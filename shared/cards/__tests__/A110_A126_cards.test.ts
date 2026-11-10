@@ -2,6 +2,7 @@ import { installOfficialCardRegistry } from './card-environment'
 
 installOfficialCardRegistry()
 
+import { commitFarmOperation } from '../../domain/farm-operations'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
@@ -59,7 +60,7 @@ const findListener = (id: string) =>
 // ─── A110_Roughcaster ───────────────────────────────────────────────
 
 describe('A110_Roughcaster', () => {
-  it('gains 3 food after construct with clay house', () => {
+  it('gains 3 food for a committed clay room', () => {
     const listener = findListener('A110-roughcaster-after-construct')
     expect(listener).toBeDefined()
     const player = createPlayer()
@@ -68,6 +69,7 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
+      result: { type: 'ok', farmOperations: [commitFarmOperation(player, { kind: 'rooms', positions: [{ row: 0, col: 2 }] })] },
     } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
@@ -76,7 +78,7 @@ describe('A110_Roughcaster', () => {
     }
   })
 
-  it('does not trigger construct with wood house', () => {
+  it('does not trigger for a committed wood room', () => {
     const listener = findListener('A110-roughcaster-after-construct')!
     const player = createPlayer()
     player.occupationPlayed = ['A110_Roughcaster']
@@ -84,11 +86,12 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
+      result: { type: 'ok', farmOperations: [commitFarmOperation(player, { kind: 'rooms', positions: [{ row: 0, col: 2 }] })] },
     } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 
-  it('does not trigger construct with stone house', () => {
+  it('does not trigger for a committed stone room', () => {
     const listener = findListener('A110-roughcaster-after-construct')!
     const player = createPlayer()
     player.occupationPlayed = ['A110_Roughcaster']
@@ -96,6 +99,7 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
+      result: { type: 'ok', farmOperations: [commitFarmOperation(player, { kind: 'rooms', positions: [{ row: 0, col: 2 }] })] },
     } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })

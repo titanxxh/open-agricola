@@ -8,24 +8,8 @@ import { getActionNewlyEnclosedPastureTiles, hasFenceBuiltEvent } from '../helpe
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B124_Trimmer'
-/**
- * B124 Trimmer:
- * In each work phase, after you enclose at least one farmyard space, you get 2 stone.
- * (Subdividing an existing pasture does not count.)
- *
- * Rule:
- * - onBuy: record current fencing area (pasture-covered zones).
- *          If during work phase, also unflag.
- * - startOfWork: unflag
- * - returnHome: flag (prevent triggering outside work phase)
- * - afterFencing: check if covered zones increased → 2 stone. Update stored area.
- *
- * Implementation:
- * - We track pasture-covered tile count in extraData.
- * - onWorkStart: unflag (start of work phase)
- * - onReturnHome: flag (prevent triggering)
- * - afterFencing: if total pasture tile count increased → 2 stone. Update count.
- */
+/** Newly enclosed area belongs to the completed host, while the work-phase
+ * limit and its reset remain on the card owner. */
 
 const countPastureTiles = (player: CardListenerContext['player']): number =>
   player.pastures.reduce((sum, p) => sum + (p.tiles?.length ?? 0), 0)
