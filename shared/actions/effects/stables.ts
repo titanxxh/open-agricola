@@ -22,6 +22,7 @@ import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { PaymentSolver, describePaymentEffectPreview } from '../payment'
 import type { PaymentCtx } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
+import { resolveBuildPlayers } from '../helpers/build-players'
 import { playerBoard } from '../../domain'
 import {
   collectLockedFarmTileKeys,
@@ -140,11 +141,13 @@ const validateStablePlacement = (
   ctx: ActionMutationContext,
   stables: FarmTilePosition[],
 ): ActionExecutionResult | undefined => {
-  const lockedKeys = collectLockedFarmTileKeys(ctx.player)
-  const idx = ctx.state.players.indexOf(ctx.player)
+  const roles = resolveBuildPlayers(ctx)
+  if (!roles) return { type: 'fail', errorKey: 'log.buildStableFail' }
+  const lockedKeys = collectLockedFarmTileKeys(roles.farmOwner)
+  const idx = ctx.state.players.indexOf(roles.farmOwner)
   const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
   if (!validated.ok) return { type: 'fail', errorKey: validated.code ?? 'log.buildStableFail' }
-  if (!isWithinStableZoneFilter(ctx.player, stables, ctx.actionContext)) {
+  if (!isWithinStableZoneFilter(roles.farmOwner, stables, ctx.actionContext)) {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
   return undefined
@@ -217,11 +220,14 @@ const buildStableFarmSelection = (
 ) => {
   const { state, player } = context
   const actionContext = readStableActionContext(context)
+  const roles = resolveBuildPlayers({ state, player, actionContext })
+  if (!roles) return undefined
+  const { farmOwner } = roles
   const zoneFilter = actionContext?.zoneFilter
   const max = actionContext?.max
-  const reserve = getAvailableStableSupplyCount(state, player, readFutureStableId(actionContext))
+  const reserve = getAvailableStableSupplyCount(state, farmOwner, readFutureStableId(actionContext))
   const selectionMax = typeof max === 'number' ? Math.min(max, reserve) : reserve
-  const idx = state.players.indexOf(player)
+  const idx = state.players.indexOf(farmOwner)
   // Affordability must use the count-dependent TOTAL cost, which the farmyard's
   // per-unit `costOverride` scan cannot express when a discount is non-uniform
   // (e.g. C88 only cheapens the 3rd/4th card-facing stable). Probe each build
@@ -248,20 +254,23 @@ const buildStableFarmSelection = (
   // (its scan bound is `selectionMax`); geometry bounds it via selectable tiles.
   farm.maxSelections = Math.min(farm.selectableTiles.length, affordableMax)
   const farmHandPositions = isSpecialStableEntry(actionContext)
-    ? collectSpecialStablePositions(state, player).map((c) => c.position)
+    ? collectSpecialStablePositions(state, farmOwner).map((c) => c.position)
     : []
   return farmHandPositions.length > 0 ? { ...farm, farmHandPositions } : farm
 }
 
-const isStableStructurallyPossible = (context: ActionAvailabilityContext) =>
-  getAvailableStableSupplyCount(context.state, context.player, readFutureStableId(readStableActionContext(context))) > 0
+const isStableStructurallyPossible = (context: ActionAvailabilityContext) => {
+  const roles = resolveBuildPlayers({ ...context, actionContext: readStableActionContext(context) })
+  return roles !== undefined && getAvailableStableSupplyCount(context.state, roles.farmOwner,
+    readFutureStableId(readStableActionContext(context))) > 0
+}
 
 const canExecuteStableCostPreview = (
   context: ActionAvailabilityContext,
 ) => {
   if (!isStableStructurallyPossible(context)) return false
   const farm = buildStableFarmSelection(context)
-  if (farm.farmType !== 'stable') return false
+  if (!farm || farm.farmType !== 'stable') return false
   if (farm.maxSelections > 0) return true
   return (farm.farmHandPositions?.length ?? 0) > 0
 }
@@ -294,8 +303,11 @@ const finalizeStables = (
   paymentChoice: string | undefined,
   farmHand: FarmTilePosition | undefined,
 ): ActionExecutionResult => {
+  const roles = resolveBuildPlayers(ctx)
+  if (!roles) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
+  const { builder, farmOwner } = roles
   const totalUnits = stables.length + (farmHand ? 1 : 0)
-  if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player, readFutureStableId(ctx.actionContext))) {
+  if (totalUnits > getAvailableStableSupplyCount(ctx.state, farmOwner, readFutureStableId(ctx.actionContext))) {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
   const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
@@ -306,7 +318,7 @@ const finalizeStables = (
   )
   if (!costResolution) return { type: 'fail', errorKey: 'log.buildStableFail' }
   const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
-    ctx.player,
+    builder,
     costResolution.paymentCost,
     'pay:stable',
     paymentChoice,
@@ -317,35 +329,35 @@ const finalizeStables = (
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
-  const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
+  const nextPlayer = JSON.parse(JSON.stringify(farmOwner)) as PlayerState
   let specialSourceCardId: string | undefined
   if (farmHand) {
     const applied = applySpecialStableAt(ctx.state, nextPlayer, farmHand)
     if (!applied) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     specialSourceCardId = applied.sourceCardId
   }
-  const farmOperation = commitFarmOperation(ctx.player, { kind: 'stables', positions: stables, standingSpecialStableCount: getStandingSpecialStableCount(ctx.player), specialStables: farmHand && specialSourceCardId ? [{ ...farmHand, sourceCardId: specialSourceCardId }] : [], preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
-  const futureStable = findMatureFutureStableEntry(ctx.state, ctx.player, readFutureStableId(ctx.actionContext))
+  const farmOperation = commitFarmOperation(farmOwner, { kind: 'stables', positions: stables, standingSpecialStableCount: getStandingSpecialStableCount(farmOwner), specialStables: farmHand && specialSourceCardId ? [{ ...farmHand, sourceCardId: specialSourceCardId }] : [], preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
+  const futureStable = findMatureFutureStableEntry(ctx.state, farmOwner, readFutureStableId(ctx.actionContext))
   if (futureStable) futureStable.resources.stable = Math.max(0, (futureStable.resources.stable ?? 0) - totalUnits)
   recordActionCostAttribution(
-    ctx.player,
+    builder,
     costResolution.farmCostAttribution,
     costResolution.baseCost,
     costResolution.finalCost,
   )
   if (ctx.sourceCard) {
-    addCardResourceGained(ctx.player, ctx.sourceCard, { stable: stables.length })
+    addCardResourceGained(builder, ctx.sourceCard, { stable: stables.length })
   }
   const resourcesPaid = sanitizePayableCost(payment.solution.resourcesPaid)
   const stableItems: FarmStableBuiltEvent['stables'] = stables.map((stable) => ({
-    playerId: ctx.player.id,
+    playerId: farmOwner.id,
     row: stable.row,
     col: stable.col,
     kind: 'normal',
   }))
   if (farmHand && specialSourceCardId) {
     stableItems.push({
-      playerId: ctx.player.id,
+      playerId: farmOwner.id,
       row: farmHand.row,
       col: farmHand.col,
       kind: 'special',
@@ -355,6 +367,8 @@ const finalizeStables = (
   const seasonalGrant = readSeasonalGrant(ctx.actionContext?.seasonalGrant)
   ctx.eventSink?.emit<'farm.stableBuilt'>({
     type: 'farm.stableBuilt',
+    actorPlayerId: builder.id,
+    targetPlayerId: farmOwner.id,
     newlyUsedTiles: farmOperation.newlyUsedTiles,
     sourceActionId: ctx.space.id,
     stables: stableItems,
@@ -397,7 +411,7 @@ export const stablesAction: ActionDefinition = {
     if (previewMode === 'base') return { kind: 'unitCost', unit: 'stable' as const, actionNameKey: 'actions.stables.name', resourcesPaid: stablesCostPreview.getBaseCost({ actionHooks: context.actionHooks, state, player, params: { actionContext } }) }
 
     const selection = buildStableFarmSelection(context)
-    if (selection.farmType !== 'stable') return undefined
+    if (!selection || selection.farmType !== 'stable') return undefined
     return { kind: 'actionCosts', actionNameKey: 'actions.stables.name',
       options: Array.from({ length: selection.maxSelections }, (_, index) => {
         const resolution = resolveStableTotalCostWithDiscount(context, index + 1)
@@ -408,6 +422,7 @@ export const stablesAction: ActionDefinition = {
   },
   execute: (context): ActionExecutionResult => {
     const farm = buildStableFarmSelection(context)
+    if (!farm) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     return {
       type: 'request',
       request: {
@@ -421,6 +436,8 @@ export const stablesAction: ActionDefinition = {
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
+    const roles = resolveBuildPlayers(ctx)
+    if (!roles) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     if (choice === 'cancel') {
       return {
         type: 'fail',
@@ -453,12 +470,12 @@ export const stablesAction: ActionDefinition = {
       if (totalUnits === 0) {
         return { type: 'fail', errorKey: 'NO_SELECTION', recoverable: true }
       }
-      if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player, readFutureStableId(ctx.actionContext))) {
+      if (totalUnits > getAvailableStableSupplyCount(ctx.state, roles.farmOwner, readFutureStableId(ctx.actionContext))) {
         return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
       }
       const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
       if (placementError?.type === 'fail') return { ...placementError, recoverable: true }
-      if (farmHand && !collectSpecialStablePositions(ctx.state, ctx.player).some(({ position }) =>
+      if (farmHand && !collectSpecialStablePositions(ctx.state, roles.farmOwner).some(({ position }) =>
         position.row === farmHand.row && position.col === farmHand.col,
       )) {
         return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
