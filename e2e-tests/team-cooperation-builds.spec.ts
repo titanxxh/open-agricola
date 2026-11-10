@@ -54,6 +54,7 @@ for (const variant of [
       await page.reload()
       await expect(target).toBeVisible()
       await target.click()
+      await page.screenshot({ path: testInfo.outputPath('partner-stable-target.png'), fullPage: false })
       const submitted = page.waitForResponse(response => response.url().endsWith('/api/game/commit-selection'))
       await page.locator('.interaction-bar').getByRole('button', { name: variant.confirm, exact: true }).click()
       const result: SessionResponse = await (await submitted).json()
