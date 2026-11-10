@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import { LobbyPage } from '../LobbyPage'
@@ -179,7 +179,7 @@ describe('LobbyPage my active games', () => {
     expect(document.querySelector('.my-game__player[data-current="true"]')).toHaveTextContent('Cara')
     expect(document.querySelectorAll('.my-game__player small')).toHaveLength(2)
     expect(document.querySelector('.my-game__turn')).toHaveAttribute('data-my-turn', 'true')
-    expect(document.title).toMatch(/^◢ /)
+    await waitFor(() => expect(document.title).toMatch(/^◢ /))
   })
   it('identifies games by their players, colors, start time and current player instead of UUID', async () => {
     const startedAt = Date.UTC(2026, 9, 27, 8, 30)
