@@ -284,22 +284,21 @@ describe('listener purity wave 2b/c', () => {
       schemaVersion: 1, type: 'farm.fenceBuilt', id: 'built', seq: 1, round: 4, phase: 'work', visibility: 'public',
       actorPlayerId: p.id, fences: edges.map(edge => ({ edge, type: 'fence' })), newlyUsedTiles: [], newFenceEdges: edges,
     }
-    const result = listenerById(A068_AsparagusGift_impl.listeners, 'A68-asparagus-gift-after-fencing')
-      .handler(context(p, { state: game, actionId: 'fence', phase: 'after', actionEvents: [built] }))
-
-    expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'gain',
-      sourceCard: 'A068_AsparagusGift',
-      params: { vegetable: 1 },
-    })
-    for (const events of [
-      { actionEvents: [{ ...built, actorPlayerId: 'other' }] },
-      { actionEvents: [{ ...built, targetPlayerId: 'other' }] },
+    for (const event of [built, { ...built, targetPlayerId: 'other' }]) {
+      const result = listenerById(A068_AsparagusGift_impl.listeners, 'A68-asparagus-gift-after-fencing')
+        .handler(context(p, { state: game, actionId: 'fence', phase: 'after', actionEvents: [event] }))
+      expectUnchanged(before, game)
+      expect(result?.flow).toMatchObject({
+        type: 'leaf', actionId: 'gain', sourceCard: 'A068_AsparagusGift', params: { vegetable: 1 },
+      })
+    }
+    const unrelatedContexts: Partial<CardListenerContext>[] = [
+      { actionEvents: [{ ...built, actorPlayerId: 'other', targetPlayerId: p.id }] },
+      { actionEvents: [built], result: { type: 'ok', farmOperations: [] } },
       { actionEvents: [], transactionEvents: [built] },
       { actionEvents: undefined, transactionEvents: [built] },
-    ]) {
+    ]
+    for (const events of unrelatedContexts) {
       const unrelated = listenerById(A068_AsparagusGift_impl.listeners, 'A68-asparagus-gift-after-fencing')
         .handler(context(p, { state: game, actionId: 'fence', phase: 'after', ...events }))
       expect(unrelated).toBeUndefined()
@@ -320,22 +319,23 @@ describe('listener purity wave 2b/c', () => {
       schemaVersion: 1, type: 'farm.spacesUsed', id: 'built', seq: 1, round: 1, phase: 'work', visibility: 'public',
       actorPlayerId: p.id, newlyUsedTiles: used,
     }
-    const result = listenerById(A073_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-after')
-      .handler(context(p, { state: game, actionId: 'construct', phase: 'after', actionEvents: [built] }))
-
-    expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'sow',
-      optional: true,
-      sourceCard: 'A073_AgriculturalFertilizers',
-    })
-    for (const events of [
-      { actionEvents: [{ ...built, newlyUsedTiles: used.map(tile => ({ ...tile, playerId: 'other' })) }] },
+    const partner = { ...built, targetPlayerId: 'other', newlyUsedTiles: used.map(tile => ({ ...tile, playerId: 'other' })) }
+    for (const event of [built, partner]) {
+      const result = listenerById(A073_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-after')
+        .handler(context(p, { state: game, actionId: 'construct', phase: 'after', actionEvents: [event] }))
+      expectUnchanged(before, game)
+      expect(result?.flow).toMatchObject({
+        type: 'leaf', actionId: 'sow', optional: true, sourceCard: 'A073_AgriculturalFertilizers',
+      })
+    }
+    const unrelatedContexts: Partial<CardListenerContext>[] = [
+      { actionEvents: [{ ...built, actorPlayerId: 'other', targetPlayerId: p.id }] },
+      { actionEvents: [built], result: { type: 'ok', farmOperations: [] } },
       { actionEvents: [{ ...built, newlyUsedTiles: [used[0]!] }] },
       { actionEvents: [], transactionEvents: [built] },
       { actionEvents: undefined, transactionEvents: [built] },
-    ]) {
+    ]
+    for (const events of unrelatedContexts) {
       const unrelated = listenerById(A073_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-after')
         .handler(context(p, { state: game, actionId: 'construct', phase: 'after', ...events }))
       expect(unrelated).toBeUndefined()
