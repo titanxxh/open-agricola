@@ -1,4 +1,16 @@
+.interaction-bar--marketplace {
+  max-height: min(75dvh, 620px);
+  overflow: hidden;
+}
+
+.interaction-bar--marketplace .interaction-bar__body {
+  min-height: 0;
+}
+
 .marketplace-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   width: min(100%, 700px);
   min-width: 0;
 }
@@ -6,7 +18,8 @@
 .marketplace-rows {
   display: grid;
   gap: 8px;
-  max-height: min(52vh, 560px);
+  min-height: 0;
+  max-height: min(45dvh, 440px);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -72,4 +85,10 @@
   .marketplace-row label:last-of-type {
     grid-column: 1 / -1;
   }
+}
+
+.marketplace-panel > .interaction-title,
+.marketplace-panel > .marketplace-hint,
+.marketplace-panel > .interaction-actions {
+  flex-shrink: 0;
 }
