@@ -419,6 +419,10 @@ const mapFenceBuilt = (
   const fencing = fences.filter((fence) => fence.type === 'fence').length
   const palisading = fences.filter((fence) => fence.type === 'palisade').length
   if (fencing === 0 && palisading === 0) return null
+  if (event.targetPlayerId && event.targetPlayerId !== event.actorPlayerId) return {
+    key: 'log.partnerFencesBuilt', playerId: event.actorPlayerId, playerRefs: { owner: event.targetPlayerId },
+    params: { player: playerName(ctx, event.actorPlayerId), owner: playerName(ctx, event.targetPlayerId), count: fencing + palisading },
+  }
   const bonusSources = [...new Set([
     ...(payment?.bonusSources ?? []),
     ...(payment?.sourceCardId ? [payment.sourceCardId] : []),

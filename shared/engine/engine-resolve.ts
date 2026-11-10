@@ -336,7 +336,8 @@ const buildInternalActionChildNodes = (
     )
     const host = int.tree.findNodeById(hostNodeId)
     if (host) inheritPrimaryBody(host, node)
-    if (ownerPlayerId) node.ownerPlayerId = ownerPlayerId
+    const childOwner = child.targetPlayerId ?? ownerPlayerId
+    if (childOwner) node.ownerPlayerId = childOwner
     return node
   })
 
