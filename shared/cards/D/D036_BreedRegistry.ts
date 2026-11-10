@@ -94,7 +94,8 @@ const sheepMovementDeltas = (context: CardListenerContext) => {
     if (event.to.kind !== 'player' || event.to.playerId !== owner.id) continue
     if (event.from.kind === 'card' || event.sourceCardId) {
       cardSheep += sheep
-    } else if (event.from.kind === 'actionSpace' || event.from.kind === 'supply') {
+    } else if (event.from.kind === 'actionSpace' || event.from.kind === 'supply'
+      || (event.from.kind === 'player' && event.reason === 'receive' && event.from.playerId !== owner.id)) {
       boardSheep += sheep
     }
   }

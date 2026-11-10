@@ -1,9 +1,10 @@
+import { animalKeysForState } from '../contract/animals'
 import type { GameState, PlayerState, Resource } from '../contract/types'
 import { readMarketplaceTransfers, type MarketplaceGood, type MarketplaceRequest, type MarketplaceTransfer } from '../contract/marketplace'
 
 const SUPPLY_GOODS = ['wood', 'clay', 'reed', 'stone', 'grain', 'vegetable', 'food'] as const
 export const marketplaceGoods = (state: GameState): MarketplaceGood[] => [
-  ...SUPPLY_GOODS, ...(state.enableFarmersOfTheMoor ? ['fuel' as const] : []),
+  ...SUPPLY_GOODS, ...(state.enableFarmersOfTheMoor ? ['fuel' as const] : []), ...animalKeysForState(state),
 ]
 
 export function marketplaceTeammates(state: GameState, player: PlayerState): PlayerState[] {
