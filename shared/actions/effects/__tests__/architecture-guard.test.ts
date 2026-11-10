@@ -126,6 +126,7 @@ describe('effects architecture guard', () => {
       'improvement',
       'individual-food-cost',
       'lie-animal',
+      'marketplace',
       'moor-solo-preparation',
       'moor-solo-retention',
       'moor-special-action-apply',

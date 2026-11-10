@@ -1,4 +1,4 @@
-import { canUseExperimentalFeature } from './experimental-features'
+import { unavailableTeamFeature } from './experimental-features'
 import { parseTeamConfiguration, type TeamConfiguration } from '../shared/contract/team'
 import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
@@ -297,9 +297,14 @@ const respondWith = (
 }
 
 /** Accepts both a bare GameState and the `{ state, sessionCursor }` debug snapshot. */
-const loadsTeamState = (raw: unknown): boolean => {
-  const hasTeam = (value: unknown) => !!value && typeof value === 'object' && 'team' in value && value.team != null
-  return hasTeam(raw) || (!!raw && typeof raw === 'object' && 'state' in raw && hasTeam(raw.state))
+const loadedTeamConfiguration = (raw: unknown): Pick<TeamConfiguration, 'cooperationRules'> | undefined => {
+  if (!raw || typeof raw !== 'object') return undefined
+  const state = 'state' in raw ? raw.state : raw
+  if (!state || typeof state !== 'object' || !('team' in state) || state.team == null) return undefined
+  const team = state.team
+  const cooperationRules = typeof team === 'object' && 'configuration' in team && team.configuration
+    && typeof team.configuration === 'object' && 'cooperationRules' in team.configuration && team.configuration.cooperationRules === true
+  return { cooperationRules: !!cooperationRules }
 }
 
 const handleAuthorizedGameRoute = async (
@@ -563,9 +568,9 @@ const handleAuthorizedGameRoute = async (
       await sendJson(res, 400, { ok: false, error: 'missing state' })
       return true
     }
-    if (loadsTeamState(body.state)
-      && !await canUseExperimentalFeature((await validateSession(extractToken(req.headers.authorization)))?.id, 'team-modes')) {
-      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: 'team-modes' })
+    const unavailable = await unavailableTeamFeature((await validateSession(extractToken(req.headers.authorization)))?.id, loadedTeamConfiguration(body.state))
+    if (unavailable) {
+      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
       return true
     }
     const { result } = await callAndRespond(req, 'loadState', [body.state], s => s.loadState(body.state))
@@ -658,8 +663,9 @@ const handleAuthorizedGameRoute = async (
     try { setup = parseGameSetupRequest(raw, draftOptions.value) }
     catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid team configuration' }); return true }
     const requestUserId = (await validateSession(extractToken(req.headers.authorization)))?.id
-    if (setup.teamConfig && !await canUseExperimentalFeature(requestUserId, 'team-modes')) {
-      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: 'team-modes' })
+    const unavailable = await unavailableTeamFeature(requestUserId, setup.teamConfig)
+    if (unavailable) {
+      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
       return true
     }
     const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
@@ -781,8 +787,9 @@ const handleAuthorizedGameRoute = async (
 
     // Identify the requesting user (optional — allows loading own draft cards)
     const requestUser = (await validateSession(extractToken(req.headers.authorization)))
-    if (teamConfig && !await canUseExperimentalFeature(requestUser?.id, 'team-modes')) {
-      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: 'team-modes' })
+    const unavailable = await unavailableTeamFeature(requestUser?.id, teamConfig)
+    if (unavailable) {
+      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
       return true
     }
 

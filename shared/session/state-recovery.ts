@@ -1,3 +1,4 @@
+import { createTeamActionSpaces } from '../team/action-spaces'
 import { createActionSpaces } from '../actions'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { restoreCardWorkerSpaces } from '../domain/card-worker-space'
@@ -30,6 +31,7 @@ export function restoreSessionState(raw: GameState, lookup?: ActionDefinitionLoo
   const workerSpaces = new Map(restoreCardWorkerSpaces(state.actionSpaces).map(space => [space.id, space]))
   const definitions = new Map([
     ...createActionSpaces(state.players.length),
+    ...createTeamActionSpaces(state.team?.configuration, state.players.length),
     ...(state.enableFarmersOfTheMoor ? createMoorActionSpaces(state.players.length) : []),
     ...(state.enableThroughTheSeasons ? createSeasonActionSpaces(state.players.length) : []),
     ...dynamicSpaces,

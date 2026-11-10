@@ -50,3 +50,16 @@ it('rejects loading a team state into the debug sandbox without availability', a
   const ordinary = await request('/api/game/new', { playerCount: 2 }, player!)
   expect((await request('/api/game/load', { state: ordinary.body.state }, player!)).status).toBe(200)
 })
+
+it('denies cooperation independently at both creation entry points and debug loading', async () => {
+  const owner = await createSession('http-owner')
+  const cooperation = { ...teamConfig, cooperationRules: true }
+  const denied = { status: 403, body: { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: 'team-cooperation-rules' } }
+  for (const url of ['/api/game/new', '/api/game/new-sandbox']) {
+    expect(await request(url, { playerCount: 4, teamConfig: cooperation }, owner!)).toEqual(denied)
+  }
+  const ordinary = await request('/api/game/new-sandbox', { playerCount: 4, teamConfig }, owner!)
+  const state = { ...ordinary.body.state, team: { ...ordinary.body.state.team, configuration: cooperation } }
+  expect(await request('/api/game/load', { state }, owner!)).toEqual(denied)
+  expect(await request('/api/game/load', { state: { state } }, owner!)).toEqual(denied)
+})

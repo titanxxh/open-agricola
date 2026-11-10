@@ -322,6 +322,19 @@ const mapResourceMoved = (
   event: ResourceMovedEvent,
   ctx: EventLogMapperContext,
 ): LogEntry | null => {
+  if (event.marketplaceTax !== undefined && event.from.kind === 'player' && event.to.kind === 'player') {
+    const resources = positiveResources(event.resources)
+    const good = Object.keys(resources)[0]
+    if (!good) return null
+    return {
+      key: 'log.marketplaceTransfer', playerId: event.from.playerId,
+      playerRefs: { giver: event.from.playerId, receiver: event.to.playerId },
+      params: {
+        giver: playerName(ctx, event.from.playerId), receiver: playerName(ctx, event.to.playerId),
+        goods: resources, tax: { [good]: event.marketplaceTax },
+      },
+    }
+  }
   if (event.reason === 'discard' && event.from.kind === 'player' && event.to.kind === 'supply') {
     const resources = positiveResources(event.resources)
     if (Object.keys(resources).length === 0) return null
