@@ -1,0 +1,30 @@
+# 43. Team cooperation rules follow the German appendix, with one Target Farm per build and partner builds visible to cards
+
+- Status: Accepted
+- Date: 2026-11-10
+
+## Context
+
+Issue #1597 adds the official partner game rules on top of the team seating and scoring from #1596. The English appendix and the German appendix ("Das Partnerspiel", revised edition and 15th anniversary appendix, page 9) differ. The German text makes the giver pay the Marketplace tax, lets a player who builds rooms, stables or fences build additionally on the partner's farm, and states that "Baukostenmodifikationen auf seinen ausgespielten Karten greifen dabei auch für den Partner". No card in the pool builds or plows on another player's farm, and no community or reference implementation rules on how cards react to such builds.
+
+## Decision
+
+- The German appendix is the rule authority. Team Cooperation Rules are one switch in the Team Configuration, off by default, available to Team and Multihand games, and independent of the team scoring method.
+- Two deliberate deviations: a single build happens on one farm only, so one action cannot build on the actor's farm and a partner's farm together; plowing onto a partner's farm is not supported.
+- Every build chooses one Target Farm before its first step: builds from action spaces, card-granted Build Rooms, Build Stables and Build Fences actions, and card effects that build directly. A card build whose text names "your house" or "your farm", uses components stored on the card or set aside by its owner, or leaves a lasting layout exception on the farm declares itself own-farm only. The core path keeps no list of such cards.
+- A Partner Build has three roles: the builder (the actor), the farm owner and the built objects with their material, count, position and pasture size. Build facts record these roles truthfully, and hooks still dispatch on the builder.
+- Card reactions read the build literally. "You build" matches the builder and "another player builds" matches the builder. Conditions on the built object read the object. A possessive object condition, such as "your house" or "your 2nd stable", requires the object to belong to the card owner, so it holds for neither the builder nor the farm owner. Effects and use limits belong to the card owner.
+- Building Cost modifiers of the builder apply to Partner Builds, per the German text. Their references to the farm and the built objects read the Target Farm; "if you live in" conditions read the builder. This is the only place where a possessive is not read literally.
+- A Partner Build costs the partner price (each room one more of each material, each stable 3 wood) unless a card sets the price. The fence surcharge of 1 wood per 1-3 fence pieces is always added and is never reduced. The builder pays, the farm owner's pieces are used, placement follows the Target Farm and the farm owner rearranges their animals.
+
+## Consequences
+
+- Build events and cards that use the actor's house type as the material of the room being built must read the built objects instead. Before the beta, a card audit slice reviews the build reaction cards and the card-granted builds against these categories, with at least one Session test per category.
+- Delivery order: Marketplace, Target Farm with stables, rooms, fences, card audit, then the Experimental Feature moves from `off` to `beta`.
+
+## Alternatives considered
+
+- Building on both farms in one action, as the German text allows: rejected for a single payment and placement context per build.
+- Making Partner Builds invisible to card reactions: simpler, but it hides real builds from the rules engine and contradicts the literal subject of the German text.
+- Keeping card-effect builds on the card owner's farm: rejected because a card-granted build is a build like any other; only the card's own text binds it to its owner's farm.
+- Adding the partner surcharge on top of card-set prices: rejected because the German text gives partner rooms and stables as prices, which card prices replace, and only fences as an added amount.
