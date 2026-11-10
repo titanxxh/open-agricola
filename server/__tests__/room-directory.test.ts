@@ -3,6 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { QueryResultRow } from 'pg'
 import { createTestDatabase } from './_helpers/postgres'
 import { RoomDirectory, type OwnerToken } from '../game/room-directory'
+import { EXPERIMENTAL_FEATURES } from '../../shared/contract/experimental-features'
+import { serializeSessionSnapshot } from '../../shared/session/serialization'
+import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
+import { createWorkSession } from './_helpers/session-fixtures'
 let directory: RoomDirectory
 beforeEach(async () => { directory = new RoomDirectory(await createTestDatabase()) })
 afterEach(async () => { await directory.db.close() })
@@ -259,6 +263,50 @@ it('shares lobby presence across owners and excludes an earlier owner epoch', as
   expect(await directory.lobby()).toContainEqual({ id: 'one', playerCount: 2, maxPlayers: 2, status: 'waiting' })
   await directory.db.prepare("UPDATE rooms SET status='playing' WHERE id='one'").run()
   expect(await directory.lobby()).toContainEqual({ id: 'one', playerCount: 2, maxPlayers: 2, status: 'playing', canSpectate: true })
+})
+
+it.each(['plain', 'compressed'] as const)('filters cooperation eligibility before the directory limit for %s rooms', async format => {
+  const stages = { ...EXPERIMENTAL_FEATURES }
+  Object.assign(EXPERIMENTAL_FEATURES, { 'team-modes': 'general', 'team-cooperation-rules': 'beta' })
+  vi.stubEnv('NODE_ENV', 'production')
+  vi.stubEnv('ADMIN_USERS', '')
+  try {
+    await start('only', 9001)
+    for (const id of ['ordinary', 'beta']) await directory.db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,'hash',1)").run(id, id, id)
+    await directory.db.prepare('INSERT INTO beta_access(user_id,granted_by,granted_at) VALUES(?,?,1)').run('beta', 'beta')
+    const persistence = new PostgresRoomPersistence(directory.db, directory)
+    const save = async (id: string, order: number, team: false | { cooperationRules?: boolean }) => {
+      const teamConfig = team === false ? undefined : { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'private', ...team } as const
+      const maxPlayers = teamConfig ? 4 : 2
+      const session = createWorkSession({ seed: 1632, options: { playerCount: maxPlayers, ...(teamConfig ? { teamConfig } : {}) } })
+      try {
+        const snapshot = serializeSessionSnapshot(session.state, session)
+        const owner = (await directory.claim(id, 'only')).owner
+        await persistence.save(id, snapshot, {
+          owner, createdBy: null, maxPlayers, status: 'playing', players: [], customCardDbIds: [],
+          ...(teamConfig ? { teamMembers: [{ memberId: id, userId: 'beta', name: 'Beta', teamIndex: 0, seatCount: 1 }] } : {}),
+        }, { owner, expectedVersion: null })
+        if (format === 'plain') await directory.db.prepare('UPDATE rooms SET state_json=? WHERE id=?').run(JSON.stringify(snapshot), id)
+        else expect((await directory.db.prepare('SELECT state_json FROM rooms WHERE id=?').get<{ state_json: string }>(id))?.state_json).toContain('gzip-base64-v1')
+        const restored = await persistence.load(id)
+        expect(restored?.serialized?.state.team?.configuration).toEqual(teamConfig)
+        expect(restored?.serialized?.frame).toEqual(JSON.parse(JSON.stringify(snapshot.frame)))
+        await directory.db.prepare('UPDATE rooms SET created_at=? WHERE id=?').run(order, id)
+        await directory.db.transaction(async () => {
+          await directory.markActive(id, owner)
+          await directory.presence(id, owner, 1, maxPlayers)
+        })()
+      } finally { session.dispose() }
+    }
+    await save('hidden-cooperation', 1, { cooperationRules: true })
+    await save('ordinary-visible', 2, false)
+    await save('legacy-team', 3, {})
+    await save('noncooperative-team', 4, { cooperationRules: false })
+    expect((await directory.lobby(1, 'ordinary')).map(room => room.id)).toEqual(['ordinary-visible'])
+    expect((await directory.lobby(3, 'ordinary')).map(room => room.id)).toEqual(['ordinary-visible', 'legacy-team', 'noncooperative-team'])
+    expect((await directory.lobby(1, 'beta')).map(room => room.id)).toEqual(['hidden-cooperation'])
+    expect((await directory.lobby(1)).map(room => room.id)).toEqual(['ordinary-visible'])
+  } finally { Object.assign(EXPERIMENTAL_FEATURES, stages); vi.unstubAllEnvs() }
 })
 
 it('reserves a one-for-one replacement when the current owner is at capacity', async () => {
