@@ -28,7 +28,8 @@ const afterListener: CardListenerRegistration = {
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stables = getActionStableConstructions(context)
-    const totalFood = stables.reduce((food, stable) => food + (stable.ordinal === 4 ? 3 : 1), 0)
+    const ownLast = getActionStableConstructions(context, context.player.id).filter(stable => stable.ordinal === 4).length
+    const totalFood = stables.length + ownLast * 2
     if (totalFood === 0) return
     return { flow: gainLeaf(CARD_ID, { food: totalFood }), sourceCard: CARD_ID }
   },
@@ -43,6 +44,7 @@ const cardImpl = {
     from: { clay: 1 },
     to: { wood: 2 },
     scope: 'unit',
+    unitPrice: { clay: 1 },
     max: 1,
     groupId: CARD_ID,
     groupMax: 1,

@@ -12,7 +12,7 @@ const constructListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const roomCount = getRoomsBuiltThisAction(context)
+    const roomCount = getRoomsBuiltThisAction(context, context.player.id)
     if (roomCount <= 0) return
     return {
       flow: {

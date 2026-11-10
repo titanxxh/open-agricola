@@ -3,19 +3,18 @@ import type { CardListenerContext } from '../card-listeners'
 
 type ConstructionContext = Pick<CardListenerContext, 'result' | 'player' | 'triggerPlayer'>
 
-/** Only committed receipts owned by this host and its builder, never nested events. */
-const operations = (context: ConstructionContext) => {
+/** Only this host's committed receipts; farm ownership does not change its builder. */
+const operations = (context: ConstructionContext, ownerPlayerId?: string) => {
   const result = context.result
-  const builder = context.triggerPlayer ?? context.player
   return result?.type === 'ok' || result?.type === 'flow'
-    ? (result.farmOperations ?? []).filter(operation => operation.playerId === builder.id) : []
+    ? (result.farmOperations ?? []).filter(operation => ownerPlayerId === undefined || operation.playerId === ownerPlayerId) : []
 }
 
-export const getActionRoomConstructions = (context: ConstructionContext): Array<Extract<FarmOperationResult, { kind: 'rooms' }>> =>
-  operations(context).flatMap(operation => operation.kind === 'rooms' ? [operation] : [])
+export const getActionRoomConstructions = (context: ConstructionContext, ownerPlayerId?: string): Array<Extract<FarmOperationResult, { kind: 'rooms' }>> =>
+  operations(context, ownerPlayerId).flatMap(operation => operation.kind === 'rooms' ? [operation] : [])
 
-export const getRoomsBuiltThisAction = (context: ConstructionContext): number =>
-  getActionRoomConstructions(context).reduce((count, operation) => count + operation.positions.length, 0)
+export const getRoomsBuiltThisAction = (context: ConstructionContext, ownerPlayerId?: string): number =>
+  getActionRoomConstructions(context, ownerPlayerId).reduce((count, operation) => count + operation.positions.length, 0)
 
-export const getActionStableConstructions = (context: ConstructionContext) =>
-  operations(context).flatMap(operation => operation.kind === 'stables' ? operation.stables : [])
+export const getActionStableConstructions = (context: ConstructionContext, ownerPlayerId?: string) =>
+  operations(context, ownerPlayerId).flatMap(operation => operation.kind === 'stables' ? operation.stables : [])
