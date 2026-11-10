@@ -84,7 +84,7 @@ it('blocks every unsupported request to a cooperative pending without changing i
     state.players[0]!.resources.wood = 6
   } })
   let state: ReturnType<typeof serializeState>
-  try { state = fixture.withCtx(() => serializeState(fixture.state, {})) } finally { fixture.dispose() }
+  try { state = fixture.withCtx(() => serializeState(fixture.state, { actionHooks: fixture.actionHooks })) } finally { fixture.dispose() }
   expect((await request('/api/game/load', { state }, owner, capability)).status).toBe(200)
   expect((await request('/api/game/action', { playerIndex: 0, spaceId: 'marketplace' }, owner, capability)).body.interaction.request.kind).toBe('marketplace-select')
   const before = await request('/api/game/state', {}, owner, capability, 'GET')
