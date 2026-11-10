@@ -25,6 +25,7 @@ import {
 import {
   addCardCostCandidateAttribution,
   cardCostCandidateMetadataForSolution,
+  buildPaymentChoiceResult,
   discountCardCostCandidate,
   filterPaymentSolutionsByReserve,
   resolvePaymentSolutionSelection,
@@ -245,6 +246,7 @@ const clearCache = (): void => {
 const isComplexCostPublic: typeof isComplexCost = (cost) => isComplexCost(cost)
 
 export const PaymentSolver = {
+  buildPaymentChoiceResult,
   computeOptions,
   describeOptions,
   canAfford,

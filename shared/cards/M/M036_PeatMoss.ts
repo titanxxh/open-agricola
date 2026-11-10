@@ -12,7 +12,7 @@ const cardImpl = {
     appliesTo: ['construct'],
     unitPrice: { wood: 3, reed: 1 },
     from: {},
-    to: { wood: 2, reed: 1 },
+    to: {},
     scope: 'unit',
     conditions: { roomMaterialWood: 1 },
   } as TradeModifier],

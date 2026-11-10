@@ -37,8 +37,8 @@ export const D015_ClaySupports = defineMinorCard({
         // matching the reference's per-room `addCost`.
         scope: 'unit',
         unitPrice: { clay: 2, wood: 1, reed: 1 },
-        from: { wood: 1 },
-        to: { clay: 3, reed: 1 },
+        from: {},
+        to: {},
         conditions: { roomMaterialClay: 1 },
       } as TradeModifier],
 } satisfies CardImpl,

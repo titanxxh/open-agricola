@@ -66,7 +66,7 @@ type SessionResponse = {
 
 Tests: `server/__tests__/{authoritative-command-settlement,rejected-pending-input}.test.ts`.
 
-Native `ActionDefinition.projectInteractionRequest` and the card projection hook refresh pending requests from current authoritative state without executing effects. This keeps affordability current after an existing legal anytime exchange. Solo Moor preparation uses the native `onMoorSoloPreparation` continuation before round-start hooks; choice annotations and the complete engine cursor survive Session restoration. Tests: `server/__tests__/standard-solo-moor-session.test.ts`.
+Native `ActionDefinition.projectInteractionRequest` and the card projection hook refresh pending requests from current authoritative state without executing effects. Native projection receives the saved params and action space and can update the prompt alongside the request. This keeps affordability current after an existing legal anytime exchange and lets restored construction replace obsolete unpaid quotes without replaying effects. Tests: `server/__tests__/fixed-room-prices-recovery.test.ts`. Solo Moor preparation uses the native `onMoorSoloPreparation` continuation before round-start hooks; choice annotations and the complete engine cursor survive Session restoration. Tests: `server/__tests__/standard-solo-moor-session.test.ts`.
 
 ## Rotation, extra turns and supply people
 

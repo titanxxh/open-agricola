@@ -205,9 +205,6 @@ const resolveStableTotalCostWithDiscount = (
     if (finalCost[k] === 0) delete finalCost[k]
   }
   const paymentCost: ComplexCost = { unitFee: unitCost, nb: totalUnits }
-  if (partner && !PaymentSolver.readExactCost(actionContext) && !readCostOverride(actionContext)) {
-    paymentCost.unitPricePremium = { wood: 1 }
-  }
   if (Object.keys(adjustments.costs).length > 0) paymentCost.fee = adjustments.costs
   if (adjustments.trades.length > 0) paymentCost.trades = adjustments.trades
   if (adjustments.bonuses.length > 0) paymentCost.bonuses = adjustments.bonuses

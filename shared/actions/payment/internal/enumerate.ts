@@ -436,7 +436,7 @@ type TradeCombo = {
 type UnitCostOption = {
   cost: PaymentResourceMap
   tradesUsed: TradeUsage[]
-  unitPricePremiumSaved?: PaymentResourceMap
+  resourceRemovalReductions?: Record<string, PaymentResourceMap>
 }
 
 const normalizePositiveResources = (resources: PaymentResourceMap): PaymentResourceMap => {
@@ -576,6 +576,7 @@ const tradeSignature = (trade: Trade) =>
     resourceSignature(trade.minCost ?? {}),
     resourceSignature(trade.maxCost ?? {}),
     trade.replaceUpTo ? 'upTo' : 'exact',
+    trade.replaceAll ? 'all' : '',
     ...(trade.unitPrice ? ['price', resourceSignature(trade.unitPrice)] : []),
   ].join('#')
 
@@ -592,7 +593,7 @@ const tradeUsageSignature = (tradesUsed: TradeUsage[]) =>
     .join('|')
 
 const unitCostOptionSignature = (option: UnitCostOption) =>
-  `${resourceSignature(option.cost)}::${tradeUsageSignature(option.tradesUsed)}`
+  `${resourceSignature(option.cost)}::${tradeUsageSignature(option.tradesUsed)}::${JSON.stringify(option.resourceRemovalReductions ?? {})}`
 
 const mergeTradeUsage = (
   left: TradeUsage[],
@@ -705,8 +706,8 @@ const applyUnitTradeToCost = (
   const saved: PaymentResourceMap = {}
   for (const [key, amount] of toEntries) {
     const current = next[key] ?? 0
-    const removed = trade.replaceUpTo ? Math.min(current, amount) : amount
-    if (removed <= 0 || current < removed || (!trade.replaceUpTo && current < amount)) {
+    const removed = trade.replaceAll ? current : trade.replaceUpTo ? Math.min(current, amount) : amount
+    if (removed <= 0 || current < removed || (!trade.replaceUpTo && !trade.replaceAll && current < amount)) {
       return null
     }
     next[key] = current - removed
@@ -743,75 +744,79 @@ const dedupeUnitCostOptions = (options: UnitCostOption[]) => {
 const buildUnitCostOptions = (
   unitFee: PaymentResourceMap,
   unitTrades: Trade[],
-  unitPricePremium?: PaymentResourceMap,
+  cost: ComplexCost,
 ): UnitCostOption[] => {
-  // Candidate closure (ADR 0004): unit trades are optional transforms, the
-  // reachable option set is order-independent by construction. Per-trade
-  // `max` and trade-group limits live in the apply guard, which reads the
-  // usage already encoded in the option's tradesUsed.
-  const base: UnitCostOption = { cost: normalizePositiveResources(unitFee), tradesUsed: [] }
-  if (unitTrades.length === 0) return [base]
-  const transforms: CandidateTransform<UnitCostOption>[] = unitTrades.map((trade, index) => ({
+  const removeResources = (option: UnitCostOption): UnitCostOption => {
+    const resources = { ...option.cost }
+    const reductions: Record<string, PaymentResourceMap> = {}
+    for (const removal of cost.costResourceRemovals ?? []) {
+      const amount = resources[removal.resource] ?? 0
+      delete resources[removal.resource]
+      if (amount > 0) {
+        const saved = reductions[removal.sourceCard] ?? {}
+        saved[removal.resource] = (saved[removal.resource] ?? 0) + amount
+        reductions[removal.sourceCard] = saved
+      }
+    }
+    return {
+      ...option,
+      cost: resources,
+      resourceRemovalReductions: mergeBonusReductionsBySource(option.resourceRemovalReductions ?? {}, reductions),
+    }
+  }
+  const bases: UnitCostOption[] = [removeResources({ cost: normalizePositiveResources(unitFee), tradesUsed: [] })]
+  const prices = unitTrades.filter(trade => trade.unitPrice && cost.unitPriceAlternatives !== false)
+    .sort((left, right) => tradeSignature(left).localeCompare(tradeSignature(right)))
+  for (const trade of prices) {
+    if (!costBoundsSatisfied(unitFee, trade.minCost, trade.maxCost) || (trade.max ?? 1) <= 0) continue
+    const resources = mergePaymentResources(trade.unitPrice ?? {}, cost.unitPriceIncrease ?? {})
+    for (const token of ['stable', 'fence'] as const) {
+      const amount = unitFee[token] ?? 0
+      if (amount > 0) resources[token] = (resources[token] ?? 0) + amount
+    }
+    bases.push(removeResources({
+      cost: normalizePositiveResources(resources),
+      tradesUsed: [{ trade, times: 1, costAttribution: {
+        saved: collectCostReduction(unitFee, resources),
+        paid: collectCostReduction(resources, unitFee),
+      } }],
+    }))
+  }
+  const transformations = unitTrades.filter(trade => !trade.unitPrice)
+  const transforms: CandidateTransform<UnitCostOption>[] = transformations.map((trade, index) => ({
     source: `${index}#${tradeSignature(trade)}`,
     maxUses: Number.POSITIVE_INFINITY,
     apply: (option) => {
-      // Own-usage cap and group allowance are independent guards: comparing
-      // prior usage against the REMAINING group allowance would wrongly stop
-      // a max:2/groupMax:2 trade after one use.
       if (getTradeUsage(option.tradesUsed, trade) >= Math.max(0, Math.floor(trade.max ?? 1))) {
         return null
       }
       if (getRemainingTradeGroupUses(option.tradesUsed, trade) <= 0) return null
-      const premium: PaymentResourceMap = {}
-      const priceInput = { ...option.cost }
-      if (trade.unitPrice && !option.tradesUsed.some(usage => usage.trade.unitPrice)) {
-        for (const [rawKey, amount] of Object.entries(unitPricePremium ?? {})) {
-          const key = rawKey as PaymentResourceKey
-          const removed = Math.min(priceInput[key] ?? 0, amount ?? 0)
-          priceInput[key] = (priceInput[key] ?? 0) - removed
-          if (removed > 0) premium[key] = removed
-        }
-      }
-      const applied = applyUnitTradeToCost(priceInput, trade)
+      const applied = applyUnitTradeToCost(option.cost, trade)
       if (!applied) return null
-      return {
+      return removeResources({
+        ...option,
         cost: applied.cost,
         tradesUsed: incrementTradeUsage(option.tradesUsed, trade, applied.costAttribution),
-        unitPricePremiumSaved: option.unitPricePremiumSaved ?? (Object.keys(premium).length > 0 ? premium : undefined),
-      }
+      })
     },
   }))
-  return closeCandidates([base], transforms, { key: unitCostOptionSignature }).map(option => {
-    const price = option.tradesUsed.filter(usage => usage.trade.unitPrice)
-      .sort((left, right) => tradeSignature(left.trade).localeCompare(tradeSignature(right.trade)))[0]
-    if (!price || !option.unitPricePremiumSaved) return option
-    return {
-      cost: option.cost,
-      tradesUsed: option.tradesUsed.map(usage => usage !== price ? usage : {
-        ...usage,
-        costAttribution: {
-          ...usage.costAttribution,
-          saved: mergePaymentResources(usage.costAttribution?.saved ?? {}, option.unitPricePremiumSaved ?? {}),
-        },
-      }),
-    }
-  })
+  return closeCandidates(bases, transforms, { key: unitCostOptionSignature })
 }
 
 const buildUnitTotalOptions = (
   unitFee: PaymentResourceMap,
   unitTrades: Trade[],
   nb?: number,
-  unitPricePremium?: PaymentResourceMap,
+  cost: ComplexCost = {},
 ): UnitCostOption[] => {
   if (nb === undefined || nb <= 0) {
     return [{ cost: {}, tradesUsed: [] }]
   }
-  if (unitTrades.length === 0) {
+  if (unitTrades.length === 0 && !cost.costResourceRemovals?.length) {
     return [{ cost: scaleResources(unitFee, nb), tradesUsed: [] }]
   }
 
-  const unitOptions = buildUnitCostOptions(unitFee, unitTrades, unitPricePremium)
+  const unitOptions = buildUnitCostOptions(unitFee, unitTrades, cost)
   let totals: UnitCostOption[] = [{ cost: {}, tradesUsed: [] }]
 
   for (let i = 0; i < nb; i += 1) {
@@ -823,6 +828,7 @@ const buildUnitTotalOptions = (
         nextTotals.push({
           cost: normalizePositiveResources(mergePaymentResources(total.cost, unitOption.cost)),
           tradesUsed,
+          resourceRemovalReductions: mergeBonusReductionsBySource(total.resourceRemovalReductions ?? {}, unitOption.resourceRemovalReductions ?? {}),
         })
       }
     }
@@ -995,7 +1001,7 @@ export const computeAllBuyableCombinations = (
   const allTrades = effectiveCost.trades ?? []
   const actionTrades = allTrades.filter((trade) => (trade.scope ?? 'action') === 'action')
   const unitTrades = allTrades.filter((trade) => trade.scope === 'unit')
-  const unitTotals = buildUnitTotalOptions(effectiveCost.unitFee ?? {}, unitTrades, nb, effectiveCost.unitPricePremium)
+  const unitTotals = buildUnitTotalOptions(effectiveCost.unitFee ?? {}, unitTrades, nb, effectiveCost)
   const costResourceRemovals = effectiveCost.costResourceRemovals ?? []
 
   const removeCostResources = (costToFilter: PaymentResourceMap) => {
@@ -1043,7 +1049,7 @@ export const computeAllBuyableCombinations = (
         if (!isWithinTradeGroupLimits(tradesUsed)) continue
         if (!satisfiesTradeGroupMinimums(tradesUsed, allTrades)) continue
         const removalReductions = mergeBonusReductionsBySource(
-          initialRemovalReductions(feeIdx),
+          mergeBonusReductionsBySource(initialRemovalReductions(feeIdx), unitTotal.resourceRemovalReductions ?? {}),
           removedBaseFee.reductions,
         )
         type BonusPath = {

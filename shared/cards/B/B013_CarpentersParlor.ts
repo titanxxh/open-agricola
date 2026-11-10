@@ -20,7 +20,7 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (constructedRoomMaterial(context) !== 'wood') return
-    return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 2, reed: 2 })] }
+    return { trades: [constructUnitPriceTrade(CARD_ID, { wood: 2, reed: 2 })] }
   },
 }
 

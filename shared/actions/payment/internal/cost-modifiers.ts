@@ -128,11 +128,12 @@ export const applyCostModifiers = (
         ...(tradeMod.groupMin !== undefined ? { groupMin: tradeMod.groupMin } : {}),
         ...(tradeMod.groupMax !== undefined ? { groupMax: tradeMod.groupMax } : {}),
         ...(tradeMod.replaceUpTo ? { replaceUpTo: true } : {}),
+        ...(tradeMod.replaceAll ? { replaceAll: true } : {}),
         ...(tradeMod.minCost ? { minCost: tradeMod.minCost } : {}),
         ...(tradeMod.maxCost ? { maxCost: tradeMod.maxCost } : {}),
         source: tradeMod.cardId,
         sourceId: tradeMod.cardId,
-        ...(baseCost.unitPricePremium && tradeMod.unitPrice ? { unitPrice: tradeMod.unitPrice } : {}),
+        ...(tradeMod.unitPrice ? { unitPrice: tradeMod.unitPrice } : {}),
       })
     } else if (mod.type === 'bonus') {
       const bonusMod = mod as BonusModifier
@@ -195,6 +196,9 @@ export const validateComplexCost = (cost: ComplexCost): void => {
 }
 
 export const validateTradeModifier = (modifier: TradeModifier): void => {
+  if (modifier.replaceAll && modifier.scope !== 'unit') {
+    throw new Error(`TradeModifier ${modifier.cardId}: replaceAll requires scope:'unit'.`)
+  }
   if (modifier.scope === 'unit' && modifier.conditions?.minNumRooms !== undefined) {
     throw new Error(
       `TradeModifier ${modifier.cardId}: scope:'unit' MUST NOT carry conditions.minNumRooms ` +

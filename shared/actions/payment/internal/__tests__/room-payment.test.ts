@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { computeAllBuyableCombinations } from '../enumerate'
-import type { CostModifier, PaymentSolution, PlayerState, Resource } from '../../../../contract/types'
+import { createInitialState } from '../../../../session/state-bootstrap'
+import { installOfficialCardRegistry } from '../../../../cards/__tests__/card-environment'
+import type { ComplexCost, CostModifier, PaymentSolution, PlayerState, Resource, Trade } from '../../../../contract/types'
+
+installOfficialCardRegistry()
 
 const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
   const out: Partial<Resource> = {}
@@ -21,14 +25,12 @@ const makePlayer = (modifiers: CostModifier[], houseType: 'wood' | 'clay' | 'sto
   stats: {} as never,
 })
 
-describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () => {
-  // Migrated case 1: D15 multi-key trade — replicate the reference cost shape and
-  // verify the alternative is enumerated.
-  it('D15 ClaySupports multi-key unit trade produces 1-room cost variants', () => {
+describe('construct cost via unified enumerate', () => {
+  it('Clay Supports provides an independent complete room price', () => {
     const player = makePlayer([{
       type: 'trade', cardId: 'D015_ClaySupports', appliesTo: ['construct'],
       scope: 'unit',
-      from: { wood: 1 }, to: { clay: 3, reed: 1 },
+      from: {}, to: {}, unitPrice: { clay: 2, wood: 1, reed: 1 },
     }])
     const sols = computeAllBuyableCombinations(
       player,
@@ -36,7 +38,6 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
       undefined,
       'construct',
     )
-    // Expect base path AND wood-swap path
     expect(sols.length).toBeGreaterThanOrEqual(2)
     const swapped = sols.find((s) => s.tradesUsed.some((t) => t.times > 0))
     const noSwap = sols.find((s) => s.tradesUsed.every((t) => t.times === 0))
@@ -44,13 +45,11 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
     expect(noSwap && nonZeroPaid(noSwap)).toEqual({ clay: 5, reed: 2 })
   })
 
-  // Migrated case 2: max=1 implicit for unit trades — D15 with nb=1 can use
-  // the row alternative at most once.
-  it('D15 unit trade applies at most once per room by default', () => {
+  it('each room chooses the Supports base once', () => {
     const player = makePlayer([{
       type: 'trade', cardId: 'D015_ClaySupports', appliesTo: ['construct'],
       scope: 'unit',
-      from: { wood: 1 }, to: { clay: 3, reed: 1 },
+      from: {}, to: {}, unitPrice: { clay: 2, wood: 1, reed: 1 },
     }])
     const sols = computeAllBuyableCombinations(
       player,
@@ -97,7 +96,7 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
     const player = makePlayer([
       {
         type: 'trade', cardId: 'D015_ClaySupports', appliesTo: ['construct'],
-        scope: 'unit', order: 10, from: { wood: 1 }, to: { clay: 3, reed: 1 },
+        scope: 'unit', order: 10, from: {}, to: {}, unitPrice: { clay: 2, wood: 1, reed: 1 },
       },
       {
         type: 'trade', cardId: 'B145_BrushwoodCollector', appliesTo: ['construct'],
@@ -120,5 +119,57 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
       const paid = nonZeroPaid(s)
       return paid.clay === 2 && paid.wood === 2 && paid.reed === undefined
     })).toBe(true)
+  })
+})
+
+
+describe('complete unit price boundaries', () => {
+  const price: Trade = { sourceId: 'price', scope: 'unit', from: {}, to: {}, unitPrice: { wood: 2, reed: 2 } }
+  const quote = (cost: ComplexCost) => computeAllBuyableCombinations(makePlayer([], 'wood'), cost, undefined, 'construct')
+
+  it.each([false, true])('chooses one base before transformations regardless of registration order: %s', reverse => {
+    const trades: Trade[] = [
+      price,
+      { sourceId: 'other-price', scope: 'unit', from: {}, to: {}, unitPrice: { wood: 3, reed: 1 } },
+      { sourceId: 'discount', scope: 'unit', from: {}, to: { wood: 1 }, replaceUpTo: true },
+    ]
+    const solutions = quote({ unitFee: { wood: 5, reed: 2 }, nb: 1, trades: reverse ? trades.reverse() : trades })
+    expect(solutions.map(nonZeroPaid)).toEqual(expect.arrayContaining([{ wood: 1, reed: 2 }, { wood: 2, reed: 1 }]))
+    expect(solutions.some(solution => (solution.resourcesPaid.wood ?? 0) === 0)).toBe(false)
+    const selected = solutions.find(solution => solution.resourcesPaid.wood === 1)
+    expect(selected?.tradesUsed.map(use => use.trade.sourceId).sort()).toEqual(['discount', 'price'])
+    expect(selected?.tradesUsed.find(use => use.trade.sourceId === 'price')?.costAttribution).toEqual({ saved: { wood: 3 }, paid: {} })
+    expect(selected?.tradesUsed.find(use => use.trade.sourceId === 'discount')?.costAttribution).toEqual({ saved: { wood: 1 } })
+  })
+
+  it('limits a price shared across multiple units by its global group', () => {
+    const solutions = quote({ unitFee: { wood: 5, reed: 2 }, nb: 2, trades: [{ ...price, groupId: 'once', groupMax: 1 }] })
+    expect(solutions.map(nonZeroPaid)).toContainEqual({ wood: 7, reed: 4 })
+    expect(solutions.some(solution => (solution.resourcesPaid.wood ?? 0) < 7)).toBe(false)
+  })
+
+  it('keeps source-specific free construction outside ordinary alternative prices', () => {
+    const solutions = quote({ unitFee: {}, nb: 1, unitPriceAlternatives: false, trades: [price] })
+    expect(solutions.map(nonZeroPaid)).toEqual([{}])
+    expect(solutions[0]?.tradesUsed).toEqual([])
+  })
+
+  it.each(['stable', 'fence'] as const)('preserves the %s supply obligation on an alternative base', token => {
+    const state = createInitialState(1636, { playerCount: 2 })
+    const player = state.players[0]!
+    Object.assign(player.resources, { wood: 20, reed: 20 })
+    const solutions = computeAllBuyableCombinations(player, { unitFee: { wood: 5, [token]: 1 }, nb: 2, trades: [price] }, undefined, 'construct', state)
+    expect(solutions.some(solution => solution.tradesUsed.length > 0)).toBe(true)
+    expect(solutions.every(solution => solution.resourcesPaid[token] === 2)).toBe(true)
+  })
+
+  it('removes resources from the increased alternative base and attributes the actual saving', () => {
+    const player = makePlayer([{ type: 'remove-resource', cardId: 'no-reed', appliesTo: ['construct'], resources: ['reed'] }], 'wood')
+    const solutions = computeAllBuyableCombinations(player, {
+      unitFee: { wood: 6, reed: 3 }, nb: 2, unitPriceIncrease: { wood: 1, reed: 1 }, trades: [price],
+    }, undefined, 'construct')
+    const selected = solutions.find(solution => solution.resourcesPaid.wood === 6)
+    expect(selected && nonZeroPaid(selected)).toEqual({ wood: 6 })
+    expect(selected?.bonusReductions?.['no-reed']).toEqual({ reed: 6 })
   })
 })

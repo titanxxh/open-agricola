@@ -130,12 +130,14 @@ export type Trade = {
   groupMin?: number
   groupMax?: number
   replaceUpTo?: boolean
+  /** Unit-cost substitution of the entire current amount of each `to` resource. */
+  replaceAll?: boolean
   minCost?: Partial<Resource>
   maxCost?: Partial<Resource>
   source?: string
   sourceId?: string
   sideEffect?: TradeSideEffect
-  /** Complete per-unit card price; its ordinary-price delta still composes with other trades. */
+  /** Alternative complete unit price, chosen before ordinary cost transformations. */
   unitPrice?: Partial<Resource>
 }
 
@@ -193,6 +195,7 @@ export type TradeModifier = {
   groupMin?: number
   groupMax?: number
   replaceUpTo?: boolean
+  replaceAll?: boolean
   minCost?: Partial<Resource>
   maxCost?: Partial<Resource>
   /**
@@ -249,8 +252,10 @@ export type ComplexCost = {
   feeIdentities?: number[]
   unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   roomMaterial?: PlayerState['houseType']
-  /** Removed once per unit when a card supplies a complete price. */
-  unitPricePremium?: PaymentResourceMap
+  /** Added to each alternative unit price; unitFee already includes this increase. */
+  unitPriceIncrease?: PaymentResourceMap
+  /** A source-specific exact room price excludes ordinary room-price alternatives. */
+  unitPriceAlternatives?: boolean
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
@@ -1145,7 +1150,8 @@ export type ActionDefinition = {
     actionContext?: Record<string, unknown>,
     actionHooks?: ActionHookRegistry,
     sourceCard?: string,
-  ) => InteractionRequest
+    context?: Pick<ActionExecutionContext, 'params' | 'space'>,
+  ) => { request: InteractionRequest; promptKey?: PromptKey }
   /** Pure executable plan, also used for descriptions. Base mode includes all potential branches. */
   flowFactory?: (context: ActionFlowPlanningContext) => ActionFlow | undefined
   execute: (context: ActionMutationContext) => ActionExecutionResult

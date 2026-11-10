@@ -115,7 +115,11 @@ export const buildConstructCost = ({
   if (unitFee === null) return null
   const premium = payer.id !== farmOwner.id && !readExactCost(actionContext) && !readCostOverride(actionContext)
     ? { [farmOwner.houseType]: 1, reed: 1 } : undefined
-  return appendConstructCostAdjustments({ unitFee, nb, roomMaterial: farmOwner.houseType, ...(premium ? { unitPricePremium: premium } : {}) }, adjustments)
+  return appendConstructCostAdjustments({
+    unitFee, nb, roomMaterial: farmOwner.houseType,
+    ...(premium ? { unitPriceIncrease: premium } : {}),
+    ...(readExactCost(actionContext) || readCostOverride(actionContext) ? { unitPriceAlternatives: false } : {}),
+  }, adjustments)
 }
 
 const countAvailableRoomTiles = (player: PlayerState) => {

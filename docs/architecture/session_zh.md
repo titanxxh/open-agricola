@@ -68,7 +68,7 @@ type SessionResponse = {
 
 测试：`server/__tests__/{authoritative-command-settlement,rejected-pending-input}.test.ts`。
 
-原生 `ActionDefinition.projectInteractionRequest` 与卡牌投影 hook 从当前权威状态刷新 pending 请求，不执行效果，使已有合法 anytime 兑换后的支付资格保持准确。单人 Moor 准备使用原生 `onMoorSoloPreparation` 续行，先于回合开始 hook；选择注解与完整引擎游标随 Session 恢复。测试：`server/__tests__/standard-solo-moor-session.test.ts`。
+原生 `ActionDefinition.projectInteractionRequest` 与卡牌投影 hook 从当前权威状态刷新 pending 请求，不执行效果，原生投影接收保存的 params 与行动格，可随请求一起更新 prompt。这样已有合法 anytime 兑换后的支付资格保持准确，恢复的建房也可刷新失效的未支付报价而不重跑效果。测试：`server/__tests__/fixed-room-prices-recovery.test.ts`。单人 Moor 准备使用原生 `onMoorSoloPreparation` 续行，先于回合开始 hook；选择注解与完整引擎游标随 Session 恢复。测试：`server/__tests__/standard-solo-moor-session.test.ts`。
 
 ## 轮转、额外回合与供应人物
 

@@ -10,8 +10,8 @@ const options = (state: GameState, player: PlayerState): ActionChoiceOption[] =>
 export const moorSoloRetentionAction: ActionDefinition = {
   id: 'moor-solo-retention', nameKey: 'actions.pay.name', descriptionKey: 'actions.pay.description',
   roundAvailable: 1, gainPerRound: {}, skipChoiceWrap: true, canBeExecutedByPlayer: () => true,
-  projectInteractionRequest: (state, player, request) => request.kind === 'choice' && request.moorSolo?.window === 'retention'
-    ? { ...request, options: options(state, player) } : request,
+  projectInteractionRequest: (state, player, request) => ({ request: request.kind === 'choice' && request.moorSolo?.window === 'retention'
+    ? { ...request, options: options(state, player) } : request }),
   execute: ({ state, player, params }) => {
     const current = soloMoorCurrent(state)
     if (!current || current.id !== params?.cardId || current.location.kind !== 'solo-current' || !current.location.inUse) return { type: 'fail', errorKey: 'special action unavailable' }
