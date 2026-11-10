@@ -1,3 +1,4 @@
+import { applyAnimalPayment, isAnimalResourceKey } from '../../domain/animal-payment'
 import { receiveFromPlayerLeaf } from './receive'
 import type { ActionDefinition, ActionFlow } from '../../contract/types'
 import { marketplaceRequest, validateMarketplaceTransfers } from '../../team/marketplace'
@@ -16,7 +17,8 @@ export const marketplaceAction: ActionDefinition = {
     if (!validation.ok) return { type: 'fail', errorKey: validation.error, recoverable: true }
     const children: ActionFlow[] = []
     for (const { giver, receiver, resource, amount } of validation.settlements) {
-      giver.resources[resource] = (giver.resources[resource] ?? 0) - amount - 1
+      if (isAnimalResourceKey(resource)) applyAnimalPayment(giver, state, resource, amount + 1)
+      else giver.resources[resource] = (giver.resources[resource] ?? 0) - amount - 1
       eventSink?.emit<'resource.moved'>({
         type: 'resource.moved', resources: { [resource]: 1 },
         from: { kind: 'player', playerId: giver.id }, to: { kind: 'supply' }, reason: 'return',
