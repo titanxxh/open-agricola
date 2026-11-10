@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 import { createEventQuery } from '../../../events/query'
+import { animalKeysForState } from '../../../contract/animals'
 import { gainLeaf } from '../../helpers/pay-gain-node'
 
 const CARD_ID = 'OLD_I97_Slaughterhouse'
@@ -20,7 +21,7 @@ const cardImpl = {
           .some(
             (e) =>
               (e.gained.food ?? 0) > 0 &&
-              (e.paid.sheep ?? 0) + (e.paid.boar ?? 0) + (e.paid.cattle ?? 0) > 0,
+              animalKeysForState(context.state).some((animal) => (e.paid[animal] ?? 0) > 0),
           )
           ? { sourceCard: CARD_ID, flow: gainLeaf(CARD_ID, { food: 1 }) }
           : undefined,

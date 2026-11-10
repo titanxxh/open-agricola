@@ -73,6 +73,50 @@ function finishFeeding(session: GameSession, initial: SessionResponse) {
   return { response, order }
 }
 
+function moorHorseSession(cookingPlayer: 0 | 1) {
+  const session = createWorkSession({
+    seed: 42,
+    options: { enableFarmersOfTheMoor: true },
+    customCards,
+    configure(state) {
+      state.round = 4
+      state.players.forEach((player, index) => {
+        player.startPlayer = index === 0
+        Object.assign(player.resources, { food: 3, grain: 1, fuel: 2 })
+        markAllWorkersUsed(state, player)
+      })
+      state.players[0]!.minorPlayed = [CARD_ID]
+      const cook = state.players[cookingPlayer]!
+      cook.improvements = ['Major_Moor_HorseSlaughterhouse1']
+      Object.assign(cook.resources, { food: 2, horse: 1 })
+      const room = cook.roomTiles[0]!
+      cook.houseAnimals = { [`${room.row}-${room.col}`]: 'horse' }
+    },
+  })
+  sessions.push(session)
+  return session
+}
+
+function cookHorse(session: GameSession, response: SessionResponse, playerIndex: number) {
+  const request = expectFeed(response, playerIndex)
+  expect(request.remaining).toBe(2)
+  const recipe = request.exchangeCatalog?.find(
+    (entry) => entry.sourceId === 'Major_Moor_HorseSlaughterhouse1' && entry.from.horse === 1,
+  )
+  expect(recipe).toBeDefined()
+  return session.resolveChoice(playerIndex, 'confirm', {
+    selections: [{ sourceId: recipe!.sourceId, exchangeIndex: recipe!.exchangeIndex, count: 1 }],
+  })
+}
+
+function confirmHeating(session: GameSession, response: SessionResponse, playerIndex: number) {
+  expect(response.ok, response.error).toBe(true)
+  expect(response.interaction).toMatchObject({
+    stateId: 'wait', playerIndex, request: { kind: 'heating', required: 2 },
+  })
+  return session.resolveChoice(playerIndex, 'confirm', { fuelUsed: 2, selections: [] })
+}
+
 describe('classic I97 Slaughterhouse', () => {
   it.each([
     { played: false, expected: [2, 3, 0, 1] },
@@ -178,6 +222,61 @@ describe('classic I97 Slaughterhouse', () => {
         }),
       }),
     )
+  })
+
+  it('receives food from an opponent cooking a horse before its last feeding in Farmers of the Moor', () => {
+    const session = moorHorseSession(1)
+    const first = nextFeeding(session, session.performRoundEnd())
+    expect(first.state.players[0]!.resources.food).toBe(3)
+    const cooked = cookHorse(session, first, 1)
+    expect(cooked.ok, cooked.error).toBe(true)
+    expect(cooked.state.players[1]!.resources).toMatchObject({ horse: 0, food: 0, begging: 0 })
+    // The reaction settles before the opponent heats and the owner pays for feeding.
+    expect(cooked.state.players[0]!.resources).toMatchObject({ food: 4, begging: 0 })
+    expect(cooked.state.events).toContainEqual(expect.objectContaining({
+      type: 'harvest.feedConverted', playerId: session.state.players[1]!.id,
+      cost: { horse: 1 }, food: { food: 2 },
+    }))
+    const ownerHeating = confirmHeating(session, cooked, 1)
+    expect(ownerHeating.state.players[0]!.resources).toMatchObject({ food: 0, begging: 0 })
+    const finished = confirmHeating(session, ownerHeating, 0)
+    expect(finished.ok, finished.error).toBe(true)
+    expect(finished.interaction.stateId).toBe('idle')
+    expect(finished.state.round).toBe(5)
+    expect(finished.state.players.map((player) => player.resources.begging)).toEqual([0, 0])
+    expect(
+      finished.state.log
+        .filter((entry) => entry.key === 'log.harvestFeedDetail')
+        .map((entry) => entry.params?.player)
+        .toReversed(),
+    ).toEqual([session.state.players[1]!.name, session.state.players[0]!.name])
+    expect(finished.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.harvestFeedDetail',
+      params: expect.objectContaining({
+        player: session.state.players[0]!.name, resources: expect.objectContaining({ food: 4 }),
+      }),
+    }))
+    expect(
+      finished.scores?.[0]?.categories.find((category) => category.key === 'cards')?.entries,
+    ).toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 2 }))
+  })
+
+  it('does not reward the owner cooking a horse in Farmers of the Moor', () => {
+    const session = moorHorseSession(0)
+    const first = nextFeeding(session, session.performRoundEnd())
+    expectFeed(first, 1)
+    const opponentFed = session.resolveChoice(1, 'confirm', {
+      selections: [{ sourceId: '__basic__', exchangeIndex: 0, count: 1 }],
+    })
+    const ownerFeed = confirmHeating(session, opponentFed, 1)
+    const cooked = cookHorse(session, ownerFeed, 0)
+    expect(cooked.ok, cooked.error).toBe(true)
+    expect(cooked.state.players[0]!.resources).toMatchObject({ horse: 0, food: 0, begging: 0 })
+    const finished = confirmHeating(session, cooked, 0)
+    expect(finished.ok, finished.error).toBe(true)
+    expect(finished.interaction.stateId).toBe('idle')
+    expect(finished.state.round).toBe(5)
+    expect(finished.state.players.map((player) => player.resources.food)).toEqual([0, 0])
   })
 
   it.each([
