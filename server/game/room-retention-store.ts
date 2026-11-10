@@ -20,7 +20,8 @@ export class RoomRetentionStore {
 
   async update(input: RoomRetentionUpdate, actorUserId: string): Promise<RoomRetentionUpdateResult> {
     return this.db.transaction(async (): Promise<RoomRetentionUpdateResult> => {
-      const previous = parseRoomRetentionPolicy(await this.db.prepare(`${selectPolicy} FOR UPDATE OF p`).get())
+      await this.db.prepare('SELECT singleton FROM room_retention_policy WHERE singleton=TRUE FOR UPDATE').get()
+      const previous = await this.read()
       if (previous.revision !== input.expectedRevision) return { kind: 'conflict', policy: previous }
       const { now } = (await this.db.prepare('SELECT (extract(epoch FROM clock_timestamp()) * 1000)::bigint AS now').get<{ now: number }>())!
       await this.db.prepare(`UPDATE room_retention_policy SET revision=revision+1, waiting_days=?, playing_days=?,
