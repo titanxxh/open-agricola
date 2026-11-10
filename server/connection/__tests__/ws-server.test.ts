@@ -539,6 +539,68 @@ describe('room-manager ws sync', () => {
     })
   })
 
+  it('continues an undeclared old two-player client through a real action, snapshot, authenticated resume and next action', async () => {
+    const { createLocalUserForTests, createSession } = await import('../../auth')
+    const cookies: string[] = []
+    for (let index = 0; index < 2; index += 1) {
+      const user = await createLocalUserForTests(`old_${randomUUID().slice(0, 8)}`, 'password123', `Old ${index}`)
+      cookies.push(`oa_session=${await createSession(user.id)}`)
+    }
+    const open = async (cookie: string) => {
+      const received: ServerEvent[] = []
+      const socket = Object.assign(new WebSocket(baseUrl, { headers: { Cookie: cookie } }), { received })
+      vi.spyOn(socket, 'send')
+      attachCollector(socket); sockets.push(socket); await waitForOpen(socket)
+      return socket
+    }
+    const first = await open(cookies[0]!)
+    await sendCommand(first, { type: 'createRoom', maxPlayers: 2 })
+    const created = await waitForEvent(first, (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated')
+    const second = await open(cookies[1]!)
+    await sendCommand(second, { type: 'joinRoom', roomId: created.roomId })
+    const initial = await waitForEvent(first, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+    expect(initial.payload.state.team).toBeUndefined()
+    expect(initial.payload.state.players).toHaveLength(2)
+    const actorIndex = initial.payload.state.currentPlayerIndex
+    const actor = created.playerIndex === actorIndex ? first : second
+    const other = actor === first ? second : first
+    const actorCookie = actor === first ? cookies[0]! : cookies[1]!
+    const prefix = await getDb().prepare('SELECT frame_hash,payload_gzip FROM game_replay_steps WHERE room_id=? AND step_no=0').get(created.roomId)
+    expect(prefix).toMatchObject({ frame_hash: expect.stringMatching(/^[0-9a-f]{64}$/), payload_gzip: expect.any(Buffer) })
+    const mutate = async (peer: TestSocket, command: ClientCommand, requestId: string) => {
+      await sendCommand(peer, { ...command, requestId })
+      return waitForEvent(peer, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate' && event.requestId === requestId)
+    }
+    const forest = await mutate(actor, { type: 'action', spaceId: 'forest' }, 'old-forest')
+    expect(forest.payload.ok, forest.payload.error).toBe(true)
+    expect(forest.version).toBe(initial.version + 1)
+    expect(forest.payload.state.players[actorIndex]!.resources.wood).toBe(3)
+    const saved = await persistence.load(created.roomId)
+    const disconnected = new Promise<void>(resolve => actor.once('close', resolve))
+    actor.close(); await disconnected
+    const resumed = await open(actorCookie)
+    await sendCommand(resumed, { type: 'joinRoom', roomId: created.roomId, intent: 'resume' })
+    let current = await waitForEvent(resumed, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+    expect(current.version).toBe(forest.version)
+    expect(current.payload.state.players[actorIndex]!.resources.wood).toBe(3)
+    expect((await persistence.load(created.roomId))?.serialized).toEqual(saved?.serialized)
+    if (current.payload.interaction.stateId === 'wait' && current.payload.interaction.request.kind === 'confirm-next-player') {
+      current = await mutate(resumed, { type: 'choice', value: 'confirm' }, 'old-turn-confirm')
+      expect(current.payload.ok, current.payload.error).toBe(true)
+    }
+    const nextActor = current.payload.state.currentPlayerIndex === actorIndex ? resumed : other
+    const nextIndex = current.payload.state.currentPlayerIndex
+    const next = await mutate(nextActor, { type: 'action', spaceId: 'day-laborer' }, 'old-next-action')
+    expect(next.payload.ok, next.payload.error).toBe(true)
+    expect(next.version).toBe(current.version + 1)
+    expect(next.payload.state.players[nextIndex]!.resources.food).toBe(current.payload.state.players[nextIndex]!.resources.food + 2)
+    expect(await getDb().prepare('SELECT frame_hash,payload_gzip FROM game_replay_steps WHERE room_id=? AND step_no=0').get(created.roomId)).toEqual(prefix)
+    for (const peer of [first, second, resumed]) {
+      expect(peer.received.some(event => event.type === 'error' && event.code === 'client_refresh_required')).toBe(false)
+      expect(vi.mocked(peer.send).mock.calls.some(([raw]) => String(raw).includes('clientCapabilities'))).toBe(false)
+    }
+  }, 15_000)
+
   it('retains durable waiting state and sets shared expiry after the last disconnect', async () => {
     const ws = new WebSocket(baseUrl) as TestSocket
     ws.received = []
