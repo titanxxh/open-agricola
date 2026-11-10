@@ -4,6 +4,6 @@ import { emptyResources } from '../contract/state-constants'
 import { marketplaceAction } from '../actions/effects/marketplace'
 
 export const createTeamActionSpaces = (configuration: TeamConfiguration | undefined, playerCount: number): ActionSpace[] =>
-  configuration?.cooperationRules && [4, 6].includes(playerCount)
+  configuration?.cooperationRules === true && [4, 6].includes(playerCount)
     ? [{ ...marketplaceAction, resources: { ...emptyResources }, takenBy: [], blockedBy: [] }]
     : []

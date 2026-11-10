@@ -297,14 +297,16 @@ const respondWith = (
 }
 
 /** Accepts both a bare GameState and the `{ state, sessionCursor }` debug snapshot. */
-const loadedTeamConfiguration = (raw: unknown): Pick<TeamConfiguration, 'cooperationRules'> | undefined => {
+const loadedTeamConfiguration = (raw: unknown): TeamConfiguration | undefined => {
   if (!raw || typeof raw !== 'object') return undefined
   const state = 'state' in raw ? raw.state : raw
   if (!state || typeof state !== 'object' || !('team' in state) || state.team == null) return undefined
   const team = state.team
-  const cooperationRules = typeof team === 'object' && 'configuration' in team && team.configuration
-    && typeof team.configuration === 'object' && 'cooperationRules' in team.configuration && team.configuration.cooperationRules === true
-  return { cooperationRules: !!cooperationRules }
+  if (typeof team !== 'object' || !('configuration' in team)
+    || !('players' in state) || !Array.isArray(state.players)) throw new Error('Invalid team configuration')
+  const configuration = parseTeamConfiguration(team.configuration, state.players.length)
+  if (!configuration) throw new Error('Invalid team configuration')
+  return configuration
 }
 
 const handleAuthorizedGameRoute = async (
@@ -568,7 +570,10 @@ const handleAuthorizedGameRoute = async (
       await sendJson(res, 400, { ok: false, error: 'missing state' })
       return true
     }
-    const unavailable = await unavailableTeamFeature((await validateSession(extractToken(req.headers.authorization)))?.id, loadedTeamConfiguration(body.state))
+    let configuration: TeamConfiguration | undefined
+    try { configuration = loadedTeamConfiguration(body.state) }
+    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid team configuration' }); return true }
+    const unavailable = await unavailableTeamFeature((await validateSession(extractToken(req.headers.authorization)))?.id, configuration)
     if (unavailable) {
       await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
       return true
