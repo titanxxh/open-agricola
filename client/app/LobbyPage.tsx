@@ -368,7 +368,7 @@ export function LobbyPage() {
                   </button>
                 ))}
               </div>
-              {isTeamMode && <TeamSetupFields maxPlayers={selectedMaxPlayers} value={teamConfiguration} onChange={setTeamConfiguration} />}
+              {isTeamMode && <TeamSetupFields maxPlayers={selectedMaxPlayers} value={teamConfiguration} onChange={setTeamConfiguration} canUseCooperation={!!user?.experimentalFeatures?.includes('team-cooperation-rules')} />}
               {selectMode !== 'hotseat' && (
                 <fieldset className="room-access-options">
                   <legend className="player-select-label">{t('platform.roomAccessLabel')}</legend>
@@ -541,7 +541,7 @@ export function LobbyPage() {
                 </label>
               )}
               <div className="player-select-actions">
-                <button type="button" className="btn-primary" disabled={isTeamMode && (roomCreation.creating || !user?.experimentalFeatures?.includes('team-modes'))} onClick={handleCreateGame}>
+                <button type="button" className="btn-primary" disabled={isTeamMode && (roomCreation.creating || !user?.experimentalFeatures?.includes('team-modes') || (teamConfiguration.cooperationRules === true && !user?.experimentalFeatures?.includes('team-cooperation-rules')))} onClick={handleCreateGame}>
                   {t(selectMode === 'hotseat' ? 'platform.startHotseat' : 'platform.createGame')}
                 </button>
                 <button type="button" className="btn-link" onClick={() => setSelectMode(null)}>

@@ -15,13 +15,15 @@ export function TeamConfigurationSummary({ maxPlayers, value }: { maxPlayers: nu
     <span>{t(`team.seating.${value.seating}`)}</span>
     <span>{t(`team.scoring.${value.scoring}`)}</span>
     {value.mode === 'team' && <span>{t(`team.visibility.${value.teammateVisibility}`)}</span>}
+    <span>{t(value.cooperationRules ? 'team.cooperationEnabled' : 'team.cooperationDisabled')}</span>
   </div>
 }
 
-export function TeamSetupFields({ maxPlayers, value, onChange }: {
+export function TeamSetupFields({ maxPlayers, value, onChange, canUseCooperation }: {
   maxPlayers: number
   value: TeamConfiguration
   onChange: (value: TeamConfiguration) => void
+  canUseCooperation: boolean
 }) {
   const { t } = useLocale()
   const id = useId()
@@ -53,6 +55,12 @@ export function TeamSetupFields({ maxPlayers, value, onChange }: {
         if (teammateVisibility) onChange({ ...value, teammateVisibility })
       }}>{visibilityOptions.map(option => <option key={option} value={option}>{t(`team.visibility.${option}`)}</option>)}</select>
     </label>}
+    {(canUseCooperation || value.cooperationRules) && <label className="team-cooperation-setting">
+      <input type="checkbox" checked={value.cooperationRules === true}
+        onChange={event => onChange({ ...value, cooperationRules: event.target.checked })} />
+      {t('team.cooperationRules')}
+    </label>}
+    {(canUseCooperation || value.cooperationRules) && <p className="team-setup-hint">{t('team.cooperationHint')}</p>}
     <p className="team-setup-hint">{t('team.seatingHint')}</p>
   </fieldset>
 }

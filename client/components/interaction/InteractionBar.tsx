@@ -1,3 +1,4 @@
+import { MarketplacePanel } from './MarketplacePanel'
 import { renderResourceAwareText, renderEffectPreview, renderDescriptionPreview, hasPositiveResources, renderPaymentSourceCards } from './ActionDescription'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
@@ -364,6 +365,7 @@ export const InteractionBar = ({
   const choiceModel = model.choice
   const resourceQuantitySelect = model.pending.resourceQuantitySelect
   const resourceBatchExchangeSelect = model.pending.resourceBatchExchangeSelect
+  const marketplaceSelect = model.pending.marketplaceSelect
   const fencePlacementMode = model.farm.fence.placementMode
   const setFencePlacementMode = model.farm.fence.setPlacementMode
   const borrowedFenceSources = model.farm.fence.borrowedSources
@@ -485,6 +487,8 @@ export const InteractionBar = ({
                 )}
               </div>
             </>
+          ) : body.kind === 'marketplaceSelect' && marketplaceSelect ? (
+            <MarketplacePanel locale={locale} {...marketplaceSelect} />
           ) : body.kind === 'resourceBatchExchangeSelect' && resourceBatchExchangeSelect ? (
             <ResourceBatchExchangePanel
               locale={locale}

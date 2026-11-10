@@ -1,3 +1,4 @@
+import type { MarketplaceTransfer } from '../../shared/contract/marketplace'
 import { PublicOpeningProgress } from './PublicOpeningProgress'
 import { GameEndControls } from './GameEndControls'
 import { TeamWaitingRoom } from './TeamWaitingRoom'
@@ -1627,7 +1628,7 @@ export const GameContainerApi = () => {
 
   const gameEndControls = !isSpectator && wsTransport && !state.gameOver ? (
     <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert}
-      teamGame={Boolean(state.team)} canUseTeamModes={user?.experimentalFeatures?.includes('team-modes')} onExperimentalFeatureUnavailable={refreshSession} />
+      teamGame={Boolean(state.team)} canUseTeamModes={user?.experimentalFeatures?.includes('team-modes') && (!state.team?.configuration.cooperationRules || user.experimentalFeatures.includes('team-cooperation-rules'))} onExperimentalFeatureUnavailable={refreshSession} />
   ) : null
 
   const encyclopediaWindow = encyclopediaAttentionWindow({ state, interaction, playerId: selfPlayer?.id })
@@ -1892,6 +1893,17 @@ export const GameContainerApi = () => {
           },
         }
       : null
+  const interactionBarMarketplaceSelect = interactionPresentationPlan.kind === 'marketplace-select'
+    ? {
+        request: interactionPresentationPlan.request,
+        actorName: interaction.stateId === 'wait' ? playerNames[state.players[interaction.playerIndex]?.id ?? ''] ?? '' : '',
+        isConfirmDisabled: (transfers: MarketplaceTransfer[]) => !isInteractive || isInteractionSubmitDraftRejected({ value: 'confirm', marketplaceTransfers: transfers }),
+        onConfirm: (transfers: MarketplaceTransfer[]) => {
+          if (!isInteractive) return
+          runInteractionSubmitCommand(buildInteractionSubmitCommand(interaction, { value: 'confirm', marketplaceTransfers: transfers }))
+        },
+      }
+    : null
   const interactionBarResourceBatchExchangeSelect =
     interactionPresentationPlan.kind === 'resource-batch-exchange-select'
       ? {
@@ -1943,6 +1955,7 @@ export const GameContainerApi = () => {
       nextPlayerConfirmDisabled: currentConfirmRejected,
       playerSwitchConfirmDisabled: currentConfirmRejected,
       heating: heatingPending,
+      marketplaceSelect: interactionBarMarketplaceSelect,
       resourceQuantitySelect: interactionBarResourceQuantitySelect,
       resourceBatchExchangeSelect: interactionBarResourceBatchExchangeSelect,
       suppressChoiceOptions: suppressPendingChoiceOptions,
