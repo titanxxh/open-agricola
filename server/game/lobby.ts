@@ -48,7 +48,10 @@ export function createLobby(deps: {
       const allRooms = [...registry.iter()]
       const allowTeams = allRooms.some(room => room.session.state.team)
         && await (deps.experimentalFeatureAccess ?? canUseExperimentalFeature)(userId, 'team-modes')
-      const rooms = allRooms.filter(room => allowTeams || !room.session.state.team)
+      const allowCooperation = allowTeams && allRooms.some(room => room.session.state.team?.configuration.cooperationRules)
+        && await (deps.experimentalFeatureAccess ?? canUseExperimentalFeature)(userId, 'team-cooperation-rules')
+      const rooms = allRooms.filter(room => !room.session.state.team || (allowTeams
+        && (!room.session.state.team.configuration.cooperationRules || allowCooperation)))
       return summarizeRoomsForLobby(rooms, limit, undefined, userId)
     },
     async dissolveRoomById(roomId, userId, options) {

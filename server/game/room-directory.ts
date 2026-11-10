@@ -255,6 +255,7 @@ export class RoomDirectory {
   async lobby(limit = 50, userId?: string): Promise<RoomSummary[]> {
     const now = await this.now()
     const allowTeams = await canUseExperimentalFeature(userId, 'team-modes', this.db)
+    const allowCooperation = allowTeams && await canUseExperimentalFeature(userId, 'team-cooperation-rules', this.db)
     const rows = await this.db.prepare(`SELECT r.id, r.created_by, r.max_players, r.status, CASE WHEN r.team_members_json IS NOT NULL THEN r.state_json END AS team_state_json, r.invited_user_ids IS NOT NULL AS invited, o.development, COALESCE(p.occupied_count, 0) AS occupied
       FROM rooms r JOIN game_contexts c ON c.room_id=r.id AND c.lifecycle='active'
       JOIN room_ownership o ON o.room_id=r.id AND o.status='active' AND o.lease_until>?
@@ -263,15 +264,16 @@ export class RoomDirectory {
       WHERE r.hotseat=0 AND r.max_players>1 AND (?::boolean OR r.team_members_json IS NULL) AND (p.connected_count>0 OR EXISTS(SELECT 1 FROM development_room_slots s WHERE s.room_id=r.id))
         AND (r.invited_user_ids IS NULL OR r.created_by=? OR jsonb_exists(r.invited_user_ids, ?))
       ORDER BY r.created_at, r.id LIMIT ?`).all<{ id: string; created_by: string | null; max_players: number; status: string; team_state_json: string | null; occupied: number; invited: boolean; development: boolean }>(now, now, allowTeams, userId ?? null, userId ?? null, limit)
-    return rows.map(row => {
+    return rows.flatMap((row): RoomSummary[] => {
       const teamConfig = storedTeamConfiguration(row.team_state_json, row.max_players)
-      return {
+      if (teamConfig?.cooperationRules && !allowCooperation) return []
+      return [{
         ...(teamConfig ? { teamConfig } : {}),
         id: row.id, playerCount: row.occupied, maxPlayers: row.max_players,
         ...(row.created_by ? { createdBy: row.created_by } : {}), status: row.status === 'playing' ? 'playing' : 'waiting',
         ...(!row.invited && !row.development && row.status === 'playing' ? { canSpectate: true } : {}),
         ...(row.invited ? { access: 'invited' as const } : {}),
-      }
+      }]
     })
   }
 

@@ -1,4 +1,5 @@
-import { canUseExperimentalFeature } from '../experimental-features'
+import { unavailableTeamFeature } from '../experimental-features'
+import type { TeamConfiguration } from '../../shared/contract/team'
 import type { ExperimentalFeatureId } from '../../shared/contract/experimental-features'
 import { admitTeamMember, planTeamSeating, teamWaitingState } from '../game/team-room'
 import { addRoomSpectator, isRoomSpectator, removeRoomSpectator } from '../game/room-spectators'
@@ -211,9 +212,10 @@ const sendCommandError = (
   })
 }
 
-async function allowTeamCreation(ctx: ConnectionCtx, requestId: string | undefined, userId: string | undefined): Promise<boolean> {
-  if (await (ctx.experimentalFeatureAccess ?? canUseExperimentalFeature)(userId, 'team-modes')) return true
-  sendCommandError(ctx, 'Experimental feature unavailable', requestId, 'experimental_feature_unavailable', undefined, 'team-modes')
+async function allowTeamCreation(ctx: ConnectionCtx, requestId: string | undefined, userId: string | undefined, configuration: TeamConfiguration): Promise<boolean> {
+  const unavailable = await unavailableTeamFeature(userId, configuration, ctx.experimentalFeatureAccess)
+  if (!unavailable) return true
+  sendCommandError(ctx, 'Experimental feature unavailable', requestId, 'experimental_feature_unavailable', undefined, unavailable)
   return false
 }
 
@@ -654,7 +656,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   let setup: ReturnType<typeof parseGameSetupRequest>
   try { setup = parseGameSetupRequest(input, draftOptions.value) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid team configuration', msg.requestId); return }
-  if (setup.teamConfig && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId)) return
+  if (setup.teamConfig && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId, setup.teamConfig)) return
   const maxPlayers = setup.playerCount
   const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers: setup.teamConfig?.mode === 'multihand' ? maxPlayers / setup.teamConfig.seatsPerTeam : maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
@@ -1259,7 +1261,7 @@ async function handleProposeGameEnd(ctx: ConnectionCtx, msg: Extract<ClientComma
   const room = requireWritableRoom(ctx, msg.requestId)
   if (!room) return
   if (msg.intent !== 'end' && msg.intent !== 'rematch') { sendCommandError(ctx, 'Invalid end intent', msg.requestId); return }
-  if (msg.intent === 'rematch' && room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId)) return
+  if (msg.intent === 'rematch' && room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId, room.session.state.team.configuration)) return
   let proposal: GameEndProposal
   try { proposal = createGameEndProposal(room, ctx.currentPlayerIndex, msg.intent, ctx.controlledPlayerIndices) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid end proposal', msg.requestId); return }
@@ -1509,7 +1511,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   const initiator = termination
     ? room.seatOwners?.find(owner => owner.playerIndex === proposerIndex)?.userId
     : ctx.currentUserId
-  if (room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, initiator)) return
+  if (room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, initiator, room.session.state.team.configuration)) return
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
   if (!persistence.ok) {
     commandOutcome('blocked')

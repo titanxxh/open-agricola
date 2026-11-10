@@ -1,5 +1,6 @@
+import type { TeamConfiguration } from '../shared/contract/team'
 import {
-  EXPERIMENTAL_FEATURES, isExperimentalFeatureAvailable,
+  EXPERIMENTAL_FEATURES, isExperimentalFeatureAvailable, teamExperimentalFeatures,
   type ExperimentalFeatureId,
 } from '../shared/contract/experimental-features'
 import { isAdmin } from './auth'
@@ -40,4 +41,9 @@ export async function experimentalAccountState(userId: string, db?: PostgresData
     betaAccess: !!account && (account.isAdmin || account.betaAccess),
     experimentalFeatures: features.filter(feature => isAvailable(feature, account)),
   }
+}
+
+export async function unavailableTeamFeature(userId: string | undefined, configuration: Pick<TeamConfiguration, 'cooperationRules'> | undefined, access: ExperimentalFeatureAccess = canUseExperimentalFeature): Promise<ExperimentalFeatureId | undefined> {
+  for (const feature of teamExperimentalFeatures(configuration)) if (!await access(userId, feature)) return feature
+  return undefined
 }
