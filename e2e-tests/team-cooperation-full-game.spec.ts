@@ -24,7 +24,7 @@ const publicGame = (payload: GameSyncPayload) => ({
 
 async function loadInitialGame(driver: RoomDriver) {
   const fixture = cooperationFullGameFixture()
-  try { await driver.command(0, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, fixture)) }) }
+  try { await driver.command(0, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, { actionHooks: fixture.actionHooks })) }) }
   finally { fixture.dispose() }
 }
 
@@ -35,7 +35,9 @@ async function synchronized(pages: readonly Page[]) {
 }
 
 async function confirmHandoff(pages: readonly Page[], driver: RoomDriver) {
-  const interaction = (await roomSnapshot(pages[0]!)).interaction
+  const waiting = (await roomSnapshot(pages[0]!)).interaction
+  if (waiting.stateId !== 'wait') throw new Error('Expected a waiting player handoff')
+  const interaction = (await roomSnapshot(pages[waiting.playerIndex]!)).interaction
   expect(interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
   if (interaction.stateId !== 'wait' || interaction.request.kind !== 'confirm-next-player') throw new Error('Expected the next player handoff')
   await driver.command(interaction.playerIndex, { type: 'choice', value: 'confirm' })
