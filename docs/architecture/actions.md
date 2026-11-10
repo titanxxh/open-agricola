@@ -95,6 +95,8 @@ Tests: `shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,pla
 
 `select-target-farm` runs before the build's before and cost hooks. Its selected `actionContext.targetFarmPlayerId` persists through placement and payment. Farm Expansion binds its direct room and stable branches together; independently granted reaction builds start a fresh scope. `farm-select.farmOwnerPlayerId` changes the displayed farm, while `interaction.playerIndex` remains the command actor. Tests: `server/__tests__/{partner-stables,partner-rooms}-session.test.ts`, `e2e-tests/team-cooperation-builds.spec.ts`. Rule authority: [ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md).
 
+Card-local farm restrictions apply to the particular build or contributed component. Special-stable helpers receive builder and farm owner separately and read the builder's cards; `specialStableTargetFarmPolicy: 'own'` restricts that special placement. A fence supply reservation can declare `targetFarmPolicy: 'own'` without restricting ordinary fences in the same action. Palisade capability reads the builder's card definitions and their `palisadeTargetFarmPolicy`, consistently in availability, quotes, placement and browser controls. These restrictions do not share the target's card abilities. Tests: `server/__tests__/card-own-farm-builds-session.test.ts`, `client/utils/__tests__/player-palisades.test.ts`.
+
 ## Farm-type commit
 
 Each farm type closes its logic inside its own `ActionDefinition.resolveChoice` under `shared/actions/effects/`:

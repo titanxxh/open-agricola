@@ -93,6 +93,8 @@ type ActionDefinition = {
 
 ## Target Farm
 
+卡牌的农场限制只约束具体建造或贡献构件。特殊畜栏 helper 显式接收 builder 和 farm owner，读取 builder 的牌；`specialStableTargetFarmPolicy: 'own'` 限制该特殊摆放。围栏库存 reservation 可声明 `targetFarmPolicy: 'own'`，不限制同行动的普通围栏。木栅能力读取 builder 的卡定义及 `palisadeTargetFarmPolicy`，可行性、报价、摆放和浏览器控件保持一致，不能借用目标农场的牌。测试：`server/__tests__/card-own-farm-builds-session.test.ts`、`client/utils/__tests__/player-palisades.test.ts`。
+
 `ActionDefinition.farmBuild` 声明建造 scope。`flow.ts` 的纯可达性查询分别绑定候选农场，并保留建造者的 hooks 和支付资源。`helpers/target-farm.ts` 把候选限定为建造者与合法队友。卡牌用 `targetFarmPolicy: 'own'` 把具体建造步骤绑定到执行者农场，核心不维护卡牌名单。
 
 `select-target-farm` 在建造的 before 与费用 hooks 前运行。选中的 `actionContext.targetFarmPlayerId` 跨摆放和支付等待保留。Farm Expansion 的直接房间与畜栏分支共用目标，卡牌独立授予的后续建造另起 scope。`farm-select.farmOwnerPlayerId` 改变显示农场，`interaction.playerIndex` 仍是命令执行者。测试：`server/__tests__/{partner-stables,partner-rooms}-session.test.ts`、`e2e-tests/team-cooperation-builds.spec.ts`。规则依据：[ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md)。
