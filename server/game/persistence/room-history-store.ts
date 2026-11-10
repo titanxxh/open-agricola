@@ -105,13 +105,14 @@ export class RoomHistoryStore {
     } }
 
     const lastFrame = snapshot.sessionCursor.engineStackCursor?.frames.at(-1)
-    // The lobby reads only these turn fields directly with PostgreSQL JSON operators.
+    // The lobby reads only public configuration and turn fields with PostgreSQL JSON operators.
     // Recovery always uses the complete encoded body, never this query projection.
     const queryFields = {
       state: {
         phase: snapshot.state.phase,
         gameOver: snapshot.state.gameOver,
         currentPlayerIndex: snapshot.state.currentPlayerIndex,
+        ...(snapshot.state.team ? { team: { configuration: snapshot.state.team.configuration } } : {}),
       },
       sessionCursor: {
         engineStackCursor: {

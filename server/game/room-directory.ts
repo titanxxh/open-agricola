@@ -261,19 +261,20 @@ export class RoomDirectory {
       JOIN room_ownership o ON o.room_id=r.id AND o.status='active' AND o.lease_until>?
       JOIN app_instances i ON i.instance_id=o.instance_id AND i.status='ready' AND i.lease_until>?
       LEFT JOIN room_presence p ON p.room_id=r.id AND p.epoch=o.epoch
-      WHERE r.hotseat=0 AND r.max_players>1 AND (?::boolean OR r.team_members_json IS NULL) AND (p.connected_count>0 OR EXISTS(SELECT 1 FROM development_room_slots s WHERE s.room_id=r.id))
+      WHERE r.hotseat=0 AND r.max_players>1 AND (?::boolean OR r.team_members_json IS NULL)
+        AND (?::boolean OR (CASE WHEN r.state_json IS JSON OBJECT THEN r.state_json::jsonb#>'{state,team,configuration,cooperationRules}' END) IS DISTINCT FROM 'true'::jsonb)
+        AND (p.connected_count>0 OR EXISTS(SELECT 1 FROM development_room_slots s WHERE s.room_id=r.id))
         AND (r.invited_user_ids IS NULL OR r.created_by=? OR jsonb_exists(r.invited_user_ids, ?))
-      ORDER BY r.created_at, r.id LIMIT ?`).all<{ id: string; created_by: string | null; max_players: number; status: string; team_state_json: string | null; occupied: number; invited: boolean; development: boolean }>(now, now, allowTeams, userId ?? null, userId ?? null, limit)
-    return rows.flatMap((row): RoomSummary[] => {
+      ORDER BY r.created_at, r.id LIMIT ?`).all<{ id: string; created_by: string | null; max_players: number; status: string; team_state_json: string | null; occupied: number; invited: boolean; development: boolean }>(now, now, allowTeams, allowCooperation, userId ?? null, userId ?? null, limit)
+    return rows.map((row): RoomSummary => {
       const teamConfig = storedTeamConfiguration(row.team_state_json, row.max_players)
-      if (teamConfig?.cooperationRules && !allowCooperation) return []
-      return [{
+      return {
         ...(teamConfig ? { teamConfig } : {}),
         id: row.id, playerCount: row.occupied, maxPlayers: row.max_players,
         ...(row.created_by ? { createdBy: row.created_by } : {}), status: row.status === 'playing' ? 'playing' : 'waiting',
         ...(!row.invited && !row.development && row.status === 'playing' ? { canSpectate: true } : {}),
         ...(row.invited ? { access: 'invited' as const } : {}),
-      }]
+      }
     })
   }
 
