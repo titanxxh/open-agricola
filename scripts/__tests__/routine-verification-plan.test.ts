@@ -1175,6 +1175,7 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/team-cooperation-builds.spec.ts',
       'e2e-tests/team-cooperation-card-builds.spec.ts',
       'e2e-tests/team-cooperation-fences.spec.ts',
+      'e2e-tests/team-cooperation-full-game.spec.ts',
       'e2e-tests/team-cooperation-marketplace.spec.ts',
       'e2e-tests/team-scoring.spec.ts',
       'e2e-tests/team-visibility.spec.ts',
