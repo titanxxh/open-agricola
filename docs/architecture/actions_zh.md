@@ -91,6 +91,12 @@ type ActionDefinition = {
 
 测试：`shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,pop-card-stack,special-effect,farmyard-goods-claim}.test.ts`、`server/__tests__/{empty-accumulation-admission,receive-existing-goods}-session.test.ts`。
 
+## 集市
+
+`shared/team/marketplace.ts` 从已开启的 Team Configuration 派生可用供应货物与队友，并在结算前校验整组选择。Marketplace 行动格通过普通工人放置派发 `effects/marketplace.ts`，使用后保持占用。每次使用中，每种货物只有一个方向和一名队友。给出方减少所选数量加一个同种货物；使用者从队友拿取时，也由该队友付这一个。非法选择不提交任何转移。
+
+接收方的 `receive` leaf 携带 `targetPlayerId`，保留接收 hooks 和接收方的动物安排权限。动物扣除通过 `domain/animal-payment.ts` 同步给出方的 holder；接收方完成普通接收与重排后才处理下一个 receive leaf。不合并农场、账号或资源池。契约：`shared/contract/marketplace.ts`。测试：`server/__tests__/marketplace{,-animals}-session.test.ts`、`e2e-tests/team-cooperation-{marketplace,animals}.spec.ts`。
+
 ## Target Farm
 
 卡牌的农场限制只约束具体建造或贡献构件。特殊畜栏 helper 显式接收 builder 和 farm owner，读取 builder 的牌；`specialStableTargetFarmPolicy: 'own'` 限制该特殊摆放。围栏库存 reservation 可声明 `targetFarmPolicy: 'own'`，不限制同行动的普通围栏。木栅能力读取 builder 的卡定义及 `palisadeTargetFarmPolicy`，可行性、报价、摆放和浏览器控件保持一致，不能借用目标农场的牌。测试：`server/__tests__/card-own-farm-builds-session.test.ts`、`client/utils/__tests__/player-palisades.test.ts`。
