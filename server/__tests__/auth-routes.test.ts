@@ -2220,6 +2220,17 @@ describe('auth routes', () => {
     expect(res.headers['Access-Control-Allow-Methods']).toContain('PATCH')
     expect(res.headers['Access-Control-Allow-Methods']).toContain('PUT')
   })
+
+  it('allows the cooperation capability header through the real server entry preflight before game routing', async () => {
+    const res = await requestJson('OPTIONS', '/api/game/state', undefined, {
+      Origin: 'http://localhost:5173',
+      'Access-Control-Request-Method': 'GET',
+      'Access-Control-Request-Headers': 'x-open-agricola-client-capabilities',
+    })
+    expect(res.status).toBe(204)
+    expect(String(res.headers['Access-Control-Allow-Headers']).toLowerCase().split(',').map(header => header.trim())).toContain('x-open-agricola-client-capabilities')
+    expect(res.json).toEqual({})
+  })
 })
 
 describe('experimental feature discovery', () => {
