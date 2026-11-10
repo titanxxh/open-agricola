@@ -2240,7 +2240,7 @@ describe('experimental feature discovery', () => {
     await getDb().prepare('DELETE FROM beta_access WHERE user_id=?').run(ordinary.id)
     expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: [], betaAccess: false })
     vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', '')
-    expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: ['team-modes'], betaAccess: false })
+    expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: ['team-modes', 'team-cooperation-rules'], betaAccess: false })
   })
 
   it('lets only administrators find and grant Beta access to email-unverified accounts', async () => {
