@@ -341,7 +341,7 @@ const collectReferencedCardIds = (params: Record<string, unknown> | undefined): 
   return cardIds
 }
 
-const richResourceParamKeys = ['resources', 'animals', 'crops'] as const
+const richResourceParamKeys = ['resources', 'animals', 'crops', 'goods', 'tax'] as const
 const cardDisplayParamKeys = ['cardId', 'fromCardId', 'toCardId'] as const
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

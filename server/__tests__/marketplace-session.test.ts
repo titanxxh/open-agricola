@@ -113,6 +113,8 @@ describe('Marketplace goods transfers', () => {
     expect(result.ok, result.error).toBe(true)
     expect(result.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0 })
     expect(result.state.players[2]!.resources).toMatchObject({ wood: 6, food: 3 })
+    expect(result.state.players[2]!.stats.resourcesFromCards.wood ?? 0).toBe(0)
+    expect(result.state.players[0]!.stats.resourcesFromCards.wood ?? 0).toBe(0)
     expect(result.state.log.filter(entry => entry.key === 'log.marketplaceTransfer')).toHaveLength(1)
     expect(result.state.events).toContainEqual(expect.objectContaining({ type: 'resource.moved', reason: 'receive',
       from: { kind: 'player', playerId: 'p1' }, to: { kind: 'player', playerId: 'p3' }, resources: { wood: 3 } }))

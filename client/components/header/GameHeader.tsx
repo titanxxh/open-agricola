@@ -99,6 +99,9 @@ export const GameHeader = ({
           />
         )}
         {!isSetup && <span className="header-round">R{state.round}/14</span>}
+        {state.team && <span className="header-team-cooperation" data-testid="team-cooperation-rules" title={t(locale, 'team.cooperationHint')}>
+          {t(locale, state.team.configuration.cooperationRules ? 'team.cooperationEnabled' : 'team.cooperationDisabled')}
+        </span>}
         {state.enableMoorBalanceRules === true && (
           <span className="header-moor-balance" data-testid="moor-balance-rules" title={t(locale, 'platform.moorBalanceRulesHint')}>
             {t(locale, 'platform.moorBalanceRules')}

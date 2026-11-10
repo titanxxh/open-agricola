@@ -809,10 +809,11 @@ export const ActionBoard = ({
             disabled={!canTake}
           >
             <h4 className="action-header">{translateCardText(locale, space.nameKey)}</h4>
+            {space.id === 'marketplace' && <span className="team-cooperation-badge">{t(locale, 'team.cooperationBadge')}</span>}
             <div className="action-desc">
               {space.baseDescriptionPreview
               ? <ActionSpaceDescription locale={locale} preview={space.baseDescriptionPreview} />
-              : t(locale, space.nameKey)}
+              : t(locale, space.id === 'marketplace' ? space.descriptionKey : space.nameKey)}
             </div>
             <div className="action-footer" />
           </button>
