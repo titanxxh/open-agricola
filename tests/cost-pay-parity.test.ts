@@ -640,7 +640,7 @@ const actionCost = (
   const adjustments = collectActionAdjustments(scenario, state, player)
   const units = scenario.units ?? 1
   if (scenario.kind === 'construct') {
-    const cost = PaymentSolver.buildConstructCost(player, adjustments.costs, units)
+    const cost = PaymentSolver.buildConstructCost({ state, payer: player, farmOwner: player, costs: adjustments.costs, roomCount: units })
     expect(cost, scenario.name).not.toBeNull()
     return appendAdjustments(cost!, adjustments)
   }
