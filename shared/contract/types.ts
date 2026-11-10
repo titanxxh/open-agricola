@@ -256,6 +256,7 @@ export type ComplexCost = {
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   paymentBudget?: PaymentResourceMap
   minimumResourcesPaid?: PaymentResourceMap
+  protectedFee?: Partial<Resource>
   resourceReserve?: ResourceReserve
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
@@ -993,6 +994,7 @@ export type ActionChoiceOption = {
  */
 export type InternalActionChild = {
   actionId: string
+  targetPlayerId?: string
   params?: Record<string, unknown>
   sourceCard?: string
   actionContext?: ActionContext

@@ -1,17 +1,17 @@
 import { defineMinorCard } from '../card-source'
-import { isBorderEdge } from '../../domain/farm'
-import { getAllEdgeIds } from '../../domain'
+import { getFarmyardEdgeIds, isFarmyardBorderEdge } from '../../domain/farm'
+import { resolveBuildPlayers } from '../../actions/helpers/build-players'
 import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
 const CARD_ID = 'E016_BriarHedge'
-const countAvailableBorderEdges = (player: { fenceSegments?: { edge: string }[] }): number => {
+const countAvailableBorderEdges = (player: CardListenerContext['player']): number => {
   const built = new Set((player.fenceSegments ?? []).map((s) => s.edge))
   let count = 0
-  for (const edgeId of getAllEdgeIds()) {
-    if (!isBorderEdge(edgeId)) continue
+  for (const edgeId of getFarmyardEdgeIds(player)) {
+    if (!isFarmyardBorderEdge(player, edgeId)) continue
     if (built.has(edgeId)) continue
     count += 1
   }
@@ -25,14 +25,16 @@ const E16FenceListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['fence'],
   handler: (ctx: CardListenerContext): ActionHookResult | void => {
+    const farm = resolveBuildPlayers(ctx)?.farmOwner
+    if (!farm) return
     const params = ctx.params as { newFenceEdges?: string[] } | undefined
     const newFenceEdges = params?.newFenceEdges
     if (newFenceEdges === undefined) {
-      const available = countAvailableBorderEdges(ctx.player)
+      const available = countAvailableBorderEdges(farm)
       const costs = { wood: available === 0 ? 0 : -available }
       return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
     }
-    const borderCount = newFenceEdges.filter(isBorderEdge).length
+    const borderCount = newFenceEdges.filter(edge => isFarmyardBorderEdge(farm, edge)).length
     const costs = { wood: borderCount === 0 ? 0 : -borderCount }
     return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
   },

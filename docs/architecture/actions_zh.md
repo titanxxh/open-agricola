@@ -106,6 +106,7 @@ type ActionDefinition = {
 - **马厩 / 犁地**（`stables.ts`、`plow.ts`）：typed-flat 支付；马厩定价由默认价、`exactCost` 或 `costOverride` 与一次完整的农场选择查询得出单价。`plow.actionContext.allowedTiles` / `adjacencyPolicy` 只影响本次犁地。
 - **犁地结算**：`farm.fieldPlowed.payment` 保留选中的 typed-flat 实付与实际季节附加费用。`sourceActionId` 标识宿主行动格，因此完整田地事件替代宿主的后备明细日志，不另产生支付事实。无法继续执行的必做宿主，仅由当前事务中该玩家实际获得的田地满足，不依赖宿主来源名；卡牌来源继续由 `sourceCardId` 保留。测试：`server/__tests__/seasonal-plow-payment-session.test.ts`、`server/__tests__/future-meeple-action-session.test.ts`。
 - **围栏**（`fencing.ts`）：校验边、来源、连通性与区域；通过农场选择的 `computeCosts` pass 计算费用；把 trade、bonus、provider 与预算传入 `pay:fence:*`。`before` 贡献按来源写回宿主：木材折扣不增加实体，卡上围栏由玩家显式选择，只为本次新建的普通围栏消耗。
+- **队友围栏**：每 1–3 条新段（含 palisade）追加 1 木材 `protectedFee`，与基础费用一起付款。预检、报价、支付选择和提交共用完整费用与建造者的来源/费用 hooks。目标农场的动物库存不随几何准备结果被截断；占用牧场改形后，由农场主通过普通玩家切换流程重排动物。测试：`server/__tests__/partner-fences-session.test.ts`。
 - **围栏付款归属**：宿主在 `farm.fenceBuilt` 预留 `paymentId`，传给其内部 pay child。只有标识、玩家及 fencing 用途均匹配的实际 `resource.paid`，才为对应建造日志提供费用和季节调整。没有实际费用或调整的空付款不产生支付事实。
 - **播种**（`sow.ts`）：没有支付组合。`maxSelections` 计算 Logical Field，`maxSeedSelections` 限制作物槽；行动作物许可与田地 owner 的许可取交集；`isUnconditionalSow` 保留显式限制。
 

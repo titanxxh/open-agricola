@@ -1,3 +1,4 @@
+import { resolveBuildPlayers } from '../../actions/helpers/build-players'
 import { defineMinorCard } from '../card-source'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
@@ -55,11 +56,13 @@ const C16FenceListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (ctx: CardListenerContext): ActionHookResult | void => {
     if (!isC16Active(ctx.player)) return
-    const fieldEdges = fieldEdgeIds(getFarmyardFields(ctx.player).map(({ row, col }) => ({ row, col })))
+    const farm = resolveBuildPlayers(ctx)?.farmOwner
+    if (!farm) return
+    const fieldEdges = fieldEdgeIds(getFarmyardFields(farm).map(({ row, col }) => ({ row, col })))
     const params = ctx.params as { newFenceEdges?: string[] } | undefined
     const newFenceEdges = params?.newFenceEdges
     if (newFenceEdges === undefined) {
-      const built = new Set((ctx.player.fenceSegments ?? []).map((s) => s.edge))
+      const built = new Set((farm.fenceSegments ?? []).map((s) => s.edge))
       let n = 0
       for (const edge of fieldEdges) if (!built.has(edge)) n += 1
       const costs = { wood: -n }

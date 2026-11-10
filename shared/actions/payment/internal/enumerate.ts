@@ -33,7 +33,7 @@ import {
   hasValidResources,
 } from '../../helpers/trades'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
-import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
+import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { solutionCache, makeCacheKey } from './cache'
 import { canConsumePaymentResourceProviders } from './provider-backing'
 import {
@@ -1172,11 +1172,11 @@ export const computeAllBuyableCombinations = (
         }
 
         for (const { cost: effectiveCostFee, sources, choiceIndices, choiceAffectsState, bonusReductions } of bonusPaths) {
-          const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
+          const { resources: realCost, supplyTokens } = splitSupplyTokenCost(mergePaymentResources(effectiveCostFee, effectiveCost.protectedFee ?? {}))
           const providerCoverOptions = buildProviderCoverOptions(realCost, paymentResourceProviders)
           for (const providerCover of providerCoverOptions) {
             if (!canCoverCost(tradeCombo.result, providerCover.remainingCost)
-              || !canPaySupplyTokens(state, player, effectiveCostFee)) {
+              || !canPaySupplyTokens(state, player, mergePaymentResources(effectiveCostFee, effectiveCost.protectedFee ?? {}))) {
               continue
             }
             const paidCost = mergePaymentResources(
@@ -1217,6 +1217,15 @@ export const computeAllBuyableCombinations = (
 
   for (const sol of rawSolutions) {
     const resourcesPaid = subtractResources(playerResources, sol.resourcesRemaining)
+    if (effectiveCost.protectedFee) {
+      for (const resource of REAL_RESOURCE_KEYS) {
+        const protectedAmount = effectiveCost.protectedFee[resource] ?? 0
+        const covered = (sol.paymentResourceCovers ?? []).reduce((total, cover) =>
+          total + (cover.costResource === resource ? cover.costAmount : 0), 0)
+        if (protectedAmount > 0) resourcesPaid[resource] = Math.max(resourcesPaid[resource] ?? 0, protectedAmount - covered)
+      }
+      if (!canPayResources(player, resourcesPaid) || !canPaySupplyTokens(state, player, resourcesPaid)) continue
+    }
     if (
       costType
       && Object.values(resourcesPaid).some((value) => (value ?? 0) < 0)
@@ -1247,8 +1256,9 @@ export const computeAllBuyableCombinations = (
       ? playedCards.filter((cardId) => cardMatchesCostList(cardId, cost.cards!.list))
       : []
     const cardCost = cost.cards.cost ?? {}
-    const canPayCardCost = canPayResources(player, cardCost)
-      && canPaySupplyTokens(state, player, cardCost)
+    const alternativeCardCost = mergePaymentResources(cardCost, effectiveCost.protectedFee ?? {})
+    const canPayCardCost = canPayResources(player, alternativeCardCost)
+      && canPaySupplyTokens(state, player, alternativeCardCost)
 
     if (cost.cards.required) {
       const requiredCardSolutions: PaymentSolution[] = []
@@ -1272,7 +1282,7 @@ export const computeAllBuyableCombinations = (
     } else if (canPayCardCost) {
       eligibleCards.forEach((cardId) => {
         const cardSolution: PaymentSolution = {
-          resourcesPaid: cardCost,
+          resourcesPaid: alternativeCardCost,
           tradesUsed: [],
           cardUsed: cardId,
         }

@@ -24,6 +24,7 @@ import type {
 import { PaymentSolver } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { resolveBuildPlayers } from '../helpers/build-players'
+import { candidateBuildFarmPlayers, withTargetFarm } from '../helpers/target-farm'
 import { playerBoard, normalizePlayerFarm } from '../../domain'
 import { getPastureSize } from '../../domain/pasture'
 import {
@@ -362,8 +363,9 @@ const fenceValidationOptions = (
   policy: FenceActionPolicy,
   fenceSources?: Record<string, string>,
   actionContext?: Record<string, unknown>,
+  contributor: PlayerState = player,
 ): FenceValidationOptions => {
-  const selectedSupplyFences = selectedFenceSupplyCount(player, actionContext)
+  const selectedSupplyFences = selectedFenceSupplyCount(contributor, actionContext)
   const borrowedCapacity = isBorrowedFenceSourcePolicy(policy.sourcePolicy)
     ? borrowedFenceDonorCapTotal(policy.sourcePolicy)
     : undefined
@@ -408,17 +410,22 @@ export const canStartFencing = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
+  source?: { space?: ActionSpace; sourceCard?: string },
 ): boolean => {
+  if (actionContext?.targetFarmPlayerId === undefined && state.team?.configuration.cooperationRules) {
+    return candidateBuildFarmPlayers({ state, player, actionContext }).some(farmOwner =>
+      canStartFencing(actionHooks, state, player, costOverride, withTargetFarm(actionContext, farmOwner.id), source))
+  }
   const roles = resolveBuildPlayers({ state, player, actionContext })
   if (!roles) return false
-  const space = state.actionSpaces?.find((entry) => entry.id === 'fencing')
+  const space = source?.space ?? state.actionSpaces?.find((entry) => entry.id === 'fencing')
     ?? { ...fenceAction, resources: player.resources, takenBy: [] }
   const request: InteractionRequest = {
     kind: 'farm-select',
     farm: buildFenceFarmInteraction(roles.farmOwner, actionContext),
     options: [{ value: 'confirm', labelKey: 'ui.interactionFenceConfirm' }],
   }
-  return !affordableFencePlans({ actionHooks, state, player, space, actionContext }, request, costOverride).next().done
+  return !affordableFencePlans({ actionHooks, state, player, space, actionContext, sourceCard: source?.sourceCard }, request, costOverride).next().done
 }
 
 type FencePayload = {
@@ -446,6 +453,7 @@ const computeFenceCostAdjustment = (
   space: ActionSpace | undefined,
   policy: FenceActionPolicy,
   actionContext?: Record<string, unknown>,
+  sourceCard?: string,
 ): {
   baseFreeFences: number
   freeFences: number
@@ -464,6 +472,7 @@ const computeFenceCostAdjustment = (
     'fence',
     { newFenceEdges, newPalisadeEdges },
     space,
+    { actionContext, sourceCard },
   )
   const hookWood = fenceOverride.costs.wood ?? 0
   const hookFreeFences = Math.max(0, -hookWood)
@@ -517,8 +526,9 @@ const buildFencePaymentCost = (
     paymentResourceProviders?: ComplexCost['paymentResourceProviders']
   },
   policy: FenceActionPolicy,
+  protectedWood = 0,
 ): ComplexCost => {
-  const cost: ComplexCost = { fee: { wood: payableWoodCost } }
+  const cost: ComplexCost = { fee: { wood: payableWoodCost }, ...(protectedWood > 0 ? { protectedFee: { wood: protectedWood } } : {}) }
   if (adjustment.trades.length > 0) cost.trades = adjustment.trades
   if (adjustment.bonuses.length > 0) cost.bonuses = adjustment.bonuses
   if ((adjustment.paymentResourceProviders?.length ?? 0) > 0) {
@@ -528,6 +538,9 @@ const buildFencePaymentCost = (
   return cost
 }
 
+const partnerFenceSurcharge = (builder: PlayerState, farmOwner: PlayerState, fences: number, palisades: number) =>
+  builder.id === farmOwner.id ? 0 : Math.ceil((fences + palisades) / 3)
+
 const canAffordFencePayment = (
   player: PlayerState,
   paymentCost: ComplexCost,
@@ -536,7 +549,7 @@ const canAffordFencePayment = (
   PaymentSolver.canAffordTypedFlatCost(player, paymentCost, 'fencing', state)
 
 export const quoteFenceSelection = (
-  ctx: Pick<ActionExecutionContext, 'state' | 'player' | 'actionHooks' | 'actionContext'> & { space?: ActionSpace },
+  ctx: Pick<ActionExecutionContext, 'state' | 'player' | 'actionHooks' | 'actionContext' | 'sourceCard'> & { space?: ActionSpace },
   requestKey: string,
   payload: FenceSelectionPayload,
 ): FenceSelectionQuote => {
@@ -555,20 +568,28 @@ export const quoteFenceSelection = (
   const newFenceEdges = edges.filter(edge => !existing.has(edge))
   const newPalisadeEdges = palisadeEdges.filter(edge => !existing.has(edge))
   const adjustment = computeFenceCostAdjustment(requireActionHookRegistry(ctx.actionHooks),
-    ctx.state, builder === farmOwner ? player : builder, newFenceEdges, newPalisadeEdges, ctx.space, policy, ctx.actionContext)
+    ctx.state, builder === farmOwner ? player : builder, newFenceEdges, newPalisadeEdges, ctx.space, policy, ctx.actionContext, ctx.sourceCard)
   const extraWood = adjustment.extraWood
-  const woodCost = computeFenceWoodCost({
+  const baseWoodCost = computeFenceWoodCost({
     fenceCount: newFenceEdges.length, palisadeCount: newPalisadeEdges.length,
     extraWood, freeFences: adjustment.freeFences, costPolicy: policy.costPolicy,
   })
+  const surcharge = partnerFenceSurcharge(builder, farmOwner, newFenceEdges.length, newPalisadeEdges.length)
+  let woodCost = baseWoodCost + surcharge
   const validated = playerBoard(ctx.state, ctx.state.players.indexOf(farmOwner)).farmyard.canBuildFence({
     edges, palisadeEdges, extraWood, freeFences: adjustment.freeFences,
     options: fenceValidationOptions(player, playerCanBuildPalisades(player), policy,
-      payload.fenceSources, ctx.actionContext),
+      payload.fenceSources, ctx.actionContext, builder),
     lockedKeys: collectLockedFarmTileKeys(farmOwner),
   })
-  const affordable = canAffordFencePayment(validated.ok && builder === farmOwner ? validated.player : builder,
-    buildFencePaymentCost(woodCost, adjustment, policy), ctx.state)
+  const payer = validated.ok && builder === farmOwner ? validated.player : builder
+  const paymentCost = buildFencePaymentCost(baseWoodCost, adjustment, policy, surcharge)
+  const affordable = canAffordFencePayment(payer, paymentCost, ctx.state)
+  if (builder !== farmOwner && affordable) {
+    const options = PaymentSolver.computeOptions(ctx.state, ctx.state.players.indexOf(builder), paymentCost, { actionId: 'fence', costType: 'fencing' })
+    woodCost = Math.min(...options.map(option => (option.resourcesPaid.wood ?? 0) +
+      (option.paymentResourceCovers ?? []).reduce((sum, cover) => sum + (cover.costResource === 'wood' ? cover.costAmount : 0), 0)))
+  }
   return { requestKey, woodCost, affordable, valid: validated.ok && affordable,
     error: !validated.ok ? validated.error?.code ?? 'log.fencingFail' : affordable ? null : 'NOT_ENOUGH_WOOD' }
 }
@@ -618,6 +639,7 @@ const finalizeFence = (
     ctx.space,
     currentPolicy,
     ctx.actionContext,
+    ctx.sourceCard,
   )
   const idx = ctx.state.players.indexOf(farmOwner)
   const validationOptions = fenceValidationOptions(
@@ -626,6 +648,7 @@ const finalizeFence = (
     currentPolicy,
     fenceSources,
     ctx.actionContext,
+    builder,
   )
   const baseValidated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
     edges,
@@ -649,6 +672,7 @@ const finalizeFence = (
     validated.payableWoodCost,
     costAdjustment,
     currentPolicy,
+    partnerFenceSurcharge(builder, farmOwner, validated.newFenceEdges.length, validated.newPalisadeEdges.length),
   )
   const payer = builder === farmOwner ? validated.player : builder
   if (!canAffordFencePayment(payer, paymentCost, ctx.state)) {
@@ -669,11 +693,18 @@ const finalizeFence = (
   const previousPasture = getPastureTileKeys(farmOwner)
   const paymentId = crypto.randomUUID()
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
+  const ownerNeedsReorganize = builder.id !== farmOwner.id && farmOwner.pastures.some(pasture =>
+    (pasture.animalCount ?? 0) > 0 && !nextPlayer.pastures.some(next =>
+      (next.tiles?.length ?? 0) === (pasture.tiles?.length ?? 0)
+      && (pasture.tiles ?? []).every(tile => (next.tiles ?? []).some(candidate => candidate.row === tile.row && candidate.col === tile.col)),
+    ))
+  if (builder.id !== farmOwner.id) nextPlayer.resources = { ...farmOwner.resources }
+  const contributor = builder === farmOwner ? nextPlayer : builder
   const supplyUsage = isBorrowedFenceSourcePolicy(currentPolicy.sourcePolicy) ? []
-    : settleFenceContributions(nextPlayer, ctx.actionContext, validated.newFenceEdges.length,
+    : settleFenceContributions(contributor, ctx.actionContext, validated.newFenceEdges.length,
       currentPolicy.costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence).supplyUsage
   for (const usage of supplyUsage) {
-    const counters = nextPlayer.cardStates[usage.sourceCard]?.counters
+    const counters = contributor.cardStates[usage.sourceCard]?.counters
     if (counters) counters[usage.counterKey] = (counters[usage.counterKey] ?? 0) - usage.usedCount
   }
   const farmOperation = commitFarmOperation(farmOwner, { kind: 'fence', positions: validated.newPastures.flatMap(pasture => pasture.tiles ?? []), preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
@@ -738,6 +769,7 @@ const finalizeFence = (
     resourcesPaid: paidResources,
     extraData,
     internalChildren: {
+      ...(ownerNeedsReorganize ? { afterHostListeners: [{ actionId: 'reorganize', targetPlayerId: farmOwner.id }] } : {}),
       beforeHostListeners: [
         buildInternalPayChild({
           cost: paymentCost,
@@ -787,15 +819,15 @@ function* affordableFencePlans(
   const policy = borrowedPolicyWithCurrentCaps(state, player, readFenceActionPolicy(context.actionContext))
   const existing = new Set((player.fenceSegments ?? []).map((segment) => segment.edge))
   const selectable = request.farm.selectableEdges.filter((edge) => !existing.has(edge))
-  const options = fenceValidationOptions(player, playerCanBuildPalisades(player), policy, undefined, context.actionContext)
-  const capacity = Math.min(sourceOrdinaryCapacity(player, policy, selectedFenceSupplyCount(player, context.actionContext)),
+  const options = fenceValidationOptions(player, playerCanBuildPalisades(player), policy, undefined, context.actionContext, builder)
+  const capacity = Math.min(sourceOrdinaryCapacity(player, policy, selectedFenceSupplyCount(builder, context.actionContext)),
     policy.segmentBounds?.fence?.max ?? selectable.length)
   const border = playerCanBuildPalisades(player) && !isBorrowedFenceSourcePolicy(policy.sourcePolicy)
     && (!policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('palisade'))
     ? selectable.filter((edge) => isFarmyardBorderEdge(player, edge)) : []
   const maxFence = !policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('fence') ? capacity : 0
   const maxPalisade = Math.min(border.length, policy.segmentBounds?.palisade?.max ?? border.length)
-  const costContext = { actionHooks: context.actionHooks, state, player: builder, space, actionId: 'fence', phase: 'computeCosts' as const }
+  const costContext = { actionHooks: context.actionHooks, state, player: builder, space, sourceCard: context.sourceCard, actionContext: context.actionContext, actionId: 'fence', phase: 'computeCosts' as const }
   const globalCosts = requireActionHookRegistry(context.actionHooks).hasMatching(costContext)
   const costListeners = getMatchingListeners(costContext)
   const geometryCosts = globalCosts || costListeners.length > 0
@@ -808,12 +840,13 @@ function* affordableFencePlans(
       if (total < (policy.segmentBounds?.total?.min ?? 0) || total > (policy.segmentBounds?.total?.max ?? Infinity)
         || fences < (policy.segmentBounds?.fence?.min ?? 0) || palisades < (policy.segmentBounds?.palisade?.min ?? 0)) continue
       if (!geometryCosts) {
-        const free = (selectedFenceSupplyCount(player, context.actionContext) + fenceCostDiscountCount(context.actionContext)) + Math.max(0, -(costOverride?.wood ?? 0))
+        const free = (selectedFenceSupplyCount(builder, context.actionContext) + fenceCostDiscountCount(context.actionContext)) + Math.max(0, -(costOverride?.wood ?? 0))
         const extra = Math.max(0, costOverride?.wood ?? 0)
         const spring = computeSpringFreeFences(state, player, Array.from({ length: fences }, () => ''), policy, free, extra)
         const wood = Math.max(0, fences - free - spring) * (policy.costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence)
           + palisades * (policy.costPolicy?.palisade?.wood ?? defaultFenceWoodCosts.palisade) + Math.max(0, policy.costPolicy?.fixedWood ?? 0) + extra
-        if (!canAffordFencePayment(builder, { fee: { wood }, paymentBudget: policy.paymentBudget }, state)) continue
+        if (!canAffordFencePayment(builder, { fee: { wood }, paymentBudget: policy.paymentBudget,
+          protectedFee: { wood: partnerFenceSurcharge(builder, player, fences, palisades) } }, state)) continue
       }
       pairs.push([fences, palisades])
     }
@@ -826,7 +859,7 @@ function* affordableFencePlans(
   let minimalAffordable = false
   const board = boardForPlayer(state, player)
   function* submit(edges: string[], palisadeEdges: string[], fenceSources?: Record<string, string>): Generator<FencePayload> {
-    const adjustment = computeFenceCostAdjustment(requireActionHookRegistry(context.actionHooks), state, builder, edges, palisadeEdges, space, policy, context.actionContext)
+    const adjustment = computeFenceCostAdjustment(requireActionHookRegistry(context.actionHooks), state, builder, edges, palisadeEdges, space, policy, context.actionContext, context.sourceCard)
     if (costOverride) {
       adjustment.freeFences += Math.max(0, -(costOverride.wood ?? 0))
       adjustment.extraWood += Math.max(0, costOverride.wood ?? 0)
@@ -835,7 +868,7 @@ function* affordableFencePlans(
       extraWood: adjustment.extraWood, freeFences: adjustment.freeFences,
       options: { ...options, fenceSources }, lockedKeys })
     const affordable = validated.ok && canAffordFencePayment(builder === player ? validated.player : builder,
-      buildFencePaymentCost(validated.payableWoodCost, adjustment, policy), state)
+      buildFencePaymentCost(validated.payableWoodCost, adjustment, policy, partnerFenceSurcharge(builder, player, validated.newFenceEdges.length, validated.newPalisadeEdges.length)), state)
     if (!affordable) return
     minimalAffordable = true
     const payload = {
@@ -888,7 +921,7 @@ function* affordableFencePlans(
       for (const requiredPalisades of selectionSubsets(requiredBorder, 0, maxPalisade)) {
         const requiredFence = required.filter((edge) => !requiredPalisades.includes(edge))
         if (geometryCosts && monotoneCosts) {
-          const adjustment = computeFenceCostAdjustment(requireActionHookRegistry(context.actionHooks), state, builder, requiredFence, requiredPalisades, space, policy, context.actionContext)
+          const adjustment = computeFenceCostAdjustment(requireActionHookRegistry(context.actionHooks), state, builder, requiredFence, requiredPalisades, space, policy, context.actionContext, context.sourceCard)
           if (costOverride) {
             adjustment.freeFences += Math.max(0, -(costOverride.wood ?? 0))
             adjustment.extraWood += Math.max(0, costOverride.wood ?? 0)
@@ -896,7 +929,7 @@ function* affordableFencePlans(
           const wood = Math.max(0, requiredFence.length - adjustment.freeFences) * (policy.costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence)
             + requiredPalisades.length * (policy.costPolicy?.palisade?.wood ?? defaultFenceWoodCosts.palisade)
             + Math.max(0, policy.costPolicy?.fixedWood ?? 0) + adjustment.extraWood
-          if (!canAffordFencePayment(builder, buildFencePaymentCost(wood, adjustment, policy), state)) continue
+          if (!canAffordFencePayment(builder, buildFencePaymentCost(wood, adjustment, policy, partnerFenceSurcharge(builder, player, requiredFence.length, requiredPalisades.length)), state)) continue
         }
         for (const [fenceCount, palisadeCount] of pairs) {
           if (fenceCount < requiredFence.length || palisadeCount < requiredPalisades.length) continue
@@ -914,12 +947,13 @@ function* affordableFencePlans(
 
 export const fenceAction: ActionDefinition = {
   id: 'fence',
+  farmBuild: { kinds: ['fences'] },
   nameKey: 'actions.fencing.name',
   descriptionKey: 'actions.fencing.description',
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) =>
-    canStartFencing(context?.actionHooks, state, player, undefined, context?.actionContext),
+    canStartFencing(context?.actionHooks, state, player, undefined, context?.actionContext, context),
   costPreview: {
     getBaseCost: () => ({ wood: minimumFenceSegments }),
     canExecute: (ctx, costOverride) =>
@@ -928,7 +962,8 @@ export const fenceAction: ActionDefinition = {
         ctx.state,
         ctx.player,
         costOverride,
-        (ctx as { actionContext?: Record<string, unknown> }).actionContext,
+        ctx.actionContext,
+        { space: ctx.space, sourceCard: ctx.sourceCard },
       ),
   },
   previewEffect: ({ player, actionContext, previewMode }) => {
@@ -961,6 +996,7 @@ export const fenceAction: ActionDefinition = {
       type: 'request',
       request: {
         kind: 'farm-select',
+        ...(farmOwner.id !== builder.id ? { farmOwnerPlayerId: farmOwner.id } : {}),
         farm,
         options: [
           { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
@@ -1039,6 +1075,7 @@ export const fenceAction: ActionDefinition = {
         ctx.space,
         currentPolicy,
         ctx.actionContext,
+        ctx.sourceCard,
       )
       const idx = ctx.state.players.indexOf(farmOwner)
       const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
@@ -1052,6 +1089,7 @@ export const fenceAction: ActionDefinition = {
           currentPolicy,
           fenceSources,
           ctx.actionContext,
+          builder,
         ),
         lockedKeys,
       })
@@ -1061,7 +1099,7 @@ export const fenceAction: ActionDefinition = {
       const baseValidated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
         edges, palisadeEdges, freeFences: costAdjustment.baseFreeFences,
         options: fenceValidationOptions(normalized, playerCanBuildPalisades(normalized), currentPolicy,
-          fenceSources, ctx.actionContext),
+          fenceSources, ctx.actionContext, builder),
         lockedKeys,
       })
       const costSources = Object.keys(resolveActionCostAttribution(costAdjustment.costAttribution,
@@ -1071,6 +1109,7 @@ export const fenceAction: ActionDefinition = {
         validated.payableWoodCost,
         costAdjustment,
         currentPolicy,
+        partnerFenceSurcharge(builder, farmOwner, validated.newFenceEdges.length, validated.newPalisadeEdges.length),
       )
       const payer = builder === farmOwner ? validated.player : builder
       if (!canAffordFencePayment(payer, paymentCost, ctx.state)) {

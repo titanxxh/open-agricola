@@ -5018,7 +5018,7 @@ export class GameCore {
       }
       const player = this.state.players[playerIndex]!
       return quoteFenceSelection({ state: this.state, player, actionHooks: this.actionHooks,
-        space: this.getSpaceById(this.activeSpaceId) ?? undefined, actionContext: this.getActionContextFromTopFrame() },
+        space: this.getSpaceById(this.activeSpaceId) ?? undefined, sourceCard: interaction.sourceCard, actionContext: this.getActionContextFromTopFrame() },
       requestKey, payload)
     })
   }
