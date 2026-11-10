@@ -13,6 +13,7 @@ import type {
 } from '../../../contract/types'
 import { getActiveCardRegistry } from '../../../cards/active-registry'
 import { getPastureCapacity } from '../../../domain/pasture'
+import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import '../../../cards/B/B012_Stockyard'
 import '../../../cards/C/C011_WildlifeReserve'
 import '../../../cards/C/C148_MudWallower'
@@ -199,6 +200,52 @@ describe('breedAction.execute', () => {
 })
 
 describe('reorganizeAction.resolveChoice', () => {
+  it.each([
+    { before: 6, minimum: 4, kept: 3 },
+    { before: 2, minimum: 1, kept: 1 },
+  ])('keeps partial newborn settlement idempotent across repeated reorganization and later gains (minimum $minimum)', ({ before, minimum, kept }) => {
+    const ctx = makeCtx({
+      state: {
+        events: [],
+        harvestBreedSummary: { p1: { resources: { sheep: 2 }, animalTypes: 1, animalCount: 2 } },
+        harvestBreedPlacement: { p1: { minimums: { sheep: minimum }, animalCounts: { sheep: before } } },
+      },
+      player: {
+        pastures: [{ id: 'sheep', tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], animalType: 'sheep', animalCount: before - 2 }],
+      },
+    })
+    ctx.player.resources.sheep = before
+    const events: DraftGameEvent[] = []
+    const eventSink: EventSink = {
+      emit: event => { events.push(event) },
+      emitMany: additions => { events.push(...additions) },
+    }
+    const arrange = (count: number) => {
+      const result = reorganizeAction.resolveChoice!({ ...ctx, eventSink }, 'confirm', { zones: [{
+        id: 'sheep', zoneType: 'pasture', animalType: 'sheep', animalCount: count,
+      }] })
+      expect(result.type).toBe('ok')
+    }
+    arrange(kept)
+    arrange(kept)
+    expect(ctx.state.harvestBreedSummary?.p1).toEqual({ resources: { sheep: 1 }, animalTypes: 1, animalCount: 1 })
+    expect(ctx.state.harvestBreedPlacement?.p1.minimums).toEqual({ sheep: kept })
+
+    ctx.player.resources.sheep += 1
+    arrange(kept + 1)
+    expect(ctx.state.harvestBreedSummary?.p1.animalCount).toBe(1)
+    expect(ctx.state.harvestBreedPlacement?.p1.minimums).toEqual({ sheep: kept + 1 })
+    arrange(kept)
+    expect(ctx.state.harvestBreedSummary?.p1).toEqual({ resources: {}, animalTypes: 0, animalCount: 0 })
+    expect(ctx.state.harvestBreedPlacement?.p1.minimums).toEqual({})
+
+    ctx.player.resources.sheep += 1
+    arrange(kept + 1)
+    expect(ctx.state.harvestBreedSummary?.p1.animalCount).toBe(0)
+    expect(events.filter(event => event.type === 'farm.animalDiscarded').map(event => event.animals))
+      .toEqual([{ sheep: before - kept }, { sheep: 1 }])
+  })
+
   it('confirm without payload returns fail with errorKey', () => {
     const ctx = makeCtx()
     const result = reorganizeAction.resolveChoice!(ctx, 'confirm', undefined)

@@ -59,6 +59,14 @@ export type BreedableAnimalCountHandler = (
   ctx: BreedThresholdContext,
 ) => number | undefined
 
+export type BreedOffspringCountHandler = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+  currentCount: number,
+  ctx: BreedThresholdContext & { breedableCount: number },
+) => number | undefined
+
 export type AnimalScoreAdjustmentHandler = (
   state: GameState,
   player: PlayerState,
@@ -296,8 +304,8 @@ export type CardEffect = {
   ) => PastureCapacityModifier[]
   computeBreedThreshold?: BreedThresholdHandler
   computeBreedableAnimalCount?: BreedableAnimalCountHandler
-  /** Offspring after parent eligibility; receives the current count, initially one. */
-  computeBreedOffspringCount?: BreedableAnimalCountHandler
+  /** Offspring after parent eligibility; receives the current count and effective parent count. */
+  computeBreedOffspringCount?: BreedOffspringCountHandler
   computeAnimalScoreAdjustment?: AnimalScoreAdjustmentHandler
   consumeAnimalPayment?: AnimalPaymentHandler
   onAnimalRemoved?: AnimalRemovedHandler
@@ -597,7 +605,7 @@ export const getBreedOffspringCount = (
   state: GameState,
   player: PlayerState,
   animalType: BreedAnimalType,
-  ctx: BreedThresholdContext,
+  ctx: BreedThresholdContext & { breedableCount: number },
 ): number => {
   const allCards = [
     ...(player.improvements ?? []),

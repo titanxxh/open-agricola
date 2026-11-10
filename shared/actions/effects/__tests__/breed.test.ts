@@ -61,6 +61,28 @@ const withEffects = <T>(effects: CardEffect[], fn: () => T): T => {
 }
 
 describe('breed core helper', () => {
+  it('passes the effective parent count to offspring queries in availability and execution', () => {
+    const player = makePlayer({ occupationPlayed: ['TEST_Parents', 'TEST_Offspring'], pastures: [makePasture(4)] })
+    player.resources.sheep = 2
+    const state = makeState(player)
+    const options = { sourceCard: 'harvest', animalTypes: ['sheep'] as const }
+    const queriedCounts: number[] = []
+    withEffects([
+      { id: 'TEST_Parents', computeBreedableAnimalCount: (_state, _player, _type, count) => count + 2 },
+      {
+        id: 'TEST_Offspring',
+        computeBreedOffspringCount: (_state, _player, _type, _count, ctx) => {
+          queriedCounts.push(ctx.breedableCount)
+          return ctx.breedableCount >= 4 ? 2 : 0
+        },
+      },
+    ], () => {
+      expect(canBreedAnimals(state, player, options)).toBe(true)
+      expect(breed(state, player, options).breedSummary.resources).toEqual({ sheep: 2 })
+      expect(queriedCounts).toEqual([4, 4])
+    })
+  })
+
   it('composes played-card offspring queries without bypassing parent eligibility', () => {
     const player = makePlayer({ occupationPlayed: ['TEST_More', 'TEST_Double'], pastures: [makePasture(4)] })
     player.resources.sheep = 1

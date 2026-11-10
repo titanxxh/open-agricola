@@ -71,7 +71,7 @@ type ActionDefinition = {
 | 行动 | 契约 |
 |---|---|
 | `collect` | 把货物从 Action Space 转移到玩家供应区。普通用格拿取整堆；卡牌授予的取物可通过 `actionContext: { spaceId, resource, amount }` 指定来源和数量，或通过 `{ spaceId, resourceTypes }` 拿取指定类型的全部货物。单独取物不构成一次 Action Space Use。判断本次拿取量的 `before` listener 读取 `collectTakeAmount()`（`shared/cards/helpers/partial-take.ts`）；完成反应和统计读取实际取得的货物。卡牌提供的累积格声明 `gainPerRound`，货物存于 `ActionSpace.resources`。 |
-| `breed` | 亲本资格成立后，`CardEffect.computeBreedOffspringCount()` 按已打出卡牌顺序从默认 1 只幼崽开始查询。有限结果向下取整且不低于零；`undefined` 保持当前数量。可用性和执行共用此查询；资源、安置下限、摘要与事件均使用所得数量。覆盖：`shared/actions/effects/__tests__/breed.test.ts`。 |
+| `breed` | 亲本资格成立后，`CardEffect.computeBreedOffspringCount()` 按已打出卡牌顺序从默认 1 只幼崽开始查询。运行时上下文包含已计入寄宿动物繁殖归属与卡牌修正的 `breedableCount`。有限结果向下取整且不低于零；`undefined` 保持当前数量。可用性和执行共用此查询；资源、安置下限、摘要与事件均使用所得数量。重排在保留所需非幼畜后逐只统计幼畜，同时扣减幼畜数和安置下限，沿用既有安置存档结构与事件身份。覆盖：`shared/actions/effects/__tests__/breed.test.ts`、`server/__tests__/harvest-breed-placement-session.test.ts`。 |
 | `gain` | 结算前先确定接收者。付款方出资的 gain 先校验完整转账再移动资源，事件保留付款方来源。显式资源参数与行动格配置的基础收益分开识别。 |
 | `return-to-space` | 把货物从玩家供应区返还到 `actionContext.targetSpaceId` 指定的格；支付与移动事件使用同一目标。动物返还使用 `applyAnimalPayment()`，保持库存与动物区数量一致。返还是单独的移动，不减少原始取得回执、按该回执判断的阈值或取得统计。部分拿取只计实际拿走的货物；取得后返还保留两笔移动。 |
 | `place-farmer-on-space` | 在固定目标上额外放一名工人，通常随后展开目标 flow；`params.executeTarget: false` 只放工人、不展开目标。`allowOccupied` 只放宽占用，不绕过封锁、轮次开放、可执行性或工人供应。准入使用 `shared/actions/helpers/placement-availability.ts` 的 `canPlaceWorkerOnSpace`，与普通放置是同一份检查清单；放哪个人由 `selectWorkerForMoorAction` 决定，所以 Farmers of the Moor 的病人留在家中。自行放人的卡牌也用同一个函数检查准入。卡牌不在 handler 里写 `ActionSpace.takenBy`。 |
