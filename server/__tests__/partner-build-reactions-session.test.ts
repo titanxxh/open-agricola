@@ -460,4 +460,73 @@ describe('Partner Build card reactions', () => {
     expect(built.state.players[owner]!.improvements).toEqual([])
   })
 
+  it('does not combine a one-space partner fence with a nested one-space own stable for Fertilizers', () => {
+    const session = table(state => {
+      state.players[0]!.minorPlayed = ['A073_AgriculturalFertilizers']
+      state.players[0]!.occupationPlayed = ['D089_Stablehand']
+      state.players[0]!.resources.grain = 1
+      state.players[0]!.fields = [{ row: 0, col: 4, stacks: [] }]
+    })
+    let response = buildFences(session)
+    for (let step = 0; step < 12 && response.interaction.stateId === 'wait'; step += 1) {
+      const request = response.interaction.request
+      if (request.kind === 'choice' && request.options.some(option => option.value === 'target-farm:p1')) break
+      if (request.kind === 'confirm-player-switch') {
+        response = session.resolveChoice(response.interaction.playerIndex, 'confirm')
+      } else if (request.kind === 'select-trigger' || request.kind === 'choice') {
+        const option = request.options.find(option => option.value === 'D089_Stablehand')
+          ?? request.options.find(option => option.value !== '__skip__' && !option.disabled)
+        if (!option) throw new Error('missing Stablehand continuation')
+        response = session.resolveChoice(response.interaction.playerIndex, option.value)
+      } else break
+      expect(response.ok, response.error).toBe(true)
+    }
+    expect(session.resolveChoice(0, 'target-farm:p1').ok).toBe(true)
+    const built = finishReactions(session, session.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] }))
+    expect(built.ok, built.error).toBe(true)
+    expect(built.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(built.state.players[0]!.resources.grain).toBe(1)
+    expect(built.state.players[0]!.fields).toEqual([{ row: 0, col: 4, stacks: [] }])
+    expect(built.state.players[0]!.stableTiles).toEqual([{ row: 0, col: 2 }])
+    expect(built.state.players[2]!.pastures[0]!.tiles).toHaveLength(1)
+    expect(readCardResourceStats(built.state.players[0]!, 'A073_AgriculturalFertilizers')?.used ?? 0).toBe(0)
+  })
+
+  it('pays Building Tycoon food to the builder and lets its card owner finish an independent teammate build after recovery', () => {
+    const session = table(state => {
+      state.players[1]!.occupationPlayed = ['D128_BuildingTycoon']
+      Object.assign(state.players[1]!.resources, { wood: 6, reed: 3, food: 1 })
+    })
+    let response = buildRoom(session)
+    for (let step = 0; step < 16 && response.interaction.stateId === 'wait'; step += 1) {
+      const request = response.interaction.request
+      if (request.kind === 'choice' && request.options.some(option => option.value === 'target-farm:p4')) break
+      if (request.kind === 'confirm-player-switch') response = session.resolveChoice(response.interaction.playerIndex, 'confirm')
+      else if (request.kind === 'select-trigger' || request.kind === 'choice') {
+        const option = request.options.find(option => option.value !== '__skip__' && !option.disabled)
+        if (!option) throw new Error('missing Tycoon continuation')
+        response = session.resolveChoice(response.interaction.playerIndex, option.value)
+      } else break
+      expect(response.ok, response.error).toBe(true)
+    }
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'choice' } })
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.state.players[1]!.resources.food).toBe(0)
+    expect(response.state.players[2]!.resources.food).toBe(0)
+    const snapshot = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+    sessions.push(restored)
+    assertRejectedUnchanged(restored, () => restored.resolveChoice(0, 'target-farm:p4'))
+    expect(restored.resolveChoice(1, 'target-farm:p4').ok).toBe(true)
+    const built = finishReactions(restored, restored.commitSelectionChoice(1, { rooms: [{ row: 1, col: 1 }] }))
+    expect(built.ok, built.error).toBe(true)
+    expect(built.state.players[1]!.resources).toMatchObject({ wood: 0, reed: 0, food: 0 })
+    expect(built.state.players[0]!.resources.food).toBe(1)
+    expect(built.state.players[2]!.resources.food).toBe(0)
+    expect(built.state.players[2]!.rooms).toBe(3)
+    expect(built.state.players[3]!.rooms).toBe(3)
+    expect(built.state.players[1]!.rooms).toBe(2)
+  })
+
 })
