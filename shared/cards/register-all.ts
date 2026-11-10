@@ -996,6 +996,7 @@ import { M128_Workbench } from './M/M128_Workbench'
 import { M129_PlowhorseMarket } from './M/M129_PlowhorseMarket'
 import { M130_Nosebag } from './M/M130_Nosebag'
 import { M131_CattleStall } from './M/M131_CattleStall'
+import { OLD_I97_Slaughterhouse } from './classic/I/OLD_I97_Slaughterhouse'
 import { STUB_BeforeBakeGainClay } from './__stubs__/STUB_BeforeBakeGainClay'
 import { Major_ClayOven } from './major/clay-oven'
 import { Major_StoneOven } from './major/stone-oven'
@@ -2011,6 +2012,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M129_PlowhorseMarket': M129_PlowhorseMarket.impl,
   'M130_Nosebag': M130_Nosebag.impl,
   'M131_CattleStall': M131_CattleStall.impl,
+  'OLD_I97_Slaughterhouse': OLD_I97_Slaughterhouse.impl,
   'STUB_BeforeBakeGainClay': STUB_BeforeBakeGainClay.impl,
   'Major_ClayOven': Major_ClayOven.impl,
   'Major_StoneOven': Major_StoneOven.impl,
