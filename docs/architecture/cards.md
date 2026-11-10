@@ -29,6 +29,8 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - Production descriptions render resources, animals, terrain and points as `ResourceText` icon tokens; `__…__` marks exact card, action and space names. `scripts/__tests__/card-description-icons.test.ts` and `card-description-double-underscore.test.ts` gate this.
 - Card faces, trigger labels, log previews and Replay share `client/components/common/cardText.ts`: official names and text fields come from the loaded language package; custom preview/room/replay metadata is normalized by the shared catalog per field, skipping empty authored translations, and card-owned prompts reference names with `{card:<id>}`. Player names follow the generated-name provenance in `client/utils/player-name.ts` ([client](client.md)).
 
+Played-card modifiers are rebuilt from their current catalog definitions on recovery. `card-modifiers.ts` replaces that card’s existing group in place, preserves all distinct catalog entries, and retains other cards and external modifiers. This prevents old serialized definitions from stacking with updated definitions. Tests: `server/__tests__/partner-rooms-session.test.ts`.
+
 Tests: `shared/cards/__tests__/card-source-representatives.test.ts`, `scripts/check-generated-cards-sync.ts`.
 
 ## Generated catalog and registry

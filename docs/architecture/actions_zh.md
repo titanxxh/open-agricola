@@ -95,14 +95,14 @@ type ActionDefinition = {
 
 `ActionDefinition.farmBuild` 声明建造 scope。`flow.ts` 的纯可达性查询分别绑定候选农场，并保留建造者的 hooks 和支付资源。`helpers/target-farm.ts` 把候选限定为建造者与合法队友。卡牌用 `targetFarmPolicy: 'own'` 把具体建造步骤绑定到执行者农场，核心不维护卡牌名单。
 
-`select-target-farm` 在建造的 before 与费用 hooks 前运行。选中的 `actionContext.targetFarmPlayerId` 跨摆放和支付等待保留。Farm Expansion 的直接房间与畜栏分支共用目标，卡牌独立授予的后续建造另起 scope。`farm-select.farmOwnerPlayerId` 改变显示农场，`interaction.playerIndex` 仍是命令执行者。测试：`server/__tests__/partner-stables-session.test.ts`、`e2e-tests/team-cooperation-builds.spec.ts`。规则依据：[ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md)。
+`select-target-farm` 在建造的 before 与费用 hooks 前运行。选中的 `actionContext.targetFarmPlayerId` 跨摆放和支付等待保留。Farm Expansion 的直接房间与畜栏分支共用目标，卡牌独立授予的后续建造另起 scope。`farm-select.farmOwnerPlayerId` 改变显示农场，`interaction.playerIndex` 仍是命令执行者。测试：`server/__tests__/{partner-stables,partner-rooms}-session.test.ts`、`e2e-tests/team-cooperation-builds.spec.ts`。规则依据：[ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md)。
 
 ## 农场类提交
 
 每种农场类型都在 `shared/actions/effects/` 下自己的 `ActionDefinition.resolveChoice` 中闭环：
 
 - 房间、畜栏和围栏通过 `helpers/build-players.ts` 解析建造者与农场主。执行者仍是建造者和付款者；几何、构件和房间材质归农场主。建造事件在 `actorPlayerId` 保留建造者，在 `targetPlayerId` 及版图位置中保留农场主。旧行动缺少 `actionContext.targetFarmPlayerId` 时，继续建在执行者自己的农场。见 [ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md) 和 `shared/actions/effects/__tests__/farm-action-events.test.ts`。
-- **房间**（`construct.ts`）：`room-payment.ts` 展开逐房间费用变体；印刷的“每间房”折扣使用 `scope:'unit'`。屋内动物按真实房间保存在 `houseAnimals`。
+- **房间**（`construct.ts`）：`room-payment.ts` 接收真实付款者、农场主和 state，支付能力读付款者，材质读农场主；`FarmInteraction` 接收明确的数量上限，只负责几何。`actionContext.allowedRoomTypes` 在可达性和提交时限制目标材质。摆放、预览和恢复后的提示共用 `constructFarmSelection`。屋内动物按真实房间保存在 `houseAnimals`。
 - **马厩 / 犁地**（`stables.ts`、`plow.ts`）：typed-flat 支付；马厩定价由默认价、`exactCost` 或 `costOverride` 与一次完整的农场选择查询得出单价。`plow.actionContext.allowedTiles` / `adjacencyPolicy` 只影响本次犁地。
 - **犁地结算**：`farm.fieldPlowed.payment` 保留选中的 typed-flat 实付与实际季节附加费用。`sourceActionId` 标识宿主行动格，因此完整田地事件替代宿主的后备明细日志，不另产生支付事实。无法继续执行的必做宿主，仅由当前事务中该玩家实际获得的田地满足，不依赖宿主来源名；卡牌来源继续由 `sourceCardId` 保留。测试：`server/__tests__/seasonal-plow-payment-session.test.ts`、`server/__tests__/future-meeple-action-session.test.ts`。
 - **围栏**（`fencing.ts`）：校验边、来源、连通性与区域；通过农场选择的 `computeCosts` pass 计算费用；把 trade、bonus、provider 与预算传入 `pay:fence:*`。`before` 贡献按来源写回宿主：木材折扣不增加实体，卡上围栏由玩家显式选择，只为本次新建的普通围栏消耗。
