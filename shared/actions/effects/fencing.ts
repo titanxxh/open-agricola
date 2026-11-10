@@ -956,15 +956,19 @@ export const fenceAction: ActionDefinition = {
     canStartFencing(context?.actionHooks, state, player, undefined, context?.actionContext, context),
   costPreview: {
     getBaseCost: () => ({ wood: minimumFenceSegments }),
-    canExecute: (ctx, costOverride) =>
-      canStartFencing(
+    canExecute: (ctx, costOverride) => {
+      const partner = resolveBuildPlayers(ctx)?.farmOwner.id !== ctx.player.id
+      const computedCosts = 'costs' in ctx && ctx.costs !== null && typeof ctx.costs === 'object'
+        && Object.keys(ctx.costs).length > 0
+      return canStartFencing(
         ctx.actionHooks,
         ctx.state,
         ctx.player,
-        costOverride,
+        partner && computedCosts ? undefined : costOverride,
         ctx.actionContext,
         { space: ctx.space, sourceCard: ctx.sourceCard },
-      ),
+      )
+    },
   },
   previewEffect: ({ player, actionContext, previewMode }) => {
     const policy = readFenceActionPolicy(actionContext)
