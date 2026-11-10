@@ -1116,6 +1116,7 @@ export type ActionDefinition = {
   anytime?: boolean
   allowAnytimeReentry?: boolean
   idleOnly?: boolean
+  farmBuild?: { kinds: readonly ('rooms' | 'stables' | 'fences')[] }
   canBeExecutedByPlayer: CanBeExecutedByPlayer
   /** Structural eligibility of the original body; independent replacement flows remain available. */
   originalActionCondition?: (context: ActionExecutionContext) => boolean
@@ -1246,7 +1247,7 @@ export type ChoiceMultiSelect = {
 export type InteractionRequest = (
   | MarketplaceRequest
   | { kind: 'solo-hand-selection'; groups: SoloHandSelectionGroup[] }
-  | { kind: 'choice'; options: ActionChoiceOption[]; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean; moorSolo?: MoorSoloChoice }
+  | { kind: 'choice'; options: ActionChoiceOption[]; defaultValue?: string; confirmLabelKey?: string; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean; moorSolo?: MoorSoloChoice }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }
@@ -1271,6 +1272,7 @@ export type InteractionRequest = (
     }
   | {
       kind: 'farm-select'
+      farmOwnerPlayerId?: string
       farm:
         | { farmType: 'plow'; selectableTiles: FarmTilePosition[] }
         | {

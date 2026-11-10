@@ -4,7 +4,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { stablesAction } from '../../actions/effects/stables'
 import type { CardImpl } from '../registry'
-import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
 const CARD_ID = 'C094_StableCleaner'
 
@@ -38,7 +37,6 @@ const anytimeListener: CardListenerRegistration = {
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (getAvailableStableSupplyCount(context.state, context.player) <= 0) return
     if (!canBuildCleanerStable(context)) return
     return {
       flow: {

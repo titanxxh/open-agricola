@@ -6,6 +6,8 @@ export type PendingChoice = {
   promptParams?: Record<string, unknown>
   options: ActionChoiceOption[]
   multiSelect?: ChoiceMultiSelect
+  defaultValue?: string
+  confirmLabelKey?: string
   playerIndex: number
   spaceId: string
   sourceCard?: string

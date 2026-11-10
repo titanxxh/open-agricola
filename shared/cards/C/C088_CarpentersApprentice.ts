@@ -1,3 +1,4 @@
+import { resolveBuildPlayers } from '../../actions/helpers/build-players'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { Trade } from '../../contract/types'
@@ -37,7 +38,9 @@ const stablesCostListener: CardListenerRegistration = {
     if (totalBuilt <= 0) return
     const unitCost = context.params?.stableUnitCost as Partial<Record<'wood', number>> | undefined
     if ((unitCost?.wood ?? 0) <= 0) return
-    const before = getStableCountForCards(context.player)
+    const build = resolveBuildPlayers(context)
+    if (!build) return
+    const before = getStableCountForCards(build.farmOwner)
     const after = before + totalBuilt
     let discounted = 0
     if (before < 3 && after >= 3) discounted += 1

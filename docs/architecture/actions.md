@@ -89,6 +89,12 @@ Generic internal actions and their contracts:
 
 Tests: `shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,pop-card-stack,special-effect,farmyard-goods-claim}.test.ts`, `server/__tests__/{empty-accumulation-admission,receive-existing-goods}-session.test.ts`.
 
+## Target Farm
+
+`ActionDefinition.farmBuild` declares a build scope. Pure availability in `flow.ts` binds each candidate farm while retaining the builder's hooks and payment resources. `helpers/target-farm.ts` limits candidates to the builder and eligible teammates. `targetFarmPolicy: 'own'` binds a card's specific build step to its executor; the core keeps no card list.
+
+`select-target-farm` runs before the build's before and cost hooks. Its selected `actionContext.targetFarmPlayerId` persists through placement and payment. Farm Expansion binds its direct room and stable branches together; independently granted reaction builds start a fresh scope. `farm-select.farmOwnerPlayerId` changes the displayed farm, while `interaction.playerIndex` remains the command actor. Tests: `server/__tests__/partner-stables-session.test.ts`, `e2e-tests/team-cooperation-builds.spec.ts`. Rule authority: [ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md).
+
 ## Farm-type commit
 
 Each farm type closes its logic inside its own `ActionDefinition.resolveChoice` under `shared/actions/effects/`:

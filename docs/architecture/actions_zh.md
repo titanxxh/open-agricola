@@ -91,6 +91,12 @@ type ActionDefinition = {
 
 测试：`shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,pop-card-stack,special-effect,farmyard-goods-claim}.test.ts`、`server/__tests__/{empty-accumulation-admission,receive-existing-goods}-session.test.ts`。
 
+## Target Farm
+
+`ActionDefinition.farmBuild` 声明建造 scope。`flow.ts` 的纯可达性查询分别绑定候选农场，并保留建造者的 hooks 和支付资源。`helpers/target-farm.ts` 把候选限定为建造者与合法队友。卡牌用 `targetFarmPolicy: 'own'` 把具体建造步骤绑定到执行者农场，核心不维护卡牌名单。
+
+`select-target-farm` 在建造的 before 与费用 hooks 前运行。选中的 `actionContext.targetFarmPlayerId` 跨摆放和支付等待保留。Farm Expansion 的直接房间与畜栏分支共用目标，卡牌独立授予的后续建造另起 scope。`farm-select.farmOwnerPlayerId` 改变显示农场，`interaction.playerIndex` 仍是命令执行者。测试：`server/__tests__/partner-stables-session.test.ts`、`e2e-tests/team-cooperation-builds.spec.ts`。规则依据：[ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md)。
+
 ## 农场类提交
 
 每种农场类型都在 `shared/actions/effects/` 下自己的 `ActionDefinition.resolveChoice` 中闭环：

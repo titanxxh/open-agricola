@@ -11,6 +11,7 @@ export const resolveBuildPlayers = ({ state, player, actionContext }: BuildPlaye
   farmOwner: PlayerState
 } | undefined => {
   const targetFarmPlayerId = actionContext?.targetFarmPlayerId
+  if (actionContext?.targetFarmPolicy === 'own' && targetFarmPlayerId !== undefined && targetFarmPlayerId !== player.id) return undefined
   if (targetFarmPlayerId === undefined || targetFarmPlayerId === player.id) {
     return { builder: player, farmOwner: player }
   }

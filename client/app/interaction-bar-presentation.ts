@@ -176,6 +176,8 @@ export type InteractionBarChoiceModel = {
   useCollector: boolean
   collectorNeeded: number
   multiSelect?: ChoiceMultiSelect
+  defaultValue?: string
+  confirmLabelKey?: string
   isOptionalActionPrompt: boolean
   optionalActionName: string | null
   triggerCardName: string | null
@@ -458,6 +460,8 @@ const buildChoiceModel = (
     useCollector: showOptions && needed > 1,
     collectorNeeded: (choice.promptParams?.needed as number | undefined) ?? 6,
     multiSelect: choice.multiSelect,
+    defaultValue: choice.defaultValue,
+    confirmLabelKey: choice.confirmLabelKey,
     isOptionalActionPrompt,
     optionalActionName,
     triggerCardName,
