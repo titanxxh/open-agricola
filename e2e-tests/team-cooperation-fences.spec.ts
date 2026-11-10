@@ -2,6 +2,7 @@
 // @covers client/components/interaction/InteractionBar.tsx
 // @covers client/app/fence-selection-quote.ts
 // @covers client/components/board/
+import { CLIENT_CAPABILITIES_HEADER, TEAM_COOPERATION_CAPABILITY } from '../shared/contract/client-capabilities'
 import { expect, test } from '@playwright/test'
 import type { SessionResponse } from '../server/game/authoritative-session'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
@@ -20,7 +21,7 @@ for (const variant of [
       await context.addInitScript(locale => localStorage.setItem('open-agricola-locale-v2', locale), variant.locale)
       await authenticateTeamAccount(context, `build_${Date.now().toString(36)}${variant.locale}`, 'Builder')
       const teamConfig = { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'private', cooperationRules: true } satisfies TeamConfiguration
-      const fresh = await context.request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1629, playerCount: 4, teamConfig, customCardIds: [] } })
+      const fresh = await context.request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: { [CLIENT_CAPABILITIES_HEADER]: TEAM_COOPERATION_CAPABILITY }, data: { seed: 1629, playerCount: 4, teamConfig, customCardIds: [] } })
       expect(fresh.ok(), await fresh.text()).toBe(true)
       const session = createWorkSession({ seed: 1629, options: { playerCount: 4, teamConfig }, configure(state) {
         state.round = 14; state.currentPlayerIndex = 0
@@ -33,7 +34,7 @@ for (const variant of [
         state.players[0]!.resources.wood = 6
       } })
       try {
-        const loaded = await context.request.post(`${BACKEND_URL}/api/game/load`, { data: { state: session.withCtx(() => serializeState(session.state, {})) } })
+        const loaded = await context.request.post(`${BACKEND_URL}/api/game/load`, { headers: { [CLIENT_CAPABILITIES_HEADER]: TEAM_COOPERATION_CAPABILITY }, data: { state: session.withCtx(() => serializeState(session.state, {})) } })
         expect(loaded.ok(), await loaded.text()).toBe(true)
       } finally { session.dispose() }
       const page = await context.newPage()

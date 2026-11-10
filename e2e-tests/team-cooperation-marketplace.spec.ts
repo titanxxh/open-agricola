@@ -1,3 +1,4 @@
+import { CLIENT_CAPABILITIES_HEADER, TEAM_COOPERATION_CAPABILITY } from '../shared/contract/client-capabilities'
 // @covers client/app/TeamSetupFields.tsx
 // @covers client/app/LobbyPage.tsx
 // @covers client/app/GameContainerApi.tsx
@@ -52,6 +53,7 @@ async function loadMarketplace(context: BrowserContext, cooperationRules: boolea
     teammateVisibility: 'private', cooperationRules,
   } satisfies TeamConfiguration
   const fresh = await context.request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+    ...(cooperationRules ? { headers: { [CLIENT_CAPABILITIES_HEADER]: TEAM_COOPERATION_CAPABILITY } } : {}),
     data: { seed: 1624, playerCount: 4, teamConfig, customCardIds: [] },
   })
   expect(fresh.ok(), await fresh.text()).toBe(true)
@@ -76,6 +78,7 @@ async function loadMarketplace(context: BrowserContext, cooperationRules: boolea
   } })
   try {
     const loaded = await context.request.post(`${BACKEND_URL}/api/game/load`, {
+      ...(cooperationRules ? { headers: { [CLIENT_CAPABILITIES_HEADER]: TEAM_COOPERATION_CAPABILITY } } : {}),
       data: { state: session.withCtx(() => serializeState(session.state, {})) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)
@@ -156,7 +159,7 @@ for (const variant of variants) {
       await page.reload()
       await expect(panel).toBeVisible()
       await expect(confirm).toBeDisabled()
-      const restored: SessionResponse = await (await context.request.get(`${BACKEND_URL}/api/game/state`)).json()
+      const restored: SessionResponse = await (await context.request.get(`${BACKEND_URL}/api/game/state`, { headers: { [CLIENT_CAPABILITIES_HEADER]: TEAM_COOPERATION_CAPABILITY } })).json()
       expect(restored.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'marketplace-select' } })
       expect(restored.state.players[0]!.resources).toMatchObject({ wood: 6, food: 1 })
       expect(restored.state.players[2]!.resources).toMatchObject({ wood: 0, food: 5 })
