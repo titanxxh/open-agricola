@@ -129,6 +129,8 @@ export type Trade = {
   groupId?: string
   groupMin?: number
   groupMax?: number
+  /** For unit trades, apply groupMax to each purchased unit instead of the whole action. */
+  groupScope?: 'action' | 'unit'
   replaceUpTo?: boolean
   minCost?: Partial<Resource>
   maxCost?: Partial<Resource>
@@ -192,6 +194,8 @@ export type TradeModifier = {
   groupId?: string
   groupMin?: number
   groupMax?: number
+  /** For unit trades, apply groupMax to each purchased unit instead of the whole action. */
+  groupScope?: 'action' | 'unit'
   replaceUpTo?: boolean
   minCost?: Partial<Resource>
   maxCost?: Partial<Resource>

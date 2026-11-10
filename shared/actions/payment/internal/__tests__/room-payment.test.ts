@@ -122,3 +122,46 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
     })).toBe(true)
   })
 })
+
+describe('exclusive unit replacement groups', () => {
+  const replacements = (groupScope?: 'action' | 'unit'): CostModifier[] => [2, 3].map((discount, index) => ({
+    type: 'trade', cardId: `room-option-${index}`, appliesTo: ['construct'],
+    scope: 'unit', groupId: 'room-replacement', groupMax: 1, groupScope,
+    from: {}, to: { wood: discount },
+  }))
+
+  it('allows at most one alternative per room while discounting both rooms', () => {
+    const player = makePlayer(replacements('unit'), 'wood')
+    const solutions = computeAllBuyableCombinations(player, { unitFee: { wood: 5, reed: 2 }, nb: 2 }, undefined, 'construct')
+    expect(solutions.some(solution => nonZeroPaid(solution).wood === 4)).toBe(true)
+    for (const solution of solutions) {
+      expect(nonZeroPaid(solution).wood).toBeGreaterThanOrEqual(4)
+      expect(nonZeroPaid(solution).reed).toBe(4)
+      expect(solution.tradesUsed.reduce((total, usage) => total + usage.times, 0)).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it('can choose different mutually exclusive alternatives for two rooms', () => {
+    const player = makePlayer(['wood', 'stone'].map(resource => ({
+      type: 'trade', cardId: `room-${resource}`, appliesTo: ['construct'],
+      scope: 'unit', groupId: 'room-replacement', groupMax: 1, groupScope: 'unit',
+      from: { [resource]: 1 }, to: { clay: 3 },
+    })))
+    Object.assign(player.resources, { wood: 1, stone: 1, clay: 4, reed: 4 })
+    const solutions = computeAllBuyableCombinations(player,
+      { unitFee: { clay: 5, reed: 2 }, nb: 2 }, undefined, 'construct')
+    expect(solutions).toHaveLength(1)
+    expect(nonZeroPaid(solutions[0]!)).toEqual({ wood: 1, stone: 1, clay: 4, reed: 4 })
+    expect(solutions[0]!.tradesUsed.map(usage => usage.times)).toEqual([1, 1])
+  })
+
+  it.each([undefined, 'action'] as const)('keeps the existing per-action cap for scope %s', groupScope => {
+    const solutions = computeAllBuyableCombinations(makePlayer(replacements(groupScope), 'wood'),
+      { unitFee: { wood: 5, reed: 2 }, nb: 2 }, undefined, 'construct')
+    expect(solutions.some(solution => nonZeroPaid(solution).wood === 7)).toBe(true)
+    for (const solution of solutions) {
+      expect(nonZeroPaid(solution).wood).toBeGreaterThanOrEqual(7)
+      expect(solution.tradesUsed.reduce((total, usage) => total + usage.times, 0)).toBeLessThanOrEqual(1)
+    }
+  })
+})

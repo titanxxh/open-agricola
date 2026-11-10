@@ -571,6 +571,7 @@ const tradeSignature = (trade: Trade) =>
     trade.groupId ?? '',
     trade.groupMin ?? '',
     trade.groupMax ?? '',
+    trade.groupScope ?? '',
     resourceSignature(trade.from),
     resourceSignature(trade.to),
     resourceSignature(trade.minCost ?? {}),
@@ -653,18 +654,17 @@ const getRemainingTradeGroupUses = (
   return Math.max(0, trade.groupMax - getTradeGroupUsage(tradesUsed, trade))
 }
 
-const isWithinTradeGroupLimits = (
-  tradesUsed: TradeUsage[],
-) => {
+const isWithinTradeGroupLimits = (tradesUsed: TradeUsage[], units = 1) => {
   const groups = new Map<string, { max: number; used: number }>()
   for (const entry of tradesUsed) {
     if (entry.times <= 0 || !entry.trade.groupId || entry.trade.groupMax === undefined) continue
+    const limit = entry.trade.groupMax * (entry.trade.groupScope === 'unit' ? units : 1)
     const existing = groups.get(entry.trade.groupId)
     if (existing) {
       existing.used += entry.times
-      existing.max = Math.min(existing.max, entry.trade.groupMax)
+      existing.max = Math.min(existing.max, limit)
     } else {
-      groups.set(entry.trade.groupId, { max: entry.trade.groupMax, used: entry.times })
+      groups.set(entry.trade.groupId, { max: limit, used: entry.times })
     }
   }
   for (const group of groups.values()) {
@@ -819,7 +819,7 @@ const buildUnitTotalOptions = (
     for (const total of totals) {
       for (const unitOption of unitOptions) {
         const tradesUsed = mergeTradeUsage(total.tradesUsed, unitOption.tradesUsed)
-        if (!isWithinTradeGroupLimits(tradesUsed)) continue
+        if (!isWithinTradeGroupLimits(tradesUsed, nb ?? 1)) continue
         nextTotals.push({
           cost: normalizePositiveResources(mergePaymentResources(total.cost, unitOption.cost)),
           tradesUsed,
@@ -1040,7 +1040,7 @@ export const computeAllBuyableCombinations = (
 
       for (const tradeCombo of tradeCombos) {
         const tradesUsed = mergeTradeUsage(unitTotal.tradesUsed, tradeCombo.tradesUsed)
-        if (!isWithinTradeGroupLimits(tradesUsed)) continue
+        if (!isWithinTradeGroupLimits(tradesUsed, nb ?? 1)) continue
         if (!satisfiesTradeGroupMinimums(tradesUsed, allTrades)) continue
         const removalReductions = mergeBonusReductionsBySource(
           initialRemovalReductions(feeIdx),

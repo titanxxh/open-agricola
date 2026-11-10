@@ -127,6 +127,7 @@ export const applyCostModifiers = (
         ...(tradeMod.groupId !== undefined ? { groupId: tradeMod.groupId } : {}),
         ...(tradeMod.groupMin !== undefined ? { groupMin: tradeMod.groupMin } : {}),
         ...(tradeMod.groupMax !== undefined ? { groupMax: tradeMod.groupMax } : {}),
+        ...(tradeMod.groupScope ? { groupScope: tradeMod.groupScope } : {}),
         ...(tradeMod.replaceUpTo ? { replaceUpTo: true } : {}),
         ...(tradeMod.minCost ? { minCost: tradeMod.minCost } : {}),
         ...(tradeMod.maxCost ? { maxCost: tradeMod.maxCost } : {}),
