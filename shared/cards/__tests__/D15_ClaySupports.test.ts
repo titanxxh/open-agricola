@@ -49,7 +49,7 @@ const makePlayer = (
 })
 
 describe('D015_ClaySupports unit-scope trade migration', () => {
-  it('static modifier shape: scope:unit, houseTypeClay condition', () => {
+  it('static modifier shape: scope:unit, roomMaterialClay condition', () => {
     expect(D015_ClaySupports.impl.modifiers?.[0]).toBeDefined()
     expect(D015_ClaySupports.impl.modifiers?.[0]).toMatchObject({
       type: 'trade',
@@ -58,7 +58,7 @@ describe('D015_ClaySupports unit-scope trade migration', () => {
       scope: 'unit',
       from: { wood: 1 },
       to: { clay: 3, reed: 1 },
-      conditions: { houseTypeClay: 1 },
+      conditions: { roomMaterialClay: 1 },
     })
   })
 

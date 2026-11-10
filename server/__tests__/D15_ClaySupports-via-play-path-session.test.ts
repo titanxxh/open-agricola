@@ -60,7 +60,7 @@ describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () 
           scope: 'unit',
           from: { wood: 1 },
           to: { clay: 3, reed: 1 },
-          conditions: { houseTypeClay: 1 },
+          conditions: { roomMaterialClay: 1 },
         }),
       ]),
     )
