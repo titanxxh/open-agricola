@@ -26,6 +26,8 @@ GitHub Pages serves the production frontend at `https://open-agricola.titanxxh.c
 
 ## Standard owner-machine release
 
+For a new request header that the deployed backend does not accept, complete the [backend-first overlap procedure](#supported-browser-and-backend-overlap) before publishing. `pnpm release` publishes automatically after verification; it does not wait for a backend deployment.
+
 Run the standard release command on an owner-controlled machine with Node.js 24.15+ excluding Node 25, locked dependencies, and an authenticated `gh` CLI:
 
 ```bash
@@ -428,6 +430,42 @@ For changes to saved state, engine cursors, pending continuations, action IDs or
 4. Run the existing target-build archive restore and live-data validation before starting the new application generation. These deployment checks remain required and do not replace behavior tests for changed formats. Missing migration, lost acknowledged state or an unusable restored game blocks PR approval and deployment.
 
 Completed Replays keep their recorded Frames, hashes and frozen Viewer Builds; historical playback does not execute current backend rules. The policy does not require every historical save or browser build to remain supported forever. Retiring retained production games is a separate operator decision with explicit authorization for the affected games, not an implied part of a feature, merge or release request. Defer an incompatible deployment until the affected saves are migrated or verified to have left the affected state.
+
+### Supported browser and backend overlap
+
+The cooperation beta introduces `X-Open-Agricola-Client-Capabilities` on HTTP game requests. Older backends do not allow this header in CORS preflight. A new Pages build with an older backend is therefore unsupported, including ordinary HTTP sandbox requests. Deploy backend capability and CORS support before publishing the new Pages build. Old clients can continue ordinary games against the updated backend; cooperation requests without support receive a readable refresh error before incompatible state or rules input is accepted.
+
+For this upgrade, use the existing independent verification and deployment entries in this order:
+
+1. Fix the eligible merged candidate SHA and a ref that points to it. `main` is valid only while it still matches that SHA. Request complete verification, then wait until `check` returns `status: passed` and exits with code 0:
+
+    ```bash
+    pnpm exec tsx scripts/ci/candidate-verification.ts request --repository titanxxh/open-agricola --sha <full-sha> --ref <fixed-ref> --tasks all
+    pnpm exec tsx scripts/ci/candidate-verification.ts check --repository titanxxh/open-agricola --sha <full-sha>
+    ```
+
+2. Deploy that exact backend candidate from the owner machine. The backend gate does not require a published Release:
+
+    ```bash
+    ./deploy-backend.sh ubuntu@ten-kr <full-sha>
+    ```
+
+3. Verify the backend build identity, retained-data checks and health through the existing deployment procedure. Before publishing Pages, confirm that the public API answers this preflight with 204 and allows the capability header. Replace both origin placeholders with the deployed origins:
+
+    ```bash
+    curl -i -X OPTIONS '<api-origin>/api/game/state' \
+      -H 'Origin: <frontend-origin>' \
+      -H 'Access-Control-Request-Method: GET' \
+      -H 'Access-Control-Request-Headers: X-Open-Agricola-Client-Capabilities'
+    ```
+
+4. Publish the same fixed candidate. The standard release command reuses its complete verification and the published Release requests Pages deployment:
+
+    ```bash
+    pnpm release vX.Y.Z --ref <full-sha>
+    ```
+
+Wait for the Pages workflow and verify the served frontend build identity. A manual `deploy-pages-broker.yml` request for this candidate has the same backend-first prerequisite. The broker's verification gate does not prove that the live backend has been upgraded. Do not publish the Release first and assume the later manual backend step will finish before Pages.
 
 ### Backend
 

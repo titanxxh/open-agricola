@@ -28,6 +28,8 @@ GitHub Pages 在 `https://open-agricola.titanxxh.com/` 提供生产前端，API 
 
 ## 本机标准发版
 
+若新请求 header 尚未被线上后端接受，先完成[后端优先的版本重叠流程](#supported-browser-and-backend-overlap)，再发布 Release。`pnpm release` 验证通过后会自动发布，不会等待后端部署。
+
 在 owner 控制的本机准备 Node.js 24.15+（不支持 Node 25）、锁定依赖和已认证的 `gh` CLI，再运行标准发版命令：
 
 ```bash
@@ -444,6 +446,44 @@ Open Agricola 已上线。升级必须保留所有尚在保留期内的 Room，�
 4. 启动新应用代际前，执行现有目标构建的归档恢复及实际数据校验。这些部署检查仍是必需项，也不能替代格式变化的行为测试。缺少必要迁移、丢失已确认状态或恢复后不能继续游戏，均阻断 PR 批准与部署。
 
 已完成 Replay 保留原始 Frame、哈希和固定 Viewer Build，历史播放不运行当前后端规则。这项策略不要求永久支持所有历史存档或浏览器构建。退役线上保留对局是独立的运维决定，需要对受影响对局的明确授权，不能从功能、合入或发布请求中推定。遇到不兼容升级，延后部署，直到受影响存档完成迁移，或已核实这些对局离开受影响状态。
+
+<a id="supported-browser-and-backend-overlap"></a>
+
+### 支持的浏览器与后端版本重叠
+
+合作规则 beta 为 HTTP 游戏请求新增 `X-Open-Agricola-Client-Capabilities`。旧后端的 CORS 预检不允许此 header，因此不支持新 Pages 配旧后端，普通 HTTP 沙盒请求也会受影响。先部署后端能力与 CORS 支持，再发布新 Pages。旧客户端可在新后端继续普通对局；缺能力的合作请求会先收到可读的刷新错误，不接受不兼容的状态发布或规则输入。
+
+本次升级按以下顺序使用现有独立验证与部署入口：
+
+1. 固定合格的已合入候选 SHA，以及指向它的 ref。只有 `main` 仍等于该 SHA 时才能使用 `main`。请求完整验证，等待 `check` 返回 `status: passed` 且退出码为0：
+
+    ```bash
+    pnpm exec tsx scripts/ci/candidate-verification.ts request --repository titanxxh/open-agricola --sha <full-sha> --ref <fixed-ref> --tasks all
+    pnpm exec tsx scripts/ci/candidate-verification.ts check --repository titanxxh/open-agricola --sha <full-sha>
+    ```
+
+2. 在 owner 本机部署同一固定后端候选。后端门禁不要求已有已发布的 Release：
+
+    ```bash
+    ./deploy-backend.sh ubuntu@ten-kr <full-sha>
+    ```
+
+3. 按现有部署流程核对后端构建标识、保留数据检查和健康状态。发布 Pages 前，确认公共 API 对以下预检返回204，并允许能力 header。将两个 origin 占位符替换为实际地址：
+
+    ```bash
+    curl -i -X OPTIONS '<api-origin>/api/game/state' \
+      -H 'Origin: <frontend-origin>' \
+      -H 'Access-Control-Request-Method: GET' \
+      -H 'Access-Control-Request-Headers: X-Open-Agricola-Client-Capabilities'
+    ```
+
+4. 发布同一固定候选。标准发版命令复用完整验证，已发布的 Release 会请求 Pages 部署：
+
+    ```bash
+    pnpm release vX.Y.Z --ref <full-sha>
+    ```
+
+等待 Pages workflow 完成，并核对前端实际构建标识。手动调用 `deploy-pages-broker.yml` 也必须先满足后端已升级的条件；broker 的验证门禁不证明线上后端已更新。不要先发布 Release，再假设手动后端部署会先于 Pages 完成。
 
 ### 后端
 

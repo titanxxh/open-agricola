@@ -89,6 +89,12 @@ Generic internal actions and their contracts:
 
 Tests: `shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,pop-card-stack,special-effect,farmyard-goods-claim}.test.ts`, `server/__tests__/{empty-accumulation-admission,receive-existing-goods}-session.test.ts`.
 
+## Marketplace
+
+`shared/team/marketplace.ts` derives available supply goods and teammates from the enabled Team Configuration, then validates the complete selection before settlement. The Marketplace Action Space dispatches `effects/marketplace.ts` through ordinary worker placement and remains occupied. Each resource has one direction and one teammate per use. Its giver pays the selected amount plus one unit of that resource, including when the space user takes from a teammate. Invalid selections commit nothing.
+
+The receiver's `receive` leaf carries `targetPlayerId`, preserving receive hooks and the receiver's animal-arrangement authority. Animal removal uses `domain/animal-payment.ts` to reconcile the giver's holders; animal arrival follows ordinary receive/reorganization before the next receive leaf. No farms, accounts or resource pools are merged. Contracts: `shared/contract/marketplace.ts`. Tests: `server/__tests__/marketplace{,-animals}-session.test.ts`, `e2e-tests/team-cooperation-{marketplace,animals}.spec.ts`.
+
 ## Target Farm
 
 `ActionDefinition.farmBuild` declares a build scope. Pure availability in `flow.ts` binds each candidate farm while retaining the builder's hooks and payment resources. `helpers/target-farm.ts` limits candidates to the builder and eligible teammates. `targetFarmPolicy: 'own'` binds a card's specific build step to its executor; the core keeps no card list.

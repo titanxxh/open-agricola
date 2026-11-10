@@ -137,7 +137,7 @@ type ClientCommand = (
 
 Waiting-room events carry `playerColors` from the authoritative player state; roster entries include `connected` so reserved seats retain their names when a player disconnects.
 
-`setTeam { teamIndex, memberId? }` moves the caller when the target is omitted; naming a member requires host authority. Waiting capacity and checkpoint success control publication. Errors use `team_change_failed` or `team_start_failed`.
+`setTeam { teamIndex, memberId? }` moves the caller when the target is omitted; naming a member requires host authority. Waiting capacity and checkpoint success control publication. Errors use `team_change_failed` or `team_start_failed`. It changes membership teamIndex, not Team Configuration. `newGame` and restart preserve the existing cooperationRules setting; they expose no mid-game rules switch.
 
 Team rooms instead send per-account `teamRoomWaiting` with opaque member IDs, names, teams, seat counts and connection status, never account IDs or player indices. `startTeamGame` requires a full roster and the host; committed seating produces each account's ordinary `roomJoined` before Step 0. Until then `RoomViewer.kind='team-member'` has no player index, and transport recovery waits for the waiting event without requesting a game snapshot. Persisted active-game summaries use a null `player_index` plus `teamWaiting` for these members. See `team-room.ts` and `team-seating.test.ts`.
 
@@ -261,8 +261,20 @@ Tests: `shared/actions/__tests__/future-schedule-preview.test.ts`, `server/__tes
 
 ## Experimental features
 
+Production declares `team-cooperation-rules` as `beta`. Eligible beta accounts and administrators may create enabled Team or Multihand Rooms; other accounts receive the existing feature denial. Account eligibility does not declare protocol support.
+
 `experimental-features.ts` owns `ExperimentalFeatureId`, `AvailabilityStage`, the single declaration registry and the pure account/stage/environment predicate. Production obeys declared `off`/`beta`/`general`; nonproduction defaults to `general`, with `DEV_EXPERIMENTAL_FEATURES=declared` restoring declarations. Anonymous visitors never pass; `off` also denies administrators. See [ADR 0042](../adr/0042-experimental-feature-availability.md).
 
 `/api/auth/me` returns `user.experimentalFeatures`, computed by the server from current account qualification. Clients use that list for entry visibility. WebSocket errors carry `code: experimental_feature_unavailable` with `feature`; HTTP returns 403 with the same fields. Durable command receipts retain only the generic code and message, so feature IDs are not stored. Availability is absent from game state, Room snapshots, Replay and result archives.
 
 Feature PR checklist: declare the ID and stage here; gate creation and public discovery at server entry points; test denials without Room/version/Replay changes, successful eligibility and unaffected participation; update client discovery and these docs. Graduation first changes the stage to `general`, then after at least one release removes the declaration, checks and obsolete UI through an owner-approved cleanup PR. [Predicate tests](../../shared/contract/__tests__/experimental-features.test.ts) and [entry tests](../../server/connection/__tests__/experimental-features.test.ts) define the behavior.
+
+## Client capabilities
+
+`shared/contract/client-capabilities.ts` owns the exact `team-cooperation-v1` token. `getCommandScope.clientCapabilities` declares support for one WebSocket; omitting the field retains that socket's declaration, and reconnecting starts a new declaration. HTTP sends `X-Open-Agricola-Client-Capabilities` per request. Unknown tokens grant nothing. `Broadcaster` owns the private WeakMap keyed by WebSocket; ConnectionCtx does not duplicate it. Capability declarations never enter GameState, Room snapshots, Replay or account records. The cooperationRules configuration itself remains ordinary persisted game configuration.
+
+Ordinary clients may omit capabilities. Cooperation creation, admission, resume, spectating and room operations require support independently of account qualification. Unsupported requests receive `client_refresh_required` with the readable message `Please refresh this page to use official cooperation rules.` HTTP uses 409; feature qualification denial remains 403. Scope and receipt queries stay available. Durable rejection settles its command receipt before the current transport stops reconnecting for refresh; the error does not revoke authentication or re-execute an acknowledged command.
+
+A public devRoom `loadGame` can replace ordinary state while sockets remain bound. The central Broadcaster guard withholds cooperative Room events, waiting/state snapshots and envelopes from unsupported members and spectators and sends only the refresh error. It keeps seats and confirmed state. This defense does not introduce a production configuration toggle. HTTP checks both the current Session and the resolved target of create/load before rules or replacement; an explicit new ordinary sandbox remains available without support. OPTIONS includes the capability CORS header without creating a Session.
+
+Tests: [WS admission and publication](../../server/connection/__tests__/cooperation-client-compatibility.test.ts), [network compatibility](../../server/connection/__tests__/experimental-feature-transport.test.ts), [HTTP gates](../../server/__tests__/experimental-feature-http.test.ts), [receipt and reconnect lifecycle](../../client/services/__tests__/gameTransport-reconnect.test.ts), [full-game and refresh UI](../../e2e-tests/team-cooperation-full-game.spec.ts). Deployment overlap is defined in [HOW_TO_DEPLOY](../HOW_TO_DEPLOY.md#supported-browser-and-backend-overlap).

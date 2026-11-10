@@ -122,6 +122,8 @@ GameContextRouter
 
 ## 实验功能发现
 
+合作规则创建选项使用 `experimentalFeatures` 中独立的 `team-cooperation-rules` 项。`WsGameTransport` 在每个新 socket 声明协议能力，`HttpGameTransport` 每次请求发送能力 header，均独立于账号资格发现。要求刷新时沿用可读错误及 reload 界面。当前 transport 等待未完成的持久 receipt 后才停止重试；认证和 journal 中的命令身份保持独立。见[客户端能力](contract.md#client-capabilities)。
+
 `AuthContext` 消费服务端的 `user.experimentalFeatures`，密码登录或重置密码后重新读取 `/api/auth/me`。缺失资格列表或未登录时视为空。`LobbyPage` 仅在该列表包含对应功能 ID 时展示组队与分身创建入口。客户端不从管理员身份、环境或对局状态推导资格。[LobbyPage 测试](../../client/app/__tests__/LobbyPage.test.tsx) 和[声明阶段浏览器测试](../../e2e-tests/experimental-feature-gates.spec.ts) 验证入口展示。
 
 `BetaBadge` 标记组队与分身创建入口，公开列表、我的对局和等待室的 `TeamConfigurationSummary`，以及实时和归档队伍结果。只有创建表单显示 `beta.creationHint`；`MyActiveGames` 从服务端接收等待及进行中房间的 `teamConfig`。`GameEndControls` 为不可用账号锁定发起组队重开，仍允许同意其他玩家的提议。`experimental_feature_unavailable` 在触发操作的控件下显示 `form-error` 并重读 `/api/auth/me`；同意时被拒说明服务端检查的是发起人，同意者看到 `beta.rematchProposerUnavailable`，不重读自身资格；大厅组队创建复用带命令日志的创建路径，让拒绝保留在表单。测试见 `GameEndControls.test.tsx`、`GameContextRouter.test.tsx`、`beta-team-ui.spec.ts`。
