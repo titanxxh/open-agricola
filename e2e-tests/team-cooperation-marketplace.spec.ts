@@ -177,8 +177,10 @@ for (const variant of variants) {
       await expect(confirm).toBeEnabled()
       await expect(wood.locator('.marketplace-tax')).toContainText(labels.woodTax)
       await expect(food.locator('.marketplace-tax')).toContainText(labels.foodTax)
+      await expect(confirm).toBeInViewport({ ratio: 1 })
       expect(await panel.evaluate(element => element.getBoundingClientRect().right - innerWidth)).toBeLessThanOrEqual(1)
-      await page.screenshot({ path: testInfo.outputPath('marketplace-tax-preview.png'), fullPage: true })
+      await page.screenshot({ path: testInfo.outputPath('marketplace-tax-preview.png'), fullPage: false })
+      await panel.screenshot({ path: testInfo.outputPath('marketplace-panel.png') })
       const submitted = page.waitForResponse(response => response.url().endsWith('/api/game/commit-selection'))
       await confirm.click()
       const result: SessionResponse = await (await submitted).json()
@@ -200,7 +202,7 @@ for (const variant of variants) {
         body: JSON.stringify({ players: result.state.players.map(({ id, resources }) => ({ id, resources })), logs }),
         contentType: 'application/json',
       })
-      await page.screenshot({ path: testInfo.outputPath('marketplace-completed.png'), fullPage: true })
+      await page.screenshot({ path: testInfo.outputPath('marketplace-completed.png'), fullPage: false })
     } finally { await context.close() }
   })
 
