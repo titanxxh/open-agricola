@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { guardedListener } from './listener-purity-guard'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
-import type { DraftGameEvent, FarmSpacesUsedEvent } from '../../contract/events'
+import type { FarmFenceBuiltEvent, FarmSpacesUsedEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { runCardListeners } from '../card-listeners'
 import { A130_MummysBoy_impl } from '../A/A130_MummysBoy'
@@ -180,11 +180,11 @@ const expectCardStatesUnchanged = (
   })
 }
 
-const fenceBuilt = (): DraftGameEvent<'farm.fenceBuilt'> => ({
-  type: 'farm.fenceBuilt',
+const fenceBuilt = (newlyEnclosedPastureTiles: FarmFenceBuiltEvent['newlyEnclosedPastureTiles'] = []): FarmFenceBuiltEvent => ({
+  schemaVersion: 1, id: 'fence-built', seq: 1, round: 1, phase: 'work', visibility: 'public',
+  type: 'farm.fenceBuilt', actorPlayerId: 'p1', newlyUsedTiles: newlyEnclosedPastureTiles, newlyEnclosedPastureTiles,
   fences: [{ edge: 'H-0-0', type: 'fence' }],
   newFenceEdges: ['H-0-0'],
-  newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
 })
 
 const farmSpaceUsed = (playerId: string): FarmSpacesUsedEvent => ({
@@ -389,7 +389,7 @@ describe('listener purity wave 2a', () => {
         },
       ],
     })
-    const actionEvents = [fenceBuilt()]
+    const actionEvents = [fenceBuilt([{ playerId: p.id, row: 0, col: 1 }, { playerId: p.id, row: 0, col: 2 }])]
     const ctx = context(p, {
       actionId: 'fence',
       transactionEvents: actionEvents,
@@ -409,11 +409,12 @@ describe('listener purity wave 2a', () => {
         sourceCard: B124,
         params: { kind: 'set-extra-data', key: 'pastureArea', value: 3 },
       },
+      { actionId: 'special-effect', sourceCard: B124, params: { kind: 'set-flag', flag: true } },
       { actionId: 'gain', sourceCard: B124, params: { stone: 2 } },
     ])
   })
 
-  it('B124 Trimmer rewards twice in the same work phase when fenced area grows twice', () => {
+  it('B124 Trimmer rewards once and ignores later growth in the same work phase without mutating state', () => {
     const p = player(B124, {
       cardStates: { [B124]: { extraData: { pastureArea: 1 }, flagged: false } },
       pastures: [
@@ -435,38 +436,37 @@ describe('listener purity wave 2a', () => {
       B124_Trimmer_impl.listeners,
       'B124-trimmer-after-fencing',
     )
-    const actionEvents = [fenceBuilt()]
+    const actionEvents = [fenceBuilt([{ playerId: p.id, row: 0, col: 1 }, { playerId: p.id, row: 0, col: 2 }])]
 
+    const beforeFirst = snapshot(p)
     const first = listener.handler(context(p, {
       actionId: 'fence',
       transactionEvents: actionEvents,
       actionEvents,
     }))
+    expectCardStatesUnchanged(p, beforeFirst, 'B124 first reward')
     expectSeqLeaves(first?.flow, [
       {
         actionId: 'special-effect',
         sourceCard: B124,
         params: { kind: 'set-extra-data', key: 'pastureArea', value: 3 },
       },
+      { actionId: 'special-effect', sourceCard: B124, params: { kind: 'set-flag', flag: true } },
       { actionId: 'gain', sourceCard: B124, params: { stone: 2 } },
     ])
 
-    p.cardStates[B124] = { extraData: { pastureArea: 3 }, flagged: false }
+    p.cardStates[B124] = { extraData: { pastureArea: 3 }, flagged: true }
     p.pastures[0]!.tiles.push({ row: 0, col: 3 })
 
+    const beforeSecond = snapshot(p)
+    const secondEvents = [fenceBuilt([{ playerId: p.id, row: 0, col: 3 }])]
     const second = listener.handler(context(p, {
       actionId: 'fence',
-      transactionEvents: actionEvents,
-      actionEvents,
+      transactionEvents: secondEvents,
+      actionEvents: secondEvents,
     }))
-    expectSeqLeaves(second?.flow, [
-      {
-        actionId: 'special-effect',
-        sourceCard: B124,
-        params: { kind: 'set-extra-data', key: 'pastureArea', value: 4 },
-      },
-      { actionId: 'gain', sourceCard: B124, params: { stone: 2 } },
-    ])
+    expect(second).toBeUndefined()
+    expectCardStatesUnchanged(p, beforeSecond, 'B124 later enclosure')
   })
 
   it('B124 Trimmer updates pasture area but does not reward when fencing only subdivides existing pasture', () => {
