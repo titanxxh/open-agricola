@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { constructUnitDiscountTrade } from '../helpers/construct-cost'
+import { constructUnitPriceTrade, constructedRoomMaterial } from '../helpers/construct-cost'
 
 const CARD_ID = 'B013_CarpentersParlor'
 /**
@@ -19,8 +19,8 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.player.houseType !== 'wood') return
-    return { trades: [constructUnitDiscountTrade(CARD_ID, { wood: 3 })] }
+    if (constructedRoomMaterial(context) !== 'wood') return
+    return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 2, reed: 2 })] }
   },
 }
 

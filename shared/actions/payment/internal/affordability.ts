@@ -123,6 +123,8 @@ export const isComplexCost = (
     'paymentResourceProviders' in cost ||
     'minimumResourcesPaid' in cost ||
     'unitFee' in cost ||
+    'roomMaterial' in cost ||
+    'unitPricePremium' in cost ||
     'nb' in cost
   )
 }

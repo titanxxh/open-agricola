@@ -1090,6 +1090,13 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'farm.roomBuilt') {
+        if (event.targetPlayerId && event.targetPlayerId !== event.actorPlayerId) {
+          const material = event.rooms[0]?.type
+          const key = material === 'clay' ? 'log.partnerRoomsBuiltClay' : material === 'stone' ? 'log.partnerRoomsBuiltStone' : 'log.partnerRoomsBuiltWood'
+          return presentationRows(event, [{ key, playerId: event.actorPlayerId, playerRefs: { owner: event.targetPlayerId },
+            params: { player: playerName(ctx, event.actorPlayerId), owner: playerName(ctx, event.targetPlayerId), count: event.rooms.length },
+          }])
+        }
         return presentationRows(event, [actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? 'construct', {
           effects: { buildRoom: event.rooms.length },
         })])

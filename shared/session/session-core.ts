@@ -1,3 +1,4 @@
+import { constructFarmSelection } from '../actions/effects/construct'
 import { validateMarketplaceTransfers } from '../team/marketplace'
 import type { FenceSelectionPayload, FenceSelectionQuote } from '../contract/protocol/game'
 import type { RoundPreparationContext } from '../contract/card-effect-hooks'
@@ -2020,11 +2021,10 @@ export class GameCore {
     costOverride?: Partial<Resource>,
     actionContext?: Record<string, unknown>,
   ): InteractionFarmSelection {
-    const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmInteraction.selectableTiles('room', {
-      costOverride,
-      actionContext,
-    })
+    return constructFarmSelection({
+      ...this.peekHostContextSnapshot(), state: this.state, player,
+      actionHooks: this.actionHooks, costs: costOverride, actionContext,
+    }) ?? { farmType: 'room', selectableTiles: [], maxSelections: 0 }
   }
 
   private readExactCost(actionContext?: Record<string, unknown>): ExactCost | undefined {

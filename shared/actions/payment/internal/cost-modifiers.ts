@@ -25,11 +25,15 @@ import type {
 export const evaluateStaticConditions = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
+  roomMaterial: PlayerState['houseType'] = player.houseType,
 ): boolean => {
   if (!conditions) return true
   if (typeof conditions.houseTypeWood === 'number' && conditions.houseTypeWood > 0 && player.houseType !== 'wood') return false
   if (typeof conditions.houseTypeClay === 'number' && conditions.houseTypeClay > 0 && player.houseType !== 'clay') return false
   if (typeof conditions.houseTypeStone === 'number' && conditions.houseTypeStone > 0 && player.houseType !== 'stone') return false
+  if (conditions.roomMaterialWood && roomMaterial !== 'wood') return false
+  if (conditions.roomMaterialClay && roomMaterial !== 'clay') return false
+  if (conditions.roomMaterialStone && roomMaterial !== 'stone') return false
   return true
 }
 
@@ -37,8 +41,9 @@ export const evaluateConditions = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
   nb?: number,
+  roomMaterial?: PlayerState['houseType'],
 ): boolean => {
-  if (!evaluateStaticConditions(player, conditions)) return false
+  if (!evaluateStaticConditions(player, conditions, roomMaterial)) return false
   if (typeof conditions?.minNumRooms === 'number') {
     const target = nb ?? player.rooms
     if (target < conditions.minNumRooms) return false
@@ -49,12 +54,13 @@ export const evaluateConditions = (
 export const getModifiersForCostType = (
   player: PlayerState,
   costType: CostModifierType,
+  roomMaterial?: PlayerState['houseType'],
 ): CostModifier[] => {
   const all = player.activeModifiers?.filter((m) => m.appliesTo.includes(costType)) ?? []
-  // Layer 1 only: static player-state checks (houseType*). minNumRooms is
+  // Layer 1 only: static residence and room-material checks. minNumRooms is
   // deferred to evaluateConditions(_, _, nb) inside enumerate.
   return all.filter((m) =>
-    m.type === 'remove-resource' || evaluateStaticConditions(player, m.conditions),
+    m.type === 'remove-resource' || evaluateStaticConditions(player, m.conditions, roomMaterial),
   )
 }
 
@@ -126,6 +132,7 @@ export const applyCostModifiers = (
         ...(tradeMod.maxCost ? { maxCost: tradeMod.maxCost } : {}),
         source: tradeMod.cardId,
         sourceId: tradeMod.cardId,
+        ...(baseCost.unitPricePremium && tradeMod.unitPrice ? { unitPrice: tradeMod.unitPrice } : {}),
       })
     } else if (mod.type === 'bonus') {
       const bonusMod = mod as BonusModifier
@@ -141,7 +148,7 @@ export const applyCostModifiers = (
         ...(bonusMod.maxCost ? { maxCost: bonusMod.maxCost } : {}),
         // Propagate nb-aware conditions (e.g. minNumRooms) so enumerate can
         // re-evaluate them against the actual nb via evaluateConditions().
-        // Static conditions (houseType*) are already filtered by
+        // Static conditions (houseType* and roomMaterial*) are already filtered by
         // getModifiersForCostType; preserving them is a no-op here.
         ...(bonusMod.conditions ? { conditions: bonusMod.conditions } : {}),
       })

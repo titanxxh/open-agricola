@@ -5,7 +5,7 @@ import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { constructUnitDiscountTrade } from '../helpers/construct-cost'
+import { constructUnitDiscountTrade, constructedRoomMaterial } from '../helpers/construct-cost'
 
 const CARD_ID = 'E150_RockBeater'
 /**
@@ -47,7 +47,7 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.player.houseType !== 'stone') return
+    if (constructedRoomMaterial(context) !== 'stone') return
     return { trades: [constructUnitDiscountTrade(CARD_ID, { stone: 2 })] }
   },
 }

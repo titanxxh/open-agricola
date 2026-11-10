@@ -85,8 +85,8 @@ describe('A123_FrameBuilder', () => {
     // conditions so the same construct call never offers both swap shapes.
     const claySwap = construct.find((m) => (m as TradeModifier).to.clay === 2)
     const stoneSwap = construct.find((m) => (m as TradeModifier).to.stone === 2)
-    expect((claySwap as TradeModifier).conditions).toEqual({ houseTypeClay: 1 })
-    expect((stoneSwap as TradeModifier).conditions).toEqual({ houseTypeStone: 1 })
+    expect((claySwap as TradeModifier).conditions).toEqual({ roomMaterialClay: 1 })
+    expect((stoneSwap as TradeModifier).conditions).toEqual({ roomMaterialStone: 1 })
 
     const renovation = modifiers.filter((m) =>
       (m as TradeModifier | BonusModifier).appliesTo.includes('renovation'),

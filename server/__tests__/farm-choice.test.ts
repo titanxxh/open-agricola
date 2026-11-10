@@ -1,9 +1,8 @@
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
-import { constructAction } from '../../shared/actions/effects/construct.ts'
+import { constructAction, constructFarmSelection } from '../../shared/actions/effects/construct.ts'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/contract/types.ts'
-import { buildRoomFarmInteraction } from '../../shared/domain/farmyard-interaction'
 import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 
@@ -70,7 +69,7 @@ describe('farm choice', () => {
     player.resources.reed = 2
     player.activeModifiers = [...(A123_FrameBuilder.impl.modifiers ?? [])]
 
-    const interaction = buildRoomFarmInteraction(player)
+    const interaction = constructFarmSelection(buildRoomCtx(player))!
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
 
@@ -105,7 +104,7 @@ describe('farm choice', () => {
     player.resources.reed = 2
     player.activeModifiers = [...(A123_FrameBuilder.impl.modifiers ?? [])]
 
-    const interaction = buildRoomFarmInteraction(player)
+    const interaction = constructFarmSelection(buildRoomCtx(player))!
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
 
@@ -129,7 +128,7 @@ describe('farm choice', () => {
       ...(A014_CarpentersHammer.impl.modifiers ?? []),
     ]
 
-    const interaction = buildRoomFarmInteraction(player)
+    const interaction = constructFarmSelection(buildRoomCtx(player))!
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
     expect(interaction.maxSelections).toBe(2)

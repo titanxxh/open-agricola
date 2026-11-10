@@ -8,11 +8,9 @@ import type {
   ActionExecutionResult,
   ComplexCost,
   FarmTilePosition,
-  GameState,
-  PlayerState,
   Resource,
 } from '../../contract/types'
-import { PaymentSolver, describePaymentEffectPreview, type ConstructCostAdjustments } from '../payment'
+import { PaymentSolver, describePaymentEffectPreview, type ConstructCostAdjustments, type ConstructPaymentInput } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { resolveBuildPlayers } from '../helpers/build-players'
 import { playerBoard } from '../../domain'
@@ -55,56 +53,40 @@ const readConstructCostAdjustments = (
   return { trades, bonuses, paymentResourceProviders }
 }
 
+const constructPaymentInput = (
+  context: ActionAvailabilityContext & Partial<ActionExecutionContext>,
+): ConstructPaymentInput | undefined => {
+  const actionContext = readConstructActionContext(context)
+  const roles = resolveBuildPlayers({ ...context, actionContext })
+  if (!roles) return undefined
+  return {
+    state: context.state, payer: roles.builder, farmOwner: roles.farmOwner,
+    costs: context.costs, actionContext, adjustments: readConstructCostAdjustments(context),
+  }
+}
+
+export const constructFarmSelection = (context: ActionAvailabilityContext & Partial<ActionExecutionContext>) => {
+  const input = constructPaymentInput(context)
+  if (!input) return undefined
+  return playerBoard(context.state, context.state.players.indexOf(input.farmOwner)).farmInteraction.selectableTiles('room', {
+    max: PaymentSolver.getMaxBuildableRooms(input),
+  })
+}
+
+const canStartConstruct = (context: ActionAvailabilityContext, costs?: Partial<Resource>) => {
+  const farm = constructFarmSelection({ ...context, costs })
+  return !!farm?.selectableTiles.length && (farm.maxSelections ?? 0) > 0
+}
+
 const constructCostPreview: ActionCostPreview = {
   dependsOnHouseType: true,
   unitCost: 'room',
-  getBaseCost: (context) => {
-    const cost = PaymentSolver.buildConstructCost(
-      context.player,
-      undefined,
-      1,
-      readConstructActionContext(context),
-    )
-    return cost?.unitFee ?? PaymentSolver.getBuildRoomCost(context.player.houseType)
+  getBaseCost: context => {
+    const input = constructPaymentInput(context)
+    return input ? PaymentSolver.buildConstructCost({ ...input, costs: undefined, adjustments: undefined, roomCount: 1 })?.unitFee ?? {} : {}
   },
-  canExecute: (context, costs) =>
-    canStartConstruct(
-      context.state,
-      context.player,
-      costs,
-      readConstructActionContext(context),
-      readConstructCostAdjustments(context),
-    ),
+  canExecute: canStartConstruct,
 }
-
-const boardForPlayer = (state: GameState, player: PlayerState) => {
-  const idx = state.players.indexOf(player)
-  if (idx >= 0) return playerBoard(state, idx)
-  return playerBoard({ ...state, players: [player] }, 0)
-}
-
-const canStartConstruct = (
-  state: GameState,
-  player: PlayerState,
-  costs: Partial<Resource> | undefined,
-  actionContext: Record<string, unknown> | undefined,
-  costAdjustments: ConstructCostAdjustments | undefined,
-): boolean => {
-  const roles = resolveBuildPlayers({ state, player, actionContext })
-  if (!roles) return false
-  const { builder, farmOwner } = roles
-  if (PaymentSolver.getMaxBuildableRooms(builder, costs, actionContext, costAdjustments) <= 0) return false
-  const costDelta = PaymentSolver.readConstructCostDelta(actionContext, costs)
-  const farm = boardForPlayer(state, farmOwner).farmInteraction.selectableTiles('room', {
-    costOverride: costDelta,
-    exactCost: PaymentSolver.readExactCost(actionContext),
-    actionContext,
-    costAdjustments,
-  })
-  if (farm.farmType !== 'room') return false
-  return farm.selectableTiles.length > 0 && (farm.maxSelections ?? 0) > 0
-}
-
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const result: Partial<Resource> = {}
@@ -153,14 +135,6 @@ const recordConstructCostAttribution = (
     rooms,
   )
 
-const buildConstructPayCost = (
-  player: PlayerState,
-  costs: Partial<Resource> | undefined,
-  actionContext: Record<string, unknown> | undefined,
-  rooms: number,
-  costAdjustments: ConstructCostAdjustments | undefined,
-): ComplexCost | null => PaymentSolver.buildConstructCost(player, costs, rooms, actionContext, costAdjustments)
-
 const finalizeRoom = (
   ctx: ActionMutationContext,
   rooms: FarmTilePosition[],
@@ -174,43 +148,15 @@ const finalizeRoom = (
   const selection = playerBoard(ctx.state, idx).farmyard.canBuildRoom(rooms, lockedKeys)
   if (!selection.ok) return { type: 'fail', errorKey: selection.code ?? 'log.action' }
 
-  const maxBuildableRooms = PaymentSolver.getMaxBuildableRooms(
-    builder,
-    ctx.costs,
-    ctx.actionContext,
-    readConstructCostAdjustments(ctx),
-  )
-  if (rooms.length > maxBuildableRooms) {
-    return { type: 'fail', errorKey: 'log.buildRoomFail' }
-  }
-
-  const payment = PaymentSolver.resolveRoomPaymentSelection(
-    builder,
-    ctx.costs,
-    rooms.length,
-    paymentChoice,
-    ctx.actionContext,
-    readConstructCostAdjustments(ctx),
-  )
+  const input = constructPaymentInput(ctx)
+  if (!input || rooms.length > PaymentSolver.getMaxBuildableRooms(input)) return { type: 'fail', errorKey: 'log.buildRoomFail' }
+  const payment = PaymentSolver.resolveRoomPaymentSelection({ ...input, roomCount: rooms.length, paymentChoice })
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
-  const payCost = buildConstructPayCost(
-    builder,
-    ctx.costs,
-    ctx.actionContext,
-    rooms.length,
-    readConstructCostAdjustments(ctx),
-  )
-  if (!payCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
-  const baseCost = buildConstructPayCost(
-    builder,
-    undefined,
-    ctx.actionContext,
-    rooms.length,
-    undefined,
-  )
-  if (!baseCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
+  const payCost = PaymentSolver.buildConstructCost({ ...input, roomCount: rooms.length })
+  const baseCost = PaymentSolver.buildConstructCost({ ...input, roomCount: rooms.length, costs: undefined, adjustments: undefined })
+  if (!payCost || !baseCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
   const farmOperation = commitRoomConstruction(ctx.state, farmOwner, rooms, ctx.sourceCard, ctx.eventSink)
 
@@ -263,51 +209,32 @@ const finalizeRoom = (
 
 export const constructAction: ActionDefinition = {
   id: 'construct',
+  farmBuild: { kinds: ['rooms'] },
   nameKey: 'actions.construct.name',
   descriptionKey: 'actions.construct.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_state, player, context) =>
-    canStartConstruct(_state, player, undefined, context?.actionContext, undefined),
+  canBeExecutedByPlayer: (state, player, context) =>
+    canStartConstruct({ state, player, actionHooks: context?.actionHooks, actionContext: context?.actionContext }),
   costPreview: constructCostPreview,
   previewEffect: context => {
-    const { state, player, costs, actionContext, previewMode } = context
-    const roles = resolveBuildPlayers(context)
-    if (!roles) return undefined
-    if (previewMode === 'base') return { kind: 'unitCost', unit: 'room', resourcesPaid: constructCostPreview.getBaseCost(context), actionNameKey: 'actions.construct.name' }
-    const adjustments = readConstructCostAdjustments(context)
-    const selection = boardForPlayer(state, roles.farmOwner).farmInteraction.selectableTiles('room', {
-      costOverride: PaymentSolver.readConstructCostDelta(actionContext, costs),
-      exactCost: PaymentSolver.readExactCost(actionContext), actionContext, costAdjustments: adjustments,
-    })
-    if (selection.farmType !== 'room') return undefined
+    const input = constructPaymentInput(context)
+    if (!input) return undefined
+    if (context.previewMode === 'base') return { kind: 'unitCost', unit: 'room', resourcesPaid: constructCostPreview.getBaseCost(context), actionNameKey: 'actions.construct.name' }
+    const selection = constructFarmSelection(context)
+    if (!selection) return undefined
     return { kind: 'actionCosts', actionNameKey: 'actions.construct.name', options: Array.from({ length: selection.maxSelections ?? 0 }, (_, index) => {
-      const cost = buildConstructPayCost(player, costs, actionContext, index + 1, adjustments)
-      const solutions = cost ? PaymentSolver.computeOptions(state, state.players.indexOf(player), cost, { actionId: 'construct', costType: 'construct' }) : []
+      const cost = PaymentSolver.buildConstructCost({ ...input, roomCount: index + 1 })
+      const solutions = cost ? PaymentSolver.computeOptions(context.state, context.state.players.indexOf(input.payer), cost, { actionId: 'construct', costType: 'construct' }) : []
       return { amount: index + 1, paymentOptions: solutions.map(solution => describePaymentEffectPreview(solution, false, { paymentResourceProviders: cost?.paymentResourceProviders })) }
     }) }
   },
   execute: (context): ActionExecutionResult => {
-    const { state, costs, actionContext } = context
-    const roles = resolveBuildPlayers(context)
-    if (!roles) return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
-    const idx = state.players.indexOf(roles.farmOwner)
-    const costDelta = PaymentSolver.readConstructCostDelta(actionContext, costs)
-    const farm = playerBoard(state, idx).farmInteraction.selectableTiles('room', {
-      costOverride: costDelta,
-      exactCost: PaymentSolver.readExactCost(actionContext),
-      actionContext,
-      costAdjustments: readConstructCostAdjustments(context),
-    })
+    const farm = constructFarmSelection(context)
+    if (!farm || !farm.selectableTiles.length || !farm.maxSelections) return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
     return {
       type: 'request',
-      request: {
-        kind: 'farm-select',
-        farm,
-        options: [
-          { value: 'confirm', labelKey: 'ui.interactionRoomConfirm' },
-        ],
-      },
+      request: { kind: 'farm-select', farm, ...(resolveBuildPlayers(context)?.farmOwner.id !== context.player.id ? { farmOwnerPlayerId: resolveBuildPlayers(context)?.farmOwner.id } : {}), options: [{ value: 'confirm', labelKey: 'ui.interactionRoomConfirm' }] },
       promptKey: 'ui.interactionRoomSelect',
     }
   },
@@ -347,24 +274,9 @@ export const constructAction: ActionDefinition = {
         return { type: 'fail', errorKey: selection.code ?? 'log.buildRoomFail', recoverable: true }
       }
 
-      const maxBuildableRooms = PaymentSolver.getMaxBuildableRooms(
-        ctx.player,
-        ctx.costs,
-        ctx.actionContext,
-        readConstructCostAdjustments(ctx),
-      )
-      if (rooms.length > maxBuildableRooms) {
-        return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
-      }
-
-      const payment = PaymentSolver.resolveRoomPaymentSelection(
-        ctx.player,
-        ctx.costs,
-        rooms.length,
-        undefined,
-        ctx.actionContext,
-        readConstructCostAdjustments(ctx),
-      )
+      const input = constructPaymentInput(ctx)
+      if (!input || rooms.length > PaymentSolver.getMaxBuildableRooms(input)) return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
+      const payment = PaymentSolver.resolveRoomPaymentSelection({ ...input, roomCount: rooms.length })
       if (payment.type === 'request') {
         return {
           type: 'request',

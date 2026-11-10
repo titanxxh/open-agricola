@@ -44,7 +44,7 @@ export const A123_FrameBuilder = defineOccupationCard({
           scope: 'unit',
           from: { wood: 1 },
           to: { clay: 2 },
-          conditions: { houseTypeClay: 1 },
+          conditions: { roomMaterialClay: 1 },
         },
         {
           type: 'trade',
@@ -53,7 +53,7 @@ export const A123_FrameBuilder = defineOccupationCard({
           scope: 'unit',
           from: { wood: 1 },
           to: { stone: 2 },
-          conditions: { houseTypeStone: 1 },
+          conditions: { roomMaterialStone: 1 },
         },
         {
           type: 'bonus',

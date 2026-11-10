@@ -314,7 +314,7 @@ describe('Moor field goods and non-field crop spaces', () => {
     expect(getUsedFarmyardTileKeys(after)).not.toContain('0-0')
     expect(session.withCtx(() => playerBoard(resp.state, 0).farmInteraction.selectableTiles('plow')).selectableTiles)
       .not.toContainEqual({ row: 0, col: 0 })
-    expect(session.withCtx(() => playerBoard(resp.state, 0).farmInteraction.selectableTiles('room')).selectableTiles)
+    expect(session.withCtx(() => playerBoard(resp.state, 0).farmInteraction.selectableTiles('room', { max: 13 })).selectableTiles)
       .not.toContainEqual({ row: 0, col: 0 })
     expect(session.withCtx(() => playerBoard(resp.state, 0).farmInteraction.selectableTiles('stable')).selectableTiles)
       .not.toContainEqual({ row: 0, col: 0 })

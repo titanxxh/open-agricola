@@ -30,7 +30,7 @@ export const A014_CarpentersHammer = defineMinorCard({
           appliesTo: ['construct'],
           discount: { wood: 2 },
           optional: false,
-          conditions: { minNumRooms: 2, houseTypeWood: 1 },
+          conditions: { minNumRooms: 2, roomMaterialWood: 1 },
         },
         {
           type: 'bonus',
@@ -38,7 +38,7 @@ export const A014_CarpentersHammer = defineMinorCard({
           appliesTo: ['construct'],
           discount: { clay: 3 },
           optional: false,
-          conditions: { minNumRooms: 2, houseTypeClay: 1 },
+          conditions: { minNumRooms: 2, roomMaterialClay: 1 },
         },
         {
           type: 'bonus',
@@ -46,7 +46,7 @@ export const A014_CarpentersHammer = defineMinorCard({
           appliesTo: ['construct'],
           discount: { stone: 4 },
           optional: false,
-          conditions: { minNumRooms: 2, houseTypeStone: 1 },
+          conditions: { minNumRooms: 2, roomMaterialStone: 1 },
         },
       ] as BonusModifier[],
 } satisfies CardImpl,
