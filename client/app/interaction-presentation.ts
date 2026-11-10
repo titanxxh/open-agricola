@@ -252,6 +252,8 @@ const pendingChoiceFromInteraction = (interaction: WaitInteraction): PendingChoi
     promptParams: interaction.promptParams,
     options: interactionChoiceOptions(interaction),
     multiSelect: interaction.request.kind === 'choice' ? interaction.request.multiSelect : undefined,
+    defaultValue: interaction.request.kind === 'choice' ? interaction.request.defaultValue : undefined,
+    confirmLabelKey: interaction.request.kind === 'choice' ? interaction.request.confirmLabelKey : undefined,
     playerIndex: interaction.playerIndex,
     spaceId: interaction.spaceId ?? '',
     sourceCard: interaction.sourceCard,

@@ -40,6 +40,8 @@ shared/engine/
 - leaf 返回的每个请求都会打开 pending envelope，其选项来自 `interactionRequestChoices()`；提交后才执行完成反应。`InteractionRequest` 是协议形状，不是节点。
 - `before` 反应 leaf 可返回按命名空间和来源组织的 `beforeHostContributions`；引擎通过 `continuationParentHostNodeId` 把它们写入尚未开始的宿主 `actionContext`。没有有效 before 宿主的贡献会失败，同一来源重复贡献时替换原条目。它们随宿主经历 pending、恢复与撤销，嵌套或另行授予的行动不继承它们。
 
+新行动节点携带 `farmTargetSelection`。开启协作时，声明 `farmBuild` 的行动由 `engine-proceed.ts` 在 hooks 前插入目标农场选择，普通局保留原有节点和选项身份。恢复游标时缺少标记按 false 处理，保留局尚未完成的建造继续在原农场进行。目标选择、摆放和支付恢复测试见 `server/__tests__/partner-stables-session.test.ts`。
+
 ## Engine 公开 API
 
 `Engine` 向 `GameCore` 暴露一个小 interface：

@@ -23,6 +23,7 @@ import { PaymentSolver, describePaymentEffectPreview } from '../payment'
 import type { PaymentCtx } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { resolveBuildPlayers } from '../helpers/build-players'
+import { candidateBuildFarmPlayers, withTargetFarm } from '../helpers/target-farm'
 import { playerBoard } from '../../domain'
 import {
   collectLockedFarmTileKeys,
@@ -156,10 +157,11 @@ const validateStablePlacement = (
 const resolveStableTotalCost = (
   actionContext: Record<string, unknown> | undefined,
   count: number,
+  partner = false,
 ) => {
   if (!isWithinStableMax(actionContext, count)) return null
   return PaymentSolver.resolveUnitCostWithDelta(
-    { wood: stableWoodCost },
+    { wood: partner && !readCostOverride(actionContext) ? 3 : stableWoodCost },
     PaymentSolver.readExactCost(actionContext),
     readStableCostDelta(actionContext),
     count,
@@ -182,8 +184,10 @@ const resolveStableTotalCostWithDiscount = (
 ): StableCostResolution | null => {
   const { state, player } = context
   const actionContext = readStableActionContext(context)
-  const baseCost = resolveStableTotalCost(actionContext, totalUnits)
-  const unitCost = resolveStableTotalCost(actionContext, 1)
+  const roles = resolveBuildPlayers({ state, player, actionContext })
+  const partner = roles !== undefined && roles.builder.id !== roles.farmOwner.id
+  const baseCost = resolveStableTotalCost(actionContext, totalUnits, partner)
+  const unitCost = resolveStableTotalCost(actionContext, 1, partner)
   if (!baseCost || !unitCost) return null
   // Recompute the complete contribution with the selected quantity. Generic
   // ctx.costs was queried before that quantity existed and must not also
@@ -259,7 +263,13 @@ const buildStableFarmSelection = (
   return farmHandPositions.length > 0 ? { ...farm, farmHandPositions } : farm
 }
 
-const isStableStructurallyPossible = (context: ActionAvailabilityContext) => {
+const isStableStructurallyPossible = (context: ActionAvailabilityContext): boolean => {
+  const actionContext = readStableActionContext(context)
+  if (actionContext?.targetFarmPlayerId === undefined && context.state.team?.configuration.cooperationRules) {
+    return candidateBuildFarmPlayers({ ...context, actionContext }).some(farmOwner => isStableStructurallyPossible({
+      ...context, actionContext: withTargetFarm(actionContext, farmOwner.id),
+    }))
+  }
   const roles = resolveBuildPlayers({ ...context, actionContext: readStableActionContext(context) })
   return roles !== undefined && getAvailableStableSupplyCount(context.state, roles.farmOwner,
     readFutureStableId(readStableActionContext(context))) > 0
@@ -267,7 +277,13 @@ const isStableStructurallyPossible = (context: ActionAvailabilityContext) => {
 
 const canExecuteStableCostPreview = (
   context: ActionAvailabilityContext,
-) => {
+): boolean => {
+  const actionContext = readStableActionContext(context)
+  if (actionContext?.targetFarmPlayerId === undefined && context.state.team?.configuration.cooperationRules) {
+    return candidateBuildFarmPlayers({ ...context, actionContext }).some(farmOwner => canExecuteStableCostPreview({
+      ...context, actionContext: withTargetFarm(actionContext, farmOwner.id),
+    }))
+  }
   if (!isStableStructurallyPossible(context)) return false
   const farm = buildStableFarmSelection(context)
   if (!farm || farm.farmType !== 'stable') return false
@@ -280,7 +296,8 @@ const stablesCostPreview: ActionCostPreview = {
   isStructurallyPossible: isStableStructurallyPossible,
   getBaseCost: (context) => {
     const actionContext = readStableActionContext(context)
-    return resolveStableTotalCost(actionContext, 1) ?? {}
+    const roles = resolveBuildPlayers({ ...context, actionContext })
+    return resolveStableTotalCost(actionContext, 1, roles !== undefined && roles.builder.id !== roles.farmOwner.id) ?? {}
   },
   canExecute: canExecuteStableCostPreview,
 }
@@ -396,6 +413,7 @@ const finalizeStables = (
 
 export const stablesAction: ActionDefinition = {
   id: 'stables',
+  farmBuild: { kinds: ['stables'] },
   nameKey: 'actions.stables.name',
   descriptionKey: 'actions.stables.description',
   roundAvailable: 1,
@@ -427,6 +445,7 @@ export const stablesAction: ActionDefinition = {
       type: 'request',
       request: {
         kind: 'farm-select',
+        ...(resolveBuildPlayers(context)?.farmOwner.id !== context.player.id ? { farmOwnerPlayerId: resolveBuildPlayers(context)?.farmOwner.id } : {}),
         farm,
         options: [
           { value: 'confirm', labelKey: 'ui.interactionStableConfirm' },

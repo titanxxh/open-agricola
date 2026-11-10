@@ -798,7 +798,10 @@ const mapStableBuilt = (
   ctx: EventLogMapperContext,
   payment: ResourcePaidEvent | undefined,
 ): LogEntry =>
-  actionDetailLog(
+  event.targetPlayerId && event.targetPlayerId !== event.actorPlayerId ? {
+    key: 'log.partnerStablesBuilt', playerId: event.actorPlayerId, playerRefs: { owner: event.targetPlayerId },
+    params: { player: playerName(ctx, event.actorPlayerId), owner: playerName(ctx, event.targetPlayerId), count: event.stables.length },
+  } : actionDetailLog(
     ctx,
     event.actorPlayerId,
     containingActionId(events, event, event.sourceActionId ?? 'stables'),

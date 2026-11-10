@@ -4,7 +4,7 @@ import { inheritPrimaryBody } from './primary-body-nodes'
 import { inheritSpaceEffectSource } from './effect-source'
 import { captureSpaceUseEvents } from './space-use-runtime'
 import { preparePrimaryCompletions, executeCompletionPhase } from './completion-runtime'
-import { evaluateFlowDoable, isActionDoableInFlowContext, isActionVetoedInFlowContext } from '../actions/flow'
+import { evaluateFlowDoable, isActionDoableInFlowContext, isActionVetoedInFlowContext, legalBuildTargetFarms } from '../actions/flow'
 import type {
   ActionExecutionContext,
   ActionExecutionResult,
@@ -1166,7 +1166,7 @@ export function engineProceed(
     if (node.deferredHostResult) {
       return executeDeferredHostAction(int, context, node)
     }
-    const actionContext = actionContextForNode(node, int)
+    let actionContext = actionContextForNode(node, int)
     const replaceResult = node.resolvedReplacement
       ? { ...node.resolvedReplacement, alternatives: [] }
       : int.hooks.applyComputeReplace({
@@ -1194,6 +1194,25 @@ export function engineProceed(
     const action = int.registry.get(replacedActionId)
     if (!action) {
       throw new Error(`missing action definition: ${replacedActionId}`)
+    }
+    if (node.farmTargetSelection && action.farmBuild && !node.bodyStarted && !node.beforePhaseResolved
+      && context.state.team?.configuration.cooperationRules === true && actionContext?.targetFarmPlayerId === undefined) {
+      const build: Extract<ActionFlow, { type: 'leaf' }> = {
+        type: 'leaf', actionId: replacedActionId, params: node.params,
+        sourceCard: replaceSourceCard, actionContext, expandFlow: node.expandFlow,
+      }
+      const farms = legalBuildTargetFarms(build, { ...context, actionContext }, id => int.registry.get(id))
+      if (farms.some(farm => farm.id !== context.player.id)) {
+        const selector = new ActionNode(`target-farm-${node.id}-${int.counterRef.value++}`, 'select-target-farm', undefined, { build })
+        selector.ownerPlayerId = context.player.id
+        inheritPrimaryBody(node, selector)
+        if (node.mandatory) enforceCompositeContinuationMandatory(selector)
+        node.resolve({ type: 'ok' })
+        int.tree.insertAfter(node.id, [selector])
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
+      actionContext = { ...actionContext, targetFarmPlayerId: context.player.id }
+      node.actionContext = actionContext
     }
     if (node.expandFlow && action.flow) {
       const flow = mergeContextIntoFlow(action.flow,

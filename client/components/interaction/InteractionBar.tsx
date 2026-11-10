@@ -232,6 +232,24 @@ const renderChoiceOptionContent = ({
   return renderOptionContent(locale, option)
 }
 
+function ChoiceSingleSelectPanel({ locale, options, defaultValue, confirmLabelKey, resolveChoice, isInteractive }: {
+  locale: Locale; options: ActionChoiceOption[]; defaultValue?: string; confirmLabelKey: string
+  resolveChoice: (value: string) => void; isInteractive: boolean
+}) {
+  const [selected, setSelected] = useState(defaultValue ?? '')
+  return <div className="interaction-actions">
+    <div role="radiogroup">
+      {options.map(option => <button key={option.value} type="button" role="radio"
+        aria-checked={selected === option.value} disabled={!isInteractive || option.disabled}
+        data-choice-value={option.value} onClick={() => setSelected(option.value)}>
+        {renderOptionLabel(locale, option)}
+      </button>)}
+    </div>
+    <button type="button" disabled={!isInteractive || !options.some(option => option.value === selected && !option.disabled)}
+      onClick={() => resolveChoice(selected)}>{translateCardText(locale, confirmLabelKey)}</button>
+  </div>
+}
+
 function ChoiceMultiSelectPanel({ locale, options, selection, resolveChoice, isInteractive }: {
   locale: Locale
   options: ActionChoiceOption[]
@@ -629,7 +647,14 @@ export const InteractionBar = ({
                   {renderInteractionText(locale, error)}
                 </div>
               ))}
-              {!choiceModel.showOptions ? null : choiceModel.multiSelect ? (
+              {!choiceModel.showOptions ? null : choiceModel.confirmLabelKey ? (
+                <ChoiceSingleSelectPanel
+                  key={`${choiceModel.confirmLabelKey}:${model.pending.choice?.playerIndex}:${model.pending.choice?.spaceId}:${choiceModel.visibleOptions.map(({ option }) => option.value).join('|')}`}
+                  locale={locale} options={choiceModel.visibleOptions.map(entry => entry.option)}
+                  defaultValue={choiceModel.defaultValue} confirmLabelKey={choiceModel.confirmLabelKey}
+                  resolveChoice={resolveChoice} isInteractive={isInteractive}
+                />
+              ) : choiceModel.multiSelect ? (
                 <ChoiceMultiSelectPanel
                   key={`${choiceModel.multiSelect.valuePrefix}:${model.pending.choice?.playerIndex}:${model.pending.choice?.spaceId}:${choiceModel.multiSelect.minSelections}:${choiceModel.multiSelect.maxSelections}:${choiceModel.visibleOptions.map(({ option }) => `${option.value}:${!!option.disabled}`).join('|')}`}
                   locale={locale}
