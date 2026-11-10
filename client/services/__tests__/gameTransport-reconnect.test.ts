@@ -90,6 +90,41 @@ describe('Room reconnect and durable commands', () => {
     } finally { transport.destroy(); send.mockRestore() }
   })
 
+  it('settles a recovered refresh rejection before stopping without replaying creation or returning to connected', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const options = { route: false, journalKey: 'refresh-recovery' } as const
+    const first = new WsGameTransport('ws://test', undefined, undefined, options)
+    let restored: InstanceType<typeof WsGameTransport> | undefined
+    try {
+      await first.connect()
+      const creation = first.createRoom({ maxPlayers: 4 })
+      void creation.catch(() => undefined)
+      const command = Socket.all[0]!.sent.find(message => message.type === 'createRoom')!
+      first.destroy()
+      restored = new WsGameTransport('ws://test', undefined, undefined, options)
+      const statuses = vi.fn()
+      restored.onConnectionStatus(statuses)
+      const resumed = restored.resumeRoomCreation()
+      expect(resumed).not.toBeNull()
+      const rejected = expect(resumed).rejects.toMatchObject({ code: 'client_refresh_required' })
+      const connecting = restored.connect()
+      await tick()
+      const socket = Socket.all[1]!
+      await vi.waitFor(() => expect(socket.sent.some(message => message.type === 'getCommandReceipt')).toBe(true))
+      const request = socket.sent.find(message => message.type === 'getCommandReceipt')!
+      socket.emit({ type: 'commandReceipt', status: 'completed', requestId: request.requestId, receipt: {
+        scopeId: command.commandContext.scopeId, commandId: command.commandContext.commandId,
+        outcome: { ok: false, code: 'client_refresh_required', error: 'Please refresh this page to use official cooperation rules.' },
+      } })
+      await connecting
+      await rejected
+      expect(restored.connected).toBe(false)
+      expect(restored.recoveringCommands).toBe(false)
+      expect(statuses).toHaveBeenLastCalledWith({ phase: 'stopped', code: 'client_refresh_required', message: 'Please refresh this page to use official cooperation rules.' })
+      expect(socket.sent.filter(message => message.type === 'createRoom' || message.type === 'joinRoom')).toEqual([])
+    } finally { first.destroy(); restored?.destroy() }
+  })
+
   it('recovers an unseated team member without requesting state or inventing a seat', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false, reconnectDelayMs: 1 })

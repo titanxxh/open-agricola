@@ -478,6 +478,7 @@ export class WsGameTransport implements GameTransport {
       const waiting = this.waitEvent(event => event.type === 'commandReceipt' && event.requestId === requestId)
       this.sendRaw({ type: 'getCommandReceipt', identity: { scopeId: identity.scopeId, commandId: identity.commandId }, requestId })
       const result = await waiting as ReceiptEvent
+      if (this.stopped) return
       if (result.status === 'completed') {
         this.completed.set(identity.commandId, result.receipt.outcome)
         if (result.receipt.outcome.ok && result.receipt.outcome.roomId && ['createRoom', 'newGame', 'proposeGameEnd', 'respondGameEnd'].includes(command.type)) this.setRoom(result.receipt.outcome.roomId)
@@ -666,6 +667,8 @@ export class WsGameTransport implements GameTransport {
 
   private stopForRequiredRefresh(): void {
     if (!this.refreshRequiredMessage || [...this.journal.commands.keys()].some(commandId => !this.completed.has(commandId))) return
+    for (const [commandId, outcome] of [...this.completed]) if (this.journal.commands.has(commandId)) this.finishCommand(commandId, outcome)
+    this.recovering = false
     this.stop(this.refreshRequiredMessage, 'client_refresh_required')
   }
 
