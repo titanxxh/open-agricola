@@ -12,6 +12,8 @@
 |---|---|
 | `fees` | 每次行动的固定费用。`computeCosts.costs` 的差值并入 `fees[0]`；负总额 clamp 为 0，折扣不会退还其他资源。 |
 | `unitFee` + `nb` | 单位费用乘数量（房间、翻修房间、围栏段、马厩）。 |
+| `roomMaterial` | 实际建出房间的材质，同时用于静态 modifier 与数量相关 bonus 的两层过滤。旧费用缺省时沿用付款者房型；显式 `houseType*` 居住条件始终读付款者。 |
+| `unitPricePremium` | 普通基础价的逐件增量。实际使用 `Trade.unitPrice` 时，每件只移除一次；普通折扣不移除。卡定价保留相对于普通价的 delta，保持原有自建组合。 |
 | `trades` | `from → to` 替代。`Trade.scope: 'action'` 每次行动对资源池转换一次；`'unit'` 对每个单位行运行候选闭包。`minCost` / `maxCost`、`replaceUpTo`、`groupMin` / `groupMax` 约束使用次数；每个单位 `TradeUsage` 记录实际替换量。 |
 | `bonuses` | 每次行动的折扣或折扣选择。`optional` 增加不用折扣的分支；`capDiscountAtCost` 把可变折扣封顶在当前费用；`trackChoiceIndex` 记录 `bonusChoiceIndex`；只有 `choiceAffectsState` 让选择免于支配剪枝；`conditions` 按数量重新求值。 |
 | `costResourceRemovals` | 已应用的删除 `{ resource, sourceCard, savedByFee }`。输入是卡牌的 `CostResourceRemovalModifier`（`type: 'remove-resource'`，属于 `CostModifier`，不是 `ComplexCost` 的 key）；`applyCostModifiers()` 在枚举前从所有费用中删除该资源并记录到这里，使枚举在后续折扣后仍保持删除并归属节省量。表达“不再需要 X”时用它，不用超大封顶折扣模拟。 |
@@ -23,6 +25,7 @@
 **固定管线顺序**（领域规则，不是卡牌优先级）：基础候选（`fee`、`fees`、`unitFee`、动态 `getBaseCosts`）→ 结构性删资源 → 候选闭包 → action 级 trade → bonus → 卡牌提供的支付资源 → card → 可负担方案 → `paymentBudget` / `minimumResourcesPaid` 过滤 → 支配剪枝与排序 → `resourceReserve` / `reserveResources` 过滤。
 
 - **候选闭包**（[ADR 0004](../adr/0004-candidate-closure-replaces-cost-modifier-ordering.md)）：卡牌购买和职业费用先规范化为 Cost Candidate List，再对所有 `deriveCardCostCandidate` 转换求不动点并做强制饱和。结果与注册顺序无关；候选转换和 `TradeModifier` 都没有 `order` 字段。每个 resources + `originalFeeIndex` 组保留一条代表行。卡牌只声明单候选转换与 `cardCostCandidateMandatory`；动态基础费用来自 `CardImpl.getBaseCosts()`。静态消费者通过 `getPrintedImprovementCostCandidates()` 读取印刷候选。
+- **房间价格**：`ConstructPaymentInput` 把付款者库存、卡牌和 providers 与目标材质、几何分开。固定价逐件 trade 与普通替换组合；附加价节省归到实际使用的价格 trade 中的稳定来源，避免相同支付重复出现在菜单。新字段均可缺省，旧费用保留原 trade 与支付标识。测试：`server/__tests__/partner-rooms-session.test.ts`。
 - **两条费用路径**（[ADR 0003](../adr/0003-card-purchase-compute-card-costs-candidates.md)）：大小改良与职业费用走候选管线；其他行动聚合 `computeCosts` 结果。候选 metadata（`sources`、`originalFeeIndex`、Cost Attribution）不进入 `PaymentSolution`。构建选项时（`describePaymentSolution()` / `describePaymentEffectPreview()`）在选择之前把 `sources` 并入每个选项的 `sourceCards`；`PaymentReceipt` 则把它们保留为 `candidateSources`，与 `costAttribution` 并列。
 - **支配剪枝**在资源可行性过滤之后执行，豁免支付路径身份、影响状态的 bonus choice 和 card 支付。
 - **Cost Attribution**：saved / paid 统计来自归因，不来自 pay leaf 的 `sourceCard`。行动 `computeCosts` 声明 `costAttribution`；宿主在真实执行后写入 clamp 后的前后差值。
