@@ -14,7 +14,7 @@ const CARD_ID = 'D121_ClayPlasterer'
  * Each clay room only costs you 3 <CLAY> and 2 <REED> to build.
  *
  * - onPlayerComputeCostsConstruct: for roomClay type, calls Utils::addCost with
- *   [CLAY => 3, REED => 2] as an alternative (discount of 2 clay from base 5 clay + 2 reed).
+ *   [CLAY => 3, REED => 2] as a complete alternative unit price.
  * - onPlayerComputeCostsRenovation: for newRoomType=roomClay, removes clay from all trade
  *   cost entries and sets fee clay to 1 (flat 1 clay fee regardless of room count).
  */
@@ -26,7 +26,7 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (constructedRoomMaterial(context) !== 'clay') return
-    return { trades: [constructUnitPriceTrade(context, CARD_ID, { clay: 3, reed: 2 })] }
+    return { trades: [constructUnitPriceTrade(CARD_ID, { clay: 3, reed: 2 })] }
   },
 }
 

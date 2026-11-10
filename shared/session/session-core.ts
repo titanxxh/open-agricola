@@ -2372,14 +2372,20 @@ export class GameCore {
       && snapshot.actionContext && typeof snapshot.actionContext === 'object'
       ? snapshot.actionContext as Record<string, unknown>
       : undefined
-    let request = nativeProject?.(
+    const params = snapshot && typeof snapshot === 'object' && 'params' in snapshot
+      && snapshot.params && typeof snapshot.params === 'object'
+      ? snapshot.params as Record<string, unknown> : undefined
+    const projection = nativeProject?.(
       this.state, player, envelope.request, actionContext, this.actionHooks, view.sourceCard,
-    ) ?? envelope.request
+      { params, space: this.getSpaceById(frame.spaceId) ?? this.createSyntheticSpace(frame.spaceId) },
+    )
+    let request = projection?.request ?? envelope.request
     if (project) request = project(this.state, player, request, envelope.pendingActionId)
-    if (request === envelope.request) return
+    if (request === envelope.request && !projection?.promptKey) return
     frame.engine.peekPendingHost()?.setPending({
       ...envelope,
       request,
+      ...(projection?.promptKey ? { promptKey: projection.promptKey } : {}),
       choices: request.kind === 'choice' ? request.options : envelope.choices,
     })
   }

@@ -7,9 +7,9 @@ import { constructUnitPriceTrade, constructedRoomMaterial } from '../helpers/con
 const CARD_ID = 'C128_WoodenHutExtender'
 /**
  * C128 Wooden Hut Extender — Wood rooms cost 1 reed, and additionally:
- *   - Rounds 1–5:  5 wood + 1 reed  (base 5+2, so -1 reed)
- *   - Rounds 6–7:  4 wood + 1 reed  (base 5+2, so -1 wood -1 reed)
- *   - Round 8+:    3 wood + 1 reed  (base 5+2, so -2 wood -1 reed)
+ *   - Rounds 1–5:  5 wood + 1 reed
+ *   - Rounds 6–7:  4 wood + 1 reed
+ *   - Round 8+:    3 wood + 1 reed
  *
  * Reference: onPlayerComputeCostsConstruct calls Utils::addCost to set the full cost
  * based on the current round, only for roomWood type.
@@ -24,12 +24,12 @@ const constructCostListener: CardListenerRegistration = {
     if (constructedRoomMaterial(context) !== 'wood') return
     const round = context.state.round
     if (round >= 8) {
-      return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 3, reed: 1 })] }
+      return { trades: [constructUnitPriceTrade(CARD_ID, { wood: 3, reed: 1 })] }
     }
     if (round >= 6) {
-      return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 4, reed: 1 })] }
+      return { trades: [constructUnitPriceTrade(CARD_ID, { wood: 4, reed: 1 })] }
     }
-    return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 5, reed: 1 })] }
+    return { trades: [constructUnitPriceTrade(CARD_ID, { wood: 5, reed: 1 })] }
   },
 }
 

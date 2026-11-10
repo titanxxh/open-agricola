@@ -163,7 +163,7 @@ export const placeFarmerAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   projectInteractionRequest: (state, player, request, actionContext, actionHooks, sourceCard) => {
-    if (!usesLiveBuildingResourceConstraints(actionContext) || request.kind !== 'choice' || !actionHooks) return request
+    if (!usesLiveBuildingResourceConstraints(actionContext) || request.kind !== 'choice' || !actionHooks) return { request }
     const options = placementOptions(state, legalPlacements(state, player, actionHooks, sourceCard, actionContext))
     const unchanged = options.length === request.options.length && options.every((option, index) => {
       const current = request.options[index]
@@ -173,7 +173,7 @@ export const placeFarmerAction: ActionDefinition = {
         && option.disabledReasonKey === current?.disabledReasonKey
         && option.sourceCard === current?.sourceCard
     })
-    return unchanged ? request : { ...request, options }
+    return { request: unchanged ? request : { ...request, options } }
   },
   canBeExecutedByPlayer: (state, player, context) =>
     context?.actionContext?.viaCardJump === true

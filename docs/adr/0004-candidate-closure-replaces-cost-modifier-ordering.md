@@ -13,7 +13,7 @@ The reference order only prevents missing candidates; it never forbids a combina
 
 - **Candidate Closure**: the cost candidate set is closed under the card cost transforms. Each transform below its `maxUses` (default 1) is applied to every candidate repeatedly, new candidates are de-duplicated and merged, until a fixed point. The result is the union over all orders and is independent of registration order.
 - **Mandatory Saturation**: each transform is `mandatory` ("costs N less") or optional ("can pay X instead"). The output keeps only saturated candidates, those to which no mandatory transform still applies; unsaturated ones are intermediate. Mandatory chains converge to the reference's final set in any order; extra options come only from optional branches.
-- Fixed-price cards are input-independent optional transforms; closure produces one fixed row per candidate and de-duplicates it. No priority field is needed.
+- In card purchases, fixed-price cards are input-independent optional transforms; closure produces one fixed row per candidate and de-duplicates it. Unit construction prices instead seed independent bases before the ordinary transformation closure ([ADR 0044](0044-unit-prices-precede-cost-transformations.md)); two complete prices never become two discounts on one unit. No priority field is needed.
 - All order fields are deleted: `CardListenerRegistration.order`, `TradeModifier.order` and the trailing-listener order fallback.
 - The closure core is shared by `resolveCardCostWithModifiersDetailed` (card purchase and occupation) and `buildUnitCostOptions` (unit trades). The two cost paths of ADR 0003 remain separate.
 - Traversal tie-breaks by sorted source ID for reproducibility and stable attribution only; it is not card semantics.

@@ -10,7 +10,7 @@ import type {
   FarmTilePosition,
   Resource,
 } from '../../contract/types'
-import { PaymentSolver, describePaymentEffectPreview, type ConstructCostAdjustments, type ConstructPaymentInput } from '../payment'
+import { PaymentSolver, describePaymentEffectPreview, type ConstructPaymentInput } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { resolveBuildPlayers } from '../helpers/build-players'
 import { playerBoard } from '../../domain'
@@ -20,6 +20,8 @@ import {
   recordActionCostAttribution,
 } from '../../cards/helpers/card-state'
 import { incRoomsBuilt } from '../../session/stats'
+import { collectFarmChoiceCostAdjustments } from '../../cards/card-listeners'
+import { requireActionHookRegistry } from '../hooks'
 
 type ConstructAvailabilityContext = ActionAvailabilityContext & {
   actionContext?: Record<string, unknown>
@@ -35,33 +37,19 @@ const readConstructActionContext = (
   return paramsActionContext as Record<string, unknown>
 }
 
-const readConstructCostAdjustments = (
-  context: unknown,
-): ConstructCostAdjustments | undefined => {
-  if (!context || typeof context !== 'object') return undefined
-  const raw = context as {
-    costTrades?: ActionExecutionContext['costTrades']
-    costBonuses?: ActionExecutionContext['costBonuses']
-    paymentResourceProviders?: ActionExecutionContext['paymentResourceProviders']
-  }
-  const trades = raw.costTrades ?? []
-  const bonuses = raw.costBonuses ?? []
-  const paymentResourceProviders = raw.paymentResourceProviders ?? []
-  if (trades.length === 0 && bonuses.length === 0 && paymentResourceProviders.length === 0) {
-    return undefined
-  }
-  return { trades, bonuses, paymentResourceProviders }
-}
-
 const constructPaymentInput = (
   context: ActionAvailabilityContext & Partial<ActionExecutionContext>,
 ): ConstructPaymentInput | undefined => {
   const actionContext = readConstructActionContext(context)
   const roles = resolveBuildPlayers({ ...context, actionContext })
   if (!roles) return undefined
+  const adjustments = context.actionHooks ? collectFarmChoiceCostAdjustments(
+    requireActionHookRegistry(context.actionHooks), context.state, roles.builder, 'construct',
+    context.params ?? {}, context.space, { sourceCard: context.sourceCard, actionContext },
+  ) : { costs: context.costs, trades: context.costTrades, bonuses: context.costBonuses, paymentResourceProviders: context.paymentResourceProviders }
   return {
     state: context.state, payer: roles.builder, farmOwner: roles.farmOwner,
-    costs: context.costs, actionContext, adjustments: readConstructCostAdjustments(context),
+    costs: adjustments.costs, actionContext, adjustments,
   }
 }
 
@@ -215,8 +203,32 @@ export const constructAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) =>
-    canStartConstruct({ state, player, actionHooks: context?.actionHooks, actionContext: context?.actionContext }),
+    canStartConstruct({ ...context, state, player, actionHooks: context?.actionHooks }),
   costPreview: constructCostPreview,
+  projectInteractionRequest: (state, player, request, actionContext, actionHooks, sourceCard, saved) => {
+    const context = { state, player, actionContext, actionHooks, sourceCard, ...saved }
+    const farm = constructFarmSelection(context)
+    if (!farm) return { request }
+    if (request.kind === 'farm-select') return { request: { ...request, farm } }
+    const payload = actionContext?.farmPayload
+    if (request.kind !== 'choice' || !payload || typeof payload !== 'object' || !('rooms' in payload) || !Array.isArray(payload.rooms)) return { request }
+    const rooms = payload.rooms.filter((tile): tile is FarmTilePosition =>
+      tile !== null && typeof tile === 'object' && typeof tile.row === 'number' && typeof tile.col === 'number')
+    if (rooms.length !== payload.rooms.length) return { request }
+    const input = constructPaymentInput(context)
+    const cost = input && rooms.length > 0 && rooms.length <= (farm.maxSelections ?? 0)
+      ? PaymentSolver.buildConstructCost({ ...input, roomCount: rooms.length }) : undefined
+    const solutions = cost ? PaymentSolver.computeOptions(state, state.players.indexOf(player), cost, { actionId: 'construct', costType: 'construct' }) : []
+    if (solutions.length > 0) {
+      const payment = PaymentSolver.buildPaymentChoiceResult(solutions, 'pay:room')
+      return { request: payment.type === 'request' ? payment.request : request }
+    }
+    const owner = resolveBuildPlayers(context)?.farmOwner
+    return {
+      request: { kind: 'farm-select', farm, ...(owner && owner.id !== player.id ? { farmOwnerPlayerId: owner.id } : {}), options: [{ value: 'confirm', labelKey: 'ui.interactionRoomConfirm' }] },
+      promptKey: 'ui.interactionRoomSelect',
+    }
+  },
   previewEffect: context => {
     const input = constructPaymentInput(context)
     if (!input) return undefined

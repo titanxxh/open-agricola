@@ -5,24 +5,11 @@ export const constructedRoomMaterial = (context: Pick<ActionExecutionContext, 's
   resolveBuildPlayers(context)?.farmOwner.houseType
 
 export const constructUnitPriceTrade = (
-  context: Pick<ActionExecutionContext, 'state' | 'player' | 'actionContext'>,
   sourceId: string,
   price: Partial<Resource>,
-): Trade => {
-  const material = constructedRoomMaterial(context) ?? context.player.houseType
-  const ordinary: Partial<Resource> = { [material]: 5, reed: 2 }
-  const from: Partial<Resource> = {}
-  const to: Partial<Resource> = {}
-  for (const key of new Set([...Object.keys(ordinary), ...Object.keys(price)] as (keyof Resource)[])) {
-    const delta = (ordinary[key] ?? 0) - (price[key] ?? 0)
-    if (delta > 0) to[key] = delta
-    if (delta < 0) from[key] = -delta
-  }
-  return {
-    from, to, scope: 'unit', sourceId,
-    ...(resolveBuildPlayers(context)?.farmOwner.id !== context.player.id ? { unitPrice: price } : {}),
-  }
-}
+): Trade => ({
+  from: {}, to: {}, scope: 'unit', sourceId, unitPrice: price,
+})
 
 export const constructUnitDiscountTrade = (
   sourceId: string,
@@ -32,4 +19,5 @@ export const constructUnitDiscountTrade = (
   to: discount,
   scope: 'unit',
   sourceId,
+  replaceUpTo: true,
 })

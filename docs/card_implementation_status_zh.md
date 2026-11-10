@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 更新日期：2026-10-30。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
+> 更新日期：2026-11-10。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
 
 > 本文只覆盖官方卡牌。Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本；需要时直接查注册表。
 
@@ -20,7 +20,7 @@
 
 | 类别 | 卡牌 |
 |---|---|
-| Team Cooperation Rules 以德文附录为准，保留两处有意偏离：一次建造只使用一个 Target Farm，犁田始终在行动者自己的农场。见 [ADR 0043](adr/0043-team-cooperation-rules-partner-builds.md)。 | 房间、畜栏和围栏建造，包含卡牌授予的建造 |
+| Team Cooperation Rules 以德文附录为准，并记录维护者裁定：一次建造只使用一个 Target Farm，犁田始终在行动者自己的农场；普通合作建房在费用变换前保留基础价增量，卡牌提供的单位单价也如此。来源授予的指定价和免费建造沿用现有规则。见 [ADR 0043](adr/0043-team-cooperation-rules-partner-builds.md)。 | 房间、畜栏和围栏建造，包含卡牌授予的建造 |
 | [#1407](https://github.com/titanxxh/open-agricola/issues/1407) 采纳的项目规则解释，用于现有来源未能确定的单人交互。这些是单卡 OA 决定，不是官方裁定，也不替代全局 other-player 或 neighbour 条件。 | `E014_WoodSaw`, `M027_GardenPath`, `M054_AgriculturalImplement`, `M056_PeatCuttingRights` |
 | 维护者方案 B：可开始的 before 流程可能让宿主无法完成的格子可选，此时需要撤销。准入不模拟奖励，各卡不加准入守卫。 | 用格 before 收益；[ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md) |
 | 维护者于 2026-10-30 确认的项目解释：完整取得格上货物，再可选返还一半换动物，保留原始取得事实和阈值判断。取得动物后先正常完成整理，包括弃养，再进入返还；不能通过返还绕过该结算。按 [#1481](https://github.com/titanxxh/open-agricola/issues/1481) 取代本卡 #1336 的旧口径，不作为新查证的官方裁定，不改变其他卡按数量或类型取物的能力。 | `D180_PartTimeWorker` |

@@ -19,9 +19,9 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const houseType = constructedRoomMaterial(context)
-    if (houseType === 'clay') return { trades: [constructUnitPriceTrade(context, CARD_ID, { clay: 3, reed: 2 })] }
-    if (houseType === 'stone') return { trades: [constructUnitPriceTrade(context, CARD_ID, { stone: 3, reed: 2 })] }
-    return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 3, reed: 2 })] }
+    if (houseType === 'clay') return { trades: [constructUnitPriceTrade(CARD_ID, { clay: 3, reed: 2 })] }
+    if (houseType === 'stone') return { trades: [constructUnitPriceTrade(CARD_ID, { stone: 3, reed: 2 })] }
+    return { trades: [constructUnitPriceTrade(CARD_ID, { wood: 3, reed: 2 })] }
   },
 }
 

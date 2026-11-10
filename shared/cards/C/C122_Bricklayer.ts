@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import type { BonusModifier } from '../../contract/types'
+import type { CostModifier } from '../../contract/types'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
@@ -28,10 +28,13 @@ const cardImpl = {
   listeners: [improvementCostListener],
   modifiers: [
     {
-      type: 'bonus',
+      type: 'trade',
       cardId: CARD_ID,
       appliesTo: ['construct'],
-      discount: { clay: 2 },
+      scope: 'unit',
+      from: {},
+      to: { clay: 2 },
+      replaceUpTo: true,
     },
     {
       type: 'bonus',
@@ -40,7 +43,7 @@ const cardImpl = {
       discount: { clay: 1 },
       optional: false,
     },
-  ] as BonusModifier[],
+  ] satisfies CostModifier[],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

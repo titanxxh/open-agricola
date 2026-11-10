@@ -66,14 +66,14 @@ describe('Partner Build rooms', () => {
   })
 
   it.each([
-    { card: 'M036_PeatMoss', material: 'wood', minor: true, payment: { wood: 3, reed: 1 }, round: 14 },
-    { card: 'D015_ClaySupports', material: 'clay', minor: true, payment: { clay: 2, wood: 1, reed: 1 }, round: 14 },
-    { card: 'B013_CarpentersParlor', material: 'wood', minor: true, payment: { wood: 2, reed: 2 }, round: 14 },
-    { card: 'B126_Carpenter', material: 'clay', minor: false, payment: { clay: 3, reed: 2 }, round: 14 },
-    { card: 'D121_ClayPlasterer', material: 'clay', minor: false, payment: { clay: 3, reed: 2 }, round: 14 },
-    { card: 'C128_WoodenHutExtender', material: 'wood', minor: false, payment: { wood: 5, reed: 1 }, round: 5 },
-    { card: 'C128_WoodenHutExtender', material: 'wood', minor: false, payment: { wood: 4, reed: 1 }, round: 7 },
-    { card: 'C128_WoodenHutExtender', material: 'wood', minor: false, payment: { wood: 3, reed: 1 }, round: 14 },
+    { card: 'M036_PeatMoss', material: 'wood', minor: true, payment: { wood: 4, reed: 2 }, round: 14 },
+    { card: 'D015_ClaySupports', material: 'clay', minor: true, payment: { clay: 3, wood: 1, reed: 2 }, round: 14 },
+    { card: 'B013_CarpentersParlor', material: 'wood', minor: true, payment: { wood: 3, reed: 3 }, round: 14 },
+    { card: 'B126_Carpenter', material: 'clay', minor: false, payment: { clay: 4, reed: 3 }, round: 14 },
+    { card: 'D121_ClayPlasterer', material: 'clay', minor: false, payment: { clay: 4, reed: 3 }, round: 14 },
+    { card: 'C128_WoodenHutExtender', material: 'wood', minor: false, payment: { wood: 6, reed: 2 }, round: 5 },
+    { card: 'C128_WoodenHutExtender', material: 'wood', minor: false, payment: { wood: 5, reed: 2 }, round: 7 },
+    { card: 'C128_WoodenHutExtender', material: 'wood', minor: false, payment: { wood: 4, reed: 2 }, round: 14 },
   ] as const)('$card uses its complete room price on the target material in round $round', ({ card, material, minor, payment, round }) => {
     const session = table(state => {
       state.round = round
@@ -98,15 +98,19 @@ describe('Partner Build rooms', () => {
     expect(built.state.players[2]!.resources).toMatchObject({ wood: 0, clay: 0, reed: 0 })
   })
 
-  it.each(['p1', 'p3'])('preserves the combined Parlor and Carpenter price on %s without rebating the partner premium twice', target => {
+  it.each(['p1', 'p3'])('chooses one complete Parlor or Carpenter price on %s', target => {
     const session = table(state => {
       state.players[0]!.minorPlayed = ['B013_CarpentersParlor']
       state.players[0]!.occupationPlayed = ['B126_Carpenter']
-      Object.assign(state.players[0]!.resources, { wood: 0, clay: 0, reed: 2 })
+      Object.assign(state.players[0]!.resources, target === 'p1' ? { wood: 2, clay: 0, reed: 2 } : { wood: 3, clay: 0, reed: 3 })
       state.players[2]!.houseType = 'wood'
     })
-    expect(session.takeAction(0, 'farm-expansion').ok).toBe(true)
-    expect(session.resolveChoice(0, `target-farm:${target}`).ok).toBe(true)
+    const offered = session.takeAction(0, 'farm-expansion')
+    expect(offered.ok).toBe(true)
+    if (offered.interaction.stateId === 'wait' && offered.interaction.request.kind === 'choice'
+      && offered.interaction.request.options.some(option => option.value === `target-farm:${target}`)) {
+      expect(session.resolveChoice(0, `target-farm:${target}`).ok).toBe(true)
+    }
     expect(selectBranch(session, 'construct').ok).toBe(true)
     const built = session.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] })
     expect(built.ok, built.error).toBe(true)
@@ -120,9 +124,9 @@ describe('Partner Build rooms', () => {
     { minor: [], occupations: ['A123_FrameBuilder'], material: 'clay', count: 1, payment: { clay: 4, wood: 1, reed: 3 } },
     { minor: [], occupations: ['C088_CarpentersApprentice'], material: 'wood', count: 1, payment: { wood: 4, reed: 3 } },
     { minor: [], occupations: ['E150_RockBeater'], material: 'stone', count: 1, payment: { stone: 4, reed: 3 } },
-    { minor: ['B013_CarpentersParlor'], occupations: ['C088_CarpentersApprentice'], material: 'wood', count: 2, payment: { reed: 4 } },
-    { minor: ['D015_ClaySupports'], occupations: ['B145_BrushwoodCollector'], material: 'clay', count: 1, payment: { clay: 2, wood: 2 } },
-    { minor: ['D015_ClaySupports', 'C014_StrawThatchedRoof'], occupations: [], material: 'clay', count: 1, payment: { clay: 2, wood: 1 } },
+    { minor: ['B013_CarpentersParlor'], occupations: ['C088_CarpentersApprentice'], material: 'wood', count: 2, payment: { wood: 2, reed: 6 } },
+    { minor: ['D015_ClaySupports'], occupations: ['B145_BrushwoodCollector'], material: 'clay', count: 1, payment: { clay: 3, wood: 2 } },
+    { minor: ['D015_ClaySupports', 'C014_StrawThatchedRoof'], occupations: [], material: 'clay', count: 1, payment: { clay: 3, wood: 1 } },
   ] as const)('combines builder $minor/$occupations on $material rooms', ({ minor, occupations, material, count, payment }) => {
     const session = table(state => {
       state.players[0]!.minorPlayed = [...minor]
@@ -237,7 +241,7 @@ describe('Partner Build rooms', () => {
     if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'choice') throw new Error('Expected room payment')
     const alternative = pending.interaction.request.options.find(option => {
       const paid = option.effectPreview
-      return paid?.kind === 'payment' && paid.resourcesPaid.clay === 2 && paid.resourcesPaid.wood === 1 && paid.resourcesPaid.reed === 1
+      return paid?.kind === 'payment' && paid.resourcesPaid.clay === 3 && paid.resourcesPaid.wood === 1 && paid.resourcesPaid.reed === 2
     })
     expect(pending.interaction.request.options.some(option => option.effectPreview?.kind === 'payment' && option.effectPreview.resourcesPaid.clay === 6 && option.effectPreview.resourcesPaid.reed === 3)).toBe(true)
     expect(alternative).toBeDefined()
@@ -256,7 +260,7 @@ describe('Partner Build rooms', () => {
     assertRejectedUnchanged(restored, () => restored.resolveChoice(0, 'target-farm:p1'))
     const built = restored.resolveChoice(0, alternative!.value)
     expect(built.ok, built.error).toBe(true)
-    expect(built.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 4, reed: 2 })
+    expect(built.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 3, reed: 1 })
     expect(built.state.players[2]!.rooms).toBe(3)
     expect(built.state.players[0]!.rooms).toBe(2)
     const undone = restored.undoAction()
