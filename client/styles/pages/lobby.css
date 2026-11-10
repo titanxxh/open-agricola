@@ -520,6 +520,19 @@
   color: var(--color-text);
   background: var(--color-bg-warm);
 }
+.team-setup-fields > .team-cooperation-setting {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  min-height: 44px;
+  gap: 8px;
+}
+.team-cooperation-setting input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
 .team-setup-hint { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--color-text-secondary); }
 .team-config-summary { display: flex; flex-wrap: wrap; gap: 4px 12px; min-width: 0; font-size: 13px; color: var(--color-text-secondary); }
 .team-config-summary > span { overflow-wrap: anywhere; }
