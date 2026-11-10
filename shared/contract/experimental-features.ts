@@ -20,4 +20,4 @@ export function isExperimentalFeatureAvailable({ stage, account, nodeEnv, devExp
 }
 
 export const teamExperimentalFeatures = (configuration: Pick<TeamConfiguration, 'cooperationRules'> | undefined): ExperimentalFeatureId[] =>
-  configuration ? ['team-modes', ...(configuration.cooperationRules ? ['team-cooperation-rules' as const] : [])] : []
+  configuration ? ['team-modes', ...(configuration.cooperationRules === true ? ['team-cooperation-rules' as const] : [])] : []

@@ -8,7 +8,7 @@ export const marketplaceGoods = (state: GameState): MarketplaceGood[] => [
 
 export function marketplaceTeammates(state: GameState, player: PlayerState): PlayerState[] {
   const team = state.team
-  if (!team?.configuration.cooperationRules || ![4, 6].includes(state.players.length)) return []
+  if (team?.configuration.cooperationRules !== true || ![4, 6].includes(state.players.length)) return []
   const index = state.players.findIndex(candidate => candidate.id === player.id)
   const ownTeam = team.playerTeams[index]
   if (ownTeam === undefined) return []

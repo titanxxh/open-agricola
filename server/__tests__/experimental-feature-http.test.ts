@@ -63,3 +63,11 @@ it('denies cooperation independently at both creation entry points and debug loa
   expect(await request('/api/game/load', { state }, owner!)).toEqual(denied)
   expect(await request('/api/game/load', { state: { state } }, owner!)).toEqual(denied)
 })
+
+it('rejects a malformed cooperation switch in a loaded team configuration', async () => {
+  const owner = await createSession('http-owner')
+  const created = await request('/api/game/new-sandbox', { playerCount: 4, teamConfig }, owner!)
+  const state = { ...created.body.state, team: { ...created.body.state.team,
+    configuration: { ...teamConfig, cooperationRules: 'true' } } }
+  expect((await request('/api/game/load', { state }, owner!)).status).toBe(400)
+})
