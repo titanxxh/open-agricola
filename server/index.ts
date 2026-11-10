@@ -16,6 +16,7 @@ import { RoomDirectory } from './game/room-directory'
 import { CommandStore } from './game/command-store'
 import { discoverRoom } from './game/room-discovery'
 import type { RoomDiscoveryRequest } from '../shared/contract/protocol/routing'
+import { CLIENT_CAPABILITIES_HEADER } from '../shared/contract/client-capabilities'
 import { isUniqueViolation, isWorkshopSubmissionInProgress } from './database/errors'
 import { consumeRateLimit } from './database/rate-limit'
 import { searchPlayersByPrefix } from './game/room-access'
@@ -105,7 +106,7 @@ const handleWhatsNew = createWhatsNewHandler()
 
 const serverCorsHeaders = () => corsHeaders({
   methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-  headers: 'Content-Type, Authorization',
+  headers: `Content-Type, Authorization, ${CLIENT_CAPABILITIES_HEADER}`,
 })
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown, headers: Record<string, string | string[]> = {}) => {
