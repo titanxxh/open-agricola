@@ -10,6 +10,8 @@ import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import { buildEnvelope } from './envelope-builder.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 import { controlledSeatIndexes, visiblePlayerIdsForConnection } from '../game/room-viewer'
+import { CLIENT_REFRESH_MESSAGE, parseClientCapabilities, requiresCooperationCapability, TEAM_COOPERATION_CAPABILITY, type ClientCapability } from '../../shared/contract/client-capabilities'
+import type { TeamConfiguration } from '../../shared/contract/team'
 
 /**
  * A hotseat connection holds every seat, so per-seat redaction would hide the
@@ -32,6 +34,18 @@ type RequesterResponse = {
 }
 
 export class Broadcaster {
+  private readonly clientCapabilities = new WeakMap<WebSocket, ReadonlySet<ClientCapability>>()
+  declareClientCapabilities(ws: WebSocket, input: unknown): void {
+    this.clientCapabilities.set(ws, parseClientCapabilities(input))
+  }
+  supportsConfiguration(ws: WebSocket, configuration: Pick<TeamConfiguration, 'cooperationRules'> | undefined): boolean {
+    return !requiresCooperationCapability(configuration) || this.clientCapabilities.get(ws)?.has(TEAM_COOPERATION_CAPABILITY) === true
+  }
+  private compatibleRecipient(ws: WebSocket, room: Room, requestId?: string): boolean {
+    if (this.supportsConfiguration(ws, room.session.state.team?.configuration)) return true
+    this.sendTo(ws, { type: 'error', code: 'client_refresh_required', error: CLIENT_REFRESH_MESSAGE, ...(requestId ? { requestId } : {}) })
+    return false
+  }
   private readonly tokens = new WeakMap<WebSocket, string>()
   authenticate(ws: WebSocket, token?: string): void { if (token) this.tokens.set(ws, token); else this.tokens.delete(ws) }
   private readonly directory?: RoomDirectory
@@ -55,7 +69,7 @@ export class Broadcaster {
   }
 
   sendRoomEvent(ws: WebSocket, room: Room, event: ServerEvent): void | Promise<void> {
-    return this.publish(room, () => { sendObserved(ws, event, roundTag(room.session.state)) })
+    return this.publish(room, () => { if (this.compatibleRecipient(ws, room)) sendObserved(ws, event, roundTag(room.session.state)) })
   }
 
   broadcastCommitted(
@@ -71,6 +85,7 @@ export class Broadcaster {
       let recipients = 0
       for (const ws of roomConnections(room)) {
         if (ws.readyState !== ws.OPEN) continue
+        if (!this.compatibleRecipient(ws, room, requesterResponse?.ws === ws ? requestId : undefined)) continue
         const env = measure('projection', () => buildEnvelope({
           room,
           resp: requesterResponse?.ws === ws ? requesterResponse.response : resp,
@@ -85,7 +100,7 @@ export class Broadcaster {
       bytes += sendObserved(ws, env)
       recipients++
     }
-    const spectators = roomSpectators(room).filter(ws => ws.readyState === ws.OPEN)
+    const spectators = roomSpectators(room).filter(ws => ws.readyState === ws.OPEN && this.compatibleRecipient(ws, room))
     if (spectators.length) {
       const envelope = measure('projection', () => buildEnvelope({ room, resp, visiblePlayerIds: [], controlledPlayerIndexes: [],
         version: room.version, cause, emittedAt, mode: 'viewer' }))
@@ -109,6 +124,7 @@ export class Broadcaster {
     mode?: SyncPayloadMode,
   ): void | Promise<void> {
     return measure('publication', () => this.publish(room, () => {
+      if (!this.compatibleRecipient(ws, room, requestId)) return
       const env = measure('projection', () => buildEnvelope({
         room,
         resp,
@@ -129,11 +145,12 @@ export class Broadcaster {
     const data = JSON.stringify(event)
     const round = roundTag(room.session.state)
     for (const ws of roomConnections(room)) {
+      if (!this.compatibleRecipient(ws, room)) continue
       sendObserved(ws, event, round, data)
     }
     if (event.type === 'roomPersistencePaused' || event.type === 'roomPersistenceResumed'
       || event.type === 'playerJoined' || event.type === 'playerDisconnected') {
-      for (const ws of roomSpectators(room)) sendObserved(ws, event, round, data)
+      for (const ws of roomSpectators(room)) if (this.compatibleRecipient(ws, room)) sendObserved(ws, event, round, data)
     }
     if (event.type === 'gameTerminated') this.endSpectating(room, 'terminated')
     else if (event.type === 'roomDissolved') this.endSpectating(room, 'removed')

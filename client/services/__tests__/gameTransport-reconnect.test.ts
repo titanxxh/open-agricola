@@ -43,6 +43,53 @@ describe('Room reconnect and durable commands', () => {
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
 
+  it('keeps the connection alive for its durable rejection before stopping for a required refresh', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    const statuses = vi.fn()
+    transport.onConnectionStatus(statuses)
+    try {
+      await transport.connect()
+      const socket = Socket.all[0]!
+      const creation = transport.createRoom({ maxPlayers: 4 })
+      const command = socket.sent.at(-1)!
+      let settled = false
+      void creation.then(() => { settled = true }, () => { settled = true })
+      socket.emit({ type: 'error', code: 'client_refresh_required', error: 'Please refresh this page to use official cooperation rules.' })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+      expect(transport.connected).toBe(true)
+      socket.emit({ type: 'commandReceipt', status: 'completed', receipt: {
+        scopeId: command.commandContext.scopeId, commandId: command.commandContext.commandId,
+        outcome: { ok: false, code: 'client_refresh_required', error: 'Please refresh this page to use official cooperation rules.' },
+      } })
+      await expect(creation).rejects.toMatchObject({ code: 'client_refresh_required' })
+      expect(transport.recoveringCommands).toBe(false)
+      expect(transport.connected).toBe(false)
+      expect(statuses).toHaveBeenLastCalledWith({ phase: 'stopped', code: 'client_refresh_required', message: 'Please refresh this page to use official cooperation rules.' })
+    } finally { transport.destroy() }
+  })
+
+  it('declares capability on both an expired idle scope and its fresh fallback', async () => {
+    const send = vi.spyOn(Socket.prototype, 'send').mockImplementation(function (this: Socket, raw: string) {
+      const message = JSON.parse(raw)
+      this.sent.push(message)
+      if (message.type !== 'getCommandScope') return
+      queueMicrotask(() => this.emit(this.sent.length === 1
+        ? { type: 'error', code: 'command_scope_expired', error: 'Command scope expired' }
+        : { type: 'commandScope', scope }))
+    })
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    try {
+      await transport.connect()
+      expect(Socket.all[0]!.sent).toEqual([
+        { type: 'getCommandScope', clientCapabilities: ['team-cooperation-v1'] },
+        { type: 'getCommandScope', clientCapabilities: ['team-cooperation-v1'] },
+      ])
+    } finally { transport.destroy(); send.mockRestore() }
+  })
+
   it('recovers an unseated team member without requesting state or inventing a seat', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false, reconnectDelayMs: 1 })
@@ -416,7 +463,7 @@ describe('Room reconnect and durable commands', () => {
     })
     const next = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await expect(next.connect()).rejects.toThrow('Command scope expired')
-    expect(Socket.all[1]!.sent).toEqual([{ type: 'getCommandScope', scopeId: command.commandContext.scopeId }])
+    expect(Socket.all[1]!.sent).toEqual([{ type: 'getCommandScope', scopeId: command.commandContext.scopeId, clientCapabilities: ['team-cooperation-v1'] }])
     next.destroy(); send.mockRestore()
   })
 

@@ -111,3 +111,16 @@ export const resolveCustomCardDbIds = (
   if (!enableCommunityDeck || !Array.isArray(raw.customCardIds)) return []
   return raw.customCardIds.filter((id): id is string => typeof id === 'string')
 }
+
+/** Accepts both a bare GameState and the `{ state, sessionCursor }` debug snapshot. */
+export const loadedTeamConfiguration = (raw: unknown): TeamConfiguration | undefined => {
+  if (!raw || typeof raw !== 'object') return undefined
+  const state = 'state' in raw ? raw.state : raw
+  if (!state || typeof state !== 'object' || !('team' in state) || state.team == null) return undefined
+  const team = state.team
+  if (typeof team !== 'object' || !('configuration' in team)
+    || !('players' in state) || !Array.isArray(state.players)) throw new Error('Invalid team configuration')
+  const configuration = parseTeamConfiguration(team.configuration, state.players.length)
+  if (!configuration) throw new Error('Invalid team configuration')
+  return configuration
+}

@@ -14,6 +14,18 @@ beforeEach(async () => {
 afterEach(async () => { vi.restoreAllMocks(); vi.unstubAllEnvs(); await db?.close() })
 
 describe('current account Beta Access', () => {
+  it('opens official cooperation to production beta accounts and administrators while preserving development access', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    await db.prepare('INSERT INTO beta_access(user_id,granted_by,granted_at) VALUES(?,?,?)').run('beta', 'owner', 123)
+    expect(await canUseExperimentalFeature('owner', 'team-cooperation-rules')).toBe(true)
+    expect(await canUseExperimentalFeature('beta', 'team-cooperation-rules')).toBe(true)
+    expect(await canUseExperimentalFeature('ordinary', 'team-cooperation-rules')).toBe(false)
+    expect(await canUseExperimentalFeature(undefined, 'team-cooperation-rules')).toBe(false)
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', '')
+    expect(await canUseExperimentalFeature('ordinary', 'team-cooperation-rules')).toBe(true)
+    expect(await canUseExperimentalFeature(undefined, 'team-cooperation-rules')).toBe(false)
+  })
   it('reads grants on every check and derives administrators from ADMIN_USERS', async () => {
     expect(await canUseExperimentalFeature(undefined, 'team-modes')).toBe(false)
     expect(await canUseExperimentalFeature('ordinary', 'team-modes')).toBe(false)

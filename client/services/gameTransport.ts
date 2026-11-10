@@ -85,19 +85,22 @@ export interface GameTransport {
 }
 
 import { API_BASE, WS_BASE } from '../config'
+import { CLIENT_CAPABILITIES_HEADER, GAME_CLIENT_CAPABILITIES } from '../../shared/contract/client-capabilities'
+
+const clientCapabilityHeaders = { [CLIENT_CAPABILITIES_HEADER]: GAME_CLIENT_CAPABILITIES.join(',') }
 
 const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
   const resp = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
     body: body ? JSON.stringify(body) : undefined,
   })
   return resp.json() as Promise<GameSyncPayload>
 }
 
 const get = async (path: string): Promise<GameSyncPayload> => {
-  const resp = await fetch(`${API_BASE}${path}`, { credentials: 'include' })
+  const resp = await fetch(`${API_BASE}${path}`, { credentials: 'include', headers: clientCapabilityHeaders })
   return resp.json() as Promise<GameSyncPayload>
 }
 
@@ -129,7 +132,7 @@ export class HttpGameTransport implements GameTransport {
 
   async quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): Promise<FenceSelectionQuote> {
     const response = await fetch(`${API_BASE}/api/game/fence-quote`, {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
       body: JSON.stringify({ playerIndex, requestKey, payload }),
     })
     if (!response.ok) throw new Error('Fence quote is unavailable')
@@ -236,7 +239,7 @@ export class HttpGameTransport implements GameTransport {
     const resp = await fetch(`${API_BASE}/api/game/validate`, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
       body: JSON.stringify({ type, playerId, payload }),
     })
     return resp.json() as Promise<ValidateResult>
@@ -281,9 +284,11 @@ const terminalCode = (code?: string): boolean => !!code && [
   'seat_replaced', 'login_required', 'not_participant', 'unknown_context', 'context_changed',
   'context_expired', 'context_removed', 'command_scope_expired',
   'player_slot_required',
+  'client_refresh_required',
 ].includes(code)
 
 export class WsGameTransport implements GameTransport {
+  private refreshRequiredMessage: string | undefined
   private ws: WebSocket | null = null
   private listeners = new Set<SnapshotListener>()
   private eventListeners = new Set<(event: ServerEvent) => void>()
@@ -364,7 +369,7 @@ export class WsGameTransport implements GameTransport {
       const timer = setTimeout(() => { observeBrowser('connect_ready', this.connectStarted ?? performance.now(), undefined, 'timeout'); reject(new Error('Connection timed out')); socket.close() }, 10000)
       socket.onopen = () => {
         if (this.ws !== socket) return
-        socket.send(JSON.stringify({ type: 'getCommandScope', ...(scope ? { scopeId: scope.scopeId } : {}) }))
+        socket.send(JSON.stringify({ type: 'getCommandScope', ...(scope ? { scopeId: scope.scopeId } : {}), clientCapabilities: GAME_CLIENT_CAPABILITIES }))
       }
       socket.onerror = () => { if (this.ws === socket) reject(new Error('WebSocket connection failed')) }
       socket.onclose = (event) => {
@@ -400,7 +405,7 @@ export class WsGameTransport implements GameTransport {
           // must still fail closed instead of becoming new operations.
           if (msg.code === 'command_scope_expired' && !this.journal.commands.size && !requestedFreshScope) {
             requestedFreshScope = true
-            socket.send(JSON.stringify({ type: 'getCommandScope' }))
+            socket.send(JSON.stringify({ type: 'getCommandScope', clientCapabilities: GAME_CLIENT_CAPABILITIES }))
             return
           }
           clearTimeout(timer)
@@ -530,9 +535,11 @@ export class WsGameTransport implements GameTransport {
     if (msg.type === 'seat_replaced') this.stop('seat was replaced', 'seat_replaced')
     if (msg.type === 'roomDissolved') this.stop(msg.reason === 'card_takedown' ? 'roomTerminatedCardTakedown' : 'roomDissolved')
     if (msg.type === 'gameTerminated') this.stop('gameTerminated')
-    if (msg.type === 'error' && terminalCode(msg.code)) this.stop(msg.error, msg.code)
+    if (msg.type === 'error' && msg.code === 'client_refresh_required') this.refreshRequiredMessage = msg.error
+    else if (msg.type === 'error' && terminalCode(msg.code)) this.stop(msg.error, msg.code)
     if (msg.type === 'commandReceipt' && msg.status === 'completed') {
       this.completed.set(msg.receipt.commandId, msg.receipt.outcome)
+      if (msg.receipt.outcome.code === 'client_refresh_required') this.refreshRequiredMessage = msg.receipt.outcome.error
       if (!this.recovering) this.finishCommand(msg.receipt.commandId, msg.receipt.outcome)
     } else if (msg.type === 'roomSpectated') {
       this.roomViewer = { kind: 'spectator' }
@@ -613,16 +620,17 @@ export class WsGameTransport implements GameTransport {
       }
       // Only recovery's serial protocol uses these waiters; ordinary request
       // errors never reject another command's independently correlated promise.
-      this.eventWaiters.forEach(waiter => waiter.reject(error))
+      if (msg.code !== 'client_refresh_required') this.eventWaiters.forEach(waiter => waiter.reject(error))
     }
     this.eventListeners.forEach(listener => listener(msg))
     for (const waiter of this.eventWaiters) if (waiter.match(msg)) waiter.resolve(msg)
+    this.stopForRequiredRefresh()
   }
 
   private finishCommand(commandId: string, outcome: CommandOutcome): void {
     const command = this.journal.commands.get(commandId)
     if (this.recovering && !outcome.ok && command?.type === 'createRoom') {
-      this.eventListeners.forEach(listener => listener({ type: 'error', error: outcome.error ?? 'Room creation failed', code: outcome.code === 'experimental_feature_unavailable' ? outcome.code : undefined }))
+      this.eventListeners.forEach(listener => listener({ type: 'error', error: outcome.error ?? 'Room creation failed', code: outcome.code === 'experimental_feature_unavailable' || outcome.code === 'client_refresh_required' ? outcome.code : undefined }))
     }
     let waitingForSnapshot = false
     const creation = this.pendingCreations.get(commandId)
@@ -654,6 +662,11 @@ export class WsGameTransport implements GameTransport {
       const timer = setTimeout(() => waiter.reject(new Error('Room recovery timed out')), 10000)
       this.eventWaiters.add(waiter)
     })
+  }
+
+  private stopForRequiredRefresh(): void {
+    if (!this.refreshRequiredMessage || [...this.journal.commands.keys()].some(commandId => !this.completed.has(commandId))) return
+    this.stop(this.refreshRequiredMessage, 'client_refresh_required')
   }
 
   private setRoom(roomId: string): void {
@@ -874,7 +887,7 @@ export class WsGameTransport implements GameTransport {
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
     const resp = await fetch(`${API_BASE}/api/game/validate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
       body: JSON.stringify({ type, playerId, payload }),
     })
     return resp.json() as Promise<ValidateResult>

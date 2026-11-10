@@ -1,4 +1,5 @@
 import { unavailableTeamFeature } from './experimental-features'
+import { CLIENT_CAPABILITIES_HEADER, CLIENT_REFRESH_MESSAGE, parseClientCapabilities, requiresCooperationCapability, TEAM_COOPERATION_CAPABILITY } from '../shared/contract/client-capabilities'
 import { parseTeamConfiguration, type TeamConfiguration } from '../shared/contract/team'
 import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
@@ -28,6 +29,7 @@ import { isLoadableLive } from './workshop-status.ts'
 import { parseDraftOptions, loadLiveCustomCards } from './connection/room-router.ts'
 import {
   asSetupPayload,
+  loadedTeamConfiguration,
   buildInitialStateOptions,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
@@ -104,6 +106,17 @@ const getSessionKey = async (req: IncomingMessage): Promise<Awaited<string>> => 
   return user?.id ?? 'anonymous'
 }
 
+class ClientRefreshRequiredError extends Error {
+  readonly code = 'client_refresh_required'
+  constructor() { super(CLIENT_REFRESH_MESSAGE) }
+}
+
+const assertHttpClientConfiguration = (req: IncomingMessage, configuration: Pick<TeamConfiguration, 'cooperationRules'> | undefined): void => {
+  const header = req.headers[CLIENT_CAPABILITIES_HEADER.toLowerCase()]
+  const capabilities = parseClientCapabilities(typeof header === 'string' ? header.split(',').map(value => value.trim()) : undefined)
+  if (requiresCooperationCapability(configuration) && !capabilities.has(TEAM_COOPERATION_CAPABILITY)) throw new ClientRefreshRequiredError()
+}
+
 const getSessionForRequest = async (req: IncomingMessage): Promise<Awaited<GameSession>> => {
   const key = (await getSessionKey(req))
   if (!userSessions.has(key)) {
@@ -115,6 +128,7 @@ const getSessionForRequest = async (req: IncomingMessage): Promise<Awaited<GameS
     await authority.check(stamp)
     requests.set(req, { ...requests.get(req), stamp })
   }
+  assertHttpClientConfiguration(req, userSessions.get(key)?.state.team?.configuration)
   sessionLastAccess.set(key, Date.now())
   return userSessions.get(key)!
 }
@@ -266,7 +280,7 @@ const rawJson = (res: ServerResponse, status: number, payload: unknown) => {
     'Content-Type': 'application/json',
     ...corsHeaders({
       methods: 'GET,POST,OPTIONS',
-      headers: 'Content-Type, Authorization, X-Viewer-Player',
+      headers: `Content-Type, Authorization, X-Viewer-Player, ${CLIENT_CAPABILITIES_HEADER}`,
     }),
   })
   res.end(JSON.stringify(payload))
@@ -296,18 +310,6 @@ const respondWith = (
   }
 }
 
-/** Accepts both a bare GameState and the `{ state, sessionCursor }` debug snapshot. */
-const loadedTeamConfiguration = (raw: unknown): TeamConfiguration | undefined => {
-  if (!raw || typeof raw !== 'object') return undefined
-  const state = 'state' in raw ? raw.state : raw
-  if (!state || typeof state !== 'object' || !('team' in state) || state.team == null) return undefined
-  const team = state.team
-  if (typeof team !== 'object' || !('configuration' in team)
-    || !('players' in state) || !Array.isArray(state.players)) throw new Error('Invalid team configuration')
-  const configuration = parseTeamConfiguration(team.configuration, state.players.length)
-  if (!configuration) throw new Error('Invalid team configuration')
-  return configuration
-}
 
 const handleAuthorizedGameRoute = async (
   req: IncomingMessage,
@@ -578,6 +580,7 @@ const handleAuthorizedGameRoute = async (
       await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
       return true
     }
+    assertHttpClientConfiguration(req, configuration)
     const { result } = await callAndRespond(req, 'loadState', [body.state], s => s.loadState(body.state))
     await sendJson(res, 200, result)
     return true
@@ -615,6 +618,7 @@ const handleAuthorizedGameRoute = async (
         : session.quoteFenceSelection(body.playerIndex, body.requestKey, payload)
       await sendJson(res, 200, quote)
     } catch (error) {
+      if (error instanceof ClientRefreshRequiredError) throw error
       await sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) })
     }
     return true
@@ -673,6 +677,7 @@ const handleAuthorizedGameRoute = async (
       await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
       return true
     }
+    assertHttpClientConfiguration(req, setup.teamConfig)
     const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
     sessionLastAccess.set(sessionKey, Date.now())
@@ -797,6 +802,7 @@ const handleAuthorizedGameRoute = async (
       await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
       return true
     }
+    assertHttpClientConfiguration(req, teamConfig)
 
     const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
@@ -1095,6 +1101,7 @@ return false
 
 export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
   if (!req.url?.startsWith('/api/game/')) return false
+  if (req.method === 'OPTIONS') { rawJson(res, 204, null); return true }
   // The debug sandbox is a development surface (#993): without anonymous
   // access every call needs a session, so unauthenticated callers cannot
   // drive server-side GameSessions or custom-code executors.
@@ -1111,6 +1118,10 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
     responses.set(res, req)
     return await handleAuthorizedGameRoute(req, res)
   } catch (error) {
+    if (error instanceof ClientRefreshRequiredError) {
+      rawJson(res, 409, { ok: false, code: error.code, error: error.message })
+      return true
+    }
     if (error instanceof UnsupportedSandboxListenerError) {
       rawJson(res, 400, { ok: false, code: error.code, error: error.message })
       return true
