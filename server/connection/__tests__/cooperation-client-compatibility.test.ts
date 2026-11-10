@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, it, vi } from 'vitest'
 import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
 import { createConnectionCtx } from '../connection-ctx'
-import type { ServerEvent } from '../../../shared/contract/protocol/ws'
+import type { ClientCommand, ServerEvent } from '../../../shared/contract/protocol/ws'
 import { TEAM_COOPERATION_CAPABILITY } from '../../../shared/contract/client-capabilities'
 import { createWorkSession } from '../../__tests__/_helpers/session-fixtures'
 import { serializeState } from '../../../shared/session/serialization'
@@ -93,7 +93,7 @@ it('withholds cooperative publication from an already joined old socket while pr
     state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
   } })
   let loaded: ReturnType<typeof serializeState>
-  try { loaded = target.withCtx(() => serializeState(target.state, {})) } finally { target.dispose() }
+  try { loaded = target.withCtx(() => serializeState(target.state, { actionHooks: target.actionHooks })) } finally { target.dispose() }
   const ordinary = { version: room.version, state: JSON.stringify(room.session.state), snapshot: await deps.persistence.load(room.id) }
   host.experimentalFeatureAccess = async (_userId, feature) => feature === 'team-modes'
   await dispatch(host, { type: 'loadGame', state: loaded })
@@ -117,7 +117,7 @@ it('withholds cooperative publication from an already joined old socket while pr
     { type: 'choice', value: 'confirm' }, { type: 'commitSelection', playerIndex: 1, payload: { rooms: [] } },
     { type: 'undoStep' }, { type: 'undoAction' }, { type: 'newGame', seed: 1632 },
     { type: 'proposeGameEnd', intent: 'end' },
-  ] as const) await dispatch(old, command)
+  ] satisfies ClientCommand[]) await dispatch(old, command)
   expect({ version: room.version, state: JSON.stringify(room.session.state), snapshot: await deps.persistence.load(room.id), replay: await deps.persistence.loadReplayHead(room.id), proposal: room.endProposal }).toEqual(before)
   const rejection = events(old).findLast(event => event.type === 'commandReceipt' && event.status === 'completed')
   expect(rejection).toMatchObject({ type: 'commandReceipt', status: 'completed', receipt: { outcome: { ok: false, code: 'client_refresh_required' } } })
