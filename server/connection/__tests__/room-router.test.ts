@@ -1,6 +1,7 @@
 import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
 import { draftSeatProgress } from '../../../shared/projections/draft-progress'
 import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
+import { createWorkSession } from '../../__tests__/_helpers/session-fixtures'
 import { describe, expect, it, vi } from 'vitest'
 import { createConnectionCtx } from '../connection-ctx.ts'
 import { removePlayerFromRoom, snapshotToRoom } from '../../game/room.ts'
@@ -1161,8 +1162,14 @@ describe('custom room command queue', () => {
     const deps = newDeps()
     const ctx = newCtx(deps)
     await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
-    ;(await markRoomStarted(ctx))
     const source = ctx.currentRoom!
+    const work = createWorkSession({ seed: 1597, configure(state) {
+      state.players[0]!.name = 'host'
+      state.players[0]!.nameIsDefault = false
+    } })
+    try { source.session.loadState(work.state) } finally { work.dispose() }
+    await markRoomStarted(ctx)
+    expect(source.session.getState().interaction.stateId).toBe('idle')
     const destinationHost = newCtx(deps)
     await dispatch(destinationHost, { type: 'createRoom', maxPlayers: 2, name: 'other' })
     const destination = destinationHost.currentRoom!
