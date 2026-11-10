@@ -41,3 +41,31 @@ it('settles a real transport journal from a generic durable rejection before the
   expect(stored.map(row => JSON.parse(row.outcome_json))).toEqual([{ ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable' }])
   expect(host.runtime().backend.registry.size()).toBe(0)
 })
+
+it('declares cooperation capability from the real transport before creating a production beta room', async () => {
+  host = await createSoloRecoveryHost()
+  await host.db.prepare('INSERT INTO beta_access(user_id,granted_by,granted_at) VALUES(?,?,?)').run(host.user.id, host.user.id, Date.now())
+  const token = await createSession(host.user.id), allocationId = randomUUID()
+  await host.runtime().directory.allocate(`user:${host.user.id}`, allocationId)
+  class AuthenticatedSocket extends WebSocket {
+    constructor(url: string) { super(url, { headers: { Cookie: `oa_session=${token}` } }) }
+  }
+  let firstId = true
+  vi.stubGlobal('crypto', { randomUUID: () => { if (firstId) { firstId = false; return allocationId } return randomUUID() } })
+  vi.stubGlobal('WebSocket', AuthenticatedSocket)
+  vi.stubGlobal('window', { location: { hostname: '127.0.0.1' } })
+  const { WsGameTransport } = await import('../../../client/services/gameTransport')
+  const client = new WsGameTransport(host.runtime().url, undefined, undefined, { route: false })
+  transport = client
+  const events: ServerEvent[] = []
+  client.onEvent(event => events.push(event))
+  await client.connect()
+  await expect(client.createRoom({ maxPlayers: 4,
+    teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', cooperationRules: true },
+  })).resolves.toBeUndefined()
+  expect(client.connected).toBe(true)
+  expect(events).toContainEqual(expect.objectContaining({ type: 'teamRoomWaiting', teamConfig: expect.objectContaining({ cooperationRules: true }) }))
+  expect(host.runtime().backend.registry.size()).toBe(1)
+  const room = [...host.runtime().backend.registry.iter()][0]!
+  expect(JSON.stringify(await host.runtime().persistence.load(room.id))).not.toContain('team-cooperation-v1')
+})

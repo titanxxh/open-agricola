@@ -20,7 +20,7 @@ type MoorSpecialActionPayload = {
 
 type ClientCommandBody =
   | { type: 'auth'; token: string }
-  | { type: 'getCommandScope'; scopeId?: string }
+  | { type: 'getCommandScope'; scopeId?: string; clientCapabilities?: readonly import('../client-capabilities').ClientCapability[] }
   | { type: 'getCommandReceipt'; identity: CommandIdentity }
   | { type: 'action'; spaceId: string }
   | { type: 'specialAction'; cardId: string; actionId: MoorSpecialActionId; payload?: MoorSpecialActionPayload }

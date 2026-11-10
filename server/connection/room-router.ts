@@ -1,4 +1,5 @@
 import { unavailableTeamFeature } from '../experimental-features'
+import { CLIENT_REFRESH_MESSAGE } from '../../shared/contract/client-capabilities'
 import type { TeamConfiguration } from '../../shared/contract/team'
 import type { ExperimentalFeatureId } from '../../shared/contract/experimental-features'
 import { admitTeamMember, planTeamSeating, teamWaitingState } from '../game/team-room'
@@ -62,6 +63,7 @@ import {
 } from '../game/custom-session-executor.ts'
 import {
   buildInitialStateOptions,
+  loadedTeamConfiguration,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
   soloCreationConfiguration,
@@ -219,6 +221,12 @@ async function allowTeamCreation(ctx: ConnectionCtx, requestId: string | undefin
   return false
 }
 
+const allowClientConfiguration = (ctx: ConnectionCtx, configuration: TeamConfiguration | undefined, requestId?: string): boolean => {
+  if (ctx.broadcaster.supportsConfiguration(ctx.ws, configuration)) return true
+  sendCommandError(ctx, CLIENT_REFRESH_MESSAGE, requestId, 'client_refresh_required')
+  return false
+}
+
 const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   if (!ctx.currentRoom) { sendCommandError(ctx, 'not in a room', requestId); return null }
   const waitingMember = ctx.currentRoom.status === 'waiting' && ctx.currentRoom.teamMembers?.find(member =>
@@ -230,11 +238,15 @@ const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
     sendCommandError(ctx, 'seat was replaced', requestId, 'seat_replaced')
     return null
   }
+  if (!allowClientConfiguration(ctx, ctx.currentRoom.session.state.team?.configuration, requestId)) return null
   return ctx.currentRoom
 }
 
-const requireReadableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null =>
-  isRoomSpectator(ctx.currentRoom, ctx.ws) ? ctx.currentRoom : requireRoom(ctx, requestId)
+const requireReadableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
+  if (!isRoomSpectator(ctx.currentRoom, ctx.ws)) return requireRoom(ctx, requestId)
+  const room = ctx.currentRoom
+  return room && allowClientConfiguration(ctx, room.session.state.team?.configuration, requestId) ? room : null
+}
 
 const waitingRoomEvent = (room: Room): Extract<ServerEvent, { type: 'roomWaiting' }> => {
   const players = [...new Set([
@@ -496,6 +508,7 @@ const commandActor = (ctx: ConnectionCtx): string => {
 async function handleCommandScope(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getCommandScope' }>): Promise<void> {
   if (!ctx.commands) throw new Error('Command storage is unavailable')
   const scope = await ctx.commands.resumeScope(commandActor(ctx), msg.scopeId)
+  if (Object.hasOwn(msg, 'clientCapabilities')) ctx.broadcaster.declareClientCapabilities(ctx.ws, msg.clientCapabilities)
   ctx.broadcaster.sendTo(ctx.ws, { type: 'commandScope', scope, requestId: msg.requestId })
 }
 
@@ -657,6 +670,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   try { setup = parseGameSetupRequest(input, draftOptions.value) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid team configuration', msg.requestId); return }
   if (setup.teamConfig && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId, setup.teamConfig)) return
+  if (!allowClientConfiguration(ctx, setup.teamConfig, msg.requestId)) return
   const maxPlayers = setup.playerCount
   const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers: setup.teamConfig?.mode === 'multihand' ? maxPlayers / setup.teamConfig.seatsPerTeam : maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
@@ -862,6 +876,7 @@ async function handleSpectateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand
   if (ctx.committer?.blockedError(room.id)) {
     sendCommandError(ctx, 'Room saving is paused', msg.requestId); return
   }
+  if (!allowClientConfiguration(ctx, room.session.state.team?.configuration, msg.requestId)) return
   await detachPreviousRoom(ctx, room)
   addRoomSpectator(room, ctx.ws)
   ctx.currentRoom = room
@@ -895,6 +910,10 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     sendCommandError(ctx, 'Only invited players can enter this room', msg.requestId, ctx.currentUserId ? 'not_participant' : 'login_required', 'active')
     return
   }
+  if (room.teamMembers && !ctx.currentUserId) {
+    sendCommandError(ctx, 'Team games require login', msg.requestId, 'login_required'); return
+  }
+  if (!allowClientConfiguration(ctx, room.session.state.team?.configuration, msg.requestId)) return
   if (room.status === 'waiting' && room.teamMembers) {
     await joinWaitingTeamRoom(ctx, room, msg)
     return
@@ -1733,10 +1752,15 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   ))
 }
 
-function handleLoadGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'loadGame' }>): void | Promise<void> {
+async function handleLoadGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'loadGame' }>): Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   // Replacing the authoritative state is a dev command like the others below.
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
+  let configuration: TeamConfiguration | undefined
+  try { configuration = loadedTeamConfiguration(msg.state) }
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid team configuration', msg.requestId); return }
+  if (configuration && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId, configuration)) return
+  if (!allowClientConfiguration(ctx, configuration, msg.requestId)) return
   return useSessionResponse(
     executeRoomSession(room, 'loadState', [msg.state], () => room.session.loadState(msg.state)),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'reconnect'),

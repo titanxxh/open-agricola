@@ -5,7 +5,7 @@ export type AvailabilityStage = 'off' | 'beta' | 'general'
 
 export const EXPERIMENTAL_FEATURES: Readonly<Record<ExperimentalFeatureId, AvailabilityStage>> = {
   'team-modes': 'beta',
-  'team-cooperation-rules': 'off',
+  'team-cooperation-rules': 'beta',
 }
 
 export function isExperimentalFeatureAvailable({ stage, account, nodeEnv, devExperimentalFeatures }: {
