@@ -311,6 +311,16 @@ describe('Partner Build fences', () => {
     ])
   })
 
+  it('does not count the geometry-free cost estimate again when deciding whether a partner can be offered', () => {
+    const session = table(state => {
+      state.players[0]!.resources.wood = 2
+      state.players[0]!.minorPlayed = ['C016_FieldFences']
+      state.players[0]!.cardStates.C016_FieldFences = { extraData: { c16Active: true } }
+      state.players[2]!.fields = [{ row: 0, col: 1, stacks: [] }]
+    })
+    assertRejectedUnchanged(session, () => session.takeAction(0, 'fencing'))
+  })
+
   it('reads field-adjacency discounts from the target farm while keeping the source card on the builder', () => {
     const session = table(state => {
       state.players[0]!.minorHand = ['C016_FieldFences']
