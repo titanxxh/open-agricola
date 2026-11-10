@@ -178,11 +178,13 @@ it.each(['M038_NatureReserve', 'M039_SpecialPasture'])('%s keeps its lasting lay
   }
 })
 
-it.each([0, 2])('does not lend Farm Hand special-stable permission from card seat %i to a partner build', cardSeat => {
+it.each([{ cardSeats: [0] }, { cardSeats: [2] }, { cardSeats: [0, 2] }])('does not lend Farm Hand special-stable permission from card seats $cardSeats to a partner build', ({ cardSeats }) => {
   const session = table(state => {
-    const holder = state.players[cardSeat]!
-    holder.occupationPlayed = ['B085_FarmHand']
-    holder.fields = [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 1, col: 2 }, { row: 1, col: 3 }].map(tile => ({ ...tile, stacks: [] }))
+    for (const cardSeat of cardSeats) {
+      const holder = state.players[cardSeat]!
+      holder.occupationPlayed = ['B085_FarmHand']
+      holder.fields = [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 1, col: 2 }, { row: 1, col: 3 }].map(tile => ({ ...tile, stacks: [] }))
+    }
     state.players[0]!.resources.wood = 3
   })
   expect(session.takeAction(0, 'farm-expansion').ok).toBe(true)
@@ -196,7 +198,7 @@ it.each([0, 2])('does not lend Farm Hand special-stable permission from card sea
   expect(built.state.players[0]!.resources.wood).toBe(0)
   expect(built.state.players[0]!.stableTiles).toEqual([])
   expect(built.state.players[2]!.stableTiles).toEqual([{ row: 0, col: 4 }])
-  expect(built.state.players[cardSeat]!.cardStates.B085_FarmHand?.flagged).not.toBe(true)
+  for (const cardSeat of cardSeats) expect(built.state.players[cardSeat]!.cardStates.B085_FarmHand?.flagged).not.toBe(true)
   expect(session.withCtx(() => getExtraRoomCapacity(session.state.players[2]!))).toBe(0)
   expect(built.state.log).toContainEqual(expect.objectContaining({ key: 'log.partnerStablesBuilt', playerId: 'p1', playerRefs: { owner: 'p3' } }))
 })
