@@ -1,3 +1,4 @@
+import { TEAM_COOPERATION_CAPABILITY } from '../../../shared/contract/client-capabilities'
 import { describe, expect, it, vi } from 'vitest'
 import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
 import { createConnectionCtx } from '../connection-ctx'
@@ -162,6 +163,7 @@ it('denies cooperation creation independently of Team eligibility while leaving 
   vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', 'declared')
   vi.stubEnv('ADMIN_USERS', 'host')
   const deps = newDeps(), host = client(deps, 'host')
+  host.experimentalFeatureAccess = async (_userId, feature) => feature === 'team-modes'
   await dispatch(host, { type: 'createRoom', maxPlayers: 4, teamConfig: { ...teamConfig, cooperationRules: true } })
   expect(host.currentRoom?.id).toBeUndefined()
   expect(deps.registry.size()).toBe(0)
@@ -174,6 +176,7 @@ it('rechecks cooperation availability at rematch proposal, final acceptance and 
   const deps = newDeps(), host = client(deps, 'host'), guest = client(deps, 'guest')
   host.experimentalFeatureAccess = async () => true
   guest.experimentalFeatureAccess = async () => true
+  for (const ctx of [host, guest]) await dispatch(ctx, { type: 'getCommandScope', clientCapabilities: [TEAM_COOPERATION_CAPABILITY] })
   await dispatch(host, { type: 'createRoom', maxPlayers: 4, teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', cooperationRules: true } })
   const room = host.currentRoom!
   await dispatch(guest, { type: 'joinRoom', roomId: room.id })
@@ -203,15 +206,16 @@ it('filters unavailable cooperation from both lobby readers while direct resume 
   vi.stubEnv('ADMIN_USERS', 'host')
   const deps = newDeps(), host = client(deps, 'host'), guest = client(deps, 'guest')
   host.experimentalFeatureAccess = async () => true
+  for (const ctx of [host, guest]) await dispatch(ctx, { type: 'getCommandScope', clientCapabilities: [TEAM_COOPERATION_CAPABILITY] })
   await dispatch(host, { type: 'createRoom', maxPlayers: 4, teamConfig: { ...teamConfig, cooperationRules: true } })
   const room = host.currentRoom!
-  expect(await deps.lobby.getRooms(50, 'host')).toEqual([])
+  expect(await deps.lobby.getRooms(50, 'guest')).toEqual([])
   const directory = new RoomDirectory(deps.commands.db)
   await directory.register('cooperation-lobby', 'http://cooperation-lobby:9000', 'cooperation-lobby')
   await directory.activate('cooperation-lobby')
   const owner = (await directory.claim(room.id, 'cooperation-lobby')).owner
   await deps.commands.db.transaction(async () => { await directory.markActive(room.id, owner); await directory.presence(room.id, owner, 1, 1) })()
-  expect(await directory.lobby(50, 'host')).toEqual([])
+  expect(await directory.lobby(50, 'guest')).toEqual([])
   guest.experimentalFeatureAccess = async () => false
   await dispatch(guest, { type: 'joinRoom', roomId: room.id })
   expect(guest.currentRoom?.id).toBe(room.id)

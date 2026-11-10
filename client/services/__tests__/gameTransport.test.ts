@@ -4,6 +4,7 @@ import { createInitialState } from '../../../shared/session/state-bootstrap'
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../../shared/contract/protocol/game'
 import { EngineStack } from '../../../shared/engine'
 import type { SoloCreationConfiguration } from '../../../shared/contract/game-creation'
+import { CLIENT_CAPABILITIES_HEADER, TEAM_COOPERATION_CAPABILITY } from '../../../shared/contract/client-capabilities'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })
 
@@ -64,6 +65,36 @@ const buildEnvelope = (requestId: string, historyLength: number): StateUpdateEnv
   requestId,
   payload: buildPayload(historyLength),
   emittedAt: Date.now(),
+})
+
+it('declares capability on HTTP snapshots, commands, fence quotes and validation without changing their payloads', async () => {
+  const calls: Array<{ url: string; init: RequestInit | undefined }> = []
+  const payload = buildPayload(3)
+  const quote = { requestKey: 'selected-fence', woodCost: 6, affordable: true, valid: true, error: null }
+  vi.stubGlobal('window', { location: { hostname: 'localhost' } })
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    calls.push({ url, init })
+    return { ok: true, json: async () => url.endsWith('/fence-quote') ? quote : url.endsWith('/validate') ? { valid: true } : payload }
+  })
+  try {
+    const { HttpGameTransport, WsGameTransport } = await import('../gameTransport')
+    const transport = new HttpGameTransport()
+    await expect(transport.getState()).resolves.toEqual(payload)
+    await expect(transport.takeAction(0, 'forest')).resolves.toEqual(payload)
+    await expect(transport.quoteFenceSelection(0, 'selected-fence', { edges: ['h-0-0'] })).resolves.toEqual(quote)
+    await expect(transport.validateFarmChoice('fencing', 'p1', { edges: ['h-0-0'] })).resolves.toEqual({ valid: true })
+    const ws = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    await expect(ws.validateFarmChoice('rooms', 'p3', { positions: [{ row: 0, col: 0 }] })).resolves.toEqual({ valid: true })
+    expect(calls.map(call => [new URL(call.url, 'http://localhost').pathname, call.init?.method ?? 'GET'])).toEqual([
+      ['/api/game/state', 'GET'], ['/api/game/action', 'POST'], ['/api/game/fence-quote', 'POST'],
+      ['/api/game/validate', 'POST'], ['/api/game/validate', 'POST'],
+    ])
+    for (const { init } of calls) expect(new Headers(init?.headers).get(CLIENT_CAPABILITIES_HEADER)).toBe(TEAM_COOPERATION_CAPABILITY)
+    expect(JSON.parse(String(calls[1]!.init?.body))).toEqual({ playerIndex: 0, spaceId: 'forest' })
+    expect(JSON.parse(String(calls[2]!.init?.body))).toEqual({ playerIndex: 0, requestKey: 'selected-fence', payload: { edges: ['h-0-0'] } })
+    expect(JSON.parse(String(calls[4]!.init?.body))).toEqual({ type: 'rooms', playerId: 'p3', payload: { positions: [{ row: 0, col: 0 }] } })
+    transport.destroy(); ws.destroy()
+  } finally { vi.unstubAllGlobals(); vi.resetModules() }
 })
 
 describe('WsGameTransport request correlation', () => {
