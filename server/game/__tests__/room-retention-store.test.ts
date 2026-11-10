@@ -36,10 +36,29 @@ describe('RoomRetentionStore', () => {
 
   it('allows one of two competing revisions and rejects the stale update without another audit', async () => {
     const { db, store } = await setup()
-    const results = await Promise.all([
+    const locked = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const blocker = db.transaction(async () => {
+      await db.prepare('SELECT singleton FROM room_retention_policy WHERE singleton=TRUE FOR UPDATE').get()
+      locked.resolve()
+      await release.promise
+    })()
+    await locked.promise
+    const competing = Promise.all([
       store.update({ expectedRevision: 1, waitingDays: 4, playingDays: 10 }, 'admin'),
       new RoomRetentionStore(db).update({ expectedRevision: 1, waitingDays: 6, playingDays: 12 }, 'admin'),
     ])
+    try {
+      await expect.poll(async () => (await db.prepare(`
+        SELECT count(DISTINCT a.pid)::int AS count FROM pg_stat_activity a
+        JOIN pg_locks l ON l.pid=a.pid
+        WHERE l.relation='room_retention_policy'::regclass AND a.wait_event_type='Lock'
+      `).get<{ count: number }>())?.count, { timeout: 5000 }).toBe(2)
+    } finally {
+      release.resolve()
+      await blocker
+    }
+    const results = await competing
     expect(results.map(result => result.kind).sort()).toEqual(['conflict', 'updated'])
     expect(results[0].policy).toEqual(results[1].policy)
     expect(await store.read()).toEqual(results[0].policy)
