@@ -135,7 +135,8 @@ export type CardEffectField = CardEffectHook
   | 'computeExtraRoomCapacity'
   | 'computeHarvestBreedOrderPriority'
   | 'enforceReorganizeOnLastHarvest'
-  | 'computeBreedThreshold' | 'computeBreedableAnimalCount' | 'computeAnimalScoreAdjustment'
+  | 'computeBreedThreshold' | 'computeBreedableAnimalCount' | 'computeBreedOffspringCount'
+  | 'computeAnimalScoreAdjustment'
   | 'onComputeAnimalZones' | 'onComputeSharedAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
@@ -295,6 +296,8 @@ export type CardEffect = {
   ) => PastureCapacityModifier[]
   computeBreedThreshold?: BreedThresholdHandler
   computeBreedableAnimalCount?: BreedableAnimalCountHandler
+  /** Offspring after parent eligibility; receives the current count, initially one. */
+  computeBreedOffspringCount?: BreedableAnimalCountHandler
   computeAnimalScoreAdjustment?: AnimalScoreAdjustmentHandler
   consumeAnimalPayment?: AnimalPaymentHandler
   onAnimalRemoved?: AnimalRemovedHandler
@@ -582,6 +585,35 @@ export const getBreedableAnimalCount = (
     } catch (err) {
       if (isCustomCard(cardId)) {
         console.warn(`[card-effects] custom card ${cardId} computeBreedableAnimalCount threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return count
+}
+
+export const getBreedOffspringCount = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+  ctx: BreedThresholdContext,
+): number => {
+  const allCards = [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ]
+  let count = 1
+  for (const cardId of allCards) {
+    const handler = getCardEffect(cardId)?.computeBreedOffspringCount
+    if (!handler) continue
+    try {
+      const next = handler(state, player, animalType, count, ctx)
+      if (typeof next === 'number' && Number.isFinite(next)) count = Math.max(0, Math.floor(next))
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} computeBreedOffspringCount threw, skipping:`, err)
         continue
       }
       throw err
