@@ -707,7 +707,7 @@ const finalizeFence = (
     const counters = contributor.cardStates[usage.sourceCard]?.counters
     if (counters) counters[usage.counterKey] = (counters[usage.counterKey] ?? 0) - usage.usedCount
   }
-  const farmOperation = commitFarmOperation(farmOwner, { kind: 'fence', positions: validated.newPastures.flatMap(pasture => pasture.tiles ?? []), preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
+  const farmOperation = commitFarmOperation(farmOwner, { kind: 'fence', positions: validated.newPastures.flatMap(pasture => pasture.tiles ?? []), preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink, builder)
   const costSources = recordActionCostAttribution(
     builder,
     costAdjustment.costAttribution,

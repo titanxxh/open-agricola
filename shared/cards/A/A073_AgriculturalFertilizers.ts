@@ -12,7 +12,7 @@ const afterListener: CardListenerRegistration = {
   actions: ['construct', 'fence', 'stables'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (getActionNewlyUsedTiles(context).length < 2) return
+    if (getActionNewlyUsedTiles(context, 'host').length < 2) return
     return {
       flow: { type: 'leaf', actionId: 'sow', optional: true, sourceCard: CARD_ID },
       sourceCard: CARD_ID,

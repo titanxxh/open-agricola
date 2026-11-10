@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { getActionRoomConstructions } from '../helpers/construction-events'
 import { createEventQuery } from '../../events/query'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -12,7 +13,7 @@ const constructListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.player.houseType !== 'clay') return
+    if (!getActionRoomConstructions(context).some(operation => operation.roomType === 'clay' && operation.positions.length > 0)) return
     return { flow: gainLeaf(CARD_ID, { food: 3 }), sourceCard: CARD_ID }
   },
 }

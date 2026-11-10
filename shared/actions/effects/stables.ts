@@ -205,6 +205,9 @@ const resolveStableTotalCostWithDiscount = (
     if (finalCost[k] === 0) delete finalCost[k]
   }
   const paymentCost: ComplexCost = { unitFee: unitCost, nb: totalUnits }
+  if (partner && !PaymentSolver.readExactCost(actionContext) && !readCostOverride(actionContext)) {
+    paymentCost.unitPricePremium = { wood: 1 }
+  }
   if (Object.keys(adjustments.costs).length > 0) paymentCost.fee = adjustments.costs
   if (adjustments.trades.length > 0) paymentCost.trades = adjustments.trades
   if (adjustments.bonuses.length > 0) paymentCost.bonuses = adjustments.bonuses
@@ -353,7 +356,7 @@ const finalizeStables = (
     if (!applied) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     specialSourceCardId = applied.sourceCardId
   }
-  const farmOperation = commitFarmOperation(farmOwner, { kind: 'stables', positions: stables, standingSpecialStableCount: getStandingSpecialStableCount(farmOwner), specialStables: farmHand && specialSourceCardId ? [{ ...farmHand, sourceCardId: specialSourceCardId }] : [], preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
+  const farmOperation = commitFarmOperation(farmOwner, { kind: 'stables', positions: stables, standingSpecialStableCount: getStandingSpecialStableCount(farmOwner), specialStables: farmHand && specialSourceCardId ? [{ ...farmHand, sourceCardId: specialSourceCardId }] : [], preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink, builder)
   const futureStable = findMatureFutureStableEntry(ctx.state, farmOwner, readFutureStableId(ctx.actionContext))
   if (futureStable) futureStable.resources.stable = Math.max(0, (futureStable.resources.stable ?? 0) - totalUnits)
   recordActionCostAttribution(

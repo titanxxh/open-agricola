@@ -3,8 +3,8 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isCardFlagged, setCardFlag, writeCardExtraData, readCardExtraData } from '../helpers/card-state'
-import { hasFenceBuiltEvent } from '../helpers/fence-events'
+import { isCardFlagged, setCardFlag, writeCardExtraData } from '../helpers/card-state'
+import { getActionNewlyEnclosedPastureTiles, hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B124_Trimmer'
@@ -30,9 +30,6 @@ const CARD_ID = 'B124_Trimmer'
 const countPastureTiles = (player: CardListenerContext['player']): number =>
   player.pastures.reduce((sum, p) => sum + (p.tiles?.length ?? 0), 0)
 
-const getStoredArea = (player: CardListenerContext['player']): number =>
-  readCardExtraData<number>(player, CARD_ID, 'pastureArea') ?? 0
-
 const setStoredArea = (player: CardListenerContext['player'], area: number) =>
   writeCardExtraData(player, CARD_ID, 'pastureArea', area)
 
@@ -52,12 +49,12 @@ const afterFencingListener: CardListenerRegistration = {
     if (!hasFenceBuiltEvent(context)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const currentArea = countPastureTiles(context.player)
-    const storedArea = getStoredArea(context.player)
+    const newlyEnclosed = getActionNewlyEnclosedPastureTiles(context)
     const children: ActionFlow[] = [
       specialEffect({ kind: 'set-extra-data', key: 'pastureArea', value: currentArea }),
     ]
-    if (currentArea > storedArea) {
-      children.push(gainLeaf(CARD_ID, { stone: 2 }))
+    if (newlyEnclosed.length > 0) {
+      children.push(specialEffect({ kind: 'set-flag', flag: true }), gainLeaf(CARD_ID, { stone: 2 }))
     }
     return { flow: { type: 'seq', children }, sourceCard: CARD_ID }
   },

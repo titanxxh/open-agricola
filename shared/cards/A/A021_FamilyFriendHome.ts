@@ -16,7 +16,7 @@ const listener: CardListenerRegistration = {
     if (context.trueAction === false) return
     const construction = getActionRoomConstructions(context).find(operation => operation.positions.length > 0)
     if (!construction) return
-    const oldRoomCount = construction.before.roomTiles.length
+    const oldRoomCount = construction.playerId === context.player.id ? construction.before.roomTiles.length : context.player.rooms
     const familySize = getFamilySize(context.player)
     // Only trigger if there were more rooms than people BEFORE building
     if (oldRoomCount <= familySize) return

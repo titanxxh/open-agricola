@@ -14,7 +14,7 @@ const listener: CardListenerRegistration = {
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const gains: Partial<Resource> = {}
-    for (const { ordinal: i } of getActionStableConstructions(context)) {
+    for (const { ordinal: i } of getActionStableConstructions(context, context.player.id)) {
       if (i === 2) gains.cattle = (gains.cattle ?? 0) + 1
       if (i === 3) gains.boar = (gains.boar ?? 0) + 1
       if (i === 4) gains.sheep = (gains.sheep ?? 0) + 1

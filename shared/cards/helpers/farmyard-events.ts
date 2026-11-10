@@ -19,12 +19,12 @@ export const getActionTerrainOperations = (context: Pick<CardListenerContext, 'r
 }
 
 /** Only this host's committed geometry; nested hosts retain separate scopes. */
-export const getActionNewlyUsedTiles = (context: Pick<CardListenerContext, 'actionEvents' | 'player' | 'result'>) => {
+export const getActionNewlyUsedTiles = (context: Pick<CardListenerContext, 'actionEvents' | 'player' | 'result'>, scope: 'own' | 'host' = 'own') => {
   const tiles = new Map<string, FarmyardTileUsage>()
   const operations = getActionFarmOperations(context)
   if (operations !== undefined) {
     for (const operation of operations) for (const tile of operation.newlyUsedTiles) {
-      if (tile.playerId === context.player.id) tiles.set(positionKey(tile), { ...tile })
+      if (scope === 'host' || tile.playerId === context.player.id) tiles.set(`${tile.playerId}:${positionKey(tile)}`, { ...tile })
     }
     return [...tiles.values()]
   }
@@ -32,7 +32,7 @@ export const getActionNewlyUsedTiles = (context: Pick<CardListenerContext, 'acti
     if (!('schemaVersion' in event)) continue
     if (event.type !== 'farm.spacesUsed') continue
     for (const tile of event.newlyUsedTiles) {
-      if (tile.playerId === context.player.id) tiles.set(positionKey(tile), { ...tile })
+      if (scope === 'host' || tile.playerId === context.player.id) tiles.set(`${tile.playerId}:${positionKey(tile)}`, { ...tile })
     }
   }
   return [...tiles.values()]

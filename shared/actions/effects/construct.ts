@@ -158,7 +158,7 @@ const finalizeRoom = (
   const baseCost = PaymentSolver.buildConstructCost({ ...input, roomCount: rooms.length, costs: undefined, adjustments: undefined })
   if (!payCost || !baseCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
-  const farmOperation = commitRoomConstruction(ctx.state, farmOwner, rooms, ctx.sourceCard, ctx.eventSink)
+  const farmOperation = commitRoomConstruction(ctx.state, farmOwner, rooms, ctx.sourceCard, ctx.eventSink, builder)
 
   if (ctx.sourceCard && rooms.length > 0) {
     const houseType = farmOwner.houseType

@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { getActionRoomConstructions } from '../helpers/construction-events'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -12,7 +13,7 @@ const CARD_ID = 'D163_JourneymanBricklayer'
  * you get 1 stone.
  *
  * "Renovates to stone" means the opponent's houseType is 'stone' after renovation.
- * "Builds stone room" means the opponent constructs while their houseType is 'stone'.
+ * Room material comes from the committed construction, including partner rooms.
  */
 
 const renovateListener: CardListenerRegistration = {
@@ -35,8 +36,7 @@ const constructListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Trigger only if opponent built a stone room
-    if (context.player.houseType !== 'stone') return
+    if (!getActionRoomConstructions(context).some(operation => operation.roomType === 'stone' && operation.positions.length > 0)) return
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
   },
 }

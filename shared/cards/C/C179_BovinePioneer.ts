@@ -1,15 +1,12 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { getActionNewlyEnclosedPastureTiles } from '../helpers/fence-events'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C179_BovinePioneer'
 
-const hasNewPasture = (context: CardListenerContext): boolean => {
-  return (context.actionEvents ?? []).some(event => 'schemaVersion' in event && event.type === 'farm.fenceBuilt'
-    && event.newlyEnclosedPastureTiles.some(tile => tile.playerId === context.player.id))
-}
 
 const listener: CardListenerRegistration = {
   id: 'C179-bovine-pioneer-after-fence',
@@ -17,7 +14,7 @@ const listener: CardListenerRegistration = {
   actions: ['fence'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!hasNewPasture(context)) return
+    if (getActionNewlyEnclosedPastureTiles(context).length === 0) return
     return { flow: gainLeaf(CARD_ID, { cattle: 1 }), sourceCard: CARD_ID }
   },
 }
