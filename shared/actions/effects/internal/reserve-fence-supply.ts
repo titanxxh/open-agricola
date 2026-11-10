@@ -17,7 +17,8 @@ export const reserveFenceSupplyAction: ActionDefinition = {
     }
     return { type: 'ok', beforeHostContributions: [{
       key: 'fenceSupplyReservations', sourceCard,
-      value: { counterKey: params.counterKey, selectedCount: params.selectedCount },
+      value: { counterKey: params.counterKey, selectedCount: params.selectedCount,
+        ...(params.targetFarmPolicy === 'own' ? { targetFarmPolicy: 'own' } : {}) },
     }] }
   },
 }

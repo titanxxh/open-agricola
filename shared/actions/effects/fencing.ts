@@ -578,7 +578,7 @@ export const quoteFenceSelection = (
   let woodCost = baseWoodCost + surcharge
   const validated = playerBoard(ctx.state, ctx.state.players.indexOf(farmOwner)).farmyard.canBuildFence({
     edges, palisadeEdges, extraWood, freeFences: adjustment.freeFences,
-    options: fenceValidationOptions(player, playerCanBuildPalisades(player), policy,
+    options: fenceValidationOptions(player, playerCanBuildPalisades(builder, player), policy,
       payload.fenceSources, ctx.actionContext, builder),
     lockedKeys: collectLockedFarmTileKeys(farmOwner),
   })
@@ -644,7 +644,7 @@ const finalizeFence = (
   const idx = ctx.state.players.indexOf(farmOwner)
   const validationOptions = fenceValidationOptions(
     normalized,
-    playerCanBuildPalisades(normalized),
+    playerCanBuildPalisades(builder, normalized),
     currentPolicy,
     fenceSources,
     ctx.actionContext,
@@ -819,10 +819,10 @@ function* affordableFencePlans(
   const policy = borrowedPolicyWithCurrentCaps(state, player, readFenceActionPolicy(context.actionContext))
   const existing = new Set((player.fenceSegments ?? []).map((segment) => segment.edge))
   const selectable = request.farm.selectableEdges.filter((edge) => !existing.has(edge))
-  const options = fenceValidationOptions(player, playerCanBuildPalisades(player), policy, undefined, context.actionContext, builder)
+  const options = fenceValidationOptions(player, playerCanBuildPalisades(builder, player), policy, undefined, context.actionContext, builder)
   const capacity = Math.min(sourceOrdinaryCapacity(player, policy, selectedFenceSupplyCount(builder, context.actionContext)),
     policy.segmentBounds?.fence?.max ?? selectable.length)
-  const border = playerCanBuildPalisades(player) && !isBorrowedFenceSourcePolicy(policy.sourcePolicy)
+  const border = playerCanBuildPalisades(builder, player) && !isBorrowedFenceSourcePolicy(policy.sourcePolicy)
     && (!policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('palisade'))
     ? selectable.filter((edge) => isFarmyardBorderEdge(player, edge)) : []
   const maxFence = !policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('fence') ? capacity : 0
@@ -970,12 +970,16 @@ export const fenceAction: ActionDefinition = {
       )
     },
   },
-  previewEffect: ({ player, actionContext, previewMode }) => {
+  previewEffect: (context) => {
+    const { player: builder, actionContext, previewMode } = context
+    const roles = resolveBuildPlayers(context)
+    if (!roles) return
+    const player = roles.farmOwner
     const policy = readFenceActionPolicy(actionContext)
-    const kinds: FenceSegmentType[] = policy.allowedSegmentTypes ?? ['fence', ...(previewMode !== 'base' && playerCanBuildPalisades(player) ? ['palisade' as const] : [])]
+    const kinds: FenceSegmentType[] = policy.allowedSegmentTypes ?? ['fence', ...(previewMode !== 'base' && playerCanBuildPalisades(builder, player) ? ['palisade' as const] : [])]
     return { kind: 'fencePlan', segments: kinds.map(kind => ({ kind, woodCost: policy.costPolicy?.[kind]?.wood ?? defaultFenceWoodCosts[kind], ...policy.segmentBounds?.[kind] })),
       totalBounds: policy.segmentBounds?.total, fixedWood: Math.max(0, policy.costPolicy?.fixedWood ?? 0),
-      freeFences: previewMode === 'base' ? 0 : selectedFenceSupplyCount(player, actionContext) + fenceCostDiscountCount(actionContext),
+      freeFences: previewMode === 'base' ? 0 : selectedFenceSupplyCount(builder, actionContext) + fenceCostDiscountCount(actionContext),
       borrowed: isBorrowedFenceSourcePolicy(policy.sourcePolicy), paymentBudget: policy.paymentBudget }
   },
   execute: (context): ActionExecutionResult => {
@@ -1089,7 +1093,7 @@ export const fenceAction: ActionDefinition = {
         freeFences: costAdjustment.freeFences,
         options: fenceValidationOptions(
           normalized,
-          playerCanBuildPalisades(normalized),
+          playerCanBuildPalisades(builder, normalized),
           currentPolicy,
           fenceSources,
           ctx.actionContext,
@@ -1102,7 +1106,7 @@ export const fenceAction: ActionDefinition = {
       }
       const baseValidated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
         edges, palisadeEdges, freeFences: costAdjustment.baseFreeFences,
-        options: fenceValidationOptions(normalized, playerCanBuildPalisades(normalized), currentPolicy,
+        options: fenceValidationOptions(normalized, playerCanBuildPalisades(builder, normalized), currentPolicy,
           fenceSources, ctx.actionContext, builder),
         lockedKeys,
       })

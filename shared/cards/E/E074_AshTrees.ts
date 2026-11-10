@@ -6,6 +6,7 @@ import { getLogicalFields } from '../helpers/card-field'
 import { canStartFencing } from '../../actions/effects/fencing'
 import { getOwnOrdinaryFenceReserveCount } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
+import { resolveBuildPlayers } from '../../actions/helpers/build-players'
 
 const CARD_ID = 'E074_AshTrees'
 const MAX_FREE_FENCES = 5
@@ -22,7 +23,8 @@ const isDoableListener: CardListenerRegistration = {
     if (stored <= 0) return
     return { doable: canStartFencing(context.actionHooks, context.state, context.player, undefined, {
       ...context.actionContext,
-      fenceSupplyReservations: { [CARD_ID]: { counterKey: 'fences', selectedCount: stored } },
+      targetFarmPolicy: 'own',
+      fenceSupplyReservations: { [CARD_ID]: { counterKey: 'fences', selectedCount: stored, targetFarmPolicy: 'own' } },
     }) }
   },
 }
@@ -33,6 +35,7 @@ const beforeFenceListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (resolveBuildPlayers(context)?.farmOwner.id !== context.player.id) return
     const stored = context.player.cardStates?.[CARD_ID]?.counters?.fences ?? 0
     if (stored <= 0) return
 
@@ -51,6 +54,7 @@ const beforeFenceListener: CardListenerRegistration = {
             params: {
               selectedCount: count,
               counterKey: 'fences',
+              targetFarmPolicy: 'own',
             },
           }
         }),

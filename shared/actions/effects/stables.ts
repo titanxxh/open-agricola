@@ -261,7 +261,7 @@ const buildStableFarmSelection = (
   // (its scan bound is `selectionMax`); geometry bounds it via selectable tiles.
   farm.maxSelections = Math.min(farm.selectableTiles.length, affordableMax)
   const farmHandPositions = isSpecialStableEntry(actionContext)
-    ? collectSpecialStablePositions(state, farmOwner).map((c) => c.position)
+    ? collectSpecialStablePositions(state, player, farmOwner).map((c) => c.position)
     : []
   return farmHandPositions.length > 0 ? { ...farm, farmHandPositions } : farm
 }
@@ -352,7 +352,7 @@ const finalizeStables = (
   const nextPlayer = JSON.parse(JSON.stringify(farmOwner)) as PlayerState
   let specialSourceCardId: string | undefined
   if (farmHand) {
-    const applied = applySpecialStableAt(ctx.state, nextPlayer, farmHand)
+    const applied = applySpecialStableAt(ctx.state, builder, nextPlayer, farmHand)
     if (!applied) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     specialSourceCardId = applied.sourceCardId
   }
@@ -497,7 +497,7 @@ export const stablesAction: ActionDefinition = {
       }
       const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
       if (placementError?.type === 'fail') return { ...placementError, recoverable: true }
-      if (farmHand && !collectSpecialStablePositions(ctx.state, roles.farmOwner).some(({ position }) =>
+      if (farmHand && !collectSpecialStablePositions(ctx.state, roles.builder, roles.farmOwner).some(({ position }) =>
         position.row === farmHand.row && position.col === farmHand.col,
       )) {
         return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }

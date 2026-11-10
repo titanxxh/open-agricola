@@ -1990,7 +1990,7 @@ export const GameContainerApi = () => {
         sow: isSelectingSow,
       },
       fence: {
-        canBuildPalisades: !!currentPlayer && playerCanBuildPalisades(currentPlayer),
+        canBuildPalisades: !!activePlayer && playerCanBuildPalisades(activePlayer, targetFarmOwner ?? activePlayer),
         placementMode: farmSelectionDraft.interactionBarDraft.fencePlacementMode,
         setPlacementMode: farmSelectionDraft.controls.setFencePlacementMode,
         borrowedSources: farmSelectionDraft.borrowedFenceSources,

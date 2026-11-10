@@ -1,11 +1,18 @@
 import type { PlayerState } from '../../shared/contract/types'
 import { getCardMeta } from '../services/card-meta'
 
-export const playerCanBuildPalisades = (player: PlayerState): boolean => {
-  const has = (id: string) => !!getCardMeta(id)?.enablesPalisades
+export const playerCanBuildPalisades = (
+  builder: Pick<PlayerState, 'id' | 'minorPlayed' | 'occupationPlayed' | 'improvements'>,
+  farmOwner: Pick<PlayerState, 'id'>,
+): boolean => {
+  const has = (id: string) => {
+    const card = getCardMeta(id)
+    return card?.enablesPalisades === true
+      && (card.palisadeTargetFarmPolicy !== 'own' || builder.id === farmOwner.id)
+  }
   return (
-    player.minorPlayed.some(has)
-    || player.occupationPlayed.some(has)
-    || player.improvements.some(has)
+    builder.minorPlayed.some(has)
+    || builder.occupationPlayed.some(has)
+    || builder.improvements.some(has)
   )
 }
