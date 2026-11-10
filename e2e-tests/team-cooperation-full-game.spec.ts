@@ -24,7 +24,7 @@ const publicGame = (payload: GameSyncPayload) => ({
 
 async function loadInitialGame(driver: RoomDriver) {
   const fixture = cooperationFullGameFixture()
-  try { await driver.command(0, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, {})) }) }
+  try { await driver.command(0, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, fixture)) }) }
   finally { fixture.dispose() }
 }
 
