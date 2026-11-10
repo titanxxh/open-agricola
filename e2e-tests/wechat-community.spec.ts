@@ -1,10 +1,15 @@
 // @covers operations/
+// @covers client/components/header/
+// @covers client/styles/pages/game.css
 import { execFileSync } from 'node:child_process'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createCanvas } from 'canvas'
 import { expect, test } from '@playwright/test'
 import { BACKEND_URL } from './fixtures'
+import { joinRoomClients, roomDriver } from './room-command-driver'
+import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
+import { serializeState } from '../shared/session/serialization'
 
 const communities = [
   { platform: 'wechat', label: 'WeChat player group', title: 'Join the WeChat player group', image: 'WeChat player group QR code', flag: '--wechat-qr', filename: 'wechat-qr', endpoint: '/api/community/wechat-qr' },
@@ -95,6 +100,33 @@ for (const community of communities) {
 
 test.describe('shared headers on touch devices', () => {
   test.use({ hasTouch: true, isMobile: true })
+  test('keeps community controls inside a narrow header while waiting for another player', async ({ page, request }) => {
+    const session = createWorkSession({ seed: 1636, configure(state) {
+      state.currentPlayerIndex = 1
+      state.round = 14
+    } })
+    let state: ReturnType<typeof serializeState>
+    try { state = session.withCtx(() => serializeState(session.state, {})) }
+    finally { session.dispose() }
+    await joinRoomClients([page], request)
+    await roomDriver([page]).command(0, { type: 'loadGame', state })
+    for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+      await page.setViewportSize(viewport)
+      await expect(page.locator('.header-compact .waiting-turn')).toContainText('Player 2')
+      for (const community of communities) {
+        const trigger = page.getByRole('button', { name: community.label, exact: true })
+        await expect(trigger).toBeVisible()
+        const bounds = await trigger.boundingBox()
+        if (!bounds) throw new Error('Missing group button')
+        expect(bounds.x).toBeGreaterThanOrEqual(0)
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width)
+        await trigger.click()
+        const dialog = page.getByRole('dialog', { name: community.title })
+        await expect(dialog).toBeVisible()
+        await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      }
+    }
+  })
   test('keeps both groups visible in the lobby and game on a narrow phone and short landscape', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     for (const url of ['/?player=p1&devMode=1&bg=none', '/?page=game&transport=ws&room=dev2&player=p1&devMode=1&bg=none']) {
