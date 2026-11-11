@@ -750,7 +750,6 @@ export type CanBeExecutedByPlayer = (
 
 /** Serializable inputs owned by one action invocation. */
 export type ActionContext = Record<string, unknown> & {
-  /** Farm owner for this build; the action executor remains its builder and payer. */
   allowedRoomTypes?: readonly PlayerState['houseType'][]
   /** Renovation bonuses supplied by this invocation, separate from computeCosts results. */
   costBonuses?: Bonus[]

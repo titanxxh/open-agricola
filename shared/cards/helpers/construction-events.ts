@@ -3,7 +3,7 @@ import type { CardListenerContext } from '../card-listeners'
 
 type ConstructionContext = Pick<CardListenerContext, 'result' | 'player' | 'triggerPlayer'>
 
-/** Only this host's committed receipts; farm ownership does not change its builder. */
+/** Only this host's committed construction receipts reach its trailing reactions. */
 const operations = (context: ConstructionContext, ownerPlayerId?: string) => {
   const result = context.result
   return result?.type === 'ok' || result?.type === 'flow'

@@ -327,7 +327,7 @@ const finalizeStables = (
     if (!applied) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     specialSourceCardId = applied.sourceCardId
   }
-  const farmOperation = commitFarmOperation(player, { kind: 'stables', positions: stables, standingSpecialStableCount: getStandingSpecialStableCount(player), specialStables: farmHand && specialSourceCardId ? [{ ...farmHand, sourceCardId: specialSourceCardId }] : [], preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink, player)
+  const farmOperation = commitFarmOperation(player, { kind: 'stables', positions: stables, standingSpecialStableCount: getStandingSpecialStableCount(player), specialStables: farmHand && specialSourceCardId ? [{ ...farmHand, sourceCardId: specialSourceCardId }] : [], preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
   const futureStable = findMatureFutureStableEntry(ctx.state, player, readFutureStableId(ctx.actionContext))
   if (futureStable) futureStable.resources.stable = Math.max(0, (futureStable.resources.stable ?? 0) - totalUnits)
   recordActionCostAttribution(

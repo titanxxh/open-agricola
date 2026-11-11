@@ -22,6 +22,7 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import { Scoring } from '../../shared/domain'
 import type { ActionFlow } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
@@ -41,6 +42,74 @@ afterEach(() => {
 })
 
 describe('custom code executor', () => {
+  it('restores a sandbox owner reward and payment choice while retaining an explicit mutation target', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card', cost: {} })
+const CARD_IMPL = { listeners: [{ actions: ['collect'], phases: ['after'], scope: 'opponent', handler: () => ({
+  flow: { type: 'seq', children: [
+    { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-counter', key: 'marker', value: 17 }, actionContext: { targetPlayerId: 'p1' } },
+    { type: 'leaf', actionId: 'gain', params: { food: 3 } },
+    { type: 'leaf', actionId: 'pay', params: { cost: { fees: [{ food: 1 }, { wood: 1 }] } } }
+  ] }
+}) }] }
+    `, 'CUSTOM_ExecutorCard')
+    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+    const cards = [makeCardData(compiled.compiledCode, compiled.manifest)]
+    const session = createWorkSession({ seed: 1655, customCards: cards, configure(state) {
+      state.round = 14
+      state.players.forEach(player => {
+        player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__']
+        Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 0 })
+      })
+      state.players[1]!.minorPlayed = ['CUSTOM_ExecutorCard']
+      state.players[1]!.resources.food = 2
+      state.players[1]!.resources.wood = 1
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+    } })
+    let restored: GameSession | undefined
+    try {
+      const beforeScores = session.getState().scores
+      let response = session.takeAction(0, 'forest')
+      for (let step = 0; step < 5 && response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-player-switch'; step++) {
+        response = session.resolveChoice(response.interaction.playerIndex, 'confirm')
+      }
+      expect(response.ok, response.error).toBe(true)
+      expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'choice' } })
+      expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0 })
+      expect(response.state.players[1]!.resources).toMatchObject({ wood: 1, food: 5 })
+      expect(response.state.players[0]!.cardStates.CUSTOM_ExecutorCard?.counters?.marker).toBe(17)
+      expect(response.state.players[1]!.cardStates.CUSTOM_ExecutorCard?.counters?.marker).toBeUndefined()
+      const pending = response.interaction
+      const snapshot = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+      restored = new GameSession(rehydrateState(snapshot), cards)
+      expect(restored.getState().interaction).toEqual(pending)
+      const request = restored.getState().interaction
+      if (request.stateId !== 'wait' || request.request.kind !== 'choice') throw new Error('Expected restored owner payment')
+      const food = request.request.options.find(option => option.effectPreview?.kind === 'payment' && option.effectPreview.resourcesPaid.food === 1)
+      if (!food) throw new Error('Expected one-food payment')
+      const continued = restored
+      assertRejectedUnchanged(continued, () => continued.resolveChoice(0, food.value))
+      response = continued.resolveChoice(1, food.value)
+      for (let step = 0; step < 5 && response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-player-switch'; step++) {
+        response = continued.resolveChoice(response.interaction.playerIndex, 'confirm')
+      }
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0 })
+      expect(response.state.players[1]!.resources).toMatchObject({ wood: 1, food: 4 })
+      expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'resource.moved', sourceCardId: 'CUSTOM_ExecutorCard',
+        to: { kind: 'player', playerId: 'p2' }, resources: { food: 3 } }))
+      expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'resource.paid', actorPlayerId: 'p2',
+        sourceCardId: 'CUSTOM_ExecutorCard', resources: { food: 1 } }))
+      expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.cardEffectPay', playerId: 'p2',
+        params: expect.objectContaining({ cardId: 'CUSTOM_ExecutorCard', cost: { food: 1 } }) }))
+      expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.cardEffectGain', playerId: 'p2',
+        params: expect.objectContaining({ cardId: 'CUSTOM_ExecutorCard', gain: { food: 3 } }) }))
+      expect(response.scores?.[1]).toEqual(beforeScores?.[1])
+      expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    } finally { restored?.dispose(); session.dispose() }
+  })
+
   it.each([{ adjustment: -2, expected: 4 }, { adjustment: 3, expected: 9 }, { adjustment: undefined, expected: 6 }])(
     'applies signed farmer score contributions from sandbox queries ($adjustment)', ({ adjustment, expected }) => {
     const compiled = validateAndCompileCustomCode(`
