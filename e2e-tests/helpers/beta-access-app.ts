@@ -69,7 +69,7 @@ async function httpsQualificationApp(hosted: HostedReleaseApp, environment: Node
   const identity = createPrereleaseAuthorityHandler({ db, getSourceToken: async request => readCookie(request.headers.cookie, 'oa_session') })
   const target = new URL(hosted.apiUrl), sockets = new Set<Duplex>()
   let origin = ''
-  const previous = { PUBLIC_APP_ORIGIN: process.env.PUBLIC_APP_ORIGIN, PRERELEASE_APP_ORIGIN: process.env.PRERELEASE_APP_ORIGIN }
+  const previous = { PUBLIC_APP_ORIGIN: process.env.PUBLIC_APP_ORIGIN, PRERELEASE_APP_ORIGIN: process.env.PRERELEASE_APP_ORIGIN, ADMIN_USERS: process.env.ADMIN_USERS }
   const headers = (request: import('node:http').IncomingMessage) => ({ ...request.headers, host: target.host,
     ...(request.headers.origin === origin ? { origin: target.origin } : {}) })
   const server = createServer({ key: await readFile(join(root, 'key.pem')), cert: await readFile(join(root, 'cert.pem')) }, (request, response) => {
@@ -106,6 +106,7 @@ async function httpsQualificationApp(hosted: HostedReleaseApp, environment: Node
   origin = `https://127.0.0.1:${address.port}`
   process.env.PUBLIC_APP_ORIGIN = origin
   process.env.PRERELEASE_APP_ORIGIN = ''
+  process.env.ADMIN_USERS = environment.ADMIN_USERS
   return { ...hosted, appUrl: `${origin}/open-agricola/`, apiUrl: origin, async close() {
     for (const socket of sockets) socket.destroy()
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))

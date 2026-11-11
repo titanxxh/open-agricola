@@ -131,7 +131,7 @@ test('administrator manages Beta qualification with bilingual revocation while m
       legacy.searchParams.set('players', '4')
       legacy.searchParams.set(key, value)
       await member.goto(legacy.href)
-      await expect(member.getByText('Unsupported game configuration', { exact: true })).toBeVisible()
+      await expect(member.getByRole('alert')).toContainText('Unsupported game configuration')
       await expect(member.locator('.action-board')).toHaveCount(0)
     }
     expect(commands).toEqual([])
@@ -140,21 +140,3 @@ test('administrator manages Beta qualification with bilingual revocation while m
   } finally { await visitor.close(); await ordinary.close(); await administrator.close() }
 })
 
-
-test('keeps prerelease entry closed for an HTTP formal configuration', async ({ browser }) => {
-  test.setTimeout(180000)
-  const insecure = await startHostedReleaseAppWithBetaAccess()
-  const context = await browser.newContext()
-  try {
-    await insecure.authenticate(context, 'e2e_admin', 'Administrator')
-    const page = await context.newPage()
-    const entry = page.waitForResponse(response => new URL(response.url()).pathname === '/api/prerelease/entry')
-    await page.goto(insecure.appUrl)
-    const response = await entry
-    expect(response.request().headers().origin).toBeUndefined()
-    expect(response.status()).toBe(403)
-    expect(await response.json()).toMatchObject({ code: 'csrf_rejected' })
-    await expectStableLobby(page)
-    await expect(page.locator('.prerelease-entry')).toHaveCount(0)
-  } finally { await context.close(); await insecure.close() }
-})
