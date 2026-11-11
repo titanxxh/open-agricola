@@ -12,17 +12,19 @@ vi.mock('../../services/room-creation', async importOriginal => ({
   startRoomCreation: vi.fn(async () => ({ roomId: 'created-team' })), resumePendingRoomCreation: () => null,
 }))
 
-const accountFeatures = vi.hoisted(() => ({ value: ['team-modes'] as string[] }))
+const accountFeatures = vi.hoisted(() => ({ value: ['team-modes'] as string[], betaAccess: false }))
 const refreshSession = vi.hoisted(() => vi.fn())
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSON.stringify({
   ok: true, games: [], rooms: path === '/api/lobby/my-rooms' ? myRoomsResponse.rooms : [],
+  protocolVersion: 1,
+  entry: path === '/api/prerelease/entry' ? { kind: 'available', channel: 'prerelease', startUrl: 'https://pre.agricola.test/open-agricola/auth/start', returnTo: `${window.location.origin}/` } : undefined,
   players: [{ id: 'Guest_ID-2', username: 'guest', displayName: 'Guest' }],
 }))))
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: { id: 'u1', username: 'host', displayName: 'Host', experimentalFeatures: accountFeatures.value },
+    user: { id: 'u1', username: 'host', displayName: 'Host', betaAccess: accountFeatures.betaAccess, experimentalFeatures: accountFeatures.value },
     logout: vi.fn(),
     apiFetch,
     refreshSession,
@@ -32,6 +34,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 vi.mock('../../contexts/LocaleContext', async () => {
   const { t: message } = await import('../../../shared/i18n')
   const labels: Record<string, string> = {
+    'prerelease.entry': 'Enter prerelease',
     'platform.lobbyTitle': 'Lobby',
     'platform.backToLobbyPlain': 'Back to Lobby',
     'platform.tabSettings': 'Settings',
@@ -117,9 +120,17 @@ afterEach(() => {
   vi.unstubAllEnvs()
   myRoomsResponse.rooms = []
   accountFeatures.value = ['team-modes']
+  accountFeatures.betaAccess = false
 })
 
 describe('LobbyPage main navigation', () => {
+  it('offers prerelease to a qualified account independently of team availability', async () => {
+    accountFeatures.betaAccess = true
+    accountFeatures.value = []
+    render(<LobbyPage />)
+    expect(await screen.findByRole('link', { name: 'Enter prerelease' })).toHaveAttribute('target', '_blank')
+  })
+
   const encyclopediaLink = () => within(screen.getByRole('navigation', { name: 'Main navigation' }))
     .getByRole('link', { name: 'Card Encyclopedia' })
 

@@ -12,6 +12,7 @@ import { setPage } from '../utils/platform-page-url'
 import { useAccountLinking } from './useAccountLinking'
 import { PlayerAccountId } from '../components/common/PlayerAccountId'
 import { BetaAccessSettings } from './BetaAccessSettings'
+import { PrereleaseEntry } from './PrereleaseEntry'
 
 type LinkedIdentity = {
   provider: 'github' | 'google'
@@ -315,6 +316,7 @@ export function SettingsPage() {
           {t('beta.accessLabel')}: <span className="settings-readonly-chip">{t('beta.accessEnabled')}</span>{' '}
           {user.experimentalFeatures?.includes('team-modes') ? <span>{t('beta.availableModes')}</span> : null}
         </p> : null}
+        <PrereleaseEntry />
         <form onSubmit={handleSaveName} className="settings-form">
           <div className="form-field">
             <label htmlFor="displayName">{t('platform.displayNameLabel')}</label>

@@ -1,11 +1,14 @@
 // @covers shared/contract/protocol/
 // @covers client/contexts/
+// @covers client/app/PrereleaseEntry.tsx
+// @covers client/app/PrereleaseHandoffPage.tsx
+// @covers client/services/prerelease.ts
 import { expect, devices, type BrowserContext, type Page, type PlaywrightWorkerArgs, type Request } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer as createHttpServer, request as httpRequest, type IncomingMessage } from 'node:http'
-import { createServer } from 'node:https'
+import { createServer, request as httpsRequest } from 'node:https'
 import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, extname, join, resolve, sep } from 'node:path'
@@ -14,6 +17,7 @@ import { createLocalUserForTests } from '../server/auth'
 import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE } from '../server/auth-cookies'
 import { getDb } from '../server/db'
 import { createFrontendHosting } from '../server/frontend-hosting'
+import { createPrereleaseAuthorityHandler } from '../server/prerelease-authority-routes'
 import { HOSTED_APP_PATH } from '../shared/contract/protocol/app-location'
 import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, openGameEndControls } from './fixtures'
 import { test } from './server-fixtures'
@@ -40,7 +44,7 @@ function frontendBuild(topology: Topology) {
   return { directory, gameBuildId: metadata.gameBuildId }
 }
 
-async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: Engine, topology: Topology) {
+async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: Engine, topology: Topology, prerelease = false) {
   expect(process.env.DATABASE_SCHEMA).toMatch(/^test_[a-f0-9]{32}$/)
   const build = frontendBuild(topology)
   const directory = mkdtempSync(join(tmpdir(), 'agricola-hosted-login-'))
@@ -48,15 +52,16 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
     '-keyout', join(directory, 'key.pem'), '-out', join(directory, 'cert.pem'),
     '-days', '1', '-subj', '/CN=app.agricola.test',
-    '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:api.agricola.test,DNS:app.test,DNS:api.test',
+    '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:api.agricola.test,DNS:pre.agricola.test,DNS:app.test,DNS:api.test',
   ], { stdio: 'ignore' })
   const username = `hosted_${randomUUID().slice(0, 8)}`
   const user = await createLocalUserForTests(username, PASSWORD)
+  if (prerelease) await getDb().prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
   await getDb().prepare(`
     INSERT INTO sandbox_settings (user_id, player_count, updated_at) VALUES (?, 3, ?)
     ON CONFLICT (user_id) DO UPDATE SET player_count = 3, updated_at = EXCLUDED.updated_at
   `).run(user.id, Date.now())
-  const keys = ['NODE_ENV', 'PUBLIC_APP_ORIGIN', 'PUBLIC_API_BASE', 'CORS_ORIGIN']
+  const keys = ['NODE_ENV', 'PUBLIC_APP_ORIGIN', 'PUBLIC_API_BASE', 'CORS_ORIGIN', 'PRERELEASE_APP_ORIGIN', 'PRERELEASE_IDENTITY_SERVICE_KEY', 'PRERELEASE_ENTRY_ENABLED']
   const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]))
   const sockets = new Set<Duplex>()
   const errors: string[] = []
@@ -79,6 +84,11 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   }
   let appOrigin = ''
   let apiOrigin = ''
+  const preOrigin = 'https://pre.agricola.test'
+  const serviceKey = 'test-target-only-service-key-at-least-32-bytes'
+  let issuedHandoffs = 0
+  const preRequests: Array<{ path: string; formalCookie: boolean }> = []
+  const identity = createPrereleaseAuthorityHandler({ db: getDb(), getSourceToken: async req => readCookie(req.headers.cookie, SESSION_COOKIE) })
   const backend = new URL(BACKEND_URL)
   const trustedBackendOrigin = new URL(FRONTEND_URL).origin
   const track = (socket: Duplex) => {
@@ -96,6 +106,73 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   }, (req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', appOrigin)
+      if (prerelease && req.headers.host === new URL(preOrigin).host) {
+        preRequests.push({ path: req.url ?? '', formalCookie: !!readCookie(req.headers.cookie, SESSION_COOKIE) })
+        if (url.pathname === '/open-agricola/auth/start') {
+          const verifier = randomBytes(32).toString('base64url'), state = randomBytes(32).toString('base64url')
+          const browserChallenge = createHash('sha256').update(verifier).digest('base64url')
+          const next = new URL(`${appOrigin}/?page=prerelease-handoff`)
+          next.hash = new URLSearchParams({ browserChallenge, state, targetOrigin: preOrigin, returnTo: `${appOrigin}/` }).toString()
+          res.writeHead(302, { Location: next.href, 'Set-Cookie': [
+            `pre_verifier=${verifier}; Path=/open-agricola/; HttpOnly; Secure; SameSite=Lax`,
+            `pre_state=${state}; Path=/open-agricola/; HttpOnly; Secure; SameSite=Lax`,
+          ], 'Cache-Control': 'no-store' })
+          res.end(); return
+        }
+        if (url.pathname === '/open-agricola/auth/handoff') {
+          res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' })
+          res.end(`<html><body><h1>Completing test handoff</h1><script>
+            const data = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+            history.replaceState(null, '', location.pathname);
+            fetch('/open-agricola/finish', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(async response => {
+              const result = await response.json();
+              document.querySelector('h1').textContent = result.ok ? 'Prerelease identity received' : 'Handoff failed';
+              if (result.ok) { const text=document.createElement('p'); text.textContent=result.username; document.body.append(text); }
+              const back=document.createElement('a');back.href=${JSON.stringify(`${appOrigin}/`)};back.textContent='Return to production';document.body.append(back);
+            });
+          </script></body></html>`)
+          return
+        }
+        if (url.pathname === '/open-agricola/finish' && req.method === 'POST') {
+          const chunks: Buffer[] = []
+          for await (const chunk of req) chunks.push(Buffer.from(chunk))
+          const data: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          const verifier = readCookie(req.headers.cookie, 'pre_verifier')
+          if (!data || typeof data !== 'object' || !('code' in data) || typeof data.code !== 'string'
+            || !('state' in data) || data.state !== readCookie(req.headers.cookie, 'pre_state')
+            || !('browserChallenge' in data) || data.browserChallenge !== createHash('sha256').update(verifier).digest('base64url')) {
+            res.writeHead(400).end(JSON.stringify({ ok: false })); return
+          }
+          const address = server.address()
+          if (!address || typeof address === 'string') throw new Error('Missing fixture address')
+          const state: unknown = await new Promise((resolveExchange, reject) => {
+            const exchange = httpsRequest({ hostname: '127.0.0.1', port: address.port, path: '/api/prerelease/exchange', method: 'POST',
+              rejectUnauthorized: false, headers: { Host: new URL(apiOrigin).host, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+            }, response => {
+              const bytes: Buffer[] = []
+              response.on('data', chunk => bytes.push(Buffer.from(chunk)))
+              response.on('end', () => { try { resolveExchange(JSON.parse(Buffer.concat(bytes).toString('utf8'))) } catch (error) { reject(error) } })
+            })
+            exchange.on('error', reject)
+            exchange.end(JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin: preOrigin, code: data.code, browserVerifier: verifier, returnTo: `${appOrigin}/` }))
+          })
+          if (!state || typeof state !== 'object' || !('ok' in state) || state.ok !== true || !('state' in state) || !state.state || typeof state.state !== 'object'
+            || !('account' in state.state) || !state.state.account || typeof state.state.account !== 'object'
+            || !('kind' in state.state.account) || state.state.account.kind !== 'active' || !('subject' in state.state.account)
+            || !state.state.account.subject || typeof state.state.account.subject !== 'object' || !('username' in state.state.account.subject)) throw new Error('Expected minimal exchanged identity')
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+          res.end(JSON.stringify({ ok: true, username: state.state.account.subject.username })); return
+        }
+        res.writeHead(404).end(); return
+      }
+      if (prerelease && req.headers.host === new URL(apiOrigin).host && url.pathname.startsWith('/api/prerelease/')) {
+        if (req.method === 'OPTIONS') {
+          res.writeHead(204, { 'Access-Control-Allow-Origin': appOrigin, 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' })
+          res.end(); return
+        }
+        if (url.pathname === '/api/prerelease/handoffs' && req.method === 'POST') issuedHandoffs++
+        if (await identity(req, res)) return
+      }
       if (topology === 'same-site-pages' && req.headers.host === new URL(appOrigin).host) {
         const file = resolve(build.directory, `.${url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname)}`)
         if (!file.startsWith(`${build.directory}${sep}`)) { res.writeHead(404); res.end(); return }
@@ -212,11 +289,16 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   process.env.PUBLIC_APP_ORIGIN = `${appOrigin}${appPath}`
   process.env.PUBLIC_API_BASE = apiOrigin
   process.env.CORS_ORIGIN = appOrigin
+  if (prerelease) {
+    process.env.PRERELEASE_APP_ORIGIN = preOrigin
+    process.env.PRERELEASE_IDENTITY_SERVICE_KEY = serviceKey
+    process.env.PRERELEASE_ENTRY_ENABLED = 'true'
+  }
   const handleFrontend = createFrontendHosting({ ...process.env, FRONTEND_ROOT: build.directory, GAME_BUILD_ID: build.gameBuildId })
   const proxy = createHttpServer((_req, res) => { res.writeHead(502); res.end() })
   proxy.on('connect', (req, socket, head) => {
     const target = new URL(`http://${req.url}`)
-    const local = ['app.test', 'api.test', 'app.agricola.test', 'api.agricola.test'].includes(target.hostname)
+    const local = ['app.test', 'api.test', 'app.agricola.test', 'api.agricola.test', 'pre.agricola.test'].includes(target.hostname)
     const upstream = connect(local ? address.port : Number(target.port) || 443, local ? '127.0.0.1' : target.hostname, () => {
       socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
       if (head.length) upstream.write(head)
@@ -236,7 +318,9 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
       args: engine === 'webkit' ? ['--enable-itp', '--cookies-policy=no-third-party'] : ['--test-third-party-cookie-phaseout'],
       proxy: { server: `http://127.0.0.1:${proxyAddress.port}` },
     })
-    await browserContext.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    await browserContext.addInitScript(origin => {
+      if (window.location.origin === origin) localStorage.setItem('open-agricola-locale-v2', 'en')
+    }, appOrigin)
     return browserContext
   }
   try {
@@ -310,6 +394,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     }
     return {
       appUrl: `${appOrigin}${appPath}`, apiOrigin, build, username, userId: user.id,
+      preOrigin, preRequests, get issuedHandoffs() { return issuedHandoffs },
       get context() { if (!context) throw new Error('Browser context is not open'); return context },
       get latestRoomState() { return latestRoomState },
       get sandboxBodyHeld() { return sandboxBodyHeld },
@@ -352,6 +437,86 @@ async function submitPassword(page: Page, username: string) {
   expect(response.status()).toBe(200)
   expect(await response.json()).toMatchObject({ ok: true, user: { username } })
 }
+
+test('prerelease entry keeps the production tab and exchanges only a browser-bound code', async ({ playwright }, testInfo) => {
+  test.setTimeout(180_000)
+  const environment = await fixture(playwright, 'chromium', 'same-site-pages', true)
+  try {
+    const page = await environment.context.newPage()
+    environment.observe(page)
+    await page.goto(`${environment.appUrl}?page=login&bg=none`)
+    await environment.loadLobby(page, () => submitPassword(page, environment.username))
+    const entry = page.getByRole('link', { name: 'Enter prerelease', exact: true })
+    await expect(entry).toHaveAttribute('href', `${environment.preOrigin}/open-agricola/auth/start`)
+    await expect(entry).toHaveAttribute('rel', 'noopener noreferrer')
+    const originalUrl = page.url()
+    const [popup] = await Promise.all([environment.context.waitForEvent('page'), entry.click()])
+    environment.observe(popup)
+    await expect(popup.getByRole('heading', { name: 'Prerelease identity received' })).toBeVisible()
+    await expect(popup.getByText(environment.username, { exact: true })).toBeVisible()
+    expect(await popup.evaluate(() => window.opener)).toBeNull()
+    expect(page.url()).toBe(originalUrl)
+    expect(page.isClosed()).toBe(false)
+    expect(environment.issuedHandoffs).toBe(1)
+    expect(environment.preRequests.map(request => request.path)).toEqual([
+      '/open-agricola/auth/start', '/open-agricola/auth/handoff', '/open-agricola/finish',
+    ])
+    expect(environment.preRequests.every(request => !request.formalCookie)).toBe(true)
+    expect(await environment.context.cookies(environment.apiOrigin)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: SESSION_COOKIE, domain: 'api.agricola.test', secure: true, httpOnly: true }),
+    ]))
+    expect((await environment.context.cookies(environment.preOrigin)).some(cookie => cookie.name === SESSION_COOKIE)).toBe(false)
+    expect(new URL(popup.url()).hash).toBe('')
+    await environment.loadLobby(popup, () => popup.getByRole('link', { name: 'Return to production' }).click())
+    expect(new URL(popup.url()).origin).toBe(new URL(environment.appUrl).origin)
+    expect(new URL(popup.url()).search).toBe('')
+    expect(new URL(popup.url()).hash).toBe('')
+
+    const badFlow = new URL(`${environment.appUrl}?page=prerelease-handoff`)
+    badFlow.hash = new URLSearchParams({ browserChallenge: 'a'.repeat(43), state: 's'.repeat(43),
+      targetOrigin: 'https://evil.test', returnTo: environment.appUrl }).toString()
+    await popup.goto(badFlow.href)
+    await expect(popup.getByRole('alert')).toContainText('This entry link is invalid or expired.')
+    expect(environment.issuedHandoffs).toBe(1)
+    expect(new URL(popup.url()).hash).toBe('')
+    await expect(popup.getByRole('link', { name: 'Return to production', exact: true })).toHaveAttribute('href', environment.appUrl)
+
+    process.env.PRERELEASE_ENTRY_ENABLED = 'false'
+    await environment.loadLobby(page, () => page.reload())
+    await expect(page.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
+    await expect(page.getByRole('status')).toContainText('Prerelease is not available yet.')
+    await page.goto(`${environment.appUrl}?page=settings&bg=none`)
+    await expect(page.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
+    process.env.PRERELEASE_ENTRY_ENABLED = 'true'
+    await page.reload()
+    await expect(page.getByRole('link', { name: 'Enter prerelease', exact: true })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('prerelease-settings.png'), fullPage: true })
+    await page.getByRole('button', { name: 'Display language: English', exact: true }).click()
+    await page.getByRole('option', { name: '简体中文', exact: true }).click()
+    await expect(page.getByRole('link', { name: '进入预发布', exact: true })).toBeVisible()
+    await expect(page.getByText('在新标签页打开预发布，保留当前正式站标签页。', { exact: true })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('prerelease-settings-zh.png'), fullPage: true })
+    await page.getByRole('button', { name: '界面语言: 简体中文', exact: true }).click()
+    await page.getByRole('option', { name: 'English', exact: true }).click()
+
+    await getDb().prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.userId)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
+    await expect(page.getByText('Enter prerelease', { exact: true })).toHaveCount(0)
+    await environment.loadLobby(page, () => page.goto(`${environment.appUrl}?bg=none`))
+    await expect(page.getByText('Enter prerelease', { exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Sign Out', exact: true }).click()
+    await expect(page.locator('#username')).toBeVisible()
+    await expect(page.getByText('Enter prerelease', { exact: true })).toHaveCount(0)
+    const guestFlow = new URL(`${environment.appUrl}?page=prerelease-handoff`)
+    guestFlow.hash = new URLSearchParams({ browserChallenge: 'a'.repeat(43), state: 's'.repeat(43),
+      targetOrigin: environment.preOrigin, returnTo: environment.appUrl }).toString()
+    await page.goto(guestFlow.href)
+    await expect(page.getByRole('alert')).toContainText('Your login or Beta access is no longer valid.')
+    expect(environment.issuedHandoffs).toBe(1)
+    expect(environment.errors).toEqual([])
+  } finally { await environment.close() }
+})
 
 test('strict WebKit reproduces legacy cross-site password login returning to the form', async ({ playwright }, testInfo) => {
   test.skip(process.platform !== 'linux', 'This red control covers WPE without CHIPS; hosted acceptance runs on every platform')

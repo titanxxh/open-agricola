@@ -44,6 +44,8 @@ Target `/status` supplies separate account, source-login and Beta facts. Preserv
 
 The formal authority is separate from pre-local session issuance, projection cleanup, full-environment access enforcement and owner activation. Implementations and controlled-time/rejection tests live in `prerelease-authority.test.ts` and `auth-routes.test.ts`; accepted policy and historical differences are recorded in ADR 0042.
 
+Lobby and Settings use `PrereleaseEntry` for Beta accounts and administrators. The authority response decides availability independently of Team feature stages. The configured start opens in a new tab; the production tab remains. A closed or missing target shows an unavailable control. `PrereleaseHandoffPage` never transfers the source login cookie or verifier, clears incoming fragment metadata, and accepts only the current target and formal root. Its one-time code returns through the fixed pre callback fragment. The browser seam is covered by the HTTPS prerelease case in `hosted-password-login.spec.ts`; pre-local sessions remain a separate delivery.
+
 ### A3. Frontend routing: URL parameters and `PageRouter`
 
 Do not add `react-router`; retain the current URL-parameter style through `?page=`:

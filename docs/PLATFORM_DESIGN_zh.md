@@ -46,6 +46,8 @@
 
 正式权威与预发布本地会话签发、投影清理、全环境门禁及 owner 开通分别交付。受控时间和拒绝反例见 `prerelease-authority.test.ts`、`auth-routes.test.ts`；已接受政策及历史差异见 ADR 0042。
 
+大厅与设置通过 `PrereleaseEntry` 向 Beta 账号和管理员提供入口，实际开放由权威响应决定，不依赖 Team 开放阶段。固定入口以新标签打开，保留正式标签；未配置或关闭时显示不可用。`PrereleaseHandoffPage` 不转交来源登录 Cookie 或 verifier，清除传入 fragment，只采用当前配置目标与正式站根，一次性 code 通过固定 pre 回调的 fragment 返回。浏览器验证见 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例；预发布本地会话另行交付。
+
 ### A3. 前端路由：URL 参数 + PageRouter 组件
 
 **不引入 react-router** — 保持现有 URL 参数风格：

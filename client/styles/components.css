@@ -101,6 +101,16 @@
   flex-direction: column;
   gap: 4px;
 }
+
+.prerelease-entry {
+  margin-bottom: 20px;
+}
+.prerelease-entry .btn-secondary {
+  display: inline-block;
+}
+.prerelease-entry .settings-hint {
+  margin-top: 8px;
+}
 .form-field label {
   font-size: 13px;
   color: var(--color-text-secondary);
