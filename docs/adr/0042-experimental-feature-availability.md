@@ -34,10 +34,11 @@ A separate PR changes a stage to `general`. After at least one released version,
 - Migration 039 uses the owner data-generation UUID. Only a formal administrator may close admission, acknowledge verified projection erasure, or prepare/open its replacement. Immutable operation receipts fence stale retries. Erased generations do not create future cleanup obligations after the target is removed.
 - Restoring a backup must rebind every retained identity to current deletion propagation without restoring source or local login rights. The required pre-native identity view, actual cleanup/remap/rescan, current formal deletion facts and a completion under 30 seconds gate activation. Missing/unknown refs block; the target key cannot authorize this audit. Close invalidates the earlier audit.
 
-`server/prerelease-authority{,-routes}.ts`, migrations 037/039 and `shared/contract/prerelease-identity.ts` implement the formal authority seam. This does not establish a live pre deployment or complete its environment admission; those remain separate dependency tickets. Main Beta-business removal is tracked by #1661.
+`server/prerelease-authority{,-routes}.ts`, migrations 037/039 and `shared/contract/prerelease-identity.ts` implement the formal authority seam. This does not establish a live pre deployment or complete its environment admission; those remain separate dependency tickets. Main removes the Team/Multihand/cooperation business under #1661, including the named feature registry, stages and its game entry checks. Beta qualification, administrator grant controls, formal identity authority and prerelease entry remain on main. The original registry and graduation sections above are historical; a hidden control or an `off` stage does not satisfy this removal.
 
 ## References
 
 - [PRD #1615](https://github.com/titanxxh/open-agricola/issues/1615)
-- [Contract](../architecture/contract.md#experimental-features)
-- [Entry-point tests](../../server/connection/__tests__/experimental-features.test.ts)
+- [Beta qualification contract](../architecture/contract.md#beta-qualification)
+- [Qualification tests](../../server/__tests__/experimental-features.test.ts)
+- [Main transport boundaries](../../server/connection/__tests__/experimental-feature-transport.test.ts)

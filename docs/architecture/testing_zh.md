@@ -81,6 +81,6 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查提供开�
 
 农场写入扫描复用 `check:card-impl-boundaries`，覆盖生产 `shared/`、`server/` 及新增子目录。全仓审计由 CLI 门禁负责，小型仓库夹具验证写入 owner、失效例外和几何依赖行为。它与操作收据共用 `FARM_LAYOUT_KEYS`，并核对权威已用格及放置几何读取是否包含在该契约内。只有具名共同写入者和两个具名建局、恢复函数有例外；根缺失或为空、解析失败和失效例外都会失败。赋值、数组修改、索引写、常见 alias 与 `Object.assign` 的机械反例见 `scripts/__tests__/farm-write-scan.test.ts`。语法扫描不证明任意 JavaScript，支付、顺序、归属及已用格资格由 Session 测试证明。
 
-## 实验功能覆盖
+## 资格与 main 输入验证
 
-[开放判定测试](../../shared/contract/__tests__/experimental-features.test.ts) 为各阶段和账号类型逐项使用生产、开发默认与回切声明的字面预期。PostgreSQL 资格测试验证实时读取与删除外键；Room 和 HTTP 入口测试验证拒绝创建／重开不改变房间、版本与回放，并验证原局仍可参与。[浏览器 helper](../../e2e-tests/helpers/experimental-features-app.ts) 通过 `restart-local.sh` 启动拥有独立数据库、对象前缀和端口的声明阶段应用，现有组队 spec 继续使用非生产默认行为。[门禁 spec](../../e2e-tests/experimental-feature-gates.spec.ts) 使用真实账号验证普通用户与管理员的入口展示。
+PostgreSQL 资格测试验证最新授予读取与删除外键。权威和退役测试覆盖身份交接、来源撤销、代次隔离及当前恢复审计。HTTP 与真实 WebSocket 边界测试在房间分配、版本或 Replay 变化前拒绝已移出配置和命令，再验证省略、空及未知能力声明下的普通请求。浏览器保留管理员授予／撤销、预发布入口、普通邀请、Hotseat 和观战验证。普通历史 pending 快照通过 `fixed-room-prices-recovery.test.ts` 和 `standard-solo-recovery-network.test.ts` 执行下一条命令。

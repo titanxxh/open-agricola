@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-11-10. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-11-12. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 > This document covers official cards only. Hook ownership is derived from `ALL_CARD_IMPLS`; query the registry instead of mirroring it here.
 
@@ -20,7 +20,6 @@ Unless the product direction changes, the following are not bugs. Cards without 
 
 | Category | Cards |
 |---|---|
-| Team Cooperation Rules follow the German appendix with recorded maintainer interpretations: one build uses one Target Farm, plowing remains on the actor's farm, and ordinary partner room prices retain the base increase before cost transformations, including when a card supplies the unit price. Source-granted exact/free construction keeps its existing policy. See [ADR 0043](adr/0043-team-cooperation-rules-partner-builds.md). | Room, stable and fence builds, including card-granted builds |
 | Project Rule Interpretations adopted in [#1407](https://github.com/titanxxh/open-agricola/issues/1407) where the available sources do not settle the solo interaction. These are card-local OA decisions, not official rulings or a general replacement for other-player or neighbour conditions. | `E014_WoodSaw`, `M027_GardenPath`, `M054_AgriculturalImplement`, `M056_PeatCuttingRights` |
 | Maintainer scheme B: a startable before flow may admit a space whose host cannot finish, requiring undo. Admission does not simulate the reward, and cards add no admission guards. | Space-use before benefits; [ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md) |
 | Maintainer interpretation confirmed 2026-10-30: collect the full pile, then optionally return half for an animal, preserving the original acquisition facts and thresholds. Collected animals complete ordinary housing, including any discards, before the return; returning goods cannot bypass that settlement. This supersedes #1336 for this card under [#1481](https://github.com/titanxxh/open-agricola/issues/1481); it is not a newly verified official ruling and does not change other cards' quantity- or type-limited takes. | `D180_PartTimeWorker` |

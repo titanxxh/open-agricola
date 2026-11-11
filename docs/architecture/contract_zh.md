@@ -133,10 +133,6 @@ type ClientCommand = (
 
 ## ServerEvent 与 StateUpdateEnvelope
 
-`setTeam { teamIndex, memberId? }` 不指定成员时移动自己；指定成员要求房主权限。等待室容量与 checkpoint 成功决定是否发布变更，错误使用 `team_change_failed` 或 `team_start_failed`。它只修改成员的 teamIndex，不修改 Team Configuration。`newGame` 与 restart 保留现有 cooperationRules 设置，不提供局中规则开关。
-
-组队房间逐账号发送 `teamRoomWaiting`，只含不透明成员 ID、名字、队伍、席位数与连接状态，不含账号 ID 或座位号。`startTeamGame` 要求满员且由房主发起；提交排座后，先向每个账号发送普通 `roomJoined`，再发 Step 0。在此之前 `RoomViewer.kind='team-member'` 没有座位号，传输恢复等待该等待事件，不请求对局快照。持久化的活动对局摘要使用空 `player_index` 与 `teamWaiting` 表示这些成员。入口与测试见 `team-room.ts`、`team-seating.test.ts`。
-
 `StateUpdateEnvelope.connectedPlayerIndexes` 独立于持久游戏状态和 Replay 传输实时座位在线信息，完整快照及既有加入／断开事件更新它。连接状态不决定轮抽是否可选牌。轮抽提交除 Room 输入窗口身份外，还携带 `opportunityKey`。
 
 `setPlayerColor { color }` 是需认证、记入命令账本的候场命令，不接受客户端指定座位。它只修改调用者颜色，持久化后才发布，不生成 Replay Step。
@@ -172,7 +168,6 @@ type GameSyncPayload = {
   privateEvents?: PrivateGameEvent[]
   waitingSeatIndexes?: number[]
   scores: PlayerScoreSummary[] | null
-  teamScores?: TeamScoreSummary[]
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
   hasActionStartSnapshot: boolean
@@ -188,7 +183,7 @@ type GameSyncPayload = {
 - `stateUpdate`、`roomWaiting`、`gameStarted`、`playerJoined`、`playerDisconnected` 与 `roomDissolved` 是广播；`roomCreated`、`roomJoined`、`authOk` 与请求错误是单播。
 - `error.code='room_capacity_reached'` 后使用 WebSocket close 1013，让客户端重新发现容量后再重试已过期或不可用的准入。
 - 每个广播的状态、私有提示、`privateEvents`、卡牌可用性和事件撤销使用同一组可见座位。提示的接收者在集合内时可见，其他视角收到 `private-prompt` 遮蔽。历史游标绑定到可见集合，与集合顺序无关。不带 `X-Viewer-Player` 的 HTTP 沙盒保留不过滤的开发流程；带上它时使用相同的视角过滤与座位守卫。
-- 参与者握手和 `RoomViewer` 分别携带 `controlledPlayerIndexes` 与 `visiblePlayerIds`；省略数组时仅指主座位。它们描述连接权限和私有展示，不包含账号 ID，也不写入规则状态。同队公开提示可见，但信封只向拥有交互座位的连接授予命令和 anytime 能力。在线事件覆盖账号占有的全部座位。
+- 参与者的房间握手与 `RoomViewer` 分别携带 `controlledPlayerIndexes` 和 `visiblePlayerIds`；省略数组表示主座位。它们表达连接权限与私密展示，不是账号 ID 或规则状态。房间 envelope 只向拥有交互座位的连接授予命令与 anytime 能力；在线状态覆盖全部自有座位。
 - `cardWarnings` 只出现在 HTTP 调试与沙盒 payload。HTTP 信封携带 `gameInstanceId`，加载状态后轮换；它既不是授权也不是模型输入。
 - `waitingSeatIndexes` 是权威 Waiting Seat 投影，独立于视角和 Interaction Player。大厅 `MyActiveRoom` 暴露 `waiting_player_indexes`、`owned_player_indexes` 与 `hotseat`；归属标记和提醒匹配任一自有待行动座位，不授予命令权限。省略归属数组时回退到主座位。见 [session](session.md#unified-sessionresponse)。
 - 托管写入携带 `commandContext`（scope、稳定命令 ID、Room ID、期望的已提交版本）；同时进行的选秀与父母选择共用一个 input-window ID。路由先解析持久回执再判断新鲜度，拒绝同一身份下内容不同的命令，并把结果随 Room transaction 持久化。回执只含结果标识与哈希，仅对其发起者可见。`requestId` 只关联一次交换。
@@ -263,13 +258,9 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 `LogEntry { key, params, playerId? }` 携带 i18n key 与参数，按当前语言渲染。开局条目可带稳定的 `playerId`，座位显示名变化时按身份刷新。
 
 
-## 实验功能
+## Beta 资格
 
-生产将 `team-cooperation-rules` 声明为 `beta`。有 beta 资格的账号和管理员可以创建开启此规则的组队或分身房间，其他账号沿用实验功能拒绝。账号资格不代表客户端支持协议。
-
-`experimental-features.ts` 统一维护 `ExperimentalFeatureId`、`AvailabilityStage`、声明清单和账号／阶段／环境的纯判定。生产严格使用声明的 `off`/`beta`/`general`；非生产默认视为 `general`，设置 `DEV_EXPERIMENTAL_FEATURES=declared` 可恢复声明。未登录永不通过，`off` 同样拒绝管理员。见 [ADR 0042](../adr/0042-experimental-feature-availability.md)。
-
-`/api/auth/me` 返回服务端按最新资格计算的 `user.experimentalFeatures`，客户端据此展示入口。WebSocket 错误包含 `code: experimental_feature_unavailable` 和 `feature`；HTTP 使用相同字段并返回 403。持久化命令回执只保留通用错误码与消息，不存储功能 ID。开放状态不进入对局状态、Room 快照、回放或结果存档。
+`/api/auth/me` 返回最新的 `betaAccess` 和 `isAdmin` 账号状态。迁移 036 保存授予记录，管理员从 `ADMIN_USERS` 派生。资格不进入 GameState、Room 快照、Replay 或结果存档。main 将其用于预发布入口和管理员授予控件。[ADR 0042](../adr/0042-experimental-feature-availability.md) 保留早期 main 内开放及后续替代决策。
 
 ## 预发布身份
 
@@ -277,10 +268,6 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 
 ## 客户端能力
 
-`shared/contract/client-capabilities.ts` 定义精确 token `team-cooperation-v1`。`getCommandScope.clientCapabilities` 为当前 WebSocket 声明支持；省略该字段保留当前 socket 声明，重连的新 socket 必须重新声明。HTTP 每次请求携带 `X-Open-Agricola-Client-Capabilities`，未知 token 不授予能力。`Broadcaster` 的私有 WeakMap 以 WebSocket 为键，ConnectionCtx 不重复保存。能力声明不进入 GameState、房间快照、Replay 或账号记录；cooperationRules 本身仍是正常持久化的对局配置。
+`shared/contract/client-capabilities.ts` 负责解析能力声明。`getCommandScope.clientCapabilities` 为当前 WebSocket 声明支持；省略字段保留该 socket 声明，重连后的新 socket 重新声明。HTTP 每次请求发送 `X-Open-Agricola-Client-Capabilities`，CORS 预检允许该 header。普通请求可省略声明，也可使用空声明或未知 token；未知 token 不授予能力。`Broadcaster` 持有私有 socket WeakMap。声明不进入 GameState、Room 快照、Replay 或账号记录。
 
-普通客户端可以不声明能力。合作房的创建、加入、恢复、观战及房间操作需要协议支持，独立于账号资格。缺能力时返回 `client_refresh_required` 及可读消息 `Please refresh this page to use official cooperation rules.`。HTTP 使用409，账号功能资格拒绝仍为403。scope 和 receipt 查询继续可用。持久命令先结算拒绝 receipt，当前 transport 再进入要求刷新的终止状态，停止重连；错误不撤销认证，也不重新执行已确认命令。
-
-公开 devRoom `loadGame` 可以在 socket 仍绑定时替换普通状态。Broadcaster 的统一发布守卫不给缺能力的成员或观众发送合作 Room 事件、等待/状态快照及 envelope，只发刷新错误，保留已确认座位和状态。此防御不新增生产配置开关。HTTP 在规则执行或替换之前，分别检查当前 Session 和创建/加载后解析出的目标配置；显式新建普通沙盒仍可不带能力。OPTIONS 返回允许能力 header 的 CORS 响应，不创建 Session。
-
-测试：[WS 准入与发布](../../server/connection/__tests__/cooperation-client-compatibility.test.ts)、[网络兼容](../../server/connection/__tests__/experimental-feature-transport.test.ts)、[HTTP 门禁](../../server/__tests__/experimental-feature-http.test.ts)、[receipt 与重连](../../client/services/__tests__/gameTransport-reconnect.test.ts)、[完整对局与刷新界面](../../e2e-tests/team-cooperation-full-game.spec.ts)。部署重叠边界见 [HOW_TO_DEPLOY](../HOW_TO_DEPLOY.md#supported-browser-and-backend-overlap)。
+命令 scope 和持久 receipt 独立于能力声明。要求刷新时，transport 先结算未完成的持久 receipt，再停止重试；不撤销认证，也不重新执行已确认命令。测试：`experimental-feature-transport.test.ts`、`gameTransport-reconnect.test.ts` 和 `auth-routes.test.ts` 的 CORS 用例。部署重叠边界见 [HOW_TO_DEPLOY](../HOW_TO_DEPLOY.md#supported-browser-and-backend-overlap)。

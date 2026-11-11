@@ -46,7 +46,7 @@
 
 正式权威与预发布本地会话签发、投影清理、全环境门禁及 owner 开通分别交付。受控时间和拒绝反例见 `prerelease-authority.test.ts`、`auth-routes.test.ts`；已接受政策及历史差异见 ADR 0042。
 
-大厅与设置通过 `PrereleaseEntry` 向 Beta 账号和管理员提供入口，实际开放由权威响应决定，不依赖 Team 开放阶段。固定入口以新标签打开，保留正式标签；未配置或关闭时显示不可用。`PrereleaseHandoffPage` 不转交来源登录 Cookie 或 verifier，清除传入 fragment，只采用当前配置目标与正式站根，一次性 code 通过固定 pre 回调的 fragment 返回。浏览器验证见 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例；预发布本地会话另行交付。
+大厅与设置通过 `PrereleaseEntry` 向 Beta 账号和管理员提供入口，实际开放由权威响应决定。固定入口以新标签打开，保留正式标签；未配置或关闭时显示不可用。`PrereleaseHandoffPage` 不转交来源登录 Cookie 或 verifier，清除传入 fragment，只采用当前配置目标与正式站根，一次性 code 通过固定 pre 回调的 fragment 返回。浏览器验证见 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例；预发布本地会话另行交付。
 
 迁移 039 将身份关联绑定到 owner 的同一个 `generation` / `PRERELEASE_DATA_GENERATION` UUID，新代次先关闭。仅正式管理员可访问的 `GET/POST /api/admin/prerelease-identity/lifecycle` 负责 prepare、activate、close 与已验证清除后的 retire。维护前 close 阻止签发/兑换；retire 撤销 grant、移除交接、消除已清除投影的后续义务并记录不可变回执。目标消失后，退役关联不再为将来的账号删除创建工作；旧退役请求不能关闭新代次。候选服务 key 不能授权 owner 操作。既有 037/038 关联升级为关闭/撤销状态，不谎称已清除。
 

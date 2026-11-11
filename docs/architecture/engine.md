@@ -39,7 +39,6 @@ shared/engine/
 - Every request a leaf returns opens a pending envelope whose options come from `interactionRequestChoices()`; completion reactions run only after it is submitted. `InteractionRequest` is a protocol shape, not a node.
 - `before` reaction leaves may return `beforeHostContributions` keyed by namespace and source; the engine upserts them into the unstarted host's `actionContext` through `continuationParentHostNodeId`. A contribution without a valid before host fails, and repeating a source replaces its entry. They follow the host through pending, recovery and undo, and nested or independently granted actions do not inherit them.
 
-New action nodes carry `farmTargetSelection`. For cooperative definitions declaring `farmBuild`, `engine-proceed.ts` inserts a Target Farm selector before hooks; ordinary games retain their node and option identities. Cursor restoration treats an absent marker as false, so an unfinished retained build continues on its original farm. Selection, placement and payment recovery are covered by `server/__tests__/partner-stables-session.test.ts`.
 
 ## Engine Public API
 
