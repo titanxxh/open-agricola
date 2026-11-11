@@ -1,0 +1,1795 @@
+.scan-card {
+  width: 100%;
+  max-width: var(--agricola-card-width);
+  aspect-ratio: 188 / 299;
+  position: relative;
+  container-type: inline-size;
+}
+
+.scan-card-inner {
+  width: 235px;
+  height: 374px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: scale(var(--card-content-scale, 0.8));
+  transform: scale(calc(100cqi / 235px));
+  transform-origin: top left;
+  border-radius: 16px;
+  overflow: hidden;
+  color: #333;
+}
+
+.scan-card-inner[data-layout="illustrated-action"] {
+  border-radius: 2px;
+}
+
+.scan-title {
+  margin: 0;
+  position: relative;
+  z-index: 3;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  text-align: center;
+  font-size: 15px;
+  line-height: 17px;
+  color: #1a1a1a;
+}
+
+.scan-number {
+  position: absolute;
+  left: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #333;
+}
+
+.scan-badge {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.scan-copy,
+.scan-event-body {
+  font-family: var(--agricola-font);
+  font-size: 12px;
+  line-height: 14px;
+  color: #333;
+  text-align: center;
+  padding: 0;
+}
+.scan-copy > span {
+  display: block;
+}
+
+.scan-illustrated,
+.scan-episode,
+.scan-story,
+.scan-offspring,
+.scan-artifact,
+.scan-guest,
+.scan-crop,
+.scan-rules {
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
+  background-color: transparent;
+}
+
+.scan-illustrated .scan-copy,
+.scan-episode .scan-copy,
+.scan-story .scan-copy,
+.scan-offspring .scan-copy,
+.scan-artifact .scan-copy,
+.scan-guest .scan-copy,
+.scan-crop .scan-copy,
+.scan-rules .scan-copy {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.scan-stack-art,
+.scan-stack-over {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+.scan-stack-art { z-index: 0; }
+.scan-stack-over { z-index: 2; }
+
+.scan-bottom-art {
+  position: absolute;
+  left: 4.5%;
+  width: 91%;
+  bottom: 2.4%;
+  object-fit: fill;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.scan-official-action .scan-category {
+  width: 26px;
+  height: 26px;
+  right: 8%;
+  top: auto;
+  bottom: 34.5%;
+  z-index: 3;
+}
+.scan-official-action[data-deck="X"] .scan-number {
+  top: 13.8%;
+  left: 7.2%;
+}
+/* The action frame closes its panel above the art, which runs to the card edges on white stock. */
+.scan-illustrated.scan-official-action { background-color: #fff; }
+.scan-illustrated__frame { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.scan-illustrated .scan-bottom-art { left: 0; width: 100%; bottom: auto; z-index: 0; }
+.scan-illustrated.scan-official-action .scan-title {
+  position: absolute;
+  top: 27px;
+  left: 12%;
+  right: 12%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--agricola-font);
+  font-size: 18.7px;
+  font-weight: 400;
+  line-height: 19.1px;
+}
+.scan-illustrated.scan-official-action .scan-number {
+  top: 64.1px;
+  left: 16.6px;
+  z-index: 3;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.4px;
+  font-weight: 400;
+  line-height: 1;
+  color: #111;
+}
+.scan-illustrated.scan-official-action .scan-copy {
+  top: 80px;
+  bottom: auto;
+  height: 158px;
+  left: 4%;
+  right: 4%;
+  z-index: 3;
+  font-family: var(--agricola-font);
+  font-size: 11px;
+  line-height: 13px;
+  text-align: center;
+}
+.scan-illustrated.scan-official-action .scan-category {
+  top: 226.5px;
+  left: 198.8px;
+  right: auto;
+  bottom: auto;
+  width: 22.2px;
+  height: 22.2px;
+}
+/* The forest prints add a flavor line under the title and run the number and its tree up the panel's foot. */
+.scan-illustrated[data-deck="legendairy-forest"] .scan-title {
+  top: var(--fe-title);
+  left: 8%;
+  right: 8%;
+  height: 24px;
+  font-size: var(--fe-title-size);
+  line-height: 1;
+}
+.scan-illustrated[data-deck="legendairy-forest"] .scan-flavor {
+  position: absolute;
+  top: var(--fe-flavor);
+  left: 9%;
+  right: 9%;
+  z-index: 3;
+  margin: 0;
+  font-family: var(--agricola-font);
+  font-size: 10.9px;
+  line-height: 13.25px;
+  text-align: center;
+  transform: translateX(var(--fe-flavor-x, 0));
+}
+.scan-illustrated[data-deck="legendairy-forest"] .scan-copy {
+  top: var(--fe-copy);
+  height: auto;
+  left: 7%;
+  right: 7%;
+  font-size: var(--fe-copy-size);
+  line-height: var(--fe-copy-line);
+}
+.scan-illustrated[data-deck="legendairy-forest"] .scan-number {
+  top: calc(var(--fe-number) - 5.5px);
+  left: 13.05px;
+  width: 12px;
+  font-family: var(--agricola-font);
+  font-size: 11px;
+  line-height: 11px;
+  text-align: center;
+  color: #2b2419;
+  transform: rotate(-90deg);
+}
+.scan-illustrated[data-deck="legendairy-forest"] .scan-forest-tree {
+  top: calc(var(--fe-tree) - 4.95px);
+  left: 14.6px;
+  width: 8.8px;
+  transform: rotate(-90deg);
+}
+.scan-illustrated[data-deck="legendairy-forest"] .scan-category {
+  top: var(--fe-category);
+  left: 199.35px;
+  width: 22.3px;
+  height: 22.3px;
+}
+.scan-card[data-card-id="FE17_LandOfMilkAndHoney"] {
+  --fe-title: 20.1px;
+  --fe-title-size: 15.94px;
+  --fe-flavor: 44px;
+  --fe-copy: 94px;
+  --fe-copy-size: 15.34px;
+  --fe-copy-line: 18.6px;
+  --fe-number: 233.1px;
+  --fe-tree: 245.75px;
+  --fe-category: 227.85px;
+}
+.scan-card[data-card-id="FE18_WarriorPrincess"] {
+  --fe-title: 15.75px;
+  --fe-title-size: 16.21px;
+  --fe-flavor: 36px;
+  --fe-copy: 88.3px;
+  --fe-copy-size: 13.8px;
+  --fe-copy-line: 17.05px;
+  --fe-number: 257.9px;
+  --fe-tree: 270.75px;
+  --fe-category: 276.25px;
+  --fe-flavor-x: -4px;
+}
+/* The print wraps its last four lines to the right of the princess. */
+.scan-card[data-card-id="FE18_WarriorPrincess"] .scan-copy::before {
+  content: '';
+  float: left;
+  width: 87px;
+  height: 190px;
+  shape-outside: polygon(0 119.85px, 36px 119.85px, 36px 136.9px, 50.5px 136.9px, 50.5px 153.95px, 84px 153.95px, 84px 171px, 86.5px 171px, 86.5px 190px, 0 190px);
+}
+.scan-card[data-card-id="FE19_DragonsLair"] {
+  --fe-title: 20.75px;
+  --fe-title-size: 17.3px;
+  --fe-flavor: 44.8px;
+  --fe-copy: 80.5px;
+  --fe-copy-size: 10.1px;
+  --fe-copy-line: 12.5px;
+  --fe-number: 283.25px;
+  --fe-tree: 296px;
+  --fe-category: 279.25px;
+}
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text__lead { gap: 0; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text__lead .scan-text__pile { width: 31px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text__lead .scan-text__p { position: relative; padding-left: 23px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text__lead .scan-text__arrow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font: 900 20px/12.5px system-ui, sans-serif;
+}
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(1) { line-height: 11.2px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(2) { margin-top: 6.6px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(2) .res-icon-sheep { font-size: 25px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(2) .scan-text__pile-line:nth-child(2) {
+  position: relative;
+  display: block;
+  left: 3.25px;
+  width: 24px;
+  height: 25.5px;
+  margin-top: -0.8px;
+}
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(2) .res-icon-moor { position: absolute; width: 13px; height: 13px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(2) .res-icon-moor:nth-child(2) { left: 5.5px; top: 6.2px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(2) .res-icon-moor:nth-child(3) { left: 11px; top: 12.4px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(3) .res-icon-boar { position: relative; left: 1.2px; top: -2.2px; font-size: 24px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(4) {
+  margin-top: 6.5px;
+  padding-left: 3.5px;
+  text-align: left;
+  font-size: 24px;
+  line-height: 23px;
+  font-weight: 700;
+}
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(4) .res-icon { vertical-align: middle; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(4) .scan-text__arrow { margin: 0 2px 0 1px; font: 900 20px/1 system-ui, sans-serif; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(4) .res-icon-cattle { font-size: 26.5px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(4) .res-icon-stone { margin-left: 2px; font-size: 30px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(4) .res-icon-horse { margin-left: 10px; font-size: 31.7px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(4) .res-icon-fuel { margin-left: 2px; font-size: 26px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(5) { margin-top: 2.25px; }
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(5) .res-icon-person {
+  margin-top: 3px;
+  font-size: 39px;
+  filter: invert(0.78);
+}
+.scan-card[data-card-id="FE19_DragonsLair"] .scan-text > :nth-child(5) .scan-text__arrow { top: 15.5px; }
+.scan-card[data-card-id="FE20_FairyRing"] {
+  --fe-title: 28.5px;
+  --fe-title-size: 20.44px;
+  --fe-flavor: 53.5px;
+  --fe-copy: 81.5px;
+  --fe-copy-size: 9.88px;
+  --fe-copy-line: 12.2px;
+  --fe-number: 217.1px;
+  --fe-tree: 229.75px;
+  --fe-category: 213.75px;
+}
+.scan-card[data-card-id="FE20_FairyRing"] .scan-text .res-icon-fairy { font-size: 43px; }
+.scan-card[data-card-id="FE21_TheRoadNotTaken"] {
+  --fe-title: 100px;
+  --fe-title-size: 18.36px;
+  --fe-flavor: 124px;
+  --fe-copy: 173.5px;
+  --fe-copy-size: 12.17px;
+  --fe-copy-line: 15.7px;
+  --fe-number: 270.9px;
+  --fe-tree: 282.75px;
+  --fe-category: 265.25px;
+}
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .scan-title { left: 25%; right: 25%; }
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .scan-copy {
+  height: 168px;
+  overflow: visible;
+  font-size: 12.4px;
+  line-height: 14.95px;
+  letter-spacing: 0;
+}
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .scan-text > p { margin: 5.25px 0 0; }
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .scan-text__lead {
+  justify-content: center;
+  align-items: center;
+  gap: 6.5px;
+  margin-top: -1.22px;
+  padding-right: 7.84px;
+}
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .scan-text__pile {
+  border: 1.3px solid #1a1a1a;
+  border-radius: 9px;
+  padding: 5.86px 8.5px 5.35px 11.75px;
+  margin: 2px 0 0;
+  row-gap: 5.7px;
+  column-gap: 3px;
+  background-color: rgba(255, 252, 225, 0.47);
+}
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .scan-text__pile .res-icon { font-size: 32px; }
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .scan-text__lead .scan-text__p {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+}
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .res-icon-arrow-1x { width: 43px; height: 19.84px; }
+.scan-card[data-card-id="X02_HomemadeSpaceRocket"] .scan-text__labeled.res-icon-score {
+  width: 38.5px;
+  height: 38.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  color: #2a2114;
+}
+.scan-card[data-card-id="X03_Transmogrifier"] .scan-title { top: 26px; }
+.scan-card[data-card-id="X03_Transmogrifier"] .scan-copy {
+  display: block;
+  font-size: 11.8px;
+  line-height: 13.87px;
+  letter-spacing: 0;
+}
+.scan-card[data-card-id="X03_Transmogrifier"] .scan-text > p { margin: 9.25px 0 0; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-copy { font-size: 12.4px; line-height: 14.95px; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  column-gap: 6.6px;
+}
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text > p {
+  flex: 1 0 100%;
+  margin: 7px 0 0;
+}
+/* Each pile as printed: the +1 and the token above a field tile, the token again on the tile, the arrow over both. */
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__pile {
+  display: block;
+  position: relative;
+  width: 75px;
+  height: 68px;
+  margin: 1px 0 0;
+}
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__pile-line { display: contents; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__pile .scan-text__t {
+  position: absolute;
+  top: 4px;
+  left: -1px;
+  font-family: "Arial Black", Arial, Helvetica, sans-serif;
+  font-size: 21.2px;
+  font-weight: 900;
+  line-height: 1;
+}
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__pile-line > .res-icon-grain,
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__pile-line > .res-icon-vegetable {
+  position: absolute;
+  top: 0;
+  left: 26.6px;
+  z-index: 3;
+  font-size: 42px;
+}
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__pile .res-icon-arrow-down {
+  position: absolute;
+  top: 26.8px;
+  left: 28.6px;
+  z-index: 2;
+  margin: 0;
+  font-size: 48px;
+  transform: rotate(90deg);
+}
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__sown {
+  position: absolute;
+  top: 28.3px;
+  left: 0;
+  z-index: 1;
+  display: block;
+  line-height: 0;
+}
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__pile .res-icon-field { font-size: 68px; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text__pile .scan-text__sown-crop {
+  position: absolute;
+  left: 26.6px;
+  top: 2.2px;
+  font-size: 42px;
+}
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text > span + span { margin-top: 0; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text > :nth-child(2) .scan-text__pile { width: 75.9px; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text > :nth-child(2) .scan-text__t { left: -10.35px; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text > :nth-child(2) .scan-text__pile-line > .res-icon-vegetable { left: 17.5px; font-size: 41px; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text > :nth-child(2) .res-icon-arrow-down { left: 20.9px; }
+.scan-card[data-card-id="X01_ExtraterrestrialExcrement"] .scan-text > :nth-child(2) .scan-text__sown-crop { left: 18.2px; font-size: 41px; }
+.scan-forest-tree { position: absolute; left: 4.6%; width: 10px; height: auto; z-index: 3; pointer-events: none; }
+.scan-story { background: #fcfbf9; }
+/* Frame from parts: bronze-rimmed tiles on white stock, wood inlays, forest parchment plates, the deck medallion. */
+.scan-story__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.scan-story__outline,
+.scan-story__line,
+.scan-story__keyline { fill: none; stroke: rgb(28 24 22); stroke-linejoin: round; }
+.scan-story__outline { stroke-width: 1.1px; }
+.scan-story__line { stroke-width: 1px; }
+.scan-story__keyline { stroke-width: 1px; }
+.scan-story .scan-forest-tree { left: 6.3px; top: 154.6px; width: 7.2px; }
+.scan-story .scan-number {
+  top: 153.4px;
+  left: 16.6px;
+  z-index: 3;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1;
+  color: #2b2419;
+}
+.scan-story[data-window="hex"] .scan-forest-tree { top: 87.6px; }
+.scan-story[data-window="hex"] .scan-number { top: 86.4px; }
+.scan-story .scan-alert {
+  position: absolute;
+  left: 20.45px;
+  top: 167.2px;
+  width: 13px;
+  z-index: 3;
+  font-family: Dominican, Georgia, serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  color: #efe5c4;
+}
+/* Bronze roundel printed under the hex stories' point value. */
+.scan-story__mark {
+  position: absolute;
+  left: 8.2px;
+  top: 158.4px;
+  z-index: 3;
+  width: 37.2px;
+  height: 37.2px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  padding-bottom: 1px;
+  border: 1px solid rgb(28 24 22);
+  border-radius: 50%;
+  background: radial-gradient(circle, #4d4327 0 13.9px, rgb(40 34 22) 14.3px 14.6px, #5a4f2a 15px);
+  box-shadow: inset 1px 1px 1.5px rgb(190 170 128 / 45%), inset -1px -1px 1.5px rgb(28 24 22 / 55%);
+  font-family: var(--agricola-font);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  color: #efe5c4;
+}
+.scan-card[data-card-id="FE12_AllYourWoodAreBelongToUs"] .scan-copy {
+  top: 56%;
+  bottom: 1.5%;
+  left: 5%;
+  right: 5%;
+  font-size: 10px;
+  line-height: 12px;
+}
+.scan-card[data-card-id="FE12_AllYourWoodAreBelongToUs"] .scan-text__p + .scan-text__p { margin-top: 3px; }
+.scan-card[data-card-id="FE02_TheUnicornPt1"] .scan-copy,
+.scan-card[data-card-id="FE03_TheUnicornPt2"] .scan-copy {
+  top: 57.4%;
+  bottom: 2.5%;
+}
+.scan-card[data-card-id="FE02_TheUnicornPt1"] .scan-text__p + .scan-text__p { margin-top: 8px; }
+.scan-card[data-card-id="FE03_TheUnicornPt2"] .scan-copy {
+  top: 56.6%;
+  font-size: 12.5px;
+  line-height: 15px;
+}
+.scan-card[data-card-id="FE03_TheUnicornPt2"] .scan-text__p + .scan-text__p { margin-top: 7px; }
+.scan-card[data-card-id="FE11_FrenchCastle"] .scan-copy {
+  top: 56%;
+  bottom: 2%;
+  left: 6%;
+  right: 6%;
+  font-size: 11px;
+  line-height: 13px;
+}
+.scan-card[data-card-id="FE11_FrenchCastle"] .scan-text__p + .scan-text__p { margin-top: 4px; }
+.scan-card[data-card-id="FE10_AMidsummersNightDream"] .scan-copy {
+  top: 56%;
+  bottom: 1.5%;
+  left: 5%;
+  right: 5%;
+  font-size: 10.5px;
+  line-height: 12.2px;
+}
+.scan-card[data-card-id="FE10_AMidsummersNightDream"] .scan-text__p + .scan-text__p { margin-top: 4px; }
+.scan-card[data-card-id="X21_MindTheJets"] .scan-stack-over { z-index: 4; }
+
+.scan-episode { background: #fdfdfb; }
+/* Frame from parts: three bevelled tiles on white stock, the official parchment on the plates. */
+.scan-episode__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.scan-episode__outline,
+.scan-episode__window,
+.scan-episode__keyline { fill: none; stroke: rgb(28 24 22); stroke-linejoin: round; }
+.scan-episode__outline,
+.scan-episode__keyline { stroke-width: 1.2px; }
+.scan-episode__window { stroke-width: 1.1px; }
+.scan-episode__inset { fill: none; stroke: rgb(60 66 50 / 0.3); stroke-width: 5px; }
+.scan-episode .scan-title { position: absolute; top: 3.2%; left: 16%; right: 10%; height: 34px; display: flex; align-items: center; justify-content: center; }
+.scan-episode .scan-number {
+  top: 39.6px;
+  left: 8.7px;
+  z-index: 3;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1;
+  color: #111;
+}
+.scan-episode[data-layout="space-merchant"] .scan-title {
+  top: 9px;
+  left: 8%;
+  right: 8%;
+  height: 36px;
+  font-family: Dominican, Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+.scan-episode .card-score {
+  left: 2.6px;
+  top: 154.8px;
+  width: 42.5px;
+  height: 42.5px;
+  z-index: 3;
+  font-family: var(--agricola-font);
+  font-size: 25.5px;
+}
+.scan-episode .scan-badge { left: 192.2px; top: 154.9px; width: 38px; height: 38px; z-index: 3; }
+.scan-episode .scan-copy { top: 58%; bottom: 4%; left: 9%; right: 9%; z-index: 3; }
+.scan-episode[data-layout="space-merchant"] .scan-copy {
+  top: 58%;
+  bottom: 5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Dominican, Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 18px;
+  left: 14.2%;
+  right: 14.2%;
+}
+.scan-episode[data-layout="space-merchant"] .scan-text__p { margin: 0; }
+.scan-card[data-card-id="X06_MerchantsOfPluto"] .scan-copy {
+  text-align: center;
+  align-items: stretch;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 18px;
+  left: 7%;
+  right: 7%;
+}
+.scan-card[data-card-id="X06_MerchantsOfPluto"] .scan-text,
+.scan-card[data-card-id="X06_MerchantsOfPluto"] .scan-text__p {
+  width: 100%;
+  text-align: center;
+}
+.scan-card[data-card-id="X04_MerchantsOfJupiter"] .scan-title {
+  font-size: 17px;
+}
+.scan-card[data-card-id="X04_MerchantsOfJupiter"] .scan-copy {
+  text-align: center;
+  align-items: stretch;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 18px;
+  left: 7%;
+  right: 7%;
+}
+.scan-card[data-card-id="X04_MerchantsOfJupiter"] .scan-text,
+.scan-card[data-card-id="X04_MerchantsOfJupiter"] .scan-text__p {
+  width: 100%;
+  text-align: center;
+}
+.scan-card[data-card-id="X05_MerchantsOfMars"] .scan-copy {
+  text-align: center;
+  align-items: stretch;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 18px;
+  left: 7%;
+  right: 7%;
+}
+.scan-card[data-card-id="X05_MerchantsOfMars"] .scan-text,
+.scan-card[data-card-id="X05_MerchantsOfMars"] .scan-text__p {
+  width: 100%;
+  text-align: center;
+}
+.scan-illustrated .scan-badge { display: none; }
+
+.scan-story .scan-title {
+  position: absolute;
+  top: 2.8%;
+  left: 4%;
+  right: 4%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Dominican, Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.scan-story .scan-copy {
+  top: 63%;
+  bottom: 5%;
+  left: 6%;
+  right: 6%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  font-family: Dominican, Georgia, serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 17px;
+}
+.scan-story .scan-text__p { margin: 0; }
+.scan-story .scan-text__p + .scan-text__p { margin-top: 12px; }
+.scan-card[data-card-id="FE26_PeruvianInquisition"] .scan-copy {
+  top: 56%;
+  bottom: 2%;
+  left: 4%;
+  right: 4%;
+  font-size: 10.5px;
+  line-height: 12.5px;
+  overflow: visible;
+}
+.scan-card[data-card-id="FE26_PeruvianInquisition"] .scan-text__p + .scan-text__p { margin-top: 3px; }
+.scan-card[data-card-id="FE26_PeruvianInquisition"] .scan-score-table {
+  width: 100%;
+  margin-top: 4px;
+  gap: 2px;
+}
+.scan-card[data-card-id="FE26_PeruvianInquisition"] .scan-score-table li {
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #2a2114;
+}
+.scan-card[data-card-id="FE26_PeruvianInquisition"] .scan-text__labeled.res-icon-score {
+  width: 16px;
+  height: 16px;
+  font-size: 7px;
+  font-weight: 700;
+  color: #2a2114;
+  line-height: 1;
+}
+.scan-card[data-card-id="FE09_NoblesseOblige"] .scan-copy {
+  top: 56%;
+  bottom: 2%;
+  left: 6%;
+  right: 6%;
+  font-size: 11px;
+  line-height: 13px;
+}
+.scan-card[data-card-id="FE09_NoblesseOblige"] .scan-text__p + .scan-text__p { margin-top: 4px; }
+.scan-card[data-card-id="FE08_MenInTights"] .scan-copy {
+  top: 56%;
+  bottom: 1.5%;
+  left: 5%;
+  right: 5%;
+  font-size: 10px;
+  line-height: 12px;
+}
+.scan-card[data-card-id="FE08_MenInTights"] .scan-text__p + .scan-text__p { margin-top: 3px; }
+.scan-card[data-card-id="FE07_TheBoarKing"] .scan-copy {
+  top: 56%;
+  bottom: 1.5%;
+  left: 5%;
+  right: 5%;
+  font-size: 10.5px;
+  line-height: 12.5px;
+}
+.scan-card[data-card-id="FE07_TheBoarKing"] .scan-text__p + .scan-text__p { margin-top: 4px; }
+.scan-card[data-card-id="FE06_TheLadyOfTheLakePt2"] .scan-copy {
+  top: 56%;
+  bottom: 1.5%;
+  left: 5%;
+  right: 5%;
+  font-size: 10.5px;
+  line-height: 12.5px;
+}
+.scan-card[data-card-id="FE06_TheLadyOfTheLakePt2"] .scan-text__p + .scan-text__p { margin-top: 4px; }
+.scan-card[data-card-id="FE04_FeralChild"] .scan-copy {
+  top: 56%;
+  bottom: 2%;
+  left: 6%;
+  right: 6%;
+  font-size: 11px;
+  line-height: 13px;
+}
+.scan-card[data-card-id="FE26_PeruvianInquisition"] .res-icon-llama {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+  background-image: url('/assets/legendairy-forest/icons/llama.png');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.scan-flavor { font-style: italic; margin: 0 0 4px; }
+.scan-score-table {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.scan-score-table li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 28px;
+  font-size: 11px;
+}
+.scan-score-table li span:first-child {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d7b23a;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+.scan-card[data-card-id="FE26_PeruvianInquisition"] .scan-score-table .res-icon-score {
+  background-color: transparent;
+  background-image: url('/assets/revised/meeples.png');
+  background-repeat: no-repeat;
+  background-position: 45.5793% 21.7988%;
+  background-size: 2560%;
+  border-radius: 0;
+}
+
+.scan-event {
+  position: relative;
+  width: min(100%, 420px);
+  aspect-ratio: 1.6;
+  border-radius: 12px;
+  overflow: hidden;
+  container-type: inline-size;
+  color: #2b2416;
+  background: #fbfaf9;
+}
+.scan-event__face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 420px;
+  height: 262.5px;
+  transform: scale(var(--card-content-scale, 1));
+  transform: scale(calc(100cqi / 420px));
+  transform-origin: top left;
+}
+/* Frame from parts: a gold plate lit from the upper right, the official parchment in its sunken panel. */
+.scan-event__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.scan-event__mottle { mix-blend-mode: overlay; }
+.scan-event__inset { fill: none; stroke: rgb(60 70 50 / 0.33); stroke-width: 6.8px; }
+.scan-event__line { fill: none; stroke: rgb(40 39 36); stroke-width: 1.2px; stroke-linejoin: round; }
+.scan-event__sprig--tone { mix-blend-mode: multiply; }
+/* The band scrollwork printed into the gold: at the left, and mirrored about the card's middle, fainter. */
+.scan-event__scroll {
+  position: absolute;
+  left: 4px;
+  top: 74.25px;
+  width: 112px;
+  height: 37.25px;
+  z-index: 1;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+.scan-event__scroll--mirror { left: 303.2px; transform: scaleX(-1); opacity: 0.83; }
+/* A long title leaves room only for the tail of the left scroll. */
+.scan-event[data-card-id="LE03_WanderingCarpenters"] .scan-event__scroll {
+  mask-image: linear-gradient(to right, #000 34px, rgb(0 0 0 / 0.55) 46px, rgb(0 0 0 / 0.25) 56px, transparent 66px);
+}
+.scan-event[data-card-id="LE03_WanderingCarpenters"] .scan-event__scroll--mirror { display: none; }
+.scan-event .scan-number {
+  top: 76.8px;
+  left: 13.5px;
+  z-index: 3;
+  font-family: Carlito, Calibri, Arial, sans-serif;
+  font-size: 11.6px;
+  font-weight: 400;
+  line-height: 1;
+  color: #2b2b2b;
+}
+.scan-event .scan-title {
+  position: absolute;
+  top: 77.1px;
+  left: 100px;
+  width: 219px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  font-family: Dominican, Georgia, serif;
+  font-size: 23px;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+}
+/* Rules and the event footer sit as one block in the middle of the linen. */
+.scan-event-body {
+  position: absolute;
+  left: 13px;
+  width: 393px;
+  top: 116.6px;
+  height: 135px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  z-index: 3;
+  font-size: 19.5px;
+  line-height: 23px;
+  letter-spacing: -0.3px;
+  color: #222;
+  background: transparent;
+}
+.scan-event-body .scan-text__p { margin: 0; }
+.scan-event-footer {
+  max-width: 318px;
+  margin: 9.75px auto 0;
+  font-family: Carlito, Calibri, sans-serif;
+  font-size: 15.5px;
+  line-height: 18.75px;
+  letter-spacing: 0.35px;
+  font-weight: 700;
+}
+/* Four lines of rules are set smaller but tracked wider, and closer to the footer. */
+.scan-event[data-card-id="LE04_InquisitiveMinds"] .scan-event-body { font-size: 17.1px; line-height: 20.75px; letter-spacing: 0.1px; }
+.scan-event[data-card-id="LE04_InquisitiveMinds"] .scan-text__i { letter-spacing: 0.4px; }
+.scan-event[data-card-id="LE04_InquisitiveMinds"] .scan-event-footer { margin-top: 4.5px; }
+
+.scan-offspring { color: #2a2418; background: #faf9f7; }
+/* Frame from parts: the official major slice mapped to navy, parchment plates, panel-corner sprigs. */
+.scan-offspring__defs { position: absolute; width: 0; height: 0; }
+.scan-offspring__body {
+  position: absolute;
+  left: 1.203px;
+  top: 2.867px;
+  width: 232.932px;
+  height: 369.193px;
+  background-size: 300% 100%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.scan-offspring .scan-stack-art { z-index: 2; }
+.scan-offspring__plates {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.scan-offspring__window { fill: rgb(54 64 105); }
+.scan-offspring__rims { fill: none; stroke-width: 5px; }
+.scan-offspring__plate {
+  stroke: #2c2925;
+  stroke-width: 2.2px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+.scan-offspring__sprig { mix-blend-mode: multiply; }
+.scan-offspring .scan-badge {
+  left: 192px;
+  top: 154.6px;
+  width: 38.5px;
+  height: 38.5px;
+  z-index: 3;
+}
+.scan-assign {
+  position: absolute;
+  top: 21.5px;
+  left: 14.5px;
+  width: 52px;
+  z-index: 3;
+  margin: 0;
+  font-family: var(--agricola-font);
+  font-size: 10.8px;
+  line-height: 13.2px;
+  font-weight: 400;
+  text-align: left;
+  white-space: pre-line;
+  color: #2a2418;
+}
+.scan-card[data-card-id="WB02_Silicoid"] .scan-title { font-size: 18.5px; line-height: 22px; }
+.scan-card[data-card-id="WB02_Silicoid"] .scan-copy {
+  top: 219px;
+  bottom: 6px;
+  left: 4%;
+  right: 4%;
+  font-size: 17px;
+  line-height: 20.2px;
+}
+.scan-card[data-card-id="WB02_Silicoid"] .scan-text__pile { display: flex; margin: 14px 0 0; }
+.scan-card[data-card-id="WB02_Silicoid"] .scan-text__pile-line { gap: 4px; font-size: 24px; font-weight: 700; }
+.scan-card[data-card-id="WB02_Silicoid"] .scan-text__pile-line > .scan-text__t:first-child { font-size: 31.5px; }
+.scan-card[data-card-id="WB02_Silicoid"] .scan-text__pile .res-icon { font-size: 38px; }
+.scan-card[data-card-id="WB02_Silicoid"] .scan-text__times { font-size: 30px; margin: 0 2px; }
+.scan-card[data-card-id="WB02_Silicoid"] .scan-text__labeled.res-icon-score {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: #2a2114;
+}
+.scan-card[data-card-id="WB02_Silicoid"] .scan-text__p { margin: 0; }
+.scan-card[data-card-id="WB02_Silicoid"] .scan-text__p + .scan-text__p { margin-top: 14.3px; }
+.scan-card[data-card-id="WB03_CaveGoblin"] .scan-title {
+  white-space: pre-line;
+  font-size: 18px;
+  line-height: 20px;
+  height: 44px;
+}
+.scan-card[data-card-id="WB03_CaveGoblin"] .scan-copy {
+  left: 6%;
+  right: 6%;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 12px;
+  line-height: 15px;
+}
+.scan-card[data-card-id="WB03_CaveGoblin"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="WB04_Elf"] .scan-title {
+  font-size: 22px;
+  line-height: 24px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="WB04_Elf"] .scan-copy {
+  left: 5%;
+  right: 5%;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 11px;
+  line-height: 13.5px;
+}
+.scan-card[data-card-id="WB04_Elf"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="WB05_PaleOne"] .scan-title {
+  font-size: 20px;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="WB05_PaleOne"] .scan-copy {
+  left: 6%;
+  right: 6%;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 12px;
+  line-height: 15px;
+}
+.scan-card[data-card-id="WB05_PaleOne"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-offspring .scan-title {
+  position: absolute;
+  top: 7px;
+  left: 47px;
+  right: 52px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2a2418;
+}
+.scan-offspring .scan-copy { top: 57%; bottom: 4%; color: #2a2418; z-index: 3; }
+.scan-offspring .scan-number { top: 91.2px; left: 5.2px; color: #f4f2ee; z-index: 3; font-family: Arial, Helvetica, sans-serif; font-weight: 400; font-size: 8.4px; line-height: 1; letter-spacing: 0.6px; }
+
+.scan-artifact { color: #1a1a1a; background: #faf9f7; }
+.scan-artifact__defs { position: absolute; width: 0; height: 0; }
+/* Frame from parts: the official minor slice mapped to green, linen plates sunk into it, the window sprigs. */
+.scan-artifact__frame,
+.scan-artifact__sprigs {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.scan-artifact__frame { z-index: 0; }
+.scan-artifact .scan-stack-art { left: 25.8px; top: 35.45px; width: 184.9px; height: 194.6px; z-index: 1; }
+.scan-artifact__sprigs { z-index: 2; }
+.scan-artifact .scan-stack-over { z-index: 3; }
+.scan-artifact__wall { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.scan-artifact__wall--shade { stroke: rgb(45 60 35 / 0.85); stroke-width: 3.6px; }
+.scan-artifact__wall--light { stroke: rgb(152 180 104); stroke-width: 3.4px; }
+.scan-artifact__inset { fill: none; stroke: rgb(60 66 50 / 0.4); stroke-width: 5px; }
+.scan-artifact__line { fill: none; stroke: rgb(45 50 38); stroke-width: 1.2px; stroke-linejoin: round; }
+.scan-artifact__line--title { stroke-width: 1.6px; }
+.scan-artifact .scan-title {
+  position: absolute;
+  top: 7.3px;
+  left: 22%;
+  right: 22%;
+  height: 41.8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  font-family: var(--agricola-font);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 20px;
+  white-space: pre-line;
+}
+.scan-artifact .scan-number { top: 90.6px; left: 7.3px; z-index: 4; font-family: Arial, Helvetica, sans-serif; font-size: 9px; line-height: 1; color: rgb(38 52 32); }
+.scan-artifact .card-score { left: 4.7px; top: 155.9px; width: 44.5px; height: 44.5px; z-index: 4; font-family: var(--agricola-font); font-size: 26.5px; }
+.scan-artifact .card-score[data-negative] { color: #fff; }
+.scan-artifact__bonus {
+  position: absolute;
+  left: 40.1px;
+  top: 180.6px;
+  width: 19px;
+  height: 19px;
+  z-index: 4;
+  background: url('/assets/revised/meeples.png') 45.5793% 21.7988% / 2560% no-repeat;
+}
+.scan-artifact .scan-badge { left: 193.35px; top: 154.9px; width: 38px; height: 38px; z-index: 4; }
+.scan-artifact .scan-category { top: 179.9px; left: 173.35px; width: 21.8px; height: 21.8px; z-index: 4; }
+.scan-artifact .scan-copy {
+  top: 209px;
+  bottom: 9px;
+  left: 8px;
+  right: 8px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #222;
+}
+/* Type sizes and line pitch measured from each scan. */
+/* Type size, line pitch and block position measured from each scan; their end icons barely indent the lines. */
+.scan-card[data-card-id="X07_LeyLines"] .scan-copy { font-size: 14.5px; line-height: 17px; padding-bottom: 9.8px; }
+.scan-card[data-card-id="X07_LeyLines"] .scan-text > * + * { margin-top: 0; }
+.scan-card[data-card-id="X08_StrangeAlienEnergy"] .scan-copy { font-size: 15.1px; line-height: 18.5px; padding-top: 7.5px; }
+.scan-card[data-card-id="X08_StrangeAlienEnergy"] .scan-text__art--end { margin: 9px 1px -9px -53px; }
+.scan-card[data-card-id="X09_AlienFarmhand"] .scan-copy { font-size: 15.2px; line-height: 18.75px; padding-top: 3.2px; }
+.scan-card[data-card-id="X09_AlienFarmhand"] .scan-text__art--end { margin: 3px 0 -3px -20px; }
+.scan-card[data-card-id="X10_Replicator"] .scan-copy { font-size: 13.75px; line-height: 16.8px; padding-top: 3.85px; }
+.scan-card[data-card-id="X10_Replicator"] .scan-text > .scan-text__p--small {
+  margin-top: 10.65px;
+  font-size: 8.5px;
+  line-height: 13.9px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X11_TheXFile"] .scan-copy { font-size: 16.7px; line-height: 20.6px; padding-bottom: 4.4px; }
+.scan-card[data-card-id="X12_FurryFriends"] .scan-copy { font-size: 12.3px; line-height: 14.85px; padding-bottom: 1px; }
+.scan-card[data-card-id="X12_FurryFriends"] .scan-text__art--end { margin: 3px 0 -16px -39px; }
+
+.scan-guest { position: relative; height: 100%; }
+.scan-guest .scan-title {
+  position: absolute;
+  top: 1.4%;
+  left: 14%;
+  right: 14%;
+  height: 13%;
+  font-family: Georgia, "Palatino Linotype", Palatino, serif;
+  font-style: italic;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.scan-guest .scan-copy {
+  top: 54%;
+  bottom: 4%;
+  left: 8%;
+  right: 8%;
+  font-size: 15px;
+  line-height: 18px;
+  font-weight: 700;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.scan-guest .scan-text { width: 100%; }
+/* Guest face from parts: band, panel, ring and keylines drawn; leaves, mottle, parchment and sprig reused. */
+.scan-guest__face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.scan-guest__stock { fill: rgb(254 253 252); }
+.scan-guest__mottle { mix-blend-mode: overlay; }
+.scan-guest__leaves,
+.scan-guest__sprig { mix-blend-mode: multiply; }
+.scan-guest__line { fill: none; stroke: rgb(40 39 36); stroke-width: 1px; stroke-linejoin: round; }
+.scan-guest__line--panel { stroke-width: 0.9px; }
+.scan-card[data-card-id="guest_Rabbit"] .scan-title {
+  top: 1.15%;
+  left: 16%;
+  right: 16%;
+  height: 10%;
+  font-family: Georgia, "Palatino Linotype", Palatino, serif;
+  font-style: italic;
+  font-size: 25.7px;
+  font-weight: 400;
+  line-height: 1;
+  z-index: 4;
+}
+.scan-card[data-card-id="guest_Rabbit"] .scan-copy {
+  top: 58%;
+  bottom: 3.5%;
+  left: 4%;
+  right: 4%;
+  font-size: 19px;
+  line-height: 23.25px;
+  font-weight: 400;
+}
+.scan-card[data-card-id="guest_Rabbit"] .scan-text__p + .scan-text__p { margin-top: 9px; }
+.scan-card[data-card-id="guest_NateWelton"] .scan-title {
+  top: 1.4%;
+  left: 14%;
+  right: 14%;
+  height: 13%;
+  font-family: Georgia, "Palatino Linotype", Palatino, serif;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1;
+  z-index: 4;
+}
+.scan-card[data-card-id="guest_NateWelton"] .scan-copy {
+  top: 54%;
+  bottom: 4%;
+  left: 7%;
+  right: 7%;
+  font-size: 15px;
+  line-height: 19px;
+  font-weight: 700;
+}
+.scan-card[data-card-id="guest_NateWelton"] .scan-text__p + .scan-text__p { margin-top: 14px; }
+.scan-card[data-card-id="guest_Gunda"] .scan-title {
+  top: 1.4%;
+  left: 14%;
+  right: 14%;
+  height: 13%;
+  font-family: Georgia, "Palatino Linotype", Palatino, serif;
+  font-style: italic;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+  z-index: 4;
+}
+.scan-card[data-card-id="guest_Gunda"] .scan-copy {
+  top: 54%;
+  bottom: 4%;
+  left: 8%;
+  right: 8%;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.scan-card[data-card-id="guest_Gunda"] .scan-text { width: 100%; }
+.scan-card[data-card-id="guest_EnochBrubak"] .scan-title { font-size: 26px; }
+.scan-card[data-card-id="guest_AaronReitzke"] .scan-title { font-size: 26px; }
+.scan-card[data-card-id="guest_AaronReitzke"] .scan-copy { font-size: 16px; line-height: 20px; }
+
+.scan-crop { position: relative; height: 100%; }
+.scan-crop .scan-title { position: absolute; top: 14px; left: 14%; right: 14%; height: 32px; display: flex; align-items: center; justify-content: center; }
+.scan-crop .scan-number { top: 18px; left: 10px; z-index: 3; font-weight: 700; }
+.scan-crop .scan-copy { top: 52px; bottom: 38%; right: 16%; z-index: 3; }
+.scan-crop.scan-official-action .scan-copy { top: 22%; right: 12%; }
+.scan-crop.scan-official-action .scan-category { top: auto; right: 8%; bottom: 40%; }
+.scan-crop.scan-official-action { background-color: #fff; }
+.scan-crop__frame { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.scan-crop .scan-bottom-art { top: 200px; left: 0; width: 100%; height: 174px; bottom: auto; z-index: 0; }
+.scan-crop .scan-badge { right: 12px; bottom: 10px; }
+
+.scan-rules { position: relative; height: 100%; }
+.scan-rules__parchment { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.scan-rules-logo { position: absolute; top: 7%; left: 8%; width: 84%; height: 18%; object-fit: contain; z-index: 2; }
+.scan-rules .scan-copy { top: 29%; bottom: 4%; overflow: auto; }
+.scan-rules .scan-copy > span { margin: 0 0 6px; }
+.scan-card[data-card-id="newdale_rules"] .scan-rules-logo { top: 1.5px; left: 2px; width: 231px; height: 113px; object-fit: fill; }
+.scan-card[data-card-id="newdale_rules"] .scan-rules .scan-copy { top: 125.7px; z-index: 3; }
+
+/* Scan text: paragraphs, italics, small caps and inline icons; no bold, like the A–E cards. */
+.scan-text { display: block; }
+.scan-text__p { margin: 0; }
+.scan-text__pile {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: top;
+  margin: 0 10px 2px 0;
+  gap: 1px;
+}
+.scan-text__pile-line { display: flex; align-items: center; justify-content: center; gap: 2px; line-height: 1; }
+.player-card-inner[data-id="L062_Broch"] .scan-text__pile {
+  position: relative;
+  display: flex;
+  width: 168px;
+  margin: 8px auto 0;
+  gap: 0;
+  align-items: stretch;
+}
+.player-card-inner[data-id="L062_Broch"] .scan-text__pile-line {
+  width: 100%;
+  height: 30px;
+  justify-content: space-between;
+}
+.player-card-inner[data-id="L062_Broch"] .scan-text__pile-line:nth-child(1) { padding-right: 44px; }
+.player-card-inner[data-id="L062_Broch"] .scan-text__pile-line:nth-child(2) { padding-left: 22px; padding-right: 22px; }
+.player-card-inner[data-id="L062_Broch"] .scan-text__pile-line:nth-child(3) { padding-left: 44px; }
+.player-card-inner[data-id="L062_Broch"] .scan-text__labeled {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+.player-card-inner[data-id="L062_Broch"] .scan-text__labeled.res-icon-stone { color: #f7f4ec; }
+.player-card-inner[data-id="L062_Broch"] .scan-text__labeled.res-icon-score { color: #2a2114; }
+.player-card-inner[data-id="L062_Broch"] .res-icon-arrow-1x {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+}
+.scan-text__lead { display: flex; align-items: flex-start; gap: 4px; text-align: left; }
+.scan-text__lead .scan-text__pile { margin: 0; flex: none; }
+.scan-text .res-icon-arrow-down {
+  width: 0.5em;
+  height: 0.35em;
+  background-position: 98.3359% 21.45%;
+  background-size: 3150.77%;
+  transform: rotate(90deg);
+  margin-left: -0.45em;
+}
+.scan-text > * + * { margin-top: 0.45em; }
+.scan-text__i { font-style: italic; }
+.scan-text__sc { font-variant-caps: small-caps; }
+.scan-text__p--small { font-size: 0.85em; line-height: 1.15; }
+.scan-text__p--left { text-align: left; }
+.scan-text__art { display: block; height: auto; margin-left: auto; margin-right: auto; }
+.scan-text__art--end { float: right; display: inline; margin: 0 0 1px 4px; }
+.scan-text__p--end { display: flow-root; }
+.scan-text__row { display: flex; align-items: center; gap: 4px; text-align: left; }
+.scan-text__row--top { align-items: flex-start; }
+.scan-text__row--top .scan-text__arrow { margin-top: 1px; }
+.scan-text__row .scan-text__art { flex: none; margin: 0; }
+.scan-text__pair { display: flex; align-items: center; gap: 4px; flex: none; }
+.scan-text__pair .scan-text__arrow { line-height: 1; margin-top: 0; }
+.scan-text .res-icon-person {
+  width: 0.72em;
+  height: 0.92em;
+  background-image: url('/assets/l-deck/icons/person.png');
+  background-size: contain;
+  background-position: center;
+}
+.scan-text .res-icon-llama {
+  width: 1.05em;
+  height: 1.05em;
+  background-image: url('/assets/legendairy-forest/icons/llama.png');
+  background-size: contain;
+  background-position: center;
+}
+.scan-text .res-icon-fairy {
+  width: 1.05em;
+  height: 1.05em;
+  background-image: url('/assets/legendairy-forest/icons/fairy.png');
+  background-size: contain;
+  background-position: center;
+}
+.scan-text .res-icon-dog {
+  width: 0.81em;
+  height: 1.08em;
+  background-image: url('/assets/changelings/icons/dog.png');
+  background-size: contain;
+  background-position: center;
+}
+.scan-text__arrow { font-weight: 700; }
+.scan-text__times { position: relative; display: inline-flex; }
+.scan-text__times-label {
+  position: absolute;
+  bottom: 72%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1;
+}
+.scan-category {
+  position: absolute;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  background-image: url('/assets/revised/card_categories.png');
+  background-size: 800% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.scan-category[data-category="ACTIONS_BOOSTER"] { background-position-x: 0%; }
+.scan-category[data-category="LIVESTOCK_PROVIDER"] { background-position-x: 14.28%; }
+.scan-category[data-category="BUILDING_RESOURCE_PROVIDER"] { background-position-x: 28.57%; }
+.scan-category[data-category="FARM_PLANNER"] { background-position-x: 42.85%; }
+.scan-category[data-category="CROP_PROVIDER"] { background-position-x: 57.14%; }
+.scan-category[data-category="FOOD_PROVIDER"], .scan-category[data-category="FOOD"] { background-position-x: 71.42%; }
+.scan-category[data-category="GOODS_PROVIDER"] { background-position-x: 85.71%; }
+.scan-category[data-category="POINTS_PROVIDER"] { background-position-x: 100%; }
+.scan-episode .scan-category { top: 181.2px; left: 173.5px; right: auto; width: 20.1px; height: 20.1px; }
+.scan-story .scan-category { top: 177px; left: 170.5px; right: auto; width: 23px; height: 23px; }
+.scan-event .scan-category { top: 81.8px; left: 385.5px; right: auto; width: 23.8px; height: 23.8px; }
+.scan-offspring .scan-category { top: 180.4px; left: 174.9px; width: 21.6px; height: 21.6px; filter: invert(85%); }
+.scan-crop .scan-category { top: 56px; right: 16px; }
+.scan-card[data-card-id="X13_SpaceDinerAtTheEndOfTheGalaxy"] .scan-title {
+  left: 14%;
+  right: 8%;
+  top: 2.2%;
+  height: 46px;
+  font-size: 15px;
+  line-height: 18px;
+  white-space: pre-line;
+}
+.scan-card[data-card-id="X13_SpaceDinerAtTheEndOfTheGalaxy"] .scan-copy {
+  left: 15%;
+  right: 8%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 13px;
+  line-height: 16px;
+}
+.scan-card[data-card-id="X13_SpaceDinerAtTheEndOfTheGalaxy"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X14_EarthlingsAreEasy"] .scan-title {
+  left: 8%;
+  right: 8%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 16px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X14_EarthlingsAreEasy"] .scan-stack-art {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.scan-card[data-card-id="X14_EarthlingsAreEasy"] .scan-copy {
+  top: 57%;
+  bottom: 4%;
+  left: 9%;
+  right: 8%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 13px;
+  line-height: 16px;
+}
+.scan-card[data-card-id="X14_EarthlingsAreEasy"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X15_Tripods"] .scan-title {
+  left: 8%;
+  right: 8%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 18px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X15_Tripods"] .scan-copy {
+  top: 57%;
+  bottom: 4%;
+  left: 8%;
+  right: 7%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 12.5px;
+  line-height: 15.5px;
+}
+.scan-card[data-card-id="X15_Tripods"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X16_BeamMeDownWelshie"] .scan-title {
+  left: 16%;
+  right: 4%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 15px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X16_BeamMeDownWelshie"] .scan-copy {
+  top: 57%;
+  bottom: 3.5%;
+  left: 8%;
+  right: 7%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 12px;
+  line-height: 14.5px;
+}
+.scan-card[data-card-id="X16_BeamMeDownWelshie"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X17_CandyTrail"] .scan-title {
+  left: 16%;
+  right: 10%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 18px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X17_CandyTrail"] .scan-number::after {
+  content: "";
+  position: absolute;
+  top: 141px;
+  left: 31.2px;
+  width: 19.5px;
+  height: 19.5px;
+  background-image: url("/assets/revised/meeples.png");
+  background-repeat: no-repeat;
+  background-position: 45.5793% 21.7988%;
+  background-size: 2560%;
+}
+.scan-card[data-card-id="X17_CandyTrail"] .scan-copy {
+  top: 57%;
+  bottom: 3.5%;
+  left: 8%;
+  right: 7%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 12px;
+  line-height: 14.5px;
+}
+.scan-card[data-card-id="X17_CandyTrail"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X18_IAmYourFather"] .scan-title {
+  left: 16%;
+  right: 6%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 16px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X18_IAmYourFather"] .scan-copy {
+  top: 57%;
+  bottom: 3.5%;
+  left: 7%;
+  right: 6%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 11.5px;
+  line-height: 14px;
+}
+.scan-card[data-card-id="X18_IAmYourFather"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X19_AlienAbduction"] .scan-title {
+  left: 16%;
+  right: 6%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 16px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X19_AlienAbduction"] .scan-copy {
+  top: 57%;
+  bottom: 3.5%;
+  left: 7%;
+  right: 6%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 11.5px;
+  line-height: 14px;
+}
+.scan-card[data-card-id="X19_AlienAbduction"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X20_DarlingIShrunk"] .scan-title {
+  left: 16%;
+  right: 4%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 15px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X20_DarlingIShrunk"] .scan-copy {
+  top: 57%;
+  bottom: 3.5%;
+  left: 7%;
+  right: 6%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 11.5px;
+  line-height: 14px;
+}
+.scan-card[data-card-id="X20_DarlingIShrunk"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X21_MindTheJets"] .scan-title {
+  left: 16%;
+  right: 6%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 17px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X21_MindTheJets"] .scan-copy {
+  top: 57%;
+  bottom: 3.5%;
+  left: 6%;
+  right: 5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 11px;
+  line-height: 12.5px;
+}
+.scan-card[data-card-id="X21_MindTheJets"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X22_CarboniteCousin"] .scan-title {
+  left: 16%;
+  right: 6%;
+  top: 2.4%;
+  height: 36px;
+  font-size: 16px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X22_CarboniteCousin"] .scan-copy {
+  top: 57%;
+  bottom: 3.5%;
+  left: 4%;
+  right: 3%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 9px;
+  line-height: 11px;
+}
+.scan-card[data-card-id="X22_CarboniteCousin"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X23_CropCircles"] .scan-title {
+  left: 20.65px;
+  right: 11.75px;
+  top: 30px;
+  height: 36px;
+  font-family: var(--agricola-font);
+  font-size: 19.4px;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+}
+.scan-card[data-card-id="X23_CropCircles"] .scan-number {
+  top: 64.9px;
+  left: 16.5px;
+  z-index: 6;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1;
+  color: #111;
+}
+.scan-card[data-card-id="X23_CropCircles"] .scan-copy {
+  top: 81.2px;
+  bottom: auto;
+  height: 155px;
+  left: 4%;
+  right: 4%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--agricola-font);
+  font-size: 13.8px;
+  line-height: 16.3px;
+}
+.scan-card[data-card-id="X23_CropCircles"] .scan-category {
+  top: 213px;
+  left: 198.2px;
+  right: auto;
+  bottom: auto;
+  width: 21.4px;
+  height: 21.4px;
+}
+.scan-card[data-card-id="X23_CropCircles"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.player-card-inner[data-id="X24_Rebel"] .card-title {
+  left: 12%;
+  right: 12%;
+  font-size: 20px;
+  line-height: 22px;
+  color: #1a1a1a;
+  font-family: Georgia, "Palatino Linotype", Palatino, serif;
+  white-space: nowrap;
+}
+.player-card-inner[data-id="X24_Rebel"] .card-desc {
+  font-size: 11.5px;
+  line-height: 14px;
+  letter-spacing: 0;
+  text-align: center;
+}
+.player-card-inner[data-id="X24_Rebel"] .scan-text__p {
+  margin: 0;
+  white-space: nowrap;
+}
+.player-card-inner[data-id="FE23_TheWitch"] .card-desc { font-size: 10.5px; line-height: 12px; }
+.player-card-inner[data-id="FE23_TheWitch"] .card-desc-scroller > div { padding: 1px 5px 2px; }
+
+.scan-text .res-icon-tree-small {
+  font-size: 1em;
+  width: 0.68em;
+  height: 0.8em;
+  vertical-align: -0.08em;
+  background-image: url('/assets/legendairy-forest/icons/tree.png');
+  background-size: contain;
+  background-position: center;
+}

@@ -100,7 +100,7 @@
 
 - **公开路由。** `PageRouter` 在等待登录状态和登录拦截之前，通过懒加载的 `EncyclopediaPage` chunk 提供 `?page=encyclopedia[&entry=<key>]`。普通页面不加载它的 chunk、数据或卡图。复制的链接只带 `page` 与 `entry`，不带房间、座位、手牌或对局参数。浏览状态按标签页保存，任一页面刷新后重新开始；`client/main.tsx` 在首次渲染前清除它。覆盖见 `encyclopedia*.spec.ts`；`encyclopedia-pages.spec.ts` 针对静态 Pages 产物运行。
 - **局内面板。** `GameHeader` 打开模态的 `InGameEncyclopedia`。它从不写 URL，也不发送游戏命令；本地草稿留在容器中，按普通快照规则处理。`encyclopedia-attention.ts` 对每个新输入窗口只提醒一次，重连页重新挂载面板后同样如此。热座接机身份变化会关闭面板，交接页不提供入口。覆盖见 `GameContainerApi.encyclopedia.test.tsx` 与 `encyclopedia-in-game.spec.ts`。
-- **牌面。** `EncyclopediaFace` 用游戏自身的组件和 `shared/projections/` 绘制目录中的每种牌面，任一卡图失败时改用 `EncyclopediaTextFace`。某语言仍显示英文的文字，在出现的每处都加标注。覆盖见 `encyclopedia-faces.spec.ts` 与 `client/app/encyclopedia/__tests__/`。
+- **牌面。** `EncyclopediaFace` 用游戏自身的组件和 `shared/projections/` 绘制目录中的每种牌面，任一卡图失败时改用 `EncyclopediaTextFace`。某语言仍显示英文的文字，在出现的每处都加标注。扫描卡里职业、次要改良和主要改良沿用 `PlayerCard`，其余印刷版式各自用单独的框体模板（[扫描卡牌面](scan-cards.md)，仅英文）。覆盖见 `encyclopedia-faces.spec.ts` 与 `client/app/encyclopedia/__tests__/`。
 
 ### 交互展示不变量
 

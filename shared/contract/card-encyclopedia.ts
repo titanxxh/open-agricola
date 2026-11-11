@@ -3,7 +3,7 @@ import type { MoorSpecialActionId } from '../moor/types'
 import type { ParentCardId } from '../parents/types'
 import type { SeasonId } from '../seasons/types'
 
-export type EncyclopediaSourceKind = 'card' | 'major' | 'parent' | 'moorSpecialAction' | 'moorStart' | 'season'
+export type EncyclopediaSourceKind = 'card' | 'major' | 'parent' | 'moorSpecialAction' | 'moorStart' | 'season' | 'scan'
 
 export type EncyclopediaPublicType =
   | 'occupation'
@@ -14,10 +14,20 @@ export type EncyclopediaPublicType =
   | 'moorSpecialAction'
   | 'moorStart'
   | 'season'
+  | 'illustratedAction'
+  | 'spaceMerchant'
+  | 'alienArtifact'
+  | 'alienEvent'
+  | 'event'
+  | 'globalEvent'
+  | 'offspring'
+  | 'guest'
+  | 'expansionRules'
 
 /** Declared deck / expansion order; the catalog's default order starts from this. */
 export const ENCYCLOPEDIA_GROUPS = [
   'A', 'B', 'C', 'D', 'E', 'M', 'majorStandard', 'major56', 'majorMoor', 'parents', 'moor', 'seasons',
+  'L', 'X', 'legendairyForest', 'LE', 'changelings', 'newdale',
 ] as const
 
 export type EncyclopediaGroup = typeof ENCYCLOPEDIA_GROUPS[number]
@@ -47,6 +57,7 @@ export type EncyclopediaFace =
   | { readonly kind: 'moorSpecialAction'; readonly image: string; readonly actions: readonly MoorSpecialActionId[] }
   | { readonly kind: 'moorStart'; readonly tiles: readonly EncyclopediaTerrainTile[] }
   | { readonly kind: 'season'; readonly season: SeasonId }
+  | { readonly kind: 'scan'; readonly cardId: string }
 
 export type EncyclopediaCostPath = Readonly<Partial<Record<keyof PaymentResource, number>>>
 

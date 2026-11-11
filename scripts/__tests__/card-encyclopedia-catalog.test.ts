@@ -4,6 +4,7 @@ import { createMajorImprovementSupply, standardMajorImprovementIds } from '../..
 import { createMoorSpecialActionCards } from '../../shared/moor/special-action-cards'
 import { moorStartCardIds } from '../../shared/moor/start-cards'
 import { PARENT_CARD_IDS } from '../../shared/parents'
+import { SCAN_CARDS } from '../../shared/scan-cards'
 import { seasonIds } from '../../shared/seasons/types'
 import type { EncyclopediaSourceKind } from '../../shared/contract/card-encyclopedia'
 import { buildEncyclopediaEntries } from '../card-encyclopedia/catalog'
@@ -23,6 +24,7 @@ const publishedIdentities: Record<EncyclopediaSourceKind, string[]> = {
   moorSpecialAction: unique(playerCounts.flatMap((count) => createMoorSpecialActionCards(count).map((card) => card.id))),
   moorStart: unique(moorStartCardIds),
   season: unique(seasonIds),
+  scan: unique(SCAN_CARDS.map((card) => card.id)),
 }
 
 const sources = loadEncyclopediaSources()

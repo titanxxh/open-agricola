@@ -134,7 +134,9 @@
   transition: background 0.15s;
 }
 
-.encyclopedia-gallery__face .player-card {
+.encyclopedia-gallery__face .player-card,
+.encyclopedia-gallery__face .scan-card,
+.encyclopedia-gallery__face .scan-event {
   width: 62%;
   transition: transform 0.15s;
 }
@@ -436,8 +438,13 @@
   padding: 8px 0;
 }
 
-.encyclopedia-detail__face .player-card {
+.encyclopedia-detail__face .player-card,
+.encyclopedia-detail__face .scan-card {
   width: min(188px, 70%);
+}
+
+.encyclopedia-detail__face .scan-event {
+  width: min(420px, 100%);
 }
 
 .encyclopedia-detail__face .parent-card-face {

@@ -7,7 +7,9 @@ import { specialActionIconArtUrl } from '../../components/board/special-action-a
 import { ParentCardFace } from '../../components/common/ParentCardFace'
 import { PlayerCard } from '../../components/common/PlayerCard'
 import { officialCardArtPath } from '../../components/common/playerCardArt'
+import { ScanCardFace } from '../../components/scan-cards/ScanCardFace'
 import { getCardMeta } from '../../services/card-meta'
+import { getScanCard, scanFaceAssets } from '../../../shared/scan-cards'
 import { resolveParentCardAssetUrls } from '../../services/parent-assets'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import type { EncyclopediaItem } from './encyclopedia-item'
@@ -75,6 +77,16 @@ const FACE_VIEWS: { readonly [K in FaceKind]: FaceView<K> } = {
   season: {
     artUrls: () => SEASON_ART.map(publicAssetUrl),
     render: ({ face, locale }) => <SeasonFace locale={locale} season={face.season} />,
+  },
+  scan: {
+    artUrls: ({ cardId }) => {
+      const card = getScanCard(cardId)
+      return card ? scanFaceAssets(card).map(publicAssetUrl) : []
+    },
+    render: ({ face, item, locale }) => {
+      const card = getScanCard(face.cardId)
+      return card ? <ScanCardFace card={card} locale={locale} /> : textFace({ item, locale })
+    },
   },
 }
 

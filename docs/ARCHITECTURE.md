@@ -20,6 +20,7 @@
 | `server/` | [server](architecture/server.md) | Connections, Rooms, Durable Room Commit, Replay, Bug Report, Workshop backend, persistence, operations |
 | `operations/` | [server deployment boundary](architecture/server.md#deployment-rollback-and-observability) | Independent monitoring deployment and restricted account aggregates |
 | `client/` | [client](architecture/client.md) | Bundles, transport and synchronized state, views, Replay Viewer, Bug Report |
+| `shared/scan-cards/`, `client/components/scan-cards/` | [scan-cards](architecture/scan-cards.md) | Scanned expansion faces: records, frame templates built from parts, adding a card |
 | Tests and gates | [testing](architecture/testing.md) | Test layers and architecture fitness checks |
 
 Each module document has a Chinese mirror (`<module>_zh.md`) next to it.

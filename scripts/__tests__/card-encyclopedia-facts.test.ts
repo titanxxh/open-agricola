@@ -99,6 +99,7 @@ describe('card encyclopedia identity facts', () => {
   it('orders the catalog by declared group, then display number, then source id', () => {
     expect([...new Set(entries.map((item) => item.group))]).toEqual([
       'A', 'B', 'C', 'D', 'E', 'M', 'majorStandard', 'major56', 'majorMoor', 'parents', 'moor', 'seasons',
+      'L', 'X', 'legendairyForest', 'LE', 'changelings', 'newdale',
     ])
     expect(ENCYCLOPEDIA_GROUPS).toEqual([...new Set(entries.map((item) => item.group))])
     expect(entries.slice(0, 2).map((item) => item.key)).toEqual(['card:A001_Shelter', 'card:A002_ShiftingCultivation'])

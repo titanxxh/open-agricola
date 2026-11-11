@@ -16,6 +16,7 @@ import {
   officialCardDeck,
   officialCardDisplayNumber,
 } from '../../shared/projections/card-display-number'
+import { isScanSkin, scanPlainText, scanPrintedText, type ScanCard } from '../../shared/scan-cards'
 import type { EncyclopediaSources, MajorCardSource, OrdinaryCardSource } from './sources'
 import { cardTexts, moorSpecialActionTexts, moorStartTexts, parentTexts, seasonTexts } from './text'
 
@@ -139,6 +140,54 @@ const majorEntry = (card: MajorCardSource, sources: EncyclopediaSources): Encycl
   score: cardScore(card),
 })
 
+const SCAN_PUBLIC_TYPE = {
+  occupation: 'occupation',
+  minor: 'minor',
+  major: 'major',
+  'alien-artifact': 'alienArtifact',
+  'illustrated-action': 'illustratedAction',
+  'space-merchant': 'spaceMerchant',
+  'alien-event': 'alienEvent',
+  event: 'event',
+  'landscape-event': 'globalEvent',
+  offspring: 'offspring',
+  guest: 'guest',
+  'crop-circles': 'alienEvent',
+  'expansion-rules': 'expansionRules',
+} as const
+
+const scanEntry = (card: ScanCard): EncyclopediaEntry => {
+  const printed = isScanSkin(card) && card.cost && Object.keys(card.cost).length > 0
+    ? { kind: 'printed' as const, paths: [card.cost] }
+    : isScanSkin(card)
+      ? { kind: 'unlisted' as const }
+      : { kind: 'notApplicable' as const }
+  const fixed = (isScanSkin(card) || card.layout === 'alien-artifact') && typeof card.vp === 'number'
+    ? card.vp
+    : card.layout === 'event' && card.mark !== undefined
+      ? card.mark
+      : (card.layout === 'space-merchant' || card.layout === 'alien-event')
+        && card.bannerKind === 'score' && card.bannerValue !== undefined
+        ? card.bannerValue
+        : null
+  return entry({
+    sourceKind: 'scan',
+    sourceId: card.id,
+    group: card.group,
+    publicType: SCAN_PUBLIC_TYPE[card.layout],
+    displayNumber: 'number' in card ? card.number : null,
+    players: isScanSkin(card) ? projectPlayers({ id: card.id, players: card.players }) : null,
+    face: { kind: 'scan', cardId: card.id },
+    text: {
+      name: [{ literal: card.name }],
+      ...(card.text ? { body: [{ literal: scanPlainText(scanPrintedText(card)) }] } : {}),
+      ...(isScanSkin(card) && card.prerequisite ? { prerequisite: [{ literal: scanPlainText(card.prerequisite) }] } : {}),
+    },
+    cost: printed,
+    score: { fixed, extraVp: 'bonusPoints' in card && card.bonusPoints === true },
+  })
+}
+
 const groupIndex = (group: EncyclopediaGroup) => ENCYCLOPEDIA_GROUPS.indexOf(group)
 const compareCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -182,6 +231,7 @@ export const buildEncyclopediaEntries = (sources: EncyclopediaSources): Encyclop
       face: { kind: 'moorStart', tiles: card.terrain.map(({ row, col, kind }) => ({ row, col, kind })) },
       text: moorStartTexts(card),
     })),
+    ...sources.scanCards.map(scanEntry),
     ...sources.seasons.map((season) => entry({
       sourceKind: 'season',
       sourceId: season,
