@@ -34,6 +34,16 @@ Use server-side sessions instead of JWT:
 - The WebSocket protocol continues to support explicit `{ type: 'auth', token: '...' }` authentication.
 - A single server does not need stateless JWTs, while server sessions allow immediate revocation.
 
+### A2.1. Formal identity authority for prerelease
+
+`server/prerelease-authority{,-routes}.ts` and `shared/contract/prerelease-identity.ts` define a version-1, target-bound authority API. Formal owns accounts and Beta qualification, including administrators. Pre receives only user ID, username, display name and authorization state; it never receives email, password/OAuth material, a formal login token or database access.
+
+`PUBLIC_APP_ORIGIN` fixes the formal HTTPS root; `PUBLIC_API_BASE` fixes the formal API origin. Pre must use a different hostname from both, including when ports differ, so formal host-only cookies cannot reach candidate code. A distinct `PRERELEASE_APP_ORIGIN` and server-only `PRERELEASE_IDENTITY_SERVICE_KEY` configure the target; missing or invalid configuration keeps it closed. `PRERELEASE_ENTRY_ENABLED=true` separately activates entry/issuance/exchange only after owner acceptance; status/events/acknowledgements remain available when entry is disabled. Formal Pages uses `/`, while pre starts at `/open-agricola/auth/start` and receives callbacks at `/open-agricola/auth/handoff`. Pre first creates a random verifier in its host-only HttpOnly cookie. Formal browser requests carry only its S256 challenge to authenticated `/api/prerelease/handoffs`, with exact Origin and return-root checks. The one-minute code travels only in a callback fragment. Target-only `/exchange` atomically checks the verifier, source login and current Beta qualification, consumes the code and records an opaque grant association. Grant IDs do not authenticate to formal APIs.
+
+Target `/status` supplies separate account, source-login and Beta facts. Preserve its absolute `confirmedAt`, `validUntil` and original source/grant deadlines when relaying or caching. Confirmations last at most 30 seconds including transit; failure never extends a previous confirmation. Grants expire within seven days and no later than their source. Known invalid state replaces a prior valid result immediately. `/events` returns durable, unacknowledged source-revocation, account-deletion and Beta-change events. `/acknowledgements` records idempotent target completion receipts. Deleting formal sessions covers current logout, all logout and password-reset revocation without broadening ordinary password-change semantics; account deletion waits for the target's deletion receipt. Per-account issuance allows ten handoffs/minute and the target identity service allows 600 requests/minute, shared across formal instances.
+
+The formal authority is separate from pre-local session issuance, projection cleanup, full-environment access enforcement and owner activation. Implementations and controlled-time/rejection tests live in `prerelease-authority.test.ts` and `auth-routes.test.ts`; accepted policy and historical differences are recorded in ADR 0042.
+
 ### A3. Frontend routing: URL parameters and `PageRouter`
 
 Do not add `react-router`; retain the current URL-parameter style through `?page=`:

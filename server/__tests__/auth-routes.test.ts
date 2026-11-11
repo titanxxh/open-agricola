@@ -58,6 +58,8 @@ afterAll(async () => { await (await import('../db.ts')).getDb().close() })
 
 const {
   changePassword,
+  claimPendingAccountDeletion,
+  finishAccountDeletion,
   createEmailVerificationToken,
   createLocalUserForTests,
   createSession,
@@ -162,6 +164,30 @@ function startOAuthCookie(res: JsonResponse): string {
   return cookiePairFromSetCookie(res.headers['Set-Cookie'], OAUTH_STATE_COOKIE)
 }
 
+function prereleaseAuthorityRequests() {
+  vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://formal.example.test')
+  vi.stubEnv('PUBLIC_API_BASE', 'https://api.example.test')
+  vi.stubEnv('PRERELEASE_ENTRY_ENABLED', 'true')
+  vi.stubEnv('PRERELEASE_APP_ORIGIN', 'https://pre.example.test')
+  vi.stubEnv('PRERELEASE_IDENTITY_SERVICE_KEY', 'service-key-with-at-least-32-bytes')
+  const binding = { protocolVersion: 1, channel: 'prerelease', targetOrigin: 'https://pre.example.test' }
+  const targetHeaders = { Authorization: 'Bearer service-key-with-at-least-32-bytes' }
+  const target = (path: string, input = {}) => requestJson('POST', `/api/prerelease/${path}`, { ...binding, ...input }, targetHeaders)
+  const enter = async (token: string | null) => {
+    const verifier = 'v'.repeat(43)
+    const issued = await requestJson('POST', '/api/prerelease/handoffs', {
+      ...binding, browserChallenge: createHash('sha256').update(verifier).digest('base64url'), returnTo: 'https://formal.example.test/',
+    }, { Cookie: `oa_session=${token}`, Origin: 'https://formal.example.test' })
+    expect(issued.status).toBe(200)
+    const exchanged = await target('exchange', { code: issued.json.code, browserVerifier: verifier, returnTo: 'https://formal.example.test/' })
+    expect(exchanged.status).toBe(200)
+    const state = exchanged.json.state
+    if (!state || typeof state !== 'object' || !('grantId' in state) || typeof state.grantId !== 'string') throw new Error('Expected grant ID')
+    return state.grantId
+  }
+  return { enter, target, targetHeaders, status: (grantId: string) => target('status', { grantId }) }
+}
+
 describe('auth routes', () => {
   beforeEach(async () => {
     wsServerMocks.endRoomsForUser.mockClear()
@@ -177,6 +203,9 @@ describe('auth routes', () => {
       await directory.activate('auth-routes-test')
     } else await directory.heartbeat('auth-routes-test')
     ;(await getDb().exec(`
+      DELETE FROM prerelease_identity_handoffs;
+      DELETE FROM prerelease_identity_grants;
+      DELETE FROM prerelease_identity_events;
       DELETE FROM github_propose_audit;
       DELETE FROM github_propose_rate_limit;
       DELETE FROM workshop_card_versions;
@@ -2231,6 +2260,77 @@ describe('auth routes', () => {
     expect(String(res.headers['Access-Control-Allow-Headers']).toLowerCase().split(',').map(header => header.trim())).toContain('x-open-agricola-client-capabilities')
     expect(res.json).toEqual({})
   })
+  it('propagates current-session and all-session logout to the matching prerelease grants through the real HTTP routes', async () => {
+    const pre = prereleaseAuthorityRequests()
+    const user = await createLocalUserForTests('pre_logout_scope', 'password123', 'Pre Logout')
+    await getDb().prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
+    const one = await createSession(user.id), two = await createSession(user.id)
+    expect((await requestJson('GET', '/api/auth/me', undefined, pre.targetHeaders)).status).toBe(401)
+    const first = await pre.enter(one), sameSource = await pre.enter(one), otherSource = await pre.enter(two)
+    expect((await requestJson('POST', '/api/auth/logout', {}, { Cookie: `oa_session=${one}` })).status).toBe(200)
+    for (const grantId of [first, sameSource]) expect((await pre.status(grantId)).json).toMatchObject({ state: { source: { kind: 'invalid' } } })
+    expect((await pre.status(otherSource)).json).toMatchObject({ state: { source: { kind: 'active' } } })
+    expect((await requestJson('POST', '/api/auth/logout-all', {}, { Cookie: `oa_session=${two}` })).status).toBe(200)
+    expect((await pre.status(otherSource)).json).toMatchObject({ state: { source: { kind: 'invalid' } } })
+    const events = await pre.target('events')
+    expect(events.status).toBe(200)
+    expect(events.json.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'source_revoked', grantId: first }),
+      expect.objectContaining({ kind: 'source_revoked', grantId: sameSource }),
+      expect.objectContaining({ kind: 'source_revoked', grantId: otherSource }),
+    ]))
+  })
+
+  it('keeps formal account deletion pending until the prerelease identity cleanup receipt arrives', async () => {
+    const pre = prereleaseAuthorityRequests()
+    const user = await createLocalUserForTests('pre_delete_receipt', 'password123', 'Pre Delete')
+    await getDb().prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
+    const token = await createSession(user.id)
+    await pre.enter(token)
+    const deletion = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `oa_session=${token}` })
+    expect(deletion.status).toBe(202)
+    expect(deletion.json).toMatchObject({ ok: true, pending: true })
+    expect(await validateSession(token ?? '')).toBeNull()
+    const listed = await pre.target('events')
+    if (!Array.isArray(listed.json.events)) throw new Error('Expected pending identity events')
+    const event = listed.json.events.find(value => value.kind === 'account_deleted')
+    expect(event).toMatchObject({ userId: user.id, grantId: null })
+    const acknowledged = await pre.target('acknowledgements', { eventId: event.id, outcome: 'deleted' })
+    expect(acknowledged.status).toBe(200)
+    expect(acknowledged.json).toMatchObject({ ok: true, receipt: { eventId: event.id, outcome: 'deleted', completedAt: expect.any(Number) } })
+    // Make the durable retry due; its public completion boundary still owns deletion.
+    await getDb().prepare('UPDATE account_deletion_requests SET next_attempt_at=0 WHERE user_id=?').run(user.id)
+    const claim = await claimPendingAccountDeletion(user.id)
+    if (!claim) throw new Error('Expected deletion retry claim')
+    expect(await finishAccountDeletion(claim)).toBe(true)
+    const replacement = await createLocalUserForTests('pre_delete_receipt', 'password123', 'Replacement')
+    expect(replacement.id).not.toBe(user.id)
+    expect((await pre.target('acknowledgements', { eventId: event.id, outcome: 'deleted' })).json).toEqual(acknowledged.json)
+  })
+
+  it('preserves prerelease sources on ordinary password change and revokes them all on password reset', async () => {
+    const pre = prereleaseAuthorityRequests()
+    const user = await createLocalUserForTests('pre_reset_sources', 'password123', 'Pre Reset')
+    await getDb().prepare('UPDATE users SET email=?,email_verified_at=? WHERE id=?').run('pre-reset@example.test', Date.now(), user.id)
+    await getDb().prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
+    const one = await createSession(user.id), two = await createSession(user.id)
+    const first = await pre.enter(one), second = await pre.enter(two)
+    const changed = await requestJson('POST', '/api/auth/change-password', { oldPassword: 'password123', newPassword: 'changed-password' }, { Cookie: `oa_session=${one}` })
+    expect(changed.status).toBe(200)
+    for (const grantId of [first, second]) expect((await pre.status(grantId)).json).toMatchObject({ state: { source: { kind: 'active' } } })
+    const mail = vi.spyOn(emailModule, 'sendEmail').mockResolvedValue(undefined)
+    expect((await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'pre_reset_sources' })).status).toBe(200)
+    const link = mail.mock.calls[0]?.[0].text.match(/https:\/\/\S+/)?.[0]
+    if (!link) throw new Error('Expected password reset link')
+    const token = new URLSearchParams(new URL(link).hash.slice(1)).get('passwordResetToken')
+    const reset = await requestJson('POST', '/api/auth/password-reset/complete', { token, password: 'reset-password', confirmPassword: 'reset-password' })
+    expect(reset.status).toBe(200)
+    for (const grantId of [first, second]) expect((await pre.status(grantId)).json).toMatchObject({ state: { source: { kind: 'invalid' }, grant: { kind: 'revoked' } } })
+    const newCookie = cookiePairFromSetCookie(reset.headers['Set-Cookie'], SESSION_COOKIE)
+    const nextToken = decodeURIComponent(newCookie.slice(newCookie.indexOf('=') + 1))
+    expect((await pre.status(await pre.enter(nextToken))).json).toMatchObject({ state: { source: { kind: 'active' }, account: { kind: 'active', subject: { id: user.id } } } })
+  })
+
 })
 
 describe('experimental feature discovery', () => {
@@ -2289,4 +2389,6 @@ describe('experimental feature discovery', () => {
       grantedBy: { id: admin.id, username: 'beta_search_admin', displayName: 'Beta Search Admin' }, grantedAt: expect.any(Number),
     })
   })
+
+
 })

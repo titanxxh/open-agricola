@@ -271,7 +271,11 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 
 `/api/auth/me` 返回服务端按最新资格计算的 `user.experimentalFeatures`，客户端据此展示入口。WebSocket 错误包含 `code: experimental_feature_unavailable` 和 `feature`；HTTP 使用相同字段并返回 403。持久化命令回执只保留通用错误码与消息，不存储功能 ID。开放状态不进入对局状态、Room 快照、回放或结果存档。
 
-功能 PR 检查清单：在本模块声明 ID 和阶段；在服务端入口为创建和公开发现加门禁；测试拒绝时房间／版本／回放不变、有资格者通过、已有局参与不受影响；同步客户端发现和文档。毕业先改为 `general`，至少发布一个版本后，由 owner 确认另开 PR 删除声明、检查及过时界面。[判定测试](../../shared/contract/__tests__/experimental-features.test.ts) 与[入口测试](../../server/connection/__tests__/experimental-features.test.ts) 定义行为。
+入口及毕业政策记录在 [ADR 0042](../adr/0042-experimental-feature-availability.md)。
+
+## 预发布身份
+
+`prerelease-identity.ts` 拥有 version-1 权威契约：固定 `prerelease` audience、目标 origin、不透明 grant 关联、最小账号投影及独立的来源/Beta/grant 状态。grant 不携带登录凭据。绝对 `confirmedAt`/`validUntil` 计入传输时间，只有成功的权威复核可更新最多 30 秒窗口；来源到期和 grant 七天上限保持固定。`isPrereleaseIdentityAuthorized` 拒绝过期或失效状态。测试：`server/__tests__/{prerelease-authority,auth-routes}.test.ts`。
 
 ## 客户端能力
 

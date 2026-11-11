@@ -134,16 +134,15 @@ Tests: `server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`.
 
 ## HTTP endpoints
 
-HTTP serves operations, tests and debugging; it is not the real-time synchronization path. Responses match `SessionResponse`, and validation endpoints never write authoritative state. Inside a WebSocket Room, development commands use `ClientCommand`.
+HTTP owns product APIs, operations and debugging. WebSocket commands remain the game synchronization path; validation endpoints never write rule state.
 
-- `beta-access-{routes,store}.ts` owns administrator `GET/PUT/DELETE /api/admin/beta-access` and idempotent grants; `experimental-features.ts` answers `/api/auth/me` qualification from one fresh read. Coverage: `beta-access-routes.test.ts`.
-- `GET /api/health`, `GET /api/rooms`, `GET /api/game/state`.
-- `POST /api/game/new` accepts `seed?` plus the WebSocket `createRoom` setup, mapped through `server/game/game-setup-options.ts`. `POST /api/game/load`, `POST /api/game/dev/*` and `POST /api/game/new-sandbox` are debugging and Workshop sandbox paths.
-- `GET /cards-manifest.json` serves card metadata to the main bundle.
-- OAuth account binding: `POST /api/auth/oauth/:provider/start?intent=link`, `GET …/callback` and `POST …/complete`, with PKCE S256 and a fragment handoff that never creates a new site session.
-- OAuth onboarding binds registration tickets to a browser challenge and verifier. Explicit credentials never fall back to another cookie identity. Account creation, identity binding, invite and single-use ticket consumption share one transaction. The callback uses fragment handoff with `no-store` and `no-referrer`; distinct error codes describe missing, invalid and expired credentials. See `oauth/store.ts`, `index.ts` and the auth tests below.
+- `beta-access-{routes,store}.ts` owns administrator `/api/admin/beta-access` grants. `experimental-features.ts` derives `/api/auth/me` eligibility from one fresh read. Tests: `beta-access-routes.test.ts`.
+- `GET /api/health`, `/api/rooms`, `/api/game/state` and `/cards-manifest.json` expose health, discovery, snapshots and metadata.
+- `POST /api/game/new` maps WebSocket creation options through `game/game-setup-options.ts`; `load`, `dev/*` and `new-sandbox` are debugging and Workshop entry points.
+- `oauth/{handler,store}.ts` owns provider start/callback/completion. PKCE binds account linking; a browser challenge binds registration tickets. Explicit invalid credentials never fall back to Cookie identity. Account, identity, invite and ticket consumption commit together. Callbacks use fragments, `no-store` and `no-referrer`.
+- `prerelease-authority{,-routes}.ts` owns `/api/prerelease/*`: formal-session handoff, target-key exchange/status and durable revocation/deletion receipts. Migration 037 captures session revocation; account deletion waits for target cleanup. `prerelease-identity.ts` fixes absolute 30-second/source/seven-day bounds. Targets default closed. Tests: `prerelease-authority.test.ts`, `auth-routes.test.ts`; policy: ADR 0042.
 
-Auth tests: `server/__tests__/auth-routes.test.ts`, `server/oauth/__tests__/store.test.ts`, `e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`.
+Auth tests: `auth-routes.test.ts`, `oauth/__tests__/store.test.ts`, `e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`.
 
 Game Context, Replay and Bug Report are versioned product APIs:
 

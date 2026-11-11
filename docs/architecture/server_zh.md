@@ -135,16 +135,15 @@ server/custom-code/
 
 ## HTTP 端点
 
-HTTP 用于运维、测试与调试，不是实时同步链路。响应与 `SessionResponse` 一致，校验端点从不写权威状态。在 WebSocket Room 内，开发命令使用 `ClientCommand`。
+HTTP 负责产品 API、运维与调试。WebSocket 命令仍是对局同步主链路；校验端点不写规则状态。
 
-- `beta-access-{routes,store}.ts` 负责管理员 `GET/PUT/DELETE /api/admin/beta-access` 与幂等授予；`experimental-features.ts` 以一次最新读取回答 `/api/auth/me` 的资格。测试：`beta-access-routes.test.ts`。
-- `GET /api/health`、`GET /api/rooms`、`GET /api/game/state`。
-- `POST /api/game/new` 接受 `seed?` 与 WebSocket `createRoom` 的设置，经 `server/game/game-setup-options.ts` 映射。`POST /api/game/load`、`POST /api/game/dev/*` 与 `POST /api/game/new-sandbox` 是调试与工坊沙盒路径。
-- `GET /cards-manifest.json` 向主 bundle 提供卡牌 metadata。
-- OAuth 账号绑定：`POST /api/auth/oauth/:provider/start?intent=link`、`GET …/callback` 与 `POST …/complete`，使用 PKCE S256 与 fragment 交接，从不创建新的站点会话。
-- OAuth 注册用浏览器 challenge 与 verifier 绑定票据，显式凭证失败时不退回其他 Cookie 身份。账号创建、身份绑定、邀请码和一次性票据消费共用事务。回调用 fragment 交接，设置 `no-store` 与 `no-referrer`；错误码区分凭证缺失、无效与过期。入口和测试见 `oauth/store.ts`、`index.ts` 及下方认证测试。
+- `beta-access-{routes,store}.ts` 负责管理员 `/api/admin/beta-access` 授予；`experimental-features.ts` 以一次最新读取计算 `/api/auth/me` 资格。测试：`beta-access-routes.test.ts`。
+- `GET /api/health`、`/api/rooms`、`/api/game/state` 与 `/cards-manifest.json` 提供健康、发现、快照与 metadata。
+- `POST /api/game/new` 经 `game/game-setup-options.ts` 映射 WebSocket 创建选项；`load`、`dev/*` 与 `new-sandbox` 为调试及工坊入口。
+- `oauth/{handler,store}.ts` 负责 provider 发起、回调与完成。PKCE 绑定账号关联，浏览器 challenge 绑定注册票据；显式无效凭证不回退 Cookie 身份。账号、身份、邀请与票据消费同事务提交。回调用 fragment，设置 `no-store` 与 `no-referrer`。
+- `prerelease-authority{,-routes}.ts` 负责 `/api/prerelease/*` 的正式会话交接、目标 key 兑换/复核及持久撤销/删除回执。迁移 037 捕获会话撤销，账号删除等待目标清理。`prerelease-identity.ts` 固定绝对 30 秒、来源及七天期限。目标默认关闭。测试：`prerelease-authority.test.ts`、`auth-routes.test.ts`；政策见 ADR 0042。
 
-认证测试：`server/__tests__/auth-routes.test.ts`、`server/oauth/__tests__/store.test.ts`、`e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`。
+认证测试：`auth-routes.test.ts`、`oauth/__tests__/store.test.ts`、`e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`。
 
 Game Context、Replay 与 Bug Report 是版本化的产品 API：
 
