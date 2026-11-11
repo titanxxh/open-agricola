@@ -314,7 +314,6 @@ export function SettingsPage() {
         </p>
         {user?.betaAccess || user?.isAdmin ? <p className="settings-readonly beta-access-status">
           {t('beta.accessLabel')}: <span className="settings-readonly-chip">{t('beta.accessEnabled')}</span>{' '}
-          {user.experimentalFeatures?.includes('team-modes') ? <span>{t('beta.availableModes')}</span> : null}
         </p> : null}
         <PrereleaseEntry />
         <form onSubmit={handleSaveName} className="settings-form">

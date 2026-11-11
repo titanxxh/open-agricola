@@ -32,7 +32,6 @@ import {
 import { verifyReplayViewerBuild } from './replay-viewer-build'
 import { SameConfigurationRematch } from './solo/SameConfigurationRematch'
 import { formatScore } from '../utils/format-score'
-import { ArchivedTeamResults } from '../components/board/ArchivedTeamResults'
 
 export const GAME_CONTEXT_CHANGED_EVENT = 'open-agricola:game-context-changed'
 
@@ -248,7 +247,6 @@ function CompletedContext({
     t('platform.gameContext.completedTitle'),
     t('platform.gameContext.legacyNoReplay'),
     <div>
-      {context.result.team ? <ArchivedTeamResults result={context.result} locale={locale} /> : <>
       <h2 className="ws-status-title">{t('platform.gameContext.players')}</h2>
       <ul>
         {context.result.players.map((player) => (
@@ -257,7 +255,6 @@ function CompletedContext({
           </li>
         ))}
       </ul>
-      </>}
       {rematch}
     </div>,
   )

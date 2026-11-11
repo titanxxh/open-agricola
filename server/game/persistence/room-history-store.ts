@@ -112,7 +112,6 @@ export class RoomHistoryStore {
         phase: snapshot.state.phase,
         gameOver: snapshot.state.gameOver,
         currentPlayerIndex: snapshot.state.currentPlayerIndex,
-        ...(snapshot.state.team ? { team: { configuration: snapshot.state.team.configuration } } : {}),
       },
       sessionCursor: {
         engineStackCursor: {

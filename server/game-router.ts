@@ -1,6 +1,4 @@
-import { unavailableTeamFeature } from './experimental-features'
-import { CLIENT_CAPABILITIES_HEADER, CLIENT_REFRESH_MESSAGE, parseClientCapabilities, requiresCooperationCapability, TEAM_COOPERATION_CAPABILITY } from '../shared/contract/client-capabilities'
-import { parseTeamConfiguration, type TeamConfiguration } from '../shared/contract/team'
+import { CLIENT_CAPABILITIES_HEADER } from '../shared/contract/client-capabilities'
 import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
 import type { FenceSelectionQuote } from '../shared/contract/protocol/game'
@@ -29,7 +27,8 @@ import { isLoadableLive } from './workshop-status.ts'
 import { parseDraftOptions, loadLiveCustomCards } from './connection/room-router.ts'
 import {
   asSetupPayload,
-  loadedTeamConfiguration,
+  assertSupportedLoadedState,
+  assertSupportedGameConfiguration,
   buildInitialStateOptions,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
@@ -106,17 +105,6 @@ const getSessionKey = async (req: IncomingMessage): Promise<Awaited<string>> => 
   return user?.id ?? 'anonymous'
 }
 
-class ClientRefreshRequiredError extends Error {
-  readonly code = 'client_refresh_required'
-  constructor() { super(CLIENT_REFRESH_MESSAGE) }
-}
-
-const assertHttpClientConfiguration = (req: IncomingMessage, configuration: Pick<TeamConfiguration, 'cooperationRules'> | undefined): void => {
-  const header = req.headers[CLIENT_CAPABILITIES_HEADER.toLowerCase()]
-  const capabilities = parseClientCapabilities(typeof header === 'string' ? header.split(',').map(value => value.trim()) : undefined)
-  if (requiresCooperationCapability(configuration) && !capabilities.has(TEAM_COOPERATION_CAPABILITY)) throw new ClientRefreshRequiredError()
-}
-
 const getSessionForRequest = async (req: IncomingMessage): Promise<Awaited<GameSession>> => {
   const key = (await getSessionKey(req))
   if (!userSessions.has(key)) {
@@ -128,7 +116,6 @@ const getSessionForRequest = async (req: IncomingMessage): Promise<Awaited<GameS
     await authority.check(stamp)
     requests.set(req, { ...requests.get(req), stamp })
   }
-  assertHttpClientConfiguration(req, userSessions.get(key)?.state.team?.configuration)
   sessionLastAccess.set(key, Date.now())
   return userSessions.get(key)!
 }
@@ -572,15 +559,8 @@ const handleAuthorizedGameRoute = async (
       await sendJson(res, 400, { ok: false, error: 'missing state' })
       return true
     }
-    let configuration: TeamConfiguration | undefined
-    try { configuration = loadedTeamConfiguration(body.state) }
-    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid team configuration' }); return true }
-    const unavailable = await unavailableTeamFeature((await validateSession(extractToken(req.headers.authorization)))?.id, configuration)
-    if (unavailable) {
-      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
-      return true
-    }
-    assertHttpClientConfiguration(req, configuration)
+    try { assertSupportedLoadedState(body.state) }
+    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Unsupported game configuration' }); return true }
     const { result } = await callAndRespond(req, 'loadState', [body.state], s => s.loadState(body.state))
     await sendJson(res, 200, result)
     return true
@@ -618,7 +598,6 @@ const handleAuthorizedGameRoute = async (
         : session.quoteFenceSelection(body.playerIndex, body.requestKey, payload)
       await sendJson(res, 200, quote)
     } catch (error) {
-      if (error instanceof ClientRefreshRequiredError) throw error
       await sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) })
     }
     return true
@@ -670,14 +649,8 @@ const handleAuthorizedGameRoute = async (
     }
     let setup: ReturnType<typeof parseGameSetupRequest>
     try { setup = parseGameSetupRequest(raw, draftOptions.value) }
-    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid team configuration' }); return true }
+    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid game configuration' }); return true }
     const requestUserId = (await validateSession(extractToken(req.headers.authorization)))?.id
-    const unavailable = await unavailableTeamFeature(requestUserId, setup.teamConfig)
-    if (unavailable) {
-      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
-      return true
-    }
-    assertHttpClientConfiguration(req, setup.teamConfig)
     const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
     sessionLastAccess.set(sessionKey, Date.now())
@@ -739,7 +712,6 @@ const handleAuthorizedGameRoute = async (
     let seed: number | undefined
     let customCardDbIds: string[] = []
     let playerCount = 2
-    let teamConfigValue: unknown
     let deckIds = [...defaultSandboxDeckIds]
     let enableThroughTheSeasons = false
     let enableFarmersOfTheMoor = false
@@ -747,19 +719,19 @@ const handleAuthorizedGameRoute = async (
     let enableSnakeOpening = false
     const customCardVersions = new Map<string, string>()
     try {
-      const body = JSON.parse(await readBody(req)) as {
+      const rawBody: unknown = JSON.parse(await readBody(req))
+      assertSupportedGameConfiguration(asSetupPayload(rawBody))
+      const body = asSetupPayload(rawBody) as {
         seed?: number
         customCardIds?: string[]
         customCardVersions?: Array<{ cardId?: unknown; versionId?: unknown }>
         playerCount?: number
-        teamConfig?: unknown
         deckIds?: string[]
         enableThroughTheSeasons?: boolean
         enableFarmersOfTheMoor?: boolean
         allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
         enableSnakeOpening?: boolean
       }
-      teamConfigValue = body.teamConfig
       if (typeof body.seed === 'number') seed = body.seed
       if (Array.isArray(body.customCardIds)) {
         customCardDbIds = body.customCardIds.filter((id): id is string => typeof id === 'string')
@@ -789,21 +761,14 @@ const handleAuthorizedGameRoute = async (
       enableFarmersOfTheMoor = body.enableFarmersOfTheMoor === true
       allowIncompleteFarmersOfTheMoorMinorDeal = enableFarmersOfTheMoor && body.allowIncompleteFarmersOfTheMoorMinorDeal === true
       enableSnakeOpening = body.enableSnakeOpening === true
-    } catch { /* ignore */ }
-
-    let teamConfig: TeamConfiguration | undefined
-    try { teamConfig = parseTeamConfiguration(teamConfigValue, playerCount) }
-    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid team configuration' }); return true }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Unsupported game configuration') {
+        await sendJson(res, 400, { ok: false, error: error.message }); return true
+      }
+    }
 
     // Identify the requesting user (optional — allows loading own draft cards)
     const requestUser = (await validateSession(extractToken(req.headers.authorization)))
-    const unavailable = await unavailableTeamFeature(requestUser?.id, teamConfig)
-    if (unavailable) {
-      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: unavailable })
-      return true
-    }
-    assertHttpClientConfiguration(req, teamConfig)
-
     const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
     sessionLastAccess.set(sessionKey, Date.now())
@@ -893,7 +858,6 @@ const handleAuthorizedGameRoute = async (
       customCards.length > 0 ? customCards : undefined,
       {
         playerCount,
-        ...(teamConfig ? { teamConfig } : {}),
         deckIds,
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
@@ -1118,10 +1082,6 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
     responses.set(res, req)
     return await handleAuthorizedGameRoute(req, res)
   } catch (error) {
-    if (error instanceof ClientRefreshRequiredError) {
-      rawJson(res, 409, { ok: false, code: error.code, error: error.message })
-      return true
-    }
     if (error instanceof UnsupportedSandboxListenerError) {
       rawJson(res, 400, { ok: false, code: error.code, error: error.message })
       return true

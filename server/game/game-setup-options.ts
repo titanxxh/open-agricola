@@ -1,4 +1,3 @@
-import { parseTeamConfiguration, type TeamConfiguration } from '../../shared/contract/team'
 import type { InitialStateOptions } from '../../shared/session/state-constants.ts'
 import type { SoloCreationConfiguration, SoloHandMode } from '../../shared/contract/game-creation'
 import { isMoorBalanceRulesEnabled } from '../../shared/contract/game-variants'
@@ -12,7 +11,6 @@ export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: numb
  * payload maps onto `InitialStateOptions`.
  */
 export type GameSetupRequest = {
-  teamConfig?: TeamConfiguration
   playerCount: number
   soloHandMode?: SoloHandMode
   enableCommunityDeck: boolean
@@ -54,10 +52,8 @@ export const parseGameSetupRequest = (
   raw: Record<string, unknown>,
   draft: DraftSetupOptions | null,
 ): GameSetupRequest => {
-  const teamConfig = parseTeamConfiguration(raw.teamConfig, clampPlayerCount(raw.maxPlayers ?? raw.playerCount))
-  if (teamConfig && raw.hotseat === true) throw new Error('Team games do not support hotseat')
+  assertSupportedGameConfiguration(raw)
   return {
-    ...(teamConfig ? { teamConfig } : {}),
     playerCount: clampPlayerCount(raw.maxPlayers ?? raw.playerCount),
     ...(clampPlayerCount(raw.maxPlayers ?? raw.playerCount) === 1
       ? { soloHandMode: raw.soloHandMode === 'choose-7' ? 'choose-7' : 'random' } : {}),
@@ -76,7 +72,6 @@ export const parseGameSetupRequest = (
 
 export const buildInitialStateOptions = (request: GameSetupRequest): InitialStateOptions => ({
   playerCount: request.playerCount,
-  ...(request.teamConfig ? { teamConfig: request.teamConfig } : {}),
   ...(request.soloHandMode ? { soloHandMode: request.soloHandMode } : {}),
   enableCommunityDeck: request.enableCommunityDeck,
   enableParentCards: request.enableParentCards,
@@ -112,15 +107,16 @@ export const resolveCustomCardDbIds = (
   return raw.customCardIds.filter((id): id is string => typeof id === 'string')
 }
 
+/** Removed game modes must fail at ingress rather than becoming ordinary games. */
+export const assertSupportedGameConfiguration = (raw: object): void => {
+  if (['teamConfig', 'team', 'multihand', 'cooperationRules'].some(key => Object.hasOwn(raw, key))) {
+    throw new Error('Unsupported game configuration')
+  }
+}
+
 /** Accepts both a bare GameState and the `{ state, sessionCursor }` debug snapshot. */
-export const loadedTeamConfiguration = (raw: unknown): TeamConfiguration | undefined => {
-  if (!raw || typeof raw !== 'object') return undefined
-  const state = 'state' in raw ? raw.state : raw
-  if (!state || typeof state !== 'object' || !('team' in state) || state.team == null) return undefined
-  const team = state.team
-  if (typeof team !== 'object' || !('configuration' in team)
-    || !('players' in state) || !Array.isArray(state.players)) throw new Error('Invalid team configuration')
-  const configuration = parseTeamConfiguration(team.configuration, state.players.length)
-  if (!configuration) throw new Error('Invalid team configuration')
-  return configuration
+export const assertSupportedLoadedState = (raw: unknown): void => {
+  if (!raw || typeof raw !== 'object') return
+  assertSupportedGameConfiguration(raw)
+  if ('state' in raw && raw.state && typeof raw.state === 'object') assertSupportedGameConfiguration(raw.state)
 }

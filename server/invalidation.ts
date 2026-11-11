@@ -29,9 +29,8 @@ export class InvalidationStore {
         throw new WorkshopSubmissionInProgressError()
       }
       const rooms = await this.db.prepare(`SELECT r.id FROM rooms r WHERE
-        (?!='card' AND (r.created_by=? OR EXISTS(SELECT 1 FROM room_players p WHERE p.room_id=r.id AND p.user_id=?)
-          OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(r.team_members_json, '[]'::jsonb)) member WHERE member->>'userId'=?)))
-        OR EXISTS(SELECT 1 FROM json_array_elements_text(r.custom_card_ids::json) c(value) WHERE c.value=ANY(?::text[])) ORDER BY r.id`).all<{ id: string }>(kind, subjectId, subjectId, subjectId, cards)
+        (?!='card' AND (r.created_by=? OR EXISTS(SELECT 1 FROM room_players p WHERE p.room_id=r.id AND p.user_id=?)))
+        OR EXISTS(SELECT 1 FROM json_array_elements_text(r.custom_card_ids::json) c(value) WHERE c.value=ANY(?::text[])) ORDER BY r.id`).all<{ id: string }>(kind, subjectId, subjectId, cards)
       const roomIds = rooms.map(room => room.id)
       await this.db.prepare('SELECT room_id FROM room_ownership WHERE room_id=ANY(?::text[]) ORDER BY room_id FOR UPDATE').all(roomIds)
       const subjects = [...cards.map(id => ({ kind: 'card', id })), ...(kind === 'user' ? [{ kind: 'user', id: subjectId }] : [])]

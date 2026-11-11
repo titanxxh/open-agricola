@@ -1,6 +1,5 @@
 import { serializeSessionSnapshot } from '../../shared/session/serialization.ts'
 import { Scoring } from '../../shared/domain/scoring.ts'
-import { computeTeamScores } from '../../shared/domain/team-scoring.ts'
 import { toRoomMeta, type Room } from './room.ts'
 import type { GameResult, RoomPersistence, RoomWriteOptions } from './persistence/room-persistence.ts'
 import type { GameTermination } from '../../shared/contract/protocol/game-termination'
@@ -24,11 +23,6 @@ export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
     farmersOfTheMoor: state.enableFarmersOfTheMoor === true,
     moorBalanceRules: state.enableFarmersOfTheMoor === true && state.enableMoorBalanceRules === true,
     snakeOpening: state.enableSnakeOpening === true,
-    ...(state.team ? { team: {
-      mode: state.team.configuration.mode,
-      scoring: state.team.configuration.scoring,
-      scores: computeTeamScores(scores, state.team, state.players),
-    } } : {}),
     players: scores.map((score, playerIndex) => ({
       playerIndex,
       gamePlayerId: score.playerId,
@@ -37,7 +31,6 @@ export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
       ...(state.players.find((player) => player.id === score.playerId)?.nameIsDefault
         ? { nameIsDefault: true } : {}),
       score: score.total,
-      ...(state.team ? { teamIndex: state.team.playerTeams[playerIndex] } : {}),
     })),
   }
 }

@@ -39,7 +39,6 @@ export type CardMeta = {
   returnCards?: string[]
   alsoCountsAs?: string[]
   enablesPalisades?: boolean
-  palisadeTargetFarmPolicy?: 'own'
   artUrl?: string
   locales?: Record<string, {
     name: string

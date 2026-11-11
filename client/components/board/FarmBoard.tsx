@@ -398,9 +398,7 @@ export type FarmBoardView = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
-  handPlayer?: Pick<PlayerState, 'id' | 'occupationHand' | 'minorHand'>
   visiblePlayerIds: readonly string[]
-  operatingPlayerId?: string
   activePlayerId?: string
   playerPanelSummary: PlayerPanelSupplySummary
   devMode: boolean
@@ -844,9 +842,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     players,
     currentPlayer,
     displayPlayer,
-    handPlayer = displayPlayer,
     visiblePlayerIds,
-    operatingPlayerId,
     activePlayerId,
     playerPanelSummary,
     currentStartPlayerId,
@@ -914,12 +910,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     isOccupationHandSelectionRejected,
   } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
-  const canInteractHand = handPlayer.id === activeFarmPlayerId && isInteractive
-  const operatingIndex = players.findIndex(player => player.id === operatingPlayerId)
-  const operating = players[operatingIndex]
-  const operationLabel = operating ? <p className="multihand-operation" data-operation-player-id={operating.id}>
-    {t(locale, 'team.operatingSeat', { number: operatingIndex + 1,
-      player: getPlayerDisplayName(locale, operating.name, operatingIndex, operating.nameIsDefault) })}</p> : null
+  const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const playCardChoice = actions.playCardChoice ?? resolveChoice
   const summary = playerPanelSummary
   const farmContainerRef = useRef<HTMLDivElement>(null)
@@ -1032,16 +1023,16 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   const handPanel = (
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
-      {operationLabel}
-      {visiblePlayerIds.includes(handPlayer.id) || devMode ? (
-        <div className="hand-sections" data-hand-anchor={handPlayer.id}>
-          <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={handPlayer.id}>
+
+      {visiblePlayerIds.includes(displayPlayer.id) || devMode ? (
+        <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
+          <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={displayPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
             <div className="hand-row">
-              {handPlayer.occupationHand.length === 0 ? (
+              {displayPlayer.occupationHand.length === 0 ? (
                 <div className="hand-empty">{t(locale, 'ui.noOccupationCards')}</div>
               ) : (
-                handPlayer.occupationHand.map((cardId) => {
+                displayPlayer.occupationHand.map((cardId) => {
                   if (isMultiOccupationSelect) {
                     const isSelectable = occupationHandSelection!.selectableCards.includes(cardId)
                     return (
@@ -1114,14 +1105,14 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               </div>
             )}
           </div>
-          <div className="hand-section minor" data-interaction-focus="minor-hand" data-focus-player={handPlayer.id}>
+          <div className="hand-section minor" data-interaction-focus="minor-hand" data-focus-player={displayPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.minorCards')}</div>
             {improvementSupply}
             <div className="hand-row">
-              {handPlayer.minorHand.length === 0 ? (
+              {displayPlayer.minorHand.length === 0 ? (
                 <div className="hand-empty">{t(locale, 'ui.noHandCards')}</div>
               ) : (
-                handPlayer.minorHand.map((cardId) => {
+                displayPlayer.minorHand.map((cardId) => {
                   const canPlay = cardAvailability[`minor:${cardId}`] !== false
                   const isSelectingThisHand =
                     isSelectingMinor || isSelectingImprovementAny

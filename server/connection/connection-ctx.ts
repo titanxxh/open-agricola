@@ -1,5 +1,3 @@
-import type { ExperimentalFeatureId } from '../../shared/contract/experimental-features'
-import type { ExperimentalFeatureAccess } from '../experimental-features'
 import type { RoomAuthority } from '../game/room-authority'
 import type { OwnerToken } from '../game/room-directory'
 import type { CommandStore, CommandRequest } from '../game/command-store'
@@ -15,7 +13,6 @@ import type { RoomCommitter } from '../game/room-committer.ts'
 import type { GameContextStore } from '../game/game-context-store.ts'
 
 export type ConnectionDeps = {
-  experimentalFeatureAccess?: ExperimentalFeatureAccess
   authority?: RoomAuthority
   commands?: CommandStore
   registry: RoomRegistry
@@ -27,7 +24,7 @@ export type ConnectionDeps = {
 }
 
 export type ConnectionCtx = {
-  activeCommand?: { request: CommandRequest; owner?: OwnerToken; outcome?: CommandOutcome; errorFeature?: ExperimentalFeatureId }
+  activeCommand?: { request: CommandRequest; owner?: OwnerToken; outcome?: CommandOutcome }
   ws: WebSocket
   sessionToken?: string
   authenticated: boolean

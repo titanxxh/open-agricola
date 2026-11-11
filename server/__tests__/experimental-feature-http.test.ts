@@ -24,99 +24,47 @@ async function request(url: string, body: unknown, token?: string, capability?: 
   await handleGameRoute(req as IncomingMessage, response as unknown as ServerResponse)
   return { status: response.status, body: JSON.parse(response.data) }
 }
-const teamConfig = { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'private' }
+const removedConfigurations = [
+  { teamConfig: { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'private' } },
+  { teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' } },
+  { cooperationRules: true },
+  { multihand: true },
+]
 
-it('rejects team creation through both HTTP entry points and allows an administrator', async () => {
-  const player = await createSession('http-player'), owner = await createSession('http-owner')
-  for (const url of ['/api/game/new', '/api/game/new-sandbox']) {
-    for (const token of [player, undefined]) {
-      const result = await request(url, { playerCount: 4, teamConfig }, token ?? undefined)
-      expect(result).toEqual({ status: 403, body: { ok: false, code: 'experimental_feature_unavailable', feature: 'team-modes', error: 'Experimental feature unavailable' } })
+it('rejects removed configurations for every account before replacing an ordinary HTTP session', async () => {
+  const owner = (await createSession('http-owner'))!, player = (await createSession('http-player'))!
+  await db.prepare('INSERT INTO beta_access(user_id,granted_by,granted_at) VALUES(?,?,?)').run('http-player', 'http-owner', 123)
+  for (const token of [owner, player, undefined]) {
+    const created = await request('/api/game/new', { seed: 1661, playerCount: 2 }, token)
+    expect(created.status).toBe(200)
+    const before = await request('/api/game/state', {}, token, undefined, 'GET')
+    for (const url of ['/api/game/new', '/api/game/new-sandbox']) {
+      for (const configuration of removedConfigurations) {
+        const rejected = await request(url, { playerCount: 4, ...configuration }, token, 'team-cooperation-v1')
+        expect(rejected).toEqual({ status: 400, body: { ok: false, error: 'Unsupported game configuration' } })
+        expect(await request('/api/game/state', {}, token, undefined, 'GET')).toEqual(before)
+      }
     }
-    expect((await request(url, { playerCount: 4, teamConfig }, owner!)).status).toBe(200)
+    for (const state of [{ ...created.body.state, team: { configuration: removedConfigurations[0].teamConfig } },
+      { state: { ...created.body.state, team: { configuration: removedConfigurations[1].teamConfig } } }]) {
+      expect(await request('/api/game/load', { state }, token)).toEqual({ status: 400, body: { ok: false, error: 'Unsupported game configuration' } })
+      expect(await request('/api/game/state', {}, token, undefined, 'GET')).toEqual(before)
+    }
   }
-  expect((await request('/api/game/new', { playerCount: 2 }, player!)).status).toBe(200)
 })
 
-it('rejects loading a team state into the debug sandbox without availability', async () => {
-  const player = await createSession('http-player'), owner = await createSession('http-owner')
-  const created = await request('/api/game/new-sandbox', { playerCount: 4, teamConfig }, owner!)
-  const teamState = created.body.state
-  expect(teamState.team).toBeTruthy()
-  const denied = { status: 403, body: { ok: false, code: 'experimental_feature_unavailable', feature: 'team-modes', error: 'Experimental feature unavailable' } }
-  for (const state of [teamState, { state: teamState }]) {
-    expect(await request('/api/game/load', { state }, player!)).toEqual(denied)
-    expect(await request('/api/game/load', { state }, undefined)).toEqual(denied)
-  }
-  expect((await request('/api/game/load', { state: teamState }, owner!)).status).toBe(200)
-  const ordinary = await request('/api/game/new', { playerCount: 2 }, player!)
-  expect((await request('/api/game/load', { state: ordinary.body.state }, player!)).status).toBe(200)
-})
-
-it('separates cooperation beta qualification from current HTTP client capability at creation and loading', async () => {
-  const owner = await createSession('http-owner')
-  const cooperation = { ...teamConfig, cooperationRules: true }
-  const denied = { status: 409, body: { ok: false, error: 'Please refresh this page to use official cooperation rules.', code: 'client_refresh_required' } }
-  for (const url of ['/api/game/new', '/api/game/new-sandbox']) {
-    expect(await request(url, { playerCount: 4, teamConfig: cooperation }, owner!)).toEqual(denied)
-    expect((await request(url, { playerCount: 4, teamConfig: cooperation }, owner!, 'team-cooperation-v1')).status).toBe(200)
-  }
-  const ordinary = await request('/api/game/new-sandbox', { playerCount: 4, teamConfig }, owner!)
-  const state = { ...ordinary.body.state, team: { ...ordinary.body.state.team, configuration: cooperation } }
-  expect(await request('/api/game/load', { state }, owner!)).toEqual(denied)
-  expect(await request('/api/game/load', { state: { state } }, owner!)).toEqual(denied)
-  expect((await request('/api/game/load', { state }, owner!, 'team-cooperation-v1')).status).toBe(200)
-})
-
-it('rejects a malformed cooperation switch in a loaded team configuration', async () => {
-  const owner = await createSession('http-owner')
-  const created = await request('/api/game/new-sandbox', { playerCount: 4, teamConfig }, owner!)
-  const state = { ...created.body.state, team: { ...created.body.state.team,
-    configuration: { ...teamConfig, cooperationRules: 'true' } } }
-  expect((await request('/api/game/load', { state }, owner!)).status).toBe(400)
-})
-
-it('blocks every unsupported request to a cooperative pending without changing it and permits an explicit new ordinary sandbox', async () => {
-  const owner = (await createSession('http-owner'))!
-  const capability = 'team-cooperation-v1'
-  const fixture = createWorkSession({ seed: 1632, options: { playerCount: 4, teamConfig: { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'private', cooperationRules: true } }, configure(state) {
-    state.currentPlayerIndex = 0
-    state.players[0]!.resources.wood = 6
-  } })
+it('accepts omitted, empty and unknown capability headers for ordinary HTTP actions', async () => {
+  const token = (await createSession('http-owner'))!
+  const fixture = createWorkSession({ seed: 1661, configure(state) { state.players[0]!.resources.food = 0 } })
   let state: ReturnType<typeof serializeState>
   try { state = fixture.withCtx(() => serializeState(fixture.state, { actionHooks: fixture.actionHooks })) } finally { fixture.dispose() }
-  expect((await request('/api/game/load', { state }, owner, capability)).status).toBe(200)
-  expect((await request('/api/game/action', { playerIndex: 0, spaceId: 'marketplace' }, owner, capability)).body.interaction.request.kind).toBe('marketplace-select')
-  const before = await request('/api/game/state', {}, owner, capability, 'GET')
-  const denied = { status: 409, body: { ok: false, code: 'client_refresh_required', error: 'Please refresh this page to use official cooperation rules.' } }
-  for (const [url, body, method] of [
-    ['/api/game/state', {}, 'GET'],
-    ['/api/game/action', { playerIndex: 0, spaceId: 'forest' }, 'POST'],
-    ['/api/game/choice', { playerIndex: 0, value: 'confirm' }, 'POST'],
-    ['/api/game/commit-selection', { playerIndex: 0, payload: { stables: [{ row: 0, col: 2 }] } }, 'POST'],
-    ['/api/game/undo', {}, 'POST'],
-    ['/api/game/undo-action', {}, 'POST'],
-    ['/api/game/round-end', {}, 'POST'],
-    ['/api/game/fence-quote', { playerIndex: 0, requestKey: 'old-quote', payload: { edges: [], palisadeEdges: [] } }, 'POST'],
-    ['/api/game/validate', { type: 'room', playerId: 'p1', payload: { rooms: [{ row: 1, col: 1 }] } }, 'POST'],
-  ] as const) {
-    expect(await request(url, body, owner, undefined, method), url).toEqual(denied)
-    expect(await request('/api/game/state', {}, owner, capability, 'GET')).toEqual(before)
+  for (const capability of [undefined, '', 'unknown, team-cooperation-v1']) {
+    expect((await request('/api/game/load', { state }, token, capability)).status).toBe(200)
+    const action = await request('/api/game/action', { playerIndex: 0, spaceId: 'day-laborer' }, token, capability)
+    expect(action.status).toBe(200)
+    expect(action.body.state.players[0].resources.food).toBe(2)
+    expect(action.body.state.actionSpaces.find((space: { id: string }) => space.id === 'day-laborer').takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
   }
-  expect((await request('/api/game/new-sandbox', { seed: 1632, playerCount: 2 }, owner)).status).toBe(200)
-  expect((await request('/api/game/state', {}, owner, undefined, 'GET')).body.state.team).toBeUndefined()
-})
-
-it('matches complete HTTP capability tokens and grants production beta creation without granting ordinary or anonymous accounts', async () => {
-  const owner = (await createSession('http-owner'))!, player = (await createSession('http-player'))!
-  const cooperation = { ...teamConfig, cooperationRules: true }
-  for (const token of ['team-cooperation-v10', 'prefix-team-cooperation-v1', '["team-cooperation-v1"]', 'TEAM-COOPERATION-V1']) {
-    expect((await request('/api/game/new', { playerCount: 4, teamConfig: cooperation }, owner, token)).status).toBe(409)
-  }
-  expect((await request('/api/game/new', { playerCount: 4, teamConfig: cooperation }, player, 'team-cooperation-v1')).status).toBe(403)
-  expect((await request('/api/game/new', { playerCount: 4, teamConfig: cooperation }, undefined, 'team-cooperation-v1')).status).toBe(403)
-  await db.prepare('INSERT INTO beta_access(user_id,granted_by,granted_at) VALUES(?,?,?)').run('http-player', 'http-owner', 123)
-  expect((await request('/api/game/new', { playerCount: 4, teamConfig: cooperation }, player, 'unknown, team-cooperation-v1')).status).toBe(200)
 })
 
 it('answers unauthenticated capability preflight without creating a sandbox', async () => {

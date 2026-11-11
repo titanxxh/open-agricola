@@ -10,7 +10,6 @@ import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
-import { ArchivedTeamResults } from '../components/board/ArchivedTeamResults'
 import { getPlayerDisplayName } from '../utils/player-name'
 import { BugReportBar } from './BugReportBar'
 import { verifyReplayViewerBuild } from './replay-viewer-build'
@@ -275,9 +274,6 @@ export function ReplayShell({
         {navigation}
         <h1>{t(context.lifecycle === 'terminated' ? 'platform.gameEnd.terminated' : 'platform.gameContext.completedTitle')}</h1>
         <p role="alert">{t('platform.gameContext.viewerUnavailable')}</p>
-        {context.lifecycle === 'completed' && context.result.team
-          ? <ArchivedTeamResults result={context.result} locale={locale} />
-          : (
         <ol className="replay-results">
           {(context.lifecycle === 'terminated' ? context.termination.players : context.result.players).map((player) => (
             <li key={player.playerIndex}>
@@ -286,7 +282,6 @@ export function ReplayShell({
             </li>
           ))}
         </ol>
-        )}
         {new URLSearchParams(window.location.search).has('bugReport')
           ? <BugReportBar roomId={context.roomId} />
           : null}
@@ -310,9 +305,6 @@ export function ReplayShell({
           <h1>{t(context.lifecycle === 'terminated' ? 'platform.gameEnd.terminated' : 'platform.gameContext.completedTitle')}</h1>
           <p>{t('platform.gameContext.choosePerspective')}</p>
         </header>
-        {context.lifecycle === 'completed' && context.result.team
-          ? <ArchivedTeamResults result={context.result} locale={locale} onWatch={playerIndex => choosePerspective(`p${playerIndex + 1}`)} />
-          : (
         <ol className="replay-results">
           {(context.lifecycle === 'terminated' ? context.termination.players : context.result.players).map((player) => (
             <li key={player.playerIndex}>
@@ -327,7 +319,6 @@ export function ReplayShell({
             </li>
           ))}
         </ol>
-        )}
         <button
           type="button"
           className="replay-open-button"

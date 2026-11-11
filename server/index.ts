@@ -2,7 +2,7 @@ import { BetaAccessStore } from './beta-access-store'
 import { createBetaAccessHandler } from './beta-access-routes'
 import { createPrereleaseAuthorityHandler } from './prerelease-authority-routes'
 import { createPrereleaseLifecycleHandler } from './prerelease-lifecycle-routes'
-import { experimentalAccountState } from './experimental-features'
+import { betaAccountState } from './experimental-features'
 import './language-packs'
 import { recoverPendingSubmissions } from './workshop-pr/submission-service'
 import { SubmissionStore } from './workshop-pr/submission-store'
@@ -261,7 +261,7 @@ const createCompletedReplayFixture = async (defaultNames = false, recordReplay =
     const payload = session.buildSyncPayload(session.getState(), [], 'debug')
     return JSON.parse(JSON.stringify({
       ...payload.state,
-      ...(payload.state.gameOver ? { scores: payload.scores ?? [], ...(payload.teamScores ? { teamScores: payload.teamScores } : {}) } : {}),
+      ...(payload.state.gameOver ? { scores: payload.scores ?? [] } : {}),
     })) as JsonValue
   }
   const frames = [capture()]
@@ -284,11 +284,10 @@ const createCompletedReplayFixture = async (defaultNames = false, recordReplay =
     return step
   })
   const now = Date.now()
-  const team = session.state.team
   const result = buildGameResult({ id: roomId, session, players: [], maxPlayers: session.state.players.length,
     version: 0, status: 'playing', startedAt: now - 1000,
     seatOwners: ownerUserId ? session.state.players.flatMap((_, playerIndex) =>
-      (team?.configuration.mode === 'multihand' ? team.playerTeams[playerIndex] === 0 : playerIndex === 0)
+      playerIndex === 0
         ? [{ playerIndex, userId: ownerUserId }] : []) : [],
   }, now)
   const db = getDb()
@@ -341,21 +340,19 @@ const createCompletedReplayFixture = async (defaultNames = false, recordReplay =
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons,
-        enable_farmers_of_the_moor, enable_snake_opening, enable_moor_balance_rules,
-        team_mode, team_scoring, team_scores
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+        enable_farmers_of_the_moor, enable_snake_opening, enable_moor_balance_rules
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(roomId, result.startedAt, result.finishedAt, result.roundsPlayed, result.playerCount,
       Number(result.communityDeck), Number(result.parentCards), Number(result.throughTheSeasons),
-      Number(result.farmersOfTheMoor), Number(result.snakeOpening), Number(result.moorBalanceRules),
-      result.team?.mode ?? null, result.team?.scoring ?? null, result.team ? JSON.stringify(result.team.scores) : null)
+      Number(result.farmersOfTheMoor), Number(result.snakeOpening), Number(result.moorBalanceRules))
     const insertPlayer = db.prepare(`
       INSERT INTO game_result_players (
-        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default, team_index
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `)
     for (const player of result.players) {
       await insertPlayer.run(roomId, player.playerIndex, player.gamePlayerId, player.userId,
-        player.displayName, player.score, player.nameIsDefault === true ? 1 : 0, player.teamIndex ?? null)
+        player.displayName, player.score, player.nameIsDefault === true ? 1 : 0)
     }
   })())
   return {
@@ -758,7 +755,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
       return
     }
-    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username), ...await experimentalAccountState(user.id) } })
+    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username), ...await betaAccountState(user.id) } })
     return
   }
 

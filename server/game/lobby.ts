@@ -1,4 +1,3 @@
-import { canUseExperimentalFeature, type ExperimentalFeatureAccess } from '../experimental-features'
 import type { RoomWriteOptions } from './persistence/room-persistence'
 import { enqueueRoomTask } from './room-queue.ts'
 import type { RoomSummary, ServerEvent } from '../../shared/contract/protocol/ws.ts'
@@ -24,7 +23,6 @@ export type Lobby = {
 
 export function createLobby(deps: {
   registry: RoomRegistry
-  experimentalFeatureAccess?: ExperimentalFeatureAccess
   checkpoint: RoomPersistenceCheckpoint
   broadcaster: RoomBroadcaster
   onRoomRetired?: (roomId: string) => void | Promise<void>
@@ -36,7 +34,6 @@ export function createLobby(deps: {
     const connections = roomConnections(room)
     await broadcaster.broadcastEvent(room, { type: 'roomDissolved', roomId: room.id, ...(reason ? { reason } : {}) })
     room.players = []
-    room.waitingTeamConnections?.clear()
     registry.delete(room.id)
     registry.clearActivity(room.id)
     for (const ws of connections) {
@@ -45,13 +42,7 @@ export function createLobby(deps: {
   }
   return {
     async getRooms(limit?: number, userId?: string) {
-      const allRooms = [...registry.iter()]
-      const allowTeams = allRooms.some(room => room.session.state.team)
-        && await (deps.experimentalFeatureAccess ?? canUseExperimentalFeature)(userId, 'team-modes')
-      const allowCooperation = allowTeams && allRooms.some(room => room.session.state.team?.configuration.cooperationRules)
-        && await (deps.experimentalFeatureAccess ?? canUseExperimentalFeature)(userId, 'team-cooperation-rules')
-      const rooms = allRooms.filter(room => !room.session.state.team || (allowTeams
-        && (!room.session.state.team.configuration.cooperationRules || allowCooperation)))
+      const rooms = [...registry.iter()]
       return summarizeRoomsForLobby(rooms, limit, undefined, userId)
     },
     async dissolveRoomById(roomId, userId, options) {
@@ -88,7 +79,6 @@ export function createLobby(deps: {
         const belongsToUser = affected.has(room.id) ||
           room.createdBy === userId ||
           room.players.some((player) => player.userId === userId) ||
-          room.teamMembers?.some(member => member.userId === userId) ||
           room.seatOwners?.some((owner) => owner.userId === userId)
         if (!belongsToUser) continue
         await enqueueRoomTask(room, async () => {

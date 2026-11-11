@@ -18,7 +18,6 @@ export const ALLOWED_EFFECT_FILES = [
   'gain.ts',
   'improvement.ts',
   'individual-food-cost.ts',
-  'marketplace.ts',
   'occupation.ts',
   'pay.ts',
   'place-farmer.ts',

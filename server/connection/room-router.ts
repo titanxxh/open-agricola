@@ -1,8 +1,3 @@
-import { unavailableTeamFeature } from '../experimental-features'
-import { CLIENT_REFRESH_MESSAGE } from '../../shared/contract/client-capabilities'
-import type { TeamConfiguration } from '../../shared/contract/team'
-import type { ExperimentalFeatureId } from '../../shared/contract/experimental-features'
-import { admitTeamMember, planTeamSeating, teamWaitingState } from '../game/team-room'
 import { addRoomSpectator, isRoomSpectator, removeRoomSpectator } from '../game/room-spectators'
 import { isPublicSpectatableRoom } from '../game/room'
 import type { FenceSelectionQuote } from '../../shared/contract/protocol/game'
@@ -63,7 +58,8 @@ import {
 } from '../game/custom-session-executor.ts'
 import {
   buildInitialStateOptions,
-  loadedTeamConfiguration,
+  assertSupportedGameConfiguration,
+  assertSupportedLoadedState,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
   soloCreationConfiguration,
@@ -196,11 +192,9 @@ const sendCommandError = (
   requestId?: string,
   code?: Extract<ServerEvent, { type: 'error' }>['code'],
   lifecycle?: GameContextLifecycle,
-  feature?: ExperimentalFeatureId,
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
   if (ctx.activeCommand) {
-    ctx.activeCommand.errorFeature = feature
     ctx.activeCommand.outcome = { ok: false, error, ...(code ? { code } : {}), ...(ctx.currentRoom ? { roomId: ctx.currentRoom.id } : {}) }
     return
   }
@@ -210,42 +204,25 @@ const sendCommandError = (
     requestId,
     ...(code ? { code } : {}),
     ...(lifecycle ? { lifecycle } : {}),
-    ...(feature ? { feature } : {}),
   })
-}
-
-async function allowTeamCreation(ctx: ConnectionCtx, requestId: string | undefined, userId: string | undefined, configuration: TeamConfiguration): Promise<boolean> {
-  const unavailable = await unavailableTeamFeature(userId, configuration, ctx.experimentalFeatureAccess)
-  if (!unavailable) return true
-  sendCommandError(ctx, 'Experimental feature unavailable', requestId, 'experimental_feature_unavailable', undefined, unavailable)
-  return false
-}
-
-const allowClientConfiguration = (ctx: ConnectionCtx, configuration: TeamConfiguration | undefined, requestId?: string): boolean => {
-  if (ctx.broadcaster.supportsConfiguration(ctx.ws, configuration)) return true
-  sendCommandError(ctx, CLIENT_REFRESH_MESSAGE, requestId, 'client_refresh_required')
-  return false
 }
 
 const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   if (!ctx.currentRoom) { sendCommandError(ctx, 'not in a room', requestId); return null }
-  const waitingMember = ctx.currentRoom.status === 'waiting' && ctx.currentRoom.teamMembers?.find(member =>
-    member.userId === ctx.currentUserId && ctx.currentRoom?.waitingTeamConnections?.get(member.memberId) === ctx.ws)
-  const activeSeat = !!waitingMember || ctx.currentRoom.players.some((player) =>
+  const activeSeat = ctx.currentRoom.players.some((player) =>
     player.ws === ctx.ws && player.playerIndex === ctx.currentPlayerIndex
   )
   if (!activeSeat) {
     sendCommandError(ctx, 'seat was replaced', requestId, 'seat_replaced')
     return null
   }
-  if (!allowClientConfiguration(ctx, ctx.currentRoom.session.state.team?.configuration, requestId)) return null
   return ctx.currentRoom
 }
 
 const requireReadableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   if (!isRoomSpectator(ctx.currentRoom, ctx.ws)) return requireRoom(ctx, requestId)
   const room = ctx.currentRoom
-  return room && allowClientConfiguration(ctx, room.session.state.team?.configuration, requestId) ? room : null
+  return room
 }
 
 const waitingRoomEvent = (room: Room): Extract<ServerEvent, { type: 'roomWaiting' }> => {
@@ -554,101 +531,6 @@ const detachPreviousRoom = async (ctx: ConnectionCtx, next: Room, previous = ctx
 }
 
 
-async function waitingMemberName(userId: string, input: unknown, previousName?: string): Promise<string> {
-  const supplied = typeof input === 'string' ? input.trim() : ''
-  if (supplied) return supplied
-  if (previousName !== undefined) return previousName
-  return (await getDb().prepare("SELECT COALESCE(NULLIF(display_name, ''),username) AS name FROM users WHERE id=?").get<{ name: string }>(userId))?.name ?? ''
-}
-
-async function publishTeamWaiting(ctx: ConnectionCtx, room: Room): Promise<void> {
-  for (const member of room.teamMembers ?? []) {
-    const ws = room.waitingTeamConnections?.get(member.memberId)
-    if (ws) await ctx.broadcaster.sendRoomEvent(ws, room, { type: 'teamRoomWaiting', ...teamWaitingState(room, member.userId) })
-  }
-}
-
-async function joinWaitingTeamRoom(ctx: ConnectionCtx, room: Room, msg: Extract<ClientCommand, { type: 'joinRoom' }>): Promise<void> {
-  if (!ctx.currentUserId) { sendCommandError(ctx, 'Team games require login', msg.requestId, 'login_required'); return }
-  const existing = room.teamMembers?.find(member => member.userId === ctx.currentUserId)
-  if (msg.intent === 'resume' && !existing) { sendCommandError(ctx, 'Only original participants can resume this game', msg.requestId, 'not_participant'); return }
-  let member: ReturnType<typeof admitTeamMember>
-  try { member = admitTeamMember(room, ctx.currentUserId, await waitingMemberName(ctx.currentUserId, msg.name, existing?.name)) }
-  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId); return }
-  const previousMembers = room.teamMembers
-  const previousConnections = room.waitingTeamConnections
-  const previousSocket = previousConnections?.get(member.memberId)
-  room.teamMembers = existing ? (room.teamMembers ?? []).map(item => item.memberId === member.memberId ? member : item) : [...(room.teamMembers ?? []), member]
-  room.waitingTeamConnections = new Map(previousConnections)
-  room.waitingTeamConnections.set(member.memberId, ctx.ws)
-  try { await ctx.checkpoint.recordMeta(room, { resume: true }) }
-  catch (error) { room.teamMembers = previousMembers; room.waitingTeamConnections = previousConnections; throw error }
-  const previous = ctx.currentRoom
-  ctx.currentRoom = room; ctx.currentPlayerIndex = -1
-  await detachPreviousRoom(ctx, room, previous)
-  if (previousSocket && previousSocket !== ctx.ws) previousSocket.close(4001, 'connection replaced')
-  await publishTeamWaiting(ctx, room)
-}
-
-async function handleStartTeamGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'startTeamGame' }>): Promise<void> {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
-  if (room.status !== 'waiting' || !room.teamMembers || !room.session.state.team || ctx.currentUserId !== room.createdBy) {
-    sendCommandError(ctx, 'Only the host can start a waiting team game', msg.requestId, 'team_start_failed'); return
-  }
-  let bindings: ReturnType<typeof planTeamSeating>
-  try { bindings = planTeamSeating(room.session.state.team, room.teamMembers, room.session.state.gameSeed) }
-  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId, 'team_start_failed'); return }
-  const names: Array<[number, string]> = bindings.map(binding => [binding.playerIndex, binding.name])
-  if (room.customSessionExecutor) await room.customSessionExecutor.updatePlayerNames(names)
-  else for (const [index, name] of names) room.session.updatePlayerName(index, name)
-  const response = await executeRoomSession(room, 'getState', [], () => room.session.getState())
-  if (!response.ok) { sendCommandError(ctx, response.error ?? 'Unable to initialize game', msg.requestId, 'team_start_failed'); return }
-  room.seatOwners = bindings.map(({ playerIndex, userId }) => ({ playerIndex, userId }))
-  room.players = room.teamMembers.flatMap(member => {
-    const ws = room.waitingTeamConnections?.get(member.memberId)
-    const binding = bindings.find(value => value.memberId === member.memberId)
-    return ws && binding ? [{ ws, playerIndex: binding.playerIndex, name: member.name, userId: member.userId }] : []
-  }).sort((left, right) => left.playerIndex - right.playerIndex)
-  room.waitingTeamConnections = new Map()
-  room.status = 'playing'; room.startedAt ??= Date.now()
-  await publishInitialState(ctx, room, response, msg.requestId, async () => {
-    for (const player of room.players) await ctx.broadcaster.sendRoomEvent(player.ws, room, {
-      type: 'roomJoined', roomId: room.id, playerIndex: player.playerIndex, ...connectionViewerMetadata(room, player.ws), status: 'playing', maxPlayers: room.maxPlayers,
-      players: bindings.map(binding => ({ playerIndex: binding.playerIndex, name: binding.name,
-        connected: room.players.some(peer => peer.userId === binding.userId) })),
-      playerColors: room.session.state.players.map(value => value.color),
-    })
-  }, async () => { await ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' }) })
-}
-
-async function handleSetTeam(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'setTeam' }>): Promise<void> {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
-  const team = room.session.state.team
-  const previous = room.teamMembers
-  const self = previous?.find(member => member.userId === ctx.currentUserId)
-  const target = msg.memberId === undefined ? self : previous?.find(member => member.memberId === msg.memberId)
-  if (room.status !== 'waiting' || team?.configuration.mode !== 'team' || !target
-    || (msg.memberId !== undefined && ctx.currentUserId !== room.createdBy)
-    || !Number.isInteger(msg.teamIndex) || msg.teamIndex < 0 || msg.teamIndex >= room.maxPlayers / team.configuration.seatsPerTeam) {
-    sendCommandError(ctx, 'You cannot move this member to that team', msg.requestId, 'team_change_failed'); return
-  }
-  const occupied = (previous ?? []).filter(member => member.memberId !== target.memberId && member.teamIndex === msg.teamIndex)
-    .reduce((sum, member) => sum + member.seatCount, 0)
-  if (occupied + target.seatCount > team.configuration.seatsPerTeam) {
-    sendCommandError(ctx, 'That team is full', msg.requestId, 'team_change_failed'); return
-  }
-  room.teamMembers = (previous ?? []).map(member => member.memberId === target.memberId ? { ...member, teamIndex: msg.teamIndex } : member)
-  try {
-    await ctx.checkpoint.recordMeta(room, ctx.activeCommand ? { receipt: {
-      request: ctx.activeCommand.request, outcome: { ok: true, roomId: room.id, roomVersion: room.version },
-    } } : undefined)
-  } catch {
-    room.teamMembers = previous
-    sendCommandError(ctx, 'Could not change teams', msg.requestId, 'team_change_failed'); return
-  }
-  await publishTeamWaiting(ctx, room)
-}
-
 async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): Promise<Awaited<void | Promise<void>>> {
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
   if (!persistence.ok) {
@@ -668,11 +550,9 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
   let setup: ReturnType<typeof parseGameSetupRequest>
   try { setup = parseGameSetupRequest(input, draftOptions.value) }
-  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid team configuration', msg.requestId); return }
-  if (setup.teamConfig && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId, setup.teamConfig)) return
-  if (!allowClientConfiguration(ctx, setup.teamConfig, msg.requestId)) return
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid game configuration', msg.requestId); return }
   const maxPlayers = setup.playerCount
-  const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers: setup.teamConfig?.mode === 'multihand' ? maxPlayers / setup.teamConfig.seatsPerTeam : maxPlayers, hotseat: setup.hotseat }, getDb())
+  const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
   if (maxPlayers === 1 && !ctx.currentUserId) {
     sendCommandError(ctx, 'A formal solo game requires login', msg.requestId, 'login_required')
@@ -752,23 +632,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     enableSnakeOpening: setup.enableSnakeOpening,
   }
   ctx.committer?.lockNewRoom(room)
-  if (room.session.state.team) {
-    if (!ctx.currentUserId) { created.executor?.dispose(); room.session.dispose(); sendCommandError(ctx, 'Team games require login', msg.requestId, 'login_required'); return }
-    const member = admitTeamMember(room, ctx.currentUserId, await waitingMemberName(ctx.currentUserId, msg.name))
-    room.teamMembers = [member]
-    room.waitingTeamConnections = new Map([[member.memberId, ctx.ws]])
-    try {
-      await ctx.checkpoint.recordCreated(room, ctx.activeCommand ? { receipt: {
-        request: ctx.activeCommand.request, outcome: { ok: true, roomId, roomVersion: 0 },
-      } } : undefined)
-    } catch (error) { created.executor?.dispose(); room.session.dispose(); throw error }
-    const previous = ctx.currentRoom
-    ctx.currentRoom = room; ctx.currentPlayerIndex = -1
-    ctx.registry.set(room)
-    await detachPreviousRoom(ctx, room, previous)
-    await publishTeamWaiting(ctx, room)
-    return
-  }
+
   const creatorSeat = resolveJoinPlayerIndex(room, undefined, ctx.currentUserId)
   if (!creatorSeat.ok) throw new Error(creatorSeat.error)
   const creatorIndex = creatorSeat.playerIndex
@@ -876,7 +740,6 @@ async function handleSpectateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand
   if (ctx.committer?.blockedError(room.id)) {
     sendCommandError(ctx, 'Room saving is paused', msg.requestId); return
   }
-  if (!allowClientConfiguration(ctx, room.session.state.team?.configuration, msg.requestId)) return
   await detachPreviousRoom(ctx, room)
   addRoomSpectator(room, ctx.ws)
   ctx.currentRoom = room
@@ -910,14 +773,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     sendCommandError(ctx, 'Only invited players can enter this room', msg.requestId, ctx.currentUserId ? 'not_participant' : 'login_required', 'active')
     return
   }
-  if (room.teamMembers && !ctx.currentUserId) {
-    sendCommandError(ctx, 'Team games require login', msg.requestId, 'login_required'); return
-  }
-  if (!allowClientConfiguration(ctx, room.session.state.team?.configuration, msg.requestId)) return
-  if (room.status === 'waiting' && room.teamMembers) {
-    await joinWaitingTeamRoom(ctx, room, msg)
-    return
-  }
+
   const ownsSeat = room.seatOwners?.some(seat => seat.userId === ctx.currentUserId)
     || room.players.some(seat => seat.userId === ctx.currentUserId && !!ctx.currentUserId)
   if (msg.intent === 'join' && !ownsSeat && room.status === 'playing' && isPublicSpectatableRoom(room)) {
@@ -1280,7 +1136,6 @@ async function handleProposeGameEnd(ctx: ConnectionCtx, msg: Extract<ClientComma
   const room = requireWritableRoom(ctx, msg.requestId)
   if (!room) return
   if (msg.intent !== 'end' && msg.intent !== 'rematch') { sendCommandError(ctx, 'Invalid end intent', msg.requestId); return }
-  if (msg.intent === 'rematch' && room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId, room.session.state.team.configuration)) return
   let proposal: GameEndProposal
   try { proposal = createGameEndProposal(room, ctx.currentPlayerIndex, msg.intent, ctx.controlledPlayerIndices) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid end proposal', msg.requestId); return }
@@ -1356,7 +1211,6 @@ async function handleFenceQuote(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
 
 function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getState' }>): void | Promise<void> {
   const room = requireReadableRoom(ctx, msg.requestId); if (!room) return
-  if (room.status === 'waiting' && room.teamMembers) return publishTeamWaiting(ctx, room)
   if (msg.unredacted && !assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const blocked = ctx.committer?.blockedError(room.id)
   if (blocked) {
@@ -1526,11 +1380,6 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     await handleProposeGameEnd(ctx, { type: 'proposeGameEnd', intent: 'rematch', requestId: msg.requestId })
     return
   }
-  const proposerIndex = room.endProposal?.proposerIndex
-  const initiator = termination
-    ? room.seatOwners?.find(owner => owner.playerIndex === proposerIndex)?.userId
-    : ctx.currentUserId
-  if (room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, initiator, room.session.state.team.configuration)) return
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
   if (!persistence.ok) {
     commandOutcome('blocked')
@@ -1569,7 +1418,6 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   const enableMoorBalanceRules = enableFarmersOfTheMoor && room.session.state.enableMoorBalanceRules === true
   const allowIncompleteFarmersOfTheMoorMinorDeal = room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false
   const enableSnakeOpening = room.enableSnakeOpening ?? (room.session.state.enableSnakeOpening === true)
-  const teamConfig = room.session.state.team?.configuration
   let created: ReturnType<typeof createIsolatedGameSession>
   try {
     created = createIsolatedGameSession(
@@ -1578,7 +1426,6 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
       customCards.length > 0 ? customCards : undefined,
       {
         playerCount: room.maxPlayers,
-        ...(teamConfig ? { teamConfig } : {}),
         ...(room.soloHandMode ? { soloHandMode: room.soloHandMode } : {}),
         enableCommunityDeck,
         enableParentCards,
@@ -1618,37 +1465,10 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   const names: Array<[number, string]> = []
   const colorsBySeat = new Map<number, typeof room.session.state.players[number]['color']>()
   const originalOwners = toRoomMeta(room).players
-  const teamMembers = room.teamMembers?.map(member => ({ ...member,
-    name: room.players.find(player => player.userId === member.userId)?.name ?? member.name,
-  }))
-  const waitingTeamConnections: NonNullable<Room['waitingTeamConnections']> = new Map()
-  for (const member of teamMembers ?? []) {
-    const connected = room.players.find(player => player.userId === member.userId && player.ws.readyState === player.ws.OPEN)
-    if (connected) waitingTeamConnections.set(member.memberId, connected.ws)
-  }
-  const startsTeamImmediately = teamMembers?.every(member => waitingTeamConnections.has(member.memberId)) === true
-  if (teamMembers && startsTeamImmediately && created.session.state.team) {
-    const bindings = planTeamSeating(created.session.state.team, teamMembers, created.session.state.gameSeed)
-    for (const member of teamMembers) {
-      const ownBindings = bindings.filter(binding => binding.memberId === member.memberId)
-      const originalColors = originalOwners.filter(owner => owner.userId === member.userId)
-        .sort((left, right) => left.playerIndex - right.playerIndex)
-        .map(owner => room.session.state.players[owner.playerIndex]!.color)
-      for (const [index, binding] of ownBindings.entries()) {
-        nextOwners.push({ playerIndex: binding.playerIndex, userId: member.userId })
-        names.push([binding.playerIndex, member.name])
-        const color = originalColors[index]
-        if (color) colorsBySeat.set(binding.playerIndex, color)
-      }
-      const primary = ownBindings[0]!
-      nextPlayers.push({ ws: waitingTeamConnections.get(member.memberId)!, playerIndex: primary.playerIndex, name: member.name, userId: member.userId })
-    }
-    waitingTeamConnections.clear()
-  }
   const sourceIndices = termination
     ? room.session.state.players.map((_, index) => index)
     : room.players.map(player => player.playerIndex)
-  for (const originalIndex of teamMembers ? [] : sourceIndices) {
+  for (const originalIndex of sourceIndices) {
     const original = room.session.state.players[originalIndex]!
     const connected = room.players.find(player => player.playerIndex === originalIndex)
     const userId = originalOwners.find(owner => owner.playerIndex === originalIndex)?.userId
@@ -1692,15 +1512,13 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         players: nextPlayers,
         version: 0,
         endProposal: null,
-        awaitingRematchPlayers: !teamMembers && !!termination && nextPlayers.length < room.maxPlayers,
-        ...(teamMembers ? { teamMembers, waitingTeamConnections } : {}),
+        awaitingRematchPlayers: !!termination && nextPlayers.length < room.maxPlayers,
         creationSource: undefined,
         ...(soloCards && soloConfiguration ? { creationConfiguration: {
           configuration: soloConfiguration, resolvedWorkshopSources: soloCards.resolvedWorkshopSources,
         } } : {}),
         seatOwners: nextOwners,
-        status: teamMembers ? startsTeamImmediately ? 'playing' : 'waiting'
-          : isDevRoom(nextRoomId) || room.hotseat === true || room.players.length >= room.maxPlayers ? 'playing' : 'waiting',
+        status: isDevRoom(nextRoomId) || room.hotseat === true || room.players.length >= room.maxPlayers ? 'playing' : 'waiting',
         colorConfirmationPlayerIndex: undefined,
         enableParentCards, draftMode, draftPoolSize, enableThroughTheSeasons,
         enableFarmersOfTheMoor, enableMoorBalanceRules, allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening,
@@ -1725,9 +1543,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
           await ctx.broadcaster.sendRoomEvent(player.ws, room, {
             type: 'roomJoined', roomId: room.id, playerIndex: player.playerIndex, ...connectionViewerMetadata(room, player.ws),
             status: room.status === 'waiting' ? 'waiting' : 'playing', maxPlayers: room.maxPlayers,
-            players: teamMembers ? room.session.state.players.map((seat, playerIndex) => ({ playerIndex, name: seat.name,
-              connected: connectedSeatIndexes(room).includes(playerIndex) }))
-              : room.players.map(seat => ({ playerIndex: seat.playerIndex, name: seat.name, connected: true })),
+            players: room.players.map(seat => ({ playerIndex: seat.playerIndex, name: seat.name, connected: true })),
             playerColors: room.session.state.players.map(seat => seat.color),
             ...(room.hotseat ? { hotseat: true } : {}),
           })
@@ -1742,10 +1558,9 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         retiredVersion: previousVersion,
         retiredTermination: termination,
         ...(ctx.activeCommand ? { receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId: nextRoomId, roomVersion: 0,
-          ...(teamMembers ? {} : { playerIndex: nextPlayers.find(player => player.ws === ctx.ws)!.playerIndex }) } } } : {}),
+          playerIndex: nextPlayers.find(player => player.ws === ctx.ws)!.playerIndex } } } : {}),
       })
       await adopt()
-      if (teamMembers) { await publishTeamWaiting(ctx, room); return }
       await ctx.broadcaster.broadcastEvent(room, waitingRoomEvent(room))
       await ctx.broadcaster.broadcastCommitted(room, resp, 'reconnect', msg.requestId)
     },
@@ -1756,11 +1571,8 @@ async function handleLoadGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   // Replacing the authoritative state is a dev command like the others below.
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
-  let configuration: TeamConfiguration | undefined
-  try { configuration = loadedTeamConfiguration(msg.state) }
-  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid team configuration', msg.requestId); return }
-  if (configuration && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId, configuration)) return
-  if (!allowClientConfiguration(ctx, configuration, msg.requestId)) return
+  try { assertSupportedLoadedState(msg.state) }
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Unsupported game configuration', msg.requestId); return }
   return useSessionResponse(
     executeRoomSession(room, 'loadState', [msg.state], () => room.session.loadState(msg.state)),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'reconnect'),
@@ -1870,8 +1682,6 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   getGameEndProposal: handleGetGameEndProposal,
   setPlayerColor: handleSetPlayerColor,
   confirmPlayerColor: handleConfirmPlayerColor,
-  startTeamGame: handleStartTeamGame,
-  setTeam: handleSetTeam,
   getState: handleGetState,
   getHistory: handleGetHistory,
   quoteFenceSelection: handleFenceQuote,
@@ -1904,6 +1714,10 @@ export async function dispatch(ctx: ConnectionCtx, msg: ClientCommand): Promise<
 }
 async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<void> {
   refreshConnectionSeat(ctx)
+  if (msg.type === 'createRoom') {
+    try { assertSupportedGameConfiguration(msg) }
+    catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Unsupported game configuration', msg.requestId); return }
+  }
   if (msg.type === 'joinRoom' && ctx.authority) {
     const db = ctx.authority.directory.db
     // Only a signed-in non-participant can spectate; everyone else loads the Room to take a seat.
@@ -1954,8 +1768,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'completed', receipt: reservation.receipt, requestId: msg.requestId })
           const currentRoom = ctx.currentRoom
           if (currentRoom && currentRoom.id === reservation.receipt.outcome.roomId) {
-            if (currentRoom.status === 'waiting' && currentRoom.teamMembers) await publishTeamWaiting(ctx, currentRoom)
-            else if (currentRoom.status === 'waiting') await ctx.broadcaster.sendRoomEvent(ctx.ws, currentRoom, waitingRoomEvent(currentRoom))
+            if (currentRoom.status === 'waiting') await ctx.broadcaster.sendRoomEvent(ctx.ws, currentRoom, waitingRoomEvent(currentRoom))
             else await handleGetState(ctx, { type: 'getState', requestId: msg.requestId })
           }
           return
@@ -2006,7 +1819,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
         }
         if (result.kind === 'completed') {
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'completed', receipt: result.receipt, requestId: msg.requestId })
-          if (active?.outcome && !active.outcome.ok) sendCommandError(ctx, active.outcome.error ?? 'Command rejected', msg.requestId, active.outcome.code as CommandErrorCode | undefined, undefined, active.errorFeature)
+          if (active?.outcome && !active.outcome.ok) sendCommandError(ctx, active.outcome.error ?? 'Command rejected', msg.requestId, active.outcome.code as CommandErrorCode | undefined, undefined)
         } else {
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'pending', identity: { scopeId: request.scopeId, commandId: request.commandId }, requestId: msg.requestId })
         }

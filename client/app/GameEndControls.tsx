@@ -1,26 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { GameEndProposal } from '../../shared/contract/protocol/game-termination'
 import { t, type Locale } from '../../shared/i18n'
 import { WsGameTransport } from '../services/gameTransport'
 import { GAME_CONTEXT_CHANGED_EVENT } from './GameContextRouter'
 import '../styles/components/game-end.css'
 
-export function GameEndControls({ transport, locale, playerNames, disabled = false, onProposalChange, teamGame = false, canUseTeamModes = false, onExperimentalFeatureUnavailable }: {
+export function GameEndControls({ transport, locale, playerNames, disabled = false, onProposalChange }: {
   transport: WsGameTransport
   locale: Locale
   playerNames: string[]
   disabled?: boolean
   onProposalChange?: (pending: boolean) => void
-  teamGame?: boolean
-  canUseTeamModes?: boolean
-  onExperimentalFeatureUnavailable?: () => void
 }) {
   const [proposal, setProposal] = useState<GameEndProposal | null>(null)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const lastUnavailableRequest = useRef<string | null>(null)
-  // Agreeing only rechecks the proposer, so that rejection is not about this account.
-  const lastCommand = useRef<'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd' | null>(null)
   useEffect(() => {
     const refresh = () => {
       if (transport.roomId) transport.sendRoomCommand('getGameEndProposal')
@@ -37,17 +31,7 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
       } else if (event.type === 'commandReceipt' || event.type === 'error') {
         setSending(false)
         const failure = event.type === 'error' ? event : event.status === 'completed' && !event.receipt.outcome.ok ? event.receipt.outcome : undefined
-        if (failure) {
-          if (failure.code === 'experimental_feature_unavailable' && lastCommand.current === 'respondGameEnd') {
-            setError(t(locale, 'beta.rematchProposerUnavailable'))
-          } else if (failure.code === 'experimental_feature_unavailable') {
-            setError(t(locale, 'beta.featureUnavailable'))
-            if (!event.requestId || lastUnavailableRequest.current !== event.requestId) {
-              lastUnavailableRequest.current = event.requestId ?? null
-              onExperimentalFeatureUnavailable?.()
-            }
-          } else setError(failure.error ?? '')
-        }
+        if (failure) setError(failure.error ?? '')
       }
     })
     const offConnection = transport.onConnectionStatus(status => {
@@ -59,13 +43,12 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
     })
     refresh()
     return () => { offEvent(); offConnection(); offSnapshot() }
-  }, [transport, locale, onExperimentalFeatureUnavailable])
+  }, [transport, locale])
   useEffect(() => { onProposalChange?.(proposal !== null) }, [onProposalChange, proposal])
   useEffect(() => () => { onProposalChange?.(false) }, [onProposalChange])
 
   const send = (type: 'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd', options: Record<string, unknown>) => {
     setError('')
-    lastCommand.current = type
     try {
       transport.sendRoomCommand(type, options)
       setSending(true)
@@ -95,10 +78,9 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
       ) : (
         <div className="game-end-actions">
           <button type="button" className="btn-secondary" disabled={disabled || sending} onClick={() => propose('end')}>{t(locale, 'platform.gameEnd.propose')}</button>
-          <button type="button" className="btn-secondary" disabled={disabled || sending || (teamGame && !canUseTeamModes)} onClick={() => propose('rematch')}>{t(locale, 'platform.gameEnd.proposeRematch')}</button>
+          <button type="button" className="btn-secondary" disabled={disabled || sending} onClick={() => propose('rematch')}>{t(locale, 'platform.gameEnd.proposeRematch')}</button>
         </div>
       )}
-      {teamGame && !canUseTeamModes && !proposal ? <p className="beta-rematch-reason">{t(locale, 'beta.rematchRequiresAccess')}</p> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
     </section>
   )
