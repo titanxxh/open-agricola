@@ -155,6 +155,20 @@ pnpm exec tsx scripts/ci/candidate-verification.ts check --repository titanxxh/o
 
 check 读取 GitHub run、job 和 step 元数据。同一 SHA 与配置的兼容成功任务可以复用，重试通过 `--tasks <failed-task-ids>` 只补失败或缺失任务。任务按各自执行时间比较，旧 run 的较晚重跑也会覆盖其他 run 的旧结果；重跑另一任务不会更新未重跑任务的时间。新 manifest 要求但未执行的任务持续阻断旧成功，直到 run 完成。执行时间缺失时，已完成 run 的可信 `updated_at` 可约束未通过证据的最晚时间，后续正常执行可替代它；时间无界或区间重叠时不能复用。缺失、失败、取消、跳过或配置不符均阻断。不能拼接另一个 PR、SHA 或本机结果。标准发布与 Pages、后端独立门禁见 [部署文档](../HOW_TO_DEPLOY.md)。
 
+### Prerelease candidate receipts
+
+`ci.yml` runs the same routine plan for main and prerelease push/PR events. Pushes never publish or deploy. `prerelease-candidate-verification.yml` accepts manual requests only on main and runs the same complete catalog against a fixed pre SHA. The main producer and candidate have separate checkouts, with no persisted checkout credentials. Candidate execution has no formal write or deployment permissions.
+
+Use the owner command to select and publish, or inspect and retry its fixed reference:
+
+```bash
+pnpm release vX.Y.Z-beta.N --channel prerelease --ref prerelease
+pnpm exec tsx scripts/ci/prerelease-verification.ts check --repository titanxxh/open-agricola --sha <fixed-pre-sha>
+pnpm exec tsx scripts/ci/prerelease-verification.ts request --repository titanxxh/open-agricola --sha <fixed-pre-sha> --tasks <failed-task-ids>
+```
+
+The immutable `verification/prerelease/<SHA>` reference and `prerelease-integration.json` establish selection and feature provenance. Check reads the effective native protections, producer main ancestry, run metadata, and actual job/step results. It binds the repository ID, channel, candidate, both verification configurations, and trusted main producer. Runs for other candidates do not supersede this candidate's evidence. Compatible retries reuse successful tasks; incomplete or incompatible tasks block publication. Stable evidence remains separate and still requires the protected-main final PR snapshot. Release suffixes do not grant authority. Native prereleases cannot enter formal Pages. Commands, manifest format, lease synchronization, channel metadata, and phase recovery are in [deployment operations](../HOW_TO_DEPLOY.md#publish-a-fixed-prerelease-candidate). Native resource configuration and live acceptance remain owner work.
+
 ## 核对 GitHub 必需检查
 
 切换工作流时，保持现有 main 审核、禁止删除、禁止 force push 和线性历史规则。按顺序核对：

@@ -66,7 +66,7 @@ function releaseRequest(value: unknown, repository: string) {
     || object(run.head_repository).full_name !== repository) {
     throw new Error('Pages release request must be a successful completed same-repository release workflow')
   }
-  return { id: integer(run.id), workflowId: integer(run.workflow_id), attempt: integer(run.run_attempt), sha: fullSha(string(run.head_sha)) }
+  return { id: integer(run.id), workflowId: integer(run.workflow_id), attempt: integer(run.run_attempt), sha: fullSha(string(run.head_sha)), tag: string(run.head_branch) }
 }
 
 function candidateSha(event: Record<string, unknown>, repository: string): string {
@@ -77,8 +77,13 @@ function candidateSha(event: Record<string, unknown>, repository: string): strin
   if (workflow.path !== REQUEST_WORKFLOW || integer(workflow.id) !== requested.workflowId) throw new Error('Unexpected Pages request workflow identity')
   const actual = releaseRequest(github(repository, `actions/runs/${requested.id}`), repository)
   if (actual.id !== requested.id || actual.workflowId !== requested.workflowId
-    || actual.attempt !== requested.attempt || actual.sha !== requested.sha) {
+    || actual.attempt !== requested.attempt || actual.sha !== requested.sha || actual.tag !== requested.tag) {
     throw new Error('Pages release request does not match trusted GitHub run metadata')
+  }
+  const release = object(github(repository, `releases/tags/${encodeURIComponent(actual.tag)}`))
+  if (release.tag_name !== actual.tag || release.prerelease !== false || release.draft !== false
+    || object(github(repository, `commits/${encodeURIComponent(actual.tag)}`)).sha !== actual.sha) {
+    throw new Error('Pages request must identify a stable published Release and its unchanged tag')
   }
   return requested.sha
 }
@@ -94,7 +99,7 @@ function assertMainOnlyEnvironment(repository: string): void {
 }
 
 function command(cwd: string, args: string[], sha: string): void {
-  const env: NodeJS.ProcessEnv = { ...process.env, GAME_BUILD_ID: sha }
+  const env: NodeJS.ProcessEnv = { ...process.env, GAME_BUILD_ID: sha, RELEASE_CHANNEL: 'stable' }
   delete env.GH_TOKEN
   delete env.GITHUB_TOKEN
   const result = spawnSync('pnpm', args, { cwd, stdio: 'inherit', env })
@@ -107,7 +112,9 @@ function assertArtifact(directory: string, sha: string): void {
   if (typeof artifact !== 'object' || artifact === null
     || !('format' in artifact) || artifact.format !== 1
     || !('gameBuildId' in artifact) || artifact.gameBuildId !== sha
-    || !('basePath' in artifact) || artifact.basePath !== '/') {
+    || !('basePath' in artifact) || artifact.basePath !== '/'
+    || 'releaseChannel' in artifact && artifact.releaseChannel !== 'stable'
+    || 'deploymentTarget' in artifact && artifact.deploymentTarget !== 'stable-pages') {
     throw new Error('Pages artifact does not match the verified candidate')
   }
 }

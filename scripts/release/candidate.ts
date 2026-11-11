@@ -12,7 +12,7 @@ export function ownerMachine(): void {
 
 export function github(repository: string, endpoint: string, body?: unknown): unknown {
   repositoryName(repository)
-  const args = ['api', `repos/${repository}/${endpoint}`, '-H', 'Accept: application/vnd.github+json']
+  const args = ['api', endpoint ? `repos/${repository}/${endpoint}` : `repos/${repository}`, '-H', 'Accept: application/vnd.github+json']
   if (body !== undefined) args.push('--method', 'POST', '--input', '-')
   const result = spawnSync('gh', args, {
     encoding: 'utf8', input: body === undefined ? undefined : JSON.stringify(body),

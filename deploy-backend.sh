@@ -41,7 +41,7 @@ git checkout --detach "$VERIFIED_SHA"
 # Node 24.15+ and pnpm are deployment-host prerequisites, as in local development.
 pnpm install --frozen-lockfile
 node --env-file=.env scripts/local-services.mjs --skip-observability
-export GAME_BUILD_ID="$TARGET_REF"
+export GAME_BUILD_ID="$TARGET_REF" RELEASE_CHANNEL=stable
 COMPOSE=(docker compose -f docker-compose.prod.yml)
 "${COMPOSE[@]}" build app
 OLD_CONTAINER="$("${COMPOSE[@]}" ps -q app)"

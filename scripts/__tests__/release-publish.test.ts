@@ -3,6 +3,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { prereleaseConfiguration } from '../ci/prerelease-verification'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
 const repository = resolve(import.meta.dirname, '../..')
@@ -13,6 +14,7 @@ type Evidence = 'passed' | 'missing' | 'failed'
 type GitHubState = {
   sha: string
   configuration: string
+  preConfiguration: string
   evidence: Evidence
   afterDispatch: Evidence
   mainSha: string
@@ -21,10 +23,10 @@ type GitHubState = {
   moveMain: boolean
   refs: Record<string, { sha: string; type: string }>
   annotatedTags: Record<string, { sha: string; type: string }>
-  release: { tag_name: string; html_url: string } | null
+  release: { tag_name: string; html_url: string; prerelease?: boolean; draft?: boolean } | null
 }
 
-function fixture() {
+function fixture(prerelease = false) {
   const root = mkdtempSync(join(tmpdir(), 'oa-release-entry-'))
   roots.push(root)
   mkdirSync(join(root, 'scripts'), { recursive: true })
@@ -48,7 +50,17 @@ function fixture() {
   git('config', 'user.email', 'release@example.test')
   git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**')
   git('commit', '-m', 'release fixture')
-  const sha = git('rev-parse', 'HEAD')
+  const mainBase = git('rev-parse', 'HEAD')
+  let sha = mainBase
+  if (prerelease) {
+    writeFileSync(join(root, 'feature.txt'), 'pre feature')
+    git('add', '.'); git('commit', '-m', 'pre feature')
+    const feature = git('rev-parse', 'HEAD')
+    writeFileSync(join(root, 'prerelease-integration.json'), JSON.stringify({ format: 1, repository: 'titanxxh/open-agricola', baselineMainSha: mainBase,
+      features: [{ id: 'pre-feature', dependsOn: [], sourceSha: feature, integratedSha: feature }] }))
+    git('add', '.'); git('commit', '-m', 'pre integration')
+    sha = git('rev-parse', 'HEAD')
+  }
   const bin = join(root, 'bin')
   mkdirSync(bin)
   const env: NodeJS.ProcessEnv = {
@@ -66,8 +78,14 @@ function fixture() {
   git('commit', '--allow-empty', '-m', 'later main integration')
   const nextMainSha = git('rev-parse', 'HEAD')
   const state: GitHubState = {
-    sha, configuration: value.configuration, evidence: 'passed', afterDispatch: 'passed',
-    mainSha: sha, nextMainSha, provenance: finalSnapshotMetadata(sha), moveMain: false, refs: {}, annotatedTags: {}, release: null,
+    sha, configuration: value.configuration, preConfiguration: prerelease ? prereleaseConfiguration(root, sha, mainBase) : '', evidence: 'passed', afterDispatch: 'passed',
+    mainSha: prerelease ? mainBase : sha, nextMainSha, provenance: finalSnapshotMetadata(sha, prerelease ? mainBase : sha), moveMain: false, refs: {}, annotatedTags: {}, release: null,
+  }
+  if (prerelease) {
+    const prefix = 'repos/titanxxh/open-agricola/'
+    state.provenance[prefix + 'git/ref/heads/prerelease'] = { ref: 'refs/heads/prerelease', object: { type: 'commit', sha } }
+    state.provenance[prefix + 'rules/branches/prerelease?per_page=100'] = ['pull_request', 'deletion', 'required_linear_history'].map(type => ({ type }))
+    state.provenance[prefix + 'rules/branches/' + encodeURIComponent('verification/prerelease/' + sha) + '?per_page=100'] = ['non_fast_forward', 'deletion', 'update'].map(type => ({ type }))
   }
   const save = () => writeFileSync(join(root, 'state.json'), JSON.stringify(state))
   save()
@@ -87,7 +105,7 @@ const step = name => ({ name, status: 'completed', conclusion: 'success' });
 if (args[0] === 'release' && args[1] === 'create') {
   event({ kind: 'release', args, evidence: state.evidence });
   if (state.release) { console.error('already exists'); process.exit(1); }
-  state.release = { tag_name: args[2], html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/' + args[2] };
+  state.release = { tag_name: args[2], html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/' + args[2], prerelease: args.includes('--prerelease'), draft: false };
   save(); output(state.release); process.exit(0);
 }
 const endpoint = args[1].replace('repos/titanxxh/open-agricola/', '');
@@ -99,7 +117,7 @@ if (args.includes('POST')) {
     const ref = body.ref.replace('refs/', '');
     if (state.refs[ref]) { console.error('gh: Reference already exists (HTTP 422)'); process.exit(1); }
     state.refs[ref] = { type: 'commit', sha: body.sha };
-  } else if (endpoint === 'actions/workflows/100/dispatches') {
+  } else if ((endpoint === 'actions/workflows/100/dispatches' || endpoint === 'actions/workflows/200/dispatches')) {
     state.evidence = state.afterDispatch;
     if (state.moveMain) state.mainSha = state.nextMainSha;
   } else throw Error('Unexpected mutation: ' + endpoint);
@@ -113,8 +131,21 @@ if (Object.hasOwn(state.provenance, args[1])) {
   const ref = decodeURIComponent(endpoint.slice(8));
   const sha = ref === 'main' ? state.mainSha : state.refs['heads/' + ref]?.sha ?? (ref === state.sha ? state.sha : null);
   if (!sha) absent(); output({ sha });
-} else if (endpoint === 'actions/workflows/candidate-verification.yml') output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
-else if (endpoint.startsWith('actions/workflows/100/runs?')) {
+} else if (endpoint === 'actions/workflows/prerelease-candidate-verification.yml') output({ id: 200, path: '.github/workflows/prerelease-candidate-verification.yml' });
+else if (endpoint === 'actions/workflows/candidate-verification.yml') output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
+else if (endpoint.startsWith('actions/workflows/200/runs?')) {
+  if (state.evidence !== 'missing') output({ id: 2, workflow_id: 200, path: '.github/workflows/prerelease-candidate-verification.yml', event: 'workflow_dispatch', head_sha: state.mainSha, head_branch: 'main', display_title: 'prerelease / ' + state.sha + ' / all',
+    repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 }, status: 'completed', run_attempt: 1,
+    updated_at: '2026-10-30T00:15:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/2' });
+} else if (endpoint === 'actions/runs/2/jobs?filter=all&per_page=100') {
+  const configuration = state.preConfiguration;
+  output({ id: 1, run_id: 2, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: 'https://example.test/run/2',
+    started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
+    steps: [step('Generate candidate manifest'), step('Prerelease manifest / 1164782262 / prerelease / ' + state.sha + ' / ' + configuration + ' / ' + state.mainSha + ' / ' + tasks.join(','))] });
+  tasks.forEach((task, index) => output({ id: index + 2, run_id: 2, run_attempt: 1, name: 'candidate / ' + task + ' / ' + configuration,
+    started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z', status: 'completed', conclusion: task === 'webkit' && state.evidence === 'failed' ? 'failure' : 'success',
+    html_url: 'https://example.test/job/' + task, steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step) }));
+} else if (endpoint.startsWith('actions/workflows/100/runs?')) {
   if (state.evidence !== 'missing') output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: state.sha,
     repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 },
     status: 'completed', run_attempt: 1, created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' });
@@ -145,11 +176,12 @@ fs.appendFileSync(path.join(process.env.RELEASE_TEST_ROOT, 'events.jsonl'), JSON
   chmodSync(join(bin, 'ssh'), 0o755)
   const events = (): { kind: string; args?: string[]; endpoint?: string; body?: unknown; evidence?: string }[] => existsSync(join(root, 'events.jsonl'))
     ? readFileSync(join(root, 'events.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
-  const publish = (...args: string[]) => spawnSync('pnpm', ['--silent', 'release', 'v9.9.9', '--poll-seconds', '0.01', '--timeout-seconds', '0.1', ...args], {
+  const publishVersion = (version: string, ...args: string[]) => spawnSync('pnpm', ['--silent', 'release', version, '--poll-seconds', '0.01', '--timeout-seconds', '0.1', ...args], {
     cwd: root, env, encoding: 'utf8', timeout: 30_000,
   })
+  const publish = (...args: string[]) => publishVersion('v9.9.9', ...args)
   const deploy = (...args: string[]) => spawnSync('bash', [join(root, 'deploy-backend.sh'), ...args], { cwd: root, env, encoding: 'utf8', timeout: 30_000 })
-  return { root, bin, sha, state, save, env, invoke, publish, deploy, events }
+  return { root, bin, sha, state, save, env, invoke, publish, publishVersion, deploy, events }
 }
 
 function remoteFixture(value: ReturnType<typeof fixture>, { fetchSha = value.sha, checkoutSha = value.sha } = {}) {
@@ -381,5 +413,41 @@ describe('direct backend deployment entry', () => {
     expect(result.status).not.toBe(0)
     expect(result.stderr).toContain('owner-controlled machine, outside CI')
     expect(value.events()).toEqual([])
+  })
+})
+
+
+describe('explicit prerelease publication', () => {
+  it('publishes and resumes an unmerged fixed candidate as a native prerelease', () => {
+    const value = fixture(true)
+    const run = () => value.publishVersion('v9.9.9-beta.1', '--channel', 'prerelease', '--ref', value.sha)
+    const first = run()
+    expect(first.status, first.stderr).toBe(0)
+    expect(JSON.parse(first.stdout)).toMatchObject({ channel: 'prerelease', sha: value.sha, status: 'published' })
+    expect(value.events().find(event => event.kind === 'release')?.args).toContain('--prerelease')
+    const retry = run()
+    expect(retry.status, retry.stderr).toBe(0)
+    expect(JSON.parse(retry.stdout)).toMatchObject({ status: 'existing', channel: 'prerelease' })
+    expect(value.events().filter(event => event.kind === 'release')).toHaveLength(1)
+  }, 20_000)
+
+  it.each([
+    ['v9.9.9-beta.1', 'stable'], ['v9.9.9', 'prerelease'], ['v9.9.9-rc.1', 'prerelease'], ['v9.9.9-beta.0', 'prerelease'],
+  ])('rejects version %s for channel %s before any mutation', (version, channel) => {
+    const value = fixture()
+    const result = value.publishVersion(version, '--channel', channel)
+    expect(result.status).toBe(1)
+    expect(value.events().filter(event => event.kind === 'release' || event.kind === 'mutation')).toEqual([])
+  })
+
+  it('refuses an existing native prerelease on the stable channel', () => {
+    const value = fixture()
+    value.state.refs['tags/v9.9.9'] = { type: 'commit', sha: value.sha }
+    value.state.release = { tag_name: 'v9.9.9', html_url: 'https://example.test/release', prerelease: true, draft: false }
+    value.save()
+    const result = value.publish()
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('channel')
+    expect(value.events().filter(event => event.kind === 'mutation')).toEqual([])
   })
 })

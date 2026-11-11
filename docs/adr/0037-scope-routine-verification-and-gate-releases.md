@@ -46,3 +46,13 @@ Path-ownership rules left most changes without narrow evidence. After the 2026-1
 Prepared dependency graphs are cached only for a matching source fingerprint. Each plan summary explains selection by changed path, runtime imports, registry evidence, direct reads, and browser evidence.
 
 The routine planner, partitioning, and execution may be restructured. `verify` remains the only required check. The complete catalog's task IDs and coverage, and the release and deployment gates, stay unchanged. Cross-commit result reuse is out of scope.
+
+## Independent prerelease channel
+
+The decisions in issues #1645 and #1655 extend this policy with a separate prerelease candidate type. Stable admission still requires a final merged-PR snapshot reachable from protected main. Prerelease admission uses an immutable integration snapshot and explicit feature/dependency provenance; it can precede main integration.
+
+Routine main and prerelease events share the canonical scope plan. Manual prerelease publication still requires every complete catalog task. Trusted main controls orchestration and receipt acceptance; candidate execution receives no formal write or deployment credentials. Receipts bind native repository identity, channel, SHA, candidate and producer configuration, and a compatible producer reachable from protected main. Configuration equality never grants trust by itself. Missing, failed, cancelled, skipped, or incompatible required work blocks publication.
+
+Only the owner main-synchronization command may rewrite prerelease, with the explicit old SHA lease and unchanged feature sources. Reviewed PRs add or remove features. Main, immutable candidates, and release tags never move through this exception. Selected features or dependency groups enter main through their own reviewed PRs and obtain evidence for the actual new main SHA.
+
+Prerelease versions use vX.Y.Z-beta.N and the native prerelease flag. Channel and target metadata bind artifacts; a suffix is not authorization. Formal Pages independently rejects native prerelease requests. Publication, installation, and live acceptance remain separate stages. Effective native protections and real target isolation must be configured and read back in the owner tickets; source changes alone do not prove those settings.

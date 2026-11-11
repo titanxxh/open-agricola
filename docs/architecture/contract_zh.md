@@ -18,6 +18,7 @@
 | `contract/game-creation.ts` | 已接受的单人创建配置及浏览器可用校验，持久化记录与本人响应读取共用 |
 | `contract/game-variants.ts` | 存在依赖关系的 Game Variant 创建选项的规范化 |
 | `contract/protocol/game.ts` | `GameSyncPayload`、`StateUpdateEnvelope`、`StateUpdateCause`、`ActionDetailEffects` |
+| `contract/protocol/app-location.ts` | 公开应用入口与前端构建身份，包含正式/预发布通道及目标 |
 | `contract/cards.ts` | `CardDefinition`，公开卡牌形状 |
 | `contract/prompt-keys.ts` | 作为 i18n 锚点的 `PromptKey` 枚举 |
 | `contract/state-constants.ts` | 不含规则代码的行动格与版图常量 |

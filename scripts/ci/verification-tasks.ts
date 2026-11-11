@@ -89,7 +89,7 @@ export function fullSha(value: string): string {
 }
 
 const configurationPath = (file: string): boolean =>
-  file === '.github/workflows/candidate-verification.yml'
+  (file === '.github/workflows/candidate-verification.yml' || file === '.github/workflows/prerelease-candidate-verification.yml')
   || file.startsWith('scripts/ci/')
   || /^scripts\/verification[^/]*\.ts$/.test(file)
   || /^scripts\/verify[^/]*\.(?:ts|sh)$/.test(file)

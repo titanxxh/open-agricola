@@ -16,6 +16,7 @@ services:
       context: .
       target: production
       args:
+        RELEASE_CHANNEL: stable
         GAME_BUILD_ID: ${GAME_BUILD_ID:-development}
     image: open-agricola:backend
     env_file:
@@ -26,6 +27,7 @@ services:
       - "5175"
     environment:
       - VALIDATION_DATABASE_URL=${VALIDATION_DATABASE_URL:-}
+      - RELEASE_CHANNEL=stable
       - NODE_ENV=production
       - BACKEND_PORT=5175
       - BACKEND_HOST=0.0.0.0
