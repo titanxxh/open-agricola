@@ -317,13 +317,13 @@ const useTransportSetup = (
     })
     const init = async () => {
       try {
+        if (!roomId) assertSupportedSetupQuery(window.location.search)
         await ws.connect()
         if (disposed || hadPendingCommands) return
         if (roomId) {
           setWsStatus({ phase: 'joining', roomId })
           ws.sendRoomCommand('joinRoom', { roomId: developmentSlot ? ws.roomId : roomId, intent: contextRoomId ? 'resume' : 'join', name: displayName ?? '', requestedPlayerIndex: toRequestedPlayerIndex(playerParam) })
         } else if (!playerParam || playerParam === 'p1') {
-          assertSupportedSetupQuery(window.location.search)
           setWsStatus({ phase: 'creating' })
           ws.sendRoomCommand('createRoom', {
             maxPlayers: maxPlayersFromQuery(window.location.search),
