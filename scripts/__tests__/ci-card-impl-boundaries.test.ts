@@ -142,11 +142,11 @@ describe('canonical architecture verification wiring', () => {
     expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: pnpm exec playwright install --with-deps chromium webkit")
   })
 
-  it('verifies public PRs and main with read-only permissions and preserves manual verification', () => {
+  it('verifies public PRs and both integration branches with read-only permissions and preserves manual verification', () => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
 
-    expect(workflow).toMatch(/^ {2}pull_request:\n {4}branches: \[main\]$/m)
-    expect(workflow).toMatch(/^ {2}push:\n {4}branches: \[main\]$/m)
+    expect(workflow).toMatch(/^ {2}pull_request:\n {4}branches: \[main, prerelease\]$/m)
+    expect(workflow).toMatch(/^ {2}push:\n {4}branches: \[main, prerelease\]$/m)
     expect(workflow).toMatch(/^ {2}workflow_dispatch:$/m)
     expect(workflow).toMatch(/permissions:\s*\n\s+contents: read/)
     expect(workflow).not.toContain('pull_request_target:')
