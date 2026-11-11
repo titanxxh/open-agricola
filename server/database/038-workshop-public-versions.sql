@@ -8,18 +8,37 @@ CREATE TABLE workshop_public_versions (
 );
 CREATE INDEX workshop_public_versions_card ON workshop_public_versions(card_id);
 
+-- Historical approval bindings were not foreign keys. A missing or other-card
+-- version cannot become public proof and must not block application startup.
 INSERT INTO workshop_public_versions(version_id,card_id,published_at)
-SELECT approved_version_id,id,updated_at FROM workshop_cards
-WHERE live=1 AND review_status IN ('approved','merged') AND approved_version_id IS NOT NULL;
+SELECT version.id,card.id,card.updated_at FROM workshop_cards card
+JOIN workshop_card_versions version ON version.id=card.approved_version_id AND version.card_id=card.id
+WHERE card.live=1 AND card.review_status IN ('approved','merged');
 
 CREATE FUNCTION record_workshop_public_version() RETURNS trigger AS $$
 BEGIN
-  IF NEW.live=1 AND NEW.review_status IN ('approved','merged') AND NEW.approved_version_id IS NOT NULL THEN
-    INSERT INTO workshop_public_versions(version_id,card_id,published_at)
-    VALUES (NEW.approved_version_id,NEW.id,NEW.updated_at) ON CONFLICT DO NOTHING;
-  END IF;
+  INSERT INTO workshop_public_versions(version_id,card_id,published_at)
+  SELECT version.id,NEW.id,NEW.updated_at FROM workshop_card_versions version
+  WHERE NEW.live=1 AND NEW.review_status IN ('approved','merged')
+    AND version.id=NEW.approved_version_id AND version.card_id=NEW.id
+  ON CONFLICT DO NOTHING;
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER workshop_public_version AFTER INSERT OR UPDATE OF live,review_status,approved_version_id ON workshop_cards
 FOR EACH ROW EXECUTE FUNCTION record_workshop_public_version();
+
+-- Controlled imports load cards before their version rows. Register only when
+-- the actual version arrives and its same-card publication is still current.
+CREATE FUNCTION record_inserted_workshop_public_version() RETURNS trigger AS $$
+BEGIN
+  INSERT INTO workshop_public_versions(version_id,card_id,published_at)
+  SELECT NEW.id,card.id,card.updated_at FROM workshop_cards card
+  WHERE card.id=NEW.card_id AND card.approved_version_id=NEW.id
+    AND card.live=1 AND card.review_status IN ('approved','merged')
+  ON CONFLICT DO NOTHING;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER workshop_public_version_insert AFTER INSERT ON workshop_card_versions
+FOR EACH ROW EXECUTE FUNCTION record_inserted_workshop_public_version();
