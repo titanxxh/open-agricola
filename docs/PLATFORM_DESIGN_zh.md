@@ -48,6 +48,10 @@
 
 大厅与设置通过 `PrereleaseEntry` 向 Beta 账号和管理员提供入口，实际开放由权威响应决定，不依赖 Team 开放阶段。固定入口以新标签打开，保留正式标签；未配置或关闭时显示不可用。`PrereleaseHandoffPage` 不转交来源登录 Cookie 或 verifier，清除传入 fragment，只采用当前配置目标与正式站根，一次性 code 通过固定 pre 回调的 fragment 返回。浏览器验证见 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例；预发布本地会话另行交付。
 
+迁移 039 将身份关联绑定到 owner 的同一个 `generation` / `PRERELEASE_DATA_GENERATION` UUID，新代次先关闭。仅正式管理员可访问的 `GET/POST /api/admin/prerelease-identity/lifecycle` 负责 prepare、activate、close 与已验证清除后的 retire。维护前 close 阻止签发/兑换；retire 撤销 grant、移除交接、消除已清除投影的后续义务并记录不可变回执。目标消失后，退役关联不再为将来的账号删除创建工作；旧退役请求不能关闭新代次。候选服务 key 不能授权 owner 操作。既有 037/038 关联升级为关闭/撤销状态，不谎称已清除。
+
+恢复会重新承担身份隐私义务，不恢复登录权。仅预发布提供的原生 `prerelease_retained_identity_refs(user_id,source_grant_id)` 必须枚举所有保留主体，包括只在对局/历史中被引用者。owner 的 associate 校验已知关联，返回无来源会话、已过期的新关联及当前账号删除事实；可信适配器实际匿名化已删除主体、重绑保留引用，并复扫 view。缺少 view/适配器或未知引用均阻断。audit-complete 将实际规范清单的 hash/数量与当前来源事实比较，并保存 owner 验证回执。开放绑定该审计操作，要求不足 30 秒，重新核对事实及待删除任务，旧 grant 永不恢复。close 清除旧审计资格；空目标也须真实空 view 审计。回执与部署资源/代次检查配合，不能用产物存在或健康检查替代原生扫描。API、并发与升级行为见 `prerelease-retirement.test.ts`。
+
 ### A3. 前端路由：URL 参数 + PageRouter 组件
 
 **不引入 react-router** — 保持现有 URL 参数风格：

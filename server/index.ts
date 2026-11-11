@@ -1,6 +1,7 @@
 import { BetaAccessStore } from './beta-access-store'
 import { createBetaAccessHandler } from './beta-access-routes'
 import { createPrereleaseAuthorityHandler } from './prerelease-authority-routes'
+import { createPrereleaseLifecycleHandler } from './prerelease-lifecycle-routes'
 import { experimentalAccountState } from './experimental-features'
 import './language-packs'
 import { recoverPendingSubmissions } from './workshop-pr/submission-service'
@@ -215,6 +216,7 @@ const directory = new RoomDirectory(getDb())
 const invalidations = new InvalidationStore(getDb())
 const persistence = new PostgresRoomPersistence(getDb(), directory)
 const gameContextStore = new GameContextStore(getDb())
+const handlePrereleaseLifecycle = createPrereleaseLifecycleHandler({ db: getDb(), requireAdmin })
 const handlePrereleaseAuthority = createPrereleaseAuthorityHandler({ db: getDb(), getSourceToken: getAuthToken })
 const betaAccessStore = new BetaAccessStore(getDb())
 const handleBetaAccess = createBetaAccessHandler({ store: betaAccessStore, requireAdmin })
@@ -468,6 +470,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
   if (await handleCommunityQr(req, res)) return
   if (await handleWhatsNew(req, res)) return
+  if (await handlePrereleaseLifecycle(req, res)) return
   if (await handlePrereleaseAuthority(req, res)) return
   if (await handleBetaAccess(req, res)) return
   if (await handleRetentionPolicy(req, res)) return
