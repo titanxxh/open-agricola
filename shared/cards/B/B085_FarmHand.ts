@@ -137,7 +137,6 @@ const cardImpl = {
      * aggregation so the core stables action carries no B85 knowledge.
      */
     getSpecialStablePositions: getFarmHandStablePositions,
-    specialStableTargetFarmPolicy: 'own',
     applySpecialStable: applyFarmHandStable,
     /**
      * Report the standing FarmHand stable so the snapshot's generic

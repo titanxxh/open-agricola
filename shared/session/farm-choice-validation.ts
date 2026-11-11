@@ -47,7 +47,7 @@ export const validateFarmChoice = (
       palisadeEdges,
       fenceSources: fp.fenceSources,
       freeFences: 0,
-      options: { skipPayment: true, allowPalisades: playerCanBuildPalisades(player, player) },
+      options: { skipPayment: true, allowPalisades: playerCanBuildPalisades(player) },
       lockedKeys,
     })
     return { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' }

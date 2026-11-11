@@ -13,7 +13,7 @@ const CARD_ID = 'D163_JourneymanBricklayer'
  * you get 1 stone.
  *
  * "Renovates to stone" means the opponent's houseType is 'stone' after renovation.
- * Room material comes from the committed construction, including partner rooms.
+ * Room material comes from the committed construction, using the built room material.
  */
 
 const renovateListener: CardListenerRegistration = {

@@ -80,8 +80,6 @@ export type DefaultSandboxDeckId = typeof defaultSandboxDeckIds[number]
 export const defaultSandboxPlayerNames = ['Player 1', 'Player 2', 'Player 3', 'Player 4', 'Player 5', 'Player 6'] as const
 
 export type InitialStateOptions = {
-  teamConfig?: import('../contract/team').TeamConfiguration
-  teamAssignments?: number[]
   playerCount?: number
   soloHandMode?: SoloHandMode
   extraMinorIds?: string[]

@@ -524,10 +524,7 @@ export function engineResolveChoice(
         if (target instanceof OrNode || target instanceof XorNode || target instanceof ParallelNode) return true
         if (target instanceof ActionNode) {
           const definition = int.registry.get(target.actionId)
-          return (target.expandFlow === true && !!definition?.flow)
-            || (target.farmTargetSelection && !target.bodyStarted && !target.beforePhaseResolved
-              && context.state.team?.configuration.cooperationRules === true
-              && definition?.farmBuild !== undefined && target.actionContext?.targetFarmPlayerId === undefined)
+          return target.expandFlow === true && !!definition?.flow
         }
         const children = 'children' in target ? target.children as EngineNode[] : []
         return !!children[0] && beginsWithChoice(children[0])

@@ -34,7 +34,6 @@ const INTERACTION_KINDS = {
   'engine-blocked': true,
   'resource-quantity-select': true,
   'resource-batch-exchange-select': true,
-  'marketplace-select': true,
 } as const satisfies Record<InteractionRequest['kind'], true>
 
 export const sandboxInteractionKinds = Object.keys(INTERACTION_KINDS) as InteractionRequest['kind'][]

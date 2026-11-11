@@ -1,7 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
-import { candidateBuildFarmPlayers } from '../../actions/helpers/target-farm'
 
 const CARD_ID = 'C089_StableMaster'
 
@@ -9,7 +8,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {
-      if (!candidateBuildFarmPlayers({ state, player }).some(farmOwner => getAvailableStableSupplyCount(state, farmOwner) > 0)) return
+      if (getAvailableStableSupplyCount(state, player) <= 0) return
       return {
         type: 'leaf',
         actionId: 'stables',

@@ -50,7 +50,7 @@ const listener: CardListenerRegistration = {
           actionId: 'stables',
           sourceCard: CARD_ID,
           targetPlayerId: ownerPlayer.id,
-          actionContext: { max: 1, exactCost: { max: 1 }, targetFarmPolicy: 'own' },
+          actionContext: { max: 1, exactCost: { max: 1 } },
         }
       : undefined
     return consumeActionSpaceToken({

@@ -1,9 +1,7 @@
-import { readMarketplaceTransfers, type MarketplaceTransfer } from '../marketplace'
 import type { FarmTilePosition, Resource, ResourceBatchExchangePayload } from '../types'
 import { isFenceEdges, isFenceSources } from './farm-selection'
 
 export type CommitSelectionPayload = {
-  marketplaceTransfers?: MarketplaceTransfer[]
   cancel?: boolean
   positions?: FarmTilePosition[]
   cardIds?: string[]
@@ -28,7 +26,6 @@ const isCrop = (value: unknown): boolean => isPosition(value)
   && ['grain', 'vegetable', 'wood', 'stone'].includes((value as { crop?: unknown }).crop as string)
 
 const fieldValidators: Record<keyof CommitSelectionPayload, (value: unknown) => boolean> = {
-  marketplaceTransfers: value => readMarketplaceTransfers(value) !== undefined,
   cancel: value => value === true,
   positions: isPositions,
   cardIds: value => Array.isArray(value) && value.every(id => typeof id === 'string'),

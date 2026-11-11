@@ -14,7 +14,6 @@ import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from 
 import { getSuppressedBeforeListenerIds, suppressBeforeListeners } from '../engine/action-context-flags'
 import { getSkipComputeReplaceListenerIds, withSkippedComputeReplaceListeners } from '../engine/replace-guard'
 import { getPlayerActionSpaceConfig } from '../cards/player-action-space'
-import { candidateBuildFarmPlayers, withTargetFarm } from './helpers/target-farm'
 
 const deferredFlowDoableFns = new WeakSet<CanBeExecutedByPlayer>()
 const flowDerivedDoableFns = new WeakMap<CanBeExecutedByPlayer, FlowActionResolver | undefined>()
@@ -95,11 +94,6 @@ const applyChildActionDoable = (
   seenActionIds: Set<string>,
 ): boolean => {
   if (!canAccessActionSpace(actionId, context)) return false
-  if (action.farmBuild && context.actionContext?.targetFarmPlayerId === undefined
-    && context.state.team?.configuration.cooperationRules === true) {
-    return candidateBuildFarmPlayers(context).some(farmOwner => applyChildActionDoable(actionId, action,
-      { ...context, actionContext: withTargetFarm(context.actionContext, farmOwner.id) }, resolveAction, seenActionIds))
-  }
   const actionKey = JSON.stringify([
     actionId,
     context.params ?? {},
@@ -310,8 +304,3 @@ export const initializeFlowDerivedCanBeExecutedByPlayer = (
   flowDerivedDoableFns.set(action.canBeExecutedByPlayer, resolveAction)
   return action
 }
-
-export const legalBuildTargetFarms = (flow: Extract<ActionFlow, { type: 'leaf' }>, context: FlowDoableContext, resolveAction: FlowActionResolver) =>
-  candidateBuildFarmPlayers({ ...context, actionContext: flow.actionContext }).filter(farmOwner => evaluateFlowDoable({
-    ...flow, optional: false, actionContext: withTargetFarm(flow.actionContext, farmOwner.id),
-  }, context, resolveAction))

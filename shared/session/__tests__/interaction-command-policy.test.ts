@@ -21,7 +21,6 @@ const cases = {
   'farm-select': { channel: 'commitSelection', commands: ['commitSelection'] },
   selection: { channel: 'commitSelection', commands: ['commitSelection'] },
   'resource-quantity-select': { channel: 'commitSelection', commands: ['commitSelection'] },
-  'marketplace-select': { channel: 'commitSelection', commands: ['commitSelection'] },
   'resource-batch-exchange-select': { channel: 'commitSelection', commands: ['commitSelection'] },
   'card-draft': { channel: 'none', commands: [] },
   'solo-hand-selection': { channel: 'none', commands: [] },

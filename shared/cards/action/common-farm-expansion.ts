@@ -3,7 +3,6 @@ import type { ActionDefinition } from '../../contract/types'
 
 export const farmExpansion: ActionDefinition = {
   id: 'farm-expansion',
-  farmBuild: { kinds: ['rooms', 'stables'] },
   nameKey: 'actions.farm-expansion.name',
   descriptionKey: 'actions.farm-expansion.description',
   roundAvailable: 1,

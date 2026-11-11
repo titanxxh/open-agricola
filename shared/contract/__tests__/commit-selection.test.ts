@@ -13,6 +13,7 @@ describe('parseCommitSelectionPayload', () => {
 
   it.each([
     [null],
+    [{ marketplaceTransfers: [{ resource: 'wood', direction: 'give', teammatePlayerId: 'p2', amount: 1 }] }],
     [{}],
     [{ farmHand: undefined }],
     [{ edges: ['H-0-0'], extraWood: 0 }],

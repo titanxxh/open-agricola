@@ -28,11 +28,7 @@ import { executeResolvedTypedFlatPayment } from './typed-flat'
 import { canPayCost } from './enumerate'
 import { readExactCost, resolveUnitCostWithDelta } from './exact-cost'
 
-export const getBuildRoomCost = (houseType: PlayerState['houseType'], partnerBuild = false): Partial<Resource> => {
-  const material = partnerBuild ? 6 : 5
-  const reed = partnerBuild ? 3 : 2
-  return { [houseType]: material, reed }
-}
+export const getBuildRoomCost = (houseType: PlayerState['houseType']): Partial<Resource> => ({ [houseType]: 5, reed: 2 })
 
 const readCostOverride = (
   actionContext?: Record<string, unknown>,
@@ -51,14 +47,12 @@ export const readConstructCostDelta = (
 }
 
 const resolveConstructUnitFee = (
-  payer: PlayerState,
-  farmOwner: PlayerState,
+  player: PlayerState,
   costDelta: Partial<Resource> | undefined,
   exactCost: ExactCost | undefined,
   nb: number,
-  sourcePrice: boolean,
 ): Partial<Resource> | null => {
-  const defaultCost = getBuildRoomCost(farmOwner.houseType, payer.id !== farmOwner.id && !exactCost && !sourcePrice)
+  const defaultCost = getBuildRoomCost(player.houseType)
   if (resolveUnitCostWithDelta(defaultCost, exactCost, costDelta, nb) === null) {
     return null
   }
@@ -93,31 +87,25 @@ const appendConstructCostAdjustments = (
 
 export type ConstructPaymentInput = {
   state: GameState
-  payer: PlayerState
-  farmOwner: PlayerState
+  player: PlayerState
   costs?: Partial<Resource>
   actionContext?: Record<string, unknown>
   adjustments?: ConstructCostAdjustments
 }
 
 export const buildConstructCost = ({
-  payer, farmOwner, costs, roomCount: nb, actionContext, adjustments,
+  player, costs, roomCount: nb, actionContext, adjustments,
 }: ConstructPaymentInput & { roomCount: number }): ComplexCost | null => {
   const costDelta = readConstructCostDelta(actionContext, costs)
   const unitFee = resolveConstructUnitFee(
-    payer,
-    farmOwner,
+    player,
     costDelta,
     readExactCost(actionContext),
     nb,
-    !!readCostOverride(actionContext),
   )
   if (unitFee === null) return null
-  const premium = payer.id !== farmOwner.id && !readExactCost(actionContext) && !readCostOverride(actionContext)
-    ? { [farmOwner.houseType]: 1, reed: 1 } : undefined
   return appendConstructCostAdjustments({
-    unitFee, nb, roomMaterial: farmOwner.houseType,
-    ...(premium ? { unitPriceIncrease: premium } : {}),
+    unitFee, nb, roomMaterial: player.houseType,
     ...(readExactCost(actionContext) || readCostOverride(actionContext) ? { unitPriceAlternatives: false } : {}),
   }, adjustments)
 }
@@ -136,17 +124,17 @@ const countAvailableRoomTiles = (player: PlayerState) => {
 }
 
 export const getMaxBuildableRooms = (input: ConstructPaymentInput): number => {
-  const { payer, farmOwner, actionContext, state } = input
+  const { player, actionContext, state } = input
   const allowed = actionContext?.allowedRoomTypes
-  if (Array.isArray(allowed) && !allowed.includes(farmOwner.houseType)) return 0
+  if (Array.isArray(allowed) && !allowed.includes(player.houseType)) return 0
   const argMax = typeof actionContext?.maxRooms === 'number'
     ? Math.max(0, Math.floor(actionContext.maxRooms))
     : 99
-  const structuralMax = Math.min(countAvailableRoomTiles(farmOwner), argMax)
+  const structuralMax = Math.min(countAvailableRoomTiles(player), argMax)
   for (let nb = 1; nb <= structuralMax; nb += 1) {
     const cost = buildConstructCost({ ...input, roomCount: nb })
     if (!cost) return nb - 1
-    if (!canPayCost(payer, cost, 'construct', state)) return nb - 1
+    if (!canPayCost(player, cost, 'construct', state)) return nb - 1
   }
   return structuralMax
 }
@@ -169,11 +157,11 @@ export const resolveRoomPaymentSelection = (input: ConstructPaymentInput & {
   roomCount: number
   paymentChoice?: string
 }): RoomPaymentSelectionResult => {
-  const { payer, paymentChoice, state } = input
+  const { player, paymentChoice, state } = input
   const cost = buildConstructCost(input)
   if (!cost) return ROOM_PAYMENT_FAILURE
   const resolved = resolveCostPaymentSelection(
-    payer,
+    player,
     cost,
     ROOM_PAYMENT_OPTION_PREFIX,
     paymentChoice,

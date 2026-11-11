@@ -57,7 +57,6 @@ export type PaymentPurpose =
   | 'moor-retention'
 
 export type ResourceMovedEvent = GameEventBase<'resource.moved'> & {
-  marketplaceTax?: number
   seasonalGrant?: SeasonalGrant
   resources: Partial<Resource>
   from: ResourceLocation

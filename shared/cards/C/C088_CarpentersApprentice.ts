@@ -1,4 +1,3 @@
-import { resolveBuildPlayers } from '../../actions/helpers/build-players'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { Trade } from '../../contract/types'
@@ -38,9 +37,7 @@ const stablesCostListener: CardListenerRegistration = {
     if (totalBuilt <= 0) return
     const unitCost = context.params?.stableUnitCost as Partial<Record<'wood', number>> | undefined
     if ((unitCost?.wood ?? 0) <= 0) return
-    const build = resolveBuildPlayers(context)
-    if (!build) return
-    const before = getStableCountForCards(build.farmOwner)
+    const before = getStableCountForCards(context.player)
     const after = before + totalBuilt
     let discounted = 0
     if (before < 3 && after >= 3) discounted += 1
@@ -68,8 +65,6 @@ const fenceIsDoableListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
-    const build = resolveBuildPlayers(context)
-    if (!build || build.farmOwner.id !== context.player.id) return
     const player = context.player
     const before = getOwnOrdinaryFenceCount(player)
     const buildLimit = getOwnOrdinaryFenceBuildLimit(player)
@@ -116,10 +111,8 @@ const fenceCostListener: CardListenerRegistration = {
     const buildingNow = newFenceEdges?.length ?? 0
     if (buildingNow <= 0) return
     // The reference:595-601: the 13th-15th fence each cost 1 wood less.
-    const build = resolveBuildPlayers(context)
-    if (!build) return
-    const before = getOwnOrdinaryFenceCount(build.farmOwner)
-    const buildLimit = getOwnOrdinaryFenceBuildLimit(build.farmOwner)
+    const before = getOwnOrdinaryFenceCount(context.player)
+    const buildLimit = getOwnOrdinaryFenceBuildLimit(context.player)
     const start = before + 1
     const end = before + buildingNow
     const free = Math.max(0, Math.min(end, buildLimit) - Math.max(start, 13) + 1)

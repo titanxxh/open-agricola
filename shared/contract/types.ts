@@ -1,4 +1,3 @@
-import type { MarketplaceRequest } from './marketplace'
 import type { MoorCompletionFrame } from '../moor/completion-types'
 import type { AnytimeActivation } from './anytime-activation'
 import type { PersonUseReceipt } from './person-use'
@@ -253,7 +252,6 @@ export type ComplexCost = {
   unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   roomMaterial?: PlayerState['houseType']
   /** Added to each alternative unit price; unitFee already includes this increase. */
-  unitPriceIncrease?: PaymentResourceMap
   /** A source-specific exact room price excludes ordinary room-price alternatives. */
   unitPriceAlternatives?: boolean
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
@@ -660,7 +658,6 @@ export type SnakeOpeningState = {
 export type GameSeed = number | string
 
 export type GameState = {
-  team?: import('./team').TeamState
   round: number
   /** Opening hands, multiplayer draft, parent selection, or ordinary play. */
   phase: 'draft' | 'solo-hand-selection' | 'parent-selection' | 'playing'
@@ -754,7 +751,6 @@ export type CanBeExecutedByPlayer = (
 /** Serializable inputs owned by one action invocation. */
 export type ActionContext = Record<string, unknown> & {
   /** Farm owner for this build; the action executor remains its builder and payer. */
-  targetFarmPlayerId?: string
   allowedRoomTypes?: readonly PlayerState['houseType'][]
   /** Renovation bonuses supplied by this invocation, separate from computeCosts results. */
   costBonuses?: Bonus[]
@@ -1130,7 +1126,6 @@ export type ActionDefinition = {
   anytime?: boolean
   allowAnytimeReentry?: boolean
   idleOnly?: boolean
-  farmBuild?: { kinds: readonly ('rooms' | 'stables' | 'fences')[] }
   canBeExecutedByPlayer: CanBeExecutedByPlayer
   /** Structural eligibility of the original body; independent replacement flows remain available. */
   originalActionCondition?: (context: ActionExecutionContext) => boolean
@@ -1247,7 +1242,6 @@ export type SubFlowKind =
   | 'engine-blocked'
   | 'resource-quantity-select'
   | 'resource-batch-exchange-select'
-  | 'marketplace-select'
 
 export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
@@ -1260,7 +1254,6 @@ export type ChoiceMultiSelect = {
 }
 
 export type InteractionRequest = (
-  | MarketplaceRequest
   | { kind: 'solo-hand-selection'; groups: SoloHandSelectionGroup[] }
   | { kind: 'choice'; options: ActionChoiceOption[]; defaultValue?: string; confirmLabelKey?: string; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean; moorSolo?: MoorSoloChoice }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
@@ -1287,7 +1280,6 @@ export type InteractionRequest = (
     }
   | {
       kind: 'farm-select'
-      farmOwnerPlayerId?: string
       farm:
         | { farmType: 'plow'; selectableTiles: FarmTilePosition[] }
         | {

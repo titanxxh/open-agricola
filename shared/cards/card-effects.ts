@@ -334,7 +334,6 @@ export type CardEffect = {
    * `stableTiles` path. Only consulted at the farm-expansion stables entry.
    */
   getSpecialStablePositions?: (state: GameState, player: PlayerState) => FarmTilePosition[]
-  specialStableTargetFarmPolicy?: 'own'
   /**
    * Settle one special stable returned by `getSpecialStablePositions`. Mutates
    * the player (flags / card state) and returns true on success, false when the
@@ -1063,21 +1062,19 @@ export const collectBuiltSpecialStables = (
  */
 export const collectSpecialStablePositions = (
   state: GameState,
-  builder: PlayerState,
-  farmOwner: PlayerState,
+  player: PlayerState,
 ): SpecialStableCandidate[] => {
   const allCards = [
-    ...builder.improvements,
-    ...builder.minorPlayed,
-    ...builder.occupationPlayed,
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
   ]
   const candidates: SpecialStableCandidate[] = []
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (!effect?.getSpecialStablePositions) continue
-    if (effect.specialStableTargetFarmPolicy === 'own' && builder.id !== farmOwner.id) continue
     try {
-      for (const position of effect.getSpecialStablePositions(state, farmOwner)) {
+      for (const position of effect.getSpecialStablePositions(state, player)) {
         candidates.push({ position, sourceCardId: cardId })
       }
     } catch (err) {
@@ -1098,21 +1095,19 @@ export const collectSpecialStablePositions = (
  */
 export const applySpecialStableAt = (
   state: GameState,
-  builder: PlayerState,
-  farmOwner: PlayerState,
+  player: PlayerState,
   position: FarmTilePosition,
 ): { sourceCardId: string } | null => {
   const allCards = [
-    ...builder.improvements,
-    ...builder.minorPlayed,
-    ...builder.occupationPlayed,
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
   ]
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (!effect?.applySpecialStable) continue
-    if (effect.specialStableTargetFarmPolicy === 'own' && builder.id !== farmOwner.id) continue
     try {
-      if (effect.applySpecialStable(state, farmOwner, position)) {
+      if (effect.applySpecialStable(state, player, position)) {
         return { sourceCardId: cardId }
       }
     } catch (err) {
