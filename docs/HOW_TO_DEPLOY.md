@@ -53,7 +53,7 @@ The standard command checks GitHub run and job evidence before publication. A Re
 
 ## Publish a fixed prerelease candidate
 
-Prerelease publication uses a separate channel. Ordinary `prerelease` pushes and PRs run the canonical routine plan and never deploy. Complete candidate verification runs manually from trusted `main`; candidate jobs have read-only repository access and no formal deployment credentials.
+Prerelease publication uses a separate channel. Ordinary `prerelease` pushes and PRs run the canonical routine plan and never deploy. Complete candidate verification runs manually from trusted `main`; candidate jobs have read-only repository access and no formal deployment credentials. Receipt identity uses `VERIFICATION_CHANNEL=prerelease`; ordinary regression commands run with stable runtime defaults. Pre-specific tests select prerelease explicitly. The production build task runs `build:hosted-frontend` with `RELEASE_CHANNEL=prerelease`, including its normal typecheck and Vite build.
 
 Before selecting a candidate, synchronize the integration branch with current `main`. Keep `prerelease-integration.json` in the candidate tree:
 

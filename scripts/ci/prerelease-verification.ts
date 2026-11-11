@@ -163,6 +163,18 @@ export function syncPrerelease(cwd: string, repository: string, sha: string, exp
   return { status: 'synchronized', channel: 'prerelease', repository, previousSha: expectedOld, sha, baselineMainSha: main, features: nextManifest.features }
 }
 
+export function runPrereleaseCandidateTask(cwd: string, id: string, sha: string, producer: string): void {
+  runCandidateTask(cwd, id, sha, (command, argv, directory) => {
+    const productionBuild = id === 'build' && command === 'pnpm' && argv.length === 2 && argv[0] === 'run' && argv[1] === 'build'
+    const env: NodeJS.ProcessEnv = { ...process.env, GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'prerelease',
+      RELEASE_CHANNEL: productionBuild ? 'prerelease' : 'stable' }
+    delete env.GH_TOKEN; delete env.GITHUB_TOKEN
+    const result = spawnSync(command, productionBuild ? ['run', 'build:hosted-frontend'] : argv, { cwd: directory, env, stdio: 'inherit' })
+    if (result.error) throw result.error
+    return result.status ?? 1
+  }, producer)
+}
+
 function trustedProducer(producer: string): void {
   fullSha(producer)
   const policy = resolve(import.meta.dirname, '../..')
@@ -205,13 +217,7 @@ export function prereleaseVerificationCli(cwd: string, input: string[]): number 
   }
   if (mode === 'source') return 0
   if (mode === 'run-task') {
-    runCandidateTask(candidate, option('--task'), sha, (command, argv, directory) => {
-      const env: NodeJS.ProcessEnv = { ...process.env, GAME_BUILD_ID: sha, RELEASE_CHANNEL: 'prerelease' }
-      delete env.GH_TOKEN; delete env.GITHUB_TOKEN
-      const result = spawnSync(command, argv, { cwd: directory, env, stdio: 'inherit' })
-      if (result.error) throw result.error
-      return result.status ?? 1
-    }, producer)
+    runPrereleaseCandidateTask(candidate, option('--task'), sha, producer)
     trustedProducer(producer)
     return 0
   }
