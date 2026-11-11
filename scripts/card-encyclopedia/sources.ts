@@ -6,6 +6,7 @@ import type { CardDefinition } from '../../shared/contract/cards'
 import { moorSpecialActionCardDefinitions } from '../../shared/moor/special-action-cards'
 import { moorStartCards, type MoorStartCardDefinition } from '../../shared/moor/start-cards'
 import { parentCards, type ParentCardDefinition } from '../../shared/parents'
+import { SCAN_CARDS, type ScanCard } from '../../shared/scan-cards'
 import { seasonIds, type SeasonId } from '../../shared/seasons/types'
 
 export type OrdinaryCardSource = CardDefinition & { kind: 'minor' | 'occupation' | 'playerAction' }
@@ -22,6 +23,7 @@ export type EncyclopediaSources = {
   readonly moorSpecialActionCards: readonly MoorSpecialActionCardSource[]
   readonly moorStartCards: readonly MoorStartCardDefinition[]
   readonly seasons: readonly SeasonId[]
+  readonly scanCards: readonly ScanCard[]
 }
 
 export const loadEncyclopediaSources = (): EncyclopediaSources => ({
@@ -33,4 +35,5 @@ export const loadEncyclopediaSources = (): EncyclopediaSources => ({
   moorSpecialActionCards: moorSpecialActionCardDefinitions,
   moorStartCards,
   seasons: seasonIds,
+  scanCards: SCAN_CARDS,
 })

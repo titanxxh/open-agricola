@@ -1,6 +1,6 @@
 import { t as translateMessage } from '../../../shared/i18n'
 import { resolveCardArtUrl } from '../../../shared/utils/card-art-url'
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ComplexCost, PaymentResourceMap } from '../../../shared/contract/types'
@@ -38,6 +38,8 @@ type PlayerCardProps = {
   enablePreview?: boolean
   cardMeta?: CardMeta
   artUrl?: string | null
+  /** Draws the description and prerequisite in place of the card-text markup. */
+  renderText?: (text: string) => ReactNode
 }
 
 type MoorMajorDisplay = {
@@ -132,18 +134,26 @@ export const PlayerCard = ({
   enablePreview = true,
   cardMeta,
   artUrl,
+  renderText,
 }: PlayerCardProps) => {
-  const cardData = useMemo(() => {
+    const cardData = useMemo(() => {
     const meta = cardMeta ?? getCardMeta(cardId)
     if (!meta) return null
+    const scanFields = {
+      scanDeck: meta.scanDeck,
+      scanNumber: meta.scanNumber,
+      scanArt: meta.scanArt,
+      scanOverlay: meta.scanOverlay,
+    }
     const display = {
       ...getCardDisplayText(locale, cardId, cardMeta ? { ...meta, authored: true } : meta),
       altCosts: cardType === 'minor' ? meta.altCosts : undefined,
     }
-    if (cardType === 'major') {
+      if (cardType === 'major') {
       const rawCost = (meta.cost ?? {}) as PaymentResourceMap | ComplexCost
       const { baseCost } = extractMajorDisplayCost(rawCost)
       return {
+        ...scanFields,
         ...display,
         cost: { ...emptyResources, ...baseCost },
         category: meta.category,
@@ -155,6 +165,7 @@ export const PlayerCard = ({
       }
     } else if (cardType === 'minor') {
       return {
+        ...scanFields,
         ...display,
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
         deck: meta.deck,
@@ -170,6 +181,7 @@ export const PlayerCard = ({
       }
     } else {
       return {
+        ...scanFields,
         ...display,
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
         deck: meta.deck,
@@ -182,15 +194,22 @@ export const PlayerCard = ({
     }
   }, [cardId, cardMeta, cardType, locale])
 
-  const numbering = getCardNumbering(cardId)
+  const numbering = cardData?.scanNumber || getCardNumbering(cardId)
   const moorMajor = cardType === 'major' ? getMoorMajorDisplay(cardId) : undefined
-  const deck = getDeckFromId(cardId)
+  const deck = cardData?.scanDeck || getDeckFromId(cardId)
   const runtimeArt = artUrl === undefined ? getCustomCardArtUrl(cardId) : artUrl
   const staticArt = cardData?.artUrl?.startsWith('/card-art/community/')
     ? cardData.artUrl
     : undefined
 
   const iconStyle = useMemo(() => {
+    if (cardData?.scanArt) {
+      return {
+        backgroundImage: `url(${publicAssetUrl(cardData.scanArt)})`,
+        backgroundSize: '100% 100%',
+        backgroundPosition: 'center',
+      }
+    }
     if (cardType === 'major') {
       const moorDisplay = getMoorMajorDisplay(cardId)
       if (moorDisplay?.imageUrl) {
@@ -234,7 +253,7 @@ export const PlayerCard = ({
     }
     const officialArt = officialCardArtPath(cardId, cardType)
     return officialArt ? { backgroundImage: `url(${publicAssetUrl(officialArt)})` } : {}
-  }, [cardType, cardId, runtimeArt, staticArt])
+  }, [cardData, cardType, cardId, runtimeArt, staticArt])
 
   if (!cardData) return null
 
@@ -290,6 +309,7 @@ export const PlayerCard = ({
         className="player-card-inner" 
         data-id={cardId} 
         data-numbering={numbering}
+        data-scan-deck={cardData.scanDeck}
         data-moor-major={moorMajor ? 'true' : undefined}
         data-cook={cardData.isCookery ? 'true' : undefined}
         data-bread={cardData.isBaking ? 'true' : undefined}
@@ -307,10 +327,13 @@ export const PlayerCard = ({
           </>
         )}
         <div className="card-icon" style={iconStyle} />
+        {cardData.scanOverlay && (
+          <div className="card-scan-overlay" style={{ backgroundImage: `url(${publicAssetUrl(cardData.scanOverlay)})` }} />
+        )}
         
         {prerequisiteText && (
           <div className="card-prerequisite">
-            <div className="prerequisite-text"><ResourceText text={prerequisiteText} /></div>
+            <div className="prerequisite-text">{renderText ? renderText(prerequisiteText) : <ResourceText text={prerequisiteText} />}</div>
           </div>
         )}
 
@@ -326,13 +349,13 @@ export const PlayerCard = ({
           <div className="card-players" data-n={cardData.players} />
         )}
 
-        {deck && (cardType !== 'major' || moorMajor) && (
+        {deck && (cardType !== 'major' || moorMajor || cardData.scanDeck) && (
           <div className="card-deck" data-deck={deck} />
         )}
         
-        {'category' in cardData && cardData.category && (
+        {'category' in cardData && cardData.category ? (
           <div className="card-category" data-category={cardData.category} title={CATEGORY_LABELS(locale)[cardData.category as keyof ReturnType<typeof CATEGORY_LABELS>] ?? cardData.category} />
-        )}
+        ) : null}
 
         {hasCost && !cardData.altCosts && (
           <div className="card-cost">
@@ -364,7 +387,7 @@ export const PlayerCard = ({
 
         <div className="card-desc">
           <div className="card-desc-scroller">
-            <CardDescriptionText locale={locale} text={cardData.description} />
+            {renderText ? renderText(cardData.description) : <CardDescriptionText locale={locale} text={cardData.description} />}
             {cardData.rules && (
               <div className="card-rules">
                 <strong className="card-rules-label">

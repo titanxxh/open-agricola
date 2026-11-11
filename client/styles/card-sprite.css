@@ -228,6 +228,22 @@
   color: #5a3d1c;
 }
 
+.player-card.major .player-card-inner[data-scan-deck] .card-title {
+  left: 11%;
+  right: 11%;
+  height: 48px;
+  font-size: 13px;
+  line-height: 15px;
+}
+.player-card.major .player-card-inner[data-id="FE16_TheFireBogFlameSpurtsOven"] .card-title {
+  left: 22%;
+  right: 22%;
+  top: 8px;
+  height: 42px;
+  font-size: 11px;
+  line-height: 13px;
+}
+
 .player-card.minor .card-title {
   color: #3a5a2c;
 }
@@ -347,6 +363,46 @@
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+.card-deck[data-deck="L"] {
+  background-image: url('/assets/l-deck/badges/deck.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.card-deck[data-deck="X"] {
+  background-image: url('/assets/x-deck/badges/deck.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.card-deck[data-deck="legendairy-forest"] {
+  background-image: url('/assets/legendairy-forest/badges/deck.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.player-card .card-scan-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background-size: 100% 100%;
+  pointer-events: none;
+}
+
+.player-card.minor .card-scan-overlay {
+  z-index: 4;
+}
+
+.player-card.occupation .player-card-inner[data-scan-deck="legendairy-forest"] .card-title {
+  color: #3a2414;
+}
+.player-card.minor .player-card-inner[data-scan-deck="legendairy-forest"] .card-title {
+  color: #24160c;
 }
 
 /* Card category icon */

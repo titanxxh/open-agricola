@@ -22,6 +22,7 @@
 | `server/` | [server](architecture/server_zh.md) | 连接、Room、Durable Room Commit、Replay、Bug Report、工坊后端、持久化、运维 |
 | `operations/` | [服务端部署边界](architecture/server_zh.md#部署回滚与可观测性) | 独立监控部署和受限账户聚合 |
 | `client/` | [client](architecture/client_zh.md) | Bundle、传输与同步状态、视图、Replay Viewer、Bug Report |
+| `shared/scan-cards/`、`client/components/scan-cards/` | [scan-cards](architecture/scan-cards.md)（仅英文） | 扫描扩展卡牌面：记录、由部件拼成的框体模板、新增卡牌 |
 | 测试与门禁 | [testing](architecture/testing_zh.md) | 测试分层与架构门禁 |
 
 每份 module 文档旁都有中文镜像（`<module>_zh.md`）；英文版是唯一权威版本。

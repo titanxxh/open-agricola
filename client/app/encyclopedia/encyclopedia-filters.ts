@@ -34,6 +34,7 @@ export const EMPTY_ENCYCLOPEDIA_FILTERS: EncyclopediaFilters = Object.freeze({
 
 export const ENCYCLOPEDIA_FILTER_TYPES = [
   'minor', 'occupation', 'major', 'mother', 'father', 'moorSpecialAction', 'moorStart', 'season',
+  'illustratedAction', 'spaceMerchant', 'alienArtifact', 'alienEvent', 'event', 'globalEvent', 'offspring', 'guest', 'expansionRules',
 ] as const satisfies readonly EncyclopediaPublicType[]
 
 export type EncyclopediaFilterOptions = Readonly<{

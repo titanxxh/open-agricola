@@ -40,6 +40,10 @@ export type CardMeta = {
   alsoCountsAs?: string[]
   enablesPalisades?: boolean
   artUrl?: string
+  scanDeck?: 'L' | 'X' | 'legendairy-forest'
+  scanNumber?: string
+  scanArt?: string
+  scanOverlay?: string
   locales?: Record<string, {
     name: string
     desc: string[]

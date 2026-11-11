@@ -123,7 +123,7 @@ test.describe(DESKTOP.name, () => {
     await option(panel, 'Major Improvement').check()
     await minimum.fill('2')
     await maximum.fill('2')
-    await expectResults(page, 15)
+    await expectResults(page, 16)
     await option(panel, 'Marked with bonus points').check()
     await expectResults(page, 6)
     expect(await galleryNames(page)).toEqual([
@@ -217,7 +217,7 @@ test.describe(MOBILE.name, () => {
     await tabTo(page, page.getByRole('button', { name: 'Remove filter: Deck B' }))
     await page.keyboard.press('Enter')
 
-    await expectResults(page, 218)
+    await expectResults(page, 229)
     await expect(page.getByRole('button', { name: 'Remove filter: Fixed points ≥ -1' })).toBeFocused()
   })
 })
@@ -286,14 +286,14 @@ test.describe(LANDSCAPE.name, () => {
 
     await option(panel, 'Marked with bonus points').check()
 
-    await expect(confirm).toHaveText('Show results (135)')
+    await expect(confirm).toHaveText('Show results (138)')
     await expect(close).toBeInViewport({ ratio: 1 })
     await expect(confirm).toBeInViewport({ ratio: 1 })
     await page.screenshot({ path: test.info().outputPath('landscape-filter-panel.png') })
 
     await confirm.click()
 
-    await expectResults(page, 135)
+    await expectResults(page, 138)
     await expect(page.getByRole('button', { name: 'Filters (1)' })).toBeFocused()
     await expectNoHorizontalOverflow(page)
   })
