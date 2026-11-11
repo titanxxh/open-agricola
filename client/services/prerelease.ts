@@ -52,7 +52,7 @@ export async function preparePrereleaseHandoff(apiFetch: (path: string, init?: R
   }))
   const callback = `${input.targetOrigin}${HOSTED_APP_PATH}auth/handoff`
   if (!object(result) || result.ok !== true || result.protocolVersion !== 1 || typeof result.code !== 'string' || !opaque(result.code)
-    || typeof result.expiresAt !== 'number' || !Number.isFinite(result.expiresAt) || result.expiresAt <= Date.now() || result.expiresAt > Date.now() + 60_000
+    || typeof result.expiresAt !== 'number' || !Number.isSafeInteger(result.expiresAt) || result.expiresAt <= 0
     || result.callbackUrl !== callback || result.returnTo !== input.returnTo) throw new PrereleaseHandoffFailure('invalid')
   const destination = new URL(callback)
   destination.hash = new URLSearchParams({ protocolVersion: '1', code: result.code, state: input.state, browserChallenge: input.browserChallenge, returnTo: input.returnTo }).toString()
