@@ -676,7 +676,7 @@ const finalizeFence = (
     const counters = contributor.cardStates[usage.sourceCard]?.counters
     if (counters) counters[usage.counterKey] = (counters[usage.counterKey] ?? 0) - usage.usedCount
   }
-  const farmOperation = commitFarmOperation(ctx.player, { kind: 'fence', positions: validated.newPastures.flatMap(pasture => pasture.tiles ?? []), preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink, ctx.player)
+  const farmOperation = commitFarmOperation(ctx.player, { kind: 'fence', positions: validated.newPastures.flatMap(pasture => pasture.tiles ?? []), preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
   const costSources = recordActionCostAttribution(
     ctx.player,
     costAdjustment.costAttribution,
@@ -793,7 +793,7 @@ function* affordableFencePlans(
     ? selectable.filter((edge) => isFarmyardBorderEdge(player, edge)) : []
   const maxFence = !policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('fence') ? capacity : 0
   const maxPalisade = Math.min(border.length, policy.segmentBounds?.palisade?.max ?? border.length)
-  const costContext = { actionHooks: context.actionHooks, state, player: player, space, sourceCard: context.sourceCard, actionContext: context.actionContext, actionId: 'fence', phase: 'computeCosts' as const }
+  const costContext = { actionHooks: context.actionHooks, state, player, space, sourceCard: context.sourceCard, actionContext: context.actionContext, actionId: 'fence', phase: 'computeCosts' as const }
   const globalCosts = requireActionHookRegistry(context.actionHooks).hasMatching(costContext)
   const costListeners = getMatchingListeners(costContext)
   const geometryCosts = globalCosts || costListeners.length > 0

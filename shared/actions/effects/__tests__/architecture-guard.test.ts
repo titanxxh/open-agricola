@@ -156,7 +156,6 @@ describe('effects architecture guard', () => {
       'scheduled-offer',
       'season-summer-bread-or-sell',
       'season-summer-sell-grain',
-      'select-target-farm',
       'selection',
       'set-first-player',
       'sow',

@@ -48,7 +48,7 @@ const commitPreparedPlayer = (player: PlayerState, prepared: PlayerState): void 
 /** The caller owns validation and the completion phase; this operation owns writes.
  * No hooks run here: its receipt stays with the original host's trailing reactions.
  */
-export function commitFarmOperation(player: PlayerState, operation: FarmOperation, eventSink?: EventSink, builder: PlayerState = player): FarmOperationResult {
+export function commitFarmOperation(player: PlayerState, operation: FarmOperation, eventSink?: EventSink): FarmOperationResult {
   if (operation.kind === 'stables' || operation.kind === 'remove-stables') assignStablePieceIds(player)
   const before = copyLayout(player)
   const stablePieces = { ...player.stablePieceIds }
@@ -116,7 +116,7 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
     ...(operation.sourceCardId ? { sourceCardId: operation.sourceCardId } : {}),
   })
   if (operation.kind === 'rooms') {
-    if (operation.positions.length > 0 && builder.turnConstruction) builder.turnConstruction.roomType = player.houseType
+    if (operation.positions.length > 0 && player.turnConstruction) player.turnConstruction.roomType = player.houseType
     return { ...result, kind: 'rooms', roomType: player.houseType }
   }
   if (operation.kind === 'stables') {
@@ -128,17 +128,16 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
     for (const special of operation.specialStables ?? []) {
       stables.push({ ...special, kind: 'special', ordinal: firstOrdinal + stables.length })
     }
-    if (builder.turnConstruction) {
-      const built = new Set(builder.turnConstruction.stablePieces)
-      const farmPrefix = builder.id === player.id ? '' : `${player.id}:`
-      for (const stable of stables) built.add(stable.kind === 'normal' ? `${farmPrefix}normal:${stable.pieceId}` : `${farmPrefix}special:${stable.sourceCardId}`)
-      builder.turnConstruction.stablePieces = [...built]
+    if (player.turnConstruction) {
+      const built = new Set(player.turnConstruction.stablePieces)
+      for (const stable of stables) built.add(stable.kind === 'normal' ? `normal:${stable.pieceId}` : `special:${stable.sourceCardId}`)
+      player.turnConstruction.stablePieces = [...built]
     }
     return { ...result, kind: 'stables', stables }
   }
-  if (operation.kind === 'fence' && builder.turnConstruction) {
+  if (operation.kind === 'fence' && player.turnConstruction) {
     const previous = new Set(before.fenceSegments.filter(segment => segment.type === 'fence').map(segment => segment.edge))
-    if (player.fenceSegments.some(segment => segment.type === 'fence' && !previous.has(segment.edge))) builder.turnConstruction.fenceBuilt = true
+    if (player.fenceSegments.some(segment => segment.type === 'fence' && !previous.has(segment.edge))) player.turnConstruction.fenceBuilt = true
   }
   return operation.kind === 'terrain'
     ? { ...result, kind: 'terrain', terrainMode: operation.mode, terrainChanges: operation.changes }
