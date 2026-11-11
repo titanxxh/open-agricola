@@ -251,7 +251,6 @@ export type ComplexCost = {
   feeIdentities?: number[]
   unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   roomMaterial?: PlayerState['houseType']
-  /** Added to each alternative unit price; unitFee already includes this increase. */
   /** A source-specific exact room price excludes ordinary room-price alternatives. */
   unitPriceAlternatives?: boolean
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
