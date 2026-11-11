@@ -11,6 +11,7 @@
 | 文件 | 内容 |
 |---|---|
 | `contract/types.ts` | `GameState`、`PlayerState`、`ActionSpace`、`Resource`、`InteractionState`、`InteractionRequest`、`ActionDefinition` |
+| `contract/workshop-public-cards.ts` | 版本化公开源码/图片快照及 30 秒新建/执行状态 |
 | `contract/workshop.ts` | 工坊 Design Draft、Workspace 与生成候选的前后端协议 |
 | `contract/protocol/ws.ts` | `ClientCommand`、`ServerEvent`、`RoomSummary` |
 | `contract/room-access.ts` | 活动 Room 准入策略与玩家搜索的展示身份 |

@@ -1,0 +1,104 @@
+import { createHash } from 'node:crypto'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { canonicalJson } from '../shared/contract/authoritative-command'
+import type { WorkshopPublicCardInput, WorkshopPublicCardSnapshot, WorkshopPublicCardStatus } from '../shared/contract/workshop-public-cards'
+import { cardArtKey } from '../shared/utils/card-art-url'
+import type { PostgresDatabase } from './database/postgres'
+import { corsHeaders } from './http-origin'
+import { getResources } from './storage/runtime'
+import { objectHash } from './storage/s3-store'
+
+type VersionRow = { id: string; version_id: string; card_json: string; art_url: string | null }
+type PublicationRow = VersionRow & {
+  disabled_at: number | null
+  live: number
+  review_status: string
+  approved_version_id: string | null
+}
+
+function loadPublication(db: PostgresDatabase, cardId: string, versionId: string) {
+  return db.prepare(`SELECT card.id, version.id AS version_id, version.card_json, version.art_url,
+      publication.disabled_at, card.live, card.review_status, card.approved_version_id
+    FROM workshop_public_versions publication
+    JOIN workshop_card_versions version ON version.id=publication.version_id AND version.card_id=publication.card_id
+    JOIN workshop_cards card ON card.id=publication.card_id
+    WHERE publication.card_id=? AND publication.version_id=?`).get<PublicationRow>(cardId, versionId)
+}
+
+async function snapshot(row: VersionRow): Promise<WorkshopPublicCardSnapshot> {
+  const raw: unknown = JSON.parse(row.card_json)
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid public card definition')
+  const cardJson = Object.fromEntries(Object.entries(raw).filter(([key]) => !key.startsWith('_')))
+  const input: WorkshopPublicCardInput = {
+    protocolVersion: 1,
+    source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: row.id, versionId: row.version_id },
+    cardJson,
+    effectCode: '_code' in raw && typeof raw._code === 'string' ? raw._code : null,
+    art: null,
+  }
+  if (row.art_url) {
+    const key = cardArtKey(row.art_url)
+    if (!key) throw new Error('Invalid public image identity')
+    const image = await getResources().read(key)
+    if (!image) throw new Error('Public image is unavailable')
+    input.art = { sha256: objectHash(image.body), contentType: image.contentType, sizeBytes: image.body.length, base64: image.body.toString('base64') }
+  }
+  return { sha256: createHash('sha256').update(canonicalJson(input)).digest('hex'), input }
+}
+
+/** Strictly public reads; the caller's author identity never changes this source. */
+export async function handleWorkshopPublicCards(req: IncomingMessage, res: ServerResponse, db: PostgresDatabase): Promise<boolean> {
+  const url = new URL(req.url ?? '', 'http://localhost')
+  if (!url.pathname.startsWith('/api/workshop/public-cards/')) return false
+  const send = (status: number, body: unknown) => {
+    res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...corsHeaders({ methods: 'GET,OPTIONS' }) })
+    res.end(JSON.stringify(body))
+  }
+  if (req.method !== 'GET') { send(405, { ok: false, code: 'read_only' }); return true }
+  const match = /^\/api\/workshop\/public-cards\/v1\/cards\/([A-Za-z0-9_-]+)(?:\/versions\/([A-Za-z0-9_-]+)\/status)?$/.exec(url.pathname)
+  const requestedHash = url.searchParams.get('sha256')
+  if (!match || (match[2] ? !requestedHash || !/^[a-f0-9]{64}$/.test(requestedHash) || url.searchParams.size !== 1 : Boolean(url.search))) {
+    send(400, { ok: false, code: 'invalid_public_card_request', protocolVersion: 1 }); return true
+  }
+  const checkedAt = Date.now()
+  try {
+    if (match[2] && requestedHash) {
+      let row = await loadPublication(db, match[1], match[2])
+      let matchingInput = false
+      if (row && row.disabled_at === null) {
+        matchingInput = (await snapshot(row)).sha256 === requestedHash
+        // Network image reads must not conceal an already committed disable.
+        row = await loadPublication(db, match[1], match[2])
+      }
+      let access: WorkshopPublicCardStatus['access']
+      if (!row) access = { kind: 'not_public', allowNew: false, allowExisting: false }
+      else if (row.disabled_at !== null) access = { kind: 'disabled', allowNew: false, allowExisting: false }
+      else if (!matchingInput) access = { kind: 'content_mismatch', allowNew: false, allowExisting: false }
+      else if (!row.live || !row.approved_version_id || !['approved', 'merged'].includes(row.review_status)) access = { kind: 'offline', allowNew: false, allowExisting: true }
+      else if (row.approved_version_id !== row.version_id) access = { kind: 'superseded', allowNew: false, allowExisting: true }
+      else access = { kind: 'current', allowNew: true, allowExisting: true }
+      const validUntil = checkedAt + 30_000
+      if (Date.now() >= validUntil) throw new Error('Public source read expired')
+      const status: WorkshopPublicCardStatus = { protocolVersion: 1, sha256: requestedHash, checkedAt, validUntil, access }
+      send(200, { ok: true, ...status })
+      return true
+    }
+    const row = await db.prepare(`SELECT card.id, version.id AS version_id, version.card_json, version.art_url
+      FROM workshop_cards card JOIN workshop_card_versions version ON version.id=card.approved_version_id AND version.card_id=card.id
+      JOIN workshop_public_versions publication ON publication.version_id=version.id AND publication.card_id=card.id
+      WHERE card.id=? AND card.live=1 AND card.review_status IN ('approved','merged') AND publication.disabled_at IS NULL`).get<VersionRow>(match[1])
+    if (!row) { send(404, { ok: false, code: 'public_card_unavailable' }); return true }
+    const publicSnapshot = await snapshot(row)
+    const current = await loadPublication(db, row.id, row.version_id)
+    if (!current || current.disabled_at !== null || !current.live || current.approved_version_id !== row.version_id || !['approved', 'merged'].includes(current.review_status)) {
+      send(409, { ok: false, code: 'public_card_changed' }); return true
+    }
+    const validUntil = checkedAt + 30_000
+    if (Date.now() >= validUntil) throw new Error('Public source read expired')
+    const status: WorkshopPublicCardStatus = { protocolVersion: 1, sha256: publicSnapshot.sha256, checkedAt, validUntil, access: { kind: 'current', allowNew: true, allowExisting: true } }
+    send(200, { ok: true, snapshot: publicSnapshot, status })
+  } catch {
+    send(503, { ok: false, code: 'public_card_source_unavailable' })
+  }
+  return true
+}

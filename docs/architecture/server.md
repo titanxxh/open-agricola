@@ -178,17 +178,18 @@ Viewer entry HTML revalidates its response policy; content-addressed assets rema
 
 ## Workshop backend
 
-`server/workshop.ts` and `server/workshop-pr/` provide custom-card upload, compilation, the sandbox and pull-request delivery. See [Platform design](../PLATFORM_DESIGN.md) for the full product flow.
+`server/workshop.ts`, `workshop-drafts.ts` and `workshop-pr/` own draft revisions, compilation, sandbox configuration and PR delivery. [Platform design](../PLATFORM_DESIGN.md) describes the product flow.
 
-- Sandbox settings (`sandbox_settings`, `sandbox_cards`) persist player count, decks and variant flags; `POST /api/game/new-sandbox` passes them to `createInitialState()`.
-- `workshop-status.ts` separates review from `live` publication. Binding and publishing require an open, non-draft `main` PR, a fixed Draft Version and authorized exact-head approval. Mismatch or failed GitHub reconciliation fails closed to `stale·offline`; transient initial refresh failure preserves `in_review` for retry. The detailed transitions live in the status code and Workshop tests.
-- Approved `main` merges graduate to read-only `merged`; earlier observed merges wait for authorized exact-head reconciliation. Other bases become `stale·offline`. Reviewed live snapshots remain served until `markBuiltInMergedCards` hands them to built-in definitions at release.
-- `customCardIds` in a real Room accept only live approved cards through their reviewed snapshot. Formal solo retains every explicit selection and rejects unavailable or changed sources with a configuration adjustment; other Rooms reject an author's own non-live card and filter other unloadable IDs. Unreviewed code runs only in the Workshop sandbox and never reaches a multiplayer `GameSession`.
-- Author `unpublish` lets existing games finish; administrator takedown ends every Room embedding the card without scoring or Replay.
-- Submissions use one repository-scoped GitHub App; `workshop_submissions` freezes operation identity and Draft Version before remote writes, branch publication uses expected-head CAS, uncertain PR creation is reconciled without another blind POST, and generated-file conflicts pause delivery. See the [GitHub App runbook](../operations/github-oauth-app-setup.md).
-- Workshop draft errors expose a typed `code` from `shared/contract/workshop.ts`; the live-edit guard returns `live_edit_blocked` with HTTP 409.
+- `sandbox_settings` and `sandbox_cards` persist test setup for `POST /api/game/new-sandbox`.
+- `workshop-status.ts` separates review from publication. Binding/publishing require an open, non-draft `main` PR, a fixed Draft Version and authorized exact-head approval. Mismatch or failed reconciliation becomes `stale·offline`; transient initial refresh failure preserves `in_review` for retry.
+- Approved `main` merges become read-only `merged` after exact-head reconciliation; other bases become stale/offline. Reviewed live snapshots serve until `markBuiltInMergedCards` hands them to built-in definitions at release.
+- Real Rooms load only reviewed live snapshots. Solo rejects changed/unavailable explicit selections with configuration adjustments; other Rooms reject the author's non-live cards and filter other unloadable IDs. Unreviewed code stays in author sandboxes.
+- Author unpublish permits existing games; administrator takedown ends affected Rooms without scoring or Replay.
+- `workshop-public-cards.ts` exports versioned, hashed public source/image inputs and 30-second creation/execution status. Publication history excludes private versions; reads never write sandbox state. Consumers own compilation and expired-status suspension. [Platform design](../PLATFORM_DESIGN.md#d3-sandbox-isolation-and-fault-tolerance) defines lifecycle policy.
+- `workshop_submissions` freezes operation/version before GitHub writes. The repository-scoped App uses expected-head CAS, reconciles uncertain PR creation and pauses generated-file conflicts. See the [GitHub App runbook](../operations/github-oauth-app-setup.md).
+- Draft errors use `shared/contract/workshop.ts`; live edits return HTTP 409 `live_edit_blocked`.
 
-Tests: `server/__tests__/{workshop-api,workshop-submissions}.test.ts`, `server/workshop-pr/__tests__/`.
+Tests: `server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submissions}.test.ts`, `server/workshop-pr/__tests__/`.
 
 ## Database
 
