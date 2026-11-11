@@ -21,7 +21,6 @@ const labels: Record<string, string> = {
   'prerelease.entry': '进入预发布',
   'beta.accessLabel': 'Beta access',
   'beta.accessEnabled': 'Enabled',
-  'beta.availableModes': 'Available: Team mode, Multihand mode',
   'platform.backToLobby': '返回大厅',
   'platform.backToLobbyPlain': '返回大厅',
   'platform.settingsTitle': '设置',
@@ -136,18 +135,17 @@ describe('SettingsPage', () => {
     expect(await screen.findByRole('link', { name: '进入预发布' })).toHaveAttribute('target', '_blank')
   })
 
-  it('shows qualified account status without treating development feature availability as qualification', async () => {
+  it('shows current account qualification and removes it after revocation', async () => {
     apiFetchMock.mockResolvedValue(Response.json({ ok: true, identities: [] }))
-    mockUser = { ...mockUser, experimentalFeatures: ['team-modes'], betaAccess: false }
+    mockUser = { ...mockUser, betaAccess: false }
     const view = render(<SettingsPage />)
     expect(screen.queryByText('Enabled')).toBeNull()
     mockUser = { ...mockUser, betaAccess: true }
     view.rerender(<SettingsPage />)
-    expect(screen.getByText('Enabled').closest('p')).toHaveTextContent('Beta access: Enabled Available: Team mode, Multihand mode')
-    mockUser = { ...mockUser, experimentalFeatures: [] }
+    expect(screen.getByText('Enabled').closest('p')).toHaveTextContent('Beta access: Enabled')
+    mockUser = { ...mockUser, betaAccess: false }
     view.rerender(<SettingsPage />)
-    expect(screen.getByText('Enabled')).toBeInTheDocument()
-    expect(screen.queryByText('Available: Team mode, Multihand mode')).toBeNull()
+    expect(screen.queryByText('Enabled')).toBeNull()
   })
 
   it.each(['GitHub', 'Google'])('starts %s linking via a credentialed POST and displays failures without navigating', async (name) => {

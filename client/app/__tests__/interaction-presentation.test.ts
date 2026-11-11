@@ -619,18 +619,3 @@ describe('Interaction Presentation', () => {
     expect(buildInteractionSubmitCommand(undo, { value: 'cancel' })).toEqual({ kind: 'rejected' })
   })
 })
-
-it('presents and submits Marketplace rows through the authoritative selection channel', () => {
-  const request = {
-    kind: 'marketplace-select', goods: ['wood', 'food'], availableByResource: { wood: 6 },
-    teammates: [{ playerId: 'p3', name: 'Partner', availableByResource: { food: 5 } }],
-  } satisfies Extract<InteractionState, { stateId: 'wait' }>['request']
-  const interaction = { stateId: 'wait', playerIndex: 0, promptKey: 'ui.marketplace.prompt', request,
-    allowedCommands: ['commitSelection', 'undoStep'], anytimeActions: [] } satisfies InteractionState
-  expect(buildInteractionPresentationPlan(interaction)).toEqual({ kind: 'marketplace-select', request })
-  expect(buildInteractionSubmitCommand(interaction, { value: 'confirm', marketplaceTransfers: [
-    { resource: 'wood', direction: 'give', teammatePlayerId: 'p3', amount: 3 },
-  ] })).toEqual({ kind: 'commitSelection', playerIndex: 0, payload: { marketplaceTransfers: [
-    { resource: 'wood', direction: 'give', teammatePlayerId: 'p3', amount: 3 },
-  ] } })
-})

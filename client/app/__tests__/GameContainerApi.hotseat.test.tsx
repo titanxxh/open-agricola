@@ -14,8 +14,6 @@ import { t } from '../../../shared/i18n'
 import { AuthProvider } from '../../contexts/AuthContext'
 import { LocaleProvider } from '../../contexts/LocaleContext'
 import { GameContainerApi } from '../GameContainerApi'
-import { processSubmit } from '../../../shared/draft/draft-manager'
-import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
 
 const workPayload = (): GameSyncPayload => {
   const registry = createOfficialCardRegistry()
@@ -45,7 +43,6 @@ class GameSocket {
   static readonly OPEN = 1
   static latest: GameSocket
   static hotseat = true
-  static multihand = false
   static payload: GameSyncPayload
   static version = 1
   static sent: Array<Record<string, unknown>> = []
@@ -80,8 +77,7 @@ class GameSocket {
           scopeId: '01800000-0000-4000-8000-000000001098', expiresAt: Date.now() + 86400000,
         } })
       } else if (message.type === 'joinRoom') {
-        const audience = GameSocket.hotseat ? { controlledPlayerIndexes: [0, 1], visiblePlayerIds: ['p1', 'p2'] }
-          : GameSocket.multihand ? { controlledPlayerIndexes: [0, 2], visiblePlayerIds: ['p1', 'p3'] } : {}
+        const audience = GameSocket.hotseat ? { controlledPlayerIndexes: [0, 1], visiblePlayerIds: ['p1', 'p2'] } : {}
         GameSocket.emit({ type: 'roomJoined', roomId: 'room-1098', playerIndex: 0,
           ...audience, hotseat: GameSocket.hotseat, status: 'playing', maxPlayers: GameSocket.payload.state.players.length,
           playerColors: GameSocket.payload.state.players.map(player => player.color),
@@ -159,7 +155,6 @@ beforeEach(() => {
   window.localStorage.setItem('open-agricola-locale-v2', 'en')
   window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1098&hotseat=1&player=p1&devMode=1')
   GameSocket.hotseat = true
-  GameSocket.multihand = false
   GameSocket.payload = workPayload()
   GameSocket.version = 1
   GameSocket.sent = []
@@ -173,145 +168,6 @@ beforeEach(() => {
   setupViewport(false)
 })
 
-const multihandPayload = (phase: 'playing' | 'draft' | 'parent-selection' = 'playing'): GameSyncPayload => {
-  const state = createInitialState(1098, { playerCount: 4,
-    ...(phase === 'draft' ? { draftMode: 'simultaneous' as const } : {}),
-    ...(phase === 'parent-selection' ? { enableParentCards: true, draftParents: true } : {}),
-  })
-  state.team = { configuration: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' }, playerTeams: [0, 1, 0, 1] }
-  state.players.forEach((player, index) => { player.name = ['Alice', 'Bob', 'Cara', 'Dan'][index]!; player.nameIsDefault = false })
-  return { ...workPayload(), state: withActiveRegistry(createOfficialCardRegistry(), () =>
-    serializeState(state, { actionHooks: undefined, engineStack: new EngineStack() })) }
-}
-
-describe('multihand account audiences', () => {
-  beforeEach(() => {
-    GameSocket.hotseat = false
-    GameSocket.multihand = true
-    GameSocket.payload = multihandPayload()
-    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1098')
-  })
-
-  it('marks both owned farms and keeps operation identity while browsing the other hand', async () => {
-    const user = userEvent.setup()
-    const { container } = renderGame()
-    await screen.findByRole('region', { name: 'Action Spaces' })
-    expect(screen.getByRole('tab', { name: /Cara/ })).toHaveClass('is-you')
-    expect(screen.getByRole('tab', { name: /Bob/ })).not.toHaveClass('is-you')
-    expect(container.querySelector('.farm-header [data-operation-player-id="p1"]')).toHaveTextContent('Acting as seat 1: Alice')
-    await user.click(screen.getByRole('tab', { name: /Cara/ }))
-    expect(container.querySelector('.hand-cards [data-operation-player-id="p1"]')).toHaveTextContent('Acting as seat 1: Alice')
-    expect(container.querySelector('[data-hand-anchor="p3"]')).toBeVisible()
-    expect(ruleCommands()).toEqual([])
-  })
-
-  it.each(['draft', 'parent-selection'] as const)('handles a manually selected owned %s seat while hand browsing leaves the request unchanged', async phase => {
-    const user = userEvent.setup()
-    GameSocket.payload = multihandPayload(phase)
-    const { container } = renderGame()
-    const chooseSeat = await screen.findByRole('combobox', { name: 'Choose a seat to handle' })
-    expect(chooseSeat).toHaveValue('p1')
-    expect(within(chooseSeat).getAllByRole('option')).toHaveLength(2)
-    await user.selectOptions(chooseSeat, 'p3')
-    expect(container.querySelector('.multihand-seat-controls [data-operation-player-id="p3"]')).toHaveTextContent('Acting as seat 3: Cara')
-    if (phase === 'draft') expect(container.querySelector('[data-player-id="p3"]')).toHaveAttribute('data-is-you', 'true')
-    const candidates = GameSocket.payload.state.parentSelection?.candidates.p3
-    const firstChoice = container.querySelector<HTMLElement>(phase === 'draft'
-      ? '.draft-pool-row-occ .draft-card' : `[data-card-id="${candidates?.mother[0]}"]`)
-    if (!firstChoice) throw new Error('Expected the selected seat first local choice')
-    await user.click(firstChoice)
-    await user.click(screen.getByRole('button', { name: 'View your hand', exact: true }))
-    const hand = await screen.findByRole('dialog', { name: 'View your hand' })
-    await user.selectOptions(within(hand).getByRole('combobox', { name: 'View your hand' }), 'p1')
-    expect(hand.querySelector('[data-hand-player-id="p1"]')).toBeVisible()
-    expect(chooseSeat).toHaveValue('p3')
-    expect(ruleCommands()).toEqual([])
-    if (phase === 'draft') {
-      const peerUpdate = structuredClone(GameSocket.payload)
-      const peerPick = processSubmit(peerUpdate.state.draft!, 'p2', firstDraftPick(peerUpdate.state.draft!, 'p2'))
-      if (peerPick.kind !== 'accepted') throw new Error(peerPick.error)
-      peerUpdate.state.draft = peerPick.draft
-      act(() => GameSocket.snapshot(peerUpdate))
-      expect(chooseSeat).toHaveValue('p3')
-    }
-    await user.click(within(hand).getByRole('button', { name: 'Close', exact: true }))
-    const next = structuredClone(GameSocket.payload)
-    if (phase === 'draft') {
-      const transition = processSubmit(next.state.draft!, 'p3', firstDraftPick(next.state.draft!, 'p3'))
-      if (transition.kind !== 'accepted') throw new Error(transition.error)
-      next.state.draft = transition.draft
-      const minor = container.querySelector<HTMLElement>('.draft-pool-row-minor .draft-card')
-      if (!minor) throw new Error('Expected the selected seat draft packet')
-      await user.click(minor)
-      expect(screen.getByRole('button', { name: 'Confirm picks', exact: true })).toBeEnabled()
-      GameSocket.payload = next
-      await user.click(screen.getByRole('button', { name: 'Confirm picks', exact: true }))
-      expect(ruleCommands().at(-1)).toMatchObject({ type: 'draftSubmit', playerId: 'p3' })
-    } else {
-      const candidates = next.state.parentSelection!.candidates.p3!
-      const father = container.querySelector<HTMLElement>(`[data-card-id="${candidates.father[0]}"]`)
-      if (!father) throw new Error('Expected the selected seat Parent candidates')
-      await user.click(father)
-      next.state.parentSelection!.submissions.p3 = { mother: candidates.mother[0]!, father: candidates.father[0]! }
-      GameSocket.payload = next
-      const confirm = container.querySelector<HTMLElement>('.parent-selection-confirm')
-      if (!confirm) throw new Error('Expected Parent confirmation')
-      await user.click(confirm)
-      expect(ruleCommands().at(-1)).toMatchObject({ type: 'parentSubmit', playerIndex: 2 })
-    }
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Choose a seat to handle' })).toHaveValue('p1'))
-  })
-
-  it('reads both owned hands and automatically follows the next owned responder without a handoff', async () => {
-    const user = userEvent.setup()
-    const { container } = renderGame()
-    await screen.findByRole('region', { name: 'Action Spaces' })
-    await user.click(screen.getByRole('tab', { name: /Cara/ }))
-    expect(container.querySelector('[data-hand-anchor="p3"]')).toBeVisible()
-    expect(container.querySelector('[data-action-id="forest"] button')).toBeDisabled()
-    await user.click(screen.getByRole('tab', { name: /Bob/ }))
-    expect(container.querySelector('[data-hand-anchor]')).not.toBeInTheDocument()
-
-    const next = multihandPayload()
-    next.state.currentPlayerIndex = 2
-    act(() => GameSocket.snapshot(next))
-    await waitFor(() => expect(screen.getByRole('tab', { name: /Cara/ })).toHaveAttribute('aria-selected', 'true'))
-    expect(container.querySelector('[data-action-id="forest"] button')).toBeEnabled()
-    expect(screen.queryByRole('dialog', { name: 'Hotseat handoff' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: /Alice/ }))
-    act(() => GameSocket.snapshot(next))
-    expect(screen.getByRole('tab', { name: /Alice/ })).toHaveAttribute('aria-selected', 'true')
-    expect(container.querySelector('[data-action-id="forest"] button')).toBeDisabled()
-
-    const outgoing = multihandPayload()
-    outgoing.state.currentPlayerIndex = 2
-    outgoing.interaction = { stateId: 'wait', playerIndex: 0, allowedCommands: ['resolveChoice'], anytimeActions: [],
-      promptKey: 'ui.interactionConfirmNextPlayer', request: { kind: 'choice', options: [{ value: 'confirm', labelKey: 'Continue' }] } }
-    act(() => GameSocket.snapshot(outgoing))
-    await waitFor(() => expect(screen.getByRole('tab', { name: /Alice/ })).toHaveAttribute('aria-selected', 'true'))
-    expect(container.querySelector('[data-hand-anchor="p1"]')).toBeVisible()
-  })
-
-  it.each(['draft', 'parent-selection'] as const)('walks owned %s requests in seat order', async phase => {
-    GameSocket.payload = multihandPayload(phase)
-    const { container } = renderGame()
-    await screen.findByRole('dialog', { name: t('en', phase === 'draft' ? 'ui.draft.dialog' : 'ui.parentSelection.dialog') })
-    const next = structuredClone(GameSocket.payload)
-    if (phase === 'draft') {
-      expect(container.querySelector('[data-player-id="p1"]')).toHaveAttribute('data-is-you', 'true')
-      const transition = processSubmit(next.state.draft!, 'p1', firstDraftPick(next.state.draft!, 'p1'))
-      if (transition.kind !== 'accepted') throw new Error(transition.error)
-      next.state.draft = transition.draft
-    } else {
-      const candidates = next.state.parentSelection!.candidates.p1!
-      next.state.parentSelection!.submissions.p1 = { mother: candidates.mother[0]!, father: candidates.father[0]! }
-    }
-    act(() => GameSocket.snapshot(next))
-    if (phase === 'draft') await waitFor(() => expect(container.querySelector('[data-player-id="p3"]')).toHaveAttribute('data-is-you', 'true'))
-    else await waitFor(() => expect(container.querySelector('.parent-selection-status')).toHaveAttribute('data-already-submitted', '0'))
-    expect(screen.queryByRole('dialog', { name: 'Hotseat handoff' })).not.toBeInTheDocument()
-  })
-})
 afterEach(() => {
   cleanup()
   window.localStorage.clear()

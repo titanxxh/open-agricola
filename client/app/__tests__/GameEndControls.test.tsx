@@ -47,51 +47,6 @@ function PendingProbe({ transport }: { transport: WsGameTransport }) {
 }
 
 describe('GameEndControls', () => {
-  it('locks starting a team rematch for an ordinary participant but permits agreement', async () => {
-    const { transport, sendRoomCommand, emit } = fakeTransport()
-    render(<GameEndControls transport={transport} locale="en" playerNames={['Ada', 'Bea']} teamGame canUseTeamModes={false} />)
-    expect(screen.getByRole('button', { name: t('en', 'platform.gameEnd.proposeRematch') })).toBeDisabled()
-    expect(screen.getByRole('button', { name: t('en', 'platform.gameEnd.propose') })).toBeEnabled()
-    expect(screen.getByText('Rematching a team game requires beta access. Ask a player who has it to start one.')).toBeVisible()
-    emit({ type: 'gameEndProposal', roomId: 'room-1', proposal: { ...proposal, intent: 'rematch' } })
-    await userEvent.click(await screen.findByRole('button', { name: t('en', 'platform.gameEnd.agree') }))
-    expect(sendRoomCommand).toHaveBeenCalledWith('respondGameEnd', { proposalId: 'proposal-1', agree: true })
-  })
-
-  it('attributes a rejection after agreeing to the proposer without refreshing the agreeing account', async () => {
-    const { transport, sendRoomCommand, emit } = fakeTransport()
-    const refresh = vi.fn()
-    render(<GameEndControls transport={transport} locale="en" playerNames={['Ada', 'Bea']} teamGame canUseTeamModes onExperimentalFeatureUnavailable={refresh} />)
-    emit({ type: 'gameEndProposal', roomId: 'room-1', proposal: { ...proposal, intent: 'rematch' } })
-    await userEvent.click(await screen.findByRole('button', { name: t('en', 'platform.gameEnd.agree') }))
-    expect(sendRoomCommand).toHaveBeenCalledWith('respondGameEnd', { proposalId: 'proposal-1', agree: true })
-    emit({ type: 'error', code: 'experimental_feature_unavailable', feature: 'team-modes', error: 'Feature unavailable' })
-    expect(await screen.findByRole('alert')).toHaveTextContent('The proposer no longer has beta access, so no new game was created. The proposer can withdraw the proposal.')
-    expect(refresh).not.toHaveBeenCalled()
-  })
-
-  it('renders a rejected Beta rematch below its control and refreshes account availability', async () => {
-    const { transport, emit } = fakeTransport()
-    const refresh = vi.fn()
-    render(<GameEndControls transport={transport} locale="en" playerNames={['Ada', 'Bea']} teamGame canUseTeamModes onExperimentalFeatureUnavailable={refresh} />)
-    expect(screen.getByRole('button', { name: t('en', 'platform.gameEnd.proposeRematch') })).toBeEnabled()
-    emit({ type: 'error', code: 'experimental_feature_unavailable', error: 'Feature unavailable' })
-    expect(await screen.findByRole('alert')).toHaveTextContent('Team modes are not available to you. No room was created.')
-    expect(screen.getByRole('alert')).toHaveClass('form-error')
-    expect(refresh).toHaveBeenCalledOnce()
-  })
-
-  it('recognizes a recovered receipt by code and refreshes once when its transient error also arrives', async () => {
-    const { transport, emit } = fakeTransport()
-    const refresh = vi.fn()
-    render(<GameEndControls transport={transport} locale="en" playerNames={['Ada', 'Bea']} teamGame canUseTeamModes onExperimentalFeatureUnavailable={refresh} />)
-    emit({ type: 'commandReceipt', requestId: 'recovered', status: 'completed', receipt: {
-      scopeId: 'scope', commandId: 'command', outcome: { ok: false, code: 'experimental_feature_unavailable', error: 'Feature unavailable' },
-    } })
-    expect(await screen.findByRole('alert')).toHaveTextContent('Team modes are not available to you. No room was created.')
-    emit({ type: 'error', requestId: 'recovered', code: 'experimental_feature_unavailable', feature: 'team-modes', error: 'Feature unavailable' })
-    expect(refresh).toHaveBeenCalledOnce()
-  })
 
   it('keeps propose actions disabled until the room can accept them', () => {
     const { transport } = fakeTransport()
