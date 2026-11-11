@@ -8,19 +8,19 @@ import { parseEnv } from 'node:util'
 import { startHostedReleaseApp, type HostedReleaseApp } from './hosted-release-app'
 
 const exec = promisify(execFile)
-export type ExperimentalFeaturesApp = HostedReleaseApp & {
+export type BetaAccessApp = HostedReleaseApp & {
   environment: NodeJS.ProcessEnv
   authenticate(context: BrowserContext, username: string, displayName: string): Promise<void>
 }
 
-/** Owns a separate database, object prefix and processes so declared gates never change other specs. */
-export async function startHostedReleaseAppWithExperimentalFeatures(): Promise<ExperimentalFeaturesApp> {
+/** Isolates account qualification and browser state from other specs. */
+export async function startHostedReleaseAppWithBetaAccess(): Promise<BetaAccessApp> {
   const root = await mkdtemp(join(tmpdir(), 'agricola-beta-'))
   const createEnvironment = { ...process.env }
   for (const key of ['BACKEND_PORT', 'FRONTEND_PORT', 'APP_BASE_PORT']) delete createEnvironment[key]
   await exec(process.execPath, ['--import', 'tsx', 'scripts/test-environment.ts', 'create', root], { env: createEnvironment })
   const envPath = join(root, 'test.env')
-  await appendFile(envPath, "DEV_EXPERIMENTAL_FEATURES='declared'\nLOCAL_DEPENDENCIES_READY='1'\n")
+  await appendFile(envPath, "LOCAL_DEPENDENCIES_READY='1'\n")
   const environment = { ...process.env, ...parseEnv(await readFile(envPath, 'utf8')) }
   let hosted: HostedReleaseApp | undefined
   let closing: Promise<void> | undefined
