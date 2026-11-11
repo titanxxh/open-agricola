@@ -11,7 +11,6 @@ The package index (`shared/actions/payment/index.ts`) exports three production f
 | `fees` | Fixed per-action fees. A `computeCosts.costs` delta merges into `fees[0]`; negative totals clamp to zero, so a discount never refunds another resource. |
 | `unitFee` + `nb` | Per-unit cost times quantity (rooms, renovated rooms, fence segments, stables). |
 | `roomMaterial` | The actual built room material for both static modifier filtering and quantity-aware bonus filtering. Missing saved values retain the payer house type; explicit `houseType*` residence conditions always read the payer. |
-
 | `unitPriceAlternatives` | A source-specific exact room price can disable ordinary alternative bases. |
 | `trades` | `from → to` substitutions. `Trade.scope: 'action'` converts the resource pool once per action; `'unit'` runs Candidate Closure on each unit row. Complete `Trade.unitPrice` rows seed independent base alternatives before that closure; their `from` and `to` are not discounts. `replaceAll` substitutes the entire current amount of the indicated unit-cost resources. `minCost` / `maxCost`, `replaceUpTo` and `groupMin` / `groupMax` bound uses; each unit `TradeUsage` records what it actually replaced. |
 | `bonuses` | Per-action discounts or discount choices. `optional` adds the no-bonus branch; `capDiscountAtCost` caps a variable discount at the current fee; `trackChoiceIndex` records `bonusChoiceIndex`; only `choiceAffectsState` exempts a choice from dominance pruning; `conditions` are re-evaluated per quantity. |
