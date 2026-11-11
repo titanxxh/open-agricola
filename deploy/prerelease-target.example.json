@@ -1,0 +1,67 @@
+{
+  "format": 1,
+  "channel": "prerelease",
+  "targetId": "prerelease-main",
+  "directory": "/srv/open-agricola-prerelease-main",
+  "policyDirectory": "/srv/open-agricola-owner-tools",
+  "project": "open-agricola-prerelease-main",
+  "origin": "https://pre.example.invalid",
+  "port": 5176,
+  "network": "open-agricola-prerelease-main-dependencies",
+  "database": {
+    "name": "oa_prerelease_main",
+    "appRole": "oa_prerelease_main_app",
+    "backupRole": "oa_prerelease_main_backup",
+    "host": "pre-postgres",
+    "port": 5432
+  },
+  "validationDatabase": {
+    "name": "oa_prerelease_main_validation",
+    "role": "oa_prerelease_main_validator",
+    "host": "pre-postgres",
+    "port": 5432
+  },
+  "objects": {
+    "bucket": "oa-prerelease-main",
+    "prefix": "live/",
+    "appKeyId": "REPLACE_PRE_APP_KEY_ID",
+    "backupKeyId": "REPLACE_PRE_BACKUP_KEY_ID",
+    "endpoint": "http://pre-objects:9000"
+  },
+  "offsite": {
+    "host": "pre-backup",
+    "directory": "/srv/backups/open-agricola-prerelease-main"
+  },
+  "builder": {
+    "name": "prerelease-main",
+    "container": "prerelease-main-builder"
+  },
+  "formal": {
+    "project": "open-agricola",
+    "directory": "/srv/open-agricola",
+    "appOrigin": "https://app.example.invalid",
+    "apiOrigin": "https://api.example.invalid",
+    "database": "agricola",
+    "bucket": "agricola",
+    "offsiteDirectory": "/srv/backups/open-agricola"
+  },
+  "budgets": {
+    "app": {
+      "memoryMiB": 768,
+      "cpus": 1,
+      "pids": 256
+    },
+    "tools": {
+      "memoryMiB": 768,
+      "cpus": 1,
+      "pids": 128
+    },
+    "build": {
+      "memoryMiB": 2048,
+      "cpus": 1,
+      "pids": 512
+    },
+    "diskMiB": 8192,
+    "reserveMemoryMiB": 512
+  }
+}
