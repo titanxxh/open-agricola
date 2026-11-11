@@ -60,7 +60,10 @@ export function createPrereleaseAuthorityHandler({ db, getSourceToken, now = Dat
     const browser = path === '/api/prerelease/entry' || path === '/api/prerelease/handoffs'
     try {
       if (browser) {
-        if (!sourceOrigin || req.headers.origin !== sourceOrigin) throw new PrereleaseAuthorityError('csrf_rejected', 403)
+        const readOnlyEntry = path === '/api/prerelease/entry' && req.method === 'GET'
+        if (!sourceOrigin || (req.headers.origin !== sourceOrigin && !(readOnlyEntry && req.headers.origin === undefined))) {
+          throw new PrereleaseAuthorityError('csrf_rejected', 403)
+        }
         if (path === '/api/prerelease/entry' && req.method === 'GET') {
           send(200, { ok: true, protocolVersion: PRERELEASE_IDENTITY_PROTOCOL, entry: await authority.entry(await getSourceToken(req), target) }, true)
           return true

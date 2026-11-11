@@ -65,7 +65,7 @@ async function setup({ configured = true } = {}) {
     protocolVersion: 1, channel: 'prerelease', targetOrigin, code, browserVerifier: verifier, returnTo, ...overrides,
   })
   const status = (grantId: string) => internal('status', { protocolVersion: 1, channel: 'prerelease', targetOrigin, grantId })
-  return { db, browser, internal, issue, exchange, status, now: () => now, advance: (ms: number) => { now += ms } }
+  return { db, base, browser, internal, issue, exchange, status, now: () => now, advance: (ms: number) => { now += ms } }
 }
 
 describe('formal prerelease identity authority', () => {
@@ -120,6 +120,44 @@ describe('formal prerelease identity authority', () => {
     expect(await (await internal('events', input)).json()).toEqual({ ok: true, protocolVersion: 1, events: [] })
   })
 
+
+  it('accepts an authenticated read-only entry without Origin while rejecting explicit foreign origins', async () => {
+    const { base } = await setup()
+    const entry = await fetch(`${base}/entry`, { headers: { cookie: `oa_session=${sourceToken}` } })
+    expect(entry.status).toBe(200)
+    expect(await entry.json()).toEqual({ ok: true, protocolVersion: 1, entry: {
+      kind: 'available', channel: 'prerelease', startUrl: `${targetOrigin}/open-agricola/auth/start`, returnTo,
+    } })
+    for (const origin of ['https://unrelated.example.test', 'null']) {
+      const rejected = await fetch(`${base}/entry`, { headers: { cookie: `oa_session=${sourceToken}`, origin } })
+      expect(rejected.status).toBe(403)
+      expect(await rejected.json()).toMatchObject({ code: 'csrf_rejected' })
+    }
+    const anonymous = await fetch(`${base}/entry`)
+    expect(anonymous.status).toBe(401)
+    expect(await anonymous.json()).toMatchObject({ code: 'not_authenticated' })
+  })
+
+  it('requires the exact formal Origin for handoff writes after permitting an entry read without it', async () => {
+    const { base, issue } = await setup()
+    const body = JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin, browserChallenge: challenge, returnTo })
+    for (const headers of [{}, { origin: 'https://unrelated.example.test' }, { origin: 'null' }]) {
+      const rejected = await fetch(`${base}/handoffs`, { method: 'POST', headers: {
+        cookie: `oa_session=${sourceToken}`, 'content-type': 'application/json', ...headers,
+      }, body })
+      expect(rejected.status).toBe(403)
+      expect(await rejected.json()).toMatchObject({ code: 'csrf_rejected' })
+    }
+    expect((await issue()).status).toBe(200)
+  })
+
+  it('keeps entry reads closed when the formal source is not an HTTPS origin', async () => {
+    const { base } = await setup()
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'http://play.example.test')
+    const rejected = await fetch(`${base}/entry`, { headers: { cookie: `oa_session=${sourceToken}` } })
+    expect(rejected.status).toBe(403)
+    expect(await rejected.json()).toMatchObject({ code: 'csrf_rejected' })
+  })
 
   it('keeps a missing target disabled while allowing the formal browser to read its unavailable entry', async () => {
     const { browser, issue, exchange } = await setup({ configured: false })
