@@ -88,6 +88,8 @@
 
 `PrereleaseHandoffPage` 与 `services/prerelease.ts` 负责 `?page=prerelease-handoff`。页面读取并清除浏览器绑定的 fragment，核对当前配置的目标和正式站根，通过已认证的正式权威只签发一次短期 code。code 仅以 fragment 交给固定 pre 回调；页面不保存登录凭据或 verifier，也不采用调用者提供的回调 URL。出错只返回正式站根。测试见 `PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx` 和 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例。
 
+浏览器只校验时间戳格式与目标。code 过期由正式权威按自身时钟在兑换时裁决，浏览器时钟偏差不参与授权。独立时钟与错误响应的反例通过 `services/__tests__/prerelease.test.ts` 中的公开 helper 验证。
+
 ### 卡牌百科
 
 - **公开路由。** `PageRouter` 在等待登录状态和登录拦截之前，通过懒加载的 `EncyclopediaPage` chunk 提供 `?page=encyclopedia[&entry=<key>]`。普通页面不加载它的 chunk、数据或卡图。复制的链接只带 `page` 与 `entry`，不带房间、座位、手牌或对局参数。浏览状态按标签页保存，任一页面刷新后重新开始；`client/main.tsx` 在首次渲染前清除它。覆盖见 `encyclopedia*.spec.ts`；`encyclopedia-pages.spec.ts` 针对静态 Pages 产物运行。

@@ -85,6 +85,8 @@ Reference targets follow the English source meaning, independently of their tran
 
 `?page=prerelease-handoff` is owned by `PrereleaseHandoffPage` and `services/prerelease.ts`. It consumes and clears browser-bound fragment metadata, checks the current configured target and formal root, and issues one short-lived code through the authenticated authority. Only the fixed pre callback receives the code in its fragment. It stores no login credentials or verifier, and never follows caller-supplied callback URLs. Errors return to the formal root. Tests: `PrereleaseEntry.test.tsx`, `PrereleaseHandoffPage.test.tsx`, and the HTTPS prerelease case in `hosted-password-login.spec.ts`.
 
+The browser validates timestamp shape and destination only. Code expiry is enforced by the authority at exchange using its own clock; browser wall-clock skew cannot decide authorization. The independent-clock and malformed-response cases use the public helper in `services/__tests__/prerelease.test.ts`.
+
 ### Card encyclopedia
 
 - **Public route.** `PageRouter` serves `?page=encyclopedia[&entry=<key>]` through a lazy `EncyclopediaPage` chunk, before the auth wait and the login gate. Ordinary pages load none of its chunks, data or art. Copied links carry only `page` and `entry`, never a room, seat, hand or game option. Browse state is per tab and starts over after a refresh of any page; `client/main.tsx` clears it before the first render. Coverage: `encyclopedia*.spec.ts`; `encyclopedia-pages.spec.ts` runs against the static Pages artifact.
