@@ -3,7 +3,7 @@ import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeF
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { checkPrereleaseVerification, requestPrereleaseVerification, syncPrerelease, validateIntegrationManifest } from '../ci/prerelease-verification'
+import { checkPrereleaseVerification, requestPrereleaseVerification, runPrereleaseCandidateTask, syncPrerelease, validateIntegrationManifest } from '../ci/prerelease-verification'
 
 const roots: string[] = []
 afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -230,4 +230,29 @@ fs.appendFileSync('bin/build-calls.txt', 'build\\n');
   expect(rejected.status).toBe(1)
   expect(rejected.stderr).toContain('cannot target formal Pages')
   expect(readFileSync(join(value.bin, 'build-calls.txt'), 'utf8').trim().split('\n')).toHaveLength(1)
+})
+
+
+it('runs baseline regressions in stable runtime and builds the pre production artifact with no formal token', () => {
+  const value = fixture()
+  writeFileSync(join(value.bin, 'pnpm'), `#!${process.execPath}
+const fs = require('node:fs');
+fs.appendFileSync('bin/task-environment.jsonl', JSON.stringify({ args: process.argv.slice(2), channel: process.env.RELEASE_CHANNEL,
+  verificationChannel: process.env.VERIFICATION_CHANNEL, sha: process.env.GAME_BUILD_ID,
+  hasToken: !!(process.env.GH_TOKEN || process.env.GITHUB_TOKEN) }) + '\\n');
+`)
+  chmodSync(join(value.bin, 'pnpm'), 0o755)
+  vi.stubEnv('GITHUB_SHA', value.main)
+  vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+  vi.stubEnv('GH_TOKEN', 'formal-token-must-not-reach-candidate')
+  vi.stubEnv('GITHUB_TOKEN', 'formal-token-must-not-reach-candidate')
+  runPrereleaseCandidateTask(value.cwd, 'build', value.sha, value.main)
+  runPrereleaseCandidateTask(value.cwd, 'webkit', value.sha, value.main)
+  const calls = readFileSync(join(value.bin, 'task-environment.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  expect(calls).toEqual([
+    { args: ['run', 'build:hosted-frontend'], channel: 'prerelease', verificationChannel: 'prerelease', sha: value.sha, hasToken: false },
+    { args: ['run', 'build:replay-viewer'], channel: 'stable', verificationChannel: 'prerelease', sha: value.sha, hasToken: false },
+    { args: ['run', 'check:bundle-size'], channel: 'stable', verificationChannel: 'prerelease', sha: value.sha, hasToken: false },
+    { args: ['run', 'verify:e2e:webkit'], channel: 'stable', verificationChannel: 'prerelease', sha: value.sha, hasToken: false },
+  ])
 })

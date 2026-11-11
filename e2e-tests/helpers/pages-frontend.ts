@@ -14,12 +14,15 @@ let built: { directory: string; gameBuildId: string } | undefined
 export function buildPagesFrontend() {
   if (!built) {
     execFileSync('pnpm', ['run', 'build:pages-frontend'], { stdio: 'pipe', maxBuffer: 256 * 1024 * 1024, env: {
-      ...process.env, VITE_API_BASE: PAGES_API_ORIGIN, VITE_WS_BASE: 'wss://api.agricola.test/ws',
+      ...process.env, RELEASE_CHANNEL: 'stable', VITE_API_BASE: PAGES_API_ORIGIN, VITE_WS_BASE: 'wss://api.agricola.test/ws',
     } })
     const directory = resolve('dist-pages')
     const metadata: unknown = JSON.parse(readFileSync(join(directory, 'frontend-build.json'), 'utf8'))
-    expect(metadata).toEqual({ format: 1, gameBuildId: expect.any(String), basePath: '/' })
-    built = { directory, gameBuildId: (metadata as { gameBuildId: string }).gameBuildId }
+    if (!metadata || typeof metadata !== 'object' || !('gameBuildId' in metadata) || typeof metadata.gameBuildId !== 'string' || !metadata.gameBuildId) {
+      throw new Error('Pages build requires its game build identity')
+    }
+    expect(metadata).toEqual({ format: 1, gameBuildId: metadata.gameBuildId, basePath: '/', releaseChannel: 'stable', deploymentTarget: 'stable-pages' })
+    built = { directory, gameBuildId: metadata.gameBuildId }
   }
   return built
 }

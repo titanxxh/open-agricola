@@ -157,7 +157,7 @@ check 读取 GitHub run、job 和 step 元数据。同一 SHA 与配置的兼容
 
 ### Prerelease candidate receipts
 
-`ci.yml` runs the same routine plan for main and prerelease push/PR events. Pushes never publish or deploy. `prerelease-candidate-verification.yml` accepts manual requests only on main and runs the same complete catalog against a fixed pre SHA. The main producer and candidate have separate checkouts, with no persisted checkout credentials. Candidate execution has no formal write or deployment permissions.
+`ci.yml` runs the same routine plan for main and prerelease push/PR events. Pushes never publish or deploy. `prerelease-candidate-verification.yml` accepts manual requests only on main and runs the same complete catalog against a fixed pre SHA. The main producer and candidate have separate checkouts, with no persisted checkout credentials. Candidate execution has no formal write or deployment permissions. `VERIFICATION_CHANNEL=prerelease` identifies its evidence, while ordinary regression commands use `RELEASE_CHANNEL=stable`. Pre-specific fixtures opt into prerelease. The production build task explicitly runs the normal typed hosted build with `RELEASE_CHANNEL=prerelease`; stable Pages fixtures pin stable themselves.
 
 Use the owner command to select and publish, or inspect and retry its fixed reference:
 

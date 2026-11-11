@@ -26,7 +26,7 @@ let pagesBuilt = false
 function frontendBuild(topology: Topology) {
   if (topology === 'same-site-pages' && !pagesBuilt) {
     execFileSync('pnpm', ['run', 'build:pages-frontend'], { stdio: 'pipe', env: {
-      ...process.env, VITE_API_BASE: 'https://api.agricola.test', VITE_WS_BASE: 'wss://api.agricola.test/ws',
+      ...process.env, RELEASE_CHANNEL: 'stable', VITE_API_BASE: 'https://api.agricola.test', VITE_WS_BASE: 'wss://api.agricola.test/ws',
     } })
     pagesBuilt = true
   }
@@ -35,7 +35,8 @@ function frontendBuild(topology: Topology) {
   if (!metadata || typeof metadata !== 'object' || !('gameBuildId' in metadata) || typeof metadata.gameBuildId !== 'string') {
     throw new Error('Build the production frontend with pnpm run build:hosted-frontend before this spec')
   }
-  expect(metadata).toEqual({ format: 1, gameBuildId: metadata.gameBuildId, basePath: topology === 'same-site-pages' ? '/' : HOSTED_APP_PATH })
+  expect(metadata).toEqual({ format: 1, gameBuildId: metadata.gameBuildId, basePath: topology === 'same-site-pages' ? '/' : HOSTED_APP_PATH,
+    releaseChannel: 'stable', deploymentTarget: topology === 'same-site-pages' ? 'stable-pages' : 'stable-hosted' })
   return { directory, gameBuildId: metadata.gameBuildId }
 }
 
