@@ -1164,7 +1164,6 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     <div className="farm-header">
       <div>
         <h2>{t(locale, 'ui.farmTitle')}</h2>
-        {showHand ? operationLabel : null}
         <div className="player-summary">{getPlayerDisplayName(locale, displayPlayer.name, players.findIndex((player) => player.id === displayPlayer.id), displayPlayer.nameIsDefault)}</div>
         <div className="player-resources-compact" data-player-resource-anchor={displayPlayer.id}>
           <span className="res-compact-group">

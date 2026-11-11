@@ -1165,20 +1165,11 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/hotseat-public-farms.spec.ts',
       'e2e-tests/issue1201-lover-settlement.spec.ts',
       'e2e-tests/mobile-scoring-pad.spec.ts',
-      'e2e-tests/multihand.spec.ts',
       'e2e-tests/played-card-chronology.spec.ts',
       'e2e-tests/room-animal-holders.spec.ts',
       'e2e-tests/seasons-worker-icons.spec.ts',
       'e2e-tests/source-aware-scoring.spec.ts',
       'e2e-tests/special-actions-localization.spec.ts',
-      'e2e-tests/team-cooperation-animals.spec.ts',
-      'e2e-tests/team-cooperation-builds.spec.ts',
-      'e2e-tests/team-cooperation-card-builds.spec.ts',
-      'e2e-tests/team-cooperation-fences.spec.ts',
-      'e2e-tests/team-cooperation-full-game.spec.ts',
-      'e2e-tests/team-cooperation-marketplace.spec.ts',
-      'e2e-tests/team-scoring.spec.ts',
-      'e2e-tests/team-visibility.spec.ts',
       'e2e-tests/visual-support-regression.spec.ts',
     ].map(file => ({ file, grep: null }))
     const farm = planRoutineVerification({
@@ -1205,7 +1196,6 @@ describe('dependency routine verification plan', () => {
     expect(replay.fullTrigger).toBe(false)
     expect(replay.browserFiles).toEqual([
       ...replayViewerSpecs,
-      { file: 'e2e-tests/team-result-archive.spec.ts', grep: null },
     ])
   }, 180_000)
 
