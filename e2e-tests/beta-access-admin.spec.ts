@@ -11,7 +11,7 @@ import { startHostedReleaseAppWithBetaAccess } from './helpers/beta-access-app'
 import { PostgresDatabase } from '../server/database/postgres'
 
 let app: Awaited<ReturnType<typeof startHostedReleaseAppWithBetaAccess>>
-test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithBetaAccess() })
+test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithBetaAccess({ https: true }) })
 test.afterAll(async () => { await app?.close() })
 
 async function expectStableLobby(page: Page) {
@@ -30,9 +30,9 @@ async function expectRemovedBusinessControls(page: Page) {
 
 test('administrator manages Beta qualification with bilingual revocation while main keeps stable game controls', async ({ browser }, testInfo) => {
   test.setTimeout(120000)
-  const administrator = await browser.newContext({ viewport: { width: 1280, height: 900 } })
-  const ordinary = await browser.newContext()
-  const visitor = await browser.newContext()
+  const administrator = await browser.newContext({ viewport: { width: 1280, height: 900 }, ignoreHTTPSErrors: true })
+  const ordinary = await browser.newContext({ ignoreHTTPSErrors: true })
+  const visitor = await browser.newContext({ ignoreHTTPSErrors: true })
   try {
     const username = `beta_member_${Date.now().toString(36)}`
     await app.authenticate(administrator, 'e2e_admin', 'Administrator')
@@ -56,7 +56,12 @@ test('administrator manages Beta qualification with bilingual revocation while m
     await member.goto(app.appUrl)
     await expectStableLobby(member)
     await expect(member.locator('.prerelease-entry')).toHaveCount(0)
+    const sameOriginEntry = owner.waitForResponse(response => new URL(response.url()).pathname === '/api/prerelease/entry')
     await owner.goto(app.appUrl)
+    const read = await sameOriginEntry
+    expect(read.request().headers().origin).toBeUndefined()
+    expect(read.status()).toBe(200)
+    expect(await read.json()).toEqual({ ok: true, protocolVersion: 1, entry: { kind: 'disabled' } })
     await expectStableLobby(owner)
     await expect(owner.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
 
@@ -108,6 +113,10 @@ test('administrator manages Beta qualification with bilingual revocation while m
 
     const retainedRooms = await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`)).json()
     const commands: string[] = []
+    const allocations: string[] = []
+    member.on('request', request => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/rooms/locate') allocations.push(request.url())
+    })
     member.on('websocket', socket => socket.on('framesent', frame => {
       const payload: unknown = JSON.parse(String(frame.payload))
       if (payload && typeof payload === 'object' && 'type' in payload && typeof payload.type === 'string') commands.push(payload.type)
@@ -125,8 +134,27 @@ test('administrator manages Beta qualification with bilingual revocation while m
       await expect(member.getByText('Unsupported game configuration', { exact: true })).toBeVisible()
       await expect(member.locator('.action-board')).toHaveCount(0)
     }
-    expect(commands).toContain('getCommandScope')
-    expect(commands).not.toContain('createRoom')
+    expect(commands).toEqual([])
+    expect(allocations).toEqual([])
     expect(await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`)).json()).toEqual(retainedRooms)
   } finally { await visitor.close(); await ordinary.close(); await administrator.close() }
+})
+
+
+test('keeps prerelease entry closed for an HTTP formal configuration', async ({ browser }) => {
+  test.setTimeout(180000)
+  const insecure = await startHostedReleaseAppWithBetaAccess()
+  const context = await browser.newContext()
+  try {
+    await insecure.authenticate(context, 'e2e_admin', 'Administrator')
+    const page = await context.newPage()
+    const entry = page.waitForResponse(response => new URL(response.url()).pathname === '/api/prerelease/entry')
+    await page.goto(insecure.appUrl)
+    const response = await entry
+    expect(response.request().headers().origin).toBeUndefined()
+    expect(response.status()).toBe(403)
+    expect(await response.json()).toMatchObject({ code: 'csrf_rejected' })
+    await expectStableLobby(page)
+    await expect(page.locator('.prerelease-entry')).toHaveCount(0)
+  } finally { await context.close(); await insecure.close() }
 })
