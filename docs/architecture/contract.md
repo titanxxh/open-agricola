@@ -9,6 +9,7 @@ This module centralizes the shapes shared by the frontend, backend and sandbox, 
 | File | Contents |
 |---|---|
 | `contract/types.ts` | `GameState`, `PlayerState`, `ActionSpace`, `Resource`, `InteractionState`, `InteractionRequest`, `ActionDefinition` |
+| `contract/workshop-public-cards.ts` | Versioned public source/image snapshots and 30-second creation/execution status |
 | `contract/workshop.ts` | Frontend/backend protocol for Workshop Design Drafts, Workspaces, and generated candidates |
 | `contract/protocol/ws.ts` | `ClientCommand`, `ServerEvent`, `RoomSummary` |
 | `contract/room-access.ts` | Active Room admission policy and player search display identities |

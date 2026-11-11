@@ -187,9 +187,10 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 - 真实 Room 中的 `customCardIds` 只接受已批准、已上线的卡，并使用其审核过的快照。正式单人保留全部显式选择，卡源不可用或来源变化时拒绝创建并返回配置调整；其他 Room 对作者自己未上线的卡给出指引，过滤其他无法加载的 ID。未审核的代码只在工坊沙盒中运行，从不进入多人 `GameSession`。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。
+- `workshop-public-cards.ts` 提供版本 1 公共输入和状态。发布记录保留曾上线版本；读取不回退私有草稿，也不写沙盒状态。输入以 SHA-256 绑定来源、版本、公开定义与源码及经校验的图片字节。状态区分新建与固定输入继续执行，自来源读取开始最多有效 30 秒，失败不续期。管理员下架禁用全部既有公共版本；消费环境负责自身校验与编译。
 - 工坊草稿错误暴露 `shared/contract/workshop.ts` 中的类型化 `code`；在线编辑守卫以 HTTP 409 返回 `live_edit_blocked`。
 
-测试：`server/__tests__/{workshop-api,workshop-submissions}.test.ts`、`server/workshop-pr/__tests__/`。
+测试：`server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submissions}.test.ts`、`server/workshop-pr/__tests__/`。
 
 ## 数据库
 

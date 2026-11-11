@@ -256,6 +256,10 @@ An early design considered a declarative JSON-only V1 DSL. It was not adopted; p
 - isolated-vm has a 100 ms CPU timeout per execution.
 - State snapshots can roll back through existing undo infrastructure.
 
+Public source handoff uses `GET /api/workshop/public-cards/v1/cards/:id` for the current live approved version, including merged cards still publicly live. The returned input binds the Workshop authority, card/version IDs, public card JSON, source and verified image bytes. SHA-256 covers `canonicalJson(input)`; image bytes have their own SHA-256. Compiler output, private drafts and generation provenance are excluded. Consumers validate and compile against their own runtime and capability contract.
+
+`GET /api/workshop/public-cards/v1/cards/:id/versions/:versionId/status?sha256=<input-hash>` returns explicit creation/execution permissions. The publication registry admits only ever-public versions and protects them from normal five-version pruning. Author offline/edit/update blocks new creation from the old version but preserves fixed execution. Administrator takedown disables all public versions of the card; deletion denies further execution. Missing/altered images and failed or expired source reads return no fresh status. `checkedAt` starts before source reads and `validUntil` is at most 30 seconds later; consumers must preserve that deadline and pause after expiry. Snapshot reads include the same initial status. These GET interfaces never write shared sandbox settings or confirmation results. Consumer sandbox execution is delivered separately from this source interface.
+
 ### D4. Workshop UI structure
 
 ```text

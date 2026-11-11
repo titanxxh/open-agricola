@@ -535,6 +535,10 @@ const ensureVersion = async (
           )
       )
       AND NOT EXISTS (
+        SELECT 1 FROM workshop_public_versions
+        WHERE version_id = workshop_card_versions.id
+      )
+      AND NOT EXISTS (
         SELECT 1 FROM workshop_submissions
         WHERE version_id = workshop_card_versions.id AND state IN ('pending','blocked')
       )
@@ -1324,6 +1328,7 @@ export async function adminTakedownCard(
       'SELECT review_status FROM workshop_cards WHERE id = ? FOR UPDATE',
     ).get(cardDbId)) as { review_status: string } | undefined
     if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
+    await db.prepare('UPDATE workshop_public_versions SET disabled_at = COALESCE(disabled_at, ?) WHERE card_id = ?').run(Date.now(), cardDbId)
     // Atomic with the card invalidation: delete every persisted room row
     // that embeds the card (exact JSON element match — LIKE would treat _
     // in nanoid ids as a wildcard). A crash can then never leave the card

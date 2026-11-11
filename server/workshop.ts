@@ -1,3 +1,4 @@
+import { handleWorkshopPublicCards } from './workshop-public-cards'
 import { isWorkshopSubmissionInProgress } from './database/errors'
 import { InvalidationStore } from './invalidation'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -357,6 +358,7 @@ export async function handleWorkshopRoute(
     }
     return handleWorkshopReviewWebhook(req, res, getDb(), reviewRuntime)
   }
+  if (await handleWorkshopPublicCards(req, res, getDb())) return true
   const routeUrl = new URL(url, 'http://localhost')
 
   if (req.method === 'GET' && url === '/api/workshop/sandbox-contract') {

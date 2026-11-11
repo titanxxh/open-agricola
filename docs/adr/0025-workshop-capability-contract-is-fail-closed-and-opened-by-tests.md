@@ -17,6 +17,10 @@ The listener action allowlist only fed the generation prompt and its sync check,
 - Admission serves honest authors and model mistakes with a clear error; it does not bound adversarial workloads beyond the isolate's time and memory limits.
 - Threat model: only reviewed, approved and live snapshots reach other players; unreviewed cards run only in their author's sandbox, and the isolate bounds memory, time and access. During command settlement, a first hook failure or out-of-contract result rejects and rolls back the command; a repeated identical failure skips that card's effect. A failure outside a command records a card warning and contributes a neutral result.
 
+## Public source handoff, 2026-11-11
+
+The version-1 public-card interface exports only a live approved publication and its immutable definition/source, with image bytes and SHA-256 identities. It never reads an author's unpublished version or exports this deployment's compiler artifacts. A consuming candidate must validate and compile under its own Workshop Capability Contract. Publication history distinguishes an old public version from a private Draft Version. Author unpublish and normal updates permit existing fixed inputs; administrator takedown disables all previously public versions of the card. Source status expires at most 30 seconds after the read starts, with no renewal on failure. Consumers pause when that deadline expires. See `server/workshop-public-cards.ts` and `server/__tests__/workshop-public-snapshots.test.ts`; consumer execution remains a separate delivery.
+
 ## Consequences
 
 - More requests receive an explicit capability-gap answer instead of an admitted card that behaves incorrectly.
