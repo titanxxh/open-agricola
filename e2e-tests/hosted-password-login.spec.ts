@@ -18,6 +18,8 @@ import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE 
 import { getDb } from '../server/db'
 import { createFrontendHosting } from '../server/frontend-hosting'
 import { createPrereleaseAuthorityHandler } from '../server/prerelease-authority-routes'
+import { configuredPrereleaseTarget } from '../server/prerelease-authority'
+import { PrereleaseIdentityLifecycle } from '../server/prerelease-identity-lifecycle'
 import { HOSTED_APP_PATH } from '../shared/contract/protocol/app-location'
 import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, openGameEndControls } from './fixtures'
 import { test } from './server-fixtures'
@@ -85,6 +87,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   let appOrigin = ''
   let apiOrigin = ''
   const preOrigin = 'https://pre.agricola.test'
+  const generationId = randomUUID()
   const serviceKey = 'test-target-only-service-key-at-least-32-bytes'
   let issuedHandoffs = 0
   const preRequests: Array<{ path: string; formalCookie: boolean }> = []
@@ -154,9 +157,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
               response.on('end', () => { try { resolveExchange(JSON.parse(Buffer.concat(bytes).toString('utf8'))) } catch (error) { reject(error) } })
             })
             exchange.on('error', reject)
-            exchange.end(JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin: preOrigin, code: data.code, browserVerifier: verifier, returnTo: `${appOrigin}/` }))
+            exchange.end(JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin: preOrigin, generationId, code: data.code, browserVerifier: verifier, returnTo: `${appOrigin}/` }))
           })
           if (!state || typeof state !== 'object' || !('ok' in state) || state.ok !== true || !('state' in state) || !state.state || typeof state.state !== 'object'
+            || !('generationId' in state.state) || state.state.generationId !== generationId
             || !('account' in state.state) || !state.state.account || typeof state.state.account !== 'object'
             || !('kind' in state.state.account) || state.state.account.kind !== 'active' || !('subject' in state.state.account)
             || !state.state.account.subject || typeof state.state.account.subject !== 'object' || !('username' in state.state.account.subject)) throw new Error('Expected minimal exchanged identity')
@@ -294,6 +298,29 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     process.env.PRERELEASE_IDENTITY_SERVICE_KEY = serviceKey
     process.env.PRERELEASE_ENTRY_ENABLED = 'true'
   }
+  const owner = new PrereleaseIdentityLifecycle(getDb())
+  const ownerBinding = { targetOrigin: preOrigin, generationId }
+  const activatePrerelease = async () => {
+    // This stateless endpoint relays identity responses; it stores no pre principals.
+    const retainedIdentityRefs: readonly never[] = []
+    const proof = JSON.stringify({ fixture: 'stateless-tls-handoff', ...ownerBinding, retainedIdentityRefs })
+    const audit = await owner.apply({
+      ...ownerBinding, action: 'audit-complete', operationId: randomUUID(),
+      identityManifestSha256: createHash('sha256').update(JSON.stringify(retainedIdentityRefs)).digest('hex'),
+      identityCount: retainedIdentityRefs.length, verificationReceiptSha256: createHash('sha256').update(proof).digest('hex'),
+    }, configuredPrereleaseTarget()?.targetOrigin)
+    await owner.apply({ ...ownerBinding, action: 'activate', operationId: randomUUID(), auditOperationId: audit.operationId }, configuredPrereleaseTarget()?.targetOrigin)
+    expect(await owner.read(preOrigin)).toMatchObject({ generationId, state: 'open', audit: { operationId: audit.operationId } })
+  }
+  const closePrerelease = async () => {
+    await owner.apply({ ...ownerBinding, action: 'close', operationId: randomUUID() }, configuredPrereleaseTarget()?.targetOrigin)
+    expect(await owner.read(preOrigin)).toMatchObject({ generationId, state: 'closed', audit: null })
+  }
+  if (prerelease) {
+    await owner.apply({ ...ownerBinding, action: 'prepare', operationId: randomUUID(), targetId: 'tls-entry-fixture', expectedPreviousGenerationId: null }, configuredPrereleaseTarget()?.targetOrigin)
+    expect(await owner.read(preOrigin)).toMatchObject({ generationId, state: 'closed', audit: null })
+    await activatePrerelease()
+  }
   const handleFrontend = createFrontendHosting({ ...process.env, FRONTEND_ROOT: build.directory, GAME_BUILD_ID: build.gameBuildId })
   const proxy = createHttpServer((_req, res) => { res.writeHead(502); res.end() })
   proxy.on('connect', (req, socket, head) => {
@@ -395,6 +422,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     return {
       appUrl: `${appOrigin}${appPath}`, apiOrigin, build, username, userId: user.id,
       preOrigin, preRequests, get issuedHandoffs() { return issuedHandoffs },
+      closePrerelease, activatePrerelease,
       get context() { if (!context) throw new Error('Browser context is not open'); return context },
       get latestRoomState() { return latestRoomState },
       get sandboxBodyHeld() { return sandboxBodyHeld },
@@ -481,13 +509,13 @@ test('prerelease entry keeps the production tab and exchanges only a browser-bou
     expect(new URL(popup.url()).hash).toBe('')
     await expect(popup.getByRole('link', { name: 'Return to production', exact: true })).toHaveAttribute('href', environment.appUrl)
 
-    process.env.PRERELEASE_ENTRY_ENABLED = 'false'
+    await environment.closePrerelease()
     await environment.loadLobby(page, () => page.reload())
     await expect(page.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
     await expect(page.getByRole('status')).toContainText('Prerelease is not available yet.')
     await page.goto(`${environment.appUrl}?page=settings&bg=none`)
     await expect(page.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
-    process.env.PRERELEASE_ENTRY_ENABLED = 'true'
+    await environment.activatePrerelease()
     await page.reload()
     await expect(page.getByRole('link', { name: 'Enter prerelease', exact: true })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('prerelease-settings.png'), fullPage: true })
