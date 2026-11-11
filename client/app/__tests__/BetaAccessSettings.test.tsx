@@ -42,7 +42,7 @@ describe('Beta access settings', () => {
     expect(apiFetch).toHaveBeenCalledWith('/api/admin/beta-access', expect.objectContaining({ method: 'PUT', body: '{"userId":"player"}' }))
     fireEvent.click(within(row).getByRole('button', { name: 'Revoke' }))
     const dialog = screen.getByRole('dialog')
-    expect(dialog).toHaveTextContent('Revoke beta access for @alice? This takes effect immediately. Existing team rooms are not affected.')
+    expect(dialog).toHaveTextContent('Revoke beta access for @alice? Prerelease access will stop within 30 seconds. Saved games and other state will be retained.')
     expect(apiFetch.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(screen.queryByRole('row', { name: /Alice @alice Owner @owner/ })).toBeNull())
