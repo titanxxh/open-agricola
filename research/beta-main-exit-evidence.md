@@ -1,6 +1,6 @@
 # 既有 Beta 业务迁出 main 的事实依据
 
-本记录回答 [研究票 #1649](https://github.com/titanxxh/open-agricola/issues/1649)，供 [迁出决策 #1650](https://github.com/titanxxh/open-agricola/issues/1650) 使用。它不决定迁出、排空、隔离承载或迁移策略，也不执行发布及数据变更。
+本记录回答 [既有 Beta 功能迁出主干前，正式发布与保留局有哪些约束？](https://github.com/titanxxh/open-agricola/issues/1649)，供 [现有 Beta 业务功能如何迁出 main，并兼容已保留的对局？](https://github.com/titanxxh/open-agricola/issues/1650) 使用。它不决定迁出、排空、隔离承载或迁移策略，也不执行发布及数据变更。
 
 ## 固定上下文
 
