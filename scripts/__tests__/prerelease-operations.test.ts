@@ -172,6 +172,7 @@ esac
   expect(existsSync(join(value.root, 'control/gate.json')), migration.stderr).toBe(true)
   const state = () => JSON.parse(readFileSync(join(value.root, 'control/gate.json'), 'utf8'))
   expect(state()).toMatchObject({ mode: 'maintenance', buildId: null, operation: { stage: 'migration', id: operationId } })
+  expect(existsSync(join(value.root, 'control', `policy-${buildId}`, 'node_modules'))).toBe(true)
   rmSync(join(value.temporary, 'migration-fail')); writeFileSync(join(value.temporary, 'startup-fail'), '')
   const startup = invoke()
   expect(startup.status, startup.stderr).not.toBe(0)
