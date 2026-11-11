@@ -105,5 +105,28 @@ test('administrator manages Beta qualification with bilingual revocation while m
     await expectStableLobby(member)
     await expect(member.locator('.prerelease-entry')).toHaveCount(0)
     expect(await (await ordinary.request.get(`${app.apiUrl}/api/auth/me`)).json()).toMatchObject({ user: { betaAccess: false } })
+
+    const retainedRooms = await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`)).json()
+    const commands: string[] = []
+    member.on('websocket', socket => socket.on('framesent', frame => {
+      const payload: unknown = JSON.parse(String(frame.payload))
+      if (payload && typeof payload === 'object' && 'type' in payload && typeof payload.type === 'string') commands.push(payload.type)
+    }))
+    for (const [key, value] of [
+      ['teamConfig', JSON.stringify({ mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' })],
+      ['team', '1'], ['multihand', '1'], ['cooperationRules', 'true'],
+    ]) {
+      const legacy = new URL(app.appUrl)
+      legacy.searchParams.set('page', 'game')
+      legacy.searchParams.set('transport', 'ws')
+      legacy.searchParams.set('players', '4')
+      legacy.searchParams.set(key, value)
+      await member.goto(legacy.href)
+      await expect(member.getByText('Unsupported game configuration', { exact: true })).toBeVisible()
+      await expect(member.locator('.action-board')).toHaveCount(0)
+    }
+    expect(commands).toContain('getCommandScope')
+    expect(commands).not.toContain('createRoom')
+    expect(await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`)).json()).toEqual(retainedRooms)
   } finally { await visitor.close(); await ordinary.close(); await administrator.close() }
 })
