@@ -23,11 +23,36 @@ if [[ "$1" == '+%s%3N' ]]; then exec /usr/bin/date +%s%N; fi
 exec /usr/bin/date "$@"
 `, { mode: 0o700 })
     const remote = join(root, 'remote')
+    const committed = (directory: string, stem: string, ageDays: number) => {
+      const archive = Buffer.from(stem), configuration = Buffer.from('private fixture configuration')
+      const report = { formatVersion: 2, backupStem: stem, environment: 'stable', retentionDays: 30,
+        validatedAt: new Date().toISOString(), sourceBuildId: sourceBuild, targetBuildId: sourceBuild,
+        archiveSha256: createHash('sha256').update(archive).digest('hex'), archiveSizeBytes: archive.length,
+        configurationSha256: createHash('sha256').update(configuration).digest('hex'), configurationSizeBytes: configuration.length }
+      const files: Array<[string, Buffer | string]> = [[`${stem}.tgz`, archive], [`env-${stem}`, configuration], [`${stem}.manifest.json`, JSON.stringify(report)]]
+      for (const [name, bytes] of files) {
+        writeFileSync(join(directory, name), bytes)
+        const date = new Date(Date.now() - ageDays * 86400_000)
+        utimesSync(join(directory, name), date, date)
+      }
+    }
+    if (fail === 'offsite-export') {
+      for (let index = 1; index <= 8; index++) committed(join(root, 'backups'), `daily-seeded-${index}`, index)
+      for (let index = 1; index <= 6; index++) committed(join(root, 'backups'), `pre-seeded-${index}`, index)
+      committed(join(root, 'backups'), 'manual-within-limit', 29)
+      committed(join(root, 'backups'), 'manual-expired', 31)
+    }
+    writeFileSync(join(root, 'bin/node'), `#!/bin/bash
+printf 'node:%s\\n' "$*" >> "$PWD/backup-events"
+exec "$OA_BACKUP_REAL_NODE" "$@"
+`, { mode: 0o700 })
     if (offsite) {
       mkdirSync(remote)
+      if (fail === 'offsite-export') committed(remote, 'manual-independent', 29)
       mkdirSync(join(root, 'deploy'))
       cpSync('backup-offsite.sh', join(root, 'backup-offsite.sh'))
       for (const path of ['deploy/offsite-retention.sh', 'deploy/commit-backup-set.sh']) cpSync(path, join(root, path))
+      if (fail === 'offsite-export') writeFileSync(join(root, 'deploy/offsite-retention.sh'), `printf 'remote-retention\\n' >> '${root}/backup-events'\n` + readFileSync(join(root, 'deploy/offsite-retention.sh'), 'utf8'))
       writeFileSync(join(remote, 'daily-old.tgz'), 'expired archive')
       const expired = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000)
       utimesSync(join(remote, 'daily-old.tgz'), expired, expired)
@@ -45,6 +70,7 @@ args=("$@")
 if [[ "$*" == *'--from0'* ]]; then
   if [[ "\${BACKUP_TEST_FAILURE:-}" == offsite-timeout ]]; then sleep 30; exit 0; fi
   for arg in "$@"; do if [[ "$arg" == --files-from=* ]]; then list="\${arg#--files-from=}"; fi; done
+  cp -- "$list" "$PWD/archive-files.nul"
   destination="\${args[-1]#fixture:}"
   while IFS= read -r -d '' name; do cp -- "backups/$name" "$destination/$name"; done < "$list"
   exit 0
@@ -55,6 +81,7 @@ cp -- "\${args[-2]}" "\${args[-1]#fixture:}"
     writeFileSync(join(root, 'bin/docker'), `#!/bin/bash
 set -eu
 printf '%s\\n' "$*" >> "$PWD/docker-calls"
+printf 'docker:%s\\n' "$*" >> "$PWD/backup-events"
 printf '%s:%s\\n' "$APP_UID" "$APP_GID" >> "$PWD/docker-users"
 case "$*" in
   'ps -aq --filter label=org.open-agricola.backup.run --filter label=org.open-agricola.backup.environment=stable')
@@ -74,7 +101,7 @@ case "$*" in
   *'ledger-merge '*) ;;
   *'ledger-export '*) printf '{"version":1,"batches":[]}' > backups/replay-removals.latest.json ;;
   *'export-online /backup/'*|*' export /backup/'*)
-    [[ "\${BACKUP_TEST_FAILURE:-}" != export ]] || exit 42
+    [[ "\${BACKUP_TEST_FAILURE:-}" != export && "\${BACKUP_TEST_FAILURE:-}" != offsite-export ]] || exit 42
     if [[ "\${BACKUP_TEST_FAILURE:-}" == deadline ]]; then sleep 30; fi
     for argument in "$@"; do
       if [[ "$argument" == /backup/.pending-*/capture ]]; then
@@ -93,7 +120,8 @@ esac
 `, { mode: 0o700 })
     const run = () => spawnSync('/bin/bash', offsite ? ['backup-offsite.sh'] : ['scripts/backup-storage.sh', 'manual-test', ...(stopped ? ['--already-stopped'] : [])], {
       cwd: root,
-      env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}`, BACKUP_TEST_FAILURE: fail,
+      env: { ...process.env, BACKUP_RETENTION_DAYS: undefined, BACKUP_DAILY_COUNT: undefined, BACKUP_PRE_COUNT: undefined,
+        OA_BACKUP_REAL_NODE: process.execPath, PATH: `${root}/bin:${process.env.PATH}`, BACKUP_TEST_FAILURE: fail,
         SOURCE_BUILD_ID: sourceBuild, MAINTENANCE_LOCK_HELD: '0', BACKUP_JOB_ID: fail.endsWith('date-width') ? '' : 'fixture-run',
         OFFSITE_BACKUP_TARGET: 'fixture', OFFSITE_BACKUP_REMOTE_DIR: remote,
         BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + (fail === 'deadline' || fail === 'offsite-timeout' ? 2000 : 30_000)) },
@@ -106,6 +134,10 @@ esac
     const archivePath = join(root, 'backups/manual-test.tgz'), reportPath = join(root, 'backups/manual-test.manifest.json')
     const configPath = join(root, 'backups/env-manual-test')
     return {
+      events: existsSync(join(root, 'backup-events')) ? readFileSync(join(root, 'backup-events'), 'utf8').trim().split('\n') : [],
+      localFiles: readdirSync(join(root, 'backups')),
+      archiveFiles: existsSync(join(root, 'archive-files.nul')) ? readFileSync(join(root, 'archive-files.nul'), 'utf8').split('\0').filter(Boolean) : [],
+      remoteFiles: offsite ? readdirSync(remote) : [],
       status: result.status, retryStatus: retry?.status, stderr: result.stderr,
       calls: existsSync(join(root, 'docker-calls')) ? readFileSync(join(root, 'docker-calls'), 'utf8').trim().split('\n') : [],
       users: existsSync(join(root, 'docker-users')) ? readFileSync(join(root, 'docker-users'), 'utf8').trim().split('\n') : [],
@@ -133,7 +165,7 @@ it('captures online from the running immutable image without stopping or restart
   expect(result.calls.some(call => call.includes('export-online /backup/'))).toBe(true)
   expect(result.calls.some(call => call.includes('--label org.open-agricola.backup.run=fixture-run'))).toBe(true)
   expect(result.calls.some(call => call.includes('app timeout --signal=TERM'))).toBe(true)
-  expect(result.report).toMatchObject({ sourceBuildId: sourceBuild, targetBuildId: sourceBuild,
+  expect(result.report).toMatchObject({ environment: 'stable', retentionDays: 30, sourceBuildId: sourceBuild, targetBuildId: sourceBuild,
     archiveSizeBytes: result.archive!.length, archiveSha256: createHash('sha256').update(result.archive!).digest('hex'),
     configurationSizeBytes: result.configuration!.length, configurationSha256: createHash('sha256').update(result.configuration!).digest('hex') })
   expect(result.mode).toBe(0o600)
@@ -204,5 +236,28 @@ it('captures and commits offsite when date ignores nanosecond field width', () =
   expect(archived.report.archiveSha256).toBe(createHash('sha256').update(archived.bytes).digest('hex'))
   expect(result.remoteLedger).toBe('{"version":1,"batches":[]}')
   expect(result.incoming).toEqual([])
+  expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
+}, 15_000)
+
+
+it('keeps stable default age/count limits and separate ledger sync after a real shell capture failure', () => {
+  const result = backup('offsite-export')
+  expect(result.status).not.toBe(0)
+  expect(result.latest).toBe(result.priorReport)
+  expect(result.localFiles.filter(name => /^daily-.*\.tgz$/.test(name)).sort()).toEqual(Array.from({ length: 7 }, (_, index) => `daily-seeded-${index + 1}.tgz`))
+  expect(result.localFiles.filter(name => /^pre-.*\.tgz$/.test(name)).sort()).toEqual(Array.from({ length: 5 }, (_, index) => `pre-seeded-${index + 1}.tgz`))
+  expect(result.localFiles).toContain('manual-within-limit.tgz')
+  expect(result.localFiles).not.toContain('manual-expired.tgz')
+  expect(result.expiredRemoteArchive).toBe(false)
+  expect(result.remoteFiles).toContain('manual-independent.tgz')
+  expect(result.remoteLedger).toBe('{"version":1,"batches":[]}')
+  expect(result.archiveFiles).not.toContain('replay-removals.latest.json')
+  expect(result.archiveFiles).toContain('manual-within-limit.tgz')
+  const captureAt = result.events.findIndex(event => event.startsWith('docker:') && event.includes('export-online /backup/'))
+  const pruneAt = result.events.findIndex(event => event.startsWith('node:') && event.includes('backup-files.mjs prune backups 7 5'))
+  const offsiteAt = result.events.indexOf('remote-retention')
+  expect(captureAt).toBeGreaterThanOrEqual(0)
+  expect(pruneAt).toBeGreaterThan(captureAt)
+  expect(offsiteAt).toBeGreaterThan(pruneAt)
   expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
 }, 15_000)

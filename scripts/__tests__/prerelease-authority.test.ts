@@ -1,12 +1,15 @@
 import { createServer } from 'node:https'
 import { once } from 'node:events'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { parsePrereleaseTarget } from '../prerelease/config'
 import { requestAuthorityLifecycle } from '../prerelease/authority'
+
+beforeEach(() => { vi.stubEnv('CI', ''); vi.stubEnv('GITHUB_ACTIONS', '') })
+afterEach(() => vi.unstubAllEnvs())
 
 it('sends the owner cookie only to exact formal HTTPS/Origin, validates receipt binding, and refuses redirects', async () => {
   const root = mkdtempSync(join(tmpdir(), 'pre-owner-authority-'))
@@ -47,4 +50,16 @@ it('sends the owner cookie only to exact formal HTTPS/Origin, validates receipt 
     server.closeAllConnections(); await new Promise<void>(done => server.close(() => done()))
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+
+it.each(['CI', 'GITHUB_ACTIONS'])('refuses authority execution in %s before reading credentials or contacting formal HTTPS', async flag => {
+  const root = mkdtempSync(join(tmpdir(), 'pre-owner-ci-'))
+  const template = JSON.parse(readFileSync('deploy/prerelease-target.example.json', 'utf8'))
+  const target = parsePrereleaseTarget({ ...template, directory: join(root, 'open-agricola-prerelease-main'), policyDirectory: process.cwd() })
+  vi.stubEnv(flag, 'true')
+  try {
+    await expect(requestAuthorityLifecycle(target, join(root, 'missing-cookie'), { action: 'close' })).rejects.toThrow('owner-controlled machine, outside CI')
+    expect(readdirSync(root)).toEqual([])
+  } finally { rmSync(root, { recursive: true, force: true }) }
 })
