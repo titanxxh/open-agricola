@@ -46,8 +46,9 @@ esac
 `, { mode: 0o700 })
   const save = () => writeFileSync(path, JSON.stringify(config))
   save()
-  const invoke = (...args: string[]) => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', ...args, '--config', path], { encoding: 'utf8', env: { ...process.env, CI: '', PATH: `${bin}:${process.env.PATH}`, PRERELEASE_TEST_CALLS: join(temporary, 'calls') }, timeout: 15000 })
-  return { root, config, save, invoke, bin, temporary, fail: join(temporary, 'fail'), calls: () => existsSync(join(temporary, 'calls')) ? readFileSync(join(temporary, 'calls'), 'utf8') : '' }
+  const env: NodeJS.ProcessEnv = { ...process.env, CI: '', GITHUB_ACTIONS: '', PATH: `${bin}:${process.env.PATH}` }
+  const invoke = (...args: string[]) => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', ...args, '--config', path], { encoding: 'utf8', env, timeout: 15000 })
+  return { root, config, save, invoke, env, bin, temporary, fail: join(temporary, 'fail'), calls: () => existsSync(join(temporary, 'calls')) ? readFileSync(join(temporary, 'calls'), 'utf8') : '' }
 }
 
 it('plans a complete isolated target without creating deployment files or exposing secrets', () => {
@@ -164,7 +165,7 @@ esac
     input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(parsePrereleaseTarget(value.config)),
       target: value.config, request, receipt: { status: 'passed', channel: 'prerelease', repository: 'titanxxh/open-agricola', sha: buildId,
         configuration: 'e'.repeat(64), producerConfiguration: 'f'.repeat(64), tasks: FULL_TASK_IDS.map((id, index) => ({ id, status: 'passed', runId: 1, jobId: index + 1 })) } }),
-    encoding: 'utf8', timeout: 30000, env: { ...process.env, CI: '', SSH_CONNECTION: 'owner fixture', PATH: `${value.bin}:${process.env.PATH}` },
+    encoding: 'utf8', timeout: 30000, env: { ...value.env, SSH_CONNECTION: 'owner fixture' },
   })
   writeFileSync(join(value.temporary, 'migration-fail'), '')
   const migration = invoke()
@@ -223,6 +224,21 @@ it('keeps the seven-day archive cap after closure without credentials or Docker,
 it('rejects whole-host cleanup requests before creating state or running tools', () => {
   const value = fixture(), result = value.invoke('cleanup', '--expected-current', 'empty')
   expect(result.status).not.toBe(0)
+  expect(existsSync(join(value.root, 'control'))).toBe(false)
+  expect(value.calls()).toBe('')
+})
+
+
+it.each(['CI', 'GITHUB_ACTIONS'])('refuses owner initialization in %s before state, Docker, SSH or GitHub effects', flag => {
+  const value = fixture()
+  value.env[flag] = 'true'
+  for (const tool of ['ssh', 'gh']) writeFileSync(join(value.bin, tool), `#!/bin/sh
+printf '${tool}\\n' >> '${value.temporary}/calls'
+exit 42
+`, { mode: 0o700 })
+  const result = value.invoke('initialize', '--expected-current', 'empty', '--generation', 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', '--ssh', 'fixture-owner')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('owner-controlled machine, outside CI')
   expect(existsSync(join(value.root, 'control'))).toBe(false)
   expect(value.calls()).toBe('')
 })
