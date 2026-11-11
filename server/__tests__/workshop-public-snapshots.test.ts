@@ -192,3 +192,21 @@ it('does not authorize new creation when a retained publication has lost its app
   const status = await fetch(`${origin}/api/workshop/public-cards/v1/cards/${card.id}/versions/${versionId}/status?sha256=${initial.snapshot.sha256}`).then(response => response.json())
   expect(status.access).toEqual({ kind: 'offline', allowNew: false, allowExisting: true })
 })
+
+it('waits for an actual same-card version during card-first import and never admits another card version', async () => {
+  const cardJson = { id: 'CUSTOM_LateVersion', name: 'Late version', card_type: 'minor', deck: 'CUSTOM', number: 0, desc: ['Public source'] }
+  await db.prepare(`INSERT INTO workshop_cards(id,author_id,card_id,card_type,name,card_json,created_at,updated_at,review_status,live,approved_version_id)
+    VALUES ('late-version-card','author',?,'minor',?,?,1,1,'approved',1,'late-public-v1')`)
+    .run(cardJson.id, cardJson.name, JSON.stringify(cardJson))
+  expect((await fetch(`${origin}/api/workshop/public-cards/v1/cards/late-version-card`)).status).toBe(404)
+  await db.prepare(`INSERT INTO workshop_card_versions(id,card_id,card_json,version_number,created_by,created_at)
+    VALUES ('late-public-v1','late-version-card',?,1,'author',1)`).run(JSON.stringify(cardJson))
+  const response = await fetch(`${origin}/api/workshop/public-cards/v1/cards/late-version-card`)
+  expect(response.status).toBe(200)
+  expect((await response.json()).snapshot.input.source).toEqual({ kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: 'late-version-card', versionId: 'late-public-v1' })
+  await db.prepare(`INSERT INTO workshop_cards(id,author_id,card_id,card_type,name,card_json,created_at,updated_at,review_status,live,approved_version_id)
+    VALUES ('wrong-card','author','CUSTOM_WrongCard','minor','Wrong','{}',1,1,'approved',1,'late-public-v1')`).run()
+  expect((await fetch(`${origin}/api/workshop/public-cards/v1/cards/wrong-card`)).status).toBe(404)
+  const status = await fetch(`${origin}/api/workshop/public-cards/v1/cards/wrong-card/versions/late-public-v1/status?sha256=${'0'.repeat(64)}`).then(result => result.json())
+  expect(status.access).toEqual({ kind: 'not_public', allowNew: false, allowExisting: false })
+})

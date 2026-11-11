@@ -111,3 +111,14 @@ it('retains an erased Workshop reference as an inaccessible tombstone without up
   expect(await db.prepare("SELECT art_url FROM workshop_cards WHERE id='workshop'").get()).toEqual({ art_url: '/card-art/saved.png' })
   expect(await db.prepare("SELECT blocked FROM stored_objects WHERE object_key='card-art/saved.png'").get()).toEqual({ blocked: true })
 })
+
+it('registers imported live public cards after their same-card immutable versions arrive', async () => {
+  fixture = await importFixture()
+  const { source, db, resources, paths } = fixture
+  source.prepare("UPDATE workshop_cards SET review_status='approved',live=1,approved_version_id='import-public-v1' WHERE id='workshop'").run()
+  source.prepare("INSERT INTO workshop_card_versions(id,card_id,card_json,version_number,created_by,created_at) VALUES('import-public-v1','workshop','{}',1,'u1',1)").run()
+  await importSqlite(paths, db, resources)
+  expect(await db.prepare("SELECT card_id,version_id FROM workshop_public_versions WHERE card_id='workshop'").get())
+    .toEqual({ card_id: 'workshop', version_id: 'import-public-v1' })
+  await assertStorageReady(db)
+})
