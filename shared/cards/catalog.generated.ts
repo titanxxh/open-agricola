@@ -3117,7 +3117,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 0,
     "enablesPalisades": true,
-    "palisadeTargetFarmPolicy": "own",
     "extraVp": true,
     "kind": "minor"
   },

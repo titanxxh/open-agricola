@@ -4,8 +4,6 @@ import type { CropStack } from '../contract/types'
 type CropType = CropStack['kind']
 
 export type PromptKey =
-  | 'ui.marketplace.prompt'
-  | 'ui.targetFarm.prompt'
   // Core interaction prompts
   | 'ui.interactionAnimalReorg'
   | 'ui.confirmNextPlayer'

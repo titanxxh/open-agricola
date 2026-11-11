@@ -11,7 +11,6 @@ type Scenario = {
   material?: 'wood' | 'clay' | 'stone'
   round?: number
   count?: number
-  partner?: boolean
   prices: Price[]
 }
 const sessions: GameSession[] = []
@@ -26,8 +25,7 @@ function prepare(scenario: Scenario, resources: Price = { wood: 99, clay: 99, st
   const session = createWorkSession({
     seed: 1636,
     options: {
-      playerCount: scenario.partner ? 4 : 2,
-      ...(scenario.partner ? { teamConfig: { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'private', cooperationRules: true } } : {}),
+      playerCount: 2,
       enableFarmersOfTheMoor: scenario.minor?.includes('M036_PeatMoss') ?? false,
     },
     configure(state) {
@@ -42,19 +40,17 @@ function prepare(scenario: Scenario, resources: Price = { wood: 99, clay: 99, st
       Object.assign(payer.resources, { wood: 0, clay: 0, stone: 0, reed: 0, food: 0, ...resources })
       payer.minorPlayed = scenario.minor ?? []
       payer.occupationPlayed = scenario.occupations ?? []
-      payer.houseType = scenario.partner ? (material === 'wood' ? 'clay' : 'wood') : material
-      if (scenario.partner) state.players[2]!.houseType = material
+      payer.houseType = material
     },
   })
   sessions.push(session)
-  expect(session.state.players).toHaveLength(scenario.partner ? 4 : 2)
+  expect(session.state.players).toHaveLength(2)
   return session
 }
 
-function open(session: GameSession, partner = false) {
+function open(session: GameSession) {
   let response = session.takeAction(0, 'farm-expansion')
   expect(response.ok, response.error).toBe(true)
-  if (partner) response = session.resolveChoice(0, 'target-farm:p3')
   const branch = options(response).find(option => option.labelKey === 'actions.construct.name')
   if (branch) response = session.resolveChoice(0, branch.value)
   expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'room' } } })
@@ -83,21 +79,17 @@ describe('complete room prices', () => {
     { name: 'Stonecutter discounts the selected Carpenter price', occupations: ['B126_Carpenter', 'A143_Stonecutter'], material: 'stone', prices: [{ stone: 2, reed: 2 }] },
     { name: 'Bricklayer discounts every clay room', occupations: ['C122_Bricklayer'], material: 'clay', count: 2, prices: [{ clay: 6, reed: 4 }] },
     { name: 'Bricklayer discounts each Carpenter room', occupations: ['B126_Carpenter', 'C122_Bricklayer'], material: 'clay', count: 2, prices: [{ clay: 2, reed: 4 }] },
-    { name: 'partner prices include the ordinary base increase', minor: ['B013_CarpentersParlor'], partner: true, prices: [{ wood: 3, reed: 3 }] },
-    { name: 'partner room prices use the target material', occupations: ['B126_Carpenter'], material: 'clay', partner: true, prices: [{ clay: 4, reed: 3 }] },
-    { name: 'Roof removes the partner reed increase too', minor: ['B013_CarpentersParlor', 'C014_StrawThatchedRoof'], partner: true, prices: [{ wood: 3 }] },
-    { name: 'Apprentice discounts the increased partner base', minor: ['B013_CarpentersParlor'], occupations: ['C088_CarpentersApprentice'], partner: true, prices: [{ wood: 1, reed: 3 }] },
   ]
 
   it.each(cases)('$name', scenario => {
     const session = prepare(scenario)
     const count = scenario.count ?? 1
-    const ownerIndex = scenario.partner ? 2 : 0
+    const ownerIndex = 0
     const before = session.getState()
     const beforeResources = { ...before.state.players[0]!.resources }
     const beforeScore = before.scores[ownerIndex]!.total
     const beforeLogs = before.state.log.length
-    open(session, scenario.partner)
+    open(session)
     let response = session.commitSelectionChoice(0, { rooms: positions.slice(0, count) })
     expect(response.ok, response.error).toBe(true)
     const paymentOptions = options(response).filter(option => option.effectPreview?.kind === 'payment')
@@ -112,7 +104,7 @@ describe('complete room prices', () => {
     expect(response.state.players[ownerIndex]!.rooms).toBe(2 + count)
     expect(response.state.players[ownerIndex]!.roomTiles).toEqual(expect.arrayContaining(positions.slice(0, count)))
     expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'resource.paid', actorPlayerId: 'p1', resources: normalized(paid) }))
-    expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'farm.roomBuilt', actorPlayerId: 'p1', targetPlayerId: scenario.partner ? 'p3' : 'p1' }))
+    expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'farm.roomBuilt', actorPlayerId: 'p1', targetPlayerId: 'p1' }))
     expect(response.state.log.length).toBeGreaterThan(beforeLogs)
     const housePoints = scenario.material === 'stone' ? 2 : scenario.material === 'clay' ? 1 : 0
     expect(response.scores[ownerIndex]!.total).toBe(beforeScore + count * (1 + housePoints))

@@ -163,13 +163,13 @@ describe('complete unit price boundaries', () => {
     expect(solutions.every(solution => solution.resourcesPaid[token] === 2)).toBe(true)
   })
 
-  it('removes resources from the increased alternative base and attributes the actual saving', () => {
+  it('removes resources from the alternative base and attributes the actual saving', () => {
     const player = makePlayer([{ type: 'remove-resource', cardId: 'no-reed', appliesTo: ['construct'], resources: ['reed'] }], 'wood')
     const solutions = computeAllBuyableCombinations(player, {
-      unitFee: { wood: 6, reed: 3 }, nb: 2, unitPriceIncrease: { wood: 1, reed: 1 }, trades: [price],
+      unitFee: { wood: 5, reed: 2 }, nb: 2, trades: [price],
     }, undefined, 'construct')
-    const selected = solutions.find(solution => solution.resourcesPaid.wood === 6)
-    expect(selected && nonZeroPaid(selected)).toEqual({ wood: 6 })
-    expect(selected?.bonusReductions?.['no-reed']).toEqual({ reed: 6 })
+    const selected = solutions.find(solution => solution.resourcesPaid.wood === 4)
+    expect(selected && nonZeroPaid(selected)).toEqual({ wood: 4 })
+    expect(selected?.bonusReductions?.['no-reed']).toEqual({ reed: 4 })
   })
 })

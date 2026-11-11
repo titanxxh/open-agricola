@@ -15,7 +15,7 @@ export type CommandOutcome = {
   code?: string
   creationAdjustment?: { configuration: SoloCreationConfiguration; issues: SoloCreationIssue[] }
 }
+export type CommandErrorCode = 'command_identity_required' | 'command_scope_expired' | 'command_content_conflict' | 'command_input_stale' | 'command_pending' | 'client_refresh_required' | SoloCreationErrorCode
 export type CommandReceipt = CommandIdentity & { outcome: CommandOutcome }
-export type CommandErrorCode = 'command_identity_required' | 'command_scope_expired' | 'command_content_conflict' | 'command_input_stale' | 'command_pending' | 'experimental_feature_unavailable' | 'client_refresh_required' | SoloCreationErrorCode
 /** The opaque window identifies opening hands, a full draft or parents, and changes on undo. */
 export type InputWindow = { id: string; kind: 'draft' | 'parent' | 'solo-hand' }

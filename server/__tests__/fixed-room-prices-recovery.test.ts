@@ -6,7 +6,7 @@ import { rehydrateState, serializeSessionSnapshot, type PersistedSessionSnapshot
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { confirmNext } from './_helpers/session-assertions'
 
-const fixture: { producer: string; cases: Record<'own' | 'payment' | 'partner' | 'free' | 'settled', { snapshot: PersistedSessionSnapshot; interaction: InteractionState }> } = JSON.parse(
+const fixture: { producer: string; cases: Record<'own' | 'payment' | 'free' | 'settled', { snapshot: PersistedSessionSnapshot; interaction: InteractionState }> } = JSON.parse(
   gunzipSync(readFileSync(new URL('./fixtures/legacy-room-prices.json.gz', import.meta.url))).toString(),
 )
 const sessions: GameSession[] = []
@@ -64,19 +64,6 @@ describe.each([false, true])('predecessor room cursors, repeated recovery %s', r
     const undo = session.undoAction(0)
     expect(undo.ok, undo.error).toBe(true)
     expect(undo.state.players[0]!).toMatchObject({ rooms: 2, resources: { wood: 1, clay: 5, reed: 2 } })
-  })
-
-  it('retains the partner target while repricing and settling the selected geometry', () => {
-    const session = restore('partner', repeat)
-    const response = pay(session, { clay: 3, wood: 1, reed: 2 })
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!).toMatchObject({ houseType: 'wood', rooms: 2, resources: { wood: 0, clay: 3, reed: 1 } })
-    expect(response.state.players[2]!).toMatchObject({ houseType: 'clay', rooms: 3 })
-    expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'farm.roomBuilt', actorPlayerId: 'p1', targetPlayerId: 'p3' }))
-    const undo = session.undoAction(0)
-    expect(undo.ok, undo.error).toBe(true)
-    expect(undo.state.players[2]!.rooms).toBe(2)
-    expect(undo.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 6, reed: 3 })
   })
 
   it('keeps a source-granted room free despite a played fixed-price card', () => {

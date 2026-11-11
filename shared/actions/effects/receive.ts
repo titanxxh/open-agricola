@@ -1,4 +1,4 @@
-import type { ActionFlow, ActionDefinition, FarmOperationResult, FutureMeepleResourceMap, GameState, PlayerState, Resource } from '../../contract/types'
+import type { ActionDefinition, FarmOperationResult, FutureMeepleResourceMap, GameState, PlayerState, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { addResourcesFromCards } from '../../session/stats'
@@ -78,16 +78,6 @@ const receiveCardGoods = (
   })
 }
 
-export const receiveFromPlayerLeaf = ({ giverPlayerId, receiverPlayerId, resources, marketplaceTax }: {
-  giverPlayerId: string
-  receiverPlayerId: string
-  resources: Partial<Resource>
-  marketplaceTax?: 1
-}): ActionFlow => ({
-  type: 'leaf', actionId: 'receive', targetPlayerId: receiverPlayerId,
-  params: { fromPlayer: { playerId: giverPlayerId, resources, ...(marketplaceTax ? { marketplaceTax } : {}) } },
-})
-
 export const receiveFromCardLeaf = (sourceCard: string, resources: Partial<Resource>) => ({
   type: 'leaf' as const,
   actionId: 'receive',
@@ -115,20 +105,6 @@ export const receiveAction: ActionDefinition = {
       && context.params.futureMeepleIds.includes(entry.id) && entry.playerId === player.id && entry.round === state.round)
       .every(entry => canReceiveScheduledEntry(player, entry.actionContext?.resourceCondition)),
   execute: ({ state, player, params, sourceCard, eventSink }) => {
-    const fromPlayer = params?.fromPlayer
-    if (fromPlayer && typeof fromPlayer === 'object' && 'playerId' in fromPlayer
-      && typeof fromPlayer.playerId === 'string' && 'resources' in fromPlayer
-      && fromPlayer.resources && typeof fromPlayer.resources === 'object') {
-      const resources = positiveResources(fromPlayer.resources)
-      addResources(player, resources)
-      trackWorkPhaseBuildingResources(state, player.id, resources)
-      eventSink?.emit<'resource.moved'>({
-        type: 'resource.moved', resources,
-        from: { kind: 'player', playerId: fromPlayer.playerId }, to: { kind: 'player', playerId: player.id },
-        reason: 'receive', ...('marketplaceTax' in fromPlayer && fromPlayer.marketplaceTax === 1 ? { marketplaceTax: 1 } : {}),
-      })
-      return { type: 'ok', resourcesGained: resources }
-    }
     const fromCard = params?.fromCard
     if (fromCard !== undefined) {
       if (!sourceCard || !fromCard || typeof fromCard !== 'object') return { type: 'fail', errorKey: 'log.actionFail' }

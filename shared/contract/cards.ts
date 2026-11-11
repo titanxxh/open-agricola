@@ -102,7 +102,6 @@ export type CardDefinition = {
    */
   mustBePlayedViaMajorImprovementAction?: boolean
   enablesPalisades?: boolean
-  palisadeTargetFarmPolicy?: 'own'
   alsoCountsAs?: CardType[]
   /**
    * The reference `$this->field = true` + `getFieldDetails`. Declarative card-field config.

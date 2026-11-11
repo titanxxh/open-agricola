@@ -25,7 +25,6 @@ export const B030_WoodPalisades = defineMinorCard({
     cost: { food: 1 },
     vp: 0,
     enablesPalisades: true,
-    palisadeTargetFarmPolicy: 'own',
     extraVp: true,
   },
   impl: cardImpl,

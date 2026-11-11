@@ -1,8 +1,7 @@
 import type { ActionExecutionContext, PlayerState, Resource, Trade } from '../../contract/types'
-import { resolveBuildPlayers } from '../../actions/helpers/build-players'
 
-export const constructedRoomMaterial = (context: Pick<ActionExecutionContext, 'state' | 'player' | 'actionContext'>): PlayerState['houseType'] | undefined =>
-  resolveBuildPlayers(context)?.farmOwner.houseType
+export const constructedRoomMaterial = (context: Pick<ActionExecutionContext, 'player'>): PlayerState['houseType'] =>
+  context.player.houseType
 
 export const constructUnitPriceTrade = (
   sourceId: string,

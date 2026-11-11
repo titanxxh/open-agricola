@@ -164,7 +164,7 @@ describe('C014 Straw-Thatched Roof session', () => {
     constructSession.loadState(constructSession.state)
     const constructBefore = constructSession.getState()
 
-    expect(PaymentSolver.getMaxBuildableRooms({ state: constructSession.state, payer: constructSession.state.players[0]!, farmOwner: constructSession.state.players[0]! })).toBe(0)
+    expect(PaymentSolver.getMaxBuildableRooms({ state: constructSession.state, player: constructSession.state.players[0]! })).toBe(0)
     const constructAfter = constructSession.getState()
     expect(constructAfter.interaction).toEqual(constructBefore.interaction)
     expect(constructAfter.state.log).toEqual(constructBefore.state.log)

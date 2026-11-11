@@ -10,7 +10,6 @@ export const interactionSubmitChannel = (
     case 'selection':
     case 'resource-quantity-select':
     case 'resource-batch-exchange-select':
-    case 'marketplace-select':
       return 'commitSelection'
     case 'card-draft':
     case 'solo-hand-selection':

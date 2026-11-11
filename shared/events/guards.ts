@@ -28,7 +28,7 @@ const baseEventKeys = new Set([
 ])
 
 const eventKeysByType: Record<string, readonly string[]> = {
-  'resource.moved': ['resources', 'from', 'to', 'reason', 'seasonalGrant', 'marketplaceTax'],
+  'resource.moved': ['resources', 'from', 'to', 'reason', 'seasonalGrant'],
   'resource.exchanged': ['paid', 'gained', 'paidFrom', 'paidTo', 'gainedFrom', 'gainedTo', 'exchangeSource', 'times'],
   'resource.accumulated': ['resources', 'to', 'silent'],
   'resource.paid': ['paymentId', 'resources', 'to', 'paymentFor', 'paymentSources', 'bonusSources', 'bonusChoiceIndex', 'returnedCardId', 'seasonalAdjustments'],
@@ -429,7 +429,6 @@ const assertSeasonalAdjustments = (value: unknown, path: string): void => {
 const assertKnownEventDetails = (type: string, event: Record<string, unknown>): void => {
   switch (type) {
     case 'resource.moved':
-      if (event.marketplaceTax !== undefined && event.marketplaceTax !== 1) throw new Error('Invalid Marketplace tax')
       assertSeasonalGrant(event.seasonalGrant)
       assertResourceMap(event.resources, 'resources')
       assertResourceLocation(event.from, 'from')

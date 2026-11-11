@@ -5,7 +5,6 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C170_AmateurFencer'
 const ONE_SPACE_PASTURE_CONTEXT = {
-  targetFarmPolicy: 'own',
   trueAction: false,
   fencePolicy: {
     segmentBounds: { total: { min: 1, max: 4 } },
