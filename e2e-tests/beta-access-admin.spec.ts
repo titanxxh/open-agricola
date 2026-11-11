@@ -139,4 +139,3 @@ test('administrator manages Beta qualification with bilingual revocation while m
     expect(await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`)).json()).toEqual(retainedRooms)
   } finally { await visitor.close(); await ordinary.close(); await administrator.close() }
 })
-
