@@ -24,6 +24,7 @@ import { useRoomCreation } from './solo/useRoomCreation'
 import { soloRoomOptions } from '../services/room-creation'
 import { CommandRejectedError } from '../services/gameTransport'
 import { BetaBadge } from '../components/common/BetaBadge'
+import { PrereleaseEntry } from './PrereleaseEntry'
 
 type RoomWorkshopCard = {
   id: string
@@ -315,6 +316,8 @@ export function LobbyPage() {
           </>
         )}
       </header>
+
+      <PrereleaseEntry />
 
       {soloSetup || roomCreation.adjustment ? <SoloSetupDialog
         locale={locale} creating={roomCreation.creating}

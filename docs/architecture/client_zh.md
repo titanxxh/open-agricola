@@ -82,6 +82,12 @@
 - 默认试玩路径是后端 `POST /api/game/new-sandbox`。设置 `VITE_SANDBOX_EXECUTOR=browser` 时，工坊试玩在浏览器中运行：`LocalGameTransport` 实现 `GameTransport`，Worker 用本地校验过的自定义代码组装共享的 `GameCore`，`server/__tests__/local-sandbox-parity.test.ts` 把行为锁定到服务端执行器。十秒超时会从最后持久化的快照（含 `engineStackCursor`）重建 Worker，并告知 UI 已回滚。对局保存在一个 IndexedDB 槽中，schema 不匹配时删除。固定到 `exactVersionId` 的试玩仍使用后端沙盒。
 - `AuthContext` 是站点登录会话（密码、GitHub 或 Google），不保存 Issue 写入授权；`LocaleContext` 切换语言。
 
+### 预发布入口
+
+`app/PrereleaseEntry.tsx` 在大厅及设置读取账号 Beta 资格和实时权威入口响应。只以 `noopener noreferrer` 新标签打开已配置的 HTTPS hosted 入口，缺少配置时明确不可用。Team 开放阶段不授予该入口。窗口重新聚焦会复核，并丢弃晚于拒绝结果返回的旧响应。
+
+`PrereleaseHandoffPage` 与 `services/prerelease.ts` 负责 `?page=prerelease-handoff`。页面读取并清除浏览器绑定的 fragment，核对当前配置的目标和正式站根，通过已认证的正式权威只签发一次短期 code。code 仅以 fragment 交给固定 pre 回调；页面不保存登录凭据或 verifier，也不采用调用者提供的回调 URL。出错只返回正式站根。测试见 `PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx` 和 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例。
+
 ### 卡牌百科
 
 - **公开路由。** `PageRouter` 在等待登录状态和登录拦截之前，通过懒加载的 `EncyclopediaPage` chunk 提供 `?page=encyclopedia[&entry=<key>]`。普通页面不加载它的 chunk、数据或卡图。复制的链接只带 `page` 与 `entry`，不带房间、座位、手牌或对局参数。浏览状态按标签页保存，任一页面刷新后重新开始；`client/main.tsx` 在首次渲染前清除它。覆盖见 `encyclopedia*.spec.ts`；`encyclopedia-pages.spec.ts` 针对静态 Pages 产物运行。

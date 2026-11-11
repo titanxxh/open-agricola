@@ -53,6 +53,10 @@ The standard command checks GitHub run and job evidence before publication. A Re
 
 ## Publish a fixed prerelease candidate
 
+Keep `PRERELEASE_ENTRY_ENABLED=false` until the owner has accepted the independent target. The formal app needs `PUBLIC_APP_ORIGIN`, `PUBLIC_API_BASE`, `PRERELEASE_APP_ORIGIN` and the target-only server key; both Compose entry points pass these explicitly. Main Lobby and Settings show the configured entry only to Beta accounts or administrators. A missing or closed target is visibly unavailable. Language sources and packs must be published and pass their own CI before publishing an application pin that consumes them.
+
+The pre start creates host-only HttpOnly verifier/state cookies, then opens the formal root with `?page=prerelease-handoff` and a fragment containing exactly `browserChallenge`, `state`, `targetOrigin`, `returnTo`. Challenge and state are 43-character base64url values. The main page clears this fragment, rechecks the current target and formal root, and issues one code. Only the fixed pre `/open-agricola/auth/handoff` receives fragment fields `protocolVersion=1`, `code`, `state`, `browserChallenge`, `returnTo`. Pre must verify its state and verifier before server-side exchange. Formal credentials stay on the formal API host; pre auth/session handling is a separate implementation and acceptance step. Failure requires returning to the formal root and starting again.
+
 Prerelease publication uses a separate channel. Ordinary `prerelease` pushes and PRs run the canonical routine plan and never deploy. Complete candidate verification runs manually from trusted `main`; candidate jobs have read-only repository access and no formal deployment credentials. Receipt identity uses `VERIFICATION_CHANNEL=prerelease`; ordinary regression commands run with stable runtime defaults. Pre-specific tests select prerelease explicitly. The production build task runs `build:hosted-frontend` with `RELEASE_CHANNEL=prerelease`, including its normal typecheck and Vite build.
 
 Before selecting a candidate, synchronize the integration branch with current `main`. Keep `prerelease-integration.json` in the candidate tree:

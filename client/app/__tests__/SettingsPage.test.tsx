@@ -7,12 +7,18 @@ import { SettingsPage } from '../SettingsPage'
 import type { AuthUser } from '../../contexts/AuthContext'
 
 const apiFetchMock = vi.fn()
+let prereleaseConfigured = false
 const settingsApiFetch = (...args: [path: string, init?: RequestInit]) => args[0] === '/api/admin/beta-access'
-  ? Promise.resolve(Response.json({ ok: true, grants: [] })) : apiFetchMock(...args)
+  ? Promise.resolve(Response.json({ ok: true, grants: [] }))
+  : args[0] === '/api/prerelease/entry'
+    ? Promise.resolve(Response.json({ ok: true, protocolVersion: 1, entry: prereleaseConfigured
+      ? { kind: 'available', channel: 'prerelease', startUrl: 'https://pre.agricola.test/open-agricola/auth/start', returnTo: `${window.location.origin}/` }
+      : { kind: 'disabled' } })) : apiFetchMock(...args)
 const logoutMock = vi.fn()
 const logoutAllMock = vi.fn()
 let mockUser: AuthUser = { id: 'u1', username: 'testuser', displayName: 'Test User', isAdmin: false }
 const labels: Record<string, string> = {
+  'prerelease.entry': '进入预发布',
   'beta.accessLabel': 'Beta access',
   'beta.accessEnabled': 'Enabled',
   'beta.availableModes': 'Available: Team mode, Multihand mode',
@@ -117,10 +123,19 @@ afterEach(() => {
   vi.clearAllMocks()
   vi.unstubAllGlobals()
   mockUser = { id: 'u1', username: 'testuser', displayName: 'Test User', isAdmin: false }
+  prereleaseConfigured = false
   window.history.replaceState(null, '', '/?page=settings')
 })
 
 describe('SettingsPage', () => {
+  it('offers the configured prerelease target to a Beta account in a new tab', async () => {
+    mockUser = { id: 'beta', username: 'beta', displayName: 'Beta', betaAccess: true }
+    prereleaseConfigured = true
+    apiFetchMock.mockResolvedValue(Response.json({ ok: true, identities: [] }))
+    render(<SettingsPage />)
+    expect(await screen.findByRole('link', { name: '进入预发布' })).toHaveAttribute('target', '_blank')
+  })
+
   it('shows qualified account status without treating development feature availability as qualification', async () => {
     apiFetchMock.mockResolvedValue(Response.json({ ok: true, identities: [] }))
     mockUser = { ...mockUser, experimentalFeatures: ['team-modes'], betaAccess: false }

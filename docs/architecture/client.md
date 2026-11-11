@@ -79,6 +79,12 @@ Reference targets follow the English source meaning, independently of their tran
 - The default playtest path is backend `POST /api/game/new-sandbox`. With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs in the browser: `LocalGameTransport` implements `GameTransport`, the Worker assembles shared `GameCore` with locally validated custom code, and `server/__tests__/local-sandbox-parity.test.ts` locks behavior to the server executor. A ten-second timeout rebuilds the Worker from the last persisted snapshot, including `engineStackCursor`, and tells the UI it rolled back. One IndexedDB slot persists the game; a mismatched schema is deleted. A playtest pinned to an `exactVersionId` still uses the backend sandbox.
 - `AuthContext` is the site login session (password, GitHub or Google) and stores no Issue-write authorization; `LocaleContext` switches locale.
 
+### Prerelease entry
+
+`app/PrereleaseEntry.tsx` serves Lobby and Settings from account Beta qualification and the fresh authority entry response. It opens only the configured HTTPS hosted start URL in a new tab with `noopener noreferrer`; missing configuration stays visibly unavailable. Team availability does not grant this entry. Focus refresh discards older replies after denial.
+
+`?page=prerelease-handoff` is owned by `PrereleaseHandoffPage` and `services/prerelease.ts`. It consumes and clears browser-bound fragment metadata, checks the current configured target and formal root, and issues one short-lived code through the authenticated authority. Only the fixed pre callback receives the code in its fragment. It stores no login credentials or verifier, and never follows caller-supplied callback URLs. Errors return to the formal root. Tests: `PrereleaseEntry.test.tsx`, `PrereleaseHandoffPage.test.tsx`, and the HTTPS prerelease case in `hosted-password-login.spec.ts`.
+
 ### Card encyclopedia
 
 - **Public route.** `PageRouter` serves `?page=encyclopedia[&entry=<key>]` through a lazy `EncyclopediaPage` chunk, before the auth wait and the login gate. Ordinary pages load none of its chunks, data or art. Copied links carry only `page` and `entry`, never a room, seat, hand or game option. Browse state is per tab and starts over after a refresh of any page; `client/main.tsx` clears it before the first render. Coverage: `encyclopedia*.spec.ts`; `encyclopedia-pages.spec.ts` runs against the static Pages artifact.
