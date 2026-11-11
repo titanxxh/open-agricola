@@ -4,7 +4,7 @@ import { createInitialState } from '../../../shared/session/state-bootstrap'
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../../shared/contract/protocol/game'
 import { EngineStack } from '../../../shared/engine'
 import type { SoloCreationConfiguration } from '../../../shared/contract/game-creation'
-import { CLIENT_CAPABILITIES_HEADER, TEAM_COOPERATION_CAPABILITY } from '../../../shared/contract/client-capabilities'
+import { CLIENT_CAPABILITIES_HEADER } from '../../../shared/contract/client-capabilities'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })
 
@@ -89,7 +89,11 @@ it('declares capability on HTTP snapshots, commands, fence quotes and validation
       ['/api/game/state', 'GET'], ['/api/game/action', 'POST'], ['/api/game/fence-quote', 'POST'],
       ['/api/game/validate', 'POST'], ['/api/game/validate', 'POST'],
     ])
-    for (const { init } of calls) expect(new Headers(init?.headers).get(CLIENT_CAPABILITIES_HEADER)).toBe(TEAM_COOPERATION_CAPABILITY)
+    for (const { init } of calls) {
+      const headers = new Headers(init?.headers)
+      expect(headers.has(CLIENT_CAPABILITIES_HEADER)).toBe(true)
+      expect(headers.get(CLIENT_CAPABILITIES_HEADER)).toBe('')
+    }
     expect(JSON.parse(String(calls[1]!.init?.body))).toEqual({ playerIndex: 0, spaceId: 'forest' })
     expect(JSON.parse(String(calls[2]!.init?.body))).toEqual({ playerIndex: 0, requestKey: 'selected-fence', payload: { edges: ['h-0-0'] } })
     expect(JSON.parse(String(calls[4]!.init?.body))).toEqual({ type: 'rooms', playerId: 'p3', payload: { positions: [{ row: 0, col: 0 }] } })
@@ -113,7 +117,7 @@ describe('WsGameTransport request correlation', () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
-    FakeWebSocket.instances[0]!.emit({ type, roomId: 'multihand', playerIndex: 0,
+    FakeWebSocket.instances[0]!.emit({ type, roomId: 'shared-ownership', playerIndex: 0,
       controlledPlayerIndexes: [0, 2], visiblePlayerIds: ['p1', 'p3'],
       status: 'playing', maxPlayers: 4, players: [], playerColors: [],
     })
