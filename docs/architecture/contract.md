@@ -262,7 +262,7 @@ Tests: `shared/actions/__tests__/future-schedule-preview.test.ts`, `server/__tes
 
 ## Prerelease identity
 
-`prerelease-identity.ts` owns version-1 target/generation/identity facts and absolute 30-second/source/seven-day bounds. Consumers match the owner data generation; grants never authenticate formal APIs. `prerelease-identity-lifecycle.ts` owns closed/open/retired generations and immutable owner receipts. Only formal administrators attest verified erasure; old grants never resume. Restore audit rebinds known retained identities without login rights; activation checks current deletion facts and a native-view manifest proof younger than 30 seconds. Tests: `server/__tests__/{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`.
+`prerelease-identity.ts` owns version-1 target/generation/identity facts and absolute 30-second/source/seven-day bounds. Consumers match the owner data generation; grants never authenticate formal APIs. Authenticated entry GET may omit `Origin` with a valid HTTPS formal configuration. Explicit origins and handoff POST must match that formal origin. `prerelease-identity-lifecycle.ts` owns closed/open/retired generations and immutable owner receipts. Only formal administrators attest verified erasure; old grants never resume. Restore audit rebinds known retained identities without login rights; activation checks current deletion facts and a native-view manifest proof younger than 30 seconds. Tests: `server/__tests__/{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`.
 
 ## Client capabilities
 

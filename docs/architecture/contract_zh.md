@@ -264,7 +264,7 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 
 ## 预发布身份
 
-`prerelease-identity.ts` 拥有 version-1 目标/代次/身份状态和绝对 30 秒、来源、七天期限。消费者匹配 owner 数据代次，grant 不用于正式登录。`prerelease-identity-lifecycle.ts` 拥有关闭/开放/退役代次及不可变 owner 回执；只有正式管理员可确认已验证的清除，旧 grant 不恢复。恢复审计以已知保留身份建立无登录权限的新关联；开放时复核当前删除事实和不足 30 秒的原生 view 清单证据。测试：`server/__tests__/{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`。
+`prerelease-identity.ts` 拥有 version-1 目标/代次/身份状态和绝对 30 秒、来源、七天期限。消费者匹配 owner 数据代次，grant 不用于正式登录。正式 HTTPS 配置有效时，已认证入口 GET 可省略 `Origin`；显式来源和交接 POST 必须匹配该正式来源。`prerelease-identity-lifecycle.ts` 拥有关闭/开放/退役代次及不可变 owner 回执；只有正式管理员可确认已验证的清除，旧 grant 不恢复。恢复审计以已知保留身份建立无登录权限的新关联；开放时复核当前删除事实和不足 30 秒的原生 view 清单证据。测试：`server/__tests__/{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`。
 
 ## 客户端能力
 

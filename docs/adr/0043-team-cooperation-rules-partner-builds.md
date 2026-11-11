@@ -7,6 +7,21 @@
 
 Under [PRD #1655](https://github.com/titanxxh/open-agricola/issues/1655) and [#1661](https://github.com/titanxxh/open-agricola/issues/1661), main removes this Beta business, including Team, Multihand, Marketplace, target-farm selection and partner construction prices. The accepted rules below remain the historical basis for the forward prerelease reconstruction in #1666. They do not describe current main runtime support. No old-Beta migration, drain or compensation is added. Ordinary construction facts, owner-target card flows and the complete unit-price policy in ADR 0044 remain formal functionality.
 
+## Forward reconstruction provenance
+
+The fixed Beta business source is `53b8a0ccf5649ce3bb7084303f0677e46c1d20e7`. Main cleanup started at integration `642c6c2ae2099a98bc07dd2568c1ffdaf35ad4d6`. After the independent operations test correction, the cleanup and formal-consumer fixes occupy `b9387d4e1a16721e197a21be73607f206f06bfa3..72af5db6227966a5755f7bce67ced881d1b6e182`.
+
+The exact file and hunk inventory remains reproducible from Git:
+
+```bash
+git diff --no-renames --unified=0 b9387d4e1a16721e197a21be73607f206f06bfa3 72af5db6227966a5755f7bce67ced881d1b6e182
+git show 53b8a0ccf5649ce3bb7084303f0677e46c1d20e7:<path>
+```
+
+Prerelease reconstruction ports only Team seating/scoring, Marketplace, target-farm selection and partner-build contracts, effects and tests forward onto cleaned main. It does not reverse this range or replace mixed files with their source53 versions. In particular, source authority/lifecycle migrations 037/039, public-card registry 038, current Beta qualification, entry/handoff pages, the authenticated same-origin entry read fix, language pin, release-channel governance and owner operations remain inherited main infrastructure. Old main feature stages and invitation exceptions do not replace prerelease environment admission.
+
+Retained ordinary consumers include [complete unit prices](0044-unit-prices-precede-cost-transformations.md), [D015](../../shared/cards/D/D015_ClaySupports.ts) and [M036](../../shared/cards/M/M036_PeatMoss.ts), [two-player card builds](../../server/__tests__/own-farm-card-session.test.ts), [old ordinary construction cursors](../../server/__tests__/fixed-room-prices-recovery.test.ts), [owner-target reactions](../../server/__tests__/before-placement-owner-target-session.test.ts), and [custom-code owner/payment recovery](../../server/__tests__/custom-code-executor.test.ts). Generic target-player routing, hooks, payment/supply, construction facts, controlled seats, Hotseat, spectators and capability transport remain current main behavior. Each future Beta hunk must preserve those consumers and their tests.
+
 ## Context
 
 Issue #1597 adds the official partner game rules on top of the team seating and scoring from #1596. The English appendix and the German appendix ("Das Partnerspiel", revised edition and 15th anniversary appendix, page 9) differ. The German text makes the giver pay the Marketplace tax, lets a player who builds rooms, stables or fences build additionally on the partner's farm, and states that "Baukostenmodifikationen auf seinen ausgespielten Karten greifen dabei auch für den Partner". No card in the pool builds or plows on another player's farm, and no community or reference implementation rules on how cards react to such builds.
