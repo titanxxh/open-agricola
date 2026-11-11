@@ -36,7 +36,6 @@
 - `card-encyclopedia.ts` 在首次使用时加载并校验百科文件的哈希，从不在启动时加载；加载失败时下次调用重试（[cards](cards_zh.md)）。
 - `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。
 - 候场消息提供权威座位颜色与连接状态；`WaitingRoomPlayers` 显示所有座位及空位，断线玩家保留姓名和座位并标为离线。其选色器提供六种颜色，禁用其他玩家已占用的颜色，并等待服务端发布保存后的选择。
-- `TeamSetupFields` 共用组队与分身的开房控件及已有变体选项；`game-setup-query.ts` 校验序列化配置。`TeamWaitingRoom` 按队伍展示未排座成员，提供自己选队、房主调队和权威满员开局。等待状态不请求对局快照；`MyActiveGames` 展示公开成员。测试见 `TeamWaitingRoom.test.tsx`、`team-rooms.spec.ts`。
 - 重连执行 `joinRoom` → `roomJoined(status, …)`：`waiting` 恢复等待页，只有 `playing` 才继续 `getState`；`newGame` 之后的 `roomWaiting` 广播会隐藏旧版图。
 - 客户端按 `occurrenceId` 消费公开事件，用于临时通知、高亮与动画；首个快照初始化游标，不重放历史。Action Log 把 `publicEventArchive` 当作只读时间线读取。
 - 玩家名通过 `client/utils/player-name.ts` 按生成名来源与座位号本地化；玩家提供的名字原样显示。
@@ -66,13 +65,13 @@
 
 - `board/ActionSpaceDescription.tsx` 根据权威 `baseDescriptionPreview` 渲染行动格图标，费用和数量始终取自该规则树。详细悬停说明与交互选项使用 `interaction/ActionDescription.tsx`。棋盘保留图形表达，不再另行维护规则表；组件和浏览器覆盖见 `ActionBoard.test.tsx` 与 `action-space-icons.spec.ts`。
 - `client/app/GameContainerApi.tsx`（含 `useTransportSetup`）、`LobbyPage.tsx` 与 `PageRouter.tsx` 编排视图，并根据 `viewPlayerId` 与 `playerIndex` 推导可交互性。
-- `FarmBoardView.visiblePlayerIds` 决定可读手牌，独立于控制权限和 Interaction Player。手牌提交（含职业多选）只允许当前显示的、拥有权限的响应座位。热座只使用已确认接机者。队友公开时可读队友手牌，但不获得命令权限。分身标出全部自有座位，并在农场和手牌区标明操作座位。`multihand-seat.ts` 默认按座位顺序推进；手选轮抽／父母座位只绑定一次选择机会，提交后失效。`MultihandSeatControls` 用独立只读弹窗浏览自有手牌，不改变输入或发送命令。重复快照保留浏览和本地勾选。覆盖见 `GameContainerApi.hotseat.test.tsx`、`FarmBoard.test.tsx`、`{multihand,team-visibility,hotseat-public-farms}.spec.ts`。
+- `FarmBoardView.visiblePlayerIds` 决定可读手牌，独立于控制权限和 Interaction Player。手牌提交（含职业多选）只允许当前显示且拥有权限的响应座位。热座只使用已确认接机者。重复快照保留浏览和本地勾选。覆盖见 `GameContainerApi.hotseat.test.tsx`、`FarmBoard.test.tsx` 和 `hotseat-public-farms.spec.ts`。
 - `DraftOverlay` 与 `PublicOpeningProgress` 共用个人数量及选牌中／等牌／完成状态。本地勾选绑定显示时的选择机会，其他人提交不清除勾选，换包才清除。实时 envelope 的座位在线信息独立于轮抽状态；离开大厅后仍消费加入和断开事件。热座从最后一次手选者之后轮转，跳过无牌座位并保留私密接机确认。覆盖：`DraftOverlay.render.test.tsx`、`gameTransport-reconnect.test.ts`、`draft-opening-order.spec.ts`。
 - 轮抽与父母卡选择阶段在独立滚动的选卡区域上方保留 `GameHeader`。内嵌模式保留语言切换。测试见 `setup-navigation.spec.ts`。
 - 协商结束与再来一局（`GameEndControls`）在轮抽、父母卡选择、单人手牌、热座交接和普通对局中都放在 `GameHeader` 的菜单里。有待处理提议时，菜单按钮显示标记并打开菜单。覆盖见 `game-end.spec.ts`。
 - `RoomInvitePicker.tsx` 在输入两个字符后搜索用户名或显示名前缀，支持点击与键盘选择，等待输入法组字结束，并丢弃已取消请求的响应。已选玩家显示为带用户名、可移除的名字标签，账号 ID 只用于创建请求。服务端确认 Room 后从 URL 移除创建选项，所有准入决定仍由服务端执行。覆盖：`RoomInvitePicker.test.tsx`、`room-invitations.spec.ts`。
 - `MyActiveGames.tsx` 通过参与者名字和颜色识别对局，显示扩展图标、游戏回合或开局阶段、本地时区的创建或开局时间，以及服务端给出的等待玩家。当前有牌可选的轮抽玩家沿用普通游戏当前行动玩家的颜色标记描边。继续游戏使用 Room ID，但不展示该 ID。覆盖：`LobbyPage.test.tsx`、`room-invitations.spec.ts`、`lobby-active-games.spec.ts`、`draft-opening-order.spec.ts`。
-- `app/use-turn-tab-title.ts` 在 `LobbyPage` 和 `GameContainerApi` 消费 Waiting Seat。非热座提醒匹配任一自有座位，独立于农场浏览。大厅摘要用 `owned_player_indexes` 区分座位归属和当前响应者，标记全部自有农场；组队账号只有一行摘要。减少动态效果时固定前缀，清理时恢复标题。覆盖：`lobby-active-games.spec.ts`、`ws-dual-player.spec.ts`、`lobby-my-rooms.test.ts`。
+- `app/use-turn-tab-title.ts` 在 `LobbyPage` 和 `GameContainerApi` 消费 Waiting Seat。非热座提醒匹配任一自有座位，独立于农场浏览。大厅摘要用 `owned_player_indexes` 区分座位归属和当前响应者，标记全部自有农场。减少动态效果时固定前缀，清理时恢复标题。覆盖：`lobby-active-games.spec.ts`、`ws-dual-player.spec.ts`、`lobby-my-rooms.test.ts`。
 - `app/solo/SoloHandOverlay.tsx` 按权威候选分组收集一次本地选择并原子提交。重复快照和语言切换保留可编辑勾选；刷新恢复候选并清空未确认勾选。Moor 准备和保留继续使用 `InteractionBar` 原生选择；`SpecialActionsPanel` 读取公开当前牌、弃牌及 `soloSupply` 投影。覆盖见 `standard-solo-ui.spec.ts` 与单人组件测试。
 - 对局布局共用玩家总览与只读公开农场。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。
 - 不支持容器单位或 CSS 长度除法的浏览器通过 `useElementWidth` 与 `ResizeObserver` 测量卡牌和农场容器，提供卡牌缩放比例与农场宽度；支持这些特性的浏览器继续使用 CSS 容器尺寸。旧浏览器尺寸、横竖屏切换与农场输入由 `touch-card-play.spec.ts` 覆盖。
@@ -84,7 +83,7 @@
 
 ### 预发布入口
 
-`app/PrereleaseEntry.tsx` 在大厅及设置读取账号 Beta 资格和实时权威入口响应。只以 `noopener noreferrer` 新标签打开已配置的 HTTPS hosted 入口，缺少配置时明确不可用。Team 开放阶段不授予该入口。窗口重新聚焦会复核，并丢弃晚于拒绝结果返回的旧响应。
+`app/PrereleaseEntry.tsx` 在大厅及设置读取账号 Beta 资格和实时权威入口响应。只以 `noopener noreferrer` 新标签打开已配置的 HTTPS hosted 入口，缺少配置时明确不可用。窗口重新聚焦会复核，并丢弃晚于拒绝结果返回的旧响应。
 
 `PrereleaseHandoffPage` 与 `services/prerelease.ts` 负责 `?page=prerelease-handoff`。页面读取并清除浏览器绑定的 fragment，核对当前配置的目标和正式站根，通过已认证的正式权威只签发一次短期 code。code 仅以 fragment 交给固定 pre 回调；页面不保存登录凭据或 verifier，也不采用调用者提供的回调 URL。出错只返回正式站根。测试见 `PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx` 和 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例。
 
@@ -120,20 +119,15 @@ GameContextRouter
 - 上下文解析器在挂载、导航或生命周期变化事件发生时读取查询参数。WebSocket 静默更新房间 URL 后，切换语言不会重启活动对局。测试见 `GameContextRouter.test.tsx` 与 `setup-navigation.spec.ts`。
 - 房间链接通过 WebSocket 加入，不指定客户端座位；服务端恢复账号已有座位，或让新玩家加入候场空位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
 - `ReplayShell` 校验 Replay header 与内容寻址的 Viewer manifest，并且只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` 的 iframe。策略版本查询参数绕过使用旧 CSP 缓存的入口 HTML。历史 Viewer 从不调用需认证的 API；保留的证据通过 `postMessage` 传入。
-- 完成的单人 Game Context 在历史 Viewer 外保留公开分数和私下校验本人资格的再开入口。即时 `ScoringPad` 注入同一再开组件；私有配置读取或 Viewer 失败均不隐藏公开结果。完成的组队局与普通多人局不提供按原配置再开。`CompletedContext` 在摘要与 `ReplayShell` 之间分配同一个视口，让重开操作下方的回放控件保持可达。
-- `ArchivedTeamResults` 在完成摘要与 Replay 入口、不可用页面中展示已存队伍名次和当前参与者元数据。终局 Replay 的 `ScoringPad` 使用录制的队伍得分摘要。
+- 完成的单人 Game Context 在历史 Viewer 外保留公开分数和私下校验本人资格的再开入口。即时 `ScoringPad` 注入同一再开组件；私有配置读取或 Viewer 失败均不隐藏公开结果。完成的多人局不提供按原配置再开。`CompletedContext` 在摘要与 `ReplayShell` 之间分配同一个视口，让重开操作下方的回放控件保持可达。
 - 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。
 - Bug Report 诊断由 `services/bug-report-diagnostics.ts` 识别浏览器和设备，并在标签页存储中保留当前 Room 最近一小时最多五次 WebSocket 关闭记录。`WsGameTransport` 只记录当前连接的关闭，排除主动销毁。创建、编辑草稿及最终确认作者时附带最新的有界诊断快照；刷新后仍可读取，不包含原始 User-Agent。测试见 `bug-report-diagnostics.test.ts` 和 `bug-report.spec.ts`。
 - Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。
 
 
-## 实验功能发现
+## Beta 资格与客户端传输
 
-合作规则创建选项使用 `experimentalFeatures` 中独立的 `team-cooperation-rules` 项。`WsGameTransport` 在每个新 socket 声明协议能力，`HttpGameTransport` 每次请求发送能力 header，均独立于账号资格发现。要求刷新时沿用可读错误及 reload 界面。当前 transport 等待未完成的持久 receipt 后才停止重试；认证和 journal 中的命令身份保持独立。见[客户端能力](contract.md#client-capabilities)。
+`AuthContext` 消费服务端账号状态 `betaAccess` 和 `isAdmin`，密码登录或重置密码后重读 `/api/auth/me`。设置页展示当前资格及管理员 `BetaAccessSettings` 授予控件。账号搜索包含未验证邮箱的账号，排除待删除账号。撤销后预发布访问在 30 秒内停止，已保存的对局及其他状态继续保留。测试：`BetaAccessSettings.test.tsx`、`SettingsPage.test.tsx`、`beta-access-admin.spec.ts`。
 
-`AuthContext` 消费服务端的 `user.experimentalFeatures`，密码登录或重置密码后重新读取 `/api/auth/me`。缺失资格列表或未登录时视为空。`LobbyPage` 仅在该列表包含对应功能 ID 时展示组队与分身创建入口。客户端不从管理员身份、环境或对局状态推导资格。[LobbyPage 测试](../../client/app/__tests__/LobbyPage.test.tsx) 和[声明阶段浏览器测试](../../e2e-tests/experimental-feature-gates.spec.ts) 验证入口展示。
-
-`BetaBadge` 标记组队与分身创建入口，公开列表、我的对局和等待室的 `TeamConfigurationSummary`，以及实时和归档队伍结果。只有创建表单显示 `beta.creationHint`；`MyActiveGames` 从服务端接收等待及进行中房间的 `teamConfig`。`GameEndControls` 为不可用账号锁定发起组队重开，仍允许同意其他玩家的提议。`experimental_feature_unavailable` 在触发操作的控件下显示 `form-error` 并重读 `/api/auth/me`；同意时被拒说明服务端检查的是发起人，同意者看到 `beta.rematchProposerUnavailable`，不重读自身资格；大厅组队创建复用带命令日志的创建路径，让拒绝保留在表单。测试见 `GameEndControls.test.tsx`、`GameContextRouter.test.tsx`、`beta-team-ui.spec.ts`。
-
-设置页独立显示 Beta 资格，不从实验功能可用性推导。管理员区的 `BetaAccessSettings` 复用 `RoomInvitePicker` 的防抖账号检索，使用仅管理员可用的 `scope=beta-access` 包含邮箱未验证账号、排除正在注销的账号，列出授予人与时间，并通过 `DangerButton` 确认撤销。授予与撤销影响后续创建和发现检查，已有房间继续可用。测试见 `BetaAccessSettings.test.tsx`、`SettingsPage.test.tsx`、`beta-access-admin.spec.ts`。
+`WsGameTransport` 在每个新 socket 声明能力，`HttpGameTransport` 发送请求 header。要求刷新时沿用可读 reload 界面，并在停止重试前结算未完成的持久 receipt。认证和 journal 的命令身份保持独立。见[客户端能力](contract.md#client-capabilities)。

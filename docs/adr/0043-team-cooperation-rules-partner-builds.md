@@ -3,6 +3,10 @@
 - Status: Accepted
 - Date: 2026-11-10
 
+## Current applicability (2026-11-12)
+
+Under [PRD #1655](https://github.com/titanxxh/open-agricola/issues/1655) and [#1661](https://github.com/titanxxh/open-agricola/issues/1661), main removes this Beta business, including Team, Multihand, Marketplace, target-farm selection and partner construction prices. The accepted rules below remain the historical basis for the forward prerelease reconstruction in #1666. They do not describe current main runtime support. No old-Beta migration, drain or compensation is added. Ordinary construction facts, owner-target card flows and the complete unit-price policy in ADR 0044 remain formal functionality.
+
 ## Context
 
 Issue #1597 adds the official partner game rules on top of the team seating and scoring from #1596. The English appendix and the German appendix ("Das Partnerspiel", revised edition and 15th anniversary appendix, page 9) differ. The German text makes the giver pay the Marketplace tax, lets a player who builds rooms, stables or fences build additionally on the partner's farm, and states that "Baukostenmodifikationen auf seinen ausgespielten Karten greifen dabei auch für den Partner". No card in the pool builds or plows on another player's farm, and no community or reference implementation rules on how cards react to such builds.

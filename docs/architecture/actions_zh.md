@@ -91,30 +91,20 @@ type ActionDefinition = {
 
 测试：`shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,pop-card-stack,special-effect,farmyard-goods-claim}.test.ts`、`server/__tests__/{empty-accumulation-admission,receive-existing-goods}-session.test.ts`。
 
-## 集市
+## 目标玩家
 
-`shared/team/marketplace.ts` 从已开启的 Team Configuration 派生可用供应货物与队友，并在结算前校验整组选择。Marketplace 行动格通过普通工人放置派发 `effects/marketplace.ts`，使用后保持占用。每次使用中，每种货物只有一个方向和一名队友。给出方减少所选数量加一个同种货物；使用者从队友拿取时，也由该队友付这一个。非法选择不提交任何转移。
+`ActionFlow.targetPlayerId` 和 `actionContext.targetPlayerId` 将效果路由给有权限的玩家。卡牌 listener 保留卡主作为接收者；普通跨玩家奖励、付款和 pending 选择沿用该身份。入口见 `helpers/target-player.ts`、`server/__tests__/before-placement-owner-target-session.test.ts` 以及 Custom Code 准入与执行测试。
 
-接收方的 `receive` leaf 携带 `targetPlayerId`，保留接收 hooks 和接收方的动物安排权限。动物扣除通过 `domain/animal-payment.ts` 同步给出方的 holder；接收方完成普通接收与重排后才处理下一个 receive leaf。不合并农场、账号或资源池。契约：`shared/contract/marketplace.ts`。测试：`server/__tests__/marketplace{,-animals}-session.test.ts`、`e2e-tests/team-cooperation-{marketplace,animals}.spec.ts`。
-
-## Target Farm
-
-卡牌的农场限制只约束具体建造或贡献构件。特殊畜栏 helper 显式接收 builder 和 farm owner，读取 builder 的牌；`specialStableTargetFarmPolicy: 'own'` 限制该特殊摆放。围栏库存 reservation 可声明 `targetFarmPolicy: 'own'`，不限制同行动的普通围栏。木栅能力读取 builder 的卡定义及 `palisadeTargetFarmPolicy`，可行性、报价、摆放和浏览器控件保持一致，不能借用目标农场的牌。测试：`server/__tests__/card-own-farm-builds-session.test.ts`、`client/utils/__tests__/player-palisades.test.ts`。
-
-`ActionDefinition.farmBuild` 声明建造 scope。`flow.ts` 的纯可达性查询分别绑定候选农场，并保留建造者的 hooks 和支付资源。`helpers/target-farm.ts` 把候选限定为建造者与合法队友。卡牌用 `targetFarmPolicy: 'own'` 把具体建造步骤绑定到执行者农场，核心不维护卡牌名单。
-
-`select-target-farm` 在建造的 before 与费用 hooks 前运行。选中的 `actionContext.targetFarmPlayerId` 跨摆放和支付等待保留。Farm Expansion 的直接房间与畜栏分支共用目标，卡牌独立授予的后续建造另起 scope。`farm-select.farmOwnerPlayerId` 改变显示农场，`interaction.playerIndex` 仍是命令执行者。测试：`server/__tests__/{partner-stables,partner-rooms,card-granted-builds}-session.test.ts`、`e2e-tests/team-cooperation-{builds,card-builds}.spec.ts`。规则依据：[ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md)。
+卡牌授予的本方建造、卡上构件与 pending 恢复由 `server/__tests__/own-farm-card-session.test.ts` 覆盖。
 
 ## 农场类提交
 
 每种农场类型都在 `shared/actions/effects/` 下自己的 `ActionDefinition.resolveChoice` 中闭环：
 
-- 房间、畜栏和围栏通过 `helpers/build-players.ts` 解析建造者与农场主。执行者仍是建造者和付款者；几何、构件和房间材质归农场主。建造事件在 `actorPlayerId` 保留建造者，在 `targetPlayerId` 及版图位置中保留农场主。旧行动缺少 `actionContext.targetFarmPlayerId` 时，继续建在执行者自己的农场。见 [ADR 0043](../adr/0043-team-cooperation-rules-partner-builds.md) 和 `shared/actions/effects/__tests__/farm-action-events.test.ts`。
-- **房间**（`construct.ts`）：`room-payment.ts` 接收真实付款者、农场主和 state，支付能力读付款者，材质读农场主；`FarmInteraction` 接收明确的数量上限，只负责几何。`actionContext.allowedRoomTypes` 在可达性和提交时限制目标材质。摆放、预览和恢复后的提示共用 `constructFarmSelection`。屋内动物按真实房间保存在 `houseAnimals`。
+- **房间**（`construct.ts`）：`room-payment.ts` 从执行玩家派生可负担性和材质；`FarmInteraction` 接收明确的数量上限，只负责几何。`actionContext.allowedRoomTypes` 在可达性和提交时限制目标材质。摆放、预览和恢复后的提示共用 `constructFarmSelection`。屋内动物按真实房间保存在 `houseAnimals`。
 - **马厩 / 犁地**（`stables.ts`、`plow.ts`）：typed-flat 支付；马厩定价由默认价、`exactCost` 或 `costOverride` 与一次完整的农场选择查询得出单价。`plow.actionContext.allowedTiles` / `adjacencyPolicy` 只影响本次犁地。
 - **犁地结算**：`farm.fieldPlowed.payment` 保留选中的 typed-flat 实付与实际季节附加费用。`sourceActionId` 标识宿主行动格，因此完整田地事件替代宿主的后备明细日志，不另产生支付事实。无法继续执行的必做宿主，仅由当前事务中该玩家实际获得的田地满足，不依赖宿主来源名；卡牌来源继续由 `sourceCardId` 保留。测试：`server/__tests__/seasonal-plow-payment-session.test.ts`、`server/__tests__/future-meeple-action-session.test.ts`。
 - **围栏**（`fencing.ts`）：校验边、来源、连通性与区域；通过农场选择的 `computeCosts` pass 计算费用；把 trade、bonus、provider 与预算传入 `pay:fence:*`。`before` 贡献按来源写回宿主：木材折扣不增加实体，卡上围栏由玩家显式选择，只为本次新建的普通围栏消耗。
-- **队友围栏**：每 1–3 条新段（含 palisade）追加 1 木材 `protectedFee`，与基础费用一起付款。预检、报价、支付选择和提交共用完整费用与建造者的来源/费用 hooks。目标农场的动物库存不随几何准备结果被截断；占用牧场改形后，由农场主通过普通玩家切换流程重排动物。测试：`server/__tests__/partner-fences-session.test.ts`。
 - **围栏付款归属**：宿主在 `farm.fenceBuilt` 预留 `paymentId`，传给其内部 pay child。只有标识、玩家及 fencing 用途均匹配的实际 `resource.paid`，才为对应建造日志提供费用和季节调整。没有实际费用或调整的空付款不产生支付事实。
 - **播种**（`sow.ts`）：没有支付组合。`maxSelections` 计算 Logical Field，`maxSeedSelections` 限制作物槽；行动作物许可与田地 owner 的许可取交集；`isUnconditionalSow` 保留显式限制。
 

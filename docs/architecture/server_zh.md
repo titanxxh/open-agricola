@@ -24,7 +24,7 @@ server/connection/
 ```
 
 - 一个 Room 恰好拥有一个 `GameSession`。WebSocket handler 通过 Room 与连接队列等待 `dispatch()`，Room 的 `ready | blocked` 闸门位于命令入口。
-- `room-router` 调用 `GameSession`，`payload-validation.ts` 规范化输入。`room-viewer.ts` 从连接成员和已存归属派生控制集合，热座包含全部座位。命令、撤销和结束同意使用该集合；Replay 记录执行座位。可见 ID helper 为快照和历史加入公开的队友座位。信封只向拥有交互座位的连接授予命令能力；在线状态覆盖自有座位。测试见 `controlled-seats.test.ts`、`multihand-network.test.ts`。
+- `room-router` 调用 `GameSession`，`payload-validation.ts` 规范化输入。`room-viewer.ts` 从连接成员和已存归属派生控制集合，热座包含全部座位。命令、撤销和结束同意使用该集合；Replay 记录执行座位。信封只向拥有交互座位的连接授予命令能力；在线状态覆盖自有座位。测试见 `controlled-seats.test.ts`、`hotseat-room.test.ts`。
 - 返回 `ok=false` 且没有 `durableTransition` 的规则命令只回复发起连接，不产生版本或 Replay Step。持久拒绝会提交；只有它的错误仅发给发起者（[ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)）。
 
 ## server/game/ — Room 与 GameSession
@@ -43,7 +43,6 @@ server/game/
 ```
 
 - `RoomPlayer { ws, playerIndex, name, userId? }` 是连接座位，不是 `PlayerState`。
-- `team-room.ts` 在 `rooms.team_members_json` 保存未排座成员，等待连接计入配额和过期判断。纯函数 `projectTeamWaitingRoom` 共用于实时等待室和“我的对局”；只有实时连接添加在线状态。`startTeamGame` 先提交种子确定的归属和名字，再发送 `roomJoined` 与 Step 0。`setTeam` 在发布前检查容量并提交成员移动，失败时回滚。测试见 `team-seating.test.ts`、`team-room.test.ts`。
 - `room-spectators.ts` 保存无座位的临时旁观订阅，只读取已有在线路由，不申请准入。旁观接收公开的加入／断开事件以及 空可见座位集合的快照与历史；`room-router` 在预留回执前拒绝写命令。旁观不改变在线人数、过期时间或 Replay；全员离线、完赛、终止和重开会结束订阅。见 [ADR 0040](../adr/0040-public-live-spectating.md)、`live-spectating-network.test.ts` 与 `live-spectating.spec.ts`。
 - 普通入座通过 `resolveJoinPlayerIndex` 随机分配空座或恢复已存座位。重开保留名字与颜色，先发布新绑定再发快照。dispatch 从 Room 刷新绑定；开发、单人与热座保留原分配。测试见 `room-router.test.ts`、`draft-opening-order.spec.ts`。
 - `room-access.ts` 负责邀请准入与 `rooms.invited_user_ids`。大厅、Context、定位与 WS 校验权限；邀请名单不进入 GameState、Replay 或公开摘要。`GET /api/lobby/players?prefix=` 要求登录，至少两个字符，排除本人，最多返回十个可邀请账号。仅管理员可用的 `scope=beta-access` 额外包含邮箱未验证账号；两种范围都排除正在注销的账号。测试：`room-invitations.test.ts`、`auth-routes.test.ts`、`room-invitations.spec.ts`。
@@ -51,7 +50,7 @@ server/game/
 - 创建预检独立授权新的建局意图，不依赖连接之前显示的规则会话。离开非 active 的 Game Context 只移除其连接座位，不再通过旧 Room 的执行 stamp 或租约发布事件。
 - 创建在持久提交回调中先采用新 Room，再分离原连接。旧房通知失败只记录故障，不回滚或释放已提交的新会话；初始化清理由提交边界决定。
 - 正式单人使用登录后的 `createRoom(maxPlayers: 1)`，不进入公开发现。`game-creation-store.ts` 授权已完成来源的配置复用，不加载旧 Room 或 Replay。创建事务同时提交 Room、Step 0、元数据和回执，再查来源与工坊准入；显式卡源不可用时返回配置调整。恢复房间时重新加载已接受的配置，恢复后的重开沿用该配置。契约与测试见 `shared/contract/game-creation.ts`、`solo-room.test.ts`。
-- `roomId` 标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 保留开局选项，在同一事务提交新 Session/UUID 和旧局退役后才迁移连接。Team/Multihand 保留账号队伍归属，用新 seed 调用 `planTeamSeating`：所有账号在线时立即开局；缺人时保留完整名单进入无座位等待室。测试：`team-rematch.test.ts`。只有权威 `gameOver` 才归档结果；失败保留终局状态供重试。队伍结果包括计分方式、排名和逐座位队伍索引。协商结束使用 `terminated`；过期、取消和清理不产生结果。得分保留小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
+- `roomId` 标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 保留开局选项，在同一事务提交新 Session/UUID 和旧局退役后才迁移连接。只有权威 `gameOver` 才归档结果；失败保留终局状态供重试。协商结束使用 `terminated`；过期、取消和清理不产生结果。得分保留小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
 - 托管 Room 使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认等待状态与座位，`GameContextStore` 统一裁定持久化期限，并保护在线连接、准入与未完成保存。管理员可配置离线保留期，默认等待 3 天、进行中 7 天。每次全员离线后固定截止时间，修改只影响下次离线周期；开发房不因闲置过期。`RoomAuthority` 将内存卸载与存档删除分开。缺失录制数据会阻断恢复。见 [ADR 0039](../adr/0039-runtime-room-retention-policy.md)。
 - 开发槽 `dev2`–`dev6` 映射到跨重启保持的永久对局身份；重开或重置会分配新身份，completed、expired 或 removed 的 context 从不复活。开发账号可以持有多个座位，开发恢复需要座位提示或唯一归属的座位；普通 Room 的座位由已认证的归属推导。客户端的 `devMode` 标志不授予任何开发权限。`room_players` 以 `(room_id, player_index)` 存储归属。
 - 候场命令 `setPlayerColor` 只修改发送者自己的座位。已入座和保留座位独占颜色；选择空位颜色时交换两处颜色。`GameSession.updatePlayerColors` 同步更新隔离 Worker。Room 队列串行处理竞争请求，checkpoint 把颜色与命令回执一同持久化后再广播；开局后锁定颜色。
@@ -103,7 +102,7 @@ ClientCommand
 ```
 
 - 只有公开 Frame Hash 与私有会话游标都未变化、且未设置 `durableTransition` 时才是 `unchanged`；只改变游标的转换也会持久化，并重复同一个 Frame。重连与补拉不产生 Step。
-- Replay Step 有 Room 全局单调递增的 `stepNo`，与 `roomVersion` 无关；同时提交按连续 Step 串行化，自动结算属于最后一份触发输入，规则结果从不依赖到达顺序。Step 0 在第一个交互命令之前存在。终局 Frame 归档逐座位和队伍得分摘要。
+- Replay Step 有 Room 全局单调递增的 `stepNo`，与 `roomVersion` 无关；同时提交按连续 Step 串行化，自动结算属于最后一份触发输入，规则结果从不依赖到达顺序。Step 0 在第一个交互命令之前存在。终局 Frame 归档逐座位得分摘要。
 - Replay Intent 由穷尽的协议 switch 白名单化；从不保存 `requestId`、token、站点 `userId` 或未校验 payload。
 - Replay 归档使用有界的权威状态差量（[ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)）。
 - 写入失败时冻结同一份 Frame 与 Intent，阻断 Room 并按退避重试；客户端等待，从不读取未提交状态。相同幂等 key 但 hash 不同会永久阻断并报警。
@@ -224,10 +223,10 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 - 浏览器发送抽样、限流的计时批次（命令 RTT、首个快照、快照到布局），服务端视为不可信的观测输入。
 
 
-## 实验功能入口
+## Beta 资格与输入边界
 
-`experimental-features.ts` 每次检查读取 `beta_access` 中的最新资格，并从 `ADMIN_USERS` 推导管理员。迁移 `036-beta-access.sql` 只新增资格表，不重写保留对局。[ADR 0042](../adr/0042-experimental-feature-availability.md) 定义开放与参与边界。
+`experimental-features.ts` 读取最新 `beta_access`，并从 `ADMIN_USERS` 派生管理员。迁移 `036-beta-access.sql` 保存资格，不改写保留对局。资格 helper 服务于 `/api/auth/me`、管理员授予控件和正式预发布权威。测试：`beta-access-routes.test.ts`、`experimental-features.test.ts` 及权威测试。[ADR 0042](../adr/0042-experimental-feature-availability.md) 保留已被替代的 main 功能 registry 决策。
 
-`connection/room-router.ts` 对解析完成的组队创建配置、终局后 `newGame` 调用者，以及协商重开的提议者进行门禁，提议和实际创建各检查一次。`game-router.ts` 覆盖两个 HTTP 创建入口，以及向调试沙盒加载组队状态。`game/lobby.ts` 与 `game/room-directory.ts` 在列表截取之前过滤公开发现。`RoomHistoryStore`（`persistence/room-history-store.ts`）只投影公开 Team Configuration，供 SQL 在 LIMIT 前过滤资格；压缩恢复正文和历史 Frame 保持原样。已有房间的加入、换队、开局和游戏操作沿用正常权限，不受阶段或资格变化影响。`Broadcaster` 在私有 WeakMap 中按 socket 保存客户端能力，见[协议约束](contract.md#client-capabilities)。测试：[房间入口](../../server/connection/__tests__/experimental-features.test.ts)、[HTTP](../../server/__tests__/experimental-feature-http.test.ts)、[资格与外键](../../server/__tests__/experimental-features.test.ts)。
+`game-setup-options.ts` 在分配房间或替换状态之前拒绝已移出业务的配置。已移出命令按未知命令失败，不改变 Room 版本或 Replay。通用客户端能力声明、socket WeakMap、HTTP header 和 CORS 支持继续保留。测试：`experimental-feature-transport.test.ts` 和 `auth-routes.test.ts`。
 
 pre owner 门禁在 `scripts/prerelease/operations.ts`；资源范围、代次与验收见 `HOW_TO_DEPLOY.md`。

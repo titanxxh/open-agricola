@@ -31,7 +31,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - 生产卡牌描述中的资源、动物、地形和分数通过 `ResourceText` token 渲染为图标；`__…__` 只标记精确的卡名、行动名和行动格名。`scripts/__tests__/card-description-icons.test.ts` 与 `card-description-double-underscore.test.ts` 负责门禁。
 - 卡面、触发标签、日志预览和 Replay 共用 `client/components/common/cardText.ts`：官方名字和文字字段读取已加载的语言包；自定义预览/房间/回放 metadata 由共享 catalog 按字段归一化，跳过空译文，卡牌自有的提示用 `{card:<id>}` 引用卡名。玩家名按 `client/utils/player-name.ts` 中的生成名来源处理（[client](client_zh.md)）。
 
-恢复时，已打出卡牌的 modifiers 按当前 catalog 定义重建。`card-modifiers.ts` 在原位置替换该卡的整组条目，保留 catalog 的全部不同条目，以及其他卡和外部 modifiers，避免旧序列化定义与更新后的定义叠加。测试：`server/__tests__/partner-rooms-session.test.ts`。
+恢复时，已打出卡牌的 modifiers 按当前 catalog 定义重建。`card-modifiers.ts` 在原位置替换该卡的整组条目，保留 catalog 的全部不同条目，以及其他卡和外部 modifiers，避免旧序列化定义与更新后的定义叠加。测试：`server/__tests__/fixed-room-prices-recovery.test.ts`。
 
 测试：`shared/cards/__tests__/card-source-representatives.test.ts`、`scripts/check-generated-cards-sync.ts`。
 

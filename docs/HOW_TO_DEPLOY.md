@@ -541,9 +541,11 @@ For changes to saved state, engine cursors, pending continuations, action IDs or
 
 Completed Replays keep their recorded Frames, hashes and frozen Viewer Builds; historical playback does not execute current backend rules. The policy does not require every historical save or browser build to remain supported forever. Retiring retained production games is a separate operator decision with explicit authorization for the affected games, not an implied part of a feature, merge or release request. Defer an incompatible deployment until the affected saves are migrated or verified to have left the affected state.
 
+The direct Beta-business move in [#1661](https://github.com/titanxxh/open-agricola/issues/1661) excludes old Team, Multihand and cooperation saves from this transition. Main removes those business paths; it adds no old-Beta drain, inventory gate, migration or participant compensation. This exception does not weaken ordinary retained-game recovery or authorize production data changes. Executed migrations 034/035 and immutable historical Replay/Viewer artifacts remain historical records. Pre reconstructs the business as forward feature changes on the cleaned main baseline; reversing the entire cleanup would overwrite formal identity, entry and operations infrastructure.
+
 ### Supported browser and backend overlap
 
-The cooperation beta introduces `X-Open-Agricola-Client-Capabilities` on HTTP game requests. Older backends do not allow this header in CORS preflight. A new Pages build with an older backend is therefore unsupported, including ordinary HTTP sandbox requests. Deploy backend capability and CORS support before publishing the new Pages build. Old clients can continue ordinary games against the updated backend; cooperation requests without support receive a readable refresh error before incompatible state or rules input is accepted.
+HTTP game requests carry `X-Open-Agricola-Client-Capabilities`. Backends that do not allow this header in CORS preflight cannot serve the current Pages build, including ordinary HTTP sandbox requests. Deploy backend capability and CORS support before publishing Pages. Ordinary clients can omit capability declarations; empty or unknown declarations grant no additional behavior.
 
 For this upgrade, use the existing independent verification and deployment entries in this order:
 

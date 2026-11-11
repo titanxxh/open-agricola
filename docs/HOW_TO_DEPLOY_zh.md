@@ -557,11 +557,13 @@ Open Agricola 已上线。升级必须保留所有尚在保留期内的 Room，�
 
 已完成 Replay 保留原始 Frame、哈希和固定 Viewer Build，历史播放不运行当前后端规则。这项策略不要求永久支持所有历史存档或浏览器构建。退役线上保留对局是独立的运维决定，需要对受影响对局的明确授权，不能从功能、合入或发布请求中推定。遇到不兼容升级，延后部署，直到受影响存档完成迁移，或已核实这些对局离开受影响状态。
 
+[#1661](https://github.com/titanxxh/open-agricola/issues/1661) 的 Beta 业务直接迁出将旧 Team、Multihand 与协作存档排除在此次切换之外。main 移除这些业务路径，不新增旧 Beta 排空、库存门禁、迁移或参与者补偿。此例外不减弱普通保留局恢复要求，也不授权修改生产数据。已执行迁移 034/035 和不可变历史 Replay、Viewer 产物继续作为历史记录保留。pre 以干净 main 为基线正向重建业务；整体反转清理会覆盖正式身份、入口和运维基础设施。
+
 <a id="supported-browser-and-backend-overlap"></a>
 
 ### 支持的浏览器与后端版本重叠
 
-合作规则 beta 为 HTTP 游戏请求新增 `X-Open-Agricola-Client-Capabilities`。旧后端的 CORS 预检不允许此 header，因此不支持新 Pages 配旧后端，普通 HTTP 沙盒请求也会受影响。先部署后端能力与 CORS 支持，再发布新 Pages。旧客户端可在新后端继续普通对局；缺能力的合作请求会先收到可读的刷新错误，不接受不兼容的状态发布或规则输入。
+HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不允许此 header 的后端不能服务当前 Pages，普通 HTTP 沙盒请求也会受影响。先部署后端能力与 CORS 支持，再发布 Pages。普通客户端可省略能力声明；空声明或未知 token 不授予额外行为。
 
 本次升级按以下顺序使用现有独立验证与部署入口：
 
