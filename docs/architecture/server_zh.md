@@ -141,7 +141,7 @@ HTTP 负责产品 API、运维与调试。WebSocket 命令仍是对局同步主�
 - `GET /api/health`、`/api/rooms`、`/api/game/state` 与 `/cards-manifest.json` 提供健康、发现、快照与 metadata。
 - `POST /api/game/new` 经 `game/game-setup-options.ts` 映射 WebSocket 创建选项；`load`、`dev/*` 与 `new-sandbox` 为调试及工坊入口。
 - `oauth/{handler,store}.ts` 负责 provider 发起、回调与完成。PKCE 绑定账号关联，浏览器 challenge 绑定注册票据；显式无效凭证不回退 Cookie 身份。账号、身份、邀请与票据消费同事务提交。回调用 fragment，设置 `no-store` 与 `no-referrer`。
-- `prerelease-authority{,-routes}.ts` 负责 `/api/prerelease/*` 的正式会话交接、目标 key 兑换/复核及持久撤销/删除回执。迁移 037 捕获会话撤销，账号删除等待目标清理。`prerelease-identity.ts` 固定绝对 30 秒、来源及七天期限。目标默认关闭。测试：`prerelease-authority.test.ts`、`auth-routes.test.ts`；政策见 ADR 0042。
+- `prerelease-authority{,-routes}.ts` 负责 `/api/prerelease/*` 的正式会话交接、目标 key 兑换/复核及持久撤销/删除回执。迁移 037/039 捕获撤销与代次清除；账号删除等待仍保留的投影清理。`prerelease-lifecycle-routes.ts` 提供仅正式管理员可用的退役及恢复审计，以原生身份清单和最新来源事实控制开放。`prerelease-identity.ts` 固定绝对 30 秒、来源及七天期限。目标默认关闭。测试：`{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`；政策见 ADR 0042。
 
 认证测试：`auth-routes.test.ts`、`oauth/__tests__/store.test.ts`、`e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`。
 

@@ -164,7 +164,7 @@ function startOAuthCookie(res: JsonResponse): string {
   return cookiePairFromSetCookie(res.headers['Set-Cookie'], OAUTH_STATE_COOKIE)
 }
 
-function prereleaseAuthorityRequests() {
+function prereleaseAuthorityRequests({ seedGeneration = true } = {}) {
   vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://formal.example.test')
   vi.stubEnv('PUBLIC_API_BASE', 'https://api.example.test')
   vi.stubEnv('PRERELEASE_ENTRY_ENABLED', 'true')
@@ -172,20 +172,31 @@ function prereleaseAuthorityRequests() {
   vi.stubEnv('PRERELEASE_IDENTITY_SERVICE_KEY', 'service-key-with-at-least-32-bytes')
   const binding = { protocolVersion: 1, channel: 'prerelease', targetOrigin: 'https://pre.example.test' }
   const targetHeaders = { Authorization: 'Bearer service-key-with-at-least-32-bytes' }
-  const target = (path: string, input = {}) => requestJson('POST', `/api/prerelease/${path}`, { ...binding, ...input }, targetHeaders)
-  const enter = async (token: string | null) => {
+  const fixtureGeneration = '00000000-0000-4000-8000-000000000001'
+  const target = (path: string, input = {}) => requestJson('POST', `/api/prerelease/${path}`, { ...binding, generationId: fixtureGeneration, ...input }, targetHeaders)
+  const enter = async (token: string | null, generationId = fixtureGeneration) => {
+    if (seedGeneration) {
+      const inserted = await getDb().prepare(`INSERT INTO prerelease_identity_generations(id,target_origin,target_id,prepared_at)
+        VALUES(?,?,'fixture-pre',1) ON CONFLICT(id) DO NOTHING`).run(fixtureGeneration, binding.targetOrigin)
+      if (inserted.changes) {
+        const auditOperationId = '90000000-0000-4000-8000-000000000001'
+        await getDb().prepare(`INSERT INTO prerelease_identity_owner_operations(operation_id,generation_id,action,request_hash,completed_at,identity_manifest_sha256,identity_count,verification_receipt_sha256)
+          VALUES(?,?,'audit-complete','fixture',1,?,0,?)`).run(auditOperationId, fixtureGeneration, 'a'.repeat(64), 'b'.repeat(64))
+        await getDb().prepare('UPDATE prerelease_identity_generations SET admission_open=true,audit_operation_id=? WHERE id=?').run(auditOperationId, fixtureGeneration)
+      }
+    }
     const verifier = 'v'.repeat(43)
     const issued = await requestJson('POST', '/api/prerelease/handoffs', {
       ...binding, browserChallenge: createHash('sha256').update(verifier).digest('base64url'), returnTo: 'https://formal.example.test/',
     }, { Cookie: `oa_session=${token}`, Origin: 'https://formal.example.test' })
     expect(issued.status).toBe(200)
-    const exchanged = await target('exchange', { code: issued.json.code, browserVerifier: verifier, returnTo: 'https://formal.example.test/' })
+    const exchanged = await target('exchange', { generationId, code: issued.json.code, browserVerifier: verifier, returnTo: 'https://formal.example.test/' })
     expect(exchanged.status).toBe(200)
     const state = exchanged.json.state
     if (!state || typeof state !== 'object' || !('grantId' in state) || typeof state.grantId !== 'string') throw new Error('Expected grant ID')
     return state.grantId
   }
-  return { enter, target, targetHeaders, status: (grantId: string) => target('status', { grantId }) }
+  return { enter, target, targetHeaders, status: (grantId: string, generationId = fixtureGeneration) => target('status', { grantId, generationId }) }
 }
 
 describe('auth routes', () => {
@@ -206,6 +217,8 @@ describe('auth routes', () => {
       DELETE FROM prerelease_identity_handoffs;
       DELETE FROM prerelease_identity_grants;
       DELETE FROM prerelease_identity_events;
+      DELETE FROM prerelease_identity_owner_operations;
+      DELETE FROM prerelease_identity_generations;
       DELETE FROM github_propose_audit;
       DELETE FROM github_propose_rate_limit;
       DELETE FROM workshop_card_versions;
@@ -2329,6 +2342,42 @@ describe('auth routes', () => {
     const newCookie = cookiePairFromSetCookie(reset.headers['Set-Cookie'], SESSION_COOKIE)
     const nextToken = decodeURIComponent(newCookie.slice(newCookie.indexOf('=') + 1))
     expect((await pre.status(await pre.enter(nextToken))).json).toMatchObject({ state: { source: { kind: 'active' }, account: { kind: 'active', subject: { id: user.id } } } })
+  })
+
+
+
+
+  it('lets only a CSRF-checked formal administrator retire verified purged projections before later account deletion', async () => {
+    const pre = prereleaseAuthorityRequests()
+    vi.stubEnv('ADMIN_USERS', 'retirement_owner')
+    const owner = await createLocalUserForTests('retirement_owner', 'password123', 'Owner')
+    const ownerToken = await createSession(owner.id)
+    const user = await createLocalUserForTests('retired_then_delete', 'password123', 'Retired target user')
+    await getDb().prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
+    const token = await createSession(user.id)
+    await pre.enter(token)
+    const endpoint = '/api/admin/prerelease-identity/lifecycle'
+    const binding = { protocolVersion: 1, channel: 'prerelease', targetOrigin: 'https://pre.example.test', generationId: '00000000-0000-4000-8000-000000000001' }
+    const close = { ...binding, action: 'close', operationId: '10000000-0000-4000-8000-000000000001' }
+    const ownerHeaders = { Cookie: `oa_session=${ownerToken}`, Origin: 'https://formal.example.test' }
+    expect((await requestJson('POST', endpoint, close, pre.targetHeaders)).status).toBe(401)
+    expect((await requestJson('POST', endpoint, close, { Cookie: `oa_session=${token}`, Origin: 'https://formal.example.test' })).status).toBe(403)
+    expect((await requestJson('POST', endpoint, close, { Cookie: `oa_session=${ownerToken}` })).status).toBe(403)
+    expect((await requestJson('POST', endpoint, close, { ...ownerHeaders, Origin: 'https://evil.example' })).status).toBe(403)
+    expect((await requestJson('POST', endpoint, close, ownerHeaders)).status).toBe(200)
+    const retired = { ...binding, action: 'retire', operationId: '10000000-0000-4000-8000-000000000002', purgeReceiptSha256: 'a'.repeat(64) }
+    const confirmed = await requestJson('POST', endpoint, retired, ownerHeaders)
+    expect(confirmed.status).toBe(200)
+    vi.stubEnv('PRERELEASE_APP_ORIGIN', '')
+    const deletion = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `oa_session=${token}` })
+    expect(deletion.status).toBe(200)
+    expect(deletion.json).toMatchObject({ ok: true, pending: false })
+    expect(await validateSession(token ?? '')).toBeNull()
+    const replacement = await createLocalUserForTests('retired_then_delete', 'password123', 'Replacement')
+    expect(replacement.id).not.toBe(user.id)
+    expect((await requestJson('POST', endpoint, retired, ownerHeaders)).json).toEqual(confirmed.json)
+    expect((await requestJson('GET', `${endpoint}?targetOrigin=https%3A%2F%2Fpre.example.test`, undefined, ownerHeaders)).json)
+      .toMatchObject({ generation: { state: 'retired', retirement: confirmed.json.receipt } })
   })
 
 })

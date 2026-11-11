@@ -271,11 +271,9 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 
 `/api/auth/me` 返回服务端按最新资格计算的 `user.experimentalFeatures`，客户端据此展示入口。WebSocket 错误包含 `code: experimental_feature_unavailable` 和 `feature`；HTTP 使用相同字段并返回 403。持久化命令回执只保留通用错误码与消息，不存储功能 ID。开放状态不进入对局状态、Room 快照、回放或结果存档。
 
-入口及毕业政策记录在 [ADR 0042](../adr/0042-experimental-feature-availability.md)。
-
 ## 预发布身份
 
-`prerelease-identity.ts` 拥有 version-1 权威契约：固定 `prerelease` audience、目标 origin、不透明 grant 关联、最小账号投影及独立的来源/Beta/grant 状态。grant 不携带登录凭据。绝对 `confirmedAt`/`validUntil` 计入传输时间，只有成功的权威复核可更新最多 30 秒窗口；来源到期和 grant 七天上限保持固定。`isPrereleaseIdentityAuthorized` 拒绝过期或失效状态。测试：`server/__tests__/{prerelease-authority,auth-routes}.test.ts`。
+`prerelease-identity.ts` 拥有 version-1 目标/代次/身份状态和绝对 30 秒、来源、七天期限。消费者匹配 owner 数据代次，grant 不用于正式登录。`prerelease-identity-lifecycle.ts` 拥有关闭/开放/退役代次及不可变 owner 回执；只有正式管理员可确认已验证的清除，旧 grant 不恢复。恢复审计以已知保留身份建立无登录权限的新关联；开放时复核当前删除事实和不足 30 秒的原生 view 清单证据。测试：`server/__tests__/{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`。
 
 ## 客户端能力
 

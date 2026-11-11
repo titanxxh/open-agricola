@@ -31,7 +31,10 @@ A separate PR changes a stage to `general`. After at least one released version,
 - Formal current logout invalidates only associations from that source login. All-session revocation and password reset cover every source for the account. Durable events and idempotent target acknowledgements record completion. Formal account deletion remains pending until the target confirms local cleanup/anonymization.
 - Every pre participant, invitee, spectator and archive reader needs current Beta access. Expired unknown state pauses access; qualification loss stops access while retaining game state. No development override, invitation or static Viewer grants an exception. Environment enforcement belongs to the pre implementation, not the rule engine.
 
-`server/prerelease-authority{,-routes}.ts`, migration 037 and `shared/contract/prerelease-identity.ts` implement the formal authority seam. This does not establish a live pre deployment or complete its environment admission; those remain separate dependency tickets. Main Beta-business removal is tracked by #1661.
+- Migration 039 uses the owner data-generation UUID. Only a formal administrator may close admission, acknowledge verified projection erasure, or prepare/open its replacement. Immutable operation receipts fence stale retries. Erased generations do not create future cleanup obligations after the target is removed.
+- Restoring a backup must rebind every retained identity to current deletion propagation without restoring source or local login rights. The required pre-native identity view, actual cleanup/remap/rescan, current formal deletion facts and a completion under 30 seconds gate activation. Missing/unknown refs block; the target key cannot authorize this audit. Close invalidates the earlier audit.
+
+`server/prerelease-authority{,-routes}.ts`, migrations 037/039 and `shared/contract/prerelease-identity.ts` implement the formal authority seam. This does not establish a live pre deployment or complete its environment admission; those remain separate dependency tickets. Main Beta-business removal is tracked by #1661.
 
 ## References
 

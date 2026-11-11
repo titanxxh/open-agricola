@@ -26,6 +26,11 @@ async function readInput(req: IncomingMessage): Promise<Record<string, unknown>>
   throw new PrereleaseAuthorityError('prerelease_request_invalid', 400)
 }
 
+function generationId(input: Record<string, unknown>): string {
+  if (typeof input.generationId !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(input.generationId)) throw new PrereleaseAuthorityError('prerelease_generation_invalid', 400)
+  return input.generationId
+}
+
 function validateTarget(input: Record<string, unknown>, target: PrereleaseTarget): void {
   if (input.protocolVersion !== PRERELEASE_IDENTITY_PROTOCOL || input.channel !== 'prerelease' || input.targetOrigin !== target.targetOrigin) {
     throw new PrereleaseAuthorityError('prerelease_target_invalid', 400)
@@ -82,16 +87,16 @@ export function createPrereleaseAuthorityHandler({ db, getSourceToken, now = Dat
         send(200, await authority.issue(await getSourceToken(req), target, { browserChallenge: input.browserChallenge, returnTo: input.returnTo }), true)
       } else if (path === '/api/prerelease/exchange') {
         if (!opaqueSecret(input.code) || !opaqueSecret(input.browserVerifier) || input.returnTo !== `${target.sourceOrigin}/`) throw new PrereleaseAuthorityError('prerelease_request_invalid', 400)
-        send(200, { ok: true, state: await authority.exchange(target, { code: input.code, browserVerifier: input.browserVerifier, returnTo: input.returnTo }) })
+        send(200, { ok: true, state: await authority.exchange(target, { code: input.code, browserVerifier: input.browserVerifier, returnTo: input.returnTo, generationId: generationId(input) }) })
       } else if (path === '/api/prerelease/status') {
         if (!opaqueSecret(input.grantId)) throw new PrereleaseAuthorityError('prerelease_request_invalid', 400)
-        send(200, { ok: true, state: await authority.status(target, input.grantId) })
+        send(200, { ok: true, state: await authority.status(target, input.grantId, generationId(input)) })
       } else if (path === '/api/prerelease/events') {
-        send(200, { ok: true, protocolVersion: PRERELEASE_IDENTITY_PROTOCOL, events: await authority.events(target) })
+        send(200, { ok: true, protocolVersion: PRERELEASE_IDENTITY_PROTOCOL, events: await authority.events(target, generationId(input)) })
       } else if (path === '/api/prerelease/acknowledgements') {
         if (typeof input.eventId !== 'string' || !/^[0-9a-f-]{36}$/.test(input.eventId)
           || (input.outcome !== 'revoked' && input.outcome !== 'deleted' && input.outcome !== 'rechecked')) throw new PrereleaseAuthorityError('prerelease_request_invalid', 400)
-        send(200, { ok: true, receipt: await authority.acknowledge(target, input.eventId, input.outcome) })
+        send(200, { ok: true, receipt: await authority.acknowledge(target, generationId(input), input.eventId, input.outcome) })
       } else throw new PrereleaseAuthorityError('prerelease_route_not_found', 404)
     } catch (error) {
       if (!(error instanceof PrereleaseAuthorityError)) throw error

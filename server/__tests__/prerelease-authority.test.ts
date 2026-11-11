@@ -9,6 +9,7 @@ import { createTestDatabase } from './_helpers/postgres'
 
 const sourceOrigin = 'https://play.example.test'
 const targetOrigin = 'https://pre.example.test'
+const generationId = '00000000-0000-4000-8000-000000000001'
 const serviceKey = 'target-service-key-with-at-least-32-bytes'
 const sourceToken = 'formal-session-secret-never-shared'
 const verifier = 'b'.repeat(43)
@@ -29,6 +30,11 @@ async function setup({ configured = true } = {}) {
   vi.stubEnv('PRERELEASE_IDENTITY_SERVICE_KEY', configured ? serviceKey : '')
   const db = await createTestDatabase()
   cleanups.push(() => db.close())
+  await db.prepare(`INSERT INTO prerelease_identity_generations(id,target_origin,target_id,prepared_at) VALUES(?,?,'fixture-pre',1)`).run(generationId, targetOrigin)
+  const auditOperationId = '90000000-0000-4000-8000-000000000001'
+  await db.prepare(`INSERT INTO prerelease_identity_owner_operations(operation_id,generation_id,action,request_hash,completed_at,identity_manifest_sha256,identity_count,verification_receipt_sha256)
+    VALUES(?,?,'audit-complete','fixture',1,?,0,?)`).run(auditOperationId, generationId, 'a'.repeat(64), 'b'.repeat(64))
+  await db.prepare('UPDATE prerelease_identity_generations SET admission_open=true,audit_operation_id=? WHERE id=?').run(auditOperationId, generationId)
   let now = 1_800_000_000_000
   await db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES('player','player','Test Player','private-password-hash',?)").run(now)
   await db.prepare('INSERT INTO sessions(token,user_id,expires_at,created_at) VALUES(?,?,?,?)').run(sourceToken, 'player', now + 9 * 86_400_000, now)
@@ -51,8 +57,8 @@ async function setup({ configured = true } = {}) {
     headers: { cookie: `oa_session=${sourceToken}`, origin: sourceOrigin, 'content-type': 'application/json', ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
-  const internal = (path: string, body: unknown, headers: Record<string, string> = {}) => fetch(`${base}/${path}`, {
-    method: 'POST', headers: { authorization: `Bearer ${serviceKey}`, 'content-type': 'application/json', ...headers }, body: JSON.stringify(body),
+  const internal = (path: string, body: Record<string, unknown>, headers: Record<string, string> = {}) => fetch(`${base}/${path}`, {
+    method: 'POST', headers: { authorization: `Bearer ${serviceKey}`, 'content-type': 'application/json', ...headers }, body: JSON.stringify({ ...body, generationId }),
   })
   const issue = (overrides = {}) => browser('handoffs', { protocolVersion: 1, channel: 'prerelease', targetOrigin, browserChallenge: challenge, returnTo, ...overrides })
   const exchange = (code: string, overrides = {}) => internal('exchange', {
@@ -78,7 +84,7 @@ describe('formal prerelease identity authority', () => {
     expect(exchanged.status).toBe(200)
     const result = await exchanged.json()
     expect(result).toEqual({ ok: true, state: {
-      protocolVersion: 1, channel: 'prerelease', targetOrigin, grantId: expect.any(String),
+      protocolVersion: 1, channel: 'prerelease', targetOrigin, generationId, grantId: expect.any(String),
       account: { kind: 'active', subject: { id: 'player', username: 'player', displayName: 'Test Player' } },
       source: { kind: 'active', expiresAt: 1_800_777_600_000 }, betaAccess: true,
       grant: { kind: 'active', expiresAt: 1_800_604_800_000 }, confirmedAt: 1_800_000_000_000, validUntil: 1_800_000_030_000,
@@ -173,18 +179,18 @@ describe('formal prerelease identity authority', () => {
     const { issue, exchange, internal, status, now, advance } = await setup()
     const handoff = await (await issue()).json()
     const initial = (await (await exchange(handoff.code)).json()).state
-    expect(isPrereleaseIdentityAuthorized(initial, now())).toBe(true)
+    expect(isPrereleaseIdentityAuthorized(initial, now(), generationId)).toBe(true)
     advance(29_999)
-    expect(isPrereleaseIdentityAuthorized(initial, now())).toBe(true)
+    expect(isPrereleaseIdentityAuthorized(initial, now(), generationId)).toBe(true)
     expect((await internal('status', { protocolVersion: 1, channel: 'prerelease', targetOrigin, grantId: initial.grantId }, { authorization: 'Bearer unavailable' })).status).toBe(401)
     advance(1)
-    expect(isPrereleaseIdentityAuthorized(initial, now())).toBe(false)
+    expect(isPrereleaseIdentityAuthorized(initial, now(), generationId)).toBe(false)
     const refreshed = (await (await status(initial.grantId)).json()).state
     expect(refreshed).toMatchObject({ confirmedAt: 1_800_000_030_000, validUntil: 1_800_000_060_000,
       source: { expiresAt: 1_800_777_600_000 }, grant: { expiresAt: 1_800_604_800_000 } })
-    expect(isPrereleaseIdentityAuthorized(refreshed, now())).toBe(true)
+    expect(isPrereleaseIdentityAuthorized(refreshed, now(), generationId)).toBe(true)
     advance(7 * 86_400_000)
-    expect(isPrereleaseIdentityAuthorized(refreshed, now())).toBe(false)
+    expect(isPrereleaseIdentityAuthorized(refreshed, now(), generationId)).toBe(false)
     expect((await (await status(initial.grantId)).json()).state.grant.kind).toBe('revoked')
   })
 
@@ -195,9 +201,9 @@ describe('formal prerelease identity authority', () => {
     const initial = (await (await exchange(handoff.code)).json()).state
     expect(initial).toMatchObject({ source: { expiresAt: 1_800_000_020_000 }, grant: { expiresAt: 1_800_000_020_000 }, validUntil: 1_800_000_020_000 })
     advance(19_999)
-    expect(isPrereleaseIdentityAuthorized(initial, now())).toBe(true)
+    expect(isPrereleaseIdentityAuthorized(initial, now(), generationId)).toBe(true)
     advance(1)
-    expect(isPrereleaseIdentityAuthorized(initial, now())).toBe(false)
+    expect(isPrereleaseIdentityAuthorized(initial, now(), generationId)).toBe(false)
     const expired = (await (await status(initial.grantId)).json()).state
     expect(expired.source).toEqual({ kind: 'invalid' })
     expect(expired.grant).toEqual({ kind: 'revoked', expiresAt: 1_800_000_020_000 })
@@ -211,7 +217,7 @@ describe('formal prerelease identity authority', () => {
     await db.prepare("DELETE FROM beta_access WHERE user_id='player'").run()
     const withdrawn = (await (await status(initial.grantId)).json()).state
     expect(withdrawn).toMatchObject({ account: { kind: 'active' }, source: { kind: 'active' }, betaAccess: false })
-    expect(isPrereleaseIdentityAuthorized(withdrawn, now())).toBe(false)
+    expect(isPrereleaseIdentityAuthorized(withdrawn, now(), generationId)).toBe(false)
     const input = { protocolVersion: 1, channel: 'prerelease', targetOrigin }
     const events = await (await internal('events', input)).json()
     expect(events.events).toEqual([expect.objectContaining({ kind: 'beta_changed', userId: 'player', grantId: null })])
@@ -220,7 +226,7 @@ describe('formal prerelease identity authority', () => {
     await db.prepare("INSERT INTO beta_access(user_id,granted_at) VALUES('player',?)").run(now())
     const restored = (await (await status(initial.grantId)).json()).state
     expect(restored.account).toEqual({ kind: 'active', subject: { id: 'player', username: 'player', displayName: 'Renamed player' } })
-    expect(isPrereleaseIdentityAuthorized(restored, now())).toBe(true)
+    expect(isPrereleaseIdentityAuthorized(restored, now(), generationId)).toBe(true)
     expect((await (await internal('events', input)).json()).events).toEqual([expect.objectContaining({ kind: 'beta_changed' })])
   })
 
