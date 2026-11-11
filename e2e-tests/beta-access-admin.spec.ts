@@ -3,23 +3,47 @@
 // @covers client/app/BetaAccessSettings.tsx
 // @covers client/app/RoomInvitePicker.tsx
 // @covers client/app/SettingsPage.tsx
+// @covers client/app/LobbyPage.tsx
+// @covers client/app/PrereleaseEntry.tsx
 // @covers client/contexts/AuthContext.tsx
-import { expect, test } from '@playwright/test'
-import { startHostedReleaseAppWithExperimentalFeatures } from './helpers/experimental-features-app'
+import { expect, test, type Page } from '@playwright/test'
+import { startHostedReleaseAppWithBetaAccess } from './helpers/beta-access-app'
 import { PostgresDatabase } from '../server/database/postgres'
 
-let app: Awaited<ReturnType<typeof startHostedReleaseAppWithExperimentalFeatures>>
-test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithExperimentalFeatures() })
+let app: Awaited<ReturnType<typeof startHostedReleaseAppWithBetaAccess>>
+test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithBetaAccess() })
 test.afterAll(async () => { await app?.close() })
 
-test('administrator grants and revokes Beta access while existing team rooms remain usable', async ({ browser }, testInfo) => {
+async function expectStableLobby(page: Page) {
+  await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Local Hotseat', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Solo game', exact: true })).toBeVisible()
+  await expectRemovedBusinessControls(page)
+}
+
+async function expectRemovedBusinessControls(page: Page) {
+  await expect(page.getByRole('button', { name: /^Team game/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Multihand game/ })).toHaveCount(0)
+  await expect(page.getByRole('checkbox', { name: /cooperation rules/i })).toHaveCount(0)
+  await expect(page.locator('.team-waiting-room, .multihand-seat-controls, .marketplace-panel')).toHaveCount(0)
+}
+
+test('administrator manages Beta qualification with bilingual revocation while main keeps stable game controls', async ({ browser }, testInfo) => {
   test.setTimeout(120000)
   const administrator = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   const ordinary = await browser.newContext()
+  const visitor = await browser.newContext()
   try {
     const username = `beta_member_${Date.now().toString(36)}`
     await app.authenticate(administrator, 'e2e_admin', 'Administrator')
     await app.authenticate(ordinary, username, 'Beta Player')
+    await visitor.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'en') })
+    const visitorPage = await visitor.newPage()
+    await visitorPage.goto(app.appUrl)
+    await expect(visitorPage.getByRole('heading', { name: 'Open Agricola', exact: true })).toBeVisible()
+    await expectRemovedBusinessControls(visitorPage)
+    await expect(visitorPage.locator('.prerelease-entry')).toHaveCount(0)
+
     if (!/^test_[a-f0-9]{32}$/.test(app.environment.DATABASE_SCHEMA ?? '')) throw new Error('Expected an isolated test schema')
     const fixture = new PostgresDatabase({ connectionString: app.environment.DATABASE_URL, schema: app.environment.DATABASE_SCHEMA })
     try {
@@ -30,7 +54,12 @@ test('administrator grants and revokes Beta access while existing team rooms rem
     expect((await ordinary.request.get(`${app.apiUrl}/api/admin/beta-access`)).status()).toBe(403)
     const owner = await administrator.newPage(), member = await ordinary.newPage()
     await member.goto(app.appUrl)
-    await expect(member.getByRole('button', { name: /^Team game/ })).toHaveCount(0)
+    await expectStableLobby(member)
+    await expect(member.locator('.prerelease-entry')).toHaveCount(0)
+    await owner.goto(app.appUrl)
+    await expectStableLobby(owner)
+    await expect(owner.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
+
     const settingsUrl = new URL(app.appUrl)
     settingsUrl.searchParams.set('page', 'settings')
     await owner.goto(settingsUrl.href)
@@ -48,34 +77,33 @@ test('administrator grants and revokes Beta access while existing team rooms rem
     await manager.screenshot({ path: testInfo.outputPath('beta-admin-mobile-section.png') })
 
     await member.reload()
-    await expect(member.getByRole('button', { name: /^Team game/ })).toBeVisible()
-    await member.getByRole('button', { name: /^Team game/ }).click()
-    await member.getByRole('button', { name: 'Create Game', exact: true }).click()
-    await expect(member.locator('.team-waiting-room')).toBeVisible()
-    const roomId = await member.locator('.ws-invite-roomid strong').textContent()
-    expect(roomId).toBeTruthy()
+    await expectStableLobby(member)
+    await expect(member.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
+    await expect(member.locator('.prerelease-entry')).toContainText('Prerelease is not available yet.')
+    expect(await (await ordinary.request.get(`${app.apiUrl}/api/auth/me`)).json()).toMatchObject({ user: { betaAccess: true } })
 
     await row.getByRole('button', { name: 'Revoke', exact: true }).click()
-    const confirmation = row.getByRole('dialog')
-    await expect(confirmation).toContainText('This takes effect immediately. Existing team rooms are not affected.')
+    let confirmation = row.getByRole('dialog')
+    await expect(confirmation).toContainText(`Revoke beta access for @${username}? Prerelease access will stop within 30 seconds. Saved games and other state will be retained.`)
     expect(await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    await manager.screenshot({ path: testInfo.outputPath('beta-admin-mobile-confirmation.png') })
-    await confirmation.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await manager.screenshot({ path: testInfo.outputPath('beta-admin-mobile-confirmation-en.png') })
+    await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await owner.getByRole('button', { name: 'Display language: English', exact: true }).click()
+    await owner.getByRole('option', { name: '简体中文', exact: true }).click()
+    await row.getByRole('button', { name: '撤销', exact: true }).click()
+    confirmation = row.getByRole('dialog')
+    await expect(confirmation).toContainText(`撤销 @${username} 的 Beta 资格？预发布访问将在 30 秒内停止，已保存的对局及其他状态会保留。`)
+    expect(await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await manager.screenshot({ path: testInfo.outputPath('beta-admin-mobile-confirmation-zh.png') })
+    await confirmation.getByRole('button', { name: '取消', exact: true }).click()
+    await owner.getByRole('button', { name: '界面语言: 简体中文', exact: true }).click()
+    await owner.getByRole('option', { name: 'English', exact: true }).click()
+    await row.getByRole('button', { name: 'Revoke', exact: true }).click()
+    await row.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click()
     await expect(row).toHaveCount(0)
     await member.reload()
-    await expect(member.locator('.team-waiting-room')).toBeVisible()
-    await member.getByRole('combobox', { name: 'Choose a team', exact: true }).selectOption('1')
-    await expect(member.getByRole('combobox', { name: 'Choose a team', exact: true })).toHaveValue('1')
-    await expect(member.locator('.ws-invite-roomid strong')).toHaveText(roomId ?? '')
-
-    await member.goto(app.appUrl)
-    await expect(member.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
-    await expect(member.getByRole('button', { name: /^Team game/ })).toHaveCount(0)
-    await expect(member.getByRole('button', { name: /^Multihand game/ })).toHaveCount(0)
-    const rejected = await ordinary.request.post(`${app.apiUrl}/api/game/new`, { data: {
-      playerCount: 4, teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' },
-    } })
-    expect(rejected.status()).toBe(403)
-    expect(await rejected.json()).toMatchObject({ code: 'experimental_feature_unavailable', feature: 'team-modes' })
-  } finally { await ordinary.close(); await administrator.close() }
+    await expectStableLobby(member)
+    await expect(member.locator('.prerelease-entry')).toHaveCount(0)
+    expect(await (await ordinary.request.get(`${app.apiUrl}/api/auth/me`)).json()).toMatchObject({ user: { betaAccess: false } })
+  } finally { await visitor.close(); await ordinary.close(); await administrator.close() }
 })
