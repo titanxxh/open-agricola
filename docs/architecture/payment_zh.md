@@ -13,7 +13,6 @@
 | `fees` | 每次行动的固定费用。`computeCosts.costs` 的差值并入 `fees[0]`；负总额 clamp 为 0，折扣不会退还其他资源。 |
 | `unitFee` + `nb` | 单位费用乘数量（房间、翻修房间、围栏段、马厩）。 |
 | `roomMaterial` | 实际建出房间的材质，同时用于静态 modifier 与数量相关 bonus 的两层过滤。旧费用缺省时沿用付款者房型；显式 `houseType*` 居住条件始终读付款者。 |
-
 | `unitPriceAlternatives` | 来源指定的精确房价可排除普通替代基础价。 |
 | `trades` | `from → to` 替代。`Trade.scope: 'action'` 每次行动对资源池转换一次；`'unit'` 对每个单位行运行候选闭包。完整的 `Trade.unitPrice` 先提供独立基础价候选，其 `from`、`to` 不作为减费叠加；`replaceAll` 替代当前单位费用中指定资源的全部数量。`minCost` / `maxCost`、`replaceUpTo`、`groupMin` / `groupMax` 约束使用次数；每个单位 `TradeUsage` 记录实际替换量。 |
 | `bonuses` | 每次行动的折扣或折扣选择。`optional` 增加不用折扣的分支；`capDiscountAtCost` 把可变折扣封顶在当前费用；`trackChoiceIndex` 记录 `bonusChoiceIndex`；只有 `choiceAffectsState` 让选择免于支配剪枝；`conditions` 按数量重新求值。 |
