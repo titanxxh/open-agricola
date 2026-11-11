@@ -6,7 +6,12 @@
 # 用法: ./offsite-retention.sh [backup-dir]   # 默认 /root/open-agricola-backups
 set -e
 DIR="${1:-/root/open-agricola-backups}"
-MAX_AGE_MINUTES=$((30 * 24 * 60))
+RETENTION_DAYS="${2:-30}"
+[[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] && (( RETENTION_DAYS >= 1 && RETENTION_DAYS <= 30 )) || { echo 'Invalid retention age'; exit 1; }
+MAX_AGE_MINUTES=$((RETENTION_DAYS * 24 * 60))
+DAILY_KEEP=30; PRE_KEEP=10
+if (( RETENTION_DAYS == 7 )); then DAILY_KEEP=7; PRE_KEEP=1000000; fi
+[[ "$(realpath -m -- "$DIR")" == "$DIR" ]] || { echo "Offsite scope contains an alias" >&2; exit 1; }
 cd "$DIR"
 committed() {
   local report stem
@@ -18,8 +23,8 @@ committed() {
   done
 }
 {
-  committed daily- | sort -nr | tail -n +31 | cut -d ' ' -f 2-
-  committed pre- | sort -nr | tail -n +11 | cut -d ' ' -f 2-
+  committed daily- | sort -nr | tail -n "+$((DAILY_KEEP + 1))" | cut -d ' ' -f 2-
+  committed pre- | sort -nr | tail -n "+$((PRE_KEEP + 1))" | cut -d ' ' -f 2-
 } | while IFS= read -r OLD; do
   STEM="${OLD%.tgz}"
   rm -f -- "$OLD" "$STEM.manifest.json" "env-$STEM"

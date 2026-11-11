@@ -57,7 +57,7 @@ set -eu
 printf '%s\\n' "$*" >> "$PWD/docker-calls"
 printf '%s:%s\\n' "$APP_UID" "$APP_GID" >> "$PWD/docker-users"
 case "$*" in
-  'ps -aq --filter label=org.open-agricola.backup.run')
+  'ps -aq --filter label=org.open-agricola.backup.run --filter label=org.open-agricola.backup.environment=stable')
     [[ "\${BACKUP_TEST_FAILURE:-}" != orphan ]] || printf '${'d'.repeat(64)}'
     ;;
   'ps -aq '*) ;;
@@ -186,6 +186,14 @@ it('reaps an abandoned maintenance tool while holding the shared host lock', () 
   const result = backup('orphan')
   expect(result.status, result.stderr).toBe(0)
   expect(result.calls).toContain(`rm -f ${'d'.repeat(64)}`)
+})
+
+it('keeps stable backup cleanup and tool labels separate from prerelease environments', () => {
+  const result = backup()
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.calls).toContain('ps -aq --filter label=org.open-agricola.backup.run --filter label=org.open-agricola.backup.environment=stable')
+  expect(result.calls.some(call => call.includes('--label org.open-agricola.backup.environment=stable'))).toBe(true)
+  expect(result.calls.some(call => call === 'ps -aq --filter label=org.open-agricola.backup.run')).toBe(false)
 })
 
 it('captures and commits offsite when date ignores nanosecond field width', () => {

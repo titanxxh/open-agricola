@@ -1,8 +1,9 @@
 #!/bin/bash
 # Maintainer-only daily online backup and independently committed offsite copy.
 set -euo pipefail
-cd "$(dirname "$0")"
-source scripts/backup-process.sh
+POLICY_ROOT="${BACKUP_POLICY_ROOT:-$(cd "$(dirname "$0")" && pwd)}"
+cd "${BACKUP_WORKING_DIRECTORY:-$POLICY_ROOT}"
+source "$POLICY_ROOT/scripts/backup-process.sh"
 backup_job_begin online "$@"
 export APP_UID="$(id -u)" APP_GID="$(id -g)"
 umask 077
@@ -13,10 +14,11 @@ OFFSITE_BACKUP_REMOTE_DIR="${OFFSITE_BACKUP_REMOTE_DIR:-/root/open-agricola-back
 [[ -n "$OFFSITE_BACKUP_TARGET" && "$OFFSITE_BACKUP_TARGET" != -* ]] || { echo 'Missing or invalid OFFSITE_BACKUP_TARGET'; exit 1; }
 [[ "$OFFSITE_BACKUP_REMOTE_DIR" =~ ^/[a-zA-Z0-9_./-]+$ ]] || { echo 'Invalid offsite directory'; exit 1; }
 SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=2)
-COMPOSE=(docker compose -f docker-compose.prod.yml)
+COMPOSE=(docker compose -f "${BACKUP_COMPOSE_FILE:-docker-compose.prod.yml}")
+[[ -z "${BACKUP_COMPOSE_PROJECT:-}" ]] || COMPOSE+=(-p "$BACKUP_COMPOSE_PROJECT")
 LEDGER=backups/replay-removals.latest.json
 MODE="${1:-full}"
-[[ "$MODE" == full || "$MODE" == ledger-only ]] || { echo 'Unknown backup mode'; exit 1; }
+[[ "$MODE" == full || "$MODE" == ledger-only || "$MODE" == sync-only ]] || { echo 'Unknown backup mode'; exit 1; }
 mkdir -p backups
 chmod 700 backups
 exec 9>backups/.maintenance.lock
@@ -27,7 +29,7 @@ else
 fi
 INCOMING=''
 cleanup() {
-  if [[ -n "$INCOMING" ]]; then
+  if [[ -n "$INCOMING" && "${REMOTE_SCOPE_VERIFIED:-0}" == 1 ]]; then
     # Best effort within the original budget; autonomous age cleanup handles an unreachable host.
     backup_cleanup_command timeout 2 ssh "${SSH_OPTS[@]}" "$OFFSITE_BACKUP_TARGET" \
       timeout --signal=TERM --kill-after=1s 1 rm -rf -- "$OFFSITE_BACKUP_REMOTE_DIR/$INCOMING" >/dev/null 2>&1 || true
@@ -65,11 +67,13 @@ backup_rsync() {
 }
 
 ensure_remote_dir() {
-  backup_remote bash -s -- "$OFFSITE_BACKUP_REMOTE_DIR" <<'REMOTE'
+  backup_remote bash -s -- "$OFFSITE_BACKUP_REMOTE_DIR" <<'REMOTE' || return 1
 set -eu
+[[ "$(realpath -m -- "$1")" == "$1" ]] || { echo "Offsite scope contains an alias" >&2; exit 1; }
 mkdir -p -- "$1"
 chmod 700 -- "$1"
 REMOTE
+  REMOTE_SCOPE_VERIFIED=1
 }
 
 sync_ledger() {
@@ -99,20 +103,21 @@ fi
 
 BACKUP_STEM="daily-$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_OK=1
-if ! MAINTENANCE_LOCK_HELD=1 bash scripts/backup-storage.sh "$BACKUP_STEM"; then
+if [[ "$MODE" == full ]] && ! MAINTENANCE_LOCK_HELD=1 bash "$POLICY_ROOT/scripts/backup-storage.sh" "$BACKUP_STEM"; then
   BACKUP_OK=0
   echo 'Backup failed; retention and offsite synchronization still run within the original deadline'
 fi
 # Counts include only complete validated sets. The age cap also removes abandoned work.
-if ! backup_command node scripts/backup-files.mjs prune backups 7 5; then BACKUP_OK=0; fi
+if ! backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" prune backups "${BACKUP_DAILY_COUNT:-7}" "${BACKUP_PRE_COUNT:-5}"; then BACKUP_OK=0; fi
 mkdir -p "$BACKUP_PENDING"
 SYNC_OK=1
 LEDGER_OK=1
 INCOMING=".incoming-$BACKUP_JOB_ID"
 if ensure_remote_dir; then
-  if backup_command node scripts/backup-files.mjs list backups "$BACKUP_PENDING/files.nul" "$BACKUP_PENDING/checksums.tsv"; then
+  if backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" list backups "$BACKUP_PENDING/files.nul" "$BACKUP_PENDING/checksums.tsv"; then
     if ! backup_remote bash -s -- "$OFFSITE_BACKUP_REMOTE_DIR/$INCOMING" <<'REMOTE'
 set -eu
+[[ "$(realpath -m -- "$1")" == "$1" ]] || exit 1
 mkdir -p -- "$1"
 chmod 700 -- "$1"
 REMOTE
@@ -127,7 +132,7 @@ REMOTE
       && backup_rsync -a -e "ssh ${SSH_OPTS[*]}" "$BACKUP_PENDING/checksums.tsv" \
         "$OFFSITE_BACKUP_TARGET:$OFFSITE_BACKUP_REMOTE_DIR/$INCOMING/checksums.tsv" \
       && backup_remote bash -s -- "$OFFSITE_BACKUP_REMOTE_DIR" "$INCOMING" \
-        "$BACKUP_DEADLINE_EPOCH_MS" < deploy/commit-backup-set.sh; then
+        "$BACKUP_DEADLINE_EPOCH_MS" < "$POLICY_ROOT/deploy/commit-backup-set.sh"; then
       echo 'Validated backup sets synchronized'
       INCOMING=''
     else
@@ -138,7 +143,7 @@ REMOTE
   sync_ledger || LEDGER_OK=0
   # Independently enforce age/count limits even if capture or synchronization failed.
   backup_remote bash -s -- \
-    "$OFFSITE_BACKUP_REMOTE_DIR" < deploy/offsite-retention.sh || SYNC_OK=0
+    "$OFFSITE_BACKUP_REMOTE_DIR" "${BACKUP_RETENTION_DAYS:-30}" < "$POLICY_ROOT/deploy/offsite-retention.sh" || SYNC_OK=0
 else
   SYNC_OK=0
   LEDGER_OK=0
