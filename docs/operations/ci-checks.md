@@ -262,3 +262,9 @@ gh workflow run deploy-pages-broker.yml --ref main -f candidate_sha=<full-sha>
 
 - GitHub Actions 页面：https://github.com/titanxxh/open-agricola/actions
 - 仓库 token 管理：仓库 → Settings → Actions → Variables
+
+### Prerelease operations rehearsal
+
+Run `pnpm verify focus scripts/__tests__/prerelease-operations.test.ts`, `prerelease-gateway.test.ts`, `prerelease-authority.test.ts`, and `prerelease-identity-audit.test.ts` individually in that directory, plus `backup-storage.test.ts`, `online-storage-archive.test.ts`, and `backup-scratch.test.ts`. The operations tests run the actual CLI/lock/files with a Docker command harness; gateway HTTP/WS and authority HTTPS tests use real local sockets. The online archive test seals/verifies/extracts actual PostgreSQL/S3 bytes and restores with a newer independent deletion ledger. These scopes do not prove a working deployment builder or real pre identity persistence.
+
+`pnpm verify e2e-tests/prerelease-owner-verification.spec.ts --browser=chromium` restarts an isolated app through the standard entry and proves the private Secure/HttpOnly gateway cookie in Chromium while public requests remain503. The scoped TLS fixture proves the gateway transport; live candidate identity, Beta, game and capacity acceptance remains owner #1668. A missing pre identity view/cleanup adapter or unsupported bounded rootless builder blocks opening. See [owner operations](../HOW_TO_DEPLOY.md#operate-the-isolated-prerelease-target) for the exact native resource and acceptance gates; keep simulated and native evidence separate.

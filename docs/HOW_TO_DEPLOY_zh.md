@@ -100,6 +100,69 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 
 原生 prerelease published 事件不能授权正式 Pages。请求工作流排除 prerelease，main broker 还会独立读取原生已发布 Release 和未移动 tag 后才安装。发布、安装和现场验收分别记录；原生保护、资源初装、部署及开放入口由 [PRD #1655](https://github.com/titanxxh/open-agricola/issues/1655) 中 owner 票验收。
 
+### 操作隔离的预发布目标
+
+使用可信 main checkout、Node 24.15+、Docker Compose、Buildx、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、离站身份、builder 和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
+
+owner #1662 负责独立源库、只读备份 role、独立一次性验证库/role、私有 bucket、app 的 `live/` 与工具的 `test/` 权限、依赖网络、1–40 的连接数限制、存储 quota、离站账户/目录及可用的受限 builder。撤销 PUBLIC CONNECT，使三个 pre role 均不能连接正式库、验证 role 不能连接源库。app 对象凭据必须不能读取正式 bucket 或验证 scratch；工具只获得源数据读取及自己的 scratch 操作权限。安装前真实权限探测不通过则阻断。`budget-check` 测量本地、数据库和对象字节数及主机余量，超额会关闭入口；它补充 owner 的 quota，不创建宿主 quota。
+
+builder 必须是运行中的非 privileged rootless BuildKit 容器，用户 `1000:1000`，标签 `org.open-agricola.environment=<targetId>`，读回的 CPU、内存、PID 限额不超过清单。只允许在 `/home/user/.local/share/buildkit` 挂载自己的状态 volume。指定 Buildx **remote** driver 的 endpoint 为 `docker-container://<builder.container>`，见 [Docker 文档](https://docs.docker.com/build/builders/drivers/remote/)。#1668 前 owner 必须在实际宿主完成受限真实构建。本次本机 rootless daemon 因 Ubuntu 用户命名空间限制启动失败，没有改宿主策略或使用 privileged 回退；命令 harness 通过不能证明 builder 或部署可用。
+
+一次性安装 `deploy/prerelease.Caddyfile.example` 的固定路由。正式生命周期 API 尚未部署时，只需规划 UUID 并启动维护网关：
+
+```bash
+./deploy-prerelease.sh plan --config "$pre_config"
+./deploy-prerelease.sh initialize --config "$pre_config" --expected-current empty --generation "$pre_generation"
+```
+
+此阶段不需要正式回执，也不启动候选 app。公网 HTTPS 必须显示固定语言包的双语维护页；#1668 验收前正式 `PRERELEASE_ENTRY_ENABLED=false`。loopback 网关端口和依赖网络不能绕过 owner 控制的代理/宿主暴露。后续动作必须提供 `--expected-current <完整已装SHA|empty>`；deploy/reset/restore 重试保持相同操作 UUID。原子状态在 `<target>/control/gate.json`，失败保留维护态和阶段。所有 pre 定时任务通过 owner CLI 串行执行，不直接调用旧 shell 入口。远程执行可加 `--ssh <owner-host>`；接收 checkout 必须有相同策略 SHA，回执/证据文件路径位于执行主机。文件另外传输，正式 Cookie 绝不进入候选目录。
+
+正式 authority 安装后，在可信 owner 机器使用 `scripts/prerelease/authority.ts`。`--cookie-file` 是所有候选挂载之外、0600 的正式管理员会话文件。工具只向固定正式 HTTPS API 和 Origin 发请求，不跟随重定向。每个 authority 动作使用自己稳定的 `--operation-id` UUID 及 `--output <private.json>`。首次 prepare 的 `--previous-generation null`，以后填已验证 retire 的代次。先登记规划代次，再关闭新交接/兑换：
+
+```bash
+node --import tsx scripts/prerelease/authority.ts prepare --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$prepare_op" --previous-generation null --output prepare.json
+node --import tsx scripts/prerelease/authority.ts close --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$close_op" --output close.json
+./deploy-prerelease.sh deploy --config "$pre_config" --expected-current "$pre_current" --sha "$pre_sha" --generation "$pre_generation" --operation-id "$pre_op" --authority-receipt close.json
+```
+
+deploy 独立检查固定 SHA、同通道的完整 GitHub 回执，只归档 tracked 候选源码，构建配对 hosted 镜像，核对前端元数据及 OCI revision/channel，固定不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份，最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
+
+候选必须提供真实 SQL view `prerelease_retained_identity_refs(user_id,source_grant_id)`，覆盖全部外部主体，包括仅存于房间/历史中的引用，并实现 `scripts/prerelease/identity-audit.ts apply <packet.json>`。adapter 删除/匿名化已删除主体，将每个保留活跃引用映射到返回的当前代次 `associationId`，不恢复会话或登录权。该持久化/清理实现由 #1663/#1667 负责；main 没有空 stub，缺 view/adapter 阻断开放。owner 读取真实行，拒绝遗漏、null 或无来源绑定，按二进制/C 顺序对 ASCII pair 去重排序并哈希共享 canonical JSON。正式 associate 校验旧来源，创建无 source、已撤销的关联，确保恢复后仍接收未来删除。
+
+```bash
+./deploy-prerelease.sh identities --config "$pre_config" --expected-current "$pre_sha"
+node --import tsx scripts/prerelease/authority.ts associate --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$associate_op" --manifest "$identity_manifest" --output associations.json
+./deploy-prerelease.sh apply-identities --config "$pre_config" --expected-current "$pre_sha" --associations associations.json
+node --import tsx scripts/prerelease/authority.ts audit-complete --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$audit_op" --verification "$native_verification" --output audit.json
+node --import tsx scripts/prerelease/authority.ts activate --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$activate_op" --audit audit.json --output activate.json
+```
+
+使用 identities/apply-identities 打印的实际产物路径。空安装也必须有真实空 view 并完成 `[]` 审计。completion 和 activate 重查当前正式账户/删除事实；activate 必须在 completion 后 30 秒内完成。close 使旧审计失效。文件存在不代表完成真实恢复或清理。
+
+#1668 在公网维护期间，用私有 owner 浏览器验收：
+
+```bash
+./deploy-prerelease.sh verify-access --config "$pre_config" --expected-current "$pre_sha"
+node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verification_token_file" "$private_owner_profile"
+```
+
+helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的十分钟 Secure/HttpOnly/host-only Cookie 绑定 build/代次，在转发 HTTP/WS 给候选前剥离；普通浏览器仍为 503。私有浏览器执行正常正式登录和真实 pre 准入，profile 不能挂载给候选。只有候选实现完整流程后，现场才能取得身份/Beta、HTTP/WS、公开卡、Viewer、保留对局/撤回、删除、容量和正式不受影响的真实证据。复制 `deploy/prerelease-acceptance.example.json`，填写精确操作/build/image/代次/指纹、当前毫秒时间 `acceptedAt`、非空证据文件路径和 SHA256；验收三十分钟过期。
+
+浏览器验收后关闭 authority、执行 maintain，再恢复同一 deploy 操作使候选在关闭状态重启。该过程撤销私有入口并 drain 已确认命令。重新扫描/应用身份，紧接着完成新 audit/activate，再开放：
+
+```bash
+./deploy-prerelease.sh open --config "$pre_config" --expected-current "$pre_sha" --sha "$pre_sha" --authority-receipt activate.json --audit audit.json --verification "$native_verification" --acceptance acceptance.json
+```
+
+open 重扫 native view，核对 completion/activation 绑定、证据哈希及运行身份，仅原子开放该已验收候选；health 不会自动开放。正式入口 flag 仍由 owner 独立激活，也不能绕过代次准入和维护态。
+
+每日 backup 从运行镜像在线捕获，绝不停 app。配对清单绑定归档/配置哈希和大小、源/目标 SHA、代次、指纹及实际隔离恢复验证。本地和离站副本最多保留七天，独立删除账本另行保留。工具有 CPU/内存/PID 限额、自身 deadline、run/environment 标签和定域清理。引入 pre 任务前必须升级正式备份脚本，防止旧全局 reaper 清理 pre 工具。通过 CLI 定时执行 budget-check 和每日 retention；retention 在关闭通道后无需 app 凭据或 Docker 仍可执行。离站另装 `offsite-retention.sh <独占pre目录> 7`，确保 app 宿主失联仍遵守期限。
+
+兼容回退仍用 deploy，明确选择经过验证的旧 SHA，并重新经过备份、目标数据验证和验收。当前保留数据不能通过时留在维护态，选择 reset 或隔离恢复；换镜像不能撤销 schema 或已确认写入。reset 前取得 close 回执，运行 `reset --expected-current <SHA> --accept-loss <当前代次> --operation-id <UUID> --authority-receipt close.json`。它先备份并离站同步、合并最新独立删除账本，再验证停写后的真实库/prefix 清空，输出绑定源 build/代次/账本哈希的 `purge-<操作>.json`。authority retire 使用 `--purge <产物>` 及同一 purge 操作 UUID。最终关闭再执行 `finish-close --authority-receipt <retire.json>`；只有不可变 retirement 回执存在后才能移除正式 target 配置，在此之前保留 source cleanup/status/ack。复用资源时先以 `--previous-generation <旧UUID>` prepare 新 UUID，再 `reinitialize --generation <新UUID> --retirement-receipt <retire.json> --authority-receipt <prepare.json>`，重新部署。旧 retire 重试不会关闭新代次。
+
+恢复时 owner 显式选择 `--backup <stem> --backup-generation <UUID>`，以 `--accept-loss <源当前代次>` 接受恢复点之后进度丢失。使用 `restore --config <全新replacement.json> --source-config <old.json> --expected-current empty --expected-source-current <old-SHA> --sha <已验证目标SHA> --generation <新UUID> --operation-id <UUID> --authority-receipt <old-close.json> ...`。replacement 的目录/project、源/验证库、role、bucket 必须独立，固定公网 origin/port 相同。工具先校验配对文件及七天期限，再安全解包纯数据，绝不安装归档凭据；使用当前独立账本，实际隔离验证目标并真实恢复。重试只清理尚未验收的 replacement，保留旧 source。关闭状态启动成功后，对旧 target purge/retire/finish-close，再 prepare replacement 代次，执行 `activate-recovery --source-config <old.json> --expected-current <new-SHA> --expected-source-current <old-SHA> --retirement-receipt <retire.json>`，只切换固定维护网关。完成全套真实身份审计和验收才开放。不能清理全宿主或复用正式资源。七天归档期限届满后，owner 仅可删除清单中的已退休 project 资源，保留 retirement 回执及独立删除账本。
+
+
 ## 一、部署后端
 
 后端部署分两种情况：

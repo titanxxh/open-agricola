@@ -229,3 +229,5 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 `experimental-features.ts` 每次检查读取 `beta_access` 中的最新资格，并从 `ADMIN_USERS` 推导管理员。迁移 `036-beta-access.sql` 只新增资格表，不重写保留对局。[ADR 0042](../adr/0042-experimental-feature-availability.md) 定义开放与参与边界。
 
 `connection/room-router.ts` 对解析完成的组队创建配置、终局后 `newGame` 调用者，以及协商重开的提议者进行门禁，提议和实际创建各检查一次。`game-router.ts` 覆盖两个 HTTP 创建入口，以及向调试沙盒加载组队状态。`game/lobby.ts` 与 `game/room-directory.ts` 在列表截取之前过滤公开发现。`RoomHistoryStore`（`persistence/room-history-store.ts`）只投影公开 Team Configuration，供 SQL 在 LIMIT 前过滤资格；压缩恢复正文和历史 Frame 保持原样。已有房间的加入、换队、开局和游戏操作沿用正常权限，不受阶段或资格变化影响。`Broadcaster` 在私有 WeakMap 中按 socket 保存客户端能力，见[协议约束](contract.md#client-capabilities)。测试：[房间入口](../../server/connection/__tests__/experimental-features.test.ts)、[HTTP](../../server/__tests__/experimental-feature-http.test.ts)、[资格与外键](../../server/__tests__/experimental-features.test.ts)。
+
+pre owner 门禁在 `scripts/prerelease/operations.ts`；资源范围、代次与验收见 `HOW_TO_DEPLOY.md`。

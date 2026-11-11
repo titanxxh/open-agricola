@@ -1,5 +1,6 @@
+import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, expect, it, vi } from 'vitest'
@@ -15,6 +16,8 @@ import { PostgresRoomPersistence } from '../../server/game/persistence/postgres-
 import { RoomCommitter, replayIntentFromCommand } from '../../server/game/room-committer'
 import { RoomDirectory } from '../../server/game/room-directory'
 import { snapshotToRoom, type Room } from '../../server/game/room'
+import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config'
+import { extractPairedPrereleaseBackup, fileHash, readPairedPrereleaseBackup } from '../prerelease/backup'
 import { exportStorageArchive, restoreStorageArchive } from '../storage-archive'
 
 vi.setConfig({ testTimeout: 120000, hookTimeout: 180000 })
@@ -36,7 +39,7 @@ it('restores one two-player recovery point while real game commands, uploads and
   const replayResources = new ReplayResources(resources)
   await replayResources.publishViewer(viewerBuildId, viewer)
   const persistence = new PostgresRoomPersistence(db)
-  const committer = new RoomCommitter({ persistence, resources: replayResources, viewerBuildId, gameBuildId: 'online-test', viewerBuildExists: async id => !!await replayResources.viewer(id) })
+  const committer = new RoomCommitter({ persistence, resources: replayResources, viewerBuildId, gameBuildId: 'a'.repeat(40), viewerBuildExists: async id => !!await replayResources.viewer(id) })
   cleanups.register(() => committer.shutdown())
   const session = createWorkSession({ seed: 42, configure(state) {
     for (const player of state.players) { player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__'] }
@@ -46,7 +49,7 @@ it('restores one two-player recovery point while real game commands, uploads and
   committer.lockNewRoom(room)
   expect((await committer.prepareRoom(room, { missingPrefix: false })).kind).toBe('committed')
   const directory = new RoomDirectory(db)
-  await directory.register('online-node', 'http://127.0.0.1:19999', 'online-test')
+  await directory.register('online-node', 'http://127.0.0.1:19999', 'a'.repeat(40))
   await directory.activate('online-node')
 
   const first = session.takeAction(0, 'forest')
@@ -66,7 +69,7 @@ it('restores one two-player recovery point while real game commands, uploads and
   await resources.stage('card-art/preserved.png', preserved, 'image/png')
   const controller = new AbortController()
   await expect(exportStorageArchive({ connectionString: getTestDatabaseUrl(), db, objects, root: join(root, 'refused'),
-    sourceBuildId: 'online-test', mode: 'maintenance', signal: controller.signal })).rejects.toThrow('Stop all applications')
+    sourceBuildId: 'a'.repeat(40), mode: 'maintenance', signal: controller.signal })).rejects.toThrow('Stop all applications')
 
   const entered = Promise.withResolvers<void>(), finish = Promise.withResolvers<void>()
   const get = objects.get.bind(objects)
@@ -77,7 +80,7 @@ it('restores one two-player recovery point while real game commands, uploads and
   })
   const archiveRoot = join(root, 'archive')
   const capture = exportStorageArchive({ connectionString: getTestDatabaseUrl(), db, objects, root: archiveRoot,
-    sourceBuildId: 'online-test', mode: 'online', deadlineEpochMs: Date.now() + 60_000, signal: controller.signal })
+    sourceBuildId: 'a'.repeat(40), mode: 'online', deadlineEpochMs: Date.now() + 60_000, signal: controller.signal })
   cleanups.register(() => { finish.resolve(); controller.abort(new Error('test cleanup')); return capture.catch(() => {}) })
   await entered.promise
 
@@ -129,8 +132,33 @@ it('restores one two-player recovery point while real game commands, uploads and
   expect(recoveredRoom.session.undoStep().ok).toBe(true)
   expect(recoveredRoom.session.state.players[0].resources.wood).toBe(0)
 
+  // New owner tools consume a sealed pair of these actual PG/S3 bytes, then
+  // restore the selected point with independently newer deletion facts.
+  const ownerTarget = parsePrereleaseTarget({ ...JSON.parse(await readFile('deploy/prerelease-target.example.json', 'utf8')),
+    directory: join(root, 'open-agricola-prerelease-main'), policyDirectory: process.cwd() })
+  const backups = join(ownerTarget.directory, 'backups'), pending = join(backups, '.pending')
+  await mkdir(pending, { recursive: true })
+  execFileSync('tar', ['-czf', join(pending, 'archive.tgz'), '-C', archiveRoot, '.'])
+  await writeFile(join(pending, 'env'), 'DATABASE_URL=prior-pre-credentials-retained-only-as-sealed-evidence\n')
+  await writeFile(join(pending, 'report.json'), JSON.stringify({ formatVersion: 2, sourceBuildId: archive.sourceBuildId,
+    targetBuildId: 'b'.repeat(40), createdAt: archive.createdAt, validatedAt: new Date().toISOString(), ...restored.validation }))
+  const generation = randomUUID(), stem = 'pre-native-paired'
+  execFileSync(process.execPath, ['scripts/backup-files.mjs', 'seal', pending, stem], { env: { ...process.env,
+    BACKUP_ENVIRONMENT: ownerTarget.targetId, BACKUP_RETENTION_DAYS: '7', BACKUP_DATA_GENERATION: generation,
+    BACKUP_TARGET_FINGERPRINT: targetFingerprint(ownerTarget) } })
+  for (const [from, to] of [['archive.tgz', `${stem}.tgz`], ['env', `env-${stem}`], ['manifest.json', `${stem}.manifest.json`]]) {
+    await writeFile(join(backups, to), await readFile(join(pending, from)))
+  }
+  const point = readPairedPrereleaseBackup(ownerTarget, stem, generation)
+  expect(point.sourceBuildId).toBe('a'.repeat(40))
+  const staging = join(backups, 'restored-native-pair')
+  extractPairedPrereleaseBackup(ownerTarget, point.archive, point.archiveSha256, staging)
+  expect(fileHash(join(staging, 'database.dump'))).toBe(fileHash(join(archiveRoot, 'database.dump')))
+  await writeFile(join(backups, `env-${stem}`), 'altered credentials')
+  expect(() => readPairedPrereleaseBackup(ownerTarget, stem, generation)).toThrow('incomplete, altered')
+
   const erased = await target()
   const newerLedger = [{ version: 1 as const, entries: [{ version: 1 as const, roomId: 'backup-room', reason: 'legal' as const,
     removedAt: Date.now(), eraseResult: false, assetHashes: [] }], assetTakedowns: [] }]
-  expect((await restoreStorageArchive(erased.url, erased.db, erased.objects, archiveRoot, newerLedger)).validation.roomCount).toBe(0)
+  expect((await restoreStorageArchive(erased.url, erased.db, erased.objects, staging, newerLedger)).validation.roomCount).toBe(0)
 })

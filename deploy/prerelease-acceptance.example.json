@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "channel": "prerelease",
+  "targetId": "prerelease-main",
+  "targetFingerprint": "REPLACE_FROM_PLAN",
+  "buildId": "REPLACE_FULL_SHA",
+  "image": "sha256:REPLACE_IMMUTABLE_IMAGE_ID",
+  "generation": "REPLACE_CURRENT_UUID",
+  "operationId": "REPLACE_PENDING_OPERATION_UUID",
+  "acceptedAt": 0,
+  "evidence": {
+    "identity": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "beta-access": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "http-ws": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "public-cards": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "viewer": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "retained-data": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "deletion-audit": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "capacity": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "formal-unaffected": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" }
+  }
+}
