@@ -146,6 +146,7 @@ export function policyTool(target: PrereleaseTarget, operation: 'inspect' | 'emp
     const archive = execFileSync('git', ['archive', '--format=tar', policySha], { cwd: target.policyDirectory, maxBuffer: 256 * 1024 * 1024 })
     command('tar', ['--exclude=CLAUDE.md', '-xf', '-', '-C', code], { input: archive })
   }
+  mkdirSync(join(code, 'node_modules'), { recursive: true, mode: 0o700 })
   const config = join(target.directory, 'control', 'target.json')
   writeFileSync(config, JSON.stringify(target), { mode: 0o600 })
   const env: string[] = []
