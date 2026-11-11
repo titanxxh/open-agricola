@@ -4,7 +4,9 @@ import { readdir, readFile, writeFile, stat, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const stemPattern = /^(daily|pre|manual)-[a-zA-Z0-9._-]+$/
-const maxAge = 30 * 24 * 60 * 60 * 1000
+const retentionDays = Number(process.env.BACKUP_RETENTION_DAYS ?? 30)
+if (!Number.isSafeInteger(retentionDays) || retentionDays < 1 || retentionDays > 30) throw new Error('Invalid backup retention age')
+const maxAge = retentionDays * 24 * 60 * 60 * 1000
 const digest = async path => {
   const hash = createHash('sha256')
   for await (const bytes of createReadStream(path)) hash.update(bytes)
@@ -45,7 +47,9 @@ async function main([command, root, first, second]) {
     const report = JSON.parse(await readFile(join(root, 'report.json'), 'utf8'))
     if (report.formatVersion !== 2 || !report.validatedAt) throw new Error('Backup has no successful restore validation')
     const archive = await digest(join(root, 'archive.tgz')), configuration = await digest(join(root, 'env'))
-    Object.assign(report, { backupStem: first, archiveSha256: archive.sha256, archiveSizeBytes: archive.size,
+    Object.assign(report, { backupStem: first, environment: process.env.BACKUP_ENVIRONMENT ?? 'stable', retentionDays,
+      ...(process.env.BACKUP_DATA_GENERATION ? { dataGeneration: process.env.BACKUP_DATA_GENERATION, targetFingerprint: process.env.BACKUP_TARGET_FINGERPRINT } : {}),
+      archiveSha256: archive.sha256, archiveSizeBytes: archive.size,
       configurationSha256: configuration.sha256, configurationSizeBytes: configuration.size })
     await writeFile(join(root, 'manifest.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
     return

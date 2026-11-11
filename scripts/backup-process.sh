@@ -3,6 +3,8 @@
 
 backup_job_begin() {
   local mode="$1"; shift
+  export BACKUP_ENVIRONMENT="${BACKUP_ENVIRONMENT:-stable}"
+  [[ "$BACKUP_ENVIRONMENT" == stable || "$BACKUP_ENVIRONMENT" =~ ^prerelease-[a-z0-9-]+$ ]] || { echo 'Invalid backup environment' >&2; return 1; }
   if [[ -z "${BACKUP_JOB_ID:-}" ]]; then
     export BACKUP_JOB_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
     if [[ "$mode" != maintenance ]]; then
@@ -42,7 +44,7 @@ backup_cleanup_command() {
 
 backup_job_cleanup() {
   local containers
-  containers="$(backup_cleanup_command timeout 5 docker ps -aq --filter "label=org.open-agricola.backup.run=$BACKUP_JOB_ID" 2>/dev/null)" || containers=''
+  containers="$(backup_cleanup_command timeout 5 docker ps -aq --filter "label=org.open-agricola.backup.run=$BACKUP_JOB_ID" --filter "label=org.open-agricola.backup.environment=$BACKUP_ENVIRONMENT" 2>/dev/null)" || containers=''
   if [[ -n "$containers" ]]; then
     # IDs come exclusively from Docker's run-owned label filter.
     backup_cleanup_command timeout 5 docker rm -f $containers >/dev/null 2>&1 || true
@@ -52,7 +54,7 @@ backup_job_cleanup() {
 backup_reap_tools() {
   local container deadline
   local containers
-  containers="$(backup_command docker ps -aq --filter label=org.open-agricola.backup.run)"
+  containers="$(backup_command docker ps -aq --filter label=org.open-agricola.backup.run --filter "label=org.open-agricola.backup.environment=$BACKUP_ENVIRONMENT")"
   for container in $containers; do
     deadline="$(backup_command docker inspect --format '{{index .Config.Labels "org.open-agricola.backup.deadline"}}' "$container")"
     # The caller holds the host lock. A zero-deadline maintenance tool cannot
@@ -72,6 +74,10 @@ backup_running_image() {
   [[ "$image" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Invalid running application image' >&2; return 1; }
   project="$(backup_command docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$container")"
   [[ -n "$project" && "$project" != '<no value>' ]] || { echo 'Application container has no deployment inventory' >&2; return 1; }
+  if [[ "$BACKUP_ENVIRONMENT" != stable ]]; then
+    [[ "$project" == "open-agricola-$BACKUP_ENVIRONMENT" ]] || { echo 'Backup application project does not match its environment' >&2; return 1; }
+    [[ "$(backup_command docker inspect --format '{{index .Config.Labels "io.open-agricola.release-channel"}}' "$container")" == prerelease ]] || { echo 'Backup requires a prerelease application' >&2; return 1; }
+  fi
   managed="$(backup_command docker ps -q --no-trunc --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=app --filter label=com.docker.compose.oneoff=False)"
   [[ "$managed" == "$container" ]] || { echo 'Online backup requires one complete managed application generation' >&2; return 1; }
   protocol="$(backup_command docker exec "$container" node --import tsx --input-type=module -e 'import { RESOURCE_DELETION_PROTOCOL } from "./server/storage/backup-coordination.ts"; console.log(RESOURCE_DELETION_PROTOCOL)')"
@@ -81,20 +87,29 @@ backup_running_image() {
   export SOURCE_BUILD_ID
   mkdir -p "$BACKUP_PENDING"
   printf 'services:\n  app:\n    image: %s\n' "$image" > "$BACKUP_PENDING/image.compose.yml"
+  if [[ "$BACKUP_ENVIRONMENT" != stable ]]; then printf '  capture:\n    image: %s\n' "$image" >> "$BACKUP_PENDING/image.compose.yml"; fi
   COMPOSE+=(-f "$PWD/$BACKUP_PENDING/image.compose.yml")
 }
 
 backup_container() {
-  local seconds name
+  local seconds name service
   local environment=(-e "SOURCE_BUILD_ID=${SOURCE_BUILD_ID:-}")
   seconds="$(backup_seconds_left)" || return
   if [[ -n "${BACKUP_DEADLINE_EPOCH_MS:-}" ]]; then environment+=(-e "BACKUP_DEADLINE_EPOCH_MS=$BACKUP_DEADLINE_EPOCH_MS"); fi
   BACKUP_SEQUENCE=$((BACKUP_SEQUENCE + 1))
-  name="agricola-backup-$BACKUP_JOB_ID-$$-$BACKUP_SEQUENCE"
+  name="agricola-backup-$BACKUP_ENVIRONMENT-$BACKUP_JOB_ID-$$-$BACKUP_SEQUENCE"
+  service="${BACKUP_TOOL_SERVICE:-app}"
+  case "$1" in export|export-online|ledger-export|ledger-merge) service="${BACKUP_CAPTURE_SERVICE:-app}";; esac
+  [[ "$service" == app || "$service" == tools || "$service" == capture ]] || { echo 'Invalid backup tool service'; return 1; }
+  if [[ "$BACKUP_ENVIRONMENT" != stable ]]; then
+    [[ "${BACKUP_TOOL_MEMORY_MIB:-}" =~ ^[0-9]+$ && "${BACKUP_TOOL_PIDS:-}" =~ ^[0-9]+$ && "${BACKUP_TOOL_CPUS:-}" =~ ^[0-9]+([.][0-9]+)?$ ]] || { echo 'Missing prerelease backup limits'; return 1; }
+    [[ "$BACKUP_TOOL_SERVICE" == tools && "$BACKUP_CAPTURE_SERVICE" == capture ]] || { echo 'Prerelease backups require isolated bounded tool services'; return 1; }
+  fi
   backup_command "${COMPOSE[@]}" run --rm --no-deps -T --name "$name" \
     --label "org.open-agricola.backup.run=$BACKUP_JOB_ID" \
+    --label "org.open-agricola.backup.environment=$BACKUP_ENVIRONMENT" \
     --label "org.open-agricola.backup.deadline=${BACKUP_DEADLINE_EPOCH_MS:-0}" \
     --user "$(id -u):$(id -g)" "${environment[@]}" -e "BACKUP_JOB_ID=$BACKUP_JOB_ID" -e BACKUP_SCRATCH_DIRECTORY=/backup \
-    -v "$PWD/backups:/backup" app timeout --signal=TERM --kill-after=3s "$seconds" \
+    -v "$PWD/backups:/backup" "$service" timeout --signal=TERM --kill-after=3s "$seconds" \
     node --import tsx scripts/storage-archive-cli.ts "$@"
 }
