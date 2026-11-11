@@ -1,18 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import userEvent from '@testing-library/user-event'
 import { LobbyPage } from '../LobbyPage'
 import { setPage } from '../../utils/platform-page-url'
 import { startRoomCreation } from '../../services/room-creation'
-import { CommandRejectedError } from '../../services/gameTransport'
 
 vi.mock('../../services/room-creation', async importOriginal => ({
   ...await importOriginal<typeof import('../../services/room-creation')>(),
-  startRoomCreation: vi.fn(async () => ({ roomId: 'created-team' })), resumePendingRoomCreation: () => null,
+  startRoomCreation: vi.fn(async () => ({ roomId: 'created-room' })), resumePendingRoomCreation: () => null,
 }))
 
-const accountFeatures = vi.hoisted(() => ({ value: ['team-modes'] as string[], betaAccess: false }))
+const accountQualification = vi.hoisted(() => ({ betaAccess: false }))
 const refreshSession = vi.hoisted(() => vi.fn())
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSON.stringify({
@@ -24,7 +22,7 @@ const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSO
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: { id: 'u1', username: 'host', displayName: 'Host', betaAccess: accountFeatures.betaAccess, experimentalFeatures: accountFeatures.value },
+    user: { id: 'u1', username: 'host', displayName: 'Host', betaAccess: accountQualification.betaAccess },
     logout: vi.fn(),
     apiFetch,
     refreshSession,
@@ -119,14 +117,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
   myRoomsResponse.rooms = []
-  accountFeatures.value = ['team-modes']
-  accountFeatures.betaAccess = false
+  accountQualification.betaAccess = false
 })
 
 describe('LobbyPage main navigation', () => {
-  it('offers prerelease to a qualified account independently of team availability', async () => {
-    accountFeatures.betaAccess = true
-    accountFeatures.value = []
+  it('offers prerelease to a qualified account in a separate tab', async () => {
+    accountQualification.betaAccess = true
     render(<LobbyPage />)
     expect(await screen.findByRole('link', { name: 'Enter prerelease' })).toHaveAttribute('target', '_blank')
   })
@@ -176,8 +172,7 @@ describe('LobbyPage main navigation', () => {
 describe('LobbyPage my active games', () => {
   it('marks every owned seat separately from an alternate current actor', async () => {
     document.title = 'Open Agricola'
-    myRoomsResponse.rooms = [{ id: 'multihand', status: 'playing', max_players: 4, updated_at: 2, created_at: 1, started_at: 1,
-      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' },
+    myRoomsResponse.rooms = [{ id: 'owned-seats', status: 'playing', max_players: 4, updated_at: 2, created_at: 1, started_at: 1,
       player_index: 0, owned_player_indexes: [0, 2], my_turn: 1, current_player_index: 2, hotseat: false,
       waiting_player_indexes: [2], progress: { phase: 'playing', round: 1 }, expansions: [],
       players: [{ playerIndex: 0, name: 'Alice', color: 'red' }, { playerIndex: 1, name: 'Bob', color: 'blue' },
@@ -185,7 +180,6 @@ describe('LobbyPage my active games', () => {
     }]
     render(<LobbyPage />)
     await screen.findByText('Cara')
-    expect(document.querySelector('.my-game .beta-badge')).toHaveTextContent('Beta')
     expect(document.querySelectorAll('.my-game__player[data-owned="true"]')).toHaveLength(2)
     expect(document.querySelector('.my-game__player[data-current="true"]')).toHaveTextContent('Cara')
     expect(document.querySelectorAll('.my-game__player small')).toHaveLength(2)
@@ -556,86 +550,5 @@ describe('LobbyPage player count selection', () => {
       customCards: 'reviewed-card-1',
       enableSnakeOpening: 'true',
     })
-  })
-})
-
-
-describe('team creation options', () => {
-  it('marks team entrances and explains Beta only on the creation panel', async () => {
-    render(<LobbyPage />)
-    expect(within(screen.getByRole('button', { name: 'Team game', exact: true })).getByText('Beta')).toBeVisible()
-    expect(within(screen.getByRole('button', { name: 'Multihand game', exact: true })).getByText('Beta')).toBeVisible()
-    expect(screen.queryByText(/Team and multihand modes are being tested/)).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Team game', exact: true }))
-    expect(screen.getByText('Team and multihand modes are being tested. Rules and screens may change. Report problems with the in-game bug report.')).toBeVisible()
-  })
-
-  it('retains a denied creation on its form and refreshes account feature availability', async () => {
-    vi.mocked(startRoomCreation).mockRejectedValueOnce(new CommandRejectedError({ ok: false, code: 'experimental_feature_unavailable' }))
-    render(<LobbyPage />)
-    await userEvent.click(screen.getByRole('button', { name: 'Team game', exact: true }))
-    await userEvent.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Team modes are not available to you. No room was created.')
-    expect(refreshSession).toHaveBeenCalledOnce()
-    expect(setPage).not.toHaveBeenCalled()
-  })
-
-  it('offers legal formats and preserves all shared variants in the team creation query', async () => {
-    vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, hasMore: false, cards: [
-      { id: 'team-workshop', name: 'Team Workshop Card', card_type: 'minor', author_name: 'Author' },
-    ] }))))
-    const user = userEvent.setup()
-    render(<LobbyPage />)
-    await user.click(screen.getByRole('button', { name: 'Team game', exact: true }))
-    expect(screen.queryByRole('button', { name: '2 Players', exact: true })).toBeNull()
-    expect(screen.queryByRole('button', { name: '3 Players', exact: true })).toBeNull()
-    expect(screen.queryByRole('button', { name: '5 Players', exact: true })).toBeNull()
-    expect(screen.getByRole('combobox', { name: 'Seats per team' })).toHaveValue('2')
-    expect(screen.getByRole('combobox', { name: 'Seat arrangement' })).toHaveValue('separated')
-    expect(screen.getByRole('combobox', { name: 'Team scoring' })).toHaveValue('category-min')
-    expect(screen.getByRole('combobox', { name: 'Teammate visibility' })).toHaveValue('shared')
-    await user.click(screen.getByRole('button', { name: '6 Players', exact: true }))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Seats per team' }), '3')
-    await user.click(screen.getByRole('button', { name: '4 Players', exact: true }))
-    expect(screen.getByRole('combobox', { name: 'Seats per team' })).toHaveValue('2')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Seat arrangement' }), 'random')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Team scoring' }), 'product')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Teammate visibility' }), 'private')
-    await user.click(screen.getByRole('button', { name: 'Simultaneous draft', exact: true }))
-    await user.click(screen.getByRole('checkbox', { name: /Enable Parent Cards expansion/ }))
-    await user.click(screen.getByRole('checkbox', { name: /Enable Through the Seasons expansion/ }))
-    await user.click(screen.getByRole('checkbox', { name: /Enable Farmers of the Moor expansion/ }))
-    await user.click(screen.getByRole('checkbox', { name: /Moor balance rules/ }))
-    await user.click(screen.getByRole('checkbox', { name: /Allow an incomplete Farmers of the Moor/ }))
-    await user.click(screen.getByRole('checkbox', { name: /Enable community cards/ }))
-    await user.click(await screen.findByRole('checkbox', { name: /Team Workshop Card/ }))
-    await user.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
-    expect(startRoomCreation).toHaveBeenCalledWith(expect.objectContaining({
-      maxPlayers: 4, draftMode: 'simultaneous', enableParentCards: true, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true,
-      enableMoorBalanceRules: true, allowIncompleteFarmersOfTheMoorMinorDeal: true, enableCommunityDeck: true, customCardIds: ['team-workshop'], enableSnakeOpening: true,
-    }))
-    expect(vi.mocked(startRoomCreation).mock.calls.at(-1)?.[0].teamConfig).toEqual({ mode: 'team', seatsPerTeam: 2, seating: 'random', scoring: 'product', teammateVisibility: 'private' })
-  })
-
-  it('uses the same format controls for multihand without a teammate visibility option', async () => {
-    const user = userEvent.setup()
-    render(<LobbyPage />)
-    await user.click(screen.getByRole('button', { name: 'Multihand game', exact: true }))
-    expect(screen.getByRole('combobox', { name: 'Seats per team' })).toHaveValue('2')
-    expect(screen.queryByRole('combobox', { name: 'Teammate visibility' })).toBeNull()
-  })
-})
-
-
-describe('experimental feature entries', () => {
-  it('hides both team entry points when the server supplies no available features', async () => {
-    accountFeatures.value = []
-    render(<LobbyPage />)
-    expect(screen.queryByRole('button', { name: 'Team game', exact: true })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Multihand game', exact: true })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Create Multiplayer Game' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Local Hotseat' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Solo game' })).toBeVisible()
   })
 })

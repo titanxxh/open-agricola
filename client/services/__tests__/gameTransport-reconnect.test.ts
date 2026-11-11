@@ -55,18 +55,18 @@ describe('Room reconnect and durable commands', () => {
       const command = socket.sent.at(-1)!
       let settled = false
       void creation.then(() => { settled = true }, () => { settled = true })
-      socket.emit({ type: 'error', code: 'client_refresh_required', error: 'Please refresh this page to use official cooperation rules.' })
+      socket.emit({ type: 'error', code: 'client_refresh_required', error: 'Please refresh this page to continue.' })
       await Promise.resolve()
       expect(settled).toBe(false)
       expect(transport.connected).toBe(true)
       socket.emit({ type: 'commandReceipt', status: 'completed', receipt: {
         scopeId: command.commandContext.scopeId, commandId: command.commandContext.commandId,
-        outcome: { ok: false, code: 'client_refresh_required', error: 'Please refresh this page to use official cooperation rules.' },
+        outcome: { ok: false, code: 'client_refresh_required', error: 'Please refresh this page to continue.' },
       } })
       await expect(creation).rejects.toMatchObject({ code: 'client_refresh_required' })
       expect(transport.recoveringCommands).toBe(false)
       expect(transport.connected).toBe(false)
-      expect(statuses).toHaveBeenLastCalledWith({ phase: 'stopped', code: 'client_refresh_required', message: 'Please refresh this page to use official cooperation rules.' })
+      expect(statuses).toHaveBeenLastCalledWith({ phase: 'stopped', code: 'client_refresh_required', message: 'Please refresh this page to continue.' })
     } finally { transport.destroy() }
   })
 
@@ -84,8 +84,8 @@ describe('Room reconnect and durable commands', () => {
     try {
       await transport.connect()
       expect(Socket.all[0]!.sent).toEqual([
-        { type: 'getCommandScope', clientCapabilities: ['team-cooperation-v1'] },
-        { type: 'getCommandScope', clientCapabilities: ['team-cooperation-v1'] },
+        { type: 'getCommandScope', clientCapabilities: [] },
+        { type: 'getCommandScope', clientCapabilities: [] },
       ])
     } finally { transport.destroy(); send.mockRestore() }
   })
@@ -114,46 +114,15 @@ describe('Room reconnect and durable commands', () => {
       const request = socket.sent.find(message => message.type === 'getCommandReceipt')!
       socket.emit({ type: 'commandReceipt', status: 'completed', requestId: request.requestId, receipt: {
         scopeId: command.commandContext.scopeId, commandId: command.commandContext.commandId,
-        outcome: { ok: false, code: 'client_refresh_required', error: 'Please refresh this page to use official cooperation rules.' },
+        outcome: { ok: false, code: 'client_refresh_required', error: 'Please refresh this page to continue.' },
       } })
       await connecting
       await rejected
       expect(restored.connected).toBe(false)
       expect(restored.recoveringCommands).toBe(false)
-      expect(statuses).toHaveBeenLastCalledWith({ phase: 'stopped', code: 'client_refresh_required', message: 'Please refresh this page to use official cooperation rules.' })
+      expect(statuses).toHaveBeenLastCalledWith({ phase: 'stopped', code: 'client_refresh_required', message: 'Please refresh this page to continue.' })
       expect(socket.sent.filter(message => message.type === 'createRoom' || message.type === 'joinRoom')).toEqual([])
     } finally { first.destroy(); restored?.destroy() }
-  })
-
-  it('recovers an unseated team member without requesting state or inventing a seat', async () => {
-    const { WsGameTransport } = await import('../gameTransport')
-    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false, reconnectDelayMs: 1 })
-    const waiting: ServerEvent = { type: 'teamRoomWaiting', roomId: 'team-room', maxPlayers: 4,
-      teamConfig: { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'shared' },
-      members: [{ memberId: 'member-a', name: 'Alice', teamIndex: 0, seatCount: 1, connected: true, isHost: true }],
-      selfMemberId: 'member-a', isHost: true, canStart: false,
-    }
-    try {
-      await transport.connect()
-      const first = Socket.all[0]!
-      first.emit(waiting)
-      expect(transport.roomId).toBe('team-room')
-      expect(transport.viewer).toEqual({ kind: 'team-member', memberId: 'member-a' })
-      expect(transport.playerIndex).toBeNull()
-      await expect(transport.getState()).rejects.toThrow('The team game has not started')
-      first.close(1006)
-      await tick()
-      const second = Socket.all[1]!
-      await vi.waitFor(() => expect(second.sent.some(message => message.type === 'joinRoom')).toBe(true))
-      expect(second.sent.find(message => message.type === 'joinRoom')).toEqual({ type: 'joinRoom', roomId: 'team-room', intent: 'resume' })
-      second.emit(waiting)
-      await vi.waitFor(() => expect(transport.connected).toBe(true))
-      expect(second.sent.some(message => message.type === 'getState')).toBe(false)
-      expect(transport.playerIndex).toBeNull()
-      second.emit(joined('team-room'))
-      second.emit(snapshot(0, 'team-room'))
-      expect(transport.playerIndex).toBe(1)
-    } finally { transport.destroy() }
   })
 
   it('reconnects a spectator without a seat or command replay and stops after an offline notice', async () => {
@@ -498,7 +467,7 @@ describe('Room reconnect and durable commands', () => {
     })
     const next = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await expect(next.connect()).rejects.toThrow('Command scope expired')
-    expect(Socket.all[1]!.sent).toEqual([{ type: 'getCommandScope', scopeId: command.commandContext.scopeId, clientCapabilities: ['team-cooperation-v1'] }])
+    expect(Socket.all[1]!.sent).toEqual([{ type: 'getCommandScope', scopeId: command.commandContext.scopeId, clientCapabilities: [] }])
     next.destroy(); send.mockRestore()
   })
 

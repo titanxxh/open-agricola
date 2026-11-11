@@ -48,32 +48,6 @@ const complete = (socket: CreationSocket, roomId: string) => {
     outcome: { ok: true, roomId, roomVersion: 0, stepNo: 0 } } })
 }
 
-it('settles a durable team waiting room after its matching acknowledgement without requesting a game snapshot', async () => {
-  const { startRoomCreation } = await import('../room-creation')
-  const operation = startRoomCreation({ maxPlayers: 4,
-    teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' },
-  })
-  let settled = false
-  void operation.then(() => { settled = true })
-  await vi.waitFor(() => expect(CreationSocket.all[0]?.sent.some(command => command.type === 'createRoom')).toBe(true))
-  const socket = CreationSocket.all[0]!, command = socket.sent.find(item => item.type === 'createRoom')!
-  const context = command.commandContext
-  if (!context || typeof context !== 'object' || !('scopeId' in context) || !('commandId' in context)
-    || typeof context.scopeId !== 'string' || typeof context.commandId !== 'string') throw new Error('Expected stable creation identity')
-  socket.emit({ type: 'commandReceipt', status: 'completed', receipt: { scopeId: context.scopeId, commandId: context.commandId,
-    outcome: { ok: true, roomId: 'waiting-team', roomVersion: 0 } } })
-  await Promise.resolve()
-  expect(settled).toBe(false)
-  socket.emit({ type: 'teamRoomWaiting', roomId: 'waiting-team', maxPlayers: 4,
-    teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' },
-    selfMemberId: 'host', isHost: true, canStart: false,
-    members: [{ memberId: 'host', name: 'Host', teamIndex: 0, seatCount: 2, isHost: true, connected: true }],
-  })
-  await vi.waitFor(() => expect(settled).toBe(true))
-  await expect(operation).resolves.toEqual({ roomId: 'waiting-team' })
-  expect(socket.sent.some(message => message.type === 'getState')).toBe(false)
-})
-
 it('uses one new allocation for a double click and a fresh allocation for the next intentional creation', async () => {
   const { startRoomCreation } = await import('../room-creation')
   const first = startRoomCreation({ sourceGameContextId: 'completed-old' })

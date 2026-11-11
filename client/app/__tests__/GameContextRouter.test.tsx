@@ -63,32 +63,6 @@ const stubResponse = (body: unknown, status = 200) => {
 }
 
 describe('GameContextRouter', () => {
-  it('shows archived multihand teams in ranked order with current participant names', async () => {
-    window.history.replaceState(null, '', '/?room=team-archive')
-    stubResponse({ ok: true, roomId: 'team-archive', lifecycle: 'completed', replayStatus: 'legacy_no_replay', result: {
-      startedAt: 1, finishedAt: 2, roundsPlayed: 14, playerCount: 4,
-      players: [
-        { playerIndex: 0, displayName: 'Alice', score: 10, teamIndex: 0 },
-        { playerIndex: 1, displayName: 'Bob', score: 20, teamIndex: 1 },
-        { playerIndex: 2, displayName: 'Alice', score: 30, teamIndex: 0 },
-        { playerIndex: 3, displayName: 'Bob', score: 40, teamIndex: 1 },
-      ],
-      team: { mode: 'multihand', scoring: 'sum', scores: [
-        { teamIndex: 0, playerIds: ['p1', 'p3'], total: 40, rank: 2 },
-        { teamIndex: 1, playerIds: ['p2', 'p4'], total: 60, rank: 1 },
-      ] },
-    } })
-    const { container } = render(<GameContextRouter><div>active app</div></GameContextRouter>)
-
-    await waitFor(() => expect(container.querySelectorAll('.archived-team-results > li')).toHaveLength(2))
-    const teams = container.querySelectorAll('.archived-team-results > li')
-    expect(teams[0]).toHaveAttribute('data-team-index', '1')
-    expect(teams[0]).toHaveTextContent('Bob')
-    expect(teams[0]!.querySelector('[data-team-total]')).toHaveTextContent('60')
-    expect(teams[1]).toHaveAttribute('data-team-index', '0')
-    expect(teams[1]).toHaveTextContent('Alice')
-    expect(teams[1]!.querySelector('[data-team-total]')).toHaveTextContent('40')
-  })
 
   it('preserves local input when locale changes after a new room updates its URL', async () => {
     window.history.replaceState(null, '', '/?transport=ws&hotseat=1')
