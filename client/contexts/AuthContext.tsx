@@ -1,4 +1,3 @@
-import type { ExperimentalFeatureId } from '../../shared/contract/experimental-features'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from '../app/game-container-helpers'
@@ -10,7 +9,6 @@ export type AuthUser = {
   displayNameIsDefault?: boolean
   isAdmin?: boolean
   betaAccess?: boolean
-  experimentalFeatures?: ExperimentalFeatureId[]
 }
 
 type RegisterPasswordInput = {

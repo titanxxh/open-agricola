@@ -44,18 +44,15 @@ async function setup(playerCount: 2 | 4 = 2) {
 describe('my active room summaries', () => {
   it('marks an alternate owned actor as your turn and lists one account room with every own seat', async () => {
     const { db, persistence, snapshot, meta } = await setup(4)
-    await persistence.save('multihand', { ...snapshot, state: { ...snapshot.state, currentPlayerIndex: 2,
-      team: { configuration: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' }, playerTeams: [0, 1, 0, 1] },
+    await persistence.save('shared-ownership', { ...snapshot, state: { ...snapshot.state, currentPlayerIndex: 2,
     } }, { ...meta, maxPlayers: 4,
       players: [{ userId: 'alice', playerIndex: 0 }, { userId: 'bob', playerIndex: 1 },
         { userId: 'alice', playerIndex: 2 }, { userId: 'bob', playerIndex: 3 }],
-      teamMembers: [{ memberId: 'first', userId: 'alice', name: 'Alice', teamIndex: 0, seatCount: 2 },
-        { memberId: 'other', userId: 'bob', name: 'Bob', teamIndex: 1, seatCount: 2 }],
     })
     const rooms = await listMyActiveRooms(db, 'alice')
     expect(rooms).toHaveLength(1)
     expect(rooms[0]).toMatchObject({ player_index: 0, owned_player_indexes: [0, 2], current_player_index: 2, my_turn: 1,
-      waiting_player_indexes: [2], teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' } })
+      waiting_player_indexes: [2] })
     expect((await listMyActiveRooms(db, 'bob'))[0]).toMatchObject({ owned_player_indexes: [1, 3], my_turn: 0 })
     expect(JSON.stringify(rooms)).not.toContain('userId')
   })
@@ -131,41 +128,6 @@ describe('my active room summaries', () => {
       expect(rooms.find(room => room.id === 'damaged')).toMatchObject({ progress: null, expansions: [], waiting_player_indexes: [] })
     },
   )
-
-  it.each(['json', 'compressed', 'configuration'] as const)('keeps safe waiting Team summaries when optional %s details are unreadable', async corruption => {
-    const { db, persistence, snapshot, meta } = await setup(4)
-    const configuration = { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'shared' } as const
-    const teamSnapshot = { ...snapshot, state: { ...snapshot.state,
-      team: { configuration, playerTeams: [0, 1, 0, 1] },
-    } }
-    const teamMeta: RoomMeta = { ...meta, maxPlayers: 4, status: 'waiting', players: [],
-      teamMembers: [{ memberId: 'first', userId: 'alice', name: 'Alice', teamIndex: 0, seatCount: 1 },
-        { memberId: 'second', userId: 'bob', name: 'Bob', teamIndex: 1, seatCount: 1 }],
-    }
-    await persistence.save('healthy-team', teamSnapshot, teamMeta)
-    await persistence.save('damaged-team', teamSnapshot, teamMeta)
-    const damaged = corruption === 'json' ? '{not-json'
-      : corruption === 'compressed' ? JSON.stringify({ roomBodyEncoding: 'gzip-base64-v1', data: 'broken' })
-        : JSON.stringify({ ...teamSnapshot, state: { ...teamSnapshot.state,
-          team: { configuration: { ...configuration, seatsPerTeam: 42 }, privateMarker: '__private_team_data__' },
-        } })
-    await db.prepare('UPDATE rooms SET state_json = ? WHERE id = ?').run(damaged, 'damaged-team')
-    const rooms = await listMyActiveRooms(db, 'alice')
-    expect(rooms.map(room => room.id).sort()).toEqual(['damaged-team', 'healthy-team'])
-    const healthy = rooms.find(room => room.id === 'healthy-team')
-    expect(healthy?.teamWaiting).toEqual({ roomId: 'healthy-team', maxPlayers: 4, teamConfig: configuration,
-      members: [{ memberId: 'first', name: 'Alice', teamIndex: 0, seatCount: 1, isHost: true },
-        { memberId: 'second', name: 'Bob', teamIndex: 1, seatCount: 1, isHost: false }],
-      selfMemberId: 'first', isHost: true, canStart: false,
-    })
-    const invalid = rooms.find(room => room.id === 'damaged-team')
-    expect(invalid).toMatchObject({ id: 'damaged-team', status: 'waiting', max_players: 4,
-      player_index: null, owned_player_indexes: [], players: [], progress: null, waiting_player_indexes: [], expansions: [],
-    })
-    expect(invalid).not.toHaveProperty('teamWaiting')
-    expect(JSON.stringify(rooms)).not.toMatch(/userId|__private_team_data__/)
-    expect(await db.prepare('SELECT state_json FROM rooms WHERE id=?').get('damaged-team')).toEqual({ state_json: damaged })
-  })
 
   it('projects the actual game round and enabled expansions without private state', async () => {
     const { db, persistence, snapshot, meta } = await setup()

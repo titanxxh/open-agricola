@@ -18,15 +18,10 @@ import { resolveCardRef } from './card-reference'
 import { LogCardLink } from './log-rendering'
 import { formatScore as formatScoreValue } from '../../utils/format-score'
 import { getPlayerDisplayName } from '../../utils/player-name'
-import type { TeamConfiguration, TeamScoreSummary } from '../../../shared/contract/team'
-import './team-scoring.css'
-import { BetaBadge } from '../common/BetaBadge'
 
 type Props = {
   locale: Locale
   scores: PlayerScoreSummary[]
-  teamScores?: TeamScoreSummary[]
-  teamConfiguration?: TeamConfiguration
   players: PlayerState[]
   onClose: () => void
   showDraftHistory?: boolean
@@ -125,7 +120,7 @@ const renderMarkerLabel = (locale: Locale, marker: Extract<ScoreEntry, { type: '
     : label}</span>
 }
 
-export const ScoringPad = ({ locale, scores, teamScores, teamConfiguration, players, onClose, showDraftHistory = false, completionActions, startingHandSelection }: Props) => {
+export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory = false, completionActions, startingHandSelection }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('score')
   const categoryRows: ScoringRow[] = categoryOrder.map((key) => ({
     id: `cat-${key}`,
@@ -232,8 +227,7 @@ export const ScoringPad = ({ locale, scores, teamScores, teamConfiguration, play
           startingHandSelection?.kept
             ? <StartingHandHistory locale={locale} selection={startingHandSelection.kept} />
             : <DraftTab locale={locale} players={players} />
-        ) : teamScores?.length ? (
-          <TeamScores locale={locale} scores={scores} teams={teamScores} players={players} configuration={teamConfiguration} />
+
         ) : (
         <div className="scoring-content">
           <div className="scoring-grid">
@@ -355,53 +349,6 @@ export const ScoringPad = ({ locale, scores, teamScores, teamConfiguration, play
       </div>
     </div>
   )
-}
-
-function TeamScores({ locale, scores, teams, players, configuration }: {
-  locale: Locale; scores: PlayerScoreSummary[]; teams: TeamScoreSummary[]; players: PlayerState[]; configuration?: TeamConfiguration
-}) {
-  const name = (playerId: string) => {
-    const index = players.findIndex(player => player.id === playerId)
-    const player = players[index]
-    return getPlayerDisplayName(locale, player?.name ?? scores.find(score => score.playerId === playerId)?.playerName ?? playerId,
-      index >= 0 ? index : undefined, player?.nameIsDefault)
-  }
-  return <div className="scoring-content team-scoring-content">
-    <p><BetaBadge locale={locale} /></p>
-    {[...teams].sort((a, b) => a.rank - b.rank || a.teamIndex - b.teamIndex).map(team => {
-      const members = team.playerIds.flatMap(id => scores.filter(score => score.playerId === id))
-      return <section key={team.teamIndex} className="team-score" data-team-index={team.teamIndex}>
-        <div className="team-score-heading">
-          <span>{t(locale, 'team.rank', { rank: team.rank })}</span>
-          <strong>{configuration?.mode === 'multihand' ? name(team.playerIds[0] ?? '') : t(locale, 'team.name', { number: team.teamIndex + 1 })}</strong>
-          <span>{t(locale, 'team.score')} <b data-team-total>{formatScoreValue(team.total)}</b></span>
-        </div>
-        <p>{team.playerIds.map(name).join(' · ')}</p>
-        <p>{t(locale, `team.scoring.${team.scoring}`)}</p>
-        {team.factors.map(factor => <p key={factor.playerId} data-team-factor={factor.playerId}>{t(locale, 'team.productFactor', {
-          name: name(factor.playerId), before: formatScoreValue(factor.total), after: formatScoreValue(factor.clampedTotal),
-        })}</p>)}
-        <details>
-          <summary>{t(locale, 'team.members')}</summary>
-          <div className="team-score-table-scroll"><table className="team-score-table">
-            <thead><tr><th>{t(locale, 'ui.scoringItem')}</th>{members.map(score => <th key={score.playerId}>{name(score.playerId)}</th>)}
-              {team.scoring === 'category-min' ? <th>{t(locale, 'team.score')}</th> : null}</tr></thead>
-            <tbody><tr><th>{t(locale, 'ui.scoringTotal')}</th>{members.map(score => <td key={score.playerId}>{formatScoreValue(score.total)}</td>)}
-              {team.scoring === 'category-min' ? <td>{formatScoreValue(team.total)}</td> : null}</tr>
-              {categoryOrder.map(key => {
-                const counted = team.categories.find(category => category.key === key)
-                return <tr key={key}><th>{t(locale, categoryLabelKey[key])}</th>{members.map(score => {
-                  const included = counted?.playerIds.includes(score.playerId) === true
-                  return <td key={score.playerId} data-player-id={score.playerId} data-team-counted={included}
-                    title={included ? t(locale, 'team.counted') : undefined}>{formatScoreValue(score.categories.find(category => category.key === key)?.total ?? 0)}</td>
-                })}{team.scoring === 'category-min' ? <td>{formatScoreValue(counted?.total ?? 0)}</td> : null}</tr>
-              })}
-            </tbody>
-          </table></div>
-        </details>
-      </section>
-    })}
-  </div>
 }
 
 type StatRow =

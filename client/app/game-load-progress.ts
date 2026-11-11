@@ -61,7 +61,6 @@ export function resolveGameLoadPhase(input: GameLoadResolveInput): GameLoadPhase
         return 'fetchingState'
       case 'reconnecting':
       case 'waiting':
-      case 'team-waiting':
       case 'error':
       case 'idle':
         return null

@@ -3,7 +3,7 @@ import { once } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBetaAccessHandler } from '../beta-access-routes'
 import { BetaAccessStore } from '../beta-access-store'
-import { canUseExperimentalFeature, experimentalAccountState } from '../experimental-features'
+import { betaAccountState } from '../experimental-features'
 import { createTestDatabase } from './_helpers/postgres'
 
 const cleanups: Array<() => Promise<void>> = []
@@ -49,7 +49,7 @@ async function setup() {
 describe('administrator Beta access', () => {
   it('grants access with the actor and time, then revokes it without a new login', async () => {
     const { db, request } = await setup()
-    expect(await canUseExperimentalFeature('player', 'team-modes', db)).toBe(false)
+    expect(await betaAccountState('player', db)).toEqual({ betaAccess: false })
     const granted = await request({ method: 'PUT', body: JSON.stringify({ userId: 'player' }) })
     expect(granted.status).toBe(200)
     expect(granted.headers.get('cache-control')).toBe('no-store')
@@ -59,11 +59,11 @@ describe('administrator Beta access', () => {
       grantedBy: { id: 'admin', username: 'admin', displayName: 'Administrator' },
       grantedAt: expect.any(Number),
     }] })
-    expect(await canUseExperimentalFeature('player', 'team-modes', db)).toBe(true)
+    expect(await betaAccountState('player', db)).toEqual({ betaAccess: true })
     const revoked = await request({ method: 'DELETE', body: JSON.stringify({ userId: 'player' }) })
     expect(revoked.status).toBe(200)
     expect(await revoked.json()).toEqual({ ok: true, grants: [] })
-    expect(await canUseExperimentalFeature('player', 'team-modes', db)).toBe(false)
+    expect(await betaAccountState('player', db)).toEqual({ betaAccess: false })
   })
 
   it('keeps the original grant when another administrator grants it again', async () => {
@@ -103,24 +103,24 @@ describe('administrator Beta access', () => {
     expect(await store.list()).toEqual([])
   })
 
-  it('derives administrator qualification without storing a grant and keeps ordinary qualification distinct from development availability', async () => {
+  it('derives administrator qualification without storing a grant and keeps ordinary qualification independent of environment', async () => {
     const { request, store, db } = await setup()
-    expect((await experimentalAccountState('admin', db)).betaAccess).toBe(true)
-    expect((await experimentalAccountState('player', db)).betaAccess).toBe(false)
-    vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', '')
-    expect(await canUseExperimentalFeature('player', 'team-modes', db)).toBe(true)
-    expect((await experimentalAccountState('player', db)).betaAccess).toBe(false)
+    expect((await betaAccountState('admin', db)).betaAccess).toBe(true)
+    expect((await betaAccountState('player', db)).betaAccess).toBe(false)
+    vi.stubEnv('NODE_ENV', 'development')
+    expect(await betaAccountState('player', db)).toEqual({ betaAccess: false })
+    expect((await betaAccountState('player', db)).betaAccess).toBe(false)
     expect((await request({ method: 'PUT', body: JSON.stringify({ userId: 'admin' }) })).status).toBe(200)
     expect(await store.list()).toEqual([])
     await request({ method: 'DELETE', body: JSON.stringify({ userId: 'admin' }) })
-    expect((await experimentalAccountState('admin', db)).betaAccess).toBe(true)
+    expect((await betaAccountState('admin', db)).betaAccess).toBe(true)
   })
 
   it('keeps the recipient when the grantor account is deleted and shows no grantor', async () => {
     const { db, request, store } = await setup()
     await request({ method: 'PUT', body: JSON.stringify({ userId: 'player' }) })
     await db.prepare('DELETE FROM users WHERE id=?').run('admin')
-    expect((await experimentalAccountState('player', db)).betaAccess).toBe(true)
+    expect((await betaAccountState('player', db)).betaAccess).toBe(true)
     expect(await store.list()).toEqual([{ account: { id: 'player', username: 'player', displayName: 'Test Player' },
       grantedBy: null, grantedAt: expect.any(Number) }])
   })

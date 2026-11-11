@@ -1,4 +1,3 @@
-import { teamWaitingState } from '../game/team-room'
 import { drainRoomSpectators, removeRoomSpectator } from '../game/room-spectators'
 import { operationsMetrics, safe } from '../observability/metrics'
 import { selectDevelopmentRoom } from '../game/development-room-slots'
@@ -322,14 +321,6 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
       if (removeRoomSpectator(ctx.currentRoom, ws)) return
       const disconnectedSeats = controlledSeatIndexes(ctx.currentRoom, ws)
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
-      if (ctx.currentRoom.status === 'waiting' && ctx.currentRoom.teamMembers) {
-        for (const member of ctx.currentRoom.teamMembers) {
-          const connection = ctx.currentRoom.waitingTeamConnections?.get(member.memberId)
-          if (connection) await deps.broadcaster.sendRoomEvent(connection, ctx.currentRoom, {
-            type: 'teamRoomWaiting', ...teamWaitingState(ctx.currentRoom, member.userId),
-          })
-        }
-      }
       if (removal === 'remaining') {
         for (const playerIndex of disconnectedSeats) await deps.broadcaster.broadcastEvent(ctx.currentRoom, {
           type: 'playerDisconnected', playerIndex,
@@ -491,7 +482,6 @@ export async function createWsServer(
         registry.clearActivity(room.id)
         for (const ws of roomConnections(room)) ws.close(1008, 'session invalidated')
         room.players = []
-        room.waitingTeamConnections?.clear()
         room.session.dispose()
       })
     }

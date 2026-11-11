@@ -24,30 +24,6 @@ const room = (id = 'r1'): Room => {
 }
 
 describe('Room Persistence Checkpoint', () => {
-  it('archives team membership and results from the same final worker score summaries', () => {
-    const session = new GameSession(1601, undefined, { playerCount: 4,
-      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' } })
-    try {
-      session.state.gameOver = true
-      const workerScores = session.getState().scores!.map((score, index) => ({ ...score, total: (index + 1) * 10 }))
-      const finished: Room = { id: 'team-result', session, players: [], maxPlayers: 4,
-        version: 0, status: 'playing', startedAt: 10,
-        seatOwners: [{ playerIndex: 0, userId: 'u1' }, { playerIndex: 1, userId: 'u2' },
-          { playerIndex: 2, userId: 'u1' }, { playerIndex: 3, userId: 'u2' }],
-        customSessionExecutor: { scoresForPersistence: () => workerScores } as never }
-
-      const result = buildGameResult(finished, 20)
-
-      expect(result.players.map(player => ({ userId: player.userId, teamIndex: player.teamIndex, score: player.score }))).toEqual([
-        { userId: 'u1', teamIndex: 0, score: 10 }, { userId: 'u2', teamIndex: 1, score: 20 },
-        { userId: 'u1', teamIndex: 0, score: 30 }, { userId: 'u2', teamIndex: 1, score: 40 },
-      ])
-      expect(result.team).toMatchObject({ mode: 'multihand', scoring: 'sum', scores: [
-        { teamIndex: 0, playerIds: ['p1', 'p3'], total: 40, rank: 2 },
-        { teamIndex: 1, playerIds: ['p2', 'p4'], total: 60, rank: 1 },
-      ] })
-    } finally { session.dispose() }
-  })
 
   it('archives default-name provenance while preserving a colliding numeric account name', () => {
     const r = room()

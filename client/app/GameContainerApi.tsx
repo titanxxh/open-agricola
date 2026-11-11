@@ -1,8 +1,6 @@
-import type { MarketplaceTransfer } from '../../shared/contract/marketplace'
 import { PublicOpeningProgress } from './PublicOpeningProgress'
 import { GameEndControls } from './GameEndControls'
-import { TeamWaitingRoom } from './TeamWaitingRoom'
-import type { RoomColorErrorCode, RoomTeamErrorCode } from '../../shared/contract/protocol/ws'
+import type { RoomColorErrorCode } from '../../shared/contract/protocol/ws'
 import { WaitingRoomPlayers } from './WaitingRoomPlayers'
 import { buildRoomSearch, roomIdFromQuery } from '../utils/game-room-url'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
@@ -25,12 +23,10 @@ import { buildFenceCommitPayload } from './farm-commit-ui'
 import { useCardPlayChoice } from '../hooks/useCardPlayChoice'
 import { useRoomHistory } from '../hooks/useRoomHistory'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
-import { isHotseatSetupQuery, parseDraftParamsFromQuery, parseRoomAccessFromQuery, parseTeamConfigurationFromQuery } from './game-setup-query'
+import { assertSupportedSetupQuery, isHotseatSetupQuery, parseDraftParamsFromQuery, parseRoomAccessFromQuery } from './game-setup-query'
 import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { HotseatHandoff } from './HotseatHandoff'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
-import { nextMultihandPlayerId, pendingMultihandInputs, type MultihandInput } from './multihand-seat'
-import { MultihandSeatControls } from './MultihandSeatControls'
 import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
@@ -164,7 +160,6 @@ const useTransportSetup = (
   const initRef = useRef(false)
   const [recoveryNotice, setRecoveryNotice] = useState(false)
   const [roomColorError, setRoomColorError] = useState<RoomColorErrorCode | null>(null)
-  const [roomTeamError, setRoomTeamError] = useState<RoomTeamErrorCode | null>(null)
   const [connectedPlayerIndexes, setConnectedPlayerIndexes] = useState<number[] | null>(null)
   const playerIndexRef = useRef(0)
 
@@ -238,7 +233,7 @@ const useTransportSetup = (
     let hotseat = false
     let receivedRoom = false
     let snapshotRoomId: string | undefined
-    let waiting: Extract<WsStatus, { phase: 'waiting' | 'team-waiting' }> | undefined
+    let waiting: Extract<WsStatus, { phase: 'waiting' }> | undefined
     let disposed = false
     const ready = () => {
       if (disposed) return
@@ -276,14 +271,6 @@ const useTransportSetup = (
         setWsStatus({ phase: 'joining', roomId: msg.roomId })
       } else if (msg.type === 'spectatingEnded') {
         ready()
-      } else if (msg.type === 'teamRoomWaiting') {
-        receivedRoom = true
-        hotseat = false
-        setRoomInUrl(msg.roomId)
-        setRoomTeamError(null)
-        waiting = { ...msg, phase: 'team-waiting' }
-        setWsReady(false)
-        setWsStatus(waiting)
       } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined') {
         receivedRoom = true
         setRoomInUrl(msg.roomId)
@@ -319,8 +306,6 @@ const useTransportSetup = (
         snapshotRoomId = msg.roomId
         setRoomInUrl(msg.roomId)
         if (ws.connected) ready()
-      } else if (msg.type === 'error' && (msg.code === 'team_change_failed' || msg.code === 'team_start_failed')) {
-        setRoomTeamError(msg.code)
       } else if (msg.type === 'error' && (msg.code === 'color_unavailable' || msg.code === 'color_locked' || msg.code === 'invalid_color' || msg.code === 'color_save_failed' || msg.code === 'color_confirmation_unavailable' || msg.code === 'color_confirmation_failed')) {
         setRoomColorError(msg.code)
       } else if (msg.type === 'error' && !ws.connected) {
@@ -338,10 +323,10 @@ const useTransportSetup = (
           setWsStatus({ phase: 'joining', roomId })
           ws.sendRoomCommand('joinRoom', { roomId: developmentSlot ? ws.roomId : roomId, intent: contextRoomId ? 'resume' : 'join', name: displayName ?? '', requestedPlayerIndex: toRequestedPlayerIndex(playerParam) })
         } else if (!playerParam || playerParam === 'p1') {
+          assertSupportedSetupQuery(window.location.search)
           setWsStatus({ phase: 'creating' })
           ws.sendRoomCommand('createRoom', {
             maxPlayers: maxPlayersFromQuery(window.location.search),
-            teamConfig: parseTeamConfigurationFromQuery(window.location.search),
             access: parseRoomAccessFromQuery(window.location.search),
             soloHandMode: maxPlayersFromQuery(window.location.search) === 1
               ? params.get('soloHandMode') === 'choose-7' ? 'choose-7' : 'random'
@@ -374,16 +359,7 @@ const useTransportSetup = (
     ? (localTransport ?? httpTransportSingleton)
     : isWsMode && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = isLocalMode ? localReady : (!isWsMode || wsReady)
-  return { roomTeamError,
-    chooseTeam: (teamIndex: number, memberId?: string) => {
-      setRoomTeamError(null)
-      try { wsTransport?.sendRoomCommand('setTeam', { teamIndex, ...(memberId === undefined ? {} : { memberId }) }) }
-      catch { setRoomTeamError('team_change_failed') }
-    },
-    startTeamGame: () => {
-      setRoomTeamError(null)
-      try { wsTransport?.sendRoomCommand('startTeamGame') } catch { setRoomTeamError('team_start_failed') }
-    },
+  return {
     connectedPlayerIndexes, transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
     setRoomColorError(null)
     try { wsTransport?.sendRoomCommand('setPlayerColor', { color }) } catch { setRoomColorError('color_save_failed') }
@@ -412,8 +388,8 @@ export const GameContainerApi = () => {
   const requestedPlayerId = useMemo(() => requestedWsPlayerIdFromQuery(window.location.search), [])
   const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
-  const { user, refreshSession } = useAuth()
-  const { connectedPlayerIndexes, transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor, roomTeamError, chooseTeam, startTeamGame } = useTransportSetup(
+  const { user } = useAuth()
+  const { connectedPlayerIndexes, transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
     isWsMode,
@@ -421,7 +397,7 @@ export const GameContainerApi = () => {
     isLocalMode,
     user?.id ?? 'anon',
   )
-  const { state, interaction, scores, teamScores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, waitingSeatIndexes, applySnapshot } =
+  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, waitingSeatIndexes, applySnapshot } =
     useGameSync()
   const roomHistory = useRoomHistory(transport, state, historyWindow)
   const privateEventNotificationBatchSeqRef = useRef(0)
@@ -516,25 +492,10 @@ export const GameContainerApi = () => {
   const isHotseat = wsStatus.phase === 'ready' && wsStatus.hotseat === true
   const participantViewer = wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'participant' ? wsStatus.viewer : null
   const controlledPlayerIndexes = participantViewer?.controlledPlayerIndexes ?? (participantViewer ? [participantViewer.playerIndex] : [])
-  const isMultihand = !isHotseat && state?.team?.configuration.mode === 'multihand'
-  const multihandRoomId = wsStatus.phase === 'ready' ? wsStatus.roomId : null
-  const [preferredMultihandInput, setPreferredMultihandInput] = useState<(MultihandInput & { roomId: string }) | null>(null)
-  const pendingMultihand = isMultihand && state ? pendingMultihandInputs(state, controlledPlayerIndexes) : []
-  const multihandPlayerId = isMultihand && state ? nextMultihandPlayerId(state, interaction, controlledPlayerIndexes,
-    preferredMultihandInput?.roomId === multihandRoomId ? preferredMultihandInput : null) : null
-  const localPlayerId = isMultihand ? multihandPlayerId ?? wsAssignedPlayerId : lockedViewPlayerId ?? wsAssignedPlayerId
-  const multihandAudienceKey = multihandPlayerId && wsStatus.phase === 'ready' ? `${wsStatus.roomId}:${multihandPlayerId}` : null
-  const [lastMultihandAudienceKey, setLastMultihandAudienceKey] = useState<string | null>(null)
-  if (lastMultihandAudienceKey !== multihandAudienceKey) {
-    setLastMultihandAudienceKey(multihandAudienceKey)
-    if (multihandPlayerId) setViewPlayerId(multihandPlayerId)
-  }
-  const activePlayer = isMultihand && multihandPlayerId && (state?.phase === 'draft' || state?.phase === 'parent-selection')
-    ? state.players.find(player => player.id === multihandPlayerId) ?? currentPlayer
-    : interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
+  const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
+  const activePlayer = interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
       ? state?.players[interaction.playerIndex] ?? currentPlayer
       : currentPlayer
-  // Multihand follows an owned responder; ordinary online play keeps its assigned seat.
   // One-device HTTP play follows the Interaction Player, including reactions.
   const selfPlayer = isSpectator ? null : isWs && localPlayerId && !isHotseat
     ? state?.players.find((p) => p.id === localPlayerId) ?? currentPlayer
@@ -542,13 +503,10 @@ export const GameContainerApi = () => {
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
   // Browsing a public farm never changes the interaction or confirmed seat.
   // HTTP sandbox follows the responder rather than a browsing preference.
-  const targetFarmOwnerId = interaction.stateId === 'wait' && interaction.request.kind === 'farm-select'
-    ? interaction.request.farmOwnerPlayerId : undefined
-  const targetFarmOwner = state?.players.find(player => player.id === targetFarmOwnerId)
-  const displayPlayer = targetFarmOwner ?? (isWs
+  const displayPlayer = isWs
     ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
-    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null))
-  const isPublicFarmView = isHotseat && !targetFarmOwner && displayPlayer?.id !== activePlayer?.id
+    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
+  const isPublicFarmView = isHotseat && displayPlayer?.id !== activePlayer?.id
   const hotseatRoomId = isHotseat && wsStatus.phase === 'ready' ? wsStatus.roomId : null
   const hotseatAudienceId = isHotseat && state
     ? state.phase === 'draft' && state.draft
@@ -578,7 +536,7 @@ export const GameContainerApi = () => {
     ? !persistencePaused && !!activePlayer && hotseatSeatConfirmed === hotseatAudienceKey && !isPublicFarmView
     : isWs
       ? !persistencePaused && (!isWs || wsStatus.phase === 'ready') && !!(activePlayer && selfPlayer && displayPlayer &&
-           activePlayer.id === selfPlayer.id && (displayPlayer.id === selfPlayer.id || displayPlayer.id === targetFarmOwner?.id))
+           activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
       : !!(activePlayer && displayPlayer))
   const hasGameView = !!(state && currentPlayer && displayPlayer)
   const canResetGame = !isSpectator && hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
@@ -657,7 +615,7 @@ export const GameContainerApi = () => {
     interactionPresentationPlan,
     locale,
     // Budgets and geometry belong to the responder, even while inspecting another farm.
-    displayPlayer: targetFarmOwner ?? (isHotseat ? activePlayer : displayPlayer),
+    displayPlayer: (isHotseat ? activePlayer : displayPlayer),
     players: state?.players,
   })
   const farmInteraction = farmSelectionDraft.farmInteraction
@@ -1470,8 +1428,6 @@ export const GameContainerApi = () => {
       : undefined
     const statusText = wsStatus.phase === 'reconnecting'
       ? t(locale, 'platform.roomReconnecting')
-      : wsStatus.phase === 'team-waiting'
-      ? t(locale, 'team.waitingTitle')
       : wsStatus.phase === 'waiting'
       ? colorConfirmingPlayer
         ? t(locale, 'platform.waitingForColorConfirmation', { player: getPlayerDisplayName(locale, colorConfirmingPlayer.name, colorConfirmingPlayer.playerIndex) })
@@ -1496,7 +1452,7 @@ export const GameContainerApi = () => {
             : `Error: ${wsStatus.message}`
         : ''
 
-    const inviteUrl = wsStatus.phase === 'waiting' || wsStatus.phase === 'team-waiting'
+    const inviteUrl = wsStatus.phase === 'waiting'
       ? `${window.location.origin}${window.location.pathname}${buildRoomSearch(wsStatus.roomId)}`
       : null
 
@@ -1521,7 +1477,7 @@ export const GameContainerApi = () => {
 
     return (
       <div className="ws-status-screen">
-        <div className={`ws-status-card${wsStatus.phase === 'team-waiting' ? ' ws-status-card--team' : ''}`}>
+        <div className="ws-status-card">
           {!isEmbedded && <div className="site-header-links"><SiteCommunityLinks /></div>}
           {!isEmbedded ? (
             <BrandMark
@@ -1541,7 +1497,7 @@ export const GameContainerApi = () => {
             </div>
           ) : null}
 
-          {(wsStatus.phase === 'waiting' || wsStatus.phase === 'team-waiting') && inviteUrl && (
+          {(wsStatus.phase === 'waiting') && inviteUrl && (
             <div className="ws-invite-panel">
               <div className="ws-invite-label">{t(locale, 'platform.inviteLabel')}</div>
               <div className="ws-invite-url-row">
@@ -1566,11 +1522,9 @@ export const GameContainerApi = () => {
                 </div>
               )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
-              {wsStatus.phase === 'team-waiting'
-                ? <TeamWaitingRoom value={wsStatus} onChooseTeam={chooseTeam} onStart={startTeamGame} disabled={persistencePaused} error={roomTeamError} />
-                : <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex ?? undefined} onColorChange={changePlayerColor} colorError={roomColorError}
+              {<WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex ?? undefined} onColorChange={changePlayerColor} colorError={roomColorError}
                   colorConfirmationPlayerIndex={wsStatus.colorConfirmationPlayerIndex} onConfirmColor={() => wsTransport?.sendRoomCommand('confirmPlayerColor')} disabled={persistencePaused} />}
-              {(wsStatus.phase === 'waiting' || wsStatus.isHost) && <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
+              {wsStatus.phase === 'waiting' && <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
                 {t(locale, 'platform.dissolveRoom')}
               </button>}
             </div>
@@ -1631,7 +1585,7 @@ export const GameContainerApi = () => {
 
   const gameEndControls = !isSpectator && wsTransport && !state.gameOver ? (
     <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert}
-      teamGame={Boolean(state.team)} canUseTeamModes={user?.experimentalFeatures?.includes('team-modes') && (!state.team?.configuration.cooperationRules || user.experimentalFeatures.includes('team-cooperation-rules'))} onExperimentalFeatureUnavailable={refreshSession} />
+      />
   ) : null
 
   const encyclopediaWindow = encyclopediaAttentionWindow({ state, interaction, playerId: selfPlayer?.id })
@@ -1672,11 +1626,6 @@ export const GameContainerApi = () => {
     </>
   )
   const gameHeader = renderGameHeader(true)
-  const multihandControls = isMultihand && state && selfPlayer && multihandRoomId
-    ? <MultihandSeatControls state={state} locale={locale} controlledPlayerIndexes={controlledPlayerIndexes}
-        pending={pendingMultihand} operatingPlayerId={selfPlayer.id}
-        onChoose={input => setPreferredMultihandInput({ ...input, roomId: multihandRoomId })} />
-    : null
   const hotseatHandoff = (playerId: string) => (
     <div className={`app app--handoff${isEmbedded ? ' app--embedded' : ''}`}>
       {renderGameHeader(false)}
@@ -1748,7 +1697,6 @@ export const GameContainerApi = () => {
     return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
-        {multihandControls}
         {notificationStack}
         {bugReportBar}
         <DraftOverlay
@@ -1779,7 +1727,6 @@ export const GameContainerApi = () => {
     return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
-        {multihandControls}
         {notificationStack}
         {bugReportBar}
         <ParentSelectionOverlay
@@ -1806,7 +1753,6 @@ export const GameContainerApi = () => {
   const farmBoardView = {
     ...farmBoardProjection,
     ...farmSelectionDraft.farmBoardDraft,
-    handPlayer: targetFarmOwner ? selfPlayer ?? activePlayer ?? undefined : undefined,
     ...(isPublicFarmView ? {
       plowSelectableSet: new Set<string>(),
       pendingPlowTile: null,
@@ -1821,7 +1767,6 @@ export const GameContainerApi = () => {
     visiblePlayerIds: isHotseat
       ? hotseatSeatConfirmed === hotseatAudienceKey && hotseatAudienceId ? [hotseatAudienceId] : []
       : participantViewer?.visiblePlayerIds ?? (selfPlayer ? [selfPlayer.id] : []),
-    operatingPlayerId: isMultihand ? selfPlayer?.id : undefined,
     activePlayerId: activePlayer?.id,
     currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
@@ -1897,17 +1842,6 @@ export const GameContainerApi = () => {
           },
         }
       : null
-  const interactionBarMarketplaceSelect = interactionPresentationPlan.kind === 'marketplace-select'
-    ? {
-        request: interactionPresentationPlan.request,
-        actorName: interaction.stateId === 'wait' ? playerNames[state.players[interaction.playerIndex]?.id ?? ''] ?? '' : '',
-        isConfirmDisabled: (transfers: MarketplaceTransfer[]) => !isInteractive || isInteractionSubmitDraftRejected({ value: 'confirm', marketplaceTransfers: transfers }),
-        onConfirm: (transfers: MarketplaceTransfer[]) => {
-          if (!isInteractive) return
-          runInteractionSubmitCommand(buildInteractionSubmitCommand(interaction, { value: 'confirm', marketplaceTransfers: transfers }))
-        },
-      }
-    : null
   const interactionBarResourceBatchExchangeSelect =
     interactionPresentationPlan.kind === 'resource-batch-exchange-select'
       ? {
@@ -1959,7 +1893,6 @@ export const GameContainerApi = () => {
       nextPlayerConfirmDisabled: currentConfirmRejected,
       playerSwitchConfirmDisabled: currentConfirmRejected,
       heating: heatingPending,
-      marketplaceSelect: interactionBarMarketplaceSelect,
       resourceQuantitySelect: interactionBarResourceQuantitySelect,
       resourceBatchExchangeSelect: interactionBarResourceBatchExchangeSelect,
       suppressChoiceOptions: suppressPendingChoiceOptions,
@@ -1990,7 +1923,7 @@ export const GameContainerApi = () => {
         sow: isSelectingSow,
       },
       fence: {
-        canBuildPalisades: !!activePlayer && playerCanBuildPalisades(activePlayer, targetFarmOwner ?? activePlayer),
+        canBuildPalisades: !!activePlayer && playerCanBuildPalisades(activePlayer),
         placementMode: farmSelectionDraft.interactionBarDraft.fencePlacementMode,
         setPlacementMode: farmSelectionDraft.controls.setFencePlacementMode,
         borrowedSources: farmSelectionDraft.borrowedFenceSources,
@@ -2030,12 +1963,11 @@ export const GameContainerApi = () => {
       locale={locale}
       players={state.players.map((p, i) => ({
         id: p.id,
-        name: isMultihand ? t(locale, 'team.seatLabel', { number: i + 1, player: playerNames[p.id] }) : playerNames[p.id],
+        name: playerNames[p.id],
         // PlayerState has no score field; use the live score projection.
         score: scores?.find((summary) => summary.playerId === p.id)?.total ?? 0,
         color: p.color,
-        isYou: isMultihand ? controlledPlayerIndexes.includes(i) : selfPlayer ? p.id === selfPlayer.id : false,
-        isOperating: isMultihand && p.id === selfPlayer?.id,
+        isYou: selfPlayer ? p.id === selfPlayer.id : false,
         isCurrent: i === state.currentPlayerIndex,
       }))}
       active={displayPlayer.id}
@@ -2170,7 +2102,7 @@ export const GameContainerApi = () => {
           }}
         />
       </div>
-      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} teamScores={teamScores} teamConfiguration={state.team?.configuration} players={state.players} onClose={closeScoring}
+      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring}
         showDraftHistory={state.gameOver && (state.players.length > 1 || !!state.soloHandSelection?.kept)}
         startingHandSelection={state.players.length === 1 ? state.soloHandSelection : undefined}
         completionActions={state.gameOver && state.players.length === 1 && isWs && wsTransport?.roomId
@@ -2193,7 +2125,6 @@ export const GameContainerApi = () => {
 
       <div ref={headerRef}>
         {gameHeader}
-        {multihandControls}
       </div>
 
       {isDesktopTable && !nearbyMajorSupply ? majorImprovementsPresentation : null}

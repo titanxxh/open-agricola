@@ -493,7 +493,7 @@ export class WsGameTransport implements GameTransport {
       // in the same event-loop turn. A playing Room never becomes ready on ack alone.
       const ready = this.waitEvent(event => event.type === 'stateUpdate' && event.roomId === this.roomId && event.sync === 'snapshot'
         || event.type === 'roomJoined' && event.roomId === this.roomId && event.status === 'waiting'
-        || event.type === 'teamRoomWaiting' && event.roomId === this.roomId)
+)
       this.sendRaw(this.roomViewer.kind === 'spectator'
         ? { type: 'spectateRoom', roomId: this.roomId }
         : { type: 'joinRoom', roomId: this.roomId, intent: 'resume', requestedPlayerIndex: this.seatHint })
@@ -547,13 +547,6 @@ export class WsGameTransport implements GameTransport {
       this.spectatingEndReason = undefined
       this.seatHint = undefined
       this.setRoom(msg.roomId)
-    } else if (msg.type === 'teamRoomWaiting') {
-      this.roomViewer = { kind: 'team-member', memberId: msg.selfMemberId }
-      this.seatHint = undefined
-      this.journal.playerIndex = undefined
-      this.setRoom(msg.roomId)
-      this.acknowledgedRoomId = msg.roomId
-      for (const [commandId, outcome] of this.completed) this.finishCommand(commandId, outcome)
     } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined' || msg.type === 'roomWaiting') {
       if ('playerIndex' in msg) {
         this.roomViewer = { kind: 'participant', playerIndex: msg.playerIndex,
@@ -631,7 +624,7 @@ export class WsGameTransport implements GameTransport {
   private finishCommand(commandId: string, outcome: CommandOutcome): void {
     const command = this.journal.commands.get(commandId)
     if (this.recovering && !outcome.ok && command?.type === 'createRoom') {
-      this.eventListeners.forEach(listener => listener({ type: 'error', error: outcome.error ?? 'Room creation failed', code: outcome.code === 'experimental_feature_unavailable' || outcome.code === 'client_refresh_required' ? outcome.code : undefined }))
+      this.eventListeners.forEach(listener => listener({ type: 'error', error: outcome.error ?? 'Room creation failed', code: outcome.code === 'client_refresh_required' ? outcome.code : undefined }))
     }
     let waitingForSnapshot = false
     const creation = this.pendingCreations.get(commandId)
@@ -778,7 +771,6 @@ export class WsGameTransport implements GameTransport {
   }
 
   async getState(options?: GetStateOptions): Promise<GameSyncPayload> {
-    if (this.roomViewer.kind === 'team-member') throw new Error('The team game has not started')
     return this.sendCommand({
       type: 'getState',
       ...(options?.unredacted ? { unredacted: true } : {}),
@@ -916,8 +908,6 @@ export class WsGameTransport implements GameTransport {
   }): void
   sendRoomCommand(type: 'setPlayerColor', opts: { color: PlayerState['color'] }): void
   sendRoomCommand(type: 'confirmPlayerColor', opts?: Record<string, never>): void
-  sendRoomCommand(type: 'startTeamGame', opts?: Record<string, never>): void
-  sendRoomCommand(type: 'setTeam', opts: { teamIndex: number; memberId?: string }): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
   sendRoomCommand(type: 'getGameEndProposal', opts?: Record<string, unknown>): void
   sendRoomCommand(type: 'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd', opts: Record<string, unknown>): void

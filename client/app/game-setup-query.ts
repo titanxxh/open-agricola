@@ -1,13 +1,4 @@
 import type { RoomAccess } from '../../shared/contract/room-access'
-import { parseTeamConfiguration, type TeamConfiguration } from '../../shared/contract/team'
-
-export function parseTeamConfigurationFromQuery(search: string): TeamConfiguration | undefined {
-  const params = new URLSearchParams(search)
-  const raw = params.get('teamConfig')
-  if (raw === null) return undefined
-  return parseTeamConfiguration(JSON.parse(raw), Number(params.get('maxPlayers') ?? '2'))
-}
-
 /**
  * Query-string plumbing for the lobby's game setup panel.
  *
@@ -48,4 +39,11 @@ export function parseRoomAccessFromQuery(search: string): RoomAccess | undefined
   const params = new URLSearchParams(search)
   if (params.get('roomAccess') !== 'invited') return undefined
   return { kind: 'invited', invitedUserIds: params.get('invitedUserIds')?.split(',').filter(Boolean) ?? [] }
+}
+
+export function assertSupportedSetupQuery(search: string): void {
+  const params = new URLSearchParams(search)
+  if (['teamConfig', 'team', 'multihand', 'cooperationRules'].some(key => params.has(key))) {
+    throw new Error('Unsupported game configuration')
+  }
 }

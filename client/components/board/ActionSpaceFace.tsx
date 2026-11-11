@@ -16,7 +16,6 @@ export function ActionSpaceFace({ locale, nameKey, preview, fallback, gainPerRou
       {!imageFailed && <img className="action-space-face__frame" src={publicAssetUrl('/assets/revised/action_frame.png')}
         alt="" onError={() => setImageFailed(true)} />}
       <h4 className="action-header">{t(locale, nameKey)}</h4>
-      {actionId === 'marketplace' && <span className="team-cooperation-badge">{t(locale, 'team.cooperationBadge')}</span>}
       <div className="action-desc">{gainPerRound && Object.values(gainPerRound).some(amount => amount > 0)
         ? <ResourceLine locale={locale} resources={gainPerRound} />
         : preview ? <ActionSpaceDescription locale={locale} preview={preview} /> : fallback}</div>

@@ -2263,7 +2263,7 @@ describe('auth routes', () => {
     expect(res.headers['Access-Control-Allow-Methods']).toContain('PUT')
   })
 
-  it('allows the cooperation capability header through the real server entry preflight before game routing', async () => {
+  it('allows the client capability header through the real server entry preflight before game routing', async () => {
     const res = await requestJson('OPTIONS', '/api/game/state', undefined, {
       Origin: 'http://localhost:5173',
       'Access-Control-Request-Method': 'GET',
@@ -2382,9 +2382,9 @@ describe('auth routes', () => {
 
 })
 
-describe('experimental feature discovery', () => {
+describe('account Beta qualification', () => {
   afterEach(() => { vi.unstubAllEnvs() })
-  it('computes current availability for /me and keeps anonymous requests unauthorized', async () => {
+  it('computes current qualification for /me and keeps anonymous requests unauthorized', async () => {
     vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', 'declared')
     vi.stubEnv('ADMIN_USERS', 'experimental_owner')
     const ordinary = await createLocalUserForTests('experimental_ordinary', 'test-password', 'Ordinary')
@@ -2392,15 +2392,15 @@ describe('experimental feature discovery', () => {
     const token = await createSession(ordinary.id)
     const ownerToken = await createSession(owner.id)
     const get = (value: string | null) => requestJson('GET', '/api/auth/me', undefined, value ? { Cookie: `oa_session=${value}` } : {})
-    expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: [], betaAccess: false })
-    expect((await get(ownerToken)).json.user).toMatchObject({ experimentalFeatures: ['team-modes', 'team-cooperation-rules'], betaAccess: true })
+    expect((await get(token)).json.user).toMatchObject({ betaAccess: false })
+    expect((await get(ownerToken)).json.user).toMatchObject({ betaAccess: true })
     expect((await get(null)).status).toBe(401)
     await getDb().prepare('INSERT INTO beta_access(user_id,granted_by,granted_at) VALUES(?,?,?)').run(ordinary.id, owner.id, 1)
-    expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: ['team-modes', 'team-cooperation-rules'], betaAccess: true })
+    expect((await get(token)).json.user).toMatchObject({ betaAccess: true })
     await getDb().prepare('DELETE FROM beta_access WHERE user_id=?').run(ordinary.id)
-    expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: [], betaAccess: false })
+    expect((await get(token)).json.user).toMatchObject({ betaAccess: false })
     vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', '')
-    expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: ['team-modes', 'team-cooperation-rules'], betaAccess: false })
+    expect((await get(token)).json.user).toMatchObject({ betaAccess: false })
   })
 
   it('lets only administrators find and grant Beta access to email-unverified accounts', async () => {

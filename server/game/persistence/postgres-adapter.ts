@@ -29,7 +29,6 @@ import { parseGameCreationRecord } from '../creation-configuration'
 import { GameCreationStore, GameCreationError } from '../game-creation-store'
 import { resolveSoloWorkshopCards } from '../workshop-room-cards'
 import { OpeningFacts } from './opening-facts'
-import { parseTeamRoomMembers } from '../../../shared/contract/team-room'
 
 type RoomRow = {
   creation_configuration_json: string | null
@@ -39,7 +38,6 @@ type RoomRow = {
   state_json: string | null
   input_window_json: string | null
   end_proposal_json: string | null
-  team_members_json: unknown
   awaiting_rematch_players: number
   max_players: number
   solo_hand_mode: SoloHandMode | null
@@ -171,7 +169,6 @@ const roomValues = (
   version: number | null,
 ): Record<string, string | number | null> => ({
   id,
-  teamMembersJson: meta.teamMembers ? JSON.stringify(meta.teamMembers) : null,
   awaitingRematchPlayers: meta.awaitingRematchPlayers ? 1 : 0,
   endProposalJson: meta.endProposal ? JSON.stringify(meta.endProposal) : null,
   inputWindowJson: meta.inputWindow ? JSON.stringify(meta.inputWindow) : null,
@@ -213,7 +210,6 @@ const toSnapshot = (
   version: row.version,
   serialized: row.state_json ? (JSON.parse(row.state_json) as PersistedSessionSnapshot) : null,
   meta: {
-    teamMembers: parseTeamRoomMembers(row.team_members_json),
     awaitingRematchPlayers: row.awaiting_rematch_players === 1,
     endProposal: row.end_proposal_json ? JSON.parse(row.end_proposal_json) as GameEndProposal : null,
     ...(row.input_window_json ? { inputWindow: JSON.parse(row.input_window_json) as RoomInputWindow } : {}),
@@ -299,7 +295,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
     this.loadCreationRow = db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?')
     this.history = new RoomHistoryStore(db)
     this.loadRoom = db.prepare(
-      `SELECT configuration_json AS creation_configuration_json, id, created_by, team_members_json, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, solo_hand_mode, status, version, custom_card_ids,
+      `SELECT configuration_json AS creation_configuration_json, id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, solo_hand_mode, status, version, custom_card_ids,
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
@@ -311,20 +307,19 @@ export class PostgresRoomPersistence implements RoomPersistence {
     )
     this.upsertRoom = db.prepare(`
       INSERT INTO rooms (
-        id, created_by, team_members_json, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, status, version, custom_card_ids,
+        id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, status, version, custom_card_ids,
         custom_cards_runtime_json, solo_hand_mode,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
         allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, created_at, updated_at
       ) VALUES (
-        @id, @createdBy, @teamMembersJson::jsonb, @invitedUserIds::jsonb, @colorConfirmationPlayerIndex, @stateJson, @inputWindowJson, @endProposalJson, @awaitingRematchPlayers, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
+        @id, @createdBy, @invitedUserIds::jsonb, @colorConfirmationPlayerIndex, @stateJson, @inputWindowJson, @endProposalJson, @awaitingRematchPlayers, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
         @customCards, @soloHandMode,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor, @enableMoorBalanceRules,
         @allowIncompleteFarmersOfTheMoorMinorDeal, @enableSnakeOpening, @hotseat, @startedAt, @now, @now
       )
       ON CONFLICT(id) DO UPDATE SET
-        team_members_json = excluded.team_members_json,
         state_json = COALESCE(excluded.state_json, rooms.state_json),
         input_window_json = excluded.input_window_json,
         invited_user_ids = excluded.invited_user_ids,
@@ -385,18 +380,18 @@ export class PostgresRoomPersistence implements RoomPersistence {
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
-        enable_snake_opening, enable_moor_balance_rules, team_mode, team_scoring, team_scores
+        enable_snake_opening, enable_moor_balance_rules
       ) VALUES (
         @roomId, @startedAt, @finishedAt, @roundsPlayed, @playerCount,
         @communityDeck, @parentCards, @throughTheSeasons, @farmersOfTheMoor,
-        @snakeOpening, @moorBalanceRules, @teamMode, @teamScoring, @teamScores::jsonb
+        @snakeOpening, @moorBalanceRules
       )
     `)
     this.insertResultPlayer = db.prepare(`
       INSERT INTO game_result_players (
-        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default, team_index
+        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default
       ) VALUES (
-        @roomId, @playerIndex, @gamePlayerId, @userId, @displayName, @score, @nameIsDefault, @teamIndex
+        @roomId, @playerIndex, @gamePlayerId, @userId, @displayName, @score, @nameIsDefault
       )
     `)
     this.pruneRooms = db.prepare(`
@@ -414,7 +409,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       RETURNING id
     `)
     this.restoreRooms = db.prepare(`
-      SELECT configuration_json AS creation_configuration_json, rooms.id, rooms.created_by, rooms.team_members_json, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json,
+      SELECT configuration_json AS creation_configuration_json, rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json,
              rooms.end_proposal_json, rooms.awaiting_rematch_players, rooms.max_players, rooms.solo_hand_mode, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
@@ -531,9 +526,6 @@ export class PostgresRoomPersistence implements RoomPersistence {
         farmersOfTheMoor: result.farmersOfTheMoor ? 1 : 0,
         moorBalanceRules: result.farmersOfTheMoor && result.moorBalanceRules === true ? 1 : 0,
         snakeOpening: result.snakeOpening ? 1 : 0,
-        teamMode: result.team?.mode ?? null,
-        teamScoring: result.team?.scoring ?? null,
-        teamScores: result.team ? JSON.stringify(result.team.scores) : null,
       }))
       for (const player of result.players) {
         ;(await this.insertResultPlayer.run({
@@ -541,7 +533,6 @@ export class PostgresRoomPersistence implements RoomPersistence {
           roomId: result.roomId,
           userId: userIds.get(player.playerIndex) ?? player.userId,
           nameIsDefault: player.nameIsDefault === true ? 1 : 0,
-          teamIndex: player.teamIndex ?? null,
         }))
       }
     }
