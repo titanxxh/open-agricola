@@ -9,9 +9,9 @@ on:
         default: ''
         type: string
   pull_request:
-    branches: [main]
+    branches: [main, prerelease]
   push:
-    branches: [main]
+    branches: [main, prerelease]
 
 permissions:
   contents: read

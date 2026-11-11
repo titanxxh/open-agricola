@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   request:
+    if: github.event.release.prerelease == false && github.event.release.draft == false
     runs-on: ubuntu-latest
     steps:
       - name: Record release deployment request

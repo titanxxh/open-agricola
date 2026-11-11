@@ -150,6 +150,16 @@ describe('frontend hosting', () => {
     expect(() => createFrontendHosting({ ...env, PUBLIC_APP_ORIGIN: 'https://pages.example/' })).not.toThrow()
   })
 
+  it('rejects prerelease frontend bytes on a stable backend and requires matching channel metadata on pre', () => {
+    writeFileSync(join(directory, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: BUILD_ID,
+      basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }))
+    expect(() => createFrontendHosting(env)).toThrow('channel')
+    expect(() => createFrontendHosting({ ...env, RELEASE_CHANNEL: 'prerelease' })).not.toThrow()
+    writeFileSync(join(directory, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: BUILD_ID, basePath: '/open-agricola/' }))
+    expect(() => createFrontendHosting({ ...env, RELEASE_CHANNEL: 'prerelease' })).toThrow('channel')
+    expect(() => createFrontendHosting({ ...env, RELEASE_CHANNEL: 'unknown' })).toThrow('channel')
+  })
+
   it.each([
     'not JSON',
     '{"format":2,"gameBuildId":"other","basePath":"/open-agricola/"}',

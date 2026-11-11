@@ -76,7 +76,7 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
     started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
     steps: [step('Generate candidate manifest'), step(`Candidate manifest / ${sha} / ${configuration} / ${tasks.join(',')}`)] })
   const requestWorkflow = { id: 200, path: requestPath }
-  const requestRun = { id: 99, workflow_id: 200, path: requestPath, event: 'release', head_sha: sha, run_attempt: 1,
+  const requestRun = { id: 99, workflow_id: 200, path: requestPath, event: 'release', head_sha: sha, head_branch: 'v1.0.0', run_attempt: 1,
     repository: { full_name: repository }, head_repository: { full_name: repository }, status: 'completed', conclusion: 'success' }
   const environment = { deployment_branch_policy: { protected_branches: false, custom_branch_policies: true } }
   const policies = { total_count: 1, branch_policies: [{ id: 10, name: 'main', type: 'branch' }] }
@@ -85,6 +85,8 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
   const prefix = `repos/${repository}`
   const responses: Record<string, unknown> = {
     ...finalSnapshotMetadata(sha, policySha),
+    [`${prefix}/releases/tags/v1.0.0`]: { tag_name: 'v1.0.0', draft: false, prerelease: false },
+    [`${prefix}/commits/v1.0.0`]: { sha },
     [`${prefix}/actions/workflows/pages-release-request.yml`]: requestWorkflow,
     [`${prefix}/actions/runs/99`]: requestRun,
     [`${prefix}/environments/github-pages`]: environment,
@@ -339,6 +341,16 @@ describe('Pages trusted broker public CLI', () => {
     expect(result.stderr).toContain('Usage: pages-deployment.ts')
     expect(value.commands()).toBe('')
   })
+})
+
+it('rejects a native prerelease published request before any candidate install or Pages action', () => {
+  const value = fixture()
+  value.responses[`repos/${repository}/releases/tags/v1.0.0`] = { tag_name: 'v1.0.0', draft: false, prerelease: true }
+  value.save()
+  const result = value.build()
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('stable published Release')
+  expect(value.commands()).not.toContain('["pnpm"')
 })
 
 describe('retired historical Pages workflow and native protection model', () => {

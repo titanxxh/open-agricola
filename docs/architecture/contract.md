@@ -16,6 +16,7 @@ This module centralizes the shapes shared by the frontend, backend and sandbox, 
 | `contract/game-creation.ts` | Accepted solo creation configuration and its browser-safe guard, shared by persisted-record and owner-response readers |
 | `contract/game-variants.ts` | Canonical creation-option normalization for dependent Game Variant choices |
 | `contract/protocol/game.ts` | `GameSyncPayload`, `StateUpdateEnvelope`, `StateUpdateCause`, `ActionDetailEffects` |
+| `contract/protocol/app-location.ts` | Public application location and frontend build identity, including stable/prerelease channel and target |
 | `contract/cards.ts` | `CardDefinition`, the public card shape |
 | `contract/prompt-keys.ts` | `PromptKey` enum used as the i18n anchor |
 | `contract/state-constants.ts` | Action-space and board constants without rule code |

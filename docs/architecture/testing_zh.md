@@ -34,6 +34,9 @@
 
 该工作流也支持复用以在合入前执行。只有所有选中的 matrix 任务成功后，完成 job 才输出任务 ID 和实际检出提交。正式发布证据要求在准确候选提交上执行其专用手动工作流。
 
+
+预发布由 `prerelease-candidate-verification.yml` 和 `scripts/ci/prerelease-verification.ts` 中独立的可信 main producer 编排。固定 ref 与集成清单绑定选定候选及独立功能来源；同一完整任务目录执行候选，不取得正式写入凭据。回执绑定仓库 ID、通道、候选 SHA、候选和策略配置，以及可从受保护 main 到达的兼容 producer。其他候选不能覆盖本候选结果，缺失或不兼容任务均阻断发布。正式候选准入保持原要求；prerelease 日常 push/PR 使用同一 routine plan。测试入口为 `candidate-verification-prerelease.test.ts`、`candidate-verification.test.ts`、`release-publish.test.ts` 和 `candidate-verification-pages.test.ts`。
+
 ## 日常范围验证
 
 GitHub Actions 是集成与发布的正式证据。本机定向检查提供开发反馈。`ci.yml` 是 PR 与 main 的唯一自动验证入口。

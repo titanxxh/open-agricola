@@ -7,6 +7,12 @@ import { HOSTED_APP_PATH, type FrontendBuild } from '../shared/contract/protocol
 const repoRoot = resolve(import.meta.dirname, '..')
 const mode = process.argv[2]
 if (mode !== 'hosted' && mode !== 'pages') throw new Error('Expected frontend mode: hosted or pages')
+const channel = process.env.RELEASE_CHANNEL ?? 'stable'
+if (channel !== 'stable' && channel !== 'prerelease') throw new Error('Invalid RELEASE_CHANNEL')
+if (mode === 'pages' && channel !== 'stable') throw new Error('Prerelease artifacts cannot target formal Pages')
+const deployment = channel === 'prerelease'
+  ? { releaseChannel: channel, deploymentTarget: 'prerelease-hosted' } as const
+  : { releaseChannel: channel, deploymentTarget: mode === 'hosted' ? 'stable-hosted' : 'stable-pages' } as const
 const basePath = mode === 'hosted' ? HOSTED_APP_PATH : '/'
 const outputDirectory = mode === 'hosted' ? 'dist' : 'dist-pages'
 if (mode === 'pages' && !process.env.VITE_API_BASE) throw new Error('Pages frontend requires VITE_API_BASE')
@@ -39,5 +45,6 @@ const frontendBuild = {
   format: 1,
   gameBuildId,
   basePath,
+  ...deployment,
 } satisfies FrontendBuild
 writeFileSync(resolve(repoRoot, outputDirectory, 'frontend-build.json'), JSON.stringify(frontendBuild) + '\n')

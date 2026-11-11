@@ -53,6 +53,49 @@ fork 仓库可传入 `--repository owner/name`，并在该仓库配置候选验�
 
 标准命令在发布前核验 GitHub run 和 job 证据。通过网页或裸 `gh release create` 创建的 Release 可能尚无这些证据，Pages 与后端部署会各自拒绝未验证的候选。本机 `pnpm release:rehearse` 记录不能替代 GitHub 证据。
 
+## 发布固定预发布候选
+
+预发布使用独立通道。`prerelease` 日常 push 和 PR 运行 canonical routine plan，不自动部署。完整候选验证由可信 `main` 手动编排；候选任务只有仓库读取权限，不取得正式部署凭据。
+
+选择候选前先同步当前 main，并在候选树维护 `prerelease-integration.json`：
+
+```json
+{
+  "format": 1,
+  "repository": "titanxxh/open-agricola",
+  "baselineMainSha": "<full-main-sha>",
+  "features": [
+    { "id": "feature-name", "dependsOn": [], "sourceSha": "<source-commit>", "integratedSha": "<replayed-feature-commit>" }
+  ]
+}
+```
+
+各 SHA 均为完整提交身份。清单提交位于功能提交之后，`integratedSha` 指向实际集成功能提交。独立功能保留来源，以便只晋升选定功能。依赖必须指向清单中已有功能且不能成环；候选须继承 main 基线且无 merge commit。
+
+owner 同步 main 时以 `rebase.updateRefs=false` 准备并审阅 rebase 结果，更新清单基线与集成提交，然后执行：
+
+```bash
+pnpm exec tsx scripts/ci/prerelease-verification.ts sync --repository titanxxh/open-agricola --sha <new-pre-sha> --expected-old <old-pre-sha> --main-sha <current-main-sha>
+```
+
+命令只以显式旧 SHA lease 更新 `refs/heads/prerelease`。远端已变化或功能来源集合发生增减时拒绝；新增和移除功能须经过可审阅 PR。命令不更新 main、固定候选引用或 tag。同步产生新 SHA 后须重新验证。
+
+owner 本机发布与恢复命令为：
+
+```bash
+pnpm release vX.Y.Z-beta.N --channel prerelease --ref prerelease
+# 失败后沿用已打印的固定候选，即使 prerelease 已前进：
+pnpm release vX.Y.Z-beta.N --channel prerelease --ref <fixed-pre-sha>
+```
+
+N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当前 main 为基线。命令固定 `verification/prerelease/<SHA>`，读取有效原生引用保护，然后在 main 派发 `prerelease-candidate-verification.yml`。回执绑定原生仓库 ID、prerelease 通道、候选 SHA、候选与可信策略配置以及 main producer 提交。producer 必须仍可从受保护 main 到达。兼容任务可分别补跑；缺失、失败、取消、跳过或配置不符均阻断。集成分支移动后仍可使用原固定候选。
+
+所有必需任务通过后创建固定 tag 及原生 GitHub prerelease，并设置 latest=false。匹配的已有发布可复用；tag、SHA 或原生通道不符时拒绝。正式通道继续要求实际已合入 main 的最终 PR 快照，且版本只接受 vX.Y.Z；预发布回执不能授权正式发布。
+
+配套 hosted 镜像使用 `GAME_BUILD_ID=<fixed-pre-sha>` 及 Docker build argument `RELEASE_CHANNEL=prerelease`，构建与运行通道相同。前端描述记录 releaseChannel 和 deploymentTarget=prerelease-hosted，镜像 label 记录 revision 和通道。正式产物使用 stable-hosted 或 stable-pages。预发布 Pages 构建在执行 builder 前拒绝，hosted 启动拒绝通道不匹配；旧版描述只允许正式运行。正式 Compose 固定 stable。安装时仍须核对完整候选回执及实际独立目标。
+
+原生 prerelease published 事件不能授权正式 Pages。请求工作流排除 prerelease，main broker 还会独立读取原生已发布 Release 和未移动 tag 后才安装。发布、安装和现场验收分别记录；原生保护、资源初装、部署及开放入口由 [PRD #1655](https://github.com/titanxxh/open-agricola/issues/1655) 中 owner 票验收。
+
 ## 一、部署后端
 
 后端部署分两种情况：

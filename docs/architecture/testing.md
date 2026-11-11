@@ -32,6 +32,9 @@ Formal request/check first admits a final merged-PR snapshot on the requested re
 
 The workflow also supports reuse for pre-merge execution. Its completion job exports the selected task IDs and checked-out commit only after every selected matrix task succeeds. Formal release evidence requires its dedicated manual run for the exact candidate commit.
 
+
+Prerelease has a separate trusted-main producer in `prerelease-candidate-verification.yml` and `scripts/ci/prerelease-verification.ts`. Its immutable ref and integration manifest bind selection and independent feature sources. The same catalog runs against the candidate without formal write credentials. Receipt acceptance binds repository ID, channel, candidate SHA, candidate/policy configuration, and a compatible producer reachable from protected main. Other candidates cannot supersede these results; missing or incompatible work blocks publication. Stable admission is unchanged. Ordinary prerelease push/PR events share the routine plan. Tests: `candidate-verification-prerelease.test.ts`, `candidate-verification.test.ts`, `release-publish.test.ts`, and `candidate-verification-pages.test.ts`.
+
 ## Routine scope verification
 
 GitHub Actions is authoritative for integration and release. Local focused checks provide development feedback. `ci.yml` is the only automatic PR and main verifier.

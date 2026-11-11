@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url'
 import { FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
 
 export const CANDIDATE_WORKFLOW = '.github/workflows/candidate-verification.yml'
+export const PRERELEASE_CANDIDATE_WORKFLOW = '.github/workflows/prerelease-candidate-verification.yml'
+export type ReleaseChannel = 'stable' | 'prerelease'
 export type CandidateIdentity = { repository: string; repositoryId: number; sha: string; configuration: string; workflowId: number }
+  & ({ channel?: 'stable' } | { channel: 'prerelease'; producerShas: readonly string[] })
 export type CandidateRunEvidence = { run: unknown; jobs: readonly unknown[] }
 export type CandidateTaskResult = {
   id: FullTaskId
@@ -100,11 +103,13 @@ const successfulStep = (job: Job, name: string): boolean =>
   && job.steps.some(step => step.name === name && step.status === 'completed' && step.conclusion === 'success')
 const newestJob = (jobs: Job[]): Job | undefined => [...jobs].sort((a, b) => b.attempt - a.attempt || b.id - a.id)[0]
 
-function manifestSelection(jobs: Job[], identity: CandidateIdentity): { tasks: FullTaskId[]; job: Job } | null {
+function manifestSelection(jobs: Job[], identity: CandidateIdentity, producerSha: string): { tasks: FullTaskId[]; job: Job } | null {
   const manifest = newestJob(jobs.filter(job => job.name === 'candidate-manifest'))
   if (!manifest || manifest.status !== 'completed' || manifest.conclusion !== 'success'
     || !successfulStep(manifest, 'Generate candidate manifest')) return null
-  const prefix = `Candidate manifest / ${identity.sha} / ${identity.configuration} / `
+  const prefix = identity.channel === 'prerelease'
+    ? `Prerelease manifest / ${identity.repositoryId} / prerelease / ${identity.sha} / ${identity.configuration} / ${producerSha} / `
+    : `Candidate manifest / ${identity.sha} / ${identity.configuration} / `
   const bindings = manifest.steps.filter(step => step.name.startsWith(prefix))
   if (bindings.length !== 1 || !successfulStep(manifest, bindings[0].name)) return null
   try {
@@ -124,15 +129,17 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
   const runs = evidence.map(entry => ({ run: parseRun(entry.run), jobs: entry.jobs.map(parseJob) }))
     .filter(({ run }) => run.repository.toLowerCase() === identity.repository.toLowerCase()
       && run.repositoryId === identity.repositoryId && run.headRepositoryId === identity.repositoryId
-      && run.sha === identity.sha && run.workflowId === identity.workflowId
-      && run.path === CANDIDATE_WORKFLOW && run.event === 'workflow_dispatch')
+      && (identity.channel === 'prerelease' ? identity.producerShas.includes(run.sha) : run.sha === identity.sha)
+      && run.workflowId === identity.workflowId
+      && run.path === (identity.channel === 'prerelease' ? PRERELEASE_CANDIDATE_WORKFLOW : CANDIDATE_WORKFLOW)
+      && run.event === 'workflow_dispatch')
   for (const { run, jobs } of runs) {
     const compatibleJobs = jobs.every(job => job.runId === run.id && job.attempt <= run.attempt)
     const hasCurrentAttempt = jobs.some(job => job.attempt === run.attempt)
     const endedAt = run.status === 'completed' ? run.updatedAt : null
     const completionBound = endedAt !== null && jobs.every(job => [job.createdAt, job.startedAt, job.completedAt]
       .every(time => time === null || time <= endedAt)) ? { start: endedAt, end: endedAt } : null
-    const selection = compatibleJobs ? manifestSelection(jobs, identity) : null
+    const selection = compatibleJobs ? manifestSelection(jobs, identity, run.sha) : null
     const manifest = newestJob(jobs.filter(job => job.name === 'candidate-manifest'))
     for (const id of selection?.tasks ?? FULL_TASK_IDS) {
       const name = `candidate / ${id} / ${identity.configuration}`
@@ -194,14 +201,14 @@ function github(endpoint: string, collection?: string): unknown {
   return collection ? parseGitHubJsonLines(output) : JSON.parse(output)
 }
 
-function mainCommit(repository: string): string {
+export function mainCommit(repository: string): string {
   const ref = object(github(`repos/${repository}/git/ref/heads/main`))
   const target = object(ref.object)
   if (ref.ref !== 'refs/heads/main' || target.type !== 'commit') throw new Error('Expected the exact main branch commit')
   return fullSha(string(target.sha))
 }
 
-function assertMainProtection(repository: string): void {
+export function assertMainProtection(repository: string): void {
   const applied = github(`repos/${repository}/rules/branches/main?per_page=100`, '[]')
   if (!Array.isArray(applied)) throw new Error('Invalid effective main branch rules')
   const rules = new Set(applied.map(rule => string(object(rule).type)))
@@ -215,7 +222,7 @@ function assertMainProtection(repository: string): void {
   if (!required.every(rule => rules.has(rule))) throw new Error('Main must require pull requests and linear history, and prevent force updates and deletion')
 }
 
-function assertRawCommit(cwd: string, repository: string, sha: string): void {
+export function assertRawCommit(cwd: string, repository: string, sha: string): void {
   if (spawnSync('git', ['cat-file', '-e', sha], { cwd, stdio: 'ignore' }).status !== 0) {
     execFileSync('git', ['fetch', '--no-tags', `https://github.com/${repository}.git`, sha], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
   }
@@ -278,10 +285,10 @@ export function checkCandidateVerification(cwd: string, repository: string, sha:
   return evaluateCandidateVerification({ repository, repositoryId, sha, configuration, workflowId: integer(workflow.id) }, evidence)
 }
 
-export function assertCandidateCheckout(cwd: string, sha: string): void {
+export function assertCandidateCheckout(cwd: string, sha: string, workflowSha = sha): void {
   fullSha(sha)
   const actual = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim()
-  if (actual !== sha || process.env.GITHUB_SHA && process.env.GITHUB_SHA !== sha) {
+  if (actual !== sha || process.env.GITHUB_SHA && process.env.GITHUB_SHA !== workflowSha) {
     throw new Error(`Candidate checkout mismatch: expected ${sha}, actual ${actual}, workflow ${process.env.GITHUB_SHA ?? 'local'}`)
   }
   const changes = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd, encoding: 'utf8' }).trim()
@@ -306,9 +313,9 @@ const runCommand: CommandRunner = (command, args, cwd) => {
   return result.status ?? 1
 }
 
-export function runCandidateTask(cwd: string, id: string, sha: string, run: CommandRunner = runCommand): void {
+export function runCandidateTask(cwd: string, id: string, sha: string, run: CommandRunner = runCommand, workflowSha = sha): void {
   const task = verificationTask(id)
-  assertCandidateCheckout(cwd, sha)
+  assertCandidateCheckout(cwd, sha, workflowSha)
   const commands = [
     ...(task.services ? [{ command: process.execPath, args: ['scripts/local-services.mjs', '--test'] }] : []),
     ...taskCommands(cwd, task.id),
@@ -317,7 +324,7 @@ export function runCandidateTask(cwd: string, id: string, sha: string, run: Comm
     const status = run(command.command, command.args, cwd)
     if (status !== 0) throw new Error(`Candidate task ${id} failed: ${command.command} ${command.args.join(' ')} (${status})`)
   }
-  assertCandidateCheckout(cwd, sha)
+  assertCandidateCheckout(cwd, sha, workflowSha)
 }
 
 export function requestCandidateVerification(cwd: string, repository: string, sha: string, ref: string, tasks: string) {

@@ -50,7 +50,13 @@ function readBuild(file: string): FrontendBuild {
     || !('basePath' in value) || value.basePath !== HOSTED_APP_PATH) {
     throw new Error('Invalid hosted frontend build metadata')
   }
-  return { format: 1, gameBuildId: value.gameBuildId, basePath: value.basePath }
+  const base = { format: 1, gameBuildId: value.gameBuildId, basePath: value.basePath } as const
+  if (!('releaseChannel' in value) && !('deploymentTarget' in value)) return base
+  if ('releaseChannel' in value && 'deploymentTarget' in value) {
+    if (value.releaseChannel === 'stable' && value.deploymentTarget === 'stable-hosted') return { ...base, releaseChannel: 'stable', deploymentTarget: 'stable-hosted' }
+    if (value.releaseChannel === 'prerelease' && value.deploymentTarget === 'prerelease-hosted') return { ...base, releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }
+  }
+  throw new Error('Invalid hosted frontend channel metadata')
 }
 
 function isMissing(error: unknown): boolean {
@@ -87,6 +93,8 @@ export function createFrontendHosting(env: NodeJS.ProcessEnv = process.env): (re
     requiredFile(directory, 'index.html')
     const build = readBuild(requiredFile(directory, 'frontend-build.json'))
     if (!env.GAME_BUILD_ID || build.gameBuildId !== env.GAME_BUILD_ID) throw new Error('Hosted frontend build identity does not match GAME_BUILD_ID')
+    const channel = env.RELEASE_CHANNEL ?? 'stable'
+    if (!['stable', 'prerelease'].includes(channel) || (build.releaseChannel ?? 'stable') !== channel) throw new Error('Hosted frontend channel does not match RELEASE_CHANNEL')
     location = { mode: 'canonical', appUrl: app.href, buildId: build.gameBuildId }
   }
 

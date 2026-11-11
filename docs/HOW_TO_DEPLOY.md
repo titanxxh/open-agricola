@@ -51,6 +51,49 @@ Use `--repository owner/name` for a fork with its own candidate-verification wor
 
 The standard command checks GitHub run and job evidence before publication. A Release created through the website or bare `gh release create` can exist without this evidence. Pages and backend deployment independently reject an unverified candidate. Local `pnpm release:rehearse` results do not replace GitHub evidence.
 
+## Publish a fixed prerelease candidate
+
+Prerelease publication uses a separate channel. Ordinary `prerelease` pushes and PRs run the canonical routine plan and never deploy. Complete candidate verification runs manually from trusted `main`; candidate jobs have read-only repository access and no formal deployment credentials.
+
+Before selecting a candidate, synchronize the integration branch with current `main`. Keep `prerelease-integration.json` in the candidate tree:
+
+```json
+{
+  "format": 1,
+  "repository": "titanxxh/open-agricola",
+  "baselineMainSha": "<full-main-sha>",
+  "features": [
+    { "id": "feature-name", "dependsOn": [], "sourceSha": "<source-commit>", "integratedSha": "<replayed-feature-commit>" }
+  ]
+}
+```
+
+Use full commit SHAs. The manifest commit follows the feature commits, so `integratedSha` identifies the actual feature integration rather than the manifest commit. Preserve independent feature sources for selective promotion. Dependencies must name included features and form an acyclic graph. The candidate must descend from its main baseline with no merge commits.
+
+For an owner-controlled main synchronization, prepare and review the rebased commits with `rebase.updateRefs=false`, update the manifest baseline and integration commits, then run:
+
+```bash
+pnpm exec tsx scripts/ci/prerelease-verification.ts sync --repository titanxxh/open-agricola --sha <new-pre-sha> --expected-old <old-pre-sha> --main-sha <current-main-sha>
+```
+
+This command only updates `refs/heads/prerelease` with an explicit old-SHA lease. It rejects a changed remote head and changes to the feature source set. New or removed features require a reviewed PR. It never updates `main`, candidate refs, or tags. A synchronization changes candidate SHAs and requires new verification.
+
+Publish from the owner machine:
+
+```bash
+pnpm release vX.Y.Z-beta.N --channel prerelease --ref prerelease
+# Resume the printed candidate after a failure, even if prerelease has advanced:
+pnpm release vX.Y.Z-beta.N --channel prerelease --ref <fixed-pre-sha>
+```
+
+`N` starts at 1. The initial selection must match the actual integration ref and current main baseline. The command fixes `verification/prerelease/<SHA>`, checks effective native reference protection, and dispatches `prerelease-candidate-verification.yml` on `main`. The receipt binds the repository ID, prerelease channel, candidate SHA, candidate and trusted-policy configuration, and the main producer commit. The producer must remain reachable from protected main. Compatible tasks can be retried independently; missing, failed, cancelled, skipped, or incompatible tasks block publication. A fixed candidate remains usable after the integration branch moves.
+
+After every required task passes, publication creates an immutable tag and native GitHub prerelease with `latest=false`. A matching published Release is reused. A tag, SHA, or native channel mismatch fails. Stable publication continues to require an actual merged main PR snapshot and accepts only `vX.Y.Z`. Prerelease evidence cannot authorize stable publication.
+
+Build the paired hosted image with `GAME_BUILD_ID=<fixed-pre-sha>` and Docker build argument `RELEASE_CHANNEL=prerelease`. Build and runtime use the same channel. The frontend descriptor records `releaseChannel` and `deploymentTarget=prerelease-hosted`; the image labels record its revision and channel. Stable artifacts use `stable-hosted` or `stable-pages`. A prerelease Pages build fails before building, and hosted startup rejects a channel mismatch. Legacy descriptors are accepted only by stable runtime. Formal Compose pins `stable`. Installation must also verify the candidate receipt and actual independent target.
+
+A prerelease published event cannot authorize formal Pages. The request workflow excludes native prereleases; the main broker independently reads the native published Release and unchanged tag before installation. A Release receipt records publication, not installation or live acceptance. Resource protection, initial configuration, deployment, and opening the entry require the owner tickets in [PRD #1655](https://github.com/titanxxh/open-agricola/issues/1655).
+
 ## 1. Deploy the Backend
 
 There are two deployment cases:

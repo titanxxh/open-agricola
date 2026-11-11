@@ -9,7 +9,8 @@ RUN corepack enable && corepack prepare pnpm@10.33.0 --activate \
     && pnpm install --frozen-lockfile
 COPY . .
 ARG GAME_BUILD_ID=development
-ENV GAME_BUILD_ID=$GAME_BUILD_ID
+ARG RELEASE_CHANNEL=stable
+ENV GAME_BUILD_ID=$GAME_BUILD_ID RELEASE_CHANNEL=$RELEASE_CHANNEL
 RUN pnpm run build:hosted-frontend \
     && REPLAY_VIEWER_ROOT=/app/viewer-builds pnpm run build:replay-viewer \
     && pnpm prune --prod
@@ -32,7 +33,9 @@ COPY --chown=node:node server/ ./server/
 COPY --chown=node:node scripts/ ./scripts/
 RUN mkdir -p data output && chown node:node data output
 ARG GAME_BUILD_ID=development
-ENV GAME_BUILD_ID=$GAME_BUILD_ID
+ARG RELEASE_CHANNEL=stable
+ENV GAME_BUILD_ID=$GAME_BUILD_ID RELEASE_CHANNEL=$RELEASE_CHANNEL
+LABEL org.opencontainers.image.revision=$GAME_BUILD_ID io.open-agricola.release-channel=$RELEASE_CHANNEL
 ENV NODE_ENV=production BACKEND_PORT=5175 BACKEND_HOST=0.0.0.0 APP_INSTANCES=1 PG_CLIENT_MODE=local FRONTEND_ROOT=/app/frontend-dist
 EXPOSE 5175
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=6 \

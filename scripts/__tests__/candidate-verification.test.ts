@@ -374,3 +374,31 @@ describe('GitHub full candidate verification evidence', () => {
     ])
   })
 })
+
+describe('prerelease evidence from the trusted main producer', () => {
+  const producer = 'c'.repeat(40)
+  const preIdentity = { ...identity, channel: 'prerelease', producerShas: [producer] } as const
+  const preEvidence = () => {
+    const value = evidence()
+    value.run.head_sha = producer
+    value.run.path = '.github/workflows/prerelease-candidate-verification.yml'
+    value.jobs[0].steps[1].name = `Prerelease manifest / ${identity.repositoryId} / prerelease / ${sha} / ${configuration} / ${producer} / ${tasks.join(',')}`
+    return value
+  }
+
+  it('accepts an unmerged pre candidate only with its independent main-produced receipt', () => {
+    expect(evaluateCandidateVerification(preIdentity, [preEvidence()]).status).toBe('passed')
+    expect(evaluateCandidateVerification(identity, [preEvidence()]).status).toBe('blocked')
+    expect(evaluateCandidateVerification(preIdentity, [evidence()]).status).toBe('blocked')
+  })
+
+  it.each(['producer', 'channel', 'repository', 'configuration', 'candidate'])('rejects a mismatched %s binding', field => {
+    const value = preEvidence()
+    if (field === 'producer') value.run.head_sha = 'd'.repeat(40)
+    else if (field === 'channel') value.jobs[0].steps[1].name = value.jobs[0].steps[1].name.replace('/ prerelease /', '/ stable /')
+    else if (field === 'repository') value.jobs[0].steps[1].name = value.jobs[0].steps[1].name.replace(String(identity.repositoryId), '999')
+    else if (field === 'configuration') value.jobs[0].steps[1].name = value.jobs[0].steps[1].name.replace(configuration, 'f'.repeat(64))
+    else value.jobs[0].steps[1].name = value.jobs[0].steps[1].name.replace(sha, 'e'.repeat(40))
+    expect(evaluateCandidateVerification(preIdentity, [value]).status).toBe('blocked')
+  })
+})

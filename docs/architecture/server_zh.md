@@ -6,7 +6,7 @@
 
 服务端负责连接、Room、持久提交、持久化与产品 HTTP API。`GameSession`（`server/game/authoritative-session.ts`）是服务端的规则命令与查询 seam，规则修改在它驱动的 `GameCore` 与 action leaf 中执行；连接、持久化与 HTTP 基础设施从不在它之外裁定规则。
 
-`frontend-hosting.ts` 负责可选的同源 `/open-agricola/` 静态托管及其公开构建元数据。配置同站的独立前端时，仅旧应用入口跳转到前端，保留公开 Room/Replay 参数并清除认证 fragment。API、operations、metrics 和 Replay 命名空间保留原归属。`auth-cookies.ts` 经 `http-origin.ts` 使用 Public Suffix List 判断站点；同站子域使用 host-only HttpOnly Cookie，不依赖 CHIPS。测试见 `auth-cookies.test.ts`、`frontend-hosting.test.ts` 和 `hosted-password-login.spec.ts`，决策见 ADR 0035。
+`frontend-hosting.ts` 托管 `/open-agricola/` 及构建元数据。同站外部前端只重定向旧应用入口，保留公开 Room/Replay 参数并清除凭据 fragment；API 命名空间保留原归属。启动核对 SHA、通道、目标与 GAME_BUILD_ID、RELEASE_CHANNEL，旧描述只允许正式通道；正式 Compose 固定 stable。`auth-cookies.ts` 通过 `http-origin.ts` 使用 PSL 判断站点，保持 host-only HttpOnly Cookie，不依赖 CHIPS。测试见 `auth-cookies.test.ts`、`frontend-hosting.test.ts`、`hosted-password-login.spec.ts`，决策见 ADR 0035。
 
 
 `community-qr.ts` 提供公开只读的微信和飞书群图片接口，每次请求读取通过原子替换更新的宿主机文件，响应禁用缓存。`deploy-operations.sh --wechat-qr` 或 `--feishu-qr` 调用 `operations/update-community-qr.mjs` 校验原图并经维护者 SSH 发布；应用只读挂载持久的社区目录。测试见 `wechat-community.test.ts` 和 `wechat-community.spec.ts`。
