@@ -18,6 +18,7 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('034-team-result-archive.sql')
     migrations.push('035-team-room-members.sql')
     migrations.push('036-beta-access.sql')
+    migrations.push('037-prerelease-authority.sql')
     migrations.push('038-workshop-public-versions.sql')
     for (const [index, filename] of migrations.entries()) {
       const version = index + 1

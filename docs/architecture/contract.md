@@ -269,7 +269,11 @@ Production declares `team-cooperation-rules` as `beta`. Eligible beta accounts a
 
 `/api/auth/me` returns `user.experimentalFeatures`, computed by the server from current account qualification. Clients use that list for entry visibility. WebSocket errors carry `code: experimental_feature_unavailable` with `feature`; HTTP returns 403 with the same fields. Durable command receipts retain only the generic code and message, so feature IDs are not stored. Availability is absent from game state, Room snapshots, Replay and result archives.
 
-Feature PR checklist: declare the ID and stage here; gate creation and public discovery at server entry points; test denials without Room/version/Replay changes, successful eligibility and unaffected participation; update client discovery and these docs. Graduation first changes the stage to `general`, then after at least one release removes the declaration, checks and obsolete UI through an owner-approved cleanup PR. [Predicate tests](../../shared/contract/__tests__/experimental-features.test.ts) and [entry tests](../../server/connection/__tests__/experimental-features.test.ts) define the behavior.
+Availability entry and graduation policy is recorded in [ADR 0042](../adr/0042-experimental-feature-availability.md).
+
+## Prerelease identity
+
+`prerelease-identity.ts` owns the version-1 authority contract: fixed `prerelease` audience, target origin, opaque grant association, minimal account projection and separate source/Beta/grant status. Grants carry no login credential. Absolute `confirmedAt`/`validUntil` retain transit time; only successful authority checks renew the maximum 30-second window. Source expiry and the seven-day grant ceiling remain fixed. `isPrereleaseIdentityAuthorized` rejects stale or invalid state. Tests: `server/__tests__/{prerelease-authority,auth-routes}.test.ts`.
 
 ## Client capabilities
 

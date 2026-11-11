@@ -36,6 +36,16 @@
 - WebSocket 协议仍支持 `{ type: 'auth', token: '...' }` 显式认证
 - 单服务器不需要 JWT 的无状态优势；服务端 session 支持即时吊销
 
+### A2.1. 预发布的正式身份权威
+
+`server/prerelease-authority{,-routes}.ts` 与 `shared/contract/prerelease-identity.ts` 定义 version-1、绑定目标的权威 API。正式站拥有账号和 Beta 资格判定，管理员规则沿用正式站。预发布只取得 user ID、username、display name 与授权状态，不取得邮箱、密码/OAuth 材料、正式登录 token 或数据库访问权。
+
+`PUBLIC_APP_ORIGIN` 固定正式 HTTPS 根，`PUBLIC_API_BASE` 固定正式 API origin。预发布必须与二者使用不同 hostname，即使端口不同也不能共享，以免正式 host-only Cookie 发给候选代码。独立的 `PRERELEASE_APP_ORIGIN` 与仅服务端持有的 `PRERELEASE_IDENTITY_SERVICE_KEY` 配置目标；缺失或无效配置保持关闭。只有 owner 验收后显式设置 `PRERELEASE_ENTRY_ENABLED=true` 才开放入口、签发和兑换；关闭入口仍允许复核、事件及完成回执。正式 Pages 使用 `/`，预发布从 `/open-agricola/auth/start` 发起，在 `/open-agricola/auth/handoff` 接收回调。预发布先将随机 verifier 存入 host-only HttpOnly Cookie。正式浏览器仅将 S256 challenge 交给需正式登录的 `/api/prerelease/handoffs`，严格核对 Origin 和固定返回根。一分钟 code 只随 callback fragment 交接。仅目标服务可调用 `/exchange`，原子核对 verifier、来源登录和当前 Beta 资格，消费 code 并记录不透明 grant 关联；grant ID 不能登录正式 API。
+
+目标 `/status` 分别提供账号、来源登录与 Beta 状态；转发或缓存必须保留绝对 `confirmedAt`、`validUntil` 及原来源/grant 期限。确认最多 30 秒且计入传输时间，失败不续期；grant 最长七天且不超过来源。收到已知失效立即替换旧的有效结果。`/events` 返回持久、未确认的来源撤销、账号删除与 Beta 变更；`/acknowledgements` 记录目标幂等完成回执。删除正式会话统一覆盖当前退出、全部退出和密码重置，不扩大普通改密码的既有语义；正式账号删除等待目标删除回执。跨正式实例共享的额度为每账号每分钟十次交接、目标身份服务每分钟 600 次请求。
+
+正式权威与预发布本地会话签发、投影清理、全环境门禁及 owner 开通分别交付。受控时间和拒绝反例见 `prerelease-authority.test.ts`、`auth-routes.test.ts`；已接受政策及历史差异见 ADR 0042。
+
 ### A3. 前端路由：URL 参数 + PageRouter 组件
 
 **不引入 react-router** — 保持现有 URL 参数风格：

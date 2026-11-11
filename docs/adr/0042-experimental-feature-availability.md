@@ -7,7 +7,7 @@ Status: Accepted
 
 New product capabilities need a small invited testing group while ordinary releases continue. Team and Multihand creation is the first Experimental Feature. Account eligibility must not become game state or a rule variation.
 
-## Decision
+## Original decision
 
 - `shared/contract/experimental-features.ts` is the single declaration of named features and their Availability Stage. Stages are code constants changed through a PR and release. `off` denies every account, including administrators; `beta` permits Beta Access and administrators; `general` permits every logged-in account. Anonymous visitors always fail.
 - `server/experimental-features.ts` reads current account qualification at every entry check. Administrators derive from `ADMIN_USERS`. Migration 036 stores one Beta Access grant per account, its grantor and timestamp. Account deletion cascades; grantor deletion clears the grantor.
@@ -20,6 +20,18 @@ New product capabilities need a small invited testing group while ordinary relea
 ## Graduation
 
 A separate PR changes a stage to `general`. After at least one released version, the owner may remove that feature declaration, entry checks and obsolete UI. New features require declaration, entry-point denial and non-triggering tests, and an explicit graduation cleanup review.
+
+## Superseding prerelease policy (2026-11-11)
+
+[PRD #1655](https://github.com/titanxxh/open-agricola/issues/1655) and its accepted identity/access decisions supersede this ADR's invitation exemption and continuing-participation policy for the independent prerelease environment. The original decision above records the earlier main-based feature rollout; it does not authorize an environment-gate bypass.
+
+- Formal remains the account and Beta authority, including administrator qualification. Pre has no independent registration, password or OAuth identity. Its local identity is a minimal read-only projection with the same user ID.
+- One-minute, one-use handoffs bind the browser S256 challenge, source formal login, configured target and exact formal return root. Only the target's restricted service key may exchange or inspect its associations. Pre must use a different hostname from both configured formal frontend and API, including across ports. Formal credentials never cross this boundary; missing configuration or the default-false `PRERELEASE_ENTRY_ENABLED` keeps entry/issuance/exchange closed while configured cleanup endpoints remain available.
+- Pre sessions last no more than seven days or the original source deadline. Successful formal confirmation supplies an absolute freshness deadline of at most 30 seconds, including transit; failed checks do not extend it, and known invalid state applies immediately.
+- Formal current logout invalidates only associations from that source login. All-session revocation and password reset cover every source for the account. Durable events and idempotent target acknowledgements record completion. Formal account deletion remains pending until the target confirms local cleanup/anonymization.
+- Every pre participant, invitee, spectator and archive reader needs current Beta access. Expired unknown state pauses access; qualification loss stops access while retaining game state. No development override, invitation or static Viewer grants an exception. Environment enforcement belongs to the pre implementation, not the rule engine.
+
+`server/prerelease-authority{,-routes}.ts`, migration 037 and `shared/contract/prerelease-identity.ts` implement the formal authority seam. This does not establish a live pre deployment or complete its environment admission; those remain separate dependency tickets. Main Beta-business removal is tracked by #1661.
 
 ## References
 

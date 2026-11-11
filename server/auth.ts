@@ -704,6 +704,12 @@ export async function finishAccountDeletion(claim: AccountDeletionClaim): Promis
     const valid = await db.prepare(`SELECT user_id FROM account_deletion_requests WHERE user_id=? AND claim_token=?
       AND claim_until>(extract(epoch FROM clock_timestamp())*1000)::bigint FOR UPDATE`).get(claim.userId, claim.token)
     if (!valid) return false
+    const pendingTarget = await db.prepare(`SELECT 1 FROM prerelease_identity_events
+      WHERE user_id=? AND kind='account_deleted' AND acknowledged_at IS NULL LIMIT 1`).get(claim.userId)
+    if (pendingTarget) {
+      await deferAccountDeletion(claim, 'prerelease_cleanup_pending')
+      return false
+    }
     await deleteAccount(claim.userId)
     return true
   })()
