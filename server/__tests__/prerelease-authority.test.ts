@@ -3,7 +3,9 @@ import { once } from 'node:events'
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isPrereleaseIdentityAuthorized } from '../../shared/contract/prerelease-identity'
-import { readCookie } from '../auth-cookies'
+import { authCookieNames } from '../auth-cookies'
+import { requestSessionToken } from '../request-auth'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 import { configuredPrereleaseTarget } from '../prerelease-authority'
 import { createPrereleaseAuthorityHandler } from '../prerelease-authority-routes'
 import { createTestDatabase } from './_helpers/postgres'
@@ -40,7 +42,7 @@ async function setup({ configured = true } = {}) {
   await db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES('player','player','Test Player','private-password-hash',?)").run(now)
   await db.prepare('INSERT INTO sessions(token,user_id,expires_at,created_at,auth_policy_version) VALUES(?,?,?,?,2)').run(sourceToken, 'player', now + 9 * 86_400_000, now)
   await db.prepare("INSERT INTO beta_access(user_id,granted_at) VALUES('player',?)").run(now)
-  const handler = createPrereleaseAuthorityHandler({ db, now: () => now, getSourceToken: async req => readCookie(req.headers.cookie, 'oa_session') })
+  const handler = createPrereleaseAuthorityHandler({ db, now: () => now, getSourceToken: async req => requestSessionToken(req) })
   const server = createServer((req, res) => {
     void handler(req, res).then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end())
   })
@@ -55,7 +57,7 @@ async function setup({ configured = true } = {}) {
   const base = `http://127.0.0.1:${address.port}/api/prerelease`
   const browser = (path: string, body?: unknown, headers: Record<string, string> = {}) => fetch(`${base}/${path}`, {
     method: body === undefined ? 'GET' : 'POST',
-    headers: { cookie: `oa_session=${sourceToken}`, origin: sourceOrigin, 'content-type': 'application/json', ...headers },
+    headers: { cookie: `${authCookieNames().session}=${sourceToken}`, origin: sourceOrigin, [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION), 'content-type': 'application/json', ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
   const internal = (path: string, body: Record<string, unknown>, headers: Record<string, string> = {}) => fetch(`${base}/${path}`, {
@@ -134,29 +136,51 @@ describe('formal prerelease identity authority', () => {
   })
 
 
-  it('accepts an authenticated read-only entry without Origin while rejecting explicit foreign origins', async () => {
-    const { base } = await setup()
-    const entry = await fetch(`${base}/entry`, { headers: { cookie: `oa_session=${sourceToken}` } })
-    expect(entry.status).toBe(200)
-    expect(await entry.json()).toEqual({ ok: true, protocolVersion: 1, entry: {
-      kind: 'available', channel: 'prerelease', startUrl: `${targetOrigin}/open-agricola/auth/start`, returnTo,
-    } })
-    for (const origin of ['https://unrelated.example.test', 'null']) {
-      const rejected = await fetch(`${base}/entry`, { headers: { cookie: `oa_session=${sourceToken}`, origin } })
+  it('rejects entry reads without trusted browser metadata even with a current session cookie', async () => {
+    const { base, browser } = await setup()
+    const cookie = `${authCookieNames().session}=${sourceToken}`
+    const invalidHeaders: Record<string, string>[] = [
+      { cookie, [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) },
+      { cookie, origin: sourceOrigin },
+      { cookie, origin: sourceOrigin, [BROWSER_AUTH_HEADER]: '1' },
+      { cookie, origin: 'https://unrelated.example.test', [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) },
+      { cookie, origin: 'null', [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) },
+    ]
+    for (const headers of invalidHeaders) {
+      const rejected = await fetch(`${base}/entry`, { headers })
       expect(rejected.status).toBe(403)
       expect(await rejected.json()).toMatchObject({ code: 'csrf_rejected' })
     }
-    const anonymous = await fetch(`${base}/entry`)
+    const anonymous = await browser('entry', undefined, { cookie: '' })
     expect(anonymous.status).toBe(401)
     expect(await anonymous.json()).toMatchObject({ code: 'not_authenticated' })
   })
 
-  it('requires the exact formal Origin for handoff writes after permitting an entry read without it', async () => {
+  it('accepts same-origin entry fetches when the formal app and API share one configured origin', async () => {
+    const { base } = await setup()
+    const origin = new URL(base).origin.replace('http:', 'https:')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', origin)
+    vi.stubEnv('PUBLIC_API_BASE', origin)
+    const entry = await fetch(`${base}/entry`, { headers: {
+      cookie: `${authCookieNames().session}=${sourceToken}`,
+      [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION), 'sec-fetch-site': 'same-origin',
+    } })
+    expect(entry.status).toBe(200)
+    expect(await entry.json()).toMatchObject({ ok: true, entry: { kind: 'available', returnTo: `${origin}/` } })
+  })
+
+  it('requires the exact formal Origin and current browser revision for handoff writes', async () => {
     const { base, issue } = await setup()
     const body = JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin, browserChallenge: challenge, returnTo })
-    for (const headers of [{}, { origin: 'https://unrelated.example.test' }, { origin: 'null' }]) {
+    const invalidHeaders: Record<string, string>[] = [
+      { [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) },
+      { origin: 'https://unrelated.example.test', [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) },
+      { origin: 'null', [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) },
+      { origin: sourceOrigin },
+    ]
+    for (const headers of invalidHeaders) {
       const rejected = await fetch(`${base}/handoffs`, { method: 'POST', headers: {
-        cookie: `oa_session=${sourceToken}`, 'content-type': 'application/json', ...headers,
+        cookie: `${authCookieNames().session}=${sourceToken}`, 'content-type': 'application/json', ...headers,
       }, body })
       expect(rejected.status).toBe(403)
       expect(await rejected.json()).toMatchObject({ code: 'csrf_rejected' })
@@ -167,7 +191,7 @@ describe('formal prerelease identity authority', () => {
   it('keeps entry reads closed when the formal source is not an HTTPS origin', async () => {
     const { base } = await setup()
     vi.stubEnv('PUBLIC_APP_ORIGIN', 'http://play.example.test')
-    const rejected = await fetch(`${base}/entry`, { headers: { cookie: `oa_session=${sourceToken}` } })
+    const rejected = await fetch(`${base}/entry`, { headers: { cookie: `${authCookieNames().session}=${sourceToken}` } })
     expect(rejected.status).toBe(403)
     expect(await rejected.json()).toMatchObject({ code: 'csrf_rejected' })
   })

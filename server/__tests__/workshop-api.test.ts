@@ -41,9 +41,9 @@ vi.mock('../db.ts', () => ({ getDb: () => db, cleanExpiredSessions: () => {} }))
 // Seed user and session
 const NOW = Date.now()
 ;(await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at, last_login_at) VALUES (?,?,?,?,?,?)').run('u1', 'alice', 'Alice', 'hash', NOW, null))
-;(await db.prepare('INSERT INTO sessions VALUES (?,?,?,?)').run('tok-alice', 'u1', NOW + 86400000, NOW))
+;(await db.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version) VALUES (?,?,?,?, 2)').run('tok-alice', 'u1', NOW + 86400000, NOW))
 ;(await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at, last_login_at) VALUES (?,?,?,?,?,?)').run('u2', 'bob', 'Bob', 'hash', NOW, null))
-;(await db.prepare('INSERT INTO sessions VALUES (?,?,?,?)').run('tok-bob', 'u2', NOW + 86400000, NOW))
+;(await db.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version) VALUES (?,?,?,?, 2)').run('tok-bob', 'u2', NOW + 86400000, NOW))
 
 vi.mock('../auth.ts', async () => {
   const actual = await vi.importActual('../auth.ts') as Record<string, unknown>
@@ -417,7 +417,7 @@ it.each([
     for (let user = 0; user < 10; user++) {
       const id = `reference-budget-${user}`
       await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?,?,?,?,?) ON CONFLICT (id) DO NOTHING').run(id, id, id, 'hash', now)
-      await db.prepare('INSERT INTO sessions VALUES (?,?,?,?) ON CONFLICT (token) DO UPDATE SET expires_at = excluded.expires_at').run(id, id, now + 86_400_000, now)
+      await db.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version) VALUES (?,?,?,?, 2) ON CONFLICT (token) DO UPDATE SET expires_at = excluded.expires_at').run(id, id, now + 86_400_000, now)
     }
     for (let minute = 0; minute < scenario.minutes; minute++) {
       clock.mockReturnValue(now + minute * 60_000)

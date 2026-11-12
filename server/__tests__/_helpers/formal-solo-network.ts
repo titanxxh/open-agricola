@@ -12,6 +12,7 @@ import { ResourceStore } from '../../storage/resource-store'
 import { ReplayResources } from '../../storage/replay-resources'
 import { getTestDatabaseUrl } from './postgres'
 import { testStorageEnvironment } from './objects'
+import { BROWSER_TEST_ORIGIN, openBrowserSocket } from './browser-auth'
 
 export class SoloNetworkPeer {
   readonly events: ServerEvent[] = []
@@ -23,7 +24,7 @@ export class SoloNetworkPeer {
   }
 
   static async connect(url: string, cookie: string): Promise<SoloNetworkPeer> {
-    const peer = new SoloNetworkPeer(new WebSocket(url, { headers: { Cookie: cookie } }))
+    const peer = new SoloNetworkPeer(openBrowserSocket(url, cookie))
     await once(peer.socket, 'open')
     return peer
   }
@@ -125,7 +126,7 @@ export async function startFormalSoloBackend(db: PostgresDatabase) {
       env: { ...process.env, ...recording.environment,
         NODE_ENV: 'production', DATABASE_URL: getTestDatabaseUrl(), DATABASE_SCHEMA: schema.name,
         S3_PREFIX: prefix, BACKEND_PORT: String(address.port), BACKEND_HOST: '127.0.0.1',
-        INSTANCE_INTERNAL_URL: baseUrl, PUBLIC_APP_ORIGIN: baseUrl,
+        INSTANCE_INTERNAL_URL: baseUrl, PUBLIC_APP_ORIGIN: BROWSER_TEST_ORIGIN, PUBLIC_API_BASE: baseUrl.replace('http:', 'https:'),
         REPLAY_VIEWER_BUILD_ID: buildId, GAME_BUILD_ID: 'standard-solo-network-acceptance',
         ALLOW_ANONYMOUS_WS: 'false', DISABLE_RATE_LIMIT: '1', WORKSHOP_PR_ENABLED: 'false', BUG_REPORTS_ENABLED: 'false',
       },

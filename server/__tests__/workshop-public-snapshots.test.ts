@@ -127,7 +127,7 @@ it('serves the same public source to its author and guests without exposing comp
     cardJson: { ...meta, card_type: 'minor', implemented: true, _draft: { note: 'PRIVATE' } },
     codeManifest: { effectHooks: [], listeners: [], cardDefinition: { cardType: 'minor', meta } },
   })
-  await db.prepare('INSERT INTO sessions(token,user_id,expires_at,created_at) VALUES (?,?,?,?)').run('author-token', 'author', Date.now() + 86400000, Date.now())
+  await db.prepare('INSERT INTO sessions (token,user_id,expires_at,created_at, auth_policy_version) VALUES (?,?,?,?, 2)').run('author-token', 'author', Date.now() + 86400000, Date.now())
   const guest = await fetch(`${origin}/api/workshop/public-cards/v1/cards/${card.id}`).then(response => response.json())
   const author = await fetch(`${origin}/api/workshop/public-cards/v1/cards/${card.id}`, { headers: { authorization: 'Bearer author-token' } }).then(response => response.json())
   expect(author.snapshot).toEqual(guest.snapshot)

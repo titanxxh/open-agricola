@@ -122,8 +122,7 @@ const addUser = async (db: PostgresDatabase, id: string, token: string) => {
     VALUES (?, ?, ?, 'x', ?)
   `).run(id, id, id, now)
   await db.prepare(`
-    INSERT INTO sessions (token, user_id, expires_at, created_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version) VALUES (?, ?, ?, ?, 2)
   `).run(token, id, now + 3_600_000, now)
 }
 

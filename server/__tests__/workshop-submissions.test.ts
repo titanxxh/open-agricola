@@ -31,7 +31,7 @@ const privateKey = generateKeyPairSync('rsa', { modulusLength: 1024 }).privateKe
 
 beforeAll(async () => {
   await db.exec("INSERT INTO users(id, username, display_name, password_hash, created_at) VALUES ('author', 'author', 'Designer', 'x', 1)")
-  await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at) VALUES (?,?,?,?)').run('test-session','author',1,Date.now()+3600_000)
+  await db.prepare('INSERT INTO sessions (token,user_id,created_at,expires_at, auth_policy_version) VALUES (?,?,?,?, 2)').run('test-session','author',1,Date.now()+3600_000)
   const provider = new GitHubReviewProvider({ appId: '1', installationId: '2', privateKey, repositoryOwner: 'titanxxh', repositoryName: 'open-agricola', fetchImpl: (...args) => github.fetch(...args) })
   server = createServer((req, res) => {
     void handleSubmitReviewRequest(req, res, req.url!.slice(1), provider).catch(error => { res.writeHead(500); res.end(String(error)) })

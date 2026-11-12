@@ -6,7 +6,9 @@ import { migratePostgres } from '../database/migrations'
 import { canonicalJson } from '../../shared/contract/authoritative-command'
 import { isPrereleaseIdentityAuthorized } from '../../shared/contract/prerelease-identity'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readCookie } from '../auth-cookies'
+import { authCookieNames } from '../auth-cookies'
+import { requestSessionToken } from '../request-auth'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 import { createPrereleaseAuthorityHandler } from '../prerelease-authority-routes'
 import { createPrereleaseLifecycleHandler } from '../prerelease-lifecycle-routes'
 import { createTestDatabase } from './_helpers/postgres'
@@ -34,9 +36,9 @@ async function setup() {
   cleanups.push(() => db.close())
   let now = 1_800_000_000_000
   await db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES('player','player','Player','',?)").run(now)
-  await db.prepare("INSERT INTO sessions(token,user_id,expires_at,created_at) VALUES('source','player',?,?)").run(now + 604_800_000, now)
+  await db.prepare("INSERT INTO sessions (token,user_id,expires_at,created_at, auth_policy_version) VALUES ('source','player',?,?, 2)").run(now + 604_800_000, now)
   await db.prepare("INSERT INTO beta_access(user_id,granted_at) VALUES('player',?)").run(now)
-  const handler = createPrereleaseAuthorityHandler({ db, now: () => now, getSourceToken: async req => readCookie(req.headers.cookie, 'oa_session') })
+  const handler = createPrereleaseAuthorityHandler({ db, now: () => now, getSourceToken: async req => requestSessionToken(req) })
   const lifecycle = createPrereleaseLifecycleHandler({ db, now: () => now, requireAdmin: async (req, res) => {
     if (req.headers['x-fixture-role'] === 'owner') return { id: 'owner' }
     res.writeHead(req.headers['x-fixture-role'] === 'player' ? 403 : 401).end()
@@ -67,9 +69,10 @@ async function setup() {
   const internal = (path: string, generationId = firstGeneration, input = {}) => fetch(`${base}/api/prerelease/${path}`, {
     method: 'POST', headers: { authorization: `Bearer ${serviceKey}`, 'content-type': 'application/json' }, body: JSON.stringify({ ...binding, generationId, ...input }),
   })
-  const entry = () => fetch(`${base}/api/prerelease/entry`, { headers: { cookie: 'oa_session=source', origin: sourceOrigin } })
+  const browserHeaders = { cookie: `${authCookieNames().session}=source`, origin: sourceOrigin, [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) }
+  const entry = () => fetch(`${base}/api/prerelease/entry`, { headers: browserHeaders })
   const issue = () => fetch(`${base}/api/prerelease/handoffs`, {
-    method: 'POST', headers: { cookie: 'oa_session=source', origin: sourceOrigin, 'content-type': 'application/json' },
+    method: 'POST', headers: { ...browserHeaders, 'content-type': 'application/json' },
     body: JSON.stringify({ ...binding, browserChallenge: createHash('sha256').update('v'.repeat(43)).digest('base64url'), returnTo: `${sourceOrigin}/` }),
   })
   const enter = async (generationId = firstGeneration) => {
@@ -249,14 +252,16 @@ describe('trusted prerelease generation retirement', () => {
     await db.prepare("INSERT INTO prerelease_identity_grants(id,user_id,source_token,target_origin,created_at,expires_at) VALUES(?,'player','source',?,1,1800604800000)").run(grantId, targetOrigin)
     await db.prepare("INSERT INTO prerelease_identity_handoffs(code_hash,user_id,source_token,target_origin,browser_challenge,return_to,expires_at,created_at) VALUES('hash','player','source',?,'challenge',?,1800000060000,1)").run(targetOrigin, `${sourceOrigin}/`)
     await migratePostgres(db)
-    expect(await (await entry()).json()).toMatchObject({ entry: { kind: 'disabled' } })
+    expect(await (await entry()).json()).toMatchObject({ ok: false, code: 'not_authenticated' })
     const legacy = (await (await read()).json()).generation
     expect(legacy).toMatchObject({ state: 'closed', targetId: 'legacy', retirement: null, audit: null })
     const state = (await (await internal('status', legacy.generationId, { grantId })).json()).state
     expect(state.grant.kind).toBe('revoked')
     expect((await action('prepare', 1, secondGeneration, { targetId: 'fixture-pre', expectedPreviousGenerationId: legacy.generationId })).status).toBe(409)
     await db.prepare("INSERT INTO account_deletion_requests(user_id,requested_at,next_attempt_at) VALUES('player',1,1)").run()
-    expect((await (await internal('events', legacy.generationId)).json()).events).toEqual([expect.objectContaining({ kind: 'account_deleted' })])
+    expect((await (await internal('events', legacy.generationId)).json()).events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'source_revoked' }), expect.objectContaining({ kind: 'account_deleted' }),
+    ]))
     expect((await action('retire', 2, legacy.generationId, { purgeReceiptSha256 })).status).toBe(200)
     expect((await (await internal('events', legacy.generationId)).json()).events).toEqual([])
   })

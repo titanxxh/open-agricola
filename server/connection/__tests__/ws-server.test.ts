@@ -9,6 +9,9 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { createWsServer } from '../ws-server.ts'
+import { authCookieNames } from '../../auth-cookies'
+import { BROWSER_WS_PROTOCOL } from '../../../shared/contract/browser-auth'
+import { BROWSER_TEST_ORIGIN, openBrowserSocket } from '../../__tests__/_helpers/browser-auth'
 import { viewerBuildExists } from '../../game/replay-viewer-build'
 import { serializeSessionSnapshot } from '../../../shared/session/serialization'
 import { getDb } from '../../db'
@@ -37,6 +40,7 @@ beforeEach(async () => {
   // A timed-out hook keeps running; never reuse its database until it finishes.
   await pendingCleanup
   vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
+  vi.stubEnv('PUBLIC_APP_ORIGIN', BROWSER_TEST_ORIGIN)
   await getDb().prepare(`INSERT INTO room_retention_policy(singleton,revision,waiting_days,playing_days)
     VALUES(TRUE,1,3,7) ON CONFLICT DO NOTHING`).run()
   recording = await recordingResources(getDb())
@@ -310,7 +314,7 @@ it('recovers an authenticated solo rematch after a lost receipt through allocati
   const backend = await createWsServer(http, { persistence, directory, internalUrl: `http://127.0.0.1:${port}`, ...recording })
   const peers: TestSocket[] = []
   const connect = async () => {
-    const socket = Object.assign(new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: { Cookie: `oa_session=${token}` } }), { received: [] as ServerEvent[] })
+    const socket = Object.assign(openBrowserSocket(`ws://127.0.0.1:${port}/ws`, `${authCookieNames().session}=${token}`), { received: [] as ServerEvent[] })
     peers.push(socket); attachCollector(socket); await waitForOpen(socket)
     return socket
   }
@@ -393,7 +397,7 @@ it.each(['card-epoch', 'retired-lease', 'lifecycle-read', 'other-active-lease'] 
   await new Promise<void>(done => { http.listen(0, '127.0.0.1', done) })
   const port = (http.address() as AddressInfo).port
   const backend = await createWsServer(http, { persistence, directory, internalUrl: `http://127.0.0.1:${port}`, ...recording })
-  const peer = Object.assign(new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: { Cookie: `oa_session=${token}` } }), { received: [] as ServerEvent[] })
+  const peer = Object.assign(openBrowserSocket(`ws://127.0.0.1:${port}/ws`, `${authCookieNames().session}=${token}`), { received: [] as ServerEvent[] })
   const closed: number[] = []
   peer.on('close', code => closed.push(code))
   attachCollector(peer)
@@ -539,16 +543,16 @@ describe('room-manager ws sync', () => {
     })
   })
 
-  it('continues an undeclared old two-player client through a real action, snapshot, authenticated resume and next action', async () => {
+  it('continues a two-player client without optional game capabilities through a real action, snapshot, authenticated resume and next action', async () => {
     const { createLocalUserForTests, createSession } = await import('../../auth')
     const cookies: string[] = []
     for (let index = 0; index < 2; index += 1) {
       const user = await createLocalUserForTests(`old_${randomUUID().slice(0, 8)}`, 'password123', `Old ${index}`)
-      cookies.push(`oa_session=${await createSession(user.id)}`)
+      cookies.push(`${authCookieNames().session}=${await createSession(user.id)}`)
     }
     const open = async (cookie: string) => {
       const received: ServerEvent[] = []
-      const socket = Object.assign(new WebSocket(baseUrl, { headers: { Cookie: cookie } }), { received })
+      const socket = Object.assign(openBrowserSocket(baseUrl, cookie), { received })
       vi.spyOn(socket, 'send')
       attachCollector(socket); sockets.push(socket); await waitForOpen(socket)
       return socket
@@ -685,7 +689,7 @@ describe('room-manager ws sync', () => {
     await vi.waitFor(() => expect(dispose).toHaveBeenCalledOnce())
   })
 
-  it('accepts createRoom over websocket when oa_session cookie is valid', async () => {
+  it.each(['browser', 'native'])('accepts createRoom over websocket with current %s authentication', async mode => {
     vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
     const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
     const persistence = new PostgresRoomPersistence(getDb())
@@ -701,11 +705,17 @@ describe('room-manager ws sync', () => {
       const username = `wsuser_${Date.now()}`
       const user = await createLocalUserForTests(username, 'password123', 'WS User')
       const token = (await createSession(user.id))
-      const ws = new WebSocket(isolatedBaseUrl, { headers: { Cookie: `oa_session=${token}` } }) as TestSocket
-      ws.received = []
+      const ws = Object.assign(mode === 'browser'
+        ? openBrowserSocket(isolatedBaseUrl, `${authCookieNames().session}=${token}`)
+        : new WebSocket(isolatedBaseUrl), { received: [] as ServerEvent[] })
       attachCollector(ws)
       sockets.push(ws)
       await waitForOpen(ws)
+      if (mode === 'native') {
+        await sendCommand(ws, { type: 'auth', token })
+        expect(await waitForEvent(ws, (event): event is Extract<ServerEvent, { type: 'authOk' }> => event.type === 'authOk'))
+          .toMatchObject({ userId: user.id, username })
+      }
 
       await sendCommand(ws, { type: 'createRoom', maxPlayers: 2, name: 'WS User' })
 
@@ -723,7 +733,11 @@ describe('room-manager ws sync', () => {
     }
   })
 
-  it('closes websocket connections from untrusted origins before cookie auth', async () => {
+  it.each([
+    { origin: 'https://evil.example', protocol: BROWSER_WS_PROTOCOL, status: 403 },
+    { origin: undefined, protocol: BROWSER_WS_PROTOCOL, status: 403 },
+    { origin: BROWSER_TEST_ORIGIN, protocol: undefined, status: 426 },
+  ])('rejects websocket upgrade before cookie auth for origin=$origin protocol=$protocol', async ({ origin, protocol, status }) => {
     vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
     vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://frontend.example')
     const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
@@ -740,21 +754,22 @@ describe('room-manager ws sync', () => {
       const username = `wsorigin_${Date.now()}`
       const user = await createLocalUserForTests(username, 'password123', 'WS Origin')
       const token = (await createSession(user.id))
-      const ws = new WebSocket(isolatedBaseUrl, {
+      const ws = new WebSocket(isolatedBaseUrl, protocol, {
         headers: {
-          Cookie: `oa_session=${token}`,
-          Origin: 'https://evil.example',
+          Cookie: `${authCookieNames().session}=${token}`,
+          ...(origin ? { Origin: origin } : {}),
         },
       }) as TestSocket
       ws.received = []
+      attachCollector(ws)
       sockets.push(ws)
 
-      const closed = await new Promise<{ code: number; reason: string }>((resolve) => {
-        ws.once('close', (code, reason) => {
-          resolve({ code, reason: reason.toString() })
-        })
-      })
-      expect(closed).toEqual({ code: 1008, reason: 'invalid origin' })
+      const opened = vi.fn()
+      ws.on('open', opened)
+      const error = await new Promise<Error>(resolve => ws.once('error', resolve))
+      expect(error.message).toContain(`Unexpected server response: ${status}`)
+      expect(opened).not.toHaveBeenCalled()
+      expect(ws.received).toEqual([])
     } finally {
       await isolatedWsServerResult.shutdown()
       await new Promise<void>((resolve, reject) => {
@@ -779,7 +794,7 @@ describe('room-manager ws sync', () => {
       const username = `wsrevoke_${Date.now()}`
       const user = await createLocalUserForTests(username, 'password123', 'WS Revoke')
       const token = (await createSession(user.id))
-      const ws = new WebSocket(isolatedBaseUrl, { headers: { Cookie: `oa_session=${token}` } }) as TestSocket
+      const ws = openBrowserSocket(isolatedBaseUrl, `${authCookieNames().session}=${token}`) as TestSocket
       ws.received = []
       attachCollector(ws)
       sockets.push(ws)

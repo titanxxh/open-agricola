@@ -98,8 +98,7 @@ describe('workshop PR propose — session', () => {
        VALUES (?, ?, ?, ?, ?)`,
     ).run(userId, `user_${userId.slice(0, 8)}`, 'Test User', 'x', now))
     ;(await db.prepare(
-      `INSERT INTO sessions (token, user_id, expires_at, created_at)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version) VALUES (?, ?, ?, ?, 2)`,
     ).run(userToken, userId, now + 3_600_000, now))
 
     cardDbId = nanoid()

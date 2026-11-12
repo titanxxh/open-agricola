@@ -4,6 +4,8 @@ import { execFileSync } from 'node:child_process'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { getDb } from '../../db'
 import { createLocalUserForTests } from '../../auth'
+import { SESSION_COOKIE } from '../../auth-cookies'
+import { browserRequestHeaders } from '../../__tests__/_helpers/browser-auth'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter'
 import { CommandStore } from '../../game/command-store'
 import { decodeReplayFrame } from '../../game/replay-codec'
@@ -51,14 +53,14 @@ describe('formal solo creation over the real network', () => {
     const username = `solo_matrix_${randomUUID().slice(0, 8)}`
     const user = await createLocalUserForTests(username, 'password123', 'Solo matrix')
     const login = await fetch(`${backend.baseUrl}/api/auth/login`, { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password: 'password123' }),
+      headers: { ...browserRequestHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password: 'password123' }),
     })
     expect(login.status).toBe(200)
     const cookie = login.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
-    expect(cookie.startsWith('oa_session=')).toBe(true)
+    expect(cookie.startsWith(`${SESSION_COOKIE}=`)).toBe(true)
     const allocationId = randomUUID()
     const locate = await fetch(`${backend.baseUrl}/api/rooms/locate`, { method: 'POST',
-      headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ allocationId }),
+      headers: { ...browserRequestHeaders, Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ allocationId }),
     })
     expect(locate.status, await locate.clone().text()).toBe(200)
     const route: { allocationId: string; wsPath: string } = await locate.json()
@@ -161,9 +163,9 @@ describe('formal solo creation over the real network', () => {
         expect(state.payload.state.farmersOfTheMoor!.soloSupply).toMatchObject({ drawCount: 9, retentionPaid: false })
         for (const card of hidden) expect(JSON.stringify(state.payload)).not.toContain(card.id)
       }
-      const mine: { ok: boolean; rooms: Array<{ id: string; max_players: number; player_index: number }> } = await (await fetch(`${backend.baseUrl}/api/lobby/my-rooms`, { headers: { Cookie: cookie } })).json()
+      const mine: { ok: boolean; rooms: Array<{ id: string; max_players: number; player_index: number }> } = await (await fetch(`${backend.baseUrl}/api/lobby/my-rooms`, { headers: { ...browserRequestHeaders, Cookie: cookie } })).json()
       expect(mine).toMatchObject({ ok: true, rooms: [{ id: roomId, max_players: 1, player_index: 0 }] })
-      const publicRooms: { ok: boolean; rooms: Array<{ id: string }> } = await (await fetch(`${backend.baseUrl}/api/rooms`)).json()
+      const publicRooms: { ok: boolean; rooms: Array<{ id: string }> } = await (await fetch(`${backend.baseUrl}/api/rooms`, { headers: { ...browserRequestHeaders, Cookie: cookie } })).json()
       expect(publicRooms).toEqual({ ok: true, rooms: [] })
       expect(await getDb().prepare('SELECT count(*) AS count FROM game_replay_steps WHERE room_id=? AND step_no=0').get(roomId)).toEqual({ count: 1 })
     } finally {

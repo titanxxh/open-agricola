@@ -4,6 +4,8 @@ import { vi } from 'vitest'
 import * as database from '../../db'
 import * as rng from '../../../shared/utils/rng'
 import { createLocalUserForTests, createSession } from '../../auth'
+import { authCookieNames } from '../../auth-cookies'
+import { BROWSER_TEST_ORIGIN } from './browser-auth'
 import { createWsServer } from '../../connection/ws-server'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter'
 import { RoomDirectory } from '../../game/room-directory'
@@ -19,6 +21,7 @@ export async function createSoloRecoveryHost(seed = 24) {
   vi.spyOn(rng, 'resolveSeed').mockImplementation(input => resolveSeed(input ?? seed))
   vi.stubEnv('NODE_ENV', 'production')
   vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
+  vi.stubEnv('PUBLIC_APP_ORIGIN', BROWSER_TEST_ORIGIN)
   const recording = await createFormalSoloRecording(db)
   const user = await createLocalUserForTests(`solo_recovery_${randomUUID().slice(0, 8)}`, 'password123', 'Recovery farmer')
   const token = await createSession(user.id)
@@ -31,6 +34,7 @@ export async function createSoloRecoveryHost(seed = 24) {
     await new Promise<void>(resolve => http.listen(0, '127.0.0.1', resolve))
     const address = http.address()
     if (!address || typeof address === 'string') throw new Error('Recovery HTTP listener did not start')
+    vi.stubEnv('PUBLIC_API_BASE', `https://127.0.0.1:${address.port}`)
     const directory = new RoomDirectory(db)
     const persistence = new PostgresRoomPersistence(db, directory)
     const backend = await createWsServer(http, { directory, persistence, resources: recording.resources,
@@ -46,7 +50,7 @@ export async function createSoloRecoveryHost(seed = 24) {
     return current
   }
   const connect = async () => {
-    const peer = await SoloNetworkPeer.connect(runtime().url, `oa_session=${token}`)
+    const peer = await SoloNetworkPeer.connect(runtime().url, `${authCookieNames().session}=${token}`)
     peers.push(peer)
     return peer
   }
