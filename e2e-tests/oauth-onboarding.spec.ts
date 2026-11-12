@@ -19,6 +19,9 @@ import { handleOAuthStart, handleOAuthCallback, handleOnboardingComplete, handle
 import { findIdentity, getOnboardingTicket } from '../server/oauth/store'
 
 test('OAuth login and registration navigate from an insecure HTTP LAN origin', async ({ playwright }) => {
+  expect(process.env.NODE_ENV).not.toBe('production')
+  const keys = ['PUBLIC_APP_ORIGIN', 'PUBLIC_API_BASE'] as const
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]))
   let origin = ''
   const starts: Array<{ provider: string; intent: string | null; hasChallenge: boolean }> = []
   const errors: string[] = []
@@ -36,8 +39,13 @@ test('OAuth login and registration navigate from an insecure HTTP LAN origin', a
         const form = new URLSearchParams(Buffer.concat(chunks).toString('utf8'))
         expect(form.get('protocol')).toBe('2')
         expect(req.headers.origin).toBe(origin)
-        expect(req.headers['sec-fetch-dest']).toBe('document')
-        expect(req.headers['sec-fetch-mode']).toBe('navigate')
+        expect(req.headers['sec-fetch-dest']).toBeUndefined()
+        expect(req.headers['sec-fetch-mode']).toBeUndefined()
+        const admission = httpAdmission(req)
+        if (!admission.ok) {
+          res.writeHead(admission.status, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: false, code: admission.code })); return
+        }
         starts.push({ provider: url.pathname.split('/')[4] ?? '', intent: form.get('intent'), hasChallenge: form.has('onboardingChallenge') })
         res.writeHead(302, { Location: `${origin}/provider-started` })
         res.end()
@@ -61,6 +69,8 @@ test('OAuth login and registration navigate from an insecure HTTP LAN origin', a
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('Missing HTTP test port')
   origin = `http://lan.agricola.test:${address.port}`
+  process.env.PUBLIC_APP_ORIGIN = origin
+  process.env.PUBLIC_API_BASE = origin
   const browser = await playwright.chromium.launch({ args: ['--host-resolver-rules=MAP lan.agricola.test 127.0.0.1', '--no-proxy-server'] })
   try {
     const page = await browser.newPage()
@@ -69,7 +79,11 @@ test('OAuth login and registration navigate from an insecure HTTP LAN origin', a
       for (const intent of ['login', 'register'] as const) {
         await page.goto(`${origin}/?page=login&authMode=${intent}`, { waitUntil: 'domcontentloaded' })
         expect(await page.evaluate(() => ({ secure: isSecureContext, digest: !!crypto.subtle }))).toEqual({ secure: false, digest: false })
-        await page.locator(`a[href*="/api/auth/oauth/${provider}/start"][href*="intent=${intent}"]`).click()
+        const [start] = await Promise.all([
+          page.waitForResponse(response => new URL(response.url()).pathname === `/api/auth/oauth/${provider}/start`),
+          page.locator(`a[href*="/api/auth/oauth/${provider}/start"][href*="intent=${intent}"]`).click(),
+        ])
+        expect(start.status()).toBe(302)
         await expect(page.getByRole('heading', { name: 'OAuth start reached' })).toBeVisible()
       }
     }
@@ -83,6 +97,10 @@ test('OAuth login and registration navigate from an insecure HTTP LAN origin', a
   } finally {
     await browser.close()
     await new Promise<void>(resolve => server.close(() => resolve()))
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key]
+      else process.env[key] = previous[key]
+    }
   }
 })
 
