@@ -1,14 +1,26 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 
 const sourceBuild = 'a'.repeat(40), image = `sha256:${'b'.repeat(64)}`, container = 'c'.repeat(64)
 
+type OffsiteDirectoryForm = 'canonical' | 'trailing-slashes' | 'dot' | 'parent' | 'cross-scope' | 'symlink'
+function offsiteDirectory(directory: string, form: OffsiteDirectoryForm) {
+  if (form === 'symlink') {
+    symlinkSync(directory, `${directory}-alias`)
+    return `${directory}-alias/`
+  }
+  return directory + { canonical: '', 'trailing-slashes': '///', dot: '/./', parent: '/../remote/', 'cross-scope': '/../backups/' }[form]
+}
+
 // Real shell, timeout, tar and hashing; native PG/S3 round trips have separate tests.
-function backup(fail = '', stopped = false, duplicate = false) {
+function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
+  mode?: 'full' | 'ledger-only'
+  directoryForm?: OffsiteDirectoryForm
+} = {}) {
   const root = mkdtempSync(join(tmpdir(), 'agricola-native-backup-'))
   const offsite = fail.startsWith('offsite-')
   try {
@@ -118,12 +130,13 @@ case "$*" in
   *) echo "Unexpected fixture Docker command: $*" >&2; exit 88 ;;
 esac
 `, { mode: 0o700 })
-    const run = () => spawnSync('/bin/bash', offsite ? ['backup-offsite.sh'] : ['scripts/backup-storage.sh', 'manual-test', ...(stopped ? ['--already-stopped'] : [])], {
+    const remoteDirectory = offsiteDirectory(remote, offsiteOptions.directoryForm ?? 'canonical')
+    const run = () => spawnSync('/bin/bash', offsite ? ['backup-offsite.sh', offsiteOptions.mode ?? 'full'] : ['scripts/backup-storage.sh', 'manual-test', ...(stopped ? ['--already-stopped'] : [])], {
       cwd: root,
       env: { ...process.env, BACKUP_RETENTION_DAYS: undefined, BACKUP_DAILY_COUNT: undefined, BACKUP_PRE_COUNT: undefined,
         OA_BACKUP_REAL_NODE: process.execPath, PATH: `${root}/bin:${process.env.PATH}`, BACKUP_TEST_FAILURE: fail,
         SOURCE_BUILD_ID: sourceBuild, MAINTENANCE_LOCK_HELD: '0', BACKUP_JOB_ID: fail.endsWith('date-width') ? '' : 'fixture-run',
-        OFFSITE_BACKUP_TARGET: 'fixture', OFFSITE_BACKUP_REMOTE_DIR: remote,
+        OFFSITE_BACKUP_TARGET: 'fixture', OFFSITE_BACKUP_REMOTE_DIR: remoteDirectory,
         BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + (fail === 'deadline' || fail === 'offsite-timeout' ? 2000 : 30_000)) },
       encoding: 'utf8', timeout: 15_000,
     })
@@ -155,6 +168,23 @@ esac
         return { report, bytes: readFileSync(join(remote, `${report.backupStem}.tgz`)) }
       }) : [],
     }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+}
+
+function retainOffsite(directoryForm: OffsiteDirectoryForm) {
+  const root = mkdtempSync(join(tmpdir(), 'agricola-offsite-retention-'))
+  const remote = join(root, 'remote')
+  try {
+    mkdirSync(remote)
+    const expired = new Date(Date.now() - 31 * 86400_000)
+    for (const name of ['daily-old.tgz', 'daily-old.manifest.json', 'env-daily-old']) {
+      writeFileSync(join(remote, name), 'expired fixture')
+      utimesSync(join(remote, name), expired, expired)
+    }
+    writeFileSync(join(remote, 'replay-removals.latest.json'), '{"version":1,"batches":[]}')
+    const result = spawnSync('/bin/bash', ['deploy/offsite-retention.sh', offsiteDirectory(remote, directoryForm)], { encoding: 'utf8' })
+    if (result.error) throw result.error
+    return { status: result.status, stderr: result.stderr, files: readdirSync(remote).sort() }
   } finally { rmSync(root, { recursive: true, force: true }) }
 }
 
@@ -238,6 +268,39 @@ it('captures and commits offsite when date ignores nanosecond field width', () =
   expect(result.incoming).toEqual([])
   expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
 }, 15_000)
+
+it.each(['full', 'ledger-only'] as const)('accepts trailing slashes for an offsite %s job', mode => {
+  const result = backup('offsite-directory', false, false, { mode, directoryForm: 'trailing-slashes' })
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.remoteLedger).toBe('{"version":1,"batches":[]}')
+  expect(result.remoteArchives).toHaveLength(mode === 'full' ? 1 : 0)
+  expect(result.expiredRemoteArchive).toBe(mode === 'ledger-only')
+  expect(result.incoming).toEqual([])
+  expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
+}, 15_000)
+
+it('accepts trailing slashes for autonomous offsite retention without removing the ledger', () => {
+  const result = retainOffsite('trailing-slashes')
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.files).toEqual(['replay-removals.latest.json'])
+})
+
+it.each(['dot', 'parent', 'cross-scope', 'symlink'] as const)('rejects an offsite %s alias after stripping trailing slashes', directoryForm => {
+  const result = backup('offsite-directory', false, false, { mode: 'ledger-only', directoryForm })
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Offsite scope contains an alias')
+  expect(result.remoteLedger).toBeUndefined()
+  expect(result.expiredRemoteArchive).toBe(true)
+  expect(result.remoteArchives).toEqual([])
+  expect(result.incoming).toEqual([])
+})
+
+it.each(['dot', 'parent', 'cross-scope', 'symlink'] as const)('rejects autonomous retention through a %s alias without deleting archives', directoryForm => {
+  const result = retainOffsite(directoryForm)
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Offsite scope contains an alias')
+  expect(result.files).toEqual(['daily-old.manifest.json', 'daily-old.tgz', 'env-daily-old', 'replay-removals.latest.json'])
+})
 
 
 it('keeps stable default age/count limits and separate ledger sync after a real shell capture failure', () => {

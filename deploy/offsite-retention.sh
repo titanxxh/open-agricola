@@ -6,6 +6,9 @@
 # 用法: ./offsite-retention.sh [backup-dir]   # 默认 /root/open-agricola-backups
 set -e
 DIR="${1:-/root/open-agricola-backups}"
+while [[ "$DIR" != / && "$DIR" == */ ]]; do
+  DIR="${DIR%/}"
+done
 RETENTION_DAYS="${2:-30}"
 [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] && (( RETENTION_DAYS >= 1 && RETENTION_DAYS <= 30 )) || { echo 'Invalid retention age'; exit 1; }
 MAX_AGE_MINUTES=$((RETENTION_DAYS * 24 * 60))
