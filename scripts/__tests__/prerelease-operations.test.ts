@@ -41,6 +41,7 @@ set -e
 printf '%s\\n' "$*" >> '${temporary}/calls'
 if [ -f '${temporary}/fail' ] && [ "$(cat '${temporary}/fail')" != stop ]; then exit 42; fi
 case "$*" in
+  'ps -q '*) exit 0;;
   *' stop --timeout 90 app') [ ! -f '${temporary}/fail' ] || exit 42;;
   *' ps -a -q app') printf '${'c'.repeat(64)}';;
   *'{{.Image}}'*) printf 'sha256:${'d'.repeat(64)}';;
@@ -234,11 +235,15 @@ it('journals migration/startup failures closed and resumes the same candidate wi
 set -e
 printf '%s\n' "$*" >> '${value.temporary}/calls'
 case "$*" in
+  'ps -q '*) exit 0;;
+  'start '*) touch '${value.temporary}/builder-running-'"$2";;
+  'stop --timeout 30 '*) rm -f '${value.temporary}/builder-running-'"$4";;
   'buildx build '*) cat >/dev/null;;
-  'buildx inspect '*) printf '${JSON.stringify({ Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${value.config.builder.container}` }] })}';;
+  'buildx inspect '*) exit 125;;
+  'buildx ls --format {{json .Builder}}') printf '%s\n' '${JSON.stringify({ Name: value.config.builder.name, Driver: 'remote', Nodes: [{ Name: 'prerelease-test0', Endpoint: `docker-container://${value.config.builder.container}` }] })}' '${JSON.stringify({ Name: value.config.builder.name, Driver: 'remote', Nodes: [{ Name: 'prerelease-test0', Endpoint: `docker-container://${value.config.builder.container}` }] })}';;
   *'{{json .Config.Labels}}'*'${value.config.builder.container}') printf '{"org.open-agricola.environment":"prerelease-test"}';;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
-  *'{{json .State}}'*'${value.config.builder.container}') printf '{"Running":true}';;
+  *'{{json .State}}'*'${value.config.builder.container}') if [ -f '${value.temporary}/builder-running-${value.config.builder.container}' ]; then printf '{"Running":true}'; else printf '{"Running":false}'; fi;;
   *'{{json .State}}'*) printf '{"Running":false,"OOMKilled":false,"ExitCode":0}';;
   *' ps -a -q app') printf '${'c'.repeat(64)}';;
   *'{{.Image}}'*) printf 'sha256:${'d'.repeat(64)}';;
@@ -321,11 +326,14 @@ function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNet
 set -e
 printf '%s\n' "$*" >> '${value.temporary}/calls'
 case "$*" in
+  'ps -q '*) exit 0;;
+  'start '*) touch '${value.temporary}/builder-running-'"$2";;
+  'stop --timeout 30 '*) rm -f '${value.temporary}/builder-running-'"$4";;
   'buildx build '*) cat >/dev/null;;
-  'buildx inspect '*) printf '${JSON.stringify({ Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${target.builder.container}` }] })}';;
+  'buildx ls --format {{json .Builder}}') printf '${JSON.stringify({ Name: target.builder.name, Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${target.builder.container}` }] })}';;
   *'{{json .Config.Labels}}'*'${target.builder.container}') printf '{"org.open-agricola.environment":"${target.targetId}"}';;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
-  *'{{json .State}}'*'${target.builder.container}') printf '{"Running":true}';;
+  *'{{json .State}}'*'${target.builder.container}') if [ -f '${value.temporary}/builder-running-${target.builder.container}' ]; then printf '{"Running":true}'; else printf '{"Running":false}'; fi;;
   *'{{json .State}}'*) cat '${containerState}';;
   *' ps -a -q app') if [ -f '${containerImage}' ]; then printf '${'c'.repeat(64)}'; fi;;
   *'{{.Image}}'*) cat '${containerImage}';;
@@ -428,9 +436,10 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
     .replaceAll(source.config.targetId, target.targetId).replaceAll(source.generation, next)
     .replace('case "$*" in', `case "$*" in\n  *' restore /backup/restore-'*) [ ! -f '${replacement.temporary}/restore-fail' ] || exit 44;;\n  *' stop --timeout 30 gateway') [ ! -f '${replacement.temporary}/gateway-stop-fail' ] || exit 45;;\nesac\ncase "$*" in`)
   const sourceBuilder = `case "$*" in
-  'buildx inspect ${source.config.builder.name} '*) printf '${JSON.stringify({ Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${source.config.builder.container}` }] })}'; exit 0;;
+  'ps -q '*) exit 0;;
+  'buildx ls --format {{json .Builder}}') printf '%s\n' '${JSON.stringify({ Name: source.config.builder.name, Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${source.config.builder.container}` }] })}' '${JSON.stringify({ Name: target.builder.name, Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${target.builder.container}` }] })}'; exit 0;;
   *'{{json .Config.Labels}}'*'${source.config.builder.container}') printf '{"org.open-agricola.environment":"${source.config.targetId}"}'; exit 0;;
-  *'{{json .State}}'*'${source.config.builder.container}') printf '{"Running":true}'; exit 0;;
+  *'{{json .State}}'*'${source.config.builder.container}') if [ -f '${replacement.temporary}/builder-running-${source.config.builder.container}' ]; then printf '{"Running":true}'; else printf '{"Running":false}'; fi; exit 0;;
 esac
 `
   writeFileSync(join(replacement.bin, 'docker'), script.replace('set -e\n', `set -e\n${sourceBuilder}`), { mode: 0o700 })

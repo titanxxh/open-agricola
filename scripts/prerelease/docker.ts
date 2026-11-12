@@ -25,18 +25,37 @@ const object = (value: unknown): Record<string, unknown> => {
 }
 const parsed = (text: string): Record<string, unknown> => object(JSON.parse(text))
 
-export function assertCapacity(target: PrereleaseTarget): void {
-  const fs = statfsSync(target.directory)
-  const remaining = fs.bavail * fs.bsize
-  const memory = target.budgets.app.memoryMiB + target.budgets.tools.memoryMiB + target.budgets.build.memoryMiB + target.budgets.reserveMemoryMiB
-  if (freemem() < memory * 1024 * 1024 || remaining < target.budgets.diskMiB * 1024 * 1024) throw new Error('Measured host capacity is below the approved prerelease budget')
+export function assertCapacity(target: PrereleaseTarget, phase: 'build' | 'tool' | 'inspect-image' | 'app' | 'idle'): void {
+  if (command('docker', ['ps', '-q', '--filter', `name=^/${target.builder.container}$`])
+    || command('docker', ['ps', '-q', '--filter', `label=org.open-agricola.backup.environment=${target.targetId}`])) {
+    throw new Error(`Prerelease ${phase} requires its builder and other tools to be stopped`)
+  }
+  const appId = command('docker', ['ps', '-q', '--filter', `label=com.docker.compose.project=${target.project}`, '--filter', 'label=com.docker.compose.service=app'])
+  if (appId) {
+    if (!/^[a-f0-9]{12,64}$/.test(appId)) throw new Error('Cannot identify one running prerelease application')
+    const app = parsed(command('docker', ['inspect', '--format', '{{json .}}', appId]))
+    const labels = object(object(app.Config).Labels), limits = object(app.HostConfig), record = readRuntime(target)
+    const images = [record.installed?.image, record.operation?.image, record.operation?.sourceImage]
+    if (labels['com.docker.compose.project'] !== target.project || labels['com.docker.compose.service'] !== 'app'
+      || object(app.State).Running !== true || typeof app.Image !== 'string' || !images.includes(app.Image)
+      || typeof limits.Memory !== 'number' || limits.Memory <= 0 || limits.Memory > target.budgets.app.memoryMiB * 1024 * 1024) {
+      throw new Error('Running prerelease application identity or memory limit differs from the target')
+    }
+  }
+  const phaseMemory = phase === 'build' ? target.budgets.build.memoryMiB : phase === 'tool' ? target.budgets.tools.memoryMiB : phase === 'inspect-image' ? 64 : 0
+  const memory = 64 + (appId || phase === 'app' ? target.budgets.app.memoryMiB : 0) + phaseMemory + target.budgets.reserveMemoryMiB
+  const fs = statfsSync(target.directory), remaining = fs.bavail * fs.bsize, available = freemem()
+  if (available < memory * 1024 * 1024 || remaining < target.budgets.diskMiB * 1024 * 1024) {
+    throw new Error(`Prerelease ${phase} capacity is below the conservative budget: available memory ${available}, required ${memory * 1024 * 1024}, disk ${remaining}`)
+  }
 }
 
-function inspectFixedImage(image: string, buildId: string, channel: 'stable' | 'prerelease'): string {
+function inspectFixedImage(target: PrereleaseTarget, image: string, buildId: string, channel: 'stable' | 'prerelease'): string {
   const digest = command('docker', ['image', 'inspect', '--format', '{{.Id}}', image])
   const labels = parsed(command('docker', ['image', 'inspect', '--format', '{{json .Config.Labels}}', digest]))
   if (!/^sha256:[a-f0-9]{64}$/.test(digest) || labels['org.opencontainers.image.revision'] !== buildId
     || labels['io.open-agricola.release-channel'] !== channel) throw new Error('Image channel/SHA does not match the fixed tool or candidate')
+  assertCapacity(target, 'inspect-image')
   const metadata = parsed(command('docker', ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
     '--memory', '64m', '--cpus', '0.25', '--pids-limit', '32', '--entrypoint', 'node', digest,
     '-e', 'process.stdout.write(require("node:fs").readFileSync("/app/frontend-dist/frontend-build.json","utf8"))']))
@@ -45,13 +64,19 @@ function inspectFixedImage(image: string, buildId: string, channel: 'stable' | '
   return digest
 }
 
-export const inspectImage = (image: string, buildId: string): string => inspectFixedImage(image, buildId, 'prerelease')
+export const inspectImage = (target: PrereleaseTarget, image: string, buildId: string): string => inspectFixedImage(target, image, buildId, 'prerelease')
+
+function stopBuilder(target: PrereleaseTarget): void {
+  command('docker', ['stop', '--timeout', '30', target.builder.container], { timeout: 40_000 })
+  if (parsed(command('docker', ['inspect', '--format', '{{json .State}}', target.builder.container])).Running !== false) throw new Error('Prerelease builder did not stop; do not start another phase')
+}
 
 function buildFixedImage(target: PrereleaseTarget, buildId: string, channel: 'stable' | 'prerelease', deadlineEpochMs?: number): string {
-  assertCapacity(target)
-  const builder = parsed(command('docker', ['buildx', 'inspect', target.builder.name, '--format', '{{json .}}']))
-  const nodes = builder.Nodes
-  if (builder.Driver !== 'remote' || !Array.isArray(nodes) || nodes.length !== 1 || object(nodes[0]).Endpoint !== `docker-container://${target.builder.container}`) throw new Error('Buildx must use the explicitly bounded prerelease BuildKit container')
+  const builders = [...new Set(command('docker', ['buildx', 'ls', '--format', '{{json .Builder}}']).split('\n').filter(Boolean)
+    .map(line => JSON.stringify(parsed(line))))].map(parsed).filter(builder => builder.Name === target.builder.name)
+  const builder = builders[0]
+  const nodes = builder?.Nodes
+  if (builders.length !== 1 || builder?.Driver !== 'remote' || !Array.isArray(nodes) || nodes.length !== 1 || object(nodes[0]).Endpoint !== `docker-container://${target.builder.container}`) throw new Error('Buildx must use the explicitly bounded prerelease BuildKit container')
   const labels = parsed(command('docker', ['inspect', '--format', '{{json .Config.Labels}}', target.builder.container]))
   const state = parsed(command('docker', ['inspect', '--format', '{{json .State}}', target.builder.container]))
   const config = parsed(command('docker', ['inspect', '--format', '{{json .Config}}', target.builder.container]))
@@ -59,18 +84,25 @@ function buildFixedImage(target: PrereleaseTarget, buildId: string, channel: 'st
   const limits = parsed(command('docker', ['inspect', '--format', '{{json .HostConfig}}', target.builder.container]))
   const cpu = typeof limits.NanoCpus === 'number' && limits.NanoCpus > 0 ? limits.NanoCpus / 1e9
     : typeof limits.CpuQuota === 'number' && typeof limits.CpuPeriod === 'number' && limits.CpuPeriod > 0 ? limits.CpuQuota / limits.CpuPeriod : 0
-  if (labels['org.open-agricola.environment'] !== target.targetId || state.Running !== true || typeof config.User !== 'string'
+  if (labels['org.open-agricola.environment'] !== target.targetId || state.Running !== false || typeof config.User !== 'string'
     || !/^1000(?::1000)?$/.test(config.User) || !Array.isArray(mounts) || mounts.some(value => object(value).Type !== 'volume' || object(value).Destination !== '/home/user/.local/share/buildkit')
     || limits.Privileged !== false || limits.PidMode === 'host' || limits.IpcMode === 'host' || limits.NetworkMode === 'host'
     || Array.isArray(limits.CapAdd) && limits.CapAdd.length > 0 || Array.isArray(limits.Devices) && limits.Devices.length > 0
     || typeof limits.Memory !== 'number' || limits.Memory <= 0 || limits.Memory > target.budgets.build.memoryMiB * 1024 * 1024
     || !cpu || cpu > target.budgets.build.cpus || typeof limits.PidsLimit !== 'number' || limits.PidsLimit <= 0 || limits.PidsLimit > target.budgets.build.pids) throw new Error('Prerelease builder limits or ownership are missing')
-  const archive = execFileSync('git', ['archive', '--format=tar', buildId], { cwd: target.policyDirectory, maxBuffer: 256 * 1024 * 1024 })
+  assertCapacity(target, 'build')
   const tag = `${target.project}${channel === 'stable' ? '-policy' : ''}:${buildId}`
-  command('docker', ['buildx', 'build', '--builder', target.builder.name, '--load', '--build-arg', `GAME_BUILD_ID=${buildId}`,
-    '--build-arg', `RELEASE_CHANNEL=${channel}`, '--tag', tag, '-'], { input: archive, cwd: target.directory,
-    timeout: deadlineEpochMs === undefined ? 30 * 60 * 1000 : Math.max(1, deadlineEpochMs - Date.now()) })
-  return inspectFixedImage(tag, buildId, channel)
+  try {
+    command('docker', ['start', target.builder.container])
+    if (parsed(command('docker', ['inspect', '--format', '{{json .State}}', target.builder.container])).Running !== true) throw new Error('Prerelease builder did not start')
+    const archive = execFileSync('git', ['archive', '--format=tar', buildId], { cwd: target.policyDirectory, maxBuffer: 256 * 1024 * 1024 })
+    command('docker', ['buildx', 'build', '--builder', target.builder.name, '--load', '--build-arg', `GAME_BUILD_ID=${buildId}`,
+      '--build-arg', `RELEASE_CHANNEL=${channel}`, '--tag', tag, '-'], { input: archive, cwd: target.directory,
+      timeout: deadlineEpochMs === undefined ? 30 * 60 * 1000 : Math.max(1, deadlineEpochMs - Date.now()) })
+  } finally {
+    stopBuilder(target)
+  }
+  return inspectFixedImage(target, tag, buildId, channel)
 }
 
 export const buildImage = (target: PrereleaseTarget, buildId: string): string => buildFixedImage(target, buildId, 'prerelease')
@@ -82,7 +114,7 @@ function trustedArchiveImage(target: PrereleaseTarget, deadlineEpochMs: number):
   if (existsSync(path)) {
     const cached = parsed(readFileSync(path, 'utf8'))
     if (cached.policySha !== policySha || typeof cached.image !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(cached.image)) throw new Error('Trusted archive image binding changed')
-    return inspectFixedImage(cached.image, policySha, 'stable')
+    return inspectFixedImage(target, cached.image, policySha, 'stable')
   }
   const image = buildFixedImage(target, policySha, 'stable', deadlineEpochMs)
   atomicJson(path, { policySha, image })
@@ -172,6 +204,7 @@ export function candidateTool(target: PrereleaseTarget, service: 'tools' | 'migr
     if (!/^[A-Z_][A-Z0-9_]*$/.test(key)) throw new Error('Invalid candidate environment key')
     environment.push('-e', `${key}=${value}`)
   }
+  assertCapacity(target, 'tool')
   return boundedTool(target, (labels, deadline, runId) => compose(target, ['run', '--rm', '--no-deps', '-T', ...labels, ...mounts, ...environment,
     '-e', `BACKUP_DEADLINE_EPOCH_MS=${deadline}`, '-e', `BACKUP_JOB_ID=${runId}`, '-e', `BACKUP_ENVIRONMENT=${target.targetId}`, '-e', 'PG_CLIENT_MODE=local', service,
     'timeout', '--signal=TERM', '--kill-after=3s', String(Math.max(1, Math.ceil((deadline - Date.now()) / 1000))),
@@ -187,6 +220,7 @@ export function trustedArchiveTool(target: PrereleaseTarget, service: 'capture' 
     const credentials = service === 'tools' ? ['--env-file', join(target.directory, 'data/dependencies.compose.env')]
       : Object.keys(dataEnvironment).flatMap(key => ['-e', key])
     if (deadline <= Date.now()) throw new Error('Trusted archive image preparation exhausted the backup deadline')
+    assertCapacity(target, 'tool')
     return command('docker', ['run', '--rm', ...labels, '--network', target.network,
     '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
     '--memory', `${target.budgets.tools.memoryMiB}m`, '--cpus', String(target.budgets.tools.cpus), '--pids-limit', String(target.budgets.tools.pids),
@@ -217,6 +251,7 @@ export function archiveTool(target: PrereleaseTarget, service: 'capture' | 'tool
 export const backupRoot = (target: PrereleaseTarget) => join(target.directory, 'backups')
 
 export function policyTool(target: PrereleaseTarget, operation: 'inspect' | 'empty' | 'reset' | 'budget' | 'identities', extra: Record<string, string> = {}, credentials: 'app' | 'tools' = 'app'): string {
+  assertCapacity(target, 'tool')
   const policySha = command('git', ['rev-parse', 'HEAD'], { cwd: target.policyDirectory })
   if (!/^[a-f0-9]{40}$/.test(policySha)) throw new Error('Trusted main policy SHA is missing')
   const code = join(target.directory, 'control', `policy-${policySha}`)

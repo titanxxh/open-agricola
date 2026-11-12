@@ -117,7 +117,6 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
   }
   if (request.action === 'backup') {
     if (!record.installed || record.operation) throw new Error('Online backup requires a complete installed deployment')
-    assertCapacity(target)
     verifyRunning(target, record)
     verifyPermissions(target)
     writeRuntime(target, record)
@@ -131,7 +130,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
         || !('objectBytes' in usage) || typeof usage.objectBytes !== 'number') throw new Error('Invalid measured storage usage')
       const local = Number(command('du', ['-sx', '--block-size=1', target.directory]).split(/\s/)[0])
       if (local + usage.databaseBytes + usage.objectBytes > target.budgets.diskMiB * 1024 * 1024) throw new Error('Prerelease storage budget exceeded')
-      assertCapacity(target)
+      assertCapacity(target, 'idle')
       return { ...usage, localBytes: local }
     } catch (error) {
       writeRuntime(target, { ...record, mode: 'maintenance', acceptance: null })
@@ -183,6 +182,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     })
     const manifest = jsonText(policyTool(target, 'identities'))
     if (canonicalJson(manifest.refs) !== canonicalJson(unique)) throw new Error('Real cleanup/remap did not produce the exact retained active identity set')
+    assertCapacity(target, 'app')
     compose(target, ['up', '-d', '--no-build', '--wait', '--wait-timeout', '120', 'app'])
     verifyRunning(target, record)
     const artifact = join(controlDirectory(target), `identity-verified-${record.generation}.json`)
@@ -282,9 +282,8 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     if (record.operation && (record.operation.id !== id || record.operation.kind !== 'restore' || record.operation.buildId !== buildId
       || record.operation.backupStem !== request.backupStem || record.generation !== next)) throw new Error('Resume the exact replacement restoration operation')
     if (!record.operation && (record.installed || record.buildId)) throw new Error('Restore requires fresh replacement resources')
-    assertCapacity(target)
     const image = record.operation?.image ?? buildImage(target, buildId)
-    inspectImage(image, buildId)
+    inspectImage(target, image, buildId)
     const operation: NonNullable<RuntimeRecord['operation']> = record.operation ?? { id, kind: 'restore', buildId, image,
       sourceBuildId: null, sourceImage: null, stage: 'backup', backupStem: request.backupStem, generation: next }
     record = { ...record, generation: next, operation }
@@ -316,6 +315,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
       writeRuntime(target, record, image)
     }
     removeRestoreStaging(target, id)
+    assertCapacity(target, 'app')
     compose(target, ['up', '-d', '--no-build', '--wait', '--wait-timeout', '120', 'app'])
     verifyRunning(target, record)
     record.operation = { ...operation, stage: 'acceptance' }
@@ -364,7 +364,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
   const operationId = request.operationId ?? randomUUID()
   if (record.operation && (record.operation.id !== operationId || record.operation.buildId !== buildId || record.operation.kind !== request.action)) throw new Error('A pending operation must resume the same fixed SHA, kind and operation ID')
   const image = record.operation?.image ?? buildImage(target, buildId)
-  inspectImage(image, buildId)
+  inspectImage(target, image, buildId)
   if (!record.operation) {
     record.operation = { id: generation(operationId), kind: request.action, buildId, image, sourceBuildId: record.buildId, sourceImage: record.installed?.image ?? null, stage: 'backup', backupStem: null,
       generation: record.generation }
@@ -387,6 +387,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     record = { ...record, buildId, installed: { buildId, image, installedAt: Date.now() }, operation: { ...operation, stage: 'startup' } }
     writeRuntime(target, record, image)
   }
+  assertCapacity(target, 'app')
   compose(target, ['up', '-d', '--no-build', '--wait', '--wait-timeout', '120', 'app'])
   verifyRunning(target, record)
   record.operation = { ...operation, stage: 'acceptance' }
