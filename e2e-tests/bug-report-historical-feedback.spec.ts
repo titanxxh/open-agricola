@@ -6,19 +6,19 @@
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { expect, test } from '@playwright/test'
-import { startHostedReleaseAppWithExperimentalFeatures } from './helpers/experimental-features-app'
+import { startHostedReleaseAppWithBetaAccess } from './helpers/beta-access-app'
 import { PostgresDatabase } from '../server/database/postgres'
 import { BugReportFeedbackService } from '../server/bug-report/feedback-service'
 import type { DeploymentProof } from '../server/bug-report/deployment-proof'
 import type { HistoricalPreview } from '../server/bug-report/historical-feedback'
 
-let app: Awaited<ReturnType<typeof startHostedReleaseAppWithExperimentalFeatures>>
+let app: Awaited<ReturnType<typeof startHostedReleaseAppWithBetaAccess>>
 test.beforeAll(async () => {
   test.setTimeout(180000)
   const previousKeys = process.env.BUG_REPORT_TOKEN_ENCRYPTION_KEYS, previousActive = process.env.BUG_REPORT_TOKEN_ACTIVE_KEY_ID
   process.env.BUG_REPORT_TOKEN_ENCRYPTION_KEYS = JSON.stringify({ isolated: Buffer.alloc(32, 7).toString('base64') })
   process.env.BUG_REPORT_TOKEN_ACTIVE_KEY_ID = 'isolated'
-  try { app = await startHostedReleaseAppWithExperimentalFeatures() }
+  try { app = await startHostedReleaseAppWithBetaAccess() }
   finally {
     if (previousKeys === undefined) delete process.env.BUG_REPORT_TOKEN_ENCRYPTION_KEYS; else process.env.BUG_REPORT_TOKEN_ENCRYPTION_KEYS = previousKeys
     if (previousActive === undefined) delete process.env.BUG_REPORT_TOKEN_ACTIVE_KEY_ID; else process.env.BUG_REPORT_TOKEN_ACTIVE_KEY_ID = previousActive

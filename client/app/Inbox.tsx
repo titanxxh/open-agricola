@@ -22,6 +22,7 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const requestVersion = useRef(0)
+  const loadedThrough = useRef<number | null>(null)
   const reading = useRef(0)
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState<InboxPage | null>(null)
@@ -32,8 +33,15 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
     if (!userId) return
     const version = ++requestVersion.current
     try {
-      const value = await readInboxPage(await apiFetch(`/api/v1/inbox${before ? `?before=${before}` : ''}`))
+      const oldest = loadedThrough.current
+      let value = await readInboxPage(await apiFetch(`/api/v1/inbox${before ? `?before=${before}` : ''}`))
+      while (!before && oldest !== null && value.nextCursor !== null && value.nextCursor > oldest) {
+        if (version !== requestVersion.current) return
+        const next = await readInboxPage(await apiFetch(`/api/v1/inbox?before=${value.nextCursor}`))
+        value = { ...next, messages: [...value.messages, ...next.messages] }
+      }
       if (version !== requestVersion.current) return
+      loadedThrough.current = value.messages.at(-1)?.id ?? (before ? oldest : null)
       setPage(current => before && current ? { ...value, messages: [...current.messages, ...value.messages] } : value)
       setError(false)
     } catch { if (version === requestVersion.current) setError(true) }

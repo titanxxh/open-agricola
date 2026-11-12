@@ -3,16 +3,16 @@
 // @covers server/bug-report-feedback-routes.ts
 // @covers client/app/BugReportFixSettings.tsx
 import { expect, test } from '@playwright/test'
-import { startHostedReleaseAppWithExperimentalFeatures } from './helpers/experimental-features-app'
+import { startHostedReleaseAppWithBetaAccess } from './helpers/beta-access-app'
 import { PostgresDatabase } from '../server/database/postgres'
 
-let app: Awaited<ReturnType<typeof startHostedReleaseAppWithExperimentalFeatures>>
+let app: Awaited<ReturnType<typeof startHostedReleaseAppWithBetaAccess>>
 test.use({ actionTimeout: 10000 })
 test.beforeAll(async () => {
   test.setTimeout(180000)
   const previous = process.env.NODE_OPTIONS
   process.env.NODE_OPTIONS = `${previous ?? ''} --import=${new URL('./helpers/github-fix-fixture.mjs', import.meta.url).pathname}`.trim()
-  try { app = await startHostedReleaseAppWithExperimentalFeatures() }
+  try { app = await startHostedReleaseAppWithBetaAccess() }
   finally { if (previous === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = previous }
 })
 test.afterAll(async () => { await app?.close() })

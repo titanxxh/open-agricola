@@ -21,12 +21,12 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('037-prerelease-authority.sql')
     migrations.push('038-workshop-public-versions.sql')
     migrations.push('039-prerelease-identity-generations.sql')
-    migrations.push('037-bug-report-feedback.sql')
-    migrations.push('038-bug-report-triage.sql')
-    migrations.push('039-bug-report-fix-links.sql')
-    migrations.push('040-bug-report-release-feedback.sql')
-    migrations.push('041-historical-feedback-subjects.sql')
-    migrations.push('042-feedback-summary-and-deletion.sql')
+    migrations.push('040-bug-report-feedback.sql')
+    migrations.push('041-bug-report-triage.sql')
+    migrations.push('042-bug-report-fix-links.sql')
+    migrations.push('043-bug-report-release-feedback.sql')
+    migrations.push('044-historical-feedback-subjects.sql')
+    migrations.push('045-feedback-summary-and-deletion.sql')
     for (const [index, filename] of migrations.entries()) {
       const version = index + 1
       if (await db.prepare('SELECT version FROM postgres_schema_migrations WHERE version = ?').get(version)) continue

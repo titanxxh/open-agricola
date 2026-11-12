@@ -6,12 +6,12 @@
 // @covers client/app/GameContainerApi.tsx
 // @covers client/app/SettingsPage.tsx
 import { expect, test } from '@playwright/test'
-import { startHostedReleaseAppWithExperimentalFeatures } from './helpers/experimental-features-app'
+import { startHostedReleaseAppWithBetaAccess } from './helpers/beta-access-app'
 import { PostgresDatabase } from '../server/database/postgres'
 
-let app: Awaited<ReturnType<typeof startHostedReleaseAppWithExperimentalFeatures>>
+let app: Awaited<ReturnType<typeof startHostedReleaseAppWithBetaAccess>>
 test.use({ actionTimeout: 10000 })
-test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithExperimentalFeatures() })
+test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithBetaAccess() })
 test.afterAll(async () => { await app?.close() })
 
 test('a signed-in player can open an account inbox without leaving the lobby', async ({ browser }) => {
@@ -182,6 +182,21 @@ test('older inbox pages append in stable order without marking messages read', a
     await expect(inbox.locator('.inbox-list > li').last()).toContainText('Report update 1')
     await expect(inbox.getByRole('button', { name: 'Older messages', exact: true })).toHaveCount(0)
     expect(await (await context.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).toMatchObject({ unreadCount: 21 })
+    await inbox.getByRole('button', { name: /Report update 1 Unread/ }).click()
+    await expect(inbox.getByRole('heading', { name: 'Report update 1', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Inbox, 20 unread', exact: true })).toBeVisible()
+    await inbox.getByRole('button', { name: 'Back to messages', exact: true }).click()
+    await expect(inbox.locator('.inbox-list > li')).toHaveCount(21)
+    await expect(inbox.locator('.inbox-list > li').last()).toContainText('Read')
+    const refreshed = page.waitForResponse(response => response.url().endsWith('/api/v1/inbox') && response.ok())
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await refreshed
+    await expect(inbox.locator('.inbox-list > li')).toHaveCount(21)
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Inbox, 20 unread', exact: true }).click()
+    await expect(inbox.locator('.inbox-list > li')).toHaveCount(21)
+    await expect(inbox.getByRole('button', { name: 'Older messages', exact: true })).toHaveCount(0)
+
   } finally { await context.close().catch(() => {}) }
 })
 
