@@ -37,9 +37,9 @@ pnpm install --frozen-lockfile
 pnpm release vX.Y.Z --ref main
 ```
 
-正式候选必须是所选仓库受保护 `main` 上某个已合入 PR 的最终集成快照。门禁明确解析 `refs/heads/main`，同名 tag 不能改变选择；同时核对原生仓库/PR 身份与原始 Git 对象可达性。未合入或中间快照在 dispatch、发布、安装候选和 SSH 前被拒绝。main 前进后，合格的旧最终快照仍可使用。已批准的最终代码树定义验证实现，配置哈希不提供批准。原生治理信任已授权的 override 权限，不证明历史策略；该新增准入策略见 ADR 0037。
+正式候选必须是所选仓库受保护 `main` 上某个已合入 PR 的最终集成快照。门禁明确解析 `refs/heads/main`，同名 tag 不能改变选择；同时核对原生仓库/PR 身份与原始 Git 对象可达性。未合入或中间快照在 dispatch、发布、安装候选和 SSH 前被拒绝。main 前进后，合格的旧最终快照仍可使用。独立固定的受保护 main producer P 为候选 C 定义编排；P 的原生 main 身份提供策略授权，双方源码配置哈希仅标识兼容执行。原生治理信任已授权的 override 权限，不证明历史策略；该新增准入策略见 ADR 0037。
 
-命令只解析一次候选，并打印完整 SHA。它复用同一 SHA、同一验证配置的完整 GitHub 成功证据。必需任务缺失或失败时，命令通过 `verification/candidates/<SHA>` 请求这些任务，等待全部通过。该分支固定保留供重试使用。已有同名分支指向其他提交时直接拒绝，不强制更新。
+命令只解析一次 C 并打印完整 SHA。`verification/candidates/<SHA>` 固定保留为候选源码 lease；已有引用指向其他提交时拒绝且不强制更新。必需任务缺失或失败时，在 main P 上请求 `candidate-verification.yml`。查找原生 run 名称 `stable / <C> / <tasks>` 及其 `Stable manifest` 绑定：仓库 ID、stable 通道、C、C/P 双方配置及 P。run head 是 P，候选 payload 仍是 C。兼容的完整证据可复用，但新的 P/C 尝试未完成、失败或配置不兼容时不能退回历史旧绿。历史回执资格由 [CI 检查](operations/ci-checks.md) 的可信 cutoff 限定。
 
 完整证据通过后，命令才创建版本 tag 和 Release。即使验证期间 `main` 移动，Release 目标仍是固定的 SHA。已有 tag 或 Release 指向其他 SHA 时拒绝；同一 SHA 的已发布 Release 直接复用，不重写 tag，也不重复创建 Release。
 

@@ -106,19 +106,23 @@ export function printVerificationOutput(message: string, stream: 'stdout' | 'std
   else console.log(escapeWorkflowCommands(message))
 }
 
+export function candidateEnvironment(execution: CandidateExecution, environment: Record<string, string> = {}): Record<string, string> {
+  return {
+    HOME: execution.home, USER: 'oa-candidate', LOGNAME: 'oa-candidate',
+    PATH: `${dirname(execution.node)}:/usr/local/bin:/usr/bin:/bin`,
+    XDG_RUNTIME_DIR: '/run/user/61000', DOCKER_HOST: `unix://${execution.socket}`,
+    CI: 'true', GITHUB_ACTIONS: 'true', TERM: 'dumb', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
+    SHARED_DATA_DIR: join(execution.work, 'data'), LOCAL_SERVICES_DIR: join(execution.work, 'data'), REPLAY_VIEWER_ROOT: join(execution.home, 'replay-viewers'),
+    ...environment,
+  }
+}
+
 export function executeCandidate(execution: CandidateExecution, command: string, args: string[], phase: string, environment: Record<string, string> = {}): number {
   if (!/^[a-z0-9-]+$/.test(phase)) throw new Error('Invalid candidate execution phase')
   const log = join(execution.privateDirectory, `${phase}.log`)
   const fd = openSync(log, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
   try {
-    const env = {
-      HOME: execution.home, USER: 'oa-candidate', LOGNAME: 'oa-candidate',
-      PATH: `${dirname(execution.node)}:/usr/local/bin:/usr/bin:/bin`,
-      XDG_RUNTIME_DIR: '/run/user/61000', DOCKER_HOST: `unix://${execution.socket}`,
-      CI: 'true', GITHUB_ACTIONS: 'true', TERM: 'dumb', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
-      SHARED_DATA_DIR: join(execution.home, 'data'), REPLAY_VIEWER_ROOT: join(execution.home, 'replay-viewers'),
-      ...environment,
-    }
+    const env = candidateEnvironment(execution, environment)
     const result = spawnSync('/usr/bin/sudo', ['-n', '/usr/bin/systemd-run', '--quiet', '--wait', '--pipe', '--collect',
       `--unit=oa-candidate-${phase}`, `--slice=user-${execution.uid}.slice`, `--uid=${execution.uid}`, `--gid=${execution.gid}`,
       '--property=NoNewPrivileges=yes', '--property=SupplementaryGroups=', '--property=KillMode=control-group',

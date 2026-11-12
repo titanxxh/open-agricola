@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { taskCommands } from '../ci/verification-tasks'
-import { collectCandidateDiagnostics, displayCandidateLog, verifyCandidateSources, escapeWorkflowCommands } from '../ci/candidate-isolation'
+import { collectCandidateDiagnostics, displayCandidateLog, verifyCandidateSources, escapeWorkflowCommands, candidateEnvironment } from '../ci/candidate-isolation'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -139,7 +139,7 @@ it.each([true, false])('waits for recursive cgroup emptiness and rejects a popul
   const prefix = source.slice(0, source.indexOf('[[ $EUID'))
   const result = spawnSync('/bin/bash', ['-s', root], { encoding: 'utf8',
     input: prefix + (clears ? '\n(sleep 0.2; printf "populated 0\\nfrozen 0\\n" > "$1/cgroup.events") &\n' : '\n')
-      + 'wait_candidate_cgroup "$1" 1\ncat "$1/cgroup.events"\n',
+      + `wait_candidate_cgroup "$1" ${clears ? 3 : 1}\ncat "$1/cgroup.events"\n`,
   })
   expect(result.status).toBe(clears ? 0 : 1)
   expect(result.stdout).toBe(clears ? 'populated 0\nfrozen 0\n' : '')
@@ -159,4 +159,23 @@ it.each(['package', 'suite-root', 'suite-entry'])('rejects candidate %s links be
     else { mkdirSync(join(value.source, 'e2e-tests')); symlinkSync(outside, join(value.source, 'e2e-tests/nested')) }
     expect(() => taskCommands(value.source, 'chromium-1')).toThrow('Candidate browser suite must contain only regular files and directories')
   }
+})
+
+it('shares the public dependency file between CI service preparation and existing test readers', () => {
+  const value = fixture(), repository = resolve(import.meta.dirname, '../..'), bin = join(value.root, 'bin')
+  mkdirSync(bin); symlinkSync(execFileSync('which', ['git'], { encoding: 'utf8' }).trim(), join(bin, 'git'))
+  const env = candidateEnvironment({ uid: 61000, gid: 61000, home: value.root, work: value.work, node: process.execPath,
+    socket: join(value.root, 'inert-socket'), privateDirectory: value.output }, { PATH: bin })
+  const prepared = spawnSync(process.execPath, [join(repository, 'scripts/local-services.mjs'), '--skip-observability'], {
+    cwd: value.work, encoding: 'utf8', env: { ...env, DATABASE_URL: 'postgres://inert@127.0.0.1/inert',
+      TEST_DATABASE_URL: 'postgres://inert@127.0.0.1/inert_test', S3_ENDPOINT: 'https://inert.example.invalid',
+      S3_BUCKET: 'inert', S3_REGION: 'us-east-1', S3_ACCESS_KEY_ID: 'inert', S3_SECRET_ACCESS_KEY: 'inert' },
+  })
+  expect(prepared.status, prepared.stderr).toBe(0)
+  const read = spawnSync(process.execPath, [join(repository, 'node_modules/tsx/dist/cli.mjs'), '-e',
+    `import {getTestDatabaseUrl} from ${JSON.stringify(join(repository, 'server/__tests__/_helpers/postgres.ts'))}; import {testStorageEnvironment} from ${JSON.stringify(join(repository, 'server/__tests__/_helpers/objects.ts'))}; console.log(JSON.stringify({database:getTestDatabaseUrl(),bucket:testStorageEnvironment().S3_BUCKET}))`], {
+    cwd: value.work, encoding: 'utf8', env,
+  })
+  expect(read.status, read.stderr).toBe(0)
+  expect(JSON.parse(read.stdout)).toEqual({ database: 'postgres://inert@127.0.0.1/inert_test', bucket: 'agricola-test' })
 })
