@@ -154,6 +154,7 @@ export async function verifyFeedbackDeployment(cwd: string, input: string[]): Pr
   if (!tagSha) throw new Error('Release tag has no exact commit')
   const sha = candidateSha(cwd, RELEASE_REPOSITORY, tagSha)
   if (sha !== tagSha) throw new Error('Release tag commit changed')
+  const commits = ancestry(cwd, sha)
   const candidate = checkCandidateVerification(cwd, RELEASE_REPOSITORY, sha)
   if (candidate.status !== 'passed' || candidate.sha !== sha || candidate.repository !== RELEASE_REPOSITORY
     || !candidate.tasks.length || candidate.tasks.some(task => task.status !== 'passed')) throw new Error('Full same-SHA GitHub candidate verification is incomplete')
@@ -165,7 +166,7 @@ export async function verifyFeedbackDeployment(cwd: string, input: string[]): Pr
   const backendMetadata = backend(target)
   const proof = parseDeploymentProof({ repository: RELEASE_REPOSITORY,
     release: { version, url: release.html_url, sha, tagSha, draft: false, prerelease: false, publishedAt }, candidate: { ...candidate, requiredTaskIds: candidate.tasks.map(task => task.id) },
-    frontend: frontendMetadata, backend: backendMetadata, ancestry: { format: 'git-raw-closure-v1', commits: ancestry(cwd, sha) }, observedAt: Date.now() })
+    frontend: frontendMetadata, backend: backendMetadata, ancestry: { format: 'git-raw-closure-v1', commits }, observedAt: Date.now() })
   if (commitRef(RELEASE_REPOSITORY, `tags/${version}`) !== sha) throw new Error('Release tag changed while observing production')
   const receipt = { operationId: randomUUID(), proof, target }
   writeFileSync(receiptPath, JSON.stringify(receipt) + '\n', { mode: 0o600, flag: 'wx' })

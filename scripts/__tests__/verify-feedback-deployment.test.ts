@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
+import { stableConfiguration } from '../ci/candidate-verification'
 import { createTestDatabase, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 
 const repository = resolve(import.meta.dirname, '../..')
@@ -32,6 +33,7 @@ async function fixture() {
   writeFileSync(join(root, '.gitignore'), 'bin/\nstate.json\nevents.jsonl\nreceipt.json\n')
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   git('init', '-b', 'main'); git('config', 'user.name', 'Feedback test'); git('config', 'user.email', 'feedback@example.test')
+  git('config', `url.file://${join(root, 'unavailable-origin')}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
   git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**'); git('commit', '-m', 'fix fixture')
   const fixSha = git('rev-parse', 'HEAD')
   git('commit', '--allow-empty', '-m', 'production fixture')
@@ -50,11 +52,7 @@ async function fixture() {
     child.stdout.on('data', data => { stdout += data }); child.stderr.on('data', data => { stderr += data })
     child.on('error', reject); child.on('close', status => resolve({ status, stdout, stderr }))
   })
-  const manifest = await invoke('scripts/ci/candidate-verification.ts', ['manifest', '--sha', sha])
-  if (manifest.status !== 0) throw new Error(manifest.stderr)
-  const parsed: unknown = JSON.parse(manifest.stdout)
-  if (!parsed || typeof parsed !== 'object' || !('configuration' in parsed) || typeof parsed.configuration !== 'string') throw new Error('Invalid manifest')
-  state.configuration = parsed.configuration; save()
+  state.configuration = stableConfiguration(root, sha, sha); save()
   const prefix = `#!${process.execPath}
 const fs = require('node:fs'); const path = require('node:path'); const root = process.env.FEEDBACK_TEST_ROOT;
 const state = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8')); const args = process.argv.slice(2);
@@ -71,10 +69,10 @@ else if(endpoint === 'releases/tags/v9.9.9') output(state.release);
 else if(endpoint === 'git/ref/tags/v9.9.9') { output({ref:'refs/tags/v9.9.9',object:{type:'commit',sha:state.tag}}); if(state.tagAfterRead){state.tag=state.tagAfterRead;fs.writeFileSync(path.join(root,'state.json'),JSON.stringify(state));} }
 else if(endpoint === 'commits/' + state.sha || endpoint === 'commits/' + state.tag) output({sha:endpoint.slice(8)});
 else if(endpoint === 'actions/workflows/candidate-verification.yml') output({id:100,path:'.github/workflows/candidate-verification.yml'});
-else if(endpoint.startsWith('actions/workflows/100/runs?')) { if(state.evidence !== 'missing') output({id:1,workflow_id:100,path:'.github/workflows/candidate-verification.yml',event:'workflow_dispatch',head_sha:state.sha,repository:{id:1164782262,full_name:'titanxxh/open-agricola'},head_repository:{id:1164782262},status:'completed',run_attempt:1,updated_at:'2026-10-30T00:15:00Z',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1'}); }
+else if(endpoint.startsWith('actions/workflows/100/runs?')) { if(state.evidence !== 'missing') output({id:1,workflow_id:100,path:'.github/workflows/candidate-verification.yml',event:'workflow_dispatch',head_sha:state.sha,head_branch:'main',display_title:'stable / ' + state.sha + ' / all',repository:{id:1164782262,full_name:'titanxxh/open-agricola'},head_repository:{id:1164782262},status:'completed',run_attempt:1,updated_at:'2026-10-30T00:15:00Z',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1'}); }
 else if(endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
-  output({id:1,run_id:1,run_attempt:1,name:'candidate-manifest',status:'completed',conclusion:'success',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1/jobs/1',started_at:'2026-10-30T00:00:00Z',completed_at:'2026-10-30T00:01:00Z',steps:[step('Generate candidate manifest'),step('Candidate manifest / ' + state.sha + ' / ' + state.configuration + ' / ' + tasks.join(','))]});
-  tasks.filter(task => !(state.evidence === 'partial' && task === 'slow')).forEach((task,index) => output({id:index+2,run_id:1,run_attempt:1,name:'candidate / ' + task + ' / ' + state.configuration,status:'completed',conclusion:state.evidence === 'failed' && task === 'webkit' ? 'failure' : 'success',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1/jobs/' + (index+2),started_at:'2026-10-30T00:05:00Z',completed_at:'2026-10-30T00:10:00Z',steps:['Checkout candidate','Install dependencies','Verify candidate checkout','Execute verification task','Install browsers'].map(step)}));
+  output({id:1,run_id:1,run_attempt:1,name:'candidate-manifest',status:'completed',conclusion:'success',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1/jobs/1',started_at:'2026-10-30T00:00:00Z',completed_at:'2026-10-30T00:01:00Z',steps:[step('Generate candidate manifest'),step('Stable manifest / 1164782262 / stable / ' + state.sha + ' / ' + state.configuration + ' / ' + state.sha + ' / ' + tasks.join(','))]});
+  tasks.filter(task => !(state.evidence === 'partial' && task === 'slow')).forEach((task,index) => output({id:index+2,run_id:1,run_attempt:1,name:'candidate / ' + task + ' / ' + state.configuration,status:'completed',conclusion:state.evidence === 'failed' && task === 'webkit' ? 'failure' : 'success',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1/jobs/' + (index+2),started_at:'2026-10-30T00:05:00Z',completed_at:'2026-10-30T00:10:00Z',steps:['Checkout candidate','Install dependencies','Verify candidate checkout','Execute verification task','Install browsers','Prepare candidate isolation','Prove native candidate isolation','Stop candidate descendants and collect private diagnostics'].map(step)}));
 } else throw Error('Unexpected GitHub endpoint: ' + endpoint);
 `)
   writeFileSync(join(root, 'bin/ssh'), prefix + `
