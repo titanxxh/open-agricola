@@ -41,6 +41,12 @@ function relatedReports(value: unknown): RelatedFeedbackReport[] {
   })
 }
 
+function historicalRelease(value: unknown): { version: string; url: string } {
+  if (!value || typeof value !== 'object' || !('version' in value) || typeof value.version !== 'string' || !/^v\d+\.\d+\.\d+$/.test(value.version)
+    || !('url' in value) || value.url !== `https://github.com/titanxxh/open-agricola/releases/tag/${value.version}`) throw new Error('invalid_feedback_response')
+  return { version: value.version, url: value.url }
+}
+
 function message(value: unknown): InboxMessage {
   if (!value || typeof value !== 'object' || !('readAt' in value) || (value.readAt !== null && !integer(value.readAt))) throw new Error('invalid_feedback_response')
   if ('kind' in value && value.kind === 'fix_released') {
@@ -49,7 +55,7 @@ function message(value: unknown): InboxMessage {
       || !('rootId' in value.release) || typeof value.release.rootId !== 'string'
       || !('firstVerified' in value.release) || !('reports' in value.release)) throw new Error('invalid_feedback_response')
     return { ...base, kind: 'fix_released', version: null, readAt: value.readAt,
-      release: { rootId: value.release.rootId, firstVerified: productionRelease(value.release.firstVerified), reports: relatedReports(value.release.reports) },
+      release: { rootId: value.release.rootId, firstVerified: productionRelease(value.release.firstVerified), reports: relatedReports(value.release.reports), ...('historicalFirstIncluded' in value.release ? { historicalFirstIncluded: historicalRelease(value.release.historicalFirstIncluded) } : {}) },
       ...('relatedReports' in value ? { relatedReports: relatedReports(value.relatedReports) } : {}),
       ...('currentProduction' in value ? { currentProduction: productionRelease(value.currentProduction) } : {}) }
   }
