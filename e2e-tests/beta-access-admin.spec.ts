@@ -1,4 +1,3 @@
-import { browserRequestHeaders } from './fixtures'
 // @covers server/beta-access-routes.ts
 // @covers server/beta-access-store.ts
 // @covers client/app/BetaAccessSettings.tsx
@@ -7,6 +6,7 @@ import { browserRequestHeaders } from './fixtures'
 // @covers client/app/LobbyPage.tsx
 // @covers client/app/PrereleaseEntry.tsx
 // @covers client/contexts/AuthContext.tsx
+import { browserRequestHeaders } from './fixtures'
 import { expect, test, type Page } from '@playwright/test'
 import { startHostedReleaseAppWithBetaAccess } from './helpers/beta-access-app'
 import { PostgresDatabase } from '../server/database/postgres'

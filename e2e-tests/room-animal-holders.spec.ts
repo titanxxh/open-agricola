@@ -1,5 +1,5 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers client/components/board/
+import { authCookieNames } from '../server/auth-cookies'
 import { expect, test, type Page, type APIResponse } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'

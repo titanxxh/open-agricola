@@ -1,6 +1,6 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers client/app/workshop/
 // @covers client/services/llm/
+import { authCookieNames } from '../server/auth-cookies'
 import { createHash } from 'node:crypto'
 import { expect, type Route } from '@playwright/test'
 import { test } from './server-fixtures'

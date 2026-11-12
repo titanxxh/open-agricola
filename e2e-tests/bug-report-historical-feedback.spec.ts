@@ -1,9 +1,9 @@
-import { browserRequestHeaders } from './fixtures'
 // @covers server/bug-report/historical-feedback.ts
 // @covers server/bug-report/historical-feedback-cli.ts
 // @covers server/bug-report/feedback-service.ts
 // @covers server/bug-report-routes.ts
 // @covers client/app/Inbox.tsx
+import { browserRequestHeaders } from './fixtures'
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { expect, test } from '@playwright/test'

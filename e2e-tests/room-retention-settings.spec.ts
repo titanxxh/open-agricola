@@ -1,8 +1,8 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers client/app/RoomRetentionSettings.tsx
 // @covers client/app/OperationsPage.tsx
 // @covers server/retention-policy-routes.ts
 // @covers server/game/room-retention-store.ts
+import { authCookieNames } from '../server/auth-cookies'
 import { expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { test } from './server-fixtures'

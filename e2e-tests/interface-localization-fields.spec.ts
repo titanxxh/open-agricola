@@ -1,5 +1,5 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers client/contexts/
+import { authCookieNames } from '../server/auth-cookies'
 import { expect, test, type APIResponse, type Page, type APIRequestContext } from '@playwright/test'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
 

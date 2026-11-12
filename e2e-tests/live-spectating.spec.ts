@@ -1,6 +1,6 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers client/styles/pages/
 // @covers server/connection/
+import { authCookieNames } from '../server/auth-cookies'
 import { expect, test, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL, openGameEndControls } from './fixtures'
 import type { Locale } from '../shared/i18n'

@@ -1,6 +1,6 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers server/game/persistence/
 // @covers client/hooks/
+import { authCookieNames } from '../server/auth-cookies'
 import {
   expect,
   test,

@@ -1,4 +1,3 @@
-import { browserRequestHeaders } from './fixtures'
 // @covers server/bug-report/feedback-service.ts
 // @covers server/bug-report-feedback-routes.ts
 // @covers client/app/Inbox.tsx
@@ -6,6 +5,7 @@ import { browserRequestHeaders } from './fixtures'
 // @covers client/app/LobbyPage.tsx
 // @covers client/app/GameContainerApi.tsx
 // @covers client/app/SettingsPage.tsx
+import { browserRequestHeaders } from './fixtures'
 import { expect, test } from '@playwright/test'
 import { startHostedReleaseAppWithBetaAccess } from './helpers/beta-access-app'
 import { PostgresDatabase } from '../server/database/postgres'
