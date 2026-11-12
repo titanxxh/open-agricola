@@ -239,6 +239,14 @@ export function assertRawCommit(cwd: string, repository: string, sha: string): v
   }
 }
 
+function completeCommitAncestry(cwd: string, repository: string, sha: string): void {
+  assertRawCommit(cwd, repository, sha)
+  if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd, encoding: 'utf8' }).trim() === 'true') {
+    execFileSync('git', ['fetch', '--no-tags', '--unshallow', `https://github.com/${repository}.git`, sha],
+      { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+  }
+}
+
 export function admitFinalSnapshot(cwd: string, repository: string, sha: string) {
   try {
     const metadata = object(github(`repos/${repository}`))
@@ -262,7 +270,7 @@ export function admitFinalSnapshot(cwd: string, repository: string, sha: string)
     })
     if (!integrated) throw new Error('Candidate must be a final merged pull request snapshot on protected main')
     assertRawCommit(cwd, repository, sha)
-    assertRawCommit(cwd, repository, main)
+    completeCommitAncestry(cwd, repository, main)
     if (spawnSync('git', ['merge-base', '--is-ancestor', sha, main], { cwd, stdio: 'ignore' }).status !== 0) {
       throw new Error('Candidate is not reachable from the explicitly resolved main commit')
     }
@@ -275,11 +283,7 @@ export function admitFinalSnapshot(cwd: string, repository: string, sha: string)
 export const LEGACY_STABLE_CUTOFF = '53b8a0ccf5649ce3bb7084303f0677e46c1d20e7'
 export function historicalStableSnapshot(cwd: string, sha: string): boolean {
   fullSha(sha)
-  assertRawCommit(cwd, 'titanxxh/open-agricola', LEGACY_STABLE_CUTOFF)
-  if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd, encoding: 'utf8' }).trim() === 'true') {
-    execFileSync('git', ['fetch', '--no-tags', '--unshallow', 'https://github.com/titanxxh/open-agricola.git', LEGACY_STABLE_CUTOFF],
-      { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
-  }
+  completeCommitAncestry(cwd, 'titanxxh/open-agricola', LEGACY_STABLE_CUTOFF)
   const result = spawnSync('git', ['merge-base', '--is-ancestor', sha, LEGACY_STABLE_CUTOFF], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   if (result.error) throw result.error
   if (result.status === 0) return true
