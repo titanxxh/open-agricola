@@ -174,7 +174,7 @@ describe('Bug Report feedback HTTP', () => {
   })
   it('protects fix mutations and reads verified pending release associations through the same admin interface', async () => {
     await request('/api/admin/bug-report-feedback', 'admin', { method: 'POST', body: JSON.stringify(input) })
-    const association = { issueNumber: 1465, requestId: 'fix-request-http', expectedVersion: 0, purpose: 'fix',
+    const association = { issueNumber: 1465, requestId: 'fix-request-http', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.',
       pullRequests: [{ number: 1500, requiredCommits: ['a'.repeat(40)] }] }
     for (const role of ['', 'reporter', 'other']) {
       expect((await request('/api/admin/bug-report-feedback/fix', role, { method: 'POST', body: JSON.stringify(association) })).status).toBe(role ? 403 : 401)

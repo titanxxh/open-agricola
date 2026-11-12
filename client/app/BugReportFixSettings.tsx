@@ -4,13 +4,17 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { readReportFeedback } from '../services/bug-report-feedback'
 
+const rowsFromReport = (report: ReportFeedbackView) => report.fix?.pullRequests.length
+  ? report.fix.pullRequests.map(pr => ({ id: crypto.randomUUID(), number: String(pr.number), commits: pr.requiredCommits.join('\n') }))
+  : [{ id: crypto.randomUUID(), number: '', commits: '' }]
+
 export function BugReportFixSettings({ report, onChange }: { report: ReportFeedbackView; onChange: (report: ReportFeedbackView) => void }) {
   const { apiFetch } = useAuth()
   const { t } = useLocale()
   const id = useId()
-  const [rows, setRows] = useState(() => report.fix?.pullRequests.length
-    ? report.fix.pullRequests.map(pr => ({ id: crypto.randomUUID(), number: String(pr.number), commits: pr.requiredCommits.join('\n') }))
-    : [{ id: crypto.randomUUID(), number: '', commits: '' }])
+  const [rows, setRows] = useState(() => rowsFromReport(report))
+  const [draftVersions, setDraftVersions] = useState({ fix: report.fix?.version ?? 0, association: report.fix?.associationVersion ?? 0 })
+  const [fixSummary, setFixSummary] = useState(report.fix?.fixSummary ?? '')
   const [rootIssue, setRootIssue] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -26,6 +30,13 @@ export function BugReportFixSettings({ report, onChange }: { report: ReportFeedb
     try {
       const result = await readReportFeedback(await apiFetch(`/api/admin/bug-report-feedback/${path}`, { method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, requestId: pending.current.requestId }) }))
+      if (path === 'fix') {
+        setRows(rowsFromReport(result)); setFixSummary(result.fix?.fixSummary ?? '')
+        setDraftVersions(current => ({ ...current, fix: result.fix?.version ?? 0 }))
+      } else {
+        setRootIssue(result.fix && result.fix.rootId !== result.submissionId ? String(result.fix.rootIssueNumber) : '')
+        setDraftVersions(current => ({ ...current, association: result.fix?.associationVersion ?? 0 }))
+      }
       onChange(result); pending.current = null
       setSaved(path === 'fix' ? 'feedback.fixSaved' : 'feedback.duplicateSaved')
     } catch (cause) {
@@ -38,14 +49,14 @@ export function BugReportFixSettings({ report, onChange }: { report: ReportFeedb
   }
   const saveFix = (event: FormEvent) => {
     event.preventDefault()
-    if (!isRoot || !rows.every(row => positive(row.number) && row.commits.trim())) return
-    void submit('fix', { issueNumber: report.issueNumber, expectedVersion: report.fix?.version ?? 0, purpose: 'fix',
+    if (!isRoot || !rows.every(row => positive(row.number) && row.commits.trim()) || !fixSummary.trim()) return
+    void submit('fix', { issueNumber: report.issueNumber, expectedVersion: draftVersions.fix, purpose: 'fix', fixSummary,
       pullRequests: rows.map(row => ({ number: Number(row.number), requiredCommits: row.commits.trim().split(/[\s,]+/) })) })
   }
   const saveDuplicate = (event: FormEvent) => {
     event.preventDefault()
     if (!positive(rootIssue)) return
-    void submit('duplicate', { issueNumber: report.issueNumber, rootIssueNumber: Number(rootIssue), expectedVersion: report.fix?.associationVersion ?? 0 })
+    void submit('duplicate', { issueNumber: report.issueNumber, rootIssueNumber: Number(rootIssue), expectedVersion: draftVersions.association })
   }
   return <div className="fix-association">
     <h3>{t('feedback.fixTitle')}</h3>
@@ -58,6 +69,7 @@ export function BugReportFixSettings({ report, onChange }: { report: ReportFeedb
       {report.fix.currentProductionRelease && report.fix.currentProductionRelease.sha !== report.fix.firstVerifiedRelease?.sha && <p>
         {t('feedback.currentProductionRelease', { version: report.fix.currentProductionRelease.version })}{' '}
         <a href={report.fix.currentProductionRelease.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: report.fix.currentProductionRelease.version })}</a></p>}
+      {report.fix.fixSummary && <><h4>{t('feedback.fixSummary')}</h4><p>{report.fix.fixSummary}</p></>}
       <h4>{t('feedback.fixReports')}</h4>
       <ul>{report.fix.reports.map(item => <li key={item.submissionId}>
         <a href={`https://github.com/titanxxh/open-agricola/issues/${item.issueNumber}`} target="_blank" rel="noopener noreferrer">#{item.issueNumber}</a>
@@ -73,6 +85,9 @@ export function BugReportFixSettings({ report, onChange }: { report: ReportFeedb
     {busy && <p role="status">{t('platform.loading')}</p>}
     {saved && <p role="status" className="settings-success">{t(saved)}</p>}
     {isRoot ? <form className="settings-form" onSubmit={saveFix}>
+      <div className="form-field"><label htmlFor={`${id}-summary`}>{t('feedback.fixSummary')}</label>
+        <textarea id={`${id}-summary`} required maxLength={2000} value={fixSummary} disabled={busy}
+          onChange={event => { setFixSummary(event.target.value); setSaved('') }} /></div>
       <h4>{t('feedback.fixPullRequests')}</h4>
       <p id={`${id}-commits-hint`} className="settings-hint">{t('feedback.fixCommitHint')}</p>
       {rows.map(row => <fieldset key={row.id} disabled={busy}>
@@ -86,7 +101,7 @@ export function BugReportFixSettings({ report, onChange }: { report: ReportFeedb
       </fieldset>)}
       {rows.length < 5 && <button type="button" className="btn-secondary" disabled={busy}
         onClick={() => setRows([...rows, { id: crypto.randomUUID(), number: '', commits: '' }])}>{t('feedback.fixAddPR')}</button>}
-      <button type="submit" className="btn-primary" disabled={busy || !rows.length || !rows.every(row => positive(row.number) && row.commits.trim())}>{t('feedback.fixSave')}</button>
+      <button type="submit" className="btn-primary" disabled={busy || !fixSummary.trim() || !rows.length || !rows.every(row => positive(row.number) && row.commits.trim())}>{t('feedback.fixSave')}</button>
     </form> : <p className="settings-hint">{t('feedback.fixEditRoot')}</p>}
     <form className="settings-form" onSubmit={saveDuplicate}>
       <div className="form-field"><label htmlFor={`${id}-root`}>{t('feedback.duplicateRoot')}</label>

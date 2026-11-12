@@ -1257,10 +1257,29 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
           OR COALESCE(github_issue_state, 'open') != 'deleted'
         )
     `).run(state, this.now(), issueNumber, state))
+    await this.db.prepare(`UPDATE bug_report_feedback_subjects SET github_issue_state=?
+      WHERE source='historical' AND github_issue_number=? AND (?='deleted' OR COALESCE(github_issue_state,'open')<>'deleted')`)
+      .run(state, issueNumber, state)
+  }
+
+  private async historicalDeletionIssues(userId: string, lock = false): Promise<HistoricalDeletionIssue[]> {
+    const rows = await this.db.prepare(`SELECT submission_id,github_issue_number,recipient_version
+      FROM bug_report_feedback_subjects WHERE source='historical' AND reporter_user_id=?
+      AND COALESCE(github_issue_state,'open')<>'deleted' ORDER BY submission_id ${lock ? 'FOR UPDATE' : ''}`)
+      .all<{ submission_id: string; github_issue_number: number; recipient_version: number }>(userId)
+    return rows.map(row => ({ submissionId: row.submission_id, issueNumber: row.github_issue_number, recipientVersion: row.recipient_version }))
+  }
+
+  async assertHistoricalDeletionIssue(userId: string, expected: HistoricalDeletionIssue): Promise<void> {
+    const current = await this.historicalDeletionIssues(userId)
+    if (!current.some(issue => issue.submissionId === expected.submissionId && issue.issueNumber === expected.issueNumber && issue.recipientVersion === expected.recipientVersion)) {
+      throw new BugReportError('bug_report_deletion_mapping_conflict', 409)
+    }
   }
 
   async reporterDeletionPlan(userId: string): Promise<Awaited<{
     issueNumbers: number[]
+    historicalIssues: HistoricalDeletionIssue[]
     discardedReports: Array<{
       submissionId: string
       submittedAt: number
@@ -1301,6 +1320,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
     }>
     return {
       issueNumbers: issues.map(({ issue_number }) => issue_number),
+      historicalIssues: await this.historicalDeletionIssues(userId),
       discardedReports: discarded.map((report) => ({
         submissionId: report.submission_id,
         submittedAt: report.submitted_at,
@@ -1309,9 +1329,12 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
     }
   }
 
-  async anonymizeReporter(userId: string): Promise<Awaited<void>> {
+  async anonymizeReporter(userId: string, expectedHistorical?: HistoricalDeletionIssue[]): Promise<Awaited<void>> {
     const now = this.now()
     ;(await this.db.transaction(async () => {
+      await this.db.prepare('SELECT id FROM users WHERE id=? FOR UPDATE').get(userId)
+      const current = await this.historicalDeletionIssues(userId, true)
+      if (expectedHistorical && JSON.stringify(current) !== JSON.stringify(expectedHistorical)) throw new BugReportError('bug_report_deletion_mapping_conflict', 409)
       ;(await this.db.prepare(`
         UPDATE bug_reports
         SET reporter_user_id = NULL,
@@ -1331,6 +1354,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
             updated_at = ?
         WHERE reporter_user_id = ?
       `).run(now, now, userId))
+      await this.db.prepare("UPDATE bug_report_feedback_subjects SET reporter_user_id=NULL WHERE source='historical' AND reporter_user_id=?").run(userId)
       ;(await this.disconnect(userId))
     })())
   }
@@ -1433,6 +1457,8 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
     }
   }
 }
+
+type HistoricalDeletionIssue = { submissionId: string; issueNumber: number; recipientVersion: number }
 
 export type IssueDeliveryAdapter = Pick<
   GitHubIssueClient,
@@ -1643,10 +1669,15 @@ export class BugReportDelivery {
           throw new BugReportError(result.code, 503, result.retryAt)
         }
       }
+      for (const issue of plan.historicalIssues) {
+        await this.store.assertHistoricalDeletionIssue(userId, issue)
+        const result = await this.client.anonymizeIssue(issue.issueNumber, userId, issue.submissionId)
+        if (!result.ok) throw new BugReportError(result.code, 503, result.retryAt)
+      }
       if (plan.tokens) {
         await this.revokeGrant(plan.tokens.accessToken)
       }
-      ;(await this.store.anonymizeReporter(userId))
+      ;(await this.store.anonymizeReporter(userId, plan.historicalIssues))
     } finally {
       this.running = false
     }

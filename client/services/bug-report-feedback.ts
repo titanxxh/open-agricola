@@ -1,4 +1,4 @@
-import { isCommitSha, parseFeedbackDetails, type FeedbackRecord, type FixAssociation, type InboxMessage, type InboxPage, type ReportFeedbackView, type VerifiedFixPullRequest, type VerifiedProductionRelease, type RelatedFeedbackReport } from '../../shared/contract/bug-report-feedback'
+import { isCommitSha, parseFeedbackDetails, parseFixSummary, type FeedbackRecord, type FixAssociation, type InboxMessage, type InboxPage, type ReportFeedbackView, type VerifiedFixPullRequest, type VerifiedProductionRelease, type RelatedFeedbackReport } from '../../shared/contract/bug-report-feedback'
 
 export const feedbackKindKey = { confirmed_bug: 'feedback.confirmedBug', not_bug: 'feedback.notBug', needs_info: 'feedback.needsInfo', fix_released: 'feedback.releaseKind' } satisfies Record<InboxMessage['kind'], string>
 
@@ -110,11 +110,7 @@ function fixAssociation(value: unknown): FixAssociation {
     || !('requiredCommits' in value) || !Array.isArray(value.requiredCommits) || !value.requiredCommits.every(isCommitSha)) {
     throw new Error('invalid_feedback_response')
   }
-  const reports = value.reports.map((report: unknown) => {
-    if (!report || typeof report !== 'object' || !('submissionId' in report) || typeof report.submissionId !== 'string'
-      || !('issueNumber' in report) || !integer(report.issueNumber) || !report.issueNumber) throw new Error('invalid_feedback_response')
-    return { submissionId: report.submissionId, issueNumber: report.issueNumber }
-  })
+  const reports = relatedReports(value.reports)
   const pullRequests = value.pullRequests.map((pr: unknown): VerifiedFixPullRequest => {
     if (!pr || typeof pr !== 'object' || !('number' in pr) || !integer(pr.number) || !pr.number
       || !('url' in pr) || pr.url !== `https://github.com/titanxxh/open-agricola/pull/${pr.number}`
@@ -123,7 +119,7 @@ function fixAssociation(value: unknown): FixAssociation {
     return { number: pr.number, url: pr.url, mergeCommit: pr.mergeCommit, requiredCommits: pr.requiredCommits }
   })
   return { rootId: value.rootId, rootIssueNumber: value.rootIssueNumber, version: value.version, associationVersion: value.associationVersion,
-    status: value.status, reports, pullRequests, requiredCommits: value.requiredCommits,
+    status: value.status, fixSummary: 'fixSummary' in value && value.fixSummary !== null ? parseFixSummary(value.fixSummary) : null, reports, pullRequests, requiredCommits: value.requiredCommits,
     ...('firstVerifiedRelease' in value ? { firstVerifiedRelease: productionRelease(value.firstVerifiedRelease) } : {}),
     ...('currentProductionRelease' in value ? { currentProductionRelease: productionRelease(value.currentProductionRelease) } : {}) }
 }

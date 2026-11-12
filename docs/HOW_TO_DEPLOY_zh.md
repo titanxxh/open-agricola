@@ -207,6 +207,8 @@ pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr
 回执绑定核验时的 SSH host 和远端目录。重试未传目标时使用原目标，显式传入不一致目标会在 SSH 前被拒绝。重试保留原操作身份和已存证据，不重复创建 Release、请求候选验证、部署或读取生产构建。保留回执至操作完成。重复核验、重试和晚到重复关联不会为同账号同根修复再发一封信。已有消息和已读时间保持不变。
 
 
+登记修复关联时，维护者必须填写具体修复摘要，说明改变了什么；空白或仅“已修复”等状态词会被拒绝。摘要与完整 PR/提交集合共同形成根修复修订。新上线信将摘要原文固定在消息中，根修复后来修订也不改写旧信或重复发信。升级前没有摘要的根修复返回 `missing_fix_summary`，补充摘要后可复用已有正式核验证据，无需重新部署；历史已发空摘要消息保留原貌。
+
 ## 预览并执行十二条历史报告反馈
 
 此操作独立于发布、部署、迁移和启动。从 owner 本机通过既有 SSH 连接在运行中的 app 容器执行，使用其数据库环境及已完成的迁移。核对主机和目录，并将 `ADMINISTRATOR_SITE_ID` 替换为当前管理员的准确站点 ID。审阅输入和输出文件都留在本机。owner 命令不会迁移、部署、新建 issue 或改写 GitHub 报告。先按上一节保留正式生产核验证据；没有包含修复的已核验部署时，可发送处理结论，上线通知继续等待。
@@ -219,16 +221,16 @@ ssh ubuntu@ten-kr \
   'cd /home/ubuntu/open-agricola && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts' \
   < /private/reviewed-feedback.json > /private/feedback-preview.json
 ssh ubuntu@ten-kr \
-  'cd /home/ubuntu/open-agricola && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts --execute --actor ADMINISTRATOR_SITE_ID' \
+  'cd /home/ubuntu/open-agricola && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts --execute --actor=ADMINISTRATOR_SITE_ID' \
   < /private/reviewed-feedback.json > /private/feedback-result.json
 ```
 
 
 输入、预览和结果可能包含站点身份，使用 mode 600 保存。默认只预览。预览先开启 PostgreSQL 只读事务，再逐项显示接收映射、完整结论及上线文案、缺失项、合入修复证据、版本来源、去重结果和跳过原因。逐项审阅后再显式执行。`projectedMessages` 不是发送回执。
 
-原映射确实缺失时，可提供 `imports` 条目，字段为 `issueNumber`、原 marker 的 `submissionId`、审阅过的 `reporterSiteId`、已有 `roomId`、原公开 issue 完整正文的 SHA-256 `bodySha256`，以及非空 `auditReference`。与已审阅的 #1652 审计和固定项目的原 issue 核对，并将文件保留在 Git 外。导入只创建通知对象；可编辑的公开座位或 Anchor 不会授予原生报告、Replay、取证、保留或 Room 权限。已有匿名化、删除中、歧义或冲突映射不能靠旧 issue 正文恢复。缺少 Game Context 或公开证据冲突时逐项跳过。
+原映射确实缺失时，可提供 `imports` 条目，字段为 `issueNumber`、原 marker 的 `submissionId`、审阅过的 `reporterSiteId`、已有 `roomId`、原公开 issue 完整正文的 SHA-256 `bodySha256`，以及非空 `auditReference`。与已审阅的 #1652 审计和固定项目的原 issue 核对，并将文件保留在 Git 外。导入只创建通知对象，但仍承担原有 GitHub 公开站点 ID 的账号删除匿名化义务。既有 App 核对准确 issue、唯一 marker 和映射版本，完成全部公开匿名化后才清除本地映射；远端失败或证据冲突时保留删除等待状态，可信删除事件沿用既有 tombstone 语义。可编辑的公开座位或 Anchor 不会授予原生报告、Replay、取证、保留或 Room 权限。已有匿名化、删除中、歧义或冲突映射不能靠旧 issue 正文恢复。缺少 Game Context 或公开证据冲突时逐项跳过。
 
-执行跳过已有处理历史，不覆盖后来的结论；先确认，再发送上线反馈。复用日常账号/根修复唯一键，持久 reconciliation 限定已审阅对象和准确修复版本。`newMessages` 是本次已提交的 `insertedTriages` 与 `releasedMessages` 之和，不计并发发送者的信件。`errors` 列出部分失败，`reconciliation.operations` 保留持久操作 ID 和待核验或通知失败详情。历史首次包含版本来自审计，与首次核验生产版本及观测时间分开。
+执行跳过已有处理历史，不覆盖后来的结论；先确认，再发送上线反馈。复用日常账号/根修复唯一键，持久 reconciliation 限定已审阅对象和准确修复版本。`newMessages` 是本次已提交的 `insertedTriages` 与 `releasedMessages` 之和，不计并发发送者的信件。`errors` 列出部分失败，`reconciliation.operations` 保留持久操作 ID 和待核验或通知失败详情。四条历史修复提供已审阅的具体摘要；已有根修复的维护者摘要优先，预览与实际信件均显示该原文。历史首次包含版本来自审计，与首次核验生产版本及观测时间分开。
 
 中断后重新预览，再用同一审阅输入执行 `--execute`。已发送信件和已读状态保持不变。通知事务仍 pending 时，在 owner 本机运行 `pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola --retry-operation OPERATION_ID`，将 `OPERATION_ID` 替换为保存的操作 ID，仅重试该通知操作。持久对象/修复校验阻止重试更换接收人或发送不同修复。遇到 `historical_subject_changed` 时重新审阅预览，不绕过校验，也不重做 Release 或部署。齐备的隔离 fixture 首次产生 16 封，重跑新增 0；实际操作逐项报告跳过，包括默认缺少 #1595 说明。
 

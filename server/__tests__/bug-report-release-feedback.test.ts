@@ -28,7 +28,7 @@ const proof: DeploymentProof = { repository, observedAt: 2000,
   frontend: { format: 1, gameBuildId: deployed, basePath: '/open-agricola/', url: 'https://example.test/open-agricola/frontend-build.json' },
   backend: { gameBuildId: deployed, running: true, ready: true, containerId: 'container-1' },
   ancestry: { format: 'git-raw-closure-v1', commits: [commit, merge, deployed] } }
-const fix = { issueNumber: 1465, requestId: 'fix-request-01', expectedVersion: 0, purpose: 'fix',
+const fix = { issueNumber: 1465, requestId: 'fix-request-01', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.',
   pullRequests: [{ number: 1500, requiredCommits: [commit] }] }
 async function report(issue = 1465, recipient = 'reporter') {
   await db.prepare(`INSERT INTO bug_reports(submission_id,reporter_user_id,room_id,player_index,lifecycle,room_version,step_no,frame_hash,
@@ -272,4 +272,45 @@ describe('verified production fix feedback', () => {
     expect((await service.listInbox('other')).messages.filter(entry => entry.kind === 'fix_released')).toHaveLength(1)
   })
 
+})
+
+it('snapshots the concrete root fix summary for every reporter and preserves sent text on revision', async () => {
+  const summary = 'Adds an explicit discard action for supply goods without advancing the current turn.'
+  await report(1466, 'other')
+  await service.associateDuplicate('admin', { issueNumber:1466,rootIssueNumber:1465,requestId:'summary-duplicate',expectedVersion:0 })
+  await service.associateFix('admin', { ...fix,fixSummary:summary })
+  await service.recordVerifiedDeployment('summary-production',proof)
+  const rootMessage = (await service.listInbox('reporter')).messages.find(message => message.kind === 'fix_released')
+  const duplicateMessage = (await service.listInbox('other')).messages.find(message => message.kind === 'fix_released')
+  expect(rootMessage).toMatchObject({ explanation:summary,reportSummary:'Discard report 1465' })
+  expect(duplicateMessage).toMatchObject({ explanation:summary,reportSummary:'Discard report 1466' })
+  if (!rootMessage) throw new Error('Missing release message')
+  const read = await service.markRead('reporter',rootMessage.id)
+  await service.associateFix('admin', { ...fix,requestId:'summary-revision',expectedVersion:1,fixSummary:'Adds supply-goods discarding with explicit quantities and preserves action availability.' })
+  expect((await service.getReport(1465)).fix).toMatchObject({ version:2,fixSummary:'Adds supply-goods discarding with explicit quantities and preserves action availability.' })
+  expect(await service.getMessage('reporter',rootMessage.id)).toEqual(read)
+  expect((await service.listInbox('other')).messages.filter(message => message.kind === 'fix_released')).toHaveLength(1)
+})
+
+it('requires a specific reviewed fix summary and leaves old roots pending until supplied', async () => {
+  for (const fixSummary of [undefined,'','  ','fixed',' Fixed! ','已 修复！','修复摘要']) {
+    await expect(service.associateFix('admin',{ ...fix,fixSummary })).rejects.toMatchObject({ code:'invalid_fix_association' })
+  }
+  await service.associateFix('admin',fix)
+  await db.prepare("UPDATE bug_report_fix_roots SET fix_summary=NULL WHERE root_id='report-1465'").run()
+  const pending = await service.recordVerifiedDeployment('legacy-root-production',proof)
+  expect(pending).toMatchObject({ status:'completed',result:{ sentMessages:0,pendingFixes:[{ rootId:'report-1465',reason:'missing_fix_summary' }] } })
+  expect((await service.listInbox('reporter')).messages.map(message => message.kind)).toEqual(['confirmed_bug'])
+  await service.associateFix('admin',{ ...fix,requestId:'reviewed-legacy-summary',expectedVersion:1,fixSummary:'Adds a supply-goods discard action while preserving the current turn.' })
+  expect((await service.listInbox('reporter')).messages[0]).toMatchObject({ kind:'fix_released',explanation:'Adds a supply-goods discard action while preserving the current turn.' })
+})
+it('does not rewrite a legacy release without a summary when the root gains reviewed text', async () => {
+  await service.associateFix('admin',fix)
+  await service.recordVerifiedDeployment('legacy-message-production',proof)
+  await db.prepare("UPDATE bug_report_feedback SET explanation='' WHERE kind='fix_released'").run()
+  const original = (await service.listInbox('reporter')).messages[0]
+  const read = await service.markRead('reporter',original.id)
+  await service.associateFix('admin',{ ...fix,requestId:'legacy-message-summary-revision',expectedVersion:1,fixSummary:'Adds resource discarding with explicit quantities and retains the active turn.' })
+  expect(await service.getMessage('reporter',original.id)).toEqual(read)
+  expect((await service.listInbox('reporter')).messages.filter(message => message.kind === 'fix_released')).toHaveLength(1)
 })

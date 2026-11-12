@@ -95,7 +95,7 @@ it('constrains source and final reconciliation to reviewed eligible allowlisted 
   await db.exec(`CREATE FUNCTION fail_release() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
     IF NEW.kind='fix_released' THEN RAISE EXCEPTION 'test notification failure'; END IF; RETURN NEW; END $$;
     CREATE TRIGGER fail_release BEFORE INSERT ON bug_report_feedback FOR EACH ROW EXECUTE FUNCTION fail_release()`)
-  await service.associateFix('admin', { issueNumber: 9999, requestId: 'unrelated-fix', expectedVersion: 0, purpose: 'fix', pullRequests: [{ number: 1534, requiredCommits: [fixes[0].sha] }] })
+  await service.associateFix('admin', { issueNumber: 9999, requestId: 'unrelated-fix', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.', pullRequests: [{ number: 1534, requiredCommits: [fixes[0].sha] }] })
   await db.exec('DROP TRIGGER fail_release ON bug_report_feedback')
   const before = await service.previewHistoricalFeedback(reviewed)
   expect(before.projectedMessages).toBe(16)
@@ -219,7 +219,7 @@ it('fences a concurrent fix edit and never applies historical metadata to a diff
   }
   const backfill = new BugReportFeedbackService(db, () => 3000, new GitHubFixVerifier(paused)).executeHistoricalFeedback('admin', reviewed)
   await atGate
-  await service.associateFix('admin', { issueNumber: 1465, requestId: 'concurrent-daily-fix', expectedVersion: 0, purpose: 'fix', pullRequests: [{ number: 1484, requiredCommits: [fixes[1].sha] }] })
+  await service.associateFix('admin', { issueNumber: 1465, requestId: 'concurrent-daily-fix', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.', pullRequests: [{ number: 1484, requiredCommits: [fixes[1].sha] }] })
   release()
   const result = await backfill
   expect(result.newMessages).toBe(15)
@@ -247,10 +247,37 @@ it('keeps identity-free root metadata after native row deletion for a live dupli
   for (const issueNumber of [1465, 1479]) await service.recordFeedback('admin', { issueNumber, requestId: `native-confirm-${issueNumber}`, expectedVersion: 0, kind: 'confirmed_bug', reportSummary: 'Native report', explanation: 'The missing action is confirmed.' })
   await service.associateDuplicate('admin', { issueNumber: 1479, rootIssueNumber: 1465, requestId: 'native-duplicate', expectedVersion: 0 })
   await service.recordFeedback('admin', { issueNumber: 1479, requestId: 'native-needs-info', expectedVersion: 1, kind: 'needs_info', reportSummary: 'Native report', explanation: 'Please identify the affected action.', missingItems: ['Which action space was occupied?'] })
-  await service.associateFix('admin', { issueNumber: 1465, requestId: 'native-root-fix', expectedVersion: 0, purpose: 'fix', pullRequests: [{ number: 1534, requiredCommits: [fixes[0].sha] }] })
+  await service.associateFix('admin', { issueNumber: 1465, requestId: 'native-root-fix', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.', pullRequests: [{ number: 1534, requiredCommits: [fixes[0].sha] }] })
   await db.prepare("DELETE FROM bug_reports WHERE submission_id='report-1465'").run()
   expect((await service.getReport(1479)).fix?.rootId).toBe('report-1465')
   await service.recordFeedback('admin', { issueNumber: 1479, requestId: 'native-reconfirmed', expectedVersion: 2, kind: 'confirmed_bug', reportSummary: 'Native report', explanation: 'The new report confirms the missing action.' })
   expect((await service.listInbox('other')).messages.map(message => message.kind)).toEqual(['fix_released','confirmed_bug','needs_info','confirmed_bug'])
   expect(await db.prepare("SELECT reporter_user_id,native_submission_id FROM bug_report_feedback_subjects WHERE submission_id='report-1465'").get()).toEqual({ reporter_user_id: null, native_submission_id: null })
+})
+
+it('supplies an audited summary for an old root without reusing its pre-summary request fingerprint', async () => {
+  await service.recordFeedback('admin',{ issueNumber:1465,requestId:'old-historical-triage',expectedVersion:0,kind:'confirmed_bug',reportSummary:'Cannot discard goods',explanation:'The missing discard action is confirmed.' })
+  await db.prepare(`INSERT INTO bug_report_fix_roots(root_id,version,pull_requests,updated_at) VALUES('report-1465',1,?::jsonb,1)`)
+    .run(JSON.stringify([{ number:1534,url:'https://github.com/titanxxh/open-agricola/pull/1534',mergeCommit:fixes[0].sha,requiredCommits:[fixes[0].sha] }]))
+  await db.prepare("INSERT INTO bug_report_fix_links(submission_id,root_id) VALUES('report-1465','report-1465')").run()
+  await db.prepare("INSERT INTO bug_report_fix_requests(submission_id,request_id,fingerprint,created_at) VALUES('report-1465','backfill1675_fix_1465','pre-summary-request',1)").run()
+  const preview = await service.previewHistoricalFeedback(reviewed)
+  expect(preview.rows.find(row => row.issueNumber === 1465)?.fix?.text).toContain('新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。')
+  const result = await service.executeHistoricalFeedback('admin',reviewed)
+  expect(result.errors).toEqual([])
+  expect(result.newMessages).toBe(15)
+  expect((await service.getReport(1465)).fix).toMatchObject({ version:2,fixSummary:'新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。' })
+  expect((await service.listInbox('reporter')).messages.find(message => message.issueNumber === 1465 && message.kind === 'fix_released'))
+    .toMatchObject({ explanation:'新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。' })
+  expect((await service.executeHistoricalFeedback('admin',reviewed)).newMessages).toBe(0)
+})
+it('previews and preserves an existing reviewed root summary instead of replacing it with historical defaults', async () => {
+  const fixSummary = 'Adds a supply-goods discard selector with explicit quantities while preserving the current turn.'
+  await service.recordFeedback('admin',{ issueNumber:1465,requestId:'reviewed-daily-triage',expectedVersion:0,kind:'confirmed_bug',reportSummary:'Cannot discard goods',explanation:'The missing discard action is confirmed.' })
+  await service.associateFix('admin',{ issueNumber:1465,requestId:'reviewed-daily-fix',expectedVersion:0,purpose:'fix',fixSummary,pullRequests:[{ number:1534,requiredCommits:[fixes[0].sha] }] })
+  const preview = await service.previewHistoricalFeedback(reviewed)
+  expect(preview.rows.find(row => row.issueNumber === 1465)?.fix?.text).toContain(fixSummary)
+  await service.executeHistoricalFeedback('admin',reviewed)
+  expect((await service.getReport(1465)).fix).toMatchObject({ version:1,fixSummary })
+  expect((await service.listInbox('reporter')).messages.find(message => message.issueNumber === 1465 && message.kind === 'fix_released')).toMatchObject({ explanation:fixSummary })
 })

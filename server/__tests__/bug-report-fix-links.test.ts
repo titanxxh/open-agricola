@@ -19,7 +19,7 @@ const github: typeof fetch = async resource => {
   if (path.includes('/compare/')) return Response.json({ status: 'ahead', merge_base_commit: { sha: firstCommit } })
   return Response.json({ sha: path.split('/').at(-1) })
 }
-const fixInput = { issueNumber: 1465, requestId: 'fix-request-01', expectedVersion: 0, purpose: 'fix',
+const fixInput = { issueNumber: 1465, requestId: 'fix-request-01', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.',
   pullRequests: [{ number: 1500, requiredCommits: [firstCommit, secondCommit] }] }
 
 beforeEach(async () => {
@@ -46,7 +46,7 @@ async function addReport(issue: number, recipient = 'other') {
 describe('Bug Report fix links', () => {
   it('persists a stable root and the complete verified merged commit set without announcing a release', async () => {
     const associated = await service.associateFix('admin', fixInput)
-    expect(associated.fix).toEqual({ rootId: 'report', rootIssueNumber: 1465, version: 1, associationVersion: 0,
+    expect(associated.fix).toEqual({ rootId: 'report', rootIssueNumber: 1465, version: 1, associationVersion: 0, fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.',
       status: 'pending_release', reports: [{ issueNumber: 1465, submissionId: 'report' }],
       pullRequests: [{ number: 1500, url: `https://github.com/${repository}/pull/1500`, mergeCommit: secondCommit,
         requiredCommits: [firstCommit, secondCommit] }], requiredCommits: [firstCommit, secondCommit] })

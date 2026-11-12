@@ -9,16 +9,16 @@ import { fixEvidenceFingerprint, type GitHubFixVerifier } from './github-fix-ver
 
 const repository = 'titanxxh/open-agricola'
 const issueUrl = (issue: number) => `https://github.com/${repository}/issues/${issue}`
-type HistoricalReport = FeedbackDetails & { issueNumber: number; reportSummary: string; fix?: { number: number; commit: string; firstIncluded: string } }
+type HistoricalReport = FeedbackDetails & { issueNumber: number; reportSummary: string; fix?: { number: number; commit: string; firstIncluded: string; summary: string } }
 const reports: HistoricalReport[] = [
   { issueNumber: 1464, reportSummary: '游戏中途断连', kind: 'needs_info', explanation: '目前还不能确认断连原因。请在原 issue 补充以下信息，便于继续排查。', missingItems: ['断连发生的时点，以及此前的具体操作步骤。', '发生频次，是否每局或同一时点重复发生。', '是整个页面掉线、页面重载，还是只有连接中断；当时页面显示什么。', '是否自动重连、需要刷新，以及重连后能否继续。', '错误提示、控制台错误或截图。', '浏览器及版本、设备与操作系统。', '同局其他玩家是否同时断连。'] },
-  { issueNumber: 1465, reportSummary: '无法主动丢弃已获得资源', kind: 'confirmed_bug', explanation: '已确认缺少主动丢弃资源的能力，影响夜班工人等需要丢弃资源的情况；对应修复已关联。', fix: { number: 1534, commit: 'a94787d1e61004fc863aaf3dbf2171bda834a716', firstIncluded: 'v0.11.8' } },
-  { issueNumber: 1479, reportSummary: '缺少提前结束对局的选项', kind: 'confirmed_bug', explanation: '已确认缺少提前结束对局的操作；修复增加了全员同意后结束对局的能力。', fix: { number: 1484, commit: 'db196efe21951429230301454cee7eef35a8d249', firstIncluded: 'v0.11.7' } },
+  { issueNumber: 1465, reportSummary: '无法主动丢弃已获得资源', kind: 'confirmed_bug', explanation: '已确认缺少主动丢弃资源的能力，影响夜班工人等需要丢弃资源的情况；对应修复已关联。', fix: { number: 1534, commit: 'a94787d1e61004fc863aaf3dbf2171bda834a716', firstIncluded: 'v0.11.8', summary: '新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。' } },
+  { issueNumber: 1479, reportSummary: '缺少提前结束对局的选项', kind: 'confirmed_bug', explanation: '已确认缺少提前结束对局的操作；修复增加了全员同意后结束对局的能力。', fix: { number: 1484, commit: 'db196efe21951429230301454cee7eef35a8d249', firstIncluded: 'v0.11.7', summary: '新增全员同意后提前结束对局的操作，避免不再继续的对局长期留在活动房间。' } },
   { issueNumber: 1490, reportSummary: '对局中频繁自动刷新页面', kind: 'needs_info', explanation: '目前还不能确认自动刷新的原因。请在原 issue 补充以下信息；诊断改进 #1499 不是该问题的已确认修复。', missingItems: ['自动刷新的频次及两次之间的间隔。', '刷新发生时正在进行什么操作或处于什么阶段。', '是整个页面重新加载，还是只有游戏画面闪动或更新。', '刷新后对局进度及刚才的操作是否保留。', '错误提示、控制台错误或截图。', '浏览器及版本、设备与操作系统。'] },
-  { issueNumber: 1504, reportSummary: '建围栏额外收取木材', kind: 'confirmed_bug', explanation: '已确认农场改建时建围栏会多收木材；修复更正了费用并移除了客户端附加费。', fix: { number: 1515, commit: 'd1570f66cd2dac96c0f66d008684cfff12f168f5', firstIncluded: 'v0.11.7' } },
+  { issueNumber: 1504, reportSummary: '建围栏额外收取木材', kind: 'confirmed_bug', explanation: '已确认农场改建时建围栏会多收木材；修复更正了费用并移除了客户端附加费。', fix: { number: 1515, commit: 'd1570f66cd2dac96c0f66d008684cfff12f168f5', firstIncluded: 'v0.11.7', summary: '更正农场改建中的围栏木材费用，并移除客户端重复附加的费用，避免多收木材。' } },
   { issueNumber: 1564, reportSummary: '春季与篱笆护理员建围栏被拒绝', kind: 'not_bug', explanation: '本次拒绝符合规则。当时已有 13 段普通围栏，每人上限为 15 段，只剩 2 段，无法再建 5 段。篱笆护理员及春季只减免木材，不增加围栏件数或上限。错误 key 的显示属于可改进的界面说明。' },
   { issueNumber: 1574, reportSummary: '单人局成人消耗三个食物', kind: 'not_bug', explanation: '本局是单人局。单人规则中，每位成人在收获喂养阶段需要 3 食物，新生儿仍为 1；多人局成人才是 2 食物。这是预期规则。' },
-  { issueNumber: 1586, reportSummary: '非传递双小发展牌出现传递箭头', kind: 'confirmed_bug', explanation: '已确认非传递的双小发展牌错误显示了传递箭头；对应渲染修复已关联。', fix: { number: 1592, commit: 'f9edb37342f4f9deeb2ccd344d5c0b9ab9a3cebf', firstIncluded: 'v0.12.6' } },
+  { issueNumber: 1586, reportSummary: '非传递双小发展牌出现传递箭头', kind: 'confirmed_bug', explanation: '已确认非传递的双小发展牌错误显示了传递箭头；对应渲染修复已关联。', fix: { number: 1592, commit: 'f9edb37342f4f9deeb2ccd344d5c0b9ab9a3cebf', firstIncluded: 'v0.12.6', summary: '修正双小发展牌的传递箭头渲染，非传递牌不再显示传递箭头。' } },
   { issueNumber: 1591, reportSummary: '地块 M066 的文字与计分', kind: 'not_bug', explanation: '地块 Land Parcel 的未使用农场格为 1、2、3 个及以上时，额外奖励分分别为 +2、-1、-3；此项与空格本身每格 -1 分分开计算，与卡面和计分问答一致。' },
   { issueNumber: 1595, reportSummary: '最后一张牌仍需确认选择', kind: 'not_bug', explanation: '' },
   { issueNumber: 1622, reportSummary: '普通收获繁殖阶段无法将动物转为食物', kind: 'not_bug', explanation: '按规则，普通收获的繁殖阶段不能将牲畜，包括新生动物，转换为食物。本局繁殖后多出的一只羊无法安置，因此被放走，这是预期行为。' },
@@ -64,7 +64,7 @@ type Subject = { submission_id: string; reporter_user_id: string | null; github_
 export type HistoricalPreviewRow = { issueNumber: number; issueUrl: string; reportSummary: string; details: FeedbackDetails;
   mapping?: { submissionId: string; recipientId: string; source: 'native' | 'historical' | 'import' };
   skipReason?: string; triage: 'send' | 'already_assessed' | 'skip'; triageText: string;
-  fix?: { pullRequests: VerifiedFixPullRequest[]; historicalFirstIncluded: { version: string; url: string }; status: 'send' | 'already_sent' | 'awaiting_verification' | 'conflict';
+  fix?: { pullRequests: VerifiedFixPullRequest[]; fixSummary: string; historicalFirstIncluded: { version: string; url: string }; status: 'send' | 'already_sent' | 'awaiting_verification' | 'conflict';
     firstVerified?: { version: string; url: string; verifiedAt: number }; currentProduction?: { version: string; url: string; verifiedAt: number }; text: string; reason?: string } }
 export type HistoricalPreview = { projectedMessages: number; rows: HistoricalPreviewRow[] }
 
@@ -104,9 +104,10 @@ export class HistoricalFeedback {
           const firstVerified = convert(plan.firstVerified), currentProduction = convert(plan.currentProduction)
           const exists = await this.db.prepare("SELECT 1 FROM bug_report_feedback WHERE recipient_user_id=? AND root_id=? AND kind='fix_released'").get(row.mapping.recipientId, view?.fix?.rootId ?? row.mapping.submissionId)
           const conflict = view?.fix && (view.fix.rootIssueNumber !== report.issueNumber || (view.fix.pullRequests.length && fixEvidenceFingerprint(view.fix.pullRequests) !== fixEvidenceFingerprint(pullRequests)))
-          row.fix = { pullRequests, historicalFirstIncluded, status: conflict ? 'conflict' : exists ? 'already_sent' : plan.currentProduction ? 'send' : 'awaiting_verification',
+          const fixSummary = view?.fix?.fixSummary ?? report.fix.summary
+          row.fix = { pullRequests, fixSummary, historicalFirstIncluded, status: conflict ? 'conflict' : exists ? 'already_sent' : plan.currentProduction ? 'send' : 'awaiting_verification',
             firstVerified, currentProduction, reason: conflict ? 'fix_evidence_conflict' : !plan.currentProduction ? 'no_verified_containing_production' : undefined,
-            text: `${report.reportSummary}\n修复已上线\n历史首次包含修复的版本：${historicalFirstIncluded.version}\n${historicalFirstIncluded.url}\n${firstVerified ? `首次核验上线版本：${firstVerified.version}\n${firstVerified.url}\n核验时间：${new Date(firstVerified.verifiedAt).toISOString()}` : '等待正式生产核验'}${currentProduction ? `\n核验时生产版本：${currentProduction.version}\n${currentProduction.url}` : ''}\n${issueUrl(report.issueNumber)}` }
+            text: `${report.reportSummary}\n修复已上线\n修复摘要：${fixSummary}\n历史首次包含修复的版本：${historicalFirstIncluded.version}\n${historicalFirstIncluded.url}\n${firstVerified ? `首次核验上线版本：${firstVerified.version}\n${firstVerified.url}\n核验时间：${new Date(firstVerified.verifiedAt).toISOString()}` : '等待正式生产核验'}${currentProduction ? `\n核验时生产版本：${currentProduction.version}\n${currentProduction.url}` : ''}\n${issueUrl(report.issueNumber)}` }
         } catch (error) {
           row.skipReason = error instanceof Error ? error.message : 'historical_preview_failed'
           row.triage = 'skip'
@@ -196,8 +197,8 @@ export class HistoricalFeedback {
         let view = await this.service.getReport(row.issueNumber)
         if (view.submissionId !== context.submissionId || view.feedback.at(-1)?.kind !== 'confirmed_bug') throw new FeedbackError('assessment_conflict', 409)
         if (view.fix?.pullRequests.length && (view.fix.rootIssueNumber !== row.issueNumber || fixEvidenceFingerprint(view.fix.pullRequests) !== fixEvidenceFingerprint(row.fix.pullRequests))) throw new FeedbackError('fix_evidence_conflict', 409)
-        if (!view.fix?.pullRequests.length) view = await this.service.associateFix(actorId, { issueNumber: row.issueNumber, expectedVersion: view.fix?.version ?? 0,
-          requestId: `backfill1675_fix_${row.issueNumber}`, purpose: 'fix', pullRequests: row.fix.pullRequests.map(pr => ({ number: pr.number, requiredCommits: pr.requiredCommits })) }, context)
+        if (!view.fix?.pullRequests.length || !view.fix.fixSummary) view = await this.service.associateFix(actorId, { issueNumber: row.issueNumber, expectedVersion: view.fix?.version ?? 0,
+          requestId: `backfill1670_fix_summary_v1_${row.issueNumber}`, fixSummary: row.fix.fixSummary, purpose: 'fix', pullRequests: row.fix.pullRequests.map(pr => ({ number: pr.number, requiredCommits: pr.requiredCommits })) }, context)
         if (!view.fix || view.fix.rootIssueNumber !== row.issueNumber || fixEvidenceFingerprint(view.fix.pullRequests) !== fixEvidenceFingerprint(row.fix.pullRequests)) throw new FeedbackError('fix_evidence_conflict', 409)
         const operation = await this.service.reconcileVerifiedFixes(`backfill1675_${randomUUID()}`, [row.issueNumber], [{ issueNumber: row.issueNumber,
           submissionId: context.submissionId, recipientVersion: context.recipientVersion, rootId: view.fix.rootId, fixVersion: view.fix.version }])

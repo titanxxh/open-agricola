@@ -394,7 +394,8 @@ const retryPendingAccountDeletion = async (userId?: string): Promise<void> => {
     const operation = await invalidations.latest('user', claim.userId)
     if (operation?.pending) { await deferAccountDeletion(claim, 'instances_retiring', Date.now() + 1000); return }
     const external = await getDb().prepare(`SELECT 1 WHERE EXISTS(SELECT 1 FROM bug_reports WHERE reporter_user_id=? AND (submitted_at IS NOT NULL OR github_issue_number IS NOT NULL))
-      OR EXISTS(SELECT 1 FROM issue_submission_connections WHERE user_id=?)`).get(claim.userId, claim.userId)
+      OR EXISTS(SELECT 1 FROM issue_submission_connections WHERE user_id=?)
+      OR EXISTS(SELECT 1 FROM bug_report_feedback_subjects WHERE source='historical' AND reporter_user_id=? AND COALESCE(github_issue_state,'open')<>'deleted')`).get(claim.userId, claim.userId, claim.userId)
     if (external) {
       if (!bugReportDelivery) throw new BugReportError('bug_report_deletion_failed', 503)
       await bugReportDelivery.deleteReporter(claim.userId)

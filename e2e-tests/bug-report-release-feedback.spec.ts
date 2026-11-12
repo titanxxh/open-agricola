@@ -51,7 +51,7 @@ test('players read the verified release, original and late related reports witho
         explanation: 'The missing discard action is confirmed.',
       } })).status()).toBe(200)
       expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { data: {
-        issueNumber, requestId: 'release-fix-request', expectedVersion: 0, purpose: 'fix', pullRequests: [{ number: 1500, requiredCommits: ['a'.repeat(40)] }],
+        issueNumber, requestId: 'release-fix-request', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit <discard> action for supply goods without advancing the current turn.', pullRequests: [{ number: 1500, requiredCommits: ['a'.repeat(40)] }],
       } })).status()).toBe(200)
       expect((await new BugReportFeedbackService(fixture).recordVerifiedDeployment('ui-deployment-01', proof)).status).toBe('completed')
       expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/release`, { data: { operationId: 'forged-proof', proof } })).status()).toBe(404)
@@ -63,6 +63,8 @@ test('players read the verified release, original and late related reports witho
       await expect(dialog.locator('.inbox-list > li')).toHaveCount(3)
       await dialog.locator('.inbox-list > li').filter({ hasText: `Discard report ${issueNumber}` }).first().getByRole('button').click()
       await expect(dialog.getByText('Fix is live', { exact: true })).toBeVisible()
+      await expect(dialog.getByRole('heading', { name: 'Fix summary', exact: true })).toBeVisible()
+      await expect(dialog.getByText('Adds an explicit <discard> action for supply goods without advancing the current turn.', { exact: true })).toBeVisible()
       const releaseLink = dialog.getByRole('link', { name: 'View release v0.20.0', exact: true }).first()
       await expect(releaseLink).toHaveAttribute('href', 'https://github.com/titanxxh/open-agricola/releases/tag/v0.20.0')
       await expect(dialog.getByRole('heading', { name: 'Related reports', exact: true })).toBeVisible()
@@ -96,6 +98,8 @@ test('players read the verified release, original and late related reports witho
       await page.getByRole('menuitem', { name: /站内信/ }).click()
       await dialog.locator('.inbox-list > li').filter({ hasText: `Discard report ${issueNumber}` }).first().getByRole('button').click()
       await expect(dialog.getByText('修复已上线', { exact: true })).toBeVisible()
+      await expect(dialog.getByRole('heading', { name: '修复摘要', exact: true })).toBeVisible()
+      await expect(dialog.getByText('Adds an explicit <discard> action for supply goods without advancing the current turn.', { exact: true })).toBeVisible()
       await expect(dialog.getByRole('link', { name: `查看 issue #${duplicate}`, exact: true })).toBeVisible()
       await expect(dialog.getByText('首次核验上线版本：v0.20.0', { exact: true })).toBeVisible()
       await expect(dialog.getByText('核验时的生产版本：v0.21.0', { exact: false })).toBeVisible()
