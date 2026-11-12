@@ -30,7 +30,8 @@
     "scripts/__tests__/verification-requirements.test.ts",
     "scripts/__tests__/hosted-release-app.test.ts",
     "scripts/__tests__/release-smoke.test.ts",
-    "scripts/__tests__/release-publish.test.ts"
+    "scripts/__tests__/release-publish.test.ts",
+    "scripts/__tests__/verify-feedback-deployment.test.ts"
   ],
   "exclude": []
 }
