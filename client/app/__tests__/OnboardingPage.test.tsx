@@ -85,6 +85,9 @@ afterEach(() => {
 describe('OnboardingPage', () => {
   it('submits a fragment handoff after removing it from the URL and keeps it retryable until success', async () => {
     vi.stubGlobal('crypto', webcrypto)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ok: true, authorizationUrl: 'https://github.com/login/oauth/authorize?state=registration',
+    }))))
     await prepareOAuthOnboarding('/api/auth/oauth/github/start?intent=register')
     const ticket = 'a'.repeat(43)
     window.history.replaceState(null, '', `/?page=onboarding#onboardingTicket=${ticket}`)

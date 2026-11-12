@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { isDevRoomId, roomIdFromQuery } from '../utils/game-room-url'
 import {
   useCallback,
@@ -108,7 +109,7 @@ function ReportedEvidenceContext({
 
   useEffect(() => {
     const controller = new AbortController()
-    void fetch(
+    void browserApiFetch(
       `${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}`
         + `/evidence/${stepNo}?frame=${frameHash}`,
       { credentials: 'include', signal: controller.signal },
@@ -355,7 +356,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
     const url = new URL(window.location.href)
     url.hash = ''
     window.history.replaceState(null, '', url)
-    void fetch(
+    void browserApiFetch(
       `${API_BASE}/api/v1/issue-submission-connection/github/complete`,
       {
         method: 'POST',
@@ -389,7 +390,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasContext || !roomId) return
     const controller = new AbortController()
-    fetch(`${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}${participantOnly ? '?intent=resume' : ''}`, {
+    browserApiFetch(`${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}${participantOnly ? '?intent=resume' : ''}`, {
       credentials: 'include',
       signal: controller.signal,
     })

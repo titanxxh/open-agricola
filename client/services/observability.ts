@@ -1,3 +1,4 @@
+import { browserApiFetch } from './browser-api'
 import { API_BASE } from '../config'
 import { observationRound, type ObservationRoundState } from '../../shared/contract/observation-round'
 
@@ -16,7 +17,7 @@ export function observeBrowser(kind: 'command_rtt' | 'snapshot_commit' | 'connec
   flushTimer = setTimeout(() => {
     flushTimer = undefined
     const body = JSON.stringify(pending.splice(0))
-    void fetch(`${API_BASE}/api/observability/telemetry`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body }).catch(() => {})
+    void browserApiFetch(`${API_BASE}/api/observability/telemetry`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body }).catch(() => {})
   }, 1000)
 }
 export const markRequest = (id: string) => { if (sampled) { if (requests.size >= 100) requests.clear(); requests.set(id, performance.now()) } }

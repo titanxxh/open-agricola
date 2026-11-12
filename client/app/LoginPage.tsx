@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -116,7 +117,7 @@ export function LoginPage() {
   useEffect(() => {
     if (mode !== 'register') return
     let cancelled = false
-    fetch(`${API_BASE}/api/auth/registration-policy`, { credentials: 'include' })
+    browserApiFetch(`${API_BASE}/api/auth/registration-policy`, { credentials: 'include' })
       .then(async resp => {
         if (!resp.ok) throw new Error('registration policy request failed')
         return await resp.json()

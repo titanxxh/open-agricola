@@ -489,8 +489,8 @@ describe('LobbyPage player count selection', () => {
     fireEvent.click(await screen.findByRole('checkbox', { name: /Reviewed Card/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
 
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards?scope=room&page=1'))
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards?scope=room&page=2'))
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards?scope=room&page=1'), expect.objectContaining({ credentials: 'include' }))
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards?scope=room&page=2'), expect.objectContaining({ credentials: 'include' }))
     expect(setPage).toHaveBeenCalledWith('game', {
       transport: 'ws',
       maxPlayers: '2',

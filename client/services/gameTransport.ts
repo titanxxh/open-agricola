@@ -1,3 +1,5 @@
+import { browserApiFetch } from './browser-api'
+import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { recordBugReportDisconnect } from './bug-report-diagnostics'
 import { markRequest, responseReceived, snapshotReceived, observeBrowser } from './observability'
@@ -90,7 +92,7 @@ import { CLIENT_CAPABILITIES_HEADER, GAME_CLIENT_CAPABILITIES } from '../../shar
 const clientCapabilityHeaders = { [CLIENT_CAPABILITIES_HEADER]: GAME_CLIENT_CAPABILITIES.join(',') }
 
 const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
-  const resp = await fetch(`${API_BASE}${path}`, {
+  const resp = await browserApiFetch(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
@@ -100,7 +102,7 @@ const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
 }
 
 const get = async (path: string): Promise<GameSyncPayload> => {
-  const resp = await fetch(`${API_BASE}${path}`, { credentials: 'include', headers: clientCapabilityHeaders })
+  const resp = await browserApiFetch(`${API_BASE}${path}`, { credentials: 'include', headers: clientCapabilityHeaders })
   return resp.json() as Promise<GameSyncPayload>
 }
 
@@ -131,7 +133,7 @@ export class HttpGameTransport implements GameTransport {
   }
 
   async quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): Promise<FenceSelectionQuote> {
-    const response = await fetch(`${API_BASE}/api/game/fence-quote`, {
+    const response = await browserApiFetch(`${API_BASE}/api/game/fence-quote`, {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
       body: JSON.stringify({ playerIndex, requestKey, payload }),
     })
@@ -236,7 +238,7 @@ export class HttpGameTransport implements GameTransport {
   }
 
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
-    const resp = await fetch(`${API_BASE}/api/game/validate`, {
+    const resp = await browserApiFetch(`${API_BASE}/api/game/validate`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
@@ -361,7 +363,7 @@ export class WsGameTransport implements GameTransport {
     this.ws = null
     previous?.close()
     await new Promise<void>((resolve, reject) => {
-      const socket = new WebSocket(url)
+      const socket = new WebSocket(url, BROWSER_WS_PROTOCOL)
       this.ws = socket
       const scope = this.readScope()
       let authenticated = false
@@ -428,7 +430,7 @@ export class WsGameTransport implements GameTransport {
     const developmentSlot = this.options.developmentSlot === true && !identity && /^dev[2-6]$/.test(this.roomId)
     const base = new URL(this.wsUrl)
     base.protocol = base.protocol === 'wss:' ? 'https:' : 'http:'
-    const response = await fetch(new URL('/api/rooms/locate', base), {
+    const response = await browserApiFetch(new URL('/api/rooms/locate', base), {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...(this.roomId ? { roomId: this.roomId } : { allocationId: this.allocationId }),
         ...(developmentSlot ? { developmentSlot: true } : {}),
@@ -880,7 +882,7 @@ export class WsGameTransport implements GameTransport {
   }
 
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
-    const resp = await fetch(`${API_BASE}/api/game/validate`, {
+    const resp = await browserApiFetch(`${API_BASE}/api/game/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
       body: JSON.stringify({ type, playerId, payload }),

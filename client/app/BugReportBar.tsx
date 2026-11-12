@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { useEffect, useState } from 'react'
 import { API_BASE } from '../config'
 import { collectBugReportDiagnostics } from '../services/bug-report-diagnostics'
@@ -77,7 +78,7 @@ const requestJson = async <T extends object>(
 ): Promise<ApiResponse<T>> => {
   const headers = new Headers(init?.headers)
   if (init?.body !== undefined) headers.set('Content-Type', 'application/json')
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await browserApiFetch(`${API_BASE}${path}`, {
     ...init,
     headers,
     credentials: 'include',

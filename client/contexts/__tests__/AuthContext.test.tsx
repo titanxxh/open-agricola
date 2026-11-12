@@ -34,7 +34,7 @@ describe('AuthProvider', () => {
   it('refreshes the authenticated user from the session endpoint', async () => {
     const user = userEvent.setup()
     let meCalls = 0
-    const fetchMock = vi.fn(async (url: string) => {
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
       if (url.endsWith('/api/auth/me')) {
         meCalls += 1
         if (meCalls === 1) {
@@ -66,6 +66,9 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     expect(screen.getByText('newuser')).toBeInTheDocument()
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(new Headers(init?.headers).get('x-oa-browser-protocol')).toBe('2')
+    }
   })
 
   it('preserves the current route as OAuth login returnTo', async () => {

@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { t as translateMessage } from '../../shared/i18n'
 import { CardTakedownButton } from './workshop/CardTakedownButton'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -637,7 +638,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
   const [isFeatured, setIsFeatured] = useState(!!card.featured)
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/workshop/cards/${card.id}/comments`)
+    browserApiFetch(`${API_BASE}/api/workshop/cards/${card.id}/comments`)
       .then(r => r.json())
       .then(d => { if (d.ok) setComments(d.comments) })
       .catch(() => {})

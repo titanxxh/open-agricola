@@ -1,3 +1,4 @@
+import { browserApiFetch } from './browser-api'
 import { isSoloCreationConfiguration, type SoloCreationConfigurationResponse, type SoloCreationErrorCode, type SoloCreationIssue } from '../../shared/contract/game-creation'
 import { API_BASE } from '../config'
 
@@ -10,7 +11,7 @@ const codes: SoloCreationErrorCode[] = ['login_required', 'not_participant', 'so
 const errorCode = (value: unknown): value is SoloCreationErrorCode => codes.some(code => code === value)
 
 export async function readSoloCreationConfiguration(roomId: string, signal?: AbortSignal): Promise<SoloCreationConfigurationResponse> {
-  const response = await fetch(`${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}/creation-configuration`, {
+  const response = await browserApiFetch(`${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}/creation-configuration`, {
     credentials: 'include', cache: 'no-store', signal,
   })
   const value: unknown = await response.json()

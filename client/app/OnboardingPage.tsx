@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { useEffect, useState, type FormEvent } from 'react'
 import { API_BASE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
@@ -54,7 +55,7 @@ export function OnboardingPage() {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${API_BASE}/api/auth/registration-policy`, { credentials: 'include' })
+    browserApiFetch(`${API_BASE}/api/auth/registration-policy`, { credentials: 'include' })
       .then(resp => {
         if (!resp.ok) throw new Error('registration policy request failed')
         return resp.json()
@@ -100,7 +101,7 @@ export function OnboardingPage() {
     }
     setLoading(true)
     try {
-      const resp = await fetch(`${API_BASE}/api/auth/onboarding/complete`, {
+      const resp = await browserApiFetch(`${API_BASE}/api/auth/onboarding/complete`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

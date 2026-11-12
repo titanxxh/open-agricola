@@ -19,7 +19,7 @@ class FakeWebSocket {
   onclose: (() => void) | null = null
   sent: Array<Record<string, unknown>> = []
 
-  constructor(public readonly url: string) {
+  constructor(public readonly url: string, public readonly protocols?: string | string[]) {
     FakeWebSocket.instances.push(this)
     queueMicrotask(() => this.onopen?.())
   }
@@ -117,6 +117,7 @@ describe('WsGameTransport request correlation', () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
     await transport.connect()
+    expect(FakeWebSocket.instances[0]?.protocols).toBe('oa.browser.v2')
     FakeWebSocket.instances[0]!.emit({ type, roomId: 'shared-ownership', playerIndex: 0,
       controlledPlayerIndexes: [0, 2], visiblePlayerIds: ['p1', 'p3'],
       status: 'playing', maxPlayers: 4, players: [], playerColors: [],

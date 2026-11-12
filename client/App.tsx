@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { LocaleProvider, useLocale } from './contexts/LocaleContext'
 import { loadCardsManifest } from './services/card-meta'
@@ -9,6 +9,7 @@ import { AppErrorBoundary } from './app/AppErrorBoundary'
 import { AppShellLoadScreen } from './app/AppShellLoadScreen'
 import { getGameLoadProgress } from './app/game-load-progress'
 import { GameContextRouter } from './app/GameContextRouter'
+import { getBrowserReloadRequired, subscribeBrowserReload } from './services/browser-api'
 import './styles/bootstrap-shell.css'
 
 const PageRouterLazy = lazy(() =>
@@ -83,11 +84,12 @@ function AppContent() {
 }
 
 function App() {
+  const reloadRequired = useSyncExternalStore(subscribeBrowserReload, getBrowserReloadRequired)
   return (
     <LocaleProvider>
-      <GameContextRouter>
+      {reloadRequired ? <AppLoadFailure /> : <GameContextRouter>
         <AppContent />
-      </GameContextRouter>
+      </GameContextRouter>}
     </LocaleProvider>
   )
 }
