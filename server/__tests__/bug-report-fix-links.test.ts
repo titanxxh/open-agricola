@@ -177,4 +177,16 @@ describe('Bug Report fix links', () => {
     expect((await service.getReport(1465)).fix?.version).toBe(2)
   })
 
+  it('uses the current conclusion when a report was reassessed before fix association', async () => {
+    await addReport(1466)
+    await service.recordFeedback('admin', { issueNumber: 1465, requestId: 'reassess-not-bug', expectedVersion: 1, kind: 'not_bug',
+      reportSummary: 'Discard action', explanation: 'Discarding is optional and this report describes the normal rule.' })
+    await expect(service.associateFix('admin', fixInput)).rejects.toMatchObject({ code: 'fix_requires_confirmed_bug' })
+    await expect(service.associateDuplicate('admin', { issueNumber: 1466, rootIssueNumber: 1465,
+      requestId: 'duplicate-reassessed', expectedVersion: 0 })).rejects.toMatchObject({ code: 'fix_requires_confirmed_bug' })
+    expect((await service.getReport(1465)).fix).toBeUndefined()
+    expect((await service.getReport(1465)).feedback.map(entry => entry.kind)).toEqual(['confirmed_bug', 'not_bug'])
+    expect((await service.getReport(1466)).feedback.map(entry => entry.kind)).toEqual(['confirmed_bug'])
+  })
+
 })
