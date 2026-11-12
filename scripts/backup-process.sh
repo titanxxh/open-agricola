@@ -5,13 +5,16 @@ backup_job_begin() {
   local mode="$1"; shift
   export BACKUP_ENVIRONMENT="${BACKUP_ENVIRONMENT:-stable}"
   [[ "$BACKUP_ENVIRONMENT" == stable || "$BACKUP_ENVIRONMENT" =~ ^prerelease-[a-z0-9-]+$ ]] || { echo 'Invalid backup environment' >&2; return 1; }
+  # Both scheduled and drained maintenance captures share one finite work budget.
+  local backup_limit="$(( $(date +%s%N) / 1000000 + 1790000 ))"
+  if [[ -z "${BACKUP_DEADLINE_EPOCH_MS:-}" ]]; then export BACKUP_DEADLINE_EPOCH_MS="$backup_limit"; fi
+  backup_seconds_left >/dev/null || return
+  # Preserve an earlier caller deadline and reserve ten seconds for cleanup.
+  if (( BACKUP_DEADLINE_EPOCH_MS > backup_limit )); then export BACKUP_DEADLINE_EPOCH_MS="$backup_limit"; fi
   if [[ -z "${BACKUP_JOB_ID:-}" ]]; then
     export BACKUP_JOB_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
     if [[ "$mode" != maintenance ]]; then
-      # Reserve the final ten seconds of the 30-minute budget for bounded cleanup.
-      # Some date implementations ignore %3N width; convert full nanoseconds.
-      export BACKUP_DEADLINE_EPOCH_MS="$(( $(date +%s%N) / 1000000 + 1790000 ))"
-      exec timeout --signal=TERM --kill-after=10s 1790 bash "$0" "$@"
+      exec timeout --signal=TERM --kill-after=10s "$(backup_seconds_left)" bash "$0" "$@"
     fi
   fi
   [[ "$BACKUP_JOB_ID" =~ ^[a-zA-Z0-9-]+$ ]] || { echo 'Invalid backup run identity' >&2; return 1; }

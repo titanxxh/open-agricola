@@ -23,6 +23,8 @@ function offsiteDirectory(directory: string, form: OffsiteDirectoryForm) {
 function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
   mode?: 'full' | 'ledger-only'
   directoryForm?: OffsiteDirectoryForm
+  operation?: 'deploy' | 'reset'
+  deadline?: 'missing' | 'expired'
 } = {}) {
   const temporary = mkdtempSync(join(tmpdir(), 'agricola-native-backup-'))
   const prerelease = fail.startsWith('prerelease-')
@@ -51,8 +53,9 @@ function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
       writeFileSync(join(root, '.env'), 'DATABASE_URL=postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test\nS3_ACCESS_KEY_ID=pre-app\n' + common, { mode: 0o600 })
       writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=postgres://oa_prerelease_test_backup:fixture@127.0.0.1/oa_prerelease_test\nVALIDATION_DATABASE_URL=postgres://oa_prerelease_test_validator:fixture@127.0.0.1/oa_prerelease_test_validation\nS3_ACCESS_KEY_ID=pre-backup\n' + common, { mode: 0o600 })
       chmodSync(join(root, '.env'), 0o600); chmodSync(join(root, 'data/dependencies.compose.env'), 0o600)
-      writeRuntime(target, { ...readRuntime(target), mode: 'open', buildId: sourceBuild, installed: { buildId: sourceBuild, image, installedAt: Date.now() },
-        operation: null, acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64) } })
+      const initial = readRuntime(target)
+      writeRuntime(target, { ...initial, mode: stopped ? 'maintenance' : 'open', buildId: sourceBuild, installed: { buildId: sourceBuild, image, installedAt: Date.now() },
+        operation: offsiteOptions.operation ? { id: '11111111-1111-4111-8111-111111111111', kind: offsiteOptions.operation, buildId: sourceBuild, image, sourceBuildId: sourceBuild, sourceImage: image, stage: 'backup', backupStem: 'manual-test', generation: initial.generation } : null, acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64) } })
     }
     const priorReport = '{"backupStem":"previous-validated-backup"}\n'
     writeFileSync(join(root, 'backups/observability.latest.json'), priorReport)
@@ -170,6 +173,7 @@ case "$*" in
 esac
 `, { mode: 0o700 })
     const remoteDirectory = offsiteDirectory(remote, offsiteOptions.directoryForm ?? 'canonical')
+    const deadline = offsiteOptions.deadline === 'missing' ? undefined : String(Date.now() + (offsiteOptions.deadline === 'expired' ? -1000 : fail === 'deadline' || fail === 'offsite-timeout' ? 2000 : 30_000))
     const run = () => spawnSync('/bin/bash', offsite ? ['backup-offsite.sh', offsiteOptions.mode ?? 'full'] : ['scripts/backup-storage.sh', 'manual-test', ...(stopped ? ['--already-stopped'] : [])], {
       cwd: root,
       env: { ...process.env, CI: fail === 'prerelease-CI' ? 'true' : '', GITHUB_ACTIONS: fail === 'prerelease-GITHUB_ACTIONS' ? 'true' : '',
@@ -183,7 +187,7 @@ esac
         BACKUP_DATA_GENERATION: target && readRuntime(target).generation, BACKUP_TARGET_FINGERPRINT: target && targetFingerprint(target),
         BACKUP_TOOL_SERVICE: target ? 'tools' : undefined, BACKUP_CAPTURE_SERVICE: target ? 'capture' : undefined,
         BACKUP_TOOL_MEMORY_MIB: target && String(target.budgets.tools.memoryMiB), BACKUP_TOOL_CPUS: target && String(target.budgets.tools.cpus), BACKUP_TOOL_PIDS: target && String(target.budgets.tools.pids),
-        BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + (fail === 'deadline' || fail === 'offsite-timeout' ? 2000 : 30_000)) },
+        BACKUP_DEADLINE_EPOCH_MS: deadline },
       encoding: 'utf8', timeout: 15_000,
     })
     const result = run()
@@ -197,6 +201,7 @@ esac
       localFiles: readdirSync(join(root, 'backups')),
       archiveFiles: existsSync(join(root, 'archive-files.nul')) ? readFileSync(join(root, 'archive-files.nul'), 'utf8').split('\0').filter(Boolean) : [],
       remoteFiles: offsite ? readdirSync(remote) : [],
+      deadline, runtime: target ? readRuntime(target) : undefined,
       status: result.status, retryStatus: retry?.status, stderr: result.stderr,
       calls: existsSync(join(root, 'docker-calls')) ? readFileSync(join(root, 'docker-calls'), 'utf8').trim().split('\n') : [],
       users: existsSync(join(root, 'docker-users')) ? readFileSync(join(root, 'docker-users'), 'utf8').trim().split('\n') : [],
@@ -419,3 +424,22 @@ it('keeps stable default age/count limits and separate ledger sync after a real 
   expect(offsiteAt).toBeGreaterThan(pruneAt)
   expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
 }, 15_000)
+
+it.each(['deploy', 'reset'] as const)('captures %s maintenance through the real shell/adapter without a caller deadline', operation => {
+  const result = backup('prerelease-policy', true, false, { operation, deadline: 'missing' })
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.calls.some(call => call.includes('export /backup/') && call.includes('--applications-stopped'))).toBe(true)
+  expect(result.runtime?.mode).toBe('maintenance')
+  expect(result.runtime?.operation?.kind).toBe(operation)
+  expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
+})
+it('preserves an earlier caller deadline for stopped prerelease capture and rejects an expired one', () => {
+  const bounded = backup('prerelease-policy', true, false, { operation: 'deploy' })
+  expect(bounded.status, bounded.stderr).toBe(0)
+  expect(bounded.calls.find(call => call.includes('export /backup/'))).toContain(`org.open-agricola.backup.deadline=${bounded.deadline}`)
+  const expired = backup('prerelease-policy', true, false, { operation: 'reset', deadline: 'expired' })
+  expect(expired.status).not.toBe(0)
+  expect(expired.stderr).toContain('Backup deadline exceeded')
+  expect(expired.calls).toEqual([])
+  expect(expired.runtime?.mode).toBe('maintenance')
+})
