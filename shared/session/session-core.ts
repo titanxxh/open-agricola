@@ -323,6 +323,7 @@ export type HistoryEntry = {
   engineStackCursor: EngineStackCursor
   turnOwnerPlayerIndex: number | null
   actionStart: boolean
+  /** At action start, the boundary protects older history, not this post-observation snapshot. */
   undoBoundary?: boolean
 }
 
@@ -2631,6 +2632,7 @@ export class GameCore {
 
   private restoreHistory(entry: HistoryEntry) {
     this.state = preservePlayerDisplayNames(this.state, restoreSessionState(entry.state, id => this.registry.get(id)))
+    if (entry.actionStart && entry.undoBoundary) this.state.pendingUndoBoundary = true
     this.reconcileRoomAnimals()
     // Task 10/11: the previous GameCore pending field was deleted from
     // `GameState`. S2 Task 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
@@ -2671,7 +2673,7 @@ export class GameCore {
     if (this.state.pendingUndoBoundary === true) return false
     if (this.isFailedAuthoritativeCommand(normalizedCommand('undoStep', null, {}))) return false
     const entry = this.history[this.history.length - 1]
-    return !!entry && entry.undoBoundary !== true
+    return !!entry && (entry.undoBoundary !== true || entry.actionStart)
   }
 
   private canUndoActionNow(): boolean {
@@ -2679,7 +2681,7 @@ export class GameCore {
     if (this.state.pendingUndoBoundary === true) return false
     if (this.isFailedAuthoritativeCommand(normalizedCommand('undoAction', null, {}))) return false
     if (this.actionStartIndex === null) return false
-    return this.actionStartIndex > this.latestUndoBoundaryIndex()
+    return this.actionStartIndex >= this.latestUndoBoundaryIndex()
   }
 
   private filterUndoCommands(base: ReadonlyArray<InteractionCommand>): InteractionCommand[] {
@@ -5633,7 +5635,8 @@ export class GameCore {
     if (this.state.pendingUndoBoundary === true) {
       return this.respond(false, 'cannot undo past boundary')
     }
-    if (this.history.length > 0 && this.history[this.history.length - 1]?.undoBoundary) {
+    const latest = this.history[this.history.length - 1]
+    if (latest?.undoBoundary && !latest.actionStart) {
       return this.respond(false, 'cannot undo past boundary')
     }
     const entry = this.history[this.history.length - 1]

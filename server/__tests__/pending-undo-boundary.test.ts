@@ -1,101 +1,84 @@
-/**
- * Behavioral tests for the state.pendingUndoBoundary one-shot flag in pushHistory.
- *
- * The flag is set by card code (e.g. after rolling random) to mark the next
- * history snapshot as an undo boundary that cannot be stepped past.
- *
- * Strategy:
- *  1. Inject `state.pendingUndoBoundary = true` via `(session as any)` after session
- *     construction but before an action that calls pushHistory.
- *  2. Drive pushHistory indirectly by calling `session.takeAction(...)`.
- *  3. Assert that:
- *     a) The flag is cleared on state after the action completes.
- *     b) The most recent history entry carries undoBoundary: true.
- *  4. Assert that undoStep() is blocked (returns ok:false) because the last
- *     history entry is an undo boundary.
- */
-import { describe, expect, it, beforeEach } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { confirmNextPlayer } from './_helpers/pending-confirms'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext, undoRuleSnapshot } from './_helpers/session-assertions'
 
-describe('state.pendingUndoBoundary consumed by pushHistory', () => {
-  let session: GameSession
+const sessions: GameSession[] = []
+afterEach(() => { for (const session of sessions.splice(0)) session.dispose() })
 
-  beforeEach(() => {
-    session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
+const work = () => {
+  const session = createWorkSession({ options: { deckIds: ['A'] }, configure(state) {
+    state.players[0]!.occupationHand = ['A095_Angler', 'A124_Knapper']
+  } })
+  sessions.push(session)
+  return session
+}
+
+const restore = (session: GameSession) => {
+  const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
+  sessions.push(restored)
+  return restored
+}
+
+describe('pending observation undo boundaries', () => {
+  it.each(['undoStep', 'undoAction'] as const)('%s can return to an action start after disclosure but cannot cross it', command => {
+    let session = work()
+    session.state.pendingUndoBoundary = true
+    assertRejectedUnchanged(session, () => session[command]())
+    const before = undoRuleSnapshot(session.getState())
+
+    const action = session.takeAction(0, 'forest')
+    expect(action.ok, action.error).toBe(true)
+    expect(action.state.pendingUndoBoundary).toBe(false)
+    expect(action.state.players[0]!.resources.wood).toBe(3)
+    session = restore(session)
+    expect(session.getState().interaction.allowedCommands).toContain(command)
+    const undone = session[command]()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undoRuleSnapshot(undone)).toBe(before)
+    expect(undone.interaction.stateId).toBe('idle')
+    expect(undone.state.publicEventArchive.at(-1)).toMatchObject({ type: 'publicEvents.canceled', reason: command })
+    session = restore(session)
+    assertRejectedUnchanged(session, () => session.undoStep())
+    assertRejectedUnchanged(session, () => session.undoAction())
+
+    expect(session.takeAction(0, 'clay-pit').ok).toBe(true)
+    expect(session[command]().ok).toBe(true)
   })
 
-  it('flag is cleared and history entry gets undoBoundary:true', () => {
-    // Inject the one-shot flag before calling an action.
-    ;(session as unknown as { state: GameState }).state.pendingUndoBoundary = true
+  it('keeps disclosure during an action irreversible before and after the next choice', () => {
+    let session = work()
+    const lesson = session.takeAction(0, 'lessons')
+    expect(lesson.ok, lesson.error).toBe(true)
+    expect(lesson.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice' } })
+    session.state.pendingUndoBoundary = true
+    session = restore(session)
+    assertRejectedUnchanged(session, () => session.undoStep())
+    assertRejectedUnchanged(session, () => session.undoAction())
 
-    // Take an action — this calls pushHistory internally.
-    const result = session.takeAction(0, 'forest')
-    expect(result.ok).toBe(true)
-
-    // The flag must be cleared from live state.
-    expect((session as unknown as { state: GameState }).state.pendingUndoBoundary).toBeFalsy()
-
-    // The most recent history entry must carry undoBoundary: true.
-    const history = (session as unknown as { history: { state: { pendingUndoBoundary?: boolean }; undoBoundary?: boolean }[] }).history
-    expect(history.length).toBeGreaterThan(0)
-    const lastEntry = history[history.length - 1]
-    expect(lastEntry?.undoBoundary).toBe(true)
+    const choice = session.resolveChoice(0, 'A095_Angler')
+    expect(choice.ok, choice.error).toBe(true)
+    expect(choice.state.pendingUndoBoundary).toBe(false)
+    expect(choice.state.players[0]!.occupationPlayed).toContain('A095_Angler')
+    session = restore(session)
+    expect(session.getState().interaction.allowedCommands).not.toContain('undoStep')
+    expect(session.getState().interaction.allowedCommands).not.toContain('undoAction')
+    assertRejectedUnchanged(session, () => session.undoStep())
+    assertRejectedUnchanged(session, () => session.undoAction())
   })
 
-  it('persisted history entry does NOT carry a lingering pendingUndoBoundary', () => {
-    ;(session as unknown as { state: GameState }).state.pendingUndoBoundary = true
-
-    session.takeAction(0, 'forest')
-
-    // The snapshot inside the history entry should not have pendingUndoBoundary=true
-    // (it must have been cleared BEFORE cloneState was called).
-    const history: { state: { pendingUndoBoundary?: boolean } }[] = (session as unknown as { history: { state: { pendingUndoBoundary?: boolean }; undoBoundary?: boolean }[] }).history
-    const lastEntry = history[history.length - 1]
-    expect(lastEntry?.state?.pendingUndoBoundary).toBeFalsy()
-  })
-
-  it('undoStep is blocked when the last history entry is an undo boundary', () => {
-    ;(session as unknown as { state: GameState }).state.pendingUndoBoundary = true
-
-    session.takeAction(0, 'forest')
-
-    // undoStep must refuse to cross the boundary entry.
-    const undoResult = session.undoStep()
-    expect(undoResult.ok).toBe(false)
-    expect(undoResult.error).toBe('cannot undo past boundary')
-  })
-
-  it('without the flag, undoStep succeeds normally', () => {
-    // Control test: without pendingUndoBoundary the undo should work.
-    session.takeAction(0, 'forest')
-
-    const undoResult = session.undoStep()
-    expect(undoResult.ok).toBe(true)
-  })
-
-  it('flag is one-shot: only the first pushHistory call gets undoBoundary:true', () => {
-    ;(session as unknown as { state: GameState }).state.pendingUndoBoundary = true
-
-    // First action consumes the flag.
-    session.takeAction(0, 'forest')
-
-    const history = (session as unknown as { history: { state: { pendingUndoBoundary?: boolean }; undoBoundary?: boolean }[] }).history
-    const entryCountAfterFirst = history.length
-    expect(history[entryCountAfterFirst - 1]?.undoBoundary).toBe(true)
-
-    // Undo that action to get back to a state where we can take another action.
-    // (Undo won't work because it's a boundary — we need to take an action for p1.)
-    // Instead confirm next player and let p2 take an action; the flag must NOT be set.
-    confirmNextPlayer(session)
-
-    session.takeAction(1, 'clay-pit')
-
-    const historyAfterSecond: { undoBoundary?: boolean }[] = (session as unknown as { history: { state: { pendingUndoBoundary?: boolean }; undoBoundary?: boolean }[] }).history
-    const lastEntry = historyAfterSecond[historyAfterSecond.length - 1]
-    // This new entry was NOT preceded by pendingUndoBoundary, so it must be falsy.
-    expect(lastEntry?.undoBoundary).toBeFalsy()
+  it('does not carry a disclosure boundary into the next player action', () => {
+    const session = work()
+    session.state.pendingUndoBoundary = true
+    confirmNext(session, session.takeAction(0, 'forest'))
+    const before = undoRuleSnapshot(session.getState())
+    expect(session.takeAction(1, 'clay-pit').ok).toBe(true)
+    const undone = session.undoAction()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undoRuleSnapshot(undone)).toBe(before)
+    expect(undone.state.currentPlayerIndex).toBe(1)
+    expect(undone.state.actionSpaces.find(space => space.id === 'forest')!.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
+    assertRejectedUnchanged(session, () => session.undoStep())
   })
 })
