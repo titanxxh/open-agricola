@@ -133,13 +133,15 @@ Tests: `server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`.
 
 ## HTTP endpoints
 
+`auth-cookies.ts` owns cookie families; `auth.ts` validates session policy versions. Migration 046 retires legacy authentication. `request-auth.ts` admits HTTP/WS requests by origin and protocol, with explicit navigation/service/ops exceptions. Tests: `{request-auth,auth-routes,postgres-auth,observability-http}.test.ts`.
+
 HTTP owns product APIs, operations and debugging. WebSocket commands remain the game synchronization path; validation endpoints never write rule state.
 
 - `beta-access-{routes,store}.ts` owns administrator `/api/admin/beta-access` grants. `experimental-features.ts` derives `/api/auth/me` eligibility from one fresh read. Tests: `beta-access-routes.test.ts`.
 - `GET /api/health`, `/api/rooms`, `/api/game/state` and `/cards-manifest.json` expose health, discovery, snapshots and metadata.
 - `POST /api/game/new` maps WebSocket creation options through `game/game-setup-options.ts`; `load`, `dev/*` and `new-sandbox` are debugging and Workshop entry points.
 - `oauth/{handler,store}.ts` owns provider start/callback/completion. PKCE binds account linking; a browser challenge binds registration tickets. Explicit invalid credentials never fall back to Cookie identity. Account, identity, invite and ticket consumption commit together. Callbacks use fragments, `no-store` and `no-referrer`.
-- `prerelease-authority{,-routes}.ts` owns `/api/prerelease/*`: formal-session handoff, target-key exchange/status and durable revocation/deletion receipts. Migrations 037/039 capture revocation and generation erasure; account deletion waits for live projection cleanup. `prerelease-lifecycle-routes.ts` exposes formal-admin-only retirement and restore audit; native identity manifests and current source facts gate activation. `prerelease-identity.ts` fixes absolute 30-second/source/seven-day bounds. Targets default closed. Authenticated entry GET accepts an absent `Origin` for HTTPS same-origin hosting. Explicit origins and handoff POST remain bound to the configured formal origin. Tests: `{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`; policy: ADR 0042.
+- `prerelease-authority{,-routes}.ts` owns `/api/prerelease/*`: formal-session handoff, target-key exchange/status and durable revocation/deletion receipts. Migrations 037/039 capture revocation and generation erasure; account deletion waits for live projection cleanup. `prerelease-lifecycle-routes.ts` exposes formal-admin-only retirement and restore audit; native identity manifests and current source facts gate activation. `prerelease-identity.ts` fixes absolute 30-second/source/seven-day bounds. Targets default closed. Browser entry and handoff use the shared request policy and current protocol; an absent Origin is allowed only with verified same-origin metadata on a same-origin formal deployment. Tests: `{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`; policy: ADR 0042.
 
 Auth tests: `auth-routes.test.ts`, `oauth/__tests__/store.test.ts`, `e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`.
 

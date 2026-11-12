@@ -435,7 +435,11 @@ export async function createWsServer(
   const allowAnonymous = allowAnonymousWs()
   const wss = new WebSocketServer({
     server, path: '/ws',
-    verifyClient: ({ req }: { req: IncomingMessage }) => websocketAdmission(req).ok,
+    verifyClient: ({ req }: { req: IncomingMessage }, done) => {
+      const admission = websocketAdmission(req)
+      if (admission.ok) done(true)
+      else done(false, admission.status, admission.code)
+    },
     handleProtocols: protocols => protocols.has(BROWSER_WS_PROTOCOL) ? BROWSER_WS_PROTOCOL : false,
   })
   wss.on('connection', (ws, req) => {

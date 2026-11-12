@@ -12,3 +12,7 @@ The previous API-hosted application entry redirects to the Pages frontend and pr
 ## Prerelease entry
 
 The separate prerelease origin uses hosted `/open-agricola/` while production remains at the Pages root. Lobby and Settings expose its configured entry only to qualified accounts, in a new tab. A pre-created verifier remains in a pre host-only HttpOnly cookie. The main handoff page carries only a browser challenge and bounded state, then sends a one-minute, single-use code to the fixed callback fragment. Formal login credentials never leave the formal API host. Missing configuration or owner activation keeps entry unavailable; pre-local authentication and final opening require their own acceptance.
+
+## Same-site prerelease authentication
+
+The prerelease hostname may share `titanxxh.com` while remaining a distinct origin. Production uses the complete `__Host-` authentication cookie family, current persisted session policy, exact configured request origins, and versioned browser HTTP/WS admission. The Pages app refuses framed startup; the credentialless Viewer remains a separate embeddable entry. OAuth starts with a protected POST before navigation. Migration retires old logins without changing retained Rooms. Opening pre requires the deployed formal policy and real Pages/browser evidence, and rollback to older authentication requires closing pre first. Same-parent browser cookie quotas remain shared. Runtime ownership and tests are in the server/client architecture documents; owner commands are in HOW_TO_DEPLOY.md.
