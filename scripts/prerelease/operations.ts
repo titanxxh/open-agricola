@@ -41,7 +41,7 @@ function verifyReceipt(value: unknown, buildId: string | undefined): void {
 
 function parseRequest(value: unknown): OperationRequest {
   const input = object(value)
-  const actions = ['initialize', 'status', 'maintain', 'backup', 'budget-check', 'retention', 'deploy', 'reset', 'reinitialize', 'finish-close', 'open', 'identities', 'apply-identities', 'restore', 'activate-recovery', 'verify-access']
+  const actions = ['initialize', 'status', 'maintain', 'backup', 'budget-check', 'retention', 'deploy', 'reset', 'reinitialize', 'finish-close', 'open', 'identities', 'apply-identities', 'restore', 'activate-recovery', 'verify-access', 'verify-formal-browser', 'reverify']
   if (typeof input.action !== 'string' || !actions.includes(input.action) || typeof input.expectedCurrent !== 'string'
     || !/^(empty|[a-f0-9]{40})$/.test(input.expectedCurrent)) throw new Error('Explicit operation and expected-current SHA are required')
   const optional = (key: string): string | undefined => {
@@ -78,7 +78,7 @@ export async function operations(args: string[]): Promise<void> {
     if (request.action !== 'retention') loadPrereleaseEnvironment(target)
     if (request.action === 'deploy' || request.action === 'open' || request.action === 'restore') verifyReceipt(input.receipt, request.buildId)
     if (args[0] === 'receive') return locked(target, input)
-    process.stdout.write(JSON.stringify(runPrereleaseOperation(target, request)) + '\n')
+    process.stdout.write(JSON.stringify(await runPrereleaseOperation(target, request)) + '\n')
     return
   }
   const values = new Map<string, string>()

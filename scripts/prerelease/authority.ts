@@ -7,6 +7,7 @@ import { atomicJson } from './runtime'
 import { canonicalJson } from '../../shared/contract/authoritative-command'
 import { ownerMachine } from '../release/candidate'
 import { assertOwnerPath, parsePrereleaseTarget, targetFingerprint, type PrereleaseTarget } from './config'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 
 const object = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid authority response')
@@ -25,12 +26,12 @@ export async function requestAuthorityLifecycle(target: PrereleaseTarget, cookie
   assertOwnerPath(path)
   if (path === target.directory || path.startsWith(`${target.directory}${sep}`) || statSync(path).mode & 0o077) throw new Error('Formal owner cookie must stay private and outside the prerelease target')
   const cookie = readFileSync(path, 'utf8').trim()
-  if (!/^[A-Za-z0-9_-]+=[A-Za-z0-9._~-]+$/.test(cookie)) throw new Error('Invalid formal owner cookie file')
+  if (!/^__Host-oa-session=[A-Za-z0-9._~-]+$/.test(cookie)) throw new Error('Invalid formal owner cookie file')
   if (body.targetOrigin !== undefined && body.targetOrigin !== target.origin) throw new Error('Wrong authority lifecycle target')
   const input = JSON.stringify({ ...body, protocolVersion: 1, channel: 'prerelease', targetOrigin: target.origin })
   return new Promise((done, reject) => {
     const outgoing = request(new URL('/api/admin/prerelease-identity/lifecycle', target.formal.apiOrigin), {
-      method: 'POST', ca, timeout: 15000, headers: { Origin: target.formal.appOrigin, Cookie: cookie, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(input) },
+      method: 'POST', ca, timeout: 15000, headers: { Origin: target.formal.appOrigin, Cookie: cookie, [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION), 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(input) },
     }, response => {
       let text = ''
       response.on('data', chunk => {

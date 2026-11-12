@@ -148,9 +148,19 @@ node --import tsx scripts/prerelease/authority.ts activate --config "$pre_config
 node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verification_token_file" "$private_owner_profile"
 ```
 
-pre 与正式 App/API 必须使用独立 Cookie site，包含私有 PSL 后缀；同站的兄弟 hostname 或不同端口会在 owner 副作用及正式交接签发前被拒绝。不要使用正式站的 pre 子域名。网关过滤 HTTP/WS 响应中的 Domain Cookie 和候选对验收 Cookie 的覆盖；JavaScript 的 Cookie 隔离仍依赖不同 site。交接继续使用顶层 PKCE 及服务端兑换，正式 App/API 的同 site 认证保持原约束。
+pre 可以使用 `https://pre.titanxxh.com`，保留正式 Pages/API 地址；必须与两者使用不同 hostname，换端口不能代替主机隔离。仅维护页的 bootstrap 可以早于正式升级。服务候选代码，包括私有 owner 验收，要求运行中的正式浏览器认证策略为 version 2。先部署匹配的正式前后端保护并完成旧会话迁移。owner 生命周期 CLI 只接受新的 `__Host-oa-session` Cookie 文件并发送浏览器协议头；迁移后重新登录取得 owner Cookie。
+
+网关只接受声明的 `__Host-oa-pre-session`、`__Host-oa-pre-handoff` 候选 Cookie，要求 Secure、HttpOnly、Path=/、SameSite=Lax 且没有 Domain。它移除其他候选 Cookie、Clear-Site-Data、入站 Authorization 和未声明的身份头；owner 验收 Cookie 不传给候选。HTTP 拒绝其他 Origin 及没有精确 pre Origin 的不安全方法；WS 要求精确 pre Origin 和 `/ws`。候选身份和房间权限仍由 app 负责。迁移、捕获和存储策略工具只取得数据凭据，不取得 target identity service key。同父域仍共享部分浏览器容量限制，不能承诺独立站点级的 Cookie 可用性隔离。
 
 helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的十分钟 Secure/HttpOnly/host-only Cookie 绑定 build/代次，在转发 HTTP/WS 给候选前剥离；普通浏览器仍为 503。私有浏览器执行正常正式登录和真实 pre 准入，profile 不能挂载给候选。只有候选实现完整流程后，现场才能取得身份/Beta、HTTP/WS、公开卡、Viewer、保留对局/撤回、删除、容量和正式不受影响的真实证据。复制 `deploy/prerelease-acceptance.example.json`，填写精确操作/build/image/代次/指纹、当前毫秒时间 `acceptedAt`、非空证据文件路径和 SHA256；验收三十分钟过期。
+
+增加实际部署的正式前端/API 与同父域浏览器测试的 `browser-boundary` 证据，并采集独立的 `formal-browser-policy` 产物：
+
+```bash
+./deploy-prerelease.sh verify-formal-browser --config "$pre_config" --expected-current "$pre_sha"
+```
+
+把打印的路径与 SHA256 写入 acceptance evidence。产物绑定 pre target/build/generation/operation、实际正式策略及 Pages 的 build marker、HTML 和模块入口字节。open 不带凭据、不跟随重定向，重新读取这些 HTTPS 地址，拒绝已变更或过期的证据。源码、配置开关或已合入 main 不能代替实际部署核对。
 
 浏览器验收后关闭 authority、执行 maintain，再恢复同一 deploy 操作使候选在关闭状态重启。该过程撤销私有入口并 drain 已确认命令。重新扫描/应用身份，紧接着完成新 audit/activate，再开放：
 
@@ -159,6 +169,15 @@ helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的�
 ```
 
 open 重扫 native view，核对 completion/activation 绑定、证据哈希及运行身份，仅原子开放该已验收候选；health 不会自动开放。正式入口 flag 仍由 owner 独立激活，也不能绕过代次准入和维护态。
+
+可信网关每十秒读取固定的正式策略接口，确认期限不超过请求开始后三十秒。能力缺失、不兼容或过期时，关闭候选 HTTP/WS 及已有连接。开放状态还绑定已验收的正式 build；正式发布 SHA 改变后，pre 关闭直至重新验收。无需重建、迁移或替换 pre 数据代次，先取得新 authority close 回执再执行：
+
+```bash
+./deploy-prerelease.sh reverify --config "$pre_config" --expected-current "$pre_sha" --operation-id "$pre_op" --authority-receipt close.json
+./deploy-prerelease.sh verify-formal-browser --config "$pre_config" --expected-current "$pre_sha"
+```
+
+使用新的操作 UUID。reverify 关闭公网、撤销私有 owner 入口，保留已安装 app 并创建 acceptance 操作；重试使用同一 UUID。重新执行私有浏览器验收、上述原生身份 audit/activate，绑定新操作生成 acceptance 文件后 open。该过程不重装 pre、不重置对局。计划回滚到没有新认证保护的正式版本时，必须先关闭 pre ingress 与正式 handoff，再回滚；不能以三十秒能力确认窗口容忍不安全回滚。
 
 每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，经相同的受限 rootless builder 从固定可信 main 策略 SHA 构建。工具 digest、revision 和 channel 均经核对，并缓存在 `control/`。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
 
