@@ -121,21 +121,16 @@ for (const { label, desc, expected } of [
 ]) {
   test(`workshop ${label} preview and actual sandbox preserve visible card text and localized default names`, async ({ page, request }, testInfo) => {
     const invalidCardArtRequests: string[] = []
+    const serverGameRequests: string[] = []
     page.on('request', observed => {
       const path = new URL(observed.url()).pathname
+      if (path.startsWith('/api/game/')) serverGameRequests.push(path)
       if (/\/assets\/(?:revised|moor|player56)\/(?:[^/]+\/)*(?:O\d+|CUSTOM_[^/]+)\.(?:png|webp|jpe?g|svg)$/i.test(path)) {
         invalidCardArtRequests.push(observed.url())
       }
     })
     await page.addInitScript(() => {
       localStorage.setItem('open-agricola-locale-v2', 'en')
-      const url = new URL(location.href)
-      if (url.searchParams.get('localSandbox') === '1') {
-        // Match production auth: keep the signed-in account instead of the
-        // development-only p1 shortcut, which would change the stash owner.
-        url.searchParams.delete('player')
-        history.replaceState(null, '', url)
-      }
     })
     const cookie = await signIn(page, request)
     const cardId = `CUSTOM_Issue936_${Date.now()}`
@@ -198,6 +193,7 @@ for (const { label, desc, expected } of [
     await expect(game.getByRole('button', { name: 'Set Round Number', exact: true })).toBeVisible()
     await expect(game.locator('.dev-panel')).toContainText('Only changes the round number. Workers stay placed; accumulated resources and harvests are not advanced.')
     expect(invalidCardArtRequests).toEqual([])
+    if (process.env.VITE_SANDBOX_EXECUTOR === 'browser') expect(serverGameRequests).toEqual([])
   })
 }
 
