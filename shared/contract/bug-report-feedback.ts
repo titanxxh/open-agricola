@@ -16,7 +16,7 @@ export type RelatedFeedbackReport = { submissionId: string; issueNumber: number 
 export type ReleaseFeedbackRecord = Omit<FeedbackRecord, 'kind' | 'version' | 'missingItems'> & {
   kind: 'fix_released'
   version: null
-  release: { rootId: string; firstVerified: VerifiedProductionRelease; reports: RelatedFeedbackReport[] }
+  release: { rootId: string; firstVerified: VerifiedProductionRelease; reports: RelatedFeedbackReport[]; historicalFirstIncluded?: { version: string; url: string } }
 }
 export type InboxMessage = (FeedbackRecord | ReleaseFeedbackRecord) & { readAt: number | null;
   relatedReports?: RelatedFeedbackReport[]; currentProduction?: VerifiedProductionRelease }

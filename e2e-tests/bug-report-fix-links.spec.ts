@@ -67,12 +67,12 @@ test('administrator links duplicates and complete merged fixes, reloads them, an
     await find(1673002)
     await manager.getByRole('spinbutton', { name: 'Duplicate of root issue number', exact: true }).fill('1673001')
     await manager.getByRole('button', { name: 'Link duplicate report', exact: true }).click()
-    await expect(manager.getByRole('status')).toContainText('Duplicate linked. No release notification sent.')
+    await expect(manager.getByRole('status')).toContainText('Duplicate linked. The system checks retained production evidence for release notifications.')
     await find(1673001)
     await manager.getByRole('spinbutton', { name: 'Fix PR number', exact: true }).fill('1500')
     await manager.getByRole('textbox', { name: 'Actual merged commit SHAs', exact: true }).fill(`${'a'.repeat(40)}\n${'b'.repeat(40)}`)
     await manager.getByRole('button', { name: 'Verify and save fix', exact: true }).click()
-    await expect(manager.getByRole('status')).toContainText('Fix association saved. No release notification sent.')
+    await expect(manager.getByRole('status')).toContainText('Fix association saved. The system checks retained production evidence for release notifications.')
     await expect(manager.getByText('Fix linked, awaiting verified production release.', { exact: true })).toBeVisible()
     expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { data: {
       issueNumber: 1673001, requestId: 'stale-version-fix', expectedVersion: 0, purpose: 'fix',

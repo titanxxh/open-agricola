@@ -2,7 +2,11 @@
   "extends": "./tsconfig.server.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.verification-tools.tsbuildinfo",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ]
   },
   "include": [
     "scripts/ci/**/*.ts",
@@ -31,7 +35,9 @@
     "scripts/__tests__/hosted-release-app.test.ts",
     "scripts/__tests__/release-smoke.test.ts",
     "scripts/__tests__/release-publish.test.ts",
-    "scripts/__tests__/verify-feedback-deployment.test.ts"
+    "scripts/__tests__/verify-feedback-deployment.test.ts",
+    "server/__tests__/bug-report-historical-feedback.test.ts",
+    "e2e-tests/bug-report-historical-feedback.spec.ts"
   ],
   "exclude": []
 }

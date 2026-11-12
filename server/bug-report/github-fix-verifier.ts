@@ -57,3 +57,7 @@ export class GitHubFixVerifier {
     return verified
   }
 }
+
+export function fixEvidenceFingerprint(input: VerifiedFixPullRequest[]): string {
+  return JSON.stringify([...input].sort((a, b) => a.number - b.number).map(pr => [pr.number, pr.url, pr.mergeCommit, [...pr.requiredCommits].sort()]))
+}
