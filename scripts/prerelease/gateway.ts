@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { readBrowserAuthPolicy, type FormalOrigins, type FormalTlsOptions } from './browser-policy.ts'
 
 export const OWNER_VERIFICATION_COOKIE = '__Host-oa-pre-verify'
+export const candidateAlias = (targetId: string) => `${targetId}-app`
 const candidateCookies = new Set(['__Host-oa-pre-session', '__Host-oa-pre-handoff'])
 const websocketTarget = /^\/(?:ws|nodes\/[A-Za-z0-9-]+\/ws)(?:\?[^#]*)?$/
 const forwardedHeaders = new Set(['accept', 'accept-language', 'cache-control', 'content-type', 'content-length', 'origin', 'referer', 'user-agent',
@@ -215,7 +216,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const appOrigin = process.env.FORMAL_APP_ORIGIN, apiOrigin = process.env.FORMAL_API_BASE
   if (!targetId || !/^prerelease-[a-z0-9-]+$/.test(targetId) || !origin || new URL(origin).origin !== origin || !origin.startsWith('https://')
     || !appOrigin || !apiOrigin) throw new Error('Invalid prerelease gateway target')
-  const gateway = createPrereleaseGateway({ targetId, origin, formal: { appOrigin, apiOrigin }, stateFile: '/control/gate.json', upstream: 'http://app:5175' })
+  const gateway = createPrereleaseGateway({ targetId, origin, formal: { appOrigin, apiOrigin }, stateFile: '/control/gate.json', upstream: `http://${candidateAlias(targetId)}:5175` })
   gateway.server.listen(5176, '0.0.0.0')
   for (const signal of ['SIGTERM', 'SIGINT'] as const) process.once(signal, () => { void gateway.close() })
 }

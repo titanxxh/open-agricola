@@ -108,7 +108,7 @@ owner #1662 负责独立源库、只读备份 role、独立一次性验证库/ro
 
 builder 必须是运行中的非 privileged rootless BuildKit 容器，用户 `1000:1000`，标签 `org.open-agricola.environment=<targetId>`，读回的 CPU、内存、PID 限额不超过清单。只允许在 `/home/user/.local/share/buildkit` 挂载自己的状态 volume。指定 Buildx **remote** driver 的 endpoint 为 `docker-container://<builder.container>`，见 [Docker 文档](https://docs.docker.com/build/builders/drivers/remote/)。#1668 前 owner 必须在实际宿主完成受限真实构建。本次本机 rootless daemon 因 Ubuntu 用户命名空间限制启动失败，没有改宿主策略或使用 privileged 回退；命令 harness 通过不能证明 builder 或部署可用。
 
-若 Caddy 在容器内运行，将可选 `proxyNetwork` 设为它现有的入口网络，例如 `open-agricola_default`，并安装 `deploy/prerelease.Caddyfile.example` 的固定路由。只有可信网关加入该外部网络，使用从 origin 派生的别名和容器端口 `5176`。Caddy 路由使用 `plan` 输出的 `proxyUpstream`；Caddy 容器里的 `127.0.0.1` 指向 Caddy 自己。候选 app 继续只接自己的 default/依赖网络，工具只接依赖网络。选择入口网络，不能选择正式存储网络。解析器拒绝将 pre 依赖/default 网络或 Docker 内置网络作为代理网络。Compose 重建会保留网关网络和别名。替换恢复保留 origin 和别名，只有源网关退役并停止后才启动新网关。若 Caddy 直接运行在宿主上，省略 `proxyNetwork` 并转发到 `127.0.0.1:<target.port>`；两种模式均保留 loopback 绑定。初装前确定这一密封拓扑。
+若 Caddy 在容器内运行，将可选 `proxyNetwork` 设为它现有的入口网络，例如 `open-agricola_default`，并安装 `deploy/prerelease.Caddyfile.example` 的固定路由。只有可信网关加入该外部网络，使用从 origin 派生的别名和容器端口 `5176`。Caddy 路由使用 `plan` 输出的 `proxyUpstream`；Caddy 容器里的 `127.0.0.1` 指向 Caddy 自己。候选 app 继续只接自己的 default/依赖网络，工具只接依赖网络。网关只连接候选 default 网络的 `<targetId>-app:5175` 别名，不使用共享的 `app` 服务名。替换恢复时内部别名随 target 改变，外部网关别名保持不变。选择入口网络，不能选择正式存储网络。解析器拒绝将 pre 依赖/default 网络或 Docker 内置网络作为代理网络。Compose 重建会保留网关网络和别名。替换恢复保留 origin 和别名，只有源网关退役并停止后才启动新网关。若 Caddy 直接运行在宿主上，省略 `proxyNetwork` 并转发到 `127.0.0.1:<target.port>`；两种模式均保留 loopback 绑定。初装前确定这一密封拓扑。
 
 正式生命周期 API 尚未部署时，先记录一个 UUID，再启动维护网关。先准备两个私有凭据文件和固定语言包；`plan` 即使带 `--ssh` 也验证本机路径，因此要在持有这些文件的宿主执行。预算必须固定为最终计划值，不能为维护初装临时调小：
 

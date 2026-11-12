@@ -88,7 +88,7 @@ it('connects only the trusted gateway to the sealed proxy network for maintenanc
     expect(composed.services.gateway.networks).toEqual({ default: {}, proxy: { aliases: ['prerelease-53aee54473ffcde6b9d906b12e5f0413-gateway'] } })
     expect(composed.services.gateway.ports).toEqual(['127.0.0.1:18575:5176'])
     if ('app' in composed.services && composed.services.app) {
-      expect(composed.services.app.networks).toEqual(['default', 'dependencies'])
+      expect(composed.services.app.networks).toEqual({ default: { aliases: ['prerelease-test-app'] }, dependencies: {} })
       for (const service of [composed.services.tools, composed.services.migrate, composed.services.capture]) {
         expect(service.networks).toEqual(['dependencies'])
       }
@@ -420,6 +420,9 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
   const target = parsePrereleaseTarget(replacement.config), next = 'cc4d6c82-676f-4dcc-a570-52377b3b32f5'
   const sourceGateway = renderCompose(parsePrereleaseTarget(source.config), source.state()).services.gateway
   expect(renderCompose(target, readRuntime(target)).services.gateway.networks).toEqual(sourceGateway.networks)
+  const sourceApp = renderCompose(parsePrereleaseTarget(source.config), source.state()).services.app
+  if (!sourceApp) throw new Error('Expected an installed source app')
+  expect(sourceApp.networks).toEqual({ default: { aliases: ['prerelease-test-app'] }, dependencies: {} })
   const operationId = 'ec4d6c82-676f-4dcc-a570-52377b3b32f5', stem = `pre-${source.operationId}`
   const script = readFileSync(join(source.bin, 'docker'), 'utf8').replaceAll(source.temporary, replacement.temporary)
     .replaceAll(source.config.targetId, target.targetId).replaceAll(source.generation, next)
@@ -467,6 +470,9 @@ esac
   }
   expect(result.status, result.stderr).toBe(0)
   expect(readRuntime(target)).toMatchObject({ mode: 'maintenance', generation: next, operation: { stage: 'acceptance' } })
+  const replacementApp = renderCompose(target, readRuntime(target)).services.app
+  if (!replacementApp) throw new Error('Expected an installed replacement app')
+  expect(replacementApp.networks).toEqual({ default: { aliases: ['prerelease-replacement-app'] }, dependencies: {} })
   expect(existsSync(staging)).toBe(false)
   expect(existsSync(`${staging}.retention.json`)).toBe(false)
   expect(readFileSync(join(source.root, 'backups', `${stem}.tgz`))).toEqual(point)

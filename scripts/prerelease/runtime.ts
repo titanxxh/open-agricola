@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { applicationDataEnvironment, assertOwnerPath, assertScopedPaths, type PrereleaseTarget, targetFingerprint } from './config'
+import { candidateAlias } from './gateway'
 
 export type InstalledBuild = { buildId: string; image: string; installedAt: number }
 export type Operation = { id: string; kind: 'deploy' | 'reset' | 'restore' | 'reverify'; buildId: string; image: string;
@@ -95,7 +96,8 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
   if (!digest(image) || candidateImage && !digest(candidateImage)) throw new Error('Compose requires immutable image digests')
   const app = { image, init: true, user: gateway.user, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
     ...limits('app'), env_file: [join(target.directory, '.env')], labels, restart: 'unless-stopped', stop_grace_period: '90s',
-    tmpfs: ['/tmp:size=67108864'], volumes: [`${join(target.directory, 'output')}:/app/output`], networks: ['default', 'dependencies'],
+    tmpfs: ['/tmp:size=67108864'], volumes: [`${join(target.directory, 'output')}:/app/output`],
+    networks: { default: { aliases: [candidateAlias(target.targetId)] }, dependencies: {} },
     environment: { RELEASE_CHANNEL: 'prerelease', NODE_ENV: 'production', APP_INSTANCES: '1', BACKEND_HOST: '0.0.0.0', BACKEND_PORT: '5175',
       ALLOW_ANONYMOUS_WS: 'false', ACCOUNT_REGISTRATION_POLICY: 'invite_only', REPLAY_TRUST_PROXY: 'true',
       GAME_BUILD_ID: record.installed?.buildId ?? record.operation?.buildId, CORS_ORIGIN: target.origin,
