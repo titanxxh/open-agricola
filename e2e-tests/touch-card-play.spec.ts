@@ -4,12 +4,12 @@ import type { GameState } from '../shared/contract/types'
 import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'
 import { GameSession } from '../server/game/authoritative-session'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 test.use({ hasTouch: true, viewport: { width: 375, height: 667 } })
 
 const openGame = async (page: Page, request: APIRequestContext, configure: (state: GameState) => void) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 1370, playerCount: 2, customCardIds: [] },
   })
   expect(fresh.ok(), await fresh.text()).toBe(true)
@@ -22,7 +22,7 @@ const openGame = async (page: Page, request: APIRequestContext, configure: (stat
   const session = new GameSession(state)
   try {
     session.loadState(state)
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks })) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)
@@ -143,7 +143,7 @@ test('touch major supply reads an unavailable card and plays only after confirma
   await supply.locator('[data-card-anchor="Major_Fireplace1"]').tap()
   const dialog = await expectDialogFits(page)
   await page.screenshot({ path: 'output/playwright/touch-card-details-major-375x667.png' })
-  const before = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  const before = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
   expect(before.state.players[0].improvements).not.toContain('Major_Fireplace1')
   const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))
   await dialog.getByRole('button', { name: 'Play this card' }).tap()
@@ -166,7 +166,7 @@ test('a failed transport submission can retry the same live card request', async
   await play.tap()
   await failed
   await expect(play).toBeEnabled()
-  const before = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  const before = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
   expect(before.state.players[0].occupationPlayed).not.toContain('A116_WoodCutter')
   const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))
   await play.tap()
@@ -251,7 +251,7 @@ test.describe('iPad without container units or CSS length division', () => {
     await farm.locator('.farm-tile.selectable').first().tap()
     await page.getByRole('button', { name: 'Confirm plow', exact: true }).last().tap()
     await expect(farm.locator('.farm-tile.field')).toHaveCount(1)
-    const result = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    const result = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
     expect(result.state.players[0].fields).toHaveLength(1)
     await page.screenshot({ path: 'output/playwright/legacy-ipad-plow-768.png' })
   })

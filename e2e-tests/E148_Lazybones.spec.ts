@@ -1,7 +1,7 @@
 // @covers shared/cards/E/
 import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 const CARD_ID = 'E148_Lazybones'
 
@@ -12,7 +12,7 @@ for (const scenario of [
   test(`Lazybones shows four selectable tiles at ${scenario.width}px in ${scenario.locale}`, async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
     await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
-    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
       data: { seed: 8148, playerCount: 2, customCardIds: [], deckIds: ['A', 'B', 'C', 'D', 'E'] },
     })
     expect(fresh.ok()).toBe(true)
@@ -24,7 +24,7 @@ for (const scenario of [
     state.players[0]!.occupationHand = [CARD_ID]
     state.players[0]!.resources.food = 5
     state.players[0]!.supplyTokensConsumed = { stable: 2 }
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })
     expect(loaded.ok()).toBe(true)
 
     await page.goto(`${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`)

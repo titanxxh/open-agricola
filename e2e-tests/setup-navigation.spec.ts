@@ -2,7 +2,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { createOpeningSession, createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
 
 const phases = ['draft', 'parent-selection'] as const
@@ -101,7 +101,7 @@ for (const phase of phases) {
   }
 
   test(`${phase} embedded mode retains language controls`, async ({ page, request }) => {
-    const created = await request.post(`${BACKEND_URL}/api/game/new`, {
+    const created = await request.post(`${BACKEND_URL}/api/game/new`, { headers: browserRequestHeaders(),
       data: phase === 'draft'
         ? { seed: 42, maxPlayers: 2, draftMode: 'simultaneous', draftPoolSize: 7 }
         : { seed: 42, maxPlayers: 2, enableParentCards: true },

@@ -1,6 +1,6 @@
 // @covers shared/seasons/
 import { expect, test } from '@playwright/test'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
@@ -10,7 +10,7 @@ for (const locale of ['en'] as const) {
   for (const free of [false, true]) {
     test(`spring fence cost explanation in ${locale}, payment ${free ? 0 : 5}`, async ({ page, request }) => {
       await page.addInitScript(value => localStorage.setItem('open-agricola-locale-v2', value), locale)
-      expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+      expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
         data: { seed: 353, playerCount: 2, customCardIds: [], enableThroughTheSeasons: true },
       })).ok()).toBe(true)
       const fixture = createWorkSession({ seed: 353, options: { enableThroughTheSeasons: true }, configure: state => {
@@ -25,13 +25,13 @@ for (const locale of ['en'] as const) {
       } })
       try {
         const state = fixture.withCtx(() => serializeState(fixture.state, {}))
-        expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+        expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
       } finally { fixture.dispose() }
-      const entered = await request.post(`${BACKEND_URL}/api/game/action`, { data: { playerIndex: 0, spaceId: 'fencing' } })
+      const entered = await request.post(`${BACKEND_URL}/api/game/action`, { headers: browserRequestHeaders(), data: { playerIndex: 0, spaceId: 'fencing' } })
       expect(entered.ok()).toBe(true)
       const edges = free ? ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
         : ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-1', 'V-0-2']
-      const committed = await request.post(`${BACKEND_URL}/api/game/commit-selection`, {
+      const committed = await request.post(`${BACKEND_URL}/api/game/commit-selection`, { headers: browserRequestHeaders(),
         data: { playerIndex: 0, payload: { edges } },
       })
       expect(committed.ok()).toBe(true)

@@ -3,7 +3,7 @@ import { expect, test, type APIRequestContext, type Locator, type Page } from '@
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import type { SessionResponse } from '../server/game/authoritative-session'
 import { serializeState } from '../shared/session/serialization'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 const ARTISAN = 'A096_TaskArtisan'
 const COB = 'A076_Cob'
@@ -12,7 +12,7 @@ const COB = 'A076_Cob'
 // confirmations, reveal reactions and WorkStart purchases follow browser controls.
 // The existing HTTP sandbox intentionally lets one human control both seats.
 const openScenario = async (page: Page, request: APIRequestContext) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 4242, playerCount: 2, customCardIds: [] },
   })
   expect(fresh.ok(), await fresh.text()).toBe(true)
@@ -32,7 +32,7 @@ const openScenario = async (page: Page, request: APIRequestContext) => {
     state.actionSpaces.find(space => space.id === 'western-quarry')!.resources.stone = 0
   } })
   try {
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: fixture.withCtx(() => serializeState(fixture.state, {})) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)
@@ -45,7 +45,7 @@ const openScenario = async (page: Page, request: APIRequestContext) => {
 }
 
 const snapshot = async (request: APIRequestContext): Promise<SessionResponse> => {
-  const response = await request.get(`${BACKEND_URL}/api/game/state`)
+  const response = await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })
   expect(response.ok(), await response.text()).toBe(true)
   return response.json()
 }

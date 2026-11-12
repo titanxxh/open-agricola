@@ -3,13 +3,13 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import type { SessionResponse } from '../server/game/authoritative-session'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 const CARD = 'C127_Lover'
 const settlement = (page: Page) => page.locator('.interaction-bar [data-choice-value="confirm"]')
 
 async function openSettlement(page: Page, request: APIRequestContext): Promise<string[]> {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 1170, playerCount: 3, customCardIds: [] },
   })
   expect(fresh.ok(), await fresh.text()).toBe(true)
@@ -31,7 +31,7 @@ async function openSettlement(page: Page, request: APIRequestContext): Promise<s
   })
   const workerIds = session.state.players[0]!.workers.map(worker => worker.id)
   try {
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: session.withCtx(() => serializeState(session.state, {})) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)
@@ -90,7 +90,7 @@ test('Lover shortage settlement survives reload and uses begging when confirmed'
   expectGrowth(result, workerIds, { food: 0, vegetable: 1, begging: 1 })
   await page.reload()
   await expect(page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch' })).toBeVisible()
-  const restored: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  const restored: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
   expectGrowth(restored, workerIds, { food: 0, vegetable: 1, begging: 1 })
   await page.screenshot({ path: 'output/playwright/issue1201-lover-begging.png' })
 })

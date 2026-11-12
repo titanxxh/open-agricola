@@ -2,7 +2,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ReplaySegment } from '../shared/contract/protocol/replay'
-import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, getJson, postJson } from './fixtures'
 
 const CARD = 'B033_Mantlepiece'
 const snapshot = async (request: APIRequestContext): Promise<GameSyncPayload> =>
@@ -71,7 +71,7 @@ for (const [locale, actionName] of [['en', 'Gain Bonus VP']] as const) {
 
     // A newly pinned completed archive must retain the relation in its Frame,
     // independently of Room History display metadata and current runtime objects.
-    const completed = await request.post(`${BACKEND_URL}/api/test/replays/completed`, { data: { state: second.state } })
+    const completed = await request.post(`${BACKEND_URL}/api/test/replays/completed`, { headers: browserRequestHeaders(), data: { state: second.state } })
     expect(completed.status(), await completed.text()).toBe(201)
     const { roomId } = await completed.json() as { roomId: string }
     const segmentResponse = await request.get(`${BACKEND_URL}/api/v1/replays/${roomId}/segments/0`)

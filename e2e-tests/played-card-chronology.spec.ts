@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { SessionResponse } from '../server/game/authoritative-session'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 const expectedOrder = ['occupation:A110_Roughcaster', 'minor:E047_SyrupTap', 'occupation:A116_WoodCutter', 'major:Major_Fireplace1']
 
@@ -75,12 +75,12 @@ const assertCardOrder = async (page: Page) => {
 for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
   test(`mixed played cards retain authoritative chronology after reload at ${viewport.width}px`, async ({ page, request }) => {
     await page.setViewportSize(viewport)
-    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
       data: { seed: 1371, playerCount: 2, customCardIds: [] },
     })).ok()).toBe(true)
     const state = playedScenario()
     expect(state.players[0]?.playedCardChronology).toEqual(expectedOrder)
-    expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+    expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     await assertCardOrder(page)

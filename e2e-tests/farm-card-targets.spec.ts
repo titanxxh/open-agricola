@@ -3,10 +3,10 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import type { SessionResponse } from '../server/game/authoritative-session'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 async function prepare(page: Page, request: APIRequestContext, kind: 'sow' | 'animals') {
-  expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+  expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 1372, playerCount: 2, customCardIds: [] },
   })).ok()).toBe(true)
   const fixture = createWorkSession({ seed: 1372, configure: state => {
@@ -30,7 +30,7 @@ async function prepare(page: Page, request: APIRequestContext, kind: 'sow' | 'an
     }
   } })
   try {
-    expect((await request.post(`${BACKEND_URL}/api/game/load`, {
+    expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: fixture.withCtx(() => serializeState(fixture.state, { actionHooks: fixture.actionHooks })) },
     })).ok()).toBe(true)
   } finally { fixture.dispose() }
@@ -91,7 +91,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }
     await visibleTargets(page)
     await farm(page).locator('.sow-choice-button[title="Grain"]').click()
     await tray(page).locator('.sow-choice-button[title="Grain"]').click()
-    const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
     expect(before.state.players[0]!.resources.grain).toBe(2)
     expect(before.state.players[0]!.fields[0]!.stacks).toEqual([])
     const sown = await confirm(page)
@@ -112,7 +112,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }
     const grown = await confirm(page)
     expect(grown.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([{ crop: 'grain', remaining: 4 }])
     await expect(tray(page)).toHaveCount(0)
-    expect((await request.post(`${BACKEND_URL}/api/game/undo-action`)).ok()).toBe(true)
+    expect((await request.post(`${BACKEND_URL}/api/game/undo-action`, { headers: browserRequestHeaders() })).ok()).toBe(true)
     await page.reload()
     await expect(page.locator('.game-layout__center [data-played-card-key]')).toHaveCount(beforeOrder.length)
     await expect(tray(page)).toHaveCount(0)
@@ -146,7 +146,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }
     await page.getByRole('button', { name: 'Return to current action' }).click()
     await visibleTargets(page)
     await visibleFarmAnimalControls(page)
-    const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
     expect(before.state.players[0]!.pastures[0]!.animalCount).toBe(1)
     expect(before.state.players[0]!.cardStates.C011_WildlifeReserve?.extraData?.animalCounts).toEqual({ boar: 1 })
     expect(await order(page)).toEqual(beforeOrder)

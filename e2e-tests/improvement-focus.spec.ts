@@ -4,10 +4,10 @@ import type { GameState } from '../shared/contract/types'
 import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'
 import { GameSession } from '../server/game/authoritative-session'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 const openGame = async (page: Page, request: APIRequestContext, configure?: (state: GameState) => void) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 1369, playerCount: 2, customCardIds: [] },
   })
   expect(fresh.ok(), await fresh.text()).toBe(true)
@@ -25,7 +25,7 @@ const openGame = async (page: Page, request: APIRequestContext, configure?: (sta
   const session = new GameSession(state)
   try {
     session.loadState(state)
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks })) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)

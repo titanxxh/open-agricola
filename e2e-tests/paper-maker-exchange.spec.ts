@@ -3,11 +3,11 @@ import { expect, test } from '@playwright/test'
 import type { SessionResponse } from '../server/game/authoritative-session'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 for (const food of [0, 20]) {
   test(`Paper Maker offers its exchange before learning with ${food} food and restores the choice on reload`, async ({ page, request }) => {
-    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
       data: { seed: 4242, playerCount: 2, customCardIds: [] },
     })
     expect(fresh.ok()).toBe(true)
@@ -22,7 +22,7 @@ for (const food of [0, 20]) {
       },
     })
     try {
-      const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+      const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
         data: { state: session.withCtx(() => serializeState(session.state, {})) },
       })
       expect(loaded.ok()).toBe(true)
@@ -65,7 +65,7 @@ for (const food of [0, 20]) {
     expect(result.state.players[0]!.resources).toMatchObject({ food: food + 1, wood: 0 })
     await page.reload()
     await expect(page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch' })).toBeVisible()
-    const restored: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    const restored: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
     expect(restored.state.players[0]!.resources).toMatchObject({ food: food + 1, wood: 0 })
     await page.screenshot({ path: `output/playwright/paper-maker-exchange-food-${food}.png` })
   })

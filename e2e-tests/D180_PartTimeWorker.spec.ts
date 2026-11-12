@@ -3,13 +3,13 @@ import { expect, test } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import type { SessionResponse } from '../shared/contract/types'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 for (const width of [1440, 390]) {
   test(`Part-Time Worker offers mixed returns after collecting and survives reload at ${width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
       data: { seed: 42, playerCount: 5, customCardIds: [] },
     })).ok()).toBe(true)
     const fixture = createWorkSession({ seed: 42, options: { playerCount: 5 }, configure: state => {
@@ -19,7 +19,7 @@ for (const width of [1440, 390]) {
       state.actionSpaces.find(space => space.id === 'forest')!.resources = { wood: 2, clay: 2 }
     } })
     try {
-      expect((await request.post(`${BACKEND_URL}/api/game/load`, {
+      expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
         data: { state: fixture.withCtx(() => serializeState(fixture.state, {})) },
       })).ok()).toBe(true)
     } finally { fixture.dispose() }

@@ -4,18 +4,18 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import type { GameState, SessionResponse } from '../shared/contract/types'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 async function prepare(page: Page, request: APIRequestContext, configure?: (state: GameState) => void, moor = false) {
   const options = { playerCount: 2, enableFarmersOfTheMoor: moor, allowIncompleteFarmersOfTheMoorMinorDeal: moor }
-  expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { ...options, seed: 1368, customCardIds: [] } })).ok()).toBe(true)
+  expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { ...options, seed: 1368, customCardIds: [] } })).ok()).toBe(true)
   const fixture = createWorkSession({ seed: 1368, options, configure: state => {
     state.round = 14
     Object.assign(state.players[0]!.resources, { wood: 20, reed: 10, food: 10, grain: 2, vegetable: 1 })
     configure?.(state)
   } })
   try {
-    expect((await request.post(`${BACKEND_URL}/api/game/load`, {
+    expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: fixture.withCtx(() => serializeState(fixture.state, { actionHooks: fixture.actionHooks })) },
     })).ok()).toBe(true)
   } finally { fixture.dispose() }

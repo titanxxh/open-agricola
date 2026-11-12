@@ -1,13 +1,13 @@
 // @covers client/components/interaction/
 import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 390 }] as const) {
   test(`actual anytime plans and player-separated schedules in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
     await page.addInitScript(locale => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
-    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 6117, playerCount: 2, customCardIds: [] } })
+    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 6117, playerCount: 2, customCardIds: [] } })
     expect(fresh.ok()).toBe(true)
     const { state } = await fresh.json() as { state: SerializedGameState }
     state.round = 5
@@ -27,7 +27,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
       { id: 'wood-plan', cardId: 'A074_StableTree', playerId: owner.id, round: 7, resources: { wood: 1 } },
       { id: 'vegetable-plan', cardId: 'B069_PottersMarket', playerId: state.players[1]!.id, round: 7, resources: { vegetable: 2 } },
     ]
-    expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+    expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     const anytime = page.locator('.anytime-bar button').filter({ hasText: 'Whisky Distiller' })
     await expect(anytime).toHaveCount(1)
@@ -61,7 +61,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
     await expect(plans.getByRole('button')).toBeFocused()
-    const final = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    const final = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
     expect(final.state.players[0].resources.grain).toBe(0)
     expect(final.state.players[0].resources.food).toBe(20)
     expect(final.state.futureMeeples.filter((entry: { cardId: string }) => entry.cardId === 'D106_WhiskyDistiller')).toHaveLength(2)
@@ -72,7 +72,7 @@ test('dense schedules keep six player colors separated on a narrow board', async
   await page.setViewportSize({ width: 390, height: 900 })
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
   // Six players are intentional here: this verifies every supported player color.
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 6117, playerCount: 6, customCardIds: [] } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 6117, playerCount: 6, customCardIds: [] } })
   expect(fresh.ok()).toBe(true)
   const { state } = await fresh.json() as { state: SerializedGameState }
   state.round = 5
@@ -89,7 +89,7 @@ test('dense schedules keep six player colors separated on a narrow board', async
     for (let occurrence = 0; occurrence < 12; occurrence++) state.futureMeeples.push({ id: `dense-${index}-${occurrence}`, cardId: 'D106_WhiskyDistiller', playerId: player.id, round: 7, resources: { food: 4 } })
     state.futureMeeples.push({ id: `wood-${index}`, cardId: 'A074_StableTree', playerId: player.id, round: 7, resources: { wood: 1234 } })
   }
-  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   const plans = page.locator('.future-meeple-holder').filter({ has: page.locator('[data-source-card="D106_WhiskyDistiller"]') })
   await expect(plans).toHaveCount(1)
@@ -120,15 +120,15 @@ test('dense schedules keep six player colors separated on a narrow board', async
 test('baking uses authoritative prices and quantities for the interaction player', async ({ page, request }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 42, playerCount: 2, customCardIds: [] } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 42, playerCount: 2, customCardIds: [] } })
   const { state } = await fresh.json() as { state: SerializedGameState }
   state.players.forEach(player => { player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__'] })
   state.players[0]!.improvements = ['Major_Fireplace1', 'Major_ClayOven']
   Object.assign(state.players[0]!.resources, { grain: 2, food: 0 })
   state.players[1]!.improvements = ['Major_StoneOven']
   Object.assign(state.players[1]!.resources, { grain: 9, food: 20 })
-  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-  const action = await request.post(`${BACKEND_URL}/api/game/action`, { data: { playerIndex: 0, spaceId: 'grain-utilization' } })
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
+  const action = await request.post(`${BACKEND_URL}/api/game/action`, { headers: browserRequestHeaders(), data: { playerIndex: 0, spaceId: 'grain-utilization' } })
   expect((await action.json()).ok).toBe(true)
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   const oven = page.locator('.exchange-row').filter({ hasText: 'Clay Oven' })
@@ -144,7 +144,7 @@ test('baking uses authoritative prices and quantities for the interaction player
   await page.locator('.exchange-confirm').click()
   await payment
   await expect(page.locator('.exchange-overlay')).toHaveCount(0)
-  const final = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  const final = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
   expect(final.state.players[0].resources).toMatchObject({ food: 7, grain: 0 })
   expect(final.state.players[1].resources).toMatchObject({ food: 20, grain: 9 })
 })
@@ -152,14 +152,14 @@ test('baking uses authoritative prices and quantities for the interaction player
 test('declared timed resource formulas show exact fixed quantities on their future round', async ({ page, request }) => {
   await page.setViewportSize({ width: 390, height: 1000 })
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 2424, playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true, customCardIds: [] } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 2424, playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true, customCardIds: [] } })
   expect(fresh.ok()).toBe(true)
   const { state } = await fresh.json() as { state: SerializedGameState }
   state.round = 5
   state.players.forEach(player => { player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__'] })
   state.players[0]!.minorPlayed = ['M128_Workbench']
   state.players[0]!.color = 'red'
-  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   const plans = page.locator('.future-meeple-holder').filter({ has: page.locator('[data-source-card="M128_Workbench"]') })
   await expect(plans).toHaveCount(2)

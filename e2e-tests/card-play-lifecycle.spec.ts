@@ -5,10 +5,10 @@ import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'
 import { GameSession, type SessionResponse } from '../server/game/authoritative-session'
 import { createPlayerActionSpaces } from '../shared/cards/player-action-space'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 const openScenario = async (page: Page, request: APIRequestContext, configure: (state: GameState) => void) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 9707, playerCount: 2, customCardIds: [] },
   })
   expect(fresh.ok(), await fresh.text()).toBe(true)
@@ -21,7 +21,7 @@ const openScenario = async (page: Page, request: APIRequestContext, configure: (
   const session = new GameSession(state)
   try {
     session.loadState(state)
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks })) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)
@@ -67,7 +67,7 @@ test('Studio Boat keeps its card-owner point before collection while its space p
     state.actionSpaces.push(...createPlayerActionSpaces(state))
     state.actionSpaces.find(space => space.id === cardId)!.resources.food = 2
   })
-  const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
   const preview = before.state.actionSpaces.find(space => space.id === cardId)?.baseDescriptionPreview
   expect(JSON.stringify(preview)).toContain('collection')
   expect(JSON.stringify(preview)).not.toContain('bonusVp')
@@ -114,7 +114,7 @@ for (const card of [
     await page.reload()
     await expect(page.locator('.played-card-slot').filter({ has: page.locator(`[data-card-anchor="${card.id}"]`) })).toBeVisible()
     await expect(page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch' })).toBeVisible()
-    const restored = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    const restored = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
     expect(restored.state.players[0].resources.food).toBe(card.food)
     await page.screenshot({ path: `output/playwright/card-play-${card.id}.png` })
   })
