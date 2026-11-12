@@ -170,6 +170,39 @@ For recovery, owner explicitly chooses `--backup <stem> --backup-generation <UUI
 
 
 Restore extraction is a disposable cache. Before extraction, the owner seals its operation, generation, target fingerprint, archive hash and original capture time in a separate retention file. Native temporary files and retries cannot renew the seven-day deadline. A persisted startup checkpoint releases the cache; startup and acceptance retries repeat that cleanup. Retention removes expired or unproven caches only inside the sealed target's backup directory, preserving valid fresh retries, other target fingerprints and the independent ledger.
+## Confirm production fixes and retry inbox delivery
+
+After publishing the formal Release and deploying its frontend and backend, run this command on the owner-controlled machine:
+
+```bash
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts vX.Y.Z \
+  --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola \
+  --frontend https://open-agricola.titanxxh.com/ \
+  --receipt /path/to/private/feedback-vX.Y.Z.json
+```
+
+The command reads the fixed-project formal Release and exact tag SHA, reuses `checkCandidateVerification` for the complete same-SHA GitHub receipt, and observes served `frontend-build.json`. Over the existing owner SSH connection it reads the running Compose app container's `GAME_BUILD_ID`, health, and live readiness response. Every build must match the Release SHA. A non-root frontend must also pass `--base-path /expected/path/` and use that exact path in `--frontend`.
+
+The tool saves a private mode-600 receipt before calling `BugReportFeedbackService` inside the running container. The receipt contains the original operation ID, immutable verification evidence, and the full SHA-checked raw Git ancestry closure. Use a complete non-shallow local repository. The closure ignores replace refs and grafts, allowing later confirmed reports or fix associations to reconcile against retained proof without another deployment. A fix qualifies only when all required merged commits and each PR's actual merge tip are in that closure. The feedback service also fences account deletion and deduplicates each account and stable root fix.
+
+The JSON result reports `release`, `deployment`, `verification`, and `notification` separately. The service result records `sentMessages` and lists `pendingFixes` with missing commits. Those fixes remain pending for later verification. `deployment: "observed"` means the tool observed the existing deployment. The command never publishes a Release, dispatches verification, deploys either application, updates What's New, or changes Bug Report App permissions. A blocked Release, incomplete verification, missing frontend, stopped or unready backend, build mismatch, or changed tag stops before notification. A notification failure exits with code 2 and retains the successful observation plus the original receipt.
+
+To retry the same notification after a lost SSH response or database failure, use the saved receipt:
+
+```bash
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts \
+  --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola \
+  --retry /path/to/private/feedback-vX.Y.Z.json
+```
+
+To inspect persisted pending operations, including reconciliation queued by a later assessment or fix link, or to retry one operation without the local receipt:
+
+```bash
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --status operations
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --retry-operation <operation-id>
+```
+
+Retry preserves the operation identity and stored proof. It does not repeat Release creation, candidate dispatch, deployment, or production observation. Keep the receipt until the operation is completed. Repeated verification, retry, and late duplicate links do not send another message for the same account and root fix. Existing messages and their read timestamps remain unchanged.
 
 ## 1. Deploy the Backend
 

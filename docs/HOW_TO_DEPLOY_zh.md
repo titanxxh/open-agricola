@@ -172,6 +172,39 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 
 
 恢复解包目录是可重新生成的缓存。解包前，owner 在独立保留期文件中固定操作、代次、target 指纹、归档哈希和原捕获时间。原生临时文件和重试不能刷新七天期限。startup 检查点持久化后清除缓存，startup 和 acceptance 重试会重复执行幂等清理。retention 只在固定 target 的备份目录内清理过期或缺少证明的缓存，保留尚有效的重试、其他 target 指纹及独立删除账本。
+## 核验生产修复并重试站内信
+
+正式 Release 发布且前后端部署完成后，在 owner 控制的本机运行：
+
+```bash
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts vX.Y.Z \
+  --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola \
+  --frontend https://open-agricola.titanxxh.com/ \
+  --receipt /path/to/private/feedback-vX.Y.Z.json
+```
+
+工具读取固定仓库的正式 Release 与准确 tag SHA，通过现有 `checkCandidateVerification` 核对同 SHA 的完整 GitHub 回执，再读取实际服务的 `frontend-build.json`。它复用 owner SSH，读取运行中 Compose app 容器的 `GAME_BUILD_ID`、健康状态和实时 readiness 响应。所有构建身份必须等于 Release SHA。非根路径前端还需传 `--base-path /expected/path/`，且 `--frontend` 必须使用完全相同的路径。
+
+调用运行中容器内的 `BugReportFeedbackService` 前，工具先保存 mode-600 私有回执。回执保留原操作 ID、不可变核验证据和逐个 SHA 校验的完整原始 Git 祖先集合。本机仓库必须完整且不是 shallow clone。祖先遍历忽略 replace refs 和 grafts，晚到的确认结论或修复关联可复用该证据，无需再次部署。只有全部必需合入提交及每个 PR 的实际合入末提交均在集合中，修复才满足上线条件。反馈服务同时处理账号删除隔离，并按账号和稳定根修复去重。
+
+JSON 结果分别报告 `release`、`deployment`、`verification` 和 `notification`。服务结果中的 `sentMessages` 记录本次新增信件数，`pendingFixes` 列出尚缺必需提交的根修复；这些修复继续等待后续核验。`deployment: "observed"` 表示读取了已有部署。工具不会创建 Release、dispatch 验证、部署前后端、更新 What's New 或扩大 Bug Report App 权限。Release 不合格、验证不全、前端不可读、后端停止或未就绪、构建不一致、tag 移动时均在通知前停止。通知失败退出码为 2，成功的部署观测与原回执仍然保留。
+
+SSH 响应丢失或数据库失败后，用原回执只重试通知：
+
+```bash
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts \
+  --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola \
+  --retry /path/to/private/feedback-vX.Y.Z.json
+```
+
+查看持久化的待处理操作，包括晚到结论或修复关联排队的补齐操作；也可在没有本地回执时按 ID 重试：
+
+```bash
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --status operations
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --retry-operation <operation-id>
+```
+
+重试保留原操作身份和已存证据，不重复创建 Release、请求候选验证、部署或读取生产构建。保留回执至操作完成。重复核验、重试和晚到重复关联不会为同账号同根修复再发一封信。已有消息和已读时间保持不变。
 
 ## 一、部署后端
 
