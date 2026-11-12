@@ -38,7 +38,7 @@ function fixture(forgedProducer = false, legacy = false) {
   git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**')
   git('commit', '-m', 'candidate fixture')
   if (legacy) {
-    git('fetch', '--no-tags', '--depth=1', repoRoot, LEGACY_STABLE_CUTOFF)
+    git('fetch', '--no-tags', repoRoot, LEGACY_STABLE_CUTOFF)
     git('checkout', '-B', 'main', LEGACY_STABLE_CUTOFF)
     writeFileSync(join(cwd, '.git/info/exclude'), 'bin/\ncommands.jsonl\ngithub-responses.json\ngithub-mutations.jsonl\n')
   }
@@ -184,6 +184,32 @@ describe('candidate verification public CLI', () => {
     const result = value.run('check', '--sha', value.sha, '--repository', candidateRepository.full_name)
     expect(result.status, result.stderr).toBe(1)
     expect(JSON.parse(result.stdout).status).toBe('blocked')
+  }, 30_000)
+
+  it('admits a historical receipt from a shallow current-main checkout', () => {
+    const value = fixture(false, true)
+    githubFixture(value)
+    writeFileSync(join(value.cwd, 'later-main.txt'), 'inert later main source\n')
+    value.git('add', '--', 'later-main.txt', ':(exclude)docs/superpowers/**')
+    value.git('commit', '-m', 'later main')
+    const main = value.git('rev-parse', 'HEAD')
+    replaceMetadata(value, { [`${prefix}/git/ref/heads/main`]: { ref: 'refs/heads/main', object: { type: 'commit', sha: main } } })
+    const root = mkdtempSync(join(tmpdir(), 'candidate-shallow-check-')); temporary.push(root)
+    const origin = join(root, 'origin.git'), checkout = join(root, 'checkout')
+    execFileSync('git', ['init', '--bare', origin], { stdio: 'ignore' })
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repoRoot, encoding: 'utf8' }).trim()
+    writeFileSync(join(origin, 'objects/info/alternates'), join(value.cwd, '.git/objects') + '\n' + join(common, 'objects') + '\n')
+    execFileSync('git', ['--git-dir', origin, 'update-ref', 'refs/heads/main', main])
+    execFileSync('git', ['clone', '--quiet', '--branch', 'main', '--depth=1', '--no-checkout', `file://${origin}`, checkout])
+    execFileSync('git', ['config', `url.file://${origin}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git'], { cwd: checkout })
+    expect(execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: checkout, encoding: 'utf8' }).trim()).toBe('true')
+    writeFileSync(join(checkout, 'github-responses.json'), readFileSync(join(value.cwd, 'github-responses.json')))
+    mkdirSync(join(checkout, 'bin'))
+    const result = spawnSync(process.execPath, [cli, 'check', '--sha', value.sha, '--repository', candidateRepository.full_name], {
+      cwd: checkout, env: value.env, encoding: 'utf8',
+    })
+    expect(result.status, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({ status: 'passed', sha: value.sha })
   }, 30_000)
 
   it('checks and requests an explicitly chosen fork using its own native repository ID and protected-main snapshot', () => {
