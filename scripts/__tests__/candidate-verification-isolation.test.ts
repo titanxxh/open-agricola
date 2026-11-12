@@ -64,3 +64,22 @@ it('escapes the actual untracked filename error from a temporary candidate tree'
   if (!(failure instanceof Error)) throw new Error('Expected candidate filename error')
   expect(escapeWorkflowCommands(failure.message)).toBe('Untracked candidate source: extra\n%3A%3Aerror%3A%3Ainert%0D%23%23[error]inert')
 })
+
+it.each([
+  { variable: 'fingerprint', command: 'gpg', first: 'fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:\n', later: 'fpr:::::::::0000000000000000000000000000000000000000:\n', expected: '9DC858229FC7DD38854AE2D88D81803C0EBFCD88' },
+  { variable: 'version', command: 'apt-cache', first: 'docker-ce | 5:29.9.3-1~ubuntu.26.04~resolute | public\n', later: 'docker-ce | 5:29.9.3-2~ubuntu.26.04~resolute | public\n', expected: '5:29.9.3-1~ubuntu.26.04~resolute' },
+])('consumes large public $command metadata under pipefail and keeps the first match', ({ variable, command, first, later, expected }) => {
+  const root = mkdtempSync(join(tmpdir(), 'oa-ci-metadata-')); roots.push(root)
+  const bin = join(root, 'bin'); mkdirSync(bin)
+  const metadata = join(root, 'public-metadata.txt')
+  writeFileSync(metadata, first + later + 'public metadata with no matching fields\n'.repeat(100000))
+  writeFileSync(join(bin, command), '#!/bin/bash\nexec /bin/cat "$OA_PUBLIC_METADATA"\n', { mode: 0o700 })
+  const setup = readFileSync(resolve(import.meta.dirname, '../ci/setup-candidate-isolation.sh'), 'utf8')
+  const assignment = setup.split('\n').find(line => line.startsWith(`${variable}=`))
+  if (!assignment) throw new Error('Missing setup metadata selection')
+  const result = spawnSync('/bin/bash', ['-c', `set -euo pipefail\n${assignment}\nprintf '%s\\n' "$${variable}"`], {
+    encoding: 'utf8', env: { ...process.env, PATH: `${bin}:/usr/bin:/bin`, OA_PUBLIC_METADATA: metadata },
+  })
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.stdout).toBe(expected + '\n')
+})
