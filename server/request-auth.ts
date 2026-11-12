@@ -36,8 +36,14 @@ export function isOAuthStartForm(req: IncomingMessage): boolean {
 }
 
 function oauthFormAdmission(req: IncomingMessage): Admission {
-  if (!isTrustedOrigin(req) || !isApiHost(req)
-    || req.headers['sec-fetch-dest'] !== 'document' || req.headers['sec-fetch-mode'] !== 'navigate') return denied
+  if (!isTrustedOrigin(req) || !isApiHost(req)) return denied
+  const mode = req.headers['sec-fetch-mode'], destination = req.headers['sec-fetch-dest']
+  const appOrigin = normalizeOrigin(process.env.PUBLIC_APP_ORIGIN)
+  const apiOrigin = normalizeOrigin(process.env.PUBLIC_API_BASE)
+  const localHttp = process.env.NODE_ENV !== 'production' && process.env.RELEASE_CHANNEL !== 'prerelease'
+    && appOrigin?.startsWith('http:') && apiOrigin?.startsWith('http:') && req.headers.origin === appOrigin
+    && mode === undefined && destination === undefined
+  if (!(mode === 'navigate' && destination === 'document') && !localHttp) return denied
   return req.headers.authorization === undefined ? accepted : invalid
 }
 
