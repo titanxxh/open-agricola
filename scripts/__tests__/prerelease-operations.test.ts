@@ -2,8 +2,10 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsS
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { targetFingerprint, parsePrereleaseTarget } from '../prerelease/config'
+import { readRuntime, writeRuntime } from '../prerelease/runtime'
 import { afterEach, expect, it } from 'vitest'
 
 const roots: string[] = []
@@ -188,6 +190,111 @@ esac
   expect(value.calls()).not.toContain('caddy')
 })
 
+
+function startupRetryFixture(sourceInstalled = true) {
+  const value = fixture(), target = parsePrereleaseTarget(value.config)
+  const buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const sourceBuildId = 'a'.repeat(40), sourceImage = `sha256:${'d'.repeat(64)}`, image = `sha256:${'e'.repeat(64)}`
+  const generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId = 'db4d6c82-676f-4dcc-a570-52377b3b32f5'
+  expect(value.invoke('initialize', '--expected-current', 'empty', '--generation', generation).status).toBe(0)
+  const state = () => readRuntime(target)
+  const containerImage = join(value.temporary, 'container-image'), containerState = join(value.temporary, 'container-state')
+  writeFileSync(containerState, '{"Running":false,"OOMKilled":false,"ExitCode":0}')
+  if (sourceInstalled) {
+    writeRuntime(target, { ...state(), mode: 'open', buildId: sourceBuildId,
+      installed: { buildId: sourceBuildId, image: sourceImage, installedAt: Date.now() },
+      acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64) } })
+    writeFileSync(containerImage, sourceImage)
+    const backups = join(value.root, 'backups'), stem = `pre-${operationId}`
+    const archive = Buffer.from('validated source snapshot'), configuration = Buffer.from('fixture configuration')
+    writeFileSync(join(backups, `${stem}.tgz`), archive); writeFileSync(join(backups, `env-${stem}`), configuration)
+    const digest = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
+    writeFileSync(join(backups, `${stem}.manifest.json`), JSON.stringify({ formatVersion: 2, backupStem: stem,
+      environment: target.targetId, retentionDays: 7, dataGeneration: generation, targetFingerprint: targetFingerprint(target),
+      createdAt: new Date().toISOString(), validatedAt: new Date().toISOString(), sourceBuildId, targetBuildId: buildId,
+      archiveSizeBytes: archive.length, archiveSha256: digest(archive), configurationSizeBytes: configuration.length, configurationSha256: digest(configuration) }))
+  }
+  const authorityFile = join(value.temporary, 'close.json')
+  writeFileSync(authorityFile, JSON.stringify({ action: 'close', generationId: generation, targetOrigin: target.origin,
+    targetId: target.targetId, completedAt: Date.now() }))
+  writeFileSync(join(value.bin, 'bash'), `#!/bin/sh
+[ "$1" = '${process.cwd()}/backup-offsite.sh' ] || exit 88
+`, { mode: 0o700 })
+  writeFileSync(join(value.bin, 'docker'), `#!/bin/sh
+set -e
+printf '%s\n' "$*" >> '${value.temporary}/calls'
+case "$*" in
+  'buildx build '*) cat >/dev/null;;
+  'buildx inspect '*) printf '${JSON.stringify({ Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${target.builder.container}` }] })}';;
+  *'{{json .Config.Labels}}'*'${target.builder.container}') printf '{"org.open-agricola.environment":"${target.targetId}"}';;
+  *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
+  *'{{json .State}}'*'${target.builder.container}') printf '{"Running":true}';;
+  *'{{json .State}}'*) cat '${containerState}';;
+  *' ps -a -q app') if [ -f '${containerImage}' ]; then printf '${'c'.repeat(64)}'; fi;;
+  *'{{.Image}}'*) cat '${containerImage}';;
+  *'com.docker.compose.project'*) if [ -f '${value.temporary}/container-project' ]; then cat '${value.temporary}/container-project'; else printf '${target.project}'; fi;;
+  *'{{json .Config}}'*) printf '{"User":"1000:1000"}';;
+  *'{{json .Mounts}}'*) printf '[]';;
+  'image inspect --format {{json .Config.Labels}}'*) printf '{"org.opencontainers.image.revision":"${buildId}","io.open-agricola.release-channel":"prerelease"}';;
+  'image inspect --format {{.Id}}'*) printf '${image}';;
+  *'/app/frontend-dist/frontend-build.json'*) printf '{"format":1,"gameBuildId":"${buildId}","basePath":"/open-agricola/","releaseChannel":"prerelease","deploymentTarget":"prerelease-hosted"}';;
+  *' up -d --no-build --wait --wait-timeout 120 app')
+    [ ! -f '${value.temporary}/startup-fail' ] || exit 43
+    printf '${image}' > '${containerImage}';;
+  *' exec -T app node '*) printf '{"buildId":"${buildId}","channel":"prerelease","generation":"${generation}"}';;
+esac
+`, { mode: 0o700 })
+  const invoke = () => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
+    input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(target), target,
+      request: { action: 'deploy', expectedCurrent: sourceInstalled ? sourceBuildId : 'empty', buildId, generation, operationId, authorityFile },
+      receipt: { status: 'passed', channel: 'prerelease', repository: 'titanxxh/open-agricola', sha: buildId,
+        configuration: 'e'.repeat(64), producerConfiguration: 'f'.repeat(64), tasks: FULL_TASK_IDS.map((id, index) => ({ id, status: 'passed', runId: 1, jobId: index + 1 })) } }),
+    encoding: 'utf8', timeout: 30000, env: { ...value.env, SSH_CONNECTION: 'owner fixture' },
+  })
+  writeFileSync(join(value.temporary, 'startup-fail'), '')
+  const interrupted = invoke()
+  expect(interrupted.status, interrupted.stderr).not.toBe(0)
+  expect(state()).toMatchObject({ mode: 'maintenance', buildId, operation: { stage: 'startup', id: operationId } })
+  rmSync(join(value.temporary, 'startup-fail'))
+  return { ...value, invoke, state, sourceImage, image, containerImage, containerState }
+}
+
+it('retries the startup journal after migration while the drained source container still exists', () => {
+  const value = startupRetryFixture()
+  expect(value.state().operation?.sourceImage).toBe(value.sourceImage)
+  expect(readFileSync(value.containerImage, 'utf8')).toBe(value.sourceImage)
+  const migrations = value.calls().split('check-live').length
+  const result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(value.state()).toMatchObject({ mode: 'maintenance', operation: { stage: 'acceptance' } })
+  expect(readFileSync(value.containerImage, 'utf8')).toBe(value.image)
+  expect(value.calls().split('check-live')).toHaveLength(migrations)
+})
+
+it.each(['empty', 'candidate'])('retries an unaccepted startup with an %s container state', kind => {
+  const value = startupRetryFixture(kind !== 'empty')
+  if (kind === 'candidate') {
+    writeFileSync(value.containerImage, value.image)
+    writeFileSync(value.containerState, '{"Running":false,"OOMKilled":false,"ExitCode":43}')
+  }
+  const result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(value.state()).toMatchObject({ mode: 'maintenance', operation: { stage: 'acceptance' } })
+})
+
+it.each(['foreign-image', 'foreign-project', 'running', 'unclean', 'oom'])('refuses a %s source during startup retry without starting any writer', kind => {
+  const value = startupRetryFixture()
+  if (kind === 'foreign-image') writeFileSync(value.containerImage, `sha256:${'f'.repeat(64)}`)
+  if (kind === 'foreign-project') writeFileSync(join(value.temporary, 'container-project'), 'open-agricola')
+  if (kind === 'running') writeFileSync(value.containerState, '{"Running":true,"OOMKilled":false,"ExitCode":0}')
+  if (kind === 'unclean') writeFileSync(value.containerState, '{"Running":false,"OOMKilled":false,"ExitCode":43}')
+  if (kind === 'oom') writeFileSync(value.containerState, '{"Running":false,"OOMKilled":true,"ExitCode":0}')
+  const starts = value.calls().split('up -d --no-build --wait --wait-timeout 120 app').length
+  const result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.state()).toMatchObject({ mode: 'maintenance', operation: { stage: 'startup' } })
+  expect(value.calls().split('up -d --no-build --wait --wait-timeout 120 app')).toHaveLength(starts)
+})
 
 it.each(['control', 'output', 'backups'])('rejects a %s mount alias into formal files before state or Docker', name => {
   const value = fixture(), formal = join(value.temporary, 'formal-private')

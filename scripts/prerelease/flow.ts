@@ -250,7 +250,7 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
     const image = record.operation?.image ?? buildImage(target, buildId)
     inspectImage(image, buildId)
     const operation: NonNullable<RuntimeRecord['operation']> = record.operation ?? { id, kind: 'restore', buildId, image,
-      sourceBuildId: null, stage: 'backup', backupStem: request.backupStem, generation: next }
+      sourceBuildId: null, sourceImage: null, stage: 'backup', backupStem: request.backupStem, generation: next }
     record = { ...record, generation: next, operation }
     // The replacement gateway must remain stopped until the old generation has been purged and retired.
     writeRuntime(target, record, image)
@@ -302,7 +302,7 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
     if (record.operation && (record.operation.id !== id || record.operation.kind !== 'reset')) throw new Error('Resume the existing reset operation ID')
     const image = record.installed?.image ?? record.operation?.image
     if (!image || !record.buildId) throw new Error('Reset source identity is missing')
-    const operation = record.operation ?? { id, kind: 'reset', buildId: record.buildId, image, sourceBuildId: record.buildId, stage: 'backup', backupStem: `pre-${id}`, generation: record.generation }
+    const operation = record.operation ?? { id, kind: 'reset', buildId: record.buildId, image, sourceBuildId: record.buildId, sourceImage: image, stage: 'backup', backupStem: `pre-${id}`, generation: record.generation }
     if (operation.stage === 'acceptance') return record
     record.operation = operation
     record = maintenance(target, record, image)
@@ -328,7 +328,7 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
   const image = record.operation?.image ?? buildImage(target, buildId)
   inspectImage(image, buildId)
   if (!record.operation) {
-    record.operation = { id: generation(operationId), kind: request.action, buildId, image, sourceBuildId: record.buildId, stage: 'backup', backupStem: null,
+    record.operation = { id: generation(operationId), kind: request.action, buildId, image, sourceBuildId: record.buildId, sourceImage: record.installed?.image ?? null, stage: 'backup', backupStem: null,
       generation: record.generation }
   }
   const operation = record.operation
