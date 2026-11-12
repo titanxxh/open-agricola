@@ -130,3 +130,16 @@ it.each([false, true])('starts candidate processes with private paths after a po
   expect(values).not.toHaveProperty('OA_INERT_ENV_MARKER')
   expect(values.NOTIFY_SOCKET).toBe(manager ? '/tmp/inert-systemd-notify' : undefined)
 })
+
+it.each([true, false])('waits for recursive cgroup emptiness and rejects a populated timeout (clears=%s)', clears => {
+  const root = mkdtempSync(join(tmpdir(), 'oa-cgroup-events-')); roots.push(root)
+  writeFileSync(join(root, 'cgroup.events'), 'populated 1\nfrozen 0\n')
+  const source = readFileSync(resolve(import.meta.dirname, '../ci/stop-candidate-isolation.sh'), 'utf8')
+  const prefix = source.slice(0, source.indexOf('[[ $EUID'))
+  const result = spawnSync('/bin/bash', ['-s', root], { encoding: 'utf8',
+    input: prefix + (clears ? '\n(sleep 0.2; printf "populated 0\\nfrozen 0\\n" > "$1/cgroup.events") &\n' : '\n')
+      + 'wait_candidate_cgroup "$1" 1\ncat "$1/cgroup.events"\n',
+  })
+  expect(result.status).toBe(clears ? 0 : 1)
+  expect(result.stdout).toBe(clears ? 'populated 0\nfrozen 0\n' : '')
+})

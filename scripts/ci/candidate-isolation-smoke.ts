@@ -26,13 +26,13 @@ const security: unknown = JSON.parse(execFileSync('docker', ['info', '--format',
 assert(Array.isArray(security) && security.includes('name=rootless'), 'Docker is not rootless')
 assert(execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).trim() === '29.9.3', 'Unexpected rootless Docker version')
 const directory = mkdtempSync('/home/oa-candidate/bind-'); chmodSync(directory, 0o700)
-await run('docker', ['run', '--rm', '--user', '0:0', '--mount', `type=bind,source=${directory},target=/marker`, image, 'bash', '-c', 'printf "native bind bytes\\n" > /marker/result'])
+await run('docker', ['run', '--mount', 'type=volume,target=/var/lib/postgresql,volume-nocopy', '--rm', '--user', '0:0', '--mount', `type=bind,source=${directory},target=/marker`, image, 'bash', '-c', 'printf "native bind bytes\\n" > /marker/result'])
 assert(readFileSync(join(directory, 'result'), 'utf8') === 'native bind bytes\n', 'Rootless bind UID mapping failed')
 const server = createServer((_, response) => response.end('host loopback marker'))
 await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
 const address = server.address(); assert(address && typeof address === 'object', 'Missing loopback address')
 try {
-  const result = await run('docker', ['run', '--rm', '--network', 'host', image, 'bash', '-c', `exec 3<>/dev/tcp/127.0.0.1/${address.port}; printf 'GET / HTTP/1.0\\r\\n\\r\\n' >&3; cat <&3`])
+  const result = await run('docker', ['run', '--mount', 'type=volume,target=/var/lib/postgresql,volume-nocopy', '--rm', '--network', 'host', image, 'bash', '-c', `exec 3<>/dev/tcp/127.0.0.1/${address.port}; printf 'GET / HTTP/1.0\\r\\n\\r\\n' >&3; cat <&3`])
   assert(result.stdout.includes('host loopback marker'), 'Container cannot reach host loopback')
 } finally { server.close() }
 const listener = createTcpServer(); await new Promise<void>(done => listener.listen(0, '127.0.0.1', done))
@@ -40,7 +40,7 @@ const allocated = listener.address(); assert(allocated && typeof allocated === '
 await new Promise<void>(done => listener.close(() => done()))
 const name = 'oa-isolation-native-postgres'
 try {
-  await run('docker', ['run', '--rm', '-d', '--name', name, '--network', 'host', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', image, '-p', String(allocated.port)])
+  await run('docker', ['run', '--mount', 'type=volume,target=/var/lib/postgresql,volume-nocopy', '--rm', '-d', '--name', name, '--network', 'host', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', image, '-p', String(allocated.port)])
   let ready = false
   for (let attempt = 0; attempt < 60; attempt++) {
     try { await run('docker', ['exec', name, 'pg_isready', '-h', '127.0.0.1', '-p', String(allocated.port)]); ready = true; break }
@@ -50,5 +50,5 @@ try {
   await new Promise<void>((done, reject) => { const socket = connect(allocated.port, '127.0.0.1', () => { socket.destroy(); done() }); socket.once('error', reject) })
 } finally { await run('docker', ['rm', '-f', name]) }
 // Keep one genuine subuid container alive for the final recursive cgroup teardown proof.
-await run('docker', ['run', '-d', '--name', 'oa-isolation-lifecycle', '--network', 'none', '--user', '65534:65534', image, 'sleep', '3600'])
+await run('docker', ['run', '--mount', 'type=volume,target=/var/lib/postgresql,volume-nocopy', '-d', '--name', 'oa-isolation-lifecycle', '--network', 'none', '--user', '65534:65534', image, 'sleep', '3600'])
 console.log('Distinct UID, protected files, NNP client, rootless bind and bidirectional native loopback passed')

@@ -143,7 +143,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       finally { collectCandidateDiagnostics(execution.work, execution.privateDirectory) }
     } else {
       const command = mode === 'smoke' ? execution.node : join(dirname(execution.node), 'pnpm')
-      const args = mode === 'smoke' ? ['/run/oa-ci-isolation/smoke.ts']
+      const args = mode === 'smoke' ? ['/run/oa-ci-isolation/smoke.mts']
         : mode === 'install' ? ['install', '--frozen-lockfile']
           : mode === 'browsers' ? ['exec', 'playwright', 'install', 'chromium', 'webkit'] : null
       if (!args) throw new Error('Usage: candidate-isolation.ts smoke|install|browsers|finish <source> <sha>')
