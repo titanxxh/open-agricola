@@ -19,3 +19,6 @@
 .bug-report-feedback-settings .feedback-history p { white-space: pre-wrap; }
 .header-menu .inbox-button, .lobby-drawer .inbox-button { width: 100%; justify-content: flex-start; }
 @media (max-width: 600px) { .inbox-dialog { padding: 16px; } }
+.fix-association { margin-top: 1.5rem; }
+.fix-association fieldset { min-width: 0; border: 1px solid var(--color-border, #bda880); padding: 0.75rem; }
+.fix-association code { overflow-wrap: anywhere; }

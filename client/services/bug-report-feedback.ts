@@ -1,4 +1,4 @@
-import { parseFeedbackDetails, type FeedbackDetails, type FeedbackRecord, type InboxMessage, type InboxPage, type ReportFeedbackView } from '../../shared/contract/bug-report-feedback'
+import { isCommitSha, parseFeedbackDetails, type FeedbackDetails, type FeedbackRecord, type FixAssociation, type InboxMessage, type InboxPage, type ReportFeedbackView, type VerifiedFixPullRequest } from '../../shared/contract/bug-report-feedback'
 
 export const feedbackKindKey = { confirmed_bug: 'feedback.confirmedBug', not_bug: 'feedback.notBug', needs_info: 'feedback.needsInfo' } satisfies Record<FeedbackDetails['kind'], string>
 
@@ -59,5 +59,33 @@ export async function readReportFeedback(response: Response): Promise<ReportFeed
     || !('version' in report) || !integer(report.version)
     || !('feedback' in report) || !Array.isArray(report.feedback)) throw new Error('invalid_feedback_response')
   return { submissionId: report.submissionId, issueNumber: report.issueNumber, issueUrl: report.issueUrl,
-    version: report.version, feedback: report.feedback.map(feedback) }
+    version: report.version, feedback: report.feedback.map(feedback), ...('fix' in report ? { fix: fixAssociation(report.fix) } : {}) }
+}
+
+function fixAssociation(value: unknown): FixAssociation {
+  if (!value || typeof value !== 'object'
+    || !('rootId' in value) || typeof value.rootId !== 'string'
+    || !('rootIssueNumber' in value) || !integer(value.rootIssueNumber) || !value.rootIssueNumber
+    || !('version' in value) || !integer(value.version)
+    || !('associationVersion' in value) || !integer(value.associationVersion)
+    || !('status' in value) || (value.status !== 'unlinked' && value.status !== 'pending_release')
+    || !('reports' in value) || !Array.isArray(value.reports)
+    || !('pullRequests' in value) || !Array.isArray(value.pullRequests)
+    || !('requiredCommits' in value) || !Array.isArray(value.requiredCommits) || !value.requiredCommits.every(isCommitSha)) {
+    throw new Error('invalid_feedback_response')
+  }
+  const reports = value.reports.map((report: unknown) => {
+    if (!report || typeof report !== 'object' || !('submissionId' in report) || typeof report.submissionId !== 'string'
+      || !('issueNumber' in report) || !integer(report.issueNumber) || !report.issueNumber) throw new Error('invalid_feedback_response')
+    return { submissionId: report.submissionId, issueNumber: report.issueNumber }
+  })
+  const pullRequests = value.pullRequests.map((pr: unknown): VerifiedFixPullRequest => {
+    if (!pr || typeof pr !== 'object' || !('number' in pr) || !integer(pr.number) || !pr.number
+      || !('url' in pr) || pr.url !== `https://github.com/titanxxh/open-agricola/pull/${pr.number}`
+      || !('mergeCommit' in pr) || !isCommitSha(pr.mergeCommit)
+      || !('requiredCommits' in pr) || !Array.isArray(pr.requiredCommits) || !pr.requiredCommits.every(isCommitSha)) throw new Error('invalid_feedback_response')
+    return { number: pr.number, url: pr.url, mergeCommit: pr.mergeCommit, requiredCommits: pr.requiredCommits }
+  })
+  return { rootId: value.rootId, rootIssueNumber: value.rootIssueNumber, version: value.version, associationVersion: value.associationVersion,
+    status: value.status === 'pending_release' ? 'pending_release' : 'unlinked', reports, pullRequests, requiredCommits: value.requiredCommits }
 }
