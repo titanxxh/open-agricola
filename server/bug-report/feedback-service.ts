@@ -3,7 +3,9 @@ import type { PostgresDatabase } from '../database/postgres'
 import { BUG_REPORT_GITHUB_REPOSITORY } from './github-issue-client'
 
 export class FeedbackError extends Error {
-  constructor(readonly code: string, readonly status: number) { super(code) }
+  readonly code: string
+  readonly status: number
+  constructor(code: string, status: number) { super(code); this.code = code; this.status = status }
 }
 
 type ReportRow = { submission_id: string; reporter_user_id: string | null; github_issue_number: number; status: string }
@@ -18,7 +20,9 @@ const message = (row: FeedbackRow): InboxMessage => ({ ...record(row), readAt: r
 const feedbackRows = `SELECT f.*, r.github_issue_number FROM bug_report_feedback f JOIN bug_reports r USING(submission_id)`
 
 export class BugReportFeedbackService {
-  constructor(private readonly db: PostgresDatabase, private readonly now = Date.now) {}
+  private readonly db: PostgresDatabase
+  private readonly now: () => number
+  constructor(db: PostgresDatabase, now = Date.now) { this.db = db; this.now = now }
 
   async getReport(issueNumber: number): Promise<ReportFeedbackView> {
     const report = await this.findReport(issueNumber)
@@ -43,7 +47,8 @@ export class BugReportFeedbackService {
       const previous = await this.db.prepare(`${feedbackRows} WHERE f.submission_id=? AND f.request_id=?`)
         .get<FeedbackRow>(report.submission_id, input.requestId)
       if (previous) {
-        if (previous.kind !== input.kind || previous.report_summary !== input.reportSummary || previous.explanation !== input.explanation) {
+        if (previous.kind !== input.kind || previous.report_summary !== input.reportSummary || previous.explanation !== input.explanation
+          || previous.version !== input.expectedVersion + 1) {
           throw new FeedbackError('feedback_request_conflict', 409)
         }
         return record(previous)
