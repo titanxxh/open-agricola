@@ -73,7 +73,7 @@ export function BetaAccessSettings() {
           <td data-label={t('beta.account')}>{grant.account.displayName} <small>@{grant.account.username}</small></td>
           <td data-label={t('beta.grantedBy')}>{grant.grantedBy ? <>{grant.grantedBy.displayName} <small>@{grant.grantedBy.username}</small></> : '—'}</td>
           <td data-label={t('beta.grantedAt')}><time dateTime={new Date(grant.grantedAt).toISOString()}>{new Date(grant.grantedAt).toLocaleString()}</time></td>
-          <td><DangerButton size="sm" disabled={saving} confirmText={t('beta.revokeConfirm', { username: grant.account.username })}
+          <td><DangerButton size="sm" disabled={saving} confirmText={t('beta.revokeConfirmImmediate', { username: grant.account.username })}
             onConfirm={() => update('DELETE', grant.account.id)}>{t('beta.revoke')}</DangerButton></td>
         </tr>)}</tbody>
       </table>}
