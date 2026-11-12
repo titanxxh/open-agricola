@@ -159,6 +159,7 @@ export function createFrontendHosting(env: NodeJS.ProcessEnv = process.env): (re
         'X-Content-Type-Options': 'nosniff',
         'Cache-Control': immutable(relativePath) ? 'public, max-age=31536000, immutable' : 'no-cache',
         ...(relativePath === 'index.html' ? { 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' } : {}),
+        ...(relativePath === 'workshop-game.html' ? { 'Content-Security-Policy': "frame-ancestors 'self'", 'X-Frame-Options': 'SAMEORIGIN' } : {}),
       })
       res.end(body)
     } catch (error) {

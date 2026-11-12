@@ -18,6 +18,7 @@
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 使用 WebSocket。从 `shared/*` 只导入 `contract`、`domain` 与 `i18n`；卡牌展示使用以 manifest 为后端的 `card-meta` 加 `custom-card-metadata`。 |
 | `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 懒加载的工坊沙盒 UI；规则经后端沙盒路径执行。 |
+| `workshop-game` | `client/workshop-game/main.ts` | `client/workshop-game/` | 独立对局 iframe；加载语言、卡牌元数据、Auth 或传输层前，只接纳同源顶层工坊的直接子窗口。 |
 | `local-sandbox-worker` | `client/local-sandbox/worker.ts` | `client/local-sandbox/` | 工坊试玩的浏览器引擎 Worker；只有其 Worker 侧文件可以导入完整的 `shared/*`，主 bundle 中的 `local-transport`、`persistence` 与 `workshop-launch` 只用类型导入 shared。 |
 | `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | 无登录、cookie、WebSocket 或命令；只读取公开 Replay JSON，使用归档时编译的展示过滤。 |
 
@@ -25,6 +26,8 @@
 - `scripts/check-bundle-size.ts` 把主 bundle 预算定为原始 1024 KB、gzip 236 KB，工坊 chunk 定为原始 400 KB，作为单独的构建后检查。
 
 ## 服务与同步状态
+
+`workshop-game/bootstrap.ts` 只接纳应用 base 下 `workshop-game.html` 的固定 HTTP／浏览器沙盒参数。父窗口必须是同源、顶层且带 `page=workshop` 的主页面；直接打开、嵌套、跨源及意外模式均保持静态。准入后 `initialize.tsx` 只挂载 Locale、Auth 和 `GameContainerApi`；未登录时提供独立打开应用的链接，不渲染账号路由。自托管主 HTML 保留 `frame-ancestors 'none'`，只有独立对局 HTML 允许 `'self'`；Pages 同样执行 JavaScript 准入检查。覆盖：`bootstrap.test.ts`、`workshop-game-entry.spec.ts`、`frontend-hosting.test.ts`。
 
 `application-bootstrap.ts` 在语言、Auth 和连接初始化前要求主应用位于顶层窗口；被嵌入时只显示独立打开根地址的链接。`browser-api.ts` 给正式 API 加当前协议版本，收到 reload-required 后停止后续请求并显示现有刷新界面。WS 使用匹配子协议；公开素材、无凭据 Viewer 与第三方模型请求保持各自运输方式。测试：`application-bootstrap.test.ts`、`browser-api.test.ts`、`hosted-password-login.spec.ts`。
 

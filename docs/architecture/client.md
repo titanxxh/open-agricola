@@ -16,6 +16,7 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | Uses WebSocket. From `shared/*`, imports only `contract`, `domain` and `i18n`; card display uses manifest-backed `card-meta` plus `custom-card-metadata`. |
 | `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | Lazy Workshop sandbox UI; rules execute through the backend sandbox path. |
+| `workshop-game` | `client/workshop-game/main.ts` | `client/workshop-game/` | Dedicated game iframe; admits only a direct child of the same-origin top-level Workshop before loading language, metadata, Auth or transport. |
 | `local-sandbox-worker` | `client/local-sandbox/worker.ts` | `client/local-sandbox/` | Browser-mode engine Worker for Workshop playtesting; only its Worker-side files may import complete `shared/*`, and main-bundle `local-transport`, `persistence` and `workshop-launch` use type-only shared imports. |
 | `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | No login, cookies, WebSocket or commands; reads only public Replay JSON with display filtering compiled at archive time. |
 
@@ -23,6 +24,8 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 - `scripts/check-bundle-size.ts` budgets the main bundle at 1024 KB raw and 236 KB gzip and the Workshop chunk at 400 KB raw, as a separate post-build check.
 
 ## Services and synchronized state
+
+`workshop-game/bootstrap.ts` accepts only the fixed HTTP/browser sandbox query on `workshop-game.html`, under the configured application base. Its parent must be the same-origin top-level main page with `page=workshop`; top-level, nested, cross-origin and unexpected-mode launches remain inert. After admission, `initialize.tsx` mounts only Locale, Auth and `GameContainerApi`; missing authentication links to the standalone application without rendering account routes. Hosted main HTML keeps `frame-ancestors 'none'`; only the dedicated HTML permits `'self'`. Pages uses the same JavaScript admission gate. Coverage: `bootstrap.test.ts`, `workshop-game-entry.spec.ts`, `frontend-hosting.test.ts`.
 
 `application-bootstrap.ts` starts the main application only in a top-level window, before language, Auth or transport initialization. Framed pages expose only a standalone root link. `browser-api.ts` adds the current browser protocol to formal API requests; a reload-required response stops later requests and shows the existing reload UI. WS uses the matching subprotocol. Public assets, credentialless Viewer requests and third-party model calls keep their own transport. Tests: `application-bootstrap.test.ts`, `browser-api.test.ts`, `hosted-password-login.spec.ts`.
 

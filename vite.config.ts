@@ -57,6 +57,14 @@ if (publicAssets.localDir) {
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
   plugins,
+  build: {
+    rolldownOptions: {
+      input: {
+        index: path.resolve(import.meta.dirname, 'index.html'),
+        workshopGame: path.resolve(import.meta.dirname, 'workshop-game.html'),
+      },
+    },
+  },
   server: {
     watch: {
       // Scope the exclusion to this checkout so worktree development still watches its own source.

@@ -1,3 +1,4 @@
+import { workshopGameUrl } from '../workshop-game/bootstrap'
 import { browserApiFetch } from '../services/browser-api'
 import { t as translateMessage } from '../../shared/i18n'
 import { CardTakedownButton } from './workshop/CardTakedownButton'
@@ -1814,7 +1815,7 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}${sandboxLocalMode && sandboxLocalFresh ? '&freshSandbox=1' : ''}`}
+              src={workshopGameUrl(sandboxLocalMode, sandboxLocalFresh)}
               title={t('platform.sandbox')}
             />
           )}
@@ -1876,7 +1877,7 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}${sandboxLocalMode && sandboxLocalFresh ? '&freshSandbox=1' : ''}`}
+              src={workshopGameUrl(sandboxLocalMode, sandboxLocalFresh)}
               title={t('platform.sandbox')}
             />
           )}
