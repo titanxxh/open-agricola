@@ -1,4 +1,6 @@
-import type { FeedbackRecord, InboxMessage, InboxPage, ReportFeedbackView } from '../../shared/contract/bug-report-feedback'
+import { parseFeedbackDetails, type FeedbackDetails, type FeedbackRecord, type InboxMessage, type InboxPage, type ReportFeedbackView } from '../../shared/contract/bug-report-feedback'
+
+export const feedbackKindKey = { confirmed_bug: 'feedback.confirmedBug', not_bug: 'feedback.notBug', needs_info: 'feedback.needsInfo' } satisfies Record<FeedbackDetails['kind'], string>
 
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 
@@ -8,13 +10,12 @@ function feedback(value: unknown): FeedbackRecord {
     || !('submissionId' in value) || typeof value.submissionId !== 'string'
     || !('issueNumber' in value) || !integer(value.issueNumber) || value.issueNumber < 1
     || !('issueUrl' in value) || value.issueUrl !== `https://github.com/titanxxh/open-agricola/issues/${value.issueNumber}`
-    || !('kind' in value) || value.kind !== 'confirmed_bug'
     || !('reportSummary' in value) || typeof value.reportSummary !== 'string'
     || !('explanation' in value) || typeof value.explanation !== 'string'
     || !('version' in value) || !integer(value.version)
     || !('createdAt' in value) || !integer(value.createdAt)) throw new Error('invalid_feedback_response')
   return { id: value.id, submissionId: value.submissionId, issueNumber: value.issueNumber, issueUrl: value.issueUrl,
-    kind: value.kind, reportSummary: value.reportSummary, explanation: value.explanation, version: value.version, createdAt: value.createdAt }
+    ...parseFeedbackDetails(value), reportSummary: value.reportSummary, version: value.version, createdAt: value.createdAt }
 }
 
 function message(value: unknown): InboxMessage {

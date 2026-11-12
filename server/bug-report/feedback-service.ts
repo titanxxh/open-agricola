@@ -1,4 +1,4 @@
-import { parseRecordFeedback, type FeedbackRecord, type InboxMessage, type InboxPage, type ReportFeedbackView } from '../../shared/contract/bug-report-feedback'
+import { parseFeedbackDetails, parseRecordFeedback, type FeedbackRecord, type InboxMessage, type InboxPage, type ReportFeedbackView } from '../../shared/contract/bug-report-feedback'
 import type { PostgresDatabase } from '../database/postgres'
 import { BUG_REPORT_GITHUB_REPOSITORY } from './github-issue-client'
 
@@ -9,13 +9,14 @@ export class FeedbackError extends Error {
 }
 
 type ReportRow = { submission_id: string; reporter_user_id: string | null; github_issue_number: number; status: string }
-type FeedbackRow = { id: number; submission_id: string; github_issue_number: number; kind: 'confirmed_bug';
+type FeedbackRow = { id: number; submission_id: string; github_issue_number: number; kind: unknown; missing_items: unknown;
   report_summary: string; explanation: string; version: number; created_at: number; read_at: number | null }
 
 const issueUrl = (number: number) => `https://github.com/${BUG_REPORT_GITHUB_REPOSITORY}/issues/${number}`
 const record = (row: FeedbackRow): FeedbackRecord => ({ id: row.id, submissionId: row.submission_id,
-  issueNumber: row.github_issue_number, issueUrl: issueUrl(row.github_issue_number), kind: row.kind,
-  reportSummary: row.report_summary, explanation: row.explanation, version: row.version, createdAt: row.created_at })
+  issueNumber: row.github_issue_number, issueUrl: issueUrl(row.github_issue_number),
+  ...parseFeedbackDetails({ kind: row.kind, explanation: row.explanation, ...(row.kind === 'needs_info' ? { missingItems: row.missing_items } : {}) }),
+  reportSummary: row.report_summary, version: row.version, createdAt: row.created_at })
 const message = (row: FeedbackRow): InboxMessage => ({ ...record(row), readAt: row.read_at })
 const feedbackRows = `SELECT f.*, r.github_issue_number FROM bug_report_feedback f JOIN bug_reports r USING(submission_id)`
 
@@ -48,6 +49,7 @@ export class BugReportFeedbackService {
         .get<FeedbackRow>(report.submission_id, input.requestId)
       if (previous) {
         if (previous.kind !== input.kind || previous.report_summary !== input.reportSummary || previous.explanation !== input.explanation
+          || JSON.stringify(previous.missing_items) !== JSON.stringify(input.kind === 'needs_info' ? input.missingItems : null)
           || previous.version !== input.expectedVersion + 1) {
           throw new FeedbackError('feedback_request_conflict', 409)
         }
@@ -57,9 +59,9 @@ export class BugReportFeedbackService {
         .get<{ version: number }>(report.submission_id)
       if (latest?.version !== input.expectedVersion) throw new FeedbackError('feedback_version_conflict', 409)
       const inserted = await this.db.prepare(`INSERT INTO bug_report_feedback(submission_id,recipient_user_id,actor_user_id,request_id,
-        kind,report_summary,explanation,version,created_at) VALUES(?,?,?,?,?,?,?,?,?) RETURNING *`)
+        kind,report_summary,explanation,missing_items,version,created_at) VALUES(?,?,?,?,?,?,?,?::jsonb,?,?) RETURNING *`)
         .get<Omit<FeedbackRow, 'github_issue_number'>>(report.submission_id, recipient, actorId, input.requestId, input.kind,
-          input.reportSummary, input.explanation, input.expectedVersion + 1, this.now())
+          input.reportSummary, input.explanation, input.kind === 'needs_info' ? JSON.stringify(input.missingItems) : null, input.expectedVersion + 1, this.now())
       if (!inserted) throw new Error('Feedback insert returned no record')
       return record({ ...inserted, github_issue_number: input.issueNumber })
     })()
