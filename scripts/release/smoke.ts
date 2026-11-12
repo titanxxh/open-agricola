@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 import { SoloBrowserDriver } from '../../e2e-tests/helpers/standard-solo-acceptance'
 import { observeReleasePage, type ReleaseDiagnosticSnapshot } from '../../e2e-tests/helpers/release-diagnostics'
 import { verifyVisibleReleaseAssets } from './render'
@@ -106,6 +107,7 @@ export async function runReleaseSmoke({ page, target, credentials, outputDirecto
   failureRecorder?: ReturnType<typeof createFailureRecorder>
 }): Promise<SmokeEvidence> {
   target = parseSmokeTarget(target.appUrl, target.apiUrl, target.buildId)
+  const browserHeaders = { Origin: new URL(target.appUrl).origin, [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) }
   const progress = progressFor(outputDirectory, evidenceHash([target, credentials.username]))
   const save = () => writeEvidence(outputDirectory, 'progress.json', progress)
   const diagnostics = observeReleasePage(page, { capacity: 512 }), driver = new SoloBrowserDriver(page)
@@ -133,7 +135,7 @@ export async function runReleaseSmoke({ page, target, credentials, outputDirecto
     await page.locator('#username').fill(credentials.username); await page.locator('#password').fill(credentials.password)
     const login = page.waitForResponse(response => response.url() === `${target.apiUrl}/api/auth/login` && response.request().method() === 'POST')
     await page.locator('.login-form button[type="submit"]').click(); assert.equal((await login).status(), 200); authenticated = true
-    const me = await page.context().request.get(`${target.apiUrl}/api/auth/me`); assert.equal(me.status(), 200)
+    const me = await page.context().request.get(`${target.apiUrl}/api/auth/me`, { headers: browserHeaders }); assert.equal(me.status(), 200)
     const identity: unknown = await me.json()
     assert.ok(object(identity) && object(identity.user) && typeof identity.user.id === 'string')
     const ownerId = identity.user.id, rooms: SmokeRoom[] = []
@@ -223,8 +225,8 @@ export async function runReleaseSmoke({ page, target, credentials, outputDirecto
     try {
       if (authenticated) {
         stage = 'logout'
-        assert.equal((await page.context().request.post(`${target.apiUrl}/api/auth/logout`, { data: {} })).status(), 200)
-        assert.equal((await page.context().request.get(`${target.apiUrl}/api/auth/me`)).status(), 401)
+        assert.equal((await page.context().request.post(`${target.apiUrl}/api/auth/logout`, { headers: browserHeaders, data: {} })).status(), 200)
+        assert.equal((await page.context().request.get(`${target.apiUrl}/api/auth/me`, { headers: browserHeaders })).status(), 401)
       }
     } catch (error) {
       const failure = fail(error)
