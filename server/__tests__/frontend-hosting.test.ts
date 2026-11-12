@@ -185,6 +185,8 @@ describe('frontend hosting', () => {
     expect(index).toMatchObject({ status: 200, body: HTML })
     expect(index.headers['content-type']).toBe('text/html; charset=utf-8')
     expect(index.headers['cache-control']).toBe('no-cache')
+    expect(index.headers['content-security-policy']).toBe("frame-ancestors 'none'")
+    expect(index.headers['x-frame-options']).toBe('DENY')
     const script = await get('/open-agricola/assets/index-Ab1234Cd.js')
     expect(script).toMatchObject({ status: 200, body: SCRIPT })
     expect(script.headers['content-type']).toBe('text/javascript; charset=utf-8')

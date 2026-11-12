@@ -38,7 +38,7 @@
 
 正式认证使用 Secure、HttpOnly、Path=/ 的 `__Host-` Cookie 家族，覆盖 session、OAuth state、onboarding 与 ops。`auth-cookies.ts` 统一名称和严格读写，重复值或 Cookie/Bearer 混用均拒绝；HTTP 开发使用独立名字，生产要求明确 HTTPS 配置。迁移 046 废止旧 session 及未完成的 OAuth/onboarding/ops 票据，用户重新登录，账号和对局保留；邮件验证不再替换浏览器 session。
 
-`request-auth.ts` 对私有 HTTP 读写和 WS upgrade 校验精确来源与浏览器协议，不从 Host 或转发头扩大信任。原生 Bearer/auth 消息不带 Cookie/Origin，所有运输方式统一验证当前 session 版本。OAuth/ops 导航有显式策略。`main.tsx` 在认证和连接初始化前拒绝被嵌入的应用；独立无凭据 Viewer 仍可嵌入。`browser-api.ts` 发送版本头并提示旧页面刷新。OAuth 先通过 POST 准备，再导航到 provider。
+`request-auth.ts` 对私有 HTTP 读写和 WS upgrade 校验精确来源与浏览器协议，不从 Host 或转发头扩大信任。原生 Bearer/auth 消息不带 Cookie/Origin，所有运输方式统一验证当前 session 版本。OAuth/ops 导航有显式策略。`main.tsx` 在认证和连接初始化前拒绝被嵌入的应用；独立无凭据 Viewer 仍可嵌入。`browser-api.ts` 发送版本头并提示旧页面刷新。OAuth 登录/注册使用顶层表单 POST，校验精确 Origin、导航元数据和协议标记，在第一方上下文设置 state，保留阻止第三方 Cookie 时的注册行为；账号关联继续使用 JSON POST 与 PKCE。服务端托管的应用 HTML 和 ops 发送禁止嵌入的 frame-ancestors 响应头。
 
 ### A2.1. 预发布的正式身份权威
 
