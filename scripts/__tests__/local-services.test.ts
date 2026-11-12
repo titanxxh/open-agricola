@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, basename } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { allocateTestPort } from '../test-ports'
 
@@ -81,3 +81,25 @@ describe('local-services Docker use', () => {
     expect(result.dockerCalls[0]).toMatch(/^compose --env-file .+ -f .+docker-compose\.local\.yml up -d --wait postgres$/)
   })
 })
+
+it('initializes a fresh persistent RustFS volume without copying image metadata or changing the service user', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oa-rustfs-volume-')); roots.push(root)
+  const project = 'oa-volume-fixture-' + basename(root).slice('oa-rustfs-volume-'.length).toLowerCase()
+  const args = ['compose', '-p', project, '-f', join(repository, 'docker-compose.local.yml')]
+  const env = { ...process.env, LOCAL_POSTGRES_PASSWORD: 'inert-postgres', LOCAL_S3_ACCESS_KEY: 'inert-access', LOCAL_S3_SECRET_KEY: 'inert-secret' }
+  const run = (...tail: string[]) => spawnSync('docker', [...args, ...tail], { env, encoding: 'utf8', timeout: 60000 })
+  try {
+    const initialized = run('run', '--rm', '--no-deps', 'objects-volume-init')
+    expect(initialized.status, initialized.stderr).toBe(0)
+    const writable = run('run', '--rm', '--no-deps', '--entrypoint', '/bin/sh', 'objects', '-ec',
+      'id -u; id -g; test -w /data; printf "inert persistent bytes" > /data/fixture; cat /data/fixture')
+    expect(writable.status, writable.stderr).toBe(0)
+    expect(writable.stdout).toBe('10001\n10001\ninert persistent bytes')
+    const persisted = run('run', '--rm', '--no-deps', '--entrypoint', '/bin/sh', 'objects', '-ec', 'id -u; cat /data/fixture')
+    expect(persisted.status, persisted.stderr).toBe(0)
+    expect(persisted.stdout).toBe('10001\ninert persistent bytes')
+  } finally {
+    const cleaned = run('down', '--volumes')
+    expect(cleaned.status, cleaned.stderr).toBe(0)
+  }
+}, 120000)

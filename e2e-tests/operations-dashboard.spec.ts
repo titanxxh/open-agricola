@@ -106,7 +106,7 @@ test('independent dashboards render registration, rooms and durable player openi
     chmodSync(join(directory, 'prometheus.yml'), 0o644)
     const promName = 'oa-ops-prom-' + randomUUID()
     names.push(promName)
-    docker(['run', '-d', '--name', promName, '--network', 'host', '-v', `${directory}/prometheus.yml:/etc/prometheus/prometheus.yml:ro`,
+    docker(['run', '-d', '--name', promName, '--network', 'host', '--tmpfs', '/prometheus:uid=65534,gid=65534,mode=0700', '-v', `${directory}/prometheus.yml:/etc/prometheus/prometheus.yml:ro`,
       'prom/prometheus:v3.15.0', '--config.file=/etc/prometheus/prometheus.yml', `--web.listen-address=127.0.0.1:${prometheusPort}`])
     const grafanaName = 'oa-ops-grafana-' + randomUUID()
     names.push(grafanaName)

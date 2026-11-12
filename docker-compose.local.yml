@@ -20,7 +20,25 @@ services:
       timeout: 3s
       retries: 30
     restart: unless-stopped
+  objects-volume-init:
+    image: rustfs/rustfs:1.0.1@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["chown 10001:10001 /data"]
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    volumes:
+      - type: volume
+        source: object-data
+        target: /data
+        volume:
+          nocopy: true
   objects:
+    depends_on:
+      objects-volume-init:
+        condition: service_completed_successfully
     image: rustfs/rustfs:1.0.1@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c
     environment:
       RUSTFS_ACCESS_KEY: ${LOCAL_S3_ACCESS_KEY:?Initialize local dependencies first}
@@ -31,7 +49,11 @@ services:
     ports:
       - "127.0.0.1:${LOCAL_S3_PORT:-59000}:9000"
     volumes:
-      - object-data:/data
+      - type: volume
+        source: object-data
+        target: /data
+        volume:
+          nocopy: true
     restart: unless-stopped
 volumes:
   postgres-data:
