@@ -21,7 +21,7 @@ describe('routine verification manifest', () => {
       changes: [], inventory: { vitest: [], browser: [] }, selections: [], expansionReasons: [], wideningReasons: [],
       checks: [{ kind: 'browser', browser: 'chromium', files: [`e2e-tests/${file}.spec.ts`], grep: null }],
     }
-    expect(routinePlanManifest(plan).browsers).toBe('chromium webkit')
+    expect(routinePlanManifest(plan).browsers).toBe('chromium webkit firefox')
   })
 })
 

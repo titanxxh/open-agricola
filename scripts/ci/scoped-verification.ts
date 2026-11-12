@@ -53,7 +53,7 @@ export function routinePlanManifest(plan: VerificationPlan) {
     tested_sha: plan.identity.testedSha,
     partitions: JSON.stringify(routinePartitionManifest(routinePartitions(plan))),
     catalog_tasks: tasks.length ? selectedTasks(tasks.join(',')).join(',') : NO_CATALOG_TASKS,
-    browsers: plan.checks.some(check => check.kind === 'browser') ? 'chromium webkit' : '',
+    browsers: plan.checks.some(check => check.kind === 'browser') ? 'chromium webkit firefox' : '',
   }
 }
 

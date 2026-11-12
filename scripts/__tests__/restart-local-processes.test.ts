@@ -26,6 +26,7 @@ import { serializeSessionSnapshot } from '../../shared/session/serialization'
 import { encodeRoomBody } from '../../server/game/persistence/room-body-codec'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import { allocateTestPort } from '../test-ports'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION, BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 
 const scriptPath = resolve(import.meta.dirname, '../../restart-local.sh')
 const tempDirs: string[] = []
@@ -162,9 +163,10 @@ describe.skipIf(process.platform !== 'linux')('restart-local saved interaction r
       env,
     })
     const connect = async () => {
-      const located = await fetch(`http://127.0.0.1:${backendPort}/api/rooms/locate`, { method: 'POST', headers: { 'content-type': 'application/json', origin: `http://127.0.0.1:${frontendPort}` }, body: JSON.stringify({ roomId: 'dev2' }) })
+      const located = await fetch(`http://127.0.0.1:${backendPort}/api/rooms/locate`, { method: 'POST', headers: { 'content-type': 'application/json', origin: `http://127.0.0.1:${frontendPort}`, [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) }, body: JSON.stringify({ roomId: 'dev2' }) })
+      expect(located.status).toBe(200)
       const route = await located.json() as { wsPath: string }
-      const ws = new WebSocket(`ws://127.0.0.1:${backendPort}${route.wsPath}`, {
+      const ws = new WebSocket(`ws://127.0.0.1:${backendPort}${route.wsPath}`, BROWSER_WS_PROTOCOL, {
         origin: `http://127.0.0.1:${frontendPort}`,
       })
       Object.assign(ws, { received: [] })

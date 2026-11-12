@@ -208,7 +208,7 @@ describe('scoped verification public CLI', () => {
     const plan = value.run('plan', '--base', 'main')
     expect(plan.status, plan.stderr).toBe(0)
     const manifest: unknown = JSON.parse(plan.stdout)
-    expect(manifest).toMatchObject({ mode: 'scoped', catalog_tasks: 'quality,build', browsers: 'chromium webkit' })
+    expect(manifest).toMatchObject({ mode: 'scoped', catalog_tasks: 'quality,build', browsers: 'chromium webkit firefox' })
     const result = value.run('run', '--base', 'main')
     expect(result.status, result.stderr).toBe(0)
     expect(value.commands()).toEqual([
