@@ -85,6 +85,7 @@ backup_running_image() {
   SOURCE_BUILD_ID="$(backup_command docker exec "$container" node -p 'process.env.GAME_BUILD_ID')"
   [[ "$SOURCE_BUILD_ID" =~ ^[0-9a-f]{40}$ ]] || { echo 'Online backup requires a deployed application build' >&2; return 1; }
   export SOURCE_BUILD_ID
+  export BACKUP_CAPTURED_IMAGE="$image"
   mkdir -p "$BACKUP_PENDING"
   printf 'services:\n  app:\n    image: %s\n' "$image" > "$BACKUP_PENDING/image.compose.yml"
   if [[ "$BACKUP_ENVIRONMENT" != stable ]]; then printf '  capture:\n    image: %s\n' "$image" >> "$BACKUP_PENDING/image.compose.yml"; fi
@@ -104,6 +105,8 @@ backup_container() {
   if [[ "$BACKUP_ENVIRONMENT" != stable ]]; then
     [[ "${BACKUP_TOOL_MEMORY_MIB:-}" =~ ^[0-9]+$ && "${BACKUP_TOOL_PIDS:-}" =~ ^[0-9]+$ && "${BACKUP_TOOL_CPUS:-}" =~ ^[0-9]+([.][0-9]+)?$ ]] || { echo 'Missing prerelease backup limits'; return 1; }
     [[ "$BACKUP_TOOL_SERVICE" == tools && "$BACKUP_CAPTURE_SERVICE" == capture ]] || { echo 'Prerelease backups require isolated bounded tool services'; return 1; }
+    backup_command "$POLICY_ROOT/node_modules/.bin/tsx" "$POLICY_ROOT/scripts/prerelease/archive-policy.ts" "$@"
+    return
   fi
   backup_command "${COMPOSE[@]}" run --rm --no-deps -T --name "$name" \
     --label "org.open-agricola.backup.run=$BACKUP_JOB_ID" \

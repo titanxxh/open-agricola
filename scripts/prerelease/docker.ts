@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { freemem } from 'node:os'
-import { existsSync, mkdirSync, statfsSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { composePath, type RuntimeRecord } from './runtime'
-import { targetFingerprint, type PrereleaseTarget } from './config'
+import { existsSync, mkdirSync, readFileSync, statfsSync, writeFileSync } from 'node:fs'
+import { join, resolve, sep } from 'node:path'
+import { atomicJson, composePath, controlDirectory, readRuntime, type RuntimeRecord } from './runtime'
+import { assertOwnerPath, targetFingerprint, type PrereleaseTarget } from './config'
 
 export function command(program: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string | Buffer; timeout?: number } = {}): string {
   const env: NodeJS.ProcessEnv = {}
@@ -32,20 +32,22 @@ export function assertCapacity(target: PrereleaseTarget): void {
   if (freemem() < memory * 1024 * 1024 || remaining < target.budgets.diskMiB * 1024 * 1024) throw new Error('Measured host capacity is below the approved prerelease budget')
 }
 
-export function inspectImage(image: string, buildId: string): string {
+function inspectFixedImage(image: string, buildId: string, channel: 'stable' | 'prerelease'): string {
   const digest = command('docker', ['image', 'inspect', '--format', '{{.Id}}', image])
   const labels = parsed(command('docker', ['image', 'inspect', '--format', '{{json .Config.Labels}}', digest]))
   if (!/^sha256:[a-f0-9]{64}$/.test(digest) || labels['org.opencontainers.image.revision'] !== buildId
-    || labels['io.open-agricola.release-channel'] !== 'prerelease') throw new Error('Image channel/SHA does not match the fixed prerelease candidate')
+    || labels['io.open-agricola.release-channel'] !== channel) throw new Error('Image channel/SHA does not match the fixed tool or candidate')
   const metadata = parsed(command('docker', ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
     '--memory', '64m', '--cpus', '0.25', '--pids-limit', '32', '--entrypoint', 'node', digest,
     '-e', 'process.stdout.write(require("node:fs").readFileSync("/app/frontend-dist/frontend-build.json","utf8"))']))
   if (metadata.format !== 1 || metadata.gameBuildId !== buildId || metadata.basePath !== '/open-agricola/'
-    || metadata.releaseChannel !== 'prerelease' || metadata.deploymentTarget !== 'prerelease-hosted') throw new Error('Hosted frontend is not paired with the prerelease image')
+    || metadata.releaseChannel !== channel || metadata.deploymentTarget !== `${channel}-hosted`) throw new Error('Hosted frontend is not paired with the fixed image')
   return digest
 }
 
-export function buildImage(target: PrereleaseTarget, buildId: string): string {
+export const inspectImage = (image: string, buildId: string): string => inspectFixedImage(image, buildId, 'prerelease')
+
+function buildFixedImage(target: PrereleaseTarget, buildId: string, channel: 'stable' | 'prerelease', deadlineEpochMs?: number): string {
   assertCapacity(target)
   const builder = parsed(command('docker', ['buildx', 'inspect', target.builder.name, '--format', '{{json .}}']))
   const nodes = builder.Nodes
@@ -64,10 +66,27 @@ export function buildImage(target: PrereleaseTarget, buildId: string): string {
     || typeof limits.Memory !== 'number' || limits.Memory <= 0 || limits.Memory > target.budgets.build.memoryMiB * 1024 * 1024
     || !cpu || cpu > target.budgets.build.cpus || typeof limits.PidsLimit !== 'number' || limits.PidsLimit <= 0 || limits.PidsLimit > target.budgets.build.pids) throw new Error('Prerelease builder limits or ownership are missing')
   const archive = execFileSync('git', ['archive', '--format=tar', buildId], { cwd: target.policyDirectory, maxBuffer: 256 * 1024 * 1024 })
-  const tag = `${target.project}:${buildId}`
+  const tag = `${target.project}${channel === 'stable' ? '-policy' : ''}:${buildId}`
   command('docker', ['buildx', 'build', '--builder', target.builder.name, '--load', '--build-arg', `GAME_BUILD_ID=${buildId}`,
-    '--build-arg', 'RELEASE_CHANNEL=prerelease', '--tag', tag, '-'], { input: archive, cwd: target.directory, timeout: 30 * 60 * 1000 })
-  return inspectImage(tag, buildId)
+    '--build-arg', `RELEASE_CHANNEL=${channel}`, '--tag', tag, '-'], { input: archive, cwd: target.directory,
+    timeout: deadlineEpochMs === undefined ? 30 * 60 * 1000 : Math.max(1, deadlineEpochMs - Date.now()) })
+  return inspectFixedImage(tag, buildId, channel)
+}
+
+export const buildImage = (target: PrereleaseTarget, buildId: string): string => buildFixedImage(target, buildId, 'prerelease')
+
+function trustedArchiveImage(target: PrereleaseTarget, deadlineEpochMs: number): string {
+  const policySha = command('git', ['rev-parse', 'HEAD'], { cwd: target.policyDirectory })
+  if (!/^[a-f0-9]{40}$/.test(policySha)) throw new Error('Trusted main policy SHA is missing')
+  const path = join(controlDirectory(target), `archive-policy-${policySha}.json`)
+  if (existsSync(path)) {
+    const cached = parsed(readFileSync(path, 'utf8'))
+    if (cached.policySha !== policySha || typeof cached.image !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(cached.image)) throw new Error('Trusted archive image binding changed')
+    return inspectFixedImage(cached.image, policySha, 'stable')
+  }
+  const image = buildFixedImage(target, policySha, 'stable', deadlineEpochMs)
+  atomicJson(path, { policySha, image })
+  return image
 }
 
 export function stopWriters(target: PrereleaseTarget, record: RuntimeRecord): void {
@@ -77,7 +96,7 @@ export function stopWriters(target: PrereleaseTarget, record: RuntimeRecord): vo
   if (!container && unacceptedStartup) return
   if (!/^[a-f0-9]+$/.test(container)) throw new Error('Cannot identify exactly one prerelease application writer')
   const image = command('docker', ['inspect', '--format', '{{.Image}}', container])
-  const drainedSource = unacceptedStartup && record.operation?.kind === 'deploy' && image === record.operation.sourceImage
+  const drainedSource = image !== record.installed.image && unacceptedStartup && record.operation?.kind === 'deploy' && image === record.operation.sourceImage
   if (image !== record.installed.image && !drainedSource
     || command('docker', ['inspect', '--format', '{{index .Config.Labels "com.docker.compose.project"}}', container]) !== target.project) throw new Error('Running application differs from the expected deployment')
   const before = parsed(command('docker', ['inspect', '--format', '{{json .State}}', container]))
@@ -106,6 +125,7 @@ export function verifyRunning(target: PrereleaseTarget, record: RuntimeRecord): 
 
 export function backupEnvironment(target: PrereleaseTarget, record: RuntimeRecord): NodeJS.ProcessEnv {
   return { BACKUP_ENVIRONMENT: target.targetId, BACKUP_WORKING_DIRECTORY: target.directory, BACKUP_POLICY_ROOT: target.policyDirectory,
+    BACKUP_TARGET_CONFIG: JSON.stringify(target), BACKUP_TARGET_BUILD_ID: record.operation?.buildId ?? record.buildId ?? '',
     BACKUP_COMPOSE_FILE: composePath(target), BACKUP_COMPOSE_PROJECT: target.project, BACKUP_TOOL_SERVICE: 'tools', BACKUP_CAPTURE_SERVICE: 'capture',
     BACKUP_TOOL_MEMORY_MIB: String(target.budgets.tools.memoryMiB), BACKUP_TOOL_CPUS: String(target.budgets.tools.cpus), BACKUP_TOOL_PIDS: String(target.budgets.tools.pids),
     BACKUP_RETENTION_DAYS: '7', BACKUP_DAILY_COUNT: '7', BACKUP_PRE_COUNT: '1000000', SOURCE_BUILD_ID: record.buildId ?? '',
@@ -120,22 +140,75 @@ function cleanupOwnedTools(target: PrereleaseTarget, runId: string): void {
   if (ids.length) command('docker', ['rm', '-f', ...ids])
 }
 
-function boundedTool(target: PrereleaseTarget, run: (labels: string[], deadline: number) => string): string {
-  const id = randomUUID(), deadline = Date.now() + 1790_000
+export type ToolBudget = { runId: string; deadlineEpochMs: number }
+
+function boundedTool(target: PrereleaseTarget, run: (labels: string[], deadline: number, runId: string) => string, budget?: ToolBudget): string {
+  const id = budget?.runId ?? randomUUID(), deadline = budget?.deadlineEpochMs ?? Date.now() + 1790_000
+  if (!/^[a-zA-Z0-9-]+$/.test(id) || !Number.isSafeInteger(deadline) || deadline <= Date.now() || deadline - Date.now() > 1800_000) throw new Error('Invalid archive tool budget')
   const labels = ['--label', `org.open-agricola.backup.environment=${target.targetId}`, '--label', `org.open-agricola.backup.run=${id}`,
     '--label', `org.open-agricola.backup.deadline=${deadline}`]
-  try { return run(labels, deadline) }
+  try { return run(labels, deadline, id) }
   finally { cleanupOwnedTools(target, id) }
 }
 
-export function candidateTool(target: PrereleaseTarget, service: 'capture' | 'tools' | 'migrate', args: string[], extra: string[] = []): string {
-  return boundedTool(target, (labels, deadline) => compose(target, ['run', '--rm', '--no-deps', '-T', ...labels, ...extra,
-    '-e', `BACKUP_DEADLINE_EPOCH_MS=${deadline}`, service, 'timeout', '--signal=TERM', '--kill-after=3s', '1790',
-    'node', '--import', 'tsx', ...args], 1800_000))
+type CandidateToolOptions = { inputs?: readonly { source: string; destination: string }[]; scratch?: string; budget?: ToolBudget; environment?: Readonly<Record<string, string>> }
+
+export function candidateTool(target: PrereleaseTarget, service: 'tools' | 'migrate', args: string[], options: CandidateToolOptions = {}): string {
+  const mounts: string[] = []
+  for (const input of options.inputs ?? []) {
+    if (!resolve(input.source).startsWith(backupRoot(target) + sep) || !/^\/backup\/[a-zA-Z0-9._/-]+$/.test(input.destination)
+      || input.destination.split('/').includes('..')) throw new Error('Candidate input is outside the selected backup')
+    assertOwnerPath(input.source)
+    mounts.push('-v', `${input.source}:${input.destination}:ro`)
+  }
+  if (options.scratch) {
+    if (!resolve(options.scratch).startsWith(backupRoot(target) + sep + '.backup-scratch-runs-')) throw new Error('Candidate scratch is outside its private run')
+    assertOwnerPath(options.scratch)
+    mkdirSync(options.scratch, { recursive: true, mode: 0o700 })
+    mounts.push('-v', `${options.scratch}:/scratch`, '-e', 'BACKUP_SCRATCH_DIRECTORY=/scratch')
+  }
+  const environment: string[] = []
+  for (const [key, value] of Object.entries(options.environment ?? {})) {
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(key)) throw new Error('Invalid candidate environment key')
+    environment.push('-e', `${key}=${value}`)
+  }
+  return boundedTool(target, (labels, deadline, runId) => compose(target, ['run', '--rm', '--no-deps', '-T', ...labels, ...mounts, ...environment,
+    '-e', `BACKUP_DEADLINE_EPOCH_MS=${deadline}`, '-e', `BACKUP_JOB_ID=${runId}`, '-e', `BACKUP_ENVIRONMENT=${target.targetId}`, '-e', 'PG_CLIENT_MODE=local', service,
+    'timeout', '--signal=TERM', '--kill-after=3s', String(Math.max(1, Math.ceil((deadline - Date.now()) / 1000))),
+    'node', '--import', 'tsx', ...args], Math.max(1, deadline - Date.now()) + 3000), options.budget)
 }
 
-export function archiveTool(target: PrereleaseTarget, service: 'capture' | 'tools' | 'migrate', args: string[], extra: string[] = []): string {
-  return candidateTool(target, service, ['scripts/storage-archive-cli.ts', ...args], extra)
+export function trustedArchiveTool(target: PrereleaseTarget, service: 'capture' | 'tools' | 'migrate', args: string[], budget?: ToolBudget): string {
+  if (!['export', 'export-online', 'ledger-export', 'ledger-merge', 'cleanup-scratch'].includes(args[0] ?? '')) throw new Error('Unknown trusted archive operation')
+  const record = readRuntime(target)
+  return boundedTool(target, (labels, deadline, runId) => {
+    const image = trustedArchiveImage(target, deadline)
+    if (deadline <= Date.now()) throw new Error('Trusted archive image preparation exhausted the backup deadline')
+    return command('docker', ['run', '--rm', ...labels, '--network', target.network,
+    '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
+    '--memory', `${target.budgets.tools.memoryMiB}m`, '--cpus', String(target.budgets.tools.cpus), '--pids-limit', String(target.budgets.tools.pids),
+    '--tmpfs', '/tmp:size=67108864', '--env-file', join(target.directory, service === 'tools' ? 'data/dependencies.compose.env' : '.env'),
+    '-e', 'PG_CLIENT_MODE=local', '-e', 'RELEASE_CHANNEL=prerelease', '-e', `SOURCE_BUILD_ID=${record.installed?.buildId ?? ''}`,
+    '-e', `BACKUP_ENVIRONMENT=${target.targetId}`, '-e', `BACKUP_JOB_ID=${runId}`,
+    '-e', `BACKUP_DEADLINE_EPOCH_MS=${deadline}`, '-e', 'BACKUP_SCRATCH_DIRECTORY=/backup',
+    '-v', `${backupRoot(target)}:/backup`, '--entrypoint', 'timeout', image, '--signal=TERM', '--kill-after=3s',
+    String(Math.max(1, Math.ceil((deadline - Date.now()) / 1000))), 'node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', ...args],
+  { cwd: target.directory, timeout: Math.max(1, deadline - Date.now()) + 3000 })
+  }, budget)
+}
+
+export function archiveTool(target: PrereleaseTarget, service: 'capture' | 'tools' | 'migrate', args: string[], environment: Readonly<Record<string, string>> = {}, budget?: ToolBudget): string {
+  if (['ledger-export', 'ledger-merge', 'cleanup-scratch', 'export', 'export-online'].includes(args[0] ?? '')) return trustedArchiveTool(target, service, args, budget)
+  if (service === 'capture') throw new Error('Candidate capture is not permitted')
+  const inputs: { source: string; destination: string }[] = []
+  if (args[0] === 'validate' || args[0] === 'restore') {
+    const path = args[1]
+    if (!path?.startsWith('/backup/') || path.split('/').includes('..')) throw new Error('Expected a selected archive input')
+    inputs.push({ source: join(backupRoot(target), path.slice('/backup/'.length)), destination: path })
+    if (args[0] === 'restore') inputs.push({ source: join(backupRoot(target), 'replay-removals.latest.json'), destination: '/backup/replay-removals.latest.json' })
+  }
+  return candidateTool(target, service, ['scripts/storage-archive-cli.ts', ...args], { inputs, budget, environment,
+    ...(args[0] === 'validate' ? { scratch: join(backupRoot(target), `.backup-scratch-runs-${budget?.runId ?? randomUUID()}`) } : {}) })
 }
 
 export const backupRoot = (target: PrereleaseTarget) => join(target.directory, 'backups')

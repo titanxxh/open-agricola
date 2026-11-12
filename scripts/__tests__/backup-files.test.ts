@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -214,4 +214,24 @@ it('expires restore bytes by the sealed capture clock while preserving fresh ret
   for (const path of [retry, foreign, original]) expect(readFileSync(join(path, 'database.dump'), 'utf8')).toBe('private restore bytes')
   expect(readFileSync(join(unrelated, 'keep'), 'utf8')).toBe('unrelated bytes')
   expect(readFileSync(join(root, 'replay-removals.latest.json'), 'utf8')).toBe('independent erasure facts')
+})
+
+it('writes a new report only in a private parent with mode 0600', () => {
+  const root = temporary(), report = join(root, 'report.json')
+  const result = spawnSync(process.execPath, [filesScript, 'write-report', report], { input: 'inert validation bytes', encoding: 'utf8' })
+  expect(result.status, result.stderr).toBe(0)
+  expect(readFileSync(report, 'utf8')).toBe('inert validation bytes')
+  expect(statSync(report).mode & 0o777).toBe(0o600)
+})
+
+it.each(['file-link', 'parent-link', 'writable-parent'])('refuses a %s report output without changing another file', kind => {
+  const root = temporary(), parent = join(root, 'private'), sentinel = join(root, 'inert-sentinel')
+  mkdirSync(parent, { mode: 0o700 }); writeFileSync(sentinel, 'inert owner fixture bytes')
+  let report = join(parent, 'report.json')
+  if (kind === 'file-link') symlinkSync(sentinel, report)
+  if (kind === 'parent-link') { symlinkSync(parent, join(root, 'alias')); report = join(root, 'alias', 'report.json') }
+  if (kind === 'writable-parent') chmodSync(parent, 0o755)
+  const result = spawnSync(process.execPath, [filesScript, 'write-report', report], { input: 'inert validation bytes', encoding: 'utf8' })
+  expect(result.status).not.toBe(0)
+  expect(readFileSync(sentinel, 'utf8')).toBe('inert owner fixture bytes')
 })

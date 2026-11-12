@@ -158,7 +158,11 @@ helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的�
 
 open 重扫 native view，核对 completion/activation 绑定、证据哈希及运行身份，仅原子开放该已验收候选；health 不会自动开放。正式入口 flag 仍由 owner 独立激活，也不能绕过代次准入和维护态。
 
-每日 backup 从运行镜像在线捕获，绝不停 app。配对清单绑定归档/配置哈希和大小、源/目标 SHA、代次、指纹及实际隔离恢复验证。本地和离站副本最多保留七天，独立删除账本另行保留。工具有 CPU/内存/PID 限额、自身 deadline、run/environment 标签和定域清理。引入 pre 任务前必须升级正式备份脚本，防止旧全局 reaper 清理 pre 工具。通过 CLI 定时执行 budget-check 和每日 retention；retention 在关闭通道后无需 app 凭据或 Docker 仍可执行。离站另装 `offsite-retention.sh <独占pre目录> 7`，确保 app 宿主失联仍遵守期限。
+每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，经相同的受限 rootless builder 从固定可信 main 策略 SHA 构建。工具 digest、revision 和 channel 均经核对，并缓存在 `control/`。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
+
+候选验证和迁移只取得所选归档、账本或身份 packet 的只读挂载，不能写宿主备份根目录或 owner 私有的 report/seal 目录。候选 scratch 记录保存在独立私有 run 目录，可信清理仍核对原期限及数据库/对象归属。原生 PostgreSQL 连接文件和恢复列表写入归档输入之外的私有临时目录。宿主独占创建 report，拒绝链接或非私有父目录。
+
+配对清单绑定归档/配置哈希和大小、源/目标 SHA、代次、指纹及实际隔离恢复验证。本地和离站副本最多保留七天，独立删除账本另行保留。工具保留原 CPU/内存/PID 限额、原 deadline、run/environment 标签和定域清理。引入 pre 任务前必须升级正式备份脚本，防止旧全局 reaper 清理 pre 工具。通过 CLI 定时执行 budget-check 和每日 retention；retention 在关闭通道后无需 app 凭据或 Docker 仍可执行。离站另装 `offsite-retention.sh <独占pre目录> 7`，确保 app 宿主失联仍遵守期限。
 
 兼容回退仍用 deploy，明确选择经过验证的旧 SHA，并重新经过备份、目标数据验证和验收。当前保留数据不能通过时留在维护态，选择 reset 或隔离恢复；换镜像不能撤销 schema 或已确认写入。reset 前取得 close 回执，运行 `reset --expected-current <SHA> --accept-loss <当前代次> --operation-id <UUID> --authority-receipt close.json`。它先备份并离站同步、合并最新独立删除账本，再验证停写后的真实库/prefix 清空，输出绑定源 build/代次/账本哈希的 `purge-<操作>.json`。authority retire 使用 `--purge <产物>` 及同一 purge 操作 UUID。最终关闭再执行 `finish-close --authority-receipt <retire.json>`；只有不可变 retirement 回执存在后才能移除正式 target 配置，在此之前保留 source cleanup/status/ack。复用资源时先以 `--previous-generation <旧UUID>` prepare 新 UUID，再 `reinitialize --generation <新UUID> --retirement-receipt <retire.json> --authority-receipt <prepare.json>`，重新部署。旧 retire 重试不会关闭新代次。
 
@@ -790,7 +794,7 @@ bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
 ./backup-offsite.sh ledger-only     # Refresh deletion facts without stopping applications
 ```
 
-每日和普通手动备份在线执行。脚本检查运行中应用镜像及其资源删除协议，再使用该不可变镜像完成捕获和隔离恢复验证。启用这些脚本前，先部署支持在线备份的完整应用代际。旧镜像或混合代际会使备份失败，不会停止或重启应用。
+正式站的每日和普通手动备份在线执行。脚本检查运行中应用镜像及其资源删除协议，再使用该不可变的受保护 main 镜像完成捕获和隔离恢复验证。启用这些脚本前，先部署支持在线备份的完整应用代际。旧镜像或混合代际会使备份失败，不会停止或重启应用。
 
 捕获先保护资源字节免受物理回收，再为数据库 dump 和对象清单固定同一个 PostgreSQL 快照。游戏命令和上传继续执行。逻辑下架仍立即禁止访问，恢复时以最新删除事实为准。快照后的新对象属于后续备份。发布前调用者显式传 `--already-stopped`，维护停机由部署调用者持有。
 
