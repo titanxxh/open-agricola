@@ -12,7 +12,7 @@ import { createPrereleaseLifecycleHandler } from '../prerelease-lifecycle-routes
 import { createTestDatabase } from './_helpers/postgres'
 
 const sourceOrigin = 'https://formal.example.test'
-const targetOrigin = 'https://pre.example.test'
+const targetOrigin = 'https://pre.beta.test'
 const serviceKey = 'fixture-only-target-service-key-32-bytes'
 const firstGeneration = '00000000-0000-4000-8000-000000000001'
 const secondGeneration = '00000000-0000-4000-8000-000000000002'

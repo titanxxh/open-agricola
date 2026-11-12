@@ -1,4 +1,4 @@
 # Owner1662 installs this fixed route once. Routine pre actions never reload Caddy.
-pre.example.invalid {
+pre.example-prerelease.invalid {
     reverse_proxy 127.0.0.1:5176
 }

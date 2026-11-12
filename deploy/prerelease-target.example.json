@@ -5,7 +5,7 @@
   "directory": "/srv/open-agricola-prerelease-main",
   "policyDirectory": "/srv/open-agricola-owner-tools",
   "project": "open-agricola-prerelease-main",
-  "origin": "https://pre.example.invalid",
+  "origin": "https://pre.example-prerelease.invalid",
   "port": 5176,
   "network": "open-agricola-prerelease-main-dependencies",
   "database": {

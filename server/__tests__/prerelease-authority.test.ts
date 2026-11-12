@@ -4,11 +4,12 @@ import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isPrereleaseIdentityAuthorized } from '../../shared/contract/prerelease-identity'
 import { readCookie } from '../auth-cookies'
+import { configuredPrereleaseTarget } from '../prerelease-authority'
 import { createPrereleaseAuthorityHandler } from '../prerelease-authority-routes'
 import { createTestDatabase } from './_helpers/postgres'
 
 const sourceOrigin = 'https://play.example.test'
-const targetOrigin = 'https://pre.example.test'
+const targetOrigin = 'https://pre.beta.test'
 const generationId = '00000000-0000-4000-8000-000000000001'
 const serviceKey = 'target-service-key-with-at-least-32-bytes'
 const sourceToken = 'formal-session-secret-never-shared'
@@ -274,7 +275,7 @@ describe('formal prerelease identity authority', () => {
     vi.stubEnv('PUBLIC_APP_ORIGIN', `${sourceOrigin}/`)
     vi.stubEnv('PRERELEASE_APP_ORIGIN', `${targetOrigin}/`)
     expect(await (await browser('entry')).json()).toMatchObject({ entry: { kind: 'available', returnTo } })
-    for (const origin of ['http://pre.example.test', 'https://pre.example.test/nested', 'https://user@pre.example.test', sourceOrigin]) {
+    for (const origin of ['http://pre.beta.test', 'https://pre.beta.test/nested', 'https://user@pre.beta.test', sourceOrigin]) {
       vi.stubEnv('PRERELEASE_APP_ORIGIN', origin)
       expect(await (await browser('entry')).json()).toMatchObject({ entry: { kind: 'disabled' } })
       expect((await issue()).status).toBe(503)
@@ -350,4 +351,14 @@ describe('formal prerelease identity authority', () => {
     expect(await (await browser('entry')).json()).toMatchObject({ entry: { kind: 'disabled' } })
   })
 
+})
+
+it('rejects a configured same-site target and respects private PSL boundaries', () => {
+  vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://app.formal-fixture.github.io')
+  vi.stubEnv('PUBLIC_API_BASE', 'https://api.formal-fixture.github.io')
+  vi.stubEnv('PRERELEASE_IDENTITY_SERVICE_KEY', 'inert-service-key-with-at-least-32-bytes')
+  vi.stubEnv('PRERELEASE_APP_ORIGIN', 'https://pre.formal-fixture.github.io')
+  expect(configuredPrereleaseTarget()).toBeUndefined()
+  vi.stubEnv('PRERELEASE_APP_ORIGIN', 'https://pre-fixture.github.io')
+  expect(configuredPrereleaseTarget()?.targetOrigin).toBe('https://pre-fixture.github.io')
 })

@@ -13,8 +13,10 @@ it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSock
   const stateFile = join(root, 'gate.json')
   let requests = 0
   const cookies: Array<string | undefined> = []
-  const upstream = createServer((req, res) => { requests++; cookies.push(req.headers.cookie); res.end('pre-only') })
+  const candidateCookies = ['candidate_fixture=inert; Path=/; Secure; HttpOnly', 'pre_hint=inert; Path=/; Secure', 'shared_fixture=inert; Domain=.agricola.test; Path=/', `${OWNER_VERIFICATION_COOKIE}=inert; Path=/; Secure; HttpOnly`]
+  const upstream = createServer((req, res) => { requests++; cookies.push(req.headers.cookie); res.setHeader('Set-Cookie', candidateCookies); res.end('pre-only') })
   const sockets = new WebSocketServer({ server: upstream })
+  sockets.on('headers', headers => { for (const cookie of candidateCookies) headers.push(`Set-Cookie: ${cookie}`) })
   const messages: string[] = []
   sockets.on('connection', (socket, req) => { cookies.push(req.headers.cookie); socket.on('message', body => { messages.push(body.toString()); socket.send('committed') }) })
   upstream.listen(0, '127.0.0.1')
@@ -28,11 +30,11 @@ it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSock
   if (!gatewayAddress || typeof gatewayAddress === 'string') throw new Error('Expected fixture TCP port')
   const url = `http://127.0.0.1:${gatewayAddress.port}`
   const headers = { Host: 'pre.agricola.test' }
-  const read = (host = headers.Host, cookie = '') => new Promise<{ status: number; body: string }>((done, reject) => {
+  const read = (host = headers.Host, cookie = '') => new Promise<{ status: number; body: string; cookies: string[] | undefined }>((done, reject) => {
     get(url, { headers: { Host: host, Cookie: cookie } }, response => {
       let body = ''
       response.on('data', data => { body += data.toString() })
-      response.on('end', () => done({ status: response.statusCode ?? 0, body }))
+      response.on('end', () => done({ status: response.statusCode ?? 0, body, cookies: response.headers['set-cookie'] }))
     }).on('error', reject)
   })
   let client: WebSocket | undefined
@@ -42,11 +44,16 @@ it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSock
     expect(requests).toBe(0)
     const state = { format: 1, targetId: 'prerelease-test', channel: 'prerelease', mode: 'open', buildId: 'a'.repeat(40), generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5' }
     await writeFile(stateFile, JSON.stringify(state))
-    expect((await read()).body).toBe('pre-only')
+    const proxied = await read()
+    expect(proxied.body).toBe('pre-only')
+    expect(proxied.cookies).toEqual(['candidate_fixture=inert; Path=/; Secure; HttpOnly', 'pre_hint=inert; Path=/; Secure'])
     expect((await read('api.agricola.test')).status).toBe(421)
     expect(requests).toBe(1)
     client = new WebSocket(url.replace('http:', 'ws:'), { headers })
+    let upgradeCookies: string[] | undefined
+    client.on('upgrade', response => { upgradeCookies = response.headers['set-cookie'] })
     await once(client, 'open')
+    expect(upgradeCookies).toEqual(['candidate_fixture=inert; Path=/; Secure; HttpOnly', 'pre_hint=inert; Path=/; Secure'])
     const committed = once(client, 'message')
     client.send('accepted-before-maintenance')
     await committed
