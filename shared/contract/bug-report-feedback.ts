@@ -11,7 +11,15 @@ export type FeedbackRecord = FeedbackDetails & {
   createdAt: number
 }
 
-export type InboxMessage = FeedbackRecord & { readAt: number | null }
+export type VerifiedProductionRelease = { version: string; url: string; sha: string; publishedAt: number; verifiedAt: number }
+export type RelatedFeedbackReport = { submissionId: string; issueNumber: number }
+export type ReleaseFeedbackRecord = Omit<FeedbackRecord, 'kind' | 'version' | 'missingItems'> & {
+  kind: 'fix_released'
+  version: null
+  release: { rootId: string; firstVerified: VerifiedProductionRelease; reports: RelatedFeedbackReport[] }
+}
+export type InboxMessage = (FeedbackRecord | ReleaseFeedbackRecord) & { readAt: number | null;
+  relatedReports?: RelatedFeedbackReport[]; currentProduction?: VerifiedProductionRelease }
 export type InboxPage = { messages: InboxMessage[]; unreadCount: number; nextCursor: number | null }
 export type ReportFeedbackView = {
   submissionId: string
@@ -29,7 +37,9 @@ export type FixAssociation = {
   rootIssueNumber: number
   version: number
   associationVersion: number
-  status: 'pending_release' | 'unlinked'
+  status: 'pending_release' | 'unlinked' | 'released'
+  firstVerifiedRelease?: VerifiedProductionRelease
+  currentProductionRelease?: VerifiedProductionRelease
   reports: Array<{ submissionId: string; issueNumber: number }>
   pullRequests: VerifiedFixPullRequest[]
   requiredCommits: string[]

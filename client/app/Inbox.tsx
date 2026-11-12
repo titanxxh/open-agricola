@@ -87,7 +87,21 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
         <button type="button" className="btn-link" onClick={() => { reading.current++; setBusy(false); setSelected(null); setError(false) }}>{t('feedback.back')}</button>
         <h3>{selected.reportSummary}</h3><p className="inbox-message__kind">{t(feedbackKindKey[selected.kind])}</p>
         <time dateTime={new Date(selected.createdAt).toISOString()}>{new Date(selected.createdAt).toLocaleString(locale)}</time>
-        <p className="inbox-message__explanation">{selected.explanation}</p>
+        <p className="inbox-message__explanation">{selected.kind === 'fix_released' ? t('feedback.releaseExplanation') : selected.explanation}</p>
+        {selected.kind === 'fix_released' && <>
+          <p>{t('feedback.firstVerifiedRelease', { version: selected.release.firstVerified.version })}</p>
+          <time dateTime={new Date(selected.release.firstVerified.verifiedAt).toISOString()}>{new Date(selected.release.firstVerified.verifiedAt).toLocaleString(locale)}</time>
+          <p><a href={selected.release.firstVerified.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: selected.release.firstVerified.version })}</a></p>
+          {selected.currentProduction && selected.currentProduction.sha !== selected.release.firstVerified.sha && <p>
+            {t('feedback.currentProductionRelease', { version: selected.currentProduction.version })}{' '}
+            <a href={selected.currentProduction.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: selected.currentProduction.version })}</a>
+            {' '}<time dateTime={new Date(selected.currentProduction.verifiedAt).toISOString()}>{new Date(selected.currentProduction.verifiedAt).toLocaleString(locale)}</time>
+          </p>}
+          <h4>{t('feedback.relatedReports')}</h4>
+          <ul>{(selected.relatedReports ?? selected.release.reports).map(report => <li key={report.submissionId}>
+            <a href={`https://github.com/titanxxh/open-agricola/issues/${report.issueNumber}`} target="_blank" rel="noopener noreferrer">{t('feedback.reportLink', { number: report.issueNumber })}</a>
+          </li>)}</ul>
+        </>}
         {selected.kind === 'needs_info' && <><h4>{t('feedback.missingItems')}</h4>
           <ul>{selected.missingItems.map((item, index) => <li key={index}>{item}</li>)}</ul>
           <p>{t('feedback.githubAccountHint')}</p></>}

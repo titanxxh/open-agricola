@@ -52,7 +52,12 @@ export function BugReportFixSettings({ report, onChange }: { report: ReportFeedb
     <p className="settings-hint">{t('feedback.fixHint')}</p>
     {report.fix && <>
       <p>{t('feedback.fixRoot', { number: report.fix.rootIssueNumber })} · {t('feedback.fixVersion', { version: report.fix.version })}</p>
-      <p>{t(report.fix.status === 'pending_release' ? 'feedback.fixPending' : 'feedback.fixUnlinked')}</p>
+      <p>{t(report.fix.status === 'released' ? 'feedback.fixReleased' : report.fix.status === 'pending_release' ? 'feedback.fixPending' : 'feedback.fixUnlinked')}</p>
+      {report.fix.firstVerifiedRelease && <p>{t('feedback.firstVerifiedRelease', { version: report.fix.firstVerifiedRelease.version })}{' '}
+        <a href={report.fix.firstVerifiedRelease.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: report.fix.firstVerifiedRelease.version })}</a></p>}
+      {report.fix.currentProductionRelease && report.fix.currentProductionRelease.sha !== report.fix.firstVerifiedRelease?.sha && <p>
+        {t('feedback.currentProductionRelease', { version: report.fix.currentProductionRelease.version })}{' '}
+        <a href={report.fix.currentProductionRelease.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: report.fix.currentProductionRelease.version })}</a></p>}
       <h4>{t('feedback.fixReports')}</h4>
       <ul>{report.fix.reports.map(item => <li key={item.submissionId}>
         <a href={`https://github.com/titanxxh/open-agricola/issues/${item.issueNumber}`} target="_blank" rel="noopener noreferrer">#{item.issueNumber}</a>

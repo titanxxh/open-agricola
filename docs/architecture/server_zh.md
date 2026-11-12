@@ -204,7 +204,7 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 - 草稿在确认报告者拥有原始座位后冻结 `roomId + stepNo + frameHash`；每个用户最多保留五份未投递的报告。公开 Issue 带清洗过的标题，正文不含截图、日志、Frame payload、其他玩家身份或隐藏信息。
 - 诊断由 `shared/contract/bug-report-diagnostics.ts` 校验，随草稿保存并与认证的 Reporter site ID 一起投递。诊断只是客户端观察；校验拒绝未知字段、超限历史和 marker/mention 注入。投递、丢弃、删号时与现象说明一并清除。测试：`bug-report-{routes,store}.test.ts`。
 - `github-issue-client` 在服务端固定仓库和安装 ID；对账只接受由指定 App 在尝试之后创建且以唯一 marker 结尾的 Issue，浏览器只轮询站内状态。本人投递使用加密 App 用户 token（AES-256-GCM、`keyId`）并确认公开身份；Hosted Issue Identity 使用安装 token。连接失效不切换作者。
-- `bug-report/feedback-service.ts` 统一持有确认 bug、非 bug、具体缺失项的待确认反馈、站内信和显式修复分组，以请求 ID 和独立版本保留历史与已读状态，约束重试和并发。结论先锁账号再锁报告；关系修改先取 advisory lock 1673001，再依次锁排序后的账号和报告。待删除账号不能接收反馈，删除开始即清空站内信，但无身份的根记录保留，仍可服务有效重复报告。`bug-report-feedback-routes.ts` 在 origin 门禁之后提供管理员结论与修复关联接口，`/api/v1/inbox` 按账号隔离。GitHub 事件不推断处理结论，关联不发送上线通知。`github-fix-verifier.ts` 只读固定公开仓库，核验已合入 PR 和实际提交祖先关系，不使用 App token。测试：`bug-report-feedback{,-routes}.test.ts`、`bug-report-fix-links.test.ts`。
+- `bug-report/feedback-service.ts` 统一管理处理结论、收件箱、修复组和上线核验操作。结论和修复写入按 1673001、排序账号、报告加锁。源事件同时保存可重试核对操作；核验证据先提交，通知事件与收件箱再原子提交。删除清空收件箱，保留无身份的根。校验 Origin 的路由控制管理员及收件箱 HTTP；仅 owner SSH 能提供部署证据。`github-fix-verifier.ts` 无 App 凭据读取合入证明。原始祖先集合支持晚到关联；账号与根去重、独立结论版本保留旧消息和已读状态。测试：`bug-report-{feedback,feedback-routes,fix-links,release-feedback}.test.ts`。
 - 删号时持久化 `deletion_pending`、登出所有会话，并通过安装 adapter 编辑已知 Issue 正文，持续重试直到 GitHub 确认站点用户 ID 已消失。
 - 维护者读取证据需要填写理由，永久审计、限流，并重新应用当前参与者的 tombstone 投影。
 - 删除（[ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)）：`server/game/replay-removal.ts` 在删除 payload 前，用 ETag CAS 把每个批次追加到私有 S3 中独立的 `erasure/ledger.json`；启动与恢复会幂等应用它，格式错误的 ledger 会阻断恢复，资源读取与上传会查询其永久哈希拒绝规则。日志从不包含 token、Frame payload、现象文字或原始 GitHub 响应。
