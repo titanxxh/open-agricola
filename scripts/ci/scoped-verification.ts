@@ -68,6 +68,22 @@ function repositoryPlan(input: { cwd: string; base: string; head: string }): Ver
     if (main.status !== 0) throw new Error('The initial prerelease push requires refs/remotes/origin/main to resolve to a commit')
     base = main.stdout.trim()
   }
+  if (/^[a-f0-9]{40}$/.test(base)
+    && spawnSync('git', ['rev-parse', '--verify', '--end-of-options', `${base}^{commit}`], { cwd: input.cwd, stdio: 'ignore' }).status !== 0) {
+    const repository = process.env.GITHUB_REPOSITORY ?? 'titanxxh/open-agricola'
+    const origin = spawnSync('git', ['config', '--get-all', 'remote.origin.url'], { cwd: input.cwd, encoding: 'utf8' })
+    const trustedOrigins = [`https://github.com/${repository}`, `git@github.com:${repository}`, `ssh://git@github.com/${repository}`]
+      .flatMap(url => [url, `${url}.git`])
+    if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repository) || origin.status !== 0 || !trustedOrigins.includes(origin.stdout.trim())) {
+      throw new Error('Missing comparison base requires a trusted GitHub origin for the current repository')
+    }
+    const fetched = spawnSync('git', ['fetch', '--no-tags', '--no-recurse-submodules', 'origin', base], {
+      cwd: input.cwd, encoding: 'utf8', timeout: 60_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    })
+    if (fetched.status !== 0) throw new Error(`Could not fetch the exact comparison base ${base} from origin`)
+    const recovered = spawnSync('git', ['rev-parse', '--verify', '--end-of-options', `${base}^{commit}`], { cwd: input.cwd, encoding: 'utf8' })
+    if (recovered.status !== 0 || recovered.stdout.trim() !== base) throw new Error('Fetched comparison base is not the exact requested commit')
+  }
   const plan = createRepositoryPlan({ ...input, base, fullTaskIds: FULL_TASK_IDS })
   if (process.env.GITHUB_SHA && process.env.GITHUB_SHA !== plan.identity.testedSha) {
     throw new Error('The actual checkout does not match the workflow SHA')

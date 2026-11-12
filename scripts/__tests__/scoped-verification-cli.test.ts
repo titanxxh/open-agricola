@@ -97,7 +97,96 @@ if (args.includes('vitest')) {
   return { cwd, sha, run, env, commit, commands }
 }
 
+function rewrittenPrerelease() {
+  const source = fixture('frontend')
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: source.cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  const base = source.sha
+  git('checkout', 'main')
+  write(source.cwd, 'client/components/board/FarmBoard.tsx', 'export const board = 3\n')
+  const head = source.commit('rebased prerelease')
+  const directory = mkdtempSync(join(tmpdir(), 'scoped-rewritten-origin-'))
+  temporary.push(directory)
+  const origin = join(directory, 'origin.git')
+  git('clone', '--bare', '--no-local', source.cwd, origin)
+  git('--git-dir', origin, 'update-ref', 'refs/heads/prerelease', head)
+  git('--git-dir', origin, 'update-ref', '-d', 'refs/heads/feature')
+  git('--git-dir', origin, 'config', 'uploadpack.allowAnySHA1InWant', 'true')
+  const checkout = (name: string) => {
+    const cwd = join(directory, name)
+    git('clone', '--quiet', '--single-branch', '--branch', 'prerelease', `file://${origin}`, cwd)
+    const localGit = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+    localGit('remote', 'set-url', 'origin', 'https://github.com/titanxxh/open-agricola.git')
+    localGit('config', `url.file://${origin}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
+    write(cwd, 'bin/pnpm', readFileSync(join(source.cwd, 'bin/pnpm'), 'utf8'))
+    chmodSync(join(cwd, 'bin/pnpm'), 0o755)
+    const env = { ...source.env, GITHUB_REPOSITORY: 'titanxxh/open-agricola', GITHUB_SHA: head,
+      GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/prerelease', GITHUB_OUTPUT: join(cwd, 'output/job.txt'),
+      COMMAND_LOG: join(cwd, 'commands.jsonl'), PATH: join(cwd, 'bin') + delimiter + process.env.PATH }
+    const run = (...args: string[]) => spawnSync(join(root, 'node_modules/.bin/tsx'), [cli, ...args], { cwd, env, encoding: 'utf8', timeout: 15_000 })
+    const hasBase = () => spawnSync('git', ['cat-file', '-e', `${base}^{commit}`], { cwd, stdio: 'ignore' }).status === 0
+    expect(hasBase()).toBe(false)
+    return { cwd, git: localGit, run, hasBase }
+  }
+  return { base, head, origin, checkout }
+}
+
 describe('scoped verification public CLI', () => {
+  it('recovers the exact rewritten push base separately for planning and worker execution', () => {
+    const history = rewrittenPrerelease()
+    const planner = history.checkout('plan'), worker = history.checkout('worker')
+
+    const planned = planner.run('plan', '--base', history.base, '--head', history.head)
+    expect(planned.status, planned.stderr).toBe(0)
+    const manifest = githubJobOutputs(join(planner.cwd, 'output/job.txt'))
+    const plan: unknown = JSON.parse(readFileSync(join(planner.cwd, 'output/verification/scoped-plan.json'), 'utf8'))
+    expect(plan).toMatchObject({ identity: { baseRef: history.base, baseSha: history.base, headSha: history.head },
+      changes: expect.arrayContaining([{ status: 'M', path: 'client/components/board/FarmBoard.tsx' }]) })
+    expect(planner.hasBase()).toBe(true)
+    expect(worker.hasBase()).toBe(false)
+
+    const executed = worker.run('run', '--base', history.base, '--head', history.head,
+      '--partition', 'units-1', '--expected-digest', manifest.plan_digest)
+    expect(executed.status, executed.stderr).toBe(0)
+    expect(worker.hasBase()).toBe(true)
+    expect(JSON.parse(readFileSync(join(worker.cwd, 'output/verification/scoped-result.json'), 'utf8')))
+      .toMatchObject({ status: 'passed', identity: { baseRef: history.base, baseSha: history.base } })
+  }, 60_000)
+
+  it.each(['file', 'other-repository'])('rejects a missing base from an untrusted %s origin', (kind) => {
+    const history = rewrittenPrerelease(), value = history.checkout('untrusted')
+    const url = kind === 'file' ? `file://${history.origin}` : 'https://github.com/other-owner/open-agricola.git'
+    value.git('config', `url.file://${history.origin}.insteadOf`, url)
+    value.git('remote', 'set-url', 'origin', url)
+
+    const planned = value.run('plan', '--base', history.base, '--head', history.head)
+    expect(planned.status).toBe(1)
+    expect(planned.stderr).toContain('Missing comparison base requires a trusted GitHub origin')
+    expect(value.hasBase()).toBe(false)
+  }, 30_000)
+
+  it.each(['plan', 'run'])('fails %s without substituting another base when origin cannot supply the commit', (command) => {
+    const history = rewrittenPrerelease(), value = history.checkout('unavailable')
+    rmSync(history.origin, { recursive: true, force: true })
+
+    const result = value.run(command, '--base', history.base, '--head', history.head, '--partition', 'units-1')
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(`Could not fetch the exact comparison base ${history.base} from origin`)
+    expect(value.hasBase()).toBe(false)
+    expect(existsSync(join(value.cwd, 'commands.jsonl'))).toBe(false)
+    const artifact = command === 'plan' ? 'scoped-plan.json' : 'scoped-result.json'
+    expect(JSON.parse(readFileSync(join(value.cwd, 'output/verification', artifact), 'utf8'))).toMatchObject({ status: 'failed' })
+  }, 30_000)
+
+  it('does not fetch an unresolved symbolic comparison ref', () => {
+    const history = rewrittenPrerelease(), value = history.checkout('symbolic')
+    const result = value.run('plan', '--base', 'missing-branch', '--head', history.head)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Needed a single revision')
+    expect(value.hasBase()).toBe(false)
+    expect(existsSync(join(value.cwd, '.git/FETCH_HEAD'))).toBe(false)
+  })
+
   it('pins the initial prerelease comparison to main and preserves its checks when main advances', () => {
     const value = fixture('frontend')
     const mainSha = execFileSync('git', ['rev-parse', 'main'], { cwd: value.cwd, encoding: 'utf8' }).trim()
