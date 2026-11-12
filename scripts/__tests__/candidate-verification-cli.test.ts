@@ -3,7 +3,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { LEGACY_STABLE_CUTOFF, stableConfiguration } from '../ci/candidate-verification'
+import { historicalStableSnapshot, LEGACY_STABLE_CUTOFF, stableConfiguration } from '../ci/candidate-verification'
 import { verificationConfiguration } from '../ci/verification-tasks'
 import { candidateRepository, finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
@@ -34,6 +34,7 @@ function fixture(forgedProducer = false, legacy = false) {
   git('init', '-b', 'main')
   git('config', 'user.name', 'Candidate Test')
   git('config', 'user.email', 'candidate@example.test')
+  git('config', `url.file://${repoRoot}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
   git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**')
   git('commit', '-m', 'candidate fixture')
   if (legacy) {
@@ -93,6 +94,45 @@ const prefix = 'repos/titanxxh/open-agricola'
 const mergedPr = (sha: string) => ({ number: 1, state: 'closed', merged: true, merged_at: '2026-10-30T00:00:00Z',
   merge_commit_sha: sha, base: { ref: 'main', repo: { ...candidateRepository } } })
 
+describe('historical stable Git ancestry', () => {
+  const older = execFileSync('git', ['rev-parse', `${LEGACY_STABLE_CUTOFF}~3`], { cwd: repoRoot, encoding: 'utf8' }).trim()
+  const newer = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()
+  function shallow(...commits: string[]) {
+    const root = mkdtempSync(join(tmpdir(), 'candidate-history-'))
+    temporary.push(root)
+    const origin = join(root, 'origin.git'), cwd = join(root, 'checkout')
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repoRoot, encoding: 'utf8' }).trim()
+    execFileSync('git', ['init', '--bare', origin], { stdio: 'ignore' })
+    writeFileSync(join(origin, 'objects/info/alternates'), join(common, 'objects') + '\n')
+    execFileSync('git', ['--git-dir', origin, 'update-ref', 'refs/heads/main', newer])
+    execFileSync('git', ['init', '-b', 'main', cwd], { stdio: 'ignore' })
+    const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+    git('config', `url.file://${origin}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
+    for (const commit of commits) git('fetch', '--no-tags', '--depth=1', `file://${origin}`, commit)
+    expect(git('rev-parse', '--is-shallow-repository')).toBe('true')
+    return { cwd, git }
+  }
+  it('fetches the missing fixed cutoff before accepting that exact historical source', () => {
+    const value = shallow(older)
+    expect(spawnSync('git', ['cat-file', '-e', LEGACY_STABLE_CUTOFF], { cwd: value.cwd, stdio: 'ignore' }).status).not.toBe(0)
+    expect(historicalStableSnapshot(value.cwd, LEGACY_STABLE_CUTOFF)).toBe(true)
+  }, 30_000)
+  it('fills cutoff ancestry when both cutoff and older source are shallow boundaries', () => {
+    const value = shallow(LEGACY_STABLE_CUTOFF, older)
+    expect(spawnSync('git', ['merge-base', '--is-ancestor', older, LEGACY_STABLE_CUTOFF], { cwd: value.cwd, stdio: 'ignore' }).status).toBe(1)
+    expect(historicalStableSnapshot(value.cwd, older)).toBe(true)
+  }, 30_000)
+  it('keeps a newer source outside the fixed historical range', () => {
+    const value = shallow(LEGACY_STABLE_CUTOFF, newer)
+    expect(historicalStableSnapshot(value.cwd, newer)).toBe(false)
+  }, 30_000)
+  it('reports a broken Git graph instead of silently classifying a historical source', () => {
+    const value = shallow(LEGACY_STABLE_CUTOFF)
+    writeFileSync(join(value.cwd, '.git/shallow'), 'invalid shallow boundary\n')
+    expect(() => historicalStableSnapshot(value.cwd, LEGACY_STABLE_CUTOFF)).toThrow()
+  })
+})
+
 describe('candidate verification public CLI', () => {
   it('refuses candidate execution on CI without a trusted external scheduler context', () => {
     const value = fixture()
@@ -111,7 +151,7 @@ describe('candidate verification public CLI', () => {
     expect(JSON.parse(result.stdout)).toMatchObject({ status, sha: value.sha })
     if (legacy) expect(JSON.parse(result.stdout).configuration).toBe(evidence.configuration)
     else expect(JSON.parse(result.stdout).configuration).not.toBe(evidence.configuration)
-  })
+  }, 30_000)
   it('admits the final candidate before formal main control and rejects a non-main producer', () => {
     const value = fixture()
     githubFixture(value)
@@ -144,7 +184,7 @@ describe('candidate verification public CLI', () => {
     const result = value.run('check', '--sha', value.sha, '--repository', candidateRepository.full_name)
     expect(result.status, result.stderr).toBe(1)
     expect(JSON.parse(result.stdout).status).toBe('blocked')
-  })
+  }, 30_000)
 
   it('checks and requests an explicitly chosen fork using its own native repository ID and protected-main snapshot', () => {
     const value = fixture()
