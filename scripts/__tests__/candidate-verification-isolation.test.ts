@@ -83,3 +83,29 @@ it.each([
   expect(result.status, result.stderr).toBe(0)
   expect(result.stdout).toBe(expected + '\n')
 })
+
+it('allocates the fixed candidate UID/GID and non-overlapping subordinate IDs in isolated Ubuntu', () => {
+  const setup = readFileSync(resolve(import.meta.dirname, '../ci/setup-candidate-isolation.sh'), 'utf8')
+  const before = setup.indexOf('# Candidate identity and automatic subordinate IDs.')
+  const after = setup.indexOf('cp -a "$source_directory"', before)
+  if (before < 0 || after < 0) throw new Error('Missing identity setup stage')
+  const result = spawnSync('docker', ['run', '--rm', '--network', 'none', '-i',
+    'ubuntu:26.04@sha256:065aa8626841f16057b78b027b464cd59c4fac36c204c72dcbf48d66f5fa8a96', 'bash', '-s'], {
+    encoding: 'utf8', timeout: 60000,
+    input: `set -euo pipefail\n${setup.slice(before, after)}\nid -u oa-candidate\nid -g oa-candidate\ngrep '^oa-candidate:' /etc/subuid\ngrep '^oa-candidate:' /etc/subgid\n`,
+  })
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.stdout).toBe('61000\n61000\noa-candidate:165536:65536\noa-candidate:165536:65536\n')
+})
+
+it('reports a failing setup stage and line without dumping its environment', () => {
+  const setup = readFileSync(resolve(import.meta.dirname, '../ci/setup-candidate-isolation.sh'), 'utf8')
+  const prefix = setup.slice(0, setup.indexOf('export PATH='))
+  const result = spawnSync('/bin/bash', ['-s'], {
+    encoding: 'utf8', input: prefix + '\nisolation_stage=identity\nfalse\n',
+    env: { ...process.env, OA_INERT_ENV_MARKER: 'inert environment bytes must remain private' },
+  })
+  expect(result.status).toBe(1)
+  expect(result.stdout).toBe('')
+  expect(result.stderr).toMatch(/^Candidate isolation setup failed: stage=identity line=\d+ status=1\n$/)
+})
