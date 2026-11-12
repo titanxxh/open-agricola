@@ -427,6 +427,7 @@ const server = createServer((req, res) => {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (await handleFrontend(req, res)) return
+  res.setHeader('Cache-Control', 'no-store')
   if (!req.url) {
     sendJson(res, 404, { error: 'Not found' })
     return

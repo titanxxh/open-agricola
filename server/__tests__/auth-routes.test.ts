@@ -266,6 +266,48 @@ describe('auth routes', () => {
     delete process.env.DISABLE_RATE_LIMIT
   })
 
+  it('marks delegated private Workshop drafts and game state as no-store', async () => {
+    const alice = await createLocalUserForTests('cache_alice', 'password123')
+    const bob = await createLocalUserForTests('cache_bob', 'password123')
+    const aliceHeaders = { Cookie: `${authCookieNames().session}=${await createSession(alice.id)}` }
+    const bobHeaders = { Cookie: `${authCookieNames().session}=${await createSession(bob.id)}` }
+    for (const [name, headers] of [['Alice draft', aliceHeaders], ['Bob draft', bobHeaders]] satisfies Array<[string, Record<string, string>]>) {
+      const cardId = name === 'Alice draft' ? 'CUSTOM_CacheAlice' : 'CUSTOM_CacheBob'
+      const created = await requestJson('POST', '/api/workshop/cards', {
+        card_id: cardId, card_type: 'minor', name,
+        card_json: { id: cardId, name, deck: 'CUSTOM', number: 0, desc: [] },
+      }, headers)
+      expect(created.status).toBe(200)
+    }
+    const mine = await requestJson('GET', '/api/workshop/cards?scope=mine', undefined, aliceHeaders)
+    expect(mine.status).toBe(200)
+    expect(mine.json).toMatchObject({ ok: true, cards: [expect.objectContaining({ name: 'Alice draft', author_id: alice.id })] })
+    expect(JSON.stringify(mine.json)).not.toContain('Bob draft')
+    expect(mine.headers['Cache-Control']).toBe('no-store')
+    const created = await requestJson('POST', '/api/game/new', { seed: 42, playerCount: 2 }, aliceHeaders)
+    expect(created.status).toBe(200)
+    const current = await requestJson('GET', '/api/game/state', undefined, aliceHeaders)
+    expect(current.status).toBe(200)
+    expect(current.json.state).toEqual(created.json.state)
+    expect(current.json.state).toMatchObject({ players: [expect.any(Object), expect.any(Object)] })
+    expect(current.headers['Cache-Control']).toBe('no-store')
+    const { disposeSandboxSessionsForUser } = await import('../game-router')
+    disposeSandboxSessionsForUser(alice.id)
+  })
+
+  it('retains explicit public immutable caching through the dispatcher', async () => {
+    const { recordingResources } = await import('./_helpers/recording')
+    const runtime = await import('../storage/runtime')
+    const recording = await recordingResources(getDb())
+    vi.spyOn(runtime, 'getResources').mockReturnValue(recording.resources.storage)
+    try {
+      const response = await requestJson('GET', `/replay-viewers/${recording.replay.viewerBuildId}/manifest.json`)
+      expect(response.status).toBe(200)
+      expect(response.json).toMatchObject({ entrypoint: 'index.html', files: { 'index.html': expect.any(String) } })
+      expect(response.headers['Cache-Control']).toBe('public, max-age=31536000, immutable')
+    } finally { await recording.close() }
+  })
+
   it('login sets an HttpOnly session cookie and does not return token', async () => {
     await createLocalUserForTests('cookieuser', 'password123', 'Cookie User')
     const res = await requestJson('POST', '/api/auth/login', { username: 'cookieuser', password: 'password123' })

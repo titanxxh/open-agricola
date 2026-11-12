@@ -134,7 +134,7 @@ server/custom-code/
 
 ## HTTP 端点
 
-`auth-cookies.ts` 管理 Cookie 家族；`auth.ts` 验证 session 策略版本。迁移 046 废止旧认证。`request-auth.ts` 按来源及协议准入 HTTP/WS 请求，显式区分导航、服务及 ops 例外。测试：`{request-auth,auth-routes,postgres-auth,observability-http}.test.ts`。
+`auth-cookies.ts` 管理 Cookie 家族；`auth.ts` 验证 session 策略版本。迁移 046 废止旧认证。HTTP 分发入口默认 no-store，显式公开资源策略可覆盖它。`request-auth.ts` 按来源及协议准入 HTTP/WS 请求，显式区分导航、服务及 ops 例外。测试：`{request-auth,auth-routes,postgres-auth,observability-http}.test.ts`。
 
 HTTP 负责产品 API、运维与调试。WebSocket 命令仍是对局同步主链路；校验端点不写规则状态。
 
