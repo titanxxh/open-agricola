@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
+import { taskCommands } from '../ci/verification-tasks'
 import { collectCandidateDiagnostics, displayCandidateLog, verifyCandidateSources, escapeWorkflowCommands } from '../ci/candidate-isolation'
 
 const roots: string[] = []
@@ -142,4 +143,20 @@ it.each([true, false])('waits for recursive cgroup emptiness and rejects a popul
   })
   expect(result.status).toBe(clears ? 0 : 1)
   expect(result.stdout).toBe(clears ? 'populated 0\nfrozen 0\n' : '')
+})
+
+it.each(['package', 'suite-root', 'suite-entry'])('rejects candidate %s links before reading outside inert data', kind => {
+  const value = fixture(), outside = join(value.root, 'outside')
+  mkdirSync(outside)
+  writeFileSync(join(outside, 'metadata.json'), 'outside inert bytes')
+  writeFileSync(join(outside, 'outside.spec.ts'), 'inert public fixture bytes')
+  writeFileSync(join(value.source, 'package.json'), '{"scripts":{"check:architecture":"pnpm run lint"}}')
+  if (kind === 'package') {
+    rmSync(join(value.source, 'package.json')); symlinkSync(join(outside, 'metadata.json'), join(value.source, 'package.json'))
+    expect(() => taskCommands(value.source, 'quality')).toThrow('Candidate package.json must be a regular file')
+  } else {
+    if (kind === 'suite-root') symlinkSync(outside, join(value.source, 'e2e-tests'))
+    else { mkdirSync(join(value.source, 'e2e-tests')); symlinkSync(outside, join(value.source, 'e2e-tests/nested')) }
+    expect(() => taskCommands(value.source, 'chromium-1')).toThrow('Candidate browser suite must contain only regular files and directories')
+  }
 })

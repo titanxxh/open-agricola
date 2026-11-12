@@ -57,7 +57,7 @@ grep -q '^oa-candidate:' /etc/subuid
 grep -q '^oa-candidate:' /etc/subgid
 isolation_stage=source-copy
 cp -a "$source_directory" /home/oa-candidate/work
-chown -R 61000:61000 /home/oa-candidate
+chown -R --no-dereference 61000:61000 /home/oa-candidate
 install -m 644 "$policy_directory/scripts/ci/candidate-isolation-smoke.ts" /run/oa-ci-isolation/smoke.mts
 printf 'trusted inert marker\n' > /run/oa-ci-isolation/protected-marker
 chmod 644 /run/oa-ci-isolation/protected-marker

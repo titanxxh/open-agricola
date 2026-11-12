@@ -3,6 +3,8 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { LEGACY_STABLE_CUTOFF, stableConfiguration } from '../ci/candidate-verification'
+import { verificationConfiguration } from '../ci/verification-tasks'
 import { candidateRepository, finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
 const repoRoot = resolve(__dirname, '../..')
@@ -16,7 +18,6 @@ function fixture(forgedProducer = false, legacy = false) {
   mkdirSync(join(cwd, 'scripts/ci'), { recursive: true })
   mkdirSync(join(cwd, '.github/workflows'), { recursive: true })
   cpSync(join(repoRoot, 'scripts/ci'), join(cwd, 'scripts/ci'), { recursive: true })
-  if (legacy) rmSync(join(cwd, 'scripts/ci/candidate-execution.json'))
   cpSync(join(repoRoot, '.github/workflows/candidate-verification.yml'), join(cwd, '.github/workflows/candidate-verification.yml'))
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: {
     'check:architecture': 'pnpm run lint && pnpm run check:test-project-coverage && pnpm run check:architecture-tests && pnpm run check:dependencies',
@@ -35,6 +36,11 @@ function fixture(forgedProducer = false, legacy = false) {
   git('config', 'user.email', 'candidate@example.test')
   git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**')
   git('commit', '-m', 'candidate fixture')
+  if (legacy) {
+    git('fetch', '--no-tags', '--depth=1', repoRoot, LEGACY_STABLE_CUTOFF)
+    git('checkout', '-B', 'main', LEGACY_STABLE_CUTOFF)
+    writeFileSync(join(cwd, '.git/info/exclude'), 'bin/\ncommands.jsonl\ngithub-responses.json\ngithub-mutations.jsonl\n')
+  }
   const sha = git('rev-parse', 'HEAD')
   const bin = join(cwd, 'bin')
   mkdirSync(bin)
@@ -43,15 +49,15 @@ function fixture(forgedProducer = false, legacy = false) {
   chmodSync(join(bin, 'pnpm'), 0o755)
   const env: NodeJS.ProcessEnv = { ...process.env, CI: '', GITHUB_ACTIONS: '', GITHUB_SHA: sha, GITHUB_OUTPUT: '', COMMAND_LOG: log, PATH: bin + delimiter + process.env.PATH }
   const run = (...args: string[]) => spawnSync(join(repoRoot, 'node_modules/.bin/tsx'), [cli, ...args], { cwd, encoding: 'utf8', env })
-  return { cwd, sha, run, log, bin, env, git }
+  return { cwd, sha, run, log, bin, env, git, legacy }
 }
 
-function githubFixture(value: ReturnType<typeof fixture>, failedTask = '', repository = candidateRepository) {
-  const configuration = JSON.parse(value.run('manifest', '--sha', value.sha).stdout).configuration
+function githubFixture(value: ReturnType<typeof fixture>, failedTask = '', repository = candidateRepository, producer = value.sha, legacy = value.legacy) {
+  const configuration = legacy ? verificationConfiguration(value.cwd, value.sha) : stableConfiguration(value.cwd, value.sha, producer)
   const tasks = ['quality', 'fast', 'slow', 'build', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit']
   const step = (name: string) => ({ name, status: 'completed', conclusion: 'success' })
   const workflow = { id: 100, path: '.github/workflows/candidate-verification.yml' }
-  const run = { id: 1, workflow_id: 100, path: workflow.path, event: 'workflow_dispatch', head_sha: value.sha,
+  const run = { id: 1, workflow_id: 100, path: workflow.path, event: 'workflow_dispatch', head_sha: producer, head_branch: 'main', display_title: legacy ? 'Candidate Verification' : `stable / ${value.sha} / all`,
     repository: { ...repository }, head_repository: { ...repository }, status: 'completed', run_attempt: 1,
     created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' }
   const jobs = tasks.map((task, index) => ({
@@ -62,16 +68,16 @@ function githubFixture(value: ReturnType<typeof fixture>, failedTask = '', repos
   }))
   jobs.unshift({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: run.html_url,
     started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
-    steps: [step('Generate candidate manifest'), step(`Candidate manifest / ${value.sha} / ${configuration} / ${tasks.join(',')}`)] })
+    steps: [step('Generate candidate manifest'), step(legacy ? `Candidate manifest / ${value.sha} / ${configuration} / ${tasks.join(',')}` : `Stable manifest / ${repository.id} / stable / ${value.sha} / ${configuration} / ${producer} / ${tasks.join(',')}`)] })
   const prefix = `repos/${repository.full_name}`
   writeFileSync(join(value.cwd, 'github-responses.json'), JSON.stringify({
-    ...finalSnapshotMetadata(value.sha, value.sha, repository),
+    ...finalSnapshotMetadata(value.sha, producer, repository),
     [`${prefix}/actions/workflows/candidate-verification.yml`]: workflow,
-    [`${prefix}/actions/workflows/100/runs?head_sha=${value.sha}&event=workflow_dispatch&per_page=100`]: { workflow_runs: [run] },
+    [`${prefix}/actions/workflows/100/runs?event=workflow_dispatch&per_page=100`]: { workflow_runs: [run] },
     [`${prefix}/actions/runs/1/jobs?filter=all&per_page=100`]: { jobs },
     [`${prefix}/commits/main`]: { sha: value.sha },
   }))
-  writeFileSync(join(value.bin, 'gh'), `#!/usr/bin/env node\nconst fs = require('node:fs'); const path = require('node:path'); const args = process.argv.slice(2); const endpoint = args[1]; fs.appendFileSync(path.join(process.cwd(), 'bin/github-reads.jsonl'), JSON.stringify(args) + '\\n'); if (args.includes('POST')) { fs.appendFileSync(path.join(process.cwd(), 'github-mutations.jsonl'), fs.readFileSync(0, 'utf8') + '\\n'); } else { const responses = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'github-responses.json'), 'utf8')); const response = responses[endpoint]; if (!response) { console.error('Unexpected GitHub endpoint: ' + endpoint); process.exit(1); } if (args.includes('--paginate')) { const key = args[args.indexOf('--jq') + 1].split('[]')[0].slice(1); for (const item of key ? response[key] : response) console.log(JSON.stringify(item)); } else console.log(JSON.stringify(response)); }\n`)
+  writeFileSync(join(value.bin, 'gh'), `#!/usr/bin/env node\nimport fs from 'node:fs'; import path from 'node:path'; const args = process.argv.slice(2); const endpoint = args[1]; fs.appendFileSync(path.join(process.cwd(), 'bin/github-reads.jsonl'), JSON.stringify(args) + '\\n'); if (args.includes('POST')) { fs.appendFileSync(path.join(process.cwd(), 'github-mutations.jsonl'), fs.readFileSync(0, 'utf8') + '\\n'); } else { const responses = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'github-responses.json'), 'utf8')); const response = responses[endpoint]; if (!response) { console.error('Unexpected GitHub endpoint: ' + endpoint); process.exit(1); } if (args.includes('--paginate')) { const key = args[args.indexOf('--jq') + 1].split('[]')[0].slice(1); for (const item of key ? response[key] : response) console.log(JSON.stringify(item)); } else console.log(JSON.stringify(response)); }\n`)
   chmodSync(join(value.bin, 'gh'), 0o755)
   return { run, jobs, configuration }
 }
@@ -95,15 +101,51 @@ describe('candidate verification public CLI', () => {
     expect(result.status).not.toBe(0)
     expect(existsSync(value.log)).toBe(false)
   })
-  it.each([{ legacy: true, exit: 0, status: 'passed' }, { legacy: false, exit: 1, status: 'blocked' }])('uses the immutable stable execution policy (legacy=$legacy)', ({ legacy, exit, status }) => {
+  it.each([{ legacy: true, exit: 0, status: 'passed' }, { legacy: false, exit: 1, status: 'blocked' }])('uses the trusted historical stable cutoff (legacy=$legacy)', ({ legacy, exit, status }) => {
     const value = fixture(false, legacy)
-    const evidence = githubFixture(value)
+    const evidence = githubFixture(value, '', candidateRepository, value.sha, true)
     for (const job of evidence.jobs) job.steps = job.steps.filter(step => !['Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].includes(step.name))
     replaceMetadata(value, { [`${prefix}/actions/runs/1/jobs?filter=all&per_page=100`]: { jobs: evidence.jobs } })
     const result = value.run('check', '--sha', value.sha, '--repository', 'titanxxh/open-agricola')
     expect(result.status, result.stderr).toBe(exit)
-    expect(JSON.parse(result.stdout)).toMatchObject({ status, sha: value.sha, configuration: evidence.configuration })
+    expect(JSON.parse(result.stdout)).toMatchObject({ status, sha: value.sha })
+    if (legacy) expect(JSON.parse(result.stdout).configuration).toBe(evidence.configuration)
+    else expect(JSON.parse(result.stdout).configuration).not.toBe(evidence.configuration)
   })
+  it('admits the final candidate before formal main control and rejects a non-main producer', () => {
+    const value = fixture()
+    githubFixture(value)
+    const env = { ...value.env, GITHUB_REPOSITORY: candidateRepository.full_name, GITHUB_REF: 'refs/heads/main',
+      GITHUB_WORKFLOW_SHA: value.sha, GITHUB_WORKFLOW_REF: `${candidateRepository.full_name}/.github/workflows/candidate-verification.yml@refs/heads/main` }
+    const source = (...args: string[]) => spawnSync(process.execPath, [join(value.cwd, 'scripts/ci/candidate-verification.ts'),
+      'formal-source', '--sha', value.sha, '--producer', value.sha, '--candidate-directory', '.', ...args], { cwd: value.cwd, encoding: 'utf8', env })
+    expect(source().status).toBe(0)
+    replaceMetadata(value, { [`${prefix}/pulls/1`]: { ...mergedPr(value.sha), merged: false, state: 'open' } })
+    expect(source().stderr).toContain('final merged pull request snapshot')
+    env.GITHUB_REF = 'refs/heads/rehearsal'
+    expect(source().stderr).toContain('trusted main producer')
+    expect(existsSync(value.log)).toBe(false)
+  })
+
+  it('never hides a new main-producer attempt behind an old historical success', () => {
+    const value = fixture(false, true)
+    const evidence = githubFixture(value)
+    writeFileSync(join(value.cwd, 'scripts/ci/new-policy.json'), '{"version":1}')
+    value.git('add', '--', 'scripts/ci/new-policy.json', ':(exclude)docs/superpowers/**'); value.git('commit', '-m', 'first main producer')
+    const producer = value.git('rev-parse', 'HEAD')
+    writeFileSync(join(value.cwd, 'scripts/ci/new-policy.json'), '{"version":2}')
+    value.git('add', '--', 'scripts/ci/new-policy.json', ':(exclude)docs/superpowers/**'); value.git('commit', '-m', 'next main producer')
+    const main = value.git('rev-parse', 'HEAD')
+    replaceMetadata(value, {
+      [`${prefix}/git/ref/heads/main`]: { ref: 'refs/heads/main', object: { type: 'commit', sha: main } },
+      [`${prefix}/actions/workflows/100/runs?event=workflow_dispatch&per_page=100`]: { workflow_runs: [evidence.run,
+        { ...evidence.run, id: 2, head_sha: producer, head_branch: 'main', display_title: `stable / ${value.sha} / all`, status: 'in_progress' }] },
+    })
+    const result = value.run('check', '--sha', value.sha, '--repository', candidateRepository.full_name)
+    expect(result.status, result.stderr).toBe(1)
+    expect(JSON.parse(result.stdout).status).toBe('blocked')
+  })
+
   it('checks and requests an explicitly chosen fork using its own native repository ID and protected-main snapshot', () => {
     const value = fixture()
     const fork = { id: 987654321, full_name: 'example/open-agricola-fork' }
@@ -273,7 +315,7 @@ describe('candidate verification public CLI', () => {
     const value = fixture()
     const metadata = githubFixture(value)
     replaceMetadata(value, {
-      [`${prefix}/actions/workflows/100/runs?head_sha=${value.sha}&event=workflow_dispatch&per_page=100`]: {
+      [`${prefix}/actions/workflows/100/runs?event=workflow_dispatch&per_page=100`]: {
         workflow_runs: [metadata.run, { ...metadata.run, id: 2, conclusion, head_repository: undefined,
           created_at: '2026-10-30T01:00:00Z', updated_at: '2026-10-30T01:15:00Z' }],
       },
@@ -314,6 +356,9 @@ describe('candidate verification public CLI', () => {
     value.git('add', '--', 'scripts/ci/verification-tasks.ts', ':(exclude)docs/superpowers/**')
     value.git('commit', '-m', 'advance producer on main')
     replaceMetadata(value, { [`${prefix}/git/ref/heads/main`]: { ref: 'refs/heads/main', object: { type: 'commit', sha: value.git('rev-parse', 'HEAD') } } })
+    const outdated = value.run('check', '--sha', value.sha, '--repository', 'titanxxh/open-agricola')
+    expect(outdated.status).toBe(1)
+    githubFixture(value, '', candidateRepository, value.git('rev-parse', 'HEAD'))
     const result = value.run('check', '--sha', value.sha, '--repository', 'titanxxh/open-agricola')
     expect(result.status, result.stderr).toBe(0)
     expect(JSON.parse(result.stdout).sha).toBe(value.sha)

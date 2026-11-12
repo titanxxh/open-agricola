@@ -3,7 +3,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { verificationConfiguration } from '../ci/verification-tasks'
+import { stableConfiguration } from '../ci/candidate-verification'
 import { candidateRepository, finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
@@ -61,11 +61,11 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
   cpSync(join(repoRoot, brokerPath), join(cwd, brokerPath))
   const policySha = commit('current main policy fixture')
   git('checkout', '--detach', policySha)
-  const configuration = verificationConfiguration(cwd, sha)
+  const configuration = stableConfiguration(cwd, sha, policySha)
   const tasks = ['quality', 'fast', 'slow', 'build', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit']
   const step = (name: string) => ({ name, status: 'completed', conclusion: 'success' })
   const candidateWorkflow = { id: 100, path: '.github/workflows/candidate-verification.yml' }
-  const candidateRun = { id: 1, workflow_id: 100, path: candidateWorkflow.path, event: 'workflow_dispatch', head_sha: sha,
+  const candidateRun = { id: 1, workflow_id: 100, path: candidateWorkflow.path, event: 'workflow_dispatch', head_sha: policySha, head_branch: 'main', display_title: `stable / ${sha} / all`,
     repository: { ...candidateRepository }, head_repository: { ...candidateRepository }, status: 'completed', run_attempt: 1,
     created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: `https://github.com/${repository}/actions/runs/1` }
   const jobs = tasks.map((task, index) => ({ id: index + 2, run_id: 1, run_attempt: 1,
@@ -74,7 +74,7 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
     steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }))
   jobs.unshift({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: candidateRun.html_url,
     started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
-    steps: [step('Generate candidate manifest'), step(`Candidate manifest / ${sha} / ${configuration} / ${tasks.join(',')}`)] })
+    steps: [step('Generate candidate manifest'), step(`Stable manifest / ${candidateRepository.id} / stable / ${sha} / ${configuration} / ${policySha} / ${tasks.join(',')}`)] })
   const requestWorkflow = { id: 200, path: requestPath }
   const requestRun = { id: 99, workflow_id: 200, path: requestPath, event: 'release', head_sha: sha, head_branch: 'v1.0.0', run_attempt: 1,
     repository: { full_name: repository }, head_repository: { full_name: repository }, status: 'completed', conclusion: 'success' }
@@ -92,7 +92,7 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
     [`${prefix}/environments/github-pages`]: environment,
     [`${prefix}/environments/github-pages/deployment-branch-policies?per_page=100`]: policies,
     [`${prefix}/actions/workflows/candidate-verification.yml`]: candidateWorkflow,
-    [`${prefix}/actions/workflows/100/runs?head_sha=${sha}&event=workflow_dispatch&per_page=100`]: { workflow_runs: [candidateRun] },
+    [`${prefix}/actions/workflows/100/runs?event=workflow_dispatch&per_page=100`]: { workflow_runs: [candidateRun] },
     [`${prefix}/actions/runs/1/jobs?filter=all&per_page=100`]: { jobs },
   }
   const eventFile = join(root, 'event.json')
@@ -390,7 +390,7 @@ describe.each(['workflow_run', 'workflow_dispatch'] as const)('Pages deployment 
     if (failure === 'missing') value.jobs.pop()
     else if (failure === 'configuration') value.jobs[0].steps[1].name = value.jobs[0].steps[1].name.replace(value.configuration, 'c'.repeat(64))
     else if (failure === 'ordinary PR') value.candidateRun.event = 'pull_request'
-    else if (failure === 'different SHA') value.candidateRun.head_sha = value.policySha
+    else if (failure === 'different SHA') value.candidateRun.head_sha = value.sha
     else value.jobs[1].steps[3].conclusion = failure
     value.save()
     const result = runWorkflow(value)

@@ -105,7 +105,7 @@ describe('canonical architecture verification wiring', () => {
       expect(caller).toContain(`      partition: ${id}\n`)
       expect(caller).toContain('      plan_digest: ${{ needs.plan.outputs.plan_digest }}')
     }
-    expect(workflow).toContain('uses: ./.github/workflows/candidate-verification.yml')
+    expect(workflow).toContain('uses: ./.github/workflows/candidate-rehearsal.yml')
     expect(workflow).toContain('tasks: ${{ needs.plan.outputs.catalog_tasks }}')
     expect(workflow).toContain("if: needs.plan.outputs.catalog_tasks != '' && needs.plan.outputs.catalog_tasks != 'none'")
     expect(workflow).toContain('candidate_sha: ${{ github.sha }}')
@@ -121,7 +121,7 @@ describe('canonical architecture verification wiring', () => {
   })
 
   it('exports reusable catalog completion only after the manifest and every matrix task succeed', () => {
-    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-verification.yml'), 'utf8')
+    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-rehearsal.yml'), 'utf8')
     const completion = workflow.slice(workflow.indexOf('\n  complete:'))
     expect(workflow).toContain('matrix: ${{ fromJSON(needs.manifest.outputs.matrix) }}')
     expect(workflow).toContain('run-task "$VERIFICATION_TASK" --sha "$CANDIDATE_SHA"')
@@ -134,7 +134,7 @@ describe('canonical architecture verification wiring', () => {
   })
 
   it('installs both engines in browser catalog lanes and declared inline browser checks', () => {
-    const candidate = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-verification.yml'), 'utf8')
+    const candidate = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-rehearsal.yml'), 'utf8')
     const routine = fs.readFileSync(path.join(repoRoot, '.github/workflows/scoped-verification.yml'), 'utf8')
 
     expect(candidate).toContain("if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'")
@@ -157,4 +157,20 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow.match(/if: github.event_name == 'workflow_dispatch' \|\| github.event.repository.private == false/g))
       .toHaveLength(1)
   })
+})
+
+it('keeps formal main control distinct from non-authorizing implementation rehearsal', () => {
+  const formal = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-verification.yml'), 'utf8')
+  const rehearsal = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-rehearsal.yml'), 'utf8')
+  expect(formal).toContain("if: github.ref == 'refs/heads/main'")
+  expect(formal).toContain('pull-requests: read')
+  expect(formal).toContain('candidate-verification.ts formal-manifest')
+  expect(formal).toContain('candidate-verification.ts formal-source')
+  expect(formal).toContain('candidate-verification.ts formal-run-task')
+  expect(formal).toContain('bash policy/scripts/ci/setup-candidate-isolation.sh')
+  expect(formal).not.toContain('bash candidate/scripts/')
+  expect(formal.indexOf('name: Verify candidate checkout')).toBeLessThan(formal.indexOf('name: Prepare candidate isolation'))
+  expect(rehearsal).toContain('name: Candidate implementation rehearsal')
+  expect(rehearsal).toContain('  workflow_call:')
+  expect(rehearsal).toContain('name: implementation-rehearsal /')
 })

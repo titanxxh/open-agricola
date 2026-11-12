@@ -1,3 +1,4 @@
+import { stableConfiguration } from '../scripts/ci/candidate-verification'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -64,7 +65,7 @@ printf '%s' "\${ACCOUNT_REGISTRATION_POLICY:-}" > "$OA_DEPLOY_CAPTURE/registrati
     if (typeof manifest !== 'object' || !manifest || !('configuration' in manifest) || typeof manifest.configuration !== 'string') {
       throw new Error('Missing fixture candidate configuration')
     }
-    env.OA_DEPLOY_CONFIGURATION = manifest.configuration
+    env.OA_DEPLOY_CONFIGURATION = stableConfiguration(directory, sha, sha)
     writeFileSync(join(bin, 'gh'), `#!${process.execPath}
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -86,14 +87,14 @@ if (Object.hasOwn(provenance, args[1])) {
   output({ sha });
 } else if (endpoint === 'actions/workflows/candidate-verification.yml') {
   output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
-} else if (endpoint === 'actions/workflows/100/runs?head_sha=' + sha + '&event=workflow_dispatch&per_page=100') {
-  output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: sha,
+} else if (endpoint === 'actions/workflows/100/runs?event=workflow_dispatch&per_page=100') {
+  output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: sha, head_branch: 'main', display_title: 'stable / ' + sha + ' / all',
     repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 }, status: 'completed', run_attempt: 1,
     created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://example.test/run/1' });
 } else if (endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
   output({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: 'https://example.test/job/1',
     started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
-    steps: [step('Generate candidate manifest'), step('Candidate manifest / ' + sha + ' / ' + configuration + ' / ' + tasks.join(','))] });
+    steps: [step('Generate candidate manifest'), step('Stable manifest / 1164782262 / stable / ' + sha + ' / ' + configuration + ' / ' + sha + ' / ' + tasks.join(','))] });
   tasks.forEach((task, index) => output({ id: index + 2, run_id: 1, run_attempt: 1, name: 'candidate / ' + task + ' / ' + configuration,
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     status: 'completed', conclusion: 'success', html_url: 'https://example.test/job/' + task,
