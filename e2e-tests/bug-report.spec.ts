@@ -1,3 +1,4 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers server/bug-report/
 import {
   expect,
@@ -7,7 +8,7 @@ import {
   type BrowserContext,
 } from '@playwright/test'
 import { createHash } from 'node:crypto'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import en from '../output/i18n/locales/en.json' with { type: 'json' }
 
 const cookieValue = (response: APIResponse, name: string): string => {
@@ -23,7 +24,7 @@ const authenticate = async (
   request: APIRequestContext,
   username: string,
 ): Promise<void> => {
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
+  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(),
     data: {
       providerUserId: `bug-report-${username}`,
       providerLogin: username,
@@ -33,7 +34,7 @@ const authenticate = async (
   })
   expect(oauth.ok()).toBe(true)
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookieValue(oauth, authCookieNames().onboarding)}` },
     data: {
       username,
       displayName: username,
@@ -43,8 +44,8 @@ const authenticate = async (
   })
   expect(complete.ok(), `${complete.status()} ${await complete.text()}`).toBe(true)
   await context.addCookies([{
-    name: 'oa_session',
-    value: cookieValue(complete, 'oa_session'),
+    name: authCookieNames().session,
+    value: cookieValue(complete, authCookieNames().session),
     url: FRONTEND_URL,
   }])
 }
@@ -152,7 +153,7 @@ test('completed replay submits one hosted bug report with the current anchor', a
   page,
   request,
 }) => {
-  const fixtureResponse = await request.post(`${BACKEND_URL}/api/test/replays/completed`)
+  const fixtureResponse = await request.post(`${BACKEND_URL}/api/test/replays/completed`, { headers: browserRequestHeaders() })
   expect(fixtureResponse.status()).toBe(201)
   const fixture = await fixtureResponse.json() as {
     roomId: string
@@ -298,7 +299,7 @@ for (const locale of ['en'] as const) {
       await page.addInitScript(value => {
         window.localStorage.setItem('open-agricola-locale-v2', value)
       }, locale)
-      const fixtureResponse = await request.post(`${BACKEND_URL}/api/test/replays/completed`)
+      const fixtureResponse = await request.post(`${BACKEND_URL}/api/test/replays/completed`, { headers: browserRequestHeaders() })
       expect(fixtureResponse.status()).toBe(201)
       const fixture = await fixtureResponse.json() as {
         roomId: string

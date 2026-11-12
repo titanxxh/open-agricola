@@ -1,3 +1,4 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/app/RoomRetentionSettings.tsx
 // @covers client/app/OperationsPage.tsx
 // @covers server/retention-policy-routes.ts
@@ -5,7 +6,7 @@
 import { expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { test } from './server-fixtures'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { createLocalUserForTests, createSession } from '../server/auth'
 import { getDb } from '../server/db'
 import { RoomRetentionStore } from '../server/game/room-retention-store'
@@ -19,7 +20,7 @@ test.beforeEach(async ({ context }) => {
   const token = await createSession(admin.id)
   expect(token).toBeTruthy()
   if (!token) throw new Error('Test session was not created')
-  await context.addCookies([{ name: 'oa_session', value: token, url: BACKEND_URL }])
+  await context.addCookies([{ name: authCookieNames().session, value: token, url: BACKEND_URL }])
   const store = new RoomRetentionStore(db), current = await store.read()
   await store.update({ expectedRevision: current.revision, waitingDays: 3, playingDays: 7 }, admin.id)
 })
@@ -48,7 +49,7 @@ for (const locale of ['en', 'zh']) for (const width of [1440, 375]) {
     expect(instances).toHaveLength(Number(process.env.APP_INSTANCES ?? 1))
     for (const instance of instances) {
       expect(new URL(instance.internal_url).hostname).toBe('127.0.0.1')
-      const current = await context.request.get(`${instance.internal_url}/api/admin/retention-policy`)
+      const current = await context.request.get(`${instance.internal_url}/api/admin/retention-policy`, { headers: browserRequestHeaders() })
       expect(current.status()).toBe(200)
       expect(await current.json()).toMatchObject({ ok: true, policy: { waitingDays: 5, playingDays: 14 } })
     }
@@ -91,21 +92,21 @@ test('ordinary accounts cannot open or change administrator retention settings',
   const token = await createSession(user.id)
   if (!token) throw new Error('Test session was not created')
   await context.clearCookies()
-  await context.addCookies([{ name: 'oa_session', value: token, url: BACKEND_URL }])
+  await context.addCookies([{ name: authCookieNames().session, value: token, url: BACKEND_URL }])
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
   await page.goto(`${FRONTEND_URL}/?page=operations&bg=none`)
   await expect(page.getByText('Administrator access required.', { exact: true })).toBeVisible()
   await expect(page.getByRole('form', { name: 'Room retention' })).toHaveCount(0)
-  expect((await context.request.get(`${BACKEND_URL}/api/admin/retention-policy`)).status()).toBe(403)
+  expect((await context.request.get(`${BACKEND_URL}/api/admin/retention-policy`, { headers: browserRequestHeaders() })).status()).toBe(403)
   expect((await context.request.patch(`${BACKEND_URL}/api/admin/retention-policy`, {
-    headers: { Origin: FRONTEND_URL }, data: { expectedRevision: 1, waitingDays: 1, playingDays: 1 },
+    headers: { ...browserRequestHeaders(), Origin: FRONTEND_URL }, data: { expectedRevision: 1, waitingDays: 1, playingDays: 1 },
   })).status()).toBe(403)
 })
 
 test('administrator requests from an untrusted Origin cannot change the policy', async ({ context }) => {
   const before = await new RoomRetentionStore(getDb()).read()
   const response = await context.request.patch(`${BACKEND_URL}/api/admin/retention-policy`, {
-    headers: { Origin: 'https://untrusted.example' },
+    headers: { ...browserRequestHeaders(), Origin: 'https://untrusted.example' },
     data: { expectedRevision: before.revision, waitingDays: 1, playingDays: 1 },
   })
   expect(response.status()).toBe(403)

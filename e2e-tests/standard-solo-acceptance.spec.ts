@@ -1,7 +1,7 @@
 // @covers client/app/solo/
 import { expect, test } from '@playwright/test'
 import { authenticateSolo, recordSoloEvidence, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 import { checkpoint, restartIsolatedBackend, verifyOriginalReceipt } from './helpers/standard-solo-process'
 
 test.use({ actionTimeout: 10_000 })
@@ -206,7 +206,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     expect(events.filter(event => event.type === 'resource.paid' && event.paymentFor === 'moor-retention')).toHaveLength(1)
     expect(events.flatMap(event => event.type === 'harvest.heated'
       ? [{ round: event.round, required: event.required, sickWorkerIds: event.sickWorkerIds }] : [])).toEqual(heatingExpected)
-    const result = await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}`)
+    const result = await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}`, { headers: browserRequestHeaders() })
     const completed = await result.json()
     const terminal = structuredClone(d.payload)
     expect(completed.lifecycle).toBe('completed')
@@ -219,7 +219,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     const immediateId = new URL(page.url()).searchParams.get('room')!
     expect(immediateId).not.toBe(sourceId)
     await expect.poll(() => d.envelope.roomId).toBe(immediateId)
-    const originalConfiguration = await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}/creation-configuration`)).json()
+    const originalConfiguration = await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}/creation-configuration`, { headers: browserRequestHeaders() })).json()
     expect(originalConfiguration).toMatchObject({ ok: true, configuration: {
       kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'choose-7', enableParentCards: true, draftParents: true,
       enableThroughTheSeasons: true, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true,
@@ -239,7 +239,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     await page.route('**/replay-viewers/**', route => route.abort())
     await page.goto(sourceUrl)
     await expect(page.locator('.solo-completed-summary')).toContainText(String(completed.result.players[0].score))
-    expect(await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}/creation-configuration`)).json()).toEqual(originalConfiguration)
+    expect(await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}/creation-configuration`, { headers: browserRequestHeaders() })).json()).toEqual(originalConfiguration)
     await page.getByRole('button', { name: 'Play again with these settings' }).click()
     await expect(page.getByRole('dialog', { name: 'Choose your starting hand' })).toBeVisible()
     const restartedId = new URL(page.url()).searchParams.get('room')!
@@ -253,7 +253,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     })
     expect(d.state.soloHandSelection?.groups.map(group => [group.kind, group.cardIds.length, group.keepCount]))
       .toEqual([['occupation', 10, 7], ['minor', 4, 3], ['moor-minor', 6, 4]])
-    const originalAfterRestart = await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}`)).json()
+    const originalAfterRestart = await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}`, { headers: browserRequestHeaders() })).json()
     expect(originalAfterRestart).toMatchObject({ lifecycle: 'completed', result: completed.result })
     await recordSoloEvidence(testInfo, 'completed-source-process-rematch', { processes, before, restored,
       sourceId, immediateId, restartedId, originalConfiguration, originalAfterRestart,
@@ -263,7 +263,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     await page.goto(sourceUrl)
     await page.getByRole('button', { name: 'Play again with these settings' }).click()
     await expect(page.getByRole('dialog', { name: 'Choose your starting hand' })).toBeVisible()
-    expect((await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}`)).json()).result).toEqual(completed.result)
+    expect((await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}`, { headers: browserRequestHeaders() })).json()).result).toEqual(completed.result)
     for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 }]) {
       await page.setViewportSize(viewport)
       await page.route(`**/api/v1/game-contexts/${sourceId}/creation-configuration`, route => route.fulfill({ json: {

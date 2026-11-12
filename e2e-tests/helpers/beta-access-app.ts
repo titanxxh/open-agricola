@@ -1,3 +1,4 @@
+import { browserRequestHeaders } from '../fixtures'
 import { expect, type BrowserContext } from '@playwright/test'
 import { execFile } from 'node:child_process'
 import { mkdtemp, readFile, appendFile, rm } from 'node:fs/promises'
@@ -7,7 +8,7 @@ import { createConnection } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { PostgresDatabase } from '../../server/database/postgres'
 import { createPrereleaseAuthorityHandler } from '../../server/prerelease-authority-routes'
-import { readCookie } from '../../server/auth-cookies'
+import { authCookieNames, readCookie } from '../../server/auth-cookies'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -47,6 +48,7 @@ export async function startHostedReleaseAppWithBetaAccess({ https = false } = {}
     return { ...app, environment, close, async authenticate(context, username, displayName) {
       await context.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'en') })
       const oauth = await context.request.post(`${app.apiUrl}/api/test/oauth/github/callback`, {
+        headers: browserRequestHeaders(app.apiUrl),
         data: { providerUserId: `beta-${username}`, providerLogin: username, email: `${username}@example.com`, displayName },
       })
       expect(oauth.ok(), await oauth.text()).toBe(true)
@@ -54,6 +56,7 @@ export async function startHostedReleaseAppWithBetaAccess({ https = false } = {}
       if (result && typeof result === 'object' && 'mode' in result && result.mode === 'login') return
       expect(result).toMatchObject({ mode: 'onboarding' })
       const complete = await context.request.post(`${app.apiUrl}/api/auth/onboarding/complete`, {
+        headers: browserRequestHeaders(app.apiUrl),
         data: { username, displayName, password: 'beta-test-password', confirmPassword: 'beta-test-password' },
       })
       expect(complete.ok(), await complete.text()).toBe(true)
@@ -69,7 +72,7 @@ async function httpsQualificationApp(hosted: HostedReleaseApp, environment: Node
   await exec('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(root, 'key.pem'),
     '-out', join(root, 'cert.pem'), '-days', '1', '-subj', '/CN=127.0.0.1', '-addext', 'subjectAltName=IP:127.0.0.1'])
   const db = new PostgresDatabase({ connectionString: environment.DATABASE_URL, schema: environment.DATABASE_SCHEMA })
-  const identity = createPrereleaseAuthorityHandler({ db, getSourceToken: async request => readCookie(request.headers.cookie, 'oa_session') })
+  const identity = createPrereleaseAuthorityHandler({ db, getSourceToken: async request => readCookie(request.headers.cookie, authCookieNames().session) })
   const target = new URL(hosted.apiUrl), sockets = new Set<Duplex>()
   let origin = ''
   const previous = { PUBLIC_APP_ORIGIN: process.env.PUBLIC_APP_ORIGIN, PRERELEASE_APP_ORIGIN: process.env.PRERELEASE_APP_ORIGIN, ADMIN_USERS: process.env.ADMIN_USERS }

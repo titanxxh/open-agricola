@@ -1,3 +1,4 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/components/header/
 // @covers server/connection/
 // @covers client/app/use-turn-tab-title.ts
@@ -9,7 +10,7 @@ import {
   type BrowserContext,
   type Page,
 } from '@playwright/test'
-import { BACKEND_URL, saveScreenshot, saveState, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, saveScreenshot, saveState, FRONTEND_URL } from './fixtures'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeSessionSnapshot } from '../shared/session/serialization'
@@ -29,7 +30,7 @@ const authenticate = async (
   request: APIRequestContext,
   username: string,
 ) => {
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
+  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(),
     data: {
       providerUserId: `ws-${username}`,
       providerLogin: username,
@@ -39,7 +40,7 @@ const authenticate = async (
   })
   expect(oauth.ok()).toBe(true)
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookieValue(oauth, authCookieNames().onboarding)}` },
     data: {
       username,
       displayName: username,
@@ -49,8 +50,8 @@ const authenticate = async (
   })
   expect(complete.ok(), `${complete.status()} ${await complete.text()}`).toBe(true)
   await context.addCookies([{
-    name: 'oa_session',
-    value: cookieValue(complete, 'oa_session'),
+    name: authCookieNames().session,
+    value: cookieValue(complete, authCookieNames().session),
     url: FRONTEND_URL,
   }])
 }

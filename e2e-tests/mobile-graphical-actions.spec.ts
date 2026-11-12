@@ -10,7 +10,7 @@ const setEnglish = async (page: Page): Promise<void> => {
 
 const readSandboxVariants = async (sandbox: FrameLocator) =>
   sandbox.locator('body').evaluate(async () => {
-    const response = await fetch('/api/game/state')
+    const response = await fetch('/api/game/state', { headers: { 'x-oa-browser-protocol': '2' } })
     const payload = await response.json() as {
       state?: {
         enableThroughTheSeasons?: boolean
@@ -37,7 +37,7 @@ const configureAndStartSandbox = async (
   const configured = await page.evaluate(async ({ seasons, moor, playerCount }) => {
     const response = await fetch('/api/game/new-sandbox', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-oa-browser-protocol': '2' },
       body: JSON.stringify({
         seed: 4242,
         customCardIds: [],

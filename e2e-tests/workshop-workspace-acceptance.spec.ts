@@ -1,3 +1,4 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/app/workshop/
 // @covers shared/projections/
 // @covers server/database/
@@ -11,7 +12,7 @@ import {
   type Page,
 } from '@playwright/test'
 import { approveCurrentDraft, publish } from '../server/workshop-drafts.ts'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { test } from './server-fixtures'
 import { createLocalUserForTests, createSession } from '../server/auth'
 
@@ -95,7 +96,7 @@ const createAccount = async (
   if (!cookie) throw new Error('Could not create the local test session')
   if (page) {
     await page.context().addCookies([{
-      name: 'oa_session',
+      name: authCookieNames().session,
       value: cookie,
       url: FRONTEND_URL,
     }])
@@ -116,7 +117,8 @@ const api = (
   method: options.method ?? 'GET',
   ...(options.data === undefined ? {} : { data: options.data }),
   headers: {
-    Cookie: account ? `oa_session=${account.cookie}` : '',
+    ...browserRequestHeaders(),
+    Cookie: account ? `${authCookieNames().session}=${account.cookie}` : '',
     ...options.headers,
   },
 })

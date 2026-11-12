@@ -2,7 +2,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
-import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL, finishHotseatOpening } from './fixtures'
 
 type HotseatProbe = { socket: WebSocket; payload?: GameSyncPayload; sent: Array<{ type: string }> }
 declare global {
@@ -103,11 +103,11 @@ test('real hotseat Moor drafts stay private during public browsing and remain us
   page.on('pageerror', error => pageErrors.push(error.message))
   await captureRoom(page)
   const username = `hotseat_moor_${Date.now().toString(36)}`
-  const oauth = await page.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+  const oauth = await page.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
     providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: 'Alice',
   } })
   expect(oauth.ok()).toBe(true)
-  const complete = await page.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, { data: {
+  const complete = await page.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, { headers: browserRequestHeaders(), data: {
     username, displayName: 'Alice', password: 'hotseat-moor-pass', confirmPassword: 'hotseat-moor-pass',
   } })
   expect(complete.ok(), `${complete.status()} ${await complete.text()}`).toBe(true)
@@ -164,11 +164,11 @@ test('real hotseat public farms stay read-only on desktop/mobile, across reconne
   await captureRoom(page)
   // Use a real cookie-backed owner so reconnect/reload exercise normal authentication.
   const username = `hotseat_1098_${Date.now().toString(36)}`
-  const oauth = await page.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+  const oauth = await page.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
     providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: 'Alice',
   } })
   expect(oauth.ok()).toBe(true)
-  const complete = await page.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, { data: {
+  const complete = await page.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, { headers: browserRequestHeaders(), data: {
     username, displayName: 'Alice', password: 'hotseat-pass-1098', confirmPassword: 'hotseat-pass-1098',
   } })
   expect(complete.ok(), `${complete.status()} ${await complete.text()}`).toBe(true)

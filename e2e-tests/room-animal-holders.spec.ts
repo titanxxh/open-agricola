@@ -1,8 +1,9 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/components/board/
 import { expect, test, type Page, type APIResponse } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 
@@ -149,16 +150,16 @@ test('room assignments can be edited separately, remain after reload, and synchr
 async function joinClients(clients: Page[], request: import('@playwright/test').APIRequestContext) {
   for (const [index, client] of clients.entries()) {
     const username = `room_holders_${Date.now().toString(36)}_${index}`
-    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
       providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
     } })
     expect(oauth.ok()).toBe(true)
     const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-      headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+      headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookie(oauth, authCookieNames().onboarding)}` },
       data: { username, displayName: username, password: 'room-holder-pass', confirmPassword: 'room-holder-pass' },
     })
     expect(complete.ok()).toBe(true)
-    await client.context().addCookies([{ name: 'oa_session', value: cookie(complete, 'oa_session'), url: FRONTEND_URL }])
+    await client.context().addCookies([{ name: authCookieNames().session, value: cookie(complete, authCookieNames().session), url: FRONTEND_URL }])
     await observe(client)
     await client.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
     await expect(client.locator('.game-layout')).toBeVisible({ timeout: 30000 })

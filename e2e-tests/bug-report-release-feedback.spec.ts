@@ -1,3 +1,4 @@
+import { browserRequestHeaders } from './fixtures'
 // @covers server/bug-report/feedback-service.ts
 // @covers server/bug-report-feedback-routes.ts
 // @covers client/app/Inbox.tsx
@@ -46,15 +47,15 @@ test('players read the verified release, original and late related reports witho
       for (const issue of [issueNumber, duplicate]) await fixture.prepare(`INSERT INTO bug_reports(submission_id,reporter_user_id,room_id,player_index,lifecycle,room_version,step_no,frame_hash,
         status,github_issue_number,created_at,updated_at) VALUES(?,?,?,0,'active',1,0,?,'submitted',?,1,1)`)
         .run(`release-${issue}-${suffix}`, account.id, `release-${suffix}`, 'a'.repeat(64), issue)
-      for (const issue of [issueNumber, duplicate]) expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`, { data: {
+      for (const issue of [issueNumber, duplicate]) expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`, { headers: browserRequestHeaders(app.apiUrl), data: {
         issueNumber: issue, requestId: `confirm-${issue}`, expectedVersion: 0, kind: 'confirmed_bug', reportSummary: `Discard report ${issue}`,
         explanation: 'The missing discard action is confirmed.',
       } })).status()).toBe(200)
-      expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { data: {
+      expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { headers: browserRequestHeaders(app.apiUrl), data: {
         issueNumber, requestId: 'release-fix-request', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit <discard> action for supply goods without advancing the current turn.', pullRequests: [{ number: 1500, requiredCommits: ['a'.repeat(40)] }],
       } })).status()).toBe(200)
       expect((await new BugReportFeedbackService(fixture).recordVerifiedDeployment('ui-deployment-01', proof)).status).toBe('completed')
-      expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/release`, { data: { operationId: 'forged-proof', proof } })).status()).toBe(404)
+      expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/release`, { headers: browserRequestHeaders(app.apiUrl), data: { operationId: 'forged-proof', proof } })).status()).toBe(404)
       const page = await reporter.newPage()
       await page.setViewportSize({ width: 1280, height: 900 })
       await page.goto(app.appUrl)
@@ -70,17 +71,17 @@ test('players read the verified release, original and late related reports witho
       await expect(dialog.getByRole('heading', { name: 'Related reports', exact: true })).toBeVisible()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       await expect.poll(async () => {
-        const inbox = await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()
+        const inbox = await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()
         return inbox.messages.find((entry: { kind: string }) => entry.kind === 'fix_released')?.readAt ?? null
       }).not.toBeNull()
-      const before = await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()
+      const before = await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()
       const original = before.messages.find((entry: { kind: string }) => entry.kind === 'fix_released')
       expect(original.readAt).not.toBeNull()
-      expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/duplicate`, { data: {
+      expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/duplicate`, { headers: browserRequestHeaders(app.apiUrl), data: {
         issueNumber: duplicate, rootIssueNumber: issueNumber, requestId: 'late-ui-duplicate', expectedVersion: 0,
       } })).status()).toBe(200)
       await new BugReportFeedbackService(fixture).recordVerifiedDeployment('ui-deployment-01', proof)
-      const after = await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()
+      const after = await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()
       expect(after.messages.filter((entry: { kind: string }) => entry.kind === 'fix_released')).toHaveLength(1)
       expect(after.messages.find((entry: { id: number }) => entry.id === original.id)).toMatchObject({ readAt: original.readAt, release: original.release,
         relatedReports: [{ issueNumber }, { issueNumber: duplicate }] })

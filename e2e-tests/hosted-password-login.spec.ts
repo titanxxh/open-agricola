@@ -13,8 +13,10 @@ import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, extname, join, resolve, sep } from 'node:path'
 import type { Duplex } from 'node:stream'
-import { createLocalUserForTests } from '../server/auth'
-import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE } from '../server/auth-cookies'
+import { createLocalUserForTests, createSession } from '../server/auth'
+import { authCookieNames, clearSessionCookie, clearOnboardingCookie, clearOAuthStateCookie, clearOperationsCookie, readCookie, serializeSessionCookie, serializeOnboardingCookie, serializeOAuthStateCookie, serializeOperationsCookie, SESSION_COOKIE } from '../server/auth-cookies'
+import { httpAdmission, requestSessionToken, websocketAdmission } from '../server/request-auth'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION, BROWSER_WS_PROTOCOL } from '../shared/contract/browser-auth'
 import { getDb } from '../server/db'
 import { createFrontendHosting } from '../server/frontend-hosting'
 import { createPrereleaseAuthorityHandler } from '../server/prerelease-authority-routes'
@@ -25,7 +27,7 @@ import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, openGameEndControls } 
 import { test } from './server-fixtures'
 
 type Topology = 'legacy-cross-site' | 'same-site-pages'
-type Engine = 'webkit' | 'chromium'
+type Engine = 'webkit' | 'chromium' | 'firefox'
 const PASSWORD = 'hosted-password-session-826'
 
 let pagesBuilt = false
@@ -54,7 +56,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
     '-keyout', join(directory, 'key.pem'), '-out', join(directory, 'cert.pem'),
     '-days', '1', '-subj', '/CN=app.agricola.test',
-    '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:api.agricola.test,DNS:pre.agricola-beta.test,DNS:app.test,DNS:api.test',
+    '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:api.agricola.test,DNS:pre.agricola.test,DNS:app.test,DNS:api.test',
   ], { stdio: 'ignore' })
   const username = `hosted_${randomUUID().slice(0, 8)}`
   const user = await createLocalUserForTests(username, PASSWORD)
@@ -65,6 +67,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   `).run(user.id, Date.now())
   const keys = ['NODE_ENV', 'PUBLIC_APP_ORIGIN', 'PUBLIC_API_BASE', 'CORS_ORIGIN', 'PRERELEASE_APP_ORIGIN', 'PRERELEASE_IDENTITY_SERVICE_KEY', 'PRERELEASE_ENTRY_ENABLED']
   const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]))
+  const backendCookieNames = authCookieNames()
   const sockets = new Set<Duplex>()
   const errors: string[] = []
   const socketMessages: string[] = []
@@ -86,12 +89,13 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   }
   let appOrigin = ''
   let apiOrigin = ''
-  const preOrigin = 'https://pre.agricola-beta.test'
+  const preOrigin = 'https://pre.agricola.test'
   const generationId = randomUUID()
   const serviceKey = 'test-target-only-service-key-at-least-32-bytes'
   let issuedHandoffs = 0
   const preRequests: Array<{ path: string; formalCookie: boolean }> = []
-  const identity = createPrereleaseAuthorityHandler({ db: getDb(), getSourceToken: async req => readCookie(req.headers.cookie, SESSION_COOKIE) })
+  const identity = createPrereleaseAuthorityHandler({ db: getDb(), getSourceToken: async req => requestSessionToken(req) })
+  const admissions: Array<{ path: string; transport: 'http' | 'ws'; origin: string | undefined; status: number }> = []
   const backend = new URL(BACKEND_URL)
   const trustedBackendOrigin = new URL(FRONTEND_URL).origin
   const track = (socket: Duplex) => {
@@ -102,6 +106,15 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   const forwardedHeaders = (req: IncomingMessage) => {
     const headers = { ...req.headers, host: backend.host }
     if (headers.origin === appOrigin || headers.origin === apiOrigin) headers.origin = trustedBackendOrigin
+    if (headers.cookie) {
+      const productionNames = authCookieNames()
+      headers.cookie = headers.cookie.split(';').flatMap(part => {
+        const [name, ...value] = part.trim().split('=')
+        if (Object.values(backendCookieNames).includes(name)) return []
+        const kind = (Object.keys(productionNames) as Array<keyof typeof productionNames>).find(key => productionNames[key] === name)
+        return [`${kind ? backendCookieNames[kind] : name}=${value.join('=')}`]
+      }).join('; ')
+    }
     return headers
   }
   const server = createServer({
@@ -109,7 +122,13 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   }, (req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', appOrigin)
-      if (prerelease && req.headers.host === new URL(preOrigin).host) {
+      if (req.headers.host === new URL(preOrigin).host) {
+        if (url.pathname === '/boundary-probe') {
+          res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' })
+          res.end('<!doctype html><title>Sibling origin probe</title><body>Sibling origin probe</body>')
+          return
+        }
+        if (!prerelease) { res.writeHead(404).end(); return }
         preRequests.push({ path: req.url ?? '', formalCookie: !!readCookie(req.headers.cookie, SESSION_COOKIE) })
         if (url.pathname === '/open-agricola/auth/start') {
           const verifier = randomBytes(32).toString('base64url'), state = randomBytes(32).toString('base64url')
@@ -169,11 +188,21 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
         }
         res.writeHead(404).end(); return
       }
-      if (prerelease && req.headers.host === new URL(apiOrigin).host && url.pathname.startsWith('/api/prerelease/')) {
+      if (req.headers.host === new URL(apiOrigin).host && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ops/'))) {
+        res.setHeader('Access-Control-Allow-Origin', appOrigin)
+        res.setHeader('Access-Control-Allow-Credentials', 'true')
         if (req.method === 'OPTIONS') {
-          res.writeHead(204, { 'Access-Control-Allow-Origin': appOrigin, 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' })
+          res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS', 'Access-Control-Allow-Headers': `Content-Type,${BROWSER_AUTH_HEADER}` })
           res.end(); return
         }
+        const admission = httpAdmission(req)
+        admissions.push({ path: url.pathname, transport: 'http', origin: req.headers.origin, status: admission.ok ? 200 : admission.status })
+        if (!admission.ok) {
+          res.writeHead(admission.status, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: false, code: admission.code })); return
+        }
+      }
+      if (prerelease && req.headers.host === new URL(apiOrigin).host && url.pathname.startsWith('/api/prerelease/')) {
         if (url.pathname === '/api/prerelease/handoffs' && req.method === 'POST') issuedHandoffs++
         if (await identity(req, res)) return
       }
@@ -217,10 +246,13 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
         }
         if (response.headers['set-cookie']) {
           headers['set-cookie'] = response.headers['set-cookie'].map(cookie => {
-            if (!cookie.startsWith(`${SESSION_COOKIE}=`)) return cookie
-            const token = readCookie(cookie, SESSION_COOKIE)
+            const kind = (Object.keys(backendCookieNames) as Array<keyof typeof backendCookieNames>).find(key => cookie.startsWith(`${backendCookieNames[key]}=`))
+            if (!kind) return cookie
+            const token = readCookie(cookie, backendCookieNames[kind])
             const options = { backendOrigin: apiOrigin, requestOrigin: req.headers.origin }
-            return token ? serializeSessionCookie(token, options) : clearSessionCookie(options)
+            const serializers = { session: serializeSessionCookie, onboarding: serializeOnboardingCookie, oauthState: serializeOAuthStateCookie, operations: serializeOperationsCookie }
+            const clearers = { session: clearSessionCookie, onboarding: clearOnboardingCookie, oauthState: clearOAuthStateCookie, operations: clearOperationsCookie }
+            return token ? serializers[kind](token, options) : clearers[kind](options)
           })
         }
         res.writeHead(response.statusCode ?? 502, headers)
@@ -262,6 +294,12 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   server.on('upgrade', (req, socket, head) => {
     if (!/^\/nodes\/[A-Za-z0-9-]+\/ws$/.test(req.url ?? '')) {
       socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n')
+      return
+    }
+    const admission = websocketAdmission(req)
+    admissions.push({ path: new URL(req.url ?? '/', apiOrigin).pathname, transport: 'ws', origin: req.headers.origin, status: admission.ok ? 101 : admission.status })
+    if (!admission.ok) {
+      socket.end(`HTTP/1.1 ${admission.status} Upgrade Rejected\r\nConnection: close\r\n\r\n`)
       return
     }
     let cancelled = false
@@ -325,7 +363,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   const proxy = createHttpServer((_req, res) => { res.writeHead(502); res.end() })
   proxy.on('connect', (req, socket, head) => {
     const target = new URL(`http://${req.url}`)
-    const local = ['app.test', 'api.test', 'app.agricola.test', 'api.agricola.test', 'pre.agricola-beta.test'].includes(target.hostname)
+    const local = ['app.test', 'api.test', 'app.agricola.test', 'api.agricola.test', 'pre.agricola.test'].includes(target.hostname)
     const upstream = connect(local ? address.port : Number(target.port) || 443, local ? '127.0.0.1' : target.hostname, () => {
       socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
       if (head.length) upstream.write(head)
@@ -342,7 +380,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     const browserContext = await playwright[engine].launchPersistentContext(join(directory, 'browser-profile'), {
       ...(engine === 'webkit' ? devices['iPhone 13'] : { viewport: { width: 1280, height: 900 } }),
       ignoreHTTPSErrors: true,
-      args: engine === 'webkit' ? ['--enable-itp', '--cookies-policy=no-third-party'] : ['--test-third-party-cookie-phaseout'],
+      args: engine === 'webkit' ? ['--enable-itp', '--cookies-policy=no-third-party'] : engine === 'chromium' ? ['--test-third-party-cookie-phaseout'] : [],
       proxy: { server: `http://127.0.0.1:${proxyAddress.port}` },
     })
     await browserContext.addInitScript(origin => {
@@ -421,7 +459,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     }
     return {
       appUrl: `${appOrigin}${appPath}`, apiOrigin, build, username, userId: user.id,
-      preOrigin, preRequests, get issuedHandoffs() { return issuedHandoffs },
+      preOrigin, preRequests, admissions, get issuedHandoffs() { return issuedHandoffs },
       closePrerelease, activatePrerelease,
       get context() { if (!context) throw new Error('Browser context is not open'); return context },
       get latestRoomState() { return latestRoomState },
@@ -682,7 +720,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       ])
       expect(logout.status()).toBe(200)
       await expect(page.locator('#username')).toBeVisible()
-      expect(await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include' })).status, environment.apiOrigin)).toBe(401)
+      expect(await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include', headers: { 'x-oa-browser-protocol': '2' } })).status, environment.apiOrigin)).toBe(401)
       await page.goto(`${environment.apiOrigin}/open-agricola/?page=login&bg=none&token=private#onboardingTicket=private`, { waitUntil: 'domcontentloaded' })
       await expect(page.locator('#username')).toBeVisible()
       expect(page.url()).toBe(`${environment.appUrl}?page=login&bg=none#`)
@@ -711,5 +749,93 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       writeFileSync(testInfo.outputPath('session-lifecycle.json'), JSON.stringify(environment.lifecycle, null, 2))
       await environment.close()
     }
+  })
+}
+
+for (const engine of ['chromium', 'webkit', 'firefox'] satisfies Engine[]) {
+  test(`${engine} sibling prerelease cannot confuse credentials or initialize a framed formal app`, async ({ playwright }, testInfo) => {
+    test.setTimeout(180_000)
+    const environment = await fixture(playwright, engine, 'same-site-pages')
+    try {
+      const page = await environment.context.newPage()
+      environment.observe(page)
+      await page.goto(`${environment.appUrl}?page=login&bg=none`)
+      await environment.loadLobby(page, () => submitPassword(page, environment.username))
+      const other = await createLocalUserForTests(`sibling_${randomUUID().slice(0, 8)}`, PASSWORD)
+      const otherToken = await createSession(other.id)
+      if (!otherToken) throw new Error('Missing sibling fixture session')
+      const sibling = await environment.context.newPage()
+      await sibling.goto(`${environment.preOrigin}/boundary-probe`)
+      await sibling.evaluate(({ token, name }) => {
+        document.cookie = `oa_session=${token}; Domain=agricola.test; Path=/; Secure; SameSite=Lax`
+        document.cookie = `oa_dev_session=${token}; Domain=agricola.test; Path=/; Secure; SameSite=Lax`
+        document.cookie = `${name}=injected-parent; Domain=agricola.test; Path=/; Secure; SameSite=Lax`
+        document.cookie = `${name}=pre-only; Path=/; Secure; SameSite=Lax`
+      }, { token: otherToken, name: SESSION_COOKIE })
+      const formalCookies = await environment.context.cookies(environment.apiOrigin)
+      expect(formalCookies.filter(cookie => cookie.name === SESSION_COOKIE).map(cookie => cookie.domain)).toEqual(['api.agricola.test'])
+      expect(formalCookies.some(cookie => cookie.name === 'oa_session' && cookie.domain === '.agricola.test')).toBe(true)
+      expect((await environment.context.cookies(environment.preOrigin)).find(cookie => cookie.name === SESSION_COOKIE)?.value).toBe('pre-only')
+      const identity = await page.evaluate(async ({ api, header, version }) => {
+        const response = await fetch(`${api}/api/auth/me`, { credentials: 'include', headers: { [header]: version } })
+        return { status: response.status, body: await response.json() }
+      }, { api: environment.apiOrigin, header: BROWSER_AUTH_HEADER, version: String(BROWSER_AUTH_VERSION) })
+      expect(identity).toMatchObject({ status: 200, body: { ok: true, user: { id: environment.userId } } })
+
+      const oldClient = await page.evaluate(async api => {
+        const response = await fetch(`${api}/api/auth/me`, { credentials: 'include' })
+        return { status: response.status, body: await response.json() }
+      }, environment.apiOrigin)
+      expect(oldClient).toEqual({ status: 426, body: { ok: false, code: 'reload_required' } })
+      for (const [path, method] of [['/api/auth/me', 'GET'], ['/api/auth/logout', 'POST'], ['/ops/', 'POST']] as const) {
+        await sibling.evaluate(async ({ api, path, method }) => {
+          await fetch(`${api}${path}`, { method, credentials: 'include' }).catch(() => undefined)
+        }, { api: environment.apiOrigin, path, method })
+        expect(environment.admissions.findLast(entry => entry.path === path && entry.origin === environment.preOrigin))
+          .toMatchObject({ transport: 'http', status: 403 })
+      }
+      for (const [source, protocols, expected] of [[sibling, [BROWSER_WS_PROTOCOL], 403], [page, [], 426]] as const) {
+        const result = await source.evaluate(({ api, protocols }) => new Promise<string>(resolveSocket => {
+          const socket = new WebSocket(`${api.replace('https:', 'wss:')}/nodes/boundary-probe/ws`, [...protocols])
+          socket.onopen = () => { socket.close(); resolveSocket('opened') }
+          socket.onerror = () => resolveSocket('rejected')
+        }), { api: environment.apiOrigin, protocols })
+        expect(result).toBe('rejected')
+        expect(environment.admissions.findLast(entry => entry.transport === 'ws')).toMatchObject({ status: expected })
+      }
+
+      const frameRequests: string[] = []
+      const frameSockets: string[] = []
+      sibling.on('request', request => { if (new URL(request.url()).origin === environment.apiOrigin) frameRequests.push(new URL(request.url()).pathname) })
+      sibling.on('websocket', socket => frameSockets.push(socket.url()))
+      const framed = new URL(`${environment.appUrl}?page=prerelease-handoff`)
+      framed.hash = new URLSearchParams({ browserChallenge: 'a'.repeat(43), state: 's'.repeat(43), targetOrigin: environment.preOrigin, returnTo: environment.appUrl }).toString()
+      await sibling.evaluate(src => { const frame = document.createElement('iframe'); frame.src = src; document.body.append(frame) }, framed.href)
+      const standalone = sibling.frameLocator('iframe').getByRole('link', { name: 'Open Agricola', exact: true })
+      await expect(standalone).toHaveAttribute('href', environment.appUrl)
+      await expect(standalone).toHaveAttribute('target', '_blank')
+      await expect(standalone).toHaveAttribute('rel', 'noopener noreferrer')
+      expect(frameRequests).toEqual([])
+      expect(frameSockets).toEqual([])
+      expect(environment.issuedHandoffs).toBe(0)
+      const [standalonePage] = await Promise.all([environment.context.waitForEvent('page'), standalone.click()])
+      await expect(standalonePage.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
+      expect(new URL(standalonePage.url()).hash).toBe('')
+      expect(new URL(standalonePage.url()).search).toBe('')
+      expect(await standalonePage.evaluate(() => window.opener)).toBeNull()
+      await standalonePage.close()
+      const logoutStatus = await page.evaluate(async ({ api, header, version }) => (await fetch(`${api}/api/auth/logout`, {
+        method: 'POST', credentials: 'include', headers: { [header]: version },
+      })).status, { api: environment.apiOrigin, header: BROWSER_AUTH_HEADER, version: String(BROWSER_AUTH_VERSION) })
+      expect(logoutStatus).toBe(200)
+      const loggedOutStatus = await page.evaluate(async ({ api, header, version }) => (await fetch(`${api}/api/auth/me`, {
+        credentials: 'include', headers: { [header]: version },
+      })).status, { api: environment.apiOrigin, header: BROWSER_AUTH_HEADER, version: String(BROWSER_AUTH_VERSION) })
+      expect(loggedOutStatus).toBe(401)
+      expect((await environment.context.cookies(environment.apiOrigin)).some(cookie => cookie.name === 'oa_session')).toBe(true)
+      await testInfo.attach('same-site-boundaries', { body: JSON.stringify({ engine, admissions: environment.admissions, framedApiRequests: frameRequests, framedSockets: frameSockets }), contentType: 'application/json' })
+      await getDb().prepare('DELETE FROM sessions WHERE user_id=?').run(other.id)
+      expect(environment.errors).toEqual([])
+    } finally { await environment.close() }
   })
 }

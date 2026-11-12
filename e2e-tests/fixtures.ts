@@ -1,11 +1,16 @@
 import { expect, type Page, type APIRequestContext } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'fs'
 import path from 'path'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../shared/contract/browser-auth'
 
 // ── URL constants ────────────────────────────────────────────────────────────
 
 export const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:5175'
 export const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173'
+export const browserRequestHeaders = (origin = FRONTEND_URL) => ({
+  Origin: new URL(origin).origin,
+  [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION),
+})
 
 // ── Output directory ─────────────────────────────────────────────────────────
 
@@ -21,10 +26,7 @@ export async function postJson(
   request: APIRequestContext,
   url: string,
   body?: unknown,
-  token?: string,
 ) {
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
   const resp = await request.post(url, {
     ...(body !== undefined ? { data: body } : {}),
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
@@ -33,7 +35,7 @@ export async function postJson(
 }
 
 export async function getJson(request: APIRequestContext, url: string) {
-  const resp = await request.get(url)
+  const resp = await request.get(url, { headers: browserRequestHeaders() })
   return resp.json()
 }
 

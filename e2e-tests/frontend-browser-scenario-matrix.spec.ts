@@ -1,3 +1,4 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/components/board/
 // @covers client/components/interaction/
 import {
@@ -10,7 +11,7 @@ import {
   type Locator,
   type Page,
 } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 type LocaleScenario = {
   locale: 'en'
@@ -59,7 +60,7 @@ const authenticateWorkshop = async (page: Page, request: APIRequestContext) => {
   const suffix = `${Date.now().toString(36)}_${workshopUserCounter++}`
   const username = `scenario_${suffix}`
   const password = 'scenario-pass-550'
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
+  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(),
     data: {
       providerUserId: `scenario-github-${suffix}`,
       providerLogin: username,
@@ -68,15 +69,15 @@ const authenticateWorkshop = async (page: Page, request: APIRequestContext) => {
     },
   })
   expect(oauth.ok()).toBe(true)
-  const onboarding = cookieValue(oauth, 'oa_onboarding')
+  const onboarding = cookieValue(oauth, authCookieNames().onboarding)
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
     data: { username, displayName: username, password, confirmPassword: password },
-    headers: { Cookie: `oa_onboarding=${onboarding}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${onboarding}` },
   })
   expect(complete.ok(), `${complete.status()} ${await complete.text()}`).toBe(true)
   await page.context().addCookies([{
-    name: 'oa_session',
-    value: cookieValue(complete, 'oa_session'),
+    name: authCookieNames().session,
+    value: cookieValue(complete, authCookieNames().session),
     url: FRONTEND_URL,
   }])
 }
@@ -85,7 +86,7 @@ const configureSandbox = async (page: Page, variants: VariantScenario) => {
   const result = await page.evaluate(async (options) => {
     const response = await fetch('/api/game/new-sandbox', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-oa-browser-protocol': '2' },
       body: JSON.stringify({
         seed: 55_000,
         customCardIds: [],
@@ -183,7 +184,7 @@ const openWorkshopSandbox = async (
 
 const readSandboxVariants = (sandbox: FrameLocator) =>
   sandbox.locator('body').evaluate(async () => {
-    const response = await fetch('/api/game/state')
+    const response = await fetch('/api/game/state', { headers: { 'x-oa-browser-protocol': '2' } })
     const payload = await response.json() as {
       state?: {
         enableThroughTheSeasons?: boolean
@@ -431,7 +432,7 @@ test.describe('iOS Safari browser smoke @webkit @ios-safari', () => {
     await expect(page.locator('.farm-tile.field')).toHaveCount(1)
     await page.getByRole('button', { name: 'Confirm switch', exact: true }).click()
     await expect.poll(() => page.evaluate(async () => {
-      const response = await fetch('/api/game/state')
+      const response = await fetch('/api/game/state', { headers: { 'x-oa-browser-protocol': '2' } })
       const payload = await response.json() as {
         state?: { currentPlayerIndex?: number }
         interaction?: { stateId?: string }

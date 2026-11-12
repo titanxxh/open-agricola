@@ -1,6 +1,7 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/contexts/
 import { expect, test, type APIResponse, type Page, type APIRequestContext } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
 
 const cookieValue = (response: APIResponse, name: string): string => {
   const header = response.headersArray().find((header) =>
@@ -13,17 +14,17 @@ const cookieValue = (response: APIResponse, name: string): string => {
 const signIn = async (page: Page, request: APIRequestContext, displayName = '录制玩家') => {
   const username = `issue936_${Date.now()}`
   const password = 'issue936-test-password'
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
+  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(),
     data: { providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName },
   })
   expect(oauth.ok()).toBe(true)
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
     data: { username, displayName, password, confirmPassword: password },
-    headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookieValue(oauth, authCookieNames().onboarding)}` },
   })
   expect(complete.ok(), await complete.text()).toBe(true)
-  const cookie = cookieValue(complete, 'oa_session')
-  await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  const cookie = cookieValue(complete, authCookieNames().session)
+  await page.context().addCookies([{ name: authCookieNames().session, value: cookie, url: FRONTEND_URL }])
   return cookie
 }
 
@@ -117,7 +118,7 @@ for (const { label, desc, expected } of [
     const cookie = await signIn(page, request)
     const cardId = `CUSTOM_Issue936_${Date.now()}`
     const created = await request.post(`${BACKEND_URL}/api/workshop/cards`, {
-      headers: { Cookie: `oa_session=${cookie}` },
+      headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().session}=${cookie}` },
       data: {
         card_id: cardId, card_type: 'minor', name: 'Medieval Mallet', description: '', status: 'draft',
         card_json: {
@@ -154,7 +155,7 @@ for (const { label, desc, expected } of [
     await page.locator('.aicw-stage-rail button').filter({ hasText: 'Card details' }).click()
     await expect.poll(async () => {
       const response = await request.get(`${BACKEND_URL}/api/workshop/cards/${card.id}/workspace`, {
-        headers: { Cookie: `oa_session=${cookie}` },
+        headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().session}=${cookie}` },
       })
       return (await response.json()).workspace.draft.cardJson.locales
     }).toMatchObject({
@@ -190,7 +191,7 @@ for (const translated of [
     const cookie = await signIn(page, request)
     const cardId = `CUSTOM_IndependentLocale_${Date.now()}`
     const created = await request.post(`${BACKEND_URL}/api/workshop/cards`, {
-      headers: { Cookie: `oa_session=${cookie}` },
+      headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().session}=${cookie}` },
       data: { card_id: cardId, card_type: 'minor', name: 'Independent locale', description: '', status: 'draft',
         card_json: { id: cardId, name: 'Independent locale', card_type: 'minor', deck: 'CUSTOM', number: 0,
           desc: ['Source description.'], rules: ['Source ruling.'], cost: {},
@@ -205,7 +206,7 @@ for (const translated of [
     await page.locator('.aicw-stage-rail button').filter({ hasText: 'Card details' }).click()
     await expect.poll(async () => {
       const response = await request.get(`${BACKEND_URL}/api/workshop/cards/${card.id}/workspace`, {
-        headers: { Cookie: `oa_session=${cookie}` },
+        headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().session}=${cookie}` },
       })
       return (await response.json()).workspace.draft.cardJson.locales.zh
     }).toMatchObject({ name: '', desc: [], rules: translated.rules })

@@ -1,6 +1,7 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/styles/pages/
 import { expect, test, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { MyActiveRoom } from '../shared/contract/lobby'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
@@ -12,23 +13,23 @@ const cookieValue = (response: APIResponse, name: string): string => {
 }
 
 async function authenticate(context: BrowserContext, username: string, displayName = username) {
-  const oauth = await context.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
+  const oauth = await context.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(),
     data: { providerUserId: `invite-${username}`, providerLogin: username, email: `${username}@example.com`, displayName },
   })
   expect(oauth.ok()).toBe(true)
   const complete = await context.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookieValue(oauth, authCookieNames().onboarding)}` },
     data: { username, displayName, password: 'invite-pass-550', confirmPassword: 'invite-pass-550' },
   })
   expect(complete.ok(), await complete.text()).toBe(true)
-  await context.addCookies([{ name: 'oa_session', value: cookieValue(complete, 'oa_session'), url: FRONTEND_URL }])
-  const me = await context.request.get(`${BACKEND_URL}/api/auth/me`)
+  await context.addCookies([{ name: authCookieNames().session, value: cookieValue(complete, authCookieNames().session), url: FRONTEND_URL }])
+  const me = await context.request.get(`${BACKEND_URL}/api/auth/me`, { headers: browserRequestHeaders() })
   const body = await me.json() as { user: { id: string } }
   return body.user.id
 }
 
 async function roomIds(context: BrowserContext) {
-  const response = await context.request.get(`${BACKEND_URL}/api/rooms`)
+  const response = await context.request.get(`${BACKEND_URL}/api/rooms`, { headers: browserRequestHeaders() })
   expect(response.headers()['cache-control']).toBe('no-store')
   const body = await response.json() as { rooms: Array<{ id: string }> }
   return body.rooms.map(room => room.id)
@@ -36,7 +37,7 @@ async function roomIds(context: BrowserContext) {
 
 async function directJoin(page: Page, wsPath: string, roomId: string) {
   return page.evaluate(({ address, id }) => new Promise<Array<{ type: string; code?: string }>>((resolve, reject) => {
-    const socket = new WebSocket(address)
+    const socket = new WebSocket(address, 'oa.browser.v2')
     const received: Array<{ type: string; code?: string }> = []
     const timer = setTimeout(() => { socket.close(); reject(new Error('Direct join timed out')) }, 10_000)
     socket.onopen = () => socket.send(JSON.stringify({ type: 'joinRoom', roomId: id, name: 'Outsider' }))
@@ -124,11 +125,11 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
       const outsiderPage = await outsider.newPage()
       await outsiderPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' })
       await expect(outsiderPage.locator('.room-item').filter({ hasText: roomId })).toHaveCount(0)
-      const denied = await outsider.request.post(`${BACKEND_URL}/api/rooms/locate`, { data: { roomId } })
+      const denied = await outsider.request.post(`${BACKEND_URL}/api/rooms/locate`, { headers: browserRequestHeaders(), data: { roomId } })
       expect(denied.status()).toBe(403)
-      const contextDenied = await outsider.request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`)
+      const contextDenied = await outsider.request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`, { headers: browserRequestHeaders() })
       expect(contextDenied.status()).toBe(403)
-      const located = await creator.request.post(`${BACKEND_URL}/api/rooms/locate`, { data: { roomId } })
+      const located = await creator.request.post(`${BACKEND_URL}/api/rooms/locate`, { headers: browserRequestHeaders(), data: { roomId } })
       const route = await located.json() as { wsPath: string }
       const directEvents = await directJoin(outsiderPage, route.wsPath, roomId)
       expect(directEvents).toContainEqual({ type: 'error', code: 'not_participant' })
@@ -159,7 +160,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
       const { state, interaction } = synced.latest
       const actor = interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
         ? interaction.playerIndex : state.currentPlayerIndex
-      const myRooms = await creator.request.get(`${BACKEND_URL}/api/lobby/my-rooms`)
+      const myRooms = await creator.request.get(`${BACKEND_URL}/api/lobby/my-rooms`, { headers: browserRequestHeaders() })
       expect(myRooms.headers()['cache-control']).toBe('no-store')
       const summary: { rooms: MyActiveRoom[] } = await myRooms.json()
       const active = summary.rooms.find(room => room.id === roomId)
@@ -193,14 +194,14 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
 }
 
 test('player search requires authentication and two literal name characters; unknown guests reject creation', async ({ browser, request }) => {
-  const anonymous = await request.get(`${BACKEND_URL}/api/lobby/players?prefix=ab`)
+  const anonymous = await request.get(`${BACKEND_URL}/api/lobby/players?prefix=ab`, { headers: browserRequestHeaders() })
   expect(anonymous.status()).toBe(401)
   const context = await browser.newContext()
   try {
     await authenticate(context, `iv_invalid_${Date.now().toString(36)}`)
-    const short = await context.request.get(`${BACKEND_URL}/api/lobby/players?prefix=a`)
+    const short = await context.request.get(`${BACKEND_URL}/api/lobby/players?prefix=a`, { headers: browserRequestHeaders() })
     expect(short.status()).toBe(400)
-    const wildcard = await context.request.get(`${BACKEND_URL}/api/lobby/players?prefix=%25%25`)
+    const wildcard = await context.request.get(`${BACKEND_URL}/api/lobby/players?prefix=%25%25`, { headers: browserRequestHeaders() })
     expect(await wildcard.json()).toEqual({ ok: true, players: [] })
     const before = await roomIds(context)
     const page = await context.newPage()
