@@ -49,7 +49,7 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
       const user = row && await userFor(row.session_token)
       if (!user || !isAdmin(user.username)) { json(res, 401, { ok: false, code: 'invalid_handoff' }); return true }
       res.writeHead(303, { Location: `${prefix}/ops/d/open-agricola/operations`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
-        'Set-Cookie': serializeOperationsCookie(row!.session_token, { backendOrigin: getRequestOrigin(req) }) })
+        'Set-Cookie': serializeOperationsCookie(row!.session_token) })
       res.end(); return true
     }
     const sessionToken = requestSessionToken(req, path.startsWith('/ops/'))

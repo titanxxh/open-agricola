@@ -78,7 +78,7 @@ describe('cookie configuration boundaries', () => {
     vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://app.example.com')
     vi.stubEnv('PUBLIC_API_BASE', api)
     expect(() => assertProductionCookieConfig()).toThrow('PUBLIC_API_BASE')
-    expect(() => serializeSessionCookie('secret', { backendOrigin: 'https://fallback.example.com' })).toThrow('PUBLIC_API_BASE')
+    expect(() => serializeSessionCookie('secret')).toThrow('PUBLIC_API_BASE')
   })
 
   it('requires a configured production app even for operations cookies', () => {

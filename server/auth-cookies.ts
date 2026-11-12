@@ -20,7 +20,6 @@ const developmentNames = {
 type CookieKind = keyof typeof productionNames
 
 type CookieOptions = {
-  backendOrigin?: string
   requestOrigin?: string | string[]
 }
 

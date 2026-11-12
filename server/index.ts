@@ -602,14 +602,14 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       sendJson(res, 400, result)
       return
     }
-    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': [serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })] })
+    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': [serializeSessionCookie(result.token, { requestOrigin: req.headers.origin }), clearOperationsCookie()] })
     return
   }
 
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
     const token = (await getAuthToken(req))
     if (token) (await logout(token))
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': [clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })] })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': [clearSessionCookie({ requestOrigin: req.headers.origin }), clearOperationsCookie()] })
     return
   }
 
@@ -620,7 +620,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       ;(await logoutAll(user.id))
       wssCtx?.closeUserConnections(user.id)
     }
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': [clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })] })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': [clearSessionCookie({ requestOrigin: req.headers.origin }), clearOperationsCookie()] })
     return
   }
 
@@ -640,7 +640,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     await retryPendingAccountDeletion(user.id)
     const pending = !!await getDb().prepare('SELECT 1 FROM users WHERE id=?').get(user.id)
     sendJson(res, pending ? 202 : 200, { ok: true, pending, operationId: operation.id }, {
-      'Set-Cookie': [clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })],
+      'Set-Cookie': [clearSessionCookie({ requestOrigin: req.headers.origin }), clearOperationsCookie()],
     })
     return
   }
@@ -737,7 +737,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     wssCtx?.closeUserConnections(result.user.id)
     sendJson(res, 200, { ok: true, user: result.user }, {
       'Cache-Control': 'no-store',
-      'Set-Cookie': [serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })],
+      'Set-Cookie': [serializeSessionCookie(result.token, { requestOrigin: req.headers.origin }), clearOperationsCookie()],
     })
     return
   }
@@ -803,12 +803,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
         return
       }
-      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
+      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { requestOrigin: req.headers.origin }) })
       return
     }
 
     const ticket = (await createOnboardingTicket(profile))
-    sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket) })
     return
   }
 
