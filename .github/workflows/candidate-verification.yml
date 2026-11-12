@@ -100,7 +100,7 @@ jobs:
         working-directory: policy
         run: |
           pnpm install --frozen-lockfile
-          pnpm exec playwright install-deps chromium webkit
+          pnpm exec playwright install-deps chromium webkit firefox
       - name: Prepare candidate isolation
         id: isolation
         run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash policy/scripts/ci/setup-candidate-isolation.sh "$PWD/candidate" "$PWD/policy" "$(command -v node)" "$(id -u)"

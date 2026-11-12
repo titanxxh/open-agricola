@@ -138,9 +138,9 @@ describe('canonical architecture verification wiring', () => {
     const routine = fs.readFileSync(path.join(repoRoot, '.github/workflows/scoped-verification.yml'), 'utf8')
 
     expect(candidate).toContain("if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'")
-    expect(candidate).toContain('pnpm exec playwright install-deps chromium webkit')
+    expect(candidate).toContain('pnpm exec playwright install-deps chromium webkit firefox')
     expect(candidate).toContain('run: node candidate/scripts/ci/candidate-isolation.ts browsers')
-    expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: pnpm exec playwright install --with-deps chromium webkit")
+    expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: pnpm exec playwright install --with-deps chromium webkit firefox")
   })
 
   it('verifies public PRs and both integration branches with read-only permissions and preserves manual verification', () => {
