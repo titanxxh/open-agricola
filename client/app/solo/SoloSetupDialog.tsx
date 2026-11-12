@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../../services/browser-api'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { SoloCreationConfiguration, SoloCreationIssue } from '../../../shared/contract/game-creation'
@@ -39,7 +40,7 @@ export function SoloSetupDialog({ locale, initialConfiguration, issues = [], cre
     void (async () => {
       const loaded: WorkshopCard[] = []
       for (let page = 1; ; page++) {
-        const response = await fetch(`${API_BASE}/api/workshop/cards?scope=room&page=${page}`, { credentials: 'include', signal: controller.signal })
+        const response = await browserApiFetch(`${API_BASE}/api/workshop/cards?scope=room&page=${page}`, { credentials: 'include', signal: controller.signal })
         const body: unknown = await response.json()
         if (!response.ok || !body || typeof body !== 'object' || !('ok' in body) || body.ok !== true
           || !('cards' in body) || !Array.isArray(body.cards) || !body.cards.every(isWorkshopCard)) throw new Error('Card source response unavailable')

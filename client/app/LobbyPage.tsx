@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { lobbyNeedsTurnTab, useTurnTabTitle } from './use-turn-tab-title'
@@ -96,7 +97,7 @@ export function LobbyPage() {
         let page = 1
         let hasMore: boolean
         do {
-          const resp = await fetch(`${API_BASE}/api/workshop/cards?scope=room&page=${page}`)
+          const resp = await browserApiFetch(`${API_BASE}/api/workshop/cards?scope=room&page=${page}`)
           const data = await resp.json() as { ok: boolean; cards?: RoomWorkshopCard[]; hasMore?: boolean }
           if (!resp.ok || !data.ok || !Array.isArray(data.cards)) throw new Error('Failed to load workshop cards')
           cards.push(...data.cards)

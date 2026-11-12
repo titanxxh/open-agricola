@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from '../app/game-container-helpers'
@@ -68,7 +69,7 @@ function devShortcutUserFromLocation(): AuthUser | null {
 async function authFetch(path: string, body: Record<string, unknown>, retries = 2) {
   for (let attempt = 0; ; attempt++) {
     try {
-      const resp = await fetch(`${API_BASE}${path}`, {
+      const resp = await browserApiFetch(`${API_BASE}${path}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -109,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshSessionFn = useCallback(async () => {
     try {
-      const resp = await fetch(`${API_BASE}/api/auth/me`, {
+      const resp = await browserApiFetch(`${API_BASE}/api/auth/me`, {
         credentials: 'include',
       })
       const data = await resp.json()
@@ -144,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshSessionFn])
 
   const registerWithPasswordFn = useCallback(async (input: RegisterPasswordInput) => {
-    const resp = await fetch(`${API_BASE}/api/auth/register`, {
+    const resp = await browserApiFetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -154,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resendVerificationFn = useCallback(async (email: string) => {
-    const resp = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+    const resp = await browserApiFetch(`${API_BASE}/api/auth/resend-verification`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -165,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // No retry: a lost response could otherwise send a second email or replay a consumed link.
   const requestPasswordResetFn = useCallback(async (identifier: string): Promise<AuthResultMessage> => {
-    const resp = await fetch(`${API_BASE}/api/auth/password-reset/request`, {
+    const resp = await browserApiFetch(`${API_BASE}/api/auth/password-reset/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -175,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resetPasswordFn = useCallback(async (input: ResetPasswordInput): Promise<AuthResultMessage> => {
-    const resp = await fetch(`${API_BASE}/api/auth/password-reset/complete`, {
+    const resp = await browserApiFetch(`${API_BASE}/api/auth/password-reset/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -190,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshSessionFn])
 
   const logoutFn = useCallback(async () => {
-    await fetch(`${API_BASE}/api/auth/logout`, {
+    await browserApiFetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
     }).catch(() => {})
@@ -198,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logoutAllFn = useCallback(async () => {
-    await fetch(`${API_BASE}/api/auth/logout-all`, {
+    await browserApiFetch(`${API_BASE}/api/auth/logout-all`, {
       method: 'POST',
       credentials: 'include',
     }).catch(() => {})
@@ -206,10 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const apiFetchFn = useCallback(async (path: string, init?: RequestInit): Promise<Response> => {
-    const headers: Record<string, string> = {
-      ...(init?.headers as Record<string, string> ?? {}),
-    }
-    const resp = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers })
+    const resp = await browserApiFetch(`${API_BASE}${path}`, init)
     if (resp.status === 401) {
       const devUser = devShortcutUserFromLocation()
       setState((previous) => {

@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -95,7 +96,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     let cancelled = false
-    void fetch(`${API_BASE}/api/v1/issue-submission-connection`, {
+    void browserApiFetch(`${API_BASE}/api/v1/issue-submission-connection`, {
       credentials: 'include',
     })
       .then(async (resp) => {
@@ -269,7 +270,7 @@ export function SettingsPage() {
     setIssueConnectionMsg(null)
     setDisconnectingIssueConnection(true)
     try {
-      const resp = await fetch(`${API_BASE}/api/v1/issue-submission-connection`, {
+      const resp = await browserApiFetch(`${API_BASE}/api/v1/issue-submission-connection`, {
         method: 'DELETE',
         credentials: 'include',
       })

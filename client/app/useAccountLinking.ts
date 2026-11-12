@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../services/browser-api'
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../config'
 
@@ -20,7 +21,7 @@ function readHandoff(): Handoff | 'invalid' | null {
 }
 
 async function postLink(path: string, body: Record<string, string>): Promise<LinkResponse> {
-  const response = await fetch(path, {
+  const response = await browserApiFetch(path, {
     method: 'POST', credentials: 'include',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   })

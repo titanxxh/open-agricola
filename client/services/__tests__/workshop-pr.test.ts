@@ -8,10 +8,12 @@ it('reads saved status and explicitly recovers the same card through the configu
   vi.stubGlobal('fetch',requests)
   const {submissionStatus,startPropose} = await import('../workshop-pr')
   await submissionStatus('card-id')
-  expect(requests).toHaveBeenLastCalledWith('https://backend.example/api/workshop/cards/card-id/submit-review',{credentials:'include'})
+  expect(requests).toHaveBeenLastCalledWith('https://backend.example/api/workshop/cards/card-id/submit-review',{credentials:'include',headers:expect.any(Headers)})
   requests.mockResolvedValue(Response.json({ok:false,code:'creation_unknown'}))
   await startPropose('card-id','recover')
   expect(requests).toHaveBeenLastCalledWith('https://backend.example/api/workshop/cards/card-id/submit-review',{
-    credentials:'include',method:'POST',body:JSON.stringify({action:'recover'}),headers:{'Content-Type':'application/json'},
+    credentials:'include',method:'POST',body:JSON.stringify({action:'recover'}),headers:expect.any(Headers),
   })
+  expect(new Headers(requests.mock.lastCall?.[1]?.headers).get('content-type')).toBe('application/json')
+  expect(new Headers(requests.mock.lastCall?.[1]?.headers).get('x-oa-browser-protocol')).toBe('2')
 })

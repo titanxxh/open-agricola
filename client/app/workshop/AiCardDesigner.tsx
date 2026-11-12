@@ -1,3 +1,4 @@
+import { browserApiFetch } from '../../services/browser-api'
 import { t as translateMessage } from '../../../shared/i18n'
 /**
  * Workshop AI Card Designer.
@@ -35,7 +36,7 @@ import type {
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>
 
-const cookieApiFetch: ApiFetch = (path, init) => fetch(`${API_BASE}${path}`, {
+const cookieApiFetch: ApiFetch = (path, init) => browserApiFetch(`${API_BASE}${path}`, {
   ...init,
   credentials: 'include',
 })

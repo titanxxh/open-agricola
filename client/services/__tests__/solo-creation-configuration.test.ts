@@ -14,7 +14,7 @@ it('reads the private owner response using no-store and credentials', async () =
     ok: true, configuration: soloCreationConfiguration, issues: [],
   })
   expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/completed%2Fsource/creation-configuration'), {
-    credentials: 'include', cache: 'no-store', signal: undefined,
+    credentials: 'include', cache: 'no-store', signal: undefined, headers: expect.any(Headers),
   })
 })
 
