@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { startWorkshopGame, workshopGameUrl } from '../bootstrap'
 
 const query = '?page=game&player=p1&embedded=1&devMode=1'
+const localQuery = '?page=game&embedded=1&devMode=1&localSandbox=1'
 const origin = 'https://formal.titanxxh.com'
+const devParent = `${origin}/?page=workshop&player=p1&devMode=1`
 
 function embed(childQuery = query, parentUrl = `${origin}/?page=workshop`, base = '/') {
   vi.stubEnv('BASE_URL', base)
@@ -31,20 +33,47 @@ async function expectInert() {
 }
 
 describe('Workshop game entry', () => {
-  it.each(['', '&localSandbox=1', '&localSandbox=1&freshSandbox=1'])('starts the bounded sandbox %s', async suffix => {
-    embed(`${query}${suffix}`)
+  it.each([query, localQuery, `${localQuery}&freshSandbox=1`])('starts the bounded sandbox %s', async childQuery => {
+    embed(childQuery)
     const start = vi.fn().mockResolvedValue(undefined)
     await startWorkshopGame(document.body, start)
     expect(start).toHaveBeenCalledOnce()
   })
 
   it.each(['/', '/open-agricola/'])('preserves the %s application base', async base => {
-    embed(query, `${origin}${base}index.html?page=workshop&view=sandbox`, base)
+    const child = embed(query, `${origin}${base}index.html?page=workshop&view=sandbox`, base)
     const start = vi.fn().mockResolvedValue(undefined)
     await startWorkshopGame(document.body, start)
     expect(start).toHaveBeenCalledOnce()
+    vi.stubGlobal('window', child.parent)
     expect(workshopGameUrl(false, false)).toBe(`${base}workshop-game.html${query}`)
-    expect(workshopGameUrl(true, true)).toBe(`${base}workshop-game.html${query}&localSandbox=1&freshSandbox=1`)
+    expect(workshopGameUrl(true, true)).toBe(`${base}workshop-game.html${localQuery}&freshSandbox=1`)
+  })
+
+  it.each([
+    { dev: true, shortcut: '', childQuery: `${query}&localSandbox=1` },
+    { dev: false, shortcut: '1', childQuery: `${query}&localSandbox=1` },
+    { dev: false, shortcut: '', childQuery: localQuery },
+  ])('matches local sandbox identity to parent and build $dev/$shortcut', async ({ dev, shortcut, childQuery }) => {
+    vi.stubEnv('DEV', dev)
+    vi.stubEnv('VITE_ENABLE_DEV_AUTH_SHORTCUTS', shortcut)
+    const child = embed(childQuery, devParent)
+    const start = vi.fn().mockResolvedValue(undefined)
+    await startWorkshopGame(document.body, start)
+    expect(start).toHaveBeenCalledOnce()
+    vi.stubGlobal('window', child.parent)
+    expect(workshopGameUrl(true, false)).toBe(`/workshop-game.html${childQuery}`)
+  })
+
+  it.each([
+    [`${query}&localSandbox=1`, `${origin}/?page=workshop`],
+    [`${query}&localSandbox=1`, `${origin}/?page=workshop&player=p1`],
+    [localQuery, devParent],
+    [`${localQuery}&player=p2`, devParent],
+  ])('rejects local sandbox identity changes from %s under %s', async (childQuery, parent) => {
+    vi.stubEnv('DEV', true)
+    embed(childQuery, parent)
+    await expectInert()
   })
 
   it('rejects top-level access', async () => {

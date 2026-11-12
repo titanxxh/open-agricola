@@ -81,6 +81,22 @@ for (const suffix of ['&room=private-room', '&transport=ws', '&page=login', '&co
   })
 }
 
+for (const { parent, child } of [
+  { parent: '/?page=workshop', child: `${entry}&localSandbox=1` },
+  { parent: '/?page=workshop&player=p1&devMode=1', child: '/workshop-game.html?page=game&embedded=1&devMode=1&localSandbox=1' },
+]) {
+  test(`the local entry cannot change its parent's identity mode ${parent}`, async ({ page, baseURL }) => {
+    if (!baseURL) throw new Error('The frontend URL is required')
+    await page.route(`${baseURL}${parent}`, route => route.fulfill({
+      contentType: 'text/html', body: documentWithFrame(child),
+    }))
+    const observed = observeStartup(page)
+    await page.goto(parent)
+    await expect(page.frameLocator('iframe').getByRole('link', { name: 'Open Agricola', exact: true })).toBeVisible()
+    expect(observed).toEqual({ requests: [], sockets: [] })
+  })
+}
+
 test('the real top-level Workshop starts its game through the bounded entry', async ({ page }) => {
   const gameRequests: string[] = []
   page.on('request', request => {

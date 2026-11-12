@@ -29,6 +29,8 @@
 
 `workshop-game/bootstrap.ts` 只接纳应用 base 下 `workshop-game.html` 的固定 HTTP／浏览器沙盒参数。父窗口必须是同源、顶层且带 `page=workshop` 的主页面；直接打开、嵌套、跨源及意外模式均保持静态。准入后 `initialize.tsx` 只挂载 Locale、Auth 和 `GameContainerApi`；未登录时提供独立打开应用的链接，不渲染账号路由。自托管主 HTML 保留 `frame-ancestors 'none'`，只有独立对局 HTML 允许 `'self'`；Pages 同样执行 JavaScript 准入检查。覆盖：`bootstrap.test.ts`、`workshop-game-entry.spec.ts`、`frontend-hosting.test.ts`。
 
+服务器沙盒保留固定的 `player=p1` 路由。浏览器沙盒省略 `player`，沿用拥有本地配置的登录账号；只有启用开发认证快捷方式的构建中，显式携带 `player=p1&devMode=1` 的工坊父页面才会向子页面传递 `player=p1`。准入检查要求子页面参数与父页面的身份模式一致，不接受任意玩家覆盖。
+
 `application-bootstrap.ts` 在语言、Auth 和连接初始化前要求主应用位于顶层窗口；被嵌入时只显示独立打开根地址的链接。`browser-api.ts` 给正式 API 加当前协议版本，收到 reload-required 后停止后续请求并显示现有刷新界面。WS 使用匹配子协议；公开素材、无凭据 Viewer 与第三方模型请求保持各自运输方式。测试：`application-bootstrap.test.ts`、`browser-api.test.ts`、`hosted-password-login.spec.ts`。
 
 - 生产启动保留前端 origin。GitHub Pages 提供 `https://open-agricola.titanxxh.com/`，HTTP 与 WS 使用单独配置的 API origin。两个 HTTPS 子域同站，账号会话继续使用仅属于 API host 的 HttpOnly Cookie。本地偏好和草稿不会自动跨源迁移。见 ADR 0035。
