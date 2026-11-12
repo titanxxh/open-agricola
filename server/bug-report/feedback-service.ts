@@ -54,7 +54,7 @@ export class BugReportFeedbackService {
       if (!report) throw new FeedbackError('feedback_report_not_found', 404)
       const link = await this.db.prepare('SELECT root_id FROM bug_report_fix_links WHERE submission_id=?').get<{ root_id: string }>(report.submission_id)
       if (link && link.root_id !== report.submission_id) throw new FeedbackError('fix_requires_root', 409)
-      if (!await this.hasConfirmedRecipient(reports)) throw new FeedbackError('reporter_unavailable', 410)
+      await this.requireConfirmedRecipient(reports)
       if (!link) await this.requireConfirmed(report.submission_id)
       if (await this.fixRequest(report.submission_id, input.requestId, fingerprint)) return this.getReport(input.issueNumber)
       const root = await this.db.prepare('SELECT * FROM bug_report_fix_roots WHERE root_id=?').get<FixRootRow>(report.submission_id)
@@ -134,14 +134,16 @@ export class BugReportFeedbackService {
     if (latest?.kind !== 'confirmed_bug') throw new FeedbackError('fix_requires_confirmed_bug', 409)
   }
 
-  private async hasConfirmedRecipient(reports: ReportRow[]): Promise<boolean> {
+  private async requireConfirmedRecipient(reports: ReportRow[]): Promise<void> {
+    let liveRecipient = false
     for (const report of reports) {
       if (!report.reporter_user_id || await this.db.prepare('SELECT 1 FROM account_deletion_requests WHERE user_id=?').get(report.reporter_user_id)) continue
+      liveRecipient = true
       const latest = await this.db.prepare('SELECT kind FROM bug_report_feedback WHERE submission_id=? ORDER BY version DESC LIMIT 1')
         .get<{ kind: string }>(report.submission_id)
-      if (latest?.kind === 'confirmed_bug') return true
+      if (latest?.kind === 'confirmed_bug') return
     }
-    return false
+    throw new FeedbackError(liveRecipient ? 'fix_requires_confirmed_bug' : 'reporter_unavailable', liveRecipient ? 409 : 410)
   }
 
   private async lockFixGraph(issueNumbers: number[]): Promise<ReportRow[]> {
