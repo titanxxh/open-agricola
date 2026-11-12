@@ -46,6 +46,7 @@ import { StageBar } from '../components/board/StageBar'
 import { PlayerTabs } from '../components/board/PlayerTabs'
 import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
+import { InboxButton } from './Inbox'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
@@ -1617,7 +1618,7 @@ export const GameContainerApi = () => {
         : selfPlayer ? playerNames[selfPlayer.id] : null}
       isMyTurn={isMyTurn}
       embedded={isEmbedded}
-      menuExtra={gameEndControls}
+      menuExtra={<>{!isEmbedded && user ? <InboxButton className="header-menu-item" /> : null}{gameEndControls}</>}
       menuAlert={gameEndMenuAlert}
       onOpenEncyclopedia={encyclopediaEntry ? () => setEncyclopediaOpenedIn({ window: encyclopediaWindow }) : undefined}
       encyclopediaEntryRef={encyclopediaEntry ? encyclopediaEntryRef : undefined}
