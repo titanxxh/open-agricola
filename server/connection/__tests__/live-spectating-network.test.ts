@@ -3,6 +3,7 @@ import { GameContextStore } from '../../game/game-context-store'
 import { randomUUID } from 'node:crypto'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createLocalUserForTests, createSession } from '../../auth'
+import { authCookieNames } from '../../auth-cookies'
 import { createSoloRecoveryHost } from '../../__tests__/_helpers/solo-recovery-network'
 import { SoloNetworkPeer } from '../../__tests__/_helpers/formal-solo-network'
 import { discoverRoom } from '../../game/room-discovery'
@@ -26,7 +27,7 @@ async function game(options: { draft?: boolean; parents?: boolean; privacy?: 'in
   const connect = async (name: string) => {
     const user = await createLocalUserForTests(`watch_${name}_${randomUUID().slice(0, 8)}`, 'password123', name)
     const token = await createSession(user.id)
-    const peer = await SoloNetworkPeer.connect(running.runtime().url, `oa_session=${token}`)
+    const peer = await SoloNetworkPeer.connect(running.runtime().url, `${authCookieNames().session}=${token}`)
     peers.push(peer)
     return { user, peer }
   }
@@ -157,7 +158,7 @@ it('delivers draft seat disconnect and rejoin presence without another selection
     .toEqual({ type: 'playerDisconnected', playerIndex: guestIndex })
 
   const token = await createSession(guest.user.id)
-  const resumed = await SoloNetworkPeer.connect(running.runtime().url, `oa_session=${token}`)
+  const resumed = await SoloNetworkPeer.connect(running.runtime().url, `${authCookieNames().session}=${token}`)
   peers.push(resumed)
   resumed.socket.send(JSON.stringify({ type: 'joinRoom', roomId: room.id, intent: 'resume', name: 'Guest' }))
   const presence = await viewer.peer.wait((event): event is Extract<ServerEvent, { type: 'playerJoined' }> =>

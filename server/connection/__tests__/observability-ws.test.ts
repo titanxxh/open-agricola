@@ -4,6 +4,8 @@ import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { getDb } from '../../db'
+import { authCookieNames } from '../../auth-cookies'
+import { BROWSER_TEST_ORIGIN, openBrowserSocket } from '../../__tests__/_helpers/browser-auth'
 import { createOperationsHandler } from '../../observability/http'
 import { createCollector } from '../../observability/collector'
 import { recordingResources } from '../../__tests__/_helpers/recording'
@@ -25,6 +27,7 @@ let base: string
 let peer: WebSocket | undefined
 beforeAll(async () => {
   vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
+  vi.stubEnv('PUBLIC_APP_ORIGIN', BROWSER_TEST_ORIGIN)
   vi.stubEnv('OBSERVABILITY_METRICS_TOKEN', 'ws-scrape-token')
   await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -211,8 +214,8 @@ it('excludes closed authenticated sockets while a real database lock delays thei
   const { createLocalUserForTests, createSession } = await import('../../auth')
   const user = await createLocalUserForTests('online_observation', 'password123')
   const token = await createSession(user.id)
-  const busy = new WebSocket(base.replace('http:', 'ws:') + '/ws', { headers: { Cookie: `oa_session=${token}` } })
-  const idle = new WebSocket(base.replace('http:', 'ws:') + '/ws', { headers: { Cookie: `oa_session=${token}` } })
+  const busy = openBrowserSocket(base.replace('http:', 'ws:') + '/ws', `${authCookieNames().session}=${token}`)
+  const idle = openBrowserSocket(base.replace('http:', 'ws:') + '/ws', `${authCookieNames().session}=${token}`)
   const reply = (socket: WebSocket, requestId: string) => new Promise<ServerEvent>(resolve => {
     const receive = (raw: Buffer) => { const event = JSON.parse(raw.toString()); if (event.requestId === requestId) { socket.off('message', receive); resolve(event) } }
     socket.on('message', receive)

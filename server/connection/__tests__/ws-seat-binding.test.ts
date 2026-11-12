@@ -26,7 +26,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { createWsServer } from '../ws-server.ts'
 import { createLocalUserForTests, createSession } from '../../auth.ts'
-import { SESSION_COOKIE } from '../../auth-cookies.ts'
+import { authCookieNames } from '../../auth-cookies.ts'
+import { BROWSER_TEST_ORIGIN, openBrowserSocket } from '../../__tests__/_helpers/browser-auth'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter.ts'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
@@ -77,9 +78,9 @@ const openWs = async (
   sockets: TestSocket[],
   sessionToken?: string,
 ): Promise<TestSocket> => {
-  const ws = new WebSocket(baseUrl, sessionToken
-    ? { headers: { Cookie: `${SESSION_COOKIE}=${sessionToken}` } }
-    : undefined) as TestSocket
+  const ws = (sessionToken
+    ? openBrowserSocket(baseUrl, `${authCookieNames().session}=${sessionToken}`)
+    : new WebSocket(baseUrl)) as TestSocket
   ws.received = []
   attachCollector(ws)
   sockets.push(ws)
@@ -182,6 +183,7 @@ describe('WS seat binding', () => {
     db = await createTestDatabase()
     vi.spyOn(database, 'getDb').mockReturnValue(db)
     vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', BROWSER_TEST_ORIGIN)
     recording = await recordingResources(db)
     const persistence = new PostgresRoomPersistence(db)
     server = createServer()

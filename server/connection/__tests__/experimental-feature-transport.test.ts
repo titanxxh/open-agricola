@@ -3,6 +3,8 @@ import WebSocket from 'ws'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createSoloRecoveryHost } from '../../__tests__/_helpers/solo-recovery-network'
 import { createSession } from '../../auth'
+import { authCookieNames } from '../../auth-cookies'
+import { BROWSER_TEST_ORIGIN } from '../../__tests__/_helpers/browser-auth'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws'
 
 let host: Awaited<ReturnType<typeof createSoloRecoveryHost>> | undefined
@@ -54,7 +56,7 @@ it('uses empty or unknown capabilities with a real ordinary transport, durable r
   const token = await createSession(host.user.id), allocationId = randomUUID()
   await host.runtime().directory.allocate(`user:${host.user.id}`, allocationId)
   class AuthenticatedSocket extends WebSocket {
-    constructor(url: string) { super(url, { headers: { Cookie: `oa_session=${token}` } }) }
+    constructor(url: string, protocols?: string | string[]) { super(url, protocols, { headers: { Cookie: `${authCookieNames().session}=${token}`, Origin: BROWSER_TEST_ORIGIN } }) }
   }
   let firstId = true
   vi.stubGlobal('crypto', { randomUUID: () => { if (firstId) { firstId = false; return allocationId } return randomUUID() } })

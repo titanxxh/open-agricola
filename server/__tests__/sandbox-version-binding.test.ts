@@ -60,8 +60,7 @@ describe('sandbox version binding', () => {
       VALUES ('author', 'sandbox_author', 'Sandbox Author', 'x', ?)
     `).run(now))
     ;(await db.prepare(`
-      INSERT INTO sessions (token, user_id, expires_at, created_at)
-      VALUES ('sandbox-token', 'author', ?, ?)
+      INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version) VALUES ('sandbox-token', 'author', ?, ?, 2)
     `).run(now + 3_600_000, now))
     const original = (await createCard(db, {
       authorId: 'author',
