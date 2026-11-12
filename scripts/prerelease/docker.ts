@@ -26,6 +26,8 @@ const object = (value: unknown): Record<string, unknown> => {
 const parsed = (text: string): Record<string, unknown> => object(JSON.parse(text))
 
 export function assertCapacity(target: PrereleaseTarget, phase: 'build' | 'tool' | 'inspect-image' | 'app' | 'idle'): void {
+  command('bash', ['-euo', 'pipefail', '-c', 'source "$1"; backup_reap_tools', 'prerelease-reap', join(target.policyDirectory, 'scripts/backup-process.sh')],
+    { env: { BACKUP_ENVIRONMENT: target.targetId, BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + 30_000) } })
   if (command('docker', ['ps', '-q', '--filter', `name=^/${target.builder.container}$`])
     || command('docker', ['ps', '-q', '--filter', `label=org.open-agricola.backup.environment=${target.targetId}`])) {
     throw new Error(`Prerelease ${phase} requires its builder and other tools to be stopped`)

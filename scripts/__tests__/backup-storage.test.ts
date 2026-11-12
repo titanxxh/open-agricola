@@ -125,11 +125,13 @@ printf '%s\\n' "$*" >> "$PWD/docker-calls"
 printf 'docker:%s\\n' "$*" >> "$PWD/backup-events"
 printf '%s:%s\\n' "\${APP_UID:-$(id -u)}" "\${APP_GID:-$(id -g)}" >> "$PWD/docker-users"
 case "$*" in
-  'buildx inspect '*) printf '${JSON.stringify({ Driver: 'remote', Nodes: [{ Endpoint: 'docker-container://prerelease-test-builder' }] })}';;
+  'buildx ls --format {{json .Builder}}') printf '${JSON.stringify({ Name: 'prerelease-test', Driver: 'remote', Nodes: [{ Endpoint: 'docker-container://prerelease-test-builder' }] })}';;
+  'start prerelease-test-builder') touch "$PWD/builder-running";;
+  'stop --timeout 30 prerelease-test-builder') rm -f "$PWD/builder-running";;
   'buildx build '*) cat >/dev/null;;
   *'{{json .Config.Labels}}'*'prerelease-test-builder') printf '{"org.open-agricola.environment":"prerelease-test"}';;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
-  *'{{json .State}}'*'prerelease-test-builder') printf '{"Running":true}';;
+  *'{{json .State}}'*'prerelease-test-builder') if [[ -f "$PWD/builder-running" ]]; then printf '{"Running":true}'; else printf '{"Running":false}'; fi;;
   *'{{json .Config}}'*) printf '{"User":"1000:1000"}';;
   *'{{json .Mounts}}'*) printf '[]';;
   'image inspect --format {{.Id}}'*) printf '${policyImage}';;
@@ -139,10 +141,15 @@ case "$*" in
     [[ "\${BACKUP_TEST_FAILURE:-}" != orphan ]] || printf '${'d'.repeat(64)}'
     ;;
   'ps -aq '*) ;;
+  inspect*'org.open-agricola.backup.environment'*) printf stable ;;
+  inspect*'org.open-agricola.backup.run'*) printf abandoned-run ;;
   inspect*'org.open-agricola.backup.deadline'*) printf 0 ;;
+  inspect*'com.docker.compose.service'*) printf app ;;
+  inspect*'com.docker.compose.oneoff'*) printf True ;;
   'rm -f '*) ;;
   *' ps -q app') printf '${container}' ;;
   'ps -q --no-trunc '*) printf '${container}' ;;
+  'ps -q '*) ;;
   *'{{.State.Running}}'*) printf true ;;
   *'{{.Image}}'*) printf '${image}' ;;
   *'com.docker.compose.project'*) printf '${target?.project ?? 'backup-fixture'}' ;;

@@ -55,15 +55,23 @@ backup_job_cleanup() {
 }
 
 backup_reap_tools() {
-  local container deadline
-  local containers
-  containers="$(backup_command docker ps -aq --filter label=org.open-agricola.backup.run --filter "label=org.open-agricola.backup.environment=$BACKUP_ENVIRONMENT")"
+  local container deadline environment run service oneoff remaining containers
+  containers="$(backup_command docker ps -aq --filter label=org.open-agricola.backup.run --filter "label=org.open-agricola.backup.environment=$BACKUP_ENVIRONMENT")" || return
   for container in $containers; do
-    deadline="$(backup_command docker inspect --format '{{index .Config.Labels "org.open-agricola.backup.deadline"}}' "$container")"
-    # The caller holds the host lock. A zero-deadline maintenance tool cannot
-    # belong to another supported deployment still in progress.
-    if [[ "$deadline" =~ ^[0-9]+$ ]] && (( deadline == 0 || deadline <= $(date +%s%N) / 1000000 )); then
-      backup_command docker rm -f "$container" >/dev/null
+    [[ "$container" =~ ^[0-9a-f]{12,64}$ ]] || { echo 'Invalid backup tool inventory' >&2; return 1; }
+    environment="$(backup_command docker inspect --format '{{index .Config.Labels "org.open-agricola.backup.environment"}}' "$container")" || return
+    run="$(backup_command docker inspect --format '{{index .Config.Labels "org.open-agricola.backup.run"}}' "$container")" || return
+    deadline="$(backup_command docker inspect --format '{{index .Config.Labels "org.open-agricola.backup.deadline"}}' "$container")" || return
+    [[ "$environment" == "$BACKUP_ENVIRONMENT" && "$run" =~ ^[a-zA-Z0-9-]+$ && "$deadline" =~ ^[0-9]{1,15}$ ]] || continue
+    service="$(backup_command docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$container")" || return
+    oneoff="$(backup_command docker inspect --format '{{index .Config.Labels "com.docker.compose.oneoff"}}' "$container")" || return
+    [[ "$service" != app || "$oneoff" == True || "$oneoff" == true ]] || continue
+    # The caller holds the environment's operation/maintenance lock. Zero is
+    # the legacy maintenance deadline; named online tools use epoch milliseconds.
+    if (( 10#$deadline <= $(date +%s%N) / 1000000 )); then
+      backup_command docker rm -f "$container" >/dev/null || return
+      remaining="$(backup_command docker ps -aq --no-trunc --filter "id=$container")" || return
+      [[ -z "$remaining" ]] || { echo 'Expired backup tool was not removed' >&2; return 1; }
     fi
   done
 }

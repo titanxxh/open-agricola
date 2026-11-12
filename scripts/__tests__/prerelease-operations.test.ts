@@ -320,6 +320,7 @@ function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNet
   writeFileSync(authorityFile, JSON.stringify({ action: 'close', generationId: generation, targetOrigin: target.origin,
     targetId: target.targetId, completedAt: Date.now() }))
   writeFileSync(join(value.bin, 'bash'), `#!/bin/sh
+if [ "$1" = -euo ]; then exec /bin/bash "$@"; fi
 [ "$1" = '${process.cwd()}/backup-offsite.sh' ] || exit 88
 `, { mode: 0o700 })
   writeFileSync(join(value.bin, 'docker'), `#!/bin/sh
@@ -585,4 +586,108 @@ it('rejects a shared hostname even when the port or final DNS dot differs', () =
   }
   expect(() => parsePrereleaseTarget({ ...value.config, origin: 'https://api.agricola.test',
     formal: { ...value.config.formal, apiOrigin: 'https://api.agricola.test.' } })).toThrow('different hostname')
+})
+
+function ownerBackupFixture() {
+  const value = fixture(), target = parsePrereleaseTarget(value.config)
+  const buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`, generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5'
+  writeRuntime(target, { ...readRuntime(target), generation, buildId, installed: { buildId, image, installedAt: 1 }, mode: 'open' })
+  const tools = [
+    { id: 'e'.repeat(64), environment: target.targetId, run: 'abandoned-run', deadline: String(Date.now() - 60_000), service: 'tools', oneoff: 'True', removed: false },
+    { id: 'f'.repeat(64), environment: 'stable', run: 'foreign-run', deadline: '0', service: 'app', oneoff: 'True', removed: false },
+  ]
+  const state = { tools, failRemove: false, retainAfterRemove: false }
+  const statePath = join(value.temporary, 'tools.json'), completed = join(value.temporary, 'backup-completed')
+  const save = () => writeFileSync(statePath, JSON.stringify(state))
+  save()
+  writeFileSync(join(value.bin, 'bash'), `#!/bin/sh
+if [ "$1" = '${process.cwd()}/backup-offsite.sh' ]; then printf complete > '${completed}'; else exec /bin/bash "$@"; fi
+`, { mode: 0o700 })
+  writeFileSync(join(value.bin, 'docker'), String.raw`#!${process.execPath}
+const fs=require('node:fs'), args=process.argv.slice(2), line=args.join(' '), file=${JSON.stringify(statePath)};
+const state=JSON.parse(fs.readFileSync(file,'utf8'));
+fs.appendFileSync(${JSON.stringify(join(value.temporary, 'calls'))},line+'\n');
+const output=value=>process.stdout.write(typeof value==='string'?value:JSON.stringify(value));
+if(args[0]==='ps') {
+  if(line.includes('com.docker.compose.service=app'))output('${'c'.repeat(64)}');
+  else {
+    const filters=args.filter((_,i)=>args[i-1]==='--filter');
+    const selected=state.tools.filter(t=>!t.removed && filters.every(f=>{
+      if(f.startsWith('id='))return t.id===f.slice(3);
+      if(f.startsWith('label=org.open-agricola.backup.environment='))return t.environment===f.split('=').slice(2).join('=');
+      if(f==='label=org.open-agricola.backup.run')return t.run!=='';
+      if(f.startsWith('label=org.open-agricola.backup.run='))return t.run===f.split('=').slice(2).join('=');
+      return false;
+    })); output(selected.map(t=>t.id).join('\n'));
+  }
+} else if(args[0]==='inspect') {
+  const tool=state.tools.find(t=>t.id===args.at(-1)), format=args[2];
+  if(tool) {
+    const labels={'org.open-agricola.backup.environment':tool.environment,'org.open-agricola.backup.run':tool.run,'org.open-agricola.backup.deadline':tool.deadline,'com.docker.compose.service':tool.service,'com.docker.compose.oneoff':tool.oneoff};
+    if(format==='{{json .Config.Labels}}')output(labels);
+    else {const match=format.match(/index .Config.Labels "([^"]+)"/);if(match)output(labels[match[1]]??'<no value>');}
+  } else if(format==='{{.Image}}')output(${JSON.stringify(image)});
+  else if(format==='{{json .}}')output({Image:${JSON.stringify(image)},State:{Running:true},HostConfig:{Memory:536870912},Config:{Labels:{'com.docker.compose.project':${JSON.stringify(target.project)},'com.docker.compose.service':'app'}}});
+  else if(format.includes('com.docker.compose.project'))output(${JSON.stringify(target.project)});
+} else if(args[0]==='rm') {
+  if(state.failRemove)process.exit(42);
+  if(!state.retainAfterRemove)for(const tool of state.tools)if(args.includes(tool.id))tool.removed=true;
+  fs.writeFileSync(file,JSON.stringify(state));
+} else if(args[0]==='compose' && line.endsWith('ps -a -q app'))output('${'c'.repeat(64)}');
+else if(line.includes('exec -T app node'))output({buildId:${JSON.stringify(buildId)},channel:'prerelease',generation:${JSON.stringify(generation)}});
+`, { mode: 0o700 })
+  return { ...value, target, state, save, completed, backup: () => value.invoke('backup', '--expected-current', buildId),
+    remaining: () => JSON.parse(readFileSync(statePath, 'utf8')).tools.filter((tool: { removed: boolean }) => !tool.removed) }
+}
+
+it('reaps an expired owned tool before public online backup capacity admission', () => {
+  const value = ownerBackupFixture()
+  const result = value.backup()
+  expect(result.status, result.stderr).toBe(0)
+  expect(existsSync(value.completed)).toBe(true)
+  expect(value.remaining()).toEqual([value.state.tools[1]])
+  expect(value.calls()).toContain(`rm -f ${'e'.repeat(64)}`)
+  expect(value.calls()).not.toMatch(/stop.*app|restart.*app|rm -f c{64}|rm -f f{64}/)
+})
+
+
+it.each(['live', 'missing-run', 'bad-run', 'missing-deadline', 'bad-deadline', 'oversized-deadline', 'managed-app'])('preserves a %s container and refuses public backup overlap', kind => {
+  const value = ownerBackupFixture(), tool = value.state.tools[0]
+  if (kind === 'live') tool.deadline = String(Date.now() + 60_000)
+  if (kind === 'missing-run') tool.run = ''
+  if (kind === 'bad-run') tool.run = 'invalid run'
+  if (kind === 'missing-deadline') tool.deadline = ''
+  if (kind === 'bad-deadline') tool.deadline = 'invalid'
+  if (kind === 'oversized-deadline') tool.deadline = '999999999999999999999'
+  if (kind === 'managed-app') { tool.service = 'app'; tool.oneoff = 'False' }
+  value.save()
+  const result = value.backup()
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('builder and other tools to be stopped')
+  expect(existsSync(value.completed)).toBe(false)
+  expect(value.remaining()).toEqual(value.state.tools)
+  expect(value.calls()).not.toMatch(/rm -f|stop.*app|restart.*app/)
+})
+
+it('leaves foreign expired tools untouched when public backup has no owned overlap', () => {
+  const value = ownerBackupFixture()
+  value.state.tools[0].environment = 'prerelease-other'; value.save()
+  const result = value.backup()
+  expect(result.status, result.stderr).toBe(0)
+  expect(existsSync(value.completed)).toBe(true)
+  expect(value.remaining()).toEqual(value.state.tools)
+  expect(value.calls()).not.toMatch(/rm -f|stop.*app|restart.*app/)
+})
+
+it.each(['failed-remove', 'still-present'])('fails public backup closed after %s expired tool cleanup', failure => {
+  const value = ownerBackupFixture()
+  if (failure === 'failed-remove') value.state.failRemove = true
+  else value.state.retainAfterRemove = true
+  value.save()
+  const result = value.backup()
+  expect(result.status).not.toBe(0)
+  expect(existsSync(value.completed)).toBe(false)
+  expect(value.remaining()).toEqual(value.state.tools)
+  expect(value.calls()).toContain(`rm -f ${'e'.repeat(64)}`)
+  expect(value.calls()).not.toMatch(/scripts\/prerelease\/storage.ts inspect|stop.*app|restart.*app|rm -f c{64}|rm -f f{64}/)
 })
