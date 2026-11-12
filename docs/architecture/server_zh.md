@@ -134,13 +134,15 @@ server/custom-code/
 
 ## HTTP 端点
 
+`auth-cookies.ts` 管理 Cookie 家族；`auth.ts` 验证 session 策略版本。迁移 046 废止旧认证。`request-auth.ts` 按来源及协议准入 HTTP/WS 请求，显式区分导航、服务及 ops 例外。测试：`{request-auth,auth-routes,postgres-auth,observability-http}.test.ts`。
+
 HTTP 负责产品 API、运维与调试。WebSocket 命令仍是对局同步主链路；校验端点不写规则状态。
 
 - `beta-access-{routes,store}.ts` 负责管理员 `/api/admin/beta-access` 授予；`experimental-features.ts` 以一次最新读取计算 `/api/auth/me` 资格。测试：`beta-access-routes.test.ts`。
 - `GET /api/health`、`/api/rooms`、`/api/game/state` 与 `/cards-manifest.json` 提供健康、发现、快照与 metadata。
 - `POST /api/game/new` 经 `game/game-setup-options.ts` 映射 WebSocket 创建选项；`load`、`dev/*` 与 `new-sandbox` 为调试及工坊入口。
 - `oauth/{handler,store}.ts` 负责 provider 发起、回调与完成。PKCE 绑定账号关联，浏览器 challenge 绑定注册票据；显式无效凭证不回退 Cookie 身份。账号、身份、邀请与票据消费同事务提交。回调用 fragment，设置 `no-store` 与 `no-referrer`。
-- `prerelease-authority{,-routes}.ts` 负责 `/api/prerelease/*` 的正式会话交接、目标 key 兑换/复核及持久撤销/删除回执。迁移 037/039 捕获撤销与代次清除；账号删除等待仍保留的投影清理。`prerelease-lifecycle-routes.ts` 提供仅正式管理员可用的退役及恢复审计，以原生身份清单和最新来源事实控制开放。`prerelease-identity.ts` 固定绝对 30 秒、来源及七天期限。目标默认关闭。HTTPS 同源部署的已认证入口 GET 允许缺少 `Origin`；显式来源及交接 POST 仍绑定配置的正式来源。测试：`{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`；政策见 ADR 0042。
+- `prerelease-authority{,-routes}.ts` 负责 `/api/prerelease/*` 的正式会话交接、目标 key 兑换/复核及持久撤销/删除回执。迁移 037/039 捕获撤销与代次清除；账号删除等待仍保留的投影清理。`prerelease-lifecycle-routes.ts` 提供仅正式管理员可用的退役及恢复审计，以原生身份清单和最新来源事实控制开放。`prerelease-identity.ts` 固定绝对 30 秒、来源及七天期限。目标默认关闭。浏览器入口与交接遵循统一来源策略及当前协议；仅正式前后端同源且具备可信 same-origin 元数据时允许缺失 Origin。测试：`{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`；政策见 ADR 0042。
 
 认证测试：`auth-routes.test.ts`、`oauth/__tests__/store.test.ts`、`e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`。
 

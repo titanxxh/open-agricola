@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { PRERELEASE_IDENTITY_PROTOCOL } from '../shared/contract/prerelease-identity'
 import type { PostgresDatabase } from './database/postgres'
 import { consumeRateLimit } from './database/rate-limit'
+import { httpAdmission } from './request-auth'
+import { normalizeOrigin } from './http-origin'
 import { configuredFormalAppOrigin, configuredPrereleaseTarget, PrereleaseAuthority, PrereleaseAuthorityError, type PrereleaseTarget } from './prerelease-authority'
 
 const secretMatches = (provided: string, expected: string) => timingSafeEqual(
@@ -60,7 +62,8 @@ export function createPrereleaseAuthorityHandler({ db, getSourceToken, now = Dat
     const browser = path === '/api/prerelease/entry' || path === '/api/prerelease/handoffs'
     try {
       if (browser) {
-        if (!sourceOrigin || req.headers.origin !== sourceOrigin) {
+        const sameOrigin = req.headers.origin === undefined && sourceOrigin === normalizeOrigin(process.env.PUBLIC_API_BASE)
+        if (!sourceOrigin || !httpAdmission(req).ok || (req.headers.origin !== sourceOrigin && !sameOrigin)) {
           throw new PrereleaseAuthorityError('csrf_rejected', 403)
         }
         if (path === '/api/prerelease/entry' && req.method === 'GET') {

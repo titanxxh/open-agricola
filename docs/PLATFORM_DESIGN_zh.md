@@ -36,11 +36,15 @@
 - WebSocket 协议仍支持 `{ type: 'auth', token: '...' }` 显式认证
 - 单服务器不需要 JWT 的无状态优势；服务端 session 支持即时吊销
 
+正式认证使用 Secure、HttpOnly、Path=/ 的 `__Host-` Cookie 家族，覆盖 session、OAuth state、onboarding 与 ops。`auth-cookies.ts` 统一名称和严格读写，重复值或 Cookie/Bearer 混用均拒绝；HTTP 开发使用独立名字，生产要求明确 HTTPS 配置。迁移 046 废止旧 session 及未完成的 OAuth/onboarding/ops 票据，用户重新登录，账号和对局保留；邮件验证不再替换浏览器 session。
+
+`request-auth.ts` 对私有 HTTP 读写和 WS upgrade 校验精确来源与浏览器协议，不从 Host 或转发头扩大信任。原生 Bearer/auth 消息不带 Cookie/Origin，所有运输方式统一验证当前 session 版本。OAuth/ops 导航有显式策略。`main.tsx` 在认证和连接初始化前拒绝被嵌入的应用；独立无凭据 Viewer 仍可嵌入。`browser-api.ts` 发送版本头并提示旧页面刷新。OAuth 先通过 POST 准备，再导航到 provider。
+
 ### A2.1. 预发布的正式身份权威
 
 `server/prerelease-authority{,-routes}.ts` 与 `shared/contract/prerelease-identity.ts` 定义 version-1、绑定目标的权威 API。正式站拥有账号和 Beta 资格判定，管理员规则沿用正式站。预发布只取得 user ID、username、display name 与授权状态，不取得邮箱、密码/OAuth 材料、正式登录 token 或数据库访问权。
 
-`PUBLIC_APP_ORIGIN` 固定正式 HTTPS 根，`PUBLIC_API_BASE` 固定正式 API origin。预发布必须与二者使用不同 Cookie site，复用包含私有后缀的公共后缀表比较。同一 site 下更换 hostname 或端口仍不足以隔离候选 JavaScript 可设置的父域 Cookie。owner 和正式配置入口均拒绝同 site 目标。网关在 HTTP 与 WebSocket 响应中拒绝候选 Domain Cookie 及对网关验收 Cookie 的覆盖，保留 host-only 预发布 Cookie。独立的 `PRERELEASE_APP_ORIGIN` 与仅服务端持有的 `PRERELEASE_IDENTITY_SERVICE_KEY` 配置目标；缺失或无效配置保持关闭。只有 owner 验收后显式设置 `PRERELEASE_ENTRY_ENABLED=true` 才开放入口、签发和兑换；关闭入口仍允许复核、事件及完成回执。正式 Pages 使用 `/`，预发布从 `/open-agricola/auth/start` 发起，在 `/open-agricola/auth/handoff` 接收回调。预发布先将随机 verifier 存入 host-only HttpOnly Cookie。正式浏览器仅将 S256 challenge 交给需正式登录的 `/api/prerelease/handoffs`，严格核对 Origin 和固定返回根。一分钟 code 只随 callback fragment 交接。仅目标服务可调用 `/exchange`，原子核对 verifier、来源登录和当前 Beta 资格，消费 code 并记录不透明 grant 关联；grant ID 不能登录正式 API。
+`PUBLIC_APP_ORIGIN` 固定正式 HTTPS 根，`PUBLIC_API_BASE` 固定正式 API origin。预发布可以使用 `https://pre.titanxxh.com`，但 hostname 必须与正式前端和 API 均不同。同站不代表可信来源；正式凭据 CORS 和请求准入不包含 pre。网关仅允许声明的预发布 Cookie，保护 owner Cookie，并过滤 Domain Cookie 与 Clear-Site-Data。开放前须核对真实正式 browser-policy 和 Pages 证据，能力过期时网关关闭入口。同父域 Cookie 配额仍是可用性限制。owner 流程见 HOW_TO_DEPLOY.md。独立的 `PRERELEASE_APP_ORIGIN` 与仅服务端持有的 `PRERELEASE_IDENTITY_SERVICE_KEY` 配置目标；缺失或无效配置保持关闭。只有 owner 验收后显式设置 `PRERELEASE_ENTRY_ENABLED=true` 才开放入口、签发和兑换；关闭入口仍允许复核、事件及完成回执。正式 Pages 使用 `/`，预发布从 `/open-agricola/auth/start` 发起，在 `/open-agricola/auth/handoff` 接收回调。预发布先将随机 verifier 存入 host-only HttpOnly Cookie。正式浏览器仅将 S256 challenge 交给需正式登录的 `/api/prerelease/handoffs`，严格核对 Origin 和固定返回根。一分钟 code 只随 callback fragment 交接。仅目标服务可调用 `/exchange`，原子核对 verifier、来源登录和当前 Beta 资格，消费 code 并记录不透明 grant 关联；grant ID 不能登录正式 API。
 
 目标 `/status` 分别提供账号、来源登录与 Beta 状态；转发或缓存必须保留绝对 `confirmedAt`、`validUntil` 及原来源/grant 期限。确认最多 30 秒且计入传输时间，失败不续期；grant 最长七天且不超过来源。收到已知失效立即替换旧的有效结果。`/events` 返回持久、未确认的来源撤销、账号删除与 Beta 变更；`/acknowledgements` 记录目标幂等完成回执。删除正式会话统一覆盖当前退出、全部退出和密码重置，不扩大普通改密码的既有语义；正式账号删除等待目标删除回执。跨正式实例共享的额度为每账号每分钟十次交接、目标身份服务每分钟 600 次请求。
 
