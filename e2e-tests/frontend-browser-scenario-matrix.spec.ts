@@ -160,8 +160,7 @@ const openWorkshopSandbox = async (
       enable_farmers_of_the_moor?: boolean
     }
   }
-  const saveBody = await saveResponse.text()
-  expect(saveResponse.ok(), `${saveResponse.status()} ${saveBody}`).toBe(true)
+  expect(saveResponse.status()).toBe(200)
   expect(saveRequest.settings).toMatchObject({
     enable_through_the_seasons: variants.seasons,
     enable_farmers_of_the_moor: variants.moor,

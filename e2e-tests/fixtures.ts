@@ -70,7 +70,9 @@ export async function finishHotseatOpening(page: Page) {
   const confirm = page.getByRole('button', { name: /^(Confirm switch|确认切换)$/ })
   const forest = page.locator('[data-action-id="forest"] button:enabled').first()
   const choice = page.locator('.interaction-bar [data-choice-value]:enabled').first()
+  const cancelExchange = page.locator('.exchange-overlay').getByRole('button', { name: /^(Cancel|取消)$/ })
   const nextStep = async () => {
+    if (await cancelExchange.isVisible()) return 'cancel-exchange'
     if (await handoff.isVisible()) return 'handoff'
     if (await skip.isVisible()) return 'skip'
     if (await confirm.isVisible()) return 'confirm'
@@ -82,7 +84,8 @@ export async function finishHotseatOpening(page: Page) {
     const next = await nextStep()
     if (next === 'work') return
     if (next === 'waiting') continue
-    const control = next === 'handoff' ? handoff.getByRole('button', { name: /continue$|，开始$/ })
+    const control = next === 'cancel-exchange' ? cancelExchange
+      : next === 'handoff' ? handoff.getByRole('button', { name: /continue$|，开始$/ })
       : next === 'skip' ? skip : next === 'confirm' ? confirm : choice
     const value = await control.getAttribute('data-choice-value')
     await control.click()
