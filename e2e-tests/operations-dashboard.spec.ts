@@ -110,7 +110,7 @@ test('independent dashboards render registration, rooms and durable player openi
       'prom/prometheus:v3.15.0', '--config.file=/etc/prometheus/prometheus.yml', `--web.listen-address=127.0.0.1:${prometheusPort}`])
     const grafanaName = 'oa-ops-grafana-' + randomUUID()
     names.push(grafanaName)
-    docker(['run', '-d', '--name', grafanaName, '--network', 'host', '--tmpfs', '/var/lib/grafana:exec,uid=472,gid=0',
+    docker(['run', '-d', '--name', grafanaName, '--network', 'host', '--tmpfs', '/var/lib/grafana:exec,uid=472,gid=0', '--tmpfs', '/tmp:uid=472,gid=0,mode=0700',
       '-e', 'GF_SERVER_HTTP_ADDR=127.0.0.1', '-e', `GF_SERVER_HTTP_PORT=${grafanaPort}`, '-e', `GF_SERVER_ROOT_URL=${base}/ops/`,
       '-e', `PROMETHEUS_URL=http://127.0.0.1:${prometheusPort}`, '-v', `${resolve('operations/grafana/grafana.ini')}:/etc/grafana/grafana.ini:ro`,
       '-v', `${resolve('operations/grafana/provisioning')}:/etc/grafana/provisioning:ro`, '-v', `${resolve('operations/grafana/dashboards')}:/etc/grafana/dashboards:ro`, 'grafana/grafana:13.2.3'])
