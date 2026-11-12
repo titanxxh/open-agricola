@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { candidateExecution, executeCandidate } from './candidate-isolation.ts'
+import { candidateExecution, executeCandidate, printVerificationOutput } from './candidate-isolation.ts'
 import { createHash } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -371,7 +371,7 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
   const sha = fullSha(option('--sha'))
   if (mode === 'source') {
     assertCandidateCheckout(cwd, sha)
-    console.log(JSON.stringify({ status: 'matched', sha }))
+    printVerificationOutput(JSON.stringify({ status: 'matched', sha }))
     return 0
   }
   if (mode === 'manifest') {
@@ -379,7 +379,7 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
     if (process.env.GITHUB_OUTPUT) {
       appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\nconfiguration=${manifest.configuration}\nmatrix=${JSON.stringify(manifest.matrix)}\ntasks=${manifest.matrix.task.join(',')}\nbinding=${manifest.binding}\n`)
     }
-    console.log(JSON.stringify(manifest))
+    printVerificationOutput(JSON.stringify(manifest))
     return 0
   }
   if (mode === 'run-task' && id) {
@@ -394,11 +394,11 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
   }
   if (mode === 'check') {
     const result = checkCandidateVerification(cwd, option('--repository'), sha)
-    console.log(JSON.stringify(result, null, 2))
+    printVerificationOutput(JSON.stringify(result, null, 2))
     return result.status === 'passed' ? 0 : 1
   }
   if (mode === 'request') {
-    console.log(JSON.stringify(requestCandidateVerification(cwd, option('--repository'), sha, option('--ref'), option('--tasks', 'all'))))
+    printVerificationOutput(JSON.stringify(requestCandidateVerification(cwd, option('--repository'), sha, option('--ref'), option('--tasks', 'all'))))
     return 0
   }
   throw new Error('Usage: candidate-verification.ts manifest|source|run-task|check|request --sha <full SHA> [options]')
@@ -407,7 +407,7 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { process.exitCode = candidateVerificationCli(process.cwd(), process.argv.slice(2)) }
   catch (error) {
-    console.error(error instanceof Error ? error.message : String(error))
+    printVerificationOutput(error instanceof Error ? error.message : String(error), 'stderr')
     process.exitCode = 1
   }
 }

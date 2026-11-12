@@ -91,11 +91,19 @@ export function displayCandidateLog(path: string): string {
     bytes = Buffer.alloc(length)
     readSync(fd, bytes, 0, length, size - length)
   } finally { closeSync(fd) }
-  return bytes.toString('utf8')
-    .replace(/::/g, '%3A%3A').replace(/##\[/g, '%23%23[').replace(/./gs, character => {
-      const code = character.charCodeAt(0)
-      return code < 32 && code !== 10 || code === 127 ? `%${code.toString(16).padStart(2, '0').toUpperCase()}` : character
-    })
+  return escapeWorkflowCommands(bytes.toString('utf8'))
+}
+
+export function escapeWorkflowCommands(message: string): string {
+  return message.replace(/::/g, '%3A%3A').replace(/##\[/g, '%23%23[').replace(/./gs, character => {
+    const code = character.charCodeAt(0)
+    return code < 32 && code !== 10 || code === 127 ? `%${code.toString(16).padStart(2, '0').toUpperCase()}` : character
+  })
+}
+
+export function printVerificationOutput(message: string, stream: 'stdout' | 'stderr' = 'stdout'): void {
+  if (stream === 'stderr') console.error(escapeWorkflowCommands(message))
+  else console.log(escapeWorkflowCommands(message))
 }
 
 export function executeCandidate(execution: CandidateExecution, command: string, args: string[], phase: string, environment: Record<string, string> = {}): number {
@@ -118,11 +126,11 @@ export function executeCandidate(execution: CandidateExecution, command: string,
     ], { stdio: ['ignore', fd, fd] })
     if (result.error) throw result.error
     return result.status ?? 1
-  } finally { closeSync(fd); console.log(displayCandidateLog(log)) }
+  } finally { closeSync(fd); printVerificationOutput(displayCandidateLog(log)) }
 }
 
 export function stopCandidateExecution(): void {
-  console.log(execFileSync('/usr/bin/sudo', ['-n', '/usr/bin/bash', join(import.meta.dirname, 'stop-candidate-isolation.sh'), String(process.getuid?.())], { encoding: 'utf8', stdio: 'pipe' }).trim())
+  printVerificationOutput(execFileSync('/usr/bin/sudo', ['-n', '/usr/bin/bash', join(import.meta.dirname, 'stop-candidate-isolation.sh'), String(process.getuid?.())], { encoding: 'utf8', stdio: 'pipe' }).trim())
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -141,5 +149,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       if (!args) throw new Error('Usage: candidate-isolation.ts smoke|install|browsers|finish <source> <sha>')
       if (executeCandidate(execution, command, args, mode) !== 0) throw new Error(`Candidate ${mode} failed`)
     }
-  } catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1 }
+  } catch (error) { printVerificationOutput(error instanceof Error ? error.message : String(error), 'stderr'); process.exitCode = 1 }
 }
