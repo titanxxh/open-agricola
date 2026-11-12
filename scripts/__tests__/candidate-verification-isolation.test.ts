@@ -179,3 +179,29 @@ it('shares the public dependency file between CI service preparation and existin
   expect(read.status, read.stderr).toBe(0)
   expect(JSON.parse(read.stdout)).toEqual({ database: 'postgres://inert@127.0.0.1/inert_test', bucket: 'agricola-test' })
 })
+
+it('keeps a temporary launcher from overwriting its parent candidate dependency file', () => {
+  const value = fixture(), repository = resolve(import.meta.dirname, '../..')
+  const launcher = join(value.root, 'launcher'), bin = join(launcher, 'node_modules/.bin')
+  mkdirSync(bin, { recursive: true }); mkdirSync(join(launcher, 'scripts'))
+  execFileSync('git', ['init', '-q', launcher])
+  writeFileSync(join(launcher, 'restart-local.sh'), readFileSync(join(repository, 'restart-local.sh')))
+  for (const name of ['tsx', 'vite', 'lsof']) writeFileSync(join(bin, name), '#!/bin/sh\nexit 42\n', { mode: 0o700 })
+  writeFileSync(join(launcher, 'scripts/local-services.mjs'), `
+    import { mkdirSync, writeFileSync } from 'node:fs'
+    import { join } from 'node:path'
+    mkdirSync(process.env.SHARED_DATA_DIR, { recursive: true })
+    writeFileSync(join(process.env.SHARED_DATA_DIR, 'dependencies.local'), 'OBSERVABILITY_ENABLED=false\\n')
+  `)
+  const parent = join(value.work, 'data/dependencies.local')
+  mkdirSync(join(value.work, 'data'))
+  writeFileSync(parent, 'inert parent dependency sentinel\n')
+  const env = candidateEnvironment({ uid: 61000, gid: 61000, home: value.root, work: value.work, node: process.execPath,
+    socket: join(value.root, 'inert-socket'), privateDirectory: value.output })
+  const result = spawnSync('/bin/bash', [join(launcher, 'restart-local.sh')], { cwd: launcher, encoding: 'utf8', env: {
+    ...env, PATH: `${bin}:${env.PATH}`, PNPM_BIN: join(bin, 'tsx'), REPLAY_VIEWER_BUILD_ID: 'inert-viewer', GAME_BUILD_ID: 'inert-game',
+  } })
+  expect(result.status, result.stderr).toBe(42)
+  expect(readFileSync(parent, 'utf8')).toBe('inert parent dependency sentinel\n')
+  expect(readFileSync(join(launcher, 'data/dependencies.local'), 'utf8')).toBe('OBSERVABILITY_ENABLED=false\n')
+})

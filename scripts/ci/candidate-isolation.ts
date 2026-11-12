@@ -112,7 +112,7 @@ export function candidateEnvironment(execution: CandidateExecution, environment:
     PATH: `${dirname(execution.node)}:/usr/local/bin:/usr/bin:/bin`,
     XDG_RUNTIME_DIR: '/run/user/61000', DOCKER_HOST: `unix://${execution.socket}`,
     CI: 'true', GITHUB_ACTIONS: 'true', TERM: 'dumb', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
-    SHARED_DATA_DIR: join(execution.work, 'data'), LOCAL_SERVICES_DIR: join(execution.work, 'data'), REPLAY_VIEWER_ROOT: join(execution.home, 'replay-viewers'),
+    REPLAY_VIEWER_ROOT: join(execution.home, 'replay-viewers'),
     ...environment,
   }
 }
