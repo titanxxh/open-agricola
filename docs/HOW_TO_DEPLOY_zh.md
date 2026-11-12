@@ -102,20 +102,23 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 
 ### 操作隔离的预发布目标
 
-使用可信 main checkout、Node 24.15+、Docker Compose、Buildx、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、离站身份、builder 和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
+使用可信 main checkout、Node 24.15+、Docker Compose、Buildx、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、依赖网络与可选代理网络、离站身份、builder 和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
 
 owner #1662 负责独立源库、只读备份 role、独立一次性验证库/role、私有 bucket、app 的 `live/` 与工具的 `test/` 权限、依赖网络、1–40 的连接数限制、存储 quota、离站账户/目录及可用的受限 builder。撤销 PUBLIC CONNECT，使三个 pre role 均不能连接正式库、验证 role 不能连接源库。app 对象凭据必须不能读取正式 bucket 或验证 scratch；工具只获得源数据读取及自己的 scratch 操作权限。安装前真实权限探测不通过则阻断。`budget-check` 测量本地、数据库和对象字节数及主机余量，超额会关闭入口；它补充 owner 的 quota，不创建宿主 quota。
 
 builder 必须是运行中的非 privileged rootless BuildKit 容器，用户 `1000:1000`，标签 `org.open-agricola.environment=<targetId>`，读回的 CPU、内存、PID 限额不超过清单。只允许在 `/home/user/.local/share/buildkit` 挂载自己的状态 volume。指定 Buildx **remote** driver 的 endpoint 为 `docker-container://<builder.container>`，见 [Docker 文档](https://docs.docker.com/build/builders/drivers/remote/)。#1668 前 owner 必须在实际宿主完成受限真实构建。本次本机 rootless daemon 因 Ubuntu 用户命名空间限制启动失败，没有改宿主策略或使用 privileged 回退；命令 harness 通过不能证明 builder 或部署可用。
 
-一次性安装 `deploy/prerelease.Caddyfile.example` 的固定路由。正式生命周期 API 尚未部署时，只需规划 UUID 并启动维护网关：
+若 Caddy 在容器内运行，将可选 `proxyNetwork` 设为它现有的入口网络，例如 `open-agricola_default`，并安装 `deploy/prerelease.Caddyfile.example` 的固定路由。只有可信网关加入该外部网络，使用从 origin 派生的别名和容器端口 `5176`。Caddy 路由使用 `plan` 输出的 `proxyUpstream`；Caddy 容器里的 `127.0.0.1` 指向 Caddy 自己。候选 app 继续只接自己的 default/依赖网络，工具只接依赖网络。选择入口网络，不能选择正式存储网络。解析器拒绝将 pre 依赖/default 网络或 Docker 内置网络作为代理网络。Compose 重建会保留网关网络和别名。替换恢复保留 origin 和别名，只有源网关退役并停止后才启动新网关。若 Caddy 直接运行在宿主上，省略 `proxyNetwork` 并转发到 `127.0.0.1:<target.port>`；两种模式均保留 loopback 绑定。初装前确定这一密封拓扑。
+
+正式生命周期 API 尚未部署时，先记录一个 UUID，再启动维护网关。先准备两个私有凭据文件和固定语言包；`plan` 即使带 `--ssh` 也验证本机路径，因此要在持有这些文件的宿主执行。预算必须固定为最终计划值，不能为维护初装临时调小：
 
 ```bash
 ./deploy-prerelease.sh plan --config "$pre_config"
 ./deploy-prerelease.sh initialize --config "$pre_config" --expected-current empty --generation "$pre_generation"
+./deploy-prerelease.sh status --config "$pre_config" --expected-current empty
 ```
 
-此阶段不需要正式回执，也不启动候选 app。公网 HTTPS 必须显示固定语言包的双语维护页；#1662 资源准备期间正式 `PRERELEASE_ENTRY_ENABLED=false`。#1668 正式安装时，完成 target 配置后才为私有验收启用该 flag；代次准入和公网网关仍分别保持关闭，直到显式门禁通过。日常关闭/开放使用生命周期动作，无需重启正式 app。loopback 网关端口和依赖网络不能绕过 owner 控制的代理/宿主暴露。后续动作必须提供 `--expected-current <完整已装SHA|empty>`；deploy/reset/restore 重试保持相同操作 UUID。原子状态在 `<target>/control/gate.json`，失败保留维护态和阶段。所有 pre 定时任务通过 owner CLI 串行执行，不直接调用旧 shell 入口。远程执行可加 `--ssh <owner-host>`；接收 checkout 必须有相同策略 SHA，回执/证据文件路径位于执行主机。文件另外传输，正式 Cookie 绝不进入候选目录。
+此阶段不需要正式回执，只启动 64 MiB 网关，不检查完整候选容量或原生存储权限。公网 HTTPS 必须显示固定语言包的双语维护页；#1662 资源准备期间正式 `PRERELEASE_ENTRY_ENABLED=false`。#1668 正式安装时，完成 target 配置后才为私有验收启用该 flag；代次准入和公网网关仍分别保持关闭，直到显式门禁通过。日常关闭/开放使用生命周期动作，无需重启正式 app。loopback 网关端口和依赖网络不能绕过 owner 控制的代理/宿主暴露。后续动作必须提供 `--expected-current <完整已装SHA|empty>`；deploy/reset/restore 重试保持相同操作 UUID。原子状态在 `<target>/control/gate.json`，失败保留维护态和阶段。所有 pre 定时任务通过 owner CLI 串行执行，不直接调用旧 shell 入口。除 `plan` 外的操作远程执行可加 `--ssh <owner-host>`；接收 checkout 必须有相同策略 SHA，回执/证据文件路径位于执行主机。文件另外传输，正式 Cookie 绝不进入候选目录。
 
 网关只接纳规范的 `/ws` 和 `/nodes/<instance-id>/ws` WebSocket 目标；instance ID 仅含字母、数字和连字符，查询参数原样转发。按实例路由的升级请求与直接升级请求使用相同的 Host、Origin、正式策略租约及 owner 权限检查。
 

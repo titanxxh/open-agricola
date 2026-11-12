@@ -1,4 +1,8 @@
 # Owner1662 installs this fixed route once. Routine pre actions never reload Caddy.
+# Container Caddy must already join target.proxyNetwork (open-agricola_default
+# in the example target). Only the trusted gateway joins that external network.
+# Use plan.proxyUpstream; the alias is derived from the fixed HTTPS origin.
+# For host Caddy, omit proxyNetwork and use 127.0.0.1:<target.port> instead.
 pre.titanxxh.com {
-    reverse_proxy 127.0.0.1:5176
+    reverse_proxy prerelease-eb81d75ff145d471e687f7bcc3fb506a-gateway:5176
 }

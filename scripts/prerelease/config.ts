@@ -74,8 +74,11 @@ export function parsePrereleaseTarget(value: unknown) {
     container: match(builderInput.container, /^prerelease-[a-z0-9-]+$/, 'Expected an explicitly scoped builder container') }
   const budgets = { app: budget(budgetsInput.app), tools: budget(budgetsInput.tools), build: budget(budgetsInput.build),
     diskMiB: integer(budgetsInput.diskMiB, 256, 4_194_304), reserveMemoryMiB: integer(budgetsInput.reserveMemoryMiB, 128, 1_048_576) }
+  const network = match(input.network, /^open-agricola-prerelease-[a-z0-9-]+$/, 'Expected an exclusive prerelease dependency network')
+  const proxyNetwork = input.proxyNetwork === undefined ? undefined : match(input.proxyNetwork, /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'Expected an external proxy network name')
+  if (proxyNetwork && [network, `${project}_default`, 'host', 'none', 'bridge'].includes(proxyNetwork)) throw new Error('External proxy network must be separate from prerelease and built-in networks')
   return { format: 1, channel: 'prerelease', targetId, directory, policyDirectory, project, origin: targetOrigin,
-    port: integer(input.port, 1024, 65535), network: match(input.network, /^open-agricola-prerelease-[a-z0-9-]+$/, 'Expected an exclusive prerelease dependency network'),
+    port: integer(input.port, 1024, 65535), network, ...(proxyNetwork === undefined ? {} : { proxyNetwork }),
     database, validationDatabase, objects, offsite, builder, budgets, formal }
 }
 

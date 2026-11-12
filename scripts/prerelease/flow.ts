@@ -272,7 +272,8 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     const sourceKeys = new Set([source.objects.appKeyId, source.objects.backupKeyId])
     if (sharedRoles || [target.objects.appKeyId, target.objects.backupKeyId].some(key => sourceKeys.has(key)) || source.network === target.network
       || source.directory === target.directory || source.database.name === target.database.name || source.validationDatabase.name === target.validationDatabase.name
-      || source.objects.bucket === target.objects.bucket || source.project === target.project || source.origin !== target.origin || source.port !== target.port) throw new Error('Restore must preserve the source and use separate replacement resources behind the fixed origin')
+      || source.objects.bucket === target.objects.bucket || source.project === target.project || source.origin !== target.origin || source.port !== target.port
+      || source.proxyNetwork !== target.proxyNetwork) throw new Error('Restore must preserve the source and use separate replacement resources behind the fixed origin')
     if (previous.mode !== 'maintenance' || previous.buildId !== request.expectedSourceCurrent || request.acceptLoss !== previous.generation) throw new Error('Source maintenance/current-version and recovery-point loss acceptance are required')
     authorityReceipt(source, previous, request.authorityFile, 'close')
     const point = readPairedPrereleaseBackup(source, request.backupStem, generation(request.backupGeneration))
@@ -325,7 +326,8 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     const source = request.sourceTarget
     if (!source || !record.installed || record.operation?.kind !== 'restore' || record.operation.stage !== 'acceptance') throw new Error('A validated isolated restoration is required')
     const previous = readRuntime(source)
-    if (previous.mode !== 'closed' || previous.buildId !== request.expectedSourceCurrent || source.origin !== target.origin || source.port !== target.port) throw new Error('Purge and retire the old target before switching the fixed maintenance entry')
+    if (previous.mode !== 'closed' || previous.buildId !== request.expectedSourceCurrent || source.origin !== target.origin || source.port !== target.port
+      || source.proxyNetwork !== target.proxyNetwork) throw new Error('Purge and retire the old target before switching the fixed maintenance entry')
     authorityReceipt(source, previous, request.retirementFile, 'retire')
     compose(source, ['stop', '--timeout', '30', 'gateway'])
     compose(target, ['up', '-d', '--no-build', 'gateway'])

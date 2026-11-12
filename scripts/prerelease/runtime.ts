@@ -15,6 +15,7 @@ export type RuntimeRecord = {
 export const controlDirectory = (target: PrereleaseTarget) => join(target.directory, 'control')
 export const recordPath = (target: PrereleaseTarget) => join(controlDirectory(target), 'gate.json')
 export const composePath = (target: PrereleaseTarget) => join(controlDirectory(target), 'compose.json')
+export const gatewayAlias = (target: PrereleaseTarget) => `prerelease-${createHash('sha256').update(target.origin).digest('hex').slice(0, 32)}-gateway`
 const sha = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
 const digest = (value: unknown): value is string => typeof value === 'string' && /^sha256:[a-f0-9]{64}$/.test(value)
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9-]{36}$/.test(value)
@@ -80,15 +81,17 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
   const gatewayPolicy = createHash('sha256')
   for (const file of gatewayFiles) gatewayPolicy.update(file).update(readFileSync(join(target.policyDirectory, file)))
   const limits = (kind: 'app' | 'tools') => ({ mem_limit: `${target.budgets[kind].memoryMiB}m`, cpus: target.budgets[kind].cpus, pids_limit: target.budgets[kind].pids })
+  const proxyNetwork = target.proxyNetwork ? { proxy: { external: true, name: target.proxyNetwork } } : {}
   const gateway = { image: 'node:24.19.0-slim', init: true, user: `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
     read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'], mem_limit: '64m', cpus: 0.25, pids_limit: 32,
     ports: [`127.0.0.1:${target.port}:5176`], labels: { ...labels, 'org.open-agricola.gateway-policy': gatewayPolicy.digest('hex') }, restart: 'unless-stopped',
     environment: { PRERELEASE_TARGET_ID: target.targetId, PRERELEASE_PUBLIC_ORIGIN: target.origin,
       FORMAL_APP_ORIGIN: target.formal.appOrigin, FORMAL_API_BASE: target.formal.apiOrigin },
     volumes: [`${controlDirectory(target)}:/control:ro`, ...gatewayFiles.map(file => `${join(target.policyDirectory, file)}:/policy/${file}:ro`)],
-    command: ['node', '/policy/scripts/prerelease/gateway.ts'], networks: ['default'] }
+    command: ['node', '/policy/scripts/prerelease/gateway.ts'],
+    networks: target.proxyNetwork ? { default: {}, proxy: { aliases: [gatewayAlias(target)] } } : ['default'] }
   const image = record.installed?.image ?? candidateImage
-  if (!image) return { name: target.project, services: { gateway }, networks: { default: {} } }
+  if (!image) return { name: target.project, services: { gateway }, networks: { default: {}, ...proxyNetwork } }
   if (!digest(image) || candidateImage && !digest(candidateImage)) throw new Error('Compose requires immutable image digests')
   const app = { image, init: true, user: gateway.user, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
     ...limits('app'), env_file: [join(target.directory, '.env')], labels, restart: 'unless-stopped', stop_grace_period: '90s',
@@ -104,7 +107,7 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
   const appDataEnvironment = applicationDataEnvironment(target)
   return { name: target.project, services: { gateway, app, tools: { ...tool, env_file: [join(target.directory, 'data/dependencies.compose.env')] },
     migrate: { ...tool, environment: { ...appDataEnvironment, ...tool.environment } }, capture: { ...tool, image, environment: { ...appDataEnvironment, ...tool.environment } } },
-  networks: { default: {}, dependencies: { external: true, name: target.network } } }
+  networks: { default: {}, dependencies: { external: true, name: target.network }, ...proxyNetwork } }
 }
 
 function maintenanceMessages(target: PrereleaseTarget) {

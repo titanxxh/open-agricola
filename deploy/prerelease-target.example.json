@@ -8,6 +8,7 @@
   "origin": "https://pre.titanxxh.com",
   "port": 5176,
   "network": "open-agricola-prerelease-main-dependencies",
+  "proxyNetwork": "open-agricola_default",
   "database": {
     "name": "oa_prerelease_main",
     "appRole": "oa_prerelease_main_app",
