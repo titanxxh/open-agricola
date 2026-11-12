@@ -4,6 +4,7 @@ import { once } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestDatabase } from './_helpers/postgres'
 import { BugReportFeedbackService } from '../bug-report/feedback-service'
+import { GitHubFixVerifier } from '../bug-report/github-fix-verifier'
 import { createBugReportFeedbackHandler } from '../bug-report-feedback-routes'
 import { handleBugReportRoute } from '../bug-report-routes'
 import { BugReportStore, TokenCipher } from '../bug-report/bug-report-store'
@@ -25,7 +26,12 @@ beforeEach(async () => {
     const role = req.headers['x-fixture-role']
     return typeof role === 'string' && ['admin', 'reporter', 'other'].includes(role) ? { id: role, username: role, displayName: role } : null
   }
-  const handler = createBugReportFeedbackHandler({ service: new BugReportFeedbackService(db), authenticate,
+  const github: typeof fetch = async resource => Response.json(new URL(String(resource)).pathname.includes('/commits/') ? { sha: 'a'.repeat(40) }
+    : { number: 1500, merged: true, merged_at: '2026-11-01T00:00:00Z', merge_commit_sha: 'a'.repeat(40),
+      html_url: 'https://github.com/titanxxh/open-agricola/pull/1500', base: { ref: 'main', repo: { full_name: 'titanxxh/open-agricola' } } })
+  const verifierFetch: typeof fetch = async resource => new URL(String(resource)).pathname.endsWith('/pulls')
+    ? Response.json([await (await github('https://api.github.com/repos/titanxxh/open-agricola/pulls/1500')).json()]) : github(resource)
+  const handler = createBugReportFeedbackHandler({ service: new BugReportFeedbackService(db, Date.now, new GitHubFixVerifier(verifierFetch)), authenticate,
     requireAdmin: async (req, res) => {
       const user = await authenticate(req)
       if (user?.id === 'admin') return user
@@ -166,4 +172,21 @@ describe('Bug Report feedback HTTP', () => {
     expect((await (await request('/api/v1/inbox', 'reporter')).json()).messages).toEqual([])
     expect((await (await request('/api/v1/inbox', 'other')).json()).messages).toEqual([])
   })
+  it('protects fix mutations and reads verified pending release associations through the same admin interface', async () => {
+    await request('/api/admin/bug-report-feedback', 'admin', { method: 'POST', body: JSON.stringify(input) })
+    const association = { issueNumber: 1465, requestId: 'fix-request-http', expectedVersion: 0, purpose: 'fix',
+      pullRequests: [{ number: 1500, requiredCommits: ['a'.repeat(40)] }] }
+    for (const role of ['', 'reporter', 'other']) {
+      expect((await request('/api/admin/bug-report-feedback/fix', role, { method: 'POST', body: JSON.stringify(association) })).status).toBe(role ? 403 : 401)
+      expect((await request('/api/admin/bug-report-feedback/duplicate', role, { method: 'POST', body: JSON.stringify({ issueNumber: 1465, rootIssueNumber: 1466, requestId: 'duplicate-http', expectedVersion: 0 }) })).status).toBe(role ? 403 : 401)
+    }
+    const saved = await request('/api/admin/bug-report-feedback/fix', 'admin', { method: 'POST', body: JSON.stringify(association) })
+    expect(saved.status).toBe(200)
+    const report = (await saved.json()).report
+    expect(report).toMatchObject({ version: 1, fix: { rootId: 'report', status: 'pending_release', version: 1, requiredCommits: ['a'.repeat(40)] } })
+    expect((await (await request('/api/admin/bug-report-feedback?issue=1465', 'admin')).json()).report).toEqual(report)
+    expect((await request('/api/admin/bug-report-feedback/fix', 'admin', { method: 'POST', body: JSON.stringify({ ...association, recipientUserId: 'other' }) })).status).toBe(400)
+    expect((await (await request('/api/v1/inbox', 'reporter')).json()).messages).toHaveLength(1)
+  })
+
 })

@@ -35,8 +35,9 @@ export function createBugReportFeedbackHandler({ service, authenticate, requireA
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const { pathname } = url
+    const fixMutation = pathname === `${ADMIN_ROUTE}/fix` || pathname === `${ADMIN_ROUTE}/duplicate`
     const detail = /^\/api\/v1\/inbox\/([^/]+)(\/read)?$/.exec(pathname)
-    if (pathname !== ADMIN_ROUTE && pathname !== INBOX_ROUTE && !detail) return false
+    if (pathname !== ADMIN_ROUTE && !fixMutation && pathname !== INBOX_ROUTE && !detail) return false
     res.setHeader('Cache-Control', 'no-store')
     res.setHeader('X-Content-Type-Options', 'nosniff')
     const send = (status: number, body: unknown) => {
@@ -44,10 +45,15 @@ export function createBugReportFeedbackHandler({ service, authenticate, requireA
       res.end(JSON.stringify(body))
     }
     try {
-      if (pathname === ADMIN_ROUTE) {
+      if (pathname === ADMIN_ROUTE || fixMutation) {
         const admin = await requireAdmin(req, res)
         if (!admin) return true
-        if (req.method === 'GET') {
+        if (fixMutation) {
+          if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); send(405, { ok: false, code: 'method_not_allowed' }); return true }
+          const input = await readBody(req)
+          const report = pathname.endsWith('/fix') ? await service.associateFix(admin.id, input) : await service.associateDuplicate(admin.id, input)
+          send(200, { ok: true, report })
+        } else if (req.method === 'GET') {
           send(200, { ok: true, report: await service.getReport(positiveInteger(url.searchParams.get('issue'))) })
         } else if (req.method === 'POST') {
           const feedback = await service.recordFeedback(admin.id, await readBody(req))
