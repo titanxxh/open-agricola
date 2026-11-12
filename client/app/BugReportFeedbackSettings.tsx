@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { Section } from '../components/common/Section'
 import { feedbackKindKey, readReportFeedback } from '../services/bug-report-feedback'
+import { BugReportFixSettings } from './BugReportFixSettings'
 import '../styles/components/inbox.css'
 
 export function BugReportFeedbackSettings() {
@@ -97,6 +98,7 @@ export function BugReportFeedbackSettings() {
           <textarea id={`${id}-explanation`} required maxLength={2000} value={explanation} disabled={busy} onChange={event => { setExplanation(event.target.value); setSaved(false) }} /></div>
         <button type="submit" className="btn-primary" disabled={busy || !valid}>{t(kind === 'confirmed_bug' ? 'feedback.confirmBug' : 'feedback.sendAssessment')}</button>
       </form>
+      {(report.feedback.at(-1)?.kind === 'confirmed_bug' || report.fix) && <BugReportFixSettings key={report.submissionId} report={report} onChange={setReport} />}
     </>}
   </Section>
 }

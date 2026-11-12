@@ -124,7 +124,7 @@ GameContextRouter
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。
 - Bug Report 诊断由 `services/bug-report-diagnostics.ts` 识别浏览器和设备，并在标签页存储中保留当前 Room 最近一小时最多五次 WebSocket 关闭记录。`WsGameTransport` 只记录当前连接的关闭，排除主动销毁。创建、编辑草稿及最终确认作者时附带最新的有界诊断快照；刷新后仍可读取，不包含原始 User-Agent。测试见 `bug-report-diagnostics.test.ts` 和 `bug-report.spec.ts`。
 - Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。
-- 大厅和对局菜单中的 `InboxButton` 经鉴权 HTTP 读取账号持久反馈。原生模态窗口保留 Room interaction，只标记打开的单封为已读；首次加载、窗口焦点和消息变化刷新未读状态。切换账号时重新挂载，credentialless Replay Viewer 不加载。`BugReportFeedbackSettings` 登记人工反馈，展示修订历史，并在版本冲突后重读。需要补充信息仍为待确认，列出具体缺失项、原 Issue 链接及在 GitHub 补充需要账号的提示。两处共用 `services/bug-report-feedback.ts`；测试：`bug-report-feedback.test.ts` 和 `bug-report-feedback.spec.ts`。
+- 大厅和对局菜单中的 `InboxButton` 经鉴权 HTTP 读取账号持久反馈。原生模态窗口保留 Room interaction，只标记打开的单封为已读；首次加载、窗口焦点和消息变化刷新未读状态。切换账号时重新挂载，credentialless Replay Viewer 不加载。`BugReportFeedbackSettings` 登记人工反馈，展示修订历史，并在版本冲突后重读。需要补充信息仍为待确认，列出具体缺失项、原 Issue 链接及在 GitHub 补充需要账号的提示。`BugReportFixSettings` 通过同一管理员服务登记显式重复关系和完整合入修复集合，显示根下报告与待发布状态，刷新后仍可读取。界面共用 `services/bug-report-feedback.ts`；测试：`bug-report-feedback.test.ts` 、`bug-report-feedback.spec.ts` 和 `bug-report-fix-links.spec.ts`。
 
 
 ## Beta 资格与客户端传输
