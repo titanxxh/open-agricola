@@ -70,4 +70,49 @@ describe('Bug Report feedback', () => {
       .rejects.toMatchObject({ code: 'feedback_request_conflict' })
     expect((await service.listInbox('reporter')).unreadCount).toBe(2)
   })
+
+  it('rolls back feedback and its inbox entry together, then permits the same request to recover', async () => {
+    await expect(db.transaction(async () => {
+      await service.recordFeedback('admin', confirmation)
+      throw new Error('caller transaction failed')
+    })()).rejects.toThrow('caller transaction failed')
+    expect((await service.getReport(1465)).feedback).toEqual([])
+    expect(await service.listInbox('reporter')).toEqual({ messages: [], unreadCount: 0, nextCursor: null })
+    expect(await service.recordFeedback('admin', confirmation)).toMatchObject({ version: 1 })
+    expect((await service.listInbox('reporter')).unreadCount).toBe(1)
+  })
+
+  it('paginates equal-time messages in stable event order without consuming unread messages', async () => {
+    const first = await service.recordFeedback('admin', confirmation)
+    const second = await service.recordFeedback('admin', { ...confirmation, requestId: 'second-request', expectedVersion: 1, explanation: 'Second assessment.' })
+    const third = await service.recordFeedback('admin', { ...confirmation, requestId: 'third-request', expectedVersion: 2, explanation: 'Third assessment.' })
+    const page = await service.listInbox('reporter', { limit: 1 })
+    expect(page).toEqual({ messages: [{ ...third, readAt: null }], unreadCount: 3, nextCursor: third.id })
+    expect(await service.listInbox('reporter', { before: third.id, limit: 1 }))
+      .toEqual({ messages: [{ ...second, readAt: null }], unreadCount: 3, nextCursor: second.id })
+    expect(await service.listInbox('reporter', { before: second.id, limit: 1 }))
+      .toEqual({ messages: [{ ...first, readAt: null }], unreadCount: 3, nextCursor: null })
+  })
+
+  it('coordinates delivery with the user lock held by account deletion', async () => {
+    vi.spyOn(database, 'getDb').mockReturnValue(db)
+    let release = () => {}
+    let locked = () => {}
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const acquired = new Promise<void>(resolve => { locked = resolve })
+    const deletion = db.transaction(async () => {
+      await db.prepare('SELECT id FROM users WHERE id=? FOR UPDATE').get('reporter')
+      locked()
+      await gate
+      await requestAccountDeletion('reporter')
+    })()
+    await acquired
+    const delivery = new BugReportFeedbackService(db).recordFeedback('admin', confirmation)
+    const outcome = delivery.then(() => 'delivered', error => error instanceof Error && 'code' in error ? error.code : 'unexpected')
+    release()
+    await deletion
+    expect(await outcome).toBe('reporter_unavailable')
+    expect((await service.getReport(1465)).feedback).toEqual([])
+    expect((await service.listInbox('reporter')).unreadCount).toBe(0)
+  })
 })

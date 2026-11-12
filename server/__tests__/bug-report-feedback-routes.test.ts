@@ -69,4 +69,28 @@ describe('Bug Report feedback HTTP', () => {
     expect((await (await request('/api/v1/inbox', 'reporter')).json()).unreadCount).toBe(0)
     expect((await (await request('/api/admin/bug-report-feedback?issue=1465', 'admin')).json()).report).toEqual(report)
   })
+
+  it('rejects anonymous reads, ordinary-user decisions, forged recipients and invalid input without sending', async () => {
+    expect((await request('/api/v1/inbox', '')).status).toBe(401)
+    for (const role of ['', 'reporter', 'other']) {
+      const result = await request('/api/admin/bug-report-feedback', role, { method: 'POST', body: JSON.stringify(input) })
+      expect(result.status).toBe(role ? 403 : 401)
+    }
+    for (const body of [null, {}, { ...input, recipientUserId: 'other' }, { ...input, explanation: '  ' },
+      { ...input, kind: 'fixed' }, { ...input, issueNumber: -1 }, { ...input, expectedVersion: 0.5 }]) {
+      const result = await request('/api/admin/bug-report-feedback', 'admin', { method: 'POST', body: JSON.stringify(body) })
+      expect(result.status).toBe(400)
+      expect(await result.json()).toEqual({ ok: false, code: 'invalid_feedback' })
+    }
+    const oversized = await request('/api/admin/bug-report-feedback', 'admin', { method: 'POST', body: 'x'.repeat(9000) })
+    expect(oversized.status).toBe(413)
+    const missing = await request('/api/admin/bug-report-feedback?issue=9999', 'admin')
+    expect(missing.status).toBe(404)
+    for (const query of ['?limit=51', '?limit=0', '?before=NaN', '?before=1.5']) {
+      expect((await request(`/api/v1/inbox${query}`, 'reporter')).status).toBe(400)
+    }
+    expect((await request('/api/v1/inbox', 'reporter', { method: 'POST' })).status).toBe(405)
+    expect((await (await request('/api/v1/inbox', 'reporter')).json()).messages).toEqual([])
+    expect((await (await request('/api/v1/inbox', 'other')).json()).messages).toEqual([])
+  })
 })
