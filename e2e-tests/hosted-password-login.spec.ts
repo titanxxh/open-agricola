@@ -249,7 +249,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
             const kind = (Object.keys(backendCookieNames) as Array<keyof typeof backendCookieNames>).find(key => cookie.startsWith(`${backendCookieNames[key]}=`))
             if (!kind) return cookie
             const token = readCookie(cookie, backendCookieNames[kind])
-            const options = { backendOrigin: apiOrigin, requestOrigin: req.headers.origin }
+            const options = { requestOrigin: req.headers.origin }
             const serializers = { session: serializeSessionCookie, onboarding: serializeOnboardingCookie, oauthState: serializeOAuthStateCookie, operations: serializeOperationsCookie }
             const clearers = { session: clearSessionCookie, onboarding: clearOnboardingCookie, oauthState: clearOAuthStateCookie, operations: clearOperationsCookie }
             return token ? serializers[kind](token, options) : clearers[kind](options)
