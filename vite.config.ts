@@ -57,6 +57,9 @@ if (publicAssets.localDir) {
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
   plugins,
+  optimizeDeps: {
+    include: ['@noble/hashes/hmac.js', 'typescript'],
+  },
   build: {
     rolldownOptions: {
       input: {
