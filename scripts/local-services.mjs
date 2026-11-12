@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { parseEnv } from 'node:util'
 import { Pool } from 'pg'
@@ -15,6 +15,13 @@ const servicesDir = process.env.LOCAL_SERVICES_DIR ?? join(dirname(commonDir), '
 mkdirSync(dataDir, { recursive: true })
 mkdirSync(servicesDir, { recursive: true })
 const credentialsFile = join(servicesDir, 'local-services.env')
+const composeFiles = ['-f', resolve('docker-compose.local.yml')]
+const composeOverride = join(servicesDir, 'local-services.compose.override.yml')
+const overrideInfo = lstatSync(composeOverride, { throwIfNoEntry: false })
+if (overrideInfo) {
+  if (!overrideInfo.isFile() || overrideInfo.uid !== process.getuid?.() || overrideInfo.mode & 0o077) throw new Error('Local services Compose override must be an owner-private regular file')
+  composeFiles.push('-f', composeOverride)
+}
 if (!existsSync(credentialsFile)) {
   writeFileSync(credentialsFile, `LOCAL_POSTGRES_PASSWORD=${randomBytes(24).toString('hex')}\nLOCAL_POSTGRES_PORT=${process.env.LOCAL_POSTGRES_PORT ?? '55432'}\n`, { mode: 0o600 })
 }
@@ -39,7 +46,7 @@ if (process.env.S3_ENDPOINT && !testOnly) {
 }
 
 if (!process.env.DATABASE_URL || testOnly) {
-  execFileSync('docker', ['compose', '--env-file', credentialsFile, '-f', resolve('docker-compose.local.yml'), 'up', '-d', '--wait', 'postgres'], { stdio: 'inherit' })
+  execFileSync('docker', ['compose', '--env-file', credentialsFile, ...composeFiles, 'up', '-d', '--wait', 'postgres'], { stdio: 'inherit' })
   const pool = new Pool({ connectionString: localUrl })
   try {
     const client = await pool.connect()
@@ -60,7 +67,7 @@ if (!process.env.DATABASE_URL || testOnly) {
 }
 const localS3Endpoint = `http://127.0.0.1:${config.LOCAL_S3_PORT}`
 if (!process.env.S3_ENDPOINT || testOnly) {
-  execFileSync('docker', ['compose', '--env-file', credentialsFile, '-f', resolve('docker-compose.local.yml'), 'up', '-d', 'objects'], { stdio: 'inherit' })
+  execFileSync('docker', ['compose', '--env-file', credentialsFile, ...composeFiles, 'up', '-d', 'objects'], { stdio: 'inherit' })
   let ready = false
   for (let attempt = 0; attempt < 60; attempt++) {
     try { if ((await fetch(`${localS3Endpoint}/health`, { signal: AbortSignal.timeout(1000) })).ok) { ready = true; break } } catch { /* booting */ }

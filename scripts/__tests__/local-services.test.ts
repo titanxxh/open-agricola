@@ -20,8 +20,11 @@ const external = {
   S3_SECRET_ACCESS_KEY: 'secret',
 }
 
+type OverrideFixture = 'private' | 'public' | 'symlink' | 'dangling'
 /** Runs local-services.mjs with only git, and optionally a recording docker, on PATH. */
-const runServices = (env: Record<string, string>, { docker }: { docker: boolean }) => {
+const runServices = (env: Record<string, string>, { docker, override, stopCompose = false }: {
+  docker: boolean; override?: OverrideFixture; stopCompose?: boolean
+}) => {
   const root = mkdtempSync(join(tmpdir(), 'oa-local-services-'))
   roots.push(root)
   const bin = join(root, 'bin')
@@ -30,14 +33,24 @@ const runServices = (env: Record<string, string>, { docker }: { docker: boolean 
   symlinkSync(git, join(bin, 'git'))
   const calls = join(root, 'docker-calls')
   if (docker) {
-    // `network inspect` fails, as for a missing network; every other call succeeds.
-    writeFileSync(join(bin, 'docker'), `#!/bin/sh\nprintf '%s\\n' "$*" >> "${calls}"\n[ "$1 $2" = "network inspect" ] && exit 1\nexit 0\n`)
+    // Stop selected Compose calls after recording so no database/S3 connection follows.
+    writeFileSync(join(bin, 'docker'), `#!/bin/sh\nprintf '%s\\n' "$*" >> "${calls}"\n[ "$1 $2" = "network inspect" ] && exit 1\n${stopCompose ? '[ "$1" = compose ] && exit 42\n' : ''}exit 0\n`)
     chmodSync(join(bin, 'docker'), 0o755)
   }
   const data = join(root, 'data')
+  const services = join(root, 'services')
+  const overridePath = join(services, 'local-services.compose.override.yml')
+  if (override) {
+    mkdirSync(services)
+    if (override === 'symlink' || override === 'dangling') {
+      const target = join(root, 'override.yml')
+      if (override === 'symlink') writeFileSync(target, 'services: {}\n', { mode: 0o600 })
+      symlinkSync(target, overridePath)
+    } else writeFileSync(overridePath, 'services: {}\n', { mode: override === 'private' ? 0o600 : 0o644 })
+  }
   const result = spawnSync(process.execPath, ['scripts/local-services.mjs'], {
     cwd: repository, encoding: 'utf8', timeout: 30_000,
-    env: { PATH: bin, HOME: root, SHARED_DATA_DIR: data, LOCAL_SERVICES_DIR: join(root, 'services'), ...env },
+    env: { PATH: bin, HOME: root, SHARED_DATA_DIR: data, LOCAL_SERVICES_DIR: services, ...env },
   })
   return {
     status: result.status,
@@ -45,6 +58,7 @@ const runServices = (env: Record<string, string>, { docker }: { docker: boolean 
     dockerCalls: existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n') : [],
     monitoringPrepared: existsSync(join(data, 'observability', 'prometheus.local.yml')),
     dependencies: existsSync(join(data, 'dependencies.local')) ? readFileSync(join(data, 'dependencies.local'), 'utf8') : '',
+    overridePath,
   }
 }
 
@@ -79,6 +93,32 @@ describe('local-services Docker use', () => {
 
     expect(result.status).not.toBe(0)
     expect(result.dockerCalls[0]).toMatch(/^compose --env-file .+ -f .+docker-compose\.local\.yml up -d --wait postgres$/)
+  })
+
+  it('loads the owner override when starting PostgreSQL', () => {
+    const { DATABASE_URL: _database, ...objectsOnly } = external
+    const result = runServices(objectsOnly, { docker: true, override: 'private', stopCompose: true })
+
+    expect(result.dockerCalls).toHaveLength(1)
+    expect(result.dockerCalls[0]).toContain(`-f ${repository}/docker-compose.local.yml -f ${result.overridePath} up -d --wait postgres`)
+  })
+
+  it('loads the same owner override when starting object storage', () => {
+    const { S3_ENDPOINT: _endpoint, ...databaseOnly } = external
+    const result = runServices(databaseOnly, { docker: true, override: 'private', stopCompose: true })
+
+    expect(result.dockerCalls).toHaveLength(1)
+    expect(result.dockerCalls[0]).toContain(`-f ${repository}/docker-compose.local.yml -f ${result.overridePath} up -d objects`)
+  })
+
+  it.each(['public', 'symlink', 'dangling'] satisfies OverrideFixture[])('rejects a %s override before starting dependencies', (override) => {
+    const { DATABASE_URL: _database, ...objectsOnly } = external
+    const result = runServices(objectsOnly, { docker: true, override, stopCompose: true })
+
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain('Local services Compose override must be an owner-private regular file')
+    expect(result.dockerCalls).toEqual([])
+    expect(result.dependencies).toBe('')
   })
 })
 

@@ -289,6 +289,28 @@ GAME_BUILD_ID="$(git rev-parse HEAD)" docker compose -f docker-compose.prod.yml 
 
 Dependencies use independent persistent volumes. Generated dependency credentials live in mode-600 `data/local-services.env`; host tools use `data/dependencies.local` and containers use `data/dependencies.compose.env`. Rebuilding applications never clears dependency data. The image contains PostgreSQL 18 native clients and an immutable Viewer, verified and uploaded to S3 at startup. Every hosted Room records; unavailable resources block game creation.
 
+For additional persistent dependency networks, the owner may create `data/local-services.compose.override.yml` beside `local-services.env` (or in `LOCAL_SERVICES_DIR`). It must be an owner-owned regular file with no group/other permissions; symlinks are rejected. `local-services.mjs` passes it to both PostgreSQL and object-storage Compose calls. For shared prerelease dependencies, preserve the original network and add only the two dependency services:
+
+```yaml
+services:
+  postgres:
+    networks:
+      default: {}
+      prerelease: {aliases: [pre-postgres]}
+  objects:
+    networks:
+      default: {}
+      prerelease: {aliases: [pre-objects]}
+networks:
+  prerelease:
+    external: true
+    name: open-agricola-prerelease-main-dependencies
+```
+
+Create the external network separately. The actual host helper must support this override before claiming persistence; a merged source change alone does not update an older host helper. Once installed, existing dependencies can join in place with `docker network connect --alias`, without restarting them. Verify their running networks/aliases against `docker compose --env-file data/local-services.env -f docker-compose.local.yml -f data/local-services.compose.override.yml config`; use both files for manual reconciliation too. Only PostgreSQL and object storage join the new dependency network; candidate services must not join either formal network.
+
+An in-place attachment does not update Compose's stored configuration hash. The first later reconciliation can recreate shared dependencies, so schedule it in formal maintenance after draining application writers. `deploy-backend.sh` currently bootstraps dependencies before its application drain; account for that ordering on the first override change. Subsequent dependency recreation retains these declared networks and aliases; a standalone `docker network connect` does not provide that guarantee.
+
 #### First SQLite migration
 
 The importer accepts the current released SQLite schema (version 33). Older schema upgrade chains are retired; export from the current `main` build before switching storage. The source is opened read-only and retained until validation succeeds.
