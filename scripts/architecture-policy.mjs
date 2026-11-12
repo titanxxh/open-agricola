@@ -2,7 +2,7 @@ import path from 'node:path'
 import { builtinModules } from 'node:module'
 import ts from 'typescript'
 
-export const browserRoots = ['client/main.tsx', 'replay-viewer/src/main.tsx']
+export const browserRoots = ['client/main.tsx', 'client/workshop-game/main.ts', 'replay-viewer/src/main.tsx']
 export const privilegedRoots = new Map([
   ['client/sandbox/SandboxApp.tsx', 'Workshop authoring sandbox entry'],
   ['client/local-sandbox/worker.ts', 'Isolated local game worker entry'],

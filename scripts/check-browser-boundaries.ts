@@ -39,7 +39,8 @@ export function browserBoundaryErrors(
   return errors
 }
 
-export function browserBoundaryPlugin(root: string, entry: string): Plugin {
+export function browserBoundaryPlugin(root: string, entryPoints: Readonly<Record<string, string>>): Plugin {
+  const expectedEntries = new Set(Object.keys(entryPoints))
   return {
     name: 'architecture-browser-boundary',
     generateBundle() {
@@ -48,13 +49,12 @@ export function browserBoundaryPlugin(root: string, entry: string): Plugin {
       for (const id of this.getModuleIds()) {
         const info = this.getModuleInfo(id)
         if (!info) continue
-        const expectedEntry = entry === 'client/main.tsx' ? 'index.html' : 'replay-viewer/index.html'
-        if (info.isEntry && relative(id) !== expectedEntry) this.error('unknown browser build entry: ' + relative(id))
+        if (info.isEntry && !expectedEntries.has(relative(id))) this.error('unknown browser build entry: ' + relative(id))
         for (const target of [...info.importedIds, ...info.dynamicallyImportedIds]) {
           edges.push({ from: relative(id), to: relative(target), typeOnly: false, dynamic: info.dynamicallyImportedIds.includes(target) })
         }
       }
-      const errors = browserBoundaryErrors(edges, [entry])
+      const errors = browserBoundaryErrors(edges, Object.values(entryPoints))
       if (errors.length) this.error(errors.join('\n'))
     },
   }
@@ -72,16 +72,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(errors.join('\n'))
     process.exitCode = 1
   } else {
-    for (const [entry, configFile] of [
-      ['client/main.tsx', 'vite.config.ts'],
-      ['replay-viewer/src/main.tsx', 'replay-viewer/vite.config.ts'],
-    ]) {
+    const builds: { configFile: string; entryPoints: Record<string, string> }[] = [
+      { configFile: 'vite.config.ts', entryPoints: { 'index.html': 'client/main.tsx', 'workshop-game.html': 'client/workshop-game/main.ts' } },
+      { configFile: 'replay-viewer/vite.config.ts', entryPoints: { 'replay-viewer/index.html': 'replay-viewer/src/main.tsx' } },
+    ]
+    for (const { configFile, entryPoints } of builds) {
       await build({
-        configFile: path.join(root, configFile!),
-        plugins: [browserBoundaryPlugin(root, entry!)],
+        configFile: path.join(root, configFile),
+        plugins: [browserBoundaryPlugin(root, entryPoints)],
         build: { write: false },
       })
     }
-    console.log('[check:browser-boundaries] both production entry closures are rule-runtime free')
+    console.log('[check:browser-boundaries] all production entry closures are rule-runtime free')
   }
 }

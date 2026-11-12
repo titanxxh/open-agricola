@@ -9,12 +9,15 @@ import { readDependencies, type DependencyEdge } from '../check-dependencies'
 const edge = (from: string, to: string, dynamic = false): DependencyEdge => ({ from, to, dynamic, typeOnly: false })
 
 describe('browser entry closures', () => {
-  it('follows virtual modules in the actual Vite graph', async () => {
+  it.each([
+    ['index.html', 'client/main.tsx'],
+    ['workshop-game.html', 'client/workshop-game/main.ts'],
+  ])('follows virtual modules in the actual Vite graph from %s', async (html, entry) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'browser-virtual-'))
     try {
       const files = {
-        'index.html': '<script type="module" src="/client/main.tsx"></script>',
-        'client/main.tsx': "import { rule } from 'generated-display'; globalThis.probe = rule",
+        [html]: `<script type="module" src="/${entry}"></script>`,
+        [entry]: "import { rule } from 'generated-display'; globalThis.probe = rule",
         'shared/engine/probe.js': 'export const rule = 42',
         'node_modules/generated-display/package.json': '{"name":"generated-display","main":"index.js"}',
         'node_modules/generated-display/index.js': 'export const rule = 0',
@@ -25,12 +28,12 @@ describe('browser entry closures', () => {
       }
       expect(readDependencies(root, ['client', 'shared']).errors).toEqual([])
       await expect(build({
-        root, configFile: false, logLevel: 'silent', build: { write: false },
+        root, configFile: false, logLevel: 'silent', build: { write: false, rolldownOptions: { input: path.join(root, html) } },
         plugins: [{
           name: 'generated-display-fixture', enforce: 'pre',
           resolveId(id) { if (id === 'generated-display') return '\0generated-display' },
           load(id) { if (id === '\0generated-display') return 'export { rule } from ' + JSON.stringify(path.join(root, 'shared/engine/probe.js')) },
-        }, browserBoundaryPlugin(root, 'client/main.tsx')],
+        }, browserBoundaryPlugin(root, { [html]: entry })],
       })).rejects.toThrow('shared/engine/probe.js')
     } finally { fs.rmSync(root, { recursive: true, force: true }) }
   })

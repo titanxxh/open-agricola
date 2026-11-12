@@ -268,6 +268,8 @@ An early design considered a declarative JSON-only V1 DSL. It was not adopted; p
 
 ### D3. Sandbox isolation and fault tolerance
 
+Workshop embeds `workshop-game.html`, a game-only entry admitted before initialization only under a same-origin top-level Workshop parent. It accepts the fixed server/browser sandbox modes, without Room, account or WebSocket routing. Nested or cross-origin parents and direct navigation receive a static standalone link. The main application still refuses all iframe initialization. Entry contracts and browser coverage are in [Client architecture](architecture/client.md).
+
 - Every custom-card effect and listener call is wrapped in `try/catch`.
 - On failure, record the error, skip the effect, and continue the game. The current sandbox session accumulates deduplicated runtime errors; the Workshop confirmation gate rereads them and rejects the erroneous version before submission.
 - isolated-vm has a 100 ms CPU timeout per execution.

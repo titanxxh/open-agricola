@@ -24,6 +24,7 @@ beforeEach(() => {
   mkdirSync(join(directory, 'i18n'), { recursive: true })
   mkdirSync(join(directory, 'card-encyclopedia'), { recursive: true })
   writeFileSync(join(directory, 'index.html'), HTML)
+  writeFileSync(join(directory, 'workshop-game.html'), '<div id="root">Workshop game</div>')
   writeFileSync(join(directory, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: BUILD_ID, basePath: '/open-agricola/' }))
   writeFileSync(join(directory, 'assets/index-Ab1234Cd.js'), SCRIPT)
   writeFileSync(join(directory, 'assets/index-Ab1234Cd.css'), 'body{color:green}')
@@ -177,6 +178,15 @@ describe('frontend hosting', () => {
     unlinkSync(join(directory, file))
     symlinkSync(outside, join(directory, file))
     expect(() => createFrontendHosting(env)).toThrow(`Invalid hosted frontend ${file}`)
+  })
+
+  it('permits only same-origin framing of the dedicated Workshop game HTML', async () => {
+    const get = await start()
+    const game = await get('/open-agricola/workshop-game.html?page=game&player=p1&embedded=1&devMode=1')
+    expect(game).toMatchObject({ status: 200, body: '<div id="root">Workshop game</div>' })
+    expect(game.headers['content-security-policy']).toBe("frame-ancestors 'self'")
+    expect(game.headers['x-frame-options']).toBe('SAMEORIGIN')
+    expect(game.headers['cache-control']).toBe('no-cache')
   })
 
   it('serves actual application files with MIME, nosniff and bounded cache semantics', async () => {
