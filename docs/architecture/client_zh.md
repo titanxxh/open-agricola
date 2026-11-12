@@ -124,6 +124,7 @@ GameContextRouter
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。
 - Bug Report 诊断由 `services/bug-report-diagnostics.ts` 识别浏览器和设备，并在标签页存储中保留当前 Room 最近一小时最多五次 WebSocket 关闭记录。`WsGameTransport` 只记录当前连接的关闭，排除主动销毁。创建、编辑草稿及最终确认作者时附带最新的有界诊断快照；刷新后仍可读取，不包含原始 User-Agent。测试见 `bug-report-diagnostics.test.ts` 和 `bug-report.spec.ts`。
 - Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。
+- 大厅和对局菜单中的 `InboxButton` 通过鉴权 HTTP 读取账号持久反馈。原生模态窗口保留当前 Room 和规则 interaction，打开单封后只标记该封已读；首次加载、窗口重新获得焦点及消息变化刷新未读状态。切换账号时重新挂载站内信，credentialless Replay Viewer 不加载它。`BugReportFeedbackSettings` 经管理员接口查找已提交的 Issue，并登记摘要与具体说明。两处界面共用 `services/bug-report-feedback.ts`，行为与浏览器测试入口为 `bug-report-feedback.test.ts` 和 `bug-report-feedback.spec.ts`。
 
 
 ## Beta 资格与客户端传输

@@ -59,12 +59,14 @@ export const GameHeader = ({
   useEffect(() => {
     if (!menuOpen) return
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (event.target instanceof Element && event.target.closest('dialog[open]')) return
       const node = menuContainerRef.current
       if (!node) return
       if (event.target instanceof Node && node.contains(event.target)) return
       setMenuOpen(false)
     }
     const handleKey = (event: KeyboardEvent) => {
+      if (document.querySelector('dialog[open]')) return
       if (event.key === 'Escape') setMenuOpen(false)
     }
     document.addEventListener('mousedown', handlePointerDown)

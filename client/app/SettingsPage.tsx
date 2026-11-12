@@ -13,6 +13,7 @@ import { useAccountLinking } from './useAccountLinking'
 import { PlayerAccountId } from '../components/common/PlayerAccountId'
 import { BetaAccessSettings } from './BetaAccessSettings'
 import { PrereleaseEntry } from './PrereleaseEntry'
+import { BugReportFeedbackSettings } from './BugReportFeedbackSettings'
 
 type LinkedIdentity = {
   provider: 'github' | 'google'
@@ -445,6 +446,7 @@ export function SettingsPage() {
       {user?.isAdmin && <Section icon="📊" title={t('platform.operationsTitle')} variant="parchment"><button className="btn btn-primary" onClick={() => setPage('operations')}>{t('platform.operationsTitle')}</button></Section>}
 
       <BetaAccessSettings />
+      <BugReportFeedbackSettings />
 
       {user?.isAdmin && (
         <Section icon="🎟️" title={t('platform.adminInvites')} variant="parchment">

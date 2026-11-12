@@ -21,6 +21,7 @@ import { SoloSetupDialog } from './solo/SoloSetupDialog'
 import { useRoomCreation } from './solo/useRoomCreation'
 import { soloRoomOptions } from '../services/room-creation'
 import { PrereleaseEntry } from './PrereleaseEntry'
+import { InboxButton } from './Inbox'
 
 type RoomWorkshopCard = {
   id: string
@@ -217,6 +218,7 @@ export function LobbyPage() {
         <SiteCommunityLinks />
         <div className="lobby-header__right">
           <LocaleSwitcher />
+          <InboxButton />
           <button
             type="button"
             className="lobby-user-pill"
@@ -247,6 +249,7 @@ export function LobbyPage() {
               onClick={() => setMenuOpen(false)}
             />
             <div className="lobby-drawer" id="lobby-mobile-drawer" role="menu">
+              <InboxButton className="lobby-drawer__item" menuItem />
               <button
                 type="button"
                 className="lobby-drawer__item"
