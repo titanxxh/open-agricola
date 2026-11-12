@@ -50,6 +50,7 @@ export function routinePlanManifest(plan: VerificationPlan) {
   return {
     mode: plan.mode,
     plan_digest: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
+    base_ref: plan.identity.baseRef,
     tested_sha: plan.identity.testedSha,
     partitions: JSON.stringify(routinePartitionManifest(routinePartitions(plan))),
     catalog_tasks: tasks.length ? selectedTasks(tasks.join(',')).join(',') : NO_CATALOG_TASKS,
@@ -58,7 +59,16 @@ export function routinePlanManifest(plan: VerificationPlan) {
 }
 
 function repositoryPlan(input: { cwd: string; base: string; head: string }): VerificationPlan {
-  const plan = createRepositoryPlan({ ...input, fullTaskIds: FULL_TASK_IDS })
+  let base = input.base
+  if (base === '0'.repeat(40)) {
+    if (process.env.GITHUB_EVENT_NAME !== 'push' || process.env.GITHUB_REF !== 'refs/heads/prerelease') {
+      throw new Error('A zero comparison base is only supported for the initial prerelease push')
+    }
+    const main = spawnSync('git', ['rev-parse', '--verify', 'refs/remotes/origin/main^{commit}'], { cwd: input.cwd, encoding: 'utf8' })
+    if (main.status !== 0) throw new Error('The initial prerelease push requires refs/remotes/origin/main to resolve to a commit')
+    base = main.stdout.trim()
+  }
+  const plan = createRepositoryPlan({ ...input, base, fullTaskIds: FULL_TASK_IDS })
   if (process.env.GITHUB_SHA && process.env.GITHUB_SHA !== plan.identity.testedSha) {
     throw new Error('The actual checkout does not match the workflow SHA')
   }

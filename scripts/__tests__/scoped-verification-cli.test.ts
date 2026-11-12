@@ -98,6 +98,58 @@ if (args.includes('vitest')) {
 }
 
 describe('scoped verification public CLI', () => {
+  it('pins the initial prerelease comparison to main and preserves its checks when main advances', () => {
+    const value = fixture('frontend')
+    const mainSha = execFileSync('git', ['rev-parse', 'main'], { cwd: value.cwd, encoding: 'utf8' }).trim()
+    execFileSync('git', ['update-ref', 'refs/remotes/origin/main', mainSha], { cwd: value.cwd })
+    value.env.GITHUB_EVENT_NAME = 'push'
+    value.env.GITHUB_REF = 'refs/heads/prerelease'
+    value.env.GITHUB_OUTPUT = join(value.cwd, 'output/initial-prerelease-plan.txt')
+
+    const planned = value.run('plan', '--base', '0'.repeat(40), '--head', value.sha)
+    expect(planned.status, planned.stderr).toBe(0)
+    const plan = githubJobOutputs(value.env.GITHUB_OUTPUT)
+    expect(plan.base_ref).toBe(mainSha)
+    expect(plan.catalog_tasks).toBe('quality,build')
+
+    execFileSync('git', ['update-ref', 'refs/remotes/origin/main', value.sha], { cwd: value.cwd })
+    const result = value.run('run', '--base', plan.base_ref, '--head', value.sha,
+      '--partition', 'units-1', '--expected-digest', plan.plan_digest)
+    expect(result.status, result.stderr).toBe(0)
+    expect(value.commands()).toContainEqual([
+      'exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx',
+    ])
+  }, 60_000)
+
+  it('fails the initial prerelease plan when the main comparison ref is unavailable', () => {
+    const value = fixture('frontend')
+    value.env.GITHUB_EVENT_NAME = 'push'
+    value.env.GITHUB_REF = 'refs/heads/prerelease'
+    const result = value.run('plan', '--base', '0'.repeat(40))
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('requires refs/remotes/origin/main to resolve to a commit')
+    expect(JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-plan.json'), 'utf8'))).toMatchObject({
+      kind: 'plan', status: 'failed',
+    })
+    expect(value.commands()).toEqual([])
+  })
+
+  it.each([
+    ['push', 'refs/heads/main'],
+    ['push', 'refs/heads/feature'],
+    ['pull_request', 'refs/pull/1/merge'],
+    ['workflow_dispatch', 'refs/heads/prerelease'],
+  ])('rejects a zero comparison base for %s on %s', (event, ref) => {
+    const value = fixture('frontend')
+    execFileSync('git', ['update-ref', 'refs/remotes/origin/main', 'main'], { cwd: value.cwd })
+    value.env.GITHUB_EVENT_NAME = event
+    value.env.GITHUB_REF = ref
+    const result = value.run('plan', '--base', '0'.repeat(40))
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('A zero comparison base is only supported for the initial prerelease push')
+    expect(value.commands()).toEqual([])
+  })
+
   it('plans and executes the complete associated Unit, cross-card and slow Session files for a card edit', () => {
     const value = fixture('card')
     const planned = value.run('plan', '--base', 'main')
