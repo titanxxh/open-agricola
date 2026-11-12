@@ -69,7 +69,7 @@ for (const provider of ['github', 'google'] as const) {
               }
             }
             if (url.pathname === '/api/auth/login') {
-              res.setHeader('Set-Cookie', serializeSessionCookie(token!, { backendOrigin: apiOrigin, requestOrigin: req.headers.origin }))
+              res.setHeader('Set-Cookie', serializeSessionCookie(token!, { requestOrigin: req.headers.origin }))
             } else if (url.pathname.endsWith('/start')) {
               await handleOAuthStart(req, res, url, current); return
             } else if (url.pathname.endsWith('/callback')) {
