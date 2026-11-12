@@ -258,4 +258,36 @@ describe('owner verified feedback deployment', () => {
     expect(value.events().map(event => event.kind)).toEqual(['ssh', 'notification'])
   })
 
+  it.each([
+    ['--host', 'another-owner-host'],
+    ['--remote-dir', '/srv/another-game'],
+  ])('rejects a receipt retry with conflicting %s before any SSH', async (flag, conflicting) => {
+    const value = await fixture()
+    value.state.notification = 'offline'; value.save()
+    expect((await value.confirm()).status).toBe(2)
+    const before = value.events().length
+    value.state.notification = 'completed'; value.save()
+    const retry = await value.invoke('scripts/release/verify-feedback-deployment.ts', ['--retry', join(value.root, 'receipt.json'), flag, conflicting])
+    expect(retry.status).toBe(1)
+    expect(retry.stderr).toContain('Retry target does not match the saved receipt')
+    expect(value.events().slice(before)).toEqual([])
+  })
+
+  it('reuses the saved host and directory when receipt retry omits target flags', async () => {
+    const value = await fixture()
+    value.state.notification = 'offline'; value.save()
+    expect((await value.confirm()).status).toBe(2)
+    const receiptPath = join(value.root, 'receipt.json')
+    expect(JSON.parse(readFileSync(receiptPath, 'utf8'))).toMatchObject({ target: { host: 'owner-test', remoteDir: '/srv/open-agricola' } })
+    const before = value.events().length
+    value.state.notification = 'completed'; value.state.evidence = 'missing'; value.state.ready = false; value.save()
+    const retry = await value.invoke('scripts/release/verify-feedback-deployment.ts', ['--retry', receiptPath])
+    expect(retry.status, retry.stderr).toBe(0)
+    expect(JSON.parse(retry.stdout)).toMatchObject({ deployment: 'unchanged', verification: 'retained', notification: { status: 'completed' } })
+    const events = value.events().slice(before)
+    expect(events.map(event => event.kind)).toEqual(['ssh', 'notification'])
+    expect(events[0].args?.at(-2)).toBe('owner-test')
+    expect(events[0].args?.at(-1)).toContain("cd -- '/srv/open-agricola'")
+  })
+
 })

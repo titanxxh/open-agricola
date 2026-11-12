@@ -34,10 +34,15 @@ function ancestry(cwd: string, sha: string): string[] {
 }
 
 type Target = { host: string; remoteDir: string }
-function remote(target: Target, command: string, input?: unknown): string {
-  if (!/^(?:[a-zA-Z0-9_.-]+@)?[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(target.host) || !target.remoteDir.startsWith('/') || /[\r\n\0]/.test(target.remoteDir)) {
+function parseTarget(value: unknown): Target {
+  const target = object(value)
+  if (typeof target.host !== 'string' || !/^(?:[a-zA-Z0-9_.-]+@)?[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(target.host)
+    || typeof target.remoteDir !== 'string' || !target.remoteDir.startsWith('/') || /[\r\n\0]/.test(target.remoteDir)) {
     throw new Error('Expected an SSH host alias and absolute remote directory')
   }
+  return { host: target.host, remoteDir: target.remoteDir }
+}
+function remote(target: Target, command: string, input?: unknown): string {
   const script = `set -eu; cd -- ${quote(target.remoteDir)}; ${command}`
   const result = spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '--', target.host, script], {
     input: input === undefined ? undefined : JSON.stringify(input), encoding: 'utf8', timeout: 120_000, maxBuffer: 32 * 1024 * 1024,
@@ -77,11 +82,11 @@ async function frontend(url: URL, basePath: string): Promise<DeploymentProof['fr
   return { format: 1, gameBuildId: fullSha(value.gameBuildId), basePath, url: url.href }
 }
 
-type Receipt = { operationId: string; proof: DeploymentProof }
+type Receipt = { operationId: string; proof: DeploymentProof; target: Target }
 function parseReceipt(value: unknown): Receipt {
   const receipt = object(value)
   if (typeof receipt.operationId !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(receipt.operationId)) throw new Error('Invalid feedback operation identity')
-  return { operationId: receipt.operationId, proof: parseDeploymentProof(receipt.proof) }
+  return { operationId: receipt.operationId, proof: parseDeploymentProof(receipt.proof), target: parseTarget(receipt.target) }
 }
 function operation(value: unknown) {
   const result = object(value)
@@ -110,7 +115,7 @@ export async function verifyFeedbackDeployment(cwd: string, input: string[]): Pr
       || value === undefined || options.has(key)) throw new Error('Usage: verify-feedback-deployment.ts [vX.Y.Z] --host host [--remote-dir /path] [--frontend URL --receipt file | --retry receipt | --retry-operation ID | --status operations]')
     options.set(key, value)
   }
-  const target = { host: options.get('--host') ?? 'ubuntu@ten-kr', remoteDir: options.get('--remote-dir') ?? '/home/ubuntu/open-agricola' }
+  const target = parseTarget({ host: options.get('--host') ?? 'ubuntu@ten-kr', remoteDir: options.get('--remote-dir') ?? '/home/ubuntu/open-agricola' })
   const modes = ['--retry','--retry-operation','--status'].filter(key => options.has(key))
   if (modes.length > 1 || modes.length && version) throw new Error('Choose one verification, retry or status operation')
   const retryOperation = options.get('--retry-operation')
@@ -134,7 +139,9 @@ export async function verifyFeedbackDeployment(cwd: string, input: string[]): Pr
   const retry = options.get('--retry')
   if (retry) {
     const receipt = parseReceipt(JSON.parse(readFileSync(resolve(cwd, retry), 'utf8')))
-    return { release: 'unchanged', deployment: 'unchanged', verification: 'retained', receipt: resolve(cwd, retry), notification: notify(target, receipt) }
+    if (options.has('--host') && options.get('--host') !== receipt.target.host
+      || options.has('--remote-dir') && options.get('--remote-dir') !== receipt.target.remoteDir) throw new Error('Retry target does not match the saved receipt')
+    return { release: 'unchanged', deployment: 'unchanged', verification: 'retained', receipt: resolve(cwd, retry), notification: notify(receipt.target, receipt) }
   }
   if (!version || !/^v\d+\.\d+\.\d+$/.test(version) || !options.has('--frontend') || !options.has('--receipt')) throw new Error('A formal version, --frontend and --receipt are required')
   const receiptPath = resolve(cwd, options.get('--receipt') ?? '')
@@ -160,7 +167,7 @@ export async function verifyFeedbackDeployment(cwd: string, input: string[]): Pr
     release: { version, url: release.html_url, sha, tagSha, draft: false, prerelease: false, publishedAt }, candidate: { ...candidate, requiredTaskIds: candidate.tasks.map(task => task.id) },
     frontend: frontendMetadata, backend: backendMetadata, ancestry: { format: 'git-raw-closure-v1', commits: ancestry(cwd, sha) }, observedAt: Date.now() })
   if (commitRef(RELEASE_REPOSITORY, `tags/${version}`) !== sha) throw new Error('Release tag changed while observing production')
-  const receipt = { operationId: randomUUID(), proof }
+  const receipt = { operationId: randomUUID(), proof, target }
   writeFileSync(receiptPath, JSON.stringify(receipt) + '\n', { mode: 0o600, flag: 'wx' })
   return { release: 'verified', deployment: 'observed', verification: 'passed', receipt: receiptPath, notification: notify(target, receipt) }
 }

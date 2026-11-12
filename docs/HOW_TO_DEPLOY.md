@@ -202,7 +202,7 @@ pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr
 pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --retry-operation <operation-id>
 ```
 
-Retry preserves the operation identity and stored proof. It does not repeat Release creation, candidate dispatch, deployment, or production observation. Keep the receipt until the operation is completed. Repeated verification, retry, and late duplicate links do not send another message for the same account and root fix. Existing messages and their read timestamps remain unchanged.
+The receipt binds the observed SSH host and remote directory. Retry uses that saved target when flags are omitted and rejects conflicting target flags before SSH. Retry preserves the operation identity and stored proof. It does not repeat Release creation, candidate dispatch, deployment, or production observation. Keep the receipt until the operation is completed. Repeated verification, retry, and late duplicate links do not send another message for the same account and root fix. Existing messages and their read timestamps remain unchanged.
 
 ## 1. Deploy the Backend
 
