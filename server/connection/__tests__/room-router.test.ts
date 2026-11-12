@@ -1040,10 +1040,16 @@ describe('durable rejection publication', () => {
     const host = newCtx(deps)
     host.currentUserId = 'u1'
     await dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const work = createWorkSession()
+    try { host.currentRoom!.session.loadState(work.state) } finally { work.dispose() }
     const guest = newCtx(deps)
     guest.currentUserId = 'u2'
     await dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
     const room = host.currentRoom!
+    expect(room.session.getState()).toMatchObject({
+      state: { phase: 'playing', roundPhase: 'work', currentPlayerIndex: host.currentPlayerIndex },
+      interaction: { stateId: 'idle' },
+    })
     const versionBefore = room.version
     ;(host.ws.send as unknown as ReturnType<typeof vi.fn>).mockClear()
     ;(guest.ws.send as unknown as ReturnType<typeof vi.fn>).mockClear()
