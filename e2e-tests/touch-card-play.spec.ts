@@ -228,6 +228,8 @@ test.describe('iPad without container units or CSS length division', () => {
         await expect(action).toBeEnabled()
       }
       await page.locator('[data-action-id="lessons"] button').first().tap()
+      await expect(page.locator('[data-interaction-focus="occupation-hand"][data-focus-player="p1"]'))
+        .toHaveAttribute('data-interaction-focused', 'true')
       await page.locator('.hand-cards [data-card-anchor="A116_WoodCutter"]').tap()
       const dialog = await expectDialogFits(page)
       const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))

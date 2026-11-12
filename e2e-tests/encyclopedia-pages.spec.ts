@@ -10,6 +10,7 @@ import { buildPagesFrontend, PAGES_API_ORIGIN, servePagesFrontend } from './help
 const ASSET_ORIGIN = 'https://titanxxh.github.io'
 const ASSET_VERSION = readFileSync('public-assets.ref', 'utf8').trim()
 const CARD_ART = /\/assets\/.+\/([A-Z]+\d+)\.png$/
+const ENCYCLOPEDIA_RUNTIME_CONTENT = /["'`]encyclopedia-[a-z-]+|\/card-encyclopedia\//
 
 test.describe.configure({ mode: 'serial' })
 
@@ -21,8 +22,9 @@ test.beforeAll(async () => {
   test.setTimeout(900_000)
   const { directory } = buildPagesFrontend()
   const assets = join(directory, 'assets')
+  // Shared bootstrap modules can name chunks; identify emitted UI and catalog code.
   encyclopediaChunks = readdirSync(assets).filter(file => file.endsWith('.js')
-    && (/encyclopedia/i.test(file) || /encyclopedia-gallery|encyclopedia-load-error|card-encyclopedia\//.test(readFileSync(join(assets, file), 'utf8'))))
+    && ENCYCLOPEDIA_RUNTIME_CONTENT.test(readFileSync(join(assets, file), 'utf8')))
   expect(encyclopediaChunks.length).toBeGreaterThan(0)
   site = await servePagesFrontend(directory)
 })
