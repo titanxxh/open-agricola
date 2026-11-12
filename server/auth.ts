@@ -624,6 +624,7 @@ export async function requestAccountDeletion(userId: string): Promise<Awaited<vo
         ),
         last_error_code = NULL
     `).run(userId, now, now))
+    await db.prepare('DELETE FROM bug_report_feedback WHERE recipient_user_id = ?').run(userId)
     ;(await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId))
     ;(await db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId))
     ;(await db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(userId))

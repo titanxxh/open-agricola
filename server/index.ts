@@ -3,6 +3,8 @@ import { createBetaAccessHandler } from './beta-access-routes'
 import { createPrereleaseAuthorityHandler } from './prerelease-authority-routes'
 import { createPrereleaseLifecycleHandler } from './prerelease-lifecycle-routes'
 import { betaAccountState } from './experimental-features'
+import { createBugReportFeedbackHandler } from './bug-report-feedback-routes'
+import { BugReportFeedbackService } from './bug-report/feedback-service'
 import './language-packs'
 import { recoverPendingSubmissions } from './workshop-pr/submission-service'
 import { SubmissionStore } from './workshop-pr/submission-store'
@@ -220,6 +222,8 @@ const handlePrereleaseLifecycle = createPrereleaseLifecycleHandler({ db: getDb()
 const handlePrereleaseAuthority = createPrereleaseAuthorityHandler({ db: getDb(), getSourceToken: getAuthToken })
 const betaAccessStore = new BetaAccessStore(getDb())
 const handleBetaAccess = createBetaAccessHandler({ store: betaAccessStore, requireAdmin })
+const handleBugReportFeedback = createBugReportFeedbackHandler({ service: new BugReportFeedbackService(getDb()),
+  requireAdmin, authenticate: async req => validateSession(await getAuthToken(req)) })
 const handleRetentionPolicy = createRetentionPolicyHandler({ store: new RoomRetentionStore(getDb()), requireAdmin })
 const replayStore = new ReplayStore(getDb())
 const replayReadLimiter = new ReplayReadLimiter()
@@ -470,6 +474,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   if (await handlePrereleaseLifecycle(req, res)) return
   if (await handlePrereleaseAuthority(req, res)) return
   if (await handleBetaAccess(req, res)) return
+  if (await handleBugReportFeedback(req, res)) return
   if (await handleRetentionPolicy(req, res)) return
   if (await handleOperations(req, res)) return
 
