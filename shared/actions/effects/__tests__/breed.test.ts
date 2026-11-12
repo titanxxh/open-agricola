@@ -1,15 +1,17 @@
-import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+import { createOfficialCardRegistry, installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
 
 installOfficialCardRegistry()
 
 import { describe, it, expect } from 'vitest'
 import type { GameState, PlayerState, Pasture } from '../../../contract/types'
-import { breed } from '../breed'
+import { breed, canBreedAnimals } from '../breed'
+import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import { getBreedThreshold, type CardEffect } from '../../../cards/card-effects'
 import { withActiveRegistry } from '../../../cards/active-registry'
 import { CardRegistry } from '../../../cards/registry'
 import { E084_DollysMother_impl } from '../../../cards/E/E084_DollysMother'
 import { M033_NightPasture_impl } from '../../../cards/M/M033_NightPasture'
+import { OLD_E203_Shepherd } from '../../../cards/classic/E/OLD_E203_Shepherd'
 
 const NIGHT_PASTURE = 'M033_NightPasture'
 
@@ -59,6 +61,65 @@ const withEffects = <T>(effects: CardEffect[], fn: () => T): T => {
 }
 
 describe('breed core helper', () => {
+  it('passes the effective parent count to offspring queries in availability and execution', () => {
+    const player = makePlayer({ occupationPlayed: ['TEST_Parents', 'TEST_Offspring'], pastures: [makePasture(4)] })
+    player.resources.sheep = 2
+    const state = makeState(player)
+    const options = { sourceCard: 'harvest', animalTypes: ['sheep'] as const }
+    const queriedCounts: number[] = []
+    withEffects([
+      { id: 'TEST_Parents', computeBreedableAnimalCount: (_state, _player, _type, count) => count + 2 },
+      {
+        id: 'TEST_Offspring',
+        computeBreedOffspringCount: (_state, _player, _type, _count, ctx) => {
+          queriedCounts.push(ctx.breedableCount)
+          return ctx.breedableCount >= 4 ? 2 : 0
+        },
+      },
+    ], () => {
+      expect(canBreedAnimals(state, player, options)).toBe(true)
+      expect(breed(state, player, options).breedSummary.resources).toEqual({ sheep: 2 })
+      expect(queriedCounts).toEqual([4, 4])
+    })
+  })
+
+  it('composes played-card offspring queries without bypassing parent eligibility', () => {
+    const player = makePlayer({ occupationPlayed: ['TEST_More', 'TEST_Double'], pastures: [makePasture(4)] })
+    player.resources.sheep = 1
+    const state = makeState(player)
+    const options = { sourceCard: 'harvest', animalTypes: ['sheep'] as const }
+    withEffects([
+      { id: 'TEST_More', computeBreedOffspringCount: (_state, _player, _type, count) => count + 1 },
+      { id: 'TEST_Double', computeBreedOffspringCount: (_state, _player, _type, count) => count * 2 },
+    ], () => {
+      expect(canBreedAnimals(state, player, options)).toBe(false)
+      expect(breed(state, player, options).breedSummary.animalCount).toBe(0)
+      player.resources.sheep = 2
+      expect(canBreedAnimals(state, player, options)).toBe(true)
+      expect(breed(state, player, options).breedSummary.resources).toEqual({ sheep: 4 })
+      expect(player.resources.sheep).toBe(6)
+    })
+  })
+
+  it.each([
+    [0, 0],
+    [-2, 0],
+    [2.9, 2],
+    [Number.NaN, 1],
+    [Number.POSITIVE_INFINITY, 1],
+  ])('normalizes offspring count %s to %i in availability and execution', (count, expected) => {
+    const player = makePlayer({ occupationPlayed: ['TEST_Offspring'], pastures: [makePasture(2)] })
+    player.resources.sheep = 2
+    const state = makeState(player)
+    const options = { sourceCard: 'harvest', animalTypes: ['sheep'] as const }
+    withEffects([{ id: 'TEST_Offspring', computeBreedOffspringCount: () => count }], () => {
+      expect(canBreedAnimals(state, player, options)).toBe(expected > 0)
+      const result = breed(state, player, options)
+      expect(result.breedSummary.animalCount).toBe(expected)
+      expect(player.resources.sheep).toBe(2 + expected)
+    })
+  })
+
   it('breeds 1 of each type when ≥2 + capacity available', () => {
     const player = makePlayer({
       resources: {
@@ -329,5 +390,74 @@ describe('breed core helper', () => {
 
     expect(result.breedSummary.resources.sheep).toBeUndefined()
     expect(player.resources.sheep).toBe(1)
+  })
+})
+
+describe('classic E203 Shepherd through the public breeding boundary', () => {
+  const cardId = OLD_E203_Shepherd.meta.id
+  const withShepherd = <T>(run: () => T): T => {
+    const registry = createOfficialCardRegistry()
+    registry.loadImpl(cardId, OLD_E203_Shepherd.impl)
+    return withActiveRegistry(registry, run)
+  }
+  const setup = (sheep: number, played = true) => {
+    const player = makePlayer({
+      occupationPlayed: played ? [cardId] : [],
+      occupationHand: played ? [] : [cardId],
+      pastures: [makePasture(4)],
+    })
+    player.resources.sheep = sheep
+    const state = makeState(player)
+    state.players.push(...['p2', 'p3', 'p4'].map(id => makePlayer({ id })))
+    return { state, player }
+  }
+
+  it.each([[0, 0], [1, 0], [2, 1], [3, 1], [4, 2], [7, 2]])(
+    '%i sheep produce %i newborns with matching events, summary and placement minimums',
+    (sheep, expected) => {
+      const { state, player } = setup(sheep)
+      const events: DraftGameEvent[] = []
+      const eventSink: EventSink = {
+        emit: event => { events.push(event) },
+        emitMany: nextEvents => { events.push(...nextEvents) },
+      }
+      withShepherd(() => {
+        const result = breed(state, player, { sourceCard: 'harvest' }, eventSink)
+        expect(player.resources.sheep).toBe(sheep + expected)
+        expect(result.breedSummary).toEqual({
+          resources: expected ? { sheep: expected } : {},
+          animalCount: expected,
+          animalTypes: expected ? 1 : 0,
+        })
+        expect(result.placementMinimums).toEqual(expected ? { sheep: 2 + expected } : {})
+        expect(events).toEqual(expected ? [{
+          type: 'farm.animalBred', animals: { sheep: expected }, source: 'harvest',
+        }] : [])
+      })
+    },
+  )
+
+  it('does not apply a card in hand or another player’s played zone', () => {
+    const { state, player } = setup(4, false)
+    state.players[1].occupationPlayed = [cardId]
+    withShepherd(() => {
+      expect(breed(state, player, { sourceCard: 'harvest' }).breedSummary.resources).toEqual({ sheep: 1 })
+    })
+    expect(player.resources.sheep).toBe(5)
+    expect(state.players[1].resources.sheep).toBe(0)
+  })
+
+  it('changes only sheep and grants two in each later breeding without persistent counters', () => {
+    const { state, player } = setup(4)
+    player.resources.boar = 2
+    player.resources.cattle = 2
+    withShepherd(() => {
+      expect(breed(state, player, { sourceCard: 'harvest' }).breedSummary.resources)
+        .toEqual({ sheep: 2, boar: 1, cattle: 1 })
+      expect(breed(state, player, { sourceCard: 'private-breeding', animalTypes: ['sheep'] }).breedSummary.resources)
+        .toEqual({ sheep: 2 })
+    })
+    expect(player.resources).toMatchObject({ sheep: 8, boar: 3, cattle: 3 })
+    expect(player.cardStates).toEqual({})
   })
 })

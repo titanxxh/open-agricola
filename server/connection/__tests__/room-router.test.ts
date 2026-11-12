@@ -1044,6 +1044,10 @@ describe('durable rejection publication', () => {
     guest.currentUserId = 'u2'
     await dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
     const room = host.currentRoom!
+    const work = createWorkSession({ seed: 1597 })
+    try { room.session.loadState(work.state) } finally { work.dispose() }
+    await markRoomStarted(host)
+    expect(room.session.getState().interaction.stateId).toBe('idle')
     const versionBefore = room.version
     ;(host.ws.send as unknown as ReturnType<typeof vi.fn>).mockClear()
     ;(guest.ws.send as unknown as ReturnType<typeof vi.fn>).mockClear()

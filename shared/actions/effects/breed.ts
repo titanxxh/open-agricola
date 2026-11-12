@@ -14,7 +14,12 @@ import {
   computeAnimalZones,
   readAnimalCountsForZoneAssignment,
 } from '../../domain/animal-zones'
-import { getBreedableAnimalCount, getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
+import {
+  getBreedableAnimalCount,
+  getBreedOffspringCount,
+  getBreedThreshold,
+  shouldEnforceReorganizeOnLastHarvest,
+} from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
 
 export type BreedOptions = {
@@ -53,6 +58,7 @@ export const canBreedAnimals = (
     const ctx = { sourceCard: opts.sourceCard }
     const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
     if (breedableCount < getBreedThreshold(state, player, type, ctx)) continue
+    if (getBreedOffspringCount(state, player, type, { ...ctx, breedableCount }) <= 0) continue
     return true
   }
   return false
@@ -63,8 +69,8 @@ export const canBreedAnimals = (
  *   - free capacity = `getTotalAnimalCapacity(player)` (no subtraction of
  *     assigned, matching prior harvest behaviour). Each newborn consumes one
  *     unit of free capacity.
- *   - For each requested animal type with ≥2 of that resource, +1 and record
- *     the increment in the returned summary.
+ *   - After parent eligibility, played-card offspring queries adjust the default
+ *     one newborn. Resources, placement minimums, summaries and events use that count.
  *
  * Consumed by both harvest path (sourceCard='harvest') and breed-shaped cards
  * such as A165 PigBreeder (sourceCard='A165_PigBreeder').
@@ -85,12 +91,15 @@ export const breed = (
     const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
     const threshold = getBreedThreshold(state, player, type, ctx)
     if (breedableCount < threshold) continue
-    placementMinimums[type] = Math.max(0, threshold - (breedableCount - (player.resources[type] ?? 0))) + 1
-    player.resources[type] += 1
-    summary.resources[type] = 1
+    const offspring = getBreedOffspringCount(state, player, type, { ...ctx, breedableCount })
+    if (offspring <= 0) continue
+    placementMinimums[type] =
+      Math.max(0, threshold - (breedableCount - (player.resources[type] ?? 0))) + offspring
+    player.resources[type] += offspring
+    summary.resources[type] = offspring
     summary.animalTypes += 1
-    summary.animalCount += 1
-    freeCapacity -= 1
+    summary.animalCount += offspring
+    freeCapacity -= offspring
   }
   if (summary.animalCount > 0) {
     eventSink?.emit<'farm.animalBred'>({
