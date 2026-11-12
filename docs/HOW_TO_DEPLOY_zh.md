@@ -290,6 +290,28 @@ GAME_BUILD_ID="$(git rev-parse HEAD)" docker compose -f docker-compose.prod.yml 
 
 依赖使用独立持久卷，生成凭据保存在 mode-600 的 `data/local-services.env`；主机工具使用 `data/dependencies.local`，容器使用 `data/dependencies.compose.env`。应用重建不清空数据库或资源。镜像包含 PostgreSQL 18 原生客户端和一个不可变 Viewer，启动时校验并上传到 S3。所有正式 Room 强制录制，资源不齐时拒绝开局。
 
+需要额外持久化依赖网络时，owner 可在 `local-services.env` 旁创建 `data/local-services.compose.override.yml`，或放在 `LOCAL_SERVICES_DIR`。文件必须由当前 owner 所有且为普通文件，不得有 group/other 权限，软链会被拒绝。`local-services.mjs` 会把它同时传给 PostgreSQL 与对象存储的 Compose 调用。共享预发布依赖时，保留原网络，只给两个依赖服务增加连接：
+
+```yaml
+services:
+  postgres:
+    networks:
+      default: {}
+      prerelease: {aliases: [pre-postgres]}
+  objects:
+    networks:
+      default: {}
+      prerelease: {aliases: [pre-objects]}
+networks:
+  prerelease:
+    external: true
+    name: open-agricola-prerelease-main-dependencies
+```
+
+单独创建 external network。实际主机 helper 支持该 override 后才能宣称持久化；源码合入不会自动更新旧主机 helper。安装后可用 `docker network connect --alias` 给现有依赖原地接入，无需重启。使用 `docker compose --env-file data/local-services.env -f docker-compose.local.yml -f data/local-services.compose.override.yml config` 核对运行网络与 alias；手工协调配置时也须传入这两个文件。只有 PostgreSQL 和对象存储加入新依赖网络，候选服务不得加入任何正式网络。
+
+原地接入不会更新 Compose 保存的配置哈希。后续第一次协调配置可能重建共享依赖，应安排在正式维护中，先排空应用写入者。`deploy-backend.sh` 当前先启动依赖、后排空应用，首次 override 变更须处理这一顺序。之后重建依赖会保留声明的网络与 alias；单独执行 `docker network connect` 不提供该保证。
+
 #### 首次 SQLite 迁移
 
 导入器只接受当前发布的 SQLite 结构（版本 33）。旧结构的逐级升级链已退役；切换存储前应先用当前 `main` 版本导出。源数据以只读方式打开，并保留到目标验证成功。
