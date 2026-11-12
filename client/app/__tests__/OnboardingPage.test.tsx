@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OnboardingPage } from '../OnboardingPage'
-import { prepareOAuthOnboarding, readOnboardingCredentials } from '../../services/oauth-onboarding'
+import { startOAuthOnboarding, readOnboardingCredentials } from '../../services/oauth-onboarding'
 import { webcrypto } from 'node:crypto'
 
 const refreshSessionMock = vi.fn(async () => {})
@@ -85,10 +85,9 @@ afterEach(() => {
 describe('OnboardingPage', () => {
   it('submits a fragment handoff after removing it from the URL and keeps it retryable until success', async () => {
     vi.stubGlobal('crypto', webcrypto)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      ok: true, authorizationUrl: 'https://github.com/login/oauth/authorize?state=registration',
-    }))))
-    await prepareOAuthOnboarding('/api/auth/oauth/github/start?intent=register')
+    const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {})
+    try { await startOAuthOnboarding('/api/auth/oauth/github/start?intent=register') }
+    finally { submit.mockRestore() }
     const ticket = 'a'.repeat(43)
     window.history.replaceState(null, '', `/?page=onboarding#onboardingTicket=${ticket}`)
     const user = userEvent.setup()
