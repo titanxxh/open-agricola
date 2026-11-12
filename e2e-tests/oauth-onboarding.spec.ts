@@ -3,7 +3,8 @@
 import { expect, devices, type BrowserContext, type Request } from '@playwright/test'
 import { createServer } from 'node:https'
 import { createServer as createHttpServer } from 'node:http'
-import { connect, type Socket } from 'node:net'
+import { connect } from 'node:net'
+import type { Duplex } from 'node:stream'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -233,7 +234,7 @@ for (const provider of ['github', 'google'] as const) {
       const sameSite = mode === 'same-site-itp'
       appOrigin = `https://${sameSite ? 'app.agricola.test' : 'app.test'}:${address.port}`
       apiOrigin = `https://${sameSite ? 'api.agricola.test' : 'api.test'}:${address.port}`
-      const sockets = new Set<Socket>()
+      const sockets = new Set<Duplex>()
       const proxy = createHttpServer()
       proxy.on('connect', (request, socket, head) => {
         const target = new URL(`http://${request.url}`)
