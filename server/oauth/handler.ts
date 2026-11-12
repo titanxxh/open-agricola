@@ -14,7 +14,8 @@ import {
 } from '../auth-cookies.ts'
 import { createSession, isUsernameReserved, validateSession, type AuthUser } from '../auth.ts'
 import { getDb } from '../db.ts'
-import { requestSessionToken } from '../request-auth'
+import { isOAuthStartForm, requestSessionToken } from '../request-auth'
+import { BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 import { corsHeaders, getRequestOrigin } from '../http-origin.ts'
 import { assertOAuthProvider, buildOAuthAuthorizationUrl, exchangeOAuthCode } from './providers.ts'
 import {
@@ -62,8 +63,8 @@ function parseProvider(url: URL): OAuthProvider {
   return provider
 }
 
-function parseIntent(url: URL): OAuthIntent {
-  const intent = url.searchParams.get('intent') ?? 'login'
+function parseIntent(params: URLSearchParams): OAuthIntent {
+  const intent = params.get('intent') ?? 'login'
   if (intent === 'login' || intent === 'register' || intent === 'link') return intent
   return 'login'
 }
@@ -143,11 +144,16 @@ function sendJson(res: ServerResponse, status: number, payload: unknown, headers
   res.end(JSON.stringify(payload))
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise(resolve => {
-    let data = ''
-    req.on('data', (chunk: Buffer) => { data += chunk.toString() })
+function readBody(req: IncomingMessage, maxBytes = Infinity): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = '', bytes = 0
+    req.on('data', (chunk: Buffer) => {
+      bytes += chunk.byteLength
+      if (bytes > maxBytes) { reject(new Error('Request body is too large')); return }
+      data += chunk.toString()
+    })
     req.on('end', () => resolve(data))
+    req.on('error', reject)
   })
 }
 
@@ -235,7 +241,25 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
     return
   }
 
-  const intent = parseIntent(url)
+  const form = isOAuthStartForm(req)
+  let parameters = url.searchParams
+  if (form) {
+    try { parameters = new URLSearchParams(await readBody(req, 4096)) }
+    catch { sendJson(res, 413, { ok: false, code: 'invalid_credentials' }); return }
+    if (parameters.getAll('protocol').length !== 1 || parameters.get('protocol') !== String(BROWSER_AUTH_VERSION)) {
+      sendJson(res, 426, { ok: false, code: 'reload_required' }); return
+    }
+    const allowed = new Set(['protocol', 'intent', 'returnTo', 'inviteCode', 'onboardingChallenge'])
+    if ([...parameters.keys()].some(key => !allowed.has(key) || parameters.getAll(key).length !== 1)
+      || !['login', 'register'].includes(parameters.get('intent') ?? '')) {
+      sendJson(res, 400, { ok: false, code: 'invalid_credentials' }); return
+    }
+  }
+  const fail = (status: number, code: string) => {
+    if (form) redirect(res, appLocation(`/?page=login&authError=${code}`), { 'Cache-Control': 'no-store' })
+    else sendJson(res, status, { ok: false, code })
+  }
+  const intent = parseIntent(parameters)
   if (intent === 'link') {
     if (req.method !== 'POST') {
       redirect(res, appLocation('/?page=settings&authError=oauth_state_invalid'))
@@ -254,23 +278,23 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
     return
   }
 
-  const returnTo = safeReturnTo(url.searchParams.get('returnTo'))
-  const onboardingChallenge = url.searchParams.get('onboardingChallenge')
+  const returnTo = safeReturnTo(parameters.get('returnTo'))
+  const onboardingChallenge = parameters.get('onboardingChallenge')
   if (onboardingChallenge !== null && !/^[a-f0-9]{64}$/.test(onboardingChallenge)) {
-    sendJson(res, 400, { ok: false, code: 'oauth_state_invalid' })
+    fail(400, 'oauth_state_invalid')
     return
   }
   const policy = getRegistrationPolicy()
-  const inviteCode = url.searchParams.get('inviteCode')?.trim() ?? ''
+  const inviteCode = parameters.get('inviteCode')?.trim() ?? ''
   let inviteCodeHash: string | undefined
   if (intent === 'register') {
     if (policy === 'disabled') {
-      sendJson(res, 403, { ok: false, code: 'registration_disabled' })
+      fail(403, 'registration_disabled')
       return
     }
     if (policy === 'invite_only') {
       if (!inviteCode || !(await isInviteCodeAvailable(inviteCode))) {
-        sendJson(res, 403, { ok: false, code: 'invalid_invite' })
+        fail(403, 'invalid_invite')
         return
       }
       inviteCodeHash = hashInviteCode(inviteCode)
@@ -284,10 +308,13 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
     ...(inviteCodeHash ? { inviteCodeHash } : {}),
     ...(onboardingChallenge ? { onboardingChallenge } : {}),
   }))
-  sendJson(res, 200, { ok: true, authorizationUrl: buildOAuthAuthorizationUrl(provider, state, req) }, {
+  const headers = {
     'Cache-Control': 'no-store',
     'Set-Cookie': serializeOAuthStateCookie(state, { backendOrigin: getRequestOrigin(req) }),
-  })
+  }
+  const authorizationUrl = buildOAuthAuthorizationUrl(provider, state, req)
+  if (form) redirect(res, authorizationUrl, { ...headers, 'Referrer-Policy': 'no-referrer' })
+  else sendJson(res, 200, { ok: true, authorizationUrl }, headers)
 }
 
 export async function handleOAuthCallback(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {

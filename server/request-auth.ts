@@ -5,7 +5,7 @@ import { isApiHost, isTrustedOrigin, normalizeOrigin } from './http-origin'
 import { allowAnonymousAccess } from './anonymous-access'
 
 type Admission = { ok: true } | { ok: false; status: 400 | 403 | 426; code: 'invalid_credentials' | 'csrf_rejected' | 'reload_required' }
-type RouteAccess = 'public' | 'navigation' | 'service' | 'operations' | 'browser' | 'application'
+type RouteAccess = 'public' | 'navigation' | 'service' | 'operations' | 'browser' | 'oauth-form' | 'application'
 const accepted: Admission = { ok: true }
 const denied: Admission = { ok: false, status: 403, code: 'csrf_rejected' }
 const reload: Admission = { ok: false, status: 426, code: 'reload_required' }
@@ -15,6 +15,7 @@ const pathname = (req: IncomingMessage) => new URL(req.url ?? '/', 'http://local
 
 function routeAccess(req: IncomingMessage): RouteAccess {
   const path = pathname(req)
+  if (isOAuthStartForm(req)) return 'oauth-form'
   if (safe(req) && (['/api/health', '/api/auth/browser-policy', '/api/whats-new', '/api/auth/registration-policy', '/api/workshop/sandbox-contract', '/api/community/wechat-qr', '/api/community/feishu-qr'].includes(path)
     || /^\/(?:replay-viewers|replay-assets|card-art)\//.test(path)
     || path.startsWith('/api/v1/replays/') || path.startsWith('/api/workshop/public-cards/'))) return 'public'
@@ -27,6 +28,17 @@ function routeAccess(req: IncomingMessage): RouteAccess {
     || /^\/api\/auth\/(?:login|register|onboarding\/complete|password-reset\/(?:request|complete)|resend-verification)$/.test(path)
     || /^\/api\/auth\/oauth\/[^/]+\/(?:start|complete)$/.test(path)) return 'browser'
   return 'application'
+}
+
+export function isOAuthStartForm(req: IncomingMessage): boolean {
+  return req.method === 'POST' && /^\/api\/auth\/oauth\/(?:github|google)\/start$/.test(pathname(req))
+    && req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() === 'application/x-www-form-urlencoded'
+}
+
+function oauthFormAdmission(req: IncomingMessage): Admission {
+  if (!isTrustedOrigin(req) || !isApiHost(req)
+    || req.headers['sec-fetch-dest'] !== 'document' || req.headers['sec-fetch-mode'] !== 'navigate') return denied
+  return req.headers.authorization === undefined ? accepted : invalid
 }
 
 function bearer(req: IncomingMessage): string {
@@ -84,6 +96,7 @@ export function httpAdmission(req: IncomingMessage): Admission {
     case 'operations': return operationsAdmission(req)
     case 'service': return req.headers.origin === undefined && req.headers.cookie === undefined ? accepted : denied
     case 'browser': return browser(req)
+    case 'oauth-form': return oauthFormAdmission(req)
     case 'application':
       if (native(req)) return accepted
       if (req.headers.origin === undefined && req.headers.cookie === undefined && req.headers.authorization === undefined
@@ -96,7 +109,7 @@ export function httpAdmission(req: IncomingMessage): Admission {
 /** Resolve the original transport without rewriting Cookie into Authorization. */
 export function requestSessionToken(req: IncomingMessage, operations = false): string {
   const access = routeAccess(req)
-  if (access === 'public' || access === 'navigation' || access === 'service' || !httpAdmission(req).ok) return ''
+  if (access === 'public' || access === 'navigation' || access === 'service' || access === 'oauth-form' || !httpAdmission(req).ok) return ''
   if (req.headers.authorization !== undefined) return native(req) ? bearer(req) : ''
   return readCookie(req.headers.cookie, operations ? authCookieNames().operations : authCookieNames().session)
 }

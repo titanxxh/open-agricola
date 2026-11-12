@@ -75,6 +75,22 @@ describe('formal request admission', () => {
     expect(httpAdmission(request('/api/auth/me', headers))).toMatchObject({ ok: false })
   })
 
+  it('admits only exact-origin top-level OAuth start forms without exposing session credentials', () => {
+    const headers = { origin: app, cookie: browser.cookie, 'content-type': 'application/x-www-form-urlencoded',
+      'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }
+    const path = '/api/auth/oauth/github/start'
+    expect(httpAdmission(request(path, headers, 'POST'))).toEqual({ ok: true })
+    expect(requestSessionToken(request(path, headers, 'POST'))).toBe('')
+    for (const changed of [
+      { origin: 'https://pre.titanxxh.com' }, { origin: undefined }, { host: 'pre.titanxxh.com' },
+      { 'sec-fetch-dest': 'iframe' }, { 'sec-fetch-mode': 'cors' }, { 'sec-fetch-mode': undefined },
+      { 'content-type': 'text/plain' }, { authorization: 'Bearer token' },
+    ]) expect(httpAdmission(request(path, { ...headers, ...changed }, 'POST'))).toMatchObject({ ok: false })
+    expect(httpAdmission(request(path, headers))).toMatchObject({ ok: false })
+    expect(httpAdmission(request('/api/auth/login', headers, 'POST'))).toMatchObject({ ok: false })
+    expect(httpAdmission(request('/api/auth/oauth/github/complete', headers, 'POST'))).toMatchObject({ ok: false })
+  })
+
   it('keeps operations resources usable while excluding sibling requests and frames', () => {
     const headers = { cookie: '__Host-oa-ops-session=ops-token', 'sec-fetch-site': 'same-origin' }
     expect(requestSessionToken(request('/ops/public/image.svg', headers), true)).toBe('ops-token')
