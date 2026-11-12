@@ -133,7 +133,7 @@ Tests: `server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`.
 
 ## HTTP endpoints
 
-`auth-cookies.ts` owns cookie families; `auth.ts` validates session policy versions. Migration 046 retires legacy authentication. `request-auth.ts` admits HTTP/WS requests by origin and protocol, with explicit navigation/service/ops exceptions. Tests: `{request-auth,auth-routes,postgres-auth,observability-http}.test.ts`.
+`auth-cookies.ts` owns cookie families; `auth.ts` validates session policy versions. Migration 046 retires legacy authentication. The HTTP dispatcher defaults to no-store; explicit public resource policies override it. `request-auth.ts` admits HTTP/WS requests by origin and protocol, with explicit navigation/service/ops exceptions. Tests: `{request-auth,auth-routes,postgres-auth,observability-http}.test.ts`.
 
 HTTP owns product APIs, operations and debugging. WebSocket commands remain the game synchronization path; validation endpoints never write rule state.
 
