@@ -8,7 +8,7 @@ import { BrandMark } from '../components/common/BrandMark'
 import { DonateWidgets } from '../components/common/DonateWidgets'
 import { authErrorMessage } from './auth-errors'
 import { API_BASE } from '../config'
-import { prepareOAuthOnboarding } from '../services/oauth-onboarding'
+import { startOAuthOnboarding } from '../services/oauth-onboarding'
 import { ForgotPasswordForm } from './ForgotPasswordForm'
 
 type Mode = 'login' | 'register' | 'forgot'
@@ -78,7 +78,7 @@ function OAuthLink({
       if (!href || starting) return
       setStarting(true)
       setStartFailed(false)
-      void prepareOAuthOnboarding(href).then(url => window.location.assign(url)).catch(() => {
+      void startOAuthOnboarding(href).catch(() => {
         setStarting(false)
         setStartFailed(true)
       })

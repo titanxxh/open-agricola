@@ -1,11 +1,11 @@
-import { browserApiFetch } from './browser-api'
+import { BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 
 const VERIFIER_KEY = 'open-agricola-onboarding-verifier'
 const TICKET_KEY = 'open-agricola-onboarding-ticket'
 
 const hex = (bytes: Uint8Array): string => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 
-export async function prepareOAuthOnboarding(href: string): Promise<string> {
+export async function startOAuthOnboarding(href: string): Promise<void> {
   const url = new URL(href, window.location.href)
   if (globalThis.crypto?.subtle) {
     const verifier = hex(crypto.getRandomValues(new Uint8Array(32)))
@@ -14,13 +14,23 @@ export async function prepareOAuthOnboarding(href: string): Promise<string> {
     sessionStorage.setItem(VERIFIER_KEY, verifier)
     sessionStorage.removeItem(TICKET_KEY)
   }
-  const response = await browserApiFetch(url.toString(), { method: 'POST' })
-  const data: unknown = await response.json()
-  if (!response.ok || !data || typeof data !== 'object' || !('ok' in data) || data.ok !== true
-    || !('authorizationUrl' in data) || typeof data.authorizationUrl !== 'string') {
-    throw new Error('OAuth preparation failed')
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.target = '_self'
+  const fields = new URLSearchParams(url.search)
+  fields.set('protocol', String(BROWSER_AUTH_VERSION))
+  url.search = ''
+  url.hash = ''
+  form.action = url.toString()
+  for (const [name, value] of fields) {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = name
+    input.value = value
+    form.append(input)
   }
-  return data.authorizationUrl
+  document.body.append(form)
+  try { form.submit() } finally { form.remove() }
 }
 
 export function readOnboardingCredentials(): { ticket: string; verifier: string } | undefined {
