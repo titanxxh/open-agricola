@@ -1,9 +1,10 @@
+import { requestSessionToken } from './request-auth'
 import { handleWorkshopPublicCards } from './workshop-public-cards'
 import { isWorkshopSubmissionInProgress } from './database/errors'
 import { InvalidationStore } from './invalidation'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getDb } from './db.ts'
-import { validateSession, extractToken, isAdmin } from './auth.ts'
+import { validateSession, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
 import { handleSubmitReviewRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 import { corsHeaders } from './http-origin.ts'
@@ -366,7 +367,7 @@ export async function handleWorkshopRoute(
     return true
   }
 
-  const token = extractToken(req.headers.authorization)
+  const token = requestSessionToken(req)
   const user = (await validateSession(token))
   const db = getDb()
 

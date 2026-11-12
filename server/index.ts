@@ -38,7 +38,6 @@ import {
   logout,
   logoutAll,
   validateSession,
-  extractToken,
   updateDisplayName,
   changePassword,
   cleanupPendingPasswordUser,
@@ -58,8 +57,10 @@ import {
   type AuthErrorCode,
   type AuthUser,
 } from './auth.ts'
-import { clearSessionCookie, readCookies, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
-import { corsHeaders, getRequestOrigin, isTrustedOrigin } from './http-origin.ts'
+import { assertProductionCookieConfig, clearSessionCookie, clearOperationsCookie, serializeOnboardingCookie, serializeSessionCookie } from './auth-cookies.ts'
+import { corsHeaders, getRequestOrigin, normalizeOrigin } from './http-origin.ts'
+import { httpAdmission, requestSessionToken } from './request-auth'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION, type BrowserAuthPolicy } from '../shared/contract/browser-auth'
 import { createInvite, listInvites, revokeInvite } from './invites.ts'
 import {
   handleLinkedIdentities,
@@ -104,17 +105,18 @@ import { createWhatsNewHandler } from './whats-new'
 import { createRetentionPolicyHandler } from './retention-policy-routes'
 import { RoomRetentionStore } from './game/room-retention-store'
 
+assertProductionCookieConfig()
 const handleFrontend = createFrontendHosting()
 const handleCommunityQr = createCommunityQrHandler()
 const handleWhatsNew = createWhatsNewHandler()
 
 const serverCorsHeaders = () => corsHeaders({
   methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-  headers: `Content-Type, Authorization, ${CLIENT_CAPABILITIES_HEADER}`,
+  headers: `Content-Type, Authorization, ${CLIENT_CAPABILITIES_HEADER}, ${BROWSER_AUTH_HEADER}`,
 })
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown, headers: Record<string, string | string[]> = {}) => {
-  res.writeHead(status, { 'Content-Type': 'application/json', ...serverCorsHeaders(), ...headers })
+  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...serverCorsHeaders(), ...headers })
   res.end(JSON.stringify(payload))
 }
 
@@ -151,15 +153,7 @@ async function checkRateLimit(ip: string): Promise<boolean> {
 }
 
 
-async function getAuthToken(req: IncomingMessage): Promise<string> {
-  const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
-  let validCookie: string | undefined
-  for (const candidate of cookieTokens) {
-    if (await validateSession(candidate)) { validCookie = candidate; break }
-  }
-  const bearer = extractToken(req.headers.authorization)
-  return validCookie || bearer || cookieTokens[0] || ''
-}
+const getAuthToken = async (req: IncomingMessage): Promise<string> => requestSessionToken(req)
 
 async function requireAdmin(req: IncomingMessage, res: ServerResponse): Promise<Awaited<AuthUser | null>> {
   const token = (await getAuthToken(req))
@@ -173,29 +167,6 @@ async function requireAdmin(req: IncomingMessage, res: ServerResponse): Promise<
     return null
   }
   return user
-}
-
-async function forwardCookieSessionAsBearer(req: IncomingMessage): Promise<void> {
-  if (req.headers.authorization) return
-  const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
-  let token = cookieTokens[0] ?? ''
-  for (const candidate of cookieTokens) {
-    if (await validateSession(candidate)) { token = candidate; break }
-  }
-  if (token) req.headers.authorization = `Bearer ${token}`
-}
-
-function isMutatingRequest(req: IncomingMessage): boolean {
-  return req.method === 'POST'
-    || req.method === 'PUT'
-    || req.method === 'PATCH'
-    || req.method === 'DELETE'
-}
-
-function rejectUntrustedOrigin(req: IncomingMessage, res: ServerResponse): boolean {
-  if (!isMutatingRequest(req) || isTrustedOrigin(req)) return false
-  sendJson(res, 403, authError('csrf_rejected', 'Untrusted origin'))
-  return true
 }
 
 // Initialize shared schema before accepting requests.
@@ -468,7 +439,23 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     return
   }
 
-  if (rejectUntrustedOrigin(req, res)) return
+  const admission = httpAdmission(req)
+  if (!admission.ok) {
+    sendJson(res, admission.status, { ok: false, code: admission.code })
+    return
+  }
+
+  if (req.method === 'GET' && req.url === '/api/auth/browser-policy') {
+    const appOrigin = normalizeOrigin(process.env.PUBLIC_APP_ORIGIN)
+    const apiOrigin = normalizeOrigin(process.env.PUBLIC_API_BASE)
+    const buildId = process.env.GAME_BUILD_ID ?? ''
+    if (process.env.NODE_ENV !== 'production' || !appOrigin?.startsWith('https:') || !apiOrigin?.startsWith('https:') || !/^[a-f0-9]{40}$/.test(buildId)) {
+      sendJson(res, 503, { ok: false, code: 'browser_policy_unavailable' })
+    } else {
+      sendJson(res, 200, { version: BROWSER_AUTH_VERSION, buildId, appOrigin, apiOrigin } satisfies BrowserAuthPolicy)
+    }
+    return
+  }
 
   if (await handleCommunityQr(req, res)) return
   if (await handleWhatsNew(req, res)) return
@@ -614,14 +601,14 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       sendJson(res, 400, result)
       return
     }
-    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
+    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': [serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })] })
     return
   }
 
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
     const token = (await getAuthToken(req))
     if (token) (await logout(token))
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': [clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })] })
     return
   }
 
@@ -632,7 +619,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       ;(await logoutAll(user.id))
       wssCtx?.closeUserConnections(user.id)
     }
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': [clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })] })
     return
   }
 
@@ -652,7 +639,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     await retryPendingAccountDeletion(user.id)
     const pending = !!await getDb().prepare('SELECT 1 FROM users WHERE id=?').get(user.id)
     sendJson(res, pending ? 202 : 200, { ok: true, pending, operationId: operation.id }, {
-      'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }),
+      'Set-Cookie': [clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })],
     })
     return
   }
@@ -694,8 +681,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       return
     }
     res.statusCode = 302
-    res.setHeader('Location', appOrigin)
-    res.setHeader('Set-Cookie', serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req) }))
+    res.setHeader('Location', `${appOrigin.replace(/\/?$/, '/')}?page=login`)
+    res.setHeader('Cache-Control', 'no-store')
     res.end()
     return
   }
@@ -749,7 +736,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     wssCtx?.closeUserConnections(result.user.id)
     sendJson(res, 200, { ok: true, user: result.user }, {
       'Cache-Control': 'no-store',
-      'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }),
+      'Set-Cookie': [serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })],
     })
     return
   }
@@ -1093,14 +1080,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     || req.url?.startsWith('/api/workshop/')
     || req.url?.startsWith('/api/admin/')
   ) {
-    ;(await forwardCookieSessionAsBearer(req))
     const handled = await handleWorkshopRoute(req, res)
     if (handled) return
   }
 
   // ── Game routes (existing) ─────────────────────────────
   if (req.url?.startsWith('/api/game/')) {
-    ;(await forwardCookieSessionAsBearer(req))
     const handled = await handleGameRoute(req, res)
     if (handled) return
   }

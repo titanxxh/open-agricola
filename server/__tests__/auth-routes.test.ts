@@ -73,7 +73,7 @@ const { createOAuthState, createOnboardingTicket, findIdentity, getOnboardingTic
 const { exchangeOAuthCode } = await import('../oauth/providers.ts')
 const { createInvite, hashInviteCode } = await import('../invites.ts')
 const { getDb } = await import('../db.ts')
-const { OAUTH_STATE_COOKIE, SESSION_COOKIE } = await import('../auth-cookies.ts')
+const { authCookieNames } = await import('../auth-cookies.ts')
 const emailModule = await import('../email.ts')
 
 await import('../index.ts')
@@ -135,7 +135,11 @@ async function requestJson(
   headers: Record<string, string> = {},
 ): Promise<JsonResponse> {
   if (!routeHandler) throw new Error('route handler was not captured')
-  const req = new MockReq(method, url, body, headers) as unknown as IncomingMessage
+  const navigation = method === 'GET' && (url.includes('/callback') || url.startsWith('/api/auth/verify-email'))
+  const native = Object.keys(headers).some(key => key.toLowerCase() === 'authorization')
+  const browserHeaders = navigation || native ? {} : { Origin: new URL(process.env.PUBLIC_APP_ORIGIN ?? 'http://localhost').origin, 'X-OA-Browser-Protocol': '2' }
+  const host = process.env.PUBLIC_API_BASE ? new URL(process.env.PUBLIC_API_BASE).host : 'localhost'
+  const req = new MockReq(method, url, body, { Host: host, ...browserHeaders, ...headers }) as unknown as IncomingMessage
   const res = new MockRes()
   await routeHandler(req, res as unknown as ServerResponse)
   await res.done
@@ -157,11 +161,11 @@ function cookiePairFromSetCookie(header: string | string[] | undefined, name: st
 }
 
 function oauthCookieForState(state: string): string {
-  return `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}`
+  return `${authCookieNames().oauthState}=${encodeURIComponent(state)}`
 }
 
 function startOAuthCookie(res: JsonResponse): string {
-  return cookiePairFromSetCookie(res.headers['Set-Cookie'], OAUTH_STATE_COOKIE)
+  return cookiePairFromSetCookie(res.headers['Set-Cookie'], authCookieNames().oauthState)
 }
 
 function prereleaseAuthorityRequests({ seedGeneration = true } = {}) {
@@ -188,7 +192,7 @@ function prereleaseAuthorityRequests({ seedGeneration = true } = {}) {
     const verifier = 'v'.repeat(43)
     const issued = await requestJson('POST', '/api/prerelease/handoffs', {
       ...binding, browserChallenge: createHash('sha256').update(verifier).digest('base64url'), returnTo: 'https://formal.example.test/',
-    }, { Cookie: `oa_session=${token}`, Origin: 'https://formal.example.test' })
+    }, { Cookie: `${authCookieNames().session}=${token}`, Origin: 'https://formal.example.test' })
     expect(issued.status).toBe(200)
     const exchanged = await target('exchange', { generationId, code: issued.json.code, browserVerifier: verifier, returnTo: 'https://formal.example.test/' })
     expect(exchanged.status).toBe(200)
@@ -205,6 +209,7 @@ describe('auth routes', () => {
     wsServerMocks.closeUserConnections.mockClear()
     vi.mocked(exchangeOAuthCode).mockReset()
     vi.stubEnv('REPLAY_TRUST_PROXY', 'true')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'http://localhost')
     process.env.DISABLE_RATE_LIMIT = '1'
     process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
     const { RoomDirectory } = await import('../game/room-directory')
@@ -267,23 +272,48 @@ describe('auth routes', () => {
     expect(res.status).toBe(200)
     expect(res.json).toMatchObject({ ok: true, user: { username: 'cookieuser' } })
     expect(res.json.token).toBeUndefined()
-    expect(res.headers['Set-Cookie']).toContain('oa_session=')
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=`)
     expect(res.headers['Set-Cookie']).toContain('HttpOnly')
     expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
   })
 
-  it('authenticates with a valid duplicate session cookie when a stale one is present', async () => {
+  it('advertises the deployed browser boundary only with complete production identity', async () => {
+    expect((await requestJson('GET', '/api/auth/browser-policy')).status).toBe(503)
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://open-agricola.titanxxh.com/')
+    vi.stubEnv('PUBLIC_API_BASE', 'https://openagapi.titanxxh.com')
+    vi.stubEnv('GAME_BUILD_ID', 'a'.repeat(40))
+    const policy = await requestJson('GET', '/api/auth/browser-policy')
+    expect(policy.status).toBe(200)
+    expect(policy.json).toEqual({ version: 2, buildId: 'a'.repeat(40), appOrigin: 'https://open-agricola.titanxxh.com', apiOrigin: 'https://openagapi.titanxxh.com' })
+    expect(policy.headers['Cache-Control']).toBe('no-store')
+    vi.stubEnv('GAME_BUILD_ID', '')
+    expect((await requestJson('GET', '/api/auth/browser-policy')).status).toBe(503)
+  })
+
+  it('rejects cached and sibling clients before login or private reads', async () => {
+    const user = await createLocalUserForTests('boundary_user', 'password123', 'Boundary')
+    const token = await createSession(user.id)
+    const cookie = `${authCookieNames().session}=${token}`
+    expect((await requestJson('GET', '/api/auth/me', undefined, { Cookie: cookie, 'X-OA-Browser-Protocol': '' })).status).toBe(426)
+    expect((await requestJson('GET', '/api/auth/me', undefined, { Cookie: cookie, Origin: 'https://pre.titanxxh.com' })).status).toBe(403)
+    const login = await requestJson('POST', '/api/auth/login', { username: user.username, password: 'password123' }, { 'X-OA-Browser-Protocol': '' })
+    expect(login.status).toBe(426)
+    expect(login.headers['Set-Cookie']).toBeUndefined()
+  })
+
+  it('rejects ambiguous session cookies even when one value is valid', async () => {
     const user = await createLocalUserForTests('duplicatecookie', 'password123', 'Duplicate Cookie')
     const validToken = (await createSession(user.id))
 
     for (const cookie of [
-      `${SESSION_COOKIE}=stale; ${SESSION_COOKIE}=${validToken}`,
-      `${SESSION_COOKIE}=${validToken}; ${SESSION_COOKIE}=stale`,
+      `${authCookieNames().session}=stale; ${authCookieNames().session}=${validToken}`,
+      `${authCookieNames().session}=${validToken}; ${authCookieNames().session}=stale`,
     ]) {
       const res = await requestJson('GET', '/api/auth/me', undefined, { Cookie: cookie })
 
-      expect(res.status).toBe(200)
-      expect(res.json).toMatchObject({ ok: true, user: { username: 'duplicatecookie' } })
+      expect(res.status).toBe(401)
+      expect(res.json).toMatchObject({ ok: false, code: 'not_authenticated' })
     }
   })
 
@@ -307,12 +337,12 @@ describe('auth routes', () => {
       .run('route-room', user.id, 0, now))
 
     const res = await requestJson('DELETE', '/api/auth/account', undefined, {
-      Cookie: `${SESSION_COOKIE}=${token}`,
+      Cookie: `${authCookieNames().session}=${token}`,
     })
 
     expect(res.status).toBe(200)
     expect(res.json).toMatchObject({ ok: true })
-    expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=;`)
     expect((await validateSession(token))).toBeNull()
     expect(((await getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id)) as { n: number }).n).toBe(0)
     expect(((await getDb().prepare('SELECT COUNT(*) AS n FROM rooms WHERE id = ?').get('route-room')) as { n: number }).n).toBe(0)
@@ -336,7 +366,7 @@ describe('auth routes', () => {
     `).run('draft-submission', user.id, 'draft-room', 'The game froze'))
 
     const res = await requestJson('DELETE', '/api/auth/account', undefined, {
-      Cookie: `${SESSION_COOKIE}=${token}`,
+      Cookie: `${authCookieNames().session}=${token}`,
     })
 
     expect(res.status).toBe(200)
@@ -353,7 +383,7 @@ describe('auth routes', () => {
     const token = await createSession(user.id)
     await getDb().prepare(`INSERT INTO bug_report_feedback_subjects(submission_id,source,reporter_user_id,github_issue_number,import_audit)
       VALUES('11111111-1111-4111-8111-111111111111','historical',?,1465,'{}')`).run(user.id)
-    const result = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `${SESSION_COOKIE}=${token}` })
+    const result = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `${authCookieNames().session}=${token}` })
     expect(result).toMatchObject({ status: 202, json: { ok: true, pending: true } })
     expect(await validateSession(token)).toBeNull()
     expect(await getDb().prepare('SELECT last_error_code FROM account_deletion_requests WHERE user_id=?').get(user.id)).toEqual({ last_error_code: 'bug_report_deletion_failed' })
@@ -393,12 +423,12 @@ describe('auth routes', () => {
     `).run(user.id, now))
 
     const res = await requestJson('DELETE', '/api/auth/account', undefined, {
-      Cookie: `${SESSION_COOKIE}=${token}`,
+      Cookie: `${authCookieNames().session}=${token}`,
     })
 
     expect(res.status).toBe(202)
     expect(res.json).toMatchObject({ ok: true, pending: true, operationId: expect.any(String) })
-    expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=;`)
     expect((await validateSession(token))).toBeNull()
     expect((await createSession(user.id))).toBeNull()
     expect((await findIdentity('github', 'gh-delete-pending'))).toBeNull()
@@ -453,7 +483,7 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).not.toContain('Partitioned')
   })
 
-  it('uses request-derived backend origin for cross-site production cookies without PUBLIC_API_BASE', async () => {
+  it('rejects production authentication without a configured API origin', async () => {
     process.env.NODE_ENV = 'production'
     process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
     await createLocalUserForTests('reqcookie', 'password123', 'Request Cookie')
@@ -464,13 +494,11 @@ describe('auth routes', () => {
       { Host: 'api.example', 'X-Forwarded-Proto': 'https', Origin: 'https://frontend.example' },
     )
 
-    expect(res.status).toBe(200)
-    expect(res.headers['Set-Cookie']).toContain('SameSite=None')
-    expect(res.headers['Set-Cookie']).toContain('Secure')
-    expect(res.headers['Set-Cookie']).toContain('Partitioned')
+    expect(res.status).toBe(403)
+    expect(res.headers['Set-Cookie']).toBeUndefined()
   })
 
-  it('keeps production-env cookies usable on http dev launch origins', async () => {
+  it('rejects production authentication on HTTP configuration', async () => {
     process.env.NODE_ENV = 'production'
     process.env.PUBLIC_APP_ORIGIN = 'http://frontend.example:5173'
     await createLocalUserForTests('httpcookie', 'password123', 'HTTP Cookie')
@@ -481,10 +509,8 @@ describe('auth routes', () => {
       { Host: 'frontend.example:5175', 'X-Forwarded-Proto': 'http', Origin: 'http://frontend.example:5173' },
     )
 
-    expect(res.status).toBe(200)
-    expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
-    expect(res.headers['Set-Cookie']).not.toContain('Secure')
-    expect(res.headers['Set-Cookie']).not.toContain('Partitioned')
+    expect(res.status).toBe(403)
+    expect(res.headers['Set-Cookie']).toBeUndefined()
   })
 
   it('password registration creates an unverified user and sends verification mail', async () => {
@@ -527,7 +553,7 @@ describe('auth routes', () => {
     expect(res.json).toMatchObject({ ok: false, code: 'email_delivery_failed' })
   })
 
-  it('email verification activates user and sets session cookie', async () => {
+  it('email verification activates the account without replacing the browser session', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
     process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
 
@@ -544,8 +570,8 @@ describe('auth routes', () => {
     const res = await requestJson('GET', `/api/auth/verify-email?token=${encodeURIComponent(token)}`)
 
     expect(res.status).toBe(302)
-    expect(res.headers.Location).toBe('https://frontend.example/open-agricola/')
-    expect(res.headers['Set-Cookie']).toContain('oa_session=')
+    expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=login')
+    expect(res.headers['Set-Cookie']).toBeUndefined()
     const verified = (await getDb().prepare('SELECT email_verified_at FROM users WHERE id = ?').get(created.userId)) as {
       email_verified_at: number | null
     }
@@ -869,7 +895,7 @@ describe('auth routes', () => {
       expect(reset.headers['Cache-Control']).toBe('no-store')
       expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(userId)
       for (const session of oldSessions) await expect(validateSession(session!)).resolves.toBeNull()
-      const cookie = cookiePairFromSetCookie(reset.headers['Set-Cookie'], SESSION_COOKIE)
+      const cookie = cookiePairFromSetCookie(reset.headers['Set-Cookie'], authCookieNames().session)
       const me = await requestJson('GET', '/api/auth/me', undefined, { Cookie: cookie })
       expect(me).toMatchObject({ status: 200, json: { ok: true, user: { id: userId } } })
 
@@ -904,7 +930,7 @@ describe('auth routes', () => {
       const verifiedBeforeSecondReset = await passwordHash()
       const [, second] = await Promise.all([createSession(userId, verifiedBeforeSecondReset), reset('racelogin@example.com', 1, 'thirdpassword')])
       expect(second.status).toBe(200)
-      expect(await sessionTokens()).toEqual([decodeURIComponent(cookiePairFromSetCookie(second.headers['Set-Cookie'], SESSION_COOKIE).split('=')[1]!)])
+      expect(await sessionTokens()).toEqual([decodeURIComponent(cookiePairFromSetCookie(second.headers['Set-Cookie'], authCookieNames().session).split('=')[1]!)])
     })
 
     it('keeps an overlapping password change from overwriting the reset password', async () => {
@@ -1080,7 +1106,7 @@ describe('auth routes', () => {
   it('me reads oa_session cookie', async () => {
     const user = await createLocalUserForTests('meuser', 'password123', 'Me User')
     const token = (await createSession(user.id))
-    const res = await requestJson('GET', '/api/auth/me', undefined, { Cookie: `oa_session=${token}` })
+    const res = await requestJson('GET', '/api/auth/me', undefined, { Cookie: `${authCookieNames().session}=${token}` })
     expect(res.status).toBe(200)
     expect((res.json.user as { username: string }).username).toBe('meuser')
   })
@@ -1159,7 +1185,7 @@ describe('auth routes', () => {
     }), 'playing', 1, 150))
     ;(await insertPlayer.run('room-gameover', user.id, 0, 1))
 
-    const res = await requestJson('GET', '/api/lobby/my-rooms', undefined, { Cookie: `oa_session=${token}` })
+    const res = await requestJson('GET', '/api/lobby/my-rooms', undefined, { Cookie: `${authCookieNames().session}=${token}` })
     expect(res.status).toBe(200)
     const rooms = res.json.rooms as Array<{ id: string; my_turn: number }>
     expect(rooms.map(r => r.id)).toEqual([
@@ -1178,7 +1204,7 @@ describe('auth routes', () => {
     expect(login.status).toBe(200)
     expect(login.json).toMatchObject({ ok: true, user: { username: 'admin', isAdmin: true } })
 
-    const me = await requestJson('GET', '/api/auth/me', undefined, { Cookie: `oa_session=${token}` })
+    const me = await requestJson('GET', '/api/auth/me', undefined, { Cookie: `${authCookieNames().session}=${token}` })
     expect(me.status).toBe(200)
     expect(me.json).toMatchObject({ ok: true, user: { username: 'admin', isAdmin: true } })
 
@@ -1186,7 +1212,7 @@ describe('auth routes', () => {
       'POST',
       '/api/admin/invites',
       { expiresInDays: 7 },
-      { Cookie: `oa_session=${token}` },
+      { Cookie: `${authCookieNames().session}=${token}` },
     )
     expect(created.status).toBe(200)
     expect(created.json).toMatchObject({ ok: true })
@@ -1196,11 +1222,11 @@ describe('auth routes', () => {
     const user = await createLocalUserForTests('allout', 'password123', 'All Out')
     const one = (await createSession(user.id))
     const two = (await createSession(user.id))
-    const res = await requestJson('POST', '/api/auth/logout-all', {}, { Cookie: `oa_session=${one}` })
+    const res = await requestJson('POST', '/api/auth/logout-all', {}, { Cookie: `${authCookieNames().session}=${one}` })
     expect(res.status).toBe(200)
     expect((await validateSession(one))).toBeNull()
     expect((await validateSession(two))).toBeNull()
-    expect(res.headers['Set-Cookie']).toContain('oa_session=;')
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=;`)
   })
 
   it('rejects cross-site cookie-backed mutation requests', async () => {
@@ -1213,7 +1239,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/logout-all',
       {},
-      { Cookie: `oa_session=${one}`, Origin: 'https://evil.example' },
+      { Cookie: `${authCookieNames().session}=${one}`, Origin: 'https://evil.example' },
     )
 
     expect(rejected.status).toBe(403)
@@ -1225,7 +1251,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/logout-all',
       {},
-      { Cookie: `oa_session=${one}`, Origin: 'https://frontend.example' },
+      { Cookie: `${authCookieNames().session}=${one}`, Origin: 'https://frontend.example' },
     )
 
     expect(allowed.status).toBe(200)
@@ -1246,11 +1272,11 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'newuser', displayName: 'New User', password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
     expect(res.status).toBe(200)
     expect((res.json.user as { username: string }).username).toBe('newuser')
-    expect(res.headers['Set-Cookie']).toContain('oa_session=')
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=`)
     expect((await findIdentity('github', 'gh-new'))?.userId).toBe((res.json.user as { id: string }).id)
   })
 
@@ -1275,8 +1301,8 @@ describe('auth routes', () => {
     const invite = await createInvite(admin.id, { expiresAt: Date.now() + 60_000, maxUses: 1 })
     vi.stubEnv('ACCOUNT_REGISTRATION_POLICY', 'invite_only')
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({ provider, providerUserId: 'handoff', emailVerified: true })
-    const start = await requestJson('GET', `/api/auth/oauth/${provider}/start?intent=register&onboardingChallenge=${challenge}&inviteCode=${invite.code}&returnTo=%2F%3Fpage%3Dworkshop`)
-    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const start = await requestJson('POST', `/api/auth/oauth/${provider}/start?intent=register&onboardingChallenge=${challenge}&inviteCode=${invite.code}&returnTo=%2F%3Fpage%3Dworkshop`)
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state')
     const callback = await requestJson('GET', `/api/auth/oauth/${provider}/callback?state=${state}&code=test-code`, undefined, { Cookie: startOAuthCookie(start) })
     const location = new URL(String(callback.headers.Location))
     const ticket = new URLSearchParams(location.hash.slice(1)).get('onboardingTicket')
@@ -1284,7 +1310,7 @@ describe('auth routes', () => {
     expect(location.origin + location.pathname + location.search).toBe('https://frontend.example/open-agricola/?page=onboarding')
     expect(callback.headers['Cache-Control']).toBe('no-store')
     expect(callback.headers['Referrer-Policy']).toBe('no-referrer')
-    expect(JSON.stringify(callback.headers['Set-Cookie'])).not.toContain('oa_onboarding=')
+    expect(JSON.stringify(callback.headers['Set-Cookie'])).not.toContain(`${authCookieNames().onboarding}=`)
     if (!ticket) throw new Error('Missing onboarding handoff')
     expect(await getOnboardingTicket(ticket)).toMatchObject({ onboardingChallenge: challenge, inviteCodeHash: hashInviteCode(invite.code), returnTo: '/?page=workshop' })
     const complete = await requestJson('POST', '/api/auth/onboarding/complete', {
@@ -1302,7 +1328,7 @@ describe('auth routes', () => {
     for (const wrongVerifier of [undefined, 123, 'wrong', 'ab'.repeat(32)]) {
       const response = await requestJson('POST', '/api/auth/onboarding/complete', {
         ticket, verifier: wrongVerifier, username: 'wrongbrowser', password: 'password123', confirmPassword: 'password123',
-      }, { Cookie: `oa_onboarding=${ticket}` })
+      }, { Cookie: `${authCookieNames().onboarding}=${ticket}` })
       expect(response.status).toBe(400)
       expect(response.json.code).toBe('oauth_onboarding_invalid')
       expect(await getOnboardingTicket(ticket)).not.toBeNull()
@@ -1316,13 +1342,13 @@ describe('auth routes', () => {
     const ticket = await createOnboardingTicket({ provider, providerUserId: 'cookie-bound', emailVerified: true }, undefined, undefined, challenge)
     const credentials = { username: 'cookiebound', password: 'password123', confirmPassword: 'password123' }
     for (const wrongVerifier of [undefined, 123, 'wrong', 'ab'.repeat(32)]) {
-      const response = await requestJson('POST', '/api/auth/onboarding/complete', { ...credentials, verifier: wrongVerifier }, { Cookie: `oa_onboarding=${ticket}` })
+      const response = await requestJson('POST', '/api/auth/onboarding/complete', { ...credentials, verifier: wrongVerifier }, { Cookie: `${authCookieNames().onboarding}=${ticket}` })
       expect(response.status).toBe(400)
       expect(response.json.code).toBe('oauth_onboarding_invalid')
       expect(await getOnboardingTicket(ticket)).not.toBeNull()
       expect(await findIdentity(provider, 'cookie-bound')).toBeNull()
     }
-    const valid = await requestJson('POST', '/api/auth/onboarding/complete', { ...credentials, verifier }, { Cookie: `oa_onboarding=${ticket}` })
+    const valid = await requestJson('POST', '/api/auth/onboarding/complete', { ...credentials, verifier }, { Cookie: `${authCookieNames().onboarding}=${ticket}` })
     expect(valid.status).toBe(200)
     expect(await findIdentity(provider, 'cookie-bound')).not.toBeNull()
     expect(await getOnboardingTicket(ticket)).toBeNull()
@@ -1345,7 +1371,7 @@ describe('auth routes', () => {
     expect(missing.json.code).toBe('oauth_onboarding_missing')
     const ticket = await createOnboardingTicket({ provider: 'google', providerUserId: 'expired', emailVerified: true })
     await getDb().prepare('UPDATE oauth_onboarding_tickets SET created_at = ?, expires_at = ?').run(Date.now() - 15 * 60_000, Date.now())
-    const expired = await requestJson('POST', '/api/auth/onboarding/complete', body, { Cookie: `oa_onboarding=${ticket}` })
+    const expired = await requestJson('POST', '/api/auth/onboarding/complete', body, { Cookie: `${authCookieNames().onboarding}=${ticket}` })
     expect(expired.status).toBe(400)
     expect(expired.json.code).toBe('oauth_onboarding_expired')
     expect(await findIdentity('google', 'expired')).toBeNull()
@@ -1370,7 +1396,7 @@ describe('auth routes', () => {
     const responses = await Promise.all(['firstuser', 'seconduser'].map(username => requestJson(
       'POST', '/api/auth/onboarding/complete',
       { username, password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )))
     expect(responses.filter(response => response.status === 200)).toHaveLength(1)
     expect(responses.find(response => response.status !== 200)?.json).toMatchObject({ code: 'oauth_onboarding_expired' })
@@ -1384,7 +1410,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'badpw', password: 'password123', confirmPassword: 'different123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'password_mismatch' })
@@ -1396,7 +1422,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'retryuser', password: 'password123', confirmPassword: 'different123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
     expect(mismatch.status).toBe(400)
     expect(mismatch.json).toMatchObject({ ok: false, code: 'password_mismatch' })
@@ -1405,7 +1431,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'retryuser', password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
     expect(retry.status).toBe(200)
     expect((retry.json.user as { username: string }).username).toBe('retryuser')
@@ -1419,7 +1445,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'takenname', password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
     expect(duplicate.status).toBe(400)
     expect(duplicate.json).toMatchObject({ ok: false, code: 'username_taken' })
@@ -1428,7 +1454,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'uniquename', password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
     expect(retry.status).toBe(200)
     expect((retry.json.user as { username: string }).username).toBe('uniquename')
@@ -1446,7 +1472,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'deleted_admin', password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
 
     expect(res.status).toBe(400)
@@ -1471,7 +1497,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'noinvite', password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
 
     expect(res.status).toBe(400)
@@ -1482,10 +1508,10 @@ describe('auth routes', () => {
   it('rejects invite-only oauth register start without an invite code', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
 
-    const res = await requestJson('GET', '/api/auth/oauth/github/start?intent=register')
+    const res = await requestJson('POST', '/api/auth/oauth/github/start?intent=register')
 
-    expect(res.status).toBe(302)
-    expect(res.headers.Location).toContain('authError=invalid_invite')
+    expect(res.status).toBe(403)
+    expect(res.json).toMatchObject({ ok: false, code: 'invalid_invite' })
     expect(res.headers['Set-Cookie']).toBeUndefined()
   })
 
@@ -1493,22 +1519,22 @@ describe('auth routes', () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
 
     const res = await requestJson(
-      'GET',
+      'POST',
       '/api/auth/oauth/google/start?intent=register&inviteCode=oa_missing',
     )
 
-    expect(res.status).toBe(302)
-    expect(res.headers.Location).toContain('authError=invalid_invite')
+    expect(res.status).toBe(403)
+    expect(res.json).toMatchObject({ ok: false, code: 'invalid_invite' })
     expect(res.headers['Set-Cookie']).toBeUndefined()
   })
 
   it('rejects oauth register start when registration is disabled', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'disabled'
 
-    const res = await requestJson('GET', '/api/auth/oauth/github/start?intent=register&inviteCode=oa_any')
+    const res = await requestJson('POST', '/api/auth/oauth/github/start?intent=register&inviteCode=oa_any')
 
-    expect(res.status).toBe(302)
-    expect(res.headers.Location).toContain('authError=registration_disabled')
+    expect(res.status).toBe(403)
+    expect(res.json).toMatchObject({ ok: false, code: 'registration_disabled' })
     expect(res.headers['Set-Cookie']).toBeUndefined()
   })
 
@@ -1522,7 +1548,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'invited', password: 'password123', confirmPassword: 'password123', inviteCode: invite.code },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
 
     expect(res.status).toBe(400)
@@ -1546,7 +1572,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'secondinvite', password: 'password123', confirmPassword: 'password123', inviteCode: invite.code },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
     expect(first.status).toBe(400)
     expect(first.json).toMatchObject({ ok: false, code: 'invalid_invite' })
@@ -1555,7 +1581,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'secondinvite', password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
 
     expect(retry.status).toBe(400)
@@ -1575,17 +1601,17 @@ describe('auth routes', () => {
     })
 
     const start = await requestJson(
-      'GET',
+      'POST',
       `/api/auth/oauth/github/start?intent=register&inviteCode=${encodeURIComponent(invite.code)}`,
     )
-    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state') ?? ''
     const callback = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
       undefined,
       { Cookie: startOAuthCookie(start) },
     )
-    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], authCookieNames().onboarding)
 
     const complete = await requestJson(
       'POST',
@@ -1613,24 +1639,24 @@ describe('auth routes', () => {
 
     for (const suffix of ['one', 'two']) {
       const start = await requestJson(
-        'GET',
+        'POST',
         `/api/auth/oauth/github/start?intent=register&inviteCode=${encodeURIComponent(invite.code)}`,
       )
-      expect(start.headers.Location).not.toContain('authError=invalid_invite')
+      expect(start.status).toBe(200)
       vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
         provider: 'github',
         providerUserId: `gh-multi-${suffix}`,
         providerLogin: `multi-${suffix}`,
         emailVerified: true,
       })
-      const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+      const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state') ?? ''
       const callback = await requestJson(
         'GET',
         `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
         undefined,
         { Cookie: startOAuthCookie(start) },
       )
-      const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+      const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], authCookieNames().onboarding)
       const complete = await requestJson(
         'POST',
         '/api/auth/onboarding/complete',
@@ -1641,11 +1667,11 @@ describe('auth routes', () => {
     }
 
     const rejected = await requestJson(
-      'GET',
+      'POST',
       `/api/auth/oauth/github/start?intent=register&inviteCode=${encodeURIComponent(invite.code)}`,
     )
-    expect(rejected.status).toBe(302)
-    expect(rejected.headers.Location).toContain('authError=invalid_invite')
+    expect(rejected.status).toBe(403)
+    expect(rejected.json).toMatchObject({ code: 'invalid_invite' })
     expect((await getDb().prepare('SELECT use_count FROM account_invites WHERE id = ?').get(invite.id)))
       .toEqual({ use_count: 2 })
   })
@@ -1663,7 +1689,7 @@ describe('auth routes', () => {
       'POST',
       '/api/admin/invites',
       { expiresInDays: 7 },
-      { Cookie: `oa_session=${token}` },
+      { Cookie: `${authCookieNames().session}=${token}` },
     )
     expect(forbidden.status).toBe(403)
     expect(forbidden.json).toMatchObject({ ok: false, code: 'admin_required' })
@@ -1678,7 +1704,7 @@ describe('auth routes', () => {
       'POST',
       '/api/admin/invites',
       { expiresInDays: 7 },
-      { Cookie: `oa_session=${token}` },
+      { Cookie: `${authCookieNames().session}=${token}` },
     )
 
     expect(created.status).toBe(200)
@@ -1686,7 +1712,7 @@ describe('auth routes', () => {
     const code = ((created.json.invite as Record<string, unknown>).code as string)
     expect(code).toMatch(/^oa_/)
 
-    const listed = await requestJson('GET', '/api/admin/invites', undefined, { Cookie: `oa_session=${token}` })
+    const listed = await requestJson('GET', '/api/admin/invites', undefined, { Cookie: `${authCookieNames().session}=${token}` })
     expect(listed.status).toBe(200)
     expect(JSON.stringify(listed.json)).not.toContain(code)
     expect((listed.json.invites as Array<{ status: string }>)[0].status).toBe('active')
@@ -1700,7 +1726,7 @@ describe('auth routes', () => {
 
     const created = await requestJson('POST', '/api/admin/invites', {
       code: 'FAMILY-2026', expiresAt, maxUses: 4,
-    }, { Cookie: `oa_session=${token}` })
+    }, { Cookie: `${authCookieNames().session}=${token}` })
 
     expect(created.status).toBe(200)
     expect(created.json).toMatchObject({
@@ -1708,7 +1734,7 @@ describe('auth routes', () => {
       invite: { code: 'FAMILY-2026', expiresAt, maxUses: 4, useCount: 0 },
     })
     const listed = await requestJson('GET', '/api/admin/invites', undefined, {
-      Cookie: `oa_session=${token}`,
+      Cookie: `${authCookieNames().session}=${token}`,
     })
     expect(listed.json).toMatchObject({
       ok: true,
@@ -1721,7 +1747,7 @@ describe('auth routes', () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
     const token = (await createSession(admin.id))
-    const headers = { Cookie: `oa_session=${token}` }
+    const headers = { Cookie: `${authCookieNames().session}=${token}` }
     const body = { code: '  DUPLICATE  ', expiresInDays: 7, maxUses: 2 }
     expect((await requestJson('POST', '/api/admin/invites', body, headers)).status).toBe(200)
 
@@ -1744,7 +1770,7 @@ describe('auth routes', () => {
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
     const token = (await createSession(admin.id))
     const response = await requestJson('POST', '/api/admin/invites', body, {
-      Cookie: `oa_session=${token}`,
+      Cookie: `${authCookieNames().session}=${token}`,
     })
     expect(response.status).toBe(400)
     expect(response.json).toMatchObject({ ok: false, code })
@@ -1760,12 +1786,12 @@ describe('auth routes', () => {
       'POST',
       `/api/admin/invites/${invite.id}/revoke`,
       {},
-      { Cookie: `oa_session=${token}` },
+      { Cookie: `${authCookieNames().session}=${token}` },
     )
 
     expect(revoked.status).toBe(200)
     expect(revoked.json).toMatchObject({ ok: true })
-    const listed = await requestJson('GET', '/api/admin/invites', undefined, { Cookie: `oa_session=${token}` })
+    const listed = await requestJson('GET', '/api/admin/invites', undefined, { Cookie: `${authCookieNames().session}=${token}` })
     const row = (listed.json.invites as Array<{ id: string; status: string }>).find(inviteRow => inviteRow.id === invite.id)
     expect(row?.status).toBe('revoked')
   })
@@ -1778,7 +1804,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/onboarding/complete',
       { username: 'disableduser', password: 'password123', confirmPassword: 'password123' },
-      { Cookie: `oa_onboarding=${ticket}` },
+      { Cookie: `${authCookieNames().onboarding}=${ticket}` },
     )
 
     expect(res.status).toBe(400)
@@ -1801,8 +1827,8 @@ describe('auth routes', () => {
       providerLogin: 'existing-gh',
       emailVerified: true,
     })
-    const start = await requestJson('GET', '/api/auth/oauth/github/start?intent=login')
-    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const start = await requestJson('POST', '/api/auth/oauth/github/start?intent=login')
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state') ?? ''
 
     const callback = await requestJson(
       'GET',
@@ -1812,7 +1838,7 @@ describe('auth routes', () => {
     )
 
     expect(callback.status).toBe(302)
-    expect(callback.headers['Set-Cookie']).toContain('oa_session=')
+    expect(callback.headers['Set-Cookie']).toContain(`${authCookieNames().session}=`)
     expect(callback.headers['Set-Cookie']).not.toContain('Partitioned')
   })
 
@@ -1827,15 +1853,15 @@ describe('auth routes', () => {
       emailVerified: true,
     })
 
-    const start = await requestJson('GET', '/api/auth/oauth/github/start?intent=login')
-    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const start = await requestJson('POST', '/api/auth/oauth/github/start?intent=login')
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state') ?? ''
     const callback = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
       undefined,
       { Cookie: startOAuthCookie(start) },
     )
-    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], authCookieNames().onboarding)
 
     const complete = await requestJson(
       'POST',
@@ -1877,7 +1903,7 @@ describe('auth routes', () => {
     })
     expect(res.status).toBe(200)
     expect(res.json).toMatchObject({ ok: true, provider: 'github', mode: 'onboarding' })
-    expect(res.headers['Set-Cookie']).toContain('oa_onboarding=')
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().onboarding}=`)
   })
 
   it('test oauth helper logs in an existing linked user when identity already exists', async () => {
@@ -1902,13 +1928,15 @@ describe('auth routes', () => {
 
     expect(res.status).toBe(200)
     expect(res.json).toMatchObject({ ok: true, provider: 'google', mode: 'login' })
-    expect(res.headers['Set-Cookie']).toContain('oa_session=')
-    expect((await validateSession(String(res.headers['Set-Cookie']).match(/oa_session=([^;]+)/)?.[1] ?? ''))).toMatchObject({
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=`)
+    expect((await validateSession(cookiePairFromSetCookie(res.headers['Set-Cookie'], authCookieNames().session).split('=')[1] ?? ''))).toMatchObject({
       username: 'oauthlogin',
     })
   })
 
   it('test oauth helper remains unavailable in production', async () => {
+    process.env.PUBLIC_API_BASE = 'https://api.example.test'
+    process.env.PUBLIC_APP_ORIGIN = 'https://app.example.test'
     process.env.NODE_ENV = 'production'
     process.env.ENABLE_AUTH_TEST_HELPERS = '1'
     const res = await requestJson('POST', '/api/test/oauth/github/callback', { providerUserId: 'x' })
@@ -1918,7 +1946,7 @@ describe('auth routes', () => {
   describe.each(['github', 'google'] as const)('%s account linking', (provider) => {
     async function startLink(userId: string) {
       const token = await createSession(userId)
-      const headers = { Cookie: `oa_session=${token}`, Origin: 'https://app.example' }
+      const headers = { Cookie: `${authCookieNames().session}=${token}`, Origin: 'https://app.example' }
       process.env.PUBLIC_APP_ORIGIN = 'https://app.example/open-agricola/'
       const start = await requestJson('POST', `/api/auth/oauth/${provider}/start?intent=link`, {}, headers)
       expect(start.status).toBe(200)
@@ -1964,7 +1992,7 @@ describe('auth routes', () => {
       const anonymous = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, body)
       expect(anonymous.status).toBe(401)
       const foreign = await requestJson('POST', `/api/auth/oauth/${provider}/complete`, body, {
-        ...headers, Cookie: `oa_session=${await createSession(other.id)}`,
+        ...headers, Cookie: `${authCookieNames().session}=${await createSession(other.id)}`,
       })
       expect(foreign.status).toBe(400)
       const wrong = provider === 'github' ? 'google' : 'github'
@@ -2021,7 +2049,7 @@ describe('auth routes', () => {
       const user = await createLocalUserForTests(`csrf_${provider}`, 'password123', 'CSRF')
       const token = await createSession(user.id)
       expect((await requestJson('POST', `/api/auth/oauth/${provider}/start?intent=link`, {}, {
-        Cookie: `oa_session=${token}`, Origin: 'https://untrusted.example',
+        Cookie: `${authCookieNames().session}=${token}`, Origin: 'https://untrusted.example',
       })).status).toBe(403)
     })
   })
@@ -2048,14 +2076,14 @@ describe('auth routes', () => {
     ;(await linkIdentity(user.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
-    const start = await requestJson('GET', '/api/auth/oauth/github/start')
-    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const start = await requestJson('POST', '/api/auth/oauth/github/start')
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state') ?? ''
 
     const withoutCookie = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
     expect(withoutCookie.status).toBe(302)
     expect(withoutCookie.headers.Location).toContain('authError=oauth_state_invalid')
-    expect(withoutCookie.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
-    expect(withoutCookie.headers['Set-Cookie']).not.toContain('oa_session=')
+    expect(withoutCookie.headers['Set-Cookie']).toContain(`${authCookieNames().oauthState}=;`)
+    expect(withoutCookie.headers['Set-Cookie']).not.toContain(`${authCookieNames().session}=`)
 
     const withCookie = await requestJson(
       'GET',
@@ -2064,8 +2092,8 @@ describe('auth routes', () => {
       { Cookie: startOAuthCookie(start) },
     )
     expect(withCookie.status).toBe(302)
-    expect(withCookie.headers['Set-Cookie']).toContain('oa_session=')
-    expect(withCookie.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
+    expect(withCookie.headers['Set-Cookie']).toContain(`${authCookieNames().session}=`)
+    expect(withCookie.headers['Set-Cookie']).toContain(`${authCookieNames().oauthState}=;`)
   })
 
   it('carries invite hash from oauth start into onboarding ticket', async () => {
@@ -2080,12 +2108,12 @@ describe('auth routes', () => {
     })
 
     const start = await requestJson(
-      'GET',
+      'POST',
       `/api/auth/oauth/github/start?intent=register&inviteCode=${encodeURIComponent(invite.code)}`,
     )
-    expect(start.status).toBe(302)
+    expect(start.status).toBe(200)
 
-    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state') ?? ''
     const callback = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
@@ -2094,8 +2122,8 @@ describe('auth routes', () => {
     )
     expect(callback.status).toBe(302)
 
-    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
-    const ticket = decodeURIComponent(onboardingCookie.replace(/^oa_onboarding=/, ''))
+    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], authCookieNames().onboarding)
+    const ticket = decodeURIComponent(onboardingCookie.slice(authCookieNames().onboarding.length + 1))
     const profile = (await getOnboardingTicket(ticket))
     expect(profile?.inviteCodeHash).toBe(hashInviteCode(invite.code))
   })
@@ -2111,8 +2139,8 @@ describe('auth routes', () => {
     }
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
-    const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
-    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const start = await requestJson('POST', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state') ?? ''
     const callback = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${state}`,
@@ -2121,7 +2149,7 @@ describe('auth routes', () => {
     )
     expect(callback.status).toBe(302)
     expect(callback.headers.Location).toBe('https://frontend.example/open-agricola/?page=onboarding')
-    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], authCookieNames().onboarding)
 
     const complete = await requestJson(
       'POST',
@@ -2137,7 +2165,7 @@ describe('auth routes', () => {
 
     expect(complete.status).toBe(200)
     expect(complete.json).toMatchObject({ ok: true, returnTo: '/?page=workshop' })
-    expect(complete.headers['Set-Cookie']).toContain('oa_session=')
+    expect(complete.headers['Set-Cookie']).toContain(`${authCookieNames().session}=`)
   })
 
   it('redirects OAuth app destinations to PUBLIC_APP_ORIGIN while preserving safe returnTo', async () => {
@@ -2152,8 +2180,8 @@ describe('auth routes', () => {
     ;(await linkIdentity(user.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
-    const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2F%3Fpage%3Dsettings')
-    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const start = await requestJson('POST', '/api/auth/oauth/github/start?returnTo=%2F%3Fpage%3Dsettings')
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state')
     const res = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${state}`,
@@ -2163,8 +2191,8 @@ describe('auth routes', () => {
 
     expect(res.status).toBe(302)
     expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=settings')
-    expect(res.headers['Set-Cookie']).toContain('oa_session=')
-    expect(res.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=`)
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().oauthState}=;`)
   })
 
   it('does not duplicate PUBLIC_APP_ORIGIN path base when OAuth returnTo already includes it', async () => {
@@ -2179,8 +2207,8 @@ describe('auth routes', () => {
     ;(await linkIdentity(user.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
-    const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
-    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const start = await requestJson('POST', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state')
     const res = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${state}`,
@@ -2204,8 +2232,8 @@ describe('auth routes', () => {
     ;(await linkIdentity(user.id, profile))
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
-    const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%3Fpage%3Dworkshop')
-    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const start = await requestJson('POST', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%3Fpage%3Dworkshop')
+    const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state')
     const res = await requestJson(
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${state}`,
@@ -2236,7 +2264,7 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/change-password',
       {},
-      { Cookie: `oa_session=${token}` },
+      { Cookie: `${authCookieNames().session}=${token}` },
     )
     expect(missingPasswordFields.status).toBe(400)
     expect(missingPasswordFields.json).toMatchObject({ ok: false, code: 'missing_fields' })
@@ -2254,8 +2282,8 @@ describe('auth routes', () => {
 
     for (const returnTo of ['https://evil.test', '//evil.test', '\\\\evil']) {
       vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
-      const start = await requestJson('GET', `/api/auth/oauth/github/start?returnTo=${encodeURIComponent(returnTo)}`)
-      const state = new URL(String(start.headers.Location)).searchParams.get('state')
+      const start = await requestJson('POST', `/api/auth/oauth/github/start?returnTo=${encodeURIComponent(returnTo)}`)
+      const state = new URL(String(start.json.authorizationUrl)).searchParams.get('state')
       const res = await requestJson(
         'GET',
         `/api/auth/oauth/github/callback?code=ok&state=${state}`,
@@ -2264,7 +2292,7 @@ describe('auth routes', () => {
       )
 
       expect(res.status).toBe(302)
-      expect(res.headers.Location).toBe('/')
+      expect(res.headers.Location).toBe('http://localhost/')
     }
   })
 
@@ -2292,10 +2320,10 @@ describe('auth routes', () => {
     const one = await createSession(user.id), two = await createSession(user.id)
     expect((await requestJson('GET', '/api/auth/me', undefined, pre.targetHeaders)).status).toBe(401)
     const first = await pre.enter(one), sameSource = await pre.enter(one), otherSource = await pre.enter(two)
-    expect((await requestJson('POST', '/api/auth/logout', {}, { Cookie: `oa_session=${one}` })).status).toBe(200)
+    expect((await requestJson('POST', '/api/auth/logout', {}, { Cookie: `${authCookieNames().session}=${one}` })).status).toBe(200)
     for (const grantId of [first, sameSource]) expect((await pre.status(grantId)).json).toMatchObject({ state: { source: { kind: 'invalid' } } })
     expect((await pre.status(otherSource)).json).toMatchObject({ state: { source: { kind: 'active' } } })
-    expect((await requestJson('POST', '/api/auth/logout-all', {}, { Cookie: `oa_session=${two}` })).status).toBe(200)
+    expect((await requestJson('POST', '/api/auth/logout-all', {}, { Cookie: `${authCookieNames().session}=${two}` })).status).toBe(200)
     expect((await pre.status(otherSource)).json).toMatchObject({ state: { source: { kind: 'invalid' } } })
     const events = await pre.target('events')
     expect(events.status).toBe(200)
@@ -2312,7 +2340,7 @@ describe('auth routes', () => {
     await getDb().prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
     const token = await createSession(user.id)
     await pre.enter(token)
-    const deletion = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `oa_session=${token}` })
+    const deletion = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `${authCookieNames().session}=${token}` })
     expect(deletion.status).toBe(202)
     expect(deletion.json).toMatchObject({ ok: true, pending: true })
     expect(await validateSession(token ?? '')).toBeNull()
@@ -2340,7 +2368,7 @@ describe('auth routes', () => {
     await getDb().prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
     const one = await createSession(user.id), two = await createSession(user.id)
     const first = await pre.enter(one), second = await pre.enter(two)
-    const changed = await requestJson('POST', '/api/auth/change-password', { oldPassword: 'password123', newPassword: 'changed-password' }, { Cookie: `oa_session=${one}` })
+    const changed = await requestJson('POST', '/api/auth/change-password', { oldPassword: 'password123', newPassword: 'changed-password' }, { Cookie: `${authCookieNames().session}=${one}` })
     expect(changed.status).toBe(200)
     for (const grantId of [first, second]) expect((await pre.status(grantId)).json).toMatchObject({ state: { source: { kind: 'active' } } })
     const mail = vi.spyOn(emailModule, 'sendEmail').mockResolvedValue(undefined)
@@ -2351,7 +2379,7 @@ describe('auth routes', () => {
     const reset = await requestJson('POST', '/api/auth/password-reset/complete', { token, password: 'reset-password', confirmPassword: 'reset-password' })
     expect(reset.status).toBe(200)
     for (const grantId of [first, second]) expect((await pre.status(grantId)).json).toMatchObject({ state: { source: { kind: 'invalid' }, grant: { kind: 'revoked' } } })
-    const newCookie = cookiePairFromSetCookie(reset.headers['Set-Cookie'], SESSION_COOKIE)
+    const newCookie = cookiePairFromSetCookie(reset.headers['Set-Cookie'], authCookieNames().session)
     const nextToken = decodeURIComponent(newCookie.slice(newCookie.indexOf('=') + 1))
     expect((await pre.status(await pre.enter(nextToken))).json).toMatchObject({ state: { source: { kind: 'active' }, account: { kind: 'active', subject: { id: user.id } } } })
   })
@@ -2371,17 +2399,17 @@ describe('auth routes', () => {
     const endpoint = '/api/admin/prerelease-identity/lifecycle'
     const binding = { protocolVersion: 1, channel: 'prerelease', targetOrigin: 'https://pre.beta.test', generationId: '00000000-0000-4000-8000-000000000001' }
     const close = { ...binding, action: 'close', operationId: '10000000-0000-4000-8000-000000000001' }
-    const ownerHeaders = { Cookie: `oa_session=${ownerToken}`, Origin: 'https://formal.example.test' }
+    const ownerHeaders = { Cookie: `${authCookieNames().session}=${ownerToken}`, Origin: 'https://formal.example.test' }
     expect((await requestJson('POST', endpoint, close, pre.targetHeaders)).status).toBe(401)
-    expect((await requestJson('POST', endpoint, close, { Cookie: `oa_session=${token}`, Origin: 'https://formal.example.test' })).status).toBe(403)
-    expect((await requestJson('POST', endpoint, close, { Cookie: `oa_session=${ownerToken}` })).status).toBe(403)
+    expect((await requestJson('POST', endpoint, close, { Cookie: `${authCookieNames().session}=${token}`, Origin: 'https://formal.example.test' })).status).toBe(403)
+    expect((await requestJson('POST', endpoint, close, { Cookie: `${authCookieNames().session}=${ownerToken}`, Origin: '' })).status).toBe(403)
     expect((await requestJson('POST', endpoint, close, { ...ownerHeaders, Origin: 'https://evil.example' })).status).toBe(403)
     expect((await requestJson('POST', endpoint, close, ownerHeaders)).status).toBe(200)
     const retired = { ...binding, action: 'retire', operationId: '10000000-0000-4000-8000-000000000002', purgeReceiptSha256: 'a'.repeat(64) }
     const confirmed = await requestJson('POST', endpoint, retired, ownerHeaders)
     expect(confirmed.status).toBe(200)
     vi.stubEnv('PRERELEASE_APP_ORIGIN', '')
-    const deletion = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `oa_session=${token}` })
+    const deletion = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `${authCookieNames().session}=${token}` })
     expect(deletion.status).toBe(200)
     expect(deletion.json).toMatchObject({ ok: true, pending: false })
     expect(await validateSession(token ?? '')).toBeNull()
@@ -2395,6 +2423,7 @@ describe('auth routes', () => {
 })
 
 describe('account Beta qualification', () => {
+  beforeEach(() => { vi.stubEnv('PUBLIC_APP_ORIGIN', 'http://localhost') })
   afterEach(() => { vi.unstubAllEnvs() })
   it('computes current qualification for /me and keeps anonymous requests unauthorized', async () => {
     vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', 'declared')
@@ -2403,7 +2432,7 @@ describe('account Beta qualification', () => {
     const owner = await createLocalUserForTests('experimental_owner', 'test-password', 'Owner')
     const token = await createSession(ordinary.id)
     const ownerToken = await createSession(owner.id)
-    const get = (value: string | null) => requestJson('GET', '/api/auth/me', undefined, value ? { Cookie: `oa_session=${value}` } : {})
+    const get = (value: string | null) => requestJson('GET', '/api/auth/me', undefined, value ? { Cookie: `${authCookieNames().session}=${value}` } : {})
     expect((await get(token)).json.user).toMatchObject({ betaAccess: false })
     expect((await get(ownerToken)).json.user).toMatchObject({ betaAccess: true })
     expect((await get(null)).status).toBe(401)
@@ -2421,8 +2450,8 @@ describe('account Beta qualification', () => {
     const ordinary = await createLocalUserForTests('beta_search_ordinary', 'test-password', 'Ordinary')
     const unverified = await createLocalUserForTests('beta_unverified', 'test-password', 'Pending Email')
     await getDb().prepare('UPDATE users SET email=?,email_verified_at=NULL WHERE id=?').run('beta-unverified@example.com', unverified.id)
-    const adminCookie = { Cookie: `oa_session=${await createSession(admin.id)}` }
-    const ordinaryCookie = { Cookie: `oa_session=${await createSession(ordinary.id)}` }
+    const adminCookie = { Cookie: `${authCookieNames().session}=${await createSession(admin.id)}` }
+    const ordinaryCookie = { Cookie: `${authCookieNames().session}=${await createSession(ordinary.id)}` }
     const regular = await requestJson('GET', '/api/lobby/players?prefix=beta_unverified', undefined, adminCookie)
     expect(regular.status).toBe(200)
     expect(regular.json).toEqual({ ok: true, players: [] })

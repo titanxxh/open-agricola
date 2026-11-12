@@ -12,6 +12,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { clientIp } from './client-ip'
 import { createFrontendHosting } from './frontend-hosting'
+import { isApiHost } from './http-origin'
 
 const AFFINITY_COOKIE = 'agricola_instance'
 const jsonError = (res: ServerResponse, status: number, message: string) => {
@@ -36,6 +37,9 @@ export function createPublicIngress(directory: RoomDirectory, secureCookies: boo
   const server = createServer((req, res) => {
     operationsMetrics.http(req, res)
     void (async () => {
+      if (process.env.NODE_ENV === 'production' && !isApiHost(req) && req.url !== '/api/health' && !req.url?.startsWith('/internal/metrics')) {
+        jsonError(res, 403, 'Invalid public host'); return
+      }
       if (await handleFrontend(req, res)) return
       const path = new URL(req.url ?? '/', 'http://localhost').pathname
       if (path.startsWith('/internal/metrics')) {
@@ -82,6 +86,9 @@ export function createPublicIngress(directory: RoomDirectory, secureCookies: boo
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)) })
   server.on('upgrade', (req, socket, head) => {
     void (async () => {
+      if (process.env.NODE_ENV === 'production' && !isApiHost(req)) {
+        socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return
+      }
       const match = nodePath.exec(req.url ?? '')
       if (!match) { socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'); return }
       const selected = (await directory.instances()).find(instance => instance.instance_id === match[1])

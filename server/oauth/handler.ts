@@ -5,16 +5,16 @@ import { nanoid } from 'nanoid'
 import {
   clearOnboardingCookie,
   clearOAuthStateCookie,
-  ONBOARDING_COOKIE,
-  OAUTH_STATE_COOKIE,
   readCookie,
   serializeOnboardingCookie,
   serializeOAuthStateCookie,
   serializeSessionCookie,
-  SESSION_COOKIE,
+  authCookieNames,
+  clearOperationsCookie,
 } from '../auth-cookies.ts'
 import { createSession, isUsernameReserved, validateSession, type AuthUser } from '../auth.ts'
 import { getDb } from '../db.ts'
+import { requestSessionToken } from '../request-auth'
 import { corsHeaders, getRequestOrigin } from '../http-origin.ts'
 import { assertOAuthProvider, buildOAuthAuthorizationUrl, exchangeOAuthCode } from './providers.ts'
 import {
@@ -225,6 +225,7 @@ async function createLocalUserForOnboarding(input: {
 }
 
 export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url: URL, user: AuthUser | null): Promise<void> {
+  if (req.method !== 'POST') { sendJson(res, 405, { ok: false, code: 'reload_required' }); return }
   let provider: OAuthProvider
   try {
     provider = parseProvider(url)
@@ -252,15 +253,11 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
     })
     return
   }
-  if (req.method === 'POST') {
-    sendJson(res, 400, { ok: false, code: 'oauth_state_invalid' })
-    return
-  }
 
   const returnTo = safeReturnTo(url.searchParams.get('returnTo'))
   const onboardingChallenge = url.searchParams.get('onboardingChallenge')
   if (onboardingChallenge !== null && !/^[a-f0-9]{64}$/.test(onboardingChallenge)) {
-    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'))
+    sendJson(res, 400, { ok: false, code: 'oauth_state_invalid' })
     return
   }
   const policy = getRegistrationPolicy()
@@ -268,12 +265,12 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
   let inviteCodeHash: string | undefined
   if (intent === 'register') {
     if (policy === 'disabled') {
-      redirect(res, appLocation('/?page=login&authError=registration_disabled'))
+      sendJson(res, 403, { ok: false, code: 'registration_disabled' })
       return
     }
     if (policy === 'invite_only') {
       if (!inviteCode || !(await isInviteCodeAvailable(inviteCode))) {
-        redirect(res, appLocation('/?page=login&authError=invalid_invite'))
+        sendJson(res, 403, { ok: false, code: 'invalid_invite' })
         return
       }
       inviteCodeHash = hashInviteCode(inviteCode)
@@ -287,7 +284,8 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
     ...(inviteCodeHash ? { inviteCodeHash } : {}),
     ...(onboardingChallenge ? { onboardingChallenge } : {}),
   }))
-  redirect(res, buildOAuthAuthorizationUrl(provider, state, req), {
+  sendJson(res, 200, { ok: true, authorizationUrl: buildOAuthAuthorizationUrl(provider, state, req) }, {
+    'Cache-Control': 'no-store',
     'Set-Cookie': serializeOAuthStateCookie(state, { backendOrigin: getRequestOrigin(req) }),
   })
 }
@@ -322,7 +320,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     return
   }
 
-  const cookieState = readCookie(req.headers.cookie, OAUTH_STATE_COOKIE)
+  const cookieState = readCookie(req.headers.cookie, authCookieNames().oauthState)
   if (!rawState || cookieState !== rawState) {
     redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'), oauthStateClearHeaders(req))
     return
@@ -364,7 +362,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
       return
     }
     redirect(res, appLocation(safeReturnTo(state.returnTo) ?? '/'), oauthStateClearHeaders(req, {
-      'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }),
+      'Set-Cookie': [serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }), clearOperationsCookie({ backendOrigin: getRequestOrigin(req) })],
     }))
     return
   }
@@ -423,7 +421,7 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     ticket?: unknown; verifier?: unknown; username?: unknown; displayName?: unknown; password?: unknown; confirmPassword?: unknown
   }>(req)
   const explicitTicket = body?.ticket !== undefined
-  const ticket = explicitTicket ? body.ticket : readCookie(req.headers.cookie, ONBOARDING_COOKIE)
+  const ticket = explicitTicket ? body.ticket : readCookie(req.headers.cookie, authCookieNames().onboarding)
   if (!ticket) {
     fail('oauth_onboarding_missing', 'Registration credentials are missing. Start registration again with GitHub or Google')
     return
@@ -482,13 +480,14 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     'Cache-Control': 'no-store',
     'Set-Cookie': [
       serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }),
+      clearOperationsCookie({ backendOrigin: getRequestOrigin(req) }),
       clearOnboardingCookie({ backendOrigin: getRequestOrigin(req) }),
     ],
   })
 }
 
 export async function handleLinkedIdentities(req: IncomingMessage, res: ServerResponse): Promise<Awaited<void>> {
-  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+  const token = requestSessionToken(req)
   const user = token ? (await validateSession(token)) : null
   if (!user) {
     sendJson(res, 401, { ok: false, code: 'not_authenticated', error: 'Not authenticated' })

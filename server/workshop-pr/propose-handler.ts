@@ -1,8 +1,9 @@
+import { requestSessionToken } from '../request-auth'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { nanoid } from 'nanoid'
 import { getDb } from '../db.ts'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
-import { validateSession, extractToken } from '../auth.ts'
+import { validateSession } from '../auth.ts'
 import { corsHeaders } from '../http-origin.ts'
 import { workshopPrConfig } from './config.ts'
 import { GitHubApiError, GitHubClient } from './github-client.ts'
@@ -58,7 +59,7 @@ export async function handleSubmitReviewRequest(
   cardDbId: string,
   reviewProvider?: ReviewProvider,
 ): Promise<void> {
-  const user = await validateSession(extractToken(req.headers.authorization))
+  const user = await validateSession(requestSessionToken(req))
   if (!user) { sendJson(res,401,{ok:false,code:'unauthenticated'}); return }
   const db = getDb()
   const owner = await db.prepare('SELECT author_id, github_pr_url FROM workshop_cards WHERE id = ?').get<{author_id:string;github_pr_url:string|null}>(cardDbId)
@@ -186,7 +187,7 @@ export async function handleRefreshPrStatus(
   cardDbId: string,
   reviewProvider?: ReviewProvider,
 ): Promise<void> {
-  const user = (await validateSession(extractToken(req.headers.authorization)))
+  const user = (await validateSession(requestSessionToken(req)))
   if (!user) {
     sendJson(res, 401, { ok: false, error: 'unauthenticated' })
     return
