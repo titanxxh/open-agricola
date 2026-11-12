@@ -1,7 +1,13 @@
-const sandboxQuery = '?page=game&player=p1&embedded=1&devMode=1'
+function sandboxQuery(local: boolean, fresh: boolean, parentSearch: string): string {
+  const parent = new URLSearchParams(parentSearch)
+  const developmentPlayer = (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1')
+    && parent.get('page') === 'workshop' && parent.get('player') === 'p1' && parent.get('devMode') === '1'
+  const player = !local || developmentPlayer ? '&player=p1' : ''
+  return `?page=game${player}&embedded=1&devMode=1${local ? '&localSandbox=1' : ''}${local && fresh ? '&freshSandbox=1' : ''}`
+}
 
 export function workshopGameUrl(local: boolean, fresh: boolean): string {
-  return `${import.meta.env.BASE_URL}workshop-game.html${sandboxQuery}${local ? '&localSandbox=1' : ''}${local && fresh ? '&freshSandbox=1' : ''}`
+  return `${import.meta.env.BASE_URL}workshop-game.html${sandboxQuery(local, fresh, window.location.search)}`
 }
 
 function isWorkshopGame(): boolean {
@@ -15,14 +21,12 @@ function isWorkshopGame(): boolean {
     if (parent.searchParams.getAll('page').length !== 1 || parent.searchParams.get('page') !== 'workshop') return false
     if (own.pathname !== `${base.pathname}workshop-game.html` || own.hash) return false
     const params = own.searchParams
-    for (const [key, value] of new URLSearchParams(sandboxQuery)) {
+    const expected = new URLSearchParams(sandboxQuery(params.has('localSandbox'), params.has('freshSandbox'), parent.search))
+    if (params.size !== expected.size) return false
+    for (const [key, value] of expected) {
       if (params.get(key) !== value) return false
     }
-    const local = params.has('localSandbox')
-    const fresh = params.has('freshSandbox')
-    if (local && params.get('localSandbox') !== '1') return false
-    if (fresh && (!local || params.get('freshSandbox') !== '1')) return false
-    return params.size === 4 + Number(local) + Number(fresh)
+    return true
   } catch {
     return false
   }
