@@ -168,9 +168,9 @@ function prereleaseAuthorityRequests({ seedGeneration = true } = {}) {
   vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://formal.example.test')
   vi.stubEnv('PUBLIC_API_BASE', 'https://api.example.test')
   vi.stubEnv('PRERELEASE_ENTRY_ENABLED', 'true')
-  vi.stubEnv('PRERELEASE_APP_ORIGIN', 'https://pre.example.test')
+  vi.stubEnv('PRERELEASE_APP_ORIGIN', 'https://pre.beta.test')
   vi.stubEnv('PRERELEASE_IDENTITY_SERVICE_KEY', 'service-key-with-at-least-32-bytes')
-  const binding = { protocolVersion: 1, channel: 'prerelease', targetOrigin: 'https://pre.example.test' }
+  const binding = { protocolVersion: 1, channel: 'prerelease', targetOrigin: 'https://pre.beta.test' }
   const targetHeaders = { Authorization: 'Bearer service-key-with-at-least-32-bytes' }
   const fixtureGeneration = '00000000-0000-4000-8000-000000000001'
   const target = (path: string, input = {}) => requestJson('POST', `/api/prerelease/${path}`, { ...binding, generationId: fixtureGeneration, ...input }, targetHeaders)
@@ -2357,7 +2357,7 @@ describe('auth routes', () => {
     const token = await createSession(user.id)
     await pre.enter(token)
     const endpoint = '/api/admin/prerelease-identity/lifecycle'
-    const binding = { protocolVersion: 1, channel: 'prerelease', targetOrigin: 'https://pre.example.test', generationId: '00000000-0000-4000-8000-000000000001' }
+    const binding = { protocolVersion: 1, channel: 'prerelease', targetOrigin: 'https://pre.beta.test', generationId: '00000000-0000-4000-8000-000000000001' }
     const close = { ...binding, action: 'close', operationId: '10000000-0000-4000-8000-000000000001' }
     const ownerHeaders = { Cookie: `oa_session=${ownerToken}`, Origin: 'https://formal.example.test' }
     expect((await requestJson('POST', endpoint, close, pre.targetHeaders)).status).toBe(401)
@@ -2376,7 +2376,7 @@ describe('auth routes', () => {
     const replacement = await createLocalUserForTests('retired_then_delete', 'password123', 'Replacement')
     expect(replacement.id).not.toBe(user.id)
     expect((await requestJson('POST', endpoint, retired, ownerHeaders)).json).toEqual(confirmed.json)
-    expect((await requestJson('GET', `${endpoint}?targetOrigin=https%3A%2F%2Fpre.example.test`, undefined, ownerHeaders)).json)
+    expect((await requestJson('GET', `${endpoint}?targetOrigin=https%3A%2F%2Fpre.beta.test`, undefined, ownerHeaders)).json)
       .toMatchObject({ generation: { state: 'retired', retirement: confirmed.json.receipt } })
   })
 

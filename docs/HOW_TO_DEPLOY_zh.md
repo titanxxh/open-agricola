@@ -148,6 +148,8 @@ node --import tsx scripts/prerelease/authority.ts activate --config "$pre_config
 node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verification_token_file" "$private_owner_profile"
 ```
 
+pre 与正式 App/API 必须使用独立 Cookie site，包含私有 PSL 后缀；同站的兄弟 hostname 或不同端口会在 owner 副作用及正式交接签发前被拒绝。不要使用正式站的 pre 子域名。网关过滤 HTTP/WS 响应中的 Domain Cookie 和候选对验收 Cookie 的覆盖；JavaScript 的 Cookie 隔离仍依赖不同 site。交接继续使用顶层 PKCE 及服务端兑换，正式 App/API 的同 site 认证保持原约束。
+
 helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的十分钟 Secure/HttpOnly/host-only Cookie 绑定 build/代次，在转发 HTTP/WS 给候选前剥离；普通浏览器仍为 503。私有浏览器执行正常正式登录和真实 pre 准入，profile 不能挂载给候选。只有候选实现完整流程后，现场才能取得身份/Beta、HTTP/WS、公开卡、Viewer、保留对局/撤回、删除、容量和正式不受影响的真实证据。复制 `deploy/prerelease-acceptance.example.json`，填写精确操作/build/image/代次/指纹、当前毫秒时间 `acceptedAt`、非空证据文件路径和 SHA256；验收三十分钟过期。
 
 浏览器验收后关闭 authority、执行 maintain，再恢复同一 deploy 操作使候选在关闭状态重启。该过程撤销私有入口并 drain 已确认命令。重新扫描/应用身份，紧接着完成新 audit/activate，再开放：

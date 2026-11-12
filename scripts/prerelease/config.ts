@@ -1,3 +1,4 @@
+import { isSameSite } from '../../server/http-origin'
 import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync, lstatSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
@@ -50,7 +51,7 @@ export function parsePrereleaseTarget(value: unknown) {
     appOrigin: origin(formalInput.appOrigin), apiOrigin: origin(formalInput.apiOrigin), database: string(formalInput.database),
     bucket: string(formalInput.bucket), offsiteDirectory: absolute(formalInput.offsiteDirectory) }
   const targetOrigin = origin(input.origin)
-  if ([formal.appOrigin, formal.apiOrigin].some(value => new URL(value).hostname === new URL(targetOrigin).hostname)) throw new Error('Prerelease must not receive formal host-only cookies')
+  if ([formal.appOrigin, formal.apiOrigin].some(value => isSameSite(new URL(value), new URL(targetOrigin)))) throw new Error('Prerelease requires a different cookie site from formal app and API')
   if (project === formal.project || overlaps(directory, formal.directory) || overlaps(directory, policyDirectory)) throw new Error('Prerelease and formal/policy directories must be disjoint')
   const db = object(input.database), validation = object(input.validationDatabase), storage = object(input.objects)
   const database = { host: match(db.host, /^[a-zA-Z0-9.-]+$/, 'Expected the sealed database host'), port: integer(db.port, 1, 65535), name: match(db.name, /^oa_prerelease_[a-z0-9_]+$/, 'Expected an isolated prerelease database'),

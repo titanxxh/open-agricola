@@ -54,7 +54,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
     '-keyout', join(directory, 'key.pem'), '-out', join(directory, 'cert.pem'),
     '-days', '1', '-subj', '/CN=app.agricola.test',
-    '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:api.agricola.test,DNS:pre.agricola.test,DNS:app.test,DNS:api.test',
+    '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:api.agricola.test,DNS:pre.agricola-beta.test,DNS:app.test,DNS:api.test',
   ], { stdio: 'ignore' })
   const username = `hosted_${randomUUID().slice(0, 8)}`
   const user = await createLocalUserForTests(username, PASSWORD)
@@ -86,7 +86,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   }
   let appOrigin = ''
   let apiOrigin = ''
-  const preOrigin = 'https://pre.agricola.test'
+  const preOrigin = 'https://pre.agricola-beta.test'
   const generationId = randomUUID()
   const serviceKey = 'test-target-only-service-key-at-least-32-bytes'
   let issuedHandoffs = 0
@@ -325,7 +325,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   const proxy = createHttpServer((_req, res) => { res.writeHead(502); res.end() })
   proxy.on('connect', (req, socket, head) => {
     const target = new URL(`http://${req.url}`)
-    const local = ['app.test', 'api.test', 'app.agricola.test', 'api.agricola.test', 'pre.agricola.test'].includes(target.hostname)
+    const local = ['app.test', 'api.test', 'app.agricola.test', 'api.agricola.test', 'pre.agricola-beta.test'].includes(target.hostname)
     const upstream = connect(local ? address.port : Number(target.port) || 443, local ? '127.0.0.1' : target.hostname, () => {
       socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
       if (head.length) upstream.write(head)

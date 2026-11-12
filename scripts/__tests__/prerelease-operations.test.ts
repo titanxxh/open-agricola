@@ -20,7 +20,7 @@ function fixture() {
   const config = {
     format: 1, channel: 'prerelease', targetId: 'prerelease-test',
     directory: root, policyDirectory: resolve('.'), project: 'open-agricola-prerelease-test',
-    origin: 'https://pre.agricola.test', port: 18575, network: 'open-agricola-prerelease-test-dependencies',
+    origin: 'https://pre.agricola-beta.test', port: 18575, network: 'open-agricola-prerelease-test-dependencies',
     database: { host: '127.0.0.1', port: 5432, name: 'oa_prerelease_test', appRole: 'oa_prerelease_test_app', backupRole: 'oa_prerelease_test_backup' },
     validationDatabase: { host: '127.0.0.1', port: 5432, name: 'oa_prerelease_test_validation', role: 'oa_prerelease_test_validator' },
     objects: { endpoint: 'http://127.0.0.1:9000', bucket: 'oa-prerelease-test', prefix: 'live/', appKeyId: 'pre-app', backupKeyId: 'pre-backup' },
@@ -427,4 +427,20 @@ exit 42
   expect(result.stderr).toContain('owner-controlled machine, outside CI')
   expect(existsSync(join(value.root, 'control'))).toBe(false)
   expect(value.calls()).toBe('')
+})
+
+it.each(['https://sibling.agricola.test', 'https://nested.app.agricola.test'])('rejects same-site pre %s before owner side effects', origin => {
+  const value = fixture(); value.config.origin = origin; value.save()
+  const result = value.invoke('plan')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('different cookie site')
+  expect(value.calls()).toBe('')
+  expect(existsSync(join(value.root, 'control'))).toBe(false)
+})
+it('uses private PSL sites when validating the owner target', () => {
+  const value = fixture()
+  value.config.formal.appOrigin = 'https://app.formal-fixture.github.io'
+  value.config.formal.apiOrigin = 'https://api.formal-fixture.github.io'
+  expect(() => parsePrereleaseTarget({ ...value.config, origin: 'https://pre.formal-fixture.github.io' })).toThrow('different cookie site')
+  expect(parsePrereleaseTarget({ ...value.config, origin: 'https://pre-fixture.github.io' }).origin).toBe('https://pre-fixture.github.io')
 })

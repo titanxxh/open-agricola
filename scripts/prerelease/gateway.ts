@@ -7,6 +7,20 @@ import { createHash } from 'node:crypto'
 
 export const OWNER_VERIFICATION_COOKIE = '__Host-oa-pre-verify'
 
+function candidateResponseHeaders(headers: IncomingHttpHeaders): IncomingHttpHeaders {
+  const result = { ...headers }
+  if (result['set-cookie']) {
+    const cookies = result['set-cookie'].filter(cookie => {
+      const [pair, ...attributes] = cookie.split(';')
+      return pair.slice(0, pair.indexOf('=')).trim() !== OWNER_VERIFICATION_COOKIE
+        && !attributes.some(attribute => /^\s*domain\s*=/i.test(attribute))
+    })
+    if (cookies.length) result['set-cookie'] = cookies
+    else delete result['set-cookie']
+  }
+  return result
+}
+
 /** The candidate has no write access to this owner-controlled file or gateway. */
 export function createPrereleaseGateway(options: { stateFile: string; targetId: string; origin: string; upstream: string; verificationFile?: string }) {
   const host = new URL(options.origin).host
@@ -90,7 +104,7 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     }
     const outgoing = request({ protocol: upstream.protocol, hostname: upstream.hostname, port: upstream.port, path: req.url ?? '/', method: req.method, headers: headers(req.headers) }, response => {
       if (!permission()) { response.destroy(); res.destroy(); return }
-      res.writeHead(response.statusCode ?? 502, response.headers)
+      res.writeHead(response.statusCode ?? 502, candidateResponseHeaders(response.headers))
       response.on('data', chunk => { if (permission()) res.write(chunk); else { response.destroy(); res.destroy() } })
       response.on('end', () => res.end())
     })
@@ -112,8 +126,8 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
       track(remote, permission)
       if (!permission()) { remote.destroy(); socket.destroy(); return }
       socket.write(`HTTP/1.1 ${response.statusCode ?? 101} Switching Protocols\r\n`)
-      for (const [name, value] of Object.entries(response.headers)) {
-        if (value !== undefined) socket.write(`${name}: ${Array.isArray(value) ? value.join(', ') : value}\r\n`)
+      for (const [name, value] of Object.entries(candidateResponseHeaders(response.headers))) {
+        if (value !== undefined) for (const entry of Array.isArray(value) ? value : [value]) socket.write(`${name}: ${entry}\r\n`)
       }
       socket.write('\r\n')
       if (head.length) remote.write(head)

@@ -1,3 +1,4 @@
+import { isSameSite } from './http-origin'
 import { createHash, randomBytes } from 'node:crypto'
 import {
   PRERELEASE_IDENTITY_FRESHNESS_MS, PRERELEASE_IDENTITY_PROTOCOL,
@@ -29,8 +30,7 @@ export function configuredPrereleaseTarget(): PrereleaseTarget | undefined {
   const formalApiOrigin = strictOrigin(process.env.PUBLIC_API_BASE)
   const serviceKey = process.env.PRERELEASE_IDENTITY_SERVICE_KEY
   if (!sourceOrigin || !formalApiOrigin || !targetOrigin || !serviceKey || Buffer.byteLength(serviceKey) < 32) return undefined
-  const targetHostname = new URL(targetOrigin).hostname
-  if ([sourceOrigin, formalApiOrigin].some(origin => new URL(origin).hostname === targetHostname)) return undefined
+  if ([sourceOrigin, formalApiOrigin].some(origin => isSameSite(new URL(origin), new URL(targetOrigin)))) return undefined
   return { sourceOrigin, targetOrigin, serviceKey, entryEnabled: process.env.PRERELEASE_ENTRY_ENABLED === 'true' }
 }
 
