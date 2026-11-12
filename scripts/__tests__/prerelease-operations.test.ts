@@ -12,7 +12,7 @@ import { afterEach, expect, it } from 'vitest'
 const roots: string[] = []
 afterEach(() => roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })))
 
-function fixture() {
+function fixture(proxyNetwork?: string) {
   const temporary = mkdtempSync(join(tmpdir(), 'agricola-pre-ops-'))
   roots.push(temporary)
   const root = join(temporary, 'open-agricola-prerelease-test')
@@ -21,6 +21,7 @@ function fixture() {
     format: 1, channel: 'prerelease', targetId: 'prerelease-test',
     directory: root, policyDirectory: resolve('.'), project: 'open-agricola-prerelease-test',
     origin: 'https://pre.agricola-beta.test', port: 18575, network: 'open-agricola-prerelease-test-dependencies',
+    ...(proxyNetwork === undefined ? {} : { proxyNetwork }),
     database: { host: '127.0.0.1', port: 5432, name: 'oa_prerelease_test', appRole: 'oa_prerelease_test_app', backupRole: 'oa_prerelease_test_backup' },
     validationDatabase: { host: '127.0.0.1', port: 5432, name: 'oa_prerelease_test_validation', role: 'oa_prerelease_test_validator' },
     objects: { endpoint: 'http://127.0.0.1:9000', bucket: 'oa-prerelease-test', prefix: 'live/', appKeyId: 'pre-app', backupKeyId: 'pre-backup' },
@@ -71,8 +72,67 @@ it('initializes only a maintenance gateway, atomically binding the explicit auth
   expect(JSON.parse(readFileSync(join(value.root, 'control/gate.json'), 'utf8'))).toMatchObject({ channel: 'prerelease', mode: 'maintenance', generation, installed: null })
   const compose = JSON.parse(readFileSync(join(value.root, 'control/compose.json'), 'utf8'))
   expect(Object.keys(compose.services)).toEqual(['gateway'])
+  expect(compose.networks).toEqual({ default: {} })
+  expect(compose.services.gateway.networks).toEqual(['default'])
   expect(compose.services.gateway.ports).toEqual(['127.0.0.1:18575:5176'])
   expect(compose.services.gateway.volumes.some((value: string) => value.includes('.env'))).toBe(false)
+  expect(parsePrereleaseTarget(value.config)).not.toHaveProperty('proxyNetwork')
+})
+
+it('connects only the trusted gateway to the sealed proxy network for maintenance and installed candidates', () => {
+  const value = fixture(), target = parsePrereleaseTarget({ ...value.config, proxyNetwork: 'open-agricola_default' })
+  const maintenance = readRuntime(target), buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`
+  for (const record of [maintenance, { ...maintenance, buildId, installed: { buildId, image, installedAt: 1 } }]) {
+    const composed = renderCompose(target, record)
+    expect(composed.networks).toMatchObject({ proxy: { external: true, name: 'open-agricola_default' } })
+    expect(composed.services.gateway.networks).toEqual({ default: {}, proxy: { aliases: ['prerelease-53aee54473ffcde6b9d906b12e5f0413-gateway'] } })
+    expect(composed.services.gateway.ports).toEqual(['127.0.0.1:18575:5176'])
+    if ('app' in composed.services && composed.services.app) {
+      expect(composed.services.app.networks).toEqual(['default', 'dependencies'])
+      for (const service of [composed.services.tools, composed.services.migrate, composed.services.capture]) {
+        expect(service.networks).toEqual(['dependencies'])
+      }
+    } else expect(Object.keys(composed.services)).toEqual(['gateway'])
+  }
+  const otherOrigin = parsePrereleaseTarget({ ...value.config, proxyNetwork: target.proxyNetwork, origin: 'https://other.agricola-beta.test' })
+  expect(renderCompose(otherOrigin, readRuntime(otherOrigin)).services.gateway.networks).not.toEqual(renderCompose(target, maintenance).services.gateway.networks)
+})
+
+it.each(['open-agricola-prerelease-test-dependencies', 'open-agricola-prerelease-test_default', 'host', 'none', 'bridge', 'invalid network'])('rejects proxy network %s before changing runtime or invoking Docker', proxyNetwork => {
+  const value = fixture()
+  writeFileSync(join(value.temporary, 'target.json'), JSON.stringify({ ...value.config, proxyNetwork }))
+  const result = value.invoke('initialize', '--expected-current', 'empty', '--generation', 'bb4d6c82-676f-4dcc-a570-52377b3b32f5')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('proxy network')
+  expect(value.calls()).toBe('')
+  expect(existsSync(join(value.root, 'control'))).toBe(false)
+})
+
+it('recreates the maintenance route from owner configuration and rejects changing its sealed proxy network', () => {
+  const value = fixture(), config = { ...value.config, proxyNetwork: 'open-agricola_default' }
+  writeFileSync(join(value.temporary, 'target.json'), JSON.stringify(config))
+  const plan = value.invoke('plan')
+  expect(plan.status, plan.stderr).toBe(0)
+  expect(JSON.parse(plan.stdout).proxyUpstream).toBe('prerelease-53aee54473ffcde6b9d906b12e5f0413-gateway:5176')
+  const initialize = () => value.invoke('initialize', '--expected-current', 'empty', '--generation', 'bb4d6c82-676f-4dcc-a570-52377b3b32f5')
+  const first = initialize()
+  expect(first.status, first.stderr).toBe(0)
+  writeFileSync(join(value.root, 'control/compose.json'), '{}')
+  const retry = initialize()
+  expect(retry.status, retry.stderr).toBe(0)
+  const composed = JSON.parse(readFileSync(join(value.root, 'control/compose.json'), 'utf8'))
+  expect(Object.keys(composed.services)).toEqual(['gateway'])
+  expect(composed.networks).toEqual({ default: {}, proxy: { external: true, name: config.proxyNetwork } })
+  expect(composed.services.gateway.networks).toEqual({ default: {}, proxy: { aliases: ['prerelease-53aee54473ffcde6b9d906b12e5f0413-gateway'] } })
+  expect(value.calls()).toContain('up -d --no-build gateway')
+  expect(value.calls()).not.toMatch(/buildx|migrate|up.*app/)
+  const record = readRuntime(parsePrereleaseTarget(config))
+  expect(record.mode).toBe('maintenance')
+  for (const changed of [value.config, { ...config, proxyNetwork: 'another-proxy' }]) {
+    const target = parsePrereleaseTarget(changed)
+    expect(targetFingerprint(target)).not.toBe(record.fingerprint)
+    expect(() => readRuntime(target)).toThrow('sealed prerelease target')
+  }
 })
 
 it('revalidates a changed formal deployment without reinstalling pre or changing its generation', () => {
@@ -222,8 +282,8 @@ esac
 })
 
 
-function startupRetryFixture(sourceInstalled = true, sameBuild = false) {
-  const value = fixture(), target = parsePrereleaseTarget(value.config)
+function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNetwork?: string) {
+  const value = fixture(proxyNetwork), target = parsePrereleaseTarget(value.config)
   const buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   const image = `sha256:${'e'.repeat(64)}`, sourceBuildId = sameBuild ? buildId : 'a'.repeat(40)
   const sourceImage = sameBuild ? image : `sha256:${'d'.repeat(64)}`
@@ -339,9 +399,9 @@ it.each(['foreign-image', 'foreign-project', 'running', 'unclean', 'oom'])('refu
 })
 
 it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging across the %s completion path', completion => {
-  const source = startupRetryFixture()
+  const source = startupRetryFixture(true, false, 'open-agricola_default')
   expect(source.invoke().status).toBe(0)
-  const replacement = fixture(), directory = join(replacement.temporary, 'open-agricola-prerelease-replacement')
+  const replacement = fixture('open-agricola_default'), directory = join(replacement.temporary, 'open-agricola-prerelease-replacement')
   renameSync(replacement.root, directory)
   Object.assign(replacement.config, { directory, targetId: 'prerelease-replacement', project: 'open-agricola-prerelease-replacement',
     network: 'open-agricola-prerelease-replacement-dependencies' })
@@ -358,10 +418,12 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
     .replaceAll('pre-app', 'replacement-app').replaceAll('pre-backup', 'replacement-backup'))
   replacement.save()
   const target = parsePrereleaseTarget(replacement.config), next = 'cc4d6c82-676f-4dcc-a570-52377b3b32f5'
+  const sourceGateway = renderCompose(parsePrereleaseTarget(source.config), source.state()).services.gateway
+  expect(renderCompose(target, readRuntime(target)).services.gateway.networks).toEqual(sourceGateway.networks)
   const operationId = 'ec4d6c82-676f-4dcc-a570-52377b3b32f5', stem = `pre-${source.operationId}`
   const script = readFileSync(join(source.bin, 'docker'), 'utf8').replaceAll(source.temporary, replacement.temporary)
     .replaceAll(source.config.targetId, target.targetId).replaceAll(source.generation, next)
-    .replace('case "$*" in', `case "$*" in\n  *' restore /backup/restore-'*) [ ! -f '${replacement.temporary}/restore-fail' ] || exit 44;;\nesac\ncase "$*" in`)
+    .replace('case "$*" in', `case "$*" in\n  *' restore /backup/restore-'*) [ ! -f '${replacement.temporary}/restore-fail' ] || exit 44;;\n  *' stop --timeout 30 gateway') [ ! -f '${replacement.temporary}/gateway-stop-fail' ] || exit 45;;\nesac\ncase "$*" in`)
   const sourceBuilder = `case "$*" in
   'buildx inspect ${source.config.builder.name} '*) printf '${JSON.stringify({ Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${source.config.builder.container}` }] })}'; exit 0;;
   *'{{json .Config.Labels}}'*'${source.config.builder.container}') printf '{"org.open-agricola.environment":"${source.config.targetId}"}'; exit 0;;
@@ -376,12 +438,18 @@ esac
   const request: OperationRequest = { action: 'restore', expectedCurrent: 'empty', buildId, generation: next, operationId,
     sourceTarget: parsePrereleaseTarget(source.config), expectedSourceCurrent: buildId, acceptLoss: source.generation,
     backupStem: stem, backupGeneration: source.generation, authorityFile: source.authorityFile }
-  const invoke = () => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
-    input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(target), target, request,
+  const invoke = (operationTarget = target) => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
+    input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(operationTarget), target: operationTarget, request,
       receipt: { status: 'passed', channel: 'prerelease', repository: 'titanxxh/open-agricola', sha: buildId,
         configuration: 'e'.repeat(64), producerConfiguration: 'f'.repeat(64), tasks: FULL_TASK_IDS.map((id, index) => ({ id, status: 'passed', runId: 1, jobId: index + 1 })) } }),
     encoding: 'utf8', timeout: 30000, env: { ...replacement.env, SSH_CONNECTION: 'owner fixture' },
   })
+  if (completion === 'normal') {
+    const changedProxy = invoke({ ...target, proxyNetwork: 'another-proxy' })
+    expect(changedProxy.status).not.toBe(0)
+    expect(changedProxy.stderr).toContain('fixed origin')
+    expect(replacement.calls()).toBe('')
+  }
   const staging = join(directory, 'backups', `restore-${operationId}`)
   if (completion === 'migration-retry') writeFileSync(join(replacement.temporary, 'restore-fail'), '')
   if (completion === 'startup-retry') writeFileSync(join(replacement.temporary, 'startup-fail'), '')
@@ -403,6 +471,35 @@ esac
   expect(existsSync(`${staging}.retention.json`)).toBe(false)
   expect(readFileSync(join(source.root, 'backups', `${stem}.tgz`))).toEqual(point)
   expect(source.state().generation).toBe(source.generation)
+  expect(replacement.calls()).not.toContain('up -d --no-build gateway')
+  if (completion === 'normal') {
+    request.action = 'activate-recovery'
+    request.expectedCurrent = buildId
+    expect(invoke().status).not.toBe(0)
+    expect(replacement.calls()).not.toContain('up -d --no-build gateway')
+
+    const previous = source.state()
+    if (!previous.operation) throw new Error('Expected an installed source operation')
+    writeRuntime(parsePrereleaseTarget(source.config), { ...previous, mode: 'closed', installed: null,
+      operation: { ...previous.operation, kind: 'reset' } })
+    const purge = Buffer.from('{}\n')
+    writeFileSync(join(source.root, 'backups', `purge-${previous.operation.id}.json`), purge)
+    request.retirementFile = join(replacement.temporary, 'retirement.json')
+    writeFileSync(request.retirementFile, JSON.stringify({ action: 'retire', generationId: source.generation,
+      targetOrigin: target.origin, targetId: source.config.targetId, completedAt: Date.now(),
+      purgeReceiptSha256: createHash('sha256').update(purge).digest('hex') }))
+    writeFileSync(join(replacement.temporary, 'gateway-stop-fail'), '')
+    expect(invoke().status).not.toBe(0)
+    expect(replacement.calls()).not.toContain('up -d --no-build gateway')
+    rmSync(join(replacement.temporary, 'gateway-stop-fail'))
+    const before = replacement.calls()
+    const activated = invoke()
+    expect(activated.status, activated.stderr).toBe(0)
+    const activation = replacement.calls().slice(before.length).trim().split('\n')
+    expect(activation).toHaveLength(2)
+    expect(activation[0]).toContain(`-p ${source.config.project} stop --timeout 30 gateway`)
+    expect(activation[1]).toContain(`-p ${target.project} up -d --no-build gateway`)
+  }
 }, 15000)
 
 it.each(['control', 'output', 'backups'])('rejects a %s mount alias into formal files before state or Docker', name => {

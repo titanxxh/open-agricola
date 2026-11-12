@@ -7,7 +7,7 @@ import { checkPrereleaseVerification } from '../ci/prerelease-verification'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { ownerMachine, RELEASE_REPOSITORY } from '../release/candidate'
 import { runPrereleaseOperation, type OperationRequest } from './flow'
-import { controlDirectory } from './runtime'
+import { controlDirectory, gatewayAlias } from './runtime'
 
 export function prerequisitePlan(configFile: string) {
   const raw: unknown = JSON.parse(readFileSync(configFile, 'utf8'))
@@ -15,6 +15,7 @@ export function prerequisitePlan(configFile: string) {
   loadPrereleaseEnvironment(target)
   return { target, summary: { channel: target.channel, targetId: target.targetId, origin: target.origin,
     project: target.project, database: target.database.name, bucket: target.objects.bucket,
+    ...(target.proxyNetwork ? { proxyUpstream: `${gatewayAlias(target)}:5176` } : {}),
     retentionDays: 7, fingerprint: targetFingerprint(target) } }
 }
 
