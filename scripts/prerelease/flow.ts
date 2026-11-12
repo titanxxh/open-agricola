@@ -161,7 +161,10 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
     mkdirSync(backupRoot(target), { recursive: true, mode: 0o700 })
     const input = join(backupRoot(target), `identity-associations-${record.generation}.json`)
     atomicJson(input, packet)
-    candidateTool(target, 'migrate', ['scripts/prerelease/identity-audit.ts', 'apply', `/backup/identity-associations-${record.generation}.json`])
+    const packetPath = `/backup/identity-associations-${record.generation}.json`
+    candidateTool(target, 'migrate', ['scripts/prerelease/identity-audit.ts', 'apply', packetPath], {
+      inputs: [{ source: join(backupRoot(target), `identity-associations-${record.generation}.json`), destination: packetPath }],
+    })
     const manifest = jsonText(policyTool(target, 'identities'))
     if (canonicalJson(manifest.refs) !== canonicalJson(unique)) throw new Error('Real cleanup/remap did not produce the exact retained active identity set')
     compose(target, ['up', '-d', '--no-build', '--wait', '--wait-timeout', '120', 'app'])
@@ -275,9 +278,9 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
       // Only this unaccepted replacement is reset on retry; the source is never changed.
       policyTool(target, 'reset', { APPLICATIONS_STOPPED: '1', CURRENT_ERASURE_LEDGER: '/backup/replay-removals.latest.json',
         PRERELEASE_OLD_GENERATION: next, PRERELEASE_OPERATION_ID: id, PRERELEASE_SOURCE_BUILD_ID: buildId })
-      archiveTool(target, 'migrate', ['restore', `/backup/restore-${id}`, '--applications-stopped'], [
-        '-e', 'CURRENT_ERASURE_LEDGER=/backup/replay-removals.latest.json',
-      ])
+      archiveTool(target, 'migrate', ['restore', `/backup/restore-${id}`, '--applications-stopped'], {
+        CURRENT_ERASURE_LEDGER: '/backup/replay-removals.latest.json',
+      })
       record = { ...record, buildId, installed: { buildId, image, installedAt: Date.now() }, operation: { ...operation, stage: 'startup' } }
       writeRuntime(target, record, image)
     }

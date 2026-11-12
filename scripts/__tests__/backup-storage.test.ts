@@ -1,9 +1,12 @@
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
+import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config'
+import { readRuntime, writeRuntime } from '../prerelease/runtime'
+import { readPairedPrereleaseBackup } from '../prerelease/backup'
 
 const sourceBuild = 'a'.repeat(40), image = `sha256:${'b'.repeat(64)}`, container = 'c'.repeat(64)
 
@@ -21,13 +24,36 @@ function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
   mode?: 'full' | 'ledger-only'
   directoryForm?: OffsiteDirectoryForm
 } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'agricola-native-backup-'))
+  const temporary = mkdtempSync(join(tmpdir(), 'agricola-native-backup-'))
+  const prerelease = fail.startsWith('prerelease-')
+  const root = prerelease ? join(temporary, 'open-agricola-prerelease-test') : temporary
+  if (prerelease) mkdirSync(root)
   const offsite = fail.startsWith('offsite-')
+  const policySha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const policyImage = `sha256:${'d'.repeat(64)}`, capturedAt = new Date(Date.now() - 1000).toISOString()
   try {
     for (const path of ['scripts', 'bin', 'data', 'backups']) mkdirSync(join(root, path))
     for (const path of ['scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs']) cpSync(path, join(root, path))
     writeFileSync(join(root, '.env'), 'ACCOUNT_REGISTRATION_POLICY=open\n')
+    writeFileSync(join(root, 'fixture-sentinel.txt'), 'inert owner fixture bytes')
     writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=test-only\n')
+    const target = prerelease ? parsePrereleaseTarget({ ...JSON.parse(readFileSync('deploy/prerelease-target.example.json', 'utf8')),
+      targetId: 'prerelease-test', directory: root, policyDirectory: process.cwd(), project: 'open-agricola-prerelease-test',
+      network: 'open-agricola-prerelease-test-dependencies',
+      database: { host: '127.0.0.1', port: 5432, name: 'oa_prerelease_test', appRole: 'oa_prerelease_test_app', backupRole: 'oa_prerelease_test_backup' },
+      validationDatabase: { host: '127.0.0.1', port: 5432, name: 'oa_prerelease_test_validation', role: 'oa_prerelease_test_validator' },
+      objects: { endpoint: 'http://127.0.0.1:9000', bucket: 'oa-prerelease-test', prefix: 'live/', appKeyId: 'pre-app', backupKeyId: 'pre-backup' },
+      offsite: { host: 'fixture', directory: '/srv/backups/open-agricola-prerelease-test' },
+      builder: { name: 'prerelease-test', container: 'prerelease-test-builder' },
+    }) : undefined
+    if (target) {
+      const common = 'S3_BUCKET=oa-prerelease-test\nS3_PREFIX=live/\nS3_SECRET_ACCESS_KEY=inert-fixture\nS3_ENDPOINT=http://127.0.0.1:9000\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n'
+      writeFileSync(join(root, '.env'), 'DATABASE_URL=postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test\nS3_ACCESS_KEY_ID=pre-app\n' + common, { mode: 0o600 })
+      writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=postgres://oa_prerelease_test_backup:fixture@127.0.0.1/oa_prerelease_test\nVALIDATION_DATABASE_URL=postgres://oa_prerelease_test_validator:fixture@127.0.0.1/oa_prerelease_test_validation\nS3_ACCESS_KEY_ID=pre-backup\n' + common, { mode: 0o600 })
+      chmodSync(join(root, '.env'), 0o600); chmodSync(join(root, 'data/dependencies.compose.env'), 0o600)
+      writeRuntime(target, { ...readRuntime(target), mode: 'open', buildId: sourceBuild, installed: { buildId: sourceBuild, image, installedAt: Date.now() },
+        operation: null, acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64) } })
+    }
     const priorReport = '{"backupStem":"previous-validated-backup"}\n'
     writeFileSync(join(root, 'backups/observability.latest.json'), priorReport)
     if (fail.endsWith('date-width')) writeFileSync(join(root, 'bin/date'), `#!/bin/bash
@@ -94,8 +120,18 @@ cp -- "\${args[-2]}" "\${args[-1]#fixture:}"
 set -eu
 printf '%s\\n' "$*" >> "$PWD/docker-calls"
 printf 'docker:%s\\n' "$*" >> "$PWD/backup-events"
-printf '%s:%s\\n' "$APP_UID" "$APP_GID" >> "$PWD/docker-users"
+printf '%s:%s\\n' "\${APP_UID:-$(id -u)}" "\${APP_GID:-$(id -g)}" >> "$PWD/docker-users"
 case "$*" in
+  'buildx inspect '*) printf '${JSON.stringify({ Driver: 'remote', Nodes: [{ Endpoint: 'docker-container://prerelease-test-builder' }] })}';;
+  'buildx build '*) cat >/dev/null;;
+  *'{{json .Config.Labels}}'*'prerelease-test-builder') printf '{"org.open-agricola.environment":"prerelease-test"}';;
+  *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
+  *'{{json .State}}'*'prerelease-test-builder') printf '{"Running":true}';;
+  *'{{json .Config}}'*) printf '{"User":"1000:1000"}';;
+  *'{{json .Mounts}}'*) printf '[]';;
+  'image inspect --format {{.Id}}'*) printf '${policyImage}';;
+  'image inspect --format {{json .Config.Labels}}'*) printf '{"org.opencontainers.image.revision":"${fail === 'prerelease-bad-revision' ? 'f'.repeat(40) : policySha}","io.open-agricola.release-channel":"${fail === 'prerelease-bad-channel' ? 'prerelease' : 'stable'}"}';;
+  *'/app/frontend-dist/frontend-build.json'*) printf '{"format":1,"gameBuildId":"${policySha}","basePath":"/open-agricola/","releaseChannel":"stable","deploymentTarget":"stable-hosted"}';;
   'ps -aq --filter label=org.open-agricola.backup.run --filter label=org.open-agricola.backup.environment=stable')
     [[ "\${BACKUP_TEST_FAILURE:-}" != orphan ]] || printf '${'d'.repeat(64)}'
     ;;
@@ -106,7 +142,8 @@ case "$*" in
   'ps -q --no-trunc '*) printf '${container}' ;;
   *'{{.State.Running}}'*) printf true ;;
   *'{{.Image}}'*) printf '${image}' ;;
-  *'com.docker.compose.project'*) printf backup-fixture ;;
+  *'com.docker.compose.project'*) printf '${target?.project ?? 'backup-fixture'}' ;;
+  *'io.open-agricola.release-channel'*) printf prerelease ;;
   *'RESOURCE_DELETION_PROTOCOL'*) if [[ "\${BACKUP_TEST_FAILURE:-}" == protocol ]]; then printf 0; else printf 1; fi ;;
   *'process.env.GAME_BUILD_ID'*) printf '${sourceBuild}' ;;
   *'cleanup-scratch /backup'*) ;;
@@ -115,17 +152,19 @@ case "$*" in
   *'export-online /backup/'*|*' export /backup/'*)
     [[ "\${BACKUP_TEST_FAILURE:-}" != export && "\${BACKUP_TEST_FAILURE:-}" != offsite-export ]] || exit 42
     if [[ "\${BACKUP_TEST_FAILURE:-}" == deadline ]]; then sleep 30; fi
+    if [[ "\${BACKUP_TEST_FAILURE:-}" == report-link ]]; then ln -s "$PWD/fixture-sentinel.txt" "$PWD/backups/.pending-fixture-run/report.json"; fi
     for argument in "$@"; do
       if [[ "$argument" == /backup/.pending-*/capture ]]; then
         capture="$PWD/backups/\${argument#/backup/}"
         mkdir -p "$capture"
         printf native-archive > "$capture/database.dump"
+        printf '%s' '${JSON.stringify({ version: 1, sourceBuildId: sourceBuild, createdAt: capturedAt, schema: 'public', objects: [] })}' > "$capture/archive.json"
       fi
     done
     ;;
   *'validate /backup/'*)
     [[ "\${BACKUP_TEST_FAILURE:-}" != validate ]] || exit 43
-    printf '{"formatVersion":2,"validatedAt":"2026-11-05T00:00:00Z","sourceBuildId":"${sourceBuild}","targetBuildId":"${sourceBuild}"}'
+    printf '${JSON.stringify({ formatVersion: 2, validatedAt: '2026-11-05T00:00:00Z', sourceBuildId: target ? policySha : sourceBuild, targetBuildId: target ? policySha : sourceBuild, ...(target ? { createdAt: '2099-01-01T00:00:00Z' } : {}) })}'
     ;;
   *) echo "Unexpected fixture Docker command: $*" >&2; exit 88 ;;
 esac
@@ -133,10 +172,17 @@ esac
     const remoteDirectory = offsiteDirectory(remote, offsiteOptions.directoryForm ?? 'canonical')
     const run = () => spawnSync('/bin/bash', offsite ? ['backup-offsite.sh', offsiteOptions.mode ?? 'full'] : ['scripts/backup-storage.sh', 'manual-test', ...(stopped ? ['--already-stopped'] : [])], {
       cwd: root,
-      env: { ...process.env, BACKUP_RETENTION_DAYS: undefined, BACKUP_DAILY_COUNT: undefined, BACKUP_PRE_COUNT: undefined,
+      env: { ...process.env, CI: fail === 'prerelease-CI' ? 'true' : '', GITHUB_ACTIONS: fail === 'prerelease-GITHUB_ACTIONS' ? 'true' : '',
+        BACKUP_RETENTION_DAYS: target ? '7' : undefined, BACKUP_DAILY_COUNT: undefined, BACKUP_PRE_COUNT: undefined,
         OA_BACKUP_REAL_NODE: process.execPath, PATH: `${root}/bin:${process.env.PATH}`, BACKUP_TEST_FAILURE: fail,
         SOURCE_BUILD_ID: sourceBuild, MAINTENANCE_LOCK_HELD: '0', BACKUP_JOB_ID: fail.endsWith('date-width') ? '' : 'fixture-run',
         OFFSITE_BACKUP_TARGET: 'fixture', OFFSITE_BACKUP_REMOTE_DIR: remoteDirectory,
+        BACKUP_ENVIRONMENT: target?.targetId, BACKUP_TARGET_CONFIG: target && fail !== 'prerelease-missing-context' ? JSON.stringify(target) : undefined,
+        BACKUP_POLICY_ROOT: target?.policyDirectory, BACKUP_WORKING_DIRECTORY: target?.directory, BACKUP_SOURCE_IMAGE: target ? image : undefined,
+        BACKUP_TARGET_BUILD_ID: target ? sourceBuild : undefined,
+        BACKUP_DATA_GENERATION: target && readRuntime(target).generation, BACKUP_TARGET_FINGERPRINT: target && targetFingerprint(target),
+        BACKUP_TOOL_SERVICE: target ? 'tools' : undefined, BACKUP_CAPTURE_SERVICE: target ? 'capture' : undefined,
+        BACKUP_TOOL_MEMORY_MIB: target && String(target.budgets.tools.memoryMiB), BACKUP_TOOL_CPUS: target && String(target.budgets.tools.cpus), BACKUP_TOOL_PIDS: target && String(target.budgets.tools.pids),
         BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + (fail === 'deadline' || fail === 'offsite-timeout' ? 2000 : 30_000)) },
       encoding: 'utf8', timeout: 15_000,
     })
@@ -160,6 +206,10 @@ esac
       configuration: existsSync(configPath) ? readFileSync(configPath) : undefined,
       pending: readdirSync(join(root, 'backups')).filter(name => name.startsWith('.pending-')),
       latest: readFileSync(join(root, 'backups/observability.latest.json'), 'utf8'), priorReport,
+      sentinel: readFileSync(join(root, 'fixture-sentinel.txt'), 'utf8'),
+      capturedAt, policySha, policyImage,
+      runtime: target ? readRuntime(target) : undefined,
+      paired: target && existsSync(reportPath) ? readPairedPrereleaseBackup(target, 'manual-test', readRuntime(target).generation) : undefined,
       remoteLedger: existsSync(join(remote, 'replay-removals.latest.json')) ? readFileSync(join(remote, 'replay-removals.latest.json'), 'utf8') : undefined,
       expiredRemoteArchive: existsSync(join(remote, 'daily-old.tgz')),
       incoming: offsite ? readdirSync(remote).filter(name => name.startsWith('.incoming-')) : [],
@@ -168,7 +218,7 @@ esac
         return { report, bytes: readFileSync(join(remote, `${report.backupStem}.tgz`)) }
       }) : [],
     }
-  } finally { rmSync(root, { recursive: true, force: true }) }
+  } finally { rmSync(temporary, { recursive: true, force: true }) }
 }
 
 function retainOffsite(directoryForm: OffsiteDirectoryForm) {
@@ -220,6 +270,51 @@ it('leaves the maintenance stop owned by the deployment caller', () => {
   expect(result.calls.some(call => /(?:stop|start) app$/.test(call))).toBe(false)
   expect(result.calls.some(call => call.includes('export-online'))).toBe(false)
   expect(result.calls.some(call => call.includes(' --applications-stopped'))).toBe(true)
+})
+
+it('refuses a linked host report without changing an inert owner fixture', () => {
+  const result = backup('report-link')
+  expect(result.sentinel).toBe('inert owner fixture bytes')
+  expect(result.status).not.toBe(0)
+  expect(result.report).toBeUndefined()
+  expect(result.latest).toBe(result.priorReport)
+})
+
+it('captures an open prerelease source using the separate trusted policy image and read-only candidate input', () => {
+  const result = backup('prerelease-policy')
+  expect(result.status, result.stderr).toBe(0)
+  const exporter = result.calls.find(call => call.includes('export-online /backup/'))
+  expect(exporter).toContain(result.policyImage)
+  expect(exporter).not.toContain(' run --rm --no-deps ')
+  const validator = result.calls.find(call => call.includes('validate /backup/'))
+  expect(validator).toContain('/capture:ro')
+  expect(validator).not.toMatch(/-v \S+\/backups:\/backup(?: |$)/)
+  expect(result.report).toMatchObject({ sourceBuildId: sourceBuild, targetBuildId: sourceBuild, createdAt: result.capturedAt, retentionDays: 7 })
+  expect(result.report.sourceBuildId).not.toBe(result.policySha)
+  expect(result.paired).toMatchObject({ sourceBuildId: sourceBuild, targetBuildId: sourceBuild, createdAt: result.capturedAt })
+  expect(result.runtime).toMatchObject({ mode: 'open', operation: null, installed: { buildId: sourceBuild, image } })
+  expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
+}, 15000)
+
+it('fails closed when prerelease backup has no trusted owner context', () => {
+  const result = backup('prerelease-missing-context')
+  expect(result.status).not.toBe(0)
+  expect(result.report).toBeUndefined()
+  expect(result.calls.some(call => call.includes('export-online /backup/'))).toBe(false)
+})
+
+it.each(['channel', 'revision'])('rejects a policy tooling image with the wrong %s without falling back to candidate export', field => {
+  const result = backup(`prerelease-bad-${field}`)
+  expect(result.status).not.toBe(0)
+  expect(result.report).toBeUndefined()
+  expect(result.calls.some(call => call.includes('export-online /backup/'))).toBe(false)
+})
+
+it.each(['CI', 'GITHUB_ACTIONS'])('refuses the prerelease archive adapter under %s before exporter execution', flag => {
+  const result = backup(`prerelease-${flag}`)
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('owner-controlled machine')
+  expect(result.calls.some(call => call.includes('export-online /backup/'))).toBe(false)
 })
 
 it('refuses a duplicate stem without deleting the validated archive', () => {

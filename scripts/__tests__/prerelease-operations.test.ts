@@ -192,10 +192,12 @@ esac
 })
 
 
-function startupRetryFixture(sourceInstalled = true) {
+function startupRetryFixture(sourceInstalled = true, sameBuild = false) {
   const value = fixture(), target = parsePrereleaseTarget(value.config)
   const buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-  const sourceBuildId = 'a'.repeat(40), sourceImage = `sha256:${'d'.repeat(64)}`, image = `sha256:${'e'.repeat(64)}`
+  const image = `sha256:${'e'.repeat(64)}`, sourceBuildId = sameBuild ? buildId : 'a'.repeat(40)
+  const sourceImage = sameBuild ? image : `sha256:${'d'.repeat(64)}`
+  const policyImage = `sha256:${'f'.repeat(64)}`
   const generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId = 'db4d6c82-676f-4dcc-a570-52377b3b32f5'
   expect(value.invoke('initialize', '--expected-current', 'empty', '--generation', generation).status).toBe(0)
   const state = () => readRuntime(target)
@@ -240,9 +242,14 @@ case "$*" in
   *'com.docker.compose.project'*) if [ -f '${value.temporary}/container-project' ]; then cat '${value.temporary}/container-project'; else printf '${target.project}'; fi;;
   *'{{json .Config}}'*) printf '{"User":"1000:1000"}';;
   *'{{json .Mounts}}'*) printf '[]';;
-  'image inspect --format {{json .Config.Labels}}'*) printf '{"org.opencontainers.image.revision":"${buildId}","io.open-agricola.release-channel":"prerelease"}';;
-  'image inspect --format {{.Id}}'*) printf '${image}';;
-  *'/app/frontend-dist/frontend-build.json'*) printf '{"format":1,"gameBuildId":"${buildId}","basePath":"/open-agricola/","releaseChannel":"prerelease","deploymentTarget":"prerelease-hosted"}';;
+  'image inspect --format {{json .Config.Labels}}'*)
+    case "$*" in *'${policyImage}'*) channel=stable;; *) channel=prerelease;; esac
+    printf '{"org.opencontainers.image.revision":"${buildId}","io.open-agricola.release-channel":"%s"}' "$channel";;
+  'image inspect --format {{.Id}}'*)
+    case "$*" in *'-policy:'*|*'${policyImage}'*) printf '${policyImage}';; *) printf '${image}';; esac;;
+  *'/app/frontend-dist/frontend-build.json'*)
+    case "$*" in *'${policyImage}'*) channel=stable;; *) channel=prerelease;; esac
+    printf '{"format":1,"gameBuildId":"${buildId}","basePath":"/open-agricola/","releaseChannel":"%s","deploymentTarget":"%s-hosted"}' "$channel" "$channel";;
   *' up -d --no-build --wait --wait-timeout 120 app')
     [ ! -f '${value.temporary}/startup-fail' ] || exit 43
     printf '${image}' > '${containerImage}';;
@@ -276,9 +283,9 @@ it('retries the startup journal after migration while the drained source contain
   expect(value.calls().split('check-live')).toHaveLength(migrations)
 })
 
-it.each(['empty', 'candidate'])('retries an unaccepted startup with an %s container state', kind => {
-  const value = startupRetryFixture(kind !== 'empty')
-  if (kind === 'candidate') {
+it.each(['empty', 'candidate', 'same-image'])('retries an unaccepted startup when container state is %s', kind => {
+  const value = startupRetryFixture(kind !== 'empty', kind === 'same-image')
+  if (kind !== 'empty') {
     writeFileSync(value.containerImage, value.image)
     writeFileSync(value.containerState, '{"Running":false,"OOMKilled":false,"ExitCode":43}')
   }
@@ -325,7 +332,13 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
   const script = readFileSync(join(source.bin, 'docker'), 'utf8').replaceAll(source.temporary, replacement.temporary)
     .replaceAll(source.config.targetId, target.targetId).replaceAll(source.generation, next)
     .replace('case "$*" in', `case "$*" in\n  *' restore /backup/restore-'*) [ ! -f '${replacement.temporary}/restore-fail' ] || exit 44;;\nesac\ncase "$*" in`)
-  writeFileSync(join(replacement.bin, 'docker'), script, { mode: 0o700 })
+  const sourceBuilder = `case "$*" in
+  'buildx inspect ${source.config.builder.name} '*) printf '${JSON.stringify({ Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${source.config.builder.container}` }] })}'; exit 0;;
+  *'{{json .Config.Labels}}'*'${source.config.builder.container}') printf '{"org.open-agricola.environment":"${source.config.targetId}"}'; exit 0;;
+  *'{{json .State}}'*'${source.config.builder.container}') printf '{"Running":true}'; exit 0;;
+esac
+`
+  writeFileSync(join(replacement.bin, 'docker'), script.replace('set -e\n', `set -e\n${sourceBuilder}`), { mode: 0o700 })
   writeFileSync(join(replacement.bin, 'bash'), readFileSync(join(source.bin, 'bash')), { mode: 0o700 })
   writeFileSync(join(source.root, 'backups/replay-removals.latest.json'), '{"version":1,"batches":[]}')
   const point = readFileSync(join(source.root, 'backups', `${stem}.tgz`))

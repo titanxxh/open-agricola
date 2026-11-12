@@ -67,7 +67,7 @@ async function kill(worker: ChildProcess): Promise<void> {
 }
 
 it('reclaims a SIGKILLed real validation database and S3 namespace from its durable record', async () => {
-  const directory = join(root, 'killed-validation')
+  const directory = join(root, '.backup-scratch-runs-killed-validation')
   const bin = join(root, 'pause-bin')
   const ready = join(root, 'restore-paused')
   await mkdir(directory)
@@ -93,16 +93,16 @@ it('reclaims a SIGKILLed real validation database and S3 namespace from its dura
     try { expect((await scratch.get('card-art/private.png'))?.body.toString()).toBe('private validation bytes') }
     finally { scratch.close() }
     await kill(worker)
-    expect(await cleanupBackupScratch(directory, env, deadline - 1)).toBe(0)
-    await expect(cleanupBackupScratch(directory, { ...env, S3_BUCKET: 'unrelated-environment' }, deadline + 1)).rejects.toThrow('different environment')
+    expect(await cleanupBackupScratch(root, env, deadline - 1)).toBe(0)
+    await expect(cleanupBackupScratch(root, { ...env, S3_BUCKET: 'unrelated-environment' }, deadline + 1)).rejects.toThrow('different environment')
     expect(await readdir(directory)).toHaveLength(1)
-    expect(await cleanupBackupScratch(directory, env, deadline + 1)).toBe(1)
+    expect(await cleanupBackupScratch(root, env, deadline + 1)).toBe(1)
     const admin = databaseMaintenance()
     try { expect(await admin.prepare('SELECT 1 FROM pg_database WHERE datname=?').get(`backup_${record.token}`)).toBeUndefined() }
     finally { await admin.close() }
     const reclaimed = S3ObjectStore.fromEnv(env, `test/backup-${record.token}/`)
     try { expect(await reclaimed.get('card-art/private.png')).toBeNull() } finally { reclaimed.close() }
-    expect(await readdir(directory)).toEqual([])
+    expect(await readdir(root)).not.toContain('.backup-scratch-runs-killed-validation')
   } finally {
     await kill(worker)
     if (restorePid) { try { process.kill(restorePid, 'SIGKILL') } catch { /* The worker may already have exited. */ } }

@@ -94,7 +94,7 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
       PRERELEASE_TARGET_ID: target.targetId, PRERELEASE_DATA_GENERATION: record.generation } }
   const tool = { image: candidateImage ?? image, init: true, user: gateway.user, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
     ...limits('tools'), profiles: ['tools'], labels, networks: ['dependencies'], tmpfs: ['/tmp:size=67108864'],
-    volumes: [`${join(target.directory, 'backups')}:/backup`], environment: { GAME_BUILD_ID: record.operation?.buildId ?? record.buildId, RELEASE_CHANNEL: 'prerelease' } }
+    environment: { GAME_BUILD_ID: record.operation?.buildId ?? record.buildId, RELEASE_CHANNEL: 'prerelease' } }
   return { name: target.project, services: { gateway, app, tools: { ...tool, env_file: [join(target.directory, 'data/dependencies.compose.env')] },
     migrate: { ...tool, env_file: [join(target.directory, '.env')] }, capture: { ...tool, image, env_file: [join(target.directory, '.env')] } },
   networks: { default: {}, dependencies: { external: true, name: target.network } } }

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import { readdir, readFile, writeFile, stat, rm, lstat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { constants, createReadStream } from 'node:fs'
+import { readdir, readFile, writeFile, stat, rm, lstat, open, realpath } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 
 const stemPattern = /^(daily|pre|manual)-[a-zA-Z0-9._-]+$/
 const retentionDays = Number(process.env.BACKUP_RETENTION_DAYS ?? 30)
@@ -63,10 +63,27 @@ async function completeSets(root) {
 
 async function main([command, root, first, second]) {
   if (!root) throw new Error('Usage: backup-files.mjs seal|list|prune <directory> <arguments>')
+  if (command === 'write-report') {
+    const parent = dirname(resolve(root)), info = await lstat(parent)
+    if (!info.isDirectory() || await realpath(parent) !== parent || info.mode & 0o077
+      || info.uid !== process.getuid()) throw new Error('Backup report requires an owner-private directory without aliases')
+    const output = await open(root, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+    try { for await (const bytes of process.stdin) await output.write(bytes) }
+    finally { await output.close() }
+    return
+  }
   if (command === 'seal') {
     if (!stemPattern.test(first ?? '')) throw new Error('Invalid backup name')
     const report = JSON.parse(await readFile(join(root, 'report.json'), 'utf8'))
     if (report.formatVersion !== 2 || !report.validatedAt) throw new Error('Backup has no successful restore validation')
+    if (process.env.BACKUP_ENVIRONMENT !== undefined && process.env.BACKUP_ENVIRONMENT !== 'stable') {
+      const capture = JSON.parse(await readFile(join(root, 'capture', 'archive.json'), 'utf8'))
+      if (capture.version !== 1 || capture.sourceBuildId !== process.env.SOURCE_BUILD_ID || !/^[a-f0-9]{40}$/.test(capture.sourceBuildId)
+        || !/^[a-f0-9]{40}$/.test(process.env.BACKUP_TARGET_BUILD_ID ?? '') || typeof capture.createdAt !== 'string'
+        || !Number.isFinite(Date.parse(capture.createdAt)) || Date.parse(capture.createdAt) > Date.now()
+        || Date.now() - Date.parse(capture.createdAt) > maxAge) throw new Error('Trusted capture metadata is missing or expired')
+      Object.assign(report, { sourceBuildId: capture.sourceBuildId, targetBuildId: process.env.BACKUP_TARGET_BUILD_ID, createdAt: capture.createdAt })
+    }
     const archive = await digest(join(root, 'archive.tgz')), configuration = await digest(join(root, 'env'))
     Object.assign(report, { backupStem: first, environment: process.env.BACKUP_ENVIRONMENT ?? 'stable', retentionDays,
       ...(process.env.BACKUP_DATA_GENERATION ? { dataGeneration: process.env.BACKUP_DATA_GENERATION, targetFingerprint: process.env.BACKUP_TARGET_FINGERPRINT } : {}),

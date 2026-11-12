@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { mkdir, readFile, writeFile, stat, mkdtemp, rm, chmod } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
 import { PostgresDatabase } from '../server/database/postgres'
 import { ResourceStore } from '../server/storage/resource-store'
 import { ErasureLedger, type ErasureBatch } from '../server/storage/erasure-ledger'
@@ -25,7 +26,7 @@ async function digest(path: string): Promise<{ sha256: string; size: number }> {
   return { sha256: hash.digest('hex'), size: (await stat(path)).size }
 }
 
-async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, root: string, args: string[], signal?: AbortSignal, deadlineEpochMs?: number): Promise<string> {
+async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, root: string, args: string[], signal?: AbortSignal, deadlineEpochMs?: number, listFile?: string): Promise<string> {
   signal?.throwIfAborted()
   const local = process.env.PG_CLIENT_MODE === 'local'
   const url = new URL(connectionString)
@@ -41,7 +42,7 @@ async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, 
   for (const [key, value] of parameters) {
     if (!/^[a-z_]+$/.test(key) || /[\r\n]/.test(value)) throw new Error('Unsupported PostgreSQL service parameter')
   }
-  const config = await mkdtemp(join(resolve(root), '.pg-client-'))
+  const config = await mkdtemp(join(tmpdir(), 'agricola-pg-client-'))
   const container = `agricola-${tool.replace('_', '-')}-${randomUUID()}`
   let launched = false
   try {
@@ -50,13 +51,14 @@ async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, 
     const deadline = deadlineEpochMs ?? Number(process.env.BACKUP_DEADLINE_EPOCH_MS || 0)
     if (deadline && deadline <= Date.now()) throw new Error('Backup deadline exceeded')
     const command = deadline ? ['timeout', '--signal=TERM', '--kill-after=3s', String(Math.max(1, Math.ceil((deadline - Date.now()) / 1000))), tool] : [tool]
-    const argv = local ? args.map(arg => arg.replace('/archive/', `${resolve(root)}/`)) : [
+    const argv = local ? args.map(arg => arg.replace('/archive/', `${resolve(root)}/`).replace('/archive-restore.list', listFile ?? '/archive-restore.list')) : [
       'run', '--rm', '--name', container, '--label', `org.open-agricola.backup.run=${process.env.BACKUP_JOB_ID || container}`,
       '--label', `org.open-agricola.backup.deadline=${deadline || 0}`,
       '--network', 'host', '--env', 'PGSERVICEFILE=/connection/service.conf',
       '--user', `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
       '--mount', `type=bind,source=${config},target=/connection,readonly`,
-      '--mount', `type=bind,source=${resolve(root)},target=/archive`, POSTGRES_IMAGE, ...command, ...args,
+      '--mount', `type=bind,source=${resolve(root)},target=/archive${tool === 'pg_restore' ? ',readonly' : ''}`,
+      ...(listFile ? ['--mount', `type=bind,source=${listFile},target=/archive-restore.list,readonly`] : []), POSTGRES_IMAGE, ...command, ...args,
     ]
     if (!args.includes('--list')) argv.push('--dbname=service=archive')
     return await new Promise<string>((done, reject) => {
@@ -169,7 +171,8 @@ export async function restoreStorageArchive(connectionString: string, db: Postgr
       ON CONFLICT(source_hash) DO UPDATE SET status=excluded.status,report_json=excluded.report_json,updated_at=excluded.updated_at`)
       .run(barrier, status, report === null ? null : JSON.stringify(report), Date.now())
   }
-  const restoreList = `restore-${randomUUID()}.list`
+  const restoreDirectory = await mkdtemp(join(tmpdir(), 'agricola-restore-'))
+  const restoreList = join(restoreDirectory, 'restore.list')
   try {
     // Apply the CURRENT ledger before placing any historical bytes in the target.
     await mergeLedger(objects, currentErasureFacts)
@@ -189,8 +192,8 @@ export async function restoreStorageArchive(connectionString: string, db: Postgr
     const listing = await pgTool('pg_restore', connectionString, root, ['--list', '/archive/database.dump'], signal)
     // public already exists and owns citext in a fresh target database. Omit
     // only its schema-creation entry, keeping every application object.
-    await writeFile(join(root, restoreList), listing.split('\n').filter(line => !/^\d+; \d+ \d+ SCHEMA - public /.test(line)).join('\n'), { mode: 0o600 })
-    await pgTool('pg_restore', connectionString, root, [`--use-list=/archive/${restoreList}`, '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl', '/archive/database.dump'], signal)
+    await writeFile(restoreList, listing.split('\n').filter(line => !/^\d+; \d+ \d+ SCHEMA - public /.test(line)).join('\n'), { mode: 0o600 })
+    await pgTool('pg_restore', connectionString, root, ['--use-list=/archive-restore.list', '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl', '/archive/database.dump'], signal, undefined, restoreList)
     await migratePostgres(db)
     // Restored routing leases belong to source processes. Detach them without
     // changing Room recovery, permanent identities or ownership fencing epochs.
@@ -210,5 +213,5 @@ export async function restoreStorageArchive(connectionString: string, db: Postgr
     await migratePostgres(db)
     await record('failed', { error: error instanceof Error ? error.message : 'Restore validation failed' })
     throw error
-  } finally { await rm(join(root, restoreList), { force: true }) }
+  } finally { await rm(restoreDirectory, { recursive: true, force: true }) }
 }

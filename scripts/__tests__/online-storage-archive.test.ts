@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, readdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, expect, it, vi } from 'vitest'
@@ -143,8 +143,11 @@ it('restores one two-player recovery point while real game commands, uploads and
   await writeFile(join(pending, 'report.json'), JSON.stringify({ formatVersion: 2, sourceBuildId: archive.sourceBuildId,
     targetBuildId: 'b'.repeat(40), createdAt: archive.createdAt, validatedAt: new Date().toISOString(), ...restored.validation }))
   const generation = randomUUID(), stem = 'pre-native-paired'
+  await mkdir(join(pending, 'capture'))
+  await writeFile(join(pending, 'capture/archive.json'), await readFile(join(archiveRoot, 'archive.json')))
   execFileSync(process.execPath, ['scripts/backup-files.mjs', 'seal', pending, stem], { env: { ...process.env,
     BACKUP_ENVIRONMENT: ownerTarget.targetId, BACKUP_RETENTION_DAYS: '7', BACKUP_DATA_GENERATION: generation,
+    SOURCE_BUILD_ID: 'a'.repeat(40), BACKUP_TARGET_BUILD_ID: 'b'.repeat(40),
     BACKUP_TARGET_FINGERPRINT: targetFingerprint(ownerTarget) } })
   for (const [from, to] of [['archive.tgz', `${stem}.tgz`], ['env', `env-${stem}`], ['manifest.json', `${stem}.manifest.json`]]) {
     await writeFile(join(backups, to), await readFile(join(pending, from)))
@@ -160,5 +163,11 @@ it('restores one two-player recovery point while real game commands, uploads and
   const erased = await target()
   const newerLedger = [{ version: 1 as const, entries: [{ version: 1 as const, roomId: 'backup-room', reason: 'legal' as const,
     removedAt: Date.now(), eraseResult: false, assetHashes: [] }], assetTakedowns: [] }]
-  expect((await restoreStorageArchive(erased.url, erased.db, erased.objects, staging, newerLedger)).validation.roomCount).toBe(0)
+  const inputFiles = (await readdir(staging)).sort(), inputHash = fileHash(join(staging, 'database.dump'))
+  await chmod(staging, 0o500)
+  try {
+    expect((await restoreStorageArchive(erased.url, erased.db, erased.objects, staging, newerLedger)).validation.roomCount).toBe(0)
+    expect((await readdir(staging)).sort()).toEqual(inputFiles)
+    expect(fileHash(join(staging, 'database.dump'))).toBe(inputHash)
+  } finally { await chmod(staging, 0o700) }
 })

@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import type { Dirent } from 'node:fs'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import { Client } from 'pg'
@@ -216,9 +217,8 @@ export async function withBackupScratch<T>(request: {
   }
 }
 
-/** Expired records remain available after every failed cleanup for the next job. */
-export async function cleanupBackupScratch(directory: string, env: NodeJS.ProcessEnv = process.env,
-  now = Date.now(), signal?: AbortSignal): Promise<number> {
+async function cleanupScratchRecords(directory: string, env: NodeJS.ProcessEnv,
+  now: number, signal?: AbortSignal): Promise<number> {
   let files: string[]
   try { files = await readdir(directory) } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return 0
@@ -232,6 +232,24 @@ export async function cleanupBackupScratch(directory: string, env: NodeJS.Proces
     await cleanOwned(record, env, 'expired', signal)
     await rm(join(directory, filename))
     cleaned++
+  }
+  return cleaned
+}
+
+/** Expired records remain available after every failed cleanup for the next job. */
+export async function cleanupBackupScratch(directory: string, env: NodeJS.ProcessEnv = process.env,
+  now = Date.now(), signal?: AbortSignal): Promise<number> {
+  let entries: Dirent[]
+  try { entries = await readdir(directory, { withFileTypes: true }) } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return 0
+    throw error
+  }
+  let cleaned = await cleanupScratchRecords(directory, env, now, signal)
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !/^\.backup-scratch-runs-[a-zA-Z0-9-]+$/.test(entry.name)) continue
+    const child = join(directory, entry.name)
+    cleaned += await cleanupScratchRecords(child, env, now, signal)
+    if ((await readdir(child)).length === 0) await rm(child, { recursive: true })
   }
   return cleaned
 }

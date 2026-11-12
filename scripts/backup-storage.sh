@@ -27,6 +27,7 @@ cleanup() {
 }
 # Never remove a previously committed stem, including on a failed retry.
 [[ ! -e "backups/$STEM.tgz" && ! -e "backups/$STEM.manifest.json" && ! -e "backups/env-$STEM" ]] || { echo 'Backup already exists'; exit 1; }
+mkdir -m 700 -- "$BACKUP_PENDING" || { echo 'Backup staging must be fresh'; exit 1; }
 trap cleanup EXIT
 trap 'exit 124' INT TERM HUP
 backup_reap_tools
@@ -55,7 +56,8 @@ ENV_FILES=(.env data/dependencies.compose.env)
 backup_command tar -czf "$BACKUP_PENDING/env" "${ENV_FILES[@]}"
 backup_command tar -C "$BACKUP_PENDING/capture" -czf "$PWD/$BACKUP_PENDING/archive.tgz" .
 backup_container ledger-export /backup/replay-removals.latest.json
-backup_container validate "/backup/.pending-$BACKUP_JOB_ID/capture" > "$BACKUP_PENDING/report.json"
+backup_container validate "/backup/.pending-$BACKUP_JOB_ID/capture" \
+  | backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" write-report "$BACKUP_PENDING/report.json"
 backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" seal "$BACKUP_PENDING" "$STEM"
 chmod 600 "$BACKUP_PENDING/archive.tgz" "$BACKUP_PENDING/env" "$BACKUP_PENDING/manifest.json" backups/replay-removals.latest.json
 mv "$BACKUP_PENDING/archive.tgz" "backups/$STEM.tgz"
