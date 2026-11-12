@@ -33,9 +33,9 @@ import { createConnectionCtx } from './connection-ctx.ts'
 import { controlledSeatIndexes } from '../game/room-viewer'
 import { dispatch, loadCustomCardsFromDb, finishConnection } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
-import { readCookies, SESSION_COOKIE } from '../auth-cookies.ts'
+import { websocketAdmission, websocketSessionToken } from '../request-auth'
+import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { validateSession } from '../auth.ts'
-import { isTrustedOrigin } from '../http-origin.ts'
 import { RoomCommitter } from '../game/room-committer.ts'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter.ts'
 import type { GameContextStore } from '../game/game-context-store.ts'
@@ -220,7 +220,7 @@ type ConnectionDeps = {
 }
 
 const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: ConnectionDeps): Promise<Awaited<void>> => {
-  if (!isTrustedOrigin(req)) {
+  if (!websocketAdmission(req).ok) {
     ws.close(1008, 'invalid origin')
     return
   }
@@ -231,11 +231,7 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
     else ws.close(1008, 'too many pending messages')
   }
   ws.on('message', bufferMessage)
-  const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
-  let token = cookieTokens[0] ?? ''
-  for (const candidate of cookieTokens) {
-    if (await validateSession(candidate)) { token = candidate; break }
-  }
+  const token = websocketSessionToken(req)
   const user = (await validateSession(token))
   if (ws.readyState !== ws.OPEN) { ws.off('message', bufferMessage); return }
   const ctx = createConnectionCtx(ws, deps, deps.allowAnonymous || !!user, user?.id)
@@ -437,7 +433,11 @@ export async function createWsServer(
   const cleanupTimer = startRoomCleanup(registry, checkpoint, committer, ROOM_CLEANUP_INTERVAL_MS, authority, deps.gameContextStore)
 
   const allowAnonymous = allowAnonymousWs()
-  const wss = new WebSocketServer({ server, path: '/ws' })
+  const wss = new WebSocketServer({
+    server, path: '/ws',
+    verifyClient: ({ req }: { req: IncomingMessage }) => websocketAdmission(req).ok,
+    handleProtocols: protocols => protocols.has(BROWSER_WS_PROTOCOL) ? BROWSER_WS_PROTOCOL : false,
+  })
   wss.on('connection', (ws, req) => {
     void handleConnection(ws, req, {
       registry,

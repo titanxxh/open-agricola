@@ -1,3 +1,4 @@
+import { getSessionByToken } from '../auth'
 import { isRoomSpectator, roomSpectators, drainRoomSpectators } from '../game/room-spectators'
 import { ExecutionAccess } from '../game/execution-access'
 import { measure, operationsMetrics, roundTag, sendObserved, safe } from '../observability/metrics'
@@ -52,7 +53,7 @@ export class Broadcaster {
       for (const ws of [...roomConnections(room), ...roomSpectators(room)]) {
         const token = this.tokens.get(ws)
         if (!token) continue
-        const allowed = await this.directory!.db.prepare('SELECT token FROM sessions WHERE token=? AND expires_at>(extract(epoch FROM clock_timestamp())*1000)::bigint FOR SHARE').get(token)
+        const allowed = await getSessionByToken(token, { db: this.directory!.db, lock: 'share' })
         if (!allowed) ws.close(1008, 'session revoked')
       }
       send()

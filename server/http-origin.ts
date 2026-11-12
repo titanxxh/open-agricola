@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 import { getDomain } from 'tldts'
+import { BROWSER_AUTH_HEADER } from '../shared/contract/browser-auth'
 
 export function isSameSite(first: URL, second: URL): boolean {
   const siteHost = (url: URL) => getDomain(url.hostname, { allowPrivateDomains: true }) ?? url.hostname
@@ -10,11 +11,12 @@ export function corsHeaders(options: {
   methods?: string
   headers?: string
 } = {}): Record<string, string> {
-  const origin = process.env.CORS_ORIGIN || '*'
+  const origin = normalizeOrigin(process.env.PUBLIC_APP_ORIGIN) ?? normalizeOrigin(process.env.CORS_ORIGIN) ?? '*'
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': options.methods ?? 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': options.headers ?? 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': options.headers ?? `Content-Type, Authorization, ${BROWSER_AUTH_HEADER}`,
+    Vary: 'Origin',
     ...(origin !== '*' ? { 'Access-Control-Allow-Credentials': 'true' } : {}),
   }
 }
@@ -37,13 +39,12 @@ export function getRequestOrigin(req: IncomingMessage): string {
   return `${proto}://${host}`
 }
 
-export function trustedOrigins(req: IncomingMessage): Set<string> {
+export function trustedOrigins(): Set<string> {
   const set = new Set<string>()
   for (const raw of [
-    process.env.CORS_ORIGIN,
+    process.env.PUBLIC_APP_ORIGIN ? undefined : process.env.CORS_ORIGIN,
     process.env.PUBLIC_APP_ORIGIN,
     process.env.PUBLIC_API_BASE,
-    getRequestOrigin(req),
   ]) {
     const origin = normalizeOrigin(raw)
     if (origin) set.add(origin)
@@ -52,7 +53,11 @@ export function trustedOrigins(req: IncomingMessage): Set<string> {
 }
 
 export function isTrustedOrigin(req: IncomingMessage): boolean {
-  if (req.headers.origin === undefined || req.headers.origin === null) return true
-  const origin = normalizeOrigin(req.headers.origin)
-  return !!origin && trustedOrigins(req).has(origin)
+  const origin = req.headers.origin
+  return typeof origin === 'string' && normalizeOrigin(origin) === origin && trustedOrigins().has(origin)
+}
+
+export function isApiHost(req: IncomingMessage): boolean {
+  const apiOrigin = normalizeOrigin(process.env.PUBLIC_API_BASE)
+  return !!apiOrigin && req.headers.host === new URL(apiOrigin).host
 }

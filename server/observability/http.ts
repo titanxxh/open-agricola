@@ -1,12 +1,12 @@
 import { request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { PostgresDatabase } from '../database/postgres'
-import { extractToken, isAdmin } from '../auth'
-import { readCookies, SESSION_COOKIE } from '../auth-cookies'
+import { extractToken, getSessionByToken, isAdmin } from '../auth'
+import { serializeOperationsCookie } from '../auth-cookies'
+import { httpAdmission, requestSessionToken } from '../request-auth'
 import { corsHeaders, getRequestOrigin } from '../http-origin'
 import { operationsMetrics } from './metrics'
 
-const OPS_COOKIE = 'oa_ops_session'
 const digest = (token: string) => createHash('sha256').update(token).digest('hex')
 const json = (res: ServerResponse, status: number, body: unknown) => {
   res.writeHead(status, { ...corsHeaders(), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
@@ -21,8 +21,7 @@ export function metricsAuthorized(req: IncomingMessage): boolean {
 /** Every resource and datasource request is authenticated against the current site session. */
 export function createOperationsHandler({ db, collect }: { db: PostgresDatabase; collect?: () => Promise<void> }) {
   const uploads = new Map<string, { since: number; count: number }>()
-  const userFor = (token: string) => db.prepare(`SELECT u.username FROM sessions s JOIN users u ON u.id=s.user_id
-    WHERE s.token=? AND s.expires_at>?`).get<{ username: string }>(token, Date.now())
+  const userFor = async (token: string) => (await getSessionByToken(token, { db }))?.user
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const path = url.pathname
@@ -37,25 +36,24 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
       res.end(await operationsMetrics.registry.metrics())
       return true
     }
+    const admission = httpAdmission(req)
+    if (!admission.ok) { json(res, admission.status, { ok: false, code: admission.code }); return true }
+    if (path.startsWith('/ops/')) {
+      res.setHeader('Content-Security-Policy', "frame-ancestors 'none'")
+      res.setHeader('X-Frame-Options', 'DENY')
+    }
     if (path === '/ops/start') {
       const ticket = url.searchParams.get('ticket') ?? ''
       const row = await db.prepare('DELETE FROM observability_tickets WHERE ticket_hash=? AND expires_at>? RETURNING session_token')
         .get<{ session_token: string }>(digest(ticket), Date.now())
       const user = row && await userFor(row.session_token)
       if (!user || !isAdmin(user.username)) { json(res, 401, { ok: false, code: 'invalid_handoff' }); return true }
-      const secure = process.env.NODE_ENV === 'production' && (process.env.PUBLIC_API_BASE ?? getRequestOrigin(req)).startsWith('https:')
       res.writeHead(303, { Location: `${prefix}/ops/d/open-agricola/operations`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
-        'Set-Cookie': `${OPS_COOKIE}=${encodeURIComponent(row!.session_token)}; Path=${prefix}/ops; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}` })
+        'Set-Cookie': serializeOperationsCookie(row!.session_token, { backendOrigin: getRequestOrigin(req) }) })
       res.end(); return true
     }
-    const tokens = [...readCookies(req.headers.cookie, path.startsWith('/ops/') ? OPS_COOKIE : SESSION_COOKIE), extractToken(req.headers.authorization)]
-    let user: { username: string } | undefined
-    let sessionToken = ''
-    for (const token of tokens) {
-      if (!token) continue
-      user = await userFor(token)
-      if (user) { sessionToken = token; break }
-    }
+    const sessionToken = requestSessionToken(req, path.startsWith('/ops/'))
+    const user = await userFor(sessionToken)
     if (!user) { json(res, 401, { ok: false, code: 'login_required' }); return true }
     if (path === '/api/observability/telemetry') {
       if (req.method !== 'POST') { json(res, 405, { ok: false }); return true }
@@ -107,7 +105,7 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
       // Build an allowlist; neither credentials nor client-supplied auth/proxy headers reach Grafana.
       const headers = { 'x-webauth-user': encodeURIComponent(user.username), 'x-webauth-role': 'Viewer', 'content-type': req.headers['content-type'] ?? 'application/json', accept: req.headers.accept ?? '*/*' }
       const upstream = httpRequest(new URL(prefix + path + url.search, target), { method: req.method, headers, timeout: 10_000 }, response => {
-        const responseHeaders = { ...response.headers, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }
+        const responseHeaders = { ...response.headers, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'content-security-policy': "frame-ancestors 'none'", 'x-frame-options': 'DENY' }
         delete responseHeaders['set-cookie']
         res.writeHead(response.statusCode ?? 502, responseHeaders)
         response.pipe(res)

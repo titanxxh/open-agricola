@@ -1,3 +1,4 @@
+import { requestSessionToken } from './request-auth'
 import { CLIENT_CAPABILITIES_HEADER } from '../shared/contract/client-capabilities'
 import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
@@ -11,7 +12,7 @@ import { GameSession } from './game/authoritative-session.ts'
 import type { FarmChoiceType, FarmChoiceValidation } from '../shared/session/farm-choice-validation.ts'
 import type { MoorSpecialActionId } from '../shared/moor/types.ts'
 import { getDb } from './db.ts'
-import { validateSession, extractToken } from './auth.ts'
+import { validateSession } from './auth.ts'
 import { allowAnonymousAccess } from './anonymous-access.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
@@ -100,8 +101,8 @@ setInterval(() => {
 }, 60_000).unref()
 
 const getSessionKey = async (req: IncomingMessage): Promise<Awaited<string>> => {
-  const user = (await validateSession(extractToken(req.headers.authorization)))
-  if (!user && extractToken(req.headers.authorization) && authority) throw new ExecutionRevokedError('Session authorization ended')
+  const user = (await validateSession(requestSessionToken(req)))
+  if (!user && requestSessionToken(req) && authority) throw new ExecutionRevokedError('Session authorization ended')
   return user?.id ?? 'anonymous'
 }
 
@@ -650,7 +651,7 @@ const handleAuthorizedGameRoute = async (
     let setup: ReturnType<typeof parseGameSetupRequest>
     try { setup = parseGameSetupRequest(raw, draftOptions.value) }
     catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid game configuration' }); return true }
-    const requestUserId = (await validateSession(extractToken(req.headers.authorization)))?.id
+    const requestUserId = (await validateSession(requestSessionToken(req)))?.id
     const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
     sessionLastAccess.set(sessionKey, Date.now())
@@ -768,7 +769,7 @@ const handleAuthorizedGameRoute = async (
     }
 
     // Identify the requesting user (optional — allows loading own draft cards)
-    const requestUser = (await validateSession(extractToken(req.headers.authorization)))
+    const requestUser = (await validateSession(requestSessionToken(req)))
     const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
     sessionLastAccess.set(sessionKey, Date.now())
@@ -1069,7 +1070,7 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
   // The debug sandbox is a development surface (#993): without anonymous
   // access every call needs a session, so unauthenticated callers cannot
   // drive server-side GameSessions or custom-code executors.
-  if (!allowAnonymousAccess() && !(await validateSession(extractToken(req.headers.authorization)))) {
+  if (!allowAnonymousAccess() && !(await validateSession(requestSessionToken(req)))) {
     rawJson(res, 401, { ok: false, code: 'login_required', error: 'Login required' })
     return true
   }

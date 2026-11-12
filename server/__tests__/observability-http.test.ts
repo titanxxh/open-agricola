@@ -5,6 +5,22 @@ import { createTestDatabase, getTestDatabaseUrl } from './_helpers/postgres'
 import { PostgresDatabase } from '../database/postgres'
 import { createOperationsHandler } from '../observability/http'
 
+const navigation = { 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' }
+function navigate(url: string, headers: Record<string, string> = {}): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const outgoing = request(url, { headers: { ...navigation, ...headers } }, response => {
+      const bytes: Buffer[] = []
+      response.on('data', chunk => bytes.push(Buffer.from(chunk)))
+      response.on('end', () => {
+        const result = new Headers()
+        for (let index = 0; index < response.rawHeaders.length; index += 2) result.append(response.rawHeaders[index]!, response.rawHeaders[index + 1]!)
+        resolve(new Response(Buffer.concat(bytes), { status: response.statusCode, headers: result }))
+      })
+    })
+    outgoing.on('error', reject)
+    outgoing.end()
+  })
+}
 const db = await createTestDatabase()
 const grafanaRequests: string[] = []
 const grafana = createServer((req, res) => {
@@ -25,13 +41,15 @@ beforeAll(async () => {
   for (const username of ['ops-admin', 'ordinary-user']) {
     await db.prepare('INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)')
       .run(username, username, username, 'unused-test-password', Date.now())
-    await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at) VALUES(?,?,?,?)')
+    await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at,auth_policy_version) VALUES(?,?,?,?,2)')
       .run(username + '-token', username, Date.now(), Date.now() + 60_000)
   }
   await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
   await new Promise<void>(done => grafana.listen(0, '127.0.0.1', done))
   vi.stubEnv('GRAFANA_URL', `http://127.0.0.1:${(grafana.address() as AddressInfo).port}`)
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  vi.stubEnv('PUBLIC_API_BASE', base)
+  vi.stubEnv('PUBLIC_APP_ORIGIN', base)
 })
 afterAll(async () => {
   await new Promise<void>(done => server.close(() => done()))
@@ -44,23 +62,23 @@ it('uses a one-time handoff, strips site credentials and checks current privileg
   const bootstrap = await fetch(base + '/api/admin/observability/session', { method: 'POST', headers: { Authorization: 'Bearer ops-admin-token' } })
   expect(bootstrap.status).toBe(200)
   const { path } = await bootstrap.json()
-  const start = await fetch(base + path, { redirect: 'manual' })
+  const start = await navigate(base + path)
   expect(start.status).toBe(303)
   const cookie = start.headers.get('set-cookie')!.split(';')[0]!
-  expect((await fetch(base + path, { redirect: 'manual' })).status).toBe(401)
-  const query = await fetch(base + '/ops/api/ds/query', { method: 'POST', headers: { Cookie: cookie, 'X-WEBAUTH-USER': 'forged', Authorization: 'Bearer ignored' }, body: '{}' })
+  expect((await navigate(base + path)).status).toBe(401)
+  const query = await fetch(base + '/ops/api/ds/query', { method: 'POST', headers: { Cookie: cookie, 'X-WEBAUTH-USER': 'forged', Origin: base }, body: '{}' })
   expect(query.status).toBe(200)
   expect(await query.json()).toEqual({ user: 'ops-admin' })
-  expect((await fetch(base + '/ops/api/dashboards/db', { method: 'POST', headers: { Cookie: cookie }, body: '{}' })).status).toBe(405)
+  expect((await fetch(base + '/ops/api/dashboards/db', { method: 'POST', headers: { Cookie: cookie, Origin: base }, body: '{}' })).status).toBe(405)
   vi.stubEnv('ADMIN_USERS', '')
-  expect((await fetch(base + '/ops/api/ds/query', { method: 'POST', headers: { Cookie: cookie }, body: '{}' })).status).toBe(403)
+  expect((await fetch(base + '/ops/api/ds/query', { method: 'POST', headers: { Cookie: cookie, Origin: base }, body: '{}' })).status).toBe(403)
   vi.stubEnv('ADMIN_USERS', 'ops-admin')
 })
 
 it('requires the current site administrator for every dashboard and data route', async () => {
   for (const route of ['/api/admin/observability', '/ops/', '/ops/api/ds/query']) {
     const anonymous = await fetch(base + route)
-    expect(anonymous.status).toBe(401)
+    expect(anonymous.status).toBe(403)
     const ordinary = await fetch(base + route, {
       headers: { Authorization: 'Bearer ordinary-user-token', 'X-WEBAUTH-USER': 'ops-admin' },
     })
@@ -71,7 +89,7 @@ it('requires the current site administrator for every dashboard and data route',
 it('lets a Chinese administrator use Grafana without invalid HTTP headers', async () => {
   await db.prepare('INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)')
     .run('unicode-admin', '管理员甲', '管理员甲', 'unused-test-password', Date.now())
-  await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at) VALUES(?,?,?,?)')
+  await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at,auth_policy_version) VALUES(?,?,?,?,2)')
     .run('unicode-admin-token', 'unicode-admin', Date.now(), Date.now() + 60_000)
   vi.stubEnv('ADMIN_USERS', 'ops-admin,管理员甲')
   try {
@@ -85,12 +103,13 @@ it('keeps local HTTP handoff cookies usable with a production API URL in .env', 
   const originalNodeEnv = process.env.NODE_ENV
   const originalApiBase = process.env.PUBLIC_API_BASE
   vi.stubEnv('PUBLIC_API_BASE', 'https://api.example.com')
+  vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://app.example.com')
   try {
     for (const environment of ['development', 'production']) {
       vi.stubEnv('NODE_ENV', environment)
       const bootstrap = await fetch(base + '/api/admin/observability/session', { method: 'POST', headers: { Authorization: 'Bearer ops-admin-token' } })
       const { path } = await bootstrap.json()
-      const start = await fetch(base + path, { redirect: 'manual' })
+      const start = await navigate(base + path, { Host: 'api.example.com' })
       expect(start.status).toBe(303)
       expect(start.headers.get('set-cookie')!.includes('; Secure')).toBe(environment === 'production')
     }
@@ -105,7 +124,7 @@ it('protects the scrape endpoint and reports actual rejected HTTP requests', asy
     return response.text()
   }
   const rejected = (text: string) => text.split('\n')
-    .filter(line => line.startsWith('agricola_http_requests_total{') && line.includes('status="401"') && line.includes('route="operations"'))
+    .filter(line => line.startsWith('agricola_http_requests_total{') && line.includes('status="403"') && line.includes('route="operations"'))
     .reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
   const before = rejected(await scrape())
   await fetch(base + '/api/admin/observability')
@@ -125,16 +144,17 @@ it('preserves the public API prefix through an actual reverse-proxy handoff, coo
   await new Promise<void>(done => proxy.listen(0, '127.0.0.1', done))
   const publicBase = `http://127.0.0.1:${(proxy.address() as AddressInfo).port}/agricola-api`
   vi.stubEnv('NODE_ENV', 'production')
-  vi.stubEnv('PUBLIC_API_BASE', publicBase)
+  vi.stubEnv('PUBLIC_API_BASE', publicBase.replace('http:', 'https:'))
+  vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://app.example.test')
   try {
     const bootstrap = await fetch(publicBase + '/api/admin/observability/session', { method: 'POST', headers: { Authorization: 'Bearer ops-admin-token' } })
     const { path } = await bootstrap.json()
-    const start = await fetch(publicBase + path, { redirect: 'manual' })
+    const start = await navigate(publicBase + path)
     expect(start.status).toBe(303)
     expect(start.headers.get('location')).toBe('/agricola-api/ops/d/open-agricola/operations')
-    expect(start.headers.get('set-cookie')).toContain('Path=/agricola-api/ops;')
+    expect(start.headers.get('set-cookie')).toContain('Path=/;')
     const cookie = start.headers.get('set-cookie')!.split(';')[0]!
-    const dashboard = await fetch(new URL(start.headers.get('location')!, publicBase), { headers: { Cookie: cookie } })
+    const dashboard = await fetch(new URL(start.headers.get('location')!, publicBase), { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'same-origin' } })
     expect(dashboard.status).toBe(200)
     expect(grafanaRequests.at(-1)).toBe('/agricola-api/ops/d/open-agricola/operations')
   } finally {

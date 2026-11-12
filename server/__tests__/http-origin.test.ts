@@ -42,6 +42,13 @@ describe('http origin helpers', () => {
     }))).toBe(false)
   })
 
+  it('does not trust a sibling, a missing origin, or request-derived host metadata', () => {
+    process.env.PUBLIC_APP_ORIGIN = 'https://open-agricola.titanxxh.com'
+    for (const origin of [undefined, 'https://pre.titanxxh.com', 'https://open-agricola.titanxxh.com/path']) {
+      expect(isTrustedOrigin(req({ origin, host: 'pre.titanxxh.com', 'x-forwarded-proto': 'https' }))).toBe(false)
+    }
+  })
+
   it('adds credentialed CORS headers for explicit CORS origins', () => {
     process.env.CORS_ORIGIN = 'https://frontend.example'
 
