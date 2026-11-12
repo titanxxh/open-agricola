@@ -19,11 +19,10 @@ import {
 import {
   clearOnboardingCookie,
   clearSessionCookie,
-  ONBOARDING_COOKIE,
   readCookie,
   serializeOnboardingCookie,
   serializeSessionCookie,
-  SESSION_COOKIE,
+  authCookieNames,
 } from '../auth-cookies.ts'
 import { checkRateLimit, resetRateLimitsForTests } from '../rate-limit.ts'
 import { getDb } from '../db.ts'
@@ -77,6 +76,16 @@ describe('auth', () => {
     `))
   })
 
+
+  it('rejects a session issued by a legacy authentication policy', async () => {
+    const user = await createLocalUserForTests('legacysession', 'password123', 'Legacy')
+    await getDb().prepare('INSERT INTO sessions(token,user_id,expires_at,created_at) VALUES(?,?,?,?)')
+      .run('legacy-session', user.id, Date.now() + 60_000, Date.now())
+    expect(await validateSession('legacy-session')).toBeNull()
+    const current = await createSession(user.id)
+    expect(current).toBeTruthy()
+    expect(await validateSession(current ?? '')).toMatchObject({ id: user.id })
+  })
 
   describe('register', () => {
     it('direct register is disabled with a stable code', async () => {
@@ -347,7 +356,7 @@ describe('auth', () => {
       expect(result).toMatchObject({ ok: false, code: 'email_not_verified' })
     })
 
-    it('verifies an email token once and creates a session', async () => {
+    it('verifies an email token once without issuing a browser session', async () => {
       process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
       const created = await registerPasswordUser({
         username: 'verifyuser',
@@ -364,8 +373,9 @@ describe('auth', () => {
       expect(verified.ok).toBe(true)
       if (!verified.ok) return
       expect(verified.user.username).toBe('verifyuser')
-      expect(verified.token).toBeTruthy()
-      expect((await validateSession(verified.token))?.username).toBe('verifyuser')
+      expect(verified).not.toHaveProperty('token')
+      expect(await getDb().prepare('SELECT token FROM sessions WHERE user_id=?').all(created.userId)).toEqual([])
+      expect(await login('verifyuser', 'password123')).toMatchObject({ ok: true, user: { id: created.userId } })
 
       const reused = (await verifyEmailToken(token))
       expect(reused).toMatchObject({ ok: false, code: 'invalid_or_expired_token' })
@@ -668,6 +678,7 @@ describe('auth', () => {
 
   describe('cookies', () => {
     it('serializes and reads auth cookies', () => {
+      const { session: SESSION_COOKIE, onboarding: ONBOARDING_COOKIE } = authCookieNames()
       const session = serializeSessionCookie('tok en')
       const onboarding = serializeOnboardingCookie('ticket=value')
       expect(session).toContain(`${SESSION_COOKIE}=tok%20en`)
@@ -679,7 +690,7 @@ describe('auth', () => {
     })
 
     it('treats malformed cookie values as missing', () => {
-      expect(readCookie(`${SESSION_COOKIE}=%`, SESSION_COOKIE)).toBe('')
+      expect(readCookie(`${authCookieNames().session}=%`, authCookieNames().session)).toBe('')
     })
   })
 

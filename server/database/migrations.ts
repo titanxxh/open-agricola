@@ -27,6 +27,7 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('043-bug-report-release-feedback.sql')
     migrations.push('044-historical-feedback-subjects.sql')
     migrations.push('045-feedback-summary-and-deletion.sql')
+    migrations.push('046-browser-auth-policy.sql')
     for (const [index, filename] of migrations.entries()) {
       const version = index + 1
       if (await db.prepare('SELECT version FROM postgres_schema_migrations WHERE version = ?').get(version)) continue
