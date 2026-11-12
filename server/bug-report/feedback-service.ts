@@ -151,7 +151,8 @@ export class BugReportFeedbackService {
     const plan = await this.previewFixDeployment(row.pull_requests)
     return { rootId: row.root_id, rootIssueNumber: row.root_issue_number, version: row.version,
       associationVersion: row.association_version, fixSummary: row.fix_summary, status: plan.currentProduction ? 'released' : row.pull_requests.length ? 'pending_release' : 'unlinked',
-      ...(releases[0] ? { firstVerifiedRelease: releases[0] } : {}), ...(releases.at(-1) ? { currentProductionRelease: releases.at(-1) } : {}),
+      ...(releases[0] ? { firstVerifiedRelease: releases[0] } : {}),
+      ...(plan.currentProduction ? { currentProductionRelease: productionRelease(plan.currentProduction.proof) } : {}),
       reports: reports.map(report => ({ submissionId: report.submission_id, issueNumber: report.github_issue_number })),
       pullRequests: row.pull_requests, requiredCommits: [...new Set(row.pull_requests.flatMap(pr => pr.requiredCommits))].sort() }
   }
@@ -345,8 +346,7 @@ export class BugReportFeedbackService {
   private async verifiedReleases(rootId: string, version: number): Promise<VerifiedProductionRelease[]> {
     const rows = await this.db.prepare(`SELECT o.proof FROM bug_report_fix_verifications v JOIN bug_report_feedback_operations o USING(operation_id)
       WHERE v.root_id=? AND v.fix_version=? ORDER BY (o.proof->>'observedAt')::bigint,o.operation_id`).all<{ proof: DeploymentProof }>(rootId, version)
-    return rows.map(row => ({ version: row.proof.release.version, url: row.proof.release.url, sha: row.proof.release.sha,
-      publishedAt: row.proof.release.publishedAt, verifiedAt: row.proof.observedAt }))
+    return rows.map(row => productionRelease(row.proof))
   }
 
   private async projectMessage(row: FeedbackRow): Promise<InboxMessage> {
@@ -356,10 +356,11 @@ export class BugReportFeedbackService {
       WHERE l.root_id=? AND r.reporter_user_id=(SELECT recipient_user_id FROM bug_report_feedback WHERE id=?)
       AND (SELECT kind FROM bug_report_feedback WHERE submission_id=r.submission_id AND kind<>'fix_released' ORDER BY version DESC LIMIT 1)='confirmed_bug' ORDER BY r.github_issue_number`)
       .all<{ submission_id: string; github_issue_number: number }>(value.release.rootId, row.id)
-    const fix = await this.db.prepare('SELECT version FROM bug_report_fix_roots WHERE root_id=?').get<{ version: number }>(value.release.rootId)
-    const releases = fix ? await this.verifiedReleases(value.release.rootId, fix.version) : []
+    const fix = await this.db.prepare('SELECT pull_requests FROM bug_report_fix_roots WHERE root_id=?')
+      .get<Pick<FixRootRow, 'pull_requests'>>(value.release.rootId)
+    const plan = await this.previewFixDeployment(fix?.pull_requests ?? [])
     return { ...value, relatedReports: related.map(report => ({ submissionId: report.submission_id, issueNumber: report.github_issue_number })),
-      ...(releases.at(-1) ? { currentProduction: releases.at(-1) } : {}) }
+      ...(plan.currentProduction ? { currentProduction: productionRelease(plan.currentProduction.proof) } : {}) }
   }
 
   async previewFixDeployment(pullRequests: VerifiedFixPullRequest[]) {
@@ -441,4 +442,9 @@ export class BugReportFeedbackService {
     if (!report) throw new FeedbackError('feedback_report_not_found', 404)
     return report
   }
+}
+
+function productionRelease(proof: DeploymentProof): VerifiedProductionRelease {
+  return { version: proof.release.version, url: proof.release.url, sha: proof.release.sha,
+    publishedAt: proof.release.publishedAt, verifiedAt: proof.observedAt }
 }

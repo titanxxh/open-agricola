@@ -199,6 +199,32 @@ describe('verified production fix feedback', () => {
     expect((await service.getReport(1465)).fix).toMatchObject({ firstVerifiedRelease: { version: 'v0.20.0' }, currentProductionRelease: { version: 'v0.21.0' } })
   })
 
+  it('clears current production after a verified rollback without rewriting the first release or read state', async () => {
+    await service.associateFix('admin', fix)
+    await service.recordVerifiedDeployment('before-rollback', proof)
+    const original = (await service.listInbox('reporter')).messages[0]
+    const read = await service.markRead('reporter', original.id)
+    const rollbackSha = 'f'.repeat(40)
+    await service.recordVerifiedDeployment('verified-rollback', { ...proof, observedAt: 2500,
+      release: { ...proof.release, version: 'v0.19.0', url: `https://github.com/${repository}/releases/tag/v0.19.0`,
+        sha: rollbackSha, tagSha: rollbackSha, publishedAt: 1000 },
+      candidate: { ...proof.candidate, sha: rollbackSha }, frontend: { ...proof.frontend, gameBuildId: rollbackSha },
+      backend: { ...proof.backend, gameBuildId: rollbackSha }, ancestry: { ...proof.ancestry, commits: [rollbackSha] } })
+    const rolledBack = await service.getMessage('reporter', original.id)
+    expect(rolledBack).toMatchObject({ id: read.id, readAt: read.readAt, createdAt: read.createdAt,
+      release: { firstVerified: { version: 'v0.20.0', sha: deployed } } })
+    expect(rolledBack.currentProduction).toBeUndefined()
+    expect((await service.listInbox('reporter')).messages[0].currentProduction).toBeUndefined()
+    const report = await service.getReport(1465)
+    expect(report.fix).toMatchObject({ status: 'pending_release', firstVerifiedRelease: { version: 'v0.20.0' } })
+    expect(report.fix?.currentProductionRelease).toBeUndefined()
+    await service.recordVerifiedDeployment('restored-production', { ...proof, observedAt: 2800 })
+    const restored = (await service.listInbox('reporter')).messages.filter(entry => entry.kind === 'fix_released')
+    expect(restored).toHaveLength(1)
+    expect(restored[0]).toMatchObject({ id: read.id, readAt: read.readAt, currentProduction: { version: 'v0.20.0' } })
+    expect((await service.getReport(1465)).fix?.status).toBe('released')
+  })
+
   it('never reconstructs a deleting or anonymized root reporter while confirmed duplicates remain deliverable', async () => {
     await report(1466, 'other')
     await service.associateDuplicate('admin', { issueNumber: 1466, rootIssueNumber: 1465, requestId: 'root-deletion-duplicate', expectedVersion: 0 })
