@@ -1,3 +1,4 @@
+import { browserRequestHeaders } from './fixtures'
 // @covers server/bug-report/feedback-service.ts
 // @covers server/bug-report-feedback-routes.ts
 // @covers client/app/Inbox.tsx
@@ -64,12 +65,12 @@ test('administrator confirmation reaches only the reporter and read state surviv
     } finally { await fixture.close() }
 
     const rejected = await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`, {
-      headers: { Origin: 'https://untrusted.example' }, data: { issueNumber, requestId: 'untrusted-request', expectedVersion: 0,
+      headers: { ...browserRequestHeaders(app.apiUrl), Origin: 'https://untrusted.example' }, data: { issueNumber, requestId: 'untrusted-request', expectedVersion: 0,
         kind: 'confirmed_bug', reportSummary: 'Wrong origin', explanation: 'This must not be delivered.' },
     })
     expect(rejected.status()).toBe(403)
-    expect(await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).toMatchObject({ messages: [], unreadCount: 0 })
-    expect((await stranger.request.get(`${app.apiUrl}/api/admin/bug-report-feedback?issue=${issueNumber}`)).status()).toBe(403)
+    expect(await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()).toMatchObject({ messages: [], unreadCount: 0 })
+    expect((await stranger.request.get(`${app.apiUrl}/api/admin/bug-report-feedback?issue=${issueNumber}`, { headers: browserRequestHeaders(app.apiUrl) })).status()).toBe(403)
 
     const owner = await administrator.newPage(), member = await reporter.newPage()
     const settings = new URL(app.appUrl); settings.searchParams.set('page', 'settings')
@@ -94,12 +95,12 @@ test('administrator confirmation reaches only the reporter and read state surviv
     await expect(inbox.getByText('Bug confirmed', { exact: true })).toBeVisible()
     await expect(inbox.getByRole('link', { name: `View issue #${issueNumber}` })).toHaveAttribute('href', `https://github.com/titanxxh/open-agricola/issues/${issueNumber}`)
     await expect(inbox.locator('b')).toHaveCount(0)
-    const delivered: unknown = await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()
+    const delivered: unknown = await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()
     if (!delivered || typeof delivered !== 'object' || !('messages' in delivered) || !Array.isArray(delivered.messages)
       || !delivered.messages[0] || typeof delivered.messages[0] !== 'object' || !('id' in delivered.messages[0])
       || typeof delivered.messages[0].id !== 'number') throw new Error('Expected delivered inbox message')
-    expect((await stranger.request.get(`${app.apiUrl}/api/v1/inbox/${delivered.messages[0].id}`)).status()).toBe(404)
-    await expect.poll(async () => (await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).unreadCount).toBe(0)
+    expect((await stranger.request.get(`${app.apiUrl}/api/v1/inbox/${delivered.messages[0].id}`, { headers: browserRequestHeaders(app.apiUrl) })).status()).toBe(404)
+    await expect.poll(async () => (await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()).unreadCount).toBe(0)
     await member.screenshot({ path: testInfo.outputPath('inbox-desktop.png'), fullPage: true })
     await member.keyboard.press('Escape')
     await member.reload()
@@ -181,7 +182,7 @@ test('older inbox pages append in stable order without marking messages read', a
     await expect(inbox.locator('.inbox-list > li')).toHaveCount(21)
     await expect(inbox.locator('.inbox-list > li').last()).toContainText('Report update 1')
     await expect(inbox.getByRole('button', { name: 'Older messages', exact: true })).toHaveCount(0)
-    expect(await (await context.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).toMatchObject({ unreadCount: 21 })
+    expect(await (await context.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()).toMatchObject({ unreadCount: 21 })
     await inbox.getByRole('button', { name: /Report update 1 Unread/ }).click()
     await expect(inbox.getByRole('heading', { name: 'Report update 1', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Inbox, 20 unread', exact: true })).toBeVisible()
@@ -263,7 +264,7 @@ test('administrator requests specific details and reassesses the same report whi
     await member.keyboard.press('Escape')
 
     // A stale administrator must reload before replacing a newer assessment.
-    const update = await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`, { data: {
+    const update = await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`, { headers: browserRequestHeaders(app.apiUrl), data: {
       issueNumber, requestId: 'triage-newer-version', expectedVersion: 1, kind: 'confirmed_bug',
       reportSummary: 'Page disconnected during feeding', explanation: 'Reassessment reproduced the socket disconnect.' } })
     expect(update.status()).toBe(200)

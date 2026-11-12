@@ -1,3 +1,4 @@
+import { browserRequestHeaders } from './fixtures'
 // @covers server/bug-report/historical-feedback.ts
 // @covers server/bug-report/historical-feedback-cli.ts
 // @covers server/bug-report/feedback-service.ts
@@ -64,12 +65,12 @@ test('owner preview and explicit backfill deliver historical feedback without cr
     expect(preview.rows.find(row => row.issueNumber === 1465)?.mapping?.source).toBe('import')
     expect(preview.rows.find(row => row.issueNumber === 1465)?.fix?.text).toContain('新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。')
     expect(await fixture.prepare('SELECT 1 FROM bug_report_feedback_subjects WHERE submission_id=?').get(marker)).toBeUndefined()
-    expect((await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).status()).toBe(200)
-    expect(await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).toMatchObject({ unreadCount: 0, messages: [] })
+    expect((await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).status()).toBe(200)
+    expect(await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()).toMatchObject({ unreadCount: 0, messages: [] })
     expect(JSON.parse(await run(true))).toMatchObject({ newMessages: 16, errors: [] })
-    expect((await reporter.request.get(`${app.apiUrl}/api/v1/bug-reports/${marker}`)).status()).toBe(404)
-    expect((await administrator.request.post(`${app.apiUrl}/api/v1/bug-reports/${marker}/evidence/inspect`, { data: { perspective: 'open', reason: 'must not grant imported authority' } })).status()).toBe(404)
-    expect((await reporter.request.get(`${app.apiUrl}/api/v1/game-contexts/${room}/evidence/999999?frame=${'f'.repeat(64)}`)).status()).toBe(403)
+    expect((await reporter.request.get(`${app.apiUrl}/api/v1/bug-reports/${marker}`, { headers: browserRequestHeaders(app.apiUrl) })).status()).toBe(404)
+    expect((await administrator.request.post(`${app.apiUrl}/api/v1/bug-reports/${marker}/evidence/inspect`, { headers: browserRequestHeaders(app.apiUrl), data: { perspective: 'open', reason: 'must not grant imported authority' } })).status()).toBe(404)
+    expect((await reporter.request.get(`${app.apiUrl}/api/v1/game-contexts/${room}/evidence/999999?frame=${'f'.repeat(64)}`, { headers: browserRequestHeaders(app.apiUrl) })).status()).toBe(403)
     expect(await fixture.prepare('SELECT COUNT(*) AS count FROM game_replay_steps WHERE room_id=?').get(room)).toEqual({ count: 0 })
     const page = await reporter.newPage()
     await page.setViewportSize({ width: 1280, height: 900 })
@@ -83,9 +84,9 @@ test('owner preview and explicit backfill deliver historical feedback without cr
     await expect(dialog.getByText('新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。', { exact: true })).toBeVisible()
     await expect(dialog.getByText('First verified in v0.30.0', { exact: true })).toBeVisible()
     await expect(dialog.getByRole('link', { name: 'View release v0.11.8', exact: true })).toHaveAttribute('href', 'https://github.com/titanxxh/open-agricola/releases/tag/v0.11.8')
-    await expect.poll(async () => (await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).unreadCount).toBe(15)
+    await expect.poll(async () => (await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()).unreadCount).toBe(15)
     expect(JSON.parse(await run(true))).toMatchObject({ newMessages: 0, errors: [] })
-    expect(await (await other.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).toMatchObject({ unreadCount: 0, messages: [] })
+    expect(await (await other.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()).toMatchObject({ unreadCount: 0, messages: [] })
     await dialog.screenshot({ path: testInfo.outputPath('historical-inbox-desktop-en.png') })
     await page.reload()
     await page.setViewportSize({ width: 390, height: 844 })

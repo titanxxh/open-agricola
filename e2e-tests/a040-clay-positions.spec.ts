@@ -1,3 +1,4 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers shared/cards/A/
 // @covers client/components/board/
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test'
@@ -5,7 +6,7 @@ import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 test.use({ actionTimeout: 10000 })
 
@@ -150,16 +151,16 @@ async function plow(page: Page, spaceKey: string) {
 async function openRoom(page: Page, observer: Page, request: APIRequestContext) {
   for (const [index, client] of [page, observer].entries()) {
     const username = `a040_${Date.now().toString(36)}_${index}`
-    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
       providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
     } })
     expect(oauth.ok()).toBe(true)
     const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-      headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+      headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookie(oauth, authCookieNames().onboarding)}` },
       data: { username, displayName: username, password: 'a040-browser-pass', confirmPassword: 'a040-browser-pass' },
     })
     expect(complete.ok()).toBe(true)
-    await client.context().addCookies([{ name: 'oa_session', value: cookie(complete, 'oa_session'), url: FRONTEND_URL }])
+    await client.context().addCookies([{ name: authCookieNames().session, value: cookie(complete, authCookieNames().session), url: FRONTEND_URL }])
     await observe(client)
     await client.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
     await expect(client.locator('.game-layout')).toBeVisible({ timeout: 30000 })

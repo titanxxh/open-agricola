@@ -1,6 +1,7 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/styles/pages/
 import { test, expect, type APIRequestContext, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 const RUN_ID = Date.now().toString(36)
 const PASSWORD = 'testpass123'
@@ -57,7 +58,7 @@ async function callOAuthHelper(
   provider: OAuthProvider,
   profile: OAuthHelperProfile,
 ): Promise<{ helper: APIResponse; cookies: string[] }> {
-  const helper = await request.post(`${BACKEND_URL}/api/test/oauth/${provider}/callback`, {
+  const helper = await request.post(`${BACKEND_URL}/api/test/oauth/${provider}/callback`, { headers: browserRequestHeaders(),
     data: profile,
   })
   expect(helper.ok()).toBe(true)
@@ -86,19 +87,19 @@ async function createUserViaOAuth(
   } = options
   const profile: OAuthHelperProfile = { providerUserId, providerLogin, email, displayName }
   const { cookies: helperCookies } = await callOAuthHelper(request, provider, profile)
-  const onboardingCookie = cookieHeaderFromSetCookie(helperCookies, 'oa_onboarding')
+  const onboardingCookie = cookieHeaderFromSetCookie(helperCookies, authCookieNames().onboarding)
 
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
     data: { username, displayName, password, confirmPassword: password },
-    headers: { Cookie: onboardingCookie },
+    headers: { ...browserRequestHeaders(), Cookie: onboardingCookie },
   })
   expect(complete.ok()).toBe(true)
 
   const sessionCookies = setCookieHeaders(complete)
-    .filter(header => header.startsWith('oa_session='))
+    .filter(header => header.startsWith(`${authCookieNames().session}=`))
     .map(header => cookieFromSetCookie(header))
   return {
-    cookieHeader: cookieHeaderFromSetCookie(setCookieHeaders(complete), 'oa_session'),
+    cookieHeader: cookieHeaderFromSetCookie(setCookieHeaders(complete), authCookieNames().session),
     cookies: sessionCookies,
     profile,
     provider,
@@ -179,7 +180,7 @@ test.describe('Platform: auth', () => {
     await expect(page.locator('text=创建多人游戏')).toBeVisible({ timeout: 15000 })
     await expect.poll(() => page.evaluate(() => localStorage.getItem('open-agricola-token'))).toBeNull()
     expect(await page.context().cookies(FRONTEND_URL)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: 'oa_session', httpOnly: true })]),
+      expect.arrayContaining([expect.objectContaining({ name: authCookieNames().session, httpOnly: true })]),
     )
 
     await page.context().clearCookies()
@@ -203,7 +204,7 @@ test.describe('Platform: auth', () => {
     await page.click('button[type="submit"]')
     await expect(page.locator('text=创建多人游戏')).toBeVisible({ timeout: 15000 })
     expect(await page.context().cookies(FRONTEND_URL)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: 'oa_session', httpOnly: true })]),
+      expect.arrayContaining([expect.objectContaining({ name: authCookieNames().session, httpOnly: true })]),
     )
   })
 
@@ -264,11 +265,11 @@ test.describe('Platform: auth', () => {
   test('a consumed onboarding ticket shows expiry and offers fresh registration', async ({ page, request }) => {
     const username = `consumed_${RUN_ID}`
     const { cookies } = await callOAuthHelper(request, 'github', { providerUserId: `consumed-${RUN_ID}` })
-    const onboarding = cookies.find(cookie => cookie.startsWith('oa_onboarding='))
+    const onboarding = cookies.find(cookie => cookie.startsWith(`${authCookieNames().onboarding}=`))
     if (!onboarding) throw new Error('Missing onboarding cookie')
     const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
       data: { username, password: PASSWORD, confirmPassword: PASSWORD },
-      headers: { Cookie: cookieHeaderFromSetCookie(cookies, 'oa_onboarding') },
+      headers: { ...browserRequestHeaders(), Cookie: cookieHeaderFromSetCookie(cookies, authCookieNames().onboarding) },
     })
     expect(complete.ok()).toBe(true)
     await page.context().addCookies([cookieFromSetCookie(onboarding)])
@@ -316,7 +317,7 @@ test.describe('Platform: auth', () => {
     const username = `e2e_name_${RUN_ID}`
     const auth = await createUserViaOAuth(request, username, { password: PASSWORD })
     const res = await request.patch(`${BACKEND_URL}/api/auth/profile`, {
-      headers: { Cookie: auth.cookieHeader },
+      headers: { ...browserRequestHeaders(), Cookie: auth.cookieHeader },
       data: { displayName: 'New Name' },
     })
     expect((await res.json()).ok).toBe(true)
@@ -531,7 +532,7 @@ test.describe('Platform: workshop', () => {
         description: 'Gain 1 <FOOD> on return home',
         card_json: { id: `CUSTOM_E2E_${RUN_ID}`, name: 'E2E Test Card', deck: 'CUSTOM', number: 0, desc: [] },
       },
-      headers: { Cookie: cookieHeader },
+      headers: { ...browserRequestHeaders(), Cookie: cookieHeader },
     })
     const d = await res.json()
     expect(d.ok).toBe(true)
@@ -539,7 +540,7 @@ test.describe('Platform: workshop', () => {
   })
 
   test('browse published workshop cards', async ({ request }) => {
-    const res = await request.get(`${BACKEND_URL}/api/workshop/cards`)
+    const res = await request.get(`${BACKEND_URL}/api/workshop/cards`, { headers: browserRequestHeaders() })
     const d = await res.json()
     expect(d.ok).toBe(true)
     expect(Array.isArray(d.cards)).toBe(true)
@@ -547,7 +548,7 @@ test.describe('Platform: workshop', () => {
 
   test('sandbox — get user sandbox', async ({ request }) => {
     const res = await request.get(`${BACKEND_URL}/api/workshop/sandbox`, {
-      headers: { Cookie: cookieHeader },
+      headers: { ...browserRequestHeaders(), Cookie: cookieHeader },
     })
     const d = await res.json()
     expect(d.ok).toBe(true)
@@ -585,22 +586,22 @@ test.describe('Platform: sandbox game with custom cards', () => {
 
     const sb1 = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
       data: {},
-      headers: { Cookie: auth1.cookieHeader },
+      headers: { ...browserRequestHeaders(), Cookie: auth1.cookieHeader },
     })
     expect((await sb1.json()).ok).toBe(true)
 
     const state1 = await request.get(`${BACKEND_URL}/api/game/state`, {
-      headers: { Cookie: auth1.cookieHeader },
+      headers: { ...browserRequestHeaders(), Cookie: auth1.cookieHeader },
     })
     const s1 = await state1.json()
 
     await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
       data: { seed: 9999 },
-      headers: { Cookie: auth2.cookieHeader },
+      headers: { ...browserRequestHeaders(), Cookie: auth2.cookieHeader },
     })
 
     const state2 = await request.get(`${BACKEND_URL}/api/game/state`, {
-      headers: { Cookie: auth2.cookieHeader },
+      headers: { ...browserRequestHeaders(), Cookie: auth2.cookieHeader },
     })
     const s2 = await state2.json()
     expect(s2.ok).not.toBe(false)

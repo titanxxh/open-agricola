@@ -1,7 +1,8 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/styles/pages/
 // @covers server/connection/
 import { expect, test, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL, openGameEndControls } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL, openGameEndControls } from './fixtures'
 import type { Locale } from '../shared/i18n'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 import type { StateUpdateEnvelope } from '../shared/contract/protocol/game'
@@ -15,16 +16,16 @@ const cookie = (response: APIResponse, name: string) => {
 }
 
 async function authenticate(context: BrowserContext, name: string, locale: Locale) {
-  const oauth = await context.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+  const oauth = await context.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
     providerUserId: name, providerLogin: name, email: `${name}@example.com`, displayName: name,
   } })
   expect(oauth.ok()).toBe(true)
   const account = await context.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookie(oauth, authCookieNames().onboarding)}` },
     data: { username: name, displayName: name, password: 'spectating-test-pass', confirmPassword: 'spectating-test-pass' },
   })
   expect(account.ok(), await account.text()).toBe(true)
-  await context.addCookies([{ name: 'oa_session', value: cookie(account, 'oa_session'), url: FRONTEND_URL }])
+  await context.addCookies([{ name: authCookieNames().session, value: cookie(account, authCookieNames().session), url: FRONTEND_URL }])
   await context.addInitScript(locale => localStorage.setItem('open-agricola-locale-v2', locale), locale)
 }
 

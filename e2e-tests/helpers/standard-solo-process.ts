@@ -8,7 +8,8 @@ import { S3ObjectStore } from '../../server/storage/s3-store'
 import { decodeReplayFrame, type JsonValue } from '../../server/game/replay-codec'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { CommandIdentity, CommandReceipt } from '../../shared/contract/protocol/commands'
-import { BACKEND_URL } from '../fixtures'
+import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
+import { browserRequestHeaders, BACKEND_URL } from '../fixtures'
 
 const exec = promisify(execFile)
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
@@ -76,12 +77,12 @@ export async function restartIsolatedBackend(viewerBuildId: string, gameBuildId:
 export async function verifyOriginalReceipt(context: BrowserContext, roomId: string, original: ClientCommand, expected: CommandReceipt) {
   const cookies = await context.cookies()
   const cookie = cookies.map(value => `${value.name}=${value.value}`).join('; ')
-  const located = await context.request.post(`${BACKEND_URL}/api/rooms/locate`, { data: { roomId } })
+  const located = await context.request.post(`${BACKEND_URL}/api/rooms/locate`, { data: { roomId }, headers: browserRequestHeaders() })
   expect(located.ok()).toBe(true)
   const route: { wsPath: string } = await located.json()
   const destination = new URL(route.wsPath, BACKEND_URL)
   destination.protocol = 'ws:'
-  const socket = new WebSocket(destination, { headers: { Cookie: cookie } })
+  const socket = new WebSocket(destination, BROWSER_WS_PROTOCOL, { headers: { ...browserRequestHeaders(), Cookie: cookie } })
   const events: ServerEvent[] = []
   socket.on('message', raw => events.push(JSON.parse(raw.toString()) as ServerEvent))
   await new Promise<void>((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject) })

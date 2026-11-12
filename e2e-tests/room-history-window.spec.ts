@@ -1,7 +1,8 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers server/game/persistence/
 // @covers client/hooks/
 import { expect, test, type APIResponse, type Page } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 import { resolveRoomWorkPrompts } from './room-work-driver'
@@ -60,17 +61,17 @@ test('real Room history loads earlier groups, preserves cancellation markers and
       if (message.type === 'roomCreated' || message.type === 'roomJoined') seats.set(page, message.playerIndex)
     }))
     const username = `history_${suffix}_${index}`
-    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
       providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: `History${index}`,
     } })
     expect(oauth.ok()).toBe(true)
     const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-      headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+      headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookie(oauth, authCookieNames().onboarding)}` },
       data: { username, displayName: `History${index}`, password: 'history-pass-954', confirmPassword: 'history-pass-954' },
     })
     expect(complete.ok(), await complete.text()).toBe(true)
-    tokens.push(cookie(complete, 'oa_session'))
-    await page.context().addCookies([{ name: 'oa_session', value: tokens[index]!, url: FRONTEND_URL }])
+    tokens.push(cookie(complete, authCookieNames().session))
+    await page.context().addCookies([{ name: authCookieNames().session, value: tokens[index]!, url: FRONTEND_URL }])
     await page.addInitScript(() => {
       localStorage.setItem('open-agricola-locale-v2', 'en')
       ;(window as AuditWindow).auditMessages = []
@@ -155,7 +156,7 @@ test('real Room history loads earlier groups, preserves cancellation markers and
   await p1.getByRole('button', { name: 'Load earlier entries', exact: true }).click()
   await expect(p1.getByTestId('room-history-controls').getByRole('button')).toHaveCount(0)
   const allRows = await rows.count()
-  const renamed = await request.patch(`${BACKEND_URL}/api/auth/profile`, { headers: { Cookie: `oa_session=${tokens[0]}` }, data: { displayName: 'HistoryRenamed' } })
+  const renamed = await request.patch(`${BACKEND_URL}/api/auth/profile`, { headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().session}=${tokens[0]}` }, data: { displayName: 'HistoryRenamed' } })
   expect(renamed.ok()).toBe(true)
   await p1.reload()
   await expect(p1.locator('.game-layout')).toBeVisible({ timeout: 30000 })

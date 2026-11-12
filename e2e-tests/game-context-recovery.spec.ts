@@ -1,3 +1,4 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers server/game/persistence/
 // @covers client/hooks/
 import {
@@ -9,7 +10,7 @@ import {
   type Page,
   type WebSocketRoute,
 } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 type RecoveryState = {
   type: 'stateUpdate'
@@ -39,7 +40,7 @@ const authenticate = async (
   username: string,
   displayName = username,
 ): Promise<void> => {
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
+  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(),
     data: {
       providerUserId: `context-${username}`,
       providerLogin: username,
@@ -49,7 +50,7 @@ const authenticate = async (
   })
   expect(oauth.ok()).toBe(true)
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookieValue(oauth, authCookieNames().onboarding)}` },
     data: {
       username,
       displayName,
@@ -59,8 +60,8 @@ const authenticate = async (
   })
   expect(complete.ok(), `${complete.status()} ${await complete.text()}`).toBe(true)
   await context.addCookies([{
-    name: 'oa_session',
-    value: cookieValue(complete, 'oa_session'),
+    name: authCookieNames().session,
+    value: cookieValue(complete, authCookieNames().session),
     url: FRONTEND_URL,
   }])
 }

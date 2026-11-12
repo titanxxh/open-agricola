@@ -1,3 +1,4 @@
+import { browserRequestHeaders } from './fixtures'
 // @covers server/bug-report/feedback-service.ts
 // @covers server/bug-report/github-fix-verifier.ts
 // @covers server/bug-report-feedback-routes.ts
@@ -38,21 +39,21 @@ test('administrator links duplicates and complete merged fixes, reloads them, an
       }
     } finally { await fixture.close() }
     for (const issueNumber of [1673001, 1673002]) {
-      const response = await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`, { data: {
+      const response = await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`, { headers: browserRequestHeaders(app.apiUrl), data: {
         issueNumber, requestId: `confirm-${issueNumber}`, expectedVersion: 0, kind: 'confirmed_bug',
         reportSummary: `Discard report ${issueNumber}`, explanation: 'The missing discard action is confirmed.',
       } })
       expect(response.status()).toBe(200)
     }
-    const forged = await reporter.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { data: {
+    const forged = await reporter.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { headers: browserRequestHeaders(app.apiUrl), data: {
       issueNumber: 1673001, requestId: 'forged-fix-request', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.',
       pullRequests: [{ number: 1500, requiredCommits: ['a'.repeat(40), 'b'.repeat(40)] }],
     } })
     expect(forged.status()).toBe(403)
-    expect((await reporter.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/duplicate`, { data: {
+    expect((await reporter.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/duplicate`, { headers: browserRequestHeaders(app.apiUrl), data: {
       issueNumber: 1673002, rootIssueNumber: 1673001, requestId: 'forged-duplicate', expectedVersion: 0,
     } })).status()).toBe(403)
-    expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { headers: { Origin: 'https://untrusted.example' }, data: {
+    expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { headers: { ...browserRequestHeaders(app.apiUrl), Origin: 'https://untrusted.example' }, data: {
       issueNumber: 1673001, requestId: 'cross-origin-fix', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.', pullRequests: [{ number: 1500, requiredCommits: ['a'.repeat(40)] }],
     } })).status()).toBe(403)
     const owner = await administrator.newPage()
@@ -76,7 +77,7 @@ test('administrator links duplicates and complete merged fixes, reloads them, an
     await manager.getByRole('button', { name: 'Verify and save fix', exact: true }).click()
     await expect(manager.getByRole('status')).toContainText('Fix association saved. The system checks retained production evidence for release notifications.')
     await expect(manager.getByText('Fix linked, awaiting verified production release.', { exact: true })).toBeVisible()
-    expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { data: {
+    expect((await administrator.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`, { headers: browserRequestHeaders(app.apiUrl), data: {
       issueNumber: 1673001, requestId: 'stale-version-fix', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.',
       pullRequests: [{ number: 1500, requiredCommits: ['a'.repeat(40), 'b'.repeat(40)] }],
     } })).status()).toBe(409)
@@ -94,7 +95,7 @@ test('administrator links duplicates and complete merged fixes, reloads them, an
     await expect(manager.getByText('已关联修复，等待核验生产上线。', { exact: true })).toBeVisible()
     await manager.screenshot({ path: testInfo.outputPath('fix-duplicate-mobile-zh.png') })
     for (const context of [reporter, duplicate]) {
-      const inbox = await (await context.request.get(`${app.apiUrl}/api/v1/inbox`)).json()
+      const inbox = await (await context.request.get(`${app.apiUrl}/api/v1/inbox`, { headers: browserRequestHeaders(app.apiUrl) })).json()
       expect(inbox.messages).toHaveLength(1)
       expect(inbox.messages[0].kind).toBe('confirmed_bug')
       const page = await context.newPage()
@@ -122,10 +123,10 @@ test('administrator drafts retain their own CAS versions across triage refreshes
     for (const number of [issue,source,alternative]) {
       await fixture.prepare(`INSERT INTO bug_reports(submission_id,reporter_user_id,room_id,player_index,lifecycle,room_version,step_no,frame_hash,status,github_issue_number,created_at,updated_at)
         VALUES(?,?,?,0,'active',1,0,?,'submitted',?,1,1)`).run(`${room}-${number}`,account.id,room,'a'.repeat(64),number)
-      expect((await administratorB.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`,{ data:{ issueNumber:number,requestId:`draft-confirm-${number}`,expectedVersion:0,kind:'confirmed_bug',reportSummary:'Discard observation',explanation:'The missing discard action is confirmed.' } })).status()).toBe(200)
+      expect((await administratorB.request.post(`${app.apiUrl}/api/admin/bug-report-feedback`,{ headers: browserRequestHeaders(app.apiUrl), data:{ issueNumber:number,requestId:`draft-confirm-${number}`,expectedVersion:0,kind:'confirmed_bug',reportSummary:'Discard observation',explanation:'The missing discard action is confirmed.' } })).status()).toBe(200)
     }
-    const updateFix = async (requestId:string,expectedVersion:number,fixSummary:string,requiredCommits:string[]) => administratorB.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`,{ data:{ issueNumber:issue,requestId,expectedVersion,purpose:'fix',fixSummary,pullRequests:[{ number:1500,requiredCommits }] } })
-    const view = async (number = issue) => (await (await administratorB.request.get(`${app.apiUrl}/api/admin/bug-report-feedback?issue=${number}`)).json()).report
+    const updateFix = async (requestId:string,expectedVersion:number,fixSummary:string,requiredCommits:string[]) => administratorB.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/fix`,{ headers: browserRequestHeaders(app.apiUrl), data:{ issueNumber:issue,requestId,expectedVersion,purpose:'fix',fixSummary,pullRequests:[{ number:1500,requiredCommits }] } })
+    const view = async (number = issue) => (await (await administratorB.request.get(`${app.apiUrl}/api/admin/bug-report-feedback?issue=${number}`, { headers: browserRequestHeaders(app.apiUrl) })).json()).report
     expect((await updateFix('draft-initial-fix',0,first,['a'.repeat(40),'b'.repeat(40)])).status()).toBe(200)
     const owner = await administratorA.newPage()
     const settings = new URL(app.appUrl); settings.searchParams.set('page','settings')
@@ -194,7 +195,7 @@ test('administrator drafts retain their own CAS versions across triage refreshes
 
     await find(source)
     await panel.getByRole('spinbutton',{ name:'Duplicate of root issue number',exact:true }).fill(String(alternative))
-    expect((await administratorB.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/duplicate`,{ data:{ issueNumber:source,rootIssueNumber:issue,requestId:'draft-concurrent-duplicate',expectedVersion:0 } })).status()).toBe(200)
+    expect((await administratorB.request.post(`${app.apiUrl}/api/admin/bug-report-feedback/duplicate`,{ headers: browserRequestHeaders(app.apiUrl), data:{ issueNumber:source,rootIssueNumber:issue,requestId:'draft-concurrent-duplicate',expectedVersion:0 } })).status()).toBe(200)
     await triage('This independent report remains confirmed while a duplicate association changes.')
     const duplicateSave = panel.getByRole('button',{ name:'Link duplicate report',exact:true })
     await duplicateSave.click()

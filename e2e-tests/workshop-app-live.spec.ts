@@ -1,3 +1,5 @@
+import { browserRequestHeaders } from './fixtures'
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/app/workshop/
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { test, expect } from '@playwright/test'
@@ -11,18 +13,18 @@ test('real bot submission survives a lost browser response', async ({page,reques
   const frontend = process.env.FRONTEND_URL!
   const suffix = Date.now().toString(36)
   const username = `workshopqa_${suffix}`
-  const oauth = await request.post(`${backend}/api/test/oauth/github/callback`,{data:{providerUserId:username,providerLogin:username,email:`${username}@example.com`,displayName:'Workshop App acceptance'}})
+  const oauth = await request.post(`${backend}/api/test/oauth/github/callback`,{ headers: browserRequestHeaders(),data:{providerUserId:username,providerLogin:username,email:`${username}@example.com`,displayName:'Workshop App acceptance'}})
   expect(oauth.ok(),await oauth.text()).toBe(true)
   const cookie = (response: typeof oauth,name:string) => {
     const header = response.headersArray().find(header => header.name.toLowerCase() === 'set-cookie' && header.value.startsWith(`${name}=`))!
     return header.value.split(';')[0]!.slice(name.length+1)
   }
-  const onboarding = cookie(oauth,'oa_onboarding')
-  const registered = await request.post(`${backend}/api/auth/onboarding/complete`,{headers:{Cookie:`oa_onboarding=${onboarding}`},data:{username,displayName:'Workshop App acceptance',password:'isolated-workshop-test-724',confirmPassword:'isolated-workshop-test-724'}})
+  const onboarding = cookie(oauth,authCookieNames().onboarding)
+  const registered = await request.post(`${backend}/api/auth/onboarding/complete`,{headers:{ ...browserRequestHeaders(),Cookie:`${authCookieNames().onboarding}=${onboarding}`},data:{username,displayName:'Workshop App acceptance',password:'isolated-workshop-test-724',confirmPassword:'isolated-workshop-test-724'}})
   expect(registered.ok(),await registered.text()).toBe(true)
-  const session = cookie(registered,'oa_session')
-  await page.context().addCookies([{name:'oa_session',value:session,url:frontend}])
-  const headers = {Cookie:`oa_session=${session}`}
+  const session = cookie(registered,authCookieNames().session)
+  await page.context().addCookies([{name:authCookieNames().session,value:session,url:frontend}])
+  const headers = {...browserRequestHeaders(),Cookie:`${authCookieNames().session}=${session}`}
   const cardId = `CUSTOM_WorkshopAcceptance_${suffix}`
   const meta = {id:cardId,name:'Workshop delivery acceptance',deck:'CUSTOM',number:0,desc:['Temporary acceptance fixture. No card effect.'],cost:{},vp:0}
   const create = await request.post(`${backend}/api/workshop/cards`,{headers,data:{card_id:cardId,card_type:'minor',name:meta.name,description:'Temporary Workshop App delivery verification for #1008. Do not merge.',card_json:{...meta,card_type:'minor',implemented:true,locales:{zh:{name:'工坊投稿验收',desc:['临时验收卡，无卡牌效果。']}}},effect_code:`const CARD_DEF = ${JSON.stringify({cardType:'minor',meta})}; const CARD_IMPL = {}`}})
@@ -61,7 +63,7 @@ test('real bot submission survives a lost browser response', async ({page,reques
 test('reopens an existing real submission after a server restart', async ({page}) => {
   test.skip(!process.env.WORKSHOP_LIVE_RECEIPT, 'requires an existing isolated acceptance receipt')
   const receipt = JSON.parse(await readFile(process.env.WORKSHOP_LIVE_RECEIPT!,'utf8'))
-  await page.context().addCookies([{name:'oa_session',value:receipt.session,url:receipt.frontend}])
+  await page.context().addCookies([{name:authCookieNames().session,value:receipt.session,url:receipt.frontend}])
   await page.goto(`${receipt.frontend}/?page=workshop&card=${receipt.id}`)
   await page.getByRole('button',{name:'投稿记录与恢复'}).click()
   await expect(page.getByRole('link',{name:'查看审核 PR'})).toHaveAttribute('href',receipt.prUrl)

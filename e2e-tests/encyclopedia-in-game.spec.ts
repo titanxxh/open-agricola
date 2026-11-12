@@ -5,7 +5,7 @@ import { createOpeningSession, createWorkSession } from '../server/__tests__/_he
 import type { GameState } from '../shared/contract/types'
 import { serializeState } from '../shared/session/serialization'
 import { draftSeatProgress } from '../shared/projections/draft-progress'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { CATALOG, expectCatalog } from './helpers/encyclopedia'
 import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
 
@@ -180,11 +180,11 @@ async function dropConnection(page: Page) {
 
 async function signIn(page: Page) {
   const username = `encyclopedia_${crypto.randomUUID().slice(0, 8)}`
-  const oauth = await page.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+  const oauth = await page.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
     providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
   } })
   expect(oauth.ok()).toBe(true)
-  const account = await page.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, { data: {
+  const account = await page.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, { headers: browserRequestHeaders(), data: {
     username, displayName: username, password: 'encyclopedia-hotseat-pass', confirmPassword: 'encyclopedia-hotseat-pass',
   } })
   expect(account.ok(), await account.text()).toBe(true)

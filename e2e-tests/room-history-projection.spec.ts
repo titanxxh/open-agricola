@@ -1,7 +1,8 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers server/game/persistence/
 // @covers client/hooks/
 import { expect, test, type Page, type APIResponse } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
@@ -60,16 +61,16 @@ test('a legal card disclosure refreshes old Room pages without losing the readin
       const page = await browser.newPage()
       pages.push(page)
       const username = `projection_${suffix}_${index}`
-      const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+      const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
         providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: `Projection${index}`,
       } })
       expect(oauth.ok()).toBe(true)
       const account = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-        headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+        headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookie(oauth, authCookieNames().onboarding)}` },
         data: { username, displayName: `Projection${index}`, password: 'projection-pass-1109', confirmPassword: 'projection-pass-1109' },
       })
       expect(account.ok()).toBe(true)
-      await page.context().addCookies([{ name: 'oa_session', value: cookie(account, 'oa_session'), url: FRONTEND_URL }])
+      await page.context().addCookies([{ name: authCookieNames().session, value: cookie(account, authCookieNames().session), url: FRONTEND_URL }])
       await page.addInitScript(() => {
         localStorage.setItem('open-agricola-locale-v2', 'en')
         const audit = window as AuditWindow

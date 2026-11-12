@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer } from 'node:https'
 import { test } from './server-fixtures'
+import { httpAdmission } from '../server/request-auth'
 import { FRONTEND_URL } from './fixtures'
 import { createLocalUserForTests, createSession, validateSession } from '../server/auth'
 import { readCookie, serializeSessionCookie, SESSION_COOKIE } from '../server/auth-cookies'
@@ -57,9 +58,16 @@ for (const provider of ['github', 'google'] as const) {
             const current = await validateSession(readCookie(req.headers.cookie, SESSION_COOKIE))
             res.setHeader('Access-Control-Allow-Origin', appOrigin)
             res.setHeader('Access-Control-Allow-Credentials', 'true')
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type,x-oa-browser-protocol')
             res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
             if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+            if (url.pathname.startsWith('/api/')) {
+              const admission = httpAdmission(req)
+              if (!admission.ok) {
+                res.writeHead(admission.status, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ ok: false, code: admission.code })); return
+              }
+            }
             if (url.pathname === '/api/auth/login') {
               res.setHeader('Set-Cookie', serializeSessionCookie(token!, { backendOrigin: apiOrigin, requestOrigin: req.headers.origin }))
             } else if (url.pathname.endsWith('/start')) {
@@ -111,7 +119,7 @@ for (const provider of ['github', 'google'] as const) {
           await route.fulfill({ status: 302, headers: { Location: `${apiOrigin}/api/auth/oauth/${provider}/callback?${params}` }, body: '' })
         })
         await page.goto(`${appOrigin}/cookie-seed`)
-        await page.evaluate(async api => { await fetch(`${api}/api/auth/login`, { method: 'POST', credentials: 'include' }) }, apiOrigin)
+        await page.evaluate(async api => { await fetch(`${api}/api/auth/login`, { method: 'POST', credentials: 'include', headers: { 'x-oa-browser-protocol': '2' } }) }, apiOrigin)
         expect((await context.cookies()).find(cookie => cookie.name === SESSION_COOKIE)?.partitionKey).toBe(sameSite ? undefined : 'https://app.test')
         await page.goto(`${appOrigin}/?page=settings`)
         await page.getByRole('button', { name: provider === 'github' ? '绑定 GitHub' : '绑定 Google' }).click()

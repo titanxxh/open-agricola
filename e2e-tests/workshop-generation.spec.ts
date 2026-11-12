@@ -1,3 +1,4 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/app/workshop/
 // @covers client/services/llm/
 import { createHash } from 'node:crypto'
@@ -45,7 +46,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   const user = await createLocalUserForTests(`editor_${width}_${Date.now().toString(36)}`, 'editor-test-password')
   const cookie = await createSession(user.id)
   if (!cookie) throw new Error('No local test session')
-  await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  await page.context().addCookies([{ name: authCookieNames().session, value: cookie, url: FRONTEND_URL }])
   await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: referenceCommit } } : { truncated: false, tree: [] } }))
   await page.goto(FRONTEND_URL)
   const cardId = `CUSTOM_Editor_${width}_${Date.now()}`
@@ -53,7 +54,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   const id = await page.evaluate(async ({ cardId, name, modelKey }) => {
     // A model outside the former exact-tuple admission list uses the same transport.
     localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: modelKey, model: 'deepseek-v4-pro' }))
-    const response = await fetch('/api/workshop/cards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ card_id: cardId, card_type: 'minor', name, description: '', card_json: { id: cardId, card_type: 'minor', name, cost: { wood: 2 }, desc: [] }, status: 'draft' }) })
+    const response = await fetch('/api/workshop/cards', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-oa-browser-protocol': '2' }, credentials: 'include', body: JSON.stringify({ card_id: cardId, card_type: 'minor', name, description: '', card_json: { id: cardId, card_type: 'minor', name, cost: { wood: 2 }, desc: [] }, status: 'draft' }) })
     const data = await response.json()
     if (!response.ok || !data.id) throw new Error(JSON.stringify(data))
     return String(data.id)
@@ -101,7 +102,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   await page.locator('.aicw-stage-rail button').filter({ hasText: 'Card ability' }).click()
   await expect(page.locator('.aicw-save-state')).toContainText('Synced')
   const pendingDevice = await browser.newContext()
-  await pendingDevice.addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  await pendingDevice.addCookies([{ name: authCookieNames().session, value: cookie, url: FRONTEND_URL }])
   const pendingPage = await pendingDevice.newPage()
   await pendingPage.addInitScript(() => { if (window === top) localStorage.setItem('open-agricola-locale-v2', 'en') })
   await pendingPage.goto(`${FRONTEND_URL}/?page=workshop&view=editor&card=${id}`)
@@ -111,7 +112,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
     pendingPage.waitForEvent('dialog').then(async dialog => { expect(dialog.message()).toContain('older draft'); await dialog.dismiss() }),
     pendingPage.getByRole('button', { name: 'Adopt as current source' }).click(),
   ])
-  const afterDecline = await pendingPage.evaluate(async id => (await (await fetch(`/api/workshop/cards/${id}/workspace`)).json()).workspace, id)
+  const afterDecline = await pendingPage.evaluate(async id => (await (await fetch(`/api/workshop/cards/${id}/workspace`, { headers: { 'x-oa-browser-protocol': '2' } })).json()).workspace, id)
   expect(afterDecline.draft.cardJson.cost).toEqual({ wood: 3 })
   expect(afterDecline.draft.effectCode).toBeNull()
   await pendingDevice.close()
@@ -162,7 +163,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   await expect(adopt).toBeEnabled()
   await Promise.all([page.waitForEvent('dialog').then(dialog => dialog.accept()), adopt.click()])
   await expect(page.locator('.aicw-current-code code')).toHaveText(source(2))
-  const persisted = await page.evaluate(async id => (await (await fetch(`/api/workshop/cards/${id}/workspace`)).json()).workspace, id)
+  const persisted = await page.evaluate(async id => (await (await fetch(`/api/workshop/cards/${id}/workspace`, { headers: { 'x-oa-browser-protocol': '2' } })).json()).workspace, id)
   expect(persisted.draft.effectCode).toBe(source(2))
   expect(persisted.draft.generation.ability.adopted.testing).toMatchObject({ code: foodTests(cardId, 2), lastRun: { outcome: { kind: 'passed', count: 1 } } })
   for (const field of ['provenance', 'provider', 'model']) expect(persisted.draft.generation.ability.adopted).not.toHaveProperty(field)
@@ -189,7 +190,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   expect(interruptedCalls).toBe(1)
   await expect(page.getByRole('button', { name: 'Retry this step' })).toHaveCount(0)
   const other = await browser.newContext()
-  await other.addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  await other.addCookies([{ name: authCookieNames().session, value: cookie, url: FRONTEND_URL }])
   const otherPage = await other.newPage()
   await otherPage.addInitScript(() => { if (window === top) localStorage.setItem('open-agricola-locale-v2', 'en') })
   await otherPage.goto(`${FRONTEND_URL}/?page=workshop&view=editor&card=${id}`)
@@ -205,7 +206,7 @@ test('four browser tools preserve protocol through UT repair beyond eight model 
   const user = await createLocalUserForTests(`loop_${Date.now().toString(36)}`, 'loop-test-password')
   const cookie = await createSession(user.id)
   if (!cookie) throw new Error('Could not create the local acceptance session')
-  await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  await page.context().addCookies([{ name: authCookieNames().session, value: cookie, url: FRONTEND_URL }])
   const destinations: Array<{ url: string; containsModelKey: boolean }> = []
   page.on('request', req => destinations.push({ url: req.url(), containsModelKey: JSON.stringify(req.headers()).includes(modelKey) || (req.postData() ?? '').includes(modelKey) }))
   await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main')
@@ -247,7 +248,7 @@ test('four browser tools preserve protocol through UT repair beyond eight model 
       draft: { cardId, cardType: 'minor', name: 'Browser Loop', description: '', cardJson: {}, effectCode: null, artUrl: null, generation: {} },
       intent: { kind: 'generate', message: 'Cost 2 wood; gain 2 food when played.' },
     })
-    const attempt = new GenerationAttempt(request, createBrowserGenerationPorts({ provider: 'deepseek', model: 'deepseek-flash', apiKey: modelKey }, (path: string, init?: RequestInit) => fetch(path, { ...init, credentials: 'include' })))
+    const attempt = new GenerationAttempt(request, createBrowserGenerationPorts({ provider: 'deepseek', model: 'deepseek-flash', apiKey: modelKey }, (path: string, init?: RequestInit) => fetch(path, { ...init, credentials: 'include', headers: { ...init?.headers, 'x-oa-browser-protocol': '2' } })))
     const completed = await attempt.start()
     return { completed }
   }, { cardId, modelKey })
@@ -265,7 +266,7 @@ test('project metadata and anonymous GitHub source work from the real browser or
   const user = await createLocalUserForTests(`reference_${Date.now().toString(36)}`, 'reference-test-password')
   const cookie = await createSession(user.id)
   if (!cookie) throw new Error('No reference test session')
-  await page.context().addCookies([{ name: 'oa_session', value: cookie, url: FRONTEND_URL }])
+  await page.context().addCookies([{ name: authCookieNames().session, value: cookie, url: FRONTEND_URL }])
   const destinations: Array<{ url: string; authorization?: string }> = []
   page.on('request', request => { destinations.push({ url: request.url(), authorization: request.headers().authorization }) })
   await page.goto(FRONTEND_URL)

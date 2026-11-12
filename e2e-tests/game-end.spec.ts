@@ -1,6 +1,6 @@
 // @covers client/styles/pages/
 import { expect, test } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL, openGameEndControls } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL, openGameEndControls } from './fixtures'
 import { authenticateSolo } from './helpers/standard-solo-acceptance'
 
 test('multiplayer end proposal survives refresh, can be rejected, and ends only after the other player agrees', async ({ browser, request }, testInfo) => {
@@ -32,12 +32,12 @@ test('multiplayer end proposal survives refresh, can be rejected, and ends only 
     await expect(guestControls).toContainText('Agreed: 1/2')
     await guest.screenshot({ path: testInfo.outputPath('mobile-end-proposal.png'), fullPage: true })
     expect(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    const before = await (await request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`)).json()
+    const before = await (await request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`, { headers: browserRequestHeaders() })).json()
     expect(before.lifecycle).not.toBe('terminated')
     await (await openGameEndControls(guest)).getByRole('button', { name: 'Agree', exact: true }).click()
     await expect(host.getByRole('heading', { name: 'Ended by agreement', exact: true })).toBeVisible()
     await expect(guest.getByRole('heading', { name: 'Ended by agreement', exact: true })).toBeVisible()
-    const ended = await (await request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`)).json()
+    const ended = await (await request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`, { headers: browserRequestHeaders() })).json()
     expect(ended).toMatchObject({ ok: true, lifecycle: 'terminated', termination: { reason: 'agreement', players: expect.any(Array) } })
     expect(ended.termination.players).toHaveLength(2)
     expect(ended).not.toHaveProperty('result')
@@ -65,7 +65,7 @@ test('solo can end during choose-seven setup after one confirmation', async ({ b
     page.once('dialog', dialog => dialog.accept())
     await (await openGameEndControls(page)).getByRole('button', { name: 'Propose ending the game', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Ended by agreement', exact: true })).toBeVisible()
-    expect(await (await request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`)).json())
+    expect(await (await request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`, { headers: browserRequestHeaders() })).json())
       .toMatchObject({ lifecycle: 'terminated', termination: { reason: 'solo_confirmation' } })
   } finally { await context.close() }
 })
@@ -81,7 +81,7 @@ test('hotseat can end from the handoff screen after one confirmation', async ({ 
     page.once('dialog', dialog => dialog.accept())
     await (await openGameEndControls(page)).getByRole('button', { name: 'Propose ending the game', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Ended by agreement', exact: true })).toBeVisible()
-    expect(await (await request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`)).json())
+    expect(await (await request.get(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`, { headers: browserRequestHeaders() })).json())
       .toMatchObject({ lifecycle: 'terminated', termination: { reason: 'hotseat_confirmation' } })
   } finally { await context.close() }
 })

@@ -1,7 +1,8 @@
+import { authCookieNames } from '../../server/auth-cookies'
 import { expect, type APIRequestContext, type APIResponse, type BrowserContext, type Page, type TestInfo } from '@playwright/test'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/contract/protocol/game'
-import { BACKEND_URL, FRONTEND_URL } from '../fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from '../fixtures'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
@@ -19,16 +20,16 @@ const cookieValue = (response: APIResponse, name: string) => {
 }
 
 export async function authenticateSolo(context: BrowserContext, request: APIRequestContext, username: string) {
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
     providerUserId: `solo-acceptance-${username}`, providerLogin: username, email: `${username}@example.com`, displayName: username,
   } })
   expect(oauth.ok()).toBe(true)
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookieValue(oauth, authCookieNames().onboarding)}` },
     data: { username, displayName: username, password: 'solo-acceptance-pass-550', confirmPassword: 'solo-acceptance-pass-550' },
   })
   expect(complete.ok(), await complete.text()).toBe(true)
-  await context.addCookies([{ name: 'oa_session', value: cookieValue(complete, 'oa_session'), url: FRONTEND_URL }])
+  await context.addCookies([{ name: authCookieNames().session, value: cookieValue(complete, authCookieNames().session), url: FRONTEND_URL }])
   await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
 }
 

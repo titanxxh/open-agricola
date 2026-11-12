@@ -1,6 +1,7 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers shared/contract/protocol/
 import { expect, test, type Page, type APIResponse } from '@playwright/test'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 
 const CARD = 'D159_ReedSeller'
@@ -61,16 +62,16 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
   const pages = await Promise.all([0, 1, 2, 3].map(async (index) => {
     const page = await browser.newPage()
     const username = `r893_${suffix}_${index}`
-    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
+    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(),
       data: { providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username },
     })
     expect(oauth.ok(), await oauth.text()).toBe(true)
     const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-      headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+      headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookie(oauth, authCookieNames().onboarding)}` },
       data: { username, displayName: username, password: 'rules-pass-893', confirmPassword: 'rules-pass-893' },
     })
     expect(complete.ok(), await complete.text()).toBe(true)
-    await page.context().addCookies([{ name: 'oa_session', value: cookie(complete, 'oa_session'), url: FRONTEND_URL }])
+    await page.context().addCookies([{ name: authCookieNames().session, value: cookie(complete, authCookieNames().session), url: FRONTEND_URL }])
     await captureState(page)
     return page
   }))
@@ -79,7 +80,7 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
     await pages[index]!.goto(`/?player=p${index + 1}&transport=ws&room=dev4&devMode=1`)
   }
   for (const page of pages) await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
-  const created = await request.post(`${BACKEND_URL}/api/game/new`, { data: { seed: 893159, playerCount: 4, maxPlayers: 4 } })
+  const created = await request.post(`${BACKEND_URL}/api/game/new`, { headers: browserRequestHeaders(), data: { seed: 893159, playerCount: 4, maxPlayers: 4 } })
   const game = (await created.json()).state
   expect(game.players).toHaveLength(4)
   for (const player of game.players) {
@@ -184,7 +185,7 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
   expect((await state(pages[0]!)).state.players[0]!.resources.begging).toBe(0)
 
   for (const cardId of ['M062_HearthBrush', 'M063_PastoralLetter']) {
-    const createdMoor = await request.post(`${BACKEND_URL}/api/game/new`, {
+    const createdMoor = await request.post(`${BACKEND_URL}/api/game/new`, { headers: browserRequestHeaders(),
       data: { seed: 89362, maxPlayers: 4, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true },
     })
     const moor = (await createdMoor.json()).state

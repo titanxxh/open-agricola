@@ -1,3 +1,4 @@
+import { browserRequestHeaders } from './fixtures'
 // @covers server/beta-access-routes.ts
 // @covers server/beta-access-store.ts
 // @covers client/app/BetaAccessSettings.tsx
@@ -49,9 +50,9 @@ test('administrator manages Beta qualification with bilingual revocation while m
     try {
       await fixture.prepare('UPDATE users SET email=?,email_verified_at=NULL WHERE username=?').run(`${username}@example.com`, username)
     } finally { await fixture.close() }
-    const invitationSearch = await administrator.request.get(`${app.apiUrl}/api/lobby/players?prefix=${username}`)
+    const invitationSearch = await administrator.request.get(`${app.apiUrl}/api/lobby/players?prefix=${username}`, { headers: browserRequestHeaders(app.apiUrl) })
     expect(await invitationSearch.json()).toEqual({ ok: true, players: [] })
-    expect((await ordinary.request.get(`${app.apiUrl}/api/admin/beta-access`)).status()).toBe(403)
+    expect((await ordinary.request.get(`${app.apiUrl}/api/admin/beta-access`, { headers: browserRequestHeaders(app.apiUrl) })).status()).toBe(403)
     const owner = await administrator.newPage(), member = await ordinary.newPage()
     await member.goto(app.appUrl)
     await expectStableLobby(member)
@@ -85,7 +86,7 @@ test('administrator manages Beta qualification with bilingual revocation while m
     await expectStableLobby(member)
     await expect(member.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
     await expect(member.locator('.prerelease-entry')).toContainText('Prerelease is not available yet.')
-    expect(await (await ordinary.request.get(`${app.apiUrl}/api/auth/me`)).json()).toMatchObject({ user: { betaAccess: true } })
+    expect(await (await ordinary.request.get(`${app.apiUrl}/api/auth/me`, { headers: browserRequestHeaders(app.apiUrl) })).json()).toMatchObject({ user: { betaAccess: true } })
 
     await row.getByRole('button', { name: 'Revoke', exact: true }).click()
     let confirmation = row.getByRole('dialog')
@@ -109,9 +110,9 @@ test('administrator manages Beta qualification with bilingual revocation while m
     await member.reload()
     await expectStableLobby(member)
     await expect(member.locator('.prerelease-entry')).toHaveCount(0)
-    expect(await (await ordinary.request.get(`${app.apiUrl}/api/auth/me`)).json()).toMatchObject({ user: { betaAccess: false } })
+    expect(await (await ordinary.request.get(`${app.apiUrl}/api/auth/me`, { headers: browserRequestHeaders(app.apiUrl) })).json()).toMatchObject({ user: { betaAccess: false } })
 
-    const retainedRooms = await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`)).json()
+    const retainedRooms = await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`, { headers: browserRequestHeaders(app.apiUrl) })).json()
     const commands: string[] = []
     const allocations: string[] = []
     member.on('request', request => {
@@ -136,6 +137,6 @@ test('administrator manages Beta qualification with bilingual revocation while m
     }
     expect(commands).toEqual([])
     expect(allocations).toEqual([])
-    expect(await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`)).json()).toEqual(retainedRooms)
+    expect(await (await ordinary.request.get(`${app.apiUrl}/api/lobby/my-rooms`, { headers: browserRequestHeaders(app.apiUrl) })).json()).toEqual(retainedRooms)
   } finally { await visitor.close(); await ordinary.close(); await administrator.close() }
 })

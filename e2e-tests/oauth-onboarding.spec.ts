@@ -10,6 +10,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from './server-fixtures'
+import { httpAdmission } from '../server/request-auth'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { validateSession } from '../server/auth'
 import { ONBOARDING_COOKIE, SESSION_COOKIE, readCookie } from '../server/auth-cookies'
@@ -28,8 +29,14 @@ test('OAuth login and registration navigate from an insecure HTTP LAN origin', a
         res.end(`export const API_BASE=${JSON.stringify(origin)};export const WS_BASE='';export const SANDBOX_EXECUTOR='server';`)
         return
       }
-      if (url.pathname.endsWith('/start')) {
+      if (url.pathname.endsWith('/start') && req.method === 'POST') {
+        expect(req.headers['x-oa-browser-protocol']).toBe('2')
         starts.push({ provider: url.pathname.split('/')[4] ?? '', intent: url.searchParams.get('intent'), hasChallenge: url.searchParams.has('onboardingChallenge') })
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ ok: true, authorizationUrl: `${origin}/provider-started` }))
+        return
+      }
+      if (url.pathname === '/provider-started') {
         res.setHeader('Content-Type', 'text/html')
         res.end('<h1>OAuth start reached</h1>')
         return
@@ -130,9 +137,16 @@ for (const provider of ['github', 'google'] as const) {
           if (req.headers.host?.startsWith('api.')) {
             res.setHeader('Access-Control-Allow-Origin', appOrigin)
             res.setHeader('Access-Control-Allow-Credentials', 'true')
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type,x-oa-browser-protocol')
             res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
             if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+            if (url.pathname.startsWith('/api/')) {
+              const admission = httpAdmission(req)
+              if (!admission.ok) {
+                res.writeHead(admission.status, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ ok: false, code: admission.code })); return
+              }
+            }
             if (url.pathname === '/cookie-seed') {
               res.writeHead(302, {
                 'Set-Cookie': 'unpartitioned_probe=1; HttpOnly; Secure; SameSite=None; Path=/',
@@ -326,12 +340,12 @@ for (const provider of ['github', 'google'] as const) {
         }
         if (supportsSession) await loadLobbyPage(() => page.reload({ waitUntil: 'domcontentloaded' }))
         else await page.reload({ waitUntil: 'domcontentloaded' })
-        const me = await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include' })).json(), apiOrigin)
+        const me = await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include', headers: { 'x-oa-browser-protocol': '2' } })).json(), apiOrigin)
         if (supportsSession) expect(me).toMatchObject({ ok: true, user: { id: identity?.userId, username } })
         else expect(me).toMatchObject({ ok: false, code: 'not_authenticated' })
         const replay = await page.evaluate(async ({ origin, body }) => {
           const result = await fetch(`${origin}/api/auth/onboarding/complete`, {
-            method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+            method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'x-oa-browser-protocol': '2' }, body: JSON.stringify(body),
           })
           return { status: result.status, code: (await result.json()).code }
         }, { origin: apiOrigin, body: completionBody })
@@ -352,7 +366,7 @@ for (const provider of ['github', 'google'] as const) {
           await loadLobbyPage(() => page.reload({ waitUntil: 'domcontentloaded' }))
           expect(new URL(page.url()).origin).toBe(appOrigin)
           expect(new URL(page.url()).pathname).toBe('/')
-          expect(await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include' })).json(), apiOrigin))
+          expect(await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include', headers: { 'x-oa-browser-protocol': '2' } })).json(), apiOrigin))
             .toMatchObject({ ok: true, user: { id: identity?.userId, username } })
         }
         expect(serverErrors).toEqual([])

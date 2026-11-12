@@ -1,7 +1,8 @@
+import { authCookieNames } from '../server/auth-cookies'
 import { expect, type APIRequestContext, type APIResponse, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ClientCommand, ServerEvent } from '../shared/contract/protocol/ws'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 declare global {
   interface Window {
@@ -23,16 +24,16 @@ export async function joinRoomClients(pages: readonly Page[], request: APIReques
   const suffix = crypto.randomUUID().slice(0, 8)
   for (const [index, page] of pages.entries()) {
     const username = `lifecycle_${suffix}_${index}`
-    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+    const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
       providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
     } })
     expect(oauth.ok()).toBe(true)
     const account = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-      headers: { Cookie: `oa_onboarding=${cookie(oauth, 'oa_onboarding')}` },
+      headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookie(oauth, authCookieNames().onboarding)}` },
       data: { username, displayName: username, password: 'lifecycle-room-pass', confirmPassword: 'lifecycle-room-pass' },
     })
     expect(account.ok()).toBe(true)
-    await page.context().addCookies([{ name: 'oa_session', value: cookie(account, 'oa_session'), url: FRONTEND_URL }])
+    await page.context().addCookies([{ name: authCookieNames().session, value: cookie(account, authCookieNames().session), url: FRONTEND_URL }])
     await page.addInitScript(locale => {
       localStorage.setItem('open-agricola-locale-v2', locale)
       window.lifecycleMessages = []

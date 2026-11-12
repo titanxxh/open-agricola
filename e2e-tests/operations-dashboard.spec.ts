@@ -12,7 +12,7 @@ import { createOperationsHandler } from '../server/observability/http'
 import { createTestDatabase } from '../server/__tests__/_helpers/postgres'
 import { createOperationsTestReader } from '../server/__tests__/_helpers/operations-reader'
 import { allocateTestPort } from '../scripts/test-ports'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 test('independent dashboards render registration, rooms and durable player openings in real Grafana', async ({ page, request }, testInfo) => {
   test.setTimeout(300_000)
@@ -67,7 +67,7 @@ test('independent dashboards render registration, rooms and durable player openi
     })())
   }
   page.on('requestfinished', capturePanel)
-  const previous = { ADMIN_USERS: process.env.ADMIN_USERS, GRAFANA_URL: process.env.GRAFANA_URL }
+  const previous = { ADMIN_USERS: process.env.ADMIN_USERS, GRAFANA_URL: process.env.GRAFANA_URL, PUBLIC_API_BASE: process.env.PUBLIC_API_BASE }
   const listen = async (server: Server) => {
     servers.push(server)
     await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
@@ -81,7 +81,7 @@ test('independent dashboards render registration, rooms and durable player openi
     for (const [id, createdAt] of [['ops_visual_admin', now], ['older-account', now - 8 * 86_400_000]] as const) {
       await db.prepare('INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)').run(id, id, id, 'unused-password', createdAt)
     }
-    await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at) VALUES(?,?,?,?)').run('visual-session', 'ops_visual_admin', now, now + 360_000)
+    await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at,auth_policy_version) VALUES(?,?,?,?,2)').run('visual-session', 'ops_visual_admin', now, now + 360_000)
     process.env.ADMIN_USERS = 'ops_visual_admin'
     let accounts = createAccountsHandler({ pool, token: 'visual-scrape' })
     const accountsPort = await listen(createServer((req, res) => { void accounts(req, res) }))
@@ -102,6 +102,7 @@ test('independent dashboards render registration, rooms and durable player openi
     const grafanaBase = `http://127.0.0.1:${grafanaPort}`
     process.env.GRAFANA_URL = grafanaBase
     const base = `http://127.0.0.1:${gatewayPort}`
+    process.env.PUBLIC_API_BASE = base
     writeFileSync(join(directory, 'prometheus.yml'), `global:\n  scrape_interval: 1s\nscrape_configs:\n  - job_name: accounts\n    metrics_path: /internal/metrics\n    authorization:\n      credentials: visual-scrape\n    static_configs:\n      - targets: ['127.0.0.1:${accountsPort}']\n  - job_name: agricola-ingress\n    metrics_path: /fixture-metrics\n    static_configs:\n      - targets: ['127.0.0.1:${gatewayPort}']\n`)
     chmodSync(join(directory, 'prometheus.yml'), 0o644)
     const promName = 'oa-ops-prom-' + randomUUID()
@@ -122,7 +123,7 @@ test('independent dashboards render registration, rooms and durable player openi
     const { path } = await handoff.json()
     await page.goto(base + path)
     const expectBundledPrometheus = async () => {
-      const response = await page.request.get(base + '/ops/api/plugins/prometheus/settings')
+      const response = await page.request.get(base + '/ops/api/plugins/prometheus/settings', { headers: browserRequestHeaders(base) })
       expect(response.ok(), await response.text()).toBe(true)
       const settings: { info: { version: string } } = await response.json()
       expect(settings.info.version).toBe(bundledPrometheus.info.version)
@@ -133,7 +134,7 @@ test('independent dashboards render registration, rooms and durable player openi
       await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible({ timeout: 30_000 })
     }
     const query = async (expression: string) => {
-      const response = await page.request.get(base + '/ops/api/datasources/proxy/uid/agricola-prometheus/api/v1/query', { params: { query: expression } })
+      const response = await page.request.get(base + '/ops/api/datasources/proxy/uid/agricola-prometheus/api/v1/query', { headers: browserRequestHeaders(base), params: { query: expression } })
       const body = await response.text()
       if (!response.ok() || !body) return { status: response.status(), body }
       return JSON.parse(body).data.result.map((row: { value: [number, string] }) => row.value[1])
@@ -141,7 +142,7 @@ test('independent dashboards render registration, rooms and durable player openi
     await expect.poll(() => query('agricola_accounts{kind="total"}'), { timeout: 30_000 }).toEqual(['2'])
     expect(await query('agricola_accounts{kind="today"}')).toEqual(['1'])
     await expect.poll(() => query('sum(agricola_platform{kind=~"rooms_waiting|rooms_playing|rooms_hotseat|rooms_retained"})'), { timeout: 30_000 }).toEqual(['126'])
-    const dashboard = (await (await page.request.get(base + '/ops/api/dashboards/uid/open-agricola')).json()).dashboard
+    const dashboard = (await (await page.request.get(base + '/ops/api/dashboards/uid/open-agricola', { headers: browserRequestHeaders(base) })).json()).dashboard
     for (const [id, expected] of [[39, '2'], [40, '1']] as const) {
       const expression = dashboard.panels.find((panel: { id: number }) => panel.id === id).targets[0].expr
       await expect.poll(() => query(expression), { timeout: 30_000 }).toEqual([expected])
@@ -237,14 +238,14 @@ test('independent dashboards render registration, rooms and durable player openi
     accounts = createAccountsHandler({ pool, token: 'visual-scrape' })
 
     const queryPlayerSamples = async (expression: string, dimension = '') => {
-      const response = await page.request.get(base + '/ops/api/datasources/proxy/uid/agricola-prometheus/api/v1/query', { params: { query: expression } })
+      const response = await page.request.get(base + '/ops/api/datasources/proxy/uid/agricola-prometheus/api/v1/query', { headers: browserRequestHeaders(base), params: { query: expression } })
       expect(response.ok(), await response.text()).toBe(true)
       const body: { status: string; error?: string; data: { result: Array<{ metric: Record<string, string>; value: [number, string] }> } } = await response.json()
       expect(body.status, body.error).toBe('success')
       return body.data.result.map(row => ({ label: row.metric[dimension] ?? '', value: Number(row.value[1]) }))
         .sort((left, right) => left.label.localeCompare(right.label))
     }
-    const playerDashboardResponse = await page.request.get(base + '/ops/api/dashboards/uid/open-agricola-players')
+    const playerDashboardResponse = await page.request.get(base + '/ops/api/dashboards/uid/open-agricola-players', { headers: browserRequestHeaders(base) })
     expect(playerDashboardResponse.ok()).toBe(true)
     const playerDashboard: { dashboard: { panels: Array<{ title: string; type: string; targets?: Array<{ expr: string }> }> } } = await playerDashboardResponse.json()
     const playerPanels = playerDashboard.dashboard.panels

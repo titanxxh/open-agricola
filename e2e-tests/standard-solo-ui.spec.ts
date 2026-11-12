@@ -1,7 +1,8 @@
+import { authCookieNames } from '../server/auth-cookies'
 // @covers client/app/solo/
 import { expect, test, type APIRequestContext, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
 import type { StateUpdateEnvelope } from '../shared/contract/protocol/game'
-import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { recordSoloEvidence, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
 import { checkpoint } from './helpers/standard-solo-process'
 
@@ -14,16 +15,16 @@ const cookieValue = (response: APIResponse, name: string): string => {
 }
 
 async function authenticate(context: BrowserContext, request: APIRequestContext, username: string) {
-  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
     providerUserId: `solo-ui-${username}`, providerLogin: username, email: `${username}@example.com`, displayName: username,
   } })
   expect(oauth.ok()).toBe(true)
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
-    headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
+    headers: { ...browserRequestHeaders(), Cookie: `${authCookieNames().onboarding}=${cookieValue(oauth, authCookieNames().onboarding)}` },
     data: { username, displayName: username, password: 'solo-ui-pass-550', confirmPassword: 'solo-ui-pass-550' },
   })
   expect(complete.ok(), await complete.text()).toBe(true)
-  await context.addCookies([{ name: 'oa_session', value: cookieValue(complete, 'oa_session'), url: FRONTEND_URL }])
+  await context.addCookies([{ name: authCookieNames().session, value: cookieValue(complete, authCookieNames().session), url: FRONTEND_URL }])
   await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
 }
 
@@ -308,7 +309,7 @@ test('a natural fourteen-round solo keeps both owner rematch entries independent
     expect(refreshedId).not.toBe(originalId)
     expect(refreshedId).not.toBe(immediateId)
     expect(state.latest().state.round).toBe(1)
-    const retained = await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${originalId}`)
+    const retained = await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${originalId}`, { headers: browserRequestHeaders() })
     expect((await retained.json()).result.players[0].score).toBe(-14)
     } catch (error) {
       try {
