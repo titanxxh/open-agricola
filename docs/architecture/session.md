@@ -70,6 +70,8 @@ Native `ActionDefinition.projectInteractionRequest` and the card projection hook
 
 ## Rotation, extra turns and supply people
 
+Undo history distinguishes an action-start boundary from a boundary reached during an action or player handoff. An entry marked both `actionStart` and `undoBoundary` already contains the disclosed information: undo may restore that entry, then re-arms `pendingUndoBoundary` to protect older history. Later boundaries still prevent undoing the action. This uses the existing saved flags, including retained cursors. Tests: `server/__tests__/{pending-undo-boundary,standard-solo-moor-session}.test.ts`.
+
 A standard solo game has one actual participant. New-game resource initialization gives that player no food; common action definitions admit one player and use the two-player base board, with Forest replenishing two wood. Participant count stays one for dealing, rule queries and settlement. Ordinary actions keep the existing confirmation and undo boundary, including the last placement before returning home or harvesting. Tests: `server/__tests__/standard-solo-core-session.test.ts`.
 
 **Extra turns** ([ADR 0001](../adr/0001-a92-adoptive-pull-model-extra-turn-hook.md), [ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)):
