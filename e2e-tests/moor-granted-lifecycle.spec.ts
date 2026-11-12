@@ -4,10 +4,10 @@ import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures
 import { setWorkersAtHome } from '../shared/domain/player'
 import { serializeState } from '../shared/session/serialization'
 import type { SessionResponse } from '../shared/contract/types'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 async function prepare(request: APIRequestContext, scheduled: boolean) {
-  expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: {
+  expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: {
     seed: 1308, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true,
     allowIncompleteFarmersOfTheMoorMinorDeal: true,
   } })).ok()).toBe(true)
@@ -35,7 +35,7 @@ async function prepare(request: APIRequestContext, scheduled: boolean) {
     }] } }
   } })
   try {
-    expect((await request.post(`${BACKEND_URL}/api/game/load`, {
+    expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: fixture.withCtx(() => serializeState(fixture.state, {})) },
     })).ok()).toBe(true)
   } finally { fixture.dispose() }
@@ -62,7 +62,7 @@ for (const scheduled of [false, true]) for (const passGrowth of scheduled ? [fal
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     await prepare(request, scheduled)
     if (scheduled) {
-      const response: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/round-end`)).json()
+      const response: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/round-end`, { headers: browserRequestHeaders() })).json()
       expect(response.ok, response.error).toBe(true)
       expect(response.state.round).toBe(6)
     }

@@ -1,3 +1,4 @@
+import { browserRequestHeaders } from './fixtures'
 // @covers replay-viewer/src/
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type APIRequestContext } from '@playwright/test'
@@ -11,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 const createReplay = async (request: APIRequestContext) => {
-  const response = await request.post(`${backend}/api/test/replays/completed`)
+  const response = await request.post(`${backend}/api/test/replays/completed`, { headers: browserRequestHeaders() })
   expect(response.status()).toBe(201)
   return await response.json() as {
     roomId: string
@@ -21,7 +22,7 @@ const createReplay = async (request: APIRequestContext) => {
 
 for (const recordReplay of [true, false]) {
   test(`completed results localize generated names and preserve account names (replay=${recordReplay})`, async ({ page, request }) => {
-    const response = await request.post(`${backend}/api/test/replays/completed?defaultNames=1&recordReplay=${recordReplay ? 1 : 0}`)
+    const response = await request.post(`${backend}/api/test/replays/completed?defaultNames=1&recordReplay=${recordReplay ? 1 : 0}`, { headers: browserRequestHeaders() })
     expect(response.status()).toBe(201)
     const { roomId } = await response.json() as { roomId: string }
     await page.goto(`/?room=${roomId}`, { waitUntil: 'domcontentloaded' })

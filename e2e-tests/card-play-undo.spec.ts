@@ -6,12 +6,12 @@ import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'
 import { takeMajorImprovementFromSupply } from '../shared/cards/major/supply'
 import { GameSession, type SessionResponse } from '../server/game/authoritative-session'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 test.use({ hasTouch: true, viewport: { width: 375, height: 812 } })
 
 const openGame = async (page: Page, request: APIRequestContext, configure: (state: GameState) => void) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1382, playerCount: 2, customCardIds: [] } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 1382, playerCount: 2, customCardIds: [] } })
   expect(fresh.ok(), await fresh.text()).toBe(true)
   const state = createInitialState(1382, { playerCount: 2 })
   for (const player of state.players) {
@@ -25,7 +25,7 @@ const openGame = async (page: Page, request: APIRequestContext, configure: (stat
   const session = new GameSession(state)
   try {
     session.loadState(state)
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { data: {
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: {
       state: session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks })),
     } })
     expect(loaded.ok(), await loaded.text()).toBe(true)

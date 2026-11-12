@@ -14,7 +14,7 @@ import { createOperationsTestReader } from '../server/__tests__/_helpers/operati
 import { allocateTestPort } from '../scripts/test-ports'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
-test('independent dashboards render registration, rooms and durable player openings in real Grafana', async ({ page, request }, testInfo) => {
+test('independent dashboards render registration, rooms and durable player openings in real Grafana', async ({ page, request, playwright }, testInfo) => {
   test.setTimeout(300_000)
   await page.setViewportSize({ width: 1280, height: 320 })
   expect((await request.get(BACKEND_URL + '/api/health')).ok()).toBe(true)
@@ -119,9 +119,16 @@ test('independent dashboards render registration, rooms and durable player openi
       'exec', grafanaName, 'cat', '/usr/share/grafana/data/plugins-bundled/prometheus/plugin.json',
     ]))
     await expect.poll(async () => { try { return (await request.get(grafanaBase + '/ops/api/health')).status() } catch { return 0 } }, { timeout: 60_000 }).toBe(200)
-    const handoff = await request.post(base + '/api/admin/observability/session', { headers: { Authorization: 'Bearer visual-session' } })
-    const { path } = await handoff.json()
-    await page.goto(base + path)
+    const nativeRequest = await playwright.request.newContext()
+    let dashboardPath: string
+    try {
+      const handoff = await nativeRequest.post(base + '/api/admin/observability/session', { headers: { Authorization: 'Bearer visual-session' } })
+      expect(handoff.status(), await handoff.text()).toBe(200)
+      const body: unknown = await handoff.json()
+      if (!body || typeof body !== 'object' || !('path' in body) || typeof body.path !== 'string') throw new Error('Missing operations handoff path')
+      dashboardPath = body.path
+    } finally { await nativeRequest.dispose() }
+    await page.goto(base + dashboardPath)
     const expectBundledPrometheus = async () => {
       const response = await page.request.get(base + '/ops/api/plugins/prometheus/settings', { headers: browserRequestHeaders(base) })
       expect(response.ok(), await response.text()).toBe(true)

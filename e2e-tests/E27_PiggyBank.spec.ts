@@ -3,12 +3,12 @@ import { expect, test } from '@playwright/test'
 import type { SessionResponse } from '../server/game/authoritative-session'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 const CARD_ID = 'E027_PiggyBank'
 
 test('Piggy Bank shows stored food after deposit, major redemption and browser reloads', async ({ page, request }) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 1294, playerCount: 2, customCardIds: [] },
   })
   expect(fresh.ok(), await fresh.text()).toBe(true)
@@ -30,14 +30,14 @@ test('Piggy Bank shows stored food after deposit, major redemption and browser r
     },
   })
   try {
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: fixture.withCtx(() => serializeState(fixture.state, {})) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)
   } finally { fixture.dispose() }
 
   const command = async (path: string, data: object): Promise<SessionResponse> => {
-    const response = await request.post(`${BACKEND_URL}/api/game/${path}`, { data })
+    const response = await request.post(`${BACKEND_URL}/api/game/${path}`, { headers: browserRequestHeaders(), data })
     const payload: SessionResponse = await response.json()
     expect(payload.ok, payload.error).toBe(true)
     return payload

@@ -1,7 +1,7 @@
 // @covers client/components/board/
 import { expect, test, type FrameLocator, type Page } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
-import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL, getJson, postJson } from './fixtures'
 
 const expectPublicCards = async (view: Page | FrameLocator) => {
   const groups = view.locator('.played-card-slot').filter({ has: view.locator('[data-card-anchor="C146_WorkshopAssistant"]') }).locator('.card-resource-groups')
@@ -49,7 +49,7 @@ test('public Card State facts render in live seat views and a newly pinned Repla
   }
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
   for (const viewer of ['p1', 'p2']) {
-    const response = await request.get(`${BACKEND_URL}/api/game/state`, { headers: { 'X-Viewer-Player': viewer } })
+    const response = await request.get(`${BACKEND_URL}/api/game/state`, { headers: { ...browserRequestHeaders(), 'X-Viewer-Player': viewer } })
     const payload = await response.json()
     expect(JSON.stringify(payload)).not.toContain('INTERNAL_BROWSER_SENTINEL')
     expect(payload.state.players[0].cardStatePresentation.C146_WorkshopAssistant.resourceGroups).toHaveLength(3)
@@ -62,7 +62,7 @@ test('public Card State facts render in live seat views and a newly pinned Repla
   await page.reload()
   await expectPublicCards(page)
 
-  const completed = await request.post(`${BACKEND_URL}/api/test/replays/completed`, { data: { state } })
+  const completed = await request.post(`${BACKEND_URL}/api/test/replays/completed`, { headers: browserRequestHeaders(), data: { state } })
   expect(completed.status(), await completed.text()).toBe(201)
   const { roomId } = await completed.json() as { roomId: string }
   await page.goto(`/?context=${roomId}`)

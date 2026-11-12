@@ -1,3 +1,4 @@
+import { browserRequestHeaders } from './fixtures'
 // @covers replay-viewer/src/
 import { expect, test } from '@playwright/test'
 
@@ -6,7 +7,7 @@ const backend = process.env.BACKEND_URL ?? 'http://localhost:5175'
 test.use({ launchOptions: { args: ['--enable-itp', '--cookies-policy=no-third-party'] } })
 
 test('sandboxed replay loads public resources and rejects other origins @webkit', async ({ page, request }) => {
-  const response = await request.post(`${backend}/api/test/replays/completed`)
+  const response = await request.post(`${backend}/api/test/replays/completed`, { headers: browserRequestHeaders() })
   expect(response.status()).toBe(201)
   const { roomId } = await response.json()
   await page.addInitScript(() => {

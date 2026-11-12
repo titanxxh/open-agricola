@@ -6,7 +6,7 @@ import { emptyResources } from '../shared/contract/state-constants'
 import { serializeState } from '../shared/session/serialization'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { confirmNext, getChoiceOptions } from '../server/__tests__/_helpers/session-assertions'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 const CARD_ID = 'M027_GardenPath'
 const purchase = (session: GameSession, actor: number, space: 'meeting-place' | 'major-improvement') => {
@@ -44,13 +44,13 @@ for (const locale of ['en']) {
           },
         })
         try {
-          const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+          const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
             data: { seed: 411, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true,
               allowIncompleteFarmersOfTheMoorMinorDeal: true },
           })
           expect(fresh.ok(), await fresh.text()).toBe(true)
           const publish = async () => {
-            const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+            const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
               data: { state: session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks })) },
             })
             expect(loaded.ok(), await loaded.text()).toBe(true)

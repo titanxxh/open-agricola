@@ -3,13 +3,13 @@
 import { expect, test } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
   test(`seasonal placement uses the board worker icon at ${viewport.width}px`, async ({ page, request }) => {
     await page.setViewportSize(viewport)
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
       data: { seed: 1373, playerCount: 2, customCardIds: [], enableThroughTheSeasons: true },
     })).ok()).toBe(true)
     const fixture = createWorkSession({ seed: 1373, options: { enableThroughTheSeasons: true }, configure: state => {
@@ -21,7 +21,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     } })
     try {
       const state = fixture.withCtx(() => serializeState(fixture.state, {}))
-      expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
+      expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
     } finally { fixture.dispose() }
 
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')

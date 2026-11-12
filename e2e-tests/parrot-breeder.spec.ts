@@ -4,11 +4,11 @@ import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures
 import { serializeState } from '../shared/session/serialization'
 import { writeCardExtraData } from '../shared/cards/helpers/card-state'
 import { findActionSpaceById } from '../shared/domain/space'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 import '../shared/cards/register-all'
 
 const openScenario = async (page: Page, request: APIRequestContext, target: string | null) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 42, playerCount: 4, customCardIds: [] },
   })
   expect(fresh.ok(), await fresh.text()).toBe(true)
@@ -24,7 +24,7 @@ const openScenario = async (page: Page, request: APIRequestContext, target: stri
     },
   })
   try {
-    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
+    const loaded = await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
       data: { state: session.withCtx(() => serializeState(session.state, {})) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)
@@ -56,7 +56,7 @@ for (const target of [null, 'meeting-place']) {
   test(`Parrot Breeder hides the paid entry for ${target ?? 'no target'}`, async ({ page, request }) => {
     await openScenario(page, request, target)
     await expect(page.locator('.anytime-actions').getByRole('button', { name: /Parrot Breeder/ })).toHaveCount(0)
-    const rejected = await request.post(`${BACKEND_URL}/api/game/anytime`, {
+    const rejected = await request.post(`${BACKEND_URL}/api/game/anytime`, { headers: browserRequestHeaders(),
       data: { playerIndex: 0, actionId: 'C150-parrot-breeder-anytime' },
     })
     const result = await rejected.json()

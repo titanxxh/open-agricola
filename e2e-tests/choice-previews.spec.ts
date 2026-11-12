@@ -5,10 +5,10 @@ import type { SessionResponse } from '../server/game/authoritative-session'
 import type { ActionChoiceOption } from '../shared/contract/types'
 import { serializeState } from '../shared/session/serialization'
 import type { SerializedGameState } from '../shared/session/serialization'
-import { BACKEND_URL } from './fixtures'
+import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 
 test('Rod Collection previews points for wood beyond the four printed exceptions', async ({ page, request }) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 38052, playerCount: 2, customCardIds: [] } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 38052, playerCount: 2, customCardIds: [] } })
   expect(fresh.ok()).toBe(true)
   const { state }: { state: SerializedGameState } = await fresh.json()
   for (const player of state.players) {
@@ -20,8 +20,8 @@ test('Rod Collection previews points for wood beyond the four printed exceptions
   owner.occupationPlayed = ['A110_Roughcaster', 'A125_Priest', 'C123_Freemason']
   owner.resources.wood = 2
   owner.cardStates.E038_RodCollection = { extraData: { woodCount: 12 } }
-  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-  const action: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { data: { playerIndex: 0, spaceId: 'fishing' } })).json()
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
+  const action: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { headers: browserRequestHeaders(), data: { playerIndex: 0, spaceId: 'fishing' } })).json()
   expect(action.ok, action.error).toBe(true)
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   const scores = page.locator('.interaction-bar [data-card-score]')
@@ -36,7 +36,7 @@ test('Rod Collection previews points for wood beyond the four printed exceptions
 })
 
 test('Cubbyhole payment choices show the shared reed cost', async ({ page, request }) => {
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 52052, playerCount: 2, customCardIds: [] } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 52052, playerCount: 2, customCardIds: [] } })
   expect(fresh.ok()).toBe(true)
   const { state }: { state: SerializedGameState } = await fresh.json()
   for (const player of state.players) {
@@ -45,12 +45,12 @@ test('Cubbyhole payment choices show the shared reed cost', async ({ page, reque
   }
   state.players[0]!.minorHand = ['E052_Cubbyhole']
   Object.assign(state.players[0]!.resources, { wood: 1, clay: 1, reed: 1 })
-  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-  const started: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { data: { playerIndex: 0, spaceId: 'meeting-place' } })).json()
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
+  const started: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { headers: browserRequestHeaders(), data: { playerIndex: 0, spaceId: 'meeting-place' } })).json()
   if (started.interaction.stateId !== 'wait' || started.interaction.request.kind !== 'choice') throw new Error('Expected improvement choice')
   const branch = started.interaction.request.options?.find(option => option.value.startsWith('action-improvement-'))
   if (!branch) throw new Error('Expected minor improvement branch')
-  const offered: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/choice`, { data: { playerIndex: 0, value: branch.value } })).json()
+  const offered: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/choice`, { headers: browserRequestHeaders(), data: { playerIndex: 0, value: branch.value } })).json()
   expect(offered.interaction).toMatchObject({ stateId: 'wait', promptKey: 'prompt.selectPayment' })
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   const payments = page.locator('.interaction-bar button').filter({ has: page.locator('[data-resource="reed"][data-amount="1"]') })
@@ -68,7 +68,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
     test(`whole-field ${target} choices click farm and Card Fields in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
       await page.setViewportSize({ width: scenario.width, height: 1000 })
       await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
-      const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1073, playerCount: 2, customCardIds: [] } })
+      const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 1073, playerCount: 2, customCardIds: [] } })
       expect(fresh.ok()).toBe(true)
       const { state } = await fresh.json() as { state: SerializedGameState }
       state.round = 4
@@ -83,8 +83,8 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
       owner.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
       owner.cardStates.D025_WitchesDanceFloor = { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 4 }] } }
       owner.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 2 }] } }
-      expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-      expect((await request.post(`${BACKEND_URL}/api/game/round-end`)).ok()).toBe(true)
+      expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
+      expect((await request.post(`${BACKEND_URL}/api/game/round-end`, { headers: browserRequestHeaders() })).ok()).toBe(true)
       await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
       const farm = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]')
       await expect(farm).toHaveClass(/position-selectable/)
@@ -98,7 +98,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
       await expect(woodSlots).toHaveCount(0)
       await page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="1-1"]').click()
       await expect(cardSlots).toHaveCount(1)
-      const unchanged = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+      const unchanged = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
       expect(unchanged.state.players[0].fields[0].stacks[0].remaining).toBe(3)
       const selected = page.waitForResponse((response) => response.url().endsWith('/api/game/choice'))
       if (target === 'card') await cardSlots.last().click()
@@ -123,7 +123,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
   test(`Peat Sled displays four distinct executable schedules in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
     await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
-    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1079, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
+    const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 1079, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
     const { state } = await fresh.json() as { state: SerializedGameState }
     for (const player of state.players) {
       player.minorHand = ['__test_placeholder__']
@@ -133,12 +133,12 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
       player.resources.fuel = 20
     }
     state.players[0]!.minorHand = ['M079_PeatSled']
-    expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-    let response = await (await request.post(`${BACKEND_URL}/api/game/action`, { data: { playerIndex: 0, spaceId: 'meeting-place' } })).json()
+    expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
+    let response = await (await request.post(`${BACKEND_URL}/api/game/action`, { headers: browserRequestHeaders(), data: { playerIndex: 0, spaceId: 'meeting-place' } })).json()
     for (let i = 0; i < 8 && !response.state.players[0].minorPlayed.includes('M079_PeatSled'); i += 1) {
       const choice = response.interaction.request.options.find((option: { value: string }) => option.value === 'M079_PeatSled' || option.value.startsWith('action-improvement-'))
       expect(choice).toBeDefined()
-      response = await (await request.post(`${BACKEND_URL}/api/game/choice`, { data: { playerIndex: 0, value: choice.value } })).json()
+      response = await (await request.post(`${BACKEND_URL}/api/game/choice`, { headers: browserRequestHeaders(), data: { playerIndex: 0, value: choice.value } })).json()
       expect(response.ok).toBe(true)
     }
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
@@ -159,7 +159,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
 
 test('skipping a spatial Scythe choice retains normal field harvesting', async ({ page, request }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 2073, playerCount: 2, customCardIds: [] } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 2073, playerCount: 2, customCardIds: [] } })
   const { state } = await fresh.json() as { state: SerializedGameState }
   state.round = 4
   for (const player of state.players) {
@@ -170,8 +170,8 @@ test('skipping a spatial Scythe choice retains normal field harvesting', async (
   }
   state.players[0]!.minorPlayed = ['E073_Scythe']
   state.players[0]!.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
-  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-  expect((await request.post(`${BACKEND_URL}/api/game/round-end`)).ok()).toBe(true)
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
+  expect((await request.post(`${BACKEND_URL}/api/game/round-end`, { headers: browserRequestHeaders() })).ok()).toBe(true)
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   await expect(page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]')).toHaveClass(/position-selectable/)
   const submitted = page.waitForResponse((result) => result.url().endsWith('/api/game/choice'))
@@ -184,7 +184,7 @@ test('skipping a spatial Scythe choice retains normal field harvesting', async (
 
 test('a scheduled Cut Peat offer commits its single physical card from the farm', async ({ page, request }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1056, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 1056, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
   expect(fresh.ok()).toBe(true)
   const session = createWorkSession({ seed: 1056, options: { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
   const state = session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks }))
@@ -203,8 +203,8 @@ test('a scheduled Cut Peat offer commits its single physical card from the farm'
     for (const worker of player.workers.filter((candidate) => candidate.isActive)) state.actionSpaces[0]!.takenBy.push({ playerId: player.id, workerId: worker.id })
   }
   owner.cardStates.M056_PeatCuttingRights = { extraData: { scheduledOffers: [{ id: 'browser-cut-peat', kind: 'moor-special-action', dueRound: 6, actionId: 'cut-peat', consumed: false }] } }
-  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-  const roundEndResponse = await request.post(`${BACKEND_URL}/api/game/round-end`)
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
+  const roundEndResponse = await request.post(`${BACKEND_URL}/api/game/round-end`, { headers: browserRequestHeaders() })
   expect(roundEndResponse.ok()).toBe(true)
   const roundEnd = await roundEndResponse.json()
   expect(roundEnd.ok, JSON.stringify(roundEnd)).toBe(true)
@@ -219,7 +219,7 @@ test('a scheduled Cut Peat offer commits its single physical card from the farm'
   expect(activation).toBeDefined()
   expect(activation?.disabled).not.toBe(true)
   if (!activation) throw new Error('Expected the Peat-Cutting Rights round-start activation')
-  const activatedResponse = await request.post(`${BACKEND_URL}/api/game/choice`, { data: { playerIndex: 0, value: activation.value } })
+  const activatedResponse = await request.post(`${BACKEND_URL}/api/game/choice`, { headers: browserRequestHeaders(), data: { playerIndex: 0, value: activation.value } })
   expect(activatedResponse.ok()).toBe(true)
   const activated = await activatedResponse.json()
   expect(activated.ok, JSON.stringify(activated)).toBe(true)
@@ -250,7 +250,7 @@ test('a scheduled Cut Peat offer commits its single physical card from the farm'
 
 test('one farm cell with multiple authoritative options requires an explicit action-card choice', async ({ page, request }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1056, playerCount: 3, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 1056, playerCount: 3, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
   expect(fresh.ok()).toBe(true)
   const fixture = createWorkSession({ seed: 1056, options: { playerCount: 3, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure(state) {
     for (const player of state.players) {
@@ -264,18 +264,18 @@ test('one farm cell with multiple authoritative options requires an explicit act
   } })
   const state = fixture.withCtx(() => serializeState(fixture.state, { actionHooks: fixture.actionHooks }))
   fixture.dispose()
-  expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
-  const plow: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { data: { playerIndex: 0, spaceId: 'farmland' } })).json()
+  expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(), data: { state } })).ok()).toBe(true)
+  const plow: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { headers: browserRequestHeaders(), data: { playerIndex: 0, spaceId: 'farmland' } })).json()
   expect(plow.ok, plow.error).toBe(true)
   expect(plow.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
-  const plowed: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/commit-selection`, { data: { playerIndex: 0, payload: { tile: { row: 2, col: 2 } } } })).json()
+  const plowed: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/commit-selection`, { headers: browserRequestHeaders(), data: { playerIndex: 0, payload: { tile: { row: 2, col: 2 } } } })).json()
   expect(plowed.ok, plowed.error).toBe(true)
   if (plowed.interaction.stateId !== 'wait' || plowed.interaction.request.kind !== 'choice') throw new Error('Expected Implement activation')
   expect(plowed.interaction.sourceCard).toBe('M054_AgriculturalImplement')
   const activation = plowed.interaction.request.options.find(option => option.value !== '__skip__')
   expect(activation).toBeDefined()
   if (!activation) throw new Error('Expected Implement activation choice')
-  const activated: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/choice`, { data: { playerIndex: 0, value: activation.value } })).json()
+  const activated: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/choice`, { headers: browserRequestHeaders(), data: { playerIndex: 0, value: activation.value } })).json()
   expect(activated.ok, activated.error).toBe(true)
   if (activated.interaction.stateId !== 'wait' || activated.interaction.request.kind !== 'choice') throw new Error('Expected Moor card-action choices')
   const alternatives = activated.interaction.request.options.filter(option => option.value.endsWith(':2:1'))
@@ -291,7 +291,7 @@ test('one farm cell with multiple authoritative options requires an explicit act
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   const tile = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="2-1"]')
   await expect(tile).toHaveClass(/position-selectable/)
-  const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
   let choiceCommands = 0
   page.on('request', sent => { if (sent.method() === 'POST' && new URL(sent.url()).pathname === '/api/game/choice') choiceCommands++ })
   await tile.click()
@@ -299,7 +299,7 @@ test('one farm cell with multiple authoritative options requires an explicit act
   await expect(sources).toHaveCount(2)
   await expect(sources.nth(0)).toHaveAttribute('data-choice-value', 'card-action:moor-special-1-3-work-market:action:fell-trees:2:1')
   await expect(sources.nth(1)).toHaveAttribute('data-choice-value', 'card-action:moor-special-1-3-horse-terrain:action:slash-and-burn:2:1')
-  const uncommitted: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  const uncommitted: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
   expect(choiceCommands).toBe(0)
   expect(uncommitted.state).toEqual(before.state)
   expect(uncommitted.scores).toEqual(before.scores)
@@ -319,7 +319,7 @@ for (const first of ['C048_Farmstead', 'B027_Toolbox']) {
   test(`Turn-end sources keep their order and one Farmstead reward across reload, first=${first}`, async ({ page, request }) => {
     const farmstead = 'C048_Farmstead'
     const toolbox = 'B027_Toolbox'
-    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
+    expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
       data: { seed: 42, playerCount: 2, customCardIds: [] },
     })).ok()).toBe(true)
     const fixture = createWorkSession({ configure: state => {
@@ -330,17 +330,17 @@ for (const first of ['C048_Farmstead', 'B027_Toolbox']) {
       Object.assign(owner.resources, { wood: 8, stone: 2, reed: 0, food: 2 })
     } })
     try {
-      expect((await request.post(`${BACKEND_URL}/api/game/load`, {
+      expect((await request.post(`${BACKEND_URL}/api/game/load`, { headers: browserRequestHeaders(),
         data: { state: fixture.withCtx(() => serializeState(fixture.state, { actionHooks: fixture.actionHooks })) },
       })).ok()).toBe(true)
     } finally { fixture.dispose() }
     const chooseApi = async (value: string): Promise<SessionResponse> =>
-      (await request.post(`${BACKEND_URL}/api/game/choice`, { data: { playerIndex: 0, value } })).json()
-    const started: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, {
+      (await request.post(`${BACKEND_URL}/api/game/choice`, { headers: browserRequestHeaders(), data: { playerIndex: 0, value } })).json()
+    const started: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/action`, { headers: browserRequestHeaders(),
       data: { playerIndex: 0, spaceId: 'farm-expansion' },
     })).json()
     expect(started.ok, started.error).toBe(true)
-    let response: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/commit-selection`, {
+    let response: SessionResponse = await (await request.post(`${BACKEND_URL}/api/game/commit-selection`, { headers: browserRequestHeaders(),
       data: { playerIndex: 0, payload: { stables: [{ row: 0, col: 0 }] } },
     })).json()
     for (let guard = 0; guard < 4; guard++) {
@@ -383,7 +383,7 @@ for (const first of ['C048_Farmstead', 'B027_Toolbox']) {
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
     await page.reload()
     await expect(page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch' })).toBeVisible()
-    const restored: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    const restored: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`, { headers: browserRequestHeaders() })).json()
     expect(restored.state.players[0]!.resources.food).toBe(3)
   })
 }
