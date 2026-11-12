@@ -37,6 +37,9 @@
 
 预发布由 `prerelease-candidate-verification.yml` 和 `scripts/ci/prerelease-verification.ts` 中独立的可信 main producer 编排。固定 ref 与集成清单绑定选定候选及独立功能来源；同一完整任务目录执行候选，不取得正式写入凭据。回执通道和测试运行环境分别控制：普通回归使用正式环境，pre 专用夹具显式选择 pre，生产构建运行正常 typed hosted builder 并写入 pre 元数据。回执绑定仓库 ID、通道、候选 SHA、候选和策略配置，以及可从受保护 main 到达的兼容 producer。其他候选不能覆盖本候选结果，缺失或不兼容任务均阻断发布。正式候选准入保持原要求；prerelease 日常 push/PR 使用同一 routine plan。测试入口为 `candidate-verification-prerelease.test.ts`、`candidate-verification.test.ts`、`release-publish.test.ts` 和 `candidate-verification-pages.test.ts`。
 
+
+完整 catalog 的候选安装钩子、浏览器下载、服务准备、构建和测试使用独立 UID 及专用 Docker29.9.3 rootless daemon。可信 runner 独占原始源码、policy 依赖、命令文件、日志与回执；policy CLI 使用 Node 原生 TypeScript，不执行候选可写目录中的工具。候选没有宿主 sudo 或 rootful Docker 权限。root 所有的 smoke 实测身份、客户端 no-new-privileges、受保护文件、bind 写入身份及双向 host 网络。Docker 容器由 daemon 的 rootless UID 映射隔离，客户端 no-new-privileges 不会经 Docker API 传播给容器。清理先停止用户管理器及全部后代 cgroup，再转交候选目录，核对源码字节并以不跟随链接的方式收集诊断。候选输出先写私有日志，显示前转义。普通 PR 完整 catalog 使用相同执行器，提供合入前证据；缺少隔离能力直接失败。`scripts/ci/candidate-execution.json` 将新 stable 执行契约绑定到源码配置，旧的已准入 stable 快照保留历史回执契约。prerelease 回执始终要求隔离准备、运行时证明与完整清理成功。测试：`candidate-verification-isolation.test.ts`、`candidate-verification-cli.test.ts` 和 `candidate-verification.test.ts`。
+
 ## 日常范围验证
 
 GitHub Actions 是集成与发布的正式证据。本机定向检查提供开发反馈。`ci.yml` 是 PR 与 main 的唯一自动验证入口。

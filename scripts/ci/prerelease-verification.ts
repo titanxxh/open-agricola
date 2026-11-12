@@ -1,11 +1,12 @@
 import { execFileSync, spawnSync } from 'node:child_process'
+import { candidateExecution, executeCandidate } from './candidate-isolation.ts'
 import { createHash } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { assertCandidateCheckout, assertMainProtection, assertRawCommit, evaluateCandidateVerification, mainCommit, parseGitHubJsonLines, PRERELEASE_CANDIDATE_WORKFLOW, repositoryName, runCandidateTask } from './candidate-verification'
-import { fullSha, selectedTasks, verificationConfiguration } from './verification-tasks'
-import { commitRef, ensureCommitRef, github, ownerMachine } from '../release/candidate'
+import { assertCandidateCheckout, assertMainProtection, assertRawCommit, evaluateCandidateVerification, mainCommit, parseGitHubJsonLines, PRERELEASE_CANDIDATE_WORKFLOW, repositoryName, runCandidateTask } from './candidate-verification.ts'
+import { fullSha, selectedTasks, verificationConfiguration } from './verification-tasks.ts'
+import { commitRef, ensureCommitRef, github, ownerMachine } from '../release/candidate.ts'
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const object = (value: unknown): Record<string, unknown> => {
@@ -127,7 +128,7 @@ export function checkPrereleaseVerification(cwd: string, repository: string, sha
     evidence.push({ run: value, jobs })
   }
   return { ...evaluateCandidateVerification({ repository, repositoryId: source.repositoryId, sha,
-    configuration: prereleaseConfiguration(cwd, sha, source.main), workflowId: workflow.id, channel: 'prerelease', producerShas,
+    configuration: prereleaseConfiguration(cwd, sha, source.main), workflowId: workflow.id, channel: 'prerelease', producerShas, execution: 'uid-rootless-v1',
   }, evidence), channel: 'prerelease' as const, producerConfiguration: policyConfiguration }
 }
 
@@ -164,11 +165,18 @@ export function syncPrerelease(cwd: string, repository: string, sha: string, exp
 }
 
 export function runPrereleaseCandidateTask(cwd: string, id: string, sha: string, producer: string): void {
+  let sequence = 0
   runCandidateTask(cwd, id, sha, (command, argv, directory) => {
     const productionBuild = id === 'build' && command === 'pnpm' && argv.length === 2 && argv[0] === 'run' && argv[1] === 'build'
     const env: NodeJS.ProcessEnv = { ...process.env, GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'prerelease',
       RELEASE_CHANNEL: productionBuild ? 'prerelease' : 'stable' }
     delete env.GH_TOKEN; delete env.GITHUB_TOKEN
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      const execution = candidateExecution()
+      return executeCandidate(execution, command === 'pnpm' ? resolve(execution.node, '../pnpm') : command,
+        productionBuild ? ['run', 'build:hosted-frontend'] : argv, `task-${sequence++}`,
+        { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'prerelease', RELEASE_CHANNEL: productionBuild ? 'prerelease' : 'stable' })
+    }
     const result = spawnSync(command, productionBuild ? ['run', 'build:hosted-frontend'] : argv, { cwd: directory, env, stdio: 'inherit' })
     if (result.error) throw result.error
     return result.status ?? 1

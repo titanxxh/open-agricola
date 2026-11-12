@@ -1,14 +1,15 @@
 import { execFileSync, spawnSync } from 'node:child_process'
+import { candidateExecution, executeCandidate } from './candidate-isolation.ts'
 import { createHash } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
+import { FULL_TASK_IDS, fullSha, candidateExecutionPolicy, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId, type CandidateExecutionPolicy } from './verification-tasks.ts'
 
 export const CANDIDATE_WORKFLOW = '.github/workflows/candidate-verification.yml'
 export const PRERELEASE_CANDIDATE_WORKFLOW = '.github/workflows/prerelease-candidate-verification.yml'
 export type ReleaseChannel = 'stable' | 'prerelease'
-export type CandidateIdentity = { repository: string; repositoryId: number; sha: string; configuration: string; workflowId: number }
+export type CandidateIdentity = { repository: string; repositoryId: number; sha: string; configuration: string; workflowId: number; execution: CandidateExecutionPolicy }
   & ({ channel?: 'stable' } | { channel: 'prerelease'; producerShas: readonly string[] })
 export type CandidateRunEvidence = { run: unknown; jobs: readonly unknown[] }
 export type CandidateTaskResult = {
@@ -146,6 +147,8 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
       const candidates = jobs.filter(job => job.name === name)
       const job = newestJob(candidates.filter(candidate => !selection || candidate.attempt >= selection.job.attempt))
       const requiredSteps = ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task']
+      if (identity.channel === 'prerelease' || identity.execution === 'uid-rootless-v1') requiredSteps.push(
+        'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics')
       if (verificationTask(id).browser) requiredSteps.push('Install browsers')
       let reason: string | null = null
       if (!hasCurrentAttempt) reason = 'Current candidate attempt has no job evidence'
@@ -282,7 +285,7 @@ export function checkCandidateVerification(cwd: string, repository: string, sha:
     if (!Array.isArray(jobs)) throw new Error('Invalid GitHub job collection')
     return { run, jobs }
   })
-  return evaluateCandidateVerification({ repository, repositoryId, sha, configuration, workflowId: integer(workflow.id) }, evidence)
+  return evaluateCandidateVerification({ repository, repositoryId, sha, configuration, workflowId: integer(workflow.id), execution: candidateExecutionPolicy(cwd, sha) }, evidence)
 }
 
 export function assertCandidateCheckout(cwd: string, sha: string, workflowSha = sha): void {
@@ -380,7 +383,13 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
     return 0
   }
   if (mode === 'run-task' && id) {
-    runCandidateTask(cwd, id, sha)
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      const execution = candidateExecution()
+      let sequence = 0
+      runCandidateTask(cwd, id, sha, (command, args) => executeCandidate(execution,
+        command === 'pnpm' ? resolve(execution.node, '../pnpm') : command, args, `task-${sequence++}`,
+        { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'stable', RELEASE_CHANNEL: 'stable' }))
+    } else runCandidateTask(cwd, id, sha)
     return 0
   }
   if (mode === 'check') {

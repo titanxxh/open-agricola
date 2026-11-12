@@ -112,7 +112,7 @@ backup_container() {
     --label "org.open-agricola.backup.run=$BACKUP_JOB_ID" \
     --label "org.open-agricola.backup.environment=$BACKUP_ENVIRONMENT" \
     --label "org.open-agricola.backup.deadline=${BACKUP_DEADLINE_EPOCH_MS:-0}" \
-    --user "$(id -u):$(id -g)" "${environment[@]}" -e "BACKUP_JOB_ID=$BACKUP_JOB_ID" -e BACKUP_SCRATCH_DIRECTORY=/backup \
+    --user "$(node "$POLICY_ROOT/scripts/ci/docker-bind-user.ts")" "${environment[@]}" -e "BACKUP_JOB_ID=$BACKUP_JOB_ID" -e BACKUP_SCRATCH_DIRECTORY=/backup \
     -v "$PWD/backups:/backup" "$service" timeout --signal=TERM --kill-after=3s "$seconds" \
     node --import tsx scripts/storage-archive-cli.ts "$@"
 }

@@ -1,4 +1,5 @@
 import { spawn, execFile } from 'node:child_process'
+import { dockerBindUser } from './ci/docker-bind-user'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { mkdir, readFile, writeFile, stat, mkdtemp, rm, chmod } from 'node:fs/promises'
@@ -55,7 +56,7 @@ async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, 
       'run', '--rm', '--name', container, '--label', `org.open-agricola.backup.run=${process.env.BACKUP_JOB_ID || container}`,
       '--label', `org.open-agricola.backup.deadline=${deadline || 0}`,
       '--network', 'host', '--env', 'PGSERVICEFILE=/connection/service.conf',
-      '--user', `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
+      '--user', dockerBindUser(),
       '--mount', `type=bind,source=${config},target=/connection,readonly`,
       '--mount', `type=bind,source=${resolve(root)},target=/archive${tool === 'pg_restore' ? ',readonly' : ''}`,
       ...(listFile ? ['--mount', `type=bind,source=${listFile},target=/archive-restore.list,readonly`] : []), POSTGRES_IMAGE, ...command, ...args,

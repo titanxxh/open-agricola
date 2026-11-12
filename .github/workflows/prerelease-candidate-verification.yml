@@ -55,9 +55,6 @@ jobs:
         with:
           node-version: 24
       - run: corepack enable
-      - name: Install trusted policy dependencies
-        working-directory: policy
-        run: pnpm install --frozen-lockfile
       - name: Generate candidate manifest
         id: manifest
         working-directory: policy
@@ -66,7 +63,7 @@ jobs:
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           CANDIDATE_REF: ${{ inputs.candidate_ref }}
           CANDIDATE_TASKS: ${{ inputs.tasks }}
-        run: pnpm exec tsx scripts/ci/prerelease-verification.ts manifest --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA" --ref "$CANDIDATE_REF" --tasks "$CANDIDATE_TASKS"
+        run: node scripts/ci/prerelease-verification.ts manifest --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA" --ref "$CANDIDATE_REF" --tasks "$CANDIDATE_TASKS"
       - name: Prerelease manifest / ${{ steps.manifest.outputs.binding }}
         run: echo 'Repository, prerelease channel, candidate, configuration and main producer are bound'
 
@@ -95,28 +92,38 @@ jobs:
         with:
           node-version: 24
       - run: corepack enable
-      - name: Install trusted policy dependencies
+      - name: Install trusted browser prerequisites
+        if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
         working-directory: policy
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install-deps chromium webkit
+      - name: Prepare candidate isolation
+        id: isolation
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash policy/scripts/ci/setup-candidate-isolation.sh "$PWD/candidate" "$PWD/policy" "$(command -v node)" "$(id -u)"
+      - name: Prove native candidate isolation
+        run: node policy/scripts/ci/candidate-isolation.ts smoke
       - name: Install dependencies
-        working-directory: candidate
-        run: pnpm install --frozen-lockfile
+        run: node policy/scripts/ci/candidate-isolation.ts install
       - name: Install browsers
         if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
-        working-directory: candidate
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: node policy/scripts/ci/candidate-isolation.ts browsers
       - name: Verify candidate checkout
         working-directory: policy
         env:
           CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
-        run: pnpm exec tsx scripts/ci/prerelease-verification.ts source --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA"
+        run: node scripts/ci/prerelease-verification.ts source --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA"
       - name: Execute verification task
         working-directory: policy
         env:
           CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
           VERIFICATION_TASK: ${{ matrix.task }}
-          REPLAY_VIEWER_ROOT: ${{ runner.temp }}/prerelease-replay-viewers
-        run: pnpm exec tsx scripts/ci/prerelease-verification.ts run-task --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA" --task "$VERIFICATION_TASK"
+        run: node scripts/ci/prerelease-verification.ts run-task --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA" --task "$VERIFICATION_TASK"
+      - name: Stop candidate descendants and collect private diagnostics
+        if: always() && steps.isolation.outcome == 'success'
+        env:
+          CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
+        run: node policy/scripts/ci/candidate-isolation.ts finish "$PWD/candidate" "$CANDIDATE_SHA"
       - name: Retain verification diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -124,10 +131,7 @@ jobs:
           name: prerelease-candidate-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.task }}
           retention-days: 7
           if-no-files-found: ignore
-          path: |
-            candidate/output/verification/**
-            candidate/output/playwright/**/error-context.md
-            candidate/output/playwright/**/test-failed-*.png
+          path: ${{ runner.temp }}/candidate-isolation/
 
   complete:
     name: candidate-complete

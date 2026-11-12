@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { fullSha } from '../ci/verification-tasks'
-import { repositoryName } from '../ci/candidate-verification'
+import { fullSha } from '../ci/verification-tasks.ts'
+import { repositoryName } from '../ci/candidate-verification.ts'
 
 export const RELEASE_REPOSITORY = 'titanxxh/open-agricola'
 

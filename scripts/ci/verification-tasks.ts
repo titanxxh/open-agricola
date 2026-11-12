@@ -126,3 +126,16 @@ export function verificationConfiguration(cwd: string, sha: string): string {
   if (offset !== blobs.length) throw new Error('Unexpected verification configuration blob output')
   return hash.digest('hex')
 }
+
+export type CandidateExecutionPolicy = 'legacy-stable' | 'uid-rootless-v1'
+
+// Only admitted stable source snapshots can use the historical execution contract.
+export function candidateExecutionPolicy(cwd: string, sha: string): CandidateExecutionPolicy {
+  fullSha(sha)
+  const file = 'scripts/ci/candidate-execution.json'
+  if (!execFileSync('git', ['ls-tree', '--name-only', sha, '--', file], { cwd, encoding: 'utf8' }).trim()) return 'legacy-stable'
+  const value: unknown = JSON.parse(execFileSync('git', ['show', `${sha}:${file}`], { cwd, encoding: 'utf8' }))
+  if (typeof value !== 'object' || value === null || !('version' in value) || value.version !== 1
+    || !('isolation' in value) || value.isolation !== 'uid-rootless-v1') throw new Error('Unsupported candidate execution policy')
+  return value.isolation
+}

@@ -71,7 +71,7 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
   const jobs = tasks.map((task, index) => ({ id: index + 2, run_id: 1, run_attempt: 1,
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     name: `candidate / ${task} / ${configuration}`, status: 'completed', conclusion: 'success', html_url: candidateRun.html_url,
-    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step) }))
+    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }))
   jobs.unshift({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: candidateRun.html_url,
     started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
     steps: [step('Generate candidate manifest'), step(`Candidate manifest / ${sha} / ${configuration} / ${tasks.join(',')}`)] })
