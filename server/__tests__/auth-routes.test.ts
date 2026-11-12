@@ -97,7 +97,7 @@ class MockReq extends Readable {
     this.url = url
     this.headers = { host: 'localhost' }
     for (const [key, value] of Object.entries(headers)) this.headers[key.toLowerCase()] = value
-    if (body !== undefined) this.push(Buffer.from(JSON.stringify(body)))
+    if (body !== undefined) this.push(Buffer.from(body instanceof URLSearchParams ? body.toString() : JSON.stringify(body)))
     this.push(null)
   }
 }
@@ -137,7 +137,7 @@ async function requestJson(
   if (!routeHandler) throw new Error('route handler was not captured')
   const navigation = method === 'GET' && (url.includes('/callback') || url.startsWith('/api/auth/verify-email'))
   const native = Object.keys(headers).some(key => key.toLowerCase() === 'authorization')
-  const browserHeaders = navigation || native ? {} : { Origin: new URL(process.env.PUBLIC_APP_ORIGIN ?? 'http://localhost').origin, 'X-OA-Browser-Protocol': '2' }
+  const browserHeaders = navigation || native || body instanceof URLSearchParams ? {} : { Origin: new URL(process.env.PUBLIC_APP_ORIGIN ?? 'http://localhost').origin, 'X-OA-Browser-Protocol': '2' }
   const host = process.env.PUBLIC_API_BASE ? new URL(process.env.PUBLIC_API_BASE).host : 'localhost'
   const req = new MockReq(method, url, body, { Host: host, ...browserHeaders, ...headers }) as unknown as IncomingMessage
   const res = new MockRes()
@@ -1810,6 +1810,103 @@ describe('auth routes', () => {
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'registration_disabled' })
     expect((await findIdentity('google', 'g-disabled'))).toBeNull()
+  })
+
+  it('starts OAuth through a first-party form navigation and completes the cookie-bound login', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://formal.example')
+    vi.stubEnv('PUBLIC_API_BASE', 'https://api.other.example')
+    const user = await createLocalUserForTests('oauth_form', 'password123', 'OAuth form')
+    const profile = { provider: 'github' as const, providerUserId: 'github-form-user', emailVerified: true }
+    await linkIdentity(user.id, profile)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+    const start = await requestJson('POST', '/api/auth/oauth/github/start', new URLSearchParams({
+      protocol: '2', intent: 'login', returnTo: '/?page=workshop',
+    }), { Origin: 'https://formal.example', 'Content-Type': 'application/x-www-form-urlencoded',
+      'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' })
+    expect(start.status).toBe(302)
+    expect(start.headers['Cache-Control']).toBe('no-store')
+    const authorization = new URL(String(start.headers.Location))
+    expect(authorization.origin).toBe('https://oauth.example')
+    const state = authorization.searchParams.get('state')
+    expect(state).toBeTruthy()
+    expect(start.headers['Set-Cookie']).toContain('__Host-oa-oauth-state=')
+    expect(start.headers['Set-Cookie']).toContain('Secure')
+    expect(start.headers['Set-Cookie']).toContain('SameSite=None')
+    expect(start.headers['Set-Cookie']).not.toContain('Partitioned')
+    const callback = await requestJson('GET', `/api/auth/oauth/github/callback?state=${state}&code=ok`, undefined,
+      { Cookie: startOAuthCookie(start) })
+    expect(callback.status).toBe(302)
+    expect(callback.headers.Location).toBe('https://formal.example/?page=workshop')
+    const cookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], authCookieNames().session)
+    expect(await validateSession(decodeURIComponent(cookie.split('=')[1]!))).toMatchObject({ id: user.id })
+  })
+
+  it('rejects invalid OAuth form revisions and fields before creating any state', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://formal.example')
+    vi.stubEnv('PUBLIC_API_BASE', 'https://api.other.example')
+    const headers = { Origin: 'https://formal.example', 'Content-Type': 'application/x-www-form-urlencoded',
+      'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' }
+    for (const [body, status] of [
+      ['intent=login', 426], ['protocol=1&intent=login', 426], ['protocol=2&protocol=2&intent=login', 426],
+      ['protocol=2&intent=link', 400], ['protocol=2&intent=login&intent=register', 400],
+      ['protocol=2&intent=login&userId=another', 400], ['protocol=2&intent=login&returnTo=' + 'x'.repeat(4096), 413],
+    ] satisfies Array<[string, number]>) {
+      const response = await requestJson('POST', '/api/auth/oauth/github/start?protocol=2&intent=login', new URLSearchParams(body), headers)
+      expect(response.status).toBe(status)
+      expect(response.headers['Set-Cookie']).toBeUndefined()
+      expect(await getDb().prepare('SELECT state_hash FROM oauth_states').all()).toEqual([])
+    }
+    const denied = await requestJson('POST', '/api/auth/oauth/github/start', new URLSearchParams({ protocol: '2', intent: 'login' }),
+      { ...headers, Origin: 'https://pre.formal.example' })
+    expect(denied.status).toBe(403)
+    expect(await getDb().prepare('SELECT state_hash FROM oauth_states').all()).toEqual([])
+  })
+
+  it('preserves form registration invitation, return location and onboarding proof through the callback', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://formal.example')
+    vi.stubEnv('PUBLIC_API_BASE', 'https://api.other.example')
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    const admin = await createLocalUserForTests('form_invite_admin', 'password123')
+    const invite = await createInvite(admin.id, { expiresAt: Date.now() + 86_400_000, maxUses: 1 })
+    const challenge = createHash('sha256').update('onboarding-form-verifier').digest('hex')
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({ provider: 'google', providerUserId: 'google-form-register', emailVerified: true })
+    const start = await requestJson('POST', '/api/auth/oauth/google/start?intent=link&returnTo=%2Fwrong', new URLSearchParams({
+      protocol: '2', intent: 'register', inviteCode: invite.code, onboardingChallenge: challenge, returnTo: '/?page=workshop',
+    }), { Origin: 'https://formal.example', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' })
+    expect(start.status).toBe(302)
+    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const callback = await requestJson('GET', `/api/auth/oauth/google/callback?state=${state}&code=ok`, undefined,
+      { Cookie: startOAuthCookie(start) })
+    expect(callback.status).toBe(302)
+    const location = new URL(String(callback.headers.Location))
+    expect(location.origin).toBe('https://formal.example')
+    expect(location.search).toBe('?page=onboarding')
+    const ticket = new URLSearchParams(location.hash.slice(1)).get('onboardingTicket')
+    expect(ticket).toBeTruthy()
+    expect(await getOnboardingTicket(ticket!)).toMatchObject({
+      provider: 'google', providerUserId: 'google-form-register', inviteCodeHash: hashInviteCode(invite.code),
+      onboardingChallenge: challenge, returnTo: '/?page=workshop',
+    })
+    expect(callback.headers['Set-Cookie']).not.toContain(`${authCookieNames().session}=`)
+  })
+
+  it('redirects OAuth form registration failures back to the formal login without creating state', async () => {
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://formal.example')
+    vi.stubEnv('PUBLIC_API_BASE', 'https://api.other.example')
+    const headers = { Origin: 'https://formal.example', 'Content-Type': 'application/x-www-form-urlencoded',
+      'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' }
+    for (const [policy, code] of [['disabled', 'registration_disabled'], ['invite_only', 'invalid_invite']]) {
+      process.env.ACCOUNT_REGISTRATION_POLICY = policy
+      const response = await requestJson('POST', '/api/auth/oauth/google/start', new URLSearchParams({ protocol: '2', intent: 'register' }), headers)
+      expect(response.status).toBe(302)
+      expect(response.headers.Location).toBe(`https://formal.example/?page=login&authError=${code}`)
+      expect(response.headers['Set-Cookie']).toBeUndefined()
+      expect(await getDb().prepare('SELECT state_hash FROM oauth_states').all()).toEqual([])
+    }
   })
 
   it('allows existing OAuth users to log in when registration is disabled', async () => {
