@@ -17,13 +17,13 @@ install -d -m 700 -o "$runner_uid" -g root "$RUNNER_TEMP/candidate-isolation"
 # Packages and their checksums are authenticated by Docker's signed apt repository.
 install -d -m 755 /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /run/oa-ci-isolation/docker.asc
-fingerprint="$(gpg --show-keys --with-colons /run/oa-ci-isolation/docker.asc | awk -F: '$1=="fpr" { print $10; exit }')"
+fingerprint="$(gpg --show-keys --with-colons /run/oa-ci-isolation/docker.asc | awk -F: '$1=="fpr" && !found { first=$10; found=1 } END { print first }')"
 [[ $fingerprint == 9DC858229FC7DD38854AE2D88D81803C0EBFCD88 ]] || exit 1
 install -m 644 /run/oa-ci-isolation/docker.asc /etc/apt/keyrings/docker-isolation.asc
 . /etc/os-release
 printf 'deb [arch=amd64 signed-by=/etc/apt/keyrings/docker-isolation.asc] https://download.docker.com/linux/ubuntu %s stable\n' "$VERSION_CODENAME" > /etc/apt/sources.list.d/docker-isolation.list
 apt-get update -qq
-version="$(apt-cache madison docker-ce | awk '$3 ~ /^5:29\.9\.3-/ { print $3; exit }')"
+version="$(apt-cache madison docker-ce | awk '$3 ~ /^5:29\.9\.3-/ && !found { first=$3; found=1 } END { print first }')"
 [[ -n $version ]] || { echo 'Pinned rootless Docker29.9.3 unavailable' >&2; exit 1; }
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends uidmap dbus-user-session docker-ce="$version" docker-ce-cli="$version" docker-ce-rootless-extras="$version"
 # The official /usr/bin/rootlesskit path has the packaged AppArmor userns profile.
