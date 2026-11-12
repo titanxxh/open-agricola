@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, lstatSync } from 'node:fs'
 import { join } from 'node:path'
 
 export const FULL_TASK_IDS = [
@@ -30,7 +30,9 @@ export function selectedTasks(value: string): FullTaskId[] {
 }
 
 function architectureCommands(cwd: string): VerificationCommand[] {
-  const value: unknown = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'))
+  const path = join(cwd, 'package.json')
+  if (!lstatSync(path).isFile()) throw new Error('Candidate package.json must be a regular file')
+  const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
   if (typeof value !== 'object' || value === null || !('scripts' in value)
     || typeof value.scripts !== 'object' || value.scripts === null
     || !('check:architecture' in value.scripts) || typeof value.scripts['check:architecture'] !== 'string') {
@@ -48,9 +50,12 @@ function architectureCommands(cwd: string): VerificationCommand[] {
 function chromiumSuite(cwd: string): string[] {
   const found: string[] = []
   const visit = (relativeDirectory: string) => {
+    if (!lstatSync(join(cwd, relativeDirectory)).isDirectory()) throw new Error('Candidate browser suite must contain only regular files and directories')
     for (const name of readdirSync(join(cwd, relativeDirectory)).sort()) {
       const relative = `${relativeDirectory}/${name}`
-      if (statSync(join(cwd, relative)).isDirectory()) visit(relative)
+      const entry = lstatSync(join(cwd, relative))
+      if (!entry.isFile() && !entry.isDirectory()) throw new Error('Candidate browser suite must contain only regular files and directories')
+      if (entry.isDirectory()) visit(relative)
       else if (/\.(?:spec|test)\.[cm]?[jt]sx?$/.test(name)) found.push(relative)
     }
   }
@@ -89,7 +94,7 @@ export function fullSha(value: string): string {
 }
 
 const configurationPath = (file: string): boolean =>
-  (file === '.github/workflows/candidate-verification.yml' || file === '.github/workflows/prerelease-candidate-verification.yml')
+  (file === '.github/workflows/candidate-verification.yml' || file === '.github/workflows/prerelease-candidate-verification.yml' || file === '.github/workflows/candidate-rehearsal.yml')
   || file.startsWith('scripts/ci/')
   || /^scripts\/verification[^/]*\.ts$/.test(file)
   || /^scripts\/verify[^/]*\.(?:ts|sh)$/.test(file)
@@ -125,17 +130,4 @@ export function verificationConfiguration(cwd: string, sha: string): string {
   }
   if (offset !== blobs.length) throw new Error('Unexpected verification configuration blob output')
   return hash.digest('hex')
-}
-
-export type CandidateExecutionPolicy = 'legacy-stable' | 'uid-rootless-v1'
-
-// Only admitted stable source snapshots can use the historical execution contract.
-export function candidateExecutionPolicy(cwd: string, sha: string): CandidateExecutionPolicy {
-  fullSha(sha)
-  const file = 'scripts/ci/candidate-execution.json'
-  if (!execFileSync('git', ['ls-tree', '--name-only', sha, '--', file], { cwd, encoding: 'utf8' }).trim()) return 'legacy-stable'
-  const value: unknown = JSON.parse(execFileSync('git', ['show', `${sha}:${file}`], { cwd, encoding: 'utf8' }))
-  if (typeof value !== 'object' || value === null || !('version' in value) || value.version !== 1
-    || !('isolation' in value) || value.isolation !== 'uid-rootless-v1') throw new Error('Unsupported candidate execution policy')
-  return value.isolation
 }

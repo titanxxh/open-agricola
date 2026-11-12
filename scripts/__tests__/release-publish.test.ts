@@ -3,6 +3,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { stableConfiguration } from '../ci/candidate-verification'
 import { prereleaseConfiguration } from '../ci/prerelease-verification'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
@@ -78,7 +79,7 @@ function fixture(prerelease = false) {
   git('commit', '--allow-empty', '-m', 'later main integration')
   const nextMainSha = git('rev-parse', 'HEAD')
   const state: GitHubState = {
-    sha, configuration: value.configuration, preConfiguration: prerelease ? prereleaseConfiguration(root, sha, mainBase) : '', evidence: 'passed', afterDispatch: 'passed',
+    sha, configuration: stableConfiguration(root, sha, prerelease ? mainBase : sha), preConfiguration: prerelease ? prereleaseConfiguration(root, sha, mainBase) : '', evidence: 'passed', afterDispatch: 'passed',
     mainSha: prerelease ? mainBase : sha, nextMainSha, provenance: finalSnapshotMetadata(sha, prerelease ? mainBase : sha), moveMain: false, refs: {}, annotatedTags: {}, release: null,
   }
   if (prerelease) {
@@ -146,13 +147,13 @@ else if (endpoint.startsWith('actions/workflows/200/runs?')) {
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z', status: 'completed', conclusion: task === 'webkit' && state.evidence === 'failed' ? 'failure' : 'success',
     html_url: 'https://example.test/job/' + task, steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }));
 } else if (endpoint.startsWith('actions/workflows/100/runs?')) {
-  if (state.evidence !== 'missing') output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: state.sha,
+  if (state.evidence !== 'missing') output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: state.mainSha, head_branch: 'main', display_title: 'stable / ' + state.sha + ' / all',
     repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 },
     status: 'completed', run_attempt: 1, created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' });
 } else if (endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
   output({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: 'https://example.test/run/1',
     started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
-    steps: [step('Generate candidate manifest'), step('Candidate manifest / ' + state.sha + ' / ' + state.configuration + ' / ' + tasks.join(','))] });
+    steps: [step('Generate candidate manifest'), step('Stable manifest / 1164782262 / stable / ' + state.sha + ' / ' + state.configuration + ' / ' + state.mainSha + ' / ' + tasks.join(','))] });
   tasks.forEach((task, index) => output({ id: index + 2, run_id: 1, run_attempt: 1, name: 'candidate / ' + task + ' / ' + state.configuration,
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     status: 'completed', conclusion: task === 'webkit' && state.evidence === 'failed' ? 'failure' : 'success', html_url: 'https://example.test/job/' + task,
@@ -261,7 +262,7 @@ describe('owner-machine release entry', () => {
     expect(result.status, result.stderr).toBe(0)
     expect(value.events().filter(event => event.endpoint === 'actions/workflows/100/dispatches' && event.kind === 'mutation')).toEqual([{
       kind: 'mutation', endpoint: 'actions/workflows/100/dispatches', evidence: 'missing', body: {
-        ref: `verification/candidates/${value.sha}`, inputs: { candidate_sha: value.sha, tasks: 'quality,fast,slow,build,chromium-1,chromium-2,chromium-3,chromium-4,browser-sandbox,webkit' },
+        ref: 'main', inputs: { candidate_sha: value.sha, tasks: 'quality,fast,slow,build,chromium-1,chromium-2,chromium-3,chromium-4,browser-sandbox,webkit' },
       },
     }])
     expect(value.events().filter(event => event.kind === 'release')[0]?.args).toContain(value.sha)
@@ -294,7 +295,7 @@ describe('owner-machine release entry', () => {
     }])
     expect(value.events().filter(event => event.kind === 'mutation' && event.endpoint === 'actions/workflows/100/dispatches')).toEqual([{
       kind: 'mutation', endpoint: 'actions/workflows/100/dispatches', evidence: 'failed', body: {
-        ref: `verification/candidates/${value.sha}`, inputs: { candidate_sha: value.sha, tasks: 'webkit' },
+        ref: 'main', inputs: { candidate_sha: value.sha, tasks: 'webkit' },
       },
     }])
   })

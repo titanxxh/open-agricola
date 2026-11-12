@@ -1,40 +1,31 @@
 name: Candidate Verification
+run-name: stable / ${{ inputs.candidate_sha }} / ${{ inputs.tasks }}
 
 on:
   workflow_dispatch:
     inputs:
       candidate_sha:
-        description: Full candidate commit SHA; must match the dispatch ref
+        description: Final merged main candidate commit SHA
         required: true
         type: string
       tasks:
-        description: Complete verification task IDs, comma-separated, or all
+        description: Complete catalog task IDs, comma-separated, or all
         default: all
         type: string
-  workflow_call:
-    inputs:
-      candidate_sha:
-        required: true
-        type: string
-      tasks:
-        default: all
-        type: string
-    outputs:
-      verified_tasks:
-        value: ${{ jobs.complete.outputs.verified_tasks }}
-      verified_sha:
-        value: ${{ jobs.complete.outputs.verified_sha }}
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
-  group: candidate-${{ github.sha }}-${{ inputs.tasks }}
+  group: stable-candidate-${{ inputs.candidate_sha }}-${{ inputs.tasks }}
   cancel-in-progress: false
 
 jobs:
   manifest:
     name: candidate-manifest
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -43,11 +34,19 @@ jobs:
       matrix: ${{ steps.manifest.outputs.matrix }}
       tasks: ${{ steps.manifest.outputs.tasks }}
     steps:
-      - name: Checkout candidate
+      - name: Checkout trusted main policy
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
+          path: policy
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.candidate_sha }}
           path: candidate
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -55,13 +54,14 @@ jobs:
       - run: corepack enable
       - name: Generate candidate manifest
         id: manifest
-        working-directory: candidate
+        working-directory: policy
         env:
+          GH_TOKEN: ${{ github.token }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           CANDIDATE_TASKS: ${{ inputs.tasks }}
-        run: node scripts/ci/candidate-verification.ts manifest --sha "$CANDIDATE_SHA" --tasks "$CANDIDATE_TASKS"
-      - name: Candidate manifest / ${{ steps.manifest.outputs.binding }}
-        run: echo 'Candidate identity and verification configuration are bound'
+        run: node scripts/ci/candidate-verification.ts formal-manifest --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA" --tasks "$CANDIDATE_TASKS"
+      - name: Stable manifest / ${{ steps.manifest.outputs.binding }}
+        run: echo 'Repository, stable channel, candidate, configuration and main producer are bound'
 
   task:
     needs: manifest
@@ -72,22 +72,29 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.manifest.outputs.matrix) }}
     steps:
+      - name: Checkout trusted main policy
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: policy
+          persist-credentials: false
       - name: Checkout candidate
         uses: actions/checkout@v7
         with:
           ref: ${{ needs.manifest.outputs.sha }}
           path: candidate
-          persist-credentials: false
-      - name: Checkout trusted environment prerequisites
-        uses: actions/checkout@v7
-        with:
-          ref: main
-          path: policy
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
       - run: corepack enable
+      - name: Verify candidate checkout
+        working-directory: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
+        run: node scripts/ci/candidate-verification.ts formal-source --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA"
       - name: Install trusted browser prerequisites
         if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
         working-directory: policy
@@ -96,35 +103,30 @@ jobs:
           pnpm exec playwright install-deps chromium webkit
       - name: Prepare candidate isolation
         id: isolation
-        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash candidate/scripts/ci/setup-candidate-isolation.sh "$PWD/candidate" "$PWD/candidate" "$(command -v node)" "$(id -u)"
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash policy/scripts/ci/setup-candidate-isolation.sh "$PWD/candidate" "$PWD/policy" "$(command -v node)" "$(id -u)"
       - name: Prove native candidate isolation
-        run: node candidate/scripts/ci/candidate-isolation.ts smoke
+        run: node policy/scripts/ci/candidate-isolation.ts smoke
       - name: Install dependencies
-        run: node candidate/scripts/ci/candidate-isolation.ts install
+        run: node policy/scripts/ci/candidate-isolation.ts install
       - name: Install browsers
         if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
-        run: node candidate/scripts/ci/candidate-isolation.ts browsers
-      - name: Verify candidate checkout
-        working-directory: candidate
-        env:
-          CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
-        run: node scripts/ci/candidate-verification.ts source --sha "$CANDIDATE_SHA"
+        run: node policy/scripts/ci/candidate-isolation.ts browsers
       - name: Execute verification task
-        working-directory: candidate
+        working-directory: policy
         env:
           CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
           VERIFICATION_TASK: ${{ matrix.task }}
-        run: node scripts/ci/candidate-verification.ts run-task "$VERIFICATION_TASK" --sha "$CANDIDATE_SHA"
+        run: node scripts/ci/candidate-verification.ts formal-run-task "$VERIFICATION_TASK" --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA"
       - name: Stop candidate descendants and collect private diagnostics
         if: always() && steps.isolation.outcome == 'success'
         env:
           CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
-        run: node candidate/scripts/ci/candidate-isolation.ts finish "$PWD/candidate" "$CANDIDATE_SHA"
+        run: node policy/scripts/ci/candidate-isolation.ts finish "$PWD/candidate" "$CANDIDATE_SHA"
       - name: Retain verification diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: candidate-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.task }}
+          name: stable-candidate-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.task }}
           retention-days: 7
           if-no-files-found: ignore
           path: ${{ runner.temp }}/candidate-isolation/
@@ -134,21 +136,15 @@ jobs:
     if: always()
     needs: [manifest, task]
     runs-on: ubuntu-latest
-    outputs:
-      verified_tasks: ${{ steps.complete.outputs.verified_tasks }}
-      verified_sha: ${{ steps.complete.outputs.verified_sha }}
     steps:
       - name: Confirm every selected candidate task
-        id: complete
         env:
           MANIFEST_RESULT: ${{ needs.manifest.result }}
           TASK_RESULT: ${{ needs.task.result }}
-          VERIFIED_TASKS: ${{ needs.manifest.outputs.tasks }}
           VERIFIED_SHA: ${{ needs.manifest.outputs.sha }}
           EXPECTED_SHA: ${{ inputs.candidate_sha }}
         run: |
-          if [[ "$MANIFEST_RESULT" != success || "$TASK_RESULT" != success || -z "$VERIFIED_TASKS" || "$VERIFIED_SHA" != "$EXPECTED_SHA" ]]; then
-            echo 'Selected candidate tasks did not all execute successfully' >&2
+          if [[ "$MANIFEST_RESULT" != success || "$TASK_RESULT" != success || "$VERIFIED_SHA" != "$EXPECTED_SHA" ]]; then
+            echo 'Stable candidate verification did not complete' >&2
             exit 1
           fi
-          printf 'verified_tasks=%s\nverified_sha=%s\n' "$VERIFIED_TASKS" "$VERIFIED_SHA" >> "$GITHUB_OUTPUT"

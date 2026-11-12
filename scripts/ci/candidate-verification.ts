@@ -4,13 +4,14 @@ import { createHash } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FULL_TASK_IDS, fullSha, candidateExecutionPolicy, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId, type CandidateExecutionPolicy } from './verification-tasks.ts'
+import { FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
 
 export const CANDIDATE_WORKFLOW = '.github/workflows/candidate-verification.yml'
 export const PRERELEASE_CANDIDATE_WORKFLOW = '.github/workflows/prerelease-candidate-verification.yml'
 export type ReleaseChannel = 'stable' | 'prerelease'
-export type CandidateIdentity = { repository: string; repositoryId: number; sha: string; configuration: string; workflowId: number; execution: CandidateExecutionPolicy }
-  & ({ channel?: 'stable' } | { channel: 'prerelease'; producerShas: readonly string[] })
+export type CandidateIdentity = { repository: string; repositoryId: number; sha: string; configuration: string; workflowId: number }
+  & ({ channel?: 'stable'; execution: 'legacy-stable' }
+    | { channel: 'stable' | 'prerelease'; execution: 'uid-rootless-v1'; producerShas: readonly string[] })
 export type CandidateRunEvidence = { run: unknown; jobs: readonly unknown[] }
 export type CandidateTaskResult = {
   id: FullTaskId
@@ -110,7 +111,8 @@ function manifestSelection(jobs: Job[], identity: CandidateIdentity, producerSha
     || !successfulStep(manifest, 'Generate candidate manifest')) return null
   const prefix = identity.channel === 'prerelease'
     ? `Prerelease manifest / ${identity.repositoryId} / prerelease / ${identity.sha} / ${identity.configuration} / ${producerSha} / `
-    : `Candidate manifest / ${identity.sha} / ${identity.configuration} / `
+    : identity.execution === 'legacy-stable' ? `Candidate manifest / ${identity.sha} / ${identity.configuration} / `
+      : `Stable manifest / ${identity.repositoryId} / stable / ${identity.sha} / ${identity.configuration} / ${producerSha} / `
   const bindings = manifest.steps.filter(step => step.name.startsWith(prefix))
   if (bindings.length !== 1 || !successfulStep(manifest, bindings[0].name)) return null
   try {
@@ -130,7 +132,7 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
   const runs = evidence.map(entry => ({ run: parseRun(entry.run), jobs: entry.jobs.map(parseJob) }))
     .filter(({ run }) => run.repository.toLowerCase() === identity.repository.toLowerCase()
       && run.repositoryId === identity.repositoryId && run.headRepositoryId === identity.repositoryId
-      && (identity.channel === 'prerelease' ? identity.producerShas.includes(run.sha) : run.sha === identity.sha)
+      && (identity.execution === 'legacy-stable' ? run.sha === identity.sha : identity.producerShas.includes(run.sha))
       && run.workflowId === identity.workflowId
       && run.path === (identity.channel === 'prerelease' ? PRERELEASE_CANDIDATE_WORKFLOW : CANDIDATE_WORKFLOW)
       && run.event === 'workflow_dispatch')
@@ -237,7 +239,7 @@ export function assertRawCommit(cwd: string, repository: string, sha: string): v
   }
 }
 
-function admitFinalSnapshot(cwd: string, repository: string, sha: string): number {
+export function admitFinalSnapshot(cwd: string, repository: string, sha: string) {
   try {
     const metadata = object(github(`repos/${repository}`))
     const repositoryId = integer(metadata.id)
@@ -264,28 +266,59 @@ function admitFinalSnapshot(cwd: string, repository: string, sha: string): numbe
     if (spawnSync('git', ['merge-base', '--is-ancestor', sha, main], { cwd, stdio: 'ignore' }).status !== 0) {
       throw new Error('Candidate is not reachable from the explicitly resolved main commit')
     }
-    return repositoryId
+    return { repositoryId, main }
   } catch (error) {
     throw new Error(`Candidate is ineligible for formal verification: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
   }
 }
 
-export function checkCandidateVerification(cwd: string, repository: string, sha: string): CandidateVerificationResult {
-  repositoryName(repository)
+export const LEGACY_STABLE_CUTOFF = '53b8a0ccf5649ce3bb7084303f0677e46c1d20e7'
+export function historicalStableSnapshot(cwd: string, sha: string): boolean {
   fullSha(sha)
-  const repositoryId = admitFinalSnapshot(cwd, repository, sha)
-  const configuration = verificationConfiguration(cwd, sha)
+  return spawnSync('git', ['merge-base', '--is-ancestor', sha, LEGACY_STABLE_CUTOFF], { cwd, stdio: 'ignore' }).status === 0
+}
+export function stableConfiguration(cwd: string, sha: string, producer: string): string {
+  return createHash('sha256').update('open-agricola-stable-main-verification-v1\0')
+    .update(verificationConfiguration(cwd, sha)).update('\0').update(verificationConfiguration(cwd, producer)).digest('hex')
+}
+
+export function checkCandidateVerification(cwd: string, repository: string, sha: string): CandidateVerificationResult {
+  repositoryName(repository); fullSha(sha)
+  const { repositoryId, main } = admitFinalSnapshot(cwd, repository, sha)
   const workflow = object(github(`repos/${repository}/actions/workflows/candidate-verification.yml`))
   if (workflow.path !== CANDIDATE_WORKFLOW) throw new Error('Unexpected candidate workflow identity')
-  const runs = github(`repos/${repository}/actions/workflows/${integer(workflow.id)}/runs?head_sha=${sha}&event=workflow_dispatch&per_page=100`, 'workflow_runs')
+  const runs = github(`repos/${repository}/actions/workflows/${integer(workflow.id)}/runs?event=workflow_dispatch&per_page=100`, 'workflow_runs')
   if (!Array.isArray(runs)) throw new Error('Invalid GitHub workflow run collection')
-  const evidence = runs.map((run): CandidateRunEvidence => {
-    const metadata = parseRun(run)
+  const policy = verificationConfiguration(cwd, main), producers: string[] = []
+  const modern: CandidateRunEvidence[] = [], legacy: CandidateRunEvidence[] = []
+  const historical = historicalStableSnapshot(cwd, sha)
+  let modernAttempt = false
+  for (const value of runs) {
+    const run = object(value), producer = fullSha(string(run.head_sha))
+    const old = historical && producer === sha
+    const current = run.head_branch === 'main' && typeof run.display_title === 'string' && run.display_title.startsWith(`stable / ${sha} / `)
+    if (!old && !current) continue
+    if (current) {
+      const metadata = parseRun(value)
+      if (metadata.repositoryId !== repositoryId || metadata.headRepositoryId !== repositoryId || metadata.workflowId !== integer(workflow.id)
+        || metadata.path !== CANDIDATE_WORKFLOW || metadata.event !== 'workflow_dispatch') continue
+      assertRawCommit(cwd, repository, producer)
+      if (spawnSync('git', ['merge-base', '--is-ancestor', producer, main], { cwd, stdio: 'ignore' }).status !== 0) continue
+      modernAttempt = true
+      if (verificationConfiguration(cwd, producer) !== policy) continue
+      producers.push(producer)
+    }
+    const metadata = parseRun(value)
     const jobs = github(`repos/${repository}/actions/runs/${metadata.id}/jobs?filter=all&per_page=100`, 'jobs')
     if (!Array.isArray(jobs)) throw new Error('Invalid GitHub job collection')
-    return { run, jobs }
-  })
-  return evaluateCandidateVerification({ repository, repositoryId, sha, configuration, workflowId: integer(workflow.id), execution: candidateExecutionPolicy(cwd, sha) }, evidence)
+    if (current) modern.push({ run: value, jobs })
+    else legacy.push({ run: value, jobs })
+  }
+  // A requested modern run cannot be hidden by an older historical success.
+  if (!modernAttempt && historical) return evaluateCandidateVerification({ repository, repositoryId, sha,
+    configuration: verificationConfiguration(cwd, sha), workflowId: integer(workflow.id), execution: 'legacy-stable' }, legacy)
+  return evaluateCandidateVerification({ repository, repositoryId, sha, configuration: stableConfiguration(cwd, sha, main),
+    workflowId: integer(workflow.id), channel: 'stable', execution: 'uid-rootless-v1', producerShas: producers }, modern)
 }
 
 export function assertCandidateCheckout(cwd: string, sha: string, workflowSha = sha): void {
@@ -333,15 +366,15 @@ export function runCandidateTask(cwd: string, id: string, sha: string, run: Comm
 export function requestCandidateVerification(cwd: string, repository: string, sha: string, ref: string, tasks: string) {
   repositoryName(repository)
   fullSha(sha)
-  admitFinalSnapshot(cwd, repository, sha)
-  const configuration = verificationConfiguration(cwd, sha)
+  const { main } = admitFinalSnapshot(cwd, repository, sha)
+  const configuration = stableConfiguration(cwd, sha, main)
   const selected = selectedTasks(tasks)
   const target = ref === 'main' ? mainCommit(repository) : object(github(`repos/${repository}/commits/${encodeURIComponent(ref)}`)).sha
   if (target !== sha) throw new Error('Dispatch ref no longer points to the fixed candidate SHA')
   const workflow = object(github(`repos/${repository}/actions/workflows/candidate-verification.yml`))
   if (workflow.path !== CANDIDATE_WORKFLOW) throw new Error('Unexpected candidate workflow identity')
   execFileSync('gh', ['api', `repos/${repository}/actions/workflows/${integer(workflow.id)}/dispatches`, '--method', 'POST', '--input', '-'], {
-    cwd, encoding: 'utf8', input: JSON.stringify({ ref, inputs: { candidate_sha: sha, tasks: selected.join(',') } }),
+    cwd, encoding: 'utf8', input: JSON.stringify({ ref: 'main', inputs: { candidate_sha: sha, tasks: selected.join(',') } }),
     stdio: ['pipe', 'pipe', 'pipe'],
   })
   return { status: 'requested', repository, sha, configuration, tasks: selected }
@@ -352,7 +385,7 @@ function options(input: string[]) {
   for (let index = 0; index < input.length; index++) {
     const key = input[index]
     if (key === '--json') continue
-    if (!['--sha', '--repository', '--ref', '--tasks'].includes(key) || result.has(key)) throw new Error(`Unexpected candidate option: ${key}`)
+    if (!['--sha', '--repository', '--ref', '--tasks', '--producer', '--candidate-directory'].includes(key) || result.has(key)) throw new Error(`Unexpected candidate option: ${key}`)
     const value = input[++index]
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${key}`)
     result.set(key, value)
@@ -364,11 +397,38 @@ function options(input: string[]) {
   }
 }
 
+function trustedStableProducer(producer: string): void {
+  fullSha(producer)
+  assertCandidateCheckout(resolve(import.meta.dirname, '../..'), producer, producer)
+  if (process.env.GITHUB_REF !== 'refs/heads/main' || process.env.GITHUB_WORKFLOW_SHA !== producer
+    || process.env.GITHUB_WORKFLOW_REF !== `${process.env.GITHUB_REPOSITORY}/${CANDIDATE_WORKFLOW}@refs/heads/main`) throw new Error('Stable verification must execute its trusted main producer')
+}
+
 export function candidateVerificationCli(cwd: string, input: string[]): number {
   const [mode, ...remaining] = input
-  const id = mode === 'run-task' ? remaining.shift() : null
+  const id = mode === 'run-task' || mode === 'formal-run-task' ? remaining.shift() : null
   const option = options(remaining)
   const sha = fullSha(option('--sha'))
+  if (mode === 'formal-manifest' || mode === 'formal-source' || mode === 'formal-run-task') {
+    const producer = fullSha(option('--producer'))
+    trustedStableProducer(producer)
+    const candidate = resolve(cwd, option('--candidate-directory'))
+    assertCandidateCheckout(candidate, sha, producer)
+    if (mode !== 'formal-run-task') {
+      const { repositoryId } = admitFinalSnapshot(candidate, option('--repository', process.env.GITHUB_REPOSITORY), sha)
+      if (mode === 'formal-source') return 0
+      const tasks = selectedTasks(option('--tasks', 'all')), configuration = stableConfiguration(candidate, sha, producer)
+      const binding = `${repositoryId} / stable / ${sha} / ${configuration} / ${producer} / ${tasks.join(',')}`
+      if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\nproducer=${producer}\nconfiguration=${configuration}\nmatrix=${JSON.stringify({ task: tasks })}\ntasks=${tasks.join(',')}\nbinding=${binding}\n`)
+      printVerificationOutput(JSON.stringify({ channel: 'stable', sha, producer, configuration, tasks, binding })); return 0
+    }
+    if (!id) throw new Error('Missing stable task')
+    const execution = candidateExecution(); let sequence = 0
+    runCandidateTask(candidate, id, sha, (command, args) => executeCandidate(execution,
+      command === 'pnpm' ? resolve(execution.node, '../pnpm') : command, args, `task-${sequence++}`,
+      { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'stable', RELEASE_CHANNEL: 'stable' }), producer)
+    trustedStableProducer(producer); return 0
+  }
   if (mode === 'source') {
     assertCandidateCheckout(cwd, sha)
     printVerificationOutput(JSON.stringify({ status: 'matched', sha }))

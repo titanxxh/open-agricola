@@ -4,7 +4,7 @@ import { evaluateCandidateVerification, parseGitHubJsonLines, type CandidateIden
 const sha = 'a'.repeat(40)
 const configuration = 'b'.repeat(64)
 const tasks = ['quality', 'fast', 'slow', 'build', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit']
-const identity = { repository: 'titanxxh/open-agricola', repositoryId: 1164782262, sha, configuration, workflowId: 100, execution: 'uid-rootless-v1' } satisfies CandidateIdentity
+const identity = { repository: 'titanxxh/open-agricola', repositoryId: 1164782262, sha, configuration, workflowId: 100, execution: 'uid-rootless-v1', channel: 'stable', producerShas: [sha] } satisfies CandidateIdentity
 const step = (name: string, conclusion = 'success') => ({ name, status: 'completed', conclusion })
 const timing = (started_at: string | null, completed_at: string | null) => ({ started_at, completed_at })
 const job = (name: string, id: number) => ({ id, run_id: 1, name, status: 'completed', conclusion: 'success', run_attempt: 1,
@@ -18,11 +18,11 @@ function evidence() {
     run: { id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch',
       head_sha: sha, repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 }, status: 'completed',
       created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z',
-      run_attempt: 1, html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' },
+      head_branch: 'main', run_attempt: 1, html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' },
     jobs: [
       { ...job('candidate-manifest', 1), created_at: '2026-10-30T00:00:00Z',
         ...timing('2026-10-30T00:00:00Z', '2026-10-30T00:01:00Z'),
-        steps: [step('Generate candidate manifest'), step(`Candidate manifest / ${sha} / ${configuration} / ${tasks.join(',')}`)] },
+        steps: [step('Generate candidate manifest'), step(`Stable manifest / ${identity.repositoryId} / stable / ${sha} / ${configuration} / ${sha} / ${tasks.join(',')}`)] },
       ...tasks.map((task, index) => job(`candidate / ${task} / ${configuration}`, index + 2)),
     ],
   }
@@ -46,7 +46,7 @@ function laterEvidence(hour = '01') {
 function fastOnlyEvidence() {
   const value = laterEvidence()
   value.jobs = [value.jobs[0], value.jobs[2]]
-  value.jobs[0].steps[1].name = `Candidate manifest / ${sha} / ${configuration} / fast`
+  value.jobs[0].steps[1].name = `Stable manifest / ${identity.repositoryId} / stable / ${sha} / ${configuration} / ${sha} / fast`
   return value
 }
 
@@ -92,6 +92,7 @@ describe('GitHub full candidate verification evidence', () => {
   it('preserves source-bound stable receipts produced by the historical execution contract', () => {
     const value = evidence()
     for (const job of value.jobs) job.steps = job.steps.filter(step => !['Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].includes(step.name))
+    value.jobs[0].steps[1].name = `Candidate manifest / ${sha} / ${configuration} / ${tasks.join(',')}`
     expect(evaluateCandidateVerification({ ...identity, execution: 'legacy-stable' }, [value]).status).toBe('passed')
   })
 
@@ -421,4 +422,15 @@ describe('prerelease evidence from the trusted main producer', () => {
     else value.jobs[0].steps[1].name = value.jobs[0].steps[1].name.replace(sha, 'e'.repeat(40))
     expect(evaluateCandidateVerification(preIdentity, [value]).status).toBe('blocked')
   })
+})
+
+it('accepts an isolated stable main producer distinct from its admitted candidate and rejects rehearsal', () => {
+  const producer = 'c'.repeat(40)
+  const modern = { ...identity, channel: 'stable', producerShas: [producer] } satisfies CandidateIdentity
+  const value = evidence()
+  value.run.head_sha = producer
+  value.jobs[0].steps[1].name = `Stable manifest / ${identity.repositoryId} / stable / ${sha} / ${configuration} / ${producer} / ${tasks.join(',')}`
+  expect(evaluateCandidateVerification(modern, [value]).status).toBe('passed')
+  value.run.path = '.github/workflows/candidate-rehearsal.yml'
+  expect(evaluateCandidateVerification(modern, [value]).status).toBe('blocked')
 })
