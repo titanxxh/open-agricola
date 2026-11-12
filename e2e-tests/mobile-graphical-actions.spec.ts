@@ -52,14 +52,14 @@ const configureAndStartSandbox = async (
   }, variants)
   expect(configured).toBe(true)
 
-  await iframe.evaluate(async (element: HTMLIFrameElement, runId) => {
+  await iframe.evaluate(async (element: HTMLIFrameElement) => {
+    const frame = element.contentWindow
+    if (!frame) throw new Error('Sandbox frame is unavailable')
     await new Promise<void>((resolve) => {
       element.addEventListener('load', () => resolve(), { once: true })
-      const url = new URL(element.src)
-      url.searchParams.set('sandboxRun', runId)
-      element.src = url.toString()
+      frame.location.reload()
     })
-  }, Date.now().toString())
+  })
   const sandbox = page.frameLocator('iframe[title="Sandbox"]')
   await expect(sandbox.locator('.action-board')).toBeVisible({ timeout: 30_000 })
   return sandbox

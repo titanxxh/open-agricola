@@ -93,6 +93,28 @@ for (const displayName of ['录制玩家', 'PlayerF', 'Player 6']) {
   })
 }
 
+test('optional exchange cancellation returns to work without spending resources', async ({ page, request }) => {
+  const created = await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {
+    seed: 4242, playerCount: 2, customCardIds: [], deckIds: ['A', 'B', 'C', 'D', 'E'],
+    enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true,
+  })
+  expect(created.ok).toBe(true)
+  expect(created.interaction.stateId).toBe('idle')
+  expect((await postJson(request, `${BACKEND_URL}/api/game/dev/set-resources`, {
+    playerIndex: 0, resources: { wood: 1, fuel: 0 },
+  })).ok).toBe(true)
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+  await page.goto(`${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`)
+  await expect(page.locator('.game-layout')).toBeVisible()
+  await page.getByRole('button', { name: 'Exchange Center', exact: true }).click()
+  await expect(page.locator('.exchange-overlay')).toBeVisible()
+  await finishHotseatOpening(page)
+  await expect(page.locator('.exchange-overlay')).toBeHidden()
+  await expect(page.locator('[data-action-id="forest"] button')).toBeEnabled()
+  expect((await getJson(request, `${BACKEND_URL}/api/game/state`)).state.players[0].resources)
+    .toMatchObject({ wood: 1, fuel: 0 })
+})
+
 for (const { label, desc, expected } of [
   { label: 'complete locale', desc: ['建造房间时，费用减少 2 木材。'], expected: 'English locale description.' },
   { label: 'partial locale', desc: [], expected: 'When you build a room, the cost is reduced by 2 wood.' },
