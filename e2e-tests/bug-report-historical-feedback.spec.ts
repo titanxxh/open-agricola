@@ -51,7 +51,7 @@ test('owner preview and explicit backfill deliver historical feedback without cr
     const body = `- Reporter site ID: \`${account.id}\`\n- Room ID: \`${room}\`\n- Reporter seat: \`p99\`\n- Step: \`999999\`\n<!-- open-agricola-report:${marker} -->`
     const reviewed = { explanation1595: '最后一张牌仍需确认是当前交互流程的体验建议，不属于规则或结算错误；建议已保留供后续体验改进。', imports: [{ issueNumber: 1465, submissionId: marker, reporterSiteId: account.id, roomId: room, bodySha256: createHash('sha256').update(body).digest('hex'), auditReference: 'isolated-reviewed-audit' }] }
     const run = async (apply = false) => {
-      const child = execFile(process.execPath, ['--import', 'tsx', 'server/bug-report/historical-feedback-cli.ts', ...(apply ? ['--execute','--actor',admin.id] : [])], {
+      const child = execFile(process.execPath, ['--import', 'tsx', 'server/bug-report/historical-feedback-cli.ts', ...(apply ? ['--execute',`--actor=${admin.id}`] : [])], {
         cwd: process.cwd(), env: { ...process.env, ...app.environment, CI: 'false', GITHUB_ACTIONS: 'false', ADMIN_USERS: 'e2e_admin',
           NODE_OPTIONS: `--import=${new URL('./helpers/historical-github-fixture.mjs', import.meta.url).pathname}`, HISTORICAL_TEST_ISSUE_BODY: body }, timeout: 60000,
       })
@@ -62,6 +62,7 @@ test('owner preview and explicit backfill deliver historical feedback without cr
     const preview: HistoricalPreview = JSON.parse(await run())
     expect(preview.projectedMessages).toBe(16)
     expect(preview.rows.find(row => row.issueNumber === 1465)?.mapping?.source).toBe('import')
+    expect(preview.rows.find(row => row.issueNumber === 1465)?.fix?.text).toContain('新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。')
     expect(await fixture.prepare('SELECT 1 FROM bug_report_feedback_subjects WHERE submission_id=?').get(marker)).toBeUndefined()
     expect((await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).status()).toBe(200)
     expect(await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).toMatchObject({ unreadCount: 0, messages: [] })
@@ -78,6 +79,8 @@ test('owner preview and explicit backfill deliver historical feedback without cr
     await expect(dialog.locator('.inbox-list > li')).toHaveCount(16)
     await dialog.locator('.inbox-list > li').filter({ hasText: '无法主动丢弃已获得资源' }).first().getByRole('button').click()
     await expect(dialog.getByText('First included in v0.11.8', { exact: false })).toBeVisible()
+    await expect(dialog.getByRole('heading', { name: 'Fix summary', exact: true })).toBeVisible()
+    await expect(dialog.getByText('新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。', { exact: true })).toBeVisible()
     await expect(dialog.getByText('First verified in v0.30.0', { exact: true })).toBeVisible()
     await expect(dialog.getByRole('link', { name: 'View release v0.11.8', exact: true })).toHaveAttribute('href', 'https://github.com/titanxxh/open-agricola/releases/tag/v0.11.8')
     await expect.poll(async () => (await (await reporter.request.get(`${app.apiUrl}/api/v1/inbox`)).json()).unreadCount).toBe(15)
@@ -92,6 +95,8 @@ test('owner preview and explicit backfill deliver historical feedback without cr
     await page.getByRole('menuitem', { name: /站内信/ }).click()
     await dialog.locator('.inbox-list > li').filter({ hasText: '无法主动丢弃已获得资源' }).first().getByRole('button').click()
     await expect(dialog.getByText('首次包含修复的版本：v0.11.8', { exact: false })).toBeVisible()
+    await expect(dialog.getByRole('heading', { name: '修复摘要', exact: true })).toBeVisible()
+    await expect(dialog.getByText('新增主动丢弃仓库物资的操作，使夜班工人等需要丢弃资源的情况能够继续。', { exact: true })).toBeVisible()
     await expect(dialog.getByText('首次核验上线版本：v0.30.0', { exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await dialog.screenshot({ path: testInfo.outputPath('historical-inbox-mobile-zh.png') })

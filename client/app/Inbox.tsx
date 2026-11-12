@@ -89,6 +89,7 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
         <time dateTime={new Date(selected.createdAt).toISOString()}>{new Date(selected.createdAt).toLocaleString(locale)}</time>
         <p className="inbox-message__explanation">{selected.kind === 'fix_released' ? t('feedback.releaseExplanation') : selected.explanation}</p>
         {selected.kind === 'fix_released' && <>
+          {selected.explanation && <><h4>{t('feedback.fixSummary')}</h4><p className="inbox-message__explanation">{selected.explanation}</p></>}
           {selected.release.historicalFirstIncluded && <p>{t('feedback.historicalFirstIncluded', { version: selected.release.historicalFirstIncluded.version })}{' '}<a href={selected.release.historicalFirstIncluded.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: selected.release.historicalFirstIncluded.version })}</a></p>}
           <p>{t('feedback.firstVerifiedRelease', { version: selected.release.firstVerified.version })}</p>
           <time dateTime={new Date(selected.release.firstVerified.verifiedAt).toISOString()}>{new Date(selected.release.firstVerified.verifiedAt).toLocaleString(locale)}</time>

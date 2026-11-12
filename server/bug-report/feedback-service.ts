@@ -16,14 +16,14 @@ type FeedbackRow = { id: number; submission_id: string; github_issue_number: num
 export type FeedbackOperation = { operationId: string; kind: 'deployment' | 'reconcile'; status: 'pending' | 'completed';
   scopeIssueNumbers?: number[]; error: string | null; createdAt: number; completedAt: number | null; result?: FeedbackReconciliationResult }
 export type FeedbackReconciliationResult = { sentMessages: number; pendingFixes: Array<{ rootId: string; rootIssueNumber: number;
-  reason: 'no_verified_deployment' | 'missing_required_commits' | 'historical_subject_changed'; missingCommits: string[] }> }
+  reason: 'no_verified_deployment' | 'missing_required_commits' | 'historical_subject_changed' | 'missing_fix_summary'; missingCommits: string[] }> }
 type OperationRow = { operation_id: string; kind: FeedbackOperation['kind']; status: FeedbackOperation['status']; error: string | null;
   created_at: number; completed_at: number | null; proof: DeploymentProof | null; fingerprint: string; result: FeedbackReconciliationResult | null; scope_issue_numbers: number[] | null; scope_subjects: FeedbackSubjectExpectation[] | null }
 const subjectScopeFingerprint = (subjects: FeedbackSubjectExpectation[] | null | undefined) => JSON.stringify(subjects?.map(subject =>
   [subject.issueNumber, subject.submissionId, subject.recipientVersion, subject.rootId, subject.fixVersion]) ?? null)
 const operation = (row: OperationRow): FeedbackOperation => ({ operationId: row.operation_id, kind: row.kind, status: row.status,
   ...(row.scope_issue_numbers ? { scopeIssueNumbers: row.scope_issue_numbers } : {}), error: row.error, createdAt: row.created_at, completedAt: row.completed_at, ...(row.result ? { result: row.result } : {}) })
-type FixRootRow = { root_id: string; version: number; pull_requests: VerifiedFixPullRequest[] }
+type FixRootRow = { root_id: string; version: number; pull_requests: VerifiedFixPullRequest[]; fix_summary: string | null }
 
 const issueUrl = (number: number) => `https://github.com/${BUG_REPORT_GITHUB_REPOSITORY}/issues/${number}`
 const record = (row: FeedbackRow): FeedbackRecord => ({ id: row.id, submissionId: row.submission_id,
@@ -83,8 +83,8 @@ export class BugReportFeedbackService {
       const root = await this.db.prepare('SELECT * FROM bug_report_fix_roots WHERE root_id=?').get<FixRootRow>(report.submission_id)
       if ((root?.version ?? 0) !== input.expectedVersion) throw new FeedbackError('fix_version_conflict', 409)
       await this.ensureFixRoot(report.submission_id)
-      await this.db.prepare('UPDATE bug_report_fix_roots SET version=?,pull_requests=?::jsonb,updated_at=? WHERE root_id=?')
-        .run(input.expectedVersion + 1, JSON.stringify(pullRequests), this.now(), report.submission_id)
+      await this.db.prepare('UPDATE bug_report_fix_roots SET version=?,pull_requests=?::jsonb,fix_summary=?,updated_at=? WHERE root_id=?')
+        .run(input.expectedVersion + 1, JSON.stringify(pullRequests), input.fixSummary, this.now(), report.submission_id)
       await this.saveFixRequest(actorId, report.submission_id, input.requestId, fingerprint, context?.issueNumbers)
       return this.getReport(input.issueNumber)
     })()
@@ -150,7 +150,7 @@ export class BugReportFeedbackService {
     const releases = await this.verifiedReleases(row.root_id, row.version)
     const plan = await this.previewFixDeployment(row.pull_requests)
     return { rootId: row.root_id, rootIssueNumber: row.root_issue_number, version: row.version,
-      associationVersion: row.association_version, status: plan.currentProduction ? 'released' : row.pull_requests.length ? 'pending_release' : 'unlinked',
+      associationVersion: row.association_version, fixSummary: row.fix_summary, status: plan.currentProduction ? 'released' : row.pull_requests.length ? 'pending_release' : 'unlinked',
       ...(releases[0] ? { firstVerifiedRelease: releases[0] } : {}), ...(releases.at(-1) ? { currentProductionRelease: releases.at(-1) } : {}),
       reports: reports.map(report => ({ submissionId: report.submission_id, issueNumber: report.github_issue_number })),
       pullRequests: row.pull_requests, requiredCommits: [...new Set(row.pull_requests.flatMap(pr => pr.requiredCommits))].sort() }
@@ -397,6 +397,11 @@ export class BugReportFeedbackService {
           reason: deployments.length ? 'missing_required_commits' : 'no_verified_deployment', missingCommits: plan.missingCommits })
         continue
       }
+      if (!root.fix_summary?.trim()) {
+        const report = reports.find(report => report.submission_id === root.root_id)
+        if (report) result.pendingFixes.push({ rootId: root.root_id, rootIssueNumber: report.github_issue_number, reason: 'missing_fix_summary', missingCommits: [] })
+        continue
+      }
       const [first] = await this.verifiedReleases(root.root_id, root.version)
       if (!first) continue
       const eligible: Array<{ report: ReportRow; feedback: FeedbackRow; recipient: string }> = []
@@ -416,8 +421,8 @@ export class BugReportFeedbackService {
         const release = { rootId: root.root_id, firstVerified: first, ...(historical?.historical_first_included && fixEvidenceFingerprint(historical.historical_first_included.pullRequests) === fixEvidenceFingerprint(root.pull_requests) ? { historicalFirstIncluded: { version: historical.historical_first_included.version, url: historical.historical_first_included.url } } : {}),
           reports: recipientReports.map(entry => ({ submissionId: entry.report.submission_id, issueNumber: entry.report.github_issue_number })) }
         const inserted = await this.db.prepare(`INSERT INTO bug_report_feedback(submission_id,recipient_user_id,request_id,kind,report_summary,explanation,
-          version,created_at,root_id,release) VALUES(?,?,?,'fix_released',?,'',NULL,?,?,?::jsonb) ON CONFLICT DO NOTHING`)
-          .run(primary.report.submission_id, recipient, `release:${root.root_id}`, primary.feedback.report_summary, this.now(), root.root_id, JSON.stringify(release))
+          version,created_at,root_id,release) VALUES(?,?,?,'fix_released',?,?,NULL,?,?,?::jsonb) ON CONFLICT DO NOTHING`)
+          .run(primary.report.submission_id, recipient, `release:${root.root_id}`, primary.feedback.report_summary, root.fix_summary, this.now(), root.root_id, JSON.stringify(release))
         result.sentMessages += inserted.changes
       }
     }

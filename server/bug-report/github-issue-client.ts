@@ -418,6 +418,7 @@ export class GitHubIssueClient {
   async anonymizeIssue(
     issueNumber: number,
     reporterUserId: string,
+    expectedSubmissionId?: string,
   ): Promise<GitHubOperationResult> {
     if (!Number.isSafeInteger(issueNumber) || issueNumber <= 0) {
       return {
@@ -426,6 +427,7 @@ export class GitHubIssueClient {
         code: 'github_issue_reference_invalid',
       }
     }
+    if (expectedSubmissionId !== undefined && !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(expectedSubmissionId)) return { ok: false, kind: 'terminal', code: 'github_issue_reference_invalid' }
     const authorization = await this.installationToken()
     if (!authorization.ok) return authorization
     const issueUrl = `${API}/repos/${BUG_REPORT_GITHUB_REPOSITORY}/issues/${issueNumber}`
@@ -453,6 +455,12 @@ export class GitHubIssueClient {
         code: 'github_anonymization_incomplete',
       }
     }
+    const matchesImportedReference = (value: IssueResponse) => !expectedSubmissionId || (
+      value.number === issueNumber && value.html_url === `https://github.com/${BUG_REPORT_GITHUB_REPOSITORY}/issues/${issueNumber}`
+      && !('pull_request' in value) && typeof value.body === 'string'
+      && value.body.match(/<!-- open-agricola-report:[^>\r\n]+ -->/g)?.length === 1
+      && value.body.includes(`<!-- open-agricola-report:${expectedSubmissionId} -->`))
+    if (!matchesImportedReference(issue)) return { ok: false, kind: 'terminal', code: 'github_anonymization_reference_conflict' }
     const publicReporterId = reporterUserId.replaceAll('`', "'")
     if (
       !issue.title.includes(publicReporterId)
@@ -495,7 +503,7 @@ export class GitHubIssueClient {
     }
     if (!response.ok) return failureFromResponse(response, this.now())
     const updated = await parseJson<IssueResponse>(response)
-    return typeof updated.title === 'string'
+    return matchesImportedReference(updated) && typeof updated.title === 'string'
       && !updated.title.includes(publicReporterId)
       && (
         updated.body === null

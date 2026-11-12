@@ -37,6 +37,7 @@ export type FixAssociation = {
   rootIssueNumber: number
   version: number
   associationVersion: number
+  fixSummary: string | null
   status: 'pending_release' | 'unlinked' | 'released'
   firstVerifiedRelease?: VerifiedProductionRelease
   currentProductionRelease?: VerifiedProductionRelease
@@ -49,6 +50,7 @@ export type AssociateFixInput = {
   requestId: string
   expectedVersion: number
   purpose: 'fix'
+  fixSummary: string
   pullRequests: FixPullRequestInput[]
 }
 export type AssociateDuplicateInput = {
@@ -63,13 +65,21 @@ const version = (value: unknown): value is number => typeof value === 'number' &
 const requestId = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{8,100}$/.test(value)
 export const isCommitSha = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
 
+export function parseFixSummary(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim() || value.length>2000
+    || new Set(['fixed','resolved','done','completed','fix','bugfix','fixsummary','已修复','修复','修复摘要','问题已解决','问题已修复'])
+      .has(value.toLowerCase().replace(/[\s\p{P}]/gu,''))) throw new Error('invalid_fix_summary')
+  return value.trim()
+}
+
 export function parseAssociateFix(value: unknown): AssociateFixInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)
-    || Object.keys(value).some(key => !['issueNumber', 'requestId', 'expectedVersion', 'purpose', 'pullRequests'].includes(key))
+    || Object.keys(value).some(key => !['issueNumber', 'requestId', 'expectedVersion', 'purpose', 'fixSummary', 'pullRequests'].includes(key))
     || !('issueNumber' in value) || !positive(value.issueNumber)
     || !('requestId' in value) || !requestId(value.requestId)
     || !('expectedVersion' in value) || !version(value.expectedVersion)
     || !('purpose' in value) || value.purpose !== 'fix'
+    || !('fixSummary' in value)
     || !('pullRequests' in value) || !Array.isArray(value.pullRequests) || !value.pullRequests.length || value.pullRequests.length > 5) {
     throw new Error('invalid_fix_association')
   }
@@ -85,7 +95,7 @@ export function parseAssociateFix(value: unknown): AssociateFixInput {
   }).sort((a, b) => a.number - b.number)
   if (new Set(pullRequests.map(pr => pr.number)).size !== pullRequests.length
     || pullRequests.flatMap(pr => pr.requiredCommits).length > 40) throw new Error('invalid_fix_association')
-  return { issueNumber: value.issueNumber, requestId: value.requestId, expectedVersion: value.expectedVersion, purpose: 'fix', pullRequests }
+  return { issueNumber: value.issueNumber, requestId: value.requestId, expectedVersion: value.expectedVersion, purpose: 'fix', fixSummary: parseFixSummary(value.fixSummary), pullRequests }
 }
 
 export function parseAssociateDuplicate(value: unknown): AssociateDuplicateInput {

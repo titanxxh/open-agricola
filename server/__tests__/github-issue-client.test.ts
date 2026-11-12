@@ -385,6 +385,21 @@ describe('GitHubIssueClient', () => {
       })
   })
 
+  it.each(['marker','duplicate-marker','repository','issue','pull-request'])('refuses historical anonymization when the %s proof conflicts', async conflict => {
+    const marker = '<!-- open-agricola-report:11111111-1111-4111-8111-111111111111 -->'
+    const issue = { number:conflict === 'issue' ? 99 : 17,html_url:conflict === 'repository' ? 'https://github.com/other/repo/issues/17' : 'https://github.com/titanxxh/open-agricola/issues/17',title:'Game bug',
+      body:`- Reporter site ID: \`site-user\`\n${conflict === 'marker' ? '<!-- open-agricola-report:other -->' : marker}${conflict === 'duplicate-marker' ? marker : ''}`,
+      ...(conflict === 'pull-request' ? { pull_request:{} } : {}) }
+    const methods: string[] = []
+    const external: typeof fetch = async (_resource,init) => {
+      methods.push(init?.method ?? 'GET')
+      return Response.json(methods.length === 1 ? { token:'installation-token',expires_at:new Date(NOW+3600000).toISOString() } : issue)
+    }
+    expect(await hostedClient(external).anonymizeIssue(17,'site-user','11111111-1111-4111-8111-111111111111'))
+      .toMatchObject({ ok:false,code:'github_anonymization_reference_conflict' })
+    expect(methods).toEqual(['POST','GET'])
+  })
+
   it('uses PKCE and validates webhook signatures', () => {
     const authorization = new URL(client(vi.fn() as unknown as typeof fetch)
       .authorizationUrl({

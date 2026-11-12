@@ -37,7 +37,9 @@
     "scripts/__tests__/release-publish.test.ts",
     "scripts/__tests__/verify-feedback-deployment.test.ts",
     "server/__tests__/bug-report-historical-feedback.test.ts",
-    "e2e-tests/bug-report-historical-feedback.spec.ts"
+    "e2e-tests/bug-report-historical-feedback.spec.ts",
+    "server/__tests__/bug-report-historical-deletion.test.ts",
+    "e2e-tests/bug-report-fix-links.spec.ts"
   ],
   "exclude": []
 }

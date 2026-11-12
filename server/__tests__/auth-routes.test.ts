@@ -348,6 +348,18 @@ describe('auth routes', () => {
     ).toBe(0)
   })
 
+  it('keeps an imported-only reporter pending until its public identity can be anonymized', async () => {
+    const user = await createLocalUserForTests('historical_delete', 'password123', 'Historical Delete')
+    const token = await createSession(user.id)
+    await getDb().prepare(`INSERT INTO bug_report_feedback_subjects(submission_id,source,reporter_user_id,github_issue_number,import_audit)
+      VALUES('11111111-1111-4111-8111-111111111111','historical',?,1465,'{}')`).run(user.id)
+    const result = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `${SESSION_COOKIE}=${token}` })
+    expect(result).toMatchObject({ status: 202, json: { ok: true, pending: true } })
+    expect(await validateSession(token)).toBeNull()
+    expect(await getDb().prepare('SELECT last_error_code FROM account_deletion_requests WHERE user_id=?').get(user.id)).toEqual({ last_error_code: 'bug_report_deletion_failed' })
+    expect(await getDb().prepare('SELECT reporter_user_id FROM bug_report_feedback_subjects WHERE github_issue_number=1465').get()).toEqual({ reporter_user_id: user.id })
+  })
+
   it('persists and disables account deletion while GitHub cleanup is unavailable', async () => {
     const user = await createLocalUserForTests('delete_pending', 'password123', 'Delete Pending')
     ;(await linkIdentity(user.id, {
