@@ -91,6 +91,33 @@ describe('formal request admission', () => {
     expect(httpAdmission(request('/api/auth/oauth/github/complete', headers, 'POST'))).toMatchObject({ ok: false })
   })
 
+  it('admits metadata-free OAuth forms only on explicitly configured local HTTP development', () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('RELEASE_CHANNEL', 'stable')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'http://192.168.1.20:5173')
+    vi.stubEnv('PUBLIC_API_BASE', 'http://192.168.1.20:5175')
+    const path = '/api/auth/oauth/github/start'
+    const headers = { origin: 'http://192.168.1.20:5173', host: '192.168.1.20:5175', 'content-type': 'application/x-www-form-urlencoded' }
+    expect(httpAdmission(request(path, headers, 'POST'))).toEqual({ ok: true })
+    for (const changed of [
+      { origin: undefined }, { origin: 'null' }, { origin: 'http://192.168.1.21:5173' }, { host: '192.168.1.21:5175' },
+      { 'sec-fetch-mode': 'navigate' }, { 'sec-fetch-dest': 'document' }, { 'sec-fetch-dest': 'iframe' },
+      { authorization: 'Bearer token' },
+    ]) expect(httpAdmission(request(path, { ...headers, ...changed }, 'POST'))).toMatchObject({ ok: false })
+    vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+    expect(httpAdmission(request(path, headers, 'POST'))).toMatchObject({ ok: false })
+    vi.stubEnv('RELEASE_CHANNEL', 'stable')
+    vi.stubEnv('NODE_ENV', 'production')
+    expect(httpAdmission(request(path, headers, 'POST'))).toMatchObject({ ok: false })
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', app)
+    vi.stubEnv('PUBLIC_API_BASE', api)
+    expect(httpAdmission(request(path, { ...headers, origin: app, host: 'openagapi.titanxxh.com' }, 'POST'))).toMatchObject({ ok: false })
+    vi.stubEnv('PUBLIC_APP_ORIGIN', '')
+    vi.stubEnv('PUBLIC_API_BASE', '')
+    expect(httpAdmission(request(path, headers, 'POST'))).toMatchObject({ ok: false })
+  })
+
   it('keeps operations resources usable while excluding sibling requests and frames', () => {
     const headers = { cookie: '__Host-oa-ops-session=ops-token', 'sec-fetch-site': 'same-origin' }
     expect(requestSessionToken(request('/ops/public/image.svg', headers), true)).toBe('ops-token')

@@ -1884,6 +1884,21 @@ describe('auth routes', () => {
     expect(await validateSession(decodeURIComponent(cookie.split('=')[1]!))).toMatchObject({ id: user.id })
   })
 
+  it('keeps the current form protocol mandatory for metadata-free HTTP development', async () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('RELEASE_CHANNEL', 'stable')
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'http://192.168.1.20:5173')
+    vi.stubEnv('PUBLIC_API_BASE', 'http://192.168.1.20:5175')
+    const headers = { Origin: 'http://192.168.1.20:5173', 'Content-Type': 'application/x-www-form-urlencoded' }
+    const obsolete = await requestJson('POST', '/api/auth/oauth/github/start', new URLSearchParams({ protocol: '1', intent: 'login' }), headers)
+    expect(obsolete.status).toBe(426)
+    expect(await getDb().prepare('SELECT state_hash FROM oauth_states').all()).toEqual([])
+    const current = await requestJson('POST', '/api/auth/oauth/github/start', new URLSearchParams({ protocol: '2', intent: 'login' }), headers)
+    expect(current.status).toBe(302)
+    expect(current.headers['Set-Cookie']).toContain('oa_dev_oauth_state=')
+    expect(current.headers['Set-Cookie']).not.toContain('Secure')
+  })
+
   it('rejects invalid OAuth form revisions and fields before creating any state', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://formal.example')
