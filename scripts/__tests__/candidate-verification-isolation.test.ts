@@ -109,3 +109,24 @@ it('reports a failing setup stage and line without dumping its environment', () 
   expect(result.stdout).toBe('')
   expect(result.stderr).toMatch(/^Candidate isolation setup failed: stage=identity line=\d+ status=1\n$/)
 })
+
+it.each([false, true])('starts candidate processes with private paths after a poisoned runner environment (manager=%s)', manager => {
+  const wrapper = resolve(import.meta.dirname, '../ci/candidate-user-environment.sh')
+  const result = spawnSync('/bin/bash', ['-p', wrapper, ...(manager ? ['--user-manager'] : []), '/usr/bin/env'], {
+    encoding: 'utf8', env: { ...process.env,
+      HOME: '/tmp/inert-runner-home', XDG_CONFIG_HOME: '/tmp/inert-runner-config', XDG_RUNTIME_DIR: '/tmp/inert-runner-runtime',
+      XDG_DATA_HOME: '/tmp/inert-runner-data', XDG_CACHE_HOME: '/tmp/inert-runner-cache', DOCKER_CONFIG: '/tmp/inert-runner-docker',
+      DBUS_SESSION_BUS_ADDRESS: 'unix:path=/tmp/inert-runner-bus', SYSTEMD_UNIT_PATH: '/tmp/inert-runner-units',
+      NOTIFY_SOCKET: '/tmp/inert-systemd-notify', OA_INERT_ENV_MARKER: 'inert host environment must be removed',
+    },
+  })
+  expect(result.status, result.stderr).toBe(0)
+  const values = Object.fromEntries(result.stdout.trim().split('\n').map(line => { const split = line.indexOf('='); return [line.slice(0, split), line.slice(split + 1)] }))
+  expect(values).toMatchObject({ HOME: '/home/oa-candidate', XDG_CONFIG_HOME: '/home/oa-candidate/.config',
+    XDG_CACHE_HOME: '/home/oa-candidate/.cache', XDG_DATA_HOME: '/home/oa-candidate/.local/share',
+    XDG_RUNTIME_DIR: '/run/user/61000', DOCKER_CONFIG: '/home/oa-candidate/.docker', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/61000/bus',
+    SYSTEMD_ENVIRONMENT_GENERATOR_PATH: '/run/oa-ci-isolation/environment-generators' })
+  expect(values).not.toHaveProperty('SYSTEMD_UNIT_PATH')
+  expect(values).not.toHaveProperty('OA_INERT_ENV_MARKER')
+  expect(values.NOTIFY_SOCKET).toBe(manager ? '/tmp/inert-systemd-notify' : undefined)
+})

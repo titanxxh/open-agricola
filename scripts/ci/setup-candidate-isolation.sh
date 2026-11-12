@@ -11,7 +11,8 @@ isolation_failure() {
     set +e
     systemctl status user@61000.service --no-pager --lines=10 >&2
     journalctl -b --unit=user@61000.service --no-pager --lines=20 >&2
-    runuser -u oa-candidate -- env HOME=/home/oa-candidate XDG_RUNTIME_DIR=/run/user/61000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/61000/bus systemctl --user status docker.service --no-pager --lines=10 >&2
+    runuser -u oa-candidate -- /run/oa-ci-isolation/candidate-user-environment.sh systemctl --user status docker.service --no-pager --lines=10 >&2
+    runuser -u oa-candidate -- /run/oa-ci-isolation/candidate-user-environment.sh systemctl --user show-environment | awk -F= '$1 ~ /^(HOME|XDG_CONFIG_HOME|XDG_DATA_HOME|XDG_CACHE_HOME|XDG_RUNTIME_DIR|DOCKER_CONFIG|DBUS_SESSION_BUS_ADDRESS)$/ { print }' >&2
   fi
   exit "$isolation_status"
 }
@@ -61,15 +62,26 @@ install -m 644 "$policy_directory/scripts/ci/candidate-isolation-smoke.ts" /run/
 printf 'trusted inert marker\n' > /run/oa-ci-isolation/protected-marker
 chmod 644 /run/oa-ci-isolation/protected-marker
 # The daemon needs newuidmap/newgidmap before payloads get NoNewPrivileges.
+install -m 755 "$policy_directory/scripts/ci/candidate-user-environment.sh" /run/oa-ci-isolation/candidate-user-environment.sh
+install -d -m 755 /run/oa-ci-isolation/environment-generators /run/systemd/system/user@61000.service.d
+cat > /run/systemd/system/user@61000.service.d/50-candidate-environment.conf <<'UNIT'
+[Service]
+ExecStart=
+ExecStart=/run/oa-ci-isolation/candidate-user-environment.sh --user-manager /usr/lib/systemd/systemd --user
+UNIT
+systemctl daemon-reload
+candidate_session=(runuser -u oa-candidate -- /run/oa-ci-isolation/candidate-user-environment.sh)
 isolation_stage=user-manager
 loginctl enable-linger oa-candidate
 systemctl start user@61000.service
-candidate_session=(runuser -u oa-candidate -- env HOME=/home/oa-candidate PATH=/usr/bin:/bin XDG_RUNTIME_DIR=/run/user/61000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/61000/bus)
 for isolation_attempt in {1..40}; do
   if "${candidate_session[@]}" systemctl --user show-environment >/dev/null 2>&1; then break; fi
   sleep 0.25
 done
-"${candidate_session[@]}" systemctl --user show-environment >/dev/null
+manager_environment="$("${candidate_session[@]}" systemctl --user show-environment)"
+for candidate_path in HOME=/home/oa-candidate XDG_CONFIG_HOME=/home/oa-candidate/.config XDG_CACHE_HOME=/home/oa-candidate/.cache XDG_DATA_HOME=/home/oa-candidate/.local/share XDG_RUNTIME_DIR=/run/user/61000 DOCKER_CONFIG=/home/oa-candidate/.docker DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/61000/bus; do
+  grep -Fx -- "$candidate_path" <<< "$manager_environment" >/dev/null
+done
 isolation_stage=rootless-daemon
 "${candidate_session[@]}" /usr/bin/dockerd-rootless-setuptool.sh install --force
 for isolation_attempt in {1..40}; do
