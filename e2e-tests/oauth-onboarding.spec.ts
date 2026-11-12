@@ -30,10 +30,16 @@ test('OAuth login and registration navigate from an insecure HTTP LAN origin', a
         return
       }
       if (url.pathname.endsWith('/start') && req.method === 'POST') {
-        expect(req.headers['x-oa-browser-protocol']).toBe('2')
-        starts.push({ provider: url.pathname.split('/')[4] ?? '', intent: url.searchParams.get('intent'), hasChallenge: url.searchParams.has('onboardingChallenge') })
-        res.setHeader('Content-Type', 'application/json')
-        res.end(JSON.stringify({ ok: true, authorizationUrl: `${origin}/provider-started` }))
+        const chunks: Buffer[] = []
+        for await (const chunk of req) chunks.push(Buffer.from(chunk))
+        const form = new URLSearchParams(Buffer.concat(chunks).toString('utf8'))
+        expect(form.get('protocol')).toBe('2')
+        expect(req.headers.origin).toBe(origin)
+        expect(req.headers['sec-fetch-dest']).toBe('document')
+        expect(req.headers['sec-fetch-mode']).toBe('navigate')
+        starts.push({ provider: url.pathname.split('/')[4] ?? '', intent: form.get('intent'), hasChallenge: form.has('onboardingChallenge') })
+        res.writeHead(302, { Location: `${origin}/provider-started` })
+        res.end()
         return
       }
       if (url.pathname === '/provider-started') {

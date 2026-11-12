@@ -118,7 +118,7 @@ describe('LoginPage auth UI', () => {
   it('allows provider navigation again after a persisted pageshow', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('open')))
-    const prepare = vi.spyOn(oauthOnboarding, 'prepareOAuthOnboarding').mockReturnValue(new Promise<string>(() => {}))
+    const prepare = vi.spyOn(oauthOnboarding, 'startOAuthOnboarding').mockReturnValue(new Promise<void>(() => {}))
     render(<LoginPage />)
     const link = screen.getByRole('link', { name: '使用 GitHub 登录' })
     await user.click(link)
