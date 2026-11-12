@@ -11,6 +11,9 @@ env_value() { sed -n "s/^$1=//p" .env 2>/dev/null | tail -n 1 || true; }
 OFFSITE_BACKUP_TARGET="${OFFSITE_BACKUP_TARGET:-$(env_value OFFSITE_BACKUP_TARGET)}"
 OFFSITE_BACKUP_REMOTE_DIR="${OFFSITE_BACKUP_REMOTE_DIR:-$(env_value OFFSITE_BACKUP_REMOTE_DIR)}"
 OFFSITE_BACKUP_REMOTE_DIR="${OFFSITE_BACKUP_REMOTE_DIR:-/root/open-agricola-backups}"
+while [[ "$OFFSITE_BACKUP_REMOTE_DIR" != / && "$OFFSITE_BACKUP_REMOTE_DIR" == */ ]]; do
+  OFFSITE_BACKUP_REMOTE_DIR="${OFFSITE_BACKUP_REMOTE_DIR%/}"
+done
 [[ -n "$OFFSITE_BACKUP_TARGET" && "$OFFSITE_BACKUP_TARGET" != -* ]] || { echo 'Missing or invalid OFFSITE_BACKUP_TARGET'; exit 1; }
 [[ "$OFFSITE_BACKUP_REMOTE_DIR" =~ ^/[a-zA-Z0-9_./-]+$ ]] || { echo 'Invalid offsite directory'; exit 1; }
 SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=2)
