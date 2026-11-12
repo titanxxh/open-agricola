@@ -9,7 +9,11 @@ services:
     ports:
       - "127.0.0.1:${LOCAL_POSTGRES_PORT:-55432}:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql
+      - type: volume
+        source: postgres-data
+        target: /var/lib/postgresql
+        volume:
+          nocopy: true
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agricola -d agricola"]
       interval: 2s
