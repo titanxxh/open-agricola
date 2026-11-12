@@ -1,9 +1,9 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, linkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { collectCandidateDiagnostics, displayCandidateLog, verifyCandidateSources } from '../ci/candidate-isolation'
+import { collectCandidateDiagnostics, displayCandidateLog, verifyCandidateSources, escapeWorkflowCommands } from '../ci/candidate-isolation'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -43,4 +43,24 @@ it('renders captured output without inline workflow commands or carriage-return 
   const value = fixture(), log = join(value.root, 'task.log')
   writeFileSync(log, 'text ::error::inert\r::set-output name=x::inert\n##[error]inert\n')
   expect(displayCandidateLog(log)).toBe('text %3A%3Aerror%3A%3Ainert%0D%3A%3Aset-output name=x%3A%3Ainert\n%23%23[error]inert\n')
+})
+
+it('escapes a candidate-derived public CLI error before writing runner stderr', () => {
+  const value = fixture()
+  const result = spawnSync(process.execPath, [resolve(import.meta.dirname, '../ci/candidate-verification.ts'),
+    'run-task', 'unknown\n::error::inert\r##[error]inert', '--sha', value.sha], {
+    cwd: value.source, encoding: 'utf8', env: { ...process.env, GITHUB_SHA: '', GITHUB_ACTIONS: '', CI: '' },
+  })
+  expect(result.status).toBe(1)
+  expect(result.stderr).toBe('Unknown complete verification task: unknown\n%3A%3Aerror%3A%3Ainert%0D%23%23[error]inert\n')
+})
+
+it('escapes the actual untracked filename error from a temporary candidate tree', () => {
+  const value = fixture()
+  writeFileSync(join(value.work, 'extra\n::error::inert\r##[error]inert'), 'inert bytes')
+  let failure: unknown
+  try { verifyCandidateSources(value.source, value.work, value.sha) } catch (error) { failure = error }
+  expect(failure).toBeInstanceOf(Error)
+  if (!(failure instanceof Error)) throw new Error('Expected candidate filename error')
+  expect(escapeWorkflowCommands(failure.message)).toBe('Untracked candidate source: extra\n%3A%3Aerror%3A%3Ainert%0D%23%23[error]inert')
 })

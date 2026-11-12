@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { candidateExecution, executeCandidate } from './candidate-isolation.ts'
+import { candidateExecution, executeCandidate, printVerificationOutput } from './candidate-isolation.ts'
 import { createHash } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -206,9 +206,9 @@ export function prereleaseVerificationCli(cwd: string, input: string[]): number 
   const sha = fullSha(option('--sha'))
   const repository = option('--repository', process.env.GITHUB_REPOSITORY)
   if (mode === 'select') { fixPrereleaseCandidate(cwd, repository, sha); return 0 }
-  if (mode === 'sync') { console.log(JSON.stringify(syncPrerelease(cwd, repository, sha, option('--expected-old'), option('--main-sha')))); return 0 }
-  if (mode === 'check') { const result = checkPrereleaseVerification(cwd, repository, sha); console.log(JSON.stringify(result)); return result.status === 'passed' ? 0 : 1 }
-  if (mode === 'request') { console.log(JSON.stringify(requestPrereleaseVerification(cwd, repository, sha, option('--tasks', 'all')))); return 0 }
+  if (mode === 'sync') { printVerificationOutput(JSON.stringify(syncPrerelease(cwd, repository, sha, option('--expected-old'), option('--main-sha')))); return 0 }
+  if (mode === 'check') { const result = checkPrereleaseVerification(cwd, repository, sha); printVerificationOutput(JSON.stringify(result)); return result.status === 'passed' ? 0 : 1 }
+  if (mode === 'request') { printVerificationOutput(JSON.stringify(requestPrereleaseVerification(cwd, repository, sha, option('--tasks', 'all')))); return 0 }
   const producer = fullSha(option('--producer'))
   trustedProducer(producer)
   const candidate = resolve(cwd, option('--candidate-directory'))
@@ -220,7 +220,7 @@ export function prereleaseVerificationCli(cwd: string, input: string[]): number 
     const configuration = prereleaseConfiguration(candidate, sha, producer)
     const binding = `${source.repositoryId} / prerelease / ${sha} / ${configuration} / ${producer} / ${tasks.join(',')}`
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\nconfiguration=${configuration}\nmatrix=${JSON.stringify({ task: tasks })}\ntasks=${tasks.join(',')}\nbinding=${binding}\n`)
-    console.log(JSON.stringify({ channel: 'prerelease', sha, producer, configuration, tasks, binding }))
+    printVerificationOutput(JSON.stringify({ channel: 'prerelease', sha, producer, configuration, tasks, binding }))
     return 0
   }
   if (mode === 'source') return 0
@@ -234,5 +234,5 @@ export function prereleaseVerificationCli(cwd: string, input: string[]): number 
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { process.exitCode = prereleaseVerificationCli(process.cwd(), process.argv.slice(2)) }
-  catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1 }
+  catch (error) { printVerificationOutput(error instanceof Error ? error.message : String(error), 'stderr'); process.exitCode = 1 }
 }
