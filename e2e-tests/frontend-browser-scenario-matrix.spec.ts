@@ -1,6 +1,6 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers client/components/board/
 // @covers client/components/interaction/
+import { authCookieNames } from '../server/auth-cookies'
 import {
   devices,
   expect,

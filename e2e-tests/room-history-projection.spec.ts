@@ -1,6 +1,6 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers server/game/persistence/
 // @covers client/hooks/
+import { authCookieNames } from '../server/auth-cookies'
 import { expect, test, type Page, type APIResponse } from '@playwright/test'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'

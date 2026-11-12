@@ -1,7 +1,7 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers client/app/workshop/
 // @covers shared/projections/
 // @covers server/database/
+import { authCookieNames } from '../server/auth-cookies'
 import { abilityArtifactFingerprint, sourceFingerprint } from '../shared/projections/workshop-generation'
 import AxeBuilder from '@axe-core/playwright'
 import { PostgresDatabase } from '../server/database/postgres'

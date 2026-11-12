@@ -1,5 +1,5 @@
-import { browserRequestHeaders } from './fixtures'
 // @covers replay-viewer/src/
+import { browserRequestHeaders } from './fixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type APIRequestContext } from '@playwright/test'
 

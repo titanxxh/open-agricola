@@ -1,5 +1,5 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers server/bug-report/
+import { authCookieNames } from '../server/auth-cookies'
 import {
   expect,
   test,

@@ -1,5 +1,5 @@
-import { browserRequestHeaders } from './fixtures'
 // @covers replay-viewer/src/
+import { browserRequestHeaders } from './fixtures'
 import { expect, test } from '@playwright/test'
 
 const backend = process.env.BACKEND_URL ?? 'http://localhost:5175'

@@ -1,7 +1,7 @@
-import { authCookieNames } from '../server/auth-cookies'
 // @covers client/components/header/
 // @covers server/connection/
 // @covers client/app/use-turn-tab-title.ts
+import { authCookieNames } from '../server/auth-cookies'
 import {
   test,
   expect,
