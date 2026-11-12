@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, symlinkSync, utimesSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, renameSync, symlinkSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { targetFingerprint, parsePrereleaseTarget } from '../prerelease/config'
 import { readRuntime, writeRuntime } from '../prerelease/runtime'
+import type { OperationRequest } from '../prerelease/flow'
 import { afterEach, expect, it } from 'vitest'
 
 const roots: string[] = []
@@ -206,8 +207,12 @@ function startupRetryFixture(sourceInstalled = true) {
       acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64) } })
     writeFileSync(containerImage, sourceImage)
     const backups = join(value.root, 'backups'), stem = `pre-${operationId}`
-    const archive = Buffer.from('validated source snapshot'), configuration = Buffer.from('fixture configuration')
-    writeFileSync(join(backups, `${stem}.tgz`), archive); writeFileSync(join(backups, `env-${stem}`), configuration)
+    const capture = join(value.temporary, 'capture'); mkdirSync(capture)
+    writeFileSync(join(capture, 'database.dump'), 'fixture database snapshot')
+    writeFileSync(join(capture, 'archive.json'), JSON.stringify({ version: 1, sourceBuildId, createdAt: new Date().toISOString(), objects: [] }))
+    execFileSync('tar', ['-czf', join(backups, `${stem}.tgz`), '-C', capture, '.'])
+    const archive = readFileSync(join(backups, `${stem}.tgz`)), configuration = Buffer.from('fixture configuration')
+    writeFileSync(join(backups, `env-${stem}`), configuration)
     const digest = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
     writeFileSync(join(backups, `${stem}.manifest.json`), JSON.stringify({ formatVersion: 2, backupStem: stem,
       environment: target.targetId, retentionDays: 7, dataGeneration: generation, targetFingerprint: targetFingerprint(target),
@@ -256,7 +261,7 @@ esac
   expect(interrupted.status, interrupted.stderr).not.toBe(0)
   expect(state()).toMatchObject({ mode: 'maintenance', buildId, operation: { stage: 'startup', id: operationId } })
   rmSync(join(value.temporary, 'startup-fail'))
-  return { ...value, invoke, state, sourceImage, image, containerImage, containerState }
+  return { ...value, invoke, state, sourceImage, image, containerImage, containerState, generation, operationId, authorityFile }
 }
 
 it('retries the startup journal after migration while the drained source container still exists', () => {
@@ -295,6 +300,67 @@ it.each(['foreign-image', 'foreign-project', 'running', 'unclean', 'oom'])('refu
   expect(value.state()).toMatchObject({ mode: 'maintenance', operation: { stage: 'startup' } })
   expect(value.calls().split('up -d --no-build --wait --wait-timeout 120 app')).toHaveLength(starts)
 })
+
+it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging across the %s completion path', completion => {
+  const source = startupRetryFixture()
+  expect(source.invoke().status).toBe(0)
+  const replacement = fixture(), directory = join(replacement.temporary, 'open-agricola-prerelease-replacement')
+  renameSync(replacement.root, directory)
+  Object.assign(replacement.config, { directory, targetId: 'prerelease-replacement', project: 'open-agricola-prerelease-replacement',
+    network: 'open-agricola-prerelease-replacement-dependencies' })
+  for (const value of [replacement.config.database, replacement.config.validationDatabase]) {
+    value.name = value.name.replace('prerelease_test', 'prerelease_replacement')
+  }
+  replacement.config.database.appRole = 'oa_prerelease_replacement_app'; replacement.config.database.backupRole = 'oa_prerelease_replacement_backup'
+  replacement.config.validationDatabase.role = 'oa_prerelease_replacement_validator'
+  Object.assign(replacement.config.objects, { bucket: 'oa-prerelease-replacement', appKeyId: 'replacement-app', backupKeyId: 'replacement-backup' })
+  replacement.config.offsite.directory = '/srv/backups/open-agricola-prerelease-replacement'
+  Object.assign(replacement.config.builder, { name: 'prerelease-replacement', container: 'prerelease-replacement-builder' })
+  for (const name of ['.env', 'data/dependencies.compose.env']) writeFileSync(join(directory, name), readFileSync(join(directory, name), 'utf8')
+    .replaceAll('prerelease_test', 'prerelease_replacement').replaceAll('oa-prerelease-test', 'oa-prerelease-replacement')
+    .replaceAll('pre-app', 'replacement-app').replaceAll('pre-backup', 'replacement-backup'))
+  replacement.save()
+  const target = parsePrereleaseTarget(replacement.config), next = 'cc4d6c82-676f-4dcc-a570-52377b3b32f5'
+  const operationId = 'ec4d6c82-676f-4dcc-a570-52377b3b32f5', stem = `pre-${source.operationId}`
+  const script = readFileSync(join(source.bin, 'docker'), 'utf8').replaceAll(source.temporary, replacement.temporary)
+    .replaceAll(source.config.targetId, target.targetId).replaceAll(source.generation, next)
+    .replace('case "$*" in', `case "$*" in\n  *' restore /backup/restore-'*) [ ! -f '${replacement.temporary}/restore-fail' ] || exit 44;;\nesac\ncase "$*" in`)
+  writeFileSync(join(replacement.bin, 'docker'), script, { mode: 0o700 })
+  writeFileSync(join(replacement.bin, 'bash'), readFileSync(join(source.bin, 'bash')), { mode: 0o700 })
+  writeFileSync(join(source.root, 'backups/replay-removals.latest.json'), '{"version":1,"batches":[]}')
+  const point = readFileSync(join(source.root, 'backups', `${stem}.tgz`))
+  const buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const request: OperationRequest = { action: 'restore', expectedCurrent: 'empty', buildId, generation: next, operationId,
+    sourceTarget: parsePrereleaseTarget(source.config), expectedSourceCurrent: buildId, acceptLoss: source.generation,
+    backupStem: stem, backupGeneration: source.generation, authorityFile: source.authorityFile }
+  const invoke = () => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
+    input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(target), target, request,
+      receipt: { status: 'passed', channel: 'prerelease', repository: 'titanxxh/open-agricola', sha: buildId,
+        configuration: 'e'.repeat(64), producerConfiguration: 'f'.repeat(64), tasks: FULL_TASK_IDS.map((id, index) => ({ id, status: 'passed', runId: 1, jobId: index + 1 })) } }),
+    encoding: 'utf8', timeout: 30000, env: { ...replacement.env, SSH_CONNECTION: 'owner fixture' },
+  })
+  const staging = join(directory, 'backups', `restore-${operationId}`)
+  if (completion === 'migration-retry') writeFileSync(join(replacement.temporary, 'restore-fail'), '')
+  if (completion === 'startup-retry') writeFileSync(join(replacement.temporary, 'startup-fail'), '')
+  let result = invoke()
+  if (completion !== 'normal') {
+    expect(result.status).not.toBe(0)
+    expect(readRuntime(target)).toMatchObject({ mode: 'maintenance', operation: { stage: completion === 'migration-retry' ? 'migration' : 'startup' } })
+    if (completion === 'migration-retry') {
+      expect(readFileSync(join(staging, 'database.dump'), 'utf8')).toBe('fixture database snapshot')
+      expect(JSON.parse(readFileSync(`${staging}.retention.json`, 'utf8')).createdAt)
+        .toBe(JSON.parse(readFileSync(join(source.root, 'backups', `${stem}.manifest.json`), 'utf8')).createdAt)
+    } else expect(existsSync(staging)).toBe(false)
+    rmSync(join(replacement.temporary, completion === 'migration-retry' ? 'restore-fail' : 'startup-fail'))
+    result = invoke()
+  }
+  expect(result.status, result.stderr).toBe(0)
+  expect(readRuntime(target)).toMatchObject({ mode: 'maintenance', generation: next, operation: { stage: 'acceptance' } })
+  expect(existsSync(staging)).toBe(false)
+  expect(existsSync(`${staging}.retention.json`)).toBe(false)
+  expect(readFileSync(join(source.root, 'backups', `${stem}.tgz`))).toEqual(point)
+  expect(source.state().generation).toBe(source.generation)
+}, 15000)
 
 it.each(['control', 'output', 'backups'])('rejects a %s mount alias into formal files before state or Docker', name => {
   const value = fixture(), formal = join(value.temporary, 'formal-private')

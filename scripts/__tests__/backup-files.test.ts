@@ -184,3 +184,34 @@ it('seals real archive/config bytes and lists only committed complete sets', () 
   ])
   expect(readdirSync(root)).toContain('daily-incomplete.tgz')
 })
+
+it('expires restore bytes by the sealed capture clock while preserving fresh retries and other scopes', () => {
+  const root = temporary(), source = temporary(), fingerprint = 'a'.repeat(64)
+  const old = new Date(Date.now() - 8 * 86400_000), fresh = new Date(Date.now() - 86400_000)
+  const stage = (directory: string, suffix: string, capturedAt: Date, owner = fingerprint) => {
+    const id = `db4d6c82-676f-4dcc-a570-52377b3b32f${suffix}`, path = join(directory, `restore-${id}`)
+    mkdirSync(path)
+    writeFileSync(join(path, 'database.dump'), 'private restore bytes')
+    writeFileSync(`${path}.retention.json`, JSON.stringify({ formatVersion: 1, operationId: id,
+      dataGeneration: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', targetFingerprint: owner,
+      archiveSha256: 'b'.repeat(64), createdAt: capturedAt.toISOString() }))
+    // Native restore creates and deletes temporary files, refreshing directory mtime.
+    writeFileSync(join(path, 'restore-temporary.list'), 'temporary')
+    rmSync(join(path, 'restore-temporary.list'))
+    return path
+  }
+  const expired = stage(root, '5', old), retry = stage(root, '6', fresh)
+  const foreign = stage(root, '7', old, 'c'.repeat(64)), original = stage(source, '5', old)
+  const unrelated = join(root, 'restore-unrelated'); mkdirSync(unrelated); writeFileSync(join(unrelated, 'keep'), 'unrelated bytes')
+  writeFileSync(join(root, 'replay-removals.latest.json'), 'independent erasure facts')
+  utimesSync(join(root, 'replay-removals.latest.json'), old, old)
+  const result = spawnSync(process.execPath, [filesScript, 'prune', root, '7', '1000000'], { encoding: 'utf8', env: {
+    ...process.env, BACKUP_RETENTION_DAYS: '7', BACKUP_ENVIRONMENT: 'prerelease-test', BACKUP_TARGET_FINGERPRINT: fingerprint,
+  } })
+  expect(result.status, result.stderr).toBe(0)
+  expect(existsSync(expired)).toBe(false)
+  expect(existsSync(`${expired}.retention.json`)).toBe(false)
+  for (const path of [retry, foreign, original]) expect(readFileSync(join(path, 'database.dump'), 'utf8')).toBe('private restore bytes')
+  expect(readFileSync(join(unrelated, 'keep'), 'utf8')).toBe('unrelated bytes')
+  expect(readFileSync(join(root, 'replay-removals.latest.json'), 'utf8')).toBe('independent erasure facts')
+})

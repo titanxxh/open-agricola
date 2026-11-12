@@ -165,6 +165,8 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 恢复时 owner 显式选择 `--backup <stem> --backup-generation <UUID>`，以 `--accept-loss <源当前代次>` 接受恢复点之后进度丢失。使用 `restore --config <全新replacement.json> --source-config <old.json> --expected-current empty --expected-source-current <old-SHA> --sha <已验证目标SHA> --generation <新UUID> --operation-id <UUID> --authority-receipt <old-close.json> ...`。replacement 的目录/project、源/验证库、role、bucket 必须独立，固定公网 origin/port 相同。工具先校验配对文件及七天期限，再安全解包纯数据，绝不安装归档凭据；使用当前独立账本，实际隔离验证目标并真实恢复。重试只清理尚未验收的 replacement，保留旧 source。关闭状态启动成功后，对旧 target purge/retire/finish-close，再 prepare replacement 代次，执行 `activate-recovery --source-config <old.json> --expected-current <new-SHA> --expected-source-current <old-SHA> --retirement-receipt <retire.json>`，只切换固定维护网关。完成全套真实身份审计和验收才开放。不能清理全宿主或复用正式资源。七天归档期限届满后，owner 仅可删除清单中的已退休 project 资源，保留 retirement 回执及独立删除账本。
 
 
+恢复解包目录是可重新生成的缓存。解包前，owner 在独立保留期文件中固定操作、代次、target 指纹、归档哈希和原捕获时间。原生临时文件和重试不能刷新七天期限。startup 检查点持久化后清除缓存，startup 和 acceptance 重试会重复执行幂等清理。retention 只在固定 target 的备份目录内清理过期或缺少证明的缓存，保留尚有效的重试、其他 target 指纹及独立删除账本。
+
 ## 一、部署后端
 
 后端部署分两种情况：

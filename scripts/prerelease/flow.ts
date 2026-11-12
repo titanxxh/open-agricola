@@ -5,7 +5,7 @@ import { assertScopedPaths, loadPrereleaseEnvironment, type PrereleaseTarget, ta
 import { atomicJson, controlDirectory, readRuntime, recordPath, writeRuntime, type RuntimeRecord } from './runtime'
 import { archiveTool, assertCapacity, backupEnvironment, backupRoot, buildImage, candidateTool, command, compose, inspectImage, policyTool, stopWriters, verifyPermissions, verifyRunning } from './docker'
 import { canonicalJson } from '../../shared/contract/authoritative-command'
-import { extractPairedPrereleaseBackup, readPairedPrereleaseBackup } from './backup'
+import { prepareRestoreStaging, readPairedPrereleaseBackup, removeRestoreStaging } from './backup'
 import { compareIdentityRefs } from './identity-manifest'
 
 export type OperationRequest = { action: string; expectedCurrent: string; buildId?: string; generation?: string; nextGeneration?: string;
@@ -80,7 +80,9 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
   if (record.mode === 'closed' && !['status', 'retention', 'reinitialize', 'finish-close'].includes(request.action)) throw new Error('Retired targets require fresh resources and a new generation')
   if (request.action === 'status') return record
   if (request.action === 'retention') {
-    command('node', [join(target.policyDirectory, 'scripts/backup-files.mjs'), 'prune', backupRoot(target), '7', '1000000'], { env: { BACKUP_RETENTION_DAYS: '7' } })
+    command('node', [join(target.policyDirectory, 'scripts/backup-files.mjs'), 'prune', backupRoot(target), '7', '1000000'], { env: {
+      BACKUP_RETENTION_DAYS: '7', BACKUP_ENVIRONMENT: target.targetId, BACKUP_TARGET_FINGERPRINT: targetFingerprint(target),
+    } })
     command('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', target.offsite.host, 'bash', '-s', '--', target.offsite.directory, '7'],
       { input: readFileSync(join(target.policyDirectory, 'deploy/offsite-retention.sh')), timeout: 60_000 })
     return { targetId: target.targetId, retentionDays: 7, mode: record.mode }
@@ -262,14 +264,14 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
       command('bash', [join(source.policyDirectory, 'backup-offsite.sh'), 'ledger-only'], { env: backupEnvironment(source, previous), timeout: 1800_000 })
       archiveTool(source, 'capture', ['ledger-export', '/backup/replay-removals.latest.json'])
       command('cp', ['--', join(backupRoot(source), 'replay-removals.latest.json'), join(backupRoot(target), 'replay-removals.latest.json')])
-      rmSync(root, { recursive: true, force: true })
-      extractPairedPrereleaseBackup(target, point.archive, point.archiveSha256, root)
+      prepareRestoreStaging(target, point, id, next)
       archiveTool(target, 'migrate', ['ledger-merge', '/backup/replay-removals.latest.json'])
       archiveTool(target, 'tools', ['validate', `/backup/restore-${id}`])
       record.operation = { ...operation, stage: 'migration' }
       writeRuntime(target, record, image)
     }
     if (record.operation?.stage === 'migration') {
+      if (!existsSync(root) || !existsSync(`${root}.retention.json`)) prepareRestoreStaging(target, point, id, next)
       // Only this unaccepted replacement is reset on retry; the source is never changed.
       policyTool(target, 'reset', { APPLICATIONS_STOPPED: '1', CURRENT_ERASURE_LEDGER: '/backup/replay-removals.latest.json',
         PRERELEASE_OLD_GENERATION: next, PRERELEASE_OPERATION_ID: id, PRERELEASE_SOURCE_BUILD_ID: buildId })
@@ -279,6 +281,7 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
       record = { ...record, buildId, installed: { buildId, image, installedAt: Date.now() }, operation: { ...operation, stage: 'startup' } }
       writeRuntime(target, record, image)
     }
+    removeRestoreStaging(target, id)
     compose(target, ['up', '-d', '--no-build', '--wait', '--wait-timeout', '120', 'app'])
     verifyRunning(target, record)
     record.operation = { ...operation, stage: 'acceptance' }

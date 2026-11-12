@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { readdir, readFile, writeFile, stat, rm } from 'node:fs/promises'
+import { readdir, readFile, writeFile, stat, rm, lstat } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const stemPattern = /^(daily|pre|manual)-[a-zA-Z0-9._-]+$/
@@ -14,6 +14,27 @@ const digest = async path => {
 }
 const removeSet = async (root, stem) => {
   for (const name of [`${stem}.tgz`, `${stem}.manifest.json`, `env-${stem}`]) await rm(join(root, name), { force: true })
+}
+
+async function pruneRestore(root, name) {
+  const id = name.slice('restore-'.length), marker = join(root, `${name}.retention.json`)
+  let createdAt = null
+  try {
+    if (!(await lstat(marker)).isFile()) throw new Error('Invalid restore retention proof')
+    const value = JSON.parse(await readFile(marker, 'utf8'))
+    if (typeof value.targetFingerprint === 'string' && /^[a-f0-9]{64}$/.test(value.targetFingerprint)
+      && value.targetFingerprint !== process.env.BACKUP_TARGET_FINGERPRINT) return
+    if (value.formatVersion !== 1 || value.operationId !== id || value.targetFingerprint !== process.env.BACKUP_TARGET_FINGERPRINT
+      || !/^[a-f0-9-]{36}$/.test(value.dataGeneration) || !/^[a-f0-9]{64}$/.test(value.archiveSha256)
+      || typeof value.createdAt !== 'string' || !Number.isFinite(Date.parse(value.createdAt)) || Date.parse(value.createdAt) > Date.now()) throw new Error('Invalid restore retention proof')
+    createdAt = Date.parse(value.createdAt)
+  } catch (error) {
+    if (error.code && error.code !== 'ENOENT') throw error
+    // Unproven partial caches are regenerable from a still-valid sealed pair.
+  }
+  if (createdAt !== null && Date.now() - createdAt <= maxAge) return
+  await rm(join(root, name), { recursive: true, force: true })
+  await rm(marker, { force: true })
 }
 
 async function completeSets(root) {
@@ -66,6 +87,12 @@ async function main([command, root, first, second]) {
     if (!Number.isSafeInteger(daily) || daily < 1 || !Number.isSafeInteger(pre) || pre < 1) throw new Error('Invalid backup retention counts')
     for (const name of await readdir(root)) {
       const path = join(root, name)
+      if (retentionDays === 7 && /^prerelease-[a-z0-9-]+$/.test(process.env.BACKUP_ENVIRONMENT ?? '')
+        && /^[a-f0-9]{64}$/.test(process.env.BACKUP_TARGET_FINGERPRINT ?? '')
+        && /^restore-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}(\.retention\.json)?$/.test(name)) {
+        await pruneRestore(root, name.replace(/\.retention\.json$/, ''))
+        continue
+      }
       let info
       try { info = await stat(path) } catch (error) { if (error.code === 'ENOENT') continue; throw error }
       if (Date.now() - info.mtimeMs <= maxAge) continue

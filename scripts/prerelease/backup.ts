@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { command } from './docker'
 import type { PrereleaseTarget } from './config'
 import { targetFingerprint } from './config'
+import { atomicJson } from './runtime'
 
 export const fileHash = (path: string): string => {
   const value = command('sha256sum', [path]).split(/\s/)[0]
@@ -29,7 +30,24 @@ export function readPairedPrereleaseBackup(target: PrereleaseTarget, stem: strin
     || !('archiveSha256' in value) || value.archiveSha256 !== fileHash(join(root, `${stem}.tgz`))
     || !('configurationSha256' in value) || value.configurationSha256 !== fileHash(join(root, `env-${stem}`))) throw new Error('Recovery point is incomplete, altered, expired or belongs to another environment/generation')
   return { root, archive: join(root, `${stem}.tgz`), sourceBuildId: value.sourceBuildId, targetBuildId: value.targetBuildId,
-    manifest: value, archiveSha256: value.archiveSha256 }
+    manifest: value, archiveSha256: value.archiveSha256, createdAt: value.createdAt }
+}
+
+export function prepareRestoreStaging(target: PrereleaseTarget, point: ReturnType<typeof readPairedPrereleaseBackup>, operationId: string, generation: string): string {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(operationId)) throw new Error('Invalid restore operation ID')
+  const root = join(target.directory, 'backups', `restore-${operationId}`)
+  atomicJson(`${root}.retention.json`, { formatVersion: 1, operationId, dataGeneration: generation,
+    targetFingerprint: targetFingerprint(target), archiveSha256: point.archiveSha256, createdAt: point.createdAt })
+  rmSync(root, { recursive: true, force: true })
+  extractPairedPrereleaseBackup(target, point.archive, point.archiveSha256, root)
+  return root
+}
+
+export function removeRestoreStaging(target: PrereleaseTarget, operationId: string): void {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(operationId)) throw new Error('Invalid restore operation ID')
+  const root = join(target.directory, 'backups', `restore-${operationId}`)
+  rmSync(root, { recursive: true, force: true })
+  rmSync(`${root}.retention.json`, { force: true })
 }
 
 export function extractPairedPrereleaseBackup(target: PrereleaseTarget, archive: string, expectedHash: string, directory: string): void {
