@@ -95,6 +95,7 @@ describe('canonical architecture verification wiring', () => {
     const gate = workflow.slice(workflow.indexOf('\n  verify:'))
     expect(workflow).not.toMatch(/^\s+paths(?:-ignore)?:/m)
     expect(workflow).toContain('scripts/ci/scoped-verification.ts plan --base "$BASE_REF" --head "$HEAD_REF"')
+    expect(workflow).toContain('      base_ref: ${{ steps.plan.outputs.base_ref }}')
     expect(workflow).not.toContain('\n  inline:')
     expect(worker).toContain('--partition "$VERIFICATION_PARTITION" --expected-digest "$EXPECTED_PLAN_DIGEST"')
     for (const id of ROUTINE_PARTITION_IDS) {
@@ -103,6 +104,7 @@ describe('canonical architecture verification wiring', () => {
       expect(caller).toContain(`fromJSON(needs.plan.outputs.partitions)['${id}'] != null`)
       expect(caller).toContain('    uses: ./.github/workflows/scoped-verification.yml\n')
       expect(caller).toContain(`      partition: ${id}\n`)
+      expect(caller).toContain('      base_ref: ${{ needs.plan.outputs.base_ref }}')
       expect(caller).toContain('      plan_digest: ${{ needs.plan.outputs.plan_digest }}')
     }
     expect(workflow).toContain('uses: ./.github/workflows/candidate-rehearsal.yml')
@@ -110,7 +112,7 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow).toContain("if: needs.plan.outputs.catalog_tasks != '' && needs.plan.outputs.catalog_tasks != 'none'")
     expect(workflow).toContain('candidate_sha: ${{ github.sha }}')
     expect(workflow).toContain('base_sha:\n        description: Optional full comparison base SHA for a manual scope probe')
-    expect(workflow.match(/(?:BASE_REF|base_ref): \$\{\{ github.event_name == 'workflow_dispatch' && inputs.base_sha \|\| github.event.pull_request.base.sha \|\| github.event.before \|\| github.sha \}\}/g)).toHaveLength(8)
+    expect(workflow.match(/(?:BASE_REF|base_ref): \$\{\{ github.event_name == 'workflow_dispatch' && inputs.base_sha \|\| github.event.pull_request.base.sha \|\| github.event.before \|\| github.sha \}\}/g)).toHaveLength(1)
     expect(workflow.match(/(?:HEAD_REF|head_ref): \$\{\{ github.event.pull_request.head.sha \|\| github.sha \}\}/g)).toHaveLength(8)
     expect(gate).toContain('name: verify\n    if: always()\n    needs: [plan, units-1, units-2, units-3, browser-1, browser-2, browser-3, browser-4, catalog]')
     expect(gate).toContain('NEEDS_JSON: ${{ toJSON(needs) }}')
