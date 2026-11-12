@@ -108,7 +108,7 @@ owner #1662 负责独立源库、只读备份 role、独立一次性验证库/ro
 
 builder 必须是已停止的非 privileged rootless BuildKit 容器，用户 `1000:1000`，标签 `org.open-agricola.environment=<targetId>`，读回的 CPU、内存、PID 限额不超过清单。只允许在 `/home/user/.local/share/buildkit` 挂载自己的状态 volume。指定 Buildx **remote** driver 的 endpoint 为 `docker-container://<builder.container>`，见 [Docker 文档](https://docs.docker.com/build/builders/drivers/remote/)。owner CLI 读取 `buildx ls --format '{{json .Builder}}'`，接受 builder/node 行中完全相同的重复对象，并要求名称唯一匹配、只有一个匹配 endpoint。每次固定 SHA 构建前验证并启动 builder，在 `finally` 中停止并读回停机状态，之后才检查镜像或运行工具。若 builder 原本正在运行，则拒绝操作，不替它停机。#1668 前 owner 必须在实际宿主完成受限真实构建；命令夹具或示例限额不能证明 builder 或部署可用。
 
-构建、存储/归档工具、镜像检查容器和 app 启动前分别检查容量。保守额度包括 gateway 的 64 MiB、当前阶段的限额、确实正在运行或即将启动的本目标 app 的完整限额，以及 `reserveMemoryMiB`。reserve 应覆盖实测 owner 进程开销和共享服务增长。在支持的 Linux Node 上，`os.freemem()` 已使用 `MemAvailable`。运行 app 的完整限额会再次预留它已经占用的内存，所以这是保守准入阈值，不是实测峰值或主机最低配置。额度依据实际 app、构建和备份测量确定，不能照搬示例相加值。发现正在运行的 builder 或归档工具会阻断下一阶段。现有锁按 target 串行；owner 调度仍须避免同主机重任务重叠。
+构建、存储/归档工具、镜像检查容器和 app 启动前分别检查容量。保守额度包括 gateway 的 64 MiB、当前阶段的限额、确实正在运行或即将启动的本目标 app 的完整限额，以及 `reserveMemoryMiB`。reserve 应覆盖实测 owner 进程开销和共享服务增长。在支持的 Linux Node 上，`os.freemem()` 已使用 `MemAvailable`。运行 app 的完整限额会再次预留它已经占用的内存，所以这是保守准入阈值，不是实测峰值或主机最低配置。额度依据实际 app、构建和备份测量确定，不能照搬示例相加值。准入前复用备份回收逻辑，只删除环境属于本目标、run 标签有效且有效截止时间已过期的工具，并读回确认删除。未过期或标签无效的工具保持原状并阻断下一阶段，正在运行的 builder 同样阻断。回收失败则拒绝准入，不停止 app。现有锁按 target 串行；owner 调度仍须避免同主机重任务重叠。
 
 升级先构建再停止旧 app，因此构建阶段也计入旧 app 限额。owner 可以先明确执行 `maintain`，使用已经允许的短维护窗口。在线备份不会为获取余量停止 app。可信归档镜像冷缓存时，先通过 app 与 build 重叠阶段的检查，再进入工具阶段；容量不足即备份失败。磁盘余量检查仍只补充 owner 存储限额，不会创建文件系统 quota。
 
