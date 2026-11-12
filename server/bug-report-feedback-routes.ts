@@ -17,7 +17,7 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   for await (const chunk of req.iterator({ destroyOnReturn: false })) {
     const buffer = Buffer.from(chunk)
     bytes += buffer.length
-    if (bytes > 8192) {
+    if (bytes > 32768) {
       req.resume()
       throw new FeedbackError('feedback_body_too_large', 413)
     }

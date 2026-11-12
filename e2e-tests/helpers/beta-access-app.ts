@@ -50,6 +50,9 @@ export async function startHostedReleaseAppWithBetaAccess({ https = false } = {}
         data: { providerUserId: `beta-${username}`, providerLogin: username, email: `${username}@example.com`, displayName },
       })
       expect(oauth.ok(), await oauth.text()).toBe(true)
+      const result: unknown = await oauth.json()
+      if (result && typeof result === 'object' && 'mode' in result && result.mode === 'login') return
+      expect(result).toMatchObject({ mode: 'onboarding' })
       const complete = await context.request.post(`${app.apiUrl}/api/auth/onboarding/complete`, {
         data: { username, displayName, password: 'beta-test-password', confirmPassword: 'beta-test-password' },
       })

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { InboxMessage, InboxPage } from '../../shared/contract/bug-report-feedback'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
-import { readInboxMessage, readInboxPage } from '../services/bug-report-feedback'
+import { feedbackKindKey, readInboxMessage, readInboxPage } from '../services/bug-report-feedback'
 import '../styles/components/inbox.css'
 
 const INBOX_CHANGED = 'open-agricola-inbox-changed'
@@ -85,9 +85,12 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
         onClick={() => { if (selected) void read(selected.id); else void refresh() }}>{t('feedback.retry')}</button></div>}
       {selected ? <article className="inbox-message">
         <button type="button" className="btn-link" onClick={() => { reading.current++; setBusy(false); setSelected(null); setError(false) }}>{t('feedback.back')}</button>
-        <h3>{selected.reportSummary}</h3><p className="inbox-message__kind">{t('feedback.confirmedBug')}</p>
+        <h3>{selected.reportSummary}</h3><p className="inbox-message__kind">{t(feedbackKindKey[selected.kind])}</p>
         <time dateTime={new Date(selected.createdAt).toISOString()}>{new Date(selected.createdAt).toLocaleString(locale)}</time>
         <p className="inbox-message__explanation">{selected.explanation}</p>
+        {selected.kind === 'needs_info' && <><h4>{t('feedback.missingItems')}</h4>
+          <ul>{selected.missingItems.map((item, index) => <li key={index}>{item}</li>)}</ul>
+          <p>{t('feedback.githubAccountHint')}</p></>}
         <a href={selected.issueUrl} target="_blank" rel="noopener noreferrer">{t('feedback.reportLink', { number: selected.issueNumber })}</a>
       </article> : !page ? !error && <p role="status">{t('platform.loading')}</p> : <>
         {page.messages.length === 0 ? <p>{t('feedback.empty')}</p> : <ol className="inbox-list">{page.messages.map(entry => <li key={entry.id}>

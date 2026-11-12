@@ -13,7 +13,7 @@
 .inbox-message h3 { margin-bottom: 8px; }
 .inbox-message__kind { font-weight: 600; }
 .inbox-message__explanation { white-space: pre-wrap; line-height: 1.6; }
-.bug-report-feedback-settings input, .bug-report-feedback-settings textarea { box-sizing: border-box; width: 100%; max-width: 100%; }
+.bug-report-feedback-settings input, .bug-report-feedback-settings textarea, .bug-report-feedback-settings select { box-sizing: border-box; width: 100%; max-width: 100%; }
 .bug-report-feedback-settings textarea { resize: vertical; min-height: 100px; }
 .bug-report-feedback-settings .feedback-history { padding-left: 20px; overflow-wrap: anywhere; }
 .bug-report-feedback-settings .feedback-history p { white-space: pre-wrap; }
