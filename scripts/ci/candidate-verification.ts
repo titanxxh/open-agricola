@@ -275,7 +275,16 @@ export function admitFinalSnapshot(cwd: string, repository: string, sha: string)
 export const LEGACY_STABLE_CUTOFF = '53b8a0ccf5649ce3bb7084303f0677e46c1d20e7'
 export function historicalStableSnapshot(cwd: string, sha: string): boolean {
   fullSha(sha)
-  return spawnSync('git', ['merge-base', '--is-ancestor', sha, LEGACY_STABLE_CUTOFF], { cwd, stdio: 'ignore' }).status === 0
+  assertRawCommit(cwd, 'titanxxh/open-agricola', LEGACY_STABLE_CUTOFF)
+  if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd, encoding: 'utf8' }).trim() === 'true') {
+    execFileSync('git', ['fetch', '--no-tags', '--unshallow', 'https://github.com/titanxxh/open-agricola.git', LEGACY_STABLE_CUTOFF],
+      { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+  }
+  const result = spawnSync('git', ['merge-base', '--is-ancestor', sha, LEGACY_STABLE_CUTOFF], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  if (result.error) throw result.error
+  if (result.status === 0) return true
+  if (result.status === 1) return false
+  throw new Error(result.stderr.trim() || 'Could not establish historical stable ancestry')
 }
 export function stableConfiguration(cwd: string, sha: string, producer: string): string {
   return createHash('sha256').update('open-agricola-stable-main-verification-v1\0')
@@ -291,12 +300,12 @@ export function checkCandidateVerification(cwd: string, repository: string, sha:
   if (!Array.isArray(runs)) throw new Error('Invalid GitHub workflow run collection')
   const policy = verificationConfiguration(cwd, main), producers: string[] = []
   const modern: CandidateRunEvidence[] = [], legacy: CandidateRunEvidence[] = []
-  const historical = historicalStableSnapshot(cwd, sha)
+  let historical: boolean | undefined
   let modernAttempt = false
   for (const value of runs) {
     const run = object(value), producer = fullSha(string(run.head_sha))
-    const old = historical && producer === sha
     const current = run.head_branch === 'main' && typeof run.display_title === 'string' && run.display_title.startsWith(`stable / ${sha} / `)
+    const old = !current && producer === sha && (historical ??= historicalStableSnapshot(cwd, sha))
     if (!old && !current) continue
     if (current) {
       const metadata = parseRun(value)
