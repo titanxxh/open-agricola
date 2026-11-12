@@ -7,6 +7,7 @@ import { archiveTool, assertCapacity, backupEnvironment, backupRoot, buildImage,
 import { canonicalJson } from '../../shared/contract/authoritative-command'
 import { prepareRestoreStaging, readPairedPrereleaseBackup, removeRestoreStaging } from './backup'
 import { compareIdentityRefs } from './identity-manifest'
+import { readFormalBrowserDeployment, verifyFormalBrowserAcceptance } from './browser-policy'
 
 export type OperationRequest = { action: string; expectedCurrent: string; buildId?: string; generation?: string; nextGeneration?: string;
   acceptLoss?: string; operationId?: string; acceptanceFile?: string; authorityFile?: string; retirementFile?: string; backupStem?: string; sourceTarget?: PrereleaseTarget;
@@ -71,7 +72,7 @@ function capture(target: PrereleaseTarget, record: RuntimeRecord, stem: string, 
 }
 
 /** Only admission opens here; health alone never creates an acceptance receipt. */
-export function runPrereleaseOperation(target: PrereleaseTarget, request: OperationRequest) {
+export async function runPrereleaseOperation(target: PrereleaseTarget, request: OperationRequest) {
   assertScopedPaths(target)
   if (request.action !== 'retention') loadPrereleaseEnvironment(target)
   let record = readRuntime(target)
@@ -98,6 +99,21 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
   if (request.action === 'maintain') {
     authorityReceipt(target, record, request.authorityFile, 'close')
     return maintenance(target, record)
+  }
+  if (request.action === 'reverify') {
+    if (!record.installed || !record.buildId) throw new Error('Reverification requires an installed prerelease build')
+    const id = generation(request.operationId)
+    authorityReceipt(target, record, request.authorityFile, 'close')
+    if (record.operation && (record.operation.kind !== 'reverify' || record.operation.id !== id)) throw new Error('Resume the pending prerelease operation first')
+    const pending: RuntimeRecord = { ...record, mode: 'maintenance', acceptance: null, operation: {
+      id, kind: 'reverify', stage: 'acceptance', buildId: record.buildId, image: record.installed.image,
+      sourceBuildId: record.buildId, sourceImage: record.installed.image, backupStem: null, generation: record.generation,
+    } }
+    rmSync(join(controlDirectory(target), 'verification.json'), { force: true })
+    rmSync(join(controlDirectory(target), 'verification.token'), { force: true })
+    writeRuntime(target, pending)
+    compose(target, ['up', '-d', '--no-build', 'gateway'])
+    return pending
   }
   if (request.action === 'backup') {
     if (!record.installed || record.operation) throw new Error('Online backup requires a complete installed deployment')
@@ -175,6 +191,14 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
       sourcePacketSha256: hash(request.associationsFile), verifiedAt: Date.now() })
     return { path: artifact, verificationReceiptSha256: hash(artifact), identityManifestSha256: manifest.identityManifestSha256, identityCount: manifest.identityCount }
   }
+  if (request.action === 'verify-formal-browser') {
+    if (!record.installed || record.mode !== 'maintenance' || !record.operation || record.operation.stage !== 'acceptance') throw new Error('Formal browser verification requires the installed maintenance candidate')
+    const deployment = await readFormalBrowserDeployment(target.formal)
+    const path = join(controlDirectory(target), `formal-browser-policy-${record.operation.id}.json`)
+    atomicJson(path, { format: 1, targetId: target.targetId, targetFingerprint: targetFingerprint(target), origin: target.origin,
+      buildId: record.buildId, generation: record.generation, operationId: record.operation.id, observedAt: Date.now(), deployment })
+    return { path, sha256: hash(path), deployment }
+  }
   if (request.action === 'open') {
     if (request.buildId !== record.buildId) throw new Error('Opening requires the installed candidate SHA receipt')
     if (!record.installed || !record.operation || record.operation.kind === 'reset' || record.operation.stage !== 'acceptance' || !request.acceptanceFile) throw new Error('Complete target acceptance is required before opening')
@@ -197,15 +221,21 @@ export function runPrereleaseOperation(target: PrereleaseTarget, request: Operat
       || acceptance.image !== record.installed.image || acceptance.generation !== record.generation || acceptance.operationId !== record.operation.id
       || typeof acceptance.acceptedAt !== 'number' || acceptance.acceptedAt > Date.now() || Date.now() - acceptance.acceptedAt > 30 * 60_000
       || !acceptance.evidence || typeof acceptance.evidence !== 'object') throw new Error('Acceptance belongs to a different target, operation, build or generation')
-    const required = ['identity', 'beta-access', 'http-ws', 'public-cards', 'viewer', 'retained-data', 'deletion-audit', 'capacity', 'formal-unaffected']
+    const required = ['identity', 'beta-access', 'http-ws', 'public-cards', 'viewer', 'retained-data', 'deletion-audit', 'capacity', 'formal-unaffected', 'browser-boundary', 'formal-browser-policy']
+    let formalProof: Record<string, unknown> | undefined
     for (const name of required) {
       if (!(name in acceptance.evidence)) throw new Error(`Missing owner acceptance evidence: ${name}`)
       const entry: unknown = Reflect.get(acceptance.evidence, name)
       if (!entry || typeof entry !== 'object' || !('path' in entry) || typeof entry.path !== 'string'
         || !('sha256' in entry) || entry.sha256 !== hash(entry.path) || statSync(entry.path).size === 0) throw new Error(`Acceptance artifact failed verification: ${name}`)
+      if (name === 'formal-browser-policy') formalProof = json(entry.path)
     }
+    const formalDeployment = await verifyFormalBrowserAcceptance(target.formal, formalProof, {
+      targetId: target.targetId, origin: target.origin, targetFingerprint: targetFingerprint(target),
+      buildId: record.installed.buildId, generation: record.generation, operationId: record.operation.id,
+    })
     verifyRunning(target, record)
-    const opened: RuntimeRecord = { ...record, mode: 'open', operation: null, acceptance: { acceptedAt: acceptance.acceptedAt, sha256: hash(request.acceptanceFile) } }
+    const opened: RuntimeRecord = { ...record, mode: 'open', operation: null, acceptance: { acceptedAt: acceptance.acceptedAt, sha256: hash(request.acceptanceFile), formalBuildId: formalDeployment.buildId } }
     writeRuntime(target, opened)
     return opened
   }

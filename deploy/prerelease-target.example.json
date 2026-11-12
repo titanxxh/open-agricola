@@ -5,7 +5,7 @@
   "directory": "/srv/open-agricola-prerelease-main",
   "policyDirectory": "/srv/open-agricola-owner-tools",
   "project": "open-agricola-prerelease-main",
-  "origin": "https://pre.example-prerelease.invalid",
+  "origin": "https://pre.titanxxh.com",
   "port": 5176,
   "network": "open-agricola-prerelease-main-dependencies",
   "database": {
@@ -39,8 +39,8 @@
   "formal": {
     "project": "open-agricola",
     "directory": "/srv/open-agricola",
-    "appOrigin": "https://app.example.invalid",
-    "apiOrigin": "https://api.example.invalid",
+    "appOrigin": "https://open-agricola.titanxxh.com",
+    "apiOrigin": "https://openagapi.titanxxh.com",
     "database": "agricola",
     "bucket": "agricola",
     "offsiteDirectory": "/srv/backups/open-agricola"

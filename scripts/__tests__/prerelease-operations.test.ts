@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { targetFingerprint, parsePrereleaseTarget } from '../prerelease/config'
-import { readRuntime, writeRuntime } from '../prerelease/runtime'
+import { readRuntime, writeRuntime, renderCompose } from '../prerelease/runtime'
 import type { OperationRequest } from '../prerelease/flow'
 import { afterEach, expect, it } from 'vitest'
 
@@ -73,6 +73,36 @@ it('initializes only a maintenance gateway, atomically binding the explicit auth
   expect(Object.keys(compose.services)).toEqual(['gateway'])
   expect(compose.services.gateway.ports).toEqual(['127.0.0.1:18575:5176'])
   expect(compose.services.gateway.volumes.some((value: string) => value.includes('.env'))).toBe(false)
+})
+
+it('revalidates a changed formal deployment without reinstalling pre or changing its generation', () => {
+  const value = fixture(), target = parsePrereleaseTarget(value.config)
+  const buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`, generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5'
+  const operationId = 'cb4d6c82-676f-4dcc-a570-52377b3b32f5'
+  writeRuntime(target, { ...readRuntime(target), generation, buildId, installed: { buildId, image, installedAt: 1 }, mode: 'open',
+    acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64), formalBuildId: 'b'.repeat(40) } })
+  const authority = join(value.temporary, 'closed.json')
+  writeFileSync(authority, JSON.stringify({ receipt: { action: 'close', generationId: generation, targetOrigin: target.origin, targetId: target.targetId, completedAt: Date.now() } }))
+  const invoke = () => value.invoke('reverify', '--expected-current', buildId, '--operation-id', operationId, '--authority-receipt', authority)
+  const result = invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(readRuntime(target)).toMatchObject({ mode: 'maintenance', generation, buildId, installed: { buildId, image, installedAt: 1 },
+    acceptance: null, operation: { id: operationId, kind: 'reverify', stage: 'acceptance', buildId, image, generation } })
+  expect(invoke().status).toBe(0)
+  expect(value.calls()).not.toMatch(/buildx|migrate|stop.*app|restart.*app/)
+})
+
+it('keeps the identity service key in the app and excludes it from migration and capture processes', () => {
+  const value = fixture(), target = parsePrereleaseTarget(value.config), buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`
+  writeFileSync(join(value.root, '.env'), readFileSync(join(value.root, '.env'), 'utf8') + 'PRERELEASE_IDENTITY_SERVICE_KEY=target-app-only-fixture\n')
+  const composed = renderCompose(target, { ...readRuntime(target), buildId, installed: { buildId, image, installedAt: 1 } })
+  if (!('app' in composed.services) || !composed.services.app || !composed.services.migrate || !composed.services.capture) throw new Error('Expected installed candidate services')
+  expect(composed.services.app.env_file).toEqual([join(value.root, '.env')])
+  for (const service of [composed.services.migrate, composed.services.capture]) {
+    expect(service.environment).toMatchObject({ DATABASE_URL: 'postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test' })
+    expect(service.environment).not.toHaveProperty('PRERELEASE_IDENTITY_SERVICE_KEY')
+    expect(service).not.toHaveProperty('env_file')
+  }
 })
 
 it('refuses a formal database before Docker, SSH, state files, or a maintenance transition', () => {
@@ -206,7 +236,7 @@ function startupRetryFixture(sourceInstalled = true, sameBuild = false) {
   if (sourceInstalled) {
     writeRuntime(target, { ...state(), mode: 'open', buildId: sourceBuildId,
       installed: { buildId: sourceBuildId, image: sourceImage, installedAt: Date.now() },
-      acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64) } })
+      acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64), formalBuildId: null } })
     writeFileSync(containerImage, sourceImage)
     const backups = join(value.root, 'backups'), stem = `pre-${operationId}`
     const capture = join(value.temporary, 'capture'); mkdirSync(capture)
@@ -429,18 +459,18 @@ exit 42
   expect(value.calls()).toBe('')
 })
 
-it.each(['https://sibling.agricola.test', 'https://nested.app.agricola.test'])('rejects same-site pre %s before owner side effects', origin => {
+it.each(['https://sibling.agricola.test', 'https://nested.app.agricola.test'])('plans a distinct same-site pre %s without opening it', origin => {
   const value = fixture(); value.config.origin = origin; value.save()
   const result = value.invoke('plan')
-  expect(result.status).not.toBe(0)
-  expect(result.stderr).toContain('different cookie site')
+  expect(result.status, result.stderr).toBe(0)
   expect(value.calls()).toBe('')
   expect(existsSync(join(value.root, 'control'))).toBe(false)
 })
-it('uses private PSL sites when validating the owner target', () => {
+it('rejects a shared hostname even when the port or final DNS dot differs', () => {
   const value = fixture()
-  value.config.formal.appOrigin = 'https://app.formal-fixture.github.io'
-  value.config.formal.apiOrigin = 'https://api.formal-fixture.github.io'
-  expect(() => parsePrereleaseTarget({ ...value.config, origin: 'https://pre.formal-fixture.github.io' })).toThrow('different cookie site')
-  expect(parsePrereleaseTarget({ ...value.config, origin: 'https://pre-fixture.github.io' }).origin).toBe('https://pre-fixture.github.io')
+  for (const origin of ['https://app.agricola.test', 'https://api.agricola.test:8443', 'https://api.agricola.test.:8443']) {
+    expect(() => parsePrereleaseTarget({ ...value.config, origin })).toThrow('different hostname')
+  }
+  expect(() => parsePrereleaseTarget({ ...value.config, origin: 'https://api.agricola.test',
+    formal: { ...value.config.formal, apiOrigin: 'https://api.agricola.test.' } })).toThrow('different hostname')
 })

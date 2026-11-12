@@ -17,6 +17,8 @@
     "retained-data": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
     "deletion-audit": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
     "capacity": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
-    "formal-unaffected": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" }
+    "formal-unaffected": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
+    "browser-boundary": { "path": "REPLACE_SAME_SITE_BROWSER_EVIDENCE", "sha256": "REPLACE_SHA256" },
+    "formal-browser-policy": { "path": "REPLACE_VERIFY_FORMAL_BROWSER_OUTPUT", "sha256": "REPLACE_SHA256" }
   }
 }

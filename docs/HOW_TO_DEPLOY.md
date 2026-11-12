@@ -127,7 +127,9 @@ node --import tsx scripts/prerelease/authority.ts close --config "$pre_config" -
 
 Deploy independently checks the complete same-channel GitHub receipt for the fixed SHA, archives tracked candidate source, builds the paired hosted image, checks frontend metadata and OCI revision/channel, and pins its immutable image ID. It closes the gateway, gracefully drains the exact owned writer, captures and validates a paired pre-change backup, verifies source/tool permissions, migrates and validates retained storage with the candidate, then checks real startup identity. It never restarts the old image after migration. It leaves the public gate closed in `acceptance`. Resume the same operation after repairing its cause; a failed clean drain requires investigation. A close receipt older than ten minutes requires a new close action/receipt, without changing the deployment operation ID. Caddy, formal apps and shared storage are not restarted by these actions.
 
-Pre uses an independent cookie site from both formal app and API, including private PSL boundaries. Sibling hostnames and different ports are rejected before owner side effects or formal handoff issuance. Do not configure a pre subdomain of the formal site. HTTP/WS gateway response filtering removes Domain cookies and candidate overrides of its verification cookie, but JavaScript cookie isolation depends on the different-site configuration. Top-level PKCE and server-side exchange remain the handoff path; formal app/API same-site authentication is unchanged.
+Pre may use `https://pre.titanxxh.com` alongside the existing formal Pages/API hosts. It must use a different hostname from each, even when ports differ. A maintenance-only bootstrap may precede formal upgrades. Serving candidate code, including private owner verification, requires the running formal browser-authentication policy version 2. Deploy the matching formal frontend/backend protection and complete its legacy-session migration first. The owner lifecycle CLI accepts only the new `__Host-oa-session` cookie file and sends the browser protocol header; obtain a fresh owner login after migration.
+
+The gateway allows only the declared `__Host-oa-pre-session` and `__Host-oa-pre-handoff` candidate cookies with Secure, HttpOnly, Path=/, SameSite=Lax and no Domain. It removes other candidate cookies, `Clear-Site-Data`, incoming Authorization and undeclared identity headers. Its owner verification cookie never reaches the candidate. HTTP rejects foreign Origin and unsafe methods without the exact pre Origin; WS requires the exact pre Origin and `/ws`. Candidate authentication and room permissions remain app responsibilities. Migration, capture and storage-policy tools receive only data credentials, without the target identity service key. Same-parent cookies still share browser availability limits; these protections do not promise independent-site cookie capacity.
 
 The candidate must implement the real `prerelease_retained_identity_refs(user_id,source_grant_id)` SQL view, covering every retained external principal including room/history-only references, and `scripts/prerelease/identity-audit.ts apply <packet.json>`. The adapter must remove/anonymize deleted principals and remap every active retained reference to the returned current-generation `associationId`; it must not recreate a session or login right. #1663/#1667 own this persistence/cleanup implementation. Main supplies no stub: a missing view/adapter blocks opening. The owner reads actual rows, rejects missing/null/unbound provenance, sorts distinct ASCII pairs in binary/C order, and hashes shared canonical JSON. The formal `associate` action verifies prior provenance and creates source-less revoked associations so future deletions still propagate after restoration.
 
@@ -150,6 +152,14 @@ node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verificati
 
 The helper POSTs the local token to the exact HTTPS gateway; it never places it in a URL. The gateway binds the ten-minute Secure/HttpOnly/host-only cookie to build and generation, strips it before candidate HTTP/WS, and leaves ordinary browsers at 503. Use normal formal login and real pre admission in this private browser. Keep its profile outside candidate mounts. This proves routing only when the actual candidate implements the required flows. Record real identity/Beta, HTTP/WS, public card, Viewer, retained-game/undo, deletion, capacity and formal-unaffected evidence. Copy `deploy/prerelease-acceptance.example.json`, fill the exact operation/build/image/generation/fingerprint, current epoch-millisecond `acceptedAt`, and nonempty evidence paths with their SHA256. Acceptance expires after 30 minutes.
 
+Include `browser-boundary` evidence from the actual deployed formal frontend/API and same-parent browser tests. Capture the independent `formal-browser-policy` artifact with:
+
+```bash
+./deploy-prerelease.sh verify-formal-browser --config "$pre_config" --expected-current "$pre_sha"
+```
+
+Use the printed path and SHA256 in acceptance evidence. The artifact binds the pre target/build/generation/operation to the live formal policy and the actual Pages build marker, HTML and module-entry bytes. `open` reads those HTTPS endpoints again without credentials or redirects and rejects changed or expired proof. Source code, a configuration switch or a successful merge cannot substitute for this readback.
+
 After browser tests, close authority admission, run `maintain`, and resume the same deploy operation to restart closed. This revokes private gateway access and drains accepted commands. Rescan/apply identities and obtain a fresh completion/activation receipt immediately before public open:
 
 ```bash
@@ -157,6 +167,15 @@ After browser tests, close authority admission, run `maintain`, and resume the s
 ```
 
 `open` rescans the native view, checks matching completion/activation and all evidence hashes, rechecks runtime identity, and atomically opens only that accepted candidate. Health alone cannot open it. The formal entry flag remains a separate owner activation; setting it does not bypass generation admission or maintenance.
+
+The trusted gateway refreshes the fixed formal policy endpoint every ten seconds, never extending confirmation beyond thirty seconds from request start. Missing, incompatible or expired capability closes candidate HTTP/WS, including existing connections. Open admission is also bound to the accepted formal build. A formal release SHA change therefore closes pre until fresh acceptance. To revalidate without rebuilding, migrating or replacing the pre data generation, obtain a fresh authority `close` receipt and run:
+
+```bash
+./deploy-prerelease.sh reverify --config "$pre_config" --expected-current "$pre_sha" --operation-id "$pre_op" --authority-receipt close.json
+./deploy-prerelease.sh verify-formal-browser --config "$pre_config" --expected-current "$pre_sha"
+```
+
+Use a new operation UUID. `reverify` closes public ingress, invalidates private owner access, preserves the installed app and creates an `acceptance` operation; retry with the same UUID. Repeat private browser acceptance and the native identity audit/activation above, bind a fresh acceptance file to this operation, then run `open`. It does not reinstall pre or reset games. For planned rollback to a formal version without the new authentication boundary, close pre ingress and formal handoff **before** rolling back; the thirty-second capability lease is not permission for an unsafe rollback window.
 
 Daily `backup` captures an installed source online, including an open gateway with no pending operation, and never stops the app. Capture and ledger operations use a separate stable tooling image built from the fixed trusted-main policy SHA through the same bounded rootless builder. Its digest, revision and channel are checked and cached under `control/`. Tool provenance is separate from the archived source installation: the sealed pair records the actual source SHA and capture time, never the tooling image's SHA or candidate-supplied metadata. No additional target configuration is needed; missing owner context fails closed.
 

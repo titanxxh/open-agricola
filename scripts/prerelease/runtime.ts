@@ -1,15 +1,15 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { assertOwnerPath, assertScopedPaths, type PrereleaseTarget, targetFingerprint } from './config'
+import { applicationDataEnvironment, assertOwnerPath, assertScopedPaths, type PrereleaseTarget, targetFingerprint } from './config'
 
 export type InstalledBuild = { buildId: string; image: string; installedAt: number }
-export type Operation = { id: string; kind: 'deploy' | 'reset' | 'restore'; buildId: string; image: string;
+export type Operation = { id: string; kind: 'deploy' | 'reset' | 'restore' | 'reverify'; buildId: string; image: string;
   sourceBuildId: string | null; sourceImage: string | null; stage: 'backup' | 'migration' | 'startup' | 'acceptance'; backupStem: string | null; generation: string }
 export type RuntimeRecord = {
   format: 1; channel: 'prerelease'; targetId: string; fingerprint: string; generation: string;
   mode: 'maintenance' | 'open' | 'closed'; buildId: string | null; installed: InstalledBuild | null;
-  operation: Operation | null; acceptance: { acceptedAt: number; sha256: string } | null
+  operation: Operation | null; acceptance: { acceptedAt: number; sha256: string; formalBuildId: string | null } | null
 }
 
 export const controlDirectory = (target: PrereleaseTarget) => join(target.directory, 'control')
@@ -50,7 +50,7 @@ export function readRuntime(target: PrereleaseTarget): RuntimeRecord {
   if (value.operation !== null) {
     const row = value.operation
     if (!row || typeof row !== 'object' || !('id' in row) || !uuid(row.id) || !('kind' in row)
-      || (row.kind !== 'deploy' && row.kind !== 'reset' && row.kind !== 'restore') || !('buildId' in row) || !sha(row.buildId)
+      || (row.kind !== 'deploy' && row.kind !== 'reset' && row.kind !== 'restore' && row.kind !== 'reverify') || !('buildId' in row) || !sha(row.buildId)
       || !('image' in row) || !digest(row.image) || !('sourceBuildId' in row) || row.sourceBuildId !== null && !sha(row.sourceBuildId)
       || !('stage' in row) || (row.stage !== 'backup' && row.stage !== 'migration' && row.stage !== 'startup' && row.stage !== 'acceptance')
       || !('backupStem' in row) || row.backupStem !== null && (typeof row.backupStem !== 'string' || !/^(daily|pre|manual)-[a-zA-Z0-9._-]+$/.test(row.backupStem))
@@ -65,7 +65,9 @@ export function readRuntime(target: PrereleaseTarget): RuntimeRecord {
     const row = value.acceptance
     if (!row || typeof row !== 'object' || !('acceptedAt' in row) || typeof row.acceptedAt !== 'number'
       || !('sha256' in row) || typeof row.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(row.sha256)) throw new Error('Invalid acceptance record')
-    acceptance = { acceptedAt: row.acceptedAt, sha256: row.sha256 }
+    const formalBuildId = 'formalBuildId' in row ? row.formalBuildId : null
+    if (formalBuildId !== null && !sha(formalBuildId)) throw new Error('Invalid accepted formal build')
+    acceptance = { acceptedAt: row.acceptedAt, sha256: row.sha256, formalBuildId }
   }
   if (value.mode !== 'maintenance' && value.mode !== 'open' && value.mode !== 'closed') throw new Error('Invalid gateway mode')
   return { format: 1, channel: 'prerelease', targetId: target.targetId, fingerprint: value.fingerprint, generation: value.generation,
@@ -74,13 +76,17 @@ export function readRuntime(target: PrereleaseTarget): RuntimeRecord {
 
 export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, candidateImage?: string) {
   const labels = { 'org.open-agricola.environment': target.targetId, 'io.open-agricola.release-channel': 'prerelease' }
+  const gatewayFiles = ['scripts/prerelease/gateway.ts', 'scripts/prerelease/browser-policy.ts', 'shared/contract/browser-auth.ts']
+  const gatewayPolicy = createHash('sha256')
+  for (const file of gatewayFiles) gatewayPolicy.update(file).update(readFileSync(join(target.policyDirectory, file)))
   const limits = (kind: 'app' | 'tools') => ({ mem_limit: `${target.budgets[kind].memoryMiB}m`, cpus: target.budgets[kind].cpus, pids_limit: target.budgets[kind].pids })
   const gateway = { image: 'node:24.19.0-slim', init: true, user: `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
     read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'], mem_limit: '64m', cpus: 0.25, pids_limit: 32,
-    ports: [`127.0.0.1:${target.port}:5176`], labels: { ...labels, 'org.open-agricola.gateway-policy': createHash('sha256').update(readFileSync(join(target.policyDirectory, 'scripts/prerelease/gateway.ts'))).digest('hex') }, restart: 'unless-stopped',
-    environment: { PRERELEASE_TARGET_ID: target.targetId, PRERELEASE_PUBLIC_ORIGIN: target.origin },
-    volumes: [`${controlDirectory(target)}:/control:ro`, `${join(target.policyDirectory, 'scripts/prerelease/gateway.ts')}:/gateway.ts:ro`],
-    command: ['node', '/gateway.ts'], networks: ['default'] }
+    ports: [`127.0.0.1:${target.port}:5176`], labels: { ...labels, 'org.open-agricola.gateway-policy': gatewayPolicy.digest('hex') }, restart: 'unless-stopped',
+    environment: { PRERELEASE_TARGET_ID: target.targetId, PRERELEASE_PUBLIC_ORIGIN: target.origin,
+      FORMAL_APP_ORIGIN: target.formal.appOrigin, FORMAL_API_BASE: target.formal.apiOrigin },
+    volumes: [`${controlDirectory(target)}:/control:ro`, ...gatewayFiles.map(file => `${join(target.policyDirectory, file)}:/policy/${file}:ro`)],
+    command: ['node', '/policy/scripts/prerelease/gateway.ts'], networks: ['default'] }
   const image = record.installed?.image ?? candidateImage
   if (!image) return { name: target.project, services: { gateway }, networks: { default: {} } }
   if (!digest(image) || candidateImage && !digest(candidateImage)) throw new Error('Compose requires immutable image digests')
@@ -95,8 +101,9 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
   const tool = { image: candidateImage ?? image, init: true, user: gateway.user, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
     ...limits('tools'), profiles: ['tools'], labels, networks: ['dependencies'], tmpfs: ['/tmp:size=67108864'],
     environment: { GAME_BUILD_ID: record.operation?.buildId ?? record.buildId, RELEASE_CHANNEL: 'prerelease' } }
+  const appDataEnvironment = applicationDataEnvironment(target)
   return { name: target.project, services: { gateway, app, tools: { ...tool, env_file: [join(target.directory, 'data/dependencies.compose.env')] },
-    migrate: { ...tool, env_file: [join(target.directory, '.env')] }, capture: { ...tool, image, env_file: [join(target.directory, '.env')] } },
+    migrate: { ...tool, environment: { ...appDataEnvironment, ...tool.environment } }, capture: { ...tool, image, environment: { ...appDataEnvironment, ...tool.environment } } },
   networks: { default: {}, dependencies: { external: true, name: target.network } } }
 }
 

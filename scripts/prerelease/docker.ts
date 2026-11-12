@@ -4,7 +4,7 @@ import { freemem } from 'node:os'
 import { existsSync, mkdirSync, readFileSync, statfsSync, writeFileSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { atomicJson, composePath, controlDirectory, readRuntime, type RuntimeRecord } from './runtime'
-import { assertOwnerPath, targetFingerprint, type PrereleaseTarget } from './config'
+import { applicationDataEnvironment, assertOwnerPath, targetFingerprint, type PrereleaseTarget } from './config'
 
 export function command(program: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string | Buffer; timeout?: number } = {}): string {
   const env: NodeJS.ProcessEnv = {}
@@ -183,17 +183,20 @@ export function trustedArchiveTool(target: PrereleaseTarget, service: 'capture' 
   const record = readRuntime(target)
   return boundedTool(target, (labels, deadline, runId) => {
     const image = trustedArchiveImage(target, deadline)
+    const dataEnvironment = service === 'tools' ? {} : applicationDataEnvironment(target)
+    const credentials = service === 'tools' ? ['--env-file', join(target.directory, 'data/dependencies.compose.env')]
+      : Object.keys(dataEnvironment).flatMap(key => ['-e', key])
     if (deadline <= Date.now()) throw new Error('Trusted archive image preparation exhausted the backup deadline')
     return command('docker', ['run', '--rm', ...labels, '--network', target.network,
     '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
     '--memory', `${target.budgets.tools.memoryMiB}m`, '--cpus', String(target.budgets.tools.cpus), '--pids-limit', String(target.budgets.tools.pids),
-    '--tmpfs', '/tmp:size=67108864', '--env-file', join(target.directory, service === 'tools' ? 'data/dependencies.compose.env' : '.env'),
+    '--tmpfs', '/tmp:size=67108864', ...credentials,
     '-e', 'PG_CLIENT_MODE=local', '-e', 'RELEASE_CHANNEL=prerelease', '-e', `SOURCE_BUILD_ID=${record.installed?.buildId ?? ''}`,
     '-e', `BACKUP_ENVIRONMENT=${target.targetId}`, '-e', `BACKUP_JOB_ID=${runId}`,
     '-e', `BACKUP_DEADLINE_EPOCH_MS=${deadline}`, '-e', 'BACKUP_SCRATCH_DIRECTORY=/backup',
     '-v', `${backupRoot(target)}:/backup`, '--entrypoint', 'timeout', image, '--signal=TERM', '--kill-after=3s',
     String(Math.max(1, Math.ceil((deadline - Date.now()) / 1000))), 'node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', ...args],
-  { cwd: target.directory, timeout: Math.max(1, deadline - Date.now()) + 3000 })
+  { cwd: target.directory, env: dataEnvironment, timeout: Math.max(1, deadline - Date.now()) + 3000 })
   }, budget)
 }
 
@@ -227,13 +230,16 @@ export function policyTool(target: PrereleaseTarget, operation: 'inspect' | 'emp
   writeFileSync(config, JSON.stringify(target), { mode: 0o600 })
   const env: string[] = []
   for (const [key, value] of Object.entries(extra)) env.push('-e', `${key}=${value}`)
+  const dataEnvironment = credentials === 'app' ? applicationDataEnvironment(target) : {}
+  const credentialArguments = credentials === 'tools' ? ['--env-file', join(target.directory, 'data/dependencies.compose.env')]
+    : Object.keys(dataEnvironment).flatMap(key => ['-e', key])
   return boundedTool(target, (labels) => command('docker', ['run', '--rm', ...labels, '--network', target.network, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
     '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`, '--memory', `${target.budgets.tools.memoryMiB}m`, '--cpus', String(target.budgets.tools.cpus),
     '--pids-limit', String(target.budgets.tools.pids), '--tmpfs', '/tmp:size=67108864',
-    '--env-file', join(target.directory, credentials === 'app' ? '.env' : 'data/dependencies.compose.env'), '-e', 'RELEASE_CHANNEL=prerelease', ...env,
+    ...credentialArguments, '-e', 'RELEASE_CHANNEL=prerelease', ...env,
     '-v', `${code}:/policy:ro`, '-v', `${join(target.policyDirectory, 'node_modules')}:/policy/node_modules:ro`, '-v', `${config}:/target.json:ro`,
     '-v', `${backupRoot(target)}:/backup`, '--workdir', '/policy', '--entrypoint', 'timeout', 'node:24.19.0-slim', '--signal=TERM', '--kill-after=3s', '1790', 'node', '--import', 'tsx', 'scripts/prerelease/storage.ts', operation],
-  { timeout: 1800_000 }))
+  { env: dataEnvironment, timeout: 1800_000 }))
 }
 
 export function verifyPermissions(target: PrereleaseTarget): void {

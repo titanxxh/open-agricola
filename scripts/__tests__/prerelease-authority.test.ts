@@ -16,14 +16,14 @@ it('sends the owner cookie only to exact formal HTTPS/Origin, validates receipt 
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=127.0.0.1',
     '-addext', 'subjectAltName=IP:127.0.0.1', '-keyout', join(root, 'key'), '-out', join(root, 'cert')], { stdio: 'ignore' })
   const cert = readFileSync(join(root, 'cert')), cookieFile = join(root, 'formal-cookie')
-  writeFileSync(cookieFile, 'oa_session=dummy-owner-cookie', { mode: 0o600 })
+  writeFileSync(cookieFile, '__Host-oa-session=dummy-owner-cookie', { mode: 0o600 })
   let behavior = 'valid', requests = 0
   const seen: unknown[] = []
   const server = createServer({ key: readFileSync(join(root, 'key')), cert }, (req, res) => {
     requests++; let body = ''
     req.on('data', bytes => { body += bytes.toString() })
     req.on('end', () => {
-      seen.push({ path: req.url, cookie: req.headers.cookie, origin: req.headers.origin, body: JSON.parse(body) })
+      seen.push({ path: req.url, cookie: req.headers.cookie, origin: req.headers.origin, protocol: req.headers['x-oa-browser-protocol'], body: JSON.parse(body) })
       if (behavior === 'redirect') { res.writeHead(302, { Location: '/wrong-target' }); res.end(); return }
       const input = JSON.parse(body)
       res.setHeader('Content-Type', 'application/json')
@@ -39,7 +39,7 @@ it('sends the owner cookie only to exact formal HTTPS/Origin, validates receipt 
   const body = { action: 'close', generationId: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId: 'cb4d6c82-676f-4dcc-a570-52377b3b32f5' }
   try {
     expect(await requestAuthorityLifecycle(target, cookieFile, body, cert)).toMatchObject({ ok: true, receipt: { action: 'close', targetOrigin: target.origin } })
-    expect(seen[0]).toEqual({ path: '/api/admin/prerelease-identity/lifecycle', cookie: 'oa_session=dummy-owner-cookie', origin: target.formal.appOrigin,
+    expect(seen[0]).toEqual({ path: '/api/admin/prerelease-identity/lifecycle', cookie: '__Host-oa-session=dummy-owner-cookie', origin: target.formal.appOrigin, protocol: '2',
       body: { ...body, protocolVersion: 1, channel: 'prerelease', targetOrigin: target.origin } })
     behavior = 'wrong'; await expect(requestAuthorityLifecycle(target, cookieFile, body, cert)).rejects.toThrow('binding mismatch')
     behavior = 'redirect'; await expect(requestAuthorityLifecycle(target, cookieFile, body, cert)).rejects.toThrow('(302)')

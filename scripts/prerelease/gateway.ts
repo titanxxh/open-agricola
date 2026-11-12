@@ -4,16 +4,26 @@ import type { Duplex } from 'node:stream'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
+import { readBrowserAuthPolicy, type FormalOrigins, type FormalTlsOptions } from './browser-policy.ts'
 
 export const OWNER_VERIFICATION_COOKIE = '__Host-oa-pre-verify'
+const candidateCookies = new Set(['__Host-oa-pre-session', '__Host-oa-pre-handoff'])
+const forwardedHeaders = new Set(['accept', 'accept-language', 'cache-control', 'content-type', 'content-length', 'origin', 'referer', 'user-agent',
+  'range', 'if-range', 'if-none-match', 'if-modified-since', 'connection', 'upgrade', 'sec-websocket-key', 'sec-websocket-version',
+  'sec-websocket-extensions', 'sec-websocket-protocol', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', 'sec-fetch-user', 'x-oa-browser-protocol'])
 
 function candidateResponseHeaders(headers: IncomingHttpHeaders): IncomingHttpHeaders {
   const result = { ...headers }
+  delete result['clear-site-data']
   if (result['set-cookie']) {
     const cookies = result['set-cookie'].filter(cookie => {
       const [pair, ...attributes] = cookie.split(';')
-      return pair.slice(0, pair.indexOf('=')).trim() !== OWNER_VERIFICATION_COOKIE
-        && !attributes.some(attribute => /^\s*domain\s*=/i.test(attribute))
+      const normalized = attributes.map(attribute => attribute.trim().toLowerCase())
+      return candidateCookies.has(pair.slice(0, pair.indexOf('=')).trim())
+        && !normalized.some(attribute => /^domain\s*=/.test(attribute))
+        && normalized.filter(attribute => attribute.startsWith('path=')).length === 1
+        && normalized.includes('path=/') && normalized.includes('secure') && normalized.includes('httponly')
+        && normalized.filter(attribute => attribute.startsWith('samesite=')).length === 1 && normalized.includes('samesite=lax')
     })
     if (cookies.length) result['set-cookie'] = cookies
     else delete result['set-cookie']
@@ -22,7 +32,7 @@ function candidateResponseHeaders(headers: IncomingHttpHeaders): IncomingHttpHea
 }
 
 /** The candidate has no write access to this owner-controlled file or gateway. */
-export function createPrereleaseGateway(options: { stateFile: string; targetId: string; origin: string; upstream: string; verificationFile?: string }) {
+export function createPrereleaseGateway(options: { stateFile: string; targetId: string; origin: string; upstream: string; formal: FormalOrigins; verificationFile?: string } & FormalTlsOptions) {
   const host = new URL(options.origin).host
   const upstream = new URL(options.upstream)
   const connections = new Map<Duplex, () => boolean>()
@@ -33,9 +43,32 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
         && 'targetId' in state && state.targetId === options.targetId
         && 'channel' in state && state.channel === 'prerelease' && 'mode' in state && (state.mode === 'open' || state.mode === 'maintenance')
         && 'buildId' in state && typeof state.buildId === 'string' && /^[a-f0-9]{40}$/.test(state.buildId)
-        && 'generation' in state && typeof state.generation === 'string' && /^[a-f0-9-]{36}$/.test(state.generation)) return { mode: state.mode, buildId: state.buildId, generation: state.generation }
+        && 'generation' in state && typeof state.generation === 'string' && /^[a-f0-9-]{36}$/.test(state.generation)) {
+        const acceptance = 'acceptance' in state ? state.acceptance : null
+        const formalBuildId = acceptance && typeof acceptance === 'object' && 'formalBuildId' in acceptance && typeof acceptance.formalBuildId === 'string'
+          && /^[a-f0-9]{40}$/.test(acceptance.formalBuildId) ? acceptance.formalBuildId : null
+        return { mode: state.mode, buildId: state.buildId, generation: state.generation, formalBuildId }
+      }
       return null
     } catch { return null }
+  }
+  let capability: { buildId: string; validUntil: number } | null = null
+  let capabilityExpiry: ReturnType<typeof setTimeout> | undefined
+  let refresh: Promise<void> | undefined
+  let stopped = false
+  const refreshBrowserPolicy = (): Promise<void> => {
+    if (stopped) return Promise.resolve()
+    if (refresh) return refresh
+    const startedAt = Date.now()
+    refresh = readBrowserAuthPolicy(options.formal, options).then(policy => {
+      if (!stopped) {
+        capability = { buildId: policy.buildId, validUntil: startedAt + 30_000 }
+        clearTimeout(capabilityExpiry)
+        capabilityExpiry = setTimeout(closeInputs, Math.max(0, capability.validUntil - Date.now()))
+        capabilityExpiry.unref()
+      }
+    }).catch(() => { capability = null; clearTimeout(capabilityExpiry) }).finally(() => { refresh = undefined; closeInputs() })
+    return refresh
   }
   const verificationFile = options.verificationFile ?? resolve(options.stateFile, '../verification.json')
   const validToken = (token: string) => {
@@ -51,8 +84,10 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
   }
   const allowed = (cookie = '') => {
     const current = state()
-    if (current?.mode === 'open') return true
-    const token = cookie.split(';').map(value => value.trim()).find(value => value.startsWith(`${OWNER_VERIFICATION_COOKIE}=`))?.slice(OWNER_VERIFICATION_COOKIE.length + 1)
+    if (!capability || capability.validUntil <= Date.now()) return false
+    if (current?.mode === 'open') return current.formalBuildId === capability.buildId
+    const tokens = cookie.split(';').map(value => value.trim()).filter(value => value.startsWith(`${OWNER_VERIFICATION_COOKIE}=`))
+    const token = tokens.length === 1 ? tokens[0].slice(OWNER_VERIFICATION_COOKIE.length + 1) : undefined
     return current?.mode === 'maintenance' && token !== undefined && validToken(token)
   }
   const track = (socket: Duplex, permission = () => allowed()) => {
@@ -60,9 +95,17 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     socket.on('close', () => connections.delete(socket))
     socket.on('error', () => socket.destroy())
   }
-  const headers = (input: IncomingHttpHeaders) => ({ ...input,
-    cookie: (input.cookie ?? '').split(';').map(value => value.trim()).filter(value => value && !value.startsWith(`${OWNER_VERIFICATION_COOKIE}=`)).join('; '),
-    host, 'x-forwarded-host': host, 'x-forwarded-proto': 'https' })
+  const headers = (input: IncomingHttpHeaders): IncomingHttpHeaders | null => {
+    const seen = new Set<string>(), cookies: string[] = []
+    for (const pair of (input.cookie ?? '').split(';').map(value => value.trim())) {
+      const name = pair.slice(0, pair.indexOf('='))
+      if (!candidateCookies.has(name)) continue
+      if (seen.has(name)) return null
+      seen.add(name); cookies.push(pair)
+    }
+    return { ...Object.fromEntries(Object.entries(input).filter(([name]) => forwardedHeaders.has(name))),
+      ...(cookies.length ? { cookie: cookies.join('; ') } : {}), host, 'x-forwarded-host': host, 'x-forwarded-proto': 'https' }
+  }
   const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
   const maintenanceHtml = (language = ''): string | null => {
     try {
@@ -94,6 +137,8 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
       })
       return
     }
+    if (req.headers.origin !== undefined && req.headers.origin !== options.origin
+      || !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? '') && req.headers.origin !== options.origin) { res.writeHead(403); res.end(); return }
     const permission = () => allowed(req.headers.cookie)
     track(req.socket, permission)
     if (!permission()) {
@@ -102,7 +147,9 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
         'Content-Security-Policy': "default-src 'none'; base-uri 'none'; frame-ancestors 'none'", 'X-Content-Type-Options': 'nosniff' })
       res.end(html ?? JSON.stringify({ ok: false, code: 'prerelease_maintenance' })); return
     }
-    const outgoing = request({ protocol: upstream.protocol, hostname: upstream.hostname, port: upstream.port, path: req.url ?? '/', method: req.method, headers: headers(req.headers) }, response => {
+    const forwarded = headers(req.headers)
+    if (!forwarded) { res.writeHead(400); res.end(); return }
+    const outgoing = request({ protocol: upstream.protocol, hostname: upstream.hostname, port: upstream.port, path: req.url ?? '/', method: req.method, headers: forwarded }, response => {
       if (!permission()) { response.destroy(); res.destroy(); return }
       res.writeHead(response.statusCode ?? 502, candidateResponseHeaders(response.headers))
       response.on('data', chunk => { if (permission()) res.write(chunk); else { response.destroy(); res.destroy() } })
@@ -118,10 +165,13 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
   server.on('upgrade', (req, socket, head) => {
     const permission = () => allowed(req.headers.cookie)
     track(socket, permission)
-    if (req.headers.host !== host || !originPath(req.url) || !permission()) {
+    if (req.headers.host !== host || !originPath(req.url) || req.headers.origin !== options.origin
+      || new URL(req.url ?? '/', options.origin).pathname !== '/ws' || !permission()) {
       socket.end('HTTP/1.1 503 Service Unavailable\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n'); return
     }
-    const outgoing = request({ protocol: upstream.protocol, hostname: upstream.hostname, port: upstream.port, path: req.url ?? '/', method: 'GET', headers: headers(req.headers) })
+    const forwarded = headers(req.headers)
+    if (!forwarded) { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); return }
+    const outgoing = request({ protocol: upstream.protocol, hostname: upstream.hostname, port: upstream.port, path: req.url ?? '/', method: 'GET', headers: forwarded })
     outgoing.on('upgrade', (response, remote, upstreamHead) => {
       track(remote, permission)
       if (!permission()) { remote.destroy(); socket.destroy(); return }
@@ -141,23 +191,30 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     outgoing.on('error', () => socket.destroy())
     outgoing.end()
   })
-  const closeInputs = () => { for (const [socket, permission] of connections) if (!permission()) socket.destroy() }
+  function closeInputs() { for (const [socket, permission] of connections) if (!permission()) socket.destroy() }
   watchFile(options.stateFile, { interval: 100, persistent: false }, closeInputs)
   watchFile(verificationFile, { interval: 100, persistent: false }, closeInputs)
   const timer = setInterval(closeInputs, 1000); timer.unref()
-  return { server, close: async () => {
+  const policyTimer = setInterval(() => { void refreshBrowserPolicy() }, 10_000); policyTimer.unref()
+  void refreshBrowserPolicy()
+  return { server, refreshBrowserPolicy, close: async () => {
+    stopped = true
+    clearTimeout(capabilityExpiry)
     unwatchFile(options.stateFile, closeInputs)
-    unwatchFile(verificationFile, closeInputs); clearInterval(timer)
+    unwatchFile(verificationFile, closeInputs); clearInterval(timer); clearInterval(policyTimer)
     for (const socket of connections.keys()) socket.destroy()
     await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done()))
+    await refresh
   } }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const targetId = process.env.PRERELEASE_TARGET_ID
   const origin = process.env.PRERELEASE_PUBLIC_ORIGIN
-  if (!targetId || !/^prerelease-[a-z0-9-]+$/.test(targetId) || !origin || new URL(origin).origin !== origin || !origin.startsWith('https://')) throw new Error('Invalid prerelease gateway target')
-  const gateway = createPrereleaseGateway({ targetId, origin, stateFile: '/control/gate.json', upstream: 'http://app:5175' })
+  const appOrigin = process.env.FORMAL_APP_ORIGIN, apiOrigin = process.env.FORMAL_API_BASE
+  if (!targetId || !/^prerelease-[a-z0-9-]+$/.test(targetId) || !origin || new URL(origin).origin !== origin || !origin.startsWith('https://')
+    || !appOrigin || !apiOrigin) throw new Error('Invalid prerelease gateway target')
+  const gateway = createPrereleaseGateway({ targetId, origin, formal: { appOrigin, apiOrigin }, stateFile: '/control/gate.json', upstream: 'http://app:5175' })
   gateway.server.listen(5176, '0.0.0.0')
   for (const signal of ['SIGTERM', 'SIGINT'] as const) process.once(signal, () => { void gateway.close() })
 }
