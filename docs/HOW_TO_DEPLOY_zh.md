@@ -76,13 +76,13 @@ pre start 先建立 host-only HttpOnly verifier/state Cookie，再前往正式�
 
 各 SHA 均为完整提交身份。清单提交位于功能提交之后，`integratedSha` 指向实际集成功能提交。独立功能保留来源，以便只晋升选定功能。依赖必须指向清单中已有功能且不能成环；候选须继承 main 基线且无 merge commit。
 
-owner 同步 main 时以 `rebase.updateRefs=false` 准备并审阅 rebase 结果，更新清单基线与集成提交，然后执行：
+owner 同步 main 时以 `rebase.updateRefs=false` 准备并审阅 rebase 结果，再更新清单基线与集成提交。同步前须取得该精确 head 由 `pull_request` 或 `push` 事件产生的成功 `verify`。即使通过，GitHub 也不会用 `workflow_dispatch` 的检查满足原生 required-status 规则，见 [GitHub 必需检查事件说明](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated)。按当前 workflow 触发条件，从同步分支向当前 main 建立 draft 对比 PR，明确标注仅作同步审阅，等待检查通过。不要将此 PR 合入 main。然后执行：
 
 ```bash
 pnpm exec tsx scripts/ci/prerelease-verification.ts sync --repository titanxxh/open-agricola --sha <new-pre-sha> --expected-old <old-pre-sha> --main-sha <current-main-sha>
 ```
 
-命令只以显式旧 SHA lease 更新 `refs/heads/prerelease`。远端已变化或功能来源集合发生增减时拒绝；新增和移除功能须经过可审阅 PR。命令不更新 main、固定候选引用或 tag。同步产生新 SHA 后须重新验证。
+命令只以显式旧 SHA lease 更新 `refs/heads/prerelease`。远端已变化或功能来源集合发生增减时拒绝；新增和移除功能须经过可审阅 PR。命令不更新 main、固定候选引用或 tag。读回新引用、等待此次 prerelease push CI 后，关闭 draft 对比 PR，不执行合入。同步产生新 SHA 后须重新取得候选验证。
 
 owner 本机发布与恢复命令为：
 

@@ -74,13 +74,13 @@ Before selecting a candidate, synchronize the integration branch with current `m
 
 Use full commit SHAs. The manifest commit follows the feature commits, so `integratedSha` identifies the actual feature integration rather than the manifest commit. Preserve independent feature sources for selective promotion. Dependencies must name included features and form an acyclic graph. The candidate must descend from its main baseline with no merge commits.
 
-For an owner-controlled main synchronization, prepare and review the rebased commits with `rebase.updateRefs=false`, update the manifest baseline and integration commits, then run:
+For an owner-controlled main synchronization, prepare and review the rebased commits with `rebase.updateRefs=false`, then update the manifest baseline and integration commits. Obtain a successful `verify` for that exact head from an eligible `pull_request` or `push` event before synchronizing. GitHub does not count `workflow_dispatch` checks toward the native required-status rule, even when they pass ([GitHub required-check events](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated)). With the current workflow triggers, open a draft comparison PR from the synchronization branch to current main, identify it as a synchronization review, and wait for its checks. Do not merge this PR into main. Then run:
 
 ```bash
 pnpm exec tsx scripts/ci/prerelease-verification.ts sync --repository titanxxh/open-agricola --sha <new-pre-sha> --expected-old <old-pre-sha> --main-sha <current-main-sha>
 ```
 
-This command only updates `refs/heads/prerelease` with an explicit old-SHA lease. It rejects a changed remote head and changes to the feature source set. New or removed features require a reviewed PR. It never updates `main`, candidate refs, or tags. A synchronization changes candidate SHAs and requires new verification.
+This command only updates `refs/heads/prerelease` with an explicit old-SHA lease. It rejects a changed remote head and changes to the feature source set. New or removed features require a reviewed PR. It never updates `main`, candidate refs, or tags. Read back the new ref, wait for its prerelease push CI, and close the draft comparison PR without merging it. A synchronization changes candidate SHAs and requires new candidate verification.
 
 Publish from the owner machine:
 
