@@ -8,7 +8,7 @@ import { createConnection } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { PostgresDatabase } from '../../server/database/postgres'
 import { createPrereleaseAuthorityHandler } from '../../server/prerelease-authority-routes'
-import { authCookieNames, readCookie } from '../../server/auth-cookies'
+import { httpAdmission, requestSessionToken, websocketAdmission } from '../../server/request-auth'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -72,15 +72,23 @@ async function httpsQualificationApp(hosted: HostedReleaseApp, environment: Node
   await exec('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(root, 'key.pem'),
     '-out', join(root, 'cert.pem'), '-days', '1', '-subj', '/CN=127.0.0.1', '-addext', 'subjectAltName=IP:127.0.0.1'])
   const db = new PostgresDatabase({ connectionString: environment.DATABASE_URL, schema: environment.DATABASE_SCHEMA })
-  const identity = createPrereleaseAuthorityHandler({ db, getSourceToken: async request => readCookie(request.headers.cookie, authCookieNames().session) })
+  const identity = createPrereleaseAuthorityHandler({ db, getSourceToken: async request => requestSessionToken(request) })
   const target = new URL(hosted.apiUrl), sockets = new Set<Duplex>()
   let origin = ''
-  const previous = { PUBLIC_APP_ORIGIN: process.env.PUBLIC_APP_ORIGIN, PRERELEASE_APP_ORIGIN: process.env.PRERELEASE_APP_ORIGIN, ADMIN_USERS: process.env.ADMIN_USERS }
+  const previous = { PUBLIC_APP_ORIGIN: process.env.PUBLIC_APP_ORIGIN, PUBLIC_API_BASE: process.env.PUBLIC_API_BASE, PRERELEASE_APP_ORIGIN: process.env.PRERELEASE_APP_ORIGIN, ADMIN_USERS: process.env.ADMIN_USERS }
   const headers = (request: import('node:http').IncomingMessage) => ({ ...request.headers, host: target.host,
     ...(request.headers.origin === origin ? { origin: target.origin } : {}) })
   const server = createServer({ key: await readFile(join(root, 'key.pem')), cert: await readFile(join(root, 'cert.pem')) }, (request, response) => {
     void (async () => {
-      if (new URL(request.url ?? '/', origin).pathname.startsWith('/api/prerelease/')) {
+      const pathname = new URL(request.url ?? '/', origin).pathname
+      if (pathname.startsWith('/api/')) {
+        const admission = httpAdmission(request)
+        if (!admission.ok) {
+          response.writeHead(admission.status, { 'Content-Type': 'application/json' })
+          response.end(JSON.stringify({ ok: false, code: admission.code })); return
+        }
+      }
+      if (pathname.startsWith('/api/prerelease/')) {
         await identity(request, response)
         return
       }
@@ -94,6 +102,11 @@ async function httpsQualificationApp(hosted: HostedReleaseApp, environment: Node
   })
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)) })
   server.on('upgrade', (request, socket, head) => {
+    const admission = websocketAdmission(request)
+    if (!admission.ok) {
+      socket.end(`HTTP/1.1 ${admission.status} Upgrade Rejected\r\nConnection: close\r\n\r\n`)
+      return
+    }
     const upstream = createConnection({ host: target.hostname, port: Number(target.port) })
     sockets.add(upstream)
     upstream.on('connect', () => {
@@ -111,6 +124,7 @@ async function httpsQualificationApp(hosted: HostedReleaseApp, environment: Node
   if (!address || typeof address === 'string') throw new Error('Expected HTTPS qualification fixture address')
   origin = `https://127.0.0.1:${address.port}`
   process.env.PUBLIC_APP_ORIGIN = origin
+  process.env.PUBLIC_API_BASE = origin
   process.env.PRERELEASE_APP_ORIGIN = ''
   process.env.ADMIN_USERS = environment.ADMIN_USERS
   return { ...hosted, appUrl: `${origin}/open-agricola/`, apiUrl: origin, async close() {

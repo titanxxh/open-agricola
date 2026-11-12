@@ -29,7 +29,7 @@ export async function postJson(
 ) {
   const resp = await request.post(url, {
     ...(body !== undefined ? { data: body } : {}),
-    ...(Object.keys(headers).length > 0 ? { headers } : {}),
+    headers: browserRequestHeaders(),
   })
   return resp.json()
 }
