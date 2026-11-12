@@ -19,6 +19,74 @@ export type ReportFeedbackView = {
   issueUrl: string
   version: number
   feedback: FeedbackRecord[]
+  fix?: FixAssociation
+}
+
+export type FixPullRequestInput = { number: number; requiredCommits: string[] }
+export type VerifiedFixPullRequest = FixPullRequestInput & { url: string; mergeCommit: string }
+export type FixAssociation = {
+  rootId: string
+  rootIssueNumber: number
+  version: number
+  associationVersion: number
+  status: 'pending_release' | 'unlinked'
+  reports: Array<{ submissionId: string; issueNumber: number }>
+  pullRequests: VerifiedFixPullRequest[]
+  requiredCommits: string[]
+}
+export type AssociateFixInput = {
+  issueNumber: number
+  requestId: string
+  expectedVersion: number
+  purpose: 'fix'
+  pullRequests: FixPullRequestInput[]
+}
+export type AssociateDuplicateInput = {
+  issueNumber: number
+  rootIssueNumber: number
+  requestId: string
+  expectedVersion: number
+}
+
+const positive = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+const version = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+const requestId = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{8,100}$/.test(value)
+export const isCommitSha = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
+
+export function parseAssociateFix(value: unknown): AssociateFixInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).some(key => !['issueNumber', 'requestId', 'expectedVersion', 'purpose', 'pullRequests'].includes(key))
+    || !('issueNumber' in value) || !positive(value.issueNumber)
+    || !('requestId' in value) || !requestId(value.requestId)
+    || !('expectedVersion' in value) || !version(value.expectedVersion)
+    || !('purpose' in value) || value.purpose !== 'fix'
+    || !('pullRequests' in value) || !Array.isArray(value.pullRequests) || !value.pullRequests.length || value.pullRequests.length > 5) {
+    throw new Error('invalid_fix_association')
+  }
+  const pullRequests = value.pullRequests.map((entry: unknown): FixPullRequestInput => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)
+      || Object.keys(entry).some(key => !['number', 'requiredCommits'].includes(key))
+      || !('number' in entry) || !positive(entry.number)
+      || !('requiredCommits' in entry) || !Array.isArray(entry.requiredCommits)
+      || !entry.requiredCommits.length || entry.requiredCommits.length > 20 || !entry.requiredCommits.every(isCommitSha)) {
+      throw new Error('invalid_fix_association')
+    }
+    return { number: entry.number, requiredCommits: [...new Set(entry.requiredCommits)].sort() }
+  }).sort((a, b) => a.number - b.number)
+  if (new Set(pullRequests.map(pr => pr.number)).size !== pullRequests.length
+    || pullRequests.flatMap(pr => pr.requiredCommits).length > 40) throw new Error('invalid_fix_association')
+  return { issueNumber: value.issueNumber, requestId: value.requestId, expectedVersion: value.expectedVersion, purpose: 'fix', pullRequests }
+}
+
+export function parseAssociateDuplicate(value: unknown): AssociateDuplicateInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).some(key => !['issueNumber', 'rootIssueNumber', 'requestId', 'expectedVersion'].includes(key))
+    || !('issueNumber' in value) || !positive(value.issueNumber)
+    || !('rootIssueNumber' in value) || !positive(value.rootIssueNumber) || value.rootIssueNumber === value.issueNumber
+    || !('requestId' in value) || !requestId(value.requestId)
+    || !('expectedVersion' in value) || !version(value.expectedVersion)) throw new Error('invalid_fix_association')
+  return { issueNumber: value.issueNumber, rootIssueNumber: value.rootIssueNumber,
+    requestId: value.requestId, expectedVersion: value.expectedVersion }
 }
 export type RecordFeedbackInput = FeedbackDetails & Pick<FeedbackRecord, 'issueNumber' | 'reportSummary'> & {
   requestId: string
