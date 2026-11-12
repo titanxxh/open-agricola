@@ -5,7 +5,7 @@ import { assertOwnerPath, assertScopedPaths, type PrereleaseTarget, targetFinger
 
 export type InstalledBuild = { buildId: string; image: string; installedAt: number }
 export type Operation = { id: string; kind: 'deploy' | 'reset' | 'restore'; buildId: string; image: string;
-  sourceBuildId: string | null; stage: 'backup' | 'migration' | 'startup' | 'acceptance'; backupStem: string | null; generation: string }
+  sourceBuildId: string | null; sourceImage: string | null; stage: 'backup' | 'migration' | 'startup' | 'acceptance'; backupStem: string | null; generation: string }
 export type RuntimeRecord = {
   format: 1; channel: 'prerelease'; targetId: string; fingerprint: string; generation: string;
   mode: 'maintenance' | 'open' | 'closed'; buildId: string | null; installed: InstalledBuild | null;
@@ -55,8 +55,10 @@ export function readRuntime(target: PrereleaseTarget): RuntimeRecord {
       || !('stage' in row) || (row.stage !== 'backup' && row.stage !== 'migration' && row.stage !== 'startup' && row.stage !== 'acceptance')
       || !('backupStem' in row) || row.backupStem !== null && (typeof row.backupStem !== 'string' || !/^(daily|pre|manual)-[a-zA-Z0-9._-]+$/.test(row.backupStem))
       || !('generation' in row) || !uuid(row.generation) || row.generation !== value.generation) throw new Error('Invalid pending prerelease operation')
+    const sourceImage = 'sourceImage' in row ? row.sourceImage : null
+    if (sourceImage !== null && (!digest(sourceImage) || row.sourceBuildId === null)) throw new Error('Invalid pending source image')
     operation = { id: row.id, kind: row.kind, buildId: row.buildId, image: row.image, sourceBuildId: row.sourceBuildId,
-      stage: row.stage, backupStem: row.backupStem, generation: row.generation }
+      sourceImage, stage: row.stage, backupStem: row.backupStem, generation: row.generation }
   }
   let acceptance: RuntimeRecord['acceptance'] = null
   if (value.acceptance !== null) {

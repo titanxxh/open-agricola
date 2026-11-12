@@ -76,12 +76,15 @@ export function stopWriters(target: PrereleaseTarget, record: RuntimeRecord): vo
   const unacceptedStartup = record.operation?.stage === 'startup' && record.operation.buildId === record.installed.buildId && !record.acceptance
   if (!container && unacceptedStartup) return
   if (!/^[a-f0-9]+$/.test(container)) throw new Error('Cannot identify exactly one prerelease application writer')
-  if (command('docker', ['inspect', '--format', '{{.Image}}', container]) !== record.installed.image
+  const image = command('docker', ['inspect', '--format', '{{.Image}}', container])
+  const drainedSource = unacceptedStartup && record.operation?.kind === 'deploy' && image === record.operation.sourceImage
+  if (image !== record.installed.image && !drainedSource
     || command('docker', ['inspect', '--format', '{{index .Config.Labels "com.docker.compose.project"}}', container]) !== target.project) throw new Error('Running application differs from the expected deployment')
   const before = parsed(command('docker', ['inspect', '--format', '{{json .State}}', container]))
+  if (drainedSource && (before.Running !== false || before.OOMKilled !== false || before.ExitCode !== 0)) throw new Error('Recorded source application is not cleanly stopped')
   compose(target, ['stop', '--timeout', '90', 'app'])
   const status = parsed(command('docker', ['inspect', '--format', '{{json .State}}', container]))
-  if (status.Running !== false || status.OOMKilled !== false || status.ExitCode !== 0 && !(unacceptedStartup && before.Running === false)) throw new Error('Application did not drain cleanly; keep maintenance and inspect accepted commits')
+  if (status.Running !== false || status.OOMKilled !== false || status.ExitCode !== 0 && !(unacceptedStartup && !drainedSource && before.Running === false)) throw new Error('Application did not drain cleanly; keep maintenance and inspect accepted commits')
 }
 
 export function verifyRunning(target: PrereleaseTarget, record: RuntimeRecord): void {
