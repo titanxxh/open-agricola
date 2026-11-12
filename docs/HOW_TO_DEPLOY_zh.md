@@ -117,6 +117,8 @@ builder 必须是运行中的非 privileged rootless BuildKit 容器，用户 `1
 
 此阶段不需要正式回执，也不启动候选 app。公网 HTTPS 必须显示固定语言包的双语维护页；#1662 资源准备期间正式 `PRERELEASE_ENTRY_ENABLED=false`。#1668 正式安装时，完成 target 配置后才为私有验收启用该 flag；代次准入和公网网关仍分别保持关闭，直到显式门禁通过。日常关闭/开放使用生命周期动作，无需重启正式 app。loopback 网关端口和依赖网络不能绕过 owner 控制的代理/宿主暴露。后续动作必须提供 `--expected-current <完整已装SHA|empty>`；deploy/reset/restore 重试保持相同操作 UUID。原子状态在 `<target>/control/gate.json`，失败保留维护态和阶段。所有 pre 定时任务通过 owner CLI 串行执行，不直接调用旧 shell 入口。远程执行可加 `--ssh <owner-host>`；接收 checkout 必须有相同策略 SHA，回执/证据文件路径位于执行主机。文件另外传输，正式 Cookie 绝不进入候选目录。
 
+网关只接纳规范的 `/ws` 和 `/nodes/<instance-id>/ws` WebSocket 目标；instance ID 仅含字母、数字和连字符，查询参数原样转发。按实例路由的升级请求与直接升级请求使用相同的 Host、Origin、正式策略租约及 owner 权限检查。
+
 升级在迁移前记录来源镜像 digest。未验收的 startup 重试只在来源容器已于固定 Compose project 内干净停止时识别该精确镜像，绝不重启来源。来源身份缺失、镜像或 project 不同、来源仍在运行或未干净停止时，继续保持维护关闭。
 
 正式 authority 安装后，在可信 owner 机器使用 `scripts/prerelease/authority.ts`。`--cookie-file` 是所有候选挂载之外、0600 的正式管理员会话文件。工具只向固定正式 HTTPS API 和 Origin 发请求，不跟随重定向。每个 authority 动作使用自己稳定的 `--operation-id` UUID 及 `--output <private.json>`。首次 prepare 的 `--previous-generation null`，以后填已验证 retire 的代次。先登记规划代次，再关闭新交接/兑换：

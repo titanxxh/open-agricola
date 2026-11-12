@@ -16,8 +16,14 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
     generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', acceptance: { formalBuildId: formal.state.buildId } }
   await writeFile(stateFile, JSON.stringify(state))
   const seen: IncomingHttpHeaders[] = []
+  const upgraded: Array<{ path: string | undefined; headers: IncomingHttpHeaders }> = []
+  const messages: string[] = []
   const upstream = createServer((req, res) => { seen.push(req.headers); res.end('ok') })
   const ws = new WebSocketServer({ server: upstream })
+  ws.on('connection', (socket, req) => {
+    upgraded.push({ path: req.url, headers: req.headers })
+    socket.on('message', body => { messages.push(body.toString()) })
+  })
   upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening')
   const address = upstream.address()
   if (!address || typeof address === 'string') throw new Error('Expected upstream port')
@@ -30,6 +36,16 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
     const req = request(base, { method, agent: false, headers: { Host: 'pre.agricola.test', ...headers } }, response => {
       response.resume(); response.on('end', () => done(response.statusCode ?? 0))
     }); req.on('error', reject); req.end()
+  })
+  const upgradeStatus = (path: string, headers: Record<string, string> = {}) => new Promise<number>((done, reject) => {
+    const req = request(base, { path, agent: false, headers: {
+      Host: 'pre.agricola.test', Origin: origin, Connection: 'Upgrade', Upgrade: 'websocket',
+      'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==', 'Sec-WebSocket-Version': '13', ...headers,
+    } }, response => {
+      response.resume(); response.on('end', () => done(response.statusCode ?? 0))
+    })
+    req.on('upgrade', (_response, socket) => { socket.destroy(); reject(new Error(`Unexpected upgrade: ${path}`)) })
+    req.on('error', reject); req.end()
   })
   let client: WebSocket | undefined
   try {
@@ -49,8 +65,27 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
       })
       expect(status).toBe(503)
     }
-    client = new WebSocket(base.replace('http:', 'ws:') + '/ws', { headers: { Host: 'pre.agricola.test', Origin: origin } })
+    const routedPath = '/nodes/f81d4fae-7dec-11d0-a765-00a0c91e6bf6/ws?resume=room%2Fone&attempt=2'
+    for (const path of [
+      '/nodes//ws', '/nodes/node_id/ws', '/nodes/node.id/ws', '/nodes/node%2Fid/ws', '/nodes/%6eode/ws',
+      '/nodes/node/ws/', '/nodes/node/ws/extra', '/nodes/node/http', '/nodes/node//ws',
+      '/nodes/node/../node/ws', '/nodes/node/%2e%2e/node/ws', '/not-a-route/../ws',
+      '/nodes/node/ws#fragment', '/nodes/node/ws?room=one#fragment',
+    ]) expect(await upgradeStatus(path), path).toBe(503)
+    expect(await upgradeStatus(routedPath, { Host: 'app.agricola.test' })).toBe(503)
+    expect(await upgradeStatus(routedPath, { Origin: 'https://app.agricola.test' })).toBe(503)
+    expect(await upgradeStatus(routedPath, { Cookie: '__Host-oa-pre-session=one; __Host-oa-pre-session=two' })).toBe(400)
+    expect(upgraded).toHaveLength(0)
+    client = new WebSocket(base.replace('http:', 'ws:') + routedPath, { headers: { Host: 'pre.agricola.test', Origin: origin,
+      Authorization: 'Bearer must-not-reach-candidate', 'X-OA-Principal': 'untrusted',
+      Cookie: 'oa_session=parent; __Host-oa-session=formal; __Host-oa-pre-session=pre' } })
     await once(client, 'open')
+    expect(upgraded).toHaveLength(1)
+    expect(upgraded[0].path).toBe(routedPath)
+    expect(upgraded[0].headers).toMatchObject({ host: 'pre.agricola.test', origin,
+      cookie: '__Host-oa-pre-session=pre', 'x-forwarded-host': 'pre.agricola.test', 'x-forwarded-proto': 'https' })
+    expect(upgraded[0].headers.authorization).toBeUndefined()
+    expect(upgraded[0].headers['x-oa-principal']).toBeUndefined()
     const closed = once(client, 'close')
     formal.state.version = 1; await gateway.refreshBrowserPolicy(); await closed
     expect(await read()).toBe(503)
@@ -58,7 +93,13 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
     expect(await read()).toBe(503)
     formal.state.buildId = state.acceptance.formalBuildId; await gateway.refreshBrowserPolicy()
     expect(await read()).toBe(200)
+    client = new WebSocket(base.replace('http:', 'ws:') + routedPath, { headers: { Host: 'pre.agricola.test', Origin: origin } })
+    await once(client, 'open')
+    const leaseExpired = once(client, 'close')
     const now = Date.now(); vi.spyOn(Date, 'now').mockReturnValue(now + 31_000)
+    client.send('expired-policy-must-not-forward')
+    await leaseExpired
+    expect(messages).toEqual([])
     expect(await read()).toBe(503)
   } finally {
     vi.restoreAllMocks(); client?.terminate(); await gateway.close()
@@ -123,7 +164,7 @@ it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSock
     const token = 'V'.repeat(43), cookie = `${OWNER_VERIFICATION_COOKIE}=${token}; oa_session=ignore-parent; __Host-oa-pre-session=pre-test`
     const proof = { targetId: 'prerelease-test', buildId: state.buildId, generation: state.generation, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 600_000 }
     await writeFile(join(root, 'verification.json'), JSON.stringify(proof))
-    owner = new WebSocket(url.replace('http:', 'ws:') + '/ws', { headers: { ...headers, Cookie: cookie } })
+    owner = new WebSocket(url.replace('http:', 'ws:') + '/nodes/bb4d6c82-676f-4dcc-a570-52377b3b32f5/ws?owner=verification', { headers: { ...headers, Cookie: cookie } })
     await once(owner, 'open')
     const closed = once(client, 'close')
     await writeFile(stateFile, JSON.stringify({ ...state, mode: 'maintenance' }))

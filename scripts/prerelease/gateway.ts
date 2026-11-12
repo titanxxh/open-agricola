@@ -8,6 +8,7 @@ import { readBrowserAuthPolicy, type FormalOrigins, type FormalTlsOptions } from
 
 export const OWNER_VERIFICATION_COOKIE = '__Host-oa-pre-verify'
 const candidateCookies = new Set(['__Host-oa-pre-session', '__Host-oa-pre-handoff'])
+const websocketTarget = /^\/(?:ws|nodes\/[A-Za-z0-9-]+\/ws)(?:\?[^#]*)?$/
 const forwardedHeaders = new Set(['accept', 'accept-language', 'cache-control', 'content-type', 'content-length', 'origin', 'referer', 'user-agent',
   'range', 'if-range', 'if-none-match', 'if-modified-since', 'connection', 'upgrade', 'sec-websocket-key', 'sec-websocket-version',
   'sec-websocket-extensions', 'sec-websocket-protocol', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', 'sec-fetch-user', 'x-oa-browser-protocol'])
@@ -166,7 +167,7 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     const permission = () => allowed(req.headers.cookie)
     track(socket, permission)
     if (req.headers.host !== host || !originPath(req.url) || req.headers.origin !== options.origin
-      || new URL(req.url ?? '/', options.origin).pathname !== '/ws' || !permission()) {
+      || !websocketTarget.test(req.url ?? '') || !permission()) {
       socket.end('HTTP/1.1 503 Service Unavailable\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n'); return
     }
     const forwarded = headers(req.headers)
