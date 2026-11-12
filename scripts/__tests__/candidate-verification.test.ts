@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateCandidateVerification, parseGitHubJsonLines } from '../ci/candidate-verification'
+import { evaluateCandidateVerification, parseGitHubJsonLines, type CandidateIdentity } from '../ci/candidate-verification'
 
 const sha = 'a'.repeat(40)
 const configuration = 'b'.repeat(64)
 const tasks = ['quality', 'fast', 'slow', 'build', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit']
-const identity = { repository: 'titanxxh/open-agricola', repositoryId: 1164782262, sha, configuration, workflowId: 100 }
+const identity = { repository: 'titanxxh/open-agricola', repositoryId: 1164782262, sha, configuration, workflowId: 100, execution: 'uid-rootless-v1' } satisfies CandidateIdentity
 const step = (name: string, conclusion = 'success') => ({ name, status: 'completed', conclusion })
 const timing = (started_at: string | null, completed_at: string | null) => ({ started_at, completed_at })
 const job = (name: string, id: number) => ({ id, run_id: 1, name, status: 'completed', conclusion: 'success', run_attempt: 1,
   created_at: '2026-10-30T00:05:00Z', ...timing('2026-10-30T00:05:00Z', '2026-10-30T00:10:00Z'),
   html_url: `https://github.com/titanxxh/open-agricola/actions/runs/1/job/${id}`,
-  steps: [step('Checkout candidate'), step('Install dependencies'), step('Verify candidate checkout'), step('Execute verification task'), step('Install browsers')],
+  steps: [step('Checkout candidate'), step('Install dependencies'), step('Verify candidate checkout'), step('Execute verification task'), step('Install browsers'), step('Prepare candidate isolation'), step('Prove native candidate isolation'), step('Stop candidate descendants and collect private diagnostics')],
 })
 
 function evidence() {
@@ -86,6 +86,20 @@ describe('GitHub full candidate verification evidence', () => {
   it('blocks a successful job whose actual test step was skipped', () => {
     const value = evidence()
     value.jobs[2].steps[3].conclusion = 'skipped'
+    expect(evaluateCandidateVerification(identity, [value]).tasks[1].status).toBe('blocked')
+  })
+
+  it('preserves source-bound stable receipts produced by the historical execution contract', () => {
+    const value = evidence()
+    for (const job of value.jobs) job.steps = job.steps.filter(step => !['Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].includes(step.name))
+    expect(evaluateCandidateVerification({ ...identity, execution: 'legacy-stable' }, [value]).status).toBe('passed')
+  })
+
+  it.each(['Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'])('blocks a receipt when %s was skipped', name => {
+    const value = evidence()
+    const step = value.jobs[2].steps.find(step => step.name === name)
+    if (!step) throw new Error('Missing fixture step')
+    step.conclusion = 'skipped'
     expect(evaluateCandidateVerification(identity, [value]).tasks[1].status).toBe('blocked')
   })
 
@@ -390,6 +404,12 @@ describe('prerelease evidence from the trusted main producer', () => {
     expect(evaluateCandidateVerification(preIdentity, [preEvidence()]).status).toBe('passed')
     expect(evaluateCandidateVerification(identity, [preEvidence()]).status).toBe('blocked')
     expect(evaluateCandidateVerification(preIdentity, [evidence()]).status).toBe('blocked')
+  })
+
+  it('blocks prerelease evidence without isolated execution even when all old task steps passed', () => {
+    const value = preEvidence()
+    for (const job of value.jobs) job.steps = job.steps.filter(step => !['Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].includes(step.name))
+    expect(evaluateCandidateVerification(preIdentity, [value]).status).toBe('blocked')
   })
 
   it.each(['producer', 'channel', 'repository', 'configuration', 'candidate'])('rejects a mismatched %s binding', field => {

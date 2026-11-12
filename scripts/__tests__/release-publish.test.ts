@@ -144,7 +144,7 @@ else if (endpoint.startsWith('actions/workflows/200/runs?')) {
     steps: [step('Generate candidate manifest'), step('Prerelease manifest / 1164782262 / prerelease / ' + state.sha + ' / ' + configuration + ' / ' + state.mainSha + ' / ' + tasks.join(','))] });
   tasks.forEach((task, index) => output({ id: index + 2, run_id: 2, run_attempt: 1, name: 'candidate / ' + task + ' / ' + configuration,
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z', status: 'completed', conclusion: task === 'webkit' && state.evidence === 'failed' ? 'failure' : 'success',
-    html_url: 'https://example.test/job/' + task, steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step) }));
+    html_url: 'https://example.test/job/' + task, steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }));
 } else if (endpoint.startsWith('actions/workflows/100/runs?')) {
   if (state.evidence !== 'missing') output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: state.sha,
     repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 },
@@ -156,7 +156,7 @@ else if (endpoint.startsWith('actions/workflows/200/runs?')) {
   tasks.forEach((task, index) => output({ id: index + 2, run_id: 1, run_attempt: 1, name: 'candidate / ' + task + ' / ' + state.configuration,
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     status: 'completed', conclusion: task === 'webkit' && state.evidence === 'failed' ? 'failure' : 'success', html_url: 'https://example.test/job/' + task,
-    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step) }));
+    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }));
 } else if (endpoint.startsWith('git/ref/')) {
   const ref = decodeURIComponent(endpoint.slice(8));
   if (!state.refs[ref]) absent(); output({ ref: 'refs/' + ref, object: state.refs[ref] });

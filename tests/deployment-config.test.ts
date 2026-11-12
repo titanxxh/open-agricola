@@ -97,7 +97,7 @@ if (Object.hasOwn(provenance, args[1])) {
   tasks.forEach((task, index) => output({ id: index + 2, run_id: 1, run_attempt: 1, name: 'candidate / ' + task + ' / ' + configuration,
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     status: 'completed', conclusion: 'success', html_url: 'https://example.test/job/' + task,
-    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step) }));
+    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }));
 } else throw Error('Unexpected fixture GitHub endpoint: ' + endpoint);
 `, { mode: 0o700 })
     delete env.ACCOUNT_REGISTRATION_POLICY

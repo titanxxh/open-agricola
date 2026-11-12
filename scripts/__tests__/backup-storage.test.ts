@@ -32,8 +32,8 @@ function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
   const policySha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   const policyImage = `sha256:${'d'.repeat(64)}`, capturedAt = new Date(Date.now() - 1000).toISOString()
   try {
-    for (const path of ['scripts', 'bin', 'data', 'backups']) mkdirSync(join(root, path))
-    for (const path of ['scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs']) cpSync(path, join(root, path))
+    for (const path of ['scripts', 'scripts/ci', 'bin', 'data', 'backups']) mkdirSync(join(root, path))
+    for (const path of ['scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs', 'scripts/ci/docker-bind-user.ts']) cpSync(path, join(root, path))
     writeFileSync(join(root, '.env'), 'ACCOUNT_REGISTRATION_POLICY=open\n')
     writeFileSync(join(root, 'fixture-sentinel.txt'), 'inert owner fixture bytes')
     writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=test-only\n')

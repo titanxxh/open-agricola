@@ -10,12 +10,13 @@ const cli = join(repoRoot, 'scripts/ci/candidate-verification.ts')
 const temporary: string[] = []
 afterEach(() => { for (const cwd of temporary.splice(0)) rmSync(cwd, { recursive: true, force: true }) })
 
-function fixture(forgedProducer = false) {
+function fixture(forgedProducer = false, legacy = false) {
   const cwd = mkdtempSync(join(tmpdir(), 'candidate-cli-'))
   temporary.push(cwd)
   mkdirSync(join(cwd, 'scripts/ci'), { recursive: true })
   mkdirSync(join(cwd, '.github/workflows'), { recursive: true })
   cpSync(join(repoRoot, 'scripts/ci'), join(cwd, 'scripts/ci'), { recursive: true })
+  if (legacy) rmSync(join(cwd, 'scripts/ci/candidate-execution.json'))
   cpSync(join(repoRoot, '.github/workflows/candidate-verification.yml'), join(cwd, '.github/workflows/candidate-verification.yml'))
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: {
     'check:architecture': 'pnpm run lint && pnpm run check:test-project-coverage && pnpm run check:architecture-tests && pnpm run check:dependencies',
@@ -40,7 +41,7 @@ function fixture(forgedProducer = false) {
   const log = join(cwd, 'commands.jsonl')
   writeFileSync(join(bin, 'pnpm'), `#!/usr/bin/env node\nimport('node:fs').then(fs => { fs.appendFileSync(process.env.COMMAND_LOG, JSON.stringify(process.argv.slice(2)) + '\\n'); if (process.env.FAIL_BUILD === '1' && process.argv[3] === 'build') process.exitCode = 7 })\n`)
   chmodSync(join(bin, 'pnpm'), 0o755)
-  const env: NodeJS.ProcessEnv = { ...process.env, GITHUB_SHA: sha, GITHUB_OUTPUT: '', COMMAND_LOG: log, PATH: bin + delimiter + process.env.PATH }
+  const env: NodeJS.ProcessEnv = { ...process.env, CI: '', GITHUB_ACTIONS: '', GITHUB_SHA: sha, GITHUB_OUTPUT: '', COMMAND_LOG: log, PATH: bin + delimiter + process.env.PATH }
   const run = (...args: string[]) => spawnSync(join(repoRoot, 'node_modules/.bin/tsx'), [cli, ...args], { cwd, encoding: 'utf8', env })
   return { cwd, sha, run, log, bin, env, git }
 }
@@ -57,7 +58,7 @@ function githubFixture(value: ReturnType<typeof fixture>, failedTask = '', repos
     id: index + 2, run_id: 1, run_attempt: 1, name: `candidate / ${task} / ${configuration}`,
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     status: 'completed', conclusion: task === failedTask ? 'failure' : 'success', html_url: run.html_url,
-    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step),
+    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step),
   }))
   jobs.unshift({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: run.html_url,
     started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
@@ -87,6 +88,22 @@ const mergedPr = (sha: string) => ({ number: 1, state: 'closed', merged: true, m
   merge_commit_sha: sha, base: { ref: 'main', repo: { ...candidateRepository } } })
 
 describe('candidate verification public CLI', () => {
+  it('refuses candidate execution on CI without a trusted external scheduler context', () => {
+    const value = fixture()
+    value.env.GITHUB_ACTIONS = 'true'; value.env.CI = 'true'
+    const result = value.run('run-task', 'build', '--sha', value.sha)
+    expect(result.status).not.toBe(0)
+    expect(existsSync(value.log)).toBe(false)
+  })
+  it.each([{ legacy: true, exit: 0, status: 'passed' }, { legacy: false, exit: 1, status: 'blocked' }])('uses the immutable stable execution policy (legacy=$legacy)', ({ legacy, exit, status }) => {
+    const value = fixture(false, legacy)
+    const evidence = githubFixture(value)
+    for (const job of evidence.jobs) job.steps = job.steps.filter(step => !['Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].includes(step.name))
+    replaceMetadata(value, { [`${prefix}/actions/runs/1/jobs?filter=all&per_page=100`]: { jobs: evidence.jobs } })
+    const result = value.run('check', '--sha', value.sha, '--repository', 'titanxxh/open-agricola')
+    expect(result.status, result.stderr).toBe(exit)
+    expect(JSON.parse(result.stdout)).toMatchObject({ status, sha: value.sha, configuration: evidence.configuration })
+  })
   it('checks and requests an explicitly chosen fork using its own native repository ID and protected-main snapshot', () => {
     const value = fixture()
     const fork = { id: 987654321, full_name: 'example/open-agricola-fork' }
