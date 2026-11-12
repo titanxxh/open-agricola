@@ -38,7 +38,7 @@ async function setup({ configured = true } = {}) {
   await db.prepare('UPDATE prerelease_identity_generations SET admission_open=true,audit_operation_id=? WHERE id=?').run(auditOperationId, generationId)
   let now = 1_800_000_000_000
   await db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES('player','player','Test Player','private-password-hash',?)").run(now)
-  await db.prepare('INSERT INTO sessions(token,user_id,expires_at,created_at) VALUES(?,?,?,?)').run(sourceToken, 'player', now + 9 * 86_400_000, now)
+  await db.prepare('INSERT INTO sessions(token,user_id,expires_at,created_at,auth_policy_version) VALUES(?,?,?,?,2)').run(sourceToken, 'player', now + 9 * 86_400_000, now)
   await db.prepare("INSERT INTO beta_access(user_id,granted_at) VALUES('player',?)").run(now)
   const handler = createPrereleaseAuthorityHandler({ db, now: () => now, getSourceToken: async req => readCookie(req.headers.cookie, 'oa_session') })
   const server = createServer((req, res) => {
@@ -70,6 +70,18 @@ async function setup({ configured = true } = {}) {
 }
 
 describe('formal prerelease identity authority', () => {
+  it('rejects legacy source credentials for new handoffs and existing grant refresh', async () => {
+    const { db, browser, issue, exchange, status } = await setup()
+    await db.prepare('UPDATE sessions SET auth_policy_version=1 WHERE token=?').run(sourceToken)
+    expect((await browser('entry')).status).toBe(401)
+    expect((await issue()).status).toBe(401)
+    await db.prepare('UPDATE sessions SET auth_policy_version=2 WHERE token=?').run(sourceToken)
+    const handoff = await (await issue()).json()
+    const grant = await (await exchange(handoff.code)).json()
+    await db.prepare('UPDATE sessions SET auth_policy_version=1 WHERE token=?').run(sourceToken)
+    expect((await (await status(grant.state.grantId)).json()).state.source).toEqual({ kind: 'invalid' })
+  })
+
   it('exchanges a browser-bound handoff once and exposes only a minimal identity with fixed deadlines', async () => {
     const { browser, issue, exchange, status } = await setup()
     expect(await (await browser('entry')).json()).toEqual({ ok: true, protocolVersion: 1, entry: {
@@ -353,12 +365,25 @@ describe('formal prerelease identity authority', () => {
 
 })
 
-it('rejects a configured same-site target and respects private PSL boundaries', () => {
+it('accepts a configured sibling hostname without changing either formal origin', () => {
   vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://app.formal-fixture.github.io')
   vi.stubEnv('PUBLIC_API_BASE', 'https://api.formal-fixture.github.io')
   vi.stubEnv('PRERELEASE_IDENTITY_SERVICE_KEY', 'inert-service-key-with-at-least-32-bytes')
   vi.stubEnv('PRERELEASE_APP_ORIGIN', 'https://pre.formal-fixture.github.io')
-  expect(configuredPrereleaseTarget()).toBeUndefined()
+  expect(configuredPrereleaseTarget()?.targetOrigin).toBe('https://pre.formal-fixture.github.io')
   vi.stubEnv('PRERELEASE_APP_ORIGIN', 'https://pre-fixture.github.io')
   expect(configuredPrereleaseTarget()?.targetOrigin).toBe('https://pre-fixture.github.io')
+})
+
+
+it('accepts the fixed titanxxh sibling deployment while refusing the exact formal hosts', () => {
+  vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://open-agricola.titanxxh.com')
+  vi.stubEnv('PUBLIC_API_BASE', 'https://openagapi.titanxxh.com')
+  vi.stubEnv('PRERELEASE_IDENTITY_SERVICE_KEY', 'inert-service-key-with-at-least-32-bytes')
+  vi.stubEnv('PRERELEASE_APP_ORIGIN', 'https://pre.titanxxh.com')
+  expect(configuredPrereleaseTarget()).toMatchObject({ sourceOrigin: 'https://open-agricola.titanxxh.com', targetOrigin: 'https://pre.titanxxh.com' })
+  for (const target of ['https://open-agricola.titanxxh.com:444', 'https://openagapi.titanxxh.com:444', 'https://openagapi.titanxxh.com.']) {
+    vi.stubEnv('PRERELEASE_APP_ORIGIN', target)
+    expect(configuredPrereleaseTarget()).toBeUndefined()
+  }
 })

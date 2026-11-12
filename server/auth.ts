@@ -1,3 +1,5 @@
+import { BROWSER_AUTH_VERSION } from '../shared/contract/browser-auth'
+import type { PostgresDatabase } from './database/postgres'
 import { isUniqueViolation } from './database/errors'
 import { scrypt, randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto'
 import { getDb } from './db.ts'
@@ -225,7 +227,9 @@ export async function createEmailVerificationToken(userId: string): Promise<Awai
   return token
 }
 
-export async function verifyEmailToken(rawToken: string): Promise<Awaited<LoginResult>> {
+export type EmailVerificationResult = { ok: true; user: AuthUser } | Extract<LoginResult, { ok: false }>
+
+export async function verifyEmailToken(rawToken: string): Promise<EmailVerificationResult> {
   const token = rawToken.trim()
   if (!token) {
     return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
@@ -247,20 +251,21 @@ export async function verifyEmailToken(rawToken: string): Promise<Awaited<LoginR
     return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
   }
 
-  const session = (await db.transaction(async () => {
-    await db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(row.user_id)
+  const verified = (await db.transaction(async () => {
+    const user = await db.prepare(`SELECT id FROM users WHERE id = ?
+      AND NOT EXISTS (SELECT 1 FROM account_deletion_requests WHERE user_id = users.id) FOR UPDATE`).get(row.user_id)
+    if (!user) return false
     const consumed = await db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?').run(now, row.token_hash, now)
-    if (consumed.changes !== 1) return null
-    ;(await db.prepare('UPDATE users SET email_verified_at = ?, last_login_at = ? WHERE id = ?').run(now, now, row.user_id))
-    return (await createSession(row.user_id))
+    if (consumed.changes !== 1) return false
+    await db.prepare('UPDATE users SET email_verified_at = ? WHERE id = ?').run(now, row.user_id)
+    return true
   })())
-  if (!session) {
+  if (!verified) {
     return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
   }
 
   return {
     ok: true,
-    token: session,
     user: {
       id: row.user_id,
       username: row.username,
@@ -537,12 +542,12 @@ export async function createSession(userId: string, verifiedPasswordHash?: strin
     : await db.prepare('SELECT id FROM users WHERE id = ? AND password_hash = ? FOR UPDATE').get(userId, verifiedPasswordHash)
   if (!user) return null
   const result = (await db.prepare(`
-    INSERT INTO sessions (token, user_id, expires_at, created_at)
-    SELECT ?, ?, ?, ?
+    INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version)
+    SELECT ?, ?, ?, ?, ?
     WHERE NOT EXISTS (
       SELECT 1 FROM account_deletion_requests WHERE user_id = ?
     )
-  `).run(token, userId, now + SESSION_TTL_MS, now, userId))
+  `).run(token, userId, now + SESSION_TTL_MS, now, BROWSER_AUTH_VERSION, userId))
   return result.changes === 1 ? token : null
   })())
 }
@@ -784,17 +789,29 @@ export async function getAccountDeletionRoomIds(userId: string): Promise<Awaited
   `).all(userId, userId)) as Array<{ id: string }>).map(row => row.id)
 }
 
-export async function validateSession(token: string): Promise<Awaited<AuthUser | null>> {
+export async function getSessionByToken(token: string, options: {
+  db?: PostgresDatabase
+  now?: number
+  lock?: 'share' | 'update'
+} = {}): Promise<{ user: AuthUser; expiresAt: number } | null> {
   if (!token) return null
-  const db = getDb()
-  const row = (await db.prepare(`
-    SELECT u.id, u.username, u.display_name
+  const db = options.db ?? getDb()
+  const row = await db.prepare(`
+    SELECT u.id, u.username, u.display_name, s.expires_at
     FROM sessions s JOIN users u ON s.user_id = u.id
-    WHERE s.token = ? AND s.expires_at > ?
-  `).get(token, Date.now())) as { id: string; username: string; display_name: string } | undefined
+    WHERE s.token = ? AND s.expires_at > ? AND s.auth_policy_version = ?
+    ${options.lock === 'update' ? 'FOR UPDATE OF s' : options.lock === 'share' ? 'FOR SHARE OF s' : ''}
+  `).get<{ id: string; username: string; display_name: string; expires_at: number }>(
+    token, options.now ?? Date.now(), BROWSER_AUTH_VERSION,
+  )
+  return row ? {
+    user: { id: row.id, username: row.username, displayName: row.display_name },
+    expiresAt: row.expires_at,
+  } : null
+}
 
-  if (!row) return null
-  return { id: row.id, username: row.username, displayName: row.display_name }
+export async function validateSession(token: string): Promise<AuthUser | null> {
+  return (await getSessionByToken(token))?.user ?? null
 }
 
 /** Extract bearer token from Authorization header. */

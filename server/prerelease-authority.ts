@@ -1,4 +1,3 @@
-import { isSameSite } from './http-origin'
 import { createHash, randomBytes } from 'node:crypto'
 import {
   PRERELEASE_IDENTITY_FRESHNESS_MS, PRERELEASE_IDENTITY_PROTOCOL,
@@ -6,7 +5,7 @@ import {
   type PrereleaseIdentityState, type PrereleaseEntry, type PrereleaseIdentityEvent, type PrereleaseIdentityReceipt,
 } from '../shared/contract/prerelease-identity'
 import { HOSTED_APP_PATH } from '../shared/contract/protocol/app-location'
-import { isAdmin } from './auth'
+import { getSessionByToken, isAdmin } from './auth'
 import type { PostgresDatabase } from './database/postgres'
 import { consumeRateLimit } from './database/rate-limit'
 import { currentPrereleaseGeneration, lockPrereleaseIdentity } from './prerelease-identity-lifecycle'
@@ -30,7 +29,7 @@ export function configuredPrereleaseTarget(): PrereleaseTarget | undefined {
   const formalApiOrigin = strictOrigin(process.env.PUBLIC_API_BASE)
   const serviceKey = process.env.PRERELEASE_IDENTITY_SERVICE_KEY
   if (!sourceOrigin || !formalApiOrigin || !targetOrigin || !serviceKey || Buffer.byteLength(serviceKey) < 32) return undefined
-  if ([sourceOrigin, formalApiOrigin].some(origin => isSameSite(new URL(origin), new URL(targetOrigin)))) return undefined
+  if ([sourceOrigin, formalApiOrigin].some(origin => new URL(origin).hostname.replace(/\.$/, '') === new URL(targetOrigin).hostname.replace(/\.$/, ''))) return undefined
   return { sourceOrigin, targetOrigin, serviceKey, entryEnabled: process.env.PRERELEASE_ENTRY_ENABLED === 'true' }
 }
 
@@ -46,7 +45,7 @@ type SourceRow = { id: string; username: string; display_name: string; expires_a
 type HandoffRow = { generation_id: string; user_id: string; source_token: string; target_origin: string; browser_challenge: string; return_to: string; expires_at: number }
 type GrantRow = {
   id: string; user_id: string; source_token: string | null; target_origin: string; expires_at: number; revoked_at: number | null
-  username: string | null; display_name: string | null; deleting: boolean; source_expires_at: number | null; beta_access: boolean
+  username: string | null; display_name: string | null; deleting: boolean; beta_access: boolean
 }
 
 export class PrereleaseAuthority {
@@ -55,18 +54,17 @@ export class PrereleaseAuthority {
   constructor(db: PostgresDatabase, now: () => number = Date.now) { this.db = db; this.now = now }
 
   private async source(token: string, now: number): Promise<SourceRow> {
-    const owner = await this.db.prepare('SELECT user_id FROM sessions WHERE token=?').get<{ user_id: string }>(token)
+    const owner = await getSessionByToken(token, { db: this.db, now })
     if (!owner) throw new PrereleaseAuthorityError('not_authenticated', 401)
     // Password reset and account deletion lock the user before touching sessions.
     const account = await this.db.prepare(`SELECT id,username,display_name FROM users WHERE id=?
       AND NOT EXISTS(SELECT 1 FROM account_deletion_requests d WHERE d.user_id=users.id) FOR UPDATE`)
-      .get<{ id: string; username: string; display_name: string }>(owner.user_id)
-    const session = account && await this.db.prepare('SELECT expires_at FROM sessions WHERE token=? AND user_id=? AND expires_at>? FOR UPDATE')
-      .get<{ expires_at: number }>(token, account.id, now)
-    if (!account || !session) throw new PrereleaseAuthorityError('not_authenticated', 401)
+      .get<{ id: string; username: string; display_name: string }>(owner.user.id)
+    const session = account && await getSessionByToken(token, { db: this.db, now, lock: 'update' })
+    if (!account || !session || session.user.id !== account.id) throw new PrereleaseAuthorityError('not_authenticated', 401)
     const betaAccess = !!await this.db.prepare('SELECT 1 FROM beta_access WHERE user_id=?').get(account.id)
     if (!isAdmin(account.username) && !betaAccess) throw new PrereleaseAuthorityError('beta_access_required', 403)
-    return { ...account, expires_at: session.expires_at, beta_access: betaAccess }
+    return { ...account, expires_at: session.expiresAt, beta_access: betaAccess }
   }
 
   async entry(token: string, target: PrereleaseTarget | undefined): Promise<PrereleaseEntry> {
@@ -120,12 +118,13 @@ export class PrereleaseAuthority {
   async status(target: PrereleaseTarget, grantId: string, generationId: string, now = this.now()): Promise<PrereleaseIdentityState> {
     const row = await this.db.prepare(`SELECT g.*, u.username, u.display_name,
       EXISTS(SELECT 1 FROM account_deletion_requests d WHERE d.user_id=g.user_id) AS deleting,
-      s.expires_at AS source_expires_at, EXISTS(SELECT 1 FROM beta_access b WHERE b.user_id=g.user_id) AS beta_access
-      FROM prerelease_identity_grants g LEFT JOIN users u ON u.id=g.user_id LEFT JOIN sessions s ON s.token=g.source_token AND s.user_id=g.user_id
+      EXISTS(SELECT 1 FROM beta_access b WHERE b.user_id=g.user_id) AS beta_access
+      FROM prerelease_identity_grants g LEFT JOIN users u ON u.id=g.user_id
       WHERE g.id=? AND g.target_origin=? AND g.generation_id=? AND g.projection_erased_at IS NULL`).get<GrantRow>(grantId, target.targetOrigin, generationId)
     if (!row) throw new PrereleaseAuthorityError('prerelease_grant_not_found', 404)
     const activeAccount = row.username !== null && row.display_name !== null && !row.deleting
-    const sourceExpiresAt = row.source_expires_at
+    const session = row.source_token && await getSessionByToken(row.source_token, { db: this.db, now })
+    const sourceExpiresAt = session && session.user.id === row.user_id ? session.expiresAt : null
     return {
       protocolVersion: PRERELEASE_IDENTITY_PROTOCOL, channel: 'prerelease', targetOrigin: target.targetOrigin, generationId, grantId,
       account: activeAccount && row.username !== null && row.display_name !== null
