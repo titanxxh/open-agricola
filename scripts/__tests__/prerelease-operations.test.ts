@@ -9,6 +9,9 @@ import { targetFingerprint, parsePrereleaseTarget } from '../prerelease/config'
 import { readRuntime, writeRuntime, renderCompose } from '../prerelease/runtime'
 import type { OperationRequest } from '../prerelease/flow'
 import { afterEach, expect, it } from 'vitest'
+import { createServer } from 'node:http'
+import { once } from 'node:events'
+import { createFrontendHosting } from '../../server/frontend-hosting'
 
 const roots: string[] = []
 afterEach(() => roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })))
@@ -194,6 +197,34 @@ it('revalidates a changed formal deployment without reinstalling pre or changing
     acceptance: null, operation: { id: operationId, kind: 'reverify', stage: 'acceptance', buildId, image, generation } })
   expect(invoke().status).toBe(0)
   expect(value.calls()).not.toMatch(/buildx|migrate|stop.*app|restart.*app/)
+})
+
+it('serves the hosted prerelease application with the actual owner Compose environment', async () => {
+  const value = fixture(), target = parsePrereleaseTarget(value.config), buildId = 'a'.repeat(40)
+  const composed = renderCompose(target, { ...readRuntime(target), buildId,
+    installed: { buildId, image: `sha256:${'d'.repeat(64)}`, installedAt: 1 } })
+  if (!('app' in composed.services) || !composed.services.app) throw new Error('Expected an installed app')
+  const frontend = join(value.temporary, 'frontend')
+  mkdirSync(frontend)
+  writeFileSync(join(frontend, 'index.html'), '<!doctype html><title>Prerelease app</title>')
+  writeFileSync(join(frontend, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: buildId,
+    basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }))
+  const hosting = createFrontendHosting({ ...composed.services.app.environment, FRONTEND_ROOT: frontend })
+  const server = createServer((req, res) => { void hosting(req, res).then(handled => { if (!handled) res.writeHead(404).end() }) })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Expected a local HTTP port')
+  try {
+    const base = `http://127.0.0.1:${address.port}`
+    expect(await (await fetch(`${base}/api/app-location`)).json()).toEqual({ mode: 'canonical',
+      appUrl: 'https://pre.agricola-beta.test/open-agricola/', buildId })
+    const response = await fetch(`${base}/open-agricola/`)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('<title>Prerelease app</title>')
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
 })
 
 it('keeps the identity service key in the app and excludes it from migration and capture processes', () => {
