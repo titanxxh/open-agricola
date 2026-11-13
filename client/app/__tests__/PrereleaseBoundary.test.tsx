@@ -56,7 +56,7 @@ it('does not follow an external target returned by a malformed callback response
   expect(window.location.origin).toBe('https://pre.agricola.test')
 })
 
-it('keeps private pages mounted when a healthy session returns less than one polling interval of authorization', async () => {
+it.each([9_000, 200])('keeps private pages continuously mounted with %ims left in a healthy cached confirmation', async cachedRemaining => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance', 'Date'] })
   vi.setSystemTime(1_000_000)
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
@@ -64,7 +64,8 @@ it('keeps private pages mounted when a healthy session returns less than one pol
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url.endsWith('/runtime')) return Response.json({ ok: true, channel: 'prerelease', buildId: build, generationId: generation,
       appOrigin: window.location.origin, formalAppOrigin: 'https://formal.agricola.test', formalApiBase: 'https://api.agricola.test', targetId: 'prerelease-main' })
-    const remaining = ++confirmations === 2 ? 9_000 : 30_000
+    const remaining = ++confirmations === 2 ? cachedRemaining : 30_000
+    if (confirmations > 2) await new Promise<void>(resolve => setTimeout(resolve, 50))
     return Response.json({ ok: true, user: { id: 'u1', username: 'beta', displayName: 'Beta', isAdmin: false, betaAccess: true },
       prerelease: { buildId: build, generationId: generation, expiresAt: 9_000_000_000_000, validUntil: Date.now() + remaining, serverTime: Date.now() } })
   }))
@@ -81,6 +82,7 @@ it('keeps private pages mounted when a healthy session returns less than one pol
   expect(screen.getByText('Private game context')).toBeVisible()
   expect(screen.queryByRole('alert')).toBeNull()
   expect(unmounted).toBe(initialUnmounts)
+  expect(confirmations).toBe(3)
 })
 
 it('expires an in-flight confirmation at the original deadline without parallel checks or late revival', async () => {
