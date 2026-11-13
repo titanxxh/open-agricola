@@ -1,4 +1,4 @@
-import { isPrereleaseClient } from '../services/prerelease-runtime'
+import { endPrereleaseSession, isPrereleaseClient } from '../services/prerelease-runtime'
 import { browserApiFetch } from '../services/browser-api'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
@@ -192,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshSessionFn])
 
   const logoutFn = useCallback(async () => {
+    endPrereleaseSession()
     await browserApiFetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
@@ -200,6 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logoutAllFn = useCallback(async () => {
+    endPrereleaseSession()
     await browserApiFetch(`${API_BASE}/api/auth/logout-all`, {
       method: 'POST',
       credentials: 'include',

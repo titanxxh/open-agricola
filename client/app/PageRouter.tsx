@@ -1,4 +1,4 @@
-import { isPrereleaseClient } from '../services/prerelease-runtime'
+import { isPrereleaseClient, prereleaseStartUrl } from '../services/prerelease-runtime'
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -102,6 +102,10 @@ export function PageRouter() {
   if (page === 'prerelease-handoff') return <PrereleaseHandoffPage />
 
   if (!user) {
+    if (isPrereleaseClient()) return <main className="prerelease-access-screen">
+      <p>{t('prerelease.returnToProduction')}</p>
+      <a className="btn-primary" href={prereleaseStartUrl()}>{t('prerelease.entry')}</a>
+    </main>
     if (page === 'onboarding') return <OnboardingPage />
     return <LoginPage />
   }
