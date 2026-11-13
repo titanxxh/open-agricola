@@ -63,7 +63,10 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
     expect(await read({ Cookie: '__Host-oa-pre-session=one; __Host-oa-pre-session=two' })).toBe(400)
     expect(seen).toHaveLength(0)
     expect(await read({ Origin: origin, Authorization: 'Bearer must-not-reach-candidate', 'X-OA-Principal': 'untrusted',
-      Cookie: 'oa_session=parent; __Host-oa-session=formal; __Host-oa-pre-session=pre' })).toBe(200)
+      Cookie: 'oa_session=parent; __Host-oa-session=formal; __Host-oa-pre-session=pre',
+      'X-OA-Pre-Build': 'opaque-build-binding', 'X-OA-Pre-Generation': 'opaque-generation-binding' })).toBe(200)
+    expect(seen[0]['x-oa-pre-build']).toBe('opaque-build-binding')
+    expect(seen[0]['x-oa-pre-generation']).toBe('opaque-generation-binding')
     expect(seen[0].cookie).toBe('__Host-oa-pre-session=pre')
     expect(seen[0].authorization).toBeUndefined(); expect(seen[0]['x-oa-principal']).toBeUndefined()
     for (const [path, browserOrigin] of [['/ws', 'https://app.agricola.test'], ['/unexpected', origin], ['/ws', '']]) {
