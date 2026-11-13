@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { dockerFixtureEnvironment } from './_helpers/docker-fixture-environment'
@@ -58,6 +58,7 @@ else if(a[0]==='compose'){
  else if(a.includes('ps'))console.log(file.endsWith('maintenance.compose.json')?(a.at(-1)==='caddy'?caddyId:newId):s.bootstrap?(s.failure==='existing-caddy'&&a.at(-1)==='caddy'?caddyId:''):a.at(-1)==='caddy'?caddyId:oldId);
  else if(a.includes('up')){s.started=true;s.caddyStarted=true;save();if(['up','up-app-stop'].includes(s.failure))process.exit(42);}
  else if(a.includes('run')){
+  const community=${JSON.stringify(join(value.directory, 'data/community'))},info=fs.existsSync(community)?fs.lstatSync(community):null;fs.appendFileSync(${JSON.stringify(join(value.root, 'community-before-run.jsonl'))},JSON.stringify({exists:!!info,directory:info?.isDirectory(),uid:info?.uid,mode:info?info.mode&0o777:null})+'\\n');
   const config=JSON.parse(fs.readFileSync(file,'utf8'));fs.writeFileSync(${JSON.stringify(join(value.root, 'observed-compose.json'))},JSON.stringify(config));
   if(a.includes('export')){
    if(['backup','backup-stopped','source-changed'].includes(s.failure)){if(s.failure==='source-changed'){s.sourceImage='sha256:'+'a'.repeat(64);save();}process.exit(43);}
@@ -288,4 +289,38 @@ it('still attempts Caddy stop when an unaccepted bootstrap application cannot be
   expect(value.current().caddyStarted).toBe(false)
   expect(value.calls().filter(call => call.args[0] === 'stop').map(call => call.args.at(-1))).toEqual(['3'.repeat(64), '2'.repeat(64)])
   expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv + 'BACKEND_IMAGE=\nCADDY_IMAGE=\n')
+})
+
+it('prepares owner-owned public community storage before the first bootstrap tool even with private umask', () => {
+  const value = fixture('', true), community = join(value.directory, 'data/community'), preload = join(value.root, 'private-umask.mjs')
+  expect(existsSync(community)).toBe(false)
+  writeFileSync(preload, 'process.umask(0o077)')
+  const result = value.invoke(value.request.sourceSha, { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` })
+  expect(result.status, result.stderr).toBe(0)
+  const observations = readFileSync(join(value.root, 'community-before-run.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  expect(observations[0]).toEqual({ exists: true, directory: true, uid: process.getuid?.(), mode: 0o755 })
+  expect(statSync(community).uid).toBe(process.getuid?.())
+  expect(statSync(community).mode & 0o777).toBe(0o755)
+})
+
+it('preserves existing owner community bytes and permissions during an upgrade', () => {
+  const value = fixture(), community = join(value.directory, 'data/community')
+  mkdirSync(community, { mode: 0o700 })
+  writeFileSync(join(community, 'whats-new.json'), 'preserve owner publication')
+  const result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(statSync(community).mode & 0o777).toBe(0o700)
+  expect(readFileSync(join(community, 'whats-new.json'), 'utf8')).toBe('preserve owner publication')
+})
+
+it.each(['file', 'symlink', 'unwritable'])('refuses unsafe %s community storage before stopping or migrating', kind => {
+  const value = fixture(), community = join(value.directory, 'data/community')
+  if (kind === 'file') writeFileSync(community, 'keep owner bytes')
+  else if (kind === 'symlink') { mkdirSync(join(value.root, 'outside-community')); symlinkSync(join(value.root, 'outside-community'), community) }
+  else { mkdirSync(community); chmodSync(community, 0o500) }
+  const result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args[0] === 'stop' || call.args.includes('check-empty') || call.args.includes('check-live'))).toBe(false)
+  if (kind === 'file') expect(readFileSync(community, 'utf8')).toBe('keep owner bytes')
+  if (kind === 'unwritable') expect(statSync(community).mode & 0o777).toBe(0o500)
 })
