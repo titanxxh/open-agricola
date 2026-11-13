@@ -7,7 +7,7 @@ import { normalizePrereleaseReturnPath, type PrereleaseRuntime } from '../shared
 import type { AuthUser } from './auth'
 import { getDb } from './db'
 import type { PostgresDatabase } from './database/postgres'
-import { FormalPrereleaseIdentityClient, parsePrereleaseIdentityState, type PrereleaseIdentityClient } from './prerelease-identity-client'
+import { FormalPrereleaseIdentityClient, parsePrereleaseIdentityState, PrereleaseIdentityError, type PrereleaseIdentityClient } from './prerelease-identity-client'
 
 const opaque = () => randomBytes(32).toString('base64url')
 const hash = (value: string) => createHash('sha256').update(value).digest('base64url')
@@ -18,6 +18,10 @@ export type PrereleaseInvalidation = { userId: string; grantId?: string; token?:
 type SessionRow = { token_hash: string; user_id: string; grant_id: string; generation_id: string; build_id: string; expires_at: number; created_at: number; identity_state: string; revoked_at: number | null; revision: number }
 type Lease = { state: PrereleaseIdentityState; userId: string; grantId: string; expiresAt: number; buildId: string; generationId: string }
 type HandoffInput = { protocolVersion: number; code: string; state: string; browserChallenge: string; returnTo: string }
+
+const handoffFailure = (state: PrereleaseIdentityState, now: number): 'expired' | 'paused' =>
+  state.account.kind === 'deleted' || !state.betaAccess || state.source.kind === 'invalid' || state.source.expiresAt <= now
+    || state.grant.kind === 'revoked' || state.grant.expiresAt <= now ? 'expired' : 'paused'
 
 const origin = (value: string | undefined): string => {
   if (!value) throw new Error('Missing prerelease identity origin')
@@ -88,6 +92,11 @@ export class PrereleaseSessions {
   private async lockSubject(userId: string): Promise<void> {
     await this.db.prepare("SELECT pg_advisory_xact_lock(hashtextextended('open-agricola:pre-subject:' || ?,0))").get(userId)
   }
+  private handoffRace(state: PrereleaseIdentityState): PrereleaseIdentityError {
+    const denied = handoffFailure(state, this.now()) === 'expired' || this.blockedGrants.has(state.grantId)
+      || state.account.kind === 'active' && this.deletedUsers.has(state.account.subject.id)
+    return new PrereleaseIdentityError(denied ? 'expired' : 'paused', 'Identity changed during handoff')
+  }
   async beginHandoff(returnPath = '/open-agricola/') {
     const canonicalPath = normalizePrereleaseReturnPath(returnPath)
     if (!canonicalPath) throw new Error('Invalid prerelease return path')
@@ -99,34 +108,51 @@ export class PrereleaseSessions {
     formal.hash = new URLSearchParams({ browserChallenge: hash(verifier), state, targetOrigin: this.runtime.appOrigin, returnTo: `${this.runtime.formalAppOrigin}/` }).toString()
     return { cookie, formalUrl: formal.href, expiresAt }
   }
-  async exchangeHandoff(cookie: string, input: HandoffInput): Promise<PrereleaseSession & { token: string; returnPath: string }> {
-    if (!secret(cookie) || input.protocolVersion !== 1 || !secret(input.code) || !secret(input.state) || !secret(input.browserChallenge) || input.returnTo !== `${this.runtime.formalAppOrigin}/`) throw new Error('Invalid prerelease handoff')
+  async exchangeHandoff(cookie: string, input: HandoffInput, currentToken = ''): Promise<PrereleaseSession & { token: string; returnPath: string }> {
+    if (input.protocolVersion !== 1 || !secret(input.code) || !secret(input.state) || !secret(input.browserChallenge) || input.returnTo !== `${this.runtime.formalAppOrigin}/`) throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff')
+    const requestHash = hash(JSON.stringify([input.protocolVersion, input.code, input.state, input.browserChallenge, input.returnTo]))
     const operationEpoch = this.epoch
+    if (secret(currentToken)) {
+      const receipt = await this.db.prepare(`SELECT handoff_return_path FROM prerelease_sessions
+        WHERE token_hash=? AND handoff_request_hash=?`).get<{ handoff_return_path: string }>(hash(currentToken), requestHash)
+      if (receipt) {
+        const returnPath = normalizePrereleaseReturnPath(receipt.handoff_return_path)
+        if (!returnPath) throw new PrereleaseIdentityError('paused', 'Invalid persisted handoff receipt')
+        const session = await this.resolve(currentToken)
+        if (!session) throw new PrereleaseIdentityError(this.status(currentToken) === 'expired' ? 'expired' : 'paused', 'Prerelease access unavailable')
+        if (operationEpoch !== this.epoch) throw new PrereleaseIdentityError(this.status(currentToken) === 'expired' || session.expiresAt <= this.now() ? 'expired' : 'paused', 'Identity changed during handoff')
+        return { ...session, token: currentToken, returnPath }
+      }
+    }
+    if (!secret(cookie)) throw new PrereleaseIdentityError(this.status(currentToken) === 'expired' ? 'expired' : 'invalid', 'Invalid prerelease handoff')
     const exchanged = await this.db.transaction(async () => {
       const pending = await this.db.prepare('SELECT * FROM prerelease_browser_handoffs WHERE cookie_hash=? FOR UPDATE').get<{ browser_verifier: string; state: string; return_path: string; expires_at: number }>(hash(cookie))
-      if (!pending || !normalizePrereleaseReturnPath(pending.return_path) || pending.expires_at <= this.now() || pending.state !== input.state || hash(pending.browser_verifier) !== input.browserChallenge) throw new Error('Invalid prerelease handoff')
+      if (!pending) throw new PrereleaseIdentityError(this.status(currentToken) === 'expired' ? 'expired' : 'invalid', 'Invalid prerelease handoff')
+      const returnPath = normalizePrereleaseReturnPath(pending.return_path)
+      if (!returnPath || pending.expires_at <= this.now() || pending.state !== input.state || hash(pending.browser_verifier) !== input.browserChallenge) throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff')
       const state = parsePrereleaseIdentityState(await this.authority.exchange({ code: input.code, browserVerifier: pending.browser_verifier, returnTo: input.returnTo }), this.runtime)
-      if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) throw new Error('Prerelease access unavailable')
+      if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) throw new PrereleaseIdentityError(handoffFailure(state, this.now()), 'Prerelease access unavailable')
       const user = this.user(state), now = this.now(), token = opaque(), expiresAt = Math.min(now + PRERELEASE_SESSION_MAX_AGE_MS, state.grant.expiresAt, state.source.kind === 'active' ? state.source.expiresAt : now)
       await this.lockSubject(user.id)
       if (this.deletedUsers.has(user.id) || await this.db.prepare('SELECT 1 FROM prerelease_deleted_subjects WHERE user_id=?').get(user.id)
-        || await this.db.prepare('SELECT 1 FROM prerelease_revoked_grants WHERE grant_id=?').get(state.grantId)) throw new Error('Revoked prerelease identity')
+        || await this.db.prepare('SELECT 1 FROM prerelease_revoked_grants WHERE grant_id=?').get(state.grantId)) throw new PrereleaseIdentityError('expired', 'Revoked prerelease identity')
       const existing = await this.db.prepare('SELECT identity_origin FROM users WHERE id=? OR username=?').get<{ identity_origin: string }>(user.id, user.username)
       if (existing && existing.identity_origin !== 'external') throw new Error('External identity conflicts with local principal')
       await this.db.prepare(`INSERT INTO users(id,username,display_name,password_hash,created_at,identity_origin) VALUES(?,?,?,NULL,?,'external')
         ON CONFLICT(id) DO UPDATE SET username=excluded.username,display_name=excluded.display_name`).run(user.id, user.username, user.displayName, now)
       await this.db.prepare(`INSERT INTO prerelease_external_identities(user_id,source_grant_id,generation_id) VALUES(?,?,?)
         ON CONFLICT(user_id) DO UPDATE SET source_grant_id=excluded.source_grant_id,generation_id=excluded.generation_id`).run(user.id, state.grantId, this.runtime.generationId)
-      await this.db.prepare('INSERT INTO prerelease_sessions(token_hash,user_id,grant_id,generation_id,build_id,created_at,expires_at,identity_state) VALUES(?,?,?,?,?,?,?,?)').run(hash(token), user.id, state.grantId, this.runtime.generationId, this.runtime.buildId, now, expiresAt, JSON.stringify(state))
+      await this.db.prepare(`INSERT INTO prerelease_sessions(token_hash,user_id,grant_id,generation_id,build_id,created_at,expires_at,identity_state,handoff_request_hash,handoff_return_path)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(hash(token), user.id, state.grantId, this.runtime.generationId, this.runtime.buildId, now, expiresAt, JSON.stringify(state), requestHash, returnPath)
       await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE cookie_hash=?').run(hash(cookie))
-      if (operationEpoch !== this.epoch) throw new Error('Identity changed during handoff')
-      return { token, user, state, expiresAt, returnPath: pending.return_path }
+      if (operationEpoch !== this.epoch) throw this.handoffRace(state)
+      return { token, user, state, expiresAt, returnPath }
     })()
-    if (operationEpoch !== this.epoch) throw new Error('Identity changed during handoff')
     const { token, user, state, expiresAt, returnPath } = exchanged
+    if (operationEpoch !== this.epoch) throw this.handoffRace(state)
     this.blockedUsers.delete(user.id)
     const lease = { state, userId: user.id, grantId: state.grantId, expiresAt, buildId: this.runtime.buildId, generationId: this.runtime.generationId }
-    if (!this.leaseAuthorized(lease)) throw new Error('Prerelease access unavailable')
+    if (!this.leaseAuthorized(lease)) throw new PrereleaseIdentityError(handoffFailure(state, this.now()), 'Prerelease access unavailable')
     this.leases.set(hash(token), lease)
     return { token, user, expiresAt, validUntil: Math.min(state.validUntil, expiresAt), returnPath }
   }
@@ -146,15 +172,20 @@ export class PrereleaseSessions {
       try {
         state = parsePrereleaseIdentityState(await this.authority.status(row.grant_id), this.runtime, row.grant_id)
         if (state.account.kind === 'active' && state.account.subject.id !== row.user_id) throw new Error('Identity subject changed')
-        if (state.account.kind !== 'active' || state.source.kind !== 'active' || state.grant.kind !== 'active' || !state.betaAccess) {
-          await this.denyState(row, state); this.knownInvalid.add(key); return null
+        if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) {
+          if (handoffFailure(state, this.now()) === 'expired') { await this.denyState(row, state); this.knownInvalid.add(key) }
+          this.leases.delete(key); return null
         }
-        const updated = await this.db.prepare(`UPDATE prerelease_sessions SET identity_state=? WHERE token_hash=? AND revoked_at IS NULL
-          AND EXISTS(SELECT 1 FROM prerelease_external_identities p WHERE p.user_id=prerelease_sessions.user_id AND p.revision=?)
-          AND NOT EXISTS(SELECT 1 FROM prerelease_deleted_subjects d WHERE d.user_id=prerelease_sessions.user_id)
-          AND NOT EXISTS(SELECT 1 FROM prerelease_revoked_grants g WHERE g.grant_id=prerelease_sessions.grant_id)`).run(JSON.stringify(state), key, row.revision)
-        if (!updated.changes) { this.leases.delete(key); return null }
-        if (state.account.kind === 'active') await this.db.prepare('UPDATE users SET username=?,display_name=? WHERE id=? AND identity_origin=\'external\'').run(state.account.subject.username, state.account.subject.displayName, row.user_id)
+        const updated = await this.db.transaction(async () => {
+          await this.lockSubject(row.user_id)
+          const updated = await this.db.prepare(`UPDATE prerelease_sessions SET identity_state=? WHERE token_hash=? AND revoked_at IS NULL
+            AND EXISTS(SELECT 1 FROM prerelease_external_identities p WHERE p.user_id=prerelease_sessions.user_id AND p.revision=?)
+            AND NOT EXISTS(SELECT 1 FROM prerelease_deleted_subjects d WHERE d.user_id=prerelease_sessions.user_id)
+            AND NOT EXISTS(SELECT 1 FROM prerelease_revoked_grants g WHERE g.grant_id=prerelease_sessions.grant_id)`).run(JSON.stringify(state), key, row.revision)
+          if (updated.changes && state.account.kind === 'active') await this.db.prepare('UPDATE users SET username=?,display_name=? WHERE id=? AND identity_origin=\'external\'').run(state.account.subject.username, state.account.subject.displayName, row.user_id)
+          return updated.changes
+        })()
+        if (!updated) { this.leases.delete(key); return null }
       } catch { this.leases.delete(key); return null }
     }
     if (state.account.kind !== 'active' || state.account.subject.id !== row.user_id) return null

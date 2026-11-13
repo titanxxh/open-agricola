@@ -4,6 +4,7 @@ import { normalizePrereleaseReturnPath, type PrereleaseHandoffSessionResponse, t
 import { PRERELEASE_HANDOFF_COOKIE, readCookie, serializePrereleaseCookie } from './auth-cookies'
 import { isPrerelease, prereleaseBindingAdmission, prereleaseRequestAdmission, prereleaseRequestBinding, prereleaseSessionToken, type PrereleaseAdmission } from './prerelease-access'
 import { getPrereleaseSessions, readPrereleaseRuntime } from './prerelease-sessions'
+import { PrereleaseIdentityError } from './prerelease-identity-client'
 
 function send(res: ServerResponse, status: number, body: unknown, cookies?: string[]): void {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store',
@@ -49,24 +50,33 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
   if (path === '/api/prerelease/session' && req.method === 'POST') {
     const admission = prereleaseBindingAdmission(req)
     if (!admission.ok) { send(res, admission.status, { ok: false, code: admission.code }); return true }
-    let raw = ''
-    for await (const chunk of req.iterator({ destroyOnReturn: false })) { raw += String(chunk); if (Buffer.byteLength(raw) > 4096) { req.resume(); send(res, 400, { ok: false, code: 'invalid_prerelease_handoff' }); return true } }
     try {
-      const input: unknown = JSON.parse(raw)
+      let raw = ''
+      for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+        raw += String(chunk)
+        if (Buffer.byteLength(raw) > 4096) { req.resume(); throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff') }
+      }
+      let input: unknown
+      try { input = JSON.parse(raw) } catch { throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff') }
       if (!input || typeof input !== 'object' || !('protocolVersion' in input) || input.protocolVersion !== 1
         || !('code' in input) || typeof input.code !== 'string' || !('state' in input) || typeof input.state !== 'string'
         || !('browserChallenge' in input) || typeof input.browserChallenge !== 'string' || !('returnTo' in input) || typeof input.returnTo !== 'string') {
-        send(res, 400, { ok: false, code: 'invalid_prerelease_handoff' }); return true
+        throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff')
       }
       const result = await service.exchangeHandoff(readCookie(req.headers.cookie, PRERELEASE_HANDOFF_COOKIE), {
         protocolVersion: 1, code: input.code, state: input.state, browserChallenge: input.browserChallenge, returnTo: input.returnTo,
-      })
+      }, prereleaseSessionToken(req))
       const runtime = service.runtime
       const body: PrereleaseHandoffSessionResponse = { ok: true, returnPath: result.returnPath, user: { ...result.user, isAdmin: false, betaAccess: true },
         prerelease: { buildId: runtime.buildId, generationId: runtime.generationId, expiresAt: result.expiresAt, validUntil: result.validUntil, serverTime: Date.now() } }
       guardResponse(req, res, result.token, true)
       send(res, 200, body, [serializePrereleaseCookie('session', result.token, result.expiresAt), serializePrereleaseCookie('handoff', '', 0)])
-    } catch { send(res, 400, { ok: false, code: 'invalid_prerelease_handoff' }) }
+    } catch (error) {
+      const kind = error instanceof PrereleaseIdentityError ? error.kind : 'paused'
+      if (kind === 'invalid') send(res, 400, { ok: false, code: 'invalid_prerelease_handoff' }, [serializePrereleaseCookie('handoff', '', 0)])
+      else if (kind === 'expired') send(res, 403, { ok: false, code: 'prerelease_access_expired' }, [serializePrereleaseCookie('handoff', '', 0)])
+      else send(res, 503, { ok: false, code: 'prerelease_access_paused' })
+    }
     return true
   }
   if (path === '/api/auth/me' && req.method === 'GET') {
@@ -122,7 +132,9 @@ function guardResponse(req: IncomingMessage, res: ServerResponse, token = prerel
       const admission = prereleaseBindingAdmission(req)
       if (!admission.ok) return admission
     }
-    if (!service?.cachedAuthorized(token, binding)) return { ok: false, status: 503, code: 'prerelease_access_paused' }
+    if (!service?.cachedAuthorized(token, binding)) return service?.status(token) === 'expired'
+      ? { ok: false, status: 403, code: 'prerelease_access_expired' }
+      : { ok: false, status: 503, code: 'prerelease_access_paused' }
     return undefined
   }
   const writeHead = res.writeHead.bind(res), end = res.end.bind(res), write = res.write.bind(res)
