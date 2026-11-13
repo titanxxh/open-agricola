@@ -1,8 +1,9 @@
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION, BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import {
   PRERELEASE_BUILD_HEADER, PRERELEASE_GENERATION_HEADER, PRERELEASE_BUILD_PROTOCOL_PREFIX,
-  PRERELEASE_GENERATION_PROTOCOL_PREFIX, type PrereleaseRuntime, type PrereleaseSessionResponse,
+  PRERELEASE_GENERATION_PROTOCOL_PREFIX, normalizePrereleaseReturnPath, type PrereleaseRuntime, type PrereleaseSessionResponse,
 } from '../../shared/contract/prerelease-runtime'
+import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export type PrereleaseFailure = 'prerelease_auth_required' | 'prerelease_access_paused' | 'prerelease_access_expired' | 'prerelease_runtime_changed' | 'invalid_prerelease_handoff'
@@ -39,9 +40,10 @@ export async function loadPrereleaseRuntime(): Promise<PrereleaseRuntime | undef
   pending ??= (async () => {
     const response = await fetch(`${API_BASE}/api/prerelease/runtime`, { credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(10_000),
       headers: { [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) } })
+    if (!response.ok) throw new Error('prerelease_access_paused')
     const value: unknown = await response.json()
     const compiled = import.meta.env.VITE_GAME_BUILD_ID
-    if (!response.ok || !object(value) || value.ok !== true || value.channel !== 'prerelease'
+    if (!object(value) || value.ok !== true || value.channel !== 'prerelease'
       || typeof compiled !== 'string' || !/^[a-f0-9]{40}$/.test(compiled) || value.buildId !== compiled
       || typeof value.generationId !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value.generationId)
       || !origin(value.appOrigin) || value.appOrigin !== window.location.origin || !origin(value.formalAppOrigin)
@@ -107,4 +109,23 @@ export function prereleaseWebSocketProtocols(): string | string[] {
 export function observePrereleaseFailure(code: unknown): void {
   if (code === 'prerelease_auth_required' || code === 'prerelease_access_paused' || code === 'prerelease_access_expired'
     || code === 'prerelease_runtime_changed' || code === 'invalid_prerelease_handoff') rejectPrereleaseAccess(code)
+}
+
+
+export function prereleaseStartUrl(search = window.location.search): string {
+  const current = new URLSearchParams(search), target = new URLSearchParams()
+  for (const key of ['room', 'context', 'step', 'frame', 'perspective', 'page', 'bg', 'lang']) {
+    const value = current.get(key)
+    if (value !== null) target.set(key, value)
+  }
+  const query = target.toString()
+  const returnPath = normalizePrereleaseReturnPath(`${HOSTED_APP_PATH}${query ? `?${query}` : ''}`) ?? HOSTED_APP_PATH
+  return `${HOSTED_APP_PATH}auth/start?${new URLSearchParams({ returnPath })}`
+}
+
+
+export function prereleaseStorageKey(key: string): string {
+  if (!isPrereleaseClient()) return key
+  if (!runtime) throw new Error('prerelease_auth_required')
+  return `${key}:prerelease:${runtime.buildId}:${runtime.generationId}`
 }
