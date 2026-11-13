@@ -12,7 +12,7 @@ function fixture() {
   const target = parsePrereleaseTarget({ ...JSON.parse(readFileSync('deploy/prerelease-target.example.json', 'utf8')),
     directory: join(root, 'open-agricola-prerelease-main') })
   const control = join(target.directory, 'control'); mkdirSync(control, { recursive: true })
-  const healthy = { format: 1, targetId: target.targetId, fingerprint: targetFingerprint(target), status: 'healthy',
+  const healthy = { format: 1, targetId: target.targetId, fingerprint: targetFingerprint(target), status: 'healthy', healthyCycle: 'ee4d6c82-676f-4dcc-a570-52377b3b32f5',
     observedAt: Date.now(), validUntil: Date.now() + 60_000, operationsAllowed: true }
   const save = (value: unknown) => writeFileSync(join(control, 'storage-guard.json'), JSON.stringify(value))
   return { target, control, healthy, save }
@@ -103,4 +103,24 @@ it.each(['probe-failure', 'healthy-write', 'forced-trip'])('stops independently 
   expect(recoveredDisk).toMatchObject({ status: 'latched', operationsAllowed: false, persistenceFailures: [], diagnostics: 'available' })
   expect(calls).toEqual(['stop', 'retry'])
   expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).toThrow(/latched/)
+})
+
+
+it('preserves a healthy cycle across samples and requires a new acceptance cycle after manual latch archival', async () => {
+  const { runStorageGuardCycle } = await import('../prerelease/storage-guard')
+  const value = fixture()
+  const observation = { sourceDatabaseBytes: 2, validationDatabaseBytes: 2, bucketBytes: 2, multipartBytes: 2,
+    localBytes: 2, offsiteBytes: 2, hostFreeBytes: 100, hostFreeInodes: 100, offsiteFreeBytes: 100, offsiteFreeInodes: 100 }
+  const limits = { ...observation, sourceDatabaseBytes: 10, validationDatabaseBytes: 10, bucketBytes: 10, multipartBytes: 10,
+    localBytes: 10, offsiteBytes: 10, hostFreeBytes: 1, hostFreeInodes: 1, offsiteFreeBytes: 1, offsiteFreeInodes: 1, operationReserveBytes: 1 }
+  const native = { observe: async () => observation, stop: async () => [] }
+  const first = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, native)
+  expect(first.healthyCycle).toMatch(/^[a-f0-9-]{36}$/)
+  expect(await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, native)).toMatchObject({ healthyCycle: first.healthyCycle })
+  await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, native, 'supervisor-stop')
+  expect(await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, native)).toMatchObject({ status: 'latched' })
+  rmSync(join(value.control, 'storage-guard.json'))
+  const recovered = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, native)
+  expect(recovered.status).toBe('healthy')
+  expect(recovered.healthyCycle).not.toBe(first.healthyCycle)
 })

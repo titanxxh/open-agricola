@@ -10,7 +10,7 @@ export type Operation = { id: string; kind: 'deploy' | 'reset' | 'restore' | 're
 export type RuntimeRecord = {
   format: 1; channel: 'prerelease'; targetId: string; fingerprint: string; generation: string;
   mode: 'maintenance' | 'open' | 'closed'; buildId: string | null; installed: InstalledBuild | null;
-  operation: Operation | null; acceptance: { acceptedAt: number; sha256: string; formalBuildId: string | null } | null
+  operation: Operation | null; acceptance: { acceptedAt: number; sha256: string; formalBuildId: string | null; healthyCycle: string | null } | null
 }
 
 export const controlDirectory = (target: PrereleaseTarget) => join(target.directory, 'control')
@@ -69,7 +69,8 @@ export function readRuntime(target: PrereleaseTarget): RuntimeRecord {
       || !('sha256' in row) || typeof row.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(row.sha256)) throw new Error('Invalid acceptance record')
     const formalBuildId = 'formalBuildId' in row ? row.formalBuildId : null
     if (formalBuildId !== null && !sha(formalBuildId)) throw new Error('Invalid accepted formal build')
-    acceptance = { acceptedAt: row.acceptedAt, sha256: row.sha256, formalBuildId }
+    const healthyCycle = 'healthyCycle' in row && uuid(row.healthyCycle) ? row.healthyCycle : null
+    acceptance = { acceptedAt: row.acceptedAt, sha256: row.sha256, formalBuildId, healthyCycle }
   }
   if (value.mode !== 'maintenance' && value.mode !== 'open' && value.mode !== 'closed') throw new Error('Invalid gateway mode')
   return { format: 1, channel: 'prerelease', targetId: target.targetId, fingerprint: value.fingerprint, generation: value.generation,

@@ -248,7 +248,7 @@ sudo systemctl enable --now open-agricola-prerelease-storage-guard.service
 
 完成安装前，在低额度隔离原生夹具验证实际超额拒写、pre role/key 拒绝、multipart 检测、优雅停止与强制停止耗时、探测失联及 watchdog 死亡、并行备份被中断，以及正式 HTTP/WS 和哨兵数据不变。命令 harness 测试不能替代原生验收。私下保留 latch、停止失败项、时间序列和完整配置指纹。
 
-恢复须由 owner 手工执行。保持公共入口关闭并保留 latch 证据，停止 guard service，检查失败项及精确操作 journal，修复容量或连接，保留所需可恢复备份，并验证已接受提交和 retained storage。一致性与原生 policy/quota 验证通过后，依据原始 owner journal 显式重新启用且仅启用三个 pre role 与两个 pre 对象账号。将 latch 归档到 control 之外，运行 `once` 后重启 service。新鲜 healthy 只允许 owner 验证工作，不代表开放。再次完成已有 authority close/audit/acceptance/open 流程后才允许用户进入。不能只删除 latch 来重启候选，timer 不能自动恢复 LOGIN、对象权限或公共入口。
+恢复须由 owner 手工执行。保持公共入口关闭并保留 latch 证据，停止 guard service，检查失败项及精确操作 journal，修复容量或连接，保留所需可恢复备份，并验证已接受提交和 retained storage。一致性与原生 policy/quota 验证通过后，依据原始 owner journal 显式重新启用且仅启用三个 pre role 与两个 pre 对象账号。将 latch 归档到 control 之外，运行 `once` 后重启 service。新鲜 healthy 开始新的 `healthyCycle` UUID，连续健康采样沿用该值；公共验收及私有验证 token 必须与它一致。恢复后旧回执和 token 仍不能准入。将当前 guard cycle 写入 acceptance 文件，并重新执行 `verify-access` 签发 token。旧 runtime 仍能由 `maintain`/`reverify` 读取，但未绑定周期的验收不能开放入口。再次完成已有 authority close/audit/acceptance/open 流程后才允许用户进入。不能只删除 latch 来重启候选，timer 不能自动恢复 LOGIN、对象权限或公共入口。
 
 ## 核验生产修复并重试站内信
 

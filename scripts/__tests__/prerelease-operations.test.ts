@@ -181,7 +181,10 @@ it('revalidates a changed formal deployment without reinstalling pre or changing
   const buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`, generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5'
   const operationId = 'cb4d6c82-676f-4dcc-a570-52377b3b32f5'
   writeRuntime(target, { ...readRuntime(target), generation, buildId, installed: { buildId, image, installedAt: 1 }, mode: 'open',
-    acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64), formalBuildId: 'b'.repeat(40) } })
+    acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64), formalBuildId: 'b'.repeat(40), healthyCycle: null } })
+  const legacy = JSON.parse(readFileSync(join(value.root, 'control/gate.json'), 'utf8')); delete legacy.acceptance.healthyCycle
+  writeFileSync(join(value.root, 'control/gate.json'), JSON.stringify(legacy))
+  expect(readRuntime(target).acceptance?.healthyCycle).toBeNull()
   const authority = join(value.temporary, 'closed.json')
   writeFileSync(authority, JSON.stringify({ receipt: { action: 'close', generationId: generation, targetOrigin: target.origin, targetId: target.targetId, completedAt: Date.now() } }))
   const invoke = () => value.invoke('reverify', '--expected-current', buildId, '--operation-id', operationId, '--authority-receipt', authority)
@@ -345,7 +348,7 @@ function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNet
   if (sourceInstalled) {
     writeRuntime(target, { ...state(), mode: 'open', buildId: sourceBuildId,
       installed: { buildId: sourceBuildId, image: sourceImage, installedAt: Date.now() },
-      acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64), formalBuildId: null } })
+      acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64), formalBuildId: null, healthyCycle: null } })
     writeFileSync(containerImage, sourceImage)
     const backups = join(value.root, 'backups'), stem = `pre-${operationId}`
     const capture = join(value.temporary, 'capture'); mkdirSync(capture)
@@ -776,4 +779,31 @@ it('refuses a storage-writing operation while its independent guard is latched, 
   expect(result.status).not.toBe(0)
   expect(result.stderr).toContain('storage guard')
   expect(value.calls()).toBe('')
+})
+
+it('binds new private verification tokens to the current healthy storage cycle', () => {
+  const value = fixture(), target = parsePrereleaseTarget(value.config), buildId = 'a'.repeat(40)
+  const generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId = 'cb4d6c82-676f-4dcc-a570-52377b3b32f5', image = `sha256:${'d'.repeat(64)}`
+  writeRuntime(target, { ...readRuntime(target), generation, buildId, installed: { buildId, image, installedAt: 1 },
+    operation: { id: operationId, kind: 'reverify', stage: 'acceptance', buildId, image, generation, sourceBuildId: buildId, sourceImage: image, backupStem: null } })
+  const docker = join(value.bin, 'docker')
+  writeFileSync(docker, readFileSync(docker, 'utf8').replace('esac', `  *' exec -T app node '*) printf '{"buildId":"${buildId}","channel":"prerelease","generation":"${generation}"}';;\nesac`))
+  const result = value.invoke('verify-access', '--expected-current', buildId)
+  expect(result.status, result.stderr).toBe(0)
+  const proof = JSON.parse(readFileSync(join(value.root, 'control/verification.json'), 'utf8'))
+  const guard = JSON.parse(readFileSync(join(value.root, 'control/storage-guard.json'), 'utf8'))
+  expect(proof.healthyCycle).toBe(guard.healthyCycle)
+  expect(proof.healthyCycle).toBe('ee4d6c82-676f-4dcc-a570-52377b3b32f5')
+})
+
+it.each([undefined, 'ff4d6c82-676f-4dcc-a570-52377b3b32f5'])('refuses acceptance from a previous storage cycle (%s) before authority checks', async healthyCycle => {
+  const value = fixture(), target = parsePrereleaseTarget(value.config), buildId = 'a'.repeat(40)
+  const generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId = 'cb4d6c82-676f-4dcc-a570-52377b3b32f5', image = `sha256:${'d'.repeat(64)}`
+  writeRuntime(target, { ...readRuntime(target), generation, buildId, installed: { buildId, image, installedAt: 1 },
+    operation: { id: operationId, kind: 'reverify', stage: 'acceptance', buildId, image, generation, sourceBuildId: buildId, sourceImage: image, backupStem: null } })
+  const path = join(value.temporary, 'acceptance.json'); writeFileSync(path, JSON.stringify({ healthyCycle }))
+  seedStorageGuard(target)
+  const { runPrereleaseOperation } = await import('../prerelease/flow')
+  await expect(runPrereleaseOperation(target, { action: 'open', expectedCurrent: buildId, buildId, acceptanceFile: path })).rejects.toThrow('storage cycle')
+  expect(readRuntime(target).mode).toBe('maintenance')
 })

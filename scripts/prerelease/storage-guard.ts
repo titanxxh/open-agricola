@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { atomicJson } from './runtime'
+import { readStorageGuard } from './storage-guard-state'
 import { targetFingerprint, type PrereleaseTarget } from './config'
 
 const usageKeys = ['sourceDatabaseBytes', 'validationDatabaseBytes', 'bucketBytes', 'multipartBytes', 'localBytes', 'offsiteBytes'] as const
@@ -58,14 +60,14 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
       && observation.offsiteFreeBytes - policy.limits.offsiteFreeBytes >= policy.limits.operationReserveBytes
       && policy.limits.localBytes - observation.localBytes >= policy.limits.operationReserveBytes
       && policy.limits.offsiteBytes - observation.offsiteBytes >= policy.limits.operationReserveBytes
-    const state = { format: 1, targetId: target.targetId, fingerprint, status: 'healthy', reason: null, observedAt,
+    const state = { format: 1, targetId: target.targetId, fingerprint, status: 'healthy', healthyCycle: readStorageGuard(path, target.targetId, fingerprint)?.healthyCycle ?? randomUUID(), reason: null, observedAt,
       validUntil: observedAt + policy.leaseMs, operationsAllowed, observation, persistenceFailures }
     if (persist(state, 'heartbeat')) return state
     reason = 'state-persistence-failed'
   }
   reason ??= 'observation-missing'
   unpersistedLatches.set(fingerprint, reason)
-  const state = { format: 1, targetId: target.targetId, fingerprint, status: 'latched', reason, observedAt,
+  const state = { format: 1, targetId: target.targetId, fingerprint, status: 'latched', healthyCycle: null, reason, observedAt,
     validUntil: observedAt, operationsAllowed: false, observation, persistenceFailures }
   if (persist(state, 'latch')) unpersistedLatches.delete(fingerprint)
   const failures = await native.stop().catch(() => ['stop-failed'])

@@ -50,7 +50,8 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
         const acceptance = 'acceptance' in state ? state.acceptance : null
         const formalBuildId = acceptance && typeof acceptance === 'object' && 'formalBuildId' in acceptance && typeof acceptance.formalBuildId === 'string'
           && /^[a-f0-9]{40}$/.test(acceptance.formalBuildId) ? acceptance.formalBuildId : null
-        return { mode: state.mode, buildId: state.buildId, generation: state.generation, formalBuildId }
+        const healthyCycle = acceptance && typeof acceptance === 'object' && 'healthyCycle' in acceptance ? acceptance.healthyCycle : null
+        return { mode: state.mode, buildId: state.buildId, generation: state.generation, formalBuildId, healthyCycle }
       }
       return null
     } catch { return null }
@@ -76,21 +77,24 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
   const verificationFile = options.verificationFile ?? resolve(options.stateFile, '../verification.json')
   const validToken = (token: string) => {
     const current = state()
-    if (!current || !/^[A-Za-z0-9_-]{43}$/.test(token)) return false
+    const guard = readStorageGuard(guardFile, options.targetId)
+    if (!guard || !current || !/^[A-Za-z0-9_-]{43}$/.test(token)) return false
     try {
       const value: unknown = JSON.parse(readFileSync(verificationFile, 'utf8'))
       return !!value && typeof value === 'object' && 'targetId' in value && value.targetId === options.targetId
         && 'buildId' in value && value.buildId === current.buildId && 'generation' in value && value.generation === current.generation
+        && 'healthyCycle' in value && value.healthyCycle === guard.healthyCycle
         && 'expiresAt' in value && typeof value.expiresAt === 'number' && value.expiresAt > Date.now() && value.expiresAt <= Date.now() + 600_000
         && 'tokenHash' in value && value.tokenHash === createHash('sha256').update(token).digest('hex')
     } catch { return false }
   }
   const guardFile = resolve(options.stateFile, '../storage-guard.json')
   const allowed = (cookie = '') => {
-    if (!readStorageGuard(guardFile, options.targetId)) return false
+    const guard = readStorageGuard(guardFile, options.targetId)
+    if (!guard) return false
     const current = state()
     if (!capability || capability.validUntil <= Date.now()) return false
-    if (current?.mode === 'open') return current.formalBuildId === capability.buildId
+    if (current?.mode === 'open') return current.formalBuildId === capability.buildId && current.healthyCycle === guard.healthyCycle
     const tokens = cookie.split(';').map(value => value.trim()).filter(value => value.startsWith(`${OWNER_VERIFICATION_COOKIE}=`))
     const token = tokens.length === 1 ? tokens[0].slice(OWNER_VERIFICATION_COOKIE.length + 1) : undefined
     return current?.mode === 'maintenance' && token !== undefined && validToken(token)
