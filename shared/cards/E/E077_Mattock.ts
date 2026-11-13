@@ -1,42 +1,29 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
+import { sumActionSpaceMovedToPlayer } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E077_Mattock'
-const isReedOrStoneAccumulationSpace = (context: CardListenerContext): boolean => {
-  if (!context.space) return false
-  const gpr = context.space.gainPerRound
-  return (gpr?.reed ?? 0) > 0 || (gpr?.stone ?? 0) > 0
-}
-
-const collectListener: CardListenerRegistration = {
+const listener: CardListenerRegistration = {
   id: 'E77-mattock-after-collect',
+  previousIds: ['E77-mattock-place-farmer'],
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isReedOrStoneAccumulationSpace(context)) return
-    return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
-  },
-}
-
-const RESOURCE_MARKET_IDS = new Set(['resource-market-4'])
-
-const placeFarmerListener: CardListenerRegistration = {
-  id: 'E77-mattock-place-farmer',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space || !RESOURCE_MARKET_IDS.has(context.space.id)) return
+    // Old cursors also captured a dormant placement reaction on non-market spaces.
+    if (context.actionId === 'place-farmer' && context.space.id !== 'resource-market-4') return
+    const events = context.actionEvents ?? context.transactionEvents
+    if (!(['reed', 'stone'] as const).some(resource =>
+      sumActionSpaceMovedToPlayer(events, resource, context.player.id) > 0)) return
     return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
   },
 }
 
 const cardImpl = {
-  listeners: [collectListener, placeFarmerListener],
+  listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

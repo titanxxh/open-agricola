@@ -1,116 +1,114 @@
+import { describe, expect, it } from 'vitest'
+import type { DraftGameEvent } from '../../contract/events'
+import { createInitialState } from '../../session/state-bootstrap'
+import {
+  executeCardListener,
+  getListenerById,
+  getMatchingListeners,
+  type CardListenerDispatchInput,
+} from '../card-listeners'
 import { installOfficialCardRegistry } from './card-environment'
 
 installOfficialCardRegistry()
 
-import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
-
-import '../E/E077_Mattock'
-import type { CardListenerContext } from '../card-listeners'
-
 const CARD_ID = 'E077_Mattock'
+type Moved = DraftGameEvent<'resource.moved'>
 
-const createPlayer = (id = 'p1'): PlayerState =>
-  ({
-    id, name: 'P1', color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
-      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2, houseType: 'wood',
-    fields: [], fences: 0, roomTiles: [], stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: [CARD_ID],
-    occupationHand: [], occupationPlayed: [],houseAnimals: {}, stableAnimals: {},
-    pastures: [], fenceSegments: [],
-    majorEffects: { wellRounds: 0 }, startPlayer: false,
-  }) as PlayerState
+const moved = (overrides: Partial<Moved> = {}): Moved => ({
+  type: 'resource.moved',
+  resources: { reed: 2 },
+  from: { kind: 'actionSpace', spaceId: 'reed-bank' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'collect',
+  ...overrides,
+})
 
-const createState = (...players: PlayerState[]): GameState =>
-  ({
-    round: 3, currentPlayerIndex: 0, players,
-    actionSpaces: [], log: [],
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
-    gameSeed: 1, availableMajorImprovements: [],
-    futureMeeples: [], pendingFutureMeeples: [],
-    gameOver: false, workPhaseObtainedResources: {},
-  }) as GameState
+const context = (events: Moved[], actionEvents = events, spaceId = 'reed-bank'): CardListenerDispatchInput => {
+  const state = createInitialState(1689, { playerCount: spaceId === 'resource-market-4' ? 4 : 2 })
+  const player = state.players[0]!
+  player.id = 'p1'
+  player.minorPlayed = [CARD_ID]
+  const space = state.actionSpaces.find(entry => entry.id === spaceId)!
+  return {
+    actionHooks: undefined, state, player, space,
+    actionId: space.id, actionSpaceUse: { newPlacement: false }, phase: 'after',
+    transactionEvents: events, actionEvents,
+    result: { type: 'ok', resourcesGained: { reed: 99 } },
+  }
+}
 
-const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace =>
-  ({
-    id, nameKey: `actions.${id}.name`, descriptionKey: `actions.${id}.description`,
-    roundAvailable: 1, gainPerRound: {},
-    canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
-    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: [],
-    ...overrides,
-  }) as ActionSpace
+const rewards = (events: Moved[], actionEvents = events) => {
+  const ctx = context(events, actionEvents)
+  return getMatchingListeners(ctx)
+    .filter(entry => entry.registration.cardIds?.includes(CARD_ID))
+    .flatMap(entry => executeCardListener(entry.registration, ctx)?.flow ?? [])
+}
 
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+const expectOneClay = (flows: ReturnType<typeof rewards>) => {
+  expect(flows).toEqual([
+    expect.objectContaining({ type: 'leaf', actionId: 'gain', params: { clay: 1 }, sourceCard: CARD_ID }),
+  ])
+}
 
-describe('E077_Mattock', () => {
-  it('gains 1 clay after collecting from reed-bank', () => {
-    const listener = findListener('E77-mattock-after-collect')!
+describe('E077_Mattock action-space resource provenance', () => {
+  it.each([
+    { resources: { reed: 3 }, reason: 'collect' as const },
+    { resources: { stone: 2 }, reason: 'collect' as const },
+    { resources: { reed: 1 }, reason: 'gain' as const },
+    { resources: { stone: 1 }, reason: 'gain' as const },
+    { resources: { reed: 1, stone: 1 }, reason: 'gain' as const },
+  ])('rewards actual $reason receipts $resources once without a new placement', receipt => {
+    expectOneClay(rewards([moved(receipt)]))
+  })
+
+  it('does not duplicate the reward when a complete use both collects reed and gains stone', () => {
+    expectOneClay(rewards([
+      moved(),
+      moved({ resources: { stone: 1 }, reason: 'gain' }),
+    ]))
+  })
+
+  it('uses explicit action-space origin even when a granting card is attributed', () => {
+    expectOneClay(rewards([moved({ reason: 'gain', sourceCardId: 'Test_GrantingCard' })]))
+  })
+
+  it.each([
+    { from: { kind: 'supply' as const } },
+    { from: { kind: 'card' as const, cardId: 'Test_Source' } },
+    { to: { kind: 'player' as const, playerId: 'p2' } },
+    { resources: { clay: 3 } },
+    { resources: { reed: 0, stone: 0 } },
+  ])('excludes nonqualifying current receipts: %j', overrides => {
+    expect(rewards([moved(overrides)])).toEqual([])
+  })
+
+  it('ignores accumulation metadata and reported gains when no goods actually moved', () => {
+    expect(rewards([])).toEqual([])
+  })
+
+  it('does not replay older transaction receipts instead of the current action receipt', () => {
+    expect(rewards([moved()], [moved({ resources: { wood: 3 } })])).toEqual([])
+    expect(rewards([moved()], [])).toEqual([])
+  })
+
+  it('keeps a retained non-market placement activation dormant', () => {
+    const ctx = context([moved()])
+    ctx.actionId = 'place-farmer'
+    ctx.actionSpaceUse = undefined
+    expect(executeCardListener(getListenerById('E77-mattock-place-farmer')!, ctx)).toBeUndefined()
+  })
+
+  it.each([
+    { id: 'E77-mattock-after-collect', actionId: 'collect', reason: 'collect' as const },
+    { id: 'E77-mattock-place-farmer', actionId: 'place-farmer', reason: 'gain' as const },
+  ])('can still execute retained activation $id', ({ id, actionId, reason }) => {
+    const spaceId = actionId === 'place-farmer' ? 'resource-market-4' : 'reed-bank'
+    const events = [moved({ reason, from: { kind: 'actionSpace', spaceId } })]
+    const ctx = context(events, events, spaceId)
+    ctx.actionId = actionId
+    ctx.actionSpaceUse = undefined
+    const listener = getListenerById(id)
     expect(listener).toBeDefined()
-    const player = createPlayer()
-    const space = createSpace('reed-bank', { gainPerRound: { reed: 1 } })
-    const result = executeCardListener(listener, {
-      state: createState(player), player, space,
-      actionId: 'collect', phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 2 } },
-    } as unknown as CardListenerContext)
-    expect(result).toBeDefined()
-    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
-    expect(leaf.actionId).toBe('gain')
-    expect(leaf.params).toEqual({ clay: 1 })
+    expectOneClay([executeCardListener(listener!, ctx)!.flow!])
   })
-
-  it('gains 1 clay after collecting from eastern-quarry (stone)', () => {
-    const listener = findListener('E77-mattock-after-collect')!
-    const player = createPlayer()
-    const space = createSpace('eastern-quarry', { gainPerRound: { stone: 1 } })
-    const result = executeCardListener(listener, {
-      state: createState(player), player, space,
-      actionId: 'collect', phase: 'after',
-      result: { type: 'ok', resourcesGained: { stone: 2 } },
-    } as unknown as CardListenerContext)
-    expect(result).toBeDefined()
-    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
-    expect(leaf.actionId).toBe('gain')
-    expect(leaf.params).toEqual({ clay: 1 })
-  })
-
-  it('gains 1 clay from resource-market-4 via place-farmer', () => {
-    const listener = findListener('E77-mattock-place-farmer')!
-    expect(listener).toBeDefined()
-    const player = createPlayer()
-    const result = executeCardListener(listener, {
-      state: createState(player), player, space: createSpace('resource-market-4'),
-      actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
-    expect(result).toBeDefined()
-    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
-    expect(leaf.actionId).toBe('gain')
-    expect(leaf.params).toEqual({ clay: 1 })
-  })
-
-  it('does not trigger for non-reed/stone accumulation', () => {
-    const listener = findListener('E77-mattock-after-collect')!
-    const player = createPlayer()
-    const space = createSpace('clay-pit', { gainPerRound: { clay: 1 } })
-    const result = executeCardListener(listener, {
-      state: createState(player), player, space,
-      actionId: 'collect', phase: 'after',
-      result: { type: 'ok', resourcesGained: { clay: 3 } },
-    } as unknown as CardListenerContext)
-    expect(result).toBeUndefined()
-  })
-
 })

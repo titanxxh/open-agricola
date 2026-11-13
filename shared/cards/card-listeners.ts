@@ -73,6 +73,8 @@ export type CardListenerRegistration = ({
   events?: never
 }) & {
   id: string
+  /** Previous activation IDs still referenced by retained native Session cursors. */
+  previousIds?: readonly string[]
   cardIds?: string[]
   phases: ActionHookPhase[]
   scope?: CardListenerScope
@@ -526,12 +528,9 @@ export const getListenerById = (listenerId: string): CardListenerRegistration | 
       if (rules.length) return retainedTimedListener(cardId, phase, rules)
     }
   }
-  const sessionCtx = getCurrentSessionContext()
-  if (sessionCtx) {
-    const custom = sessionCtx.customListeners.find((l) => l.id === listenerId)
-    if (custom) return custom
-  }
-  return active.getAllListeners().find((l) => l.id === listenerId)
+  const listeners = [...(getCurrentSessionContext()?.customListeners ?? []), ...active.getAllListeners()]
+  return listeners.find(listener => listener.id === listenerId)
+    ?? listeners.find(listener => listener.previousIds?.includes(listenerId))
 }
 
 /**

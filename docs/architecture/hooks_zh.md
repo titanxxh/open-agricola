@@ -8,8 +8,8 @@ Hook 注册表、公开行动的执行顺序、Stage Dispatch 与 listener 纯�
 
 ## Hook 系统
 
-- 每个 `GameCore` 拥有自己的 `ActionHookRegistry`（`actionHooks`）。分发、可用性、费用预览和规则 helper 显式接收它，没有进程级默认值。上下文对象声明 `actionHooks`，只有无通用规则的纯调用才用 `undefined`。注册表是每个 Core 重建的运行时依赖，从不进入状态或游标。
-- `CardRegistry` 也没有进程默认值：卡牌查找使用临时同步的 `withCtx` 绑定，嵌套调用和异常后恢复；未绑定环境的查找直接失败。自定义代码 adapter 在调用不可信代码前剥离 `actionHooks`。
+- 每个 `GameCore` 拥有并重建运行时的 `actionHooks: ActionHookRegistry`，它不进入保存状态或游标。分发、可用性、费用和规则查询显式接收它，没有进程默认值。上下文必须声明 `actionHooks`，只有无规则查询的纯调用才用 `undefined`。
+- `CardRegistry` 也没有进程默认值：同步 `withCtx` 作用域在嵌套或异常后恢复绑定，未绑定的查找直接失败。自定义代码 adapter 剥离 `actionHooks`。
 
 ```text
 isDoable                 修改行动是否可执行
@@ -25,6 +25,7 @@ anytime                  注册额外的 anytime 行动
 - `ActionHookContext` 为 `{ actionHooks, state, player, space, actionId, phase, result?, choice?, doable? }`；执行期 `ActionMutationContext.eventSink` 记录事件。`ActionHookResult`（`shared/actions/hooks.ts`）为 `{ doable?, actionId?, extraData?, extraOptions?, extraExchanges?, followUpActions?, flow?, costs?, trades?, bonuses?, paymentResourceProviders?, costAttribution?, reserveResources?, sourceCard?, countCardUse?, labelKey?, labelParams?, decline?, alternativeFlow? }`。`extraExchanges` 注入运行时兑换，`countCardUse` 控制启用计数，`labelKey` / `labelParams` 为这次贡献命名；`computeReplace` 结果带 `decline` + `alternativeFlow` 时，该流程作为原行动旁的备选项提供，而不是替换原行动。顶层 `flow.sourceCard` 会复制给缺少来源的子 leaf。
 - Card listener 默认只匹配已打出卡牌；只有显式 `zones` 才扫描手牌。匹配结果携带 `ownerCardId` / `ownerCardZone`。手牌 listener 同样保持纯函数，按视角序列化时隐藏从隐藏手牌派生的全部信息。
 - `listener-contract.ts` 统一规定订阅目标和阶段。每条注册只能选择显式 `actions`、`actionSpaces`（`before`、`immediatelyAfter`、`after`、`isDoable` 或 `computeReplace`）、已提交 host 的 `events`（仅 `after`）或 `globalQuery: true`（仅 `isDoable`），且阶段非空。`actionSpaces` 接受非空棋盘格 ID 数组或显式 `'all'`；handler 可筛选格子类别，无需枚举所有卡牌创建的格子。棋盘格 ID 是筛选数据，不是行动订阅身份。`anytime` 和 `compute-exchanges` 是显式查询身份。全部注册入口复制并冻结筛选条件，包括 retained timed listener 和工坊 overlay；clone/merge 和 getter 不能改变订阅。架构门禁以相同契约检查完整展开的 `ALL_CARD_IMPLS`。Workshop 在 AST、manifest 和两种 runtime 边界保持独立受测子集。
+- 原生 `previousIds` 解析保留游标中的旧 activation ID（当前 ID 优先），不新增订阅；这些数组会被复制并冻结。
 - Listener `scope` 为 `player`、`opponent` 或 `any`。匹配按 listener ID 枚举；尾随节点按 owner 分组（全局、当前玩家、其他玩家），组内按打出顺序稳定排序。反应 listener 进入 trigger-select；compute / query listener 确定性聚合。
 - 行动格使用反应选择 `actionSpaces`；规则动作保留 `actions`，包括订阅 `place-farmer` 的人员放置规则。显式用格上下文标识实际进入、查询和整格替换。内部规则动作即使带相同 `space` 或 `targetSpaceId`，也不会打开用格窗口。见 [ADR 0031](../adr/0031-explicit-action-space-use-subscriptions.md)。
 - `before` 在合法目标确定后、费用前运行。`space-use-nodes.ts` 用引擎 sequence 包住一次完整用格，分为主体和完成阶段。普通放人、额外放人、搬迁和无人员用格进入此边界；只放人不执行目标的效果不进入。主体包括支付、选择、替换后代和强制子流程。只有主体事件进入本次用格收据；反应奖励及嵌套用格保留各自身份。

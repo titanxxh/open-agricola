@@ -3,7 +3,7 @@ import { CardRegistry, type CardImpl } from '../registry'
 import { moorSpecialActionCardDefinitions } from '../../moor/special-action-cards'
 import { SessionCardContext } from '../session-card-context'
 import type { CardListenerRegistration } from '../card-listeners'
-import { runCardListeners } from '../card-listeners'
+import { executeCardListener, getListenerById, runCardListeners } from '../card-listeners'
 import { createInitialState } from '../../session/state-bootstrap'
 import { withActiveRegistry } from '../active-registry'
 
@@ -30,6 +30,7 @@ describe('listener registration admission', () => {
 
   it.each([
     {}, { actions: [] }, { actions: ['*'] },
+    ...[null, 'old', [3], [''], ['  ']].map(previousIds => ({ actions: ['collect'], previousIds })),
     ...['immediatelyAfter', 'computeArgs', 'computeCosts', 'isDoable', 'computeReplace', 'anytime'].flatMap(phase => [
       { actions: ['moor-action'], phases: ['before', phase] }, { actions: ['moor-action', 'collect'], phases: ['after', phase] },
     ]), { actions: ['unknown'] }, { actions: ['store-on-card'] },
@@ -87,6 +88,35 @@ describe('listener registration admission', () => {
         expect(() => { if (Array.isArray(installed.actionSpaces)) installed.actionSpaces.push('forest') }).toThrow()
       }
     }
+  })
+
+  it('resolves copied previous activation IDs without adding duplicate subscriptions', () => {
+    const registry = new CardRegistry()
+    const previousIds = ['former-collect', 'former-placement']
+    registry.loadImpl('TEST_Listener', { listeners: [{ ...valid(), previousIds }] })
+    previousIds.push('not-retained')
+    const merged = new CardRegistry()
+    merged.mergeFrom(registry.clone())
+    const state = createInitialState(42, { playerCount: 2 })
+    state.players[0]!.minorPlayed = ['TEST_Listener']
+    const context = { actionHooks: undefined, state, player: state.players[0]!, space: state.actionSpaces[0]!, actionId: 'collect', phase: 'after' as const }
+    for (const current of [registry, registry.clone(), merged]) withActiveRegistry(current, () => {
+      for (const id of ['legal', 'former-collect', 'former-placement']) {
+        const listener = getListenerById(id)
+        expect(listener?.id).toBe('legal')
+        expect(executeCardListener(listener!, context)?.flow).toMatchObject({ actionId: 'gain', params: { food: 2 } })
+        expect(() => Array.prototype.push.call(listener!.previousIds, 'changed')).toThrow()
+      }
+      expect(getListenerById('not-retained')).toBeUndefined()
+      expect(runCardListeners(context)).toEqual([{ flow: { type: 'leaf', actionId: 'gain', params: { food: 2 } } }])
+    })
+  })
+
+  it('prefers an exact activation ID over another listener previous ID', () => {
+    const registry = new CardRegistry()
+    registry.registerListener({ ...valid(), previousIds: ['former'] })
+    registry.registerListener({ ...valid(), id: 'former', handler: () => ({ doable: false }) })
+    withActiveRegistry(registry, () => expect(getListenerById('former')?.id).toBe('former'))
   })
 
   it.each(['action', 'body', 'completion'] as const)('rejects the removed %s settlement option', settlement => {
