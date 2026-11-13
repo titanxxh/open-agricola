@@ -3252,7 +3252,7 @@
   overflow: visible;
 }
 .farm-operation-area[data-interaction-focused="true"] .farm-grid {
-  --tile: clamp(36px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
+  --tile: clamp(36px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - var(--section-nav-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
 }
 .farm-fence-hit {
   position: absolute;
@@ -3625,7 +3625,7 @@
   margin-bottom: 0;
 }
 .farm-operation-area--with-card-targets[data-interaction-focused="true"] .farm-grid {
-  --tile: clamp(36px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 210px) / var(--farm-grid-row-ratio))), 110px);
+  --tile: clamp(36px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - var(--section-nav-height, 0px) - 210px) / var(--farm-grid-row-ratio))), 110px);
 }
 .farm-card-target-tray {
   padding: 8px;
@@ -3691,10 +3691,10 @@
     align-items: start;
   }
   .farm-operation-area--with-card-targets[data-interaction-focused="true"] .farm-grid {
-    --tile: clamp(30px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
+    --tile: clamp(30px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - var(--section-nav-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
   }
   .farm-card-target-tray {
-    max-height: calc(100dvh - var(--interaction-bar-height, 0px) - 36px);
+    max-height: calc(100dvh - var(--interaction-bar-height, 0px) - var(--section-nav-height, 0px) - 36px);
   }
 }
 .extra-sow-targets {

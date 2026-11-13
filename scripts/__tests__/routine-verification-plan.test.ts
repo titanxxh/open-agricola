@@ -1168,6 +1168,7 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/played-card-chronology.spec.ts',
       'e2e-tests/room-animal-holders.spec.ts',
       'e2e-tests/seasons-worker-icons.spec.ts',
+      'e2e-tests/section-navigation.spec.ts',
       'e2e-tests/source-aware-scoring.spec.ts',
       'e2e-tests/special-actions-localization.spec.ts',
       'e2e-tests/visual-support-regression.spec.ts',
