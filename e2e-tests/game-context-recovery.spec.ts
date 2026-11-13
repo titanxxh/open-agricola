@@ -11,6 +11,7 @@ import {
   type WebSocketRoute,
 } from '@playwright/test'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { finishWsOpening, observeWsOpening } from './helpers/ws-opening'
 
 type RecoveryState = {
   type: 'stateUpdate'
@@ -256,6 +257,8 @@ for (const [color, expectedShade] of [['green', 'rgb(22, 138, 74)'], ['purple', 
       await authenticate(hostContext, request, hostName)
       await authenticate(guestContext, request, `piece_guest_${color}_${suffix}`)
       const host = await hostContext.newPage(), guest = await guestContext.newPage()
+      const hostOpening = observeWsOpening(host)
+      const guestOpening = observeWsOpening(guest)
       await host.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=2`)
       const roomId = await host.locator('.ws-invite-roomid strong').textContent()
       await host.locator(`.ws-color-option[data-player-color=${color}]`).click()
@@ -269,13 +272,7 @@ for (const [color, expectedShade] of [['green', 'rgb(22, 138, 74)'], ['purple', 
       await expect(guest.locator('.game-layout')).toBeVisible()
       const forest = host.locator('[data-action-id="forest"] button').first()
       const peerAction = guest.locator('[data-action-id="reed-bank"] button').first()
-      const skips = [host, guest].map(page => page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过|Do not use Elder|不使用长者)$/ }))
-      const firstAction = hostIndex === 0 ? forest : peerAction
-      for (let step = 0; step < 4; step++) {
-        await expect.poll(async () => await firstAction.isEnabled() || (await Promise.all(skips.map(skip => skip.isVisible()))).some(Boolean)).toBe(true)
-        if (await firstAction.isEnabled()) break
-        for (const skip of skips) if (await skip.isVisible()) await skip.click()
-      }
+      await finishWsOpening([hostOpening, guestOpening])
       if (hostIndex !== 0) {
         await expect(peerAction).toBeEnabled()
         await peerAction.click()

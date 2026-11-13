@@ -77,6 +77,7 @@ jobs:
             output/verification/**
             output/playwright/**/error-context.md
             output/playwright/**/test-failed-*.png
+            output/playwright/**/trace.zip
             output/playwright/**/session-lifecycle.json
             output/playwright/**/session-failure.json
             output/playwright/**/session-failure.png
