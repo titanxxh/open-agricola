@@ -19,7 +19,9 @@ export function parseImageImportRequest(value: unknown) {
   if (input.action !== 'prepare-image-import' && input.action !== 'import-image'
     || typeof input.expectedCurrent !== 'string' || !/^(empty|[a-f0-9]{40})$/.test(input.expectedCurrent)
     || typeof input.operationId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(input.operationId)) throw new Error('Explicit image import action, current SHA and operation UUID are required')
-  return { action: input.action, expectedCurrent: input.expectedCurrent, operationId: input.operationId, transfer: parseContainerImageTransfer(input.transfer) }
+  const transfer = parseContainerImageTransfer(input.transfer)
+  if (transfer.receipt.purpose === 'formal-candidate') throw new Error('Formal application images cannot enter a prerelease target')
+  return { action: input.action, expectedCurrent: input.expectedCurrent, operationId: input.operationId, transfer }
 }
 
 export function runImageImport(target: PrereleaseTarget, request: ReturnType<typeof parseImageImportRequest>) {

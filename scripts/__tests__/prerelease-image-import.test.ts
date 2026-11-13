@@ -276,3 +276,16 @@ it.each(['expired', 'producer', 'expected-current', 'open', 'running-app', 'plat
   expect(existsSync(join(value.target.directory, 'control/gate.json')) ? readFileSync(join(value.target.directory, 'control/gate.json'), 'utf8') : undefined).toBe(before)
   expect(value.calls()).not.toMatch(/buildx|"run"|"start"|"stop"|"tag"/)
 })
+
+it('refuses a formal application image at prerelease import before staging or Docker work', () => {
+  const value = fixture()
+  const transfer = { ...value.transfer, receipt: { ...value.transfer.receipt,
+    purpose: 'formal-candidate', channel: 'stable', verification: { ...value.transfer.receipt.verification, kind: 'stable' } } }
+  const before = readRuntime(value.target)
+  writeRuntime(value.target, before)
+  const result = value.invoke('prepare-image-import', { transfer })
+  expect(result.status, result.stdout).not.toBe(0)
+  expect(result.stderr).toContain('Formal application images cannot enter a prerelease target')
+  expect(readRuntime(value.target)).toEqual(before)
+  expect(value.calls()).toBe('')
+})

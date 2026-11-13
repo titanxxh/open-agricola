@@ -42,6 +42,12 @@ describe('trusted container image production admission', () => {
       purpose: 'candidate', channel: 'prerelease', sourceSha, producerSha, build: { runId: 123, runAttempt: 2 },
     })
   })
+  it('binds a separately verified formal candidate to stable without granting tool authority', () => {
+    expect(imageBuildRequest({ purpose: 'formal-candidate', sourceSha }, environment)).toMatchObject({
+      purpose: 'formal-candidate', channel: 'stable', sourceSha, producerSha,
+    })
+    expect(() => imageBuildRequest({ purpose: 'trusted-policy', sourceSha }, environment)).toThrow(/policy source/)
+  })
   it('requires a main-only publishing environment without adding a reviewer gate', () => {
     const env = { name: 'prerelease-image-publish', deployment_branch_policy: { protected_branches: false, custom_branch_policies: true } }
     expect(() => verifyPublishEnvironment(env, { branch_policies: [{ name: 'main', type: 'branch' }] })).not.toThrow()

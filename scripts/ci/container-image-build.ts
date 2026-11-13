@@ -178,7 +178,8 @@ export function imageBuildRequest(input: { purpose: string; sourceSha: string },
   const common = { sourceSha, producerSha, repository, repositoryId: integer(env.GITHUB_REPOSITORY_ID),
     build: { runId: integer(env.GITHUB_RUN_ID), runAttempt: integer(env.GITHUB_RUN_ATTEMPT) } }
   if (input.purpose === 'candidate') return { ...common, purpose: 'candidate' as const, channel: 'prerelease' as const }
-  if (input.purpose !== 'trusted-policy' || sourceSha !== producerSha) throw new Error('Trusted policy source must be the main producer; purpose must be candidate or trusted-policy')
+  if (input.purpose === 'formal-candidate') return { ...common, purpose: 'formal-candidate' as const, channel: 'stable' as const }
+  if (input.purpose !== 'trusted-policy' || sourceSha !== producerSha) throw new Error('Trusted policy source must be the main producer; purpose must be candidate, formal-candidate or trusted-policy')
   return { ...common, purpose: 'trusted-policy' as const, channel: 'stable' as const }
 }
 
@@ -191,6 +192,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     else if (mode === 'verify') verifyBuiltImage()
     else if (mode === 'publish') await publishBuiltImage(policy)
     else if (mode === 'cleanup') cleanupImageBuild()
-    else throw new Error('Usage: container-image-build.ts prepare <candidate|trusted-policy> <SHA> <source-directory> | build | verify | publish | cleanup')
+    else throw new Error('Usage: container-image-build.ts prepare <candidate|formal-candidate|trusted-policy> <SHA> <source-directory> | build | verify | publish | cleanup')
   } catch (error) { printVerificationOutput(error instanceof Error ? error.message : 'Image production failed', 'stderr'); process.exitCode = 1 }
 }
