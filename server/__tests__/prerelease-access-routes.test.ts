@@ -1,7 +1,11 @@
 import { createServer, type Server } from 'node:http'
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 import { PRERELEASE_BUILD_HEADER, PRERELEASE_GENERATION_HEADER } from '../../shared/contract/prerelease-runtime'
+import { createCommunityQrHandler } from '../community-qr'
 
 const fixture = vi.hoisted(() => {
   const runtime = { buildId: 'a'.repeat(40), generationId: '11111111-2222-4333-8444-555555555555', appOrigin: 'https://pre.example.test',
@@ -27,6 +31,7 @@ let server: Server | undefined
 let origin = ''
 let dataReads = 0
 let releaseSlow: (() => void) | undefined
+let communityQr: ReturnType<typeof createCommunityQrHandler> | undefined
 beforeEach(async () => {
   vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
   fixture.authorize(true)
@@ -36,6 +41,7 @@ beforeEach(async () => {
   server = createServer((req, res) => { void (async () => {
     if (await handlePrereleaseRoute(req, res)) return
     if (!await requirePrereleaseRequest(req, res)) return
+    if (communityQr && await communityQr(req, res)) return
     if (req.url === '/api/game/slow') await new Promise<void>(resolve => { releaseSlow = resolve })
     const program = req.url?.startsWith('/open-agricola/') || req.url?.startsWith('/replay-viewers/')
     if (!program) dataReads++
@@ -49,6 +55,7 @@ beforeEach(async () => {
   fixture.runtime.appOrigin = `https://127.0.0.1:${address.port}`
 })
 afterEach(async () => {
+  communityQr = undefined
   releaseSlow?.(); releaseSlow = undefined
   await new Promise<void>((resolve, reject) => server?.close(error => error ? reject(error) : resolve()))
   vi.unstubAllEnvs()
@@ -56,6 +63,31 @@ afterEach(async () => {
 const headers = (cookie = '__Host-oa-pre-session=pre-only') => ({ origin: fixture.runtime.appOrigin,
   [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION), [PRERELEASE_BUILD_HEADER]: 'a'.repeat(40),
   [PRERELEASE_GENERATION_HEADER]: '11111111-2222-4333-8444-555555555555', cookie })
+
+it.each(['wechat', 'feishu'])('admits the exact authenticated %s QR image without binding headers', async platform => {
+  const root = await mkdtemp(join(tmpdir(), 'pre-community-image-'))
+  const image = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+  const path = `/api/community/${platform}-qr`
+  const imageHeaders = { cookie: '__Host-oa-pre-session=pre-only', 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'image' }
+  try {
+    await writeFile(join(root, `${platform}-qr`), image)
+    communityQr = createCommunityQrHandler(root)
+    const response = await fetch(origin + path, { headers: imageHeaders })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('image/png')
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(image)
+    for (const denied of [{ ...imageHeaders, cookie: '' }, { ...imageHeaders, cookie: '__Host-oa-session=formal' },
+      { ...imageHeaders, 'sec-fetch-site': 'same-site' }, { ...imageHeaders, origin: 'https://sibling.example.test' }]) {
+      expect((await fetch(origin + path, { headers: denied })).status).not.toBe(200)
+    }
+    for (const unrelated of [path + '/extra', '/api/v1/game-contexts/private/evidence/0']) {
+      expect((await fetch(origin + unrelated, { headers: imageHeaders })).status).toBe(426)
+    }
+    expect((await fetch(origin + path, { method: 'HEAD', headers: imageHeaders })).status).toBe(426)
+    await writeFile(join(root, `${platform}-qr`), 'invalid image')
+    expect((await fetch(origin + path, { headers: imageHeaders })).status).toBe(503)
+  } finally { communityQr = undefined; await rm(root, { recursive: true, force: true }) }
+})
 
 it('gates all data owners before reads while keeping only the program and metadata bootstrap public', async () => {
   for (const path of ['/api/rooms', '/api/rooms/locate', '/api/v1/game-contexts/room', '/api/v1/game-contexts/room/evidence/0',
