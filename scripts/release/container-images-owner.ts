@@ -74,7 +74,8 @@ export async function prepareContainerImageArchive({ receipt: verified, authFile
       if (!await completed) throw new Error('Owner image export was interrupted')
     } catch (error) { child.kill('SIGKILL'); await completed; throw error }
     finally { clearTimeout(timer) }
-    const { sha256, bytes: archiveBytes } = validateContainerImageArchive({ archivePath: partial, imageId: receipt.imageId, sourceSha: receipt.sourceSha, channel: receipt.channel, maxBytes })
+    const { sha256, bytes: archiveBytes, archiveManifestDigest } = validateContainerImageArchive({ archivePath: partial, imageId: receipt.imageId, sourceSha: receipt.sourceSha, channel: receipt.channel, maxBytes })
+    if (archiveManifestDigest === null) throw new Error('Owner export has no verified OCI index; upgrade owner Docker to a version whose image save includes index.json and retry')
     renameSync(partial, archivePath)
     const transfer: ContainerImageTransfer = { format: 1, receipt, archive: { sha256, bytes: archiveBytes } }
     writeFileSync(join(operation, 'transfer.json'), JSON.stringify(transfer) + '\n', { flag: 'wx', mode: 0o600, flush: true })
