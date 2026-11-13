@@ -30,8 +30,9 @@ export function subscribePrereleaseAccess(listener: () => void): () => void {
   listeners.add(listener); return () => { listeners.delete(listener) }
 }
 function publish(next: PrereleaseAccess) { access = next; for (const listener of listeners) listener() }
+const terminalFailure = (state: PrereleaseAccess) => state.kind === 'ended' || state.kind === 'blocked' && state.code !== 'prerelease_access_paused' ? state.code : undefined
 export function rejectPrereleaseAccess(code: PrereleaseFailure): void {
-  if (!isPrereleaseClient() || access.kind === 'ended' || access.kind === 'blocked' && access.code === 'prerelease_runtime_changed') return
+  if (!isPrereleaseClient() || terminalFailure(access)) return
   clearTimeout(leaseTimer)
   revision++
   publish({ kind: 'blocked', code })
@@ -69,12 +70,13 @@ export async function loadPrereleaseRuntime(): Promise<PrereleaseRuntime | undef
   return pending
 }
 export function acceptPrereleaseSession(value: unknown, expectedRevision = revision, requestStarted = performance.now()): PrereleaseSessionResponse {
-  if (access.kind === 'ended') throw new Error('prerelease_auth_required')
+  const failure = terminalFailure(access)
+  if (failure) throw new Error(failure)
   if (!runtime || !object(value) || value.ok !== true || !object(value.user) || !object(value.prerelease)
     || value.prerelease.buildId !== runtime.buildId || value.prerelease.generationId !== runtime.generationId) {
     rejectPrereleaseAccess('prerelease_runtime_changed'); throw new Error('prerelease_runtime_changed')
   }
-  if (expectedRevision !== revision || access.kind === 'blocked' && access.code === 'prerelease_runtime_changed') throw new Error('prerelease_runtime_changed')
+  if (expectedRevision !== revision) throw new Error('prerelease_runtime_changed')
   const user = value.user, pre = value.prerelease
   if (typeof user.id !== 'string' || !user.id || typeof user.username !== 'string' || typeof user.displayName !== 'string'
     || user.isAdmin !== false || user.betaAccess !== true || typeof pre.expiresAt !== 'number' || !Number.isSafeInteger(pre.expiresAt)
