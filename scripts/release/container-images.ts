@@ -116,7 +116,9 @@ function trustedProducer(cwd: string, producer: string): { repositoryId: number;
   assertRawCommit(cwd, RELEASE_REPOSITORY, main); assertRawCommit(cwd, RELEASE_REPOSITORY, producer)
   if (spawnSync('git', ['merge-base', '--is-ancestor', producer, main], { cwd, stdio: 'ignore' }).status !== 0
     || verificationConfiguration(cwd, producer) !== verificationConfiguration(cwd, main)
-    || spawnSync('git', ['diff', '--quiet', producer, main, '--', CONTAINER_IMAGE_WORKFLOW, ':(glob)scripts/release/container-images*.ts'], { cwd, stdio: 'ignore' }).status !== 0) {
+    || spawnSync('git', ['diff', '--quiet', producer, main, '--', CONTAINER_IMAGE_WORKFLOW, ':(glob)scripts/release/container-images*.ts',
+      ':(glob)scripts/release/backend-*', 'scripts/image-intake.ts', 'deploy-backend.sh', 'docker-compose.prod.yml',
+      'scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs'], { cwd, stdio: 'ignore' }).status !== 0) {
     throw new Error('Image producer is not compatible protected main')
   }
   return { repositoryId: integer(repository.id), main }

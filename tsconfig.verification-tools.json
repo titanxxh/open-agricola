@@ -25,6 +25,8 @@
     "scripts/__tests__/verify-affected.test.ts",
     "scripts/__tests__/isolated-browser.test.ts",
     "scripts/__tests__/candidate-verification*.test.ts",
+    "scripts/__tests__/backend-image*.test.ts",
+    "scripts/__tests__/container-image-frontend.test.ts",
     "scripts/__tests__/scoped-verification*.test.ts",
     "scripts/__tests__/test-consumers.test.ts",
     "scripts/__tests__/routine-verification-replay.test.ts",
