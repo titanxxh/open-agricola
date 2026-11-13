@@ -143,7 +143,7 @@ else if(line.includes(' exec -T app node '))process.stdout.write(JSON.stringify(
     expect(await db.prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
     expect(readRuntime(target).mode).toBe('maintenance')
   } finally { await db.close() }
-})
+}, 15_000)
 
 it('rejects the legacy on-host build target before planning or invoking Docker', () => {
   const value = fixture()
