@@ -9,6 +9,7 @@ import { atomicJson, readRuntime, writeRuntime } from '../prerelease/runtime'
 import { importedImagePath } from '../prerelease/docker'
 import type { ContainerImageTransfer } from '../release/container-images'
 import { readPairedPrereleaseBackup } from '../prerelease/backup'
+import { seedStorageGuard } from './prerelease-storage-guard-fixture'
 
 const sourceBuild = 'a'.repeat(40), image = `sha256:${'b'.repeat(64)}`, container = 'c'.repeat(64)
 
@@ -21,7 +22,7 @@ function offsiteDirectory(directory: string, form: OffsiteDirectoryForm) {
   return directory + { canonical: '', 'trailing-slashes': '///', dot: '/./', parent: '/../remote/', 'cross-scope': '/../backups/' }[form]
 }
 
-// Real shell, timeout, tar and hashing; native PG/S3 round trips have separate tests.
+// Real shell, timeout, tar and hashing; native PG/S3 and resident app cgroups have separate tests.
 function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
   mode?: 'full' | 'ledger-only'
   directoryForm?: OffsiteDirectoryForm
@@ -50,6 +51,7 @@ function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
       offsite: { host: 'fixture', directory: '/srv/backups/open-agricola-prerelease-test' },
     }) : undefined
     if (target) {
+      if (fail !== 'prerelease-missing-guard') seedStorageGuard(target)
       const common = 'S3_BUCKET=oa-prerelease-test\nS3_PREFIX=live/\nS3_SECRET_ACCESS_KEY=inert-fixture\nS3_ENDPOINT=http://127.0.0.1:9000\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n'
       writeFileSync(join(root, '.env'), 'DATABASE_URL=postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test\nS3_ACCESS_KEY_ID=pre-app\n' + common, { mode: 0o600 })
       writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=postgres://oa_prerelease_test_backup:fixture@127.0.0.1/oa_prerelease_test\nVALIDATION_DATABASE_URL=postgres://oa_prerelease_test_validator:fixture@127.0.0.1/oa_prerelease_test_validation\nS3_ACCESS_KEY_ID=pre-backup\n' + common, { mode: 0o600 })
@@ -153,7 +155,8 @@ case "$*" in
   inspect*'com.docker.compose.oneoff'*) printf True ;;
   'rm -f '*) ;;
   *' ps -q app') printf '${container}' ;;
-  'ps -q --no-trunc '*) printf '${container}' ;;
+  'ps -q --no-trunc '*'label=com.docker.compose.oneoff=False') printf '${container}' ;;
+  'ps -q --no-trunc '*) ;; # Source metadata is mocked above; no native resident app memory is credited.
   'ps -q '*) ;;
   *'{{.State.Running}}'*) printf true ;;
   *'{{.Image}}'*) printf '${image}' ;;
@@ -313,6 +316,14 @@ it('captures an open prerelease source using the separate trusted policy image a
   expect(result.runtime).toMatchObject({ mode: 'open', operation: null, installed: { buildId: sourceBuild, image } })
   expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
 }, 15000)
+
+it('requires fresh owner storage admission before exporting prerelease data', () => {
+  const result = backup('prerelease-missing-guard')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Prerelease storage guard is missing, stale or latched')
+  expect(result.report).toBeUndefined()
+  expect(result.calls.some(call => call.includes('export-online /backup/'))).toBe(false)
+})
 
 it('requires an imported policy image before backup without building or exporting from the candidate', () => {
   const result = backup('prerelease-missing-policy')
