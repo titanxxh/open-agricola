@@ -39,6 +39,8 @@ import { SeasonsBoard } from '../components/board/SeasonsBoard'
 import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
 import { DesktopPlayerOverview } from '../components/board/DesktopPlayerOverview'
 import { DesktopPublicFarms } from './DesktopPublicFarms'
+import { SectionNav } from './SectionNav'
+import { ownHandSectionAvailable, sectionNavItems } from './section-nav'
 import { SpecialActionsPanel } from '../components/board/SpecialActionsPanel'
 import { MajorImprovements, type MajorSupplyExpansion } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
@@ -2022,7 +2024,7 @@ export const GameContainerApi = () => {
   const expansionActionBoards = (
     <>
       {state.enableFarmersOfTheMoor && state.farmersOfTheMoor ? (
-        <section className="board-panel board-special-actions">
+        <section className="board-panel board-special-actions" data-section-target="moor">
           <div className="moor-action-spaces" ref={setMoorActionOutlet} />
           <SpecialActionsPanel
             locale={locale}
@@ -2038,7 +2040,7 @@ export const GameContainerApi = () => {
         </section>
       ) : null}
       {state.enableThroughTheSeasons && state.throughTheSeasons ? (
-        <section className="board-panel board-seasons">
+        <section className="board-panel board-seasons" data-section-target="seasons">
           <SeasonsBoard
             locale={locale}
             throughTheSeasons={state.throughTheSeasons}
@@ -2051,6 +2053,19 @@ export const GameContainerApi = () => {
       ) : null}
     </>
   )
+  const sectionItems = sectionNavItems({
+    handPlayerId: ownHandSectionAvailable({
+      selfPlayerId: selfPlayer?.id ?? null,
+      displayPlayerId: displayPlayer.id,
+      visiblePlayerIds: farmBoardView.visiblePlayerIds,
+      devMode: farmBoardView.devMode,
+    }),
+    viewedFarm: true,
+    publicFarms: state.players.some(player => player.id !== displayPlayer.id),
+    seasons: !!(state.enableThroughTheSeasons && state.throughTheSeasons),
+    moor: !!(state.enableFarmersOfTheMoor && state.farmersOfTheMoor),
+    majorSupply: true,
+  })
 
   return withEncyclopedia(
     <div className={`app${isEmbedded ? ' app--embedded' : ''}${isDesktopTable ? ' app--desktop-table' : ''}`}>
@@ -2152,7 +2167,7 @@ export const GameContainerApi = () => {
             </div>
           ) : null}
           {!hasHotseatExchangeOverlay ? playerTabsPresentation : null}
-          <section className="board-panel board-farm">
+          <section className="board-panel board-farm" data-section-target="farm">
             <PlayerFarmPanel
               state={state}
               viewedPlayerId={displayPlayer.id}
@@ -2198,6 +2213,7 @@ export const GameContainerApi = () => {
         </div>
       </div>
 
+      <SectionNav locale={locale} items={sectionItems} />
       {bugReportBar}
       {/* Keep local panel drafts mounted, but neither visible nor actionable while browsing. */}
       <div hidden={isPublicFarmView} inert={isPublicFarmView}>

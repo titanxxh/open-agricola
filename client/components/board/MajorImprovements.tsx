@@ -68,7 +68,7 @@ export const MajorImprovements = ({
 
   return (
     <section className={`major-improvements ${shouldExpand ? 'expanded' : 'collapsed'}`}
-      data-interaction-focus="major-supply">
+      data-interaction-focus="major-supply" data-section-target="major-supply">
       <h2>
         <button type="button" aria-expanded={shouldExpand} className="major-supply-toggle"
           onClick={() => onExpansionChange({ requestKey, expanded: !shouldExpand })}>

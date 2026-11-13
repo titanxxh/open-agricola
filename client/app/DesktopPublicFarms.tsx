@@ -12,7 +12,7 @@ type Props = Pick<PlayerFarmPanelProps, 'view' | 'actions'> & {
 
 export function DesktopPublicFarms({ state, viewedPlayerId, pastureCapacities, view, actions }: Props) {
   return (
-    <section className="desktop-public-farms">
+    <section className="desktop-public-farms" data-section-target="public-farms">
       <h2>{t(view.locale, 'ui.publicFarms')}</h2>
       <div className="desktop-public-farms__grid">
         {state.players.filter(player => player.id !== viewedPlayerId).map(player => (
