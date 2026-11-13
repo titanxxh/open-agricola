@@ -174,14 +174,20 @@ export function maintainBackendImage(path: string, expected: Target): void {
     restartOld = false
     compose(['run', '--rm', '--no-deps', '--pull', 'never', 'app', 'node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', 'check-live', request.sourceSha, '--applications-stopped'], 120_000)
     drainTarget = () => {
+      const failures: unknown[] = []
       for (const service of bootstrap ? ['app', 'caddy'] : ['app']) {
-        const ids = compose(['ps', '-a', '-q', service]).split('\n').filter(Boolean)
-        if (ids.some(id => !/^[a-f0-9]{12,64}$/.test(id))) throw new Error('Failed target application inventory is invalid')
+        let ids: string[]
+        try { ids = compose(['ps', '-a', '-q', service]).split('\n').filter(Boolean) }
+        catch (error) { failures.push(error); continue }
         for (const id of ids) {
-          docker(['stop', '--time', '90', id], 100_000)
-          if (object(inspect(id).State).Running !== false) throw new Error('Failed target application did not stop')
+          try {
+            if (!/^[a-f0-9]{12,64}$/.test(id)) throw new Error('Failed target application inventory is invalid')
+            docker(['stop', '--time', '90', id], 100_000)
+            if (object(inspect(id).State).Running !== false) throw new Error('Failed target application did not stop')
+          } catch (error) { failures.push(error) }
         }
       }
+      if (failures.length) throw new AggregateError(failures, 'Could not confirm every unaccepted target stopped')
     }
     compose(['up', '-d', '--remove-orphans', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '120', 'app', 'caddy'], 150_000)
     const currentId = compose(['ps', '-q', 'app']), current = inspect(currentId), currentEnv = environment(object(current.Config).Env)

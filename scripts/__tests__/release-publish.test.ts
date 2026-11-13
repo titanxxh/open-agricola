@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { stableConfiguration } from '../ci/candidate-verification'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { prereleaseConfiguration } from '../ci/prerelease-verification'
+import { dockerFixtureEnvironment } from './_helpers/docker-fixture-environment'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
 const repository = resolve(import.meta.dirname, '../..')
@@ -68,11 +69,11 @@ function fixture(prerelease = false) {
   }
   const bin = join(root, 'bin')
   mkdirSync(bin)
-  const env: NodeJS.ProcessEnv = {
-    ...process.env, CI: '', GITHUB_ACTIONS: '', GITHUB_SHA: '', GITHUB_OUTPUT: '',
+  const env = dockerFixtureEnvironment({
+    CI: '', GITHUB_ACTIONS: '', GITHUB_SHA: '', GITHUB_OUTPUT: '',
     PATH: [bin, join(repository, 'node_modules/.bin'), process.env.PATH].join(delimiter),
     RELEASE_TEST_ROOT: root,
-  }
+  })
   const invoke = (script: string, args: string[]) => spawnSync(join(repository, 'node_modules/.bin/tsx'), [join(root, script), ...args], {
     cwd: root, env, encoding: 'utf8', timeout: 30_000,
   })

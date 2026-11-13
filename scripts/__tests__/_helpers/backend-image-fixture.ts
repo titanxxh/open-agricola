@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
+import { dockerFixtureEnvironment } from './docker-fixture-environment'
 import { FULL_TASK_IDS } from '../../ci/verification-tasks'
 
 const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
@@ -61,7 +62,7 @@ else if(a[0]==='cp')fs.writeFileSync(a.at(-1),JSON.stringify({...${JSON.stringif
 else if(a[0]!=='rm')process.exit(3);
 `, { mode: 0o700 })
   const invoke = (mode = 'receive') => spawnSync(process.execPath, ['scripts/release/backend-image-receiver.ts', mode, requestPath, ...(mode === 'check' ? [directory, sourceSha, producerSha] : [])], {
-    cwd: resolve(import.meta.dirname, '../../..'), env: { ...process.env, CI: '', GITHUB_ACTIONS: '', PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8', timeout: 30000,
+    cwd: resolve(import.meta.dirname, '../../..'), env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${bin}:${process.env.PATH}` }), encoding: 'utf8', timeout: 30000,
   })
   return { root, bin, directory, stage, requestPath, statePath, request, state, save, invoke, imageId, archivePath,
     calls: (): string[][] => existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : [] }
