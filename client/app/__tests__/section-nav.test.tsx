@@ -219,6 +219,9 @@ describe('SectionNav', () => {
     expect(css).toContain('--section-nav-height')
     expect(css).toContain('bottom: calc(max(var(--interaction-bar-height, 72px), var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) + 8px)')
     expect(css).toContain('padding-bottom: calc(var(--app-edge-padding) + max(var(--interaction-bar-height, 0px), var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) + var(--section-nav-height, 0px))')
+    expect(readFileSync(resolve('client/styles/pages/mobile-table.css'), 'utf8')).toContain(
+      '100dvh - var(--interaction-bar-height, 0px) - var(--section-nav-height, 0px) - 72px',
+    )
   })
 
   it('scrolls a section that is clear of the action bar but still under the shortcut dock', () => {
