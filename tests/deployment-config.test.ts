@@ -126,6 +126,12 @@ describe('production deployment config', () => {
     }
   })
 
+  it('keeps scheduled backup on the shared maintenance lock without waiting', () => {
+    const backup = readFileSync('backup-offsite.sh', 'utf8')
+    expect(backup).toContain('exec 9>backups/.maintenance.lock')
+    expect(backup).toContain("flock -n 9 || { echo 'Backup or deployment is already running; skip this schedule'; exit 0; }")
+  })
+
   it('runs retention and offsite sync even when the daily backup fails', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
     expect(script).toContain('if [[ "$MODE" == full ]] && ! MAINTENANCE_LOCK_HELD=1 bash "$POLICY_ROOT/scripts/backup-storage.sh" "$BACKUP_STEM"; then')

@@ -56,6 +56,7 @@ else if(a[0]==='start'){s.running=true;save();}
 else if(a[0]==='ps'){}
 else if(a[0]==='volume'){if(s.failure==='retained-volume'||s.projectVolume)console.log('formal_app-data');}
 else if(a[0]==='compose'){
+ log('compose-owner',[process.env.APP_UID??'<unset>',process.env.APP_GID??'<unset>']);
  const file=a[a.indexOf('-f')+1];
  if(a.includes('config'))out({name:'formal',services:{app:{image:'mutable:old',build:{context:'.'},environment:{...data,...(s.failure==='data-target'?{S3_BUCKET:'another'}:{})},volumes:[],networks:['default']},caddy:{image:'caddy:mutable',depends_on:['app']}},networks:{default:{name:'formal_default'},dependencies:{external:true,name:'shared_dependencies'}}});
  else if(a.includes('ps'))console.log(file.endsWith('maintenance.compose.json')?(a.at(-1)==='caddy'?caddyId:newId):s.bootstrap?(s.failure==='existing-caddy'&&a.at(-1)==='caddy'?caddyId:''):a.at(-1)==='caddy'?caddyId:oldId);
@@ -102,6 +103,7 @@ it('delivers an imported immutable image with source capture, target restore val
   expect(index(' export ')).toBeLessThan(index(' validate '))
   expect(index(' validate ')).toBeLessThan(index('check-live'))
   expect(index('check-live')).toBeLessThan(index(' up '))
+  expect(calls.find(call => call.kind === 'docker' && call.args.includes('up'))?.args).toContain('--remove-orphans')
   expect(commands.find(command => command.includes(' export '))).toContain(' capture ')
   expect(commands.find(command => command.includes(' validate '))).toContain(' app ')
   const manifest = JSON.parse(readFileSync(join(value.directory, 'backups', `pre-${value.request.sourceSha.slice(0, 12)}-${value.request.operationId}.manifest.json`), 'utf8'))
@@ -110,6 +112,15 @@ it('delivers an imported immutable image with source capture, target restore val
   expect(manifest.archiveSizeBytes).toBeGreaterThan(0)
   expect(result.stdout).toContain(`Current build: ${value.request.sourceSha}`)
   expect(result.stdout + result.stderr).not.toContain('private-fixture-secret')
+})
+
+it('passes the deployment owner UID and GID to Compose despite inherited user overrides', () => {
+  const value = fixture(), result = value.invoke(value.request.sourceSha, { APP_UID: '424242', APP_GID: '424243' })
+  expect(result.status, result.stderr).toBe(0)
+  const owners = value.calls().filter(call => call.kind === 'compose-owner')
+  expect(owners.length).toBeGreaterThan(0)
+  expect(new Set(owners.map(call => call.args.join(':'))))
+    .toEqual(new Set([`${process.getuid?.()}:${process.getgid?.()}`]))
 })
 
 it.each(['fetch', 'checkout', 'data-target', 'oom'])('rejects %s mismatch before stopping the retained application', failure => {
