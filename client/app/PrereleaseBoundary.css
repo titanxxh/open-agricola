@@ -1,0 +1,22 @@
+.prerelease-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .5rem 1.5rem;
+  padding: .5rem 1rem;
+  background: #6c3920;
+  color: #fff8eb;
+  font-size: .85rem;
+}
+.prerelease-banner a { color: inherit; text-decoration: underline; }
+.prerelease-access-screen {
+  max-width: 36rem;
+  margin: 10vh auto;
+  padding: 1.5rem;
+  text-align: center;
+}
+.prerelease-access-screen .btn-primary,
+.prerelease-access-screen .btn-secondary { margin: .5rem; }

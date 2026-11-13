@@ -1,3 +1,4 @@
+import { isPrereleaseClient } from '../services/prerelease-runtime'
 import { browserApiFetch } from '../services/browser-api'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
@@ -56,7 +57,7 @@ type AuthContextValue = AuthState & {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 const devAuthShortcutsEnabled = (): boolean =>
-  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1'
+  !isPrereleaseClient() && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1')
 
 function devShortcutUserFromLocation(): AuthUser | null {
   const params = new URLSearchParams(window.location.search)
