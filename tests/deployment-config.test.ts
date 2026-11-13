@@ -1,10 +1,5 @@
-import { stableConfiguration } from '../scripts/ci/candidate-verification'
-import { execFileSync, spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { delimiter, join } from 'node:path'
+import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { finalSnapshotMetadata } from '../scripts/__tests__/_helpers/candidate-provenance'
 
 function expectWorkflowSecrets(file: string, workflow: string): void {
   if (file === 'container-image-build.yml') {
@@ -31,178 +26,11 @@ function expectWorkflowSecrets(file: string, workflow: string): void {
   expect(workflow).not.toMatch(/\bsecrets\s*(?:\.|\[)/)
 }
 
-// Run the public candidate checker against local Git and controlled GitHub evidence.
-// Capture the remote command without executing the deployment body or opening SSH.
-function captureBackendDeployment(args: string[], policy?: string) {
-  const directory = mkdtempSync(join(tmpdir(), 'open-agricola-deploy-'))
-  const repository = process.cwd()
-  const bin = join(directory, 'bin')
-  const captures = {
-    ssh: join(bin, 'ssh-args'),
-    sudo: join(bin, 'sudo-args'),
-    bash: join(bin, 'bash-args'),
-    policy: join(bin, 'registration-policy'),
-    ref: join(bin, 'candidate-ref'),
-  }
-  try {
-    mkdirSync(join(directory, 'scripts'), { recursive: true })
-    mkdirSync(join(directory, '.github/workflows'), { recursive: true })
-    for (const path of ['scripts/ci', 'scripts/release', '.github/workflows/candidate-verification.yml', 'deploy-backend.sh', 'package.json', 'pnpm-lock.yaml']) {
-      cpSync(join(repository, path), join(directory, path), { recursive: true })
-    }
-    writeFileSync(join(directory, '.gitignore'), 'bin/\n')
-    const git = (...input: string[]) => execFileSync('git', input, { cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-    git('init', '-b', 'main')
-    git('config', 'user.name', 'Deployment Test')
-    git('config', 'user.email', 'deployment@example.test')
-    git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**')
-    git('commit', '-m', 'deployment fixture')
-    const sha = git('rev-parse', 'HEAD')
-    const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
-    mkdirSync(bin)
-    writeFileSync(join(bin, 'git'), `#!${process.execPath}
-import { spawnSync } from 'node:child_process';
-const args = process.argv.slice(2);
-if (!['cat-file', 'rev-parse', 'ls-tree', 'show', 'status', 'merge-base'].includes(args[0])) throw Error('Unexpected fixture git command: ' + args.join(' '));
-const result = spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit' });
-process.exit(result.status ?? 1);
-`, { mode: 0o700 })
-    writeFileSync(join(bin, 'ssh'), `#!/bin/bash
-printf '%s\\0' "$@" > "$OA_DEPLOY_CAPTURE/ssh-args"
-exec /bin/bash -c "$2"
-`, { mode: 0o700 })
-    writeFileSync(join(bin, 'sudo'), `#!/bin/bash
-printf '%s\\0' "$@" > "$OA_DEPLOY_CAPTURE/sudo-args"
-exit 99
-`, { mode: 0o700 })
-    writeFileSync(join(bin, 'bash'), `#!/bin/bash
-printf '%s\\0' "$@" > "$OA_DEPLOY_CAPTURE/bash-args"
-printf '%s' "\${ACCOUNT_REGISTRATION_POLICY:-}" > "$OA_DEPLOY_CAPTURE/registration-policy"
-`, { mode: 0o700 })
-    const env: NodeJS.ProcessEnv = {
-      ...process.env, CI: '', GITHUB_ACTIONS: '', GITHUB_SHA: '', GITHUB_OUTPUT: '',
-      RELEASE_REPOSITORY: 'titanxxh/open-agricola', OA_DEPLOY_CAPTURE: bin, OA_DEPLOY_SHA: sha,
-      PATH: [bin, join(repository, 'node_modules/.bin'), process.env.PATH].join(delimiter),
-    }
-    const manifest: unknown = JSON.parse(execFileSync(join(repository, 'node_modules/.bin/tsx'), [
-      'scripts/ci/candidate-verification.ts', 'manifest', '--sha', sha,
-    ], { cwd: directory, env, encoding: 'utf8' }))
-    if (typeof manifest !== 'object' || !manifest || !('configuration' in manifest) || typeof manifest.configuration !== 'string') {
-      throw new Error('Missing fixture candidate configuration')
-    }
-    env.OA_DEPLOY_CONFIGURATION = stableConfiguration(directory, sha, sha)
-    writeFileSync(join(bin, 'gh'), `#!${process.execPath}
-import { existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-const args = process.argv.slice(2);
-if (args[0] !== 'api' || args.includes('POST')) throw Error('Unexpected fixture GitHub command: ' + args.join(' '));
-const endpoint = args[1].replace('repos/titanxxh/open-agricola/', '');
-const sha = process.env.OA_DEPLOY_SHA;
-const configuration = process.env.OA_DEPLOY_CONFIGURATION;
-const output = value => console.log(JSON.stringify(value));
-const step = name => ({ name, status: 'completed', conclusion: 'success' });
-const tasks = ['quality', 'fast', 'slow', 'build', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit'];
-const provenance = ${JSON.stringify(finalSnapshotMetadata(sha))};
-if (Object.hasOwn(provenance, args[1])) {
-  const metadata = provenance[args[1]];
-  if (Array.isArray(metadata) && args.includes('--paginate')) metadata.forEach(output); else output(metadata);
-  if (endpoint === 'git/ref/heads/main' && !existsSync(join(process.env.OA_DEPLOY_CAPTURE, 'candidate-ref'))) writeFileSync(join(process.env.OA_DEPLOY_CAPTURE, 'candidate-ref'), 'main');
-} else if (endpoint.startsWith('commits/')) {
-  writeFileSync(join(process.env.OA_DEPLOY_CAPTURE, 'candidate-ref'), decodeURIComponent(endpoint.slice(8)));
-  output({ sha });
-} else if (endpoint === 'actions/workflows/candidate-verification.yml') {
-  output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
-} else if (endpoint === 'actions/workflows/100/runs?event=workflow_dispatch&per_page=100') {
-  output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: sha, head_branch: 'main', display_title: 'stable / ' + sha + ' / all',
-    repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 }, status: 'completed', run_attempt: 1,
-    created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://example.test/run/1' });
-} else if (endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
-  output({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: 'https://example.test/job/1',
-    started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
-    steps: [step('Generate candidate manifest'), step('Stable manifest / 1164782262 / stable / ' + sha + ' / ' + configuration + ' / ' + sha + ' / ' + tasks.join(','))] });
-  tasks.forEach((task, index) => output({ id: index + 2, run_id: 1, run_attempt: 1, name: 'candidate / ' + task + ' / ' + configuration,
-    started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
-    status: 'completed', conclusion: 'success', html_url: 'https://example.test/job/' + task,
-    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }));
-} else throw Error('Unexpected fixture GitHub endpoint: ' + endpoint);
-`, { mode: 0o700 })
-    delete env.ACCOUNT_REGISTRATION_POLICY
-    if (policy !== undefined) env.ACCOUNT_REGISTRATION_POLICY = policy
-    const result = spawnSync('/bin/bash', ['deploy-backend.sh', ...args], { cwd: directory, env, encoding: 'utf8', timeout: 30_000 })
-    if (result.error) throw result.error
-    if (result.status !== 0) throw new Error(`deployment capture failed: ${result.stderr}`)
-    const capturedArgs = (file: string) => existsSync(file)
-      ? readFileSync(file, 'utf8').split('\0').slice(0, -1)
-      : []
-    return {
-      sha,
-      ref: readFileSync(captures.ref, 'utf8'),
-      host: capturedArgs(captures.ssh)[0],
-      sudo: capturedArgs(captures.sudo),
-      args: capturedArgs(captures.bash),
-      policy: readFileSync(captures.policy, 'utf8'),
-    }
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
-}
-
 describe('production deployment config', () => {
   it('requires an explicit registration policy so fresh deployments do not silently lock themselves', () => {
     const compose = readFileSync('docker-compose.prod.yml', 'utf8')
     expect(compose).toContain('ACCOUNT_REGISTRATION_POLICY=${ACCOUNT_REGISTRATION_POLICY:?')
     expect(compose).not.toContain('ACCOUNT_REGISTRATION_POLICY=${ACCOUNT_REGISTRATION_POLICY:-invite_only}')
-  })
-
-  it('passes the explicit registration policy through local backend deployment', () => {
-    const deployment = captureBackendDeployment([], 'invite_only')
-    expect(deployment.host).toBe('ubuntu@ten-kr')
-    expect(deployment.sudo).toEqual([])
-    expect(deployment.ref).toBe('main')
-    expect(deployment.args).toEqual(['-s', '/home/ubuntu/open-agricola', deployment.sha])
-    expect(deployment.policy).toBe('invite_only')
-  })
-
-  it('supports an explicit SSH user, version and directory without privilege escalation', () => {
-    const deployment = captureBackendDeployment(['operator@example.com', 'v0.7.9', '/srv/game'], 'open')
-    expect(deployment.host).toBe('operator@example.com')
-    expect(deployment.sudo).toEqual([])
-    expect(deployment.ref).toBe('v0.7.9')
-    expect(deployment.args).toEqual(['-s', '/srv/game', deployment.sha])
-    expect(deployment.policy).toBe('open')
-  })
-
-  it('treats remote paths, refs and registration policy as literal arguments', () => {
-    // Shell evaluation would exit early or alter the captured arguments.
-    const remoteDir = '/srv/game folder; exit 71'
-    const ref = 'topic/$(exit 72)'
-    const policy = 'invite_only; exit 73'
-    const deployment = captureBackendDeployment(['ten-kr', ref, remoteDir], policy)
-    expect(deployment.host).toBe('ubuntu@ten-kr')
-    expect(deployment.sudo).toEqual([])
-    expect(deployment.ref).toBe(ref)
-    expect(deployment.args).toEqual(['-s', remoteDir, deployment.sha])
-    expect(deployment.policy).toBe(policy)
-  })
-
-  it('records the target commit in the image before validating live storage', () => {
-    const script = readFileSync('deploy-backend.sh', 'utf8')
-    expect(script).toContain('TARGET_REF="$(git rev-parse \'FETCH_HEAD^{commit}\')"')
-    expect(script).toContain('[[ "$TARGET_REF" == "$VERIFIED_SHA" ]]')
-    expect(script).toContain('export GAME_BUILD_ID="$TARGET_REF"')
-    expect(script).toContain('check-live "$TARGET_REF" --applications-stopped')
-    const buildAt = script.indexOf('"${COMPOSE[@]}" build app')
-    const backupAt = script.indexOf('bash scripts/backup-storage.sh "$STEM" --already-stopped')
-    expect(buildAt).toBeGreaterThan(script.indexOf('export GAME_BUILD_ID="$TARGET_REF"'))
-    expect(backupAt).toBeGreaterThan(buildAt)
-    expect(script.indexOf('check-live "$TARGET_REF"')).toBeGreaterThan(backupAt)
-    expect(script).not.toContain('reset --hard')
-  })
-
-  it('detaches deployment commands from the SSH script input', () => {
-    const script = readFileSync('deploy-backend.sh', 'utf8')
-    expect(script).toContain('deploy_backend() {')
-    expect(script).toContain('deploy_backend "$@" < /dev/null')
   })
 
   it('keeps Actions on hosted runners and permits only the protected image publish secret', () => {
@@ -237,7 +65,7 @@ describe('production deployment config', () => {
     expect(dockerfile).toContain('USER node')
     const compose = readFileSync('docker-compose.prod.yml', 'utf8')
     expect(compose.match(/user: "\$\{APP_UID:-1000\}:\$\{APP_GID:-1000\}"/g)).toHaveLength(2)
-    for (const file of ['deploy-backend.sh', 'backup-offsite.sh', 'scripts/backup-storage.sh']) {
+    for (const file of ['backup-offsite.sh', 'scripts/backup-storage.sh']) {
       expect(readFileSync(file, 'utf8')).toContain('export APP_UID="$(id -u)" APP_GID="$(id -g)"')
     }
   })
@@ -296,19 +124,6 @@ describe('production deployment config', () => {
       expect(compose).not.toContain('  executor:')
       expect(compose).not.toContain('      - executor')
     }
-    const script = readFileSync('deploy-backend.sh', 'utf8')
-    expect(script).toContain('up -d --remove-orphans')
-  })
-
-
-
-  it('shares one maintenance lock between deployment and scheduled backup', () => {
-    const backup = readFileSync('backup-offsite.sh', 'utf8')
-    const deploy = readFileSync('deploy-backend.sh', 'utf8')
-    expect(backup).toContain('backups/.maintenance.lock')
-    expect(deploy).toContain('backups/.maintenance.lock')
-    expect(backup).toContain('flock -n 9')
-    expect(deploy).toContain('flock -w 1800 9')
   })
 
   it('runs retention and offsite sync even when the daily backup fails', () => {
@@ -323,8 +138,6 @@ describe('production deployment config', () => {
     expect(rsyncFailureAt).toBeGreaterThan(-1)
     expect(remotePruneAt).toBeGreaterThan(rsyncFailureAt)
   })
-
-
 
   it('propagates shared-ledger sync failures to the cron exit status', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
@@ -368,9 +181,8 @@ describe('production deployment config', () => {
     expect(readFileSync('scripts/backup-storage.sh', 'utf8')).toContain('ledger-export /backup/replay-removals.latest.json')
   })
 
-  it('shares the native archive helper between scheduled and pre-deploy backups', () => {
+  it('uses the native archive helper for scheduled backups', () => {
     expect(readFileSync('backup-offsite.sh', 'utf8')).toContain('bash "$POLICY_ROOT/scripts/backup-storage.sh" "$BACKUP_STEM"')
-    expect(readFileSync('deploy-backend.sh', 'utf8')).toContain('bash scripts/backup-storage.sh "$STEM" --already-stopped')
   })
 
   it('keeps the offsite retention independent from local pruning and within the 30-day cap', () => {
