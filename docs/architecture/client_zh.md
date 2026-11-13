@@ -122,7 +122,7 @@ GameContextRouter
   └─ removed → Replay Tombstone 页面
 ```
 
-- `game-room-url.ts` 生成的普通对局链接只需 `room`；连接方式和座位来自 Room 与登录账号。开发链接保留显式座位控制。
+- `game-room-url.ts` 生成的普通对局链接只需 `room`；连接方式和座位来自 Room 与登录账号。仅显式开发房间或上下文链接保留座位控制；普通建房跟随登录账号获分配的座位。
 - `?room=<roomId>` 在卡牌 manifest 与登录门之前解析；未登录的活动上下文保留完整的 `returnTo`，非活动上下文不加载认证依赖。
 - 上下文解析器在挂载、导航或生命周期变化事件发生时读取查询参数。WebSocket 静默更新房间 URL 后，切换语言不会重启活动对局。测试见 `GameContextRouter.test.tsx` 与 `setup-navigation.spec.ts`。
 - 房间链接通过 WebSocket 加入，不指定客户端座位；服务端恢复账号已有座位，或让新玩家加入候场空位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。

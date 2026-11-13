@@ -277,6 +277,15 @@ test.describe('WS dual-player sync', () => {
     await p1.waitForSelector('.game-layout', { timeout: 15000 })
     console.log('Both boards loaded')
     expect(creatorSeat.index).toBeGreaterThanOrEqual(0)
+    expect(guestSeat.index).toBeGreaterThanOrEqual(0)
+    for (const seat of [creatorSeat, guestSeat]) {
+      const assignedPlayerId = `p${seat.index + 1}`
+      await expect(seat.page.locator('.player-tabs__tab[data-owned="true"]')).toHaveAttribute('data-player', assignedPlayerId)
+      const hand = seat.page.locator('[data-hand-anchor]')
+      await expect(hand).toHaveAttribute('data-hand-anchor', assignedPlayerId)
+      await expect(hand.locator('.occupation .player-card')).toHaveCount(7)
+      await expect(hand.locator('.minor .player-card')).toHaveCount(7)
+    }
     if (creatorSeat.index !== 0) {
       ;[p1, p2] = [p2, p1]
       ;[ctx1, ctx2] = [ctx2, ctx1]

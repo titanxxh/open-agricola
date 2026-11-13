@@ -308,7 +308,7 @@ export const shouldSuppressPendingChoiceOptionsInInteractionBar = (
 export const requestedWsPlayerIdFromQuery = (search: string): string | null => {
   const params = new URLSearchParams(search)
   const roomId = roomIdFromQuery(search)
-  if (roomId !== null && !isDevRoomId(roomId)) return null
+  if (roomId === null || !isDevRoomId(roomId)) return null
   const raw = params.get('player') ?? params.get('playerId')
   if (!raw) return null
   if (/^p[1-6]$/.test(raw)) return raw
