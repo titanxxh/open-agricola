@@ -1,4 +1,4 @@
-import { prereleaseSocketAllowed } from '../prerelease-access'
+import { closePrereleaseSocket, isPrerelease, prereleaseSocketAllowed } from '../prerelease-access'
 import { getSessionByToken } from '../auth'
 import { isRoomSpectator, roomSpectators, drainRoomSpectators } from '../game/room-spectators'
 import { ExecutionAccess } from '../game/execution-access'
@@ -45,7 +45,7 @@ export class Broadcaster {
   constructor(directory?: RoomDirectory) { this.directory = directory }
 
   private send(ws: WebSocket, event: ServerEvent, capturedRound?: string, encodedMessage?: string): number {
-    if (!prereleaseSocketAllowed(ws)) { ws.close(1008, 'prerelease access ended'); return 0 }
+    if (!prereleaseSocketAllowed(ws)) { closePrereleaseSocket(ws); return 0 }
     return sendObserved(ws, event, capturedRound, encodedMessage)
   }
 
@@ -60,7 +60,7 @@ export class Broadcaster {
         const token = this.tokens.get(ws)
         if (!token) continue
         const allowed = await getSessionByToken(token, { db: this.directory!.db, lock: 'share' })
-        if (!allowed) ws.close(1008, 'session revoked')
+        if (!allowed) { if (isPrerelease()) closePrereleaseSocket(ws); else ws.close(1008, 'session revoked') }
       }
       send()
     })()

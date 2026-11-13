@@ -1,4 +1,4 @@
-import { isPrerelease, prereleaseRequestAdmission, trackPrereleaseSocket } from '../prerelease-access'
+import { closePrereleaseSocket, isPrerelease, prereleaseRequestAdmission, trackPrereleaseSocket } from '../prerelease-access'
 import { drainRoomSpectators, removeRoomSpectator } from '../game/room-spectators'
 import { operationsMetrics, safe } from '../observability/metrics'
 import { selectDevelopmentRoom } from '../game/development-room-slots'
@@ -472,7 +472,7 @@ export async function createWsServer(
     const sockets = activeUserSockets.get(userId)
     if (!sockets) return
     for (const ws of [...sockets]) {
-      ws.close(1008, 'session revoked')
+      if (isPrerelease()) closePrereleaseSocket(ws); else ws.close(1008, 'session revoked')
     }
     activeUserSockets.delete(userId)
   }
@@ -491,7 +491,7 @@ export async function createWsServer(
         } catch (error) { if (!(error instanceof RoomOwnershipError)) throw error }
         registry.delete(room.id)
         registry.clearActivity(room.id)
-        for (const ws of roomConnections(room)) ws.close(1008, 'session invalidated')
+        for (const ws of roomConnections(room)) { if (isPrerelease()) closePrereleaseSocket(ws); else ws.close(1008, 'session invalidated') }
         room.players = []
         room.session.dispose()
       })
