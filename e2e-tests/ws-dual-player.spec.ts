@@ -11,7 +11,7 @@ import {
   type Page,
 } from '@playwright/test'
 import { browserRequestHeaders, BACKEND_URL, saveScreenshot, saveState, FRONTEND_URL } from './fixtures'
-import type { ServerEvent } from '../shared/contract/protocol/ws'
+import { finishWsOpening, observeWsOpening } from './helpers/ws-opening'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeSessionSnapshot } from '../shared/session/serialization'
 
@@ -54,16 +54,6 @@ const authenticate = async (
     value: cookieValue(complete, authCookieNames().session),
     url: FRONTEND_URL,
   }])
-}
-
-const observeSeat = (page: Page) => {
-  const seat = { index: -1 }
-  page.on('websocket', socket => socket.on('framereceived', ({ payload }) => {
-    if (typeof payload !== 'string') return
-    const message: ServerEvent = JSON.parse(payload)
-    if (message.type === 'roomCreated' || message.type === 'roomJoined') seat.index = message.playerIndex
-  }))
-  return seat
 }
 
 test.describe('WS dual-player sync', () => {
@@ -184,8 +174,8 @@ test.describe('WS dual-player sync', () => {
         await authenticate(ctx2, request, name2)
         const p1 = await ctx1.newPage()
         const p2 = await ctx2.newPage()
-        const creatorSeat = observeSeat(p1)
-        const guestSeat = observeSeat(p2)
+        const creatorSeat = observeWsOpening(p1)
+        const guestSeat = observeWsOpening(p2)
         await p1.goto(`${FRONTEND_URL}/?transport=ws`)
         const roomLabel = p1.locator('.ws-invite-roomid strong')
         await expect(roomLabel).toBeVisible()
@@ -197,16 +187,7 @@ test.describe('WS dual-player sync', () => {
         expect([creatorSeat.index, guestSeat.index].sort()).toEqual([0, 1])
         const creatorId = `p${creatorSeat.index + 1}`
         const guestId = `p${guestSeat.index + 1}`
-        const firstPlayer = creatorSeat.index === 0 ? p1 : p2
-        const openingForest = firstPlayer.locator('[data-action-id="forest"] button:enabled').first()
-        const skips = [p1, p2].map(page => page.locator('.interaction-bar')
-          .getByRole('button', { name: /^(Skip|跳过|Do not use|不使用)/ }).first())
-        for (let step = 0; step < 8; step++) {
-          await expect.poll(async () => await openingForest.isVisible() ||
-            (await Promise.all(skips.map(skip => skip.isVisible()))).some(Boolean)).toBe(true)
-          if (await openingForest.isVisible()) break
-          for (const skip of skips) if (await skip.isVisible()) await skip.click()
-        }
+        await finishWsOpening([creatorSeat, guestSeat])
         if (creatorSeat.index !== 0) {
           await p2.locator('[data-action-id="grain-seeds"] button:enabled').first().click()
           await p2.getByRole('button', { name: 'Confirm switch', exact: true }).click()
@@ -273,7 +254,8 @@ test.describe('WS dual-player sync', () => {
     await authenticate(ctx2, request, `ws_b_${suffix}`)
     let p1 = await ctx1.newPage()
     let p2 = await ctx2.newPage()
-    const creatorSeat = observeSeat(p1)
+    const creatorSeat = observeWsOpening(p1)
+    const guestSeat = observeWsOpening(p2)
 
     // Step 1: P1 creates room
     console.log('\n=== Step 1: P1 creates room ===')
@@ -300,20 +282,7 @@ test.describe('WS dual-player sync', () => {
       ;[ctx1, ctx2] = [ctx2, ctx1]
     }
     const ctx2Storage = await ctx2.storageState()
-    // Ordinary rooms keep random deals; decline a possible round-one hand offer
-    // before exercising action/undo synchronization.
-    const firstAction = p1.locator('.action-card-holder button:not([disabled])').first()
-    const setupSkips = [p1, p2].map(page =>
-      page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过|Do not use|不使用)/ }).first(),
-    )
-    for (let step = 0; step < 8; step++) {
-      await expect.poll(async () =>
-        await firstAction.isVisible() || (await Promise.all(setupSkips.map(skip => skip.isVisible()))).some(Boolean),
-      { timeout: 20_000 }).toBe(true)
-      if (await firstAction.isVisible()) break
-      for (const skip of setupSkips) if (await skip.isVisible()) await skip.click()
-    }
-    await expect(firstAction).toBeVisible()
+    await finishWsOpening([creatorSeat, guestSeat])
     await saveScreenshot(p1, '02-p1-board')
     await saveScreenshot(p2, '02-p2-board')
 

@@ -46,7 +46,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: '
     }
     if (host === 'app.agricola.test') { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>Formal Pages fixture</title>'); return }
     if (host !== 'pre.agricola.test') { res.writeHead(421); res.end(); return }
-    const outgoing = request({ hostname: '127.0.0.1', port: gatewayPort, path: req.url, method: req.method, headers: req.headers }, response => {
+    // Revocation closes authorized gateway sockets. Each probe needs a new connection to observe its HTTP status.
+    const outgoing = request({ hostname: '127.0.0.1', port: gatewayPort, path: req.url, method: req.method, headers: req.headers, agent: false }, response => {
       res.writeHead(response.statusCode ?? 500, response.headers); response.pipe(res)
     })
     outgoing.on('error', () => res.destroy()); req.pipe(outgoing)
