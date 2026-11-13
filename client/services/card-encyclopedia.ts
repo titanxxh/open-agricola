@@ -1,3 +1,4 @@
+import { resourceFetch } from './resource-fetch'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 import type {
@@ -30,7 +31,7 @@ const parseManifest = (value: unknown): CardEncyclopediaManifest => {
 }
 
 const fetchVerified = async (ref: CardEncyclopediaFileRef): Promise<unknown> => {
-  const response = await fetch(`${base}${ref.file}`)
+  const response = await resourceFetch(`${base}${ref.file}`)
   if (!response.ok) throw new Error(`Card encyclopedia unavailable (${response.status})`)
   const raw = await response.text()
   if (bytesToHex(sha256(utf8ToBytes(raw))) !== ref.sha256) throw new Error('Card encyclopedia checksum mismatch')
@@ -38,7 +39,7 @@ const fetchVerified = async (ref: CardEncyclopediaFileRef): Promise<unknown> => 
 }
 
 const load = async (): Promise<CardEncyclopedia> => {
-  const response = await fetch(`${base}manifest.json`, { cache: 'no-cache' })
+  const response = await resourceFetch(`${base}manifest.json`, { cache: 'no-cache' })
   if (!response.ok) throw new Error(`Card encyclopedia unavailable (${response.status})`)
   const manifest = parseManifest(await response.json())
   const [catalog, search] = await Promise.all([fetchVerified(manifest.catalog), fetchVerified(manifest.search)]) as

@@ -74,3 +74,10 @@ it('expires the worker lease using monotonic request time, including transit des
   expect(pre.getPrereleaseAccess()).toEqual({ kind: 'blocked', code: 'prerelease_access_paused' })
   expect(() => pre.assertPrereleaseAccess()).toThrow('prerelease_access_paused')
 })
+
+
+it('preserves a Context locator for handoff while dropping fragments, development flags and credentials', async () => {
+  const pre = await import('../prerelease-runtime')
+  expect(new URL(pre.prereleaseStartUrl('?context=kept-room&step=4&frame=' + 'f'.repeat(64) + '&devMode=1&player=p1&token=secret'), window.location.origin).searchParams.get('returnPath'))
+    .toBe('/open-agricola/?context=kept-room&step=4&frame=' + 'f'.repeat(64))
+})
