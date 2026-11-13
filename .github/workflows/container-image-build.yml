@@ -1,0 +1,86 @@
+name: Container Image Build
+run-name: image / ${{ inputs.purpose }} / ${{ inputs.source_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      purpose:
+        description: Prerelease candidate or the current trusted main archive tool
+        type: choice
+        options: [candidate, trusted-policy]
+        required: true
+      source_sha:
+        description: Full immutable source SHA; trusted-policy must equal this main producer
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  # Only the trusted negative-access probe uses this token. Publishing uses a separate PAT.
+  packages: read
+
+concurrency:
+  group: private-container-image
+  cancel-in-progress: false
+
+jobs:
+  image:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: prerelease-image-publish
+    steps:
+      - name: Checkout trusted main policy
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: policy
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout fixed image source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Admit source and prepare tracked archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_PURPOSE: ${{ inputs.purpose }}
+          IMAGE_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node policy/scripts/ci/container-image-build.ts prepare "$IMAGE_PURPOSE" "$IMAGE_SOURCE_SHA" "$PWD/source"
+      - name: Prepare candidate isolation
+        id: isolation
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash policy/scripts/ci/setup-candidate-isolation.sh "$RUNNER_TEMP/container-image/payload" "$PWD/policy" "$(command -v node)" "$(id -u)"
+      - name: Prove native candidate isolation
+        run: node policy/scripts/ci/candidate-isolation.ts smoke
+      - name: Build image and stop candidate execution
+        run: node policy/scripts/ci/container-image-build.ts build
+      - name: Verify stopped build output
+        run: node policy/scripts/ci/container-image-build.ts verify
+      - name: Publish private image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_PUBLISH_TOKEN: ${{ secrets.GHCR_PUBLISH_TOKEN }}
+          GHCR_PUBLISH_USER: ${{ vars.GHCR_PUBLISH_USER }}
+          GHCR_PRIVATE_PACKAGE_ID: ${{ vars.GHCR_PRIVATE_PACKAGE_ID }}
+        run: node policy/scripts/ci/container-image-build.ts publish
+      - name: Retain non-secret image receipt
+        uses: actions/upload-artifact@v7
+        with:
+          name: container-image-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ runner.temp }}/container-image/receipt/container-image-receipt.json
+      - name: Stop remaining candidate execution
+        if: always() && steps.isolation.outcome == 'success'
+        run: node policy/scripts/ci/container-image-build.ts cleanup
+      - name: Remove private image staging
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/container-image"
