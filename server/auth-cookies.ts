@@ -1,5 +1,8 @@
 import { isSameSite } from './http-origin'
 
+export const PRERELEASE_SESSION_COOKIE = '__Host-oa-pre-session'
+export const PRERELEASE_HANDOFF_COOKIE = '__Host-oa-pre-handoff'
+
 export const SESSION_COOKIE = '__Host-oa-session'
 export const ONBOARDING_COOKIE = '__Host-oa-onboarding'
 export const OAUTH_STATE_COOKIE = '__Host-oa-oauth-state'
@@ -24,6 +27,7 @@ type CookieOptions = {
 }
 
 export function authCookieNames(): Readonly<typeof productionNames> {
+  if (process.env.RELEASE_CHANNEL === 'prerelease') return { ...productionNames, session: PRERELEASE_SESSION_COOKIE }
   return process.env.NODE_ENV === 'production' ? productionNames : developmentNames
 }
 
@@ -109,4 +113,11 @@ export function clearOAuthStateCookie(options: CookieOptions = {}): string {
 
 export function clearOperationsCookie(options: CookieOptions = {}): string {
   return serialize('operations', '', 0, options)
+}
+
+export function serializePrereleaseCookie(kind: 'session' | 'handoff', value: string, expiresAt: number, now = Date.now()): string {
+  const name = kind === 'session' ? PRERELEASE_SESSION_COOKIE : PRERELEASE_HANDOFF_COOKIE
+  const bound = kind === 'session' ? 604800 : 60
+  const maxAge = Math.max(0, Math.min(bound, Math.floor((expiresAt - now) / 1000)))
+  return `${name}=${encodeURIComponent(value)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}; Secure`
 }
