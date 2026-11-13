@@ -16,7 +16,7 @@ export function inspectRegistryManifest(value: unknown, imageId: string): void {
 
 export type RegistryCredentials = { publishToken: string; probeToken: string; publisher: string; expectedPackageId: string }
 
-async function registryResponse(reference: string, login?: { user: string; token: string }): Promise<Response | null> {
+async function registryResponse(reference: string, login?: { user: string; token: string }, mode: 'read' | 'denial' = 'read'): Promise<Response | null> {
   if (!/^sha256:[a-f0-9]{64}$/.test(reference) && !/^[a-z0-9-]+$/.test(reference)) throw new Error('Invalid fixed registry reference')
   const headers: Record<string, string> = login ? { Authorization: `Basic ${Buffer.from(`${login.user}:${login.token}`).toString('base64')}` } : {}
   const auth = await fetch(`https://ghcr.io/token?service=ghcr.io&scope=repository:titanxxh/${packageName}:pull`,
@@ -29,14 +29,25 @@ async function registryResponse(reference: string, login?: { user: string; token
     headers: { Authorization: `Bearer ${body.token}`, Accept: 'application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' },
     signal: AbortSignal.timeout(10_000), redirect: 'error',
   })
-  if (response.status === 401 || response.status === 403) return null
+  if (response.status === 401 || response.status === 403 || mode === 'denial' && response.status === 404) return null
   if (!response.ok) throw new Error('Cannot establish access to the known registry version; inspect owner package setup')
   return response
 }
 
+async function verifiedManifestBytes(response: Response): Promise<{ bytes: Buffer; digest: string }> {
+  const bytes = Buffer.from(await response.arrayBuffer())
+  const digest = `sha256:${createHash('sha256').update(bytes).digest('hex')}`
+  if (response.headers.get('docker-content-digest') !== digest) throw new Error('Registry manifest content digest mismatch')
+  return { bytes, digest }
+}
+
 export async function assertPrivateReadDenials(reference: string, credentials: RegistryCredentials): Promise<void> {
-  if (await registryResponse(reference)) throw new Error('Private image permits anonymous reads')
-  if (await registryResponse(reference, { user: process.env.GITHUB_ACTOR ?? credentials.publisher, token: credentials.probeToken })) {
+  if (!/^sha256:[a-f0-9]{64}$/.test(reference)) throw new Error('Private access checks require an immutable manifest digest')
+  const publisher = await registryResponse(reference, { user: credentials.publisher, token: credentials.publishToken })
+  if (!publisher) throw new Error('Publisher cannot read the known private manifest')
+  if ((await verifiedManifestBytes(publisher)).digest !== reference) throw new Error('Registry manifest differs from the fixed digest')
+  if (await registryResponse(reference, undefined, 'denial')) throw new Error('Private image permits anonymous reads')
+  if (await registryResponse(reference, { user: process.env.GITHUB_ACTOR ?? credentials.publisher, token: credentials.probeToken }, 'denial')) {
     throw new Error('Private image grants this public repository access; review Actions/Codespaces package setup')
   }
 }
@@ -44,9 +55,7 @@ export async function assertPrivateReadDenials(reference: string, credentials: R
 export async function publishedRegistryManifest(reference: string, imageId: string, credentials: RegistryCredentials): Promise<string> {
   const response = await registryResponse(reference, { user: credentials.publisher, token: credentials.publishToken })
   if (!response) throw new Error('Publisher cannot read the uploaded private image')
-  const bytes = Buffer.from(await response.arrayBuffer())
-  const digest = `sha256:${createHash('sha256').update(bytes).digest('hex')}`
-  if (response.headers.get('docker-content-digest') !== digest) throw new Error('Registry manifest content digest mismatch')
+  const { bytes, digest } = await verifiedManifestBytes(response)
   inspectRegistryManifest(JSON.parse(bytes.toString('utf8')), imageId)
   return digest
 }
