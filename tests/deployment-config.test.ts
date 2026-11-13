@@ -6,6 +6,31 @@ import { delimiter, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { finalSnapshotMetadata } from '../scripts/__tests__/_helpers/candidate-provenance'
 
+function expectWorkflowSecrets(file: string, workflow: string): void {
+  if (file === 'container-image-build.yml') {
+    const imageJob = workflow.match(/^ {2}image:\n(?: {4}[^\n]*\n|\n)*/m)?.[0] ?? ''
+    expect(workflow).toContain('jobs:\n' + imageJob)
+    expect(imageJob).toMatch(/^ {2}image:\n {4}if: github.ref == 'refs\/heads\/main'\n {4}runs-on: ubuntu-latest\n {4}timeout-minutes: 60\n {4}environment: prerelease-image-publish\n {4}steps:\n/)
+    const publishAfterStop = [
+      '      - name: Build image and stop candidate execution',
+      '        run: node policy/scripts/ci/container-image-build.ts build',
+      '      - name: Verify stopped build output',
+      '        run: node policy/scripts/ci/container-image-build.ts verify',
+      '      - name: Publish private image',
+      '        env:',
+      '          GH_TOKEN: ${{ github.token }}',
+      '          GHCR_PUBLISH_TOKEN: ${{ secrets.GHCR_PUBLISH_TOKEN }}',
+      '          GHCR_PUBLISH_USER: ${{ vars.GHCR_PUBLISH_USER }}',
+      '          GHCR_PRIVATE_PACKAGE_ID: ${{ vars.GHCR_PRIVATE_PACKAGE_ID }}',
+      '        run: node policy/scripts/ci/container-image-build.ts publish',
+      '',
+    ].join('\n')
+    expect(imageJob).toContain(publishAfterStop)
+    workflow = workflow.replace(publishAfterStop, publishAfterStop.replace('${{ secrets.GHCR_PUBLISH_TOKEN }}', ''))
+  }
+  expect(workflow).not.toMatch(/\bsecrets\s*(?:\.|\[)/)
+}
+
 // Run the public candidate checker against local Git and controlled GitHub evidence.
 // Capture the remote command without executing the deployment body or opening SSH.
 function captureBackendDeployment(args: string[], policy?: string) {
@@ -180,16 +205,30 @@ describe('production deployment config', () => {
     expect(script).toContain('deploy_backend "$@" < /dev/null')
   })
 
-  it('keeps Actions off self-hosted runners and long-lived repository secrets', () => {
+  it('keeps Actions on hosted runners and permits only the protected image publish secret', () => {
     for (const file of readdirSync('.github/workflows').filter((name) => /\.ya?ml$/.test(name))) {
       const workflow = readFileSync(`.github/workflows/${file}`, 'utf8')
       expect(workflow).not.toContain('vars.RUNNER_LABEL')
       expect(workflow).not.toContain('self-hosted')
-      expect(workflow).not.toMatch(/\bsecrets(?:\.|\[)/)
+      expectWorkflowSecrets(file, workflow)
       for (const match of workflow.matchAll(/^\s*runs-on:\s*(.+)$/gm)) {
         expect(match[1]).toBe('ubuntu-latest')
       }
     }
+  })
+
+  it.each([
+    ['another workflow', 'container-copy.yml', (workflow: string) => workflow],
+    ['another secret', 'container-image-build.yml', (workflow: string) => workflow.replace('secrets.GHCR_PUBLISH_TOKEN', 'secrets.OTHER_TOKEN')],
+    ['job-level secret', 'container-image-build.yml', (workflow: string) => workflow.replace('    steps:', '    env: { TOKEN: ${{ secrets.GHCR_PUBLISH_TOKEN }} }\n    steps:')],
+    ['candidate secret', 'container-image-build.yml', (workflow: string) => workflow.replace('      - name: Build image and stop candidate execution', '      - run: echo ${{ secrets.GHCR_PUBLISH_TOKEN }}\n      - name: Build image and stop candidate execution')],
+    ['unprotected branch', 'container-image-build.yml', (workflow: string) => workflow.replace("github.ref == 'refs/heads/main'", 'always()')],
+    ['another environment', 'container-image-build.yml', (workflow: string) => workflow.replace('environment: prerelease-image-publish', 'environment: other')],
+    ['missing stop', 'container-image-build.yml', (workflow: string) => workflow.replace('container-image-build.ts build', 'container-image-build.ts prepare')],
+    ['skipped verification', 'container-image-build.yml', (workflow: string) => workflow.replace('      - name: Verify stopped build output', '      - name: Verify stopped build output\n        if: false')],
+  ])('rejects image publish secret outside its approved boundary: %s', (_name, file, mutate) => {
+    const workflow = readFileSync('.github/workflows/container-image-build.yml', 'utf8')
+    expect(() => expectWorkflowSecrets(file, mutate(workflow))).toThrow()
   })
 
   it('packages native backup tools and runs the application as the deployment user', () => {
