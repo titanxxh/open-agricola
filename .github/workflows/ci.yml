@@ -3,6 +3,11 @@ name: CI
 on:
   workflow_dispatch:
     inputs:
+      native_image_probe:
+        description: Diagnostic only; run the isolated native image probe instead of CI
+        required: false
+        default: false
+        type: boolean
       base_sha:
         description: Optional full comparison base SHA for a manual scope probe
         required: false
@@ -21,8 +26,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-image-probe:
+    name: Native image build probe (diagnostic only)
+    if: github.event_name == 'workflow_dispatch' && inputs.native_image_probe == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Prepare tracked probe payload
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/native-image-probe-payload"
+          git archive HEAD | tar -xf - -C "$RUNNER_TEMP/native-image-probe-payload"
+      - name: Prepare candidate isolation
+        id: isolation
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash scripts/ci/setup-candidate-isolation.sh "$RUNNER_TEMP/native-image-probe-payload" "$PWD" "$(command -v node)" "$(id -u)"
+      - name: Prove native candidate isolation
+        run: node scripts/ci/candidate-isolation.ts smoke
+      - name: Compare production and native snapshotters
+        run: node scripts/ci/container-image-build-native-probe.ts run
+      - name: Stop candidate execution
+        if: always() && steps.isolation.outcome == 'success'
+        run: node scripts/ci/container-image-build.ts cleanup
+      - name: Retain bounded native diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-image-probe-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/candidate-isolation/output/verification/native-image-probe.json
+
   plan:
-    if: github.event_name == 'workflow_dispatch' || github.event.repository.private == false
+    if: inputs.native_image_probe != true && (github.event_name == 'workflow_dispatch' || github.event.repository.private == false)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -147,7 +188,7 @@ jobs:
 
   verify:
     name: verify
-    if: always()
+    if: always() && inputs.native_image_probe != true
     needs: [plan, units-1, units-2, units-3, browser-1, browser-2, browser-3, browser-4, catalog]
     runs-on: ubuntu-latest
     timeout-minutes: 10

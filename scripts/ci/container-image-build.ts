@@ -14,6 +14,10 @@ const workflow = CONTAINER_IMAGE_WORKFLOW
 const builderImage = 'moby/buildkit@sha256:97719ccb2ac86fb44fd36f330a6d302f63dddd5326f3ada24f9c05ccac0d9098'
 const maxImageBytes = 4 * 1024 * 1024 * 1024
 
+export function imageBuilderCreateCommand(): string {
+  return `docker buildx create --name oa-image --driver docker-container --driver-opt image=${builderImage},memory=4g,memory-swap=4g,cpu-quota=200000,cpu-period=100000 --use`
+}
+
 function command(program: string, args: string[], options: { cwd?: string; input?: string; env?: NodeJS.ProcessEnv; timeout?: number } = {}): string {
   return execFileSync(program, args, { encoding: 'utf8', timeout: 30_000, maxBuffer: 1024 * 1024,
     stdio: ['pipe', 'pipe', 'pipe'], ...options }).trim()
@@ -78,7 +82,7 @@ export function buildIsolatedImage(): void {
   const limits = command('systemctl', ['show', 'user-61000.slice', '-p', 'MemoryMax', '-p', 'MemorySwapMax', '-p', 'CPUQuotaPerSecUSec', '-p', 'TasksMax']).split('\n')
   if (!['MemoryMax=6442450944', 'MemorySwapMax=0', 'CPUQuotaPerSecUSec=2s', 'TasksMax=768'].every(limit => limits.includes(limit))) throw new Error('Image build cgroup limits were not applied')
   const script = [
-    `docker buildx create --name oa-image --driver docker-container --driver-opt image=${builderImage},memory=4g,memory-swap=4g,cpu-quota=200000,cpu-period=100000 --use`,
+    imageBuilderCreateCommand(),
     'docker buildx inspect --bootstrap oa-image',
     `docker buildx build --builder oa-image --platform linux/amd64 --provenance=false --sbom=false --metadata-file image-metadata.json --output type=docker,dest=image.tar,compression=uncompressed,force-compression=true --tag oa-container-image:${request.sourceSha} --build-arg GAME_BUILD_ID=${request.sourceSha} --build-arg RELEASE_CHANNEL=${request.channel} - < context.tar`,
   ].join('\n')
