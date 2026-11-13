@@ -226,6 +226,26 @@ export class PrereleaseSessions {
     this.failures.delete(key); this.leases.set(key, lease)
     return { user: this.user(state), expiresAt: row.expires_at, validUntil: Math.min(state.validUntil, row.expires_at) }
   }
+  /** Publication keeps the caller's row lock and never refreshes identity under it. */
+  async readPersisted(token: string, options: { db?: PostgresDatabase; now?: number; lock?: 'share' | 'update' } = {}): Promise<PrereleaseSession | null> {
+    if (!secret(token)) return null
+    const db = options.db ?? this.db, operationEpoch = this.epoch
+    const row = await db.prepare(`SELECT s.*,
+      EXISTS(SELECT 1 FROM prerelease_deleted_subjects d WHERE d.user_id=s.user_id)
+        OR EXISTS(SELECT 1 FROM prerelease_revoked_grants g WHERE g.grant_id=s.grant_id) AS invalidated
+      FROM prerelease_sessions s JOIN prerelease_external_identities p ON p.user_id=s.user_id WHERE s.token_hash=?
+      ${options.lock === 'update' ? 'FOR UPDATE OF s' : options.lock === 'share' ? 'FOR SHARE OF s' : ''}`)
+      .get<Omit<SessionRow, 'revision'> & { invalidated: boolean }>(hash(token))
+    const now = options.now ?? this.now()
+    if (!row || operationEpoch !== this.epoch || row.invalidated || row.revoked_at !== null || row.expires_at <= now
+      || row.generation_id !== this.runtime.generationId || row.build_id !== this.runtime.buildId
+      || this.deletedUsers.has(row.user_id) || this.blockedUsers.has(row.user_id) || this.blockedGrants.has(row.grant_id)) return null
+    try {
+      const state = parsePrereleaseIdentityState(JSON.parse(row.identity_state), this.runtime, row.grant_id)
+      if (!isPrereleaseIdentityAuthorized(state, now, this.runtime.generationId) || state.account.kind !== 'active' || state.account.subject.id !== row.user_id) return null
+      return { user: this.user(state), expiresAt: row.expires_at, validUntil: Math.min(state.validUntil, row.expires_at) }
+    } catch { return null }
+  }
   private async denyState(row: Pick<SessionRow, 'user_id' | 'grant_id'>, state: PrereleaseIdentityState): Promise<void> {
     const sourceInvalid = state.source.kind !== 'active' || state.source.expiresAt <= this.now() || state.grant.kind !== 'active' || state.grant.expiresAt <= this.now()
     const reason = state.account.kind !== 'active' ? 'account_deleted' : sourceInvalid ? 'source_revoked' : 'beta_changed'
