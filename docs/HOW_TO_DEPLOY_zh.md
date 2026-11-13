@@ -102,17 +102,26 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 
 ### 操作隔离的预发布目标
 
-使用可信 main checkout、Node 24.15+、Docker Compose、Buildx、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、依赖网络与可选代理网络、离站身份、builder 和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
+使用可信 main checkout、Node 24.15+、Docker Compose、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、依赖网络与可选代理网络、离站身份、导入镜像来源和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
 
-owner #1662 负责独立源库、只读备份 role、独立一次性验证库/role、私有 bucket、app 的 `live/` 与工具的 `test/` 权限、依赖网络、1–40 的连接数限制、存储 quota、离站账户/目录及可用的受限 builder。撤销 PUBLIC CONNECT，使三个 pre role 均不能连接正式库、验证 role 不能连接源库。app 对象凭据必须不能读取正式 bucket 或验证 scratch；工具只获得源数据读取及自己的 scratch 操作权限。安装前真实权限探测不通过则阻断。`budget-check` 测量本地、数据库和对象字节数及主机余量，超额会关闭入口；它补充 owner 的 quota，不创建宿主 quota。
+owner #1662 负责独立源库、只读备份 role、独立一次性验证库/role、私有 bucket、app 的 `live/` 与工具的 `test/` 权限、依赖网络、1–40 的连接数限制、存储 quota、离站账户/目录以及实测 runtime、备份和镜像导入余量。撤销 PUBLIC CONNECT，使三个 pre role 均不能连接正式库、验证 role 不能连接源库。app 对象凭据必须不能读取正式 bucket 或验证 scratch；工具只获得源数据读取及自己的 scratch 操作权限。安装前真实权限探测不通过则阻断。`budget-check` 测量本地、数据库和对象字节数及主机余量，超额会关闭入口；它补充 owner 的 quota，不创建宿主 quota。
 
-builder 必须是已停止的非 privileged rootless BuildKit 容器，用户 `1000:1000`，标签 `org.open-agricola.environment=<targetId>`，读回的 CPU、内存、PID 限额不超过清单。只允许在 `/home/user/.local/share/buildkit` 挂载自己的状态 volume。指定 Buildx **remote** driver 的 endpoint 为 `docker-container://<builder.container>`，见 [Docker 文档](https://docs.docker.com/build/builders/drivers/remote/)。owner CLI 读取 `buildx ls --format '{{json .Builder}}'`，接受 builder/node 行中完全相同的重复对象，并要求名称唯一匹配、只有一个匹配 endpoint。每次固定 SHA 构建前验证并启动 builder，在 `finally` 中停止并读回停机状态，之后才检查镜像或运行工具。若 builder 原本正在运行，则拒绝操作，不替它停机。#1668 前 owner 必须在实际宿主完成受限真实构建；命令夹具或示例限额不能证明 builder 或部署可用。
+候选和 trusted-policy 镜像均由 GitHub 托管 `ubuntu-latest` 上的 `container-image-build.yml` 为固定 source/producer SHA 构建，平台固定 `linux/amd64`。宿主不构建镜像，归档工具缓存未命中也不回退构建。发布使用仅允许 main 的 `prerelease-image-publish` environment，以及 owner 配置的 `GHCR_PRIVATE_PACKAGE_ID`、`GHCR_PUBLISH_USER` 和 `GHCR_PUBLISH_TOKEN`；该 token 是专用 classic PAT，只用于所需的 `write:packages` / `read:packages`，不复用通用 owner token，也不要求逐次 reviewer。首次创建包须读回 private 状态与原生 ID，owner 保存 ACL 审计并固定该 ID 供后续执行。独立 private GHCR 包不得继承公开仓库权限，也不得授权本仓 Actions 或 Codespaces；owner 首次配置须审计权限。producer 核验包身份、private 状态及匿名/本仓 token 访问被拒；受限 builder 删除后，专用发布 token 才交给可信发布代码。公开 workflow artifact 仅含回执，不上传镜像、层或构建缓存。准入与配置要求见 [CI 检查](operations/ci-checks.md)。
 
-构建、存储/归档工具、镜像检查容器和 app 启动前分别检查容量。保守额度包括 gateway 的 64 MiB、当前阶段的限额、确实正在运行或即将启动的本目标 app 的完整限额，以及 `reserveMemoryMiB`。reserve 应覆盖实测 owner 进程开销和共享服务增长。在支持的 Linux Node 上，`os.freemem()` 已使用 `MemAvailable`。运行 app 的完整限额会再次预留它已经占用的内存，所以这是保守准入阈值，不是实测峰值或主机最低配置。额度依据实际 app、构建和备份测量确定，不能照搬示例相加值。准入前复用备份回收逻辑，只删除环境属于本目标、run 标签有效且有效截止时间已过期的工具，并读回确认删除。未过期或标签无效的工具保持原状并阻断下一阶段，正在运行的 builder 同样阻断。回收失败则拒绝准入，不停止 app。现有锁按 target 串行；owner 调度仍须避免同主机重任务重叠。
+镜像导入、存储/归档工具、镜像检查容器和 app 启动前分别检查容量。保守额度包含 gateway 的 64 MiB、当前阶段限额、实际运行或即将启动的本目标 app 完整限额，以及 `reserveMemoryMiB`。导入另用 `budgets.import.memoryHeadroomMiB`，这是准入阈值，不是 Docker daemon 内存限制。支持的 Linux Node 上 `os.freemem()` 已使用 `MemAvailable`。运行 app 的完整限额会再次预留其已占内存，所以不能视为实测峰值或主机最低配置。最终额度依实际 runtime、worker、共享服务、备份和导入测量确定，不能照搬示例或语法下限。准入前只回收属于本环境、run 标签有效且有效截止时间已过期的工具，并读回确认；未过期或标签无效工具保留并阻断。清理失败不停止 app。owner 调度仍须避免不同 target 的重任务重叠。
 
-升级先构建再停止旧 app，因此构建阶段也计入旧 app 限额。owner 可以先明确执行 `maintain`，使用已经允许的短维护窗口。在线备份不会为获取余量停止 app。可信归档镜像冷缓存时，先通过 app 与 build 重叠阶段的检查，再进入工具阶段；容量不足即备份失败。磁盘余量检查仍只补充 owner 存储限额，不会创建文件系统 quota。
+导入只允许未安装或维护中的 target，且实际 app 已停止；它不会代为停 app，已有安装须先明确执行 `maintain`。在线备份不会为获取余量停 app，缺少已验证 trusted-policy 镜像时直接给出导入提示。`budgets.import.maxArchiveMiB` 限制未压缩传输归档的字节数。暂存和加载前读回本地 Linux AMD64 daemon 平台与 Docker 数据目录，核对实际文件系统设备：共用设备需 reserve 加四份归档大小，分离设备则暂存/快照盘需 reserve 加两份、Docker 盘需 reserve 加两份。接收端持有 target 锁时，将上传文件复制成独占私有快照，对同一个独立 inode 校验并加载；并发 SCP 无法改变已检查的输入，成功或失败均清理快照。这是保守余量，不是解包大小保证或 quota。`docker load` 在共享 daemon 中执行，中断客户端可能留下镜像字节；失败不更新 runtime 或就绪缓存。磁盘检查只补充 owner 存储限额。
 
 若 Caddy 在容器内运行，将可选 `proxyNetwork` 设为它现有的入口网络，例如 `open-agricola_default`，并安装 `deploy/prerelease.Caddyfile.example` 的固定路由。只有可信网关加入该外部网络，使用从 origin 派生的别名和容器端口 `5176`。Caddy 路由使用 `plan` 输出的 `proxyUpstream`；Caddy 容器里的 `127.0.0.1` 指向 Caddy 自己。候选 app 继续只接自己的 default/依赖网络，工具只接依赖网络。网关只连接候选 default 网络的 `<targetId>-app:5175` 别名，不使用共享的 `app` 服务名。替换恢复时内部别名随 target 改变，外部网关别名保持不变。选择入口网络，不能选择正式存储网络。解析器拒绝将 pre 依赖/default 网络或 Docker 内置网络作为代理网络。Compose 重建会保留网关网络和别名。替换恢复保留 origin 和别名，只有源网关退役并停止后才启动新网关。若 Caddy 直接运行在宿主上，省略 `proxyNetwork` 并转发到 `127.0.0.1:<target.port>`；两种模式均保留 loopback 绑定。初装前确定这一密封拓扑。
+
+目标清单使用 format 2，必须声明 `imageSource=owner-imported-ghcr`；旧 `builder` 与 `budgets.build` 字段被拒绝，不迁移旧 target。使用 HEAD 等于镜像 producer SHA 的可信 owner checkout，接收端 policy checkout 也须相同。owner 核验完整 GitHub build run、attempt、receipt artifact 及候选验证后，以 mode-0600 的 `{ "username": "...", "token": "..." }` JSON 凭据拉取固定 GHCR digest 并导出无 tag 归档。认证只留 owner 本机；SSH 只传目标绑定 envelope 和归档。接收端验证字节、唯一 config/image ID、平台、labels 和实际 hosted frontend 后才写镜像缓存，不启动镜像、不改网关或 installed/admission 记录。
+
+```bash
+./deploy-prerelease.sh import-image --config "$pre_config" --ssh "$pre_host" --expected-current "$pre_current" --purpose trusted-policy --sha "$policy_sha" --build-run "$policy_image_run" --build-attempt "$policy_image_attempt" --artifact-id "$policy_image_artifact" --auth-file "$ghcr_read_auth" --operation-id "$policy_import_op"
+./deploy-prerelease.sh import-image --config "$pre_config" --ssh "$pre_host" --expected-current "$pre_current" --purpose candidate --sha "$pre_sha" --build-run "$candidate_image_run" --build-attempt "$candidate_image_attempt" --artifact-id "$candidate_image_artifact" --auth-file "$ghcr_read_auth" --operation-id "$candidate_import_op"
+```
+
+首次安装前 current 使用 `empty`。传输或 load 中断后，`control/` 私有 journal 保留原操作和 image ID；重试必须复用，不能用同源码的重构建镜像替换。trusted-policy 的 `stable` 仅标识工具，不能授权正式或预发布 app 部署。候选部署仍需独立完整 prerelease 验证。policy 变化后，消费前须具备对应导入工具镜像和候选 producer 绑定。
 
 正式生命周期 API 尚未部署时，先记录一个 UUID，再启动维护网关。先准备两个私有凭据文件和固定语言包；`plan` 即使带 `--ssh` 也验证本机路径，因此要在持有这些文件的宿主执行。预算必须固定为最终计划值，不能为维护初装临时调小：
 
@@ -136,7 +145,7 @@ node --import tsx scripts/prerelease/authority.ts close --config "$pre_config" -
 ./deploy-prerelease.sh deploy --config "$pre_config" --expected-current "$pre_current" --sha "$pre_sha" --generation "$pre_generation" --operation-id "$pre_op" --authority-receipt close.json
 ```
 
-deploy 独立检查固定 SHA、同通道的完整 GitHub 回执，只归档 tracked 候选源码，构建配对 hosted 镜像，核对前端元数据及 OCI revision/channel，固定不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份，最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
+deploy 独立检查固定 SHA、同通道的完整 GitHub 回执，在修改准入或数据前，解析已验证导入的候选与 trusted-policy 镜像，核对前端元数据及 OCI revision/channel，固定候选不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份，最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
 
 候选必须提供真实 SQL view `prerelease_retained_identity_refs(user_id,source_grant_id)`，覆盖全部外部主体，包括仅存于房间/历史中的引用，并实现 `scripts/prerelease/identity-audit.ts apply <packet.json>`。adapter 删除/匿名化已删除主体，将每个保留活跃引用映射到返回的当前代次 `associationId`，不恢复会话或登录权。该持久化/清理实现由 #1663/#1667 负责；main 没有空 stub，缺 view/adapter 阻断开放。owner 读取真实行，拒绝遗漏、null 或无来源绑定，按二进制/C 顺序对 ASCII pair 去重排序并哈希共享 canonical JSON。正式 associate 校验旧来源，创建无 source、已撤销的关联，确保恢复后仍接收未来删除。
 
@@ -188,7 +197,7 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 
 使用新的操作 UUID。reverify 关闭公网、撤销私有 owner 入口，保留已安装 app 并创建 acceptance 操作；重试使用同一 UUID。重新执行私有浏览器验收、上述原生身份 audit/activate，绑定新操作生成 acceptance 文件后 open。该过程不重装 pre、不重置对局。计划回滚到没有新认证保护的正式版本时，必须先关闭 pre ingress 与正式 handoff，再回滚；不能以三十秒能力确认窗口容忍不安全回滚。
 
-每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，经相同的受限 rootless builder 从固定可信 main 策略 SHA 构建。工具 digest、revision 和 channel 均经核对，并缓存在 `control/`。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
+每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，从固定可信 main 策略 SHA 在外部构建并导入。工具回执、不可变 image ID、revision 和 channel 均与 `control/` 中的目标缓存核对；缺缓存时拒绝，不构建也不停 app。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
 
 候选验证和迁移只取得所选归档、账本或身份 packet 的只读挂载，不能写宿主备份根目录或 owner 私有的 report/seal 目录。候选 scratch 记录保存在独立私有 run 目录，可信清理仍核对原期限及数据库/对象归属。原生 PostgreSQL 连接文件和恢复列表写入归档输入之外的私有临时目录。宿主独占创建 report，拒绝链接或非私有父目录。
 

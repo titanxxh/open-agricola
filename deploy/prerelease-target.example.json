@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "channel": "prerelease",
   "targetId": "prerelease-main",
   "directory": "/srv/open-agricola-prerelease-main",
@@ -33,10 +33,6 @@
     "host": "pre-backup",
     "directory": "/srv/backups/open-agricola-prerelease-main"
   },
-  "builder": {
-    "name": "prerelease-main",
-    "container": "prerelease-main-builder"
-  },
   "formal": {
     "project": "open-agricola",
     "directory": "/srv/open-agricola",
@@ -57,12 +53,12 @@
       "cpus": 1,
       "pids": 128
     },
-    "build": {
-      "memoryMiB": 2048,
-      "cpus": 1,
-      "pids": 512
-    },
     "diskMiB": 8192,
-    "reserveMemoryMiB": 512
-  }
+    "reserveMemoryMiB": 512,
+    "import": {
+      "maxArchiveMiB": 2048,
+      "memoryHeadroomMiB": 512
+    }
+  },
+  "imageSource": "owner-imported-ghcr"
 }

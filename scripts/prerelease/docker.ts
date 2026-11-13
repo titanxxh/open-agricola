@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process'
 import { freemem } from 'node:os'
 import { existsSync, mkdirSync, readFileSync, statfsSync, writeFileSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { atomicJson, composePath, controlDirectory, readRuntime, type RuntimeRecord } from './runtime'
+import { composePath, controlDirectory, readRuntime, type RuntimeRecord } from './runtime'
+import { parseContainerImageTransfer, assertExpectedContainerImage, type ContainerImagePurpose } from '../release/container-images.ts'
 import { applicationDataEnvironment, assertOwnerPath, targetFingerprint, type PrereleaseTarget } from './config'
 
 export function command(program: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string | Buffer; timeout?: number } = {}): string {
@@ -25,12 +26,11 @@ const object = (value: unknown): Record<string, unknown> => {
 }
 const parsed = (text: string): Record<string, unknown> => object(JSON.parse(text))
 
-export function assertCapacity(target: PrereleaseTarget, phase: 'build' | 'tool' | 'inspect-image' | 'app' | 'idle'): void {
+export function assertCapacity(target: PrereleaseTarget, phase: 'import' | 'tool' | 'inspect-image' | 'app' | 'idle'): void {
   command('bash', ['-euo', 'pipefail', '-c', 'source "$1"; backup_reap_tools', 'prerelease-reap', join(target.policyDirectory, 'scripts/backup-process.sh')],
     { env: { BACKUP_ENVIRONMENT: target.targetId, BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + 30_000) } })
-  if (command('docker', ['ps', '-q', '--filter', `name=^/${target.builder.container}$`])
-    || command('docker', ['ps', '-q', '--filter', `label=org.open-agricola.backup.environment=${target.targetId}`])) {
-    throw new Error(`Prerelease ${phase} requires its builder and other tools to be stopped`)
+  if (command('docker', ['ps', '-q', '--filter', `label=org.open-agricola.backup.environment=${target.targetId}`])) {
+    throw new Error(`Prerelease ${phase} requires other tools to be stopped`)
   }
   const appId = command('docker', ['ps', '-q', '--filter', `label=com.docker.compose.project=${target.project}`, '--filter', 'label=com.docker.compose.service=app'])
   if (appId) {
@@ -44,7 +44,7 @@ export function assertCapacity(target: PrereleaseTarget, phase: 'build' | 'tool'
       throw new Error('Running prerelease application identity or memory limit differs from the target')
     }
   }
-  const phaseMemory = phase === 'build' ? target.budgets.build.memoryMiB : phase === 'tool' ? target.budgets.tools.memoryMiB : phase === 'inspect-image' ? 64 : 0
+  const phaseMemory = phase === 'import' ? target.budgets.import.memoryHeadroomMiB : phase === 'tool' ? target.budgets.tools.memoryMiB : phase === 'inspect-image' ? 64 : 0
   const memory = 64 + (appId || phase === 'app' ? target.budgets.app.memoryMiB : 0) + phaseMemory + target.budgets.reserveMemoryMiB
   const fs = statfsSync(target.directory), remaining = fs.bavail * fs.bsize, available = freemem()
   if (available < memory * 1024 * 1024 || remaining < target.budgets.diskMiB * 1024 * 1024) {
@@ -55,7 +55,7 @@ export function assertCapacity(target: PrereleaseTarget, phase: 'build' | 'tool'
 function inspectFixedImage(target: PrereleaseTarget, image: string, buildId: string, channel: 'stable' | 'prerelease'): string {
   const digest = command('docker', ['image', 'inspect', '--format', '{{.Id}}', image])
   const labels = parsed(command('docker', ['image', 'inspect', '--format', '{{json .Config.Labels}}', digest]))
-  if (!/^sha256:[a-f0-9]{64}$/.test(digest) || labels['org.opencontainers.image.revision'] !== buildId
+  if (!/^sha256:[a-f0-9]{64}$/.test(image) || digest !== image || labels['org.opencontainers.image.revision'] !== buildId
     || labels['io.open-agricola.release-channel'] !== channel) throw new Error('Image channel/SHA does not match the fixed tool or candidate')
   assertCapacity(target, 'inspect-image')
   const metadata = parsed(command('docker', ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
@@ -68,60 +68,23 @@ function inspectFixedImage(target: PrereleaseTarget, image: string, buildId: str
 
 export const inspectImage = (target: PrereleaseTarget, image: string, buildId: string): string => inspectFixedImage(target, image, buildId, 'prerelease')
 
-function stopBuilder(target: PrereleaseTarget): void {
-  command('docker', ['stop', '--timeout', '30', target.builder.container], { timeout: 40_000 })
-  if (parsed(command('docker', ['inspect', '--format', '{{json .State}}', target.builder.container])).Running !== false) throw new Error('Prerelease builder did not stop; do not start another phase')
+export const importedImagePath = (target: PrereleaseTarget, purpose: ContainerImagePurpose, sourceSha: string, producerSha: string): string =>
+  join(controlDirectory(target), `image-${purpose}-${sourceSha}-${producerSha}.json`)
+
+export function importedImage(target: PrereleaseTarget, purpose: ContainerImagePurpose, sourceSha: string, pendingImageId?: string): string {
+  const producerSha = command('git', ['rev-parse', 'HEAD'], { cwd: target.policyDirectory })
+  if (!/^[a-f0-9]{40}$/.test(sourceSha) || !/^[a-f0-9]{40}$/.test(producerSha)) throw new Error('Imported image requires fixed source and policy SHAs')
+  const path = importedImagePath(target, purpose, sourceSha, producerSha)
+  if (!existsSync(path)) throw new Error(`Missing verified imported image: import ${purpose} ${sourceSha} with policy ${producerSha} before this operation`)
+  const cached = parsed(readFileSync(path, 'utf8'))
+  if (cached.fingerprint !== targetFingerprint(target)) throw new Error('Imported image belongs to another target')
+  const transfer = parseContainerImageTransfer(cached.transfer)
+  assertExpectedContainerImage(transfer.receipt, { purpose, sourceSha, producerSha, pendingImageId })
+  return inspectFixedImage(target, transfer.receipt.imageId, sourceSha, purpose === 'candidate' ? 'prerelease' : 'stable')
 }
 
-function buildFixedImage(target: PrereleaseTarget, buildId: string, channel: 'stable' | 'prerelease', deadlineEpochMs?: number): string {
-  const builders = [...new Set(command('docker', ['buildx', 'ls', '--format', '{{json .Builder}}']).split('\n').filter(Boolean)
-    .map(line => JSON.stringify(parsed(line))))].map(parsed).filter(builder => builder.Name === target.builder.name)
-  const builder = builders[0]
-  const nodes = builder?.Nodes
-  if (builders.length !== 1 || builder?.Driver !== 'remote' || !Array.isArray(nodes) || nodes.length !== 1 || object(nodes[0]).Endpoint !== `docker-container://${target.builder.container}`) throw new Error('Buildx must use the explicitly bounded prerelease BuildKit container')
-  const labels = parsed(command('docker', ['inspect', '--format', '{{json .Config.Labels}}', target.builder.container]))
-  const state = parsed(command('docker', ['inspect', '--format', '{{json .State}}', target.builder.container]))
-  const config = parsed(command('docker', ['inspect', '--format', '{{json .Config}}', target.builder.container]))
-  const mounts: unknown = JSON.parse(command('docker', ['inspect', '--format', '{{json .Mounts}}', target.builder.container]))
-  const limits = parsed(command('docker', ['inspect', '--format', '{{json .HostConfig}}', target.builder.container]))
-  const cpu = typeof limits.NanoCpus === 'number' && limits.NanoCpus > 0 ? limits.NanoCpus / 1e9
-    : typeof limits.CpuQuota === 'number' && typeof limits.CpuPeriod === 'number' && limits.CpuPeriod > 0 ? limits.CpuQuota / limits.CpuPeriod : 0
-  if (labels['org.open-agricola.environment'] !== target.targetId || state.Running !== false || typeof config.User !== 'string'
-    || !/^1000(?::1000)?$/.test(config.User) || !Array.isArray(mounts) || mounts.some(value => object(value).Type !== 'volume' || object(value).Destination !== '/home/user/.local/share/buildkit')
-    || limits.Privileged !== false || limits.PidMode === 'host' || limits.IpcMode === 'host' || limits.NetworkMode === 'host'
-    || Array.isArray(limits.CapAdd) && limits.CapAdd.length > 0 || Array.isArray(limits.Devices) && limits.Devices.length > 0
-    || typeof limits.Memory !== 'number' || limits.Memory <= 0 || limits.Memory > target.budgets.build.memoryMiB * 1024 * 1024
-    || !cpu || cpu > target.budgets.build.cpus || typeof limits.PidsLimit !== 'number' || limits.PidsLimit <= 0 || limits.PidsLimit > target.budgets.build.pids) throw new Error('Prerelease builder limits or ownership are missing')
-  assertCapacity(target, 'build')
-  const tag = `${target.project}${channel === 'stable' ? '-policy' : ''}:${buildId}`
-  try {
-    command('docker', ['start', target.builder.container])
-    if (parsed(command('docker', ['inspect', '--format', '{{json .State}}', target.builder.container])).Running !== true) throw new Error('Prerelease builder did not start')
-    const archive = execFileSync('git', ['archive', '--format=tar', buildId], { cwd: target.policyDirectory, maxBuffer: 256 * 1024 * 1024 })
-    command('docker', ['buildx', 'build', '--builder', target.builder.name, '--load', '--build-arg', `GAME_BUILD_ID=${buildId}`,
-      '--build-arg', `RELEASE_CHANNEL=${channel}`, '--tag', tag, '-'], { input: archive, cwd: target.directory,
-      timeout: deadlineEpochMs === undefined ? 30 * 60 * 1000 : Math.max(1, deadlineEpochMs - Date.now()) })
-  } finally {
-    stopBuilder(target)
-  }
-  return inspectFixedImage(target, tag, buildId, channel)
-}
-
-export const buildImage = (target: PrereleaseTarget, buildId: string): string => buildFixedImage(target, buildId, 'prerelease')
-
-function trustedArchiveImage(target: PrereleaseTarget, deadlineEpochMs: number): string {
-  const policySha = command('git', ['rev-parse', 'HEAD'], { cwd: target.policyDirectory })
-  if (!/^[a-f0-9]{40}$/.test(policySha)) throw new Error('Trusted main policy SHA is missing')
-  const path = join(controlDirectory(target), `archive-policy-${policySha}.json`)
-  if (existsSync(path)) {
-    const cached = parsed(readFileSync(path, 'utf8'))
-    if (cached.policySha !== policySha || typeof cached.image !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(cached.image)) throw new Error('Trusted archive image binding changed')
-    return inspectFixedImage(target, cached.image, policySha, 'stable')
-  }
-  const image = buildFixedImage(target, policySha, 'stable', deadlineEpochMs)
-  atomicJson(path, { policySha, image })
-  return image
-}
+export const trustedArchiveImage = (target: PrereleaseTarget): string =>
+  importedImage(target, 'trusted-policy', command('git', ['rev-parse', 'HEAD'], { cwd: target.policyDirectory }))
 
 export function stopWriters(target: PrereleaseTarget, record: RuntimeRecord): void {
   if (!record.installed) return
@@ -217,7 +180,7 @@ export function trustedArchiveTool(target: PrereleaseTarget, service: 'capture' 
   if (!['export', 'export-online', 'ledger-export', 'ledger-merge', 'cleanup-scratch'].includes(args[0] ?? '')) throw new Error('Unknown trusted archive operation')
   const record = readRuntime(target)
   return boundedTool(target, (labels, deadline, runId) => {
-    const image = trustedArchiveImage(target, deadline)
+    const image = trustedArchiveImage(target)
     const dataEnvironment = service === 'tools' ? {} : applicationDataEnvironment(target)
     const credentials = service === 'tools' ? ['--env-file', join(target.directory, 'data/dependencies.compose.env')]
       : Object.keys(dataEnvironment).flatMap(key => ['-e', key])

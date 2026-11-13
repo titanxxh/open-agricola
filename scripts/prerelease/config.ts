@@ -40,7 +40,8 @@ const overlaps = (left: string, right: string) => left === right || left.startsW
 /** Parse identities before any network request, directory creation or container command. */
 export function parsePrereleaseTarget(value: unknown) {
   const input = object(value)
-  if (input.format !== 1 || input.channel !== 'prerelease') throw new Error('An explicit prerelease target is required')
+  if (input.format !== 2 || input.channel !== 'prerelease' || input.imageSource !== 'owner-imported-ghcr') throw new Error('A format 2 owner-imported prerelease target is required')
+  if (Object.hasOwn(input, 'builder')) throw new Error('On-host build configuration is no longer supported')
   const targetId = match(input.targetId, /^prerelease-[a-z0-9-]+$/, 'Invalid prerelease target identity')
   const directory = absolute(input.directory), policyDirectory = absolute(input.policyDirectory)
   const project = string(input.project)
@@ -69,17 +70,18 @@ export function parsePrereleaseTarget(value: unknown) {
   const offsiteInput = object(input.offsite)
   const offsite = { host: match(offsiteInput.host, /^[a-zA-Z0-9][a-zA-Z0-9@_.-]*$/, 'Invalid offsite SSH target'), directory: absolute(offsiteInput.directory) }
   if (overlaps(offsite.directory, formal.offsiteDirectory) || offsite.directory.split('/').at(-1) !== project) throw new Error('Offsite directory must belong exclusively to this prerelease target')
-  const builderInput = object(input.builder), budgetsInput = object(input.budgets)
-  const builder = { name: match(builderInput.name, /^prerelease-[a-z0-9-]+$/, 'Expected a prerelease builder'),
-    container: match(builderInput.container, /^prerelease-[a-z0-9-]+$/, 'Expected an explicitly scoped builder container') }
-  const budgets = { app: budget(budgetsInput.app), tools: budget(budgetsInput.tools), build: budget(budgetsInput.build),
+  const budgetsInput = object(input.budgets)
+  if (Object.hasOwn(budgetsInput, 'build')) throw new Error('On-host build configuration is no longer supported')
+  const importInput = object(budgetsInput.import)
+  const budgets = { app: budget(budgetsInput.app), tools: budget(budgetsInput.tools),
+    import: { maxArchiveMiB: integer(importInput.maxArchiveMiB, 1, 131072), memoryHeadroomMiB: integer(importInput.memoryHeadroomMiB, 32, 131072) },
     diskMiB: integer(budgetsInput.diskMiB, 256, 4_194_304), reserveMemoryMiB: integer(budgetsInput.reserveMemoryMiB, 128, 1_048_576) }
   const network = match(input.network, /^open-agricola-prerelease-[a-z0-9-]+$/, 'Expected an exclusive prerelease dependency network')
   const proxyNetwork = input.proxyNetwork === undefined ? undefined : match(input.proxyNetwork, /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'Expected an external proxy network name')
   if (proxyNetwork && [network, `${project}_default`, 'host', 'none', 'bridge'].includes(proxyNetwork)) throw new Error('External proxy network must be separate from prerelease and built-in networks')
-  return { format: 1, channel: 'prerelease', targetId, directory, policyDirectory, project, origin: targetOrigin,
+  return { format: 2, channel: 'prerelease', imageSource: 'owner-imported-ghcr', targetId, directory, policyDirectory, project, origin: targetOrigin,
     port: integer(input.port, 1024, 65535), network, ...(proxyNetwork === undefined ? {} : { proxyNetwork }),
-    database, validationDatabase, objects, offsite, builder, budgets, formal }
+    database, validationDatabase, objects, offsite, budgets, formal }
 }
 
 export type PrereleaseTarget = ReturnType<typeof parsePrereleaseTarget>
