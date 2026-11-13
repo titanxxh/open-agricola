@@ -1,3 +1,4 @@
+import { resourceFetch } from './resource-fetch'
 import { useSyncExternalStore } from 'react'
 import { API_BASE } from '../config'
 import { parseWhatsNew, type WhatsNewRelease } from '../../shared/contract/whats-new'
@@ -24,7 +25,7 @@ function publish(next: WhatsNewSnapshot) {
  * other failures also hide it but let a later mount retry.
  */
 function load() {
-  request ??= fetch(`${API_BASE}/api/whats-new`)
+  request ??= resourceFetch(`${API_BASE}/api/whats-new`)
     .then(async response => {
       if (response.status === 404) return
       if (!response.ok) throw new Error(`What's New unavailable (${response.status})`)
