@@ -111,9 +111,12 @@ describe('section navigation targets', () => {
     expect(items.find(item => item.id === 'hand')?.selector).toBe('[data-section-target="hand"][data-hand-anchor="p1"]')
   })
 
-  it('keeps another player hand unavailable even when that hand is on screen in dev mode', () => {
+  it('offers the hand shortcut for every visible seat and not for a dev-only foreign hand', () => {
     expect(ownHandSectionAvailable({
-      selfPlayerId: 'p1', displayPlayerId: 'p2', visiblePlayerIds: ['p2'], devMode: true,
+      selfPlayerId: 'p1', displayPlayerId: 'p3', visiblePlayerIds: ['p1', 'p3'], devMode: false,
+    })).toBe('p3')
+    expect(ownHandSectionAvailable({
+      selfPlayerId: 'p1', displayPlayerId: 'p2', visiblePlayerIds: [], devMode: true,
     })).toBeNull()
     expect(ownHandSectionAvailable({
       selfPlayerId: 'p1', displayPlayerId: 'p1', visiblePlayerIds: [], devMode: false,

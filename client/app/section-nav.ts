@@ -26,9 +26,10 @@ export function ownHandSectionAvailable(input: {
   devMode: boolean
 }): string | null {
   const { selfPlayerId, displayPlayerId, visiblePlayerIds, devMode } = input
-  if (!selfPlayerId || selfPlayerId !== displayPlayerId) return null
-  if (!visiblePlayerIds.includes(selfPlayerId) && !devMode) return null
-  return selfPlayerId
+  if (!displayPlayerId) return null
+  if (visiblePlayerIds.includes(displayPlayerId)) return displayPlayerId
+  if (devMode && selfPlayerId === displayPlayerId) return displayPlayerId
+  return null
 }
 
 export function sectionNavItems(availability: SectionNavAvailability): SectionNavItem[] {
