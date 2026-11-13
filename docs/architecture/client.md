@@ -119,7 +119,7 @@ GameContextRouter
   └─ removed -> Replay Tombstone page
 ```
 
-- `game-room-url.ts` generates ordinary game links with only `room`; connection and seat selection come from the Room and authenticated account. Development links retain explicit seat controls.
+- `game-room-url.ts` generates ordinary game links with only `room`; connection and seat selection come from the Room and authenticated account. Only explicit development room/context links retain seat controls; ordinary creation follows the authenticated account's assigned seat.
 - `?room=<roomId>` is parsed before the card manifest and login gate; an unauthenticated active context keeps the complete `returnTo`, and non-active contexts load no authentication dependency.
 - The context resolver captures the query on mount and on navigation or lifecycle-change events. Silent WebSocket room URL updates do not restart the active app when locale changes. Coverage: `GameContextRouter.test.tsx` and `setup-navigation.spec.ts`.
 - Room links join over WebSocket without a client-selected seat; the server restores an account's existing seat or admits a new player to an available waiting seat. During a save pause every online seat sees the same status and new-command controls are disabled.

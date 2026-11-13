@@ -70,7 +70,18 @@ const listAppSourceFiles = (dir: string): string[] =>
   })
 
 describe('GameContainerApi WS player identity', () => {
+  it.each([
+    '?player=p1&transport=ws',
+    '?player=p2&transport=ws',
+    '?playerId=2&transport=ws',
+    '?page=game&playerId=p2&transport=ws',
+  ])('uses the assigned seat when creating an ordinary room from %s', search => {
+    expect(requestedWsPlayerIdFromQuery(search)).toBeNull()
+  })
+
   it.each([2, 3, 4, 5, 6])('preserves a requested seat in dev%s context links', count => {
+    expect(requestedWsPlayerIdFromQuery(`?room=dev${count}&player=p1`)).toBe('p1')
+    expect(requestedWsPlayerIdFromQuery(`?room=dev${count}&playerId=${count}`)).toBe(`p${count}`)
     expect(requestedWsPlayerIdFromQuery(`?context=dev${count}&player=p${count}`)).toBe(`p${count}`)
     expect(requestedWsPlayerIdFromQuery(`?context=dev${count}-00000000-0000-4000-8000-000000000000&player=p${count}`)).toBe(`p${count}`)
   })
