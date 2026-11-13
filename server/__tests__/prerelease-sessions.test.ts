@@ -231,3 +231,24 @@ it('does not persist a refresh response whose subject differs from the bound loc
   const stored = await context.db.prepare('SELECT identity_state FROM prerelease_sessions WHERE user_id=?').get<{ identity_state: string }>(session.user.id)
   expect(stored && JSON.parse(stored.identity_state)).toMatchObject({ account: { subject: { id: 'formal-user' } }, confirmedAt: 1_800_000_000_000, validUntil: 1_800_000_030_000 })
 })
+
+it('does not retain unknown browser-token misses as issued-session invalidations', async () => {
+  const context = await setupConsumer()
+  for (let index = 0; index < 32; index++) {
+    const token = String(index).padStart(43, 'u')
+    expect(await context.service.resolve(token)).toBeNull()
+    expect(context.service.status(token)).toBe('paused')
+    await context.service.revoke(token)
+    expect(context.service.status(token)).toBe('paused')
+  }
+})
+
+it('requires an installed erasure adapter before acknowledging account deletion', async () => {
+  const context = await setupConsumer(), session = await context.enter()
+  const reopened = new PrereleaseSessions({ db: context.db, runtime, authority: context.authority, now: context.now })
+  context.events.push({ id: '00000000-0000-4000-8000-000000000006', kind: 'account_deleted', userId: session.user.id, grantId: null, createdAt: context.now() })
+  await expect(reopened.processEvents()).rejects.toThrow('Prerelease account erasure adapter is not configured')
+  expect(context.acknowledgements).toEqual([])
+  expect(await context.db.prepare('SELECT id FROM users WHERE id=?').get(session.user.id)).toEqual({ id: session.user.id })
+  expect(await reopened.resolve(session.token)).toBeNull()
+})
