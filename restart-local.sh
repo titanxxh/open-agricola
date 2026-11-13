@@ -585,7 +585,7 @@ REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
     REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" \
     "$PNPM_BIN" run build:replay-viewer | tail -n 1
 )}"
-GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
+export GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 env REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" REPLAY_VIEWER_BUILD_ID="$REPLAY_VIEWER_BUILD_ID" "$PNPM_BIN" exec tsx scripts/upload-replay-viewer.ts
 
 RESET_CONFIRMED=0
