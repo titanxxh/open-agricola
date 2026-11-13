@@ -144,7 +144,8 @@ export function createFrontendHosting(env: NodeJS.ProcessEnv = process.env): (re
       finish(req, res, 308, '', { Location: `${HOSTED_APP_PATH}${query}` })
       return true
     }
-    const relativePath = pathname.slice(HOSTED_APP_PATH.length) || 'index.html'
+    const requestedPath = pathname.slice(HOSTED_APP_PATH.length)
+    const relativePath = !requestedPath || env.RELEASE_CHANNEL === 'prerelease' && requestedPath === 'auth/handoff' ? 'index.html' : requestedPath
     try {
       const file = await realpath(join(directory, relativePath))
       if (!inside(directory, file) || !(await stat(file)).isFile()) {
