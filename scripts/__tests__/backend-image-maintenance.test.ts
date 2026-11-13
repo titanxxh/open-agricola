@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { createBackendImageFixture } from './_helpers/backend-image-fixture'
@@ -17,10 +17,12 @@ function fixture(failure = '') {
   for (const name of ['image-intake.ts', 'backup-storage.sh', 'backup-process.sh', 'backup-files.mjs']) cpSync(join(repository, 'scripts', name), join(policy, 'scripts', name))
   writeFileSync(join(policy, 'package.json'), '{"type":"module"}')
   mkdirSync(join(value.directory, 'data'))
-  writeFileSync(join(value.directory, '.env'), 'ACCOUNT_REGISTRATION_POLICY=invite_only\n')
+  cpSync(join(repository, 'docker-compose.prod.yml'), join(value.directory, 'docker-compose.prod.yml'))
   writeFileSync(join(value.directory, 'data/dependencies.compose.env'), 'DATABASE_URL=private-fixture\n')
   writeFileSync(join(value.directory, 'data/postgres-cutover.validated'), '')
   const oldId = '1'.repeat(64), caddyId = '2'.repeat(64), newId = '3'.repeat(64), sourceBuild = '7'.repeat(40), sourceImage = `sha256:${'8'.repeat(64)}`, caddyImage = `sha256:${'9'.repeat(64)}`
+  const originalEnv = `# owner configuration\nACCOUNT_REGISTRATION_POLICY=invite_only\nPUBLIC_API_BASE=https://api.example.test\nPRIVATE_SENTINEL='keep exactly this value'\nBACKEND_IMAGE=${sourceImage}\n`
+  writeFileSync(join(value.directory, '.env'), originalEnv)
   const data = { DATABASE_URL: 'postgres://private-fixture/formal', S3_ENDPOINT: 'http://objects:9000', S3_BUCKET: 'formal', S3_PREFIX: '', S3_REGION: 'fixture', S3_FORCE_PATH_STYLE: 'true', S3_ACCESS_KEY_ID: 'private-fixture-key', S3_SECRET_ACCESS_KEY: 'private-fixture-secret' }
   const state = { failure, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
   const statePath = join(value.root, 'maintenance.json'), callsPath = join(value.root, 'maintenance-calls.jsonl')
@@ -67,7 +69,7 @@ else if(a[0]==='compose'){
     [join(policy, 'scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, expectedSha, value.request.producerSha],
     { env: { ...process.env, CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }, encoding: 'utf8', timeout: 30_000 })
   const calls = (): { kind: string; args: string[] }[] => existsSync(callsPath) ? readFileSync(callsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
-  return { ...value, sourceBuild, sourceImage, oldId, invoke, calls,
+  return { ...value, sourceBuild, sourceImage, oldId, originalEnv, invoke, calls,
     current: () => JSON.parse(readFileSync(statePath, 'utf8')),
     compose: () => JSON.parse(readFileSync(join(value.root, 'observed-compose.json'), 'utf8')) }
 }
@@ -139,4 +141,71 @@ it.each(['drain', 'live', 'up', 'up-identity', 'backup-stopped', 'source-changed
   expect(result.status).not.toBe(0)
   expect(value.calls().some(call => call.args[0] === 'start')).toBe(false)
   expect(value.current().started).toBe(false)
+})
+
+function nativeCompose(directory: string, explicitEnvFile = false) {
+  const { BACKEND_IMAGE: _image, COMPOSE_ENV_FILES: _files, COMPOSE_DISABLE_ENV_FILE: _disabled, ...env } = process.env
+  return spawnSync('docker', ['compose', ...(explicitEnvFile ? ['--env-file', '.env'] : []), '-f', 'docker-compose.prod.yml', 'config', '--format', 'json'],
+    { cwd: directory, env, encoding: 'utf8', timeout: 30_000 })
+}
+
+it('pins subsequent documented Compose run/up to the installed image with default and explicit .env selection', () => {
+  const value = fixture(), result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  for (const explicitEnvFile of [false, true]) {
+    const config = nativeCompose(value.directory, explicitEnvFile)
+    expect(config.status, config.stderr).toBe(0)
+    expect(JSON.parse(config.stdout).services.app.image).toBe(value.imageId)
+  }
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv.replace(value.sourceImage, value.imageId))
+  expect(statSync(join(value.directory, '.env')).mode & 0o777).toBe(0o600)
+  expect(JSON.parse(readFileSync(join(value.directory, 'data/deployed-image.json'), 'utf8')).nativeImageId).toBe(value.imageId)
+})
+
+it('rejects ordinary Compose maintenance without the installed image binding instead of selecting a legacy tag', () => {
+  const value = fixture()
+  writeFileSync(join(value.directory, '.env'), value.originalEnv.replace(`BACKEND_IMAGE=${value.sourceImage}\n`, ''))
+  const result = nativeCompose(value.directory)
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('BACKEND_IMAGE')
+})
+
+it.each(['fetch', 'backup', 'report-target'])('preserves the previous binding for %s before live migration', failure => {
+  const value = fixture(failure)
+  expect(value.invoke().status).not.toBe(0)
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv)
+})
+
+it.each(['live', 'up', 'up-identity'])('disables ordinary Compose after %s without restoring an old executable on migrated data', failure => {
+  const value = fixture(failure)
+  expect(value.invoke().status).not.toBe(0)
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv.replace(value.sourceImage, ''))
+  expect(nativeCompose(value.directory).status).not.toBe(0)
+})
+
+it.each(['duplicate', 'quoted', 'tag', 'symlink'])('rejects %s installed-image configuration before source changes', form => {
+  const value = fixture(), path = join(value.directory, '.env')
+  if (form === 'symlink') { renameSync(path, path + '.outside'); symlinkSync(path + '.outside', path) }
+  else writeFileSync(path, form === 'duplicate' ? value.originalEnv + `BACKEND_IMAGE=${value.sourceImage}\n`
+    : value.originalEnv.replace(value.sourceImage, form === 'tag' ? 'open-agricola:backend' : `"${value.sourceImage}"`))
+  const result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.kind === 'git')).toBe(false)
+})
+
+it('initializes the binding for an existing deployment that predates fixed image delivery', () => {
+  const value = fixture(), before = value.originalEnv.replace(`BACKEND_IMAGE=${value.sourceImage}\n`, '')
+  writeFileSync(join(value.directory, '.env'), before)
+  const result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(before + `BACKEND_IMAGE=${value.imageId}\n`)
+  expect(JSON.parse(nativeCompose(value.directory).stdout).services.app.image).toBe(value.imageId)
+})
+
+it('rejects an installed selector that conflicts with the retained native application before stopping it', () => {
+  const value = fixture()
+  writeFileSync(join(value.directory, '.env'), value.originalEnv.replace(value.sourceImage, `sha256:${'e'.repeat(64)}`))
+  const result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args[0] === 'stop' || call.args[0] === 'checkout')).toBe(false)
 })

@@ -466,10 +466,10 @@ Bug Report GitHub App、Workshop PR 和账号 OAuth 都仍是可选集成；配�
 
 3. 使用仓库中的 `docker-compose.prod.yml`，保留完整 PostgreSQL/S3、OAuth 和入口配置。
 
-4. 启动：
+4. 先完成下方「后端」的 owner 固定镜像交付，取得已验收的 `.env` 绑定后再启动：
 
    ```bash
-   docker compose -f docker-compose.prod.yml up -d --build
+   docker compose -f docker-compose.prod.yml up -d --no-build --pull never
    ```
 
 5. 验证：
@@ -804,7 +804,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
 
 维护锁内再次绑定目录、`F`、`P` 和实际 image。保留精确的旧 container/image/Build，检查固定 fetch/checkout 与数据目标，然后干净停止旧应用。旧 image 负责导出 PostgreSQL/S3，新 image 负责隔离恢复验证；通过后才执行 `check-live`，以 `--no-build --pull never` 启动 app 和原 Caddy image。正式主机没有 `pnpm install`、应用构建、registry 登录或自动依赖升级。共享依赖变更仍须单独维护。
 
-只有停机前正在运行、此次干净停止且身份未变化的旧容器，才会在 live migration 前的备份失败后恢复。OOM、未干净排空或开始 live migration 后的失败保持维护，不把旧程序接到可能已变化的 schema。`data_imports` 屏障和容器健康检查继续生效。私有操作目录保存导入、source 身份和 resolved Compose；后者含环境凭据，勿公开。`data/deployed-build-id` 与 `data/deployed-image.json` 记录成功交付；真实浏览器、保留对局和双实例现场验收仍须另做。
+只有停机前正在运行、此次干净停止且身份未变化的旧容器，才会在 live migration 前的备份失败后恢复。OOM、未干净排空或开始 live migration 后的失败保持维护，不把旧程序接到可能已变化的 schema。`data_imports` 屏障和容器健康检查继续生效。私有操作目录保存导入、source 身份和 resolved Compose；后者含环境凭据，勿公开。`data/deployed-build-id` 与审计证据 `data/deployed-image.json` 记录成功交付，随后在实际部署目录的 owner 私有 `.env` 中原子写入唯一、无引号的 `BACKEND_IMAGE=sha256:...`，固定已验收的原生不可变镜像。其他配置保持原字节；重复、带引号或使用可变 tag 的镜像配置会被拒绝。普通 Compose 默认读取该 `.env`，显式 `--env-file .env` 也读取同一绑定，不再回退旧 tag。不要用 shell、其他环境文件或备份配置覆盖该绑定。迁移前失败保留旧绑定；开始 live migration 前先写空绑定，此后失败会让普通 `run/up` 保持拒绝，直到固定镜像交付成功。JSON 回执是历史证据，不是另一套镜像选择。真实浏览器、保留对局和双实例现场验收仍须另做。
 
 ### 前端
 
@@ -997,7 +997,7 @@ cron 模板按宿主机的 `Asia/Shanghai` 时区调度：每日 04:00 备份，
 
 #### 恢复或切换外部服务
 
-停止全部应用。准备目标版本镜像、原始归档、配对 manifest、最新独立 ledger、保留的加密密钥，以及一个空目标数据库和隔离的目标对象 namespace。先核对 tar 的 SHA-256/长度与 manifest，然后解包到私有目录；恢复工具还会核对内层数据库和每个对象的 hash/长度。配置目标连接组后运行：
+停止全部应用。准备目标版本镜像、原始归档、配对 manifest、最新独立 ledger、保留的加密密钥，以及一个空目标数据库和隔离的目标对象 namespace。先核对 tar 的 SHA-256/长度与 manifest，然后解包到私有目录；恢复工具还会核对内层数据库和每个对象的 hash/长度。配置目标连接组时保留本部署 `.env` 中已验收的 `BACKEND_IMAGE`，随后运行。备份配置属于源版本，不得覆盖此绑定；缺失或为空时，须先完成固定镜像交付才能使用这些命令：
 
 ```bash
 # /restore/archive contains archive.json, database.dump, and objects/.
@@ -1014,7 +1014,7 @@ docker compose -f docker-compose.prod.yml up -d --no-build --wait app caddy
 
 ### Replay 下架
 
-CLI 只接受精确 Room ID 和 `removed`、`moderation`、`legal` 三种原因。先停后端并 dry-run，确认输出的 Room 与资源 Hash 后再执行：
+CLI 只接受精确 Room ID 和 `removed`、`moderation`、`legal` 三种原因。在实际部署目录使用已验收的 `.env` 镜像绑定，先停后端并 dry-run，确认输出的 Room 与资源 Hash 后再执行：
 
 ```bash
 OA_ROOM_ID=replace-with-exact-room-id

@@ -455,10 +455,10 @@ Optional free-domain providers:
 
 3. Use the checked-in `docker-compose.prod.yml` so PostgreSQL/S3, OAuth, and ingress settings remain complete.
 
-4. Start the stack:
+4. Complete the owner fixed-image delivery in the Backend section first. Its accepted `.env` binding is required before starting the stack:
 
    ```bash
-   docker compose -f docker-compose.prod.yml up -d --build
+   docker compose -f docker-compose.prod.yml up -d --no-build --pull never
    ```
 
 5. Verify it:
@@ -786,7 +786,7 @@ The server extracts trusted controller files only from `P`. A separate bounded c
 
 Inside the maintenance lock, the controller rebinds directory, `F`, `P` and actual image. It retains exact source container/image/Build identities, checks fixed fetch/checkout and data targets, then drains the source cleanly. The source image exports PostgreSQL/S3; the target image validates an isolated restore. Only then may `check-live` run and app plus the retained Caddy image start with `--no-build --pull never`. The formal host performs no `pnpm install`, application build, registry login or automatic dependency upgrade. Shared dependencies still require separate maintenance.
 
-Only a source that was running at entry, drained cleanly by this operation and retained its exact identity can restart after a pre-migration backup failure. OOM, unclean drain and failures after live migration begins keep maintenance active. The `data_imports` barrier and container health gate remain. The private operation directory retains import/source evidence and resolved Compose, which contains environment credentials and must remain private. Successful delivery records `data/deployed-build-id` and `data/deployed-image.json`. Real-browser, retained-game and two-instance acceptance remain separate field checks.
+Only a source that was running at entry, drained cleanly by this operation and retained its exact identity can restart after a pre-migration backup failure. OOM, unclean drain and failures after live migration begins keep maintenance active. The `data_imports` barrier and container health gate remain. The private operation directory retains import/source evidence and resolved Compose, which contains environment credentials and must remain private. Successful delivery records `data/deployed-build-id` and the audit evidence `data/deployed-image.json`, then atomically pins the accepted native immutable image as the single unquoted `BACKEND_IMAGE=sha256:...` assignment in the deployment directory's owner-private `.env`. Existing configuration is preserved; duplicate, quoted or mutable image assignments are rejected. Ordinary Compose uses this selector with its default `.env` or `--env-file .env`; it never falls back to a legacy tag. Do not override it through the shell, another environment file, or a configuration archive. Pre-migration failures retain the old selector. Immediately before live migration the selector is blanked; a later failure leaves ordinary `run/up` closed until a verified delivery succeeds. The JSON receipt is historical evidence, not another image selector. Real-browser, retained-game and two-instance acceptance remain separate field checks.
 
 ### Frontend
 
@@ -977,7 +977,7 @@ Offsite ledger synchronization reads the remote copy, merges it into the current
 
 #### Restore or switch to external services
 
-Stop every application. Prepare the target image, archive and matching report, latest independent ledger, retained encryption keys, an empty target database, and a separate target object namespace. Verify the tar SHA-256/length against the report before extracting into a private directory. Restore also verifies the inner database and object hashes/lengths. Configure the destination connection group, then run:
+Stop every application. Prepare the target image, archive and matching report, latest independent ledger, retained encryption keys, an empty target database, and a separate target object namespace. Verify the tar SHA-256/length against the report before extracting into a private directory. Restore also verifies the inner database and object hashes/lengths. Configure the destination connection group while preserving the accepted `BACKEND_IMAGE` from this deployment's `.env`, then run. A backup configuration belongs to its source build and must not replace this selector. Missing or blank bindings require a verified fixed-image delivery before these commands:
 
 ```bash
 # /restore/archive contains archive.json, database.dump, and objects/.
@@ -994,7 +994,7 @@ Restore merges current deletion facts before placing allowed historical objects,
 
 ### Remove a Replay
 
-The CLI accepts only an exact Room ID and one of three reasons: `removed`, `moderation`, or `legal`. Stop the backend and run a dry run first. Execute only after confirming the Room and asset hashes in its output:
+The CLI accepts only an exact Room ID and one of three reasons: `removed`, `moderation`, or `legal`. Use the deployment directory and its accepted `.env` image binding. Stop the backend and run a dry run first. Execute only after confirming the Room and asset hashes in its output:
 
 ```bash
 OA_ROOM_ID=replace-with-exact-room-id
