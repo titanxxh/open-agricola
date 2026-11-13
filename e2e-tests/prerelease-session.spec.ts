@@ -158,6 +158,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     await expect(page.locator('.prerelease-banner')).toContainText('Prerelease aaaaaaaaaaaa')
     await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible()
+    await expect(page.locator('.lobby-user-pill')).toHaveText(user.displayName)
     return page
   }
   const browser = await playwright.chromium.launch()
@@ -184,6 +185,7 @@ test('real prerelease consumer creates a persistent restricted cookie and restor
     try {
       const resumed = await restored.newPage(); await resumed.goto(`${environment.preOrigin}/open-agricola/`)
       await expect(resumed.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible()
+      await expect(resumed.locator('.lobby-user-pill')).toHaveText(environment.user.displayName)
       await resumed.goto(`${environment.preOrigin}/open-agricola/?page=settings`)
       await expect(resumed.locator('input[type=password]')).toHaveCount(0)
       await expect(resumed.getByText('This action is unavailable in the read-only prerelease workshop.')).toBeVisible()
