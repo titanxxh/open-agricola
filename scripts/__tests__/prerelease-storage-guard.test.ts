@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -75,4 +75,32 @@ it('rejects unmeasured limits and owner credentials inside candidate paths befor
   expect(() => parseStorageGuardConfig(value.target, {})).toThrow(/guard configuration/)
   expect(() => parseStorageGuardConfig(value.target, { format: 1, fingerprint: targetFingerprint(value.target),
     databaseJournal: join(value.target.directory, 'owner.json') })).toThrow(/outside|configuration/)
+})
+
+
+it.each(['probe-failure', 'healthy-write', 'forced-trip'])('stops independently when control persistence fails during %s and never heals the in-process latch', async fault => {
+  const { runStorageGuardCycle } = await import('../prerelease/storage-guard')
+  const value = fixture(), calls: string[] = []
+  value.save(value.healthy)
+  const observation = { sourceDatabaseBytes: 2, validationDatabaseBytes: 2, bucketBytes: 2, multipartBytes: 2,
+    localBytes: 2, offsiteBytes: 2, hostFreeBytes: 100, hostFreeInodes: 100, offsiteFreeBytes: 100, offsiteFreeInodes: 100 }
+  const limits = { ...observation, sourceDatabaseBytes: 10, validationDatabaseBytes: 10, bucketBytes: 10, multipartBytes: 10,
+    localBytes: 10, offsiteBytes: 10, hostFreeBytes: 1, hostFreeInodes: 1, offsiteFreeBytes: 1, offsiteFreeInodes: 1, operationReserveBytes: 1 }
+  chmodSync(value.control, 0o500)
+  try {
+    const result = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, {
+      observe: async () => { if (fault === 'probe-failure') throw new Error('probe unavailable'); return observation },
+      stop: async () => { calls.push('stop'); return ['postgres-roles'] },
+    }, fault === 'forced-trip' ? 'supervisor-stop' : undefined)
+    expect(calls).toEqual(['stop'])
+    expect(result).toMatchObject({ status: 'latched', failures: ['postgres-roles'] })
+    expect(result.persistenceFailures).toContain('latch')
+    expect(result.persistenceFailures).toContain('stop-receipt')
+  } finally { chmodSync(value.control, 0o700) }
+  const recoveredDisk = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, {
+    observe: async () => observation, stop: async () => { calls.push('retry'); return [] },
+  })
+  expect(recoveredDisk).toMatchObject({ status: 'latched', operationsAllowed: false, persistenceFailures: [], diagnostics: 'available' })
+  expect(calls).toEqual(['stop', 'retry'])
+  expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).toThrow(/latched/)
 })
