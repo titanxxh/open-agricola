@@ -143,6 +143,7 @@ it('exposes only safe stage fields and counts online presence only for a matchin
 
 it('backfills only proven surviving starts as legacy and never replaces missing historical gameplay time with a recovery observation', async () => {
   await persistence.save('legacy', null, meta({ startedAt: now - 60_000 }))
+  await db.exec('DROP VIEW prerelease_retained_identity_refs')
   await db.exec(`DROP VIEW operations_current_openings;
     DROP TABLE game_opening_accounts,game_opening_facts,game_opening_tracking;
     DELETE FROM postgres_schema_migrations WHERE version=31;`)
