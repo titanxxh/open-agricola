@@ -70,6 +70,14 @@ export function parseStorageGuardConfig(target: PrereleaseTarget, input: unknown
 }
 export type StorageGuardConfig = ReturnType<typeof parseStorageGuardConfig>
 
+/** systemd supplies the actual deadline; never assume the template unit is installed unchanged. */
+export function assertStorageGuardWatchdog(config: Pick<StorageGuardConfig, 'intervalMs' | 'probeTimeoutMs'>, watchdogUsec: string | undefined): void {
+  const usec = watchdogUsec && /^\d+$/.test(watchdogUsec) ? Number(watchdogUsec) : NaN
+  if (!Number.isSafeInteger(usec) || usec <= 0) throw new Error('Storage guard watch requires a positive safe-integer WATCHDOG_USEC from systemd')
+  // Includes the bounded 3-second notification and headroom for local processing/I/O.
+  if (config.intervalMs + config.probeTimeoutMs + 10_000 >= usec / 1000) throw new Error('Storage guard cycle plus 10s margin must fit the systemd watchdog deadline')
+}
+
 function privateJson(path: string): Record<string, unknown> {
   assertOwnerPath(path)
   const file = lstatSync(path)

@@ -53,7 +53,11 @@ vi.mock('../db.ts', async () => {
   const db = await createTestDatabase()
   return { getDb: () => db, initializeDatabase: async () => {}, cleanExpiredSessions: async () => {} }
 })
-afterAll(async () => { await (await import('../db.ts')).getDb().close() })
+afterAll(async () => {
+  vi.clearAllTimers()
+  vi.useRealTimers()
+  await (await import('../db.ts')).getDb().close()
+})
 
 
 const {
@@ -76,6 +80,9 @@ const { getDb } = await import('../db.ts')
 const { authCookieNames } = await import('../auth-cookies.ts')
 const emailModule = await import('../email.ts')
 
+// Keep background workers idle unless a test explicitly schedules a competing drain.
+// Database time, request I/O and retry deadlines still use the real clock.
+vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
 await import('../index.ts')
 
 type JsonResponse = {
@@ -383,12 +390,93 @@ describe('auth routes', () => {
     })
 
     expect(res.status).toBe(200)
-    expect(res.json).toMatchObject({ ok: true })
+    expect(res.json).toMatchObject({ ok: true, pending: false, operationId: expect.any(String) })
     expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=;`)
     expect((await validateSession(token))).toBeNull()
     expect(((await getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id)) as { n: number }).n).toBe(0)
     expect(((await getDb().prepare('SELECT COUNT(*) AS n FROM rooms WHERE id = ?').get('route-room')) as { n: number }).n).toBe(0)
     expect(wsServerMocks.endRoomsForUser).toHaveBeenCalledWith(user.id, ['route-room'])
+    expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(user.id)
+  })
+
+  it('defers account deletion while the background invalidation drain is running', async () => {
+    const { InvalidationStore } = await import('../invalidation')
+    const auth = await import('../auth')
+    const user = await createLocalUserForTests('delete_drain', 'password123')
+    const token = await createSession(user.id)
+    if (!token) throw new Error('Expected a session token')
+    const started = Promise.withResolvers<void>(), release = Promise.withResolvers<void>(), drained = Promise.withResolvers<void>()
+    const originalDrain = InvalidationStore.prototype.drain
+    vi.spyOn(InvalidationStore.prototype, 'drain').mockImplementationOnce(async function (this: InstanceType<typeof InvalidationStore>, ...args) {
+      started.resolve()
+      await release.promise
+      try { await originalDrain.apply(this, args) } finally { drained.resolve() }
+    })
+    vi.advanceTimersByTime(1000)
+    await started.promise
+    try {
+      const requestedAt = Date.now()
+      const res = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `${authCookieNames().session}=${token}` })
+      expect(res.status).toBe(202)
+      expect(res.json).toMatchObject({ ok: true, pending: true, operationId: expect.any(String) })
+      expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=;`)
+      expect(await validateSession(token)).toBeNull()
+      expect((await requestJson('GET', '/api/auth/me', undefined, { Cookie: `${authCookieNames().session}=${token}` })).status).toBe(401)
+      const operation = await new InvalidationStore(getDb()).latest('user', user.id)
+      expect(operation).toMatchObject({ id: res.json.operationId, pending: true })
+      const deferred = await getDb().prepare('SELECT last_error_code, next_attempt_at, claim_token FROM account_deletion_requests WHERE user_id=?')
+        .get<{ last_error_code: string; next_attempt_at: number; claim_token: string | null }>(user.id)
+      expect(deferred).toMatchObject({ last_error_code: 'instances_retiring', claim_token: null })
+      if (!deferred) throw new Error('Expected a durable deletion retry')
+      expect(deferred.next_attempt_at).toBeGreaterThanOrEqual(requestedAt + 1000)
+      release.resolve()
+      await drained.promise
+      expect(await new InvalidationStore(getDb()).latest('user', user.id)).toMatchObject({ pending: false })
+      // Wait for the real persisted backoff; advancing only interval scheduling cannot bypass it.
+      await new Promise(done => setTimeout(done, Math.max(0, deferred.next_attempt_at - Date.now() + 10)))
+      const deleted = Promise.withResolvers<boolean>()
+      vi.spyOn(auth, 'finishAccountDeletion').mockImplementationOnce(async claim => {
+        const result = await finishAccountDeletion(claim)
+        deleted.resolve(result)
+        return result
+      })
+      vi.advanceTimersByTime(4000)
+      expect(await deleted.promise).toBe(true)
+      expect(await getDb().prepare('SELECT 1 FROM users WHERE id=?').get(user.id)).toBeUndefined()
+      expect(await getDb().prepare('SELECT 1 FROM account_deletion_requests WHERE user_id=?').get(user.id)).toBeUndefined()
+      expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(user.id)
+    } finally {
+      release.resolve()
+      await drained.promise
+    }
+  })
+
+  it('keeps account deletion pending when another worker owns the deletion claim', async () => {
+    const { InvalidationStore } = await import('../invalidation')
+    const user = await createLocalUserForTests('delete_claim', 'password123')
+    const token = await createSession(user.id)
+    if (!token) throw new Error('Expected a session token')
+    const heldClaim = Promise.withResolvers<NonNullable<Awaited<ReturnType<typeof claimPendingAccountDeletion>>>>()
+    const originalBegin = InvalidationStore.prototype.begin
+    vi.spyOn(InvalidationStore.prototype, 'begin').mockImplementationOnce(async function (this: InstanceType<typeof InvalidationStore>, ...args) {
+      const operation = await originalBegin.apply(this, args)
+      const claim = await claimPendingAccountDeletion(user.id)
+      if (!claim) throw new Error('Expected the competing worker to claim deletion')
+      heldClaim.resolve(claim)
+      return operation
+    })
+    const res = await requestJson('DELETE', '/api/auth/account', undefined, { Cookie: `${authCookieNames().session}=${token}` })
+    const claim = await heldClaim.promise
+    expect(res).toMatchObject({ status: 202, json: { ok: true, pending: true, operationId: expect.any(String) } })
+    expect(res.headers['Set-Cookie']).toContain(`${authCookieNames().session}=;`)
+    expect(await validateSession(token)).toBeNull()
+    expect(await new InvalidationStore(getDb()).latest('user', user.id)).toMatchObject({ pending: false })
+    expect(await getDb().prepare('SELECT claim_token, last_error_code FROM account_deletion_requests WHERE user_id=?').get(user.id))
+      .toEqual({ claim_token: claim.token, last_error_code: null })
+    expect(await claimPendingAccountDeletion(user.id)).toBeNull()
+    expect(await finishAccountDeletion(claim)).toBe(true)
+    expect(await getDb().prepare('SELECT 1 FROM users WHERE id=?').get(user.id)).toBeUndefined()
+    expect(await getDb().prepare('SELECT 1 FROM account_deletion_requests WHERE user_id=?').get(user.id)).toBeUndefined()
     expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(user.id)
   })
 
