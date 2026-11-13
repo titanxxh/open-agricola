@@ -798,7 +798,11 @@ export async function getSessionByToken(token: string, options: {
   lock?: 'share' | 'update'
 } = {}): Promise<{ user: AuthUser; expiresAt: number } | null> {
   if (!token) return null
-  if (process.env.RELEASE_CHANNEL === 'prerelease') return await getPrereleaseSessions()?.resolve(token) ?? null
+  if (process.env.RELEASE_CHANNEL === 'prerelease') {
+    const sessions = getPrereleaseSessions()
+    return await (options.db || options.now !== undefined || options.lock
+      ? sessions?.readPersisted(token, options) : sessions?.resolve(token)) ?? null
+  }
   const db = options.db ?? getDb()
   const row = await db.prepare(`
     SELECT u.id, u.username, u.display_name, s.expires_at
