@@ -82,6 +82,92 @@ it('keeps the original absolute lease during an outage and reopens only after a 
   expect(context.service.status(session.token)).toBe('expired')
 })
 
+it('pauses a previous qualification denial before notifying listeners of a new qualification change', async () => {
+  const context = await setupConsumer(), first = await context.enter(), second = await context.enter()
+  context.advance(15_000); context.setBeta(false)
+  await context.service.refreshActive()
+  expect([context.service.status(first.token), context.service.status(second.token)]).toEqual(['expired', 'expired'])
+  let observed: string[] = []
+  context.service.subscribeInvalidation(() => { observed = [context.service.status(first.token), context.service.status(second.token)] })
+  context.setBeta(true); context.offline(true)
+  context.events.push({ id: '00000000-0000-4000-8000-000000000010', kind: 'beta_changed', userId: first.user.id, grantId: null, createdAt: context.now() })
+  await expect(context.service.processEvents()).rejects.toThrow('source offline')
+  expect(observed).toEqual(['paused', 'paused'])
+  expect([context.service.status(first.token), context.service.status(second.token)]).toEqual(['paused', 'paused'])
+  context.offline(false)
+  expect(await context.service.resolve(second.token)).toMatchObject({ user: second.user, expiresAt: second.expiresAt })
+  expect(context.service.status(second.token)).toBe('authorized')
+})
+
+it('classifies a background qualification denial for issued sessions without a loaded lease', async () => {
+  const context = await setupConsumer(), first = await context.enter(), second = await context.enter()
+  const reopened = new PrereleaseSessions({ db: context.db, runtime, authority: context.authority, now: context.now })
+  cleanup.push(async () => { reopened.close() })
+  expect(await reopened.resolve(first.token)).not.toBeNull()
+  context.advance(15_000); context.setBeta(false)
+  await reopened.refreshActive()
+  expect([reopened.status(first.token), reopened.status(second.token)]).toEqual(['expired', 'expired'])
+  expect(await context.db.prepare('SELECT grant_id FROM prerelease_revoked_grants').all()).toEqual([])
+})
+
+it.each(['logout', 'source_revoked', 'source_invalid', 'account_deleted', 'absolute_expiry'])('keeps confirmed %s expired after a qualification notification', async reason => {
+  const context = await setupConsumer({ sourceRemaining: 20_000 }), session = await context.enter()
+  if (reason === 'logout') await context.service.revoke(session.token)
+  else if (reason === 'absolute_expiry') { context.advance(20_000); await context.service.refreshActive() }
+  else if (reason === 'source_invalid') {
+    context.revoked.add('g'.repeat(42) + '1'); context.setBeta(false); context.advance(15_000)
+    await context.service.refreshActive()
+  }
+  else {
+    context.events.push(reason === 'source_revoked'
+      ? { id: '00000000-0000-4000-8000-000000000011', kind: 'source_revoked', userId: session.user.id, grantId: 'g'.repeat(42) + '1', createdAt: context.now() }
+      : { id: '00000000-0000-4000-8000-000000000011', kind: 'account_deleted', userId: session.user.id, grantId: null, createdAt: context.now() })
+    await context.service.processEvents()
+  }
+  expect(context.service.status(session.token)).toBe('expired')
+  context.offline(true)
+  context.events.push({ id: '00000000-0000-4000-8000-000000000012', kind: 'beta_changed', userId: session.user.id, grantId: null, createdAt: context.now() })
+  await context.service.processEvents().catch(error => { expect(error).toMatchObject({ message: 'source offline' }) })
+  expect(context.service.status(session.token)).toBe('expired')
+  expect(context.service.cachedAuthorized(session.token)).toBe(false)
+})
+
+it.each(['elapsed', 'future'])('pauses a %s background confirmation without inventing source revocation', async freshness => {
+  const context = await setupConsumer(), session = await context.enter()
+  context.advance(15_000)
+  context.setStatus(async grantId => {
+    const state = context.state(grantId)
+    state.confirmedAt += freshness === 'elapsed' ? -30_001 : 1
+    state.validUntil = state.confirmedAt + 30_000
+    return state
+  })
+  await context.service.refreshActive()
+  expect(context.service.status(session.token)).toBe('paused')
+  expect(context.service.cachedAuthorized(session.token)).toBe(false)
+  expect(await context.db.prepare('SELECT grant_id FROM prerelease_revoked_grants').all()).toEqual([])
+  expect(await context.db.prepare('SELECT revoked_at FROM prerelease_sessions').all()).toEqual([{ revoked_at: null }])
+  context.setStatus(async grantId => context.state(grantId))
+  expect(await context.service.resolve(session.token)).toMatchObject({ user: session.user, expiresAt: session.expiresAt })
+})
+
+it('does not let an older negative confirmation override a newer qualification notification', async () => {
+  const context = await setupConsumer(), session = await context.enter()
+  const started = Promise.withResolvers<void>(), response = Promise.withResolvers<PrereleaseIdentityState>()
+  let calls = 0
+  context.setStatus(async () => { if (++calls > 1) throw new Error('source offline'); started.resolve(); return response.promise })
+  context.advance(30_000)
+  const resolving = context.service.resolve(session.token)
+  await started.promise
+  context.events.push({ id: '00000000-0000-4000-8000-000000000013', kind: 'beta_changed', userId: session.user.id, grantId: null, createdAt: context.now() })
+  try {
+    await expect(context.service.processEvents()).rejects.toThrow('source offline')
+    response.resolve({ ...context.state('g'.repeat(42) + '1'), betaAccess: false })
+    expect(await resolving).toBeNull()
+    expect(context.service.status(session.token)).toBe('paused')
+    expect(await context.db.prepare('SELECT grant_id FROM prerelease_revoked_grants').all()).toEqual([])
+  } finally { response.resolve(context.state('g'.repeat(42) + '1')); await resolving }
+})
+
 it('revokes only the matching source grant and fences a stale in-flight refresh without deleting seats', async () => {
   const context = await setupConsumer(), first = await context.enter(), second = await context.enter()
   await context.db.prepare("INSERT INTO rooms(id,created_by,created_at,updated_at) VALUES('retained',?,1,1)").run(first.user.id)
