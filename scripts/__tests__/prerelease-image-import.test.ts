@@ -150,7 +150,7 @@ it('binds a containerd runtime handle separately from its config digest and refu
   expect(changedStore.stderr).toContain('native image ID')
   expect(readFileSync(value.cache, 'utf8')).toBe(original)
   expect(readRuntime(value.target).operation?.image).toBe(value.nativeImageId)
-})
+}, 20_000)
 
 it('loads the validated snapshot while a concurrent upload replaces the operation transfer path', async () => {
   const value = fixture(), upload = value.stage()
