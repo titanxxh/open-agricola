@@ -70,7 +70,9 @@ export function collectCandidateDiagnostics(work: string, destination: string): 
     let metadata
     try { noLinkParents(work, path); metadata = lstatSync(path) } catch { return }
     if (metadata.isDirectory()) { for (const entry of readdirSync(path)) visit(join(relative, entry)); return }
-    if (!metadata.isFile() || metadata.nlink !== 1 || metadata.size > 16 * 1024 * 1024 || total + metadata.size > 128 * 1024 * 1024) return
+    const maximumFileSize = relative.startsWith('output/playwright/') && relative.endsWith('/trace.zip')
+      ? 64 * 1024 * 1024 : 16 * 1024 * 1024
+    if (!metadata.isFile() || metadata.nlink !== 1 || metadata.size > maximumFileSize || total + metadata.size > 128 * 1024 * 1024) return
     const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     try {
       const opened = fstatSync(fd)
