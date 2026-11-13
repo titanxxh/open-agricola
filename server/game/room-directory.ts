@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { PostgresDatabase } from '../database/postgres'
 import type { CommandIdentity } from '../../shared/contract/protocol/commands'
 import { selectDevelopmentRoom } from './development-room-slots'
+import { sessionCapacity } from './session-capacity'
 
 export const INSTANCE_LEASE_MS = 30000
 export const ROOM_ADMISSION_MS = 30000
@@ -22,7 +23,7 @@ export class RoomDirectory {
   private async now(): Promise<number> { return (await this.db.prepare('SELECT (extract(epoch FROM clock_timestamp()) * 1000)::bigint AS now').get<{ now: number }>())!.now }
   private async serial(): Promise<void> { await this.db.exec('SELECT pg_advisory_xact_lock(973)') }
 
-  async register(instanceId: string, internalUrl: string, generation: string, capacity = 30): Promise<void> {
+  async register(instanceId: string, internalUrl: string, generation: string, capacity = sessionCapacity.rooms): Promise<void> {
     const url = new URL(internalUrl)
     if (url.protocol !== 'http:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Invalid private instance URL')
     if (!/^[A-Za-z0-9-]+$/.test(instanceId) || !generation || !Number.isSafeInteger(capacity) || capacity < 1) throw new Error('Invalid instance registration')

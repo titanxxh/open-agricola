@@ -27,7 +27,7 @@ function fixture(proxyNetwork?: string) {
     objects: { endpoint: 'http://127.0.0.1:9000', bucket: 'oa-prerelease-test', prefix: 'live/', appKeyId: 'pre-app', backupKeyId: 'pre-backup' },
     offsite: { host: 'backup-fixture', directory: '/srv/backups/open-agricola-prerelease-test' },
     formal: { project: 'open-agricola', directory: '/srv/open-agricola', appOrigin: 'https://app.agricola.test', apiOrigin: 'https://api.agricola.test', database: 'agricola', bucket: 'agricola', offsiteDirectory: '/srv/backups/open-agricola' },
-    budgets: { app: { memoryMiB: 512, cpus: 1, pids: 256 }, tools: { memoryMiB: 512, cpus: 1, pids: 128 }, import: { maxArchiveMiB: 256, memoryHeadroomMiB: 128, intake: { memoryMiB: 128, cpus: 1, pids: 64 } }, diskMiB: 4096, reserveMemoryMiB: 256 },
+    budgets: { app: { memoryMiB: 512, cpus: 1, pids: 256 }, tools: { memoryMiB: 512, cpus: 1, pids: 128 }, sessions: { rooms: 10, customWorkers: 1 }, import: { maxArchiveMiB: 256, memoryHeadroomMiB: 128, intake: { memoryMiB: 128, cpus: 1, pids: 64 } }, diskMiB: 4096, reserveMemoryMiB: 256 },
   }
   writeFileSync(join(root, '.env'), 'DATABASE_URL=postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test\nS3_BUCKET=oa-prerelease-test\nS3_PREFIX=live/\nS3_ACCESS_KEY_ID=pre-app\nS3_SECRET_ACCESS_KEY=fixture-app\nS3_ENDPOINT=http://127.0.0.1:9000\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n')
   writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=postgres://oa_prerelease_test_backup:fixture@127.0.0.1/oa_prerelease_test\nVALIDATION_DATABASE_URL=postgres://oa_prerelease_test_validator:fixture@127.0.0.1/oa_prerelease_test_validation\nS3_BUCKET=oa-prerelease-test\nS3_PREFIX=live/\nS3_ACCESS_KEY_ID=pre-backup\nS3_SECRET_ACCESS_KEY=fixture-tools\nS3_ENDPOINT=http://127.0.0.1:9000\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n')
@@ -192,6 +192,7 @@ it('keeps the identity service key in the app and excludes it from migration and
   const composed = renderCompose(target, { ...readRuntime(target), buildId, installed: { buildId, image, installedAt: 1 } })
   if (!('app' in composed.services) || !composed.services.app || !composed.services.migrate || !composed.services.capture) throw new Error('Expected installed candidate services')
   expect(composed.services.app.env_file).toEqual([join(value.root, '.env')])
+  expect(composed.services.app.environment).toMatchObject({ APP_ROOM_CAPACITY: '10', CUSTOM_SESSION_WORKER_CAPACITY: '1' })
   for (const service of [composed.services.migrate, composed.services.capture]) {
     expect(service.environment).toMatchObject({ DATABASE_URL: 'postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test' })
     expect(service.environment).not.toHaveProperty('PRERELEASE_IDENTITY_SERVICE_KEY')

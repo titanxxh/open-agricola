@@ -43,6 +43,10 @@
     "offsiteDirectory": "/srv/backups/open-agricola"
   },
   "budgets": {
+    "sessions": {
+      "rooms": 10,
+      "customWorkers": 1
+    },
     "app": {
       "memoryMiB": 768,
       "cpus": 1,

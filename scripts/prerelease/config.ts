@@ -73,7 +73,9 @@ export function parsePrereleaseTarget(value: unknown) {
   const budgetsInput = object(input.budgets)
   if (Object.hasOwn(budgetsInput, 'build')) throw new Error('On-host build configuration is no longer supported')
   const importInput = object(budgetsInput.import)
+  const sessionsInput = object(budgetsInput.sessions)
   const budgets = { app: budget(budgetsInput.app), tools: budget(budgetsInput.tools),
+    sessions: { rooms: integer(sessionsInput.rooms, 1, 30), customWorkers: integer(sessionsInput.customWorkers, 0, 15) },
     import: { maxArchiveMiB: integer(importInput.maxArchiveMiB, 1, 131072), memoryHeadroomMiB: integer(importInput.memoryHeadroomMiB, 32, 131072), intake: budget(importInput.intake) },
     diskMiB: integer(budgetsInput.diskMiB, 256, 4_194_304), reserveMemoryMiB: integer(budgetsInput.reserveMemoryMiB, 128, 1_048_576) }
   if (budgets.import.memoryHeadroomMiB < budgets.import.intake.memoryMiB) throw new Error('Image intake cap exceeds import admission headroom')
