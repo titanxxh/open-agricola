@@ -5,35 +5,29 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { BROWSER_WS_PROTOCOL } from '../../../shared/contract/browser-auth'
 import { PRERELEASE_BUILD_PROTOCOL_PREFIX, PRERELEASE_GENERATION_PROTOCOL_PREFIX } from '../../../shared/contract/prerelease-runtime'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws'
+import type { PrereleaseIdentityState } from '../../../shared/contract/prerelease-identity'
 import { createSoloRecoveryHost } from '../../__tests__/_helpers/solo-recovery-network'
 import { enqueueRoomTask } from '../../game/room-queue'
+import { PrereleaseSessions } from '../../prerelease-sessions'
 
 const fixture = vi.hoisted(() => {
   const runtime = { buildId: 'a'.repeat(40), generationId: '11111111-2222-4333-8444-555555555555', appOrigin: '',
     formalAppOrigin: 'https://formal.example.test', formalApiBase: 'https://api.example.test', targetId: 'prerelease-main' }
-  const user = { id: '', username: 'farmer', displayName: 'Farmer', isAdmin: false }
   let now = 0
-  let revoked = false
-  const invalidations = new Set<() => void>()
-  return { runtime, user, advance: (value: number) => { now = value }, reset: () => { now = 0; revoked = false },
-    revoke: () => { revoked = true; for (const notify of invalidations) notify() },
-    service: { runtime,
-      resolve: async (token: string) => token === 'pre-only' && !revoked && now < 30000 ? { user, expiresAt: 700000, validUntil: 30000 } : null,
-      cachedAuthorized: (token: string, binding?: { buildId?: string; generationId?: string }) => token === 'pre-only' && !revoked && now < 30000
-        && (!binding?.buildId || binding.buildId === runtime.buildId) && (!binding?.generationId || binding.generationId === runtime.generationId),
-      status: () => revoked ? 'expired' : 'paused', subscribeInvalidation: (notify: () => void) => { invalidations.add(notify); return () => { invalidations.delete(notify) } },
-    } }
+  return { runtime, now: () => now, advance: (value: number) => { now = value }, reset: () => { now = 0 } }
 })
-vi.mock('../../prerelease-sessions', () => ({ getPrereleaseSessions: () => process.env.RELEASE_CHANNEL === 'prerelease' ? fixture.service : undefined,
+vi.mock('../../prerelease-sessions', async importOriginal => ({ ...await importOriginal<typeof import('../../prerelease-sessions')>(),
+  getPrereleaseSessions: () => process.env.RELEASE_CHANNEL === 'prerelease' ? service : undefined,
   readPrereleaseRuntime: () => process.env.RELEASE_CHANNEL === 'prerelease' ? fixture.runtime : undefined }))
 
 let host: Awaited<ReturnType<typeof createSoloRecoveryHost>> | undefined
+let service: PrereleaseSessions | undefined, token = ''
 const sockets: WebSocket[] = []
 let releaseQueue: (() => void) | undefined
 afterEach(async () => {
   releaseQueue?.(); releaseQueue = undefined
   for (const socket of sockets.splice(0)) if (socket.readyState !== WebSocket.CLOSED) { const closed = once(socket, 'close'); socket.close(); await closed }
-  try { await host?.close() } finally { host = undefined; fixture.reset(); vi.unstubAllEnvs(); vi.restoreAllMocks() }
+  try { await host?.close() } finally { host = undefined; service?.close(); service = undefined; token = ''; fixture.reset(); vi.unstubAllEnvs(); vi.restoreAllMocks() }
 }, 30000)
 
 function socket(cookie: string, buildId = fixture.runtime.buildId): WebSocket {
@@ -49,10 +43,21 @@ async function prepare() {
   host = await createSoloRecoveryHost()
   const created = await host.create()
   await created.peer.close()
-  fixture.user.id = host.user.id
   fixture.runtime.appOrigin = host.runtime().url.replace('ws:', 'https:').replace('/ws', '')
   vi.stubEnv('PUBLIC_APP_ORIGIN', fixture.runtime.appOrigin)
   vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+  await host.db.prepare('DELETE FROM sessions WHERE user_id=?').run(host.user.id)
+  await host.db.prepare(`UPDATE users SET identity_origin='external',password_hash=NULL,password_updated_at=NULL,
+    email=NULL,email_verified_at=NULL WHERE id=?`).run(host.user.id)
+  const state: PrereleaseIdentityState = { protocolVersion: 1, channel: 'prerelease', targetOrigin: fixture.runtime.appOrigin,
+    generationId: fixture.runtime.generationId, grantId: 'g'.repeat(43), account: { kind: 'active', subject: {
+      id: host.user.id, username: host.user.username, displayName: host.user.displayName } },
+    source: { kind: 'active', expiresAt: 700000 }, grant: { kind: 'active', expiresAt: 700000 }, betaAccess: true, confirmedAt: 0, validUntil: 30000 }
+  service = new PrereleaseSessions({ db: host.db, runtime: fixture.runtime, now: fixture.now,
+    authority: { exchange: async () => state, status: async () => state, events: async () => [], acknowledge: async () => {} } })
+  const pending = await service.beginHandoff(), params = new URLSearchParams(new URL(pending.formalUrl).hash.slice(1))
+  token = (await service.exchangeHandoff(pending.cookie, { protocolVersion: 1, code: 'c'.repeat(43), state: params.get('state')!,
+    browserChallenge: params.get('browserChallenge')!, returnTo: `${fixture.runtime.formalAppOrigin}/` })).token
   return { roomId: created.state.roomId, before: await host.runtime().persistence.load(created.state.roomId), head: await host.runtime().persistence.loadReplayHead(created.state.roomId) }
 }
 
@@ -60,7 +65,7 @@ it('rejects foreign cookies and stale application bindings at the actual upgrade
   const created = await prepare()
   for (const [cookie, build, expected] of [
     ['__Host-oa-session=formal; oa_dev_session=developer', fixture.runtime.buildId, 401],
-    ['__Host-oa-pre-session=pre-only', 'c'.repeat(40), 426],
+    [`__Host-oa-pre-session=${token}`, 'c'.repeat(40), 426],
   ] satisfies [string, string, number][]) {
     const value = socket(cookie, build)
     const response = new Promise<number>((resolve, reject) => {
@@ -76,7 +81,7 @@ it('rejects foreign cookies and stale application bindings at the actual upgrade
 
 it('rechecks a queued write after thirty seconds and closes access without changing confirmed state or seats', async () => {
   const created = await prepare()
-  const value = socket('__Host-oa-pre-session=pre-only')
+  const value = socket(`__Host-oa-pre-session=${token}`)
   const events: ServerEvent[] = []
   value.on('message', raw => { const event: ServerEvent = JSON.parse(raw.toString()); events.push(event) })
   await once(value, 'open')
@@ -111,7 +116,7 @@ it('rechecks a queued write after thirty seconds and closes access without chang
 
 it('stops idle access and refuses a direct publication at the absolute lease deadline', async () => {
   const created = await prepare()
-  const value = socket('__Host-oa-pre-session=pre-only')
+  const value = socket(`__Host-oa-pre-session=${token}`)
   const events: ServerEvent[] = []
   value.on('message', raw => { const event: ServerEvent = JSON.parse(raw.toString()); events.push(event) })
   await once(value, 'open')
@@ -132,7 +137,7 @@ it('stops idle access and refuses a direct publication at the absolute lease dea
 
 it('announces a known revocation immediately with the client admission code and retains the seat', async () => {
   const created = await prepare()
-  const value = socket('__Host-oa-pre-session=pre-only')
+  const value = socket(`__Host-oa-pre-session=${token}`)
   const events: ServerEvent[] = []
   value.on('message', raw => { const event: ServerEvent = JSON.parse(raw.toString()); events.push(event) })
   await once(value, 'open')
@@ -141,7 +146,7 @@ it('announces a known revocation immediately with the client admission code and 
   const room = host!.runtime().backend.registry.get(created.roomId)!
   const connection = room.players.find(player => player.userId === host!.user.id)!.ws
   const closed = once(value, 'close')
-  fixture.revoke()
+  await service!.revoke(token)
   expect(connection.readyState).toBe(WebSocket.CLOSING)
   const [code, reason] = await closed
   expect(code).toBe(1008)
@@ -152,7 +157,7 @@ it('announces a known revocation immediately with the client admission code and 
 
 it('announces changed application identity through the same typed close contract', async () => {
   const created = await prepare()
-  const value = socket('__Host-oa-pre-session=pre-only')
+  const value = socket(`__Host-oa-pre-session=${token}`)
   const events: ServerEvent[] = []
   value.on('message', raw => { const event: ServerEvent = JSON.parse(raw.toString()); events.push(event) })
   await once(value, 'open')
