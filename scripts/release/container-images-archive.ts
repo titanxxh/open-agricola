@@ -83,9 +83,9 @@ export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId
   }
 }
 
-type Entry = { offset: number; size: number }
-function archiveContents(fd: number, bytes: number): Map<string, Entry> {
-  const entries = new Map<string, Entry>(), header = Buffer.alloc(512)
+type Entry = { offset: number; size: number; sha256: string }
+function archiveContents(fd: number, bytes: number) {
+  const entries = new Map<string, Entry>(), header = Buffer.alloc(512), chunk = Buffer.alloc(1024 * 1024), hash = createHash('sha256')
   let offset = 0, ended = false
   const field = (start: number, length: number) => header.subarray(start, start + length).toString('utf8').replace(/\0.*$/s, '')
   const octal = (value: string): number => {
@@ -96,12 +96,13 @@ function archiveContents(fd: number, bytes: number): Map<string, Entry> {
   }
   while (offset + 512 <= bytes) {
     if (readSync(fd, header, 0, 512, offset) !== 512) throw new Error('Truncated image archive')
+    hash.update(header)
     if (header.every(byte => byte === 0)) {
       if (bytes - offset < 1024 || bytes % 512) throw new Error('Truncated image tar terminator')
-      const tail = Buffer.alloc(64 * 1024)
-      for (let cursor = offset; cursor < bytes;) {
-        const size = readSync(fd, tail, 0, Math.min(tail.length, bytes - cursor), cursor)
-        if (!size || !tail.subarray(0, size).every(byte => byte === 0)) throw new Error('Unexpected data after image tar terminator')
+      for (let cursor = offset + 512; cursor < bytes;) {
+        const size = readSync(fd, chunk, 0, Math.min(chunk.length, bytes - cursor), cursor)
+        if (!size || !chunk.subarray(0, size).every(byte => byte === 0)) throw new Error('Unexpected data after image tar terminator')
+        hash.update(chunk.subarray(0, size))
         cursor += size
       }
       ended = true; break
@@ -111,24 +112,24 @@ function archiveContents(fd: number, bytes: number): Map<string, Entry> {
     const prefix = field(345, 155), name = (prefix ? prefix + '/' : '') + field(0, 100), type = field(156, 1), size = octal(field(124, 12))
     if (!/^[A-Za-z0-9._/-]+$/.test(name) || name.startsWith('/') || name.replace(/\/$/, '').split('/').some(part => !part || part === '.' || part === '..') || entries.has(name)
       || !['', '0', '5'].includes(type) || type === '5' && size !== 0 || offset + 512 + size > bytes || entries.size >= 100_000) throw new Error('Unsafe, duplicate or truncated image tar member')
-    if (type !== '5') entries.set(name, { offset: offset + 512, size })
-    offset += 512 + Math.ceil(size / 512) * 512
+    const start = offset + 512, end = start + Math.ceil(size / 512) * 512, memberHash = createHash('sha256')
+    if (end > bytes) throw new Error('Truncated image archive padding')
+    for (let cursor = start; cursor < end;) {
+      const length = readSync(fd, chunk, 0, Math.min(chunk.length, end - cursor), cursor)
+      if (!length) throw new Error('Truncated image archive member')
+      hash.update(chunk.subarray(0, length))
+      memberHash.update(chunk.subarray(0, Math.min(length, Math.max(0, start + size - cursor))))
+      cursor += length
+    }
+    if (type !== '5') entries.set(name, { offset: start, size, sha256: memberHash.digest('hex') })
+    offset = end
   }
   if (!ended) throw new Error('Image archive has no complete terminator')
-  return entries
-}
-function fileHash(fd: number, offset: number, bytes: number): string {
-  const hash = createHash('sha256'), chunk = Buffer.alloc(1024 * 1024)
-  for (let cursor = 0; cursor < bytes;) {
-    const size = readSync(fd, chunk, 0, Math.min(chunk.length, bytes - cursor), offset + cursor)
-    if (!size) throw new Error('Truncated image archive member')
-    hash.update(chunk.subarray(0, size)); cursor += size
-  }
-  return hash.digest('hex')
+  return { entries, sha256: hash.digest('hex') }
 }
 
-function validateArchive(fd: number, bytes: number, receipt: { imageId: string; sourceSha: string; purpose: 'candidate' | 'trusted-policy' }, allowProducerTag: boolean): string | null {
-  const entries = archiveContents(fd, bytes)
+function validateArchive(fd: number, bytes: number, receipt: { imageId: string; sourceSha: string; purpose: 'candidate' | 'trusted-policy' }, allowProducerTag: boolean) {
+  const { entries, sha256 } = archiveContents(fd, bytes)
   const entry = (name: string): Entry => { const result = entries.get(name); if (!result) throw new Error('Missing image archive member'); return result }
   const json = (name: string): unknown => {
     const item = entry(name)
@@ -152,7 +153,7 @@ function validateArchive(fd: number, bytes: number, receipt: { imageId: string; 
     }
   }
   const configPath = string(image.Config), configEntry = entry(configPath), config = object(json(configPath))
-  if (`sha256:${fileHash(fd, configEntry.offset, configEntry.size)}` !== receipt.imageId || config.os !== 'linux' || config.architecture !== 'amd64') throw new Error('Archive config ID or platform differs from receipt')
+  if (`sha256:${configEntry.sha256}` !== receipt.imageId || config.os !== 'linux' || config.architecture !== 'amd64') throw new Error('Archive config ID or platform differs from receipt')
   identity(object(config.config), receipt)
   const layers = strings(image.Layers), rootfs = object(config.rootfs), diffs = strings(rootfs.diff_ids)
   if (rootfs.type !== 'layers' || layers.length !== diffs.length || new Set(layers).size !== layers.length) throw new Error('Invalid archive layer set')
@@ -163,7 +164,7 @@ function validateArchive(fd: number, bytes: number, receipt: { imageId: string; 
     const sum = header.reduce((value, byte, index) => value + (index >= 148 && index < 156 ? 32 : byte), 0)
     if (!header.every(byte => byte === 0) && (!/^[0-7]+$/.test(checksum) || Number.parseInt(checksum, 8) !== sum)
       || ['1f8b', '425a68', 'fd377a585a00', '28b52ffd', '04224d18'].some(magic => header.subarray(0, magic.length / 2).toString('hex') === magic)) throw new Error('Expected an uncompressed tar layer')
-    if (`sha256:${fileHash(fd, layer.offset, layer.size)}` !== diffs[index]) throw new Error('Image layer differs from its uncompressed config digest')
+    if (`sha256:${layer.sha256}` !== diffs[index]) throw new Error('Image layer differs from its uncompressed config digest')
   }
   let archiveManifestDigest: string | null = null
   if (entries.has('index.json')) {
@@ -186,7 +187,7 @@ function validateArchive(fd: number, bytes: number, receipt: { imageId: string; 
       || !/^sha256:[a-f0-9]{64}$/.test(digest) || Object.keys(annotations).length > 0 && !allowedAnnotations
       || !['application/vnd.oci.image.manifest.v1+json', 'application/vnd.docker.distribution.manifest.v2+json'].includes(string(descriptor.mediaType))) throw new Error('Unexpected OCI image descriptor or tags')
     const path = 'blobs/sha256/' + digest.slice(7), blob = entry(path)
-    if (`sha256:${fileHash(fd, blob.offset, blob.size)}` !== digest || descriptor.size !== blob.size) throw new Error('OCI manifest digest differs')
+    if (`sha256:${blob.sha256}` !== digest || descriptor.size !== blob.size) throw new Error('OCI manifest digest differs')
     const manifest = object(json(path)), config = object(manifest.config), descriptorsOfLayers = manifest.layers
     if (Object.keys(manifest).some(key => !['schemaVersion', 'mediaType', 'config', 'layers'].includes(key)) || manifest.schemaVersion !== 2
       || Object.keys(config).some(key => !['mediaType', 'digest', 'size'].includes(key)) || config.size !== configEntry.size
@@ -199,7 +200,7 @@ function validateArchive(fd: number, bytes: number, receipt: { imageId: string; 
     }
     archiveManifestDigest = digest
   }
-  return archiveManifestDigest
+  return { archiveManifestDigest, sha256 }
 }
 
 export function validateContainerImageArchive({ archivePath, imageId: id, sourceSha, channel, maxBytes, allowProducerTag = false }: {
@@ -211,8 +212,7 @@ export function validateContainerImageArchive({ archivePath, imageId: id, source
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || bytes > maxBytes) throw new Error('Image archive exceeds its byte bound')
   const fd = openSync(archivePath, 'r')
   try {
-    const archiveManifestDigest = validateArchive(fd, bytes, { imageId: id, sourceSha, purpose: channel === 'prerelease' ? 'candidate' : 'trusted-policy' }, allowProducerTag)
-    return { sha256: fileHash(fd, 0, bytes), bytes, archiveManifestDigest }
+    return { ...validateArchive(fd, bytes, { imageId: id, sourceSha, purpose: channel === 'prerelease' ? 'candidate' : 'trusted-policy' }, allowProducerTag), bytes }
   } finally { closeSync(fd) }
 }
 
