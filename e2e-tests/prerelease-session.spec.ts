@@ -93,7 +93,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
   const childEnv: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production', RELEASE_CHANNEL: 'prerelease', GAME_BUILD_ID: buildId, VITE_BASE_PATH: '/open-agricola/', VITE_API_BASE: '', VITE_WS_BASE: '' }
   delete childEnv.PRERELEASE_IDENTITY_SERVICE_KEY
   writeFileSync(envFile, envText({ ...dependencies, DATABASE_URL: databaseUrl, DATABASE_SCHEMA: schema, S3_PREFIX: prefix, RELEASE_CHANNEL: 'prerelease', GAME_BUILD_ID: buildId,
-    PUBLIC_APP_ORIGIN: `${preOrigin}/open-agricola/`, PUBLIC_API_BASE: preOrigin, CORS_ORIGIN: preOrigin, FORMAL_APP_ORIGIN: formalOrigin, FORMAL_API_BASE: formalOrigin,
+    PUBLIC_APP_ORIGIN: preOrigin, PUBLIC_API_BASE: preOrigin, CORS_ORIGIN: preOrigin, FORMAL_APP_ORIGIN: formalOrigin, FORMAL_API_BASE: formalOrigin,
     PRERELEASE_DATA_GENERATION: generationId, PRERELEASE_TARGET_ID: targetId, PRERELEASE_IDENTITY_SERVICE_KEY: serviceKey, FRONTEND_ROOT: root,
     NODE_EXTRA_CA_CERTS: join(directory, 'cert.pem'), SHARED_DATA_DIR: join(directory, 'data'), REPLAY_VIEWER_ROOT: join(directory, 'data/replay-viewers'),
     BACKEND_LOG: join(directory, 'backend.log'), FRONTEND_LOG: join(directory, 'frontend.log'), OWNED_PROCESSES_FILE: owned, BACKEND_PORT: String(backendPort),
@@ -188,7 +188,7 @@ test('real prerelease consumer creates a persistent restricted cookie and restor
       await expect(resumed.locator('.lobby-user-pill')).toHaveText(environment.user.displayName)
       await resumed.goto(`${environment.preOrigin}/open-agricola/?page=settings`)
       await expect(resumed.locator('input[type=password]')).toHaveCount(0)
-      await expect(resumed.getByText('This action is unavailable in the read-only prerelease workshop.')).toBeVisible()
+      await expect(resumed.locator('.prerelease-access-screen')).toContainText('Return to production')
       await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
       await expect(resumed.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
       await expect(resumed.getByRole('link', { name: 'Return to production', exact: true })).toBeVisible()
