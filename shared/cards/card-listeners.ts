@@ -22,6 +22,8 @@ export type CardListenerContext = ActionExecutionContext & {
   phase: ActionHookPhase
   transactionEvents: readonly (GameEvent | DraftGameEvent)[]
   actionEvents?: readonly (GameEvent | DraftGameEvent)[]
+  /** This host's own committed events, excluding continuation descendants. Absent in older cursors. */
+  ownActionEvents?: readonly (GameEvent | DraftGameEvent)[]
   eventQuery: EventQuery
   result?: ActionExecutionResult
   choice?: string
@@ -609,6 +611,7 @@ export const collectComputeExchanges = (
   return out
 }
 
+// SAFETY: Compute-only preview contexts read space identity, never execute this synthetic action.
 const makeDummySpace = (actionId: string): ActionSpace => ({
   id: `${actionId}-cost-preview`,
   position: 0,

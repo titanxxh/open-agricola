@@ -219,17 +219,24 @@ describe('E118_KindlingGatherer action-space provenance', () => {
 
   it('gain grants wood for food moved from an action space to the trigger player', () => {
     const { session: ruleSession, player } = setup()
-    const events = [moved({ food: 2 }, player.id, { kind: 'supply' }, 'gain')]
+    const events = [moved({ food: 2 }, player.id, { kind: 'actionSpace', spaceId: 'day-laborer' }, 'gain')]
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.moved',
-        from: expect.objectContaining({ kind: 'supply' }),
+        from: expect.objectContaining({ kind: 'actionSpace', spaceId: 'day-laborer' }),
         to: expect.objectContaining({ kind: 'player', playerId: player.id }),
       }),
     ]))
     const flow = runListener(ruleSession, LISTENER_ID, 'gain', 'day-laborer', events)
 
     expectWoodFlow(flow)
+  })
+
+  it('does not infer action-space origin from an unmarked supply gain in a real space context', () => {
+    const { session: ruleSession, player } = setup()
+    expect(runListener(ruleSession, LISTENER_ID, 'gain', 'day-laborer', [
+      moved({ food: 2 }, player.id, { kind: 'supply' }, 'gain'),
+    ])).toBeUndefined()
   })
 
   it('does not grant wood for same-resource supply or card moves', () => {

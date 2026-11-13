@@ -465,6 +465,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     clone.expandFlowIdStyle = node.expandFlowIdStyle
     clone.beforePhaseResolved = node.beforePhaseResolved
     clone.bodyStarted = node.bodyStarted
+    clone.ownActionEvents = node.ownActionEvents ? structuredClone(node.ownActionEvents) : undefined
     clone.selectedBranchChoice = node.selectedBranchChoice
     clone.continuationParentHostNodeId = node.continuationParentHostNodeId
     return copySharedNodeMetadata(node, clone)

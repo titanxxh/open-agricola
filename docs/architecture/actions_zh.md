@@ -71,7 +71,7 @@ type ActionDefinition = {
 | 行动 | 契约 |
 |---|---|
 | `collect` | 把货物从 Action Space 转移到玩家供应区。普通用格拿取整堆；卡牌授予的取物可通过 `actionContext: { spaceId, resource, amount }` 指定来源和数量，或通过 `{ spaceId, resourceTypes }` 拿取指定类型的全部货物。单独取物不构成一次 Action Space Use。判断本次拿取量的 `before` listener 读取 `collectTakeAmount()`（`shared/cards/helpers/partial-take.ts`）；完成反应和统计读取实际取得的货物。卡牌提供的累积格声明 `gainPerRound`，货物存于 `ActionSpace.resources`。 |
-| `gain` | 结算前先确定接收者。付款方出资的 gain 先校验完整转账再移动资源，事件保留付款方来源。显式资源参数与行动格配置的基础收益分开识别。 |
+| `gain` | 结算前先确定接收者。付款方出资的 gain 先校验完整转账再移动资源，事件保留付款方来源。显式资源参数与行动格配置的基础收益分开识别。具名 gain 工厂直接执行时也交给标准 leaf，显式携带固定收益并保留卡牌归因，不从外围行动格猜测收益或来源。 |
 | `return-to-space` | 把货物从玩家供应区返还到 `actionContext.targetSpaceId` 指定的格；支付与移动事件使用同一目标。动物返还使用 `applyAnimalPayment()`，保持库存与动物区数量一致。返还是单独的移动，不减少原始取得回执、按该回执判断的阈值或取得统计。部分拿取只计实际拿走的货物；取得后返还保留两笔移动。 |
 | `place-farmer-on-space` | 在固定目标上额外放一名工人，通常随后展开目标 flow；`params.executeTarget: false` 只放工人、不展开目标。`allowOccupied` 只放宽占用，不绕过封锁、轮次开放、可执行性或工人供应。准入使用 `shared/actions/helpers/placement-availability.ts` 的 `canPlaceWorkerOnSpace`，与普通放置是同一份检查清单；放哪个人由 `selectWorkerForMoorAction` 决定，所以 Farmers of the Moor 的病人留在家中。自行放人的卡牌也用同一个函数检查准入。卡牌不在 handler 里写 `ActionSpace.takenBy`。 |
 | 无人物使用与固定目标跳转 | 卡牌可不放置、不消耗人物而执行完整行动格 flow（`place-farmer.actionContext.viaCardJump`），或把绑定工人跳转到固定目标（`jumpLeaf`）。查询与执行绑定同一工人；费用、否决、联动封锁和防递归仍生效。 |
@@ -87,6 +87,7 @@ type ActionDefinition = {
 
 - 职业可用性、选择提交和直接 / 免费打出共用同一个前置门禁。改良费用预览与支付以授予的 `sourceCard` 或实体行动格 ID 作为 `actionCardId`。
 - 选择类后续行动在 `actionContext` 中携带语义来源（例如 `extraCropPlacement`）；后续卡牌读取该标记，不读来源卡 ID。
+- 从行动格取得的 listener 使用标准 `collect` / `gain` 的 after 完成点和 `hasActionSpaceAcquisition()`（`cards/helpers/event-provenance.ts`）。直接宿主事实确定真实来源和一次取得，不依赖整格使用。测试：`server/__tests__/action-space-acquisition-session.test.ts`、`shared/engine/__tests__/resource-acquisition-scope.test.ts`。
 - 资源获得类 listener 订阅实际入账的行动（`gain`、`collect`、`receive`、`reap`、`exchange`），不订阅把入账交给 `receive` 的来源动作；同一次移动不能两次到达同一个 listener。关心卡牌自身 counter 或栈的 listener 可以订阅来源动作。
 
 测试：`shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,pop-card-stack,special-effect,farmyard-goods-claim}.test.ts`、`server/__tests__/{empty-accumulation-admission,receive-existing-goods}-session.test.ts`。

@@ -36,6 +36,8 @@ export class ActionNode extends BaseNode {
   public deferredHostCommitCompleted?: boolean
   public deferredHostTransactionEvents?: GameEvent[]
   public deferredHostActionEvents?: GameEvent[]
+  /** Direct emissions only; unlike the completed action receipt this never absorbs child events. */
+  public ownActionEvents?: GameEvent[]
   public deferredHostTriggerSnapshot?: TriggerSnapshot
   public deferredHostChoice?: string
   public deferredHostResultTargetNodeId?: string
@@ -135,6 +137,7 @@ export class ActionNode extends BaseNode {
       deferredHostCommitCompleted: this.deferredHostCommitCompleted,
       deferredHostTransactionEvents: this.deferredHostTransactionEvents,
       deferredHostActionEvents: this.deferredHostActionEvents,
+      ownActionEvents: this.ownActionEvents,
       deferredHostTriggerSnapshot: this.deferredHostTriggerSnapshot,
       deferredHostChoice: this.deferredHostChoice,
       deferredHostResultTargetNodeId: this.deferredHostResultTargetNodeId,

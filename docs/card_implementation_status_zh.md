@@ -66,7 +66,7 @@
 - 不照抄 mutable PHP args 和原地 cost rewrite；OA 保留结构化 modifiers 和 payment enumeration。
 - 可从权威计数派生的 infobox 使用卡牌自己的 `getStatePresentation`，不要用内部存取动作 listener 维护同步副本。
 - listener 时机按 [ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)，从 OA 自身的生命周期和 Reaction Window 语义选择，保留卡牌要求的资源可用时点与玩家自选顺序。参考实现的回调名称和先后不决定阶段。
-- 行动格使用前 / 完整结束后的反应订阅既有 `place-farmer` 生命周期并筛选 `context.space`，不得用内部节点通配反应近似整格完成。
+- 行动格使用前 / 完整结束后的反应订阅 `actionSpaces`，取得反应读取标准 `collect` / `gain` 的直接宿主事实。不得用内部节点通配反应近似整格完成，也不得用整格收据近似取得；`place-farmer` 标识人员放置，不代表这两类事实。
 - listener 资格由共享的封闭目标 / 阶段契约规定，不得从可执行动作注册推断，不得省略筛选条件或修改已注册的筛选对象。
 - 参考实现平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
 - Moor Special Action 反应使用统一 `moor-action` before/after 身份和原生类型化触发事实；具体特殊行动 ID 仅用于执行、筛选和来源，不能作为 listener 目标。

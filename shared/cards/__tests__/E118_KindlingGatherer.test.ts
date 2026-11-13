@@ -61,12 +61,13 @@ const foodMoved = (
   playerId = 'p1',
   spaceId = 'fishing',
   food = 1,
+  reason: 'collect' | 'gain' = 'collect',
 ): DraftGameEvent<'resource.moved'> => ({
   type: 'resource.moved',
   resources: { food },
   from: { kind: 'actionSpace', spaceId },
   to: { kind: 'player', playerId },
-  reason: 'collect',
+  reason,
 })
 
 const foodGainedFromSupply = (
@@ -118,14 +119,14 @@ describe('E118_KindlingGatherer', () => {
     expect(leaf.params).toEqual({ wood: 1 })
   })
 
-  it('gains 1 wood after place-farmer on resource-market-4', () => {
+  it('gains 1 wood after the resource-market-4 gain', () => {
     const listener = findListener(LISTENER_ID)!
     expect(listener).toBeDefined()
     const player = createPlayer()
-    const actionEvents = [foodMoved(player.id, 'resource-market-4', 1)]
+    const actionEvents = [foodMoved(player.id, 'resource-market-4', 1, 'gain')]
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('resource-market-4'),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'gain', phase: 'after',
       transactionEvents: actionEvents,
       actionEvents,
     } as unknown as CardListenerContext)
@@ -139,7 +140,7 @@ describe('E118_KindlingGatherer', () => {
     const listener = findListener(LISTENER_ID)!
     expect(listener).toBeDefined()
     const player = createPlayer()
-    const actionEvents = [foodGainedFromSupply(player.id, 2)]
+    const actionEvents = [foodMoved(player.id, 'day-laborer', 2, 'gain')]
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('day-laborer'),
       actionId: 'gain', phase: 'after',
@@ -151,6 +152,16 @@ describe('E118_KindlingGatherer', () => {
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('gain')
     expect(leaf.params).toEqual({ wood: 1 })
+  })
+
+  it('does not infer action-space origin from supply food in a named space context', () => {
+    const player = createPlayer()
+    const actionEvents = [foodGainedFromSupply(player.id, 2)]
+    const result = executeCardListener(findListener(LISTENER_ID)!, {
+      actionHooks: undefined, state: createState(player), player, space: createSpace('day-laborer'),
+      actionId: 'gain', phase: 'after', transactionEvents: actionEvents, actionEvents,
+    })
+    expect(result).toBeUndefined()
   })
 
   it('does not trigger for unrelated spaces', () => {

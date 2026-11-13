@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
-import { sumActionSpaceMovedToPlayer } from '../helpers/event-provenance'
+import { hasActionSpaceAcquisition } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -11,13 +11,11 @@ const listener: CardListenerRegistration = {
   previousIds: ['E77-mattock-place-farmer'],
   cardIds: [CARD_ID],
   phases: ['after'],
-  actionSpaces: 'all',
+  actions: ['collect', 'gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Old cursors also captured a dormant placement reaction on non-market spaces.
     if (context.actionId === 'place-farmer' && context.space.id !== 'resource-market-4') return
-    const events = context.actionEvents ?? context.transactionEvents
-    if (!(['reed', 'stone'] as const).some(resource =>
-      sumActionSpaceMovedToPlayer(events, resource, context.player.id) > 0)) return
+    if (!hasActionSpaceAcquisition(context, ['reed', 'stone'])) return
     return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
   },
 }

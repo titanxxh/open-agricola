@@ -1,42 +1,18 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { DraftGameEvent, ResourceMovedEvent } from '../../contract/events'
-import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
+import type { ActionHookResult } from '../../actions/hooks'
+import { hasActionSpaceAcquisition } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E118_KindlingGatherer'
-type QueryableResourceMovedEvent = ResourceMovedEvent | DraftGameEvent<'resource.moved'>
-
-const isFoodFromActionSpace = (
-  context: CardListenerContext,
-  event: QueryableResourceMovedEvent,
-) =>
-  event.from.kind === 'actionSpace' ||
-  (
-    context.actionId === 'gain' &&
-    event.from.kind === 'supply' &&
-    event.reason === 'gain' &&
-    !event.sourceCardId &&
-    Boolean(context.space?.id)
-  )
-
-const hasActionSpaceFoodMovedToTriggerPlayer = (context: CardListenerContext) =>
-  sumResourceMovedToPlayer(
-    context.actionEvents ?? context.transactionEvents,
-    'food',
-    (context.triggerPlayer ?? context.player).id,
-    (event) => isFoodFromActionSpace(context, event),
-  ) > 0
-
 const listener: CardListenerRegistration = {
   id: 'E118-kindling-gatherer-after-action-space-food',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['after'],
   actions: ['collect', 'gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (hasActionSpaceFoodMovedToTriggerPlayer(context)) {
+    if (hasActionSpaceAcquisition(context, ['food'])) {
       return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
     }
   },

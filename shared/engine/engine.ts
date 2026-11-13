@@ -81,8 +81,14 @@ type MutableNodeState = EngineNode & {
   setState?: (state: 'ready' | 'resolved' | 'blocked') => void
 }
 
-const cloneSnapshotValue = <T>(value: T): T =>
-  JSON.parse(JSON.stringify(value)) as T
+const cloneSnapshotValue = <T>(value: T): T => {
+  // Probes also clone runtime spaces: JSON intentionally drops their executable definitions.
+  try {
+    return JSON.parse(JSON.stringify(value)) as T
+  } catch (cause) {
+    throw new Error('Cannot clone engine snapshot value', { cause })
+  }
+}
 
 const cloneEventLogDerivations = (
   derivations: EngineInternals['eventLogDerivations'],
@@ -237,6 +243,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         action.deferredHostCommitCompleted = data.deferredHostCommitCompleted as boolean | undefined
         action.deferredHostTransactionEvents = data.deferredHostTransactionEvents as ActionNode['deferredHostTransactionEvents']
         action.deferredHostActionEvents = data.deferredHostActionEvents as ActionNode['deferredHostActionEvents']
+        action.ownActionEvents = data.ownActionEvents as ActionNode['ownActionEvents']
         action.deferredHostTriggerSnapshot = data.deferredHostTriggerSnapshot as ActionNode['deferredHostTriggerSnapshot']
         action.deferredHostChoice = data.deferredHostChoice as string | undefined
         action.deferredHostResultTargetNodeId = data.deferredHostResultTargetNodeId as string | undefined

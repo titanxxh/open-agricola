@@ -85,6 +85,18 @@ export const sumActionSpaceMovedToPlayer = (
     event.from.kind === 'actionSpace',
   )
 
+/** Count an acquisition at its emitting host, not again in a parent's aggregate receipt.
+ * Older retained activations have only the original action/transaction receipt.
+ */
+export const hasActionSpaceAcquisition = (
+  context: CardListenerContext,
+  resources: readonly (keyof Resource)[],
+): boolean => {
+  const events = context.ownActionEvents ?? context.actionEvents ?? context.transactionEvents
+  const playerId = (context.triggerPlayer ?? context.player).id
+  return resources.some(resource => sumActionSpaceMovedToPlayer(events, resource, playerId) > 0)
+}
+
 export const sumActionSpaceMovedToTriggerPlayer = (
   context: CardListenerContext,
   resource: keyof Resource,

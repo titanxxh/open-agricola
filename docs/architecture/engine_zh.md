@@ -60,7 +60,7 @@ shared/engine/
 
 测试：`shared/engine/__tests__/{engine,engine-flow,tree-selected-branch,restore-regressions,optional-node-context,resolve-choice-continuations,space-use-clone,moor-completion-clone}.test.ts`。
 
-修改回调在 `execute`、显式 `resolveChoice` 和单选项自动处理时均收到 `completedTransactionEvents`，包含 Session 尚未刷出的已完成事实。该共享读取上下文不替代当前宿主自身的收据。回归测试：`shared/engine/__tests__/event-transaction.test.ts`。
+修改回调在 `execute`、显式 `resolveChoice` 和单选项自动处理时均收到 `completedTransactionEvents`，包含 Session 尚未刷出的已完成事实。该共享读取上下文不替代当前宿主自身的收据。`continuation-events.ts` 另将直接发出的事实记录为 `ActionNode.ownActionEvents`，并传入 activation 帧；汇总完成收据保持不变。直接收据固定 execute/resolve/commit 发出的事实，跨请求、返回 flow、内部子动作、克隆、pending、恢复和撤销保留，不吸收子动作事实。没有此字段的旧保留帧继续使用原先捕获的收据；恢复不改写已接受历史，也不重新匹配已固定来源。回归测试：`shared/engine/__tests__/{event-transaction,resource-acquisition-scope}.test.ts`。
 
 ## EngineStack
 

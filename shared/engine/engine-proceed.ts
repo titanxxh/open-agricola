@@ -76,7 +76,7 @@ import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
 import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
 import { interactionRequestChoices } from './pending-validation'
-import { activationEventReadContext, mergeContinuationEvents, preserveContinuationEventScopes } from './continuation-events'
+import { activationEventReadContext, mergeContinuationEvents, preserveContinuationEventScopes, recordOwnActionEvents } from './continuation-events'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { applyComputeCostResults } from './compute-cost-results'
 import { findActionSpaceById } from '../domain/space'
@@ -317,7 +317,7 @@ const actionContextForNode = (
     int,
   )
 
-const paymentInfoFromResult = (result: ActionExecutionResult): unknown => {
+const paymentInfoFromResult = (result: ActionExecutionResult): ActionExecutionResult | Record<string, unknown> => {
   if (result.type !== 'ok') return result
   const extraData = result.extraData ?? {}
   const resourcesPaid = result.resourcesPaid ?? extraData.resourcesPaid
@@ -461,6 +461,7 @@ export const buildDeferredHostNode = (
     result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
   node.deferredHostTransactionEvents = [...transactionEvents]
   node.deferredHostActionEvents = [...actionEvents]
+  node.ownActionEvents = hostNode.ownActionEvents ? structuredClone(hostNode.ownActionEvents) : undefined
   node.deferredHostChoice = choice ?? hostNode.selectedBranchChoice
   node.deferredHostResultTargetNodeId = hostNode.internalHostNodeId
   node.deferredHostResultKey = hostNode.internalResultKey
@@ -490,6 +491,7 @@ const buildDeferredHostContinuationNode = (
   node.deferredHostCommitCompleted = true
   node.deferredHostTransactionEvents = sourceNode.deferredHostTransactionEvents
   node.deferredHostActionEvents = sourceNode.deferredHostActionEvents
+  node.ownActionEvents = sourceNode.ownActionEvents ? structuredClone(sourceNode.ownActionEvents) : undefined
   node.deferredHostTriggerSnapshot = sourceNode.deferredHostTriggerSnapshot
   node.deferredHostChoice = sourceNode.deferredHostChoice
   node.deferredHostResultTargetNodeId = sourceNode.deferredHostResultTargetNodeId
@@ -763,6 +765,7 @@ const executeDeferredHostAction = (
     eventBuffer.flushTo(eventFrame.sink)
     ensureEventState(context.state)
     completedEvents = eventFrame.complete(context.state)
+    recordOwnActionEvents(node, completedEvents)
     recordEventLogDerivation(int, completedEvents, result)
     node.deferredHostTriggerSnapshot = createTriggerSnapshot(context.state)
   }
@@ -817,10 +820,10 @@ const executeDeferredHostAction = (
       ),
     )
     .filter((action) => action)
-  const proceedBaseEvent = buildListenerEvent(executionContext, {
-    result,
-    choice: node.deferredHostChoice,
-  })
+  const proceedBaseEvent = {
+    ...buildListenerEvent(executionContext, { result, choice: node.deferredHostChoice }),
+    ownActionEvents: node.ownActionEvents,
+  }
   const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
   const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
   const trailingActionEventStartIndex = result.type === 'flow'
@@ -1319,6 +1322,7 @@ export function engineProceed(
       eventBuffer.flushTo(eventFrame.sink)
       ensureEventState(context.state)
       completedEvents = eventFrame.complete(context.state)
+      recordOwnActionEvents(node, completedEvents)
       recordEventLogDerivation(int, completedEvents, result)
     }
     if (result.type === 'fail') {
@@ -1465,7 +1469,10 @@ export function engineProceed(
         ),
       )
       .filter((action) => action)
-    const proceedBaseEvent = buildListenerEvent(executionContext, { result, choice })
+    const proceedBaseEvent = {
+      ...buildListenerEvent(executionContext, { result, choice }),
+      ownActionEvents: node.ownActionEvents,
+    }
     const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
     const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
     const trailingActionEventStartIndex = result.type === 'flow'
