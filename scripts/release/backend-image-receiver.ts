@@ -141,8 +141,8 @@ const unitName = (request: BackendImageRequest): string => `oa-formal-image-inta
 function docker(args: string[]): string {
   return execFileSync('docker', args, { encoding: 'utf8', timeout: 30_000, maxBuffer: 2 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 }
-export function pinBackendDocker(stage: string): () => void {
-  const context: unknown = JSON.parse(docker(['context', 'inspect']))
+export function pinBackendDocker(stage: string, runDocker: (args: string[]) => string = docker): () => void {
+  const context: unknown = JSON.parse(runDocker(['context', 'inspect']))
   if (!Array.isArray(context) || context.length !== 1) throw new Error('Expected one native Docker context')
   const endpoint = object(object(object(context[0]).Endpoints).docker), socket = endpoint.Host
   if (typeof socket !== 'string' || !/^unix:\/\/\/[A-Za-z0-9_./-]+$/.test(socket)
@@ -238,7 +238,7 @@ export function receiveBackendImage(path: string): string {
   }
 }
 
-export function verifyReceivedBackendImage(path: string, expected: BackendImageTarget, admitted?: 'maintenance'): string {
+export function verifyReceivedBackendImage(path: string, expected: BackendImageTarget, admitted?: 'maintenance', runDocker?: (args: string[]) => string): string {
   const request = admitted ? readBackendImageOperation(path, admitted).request : readBackendImageRequest(path), reportPath = join(request.stage, 'image.json')
   if (request.directory !== expected.directory || request.sourceSha !== expected.sourceSha || request.producerSha !== expected.producerSha) throw new Error('Imported formal image does not match the owner deployment target')
   ownerPath(reportPath, false)
@@ -246,12 +246,12 @@ export function verifyReceivedBackendImage(path: string, expected: BackendImageT
   if (report.format !== 1 || report.bindingSha256 !== binding(request) || report.sourceSha !== request.sourceSha
     || report.producerSha !== request.producerSha || report.imageId !== request.transfer.receipt.imageId
     || report.archiveManifestDigest !== null && (typeof report.archiveManifestDigest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(report.archiveManifestDigest))) throw new Error('Imported formal image belongs to another input or operation')
-  const unpin = pinBackendDocker(request.stage)
+  const unpin = pinBackendDocker(request.stage, runDocker)
   try {
     requireMemory(request)
-    const id = nativeContainerImageId({ configDigest: request.transfer.receipt.imageId, manifestDigest: report.archiveManifestDigest })
+    const id = nativeContainerImageId({ configDigest: request.transfer.receipt.imageId, manifestDigest: report.archiveManifestDigest }, runDocker)
     if (id !== report.nativeImageId) throw new Error('Formal image store changed after intake')
-    return inspectLoadedContainerImage({ imageId: id, expected: { purpose: 'formal-candidate', sourceSha: request.sourceSha, producerSha: request.producerSha } })
+    return inspectLoadedContainerImage({ imageId: id, expected: { purpose: 'formal-candidate', sourceSha: request.sourceSha, producerSha: request.producerSha } }, runDocker)
   } finally { unpin() }
 }
 

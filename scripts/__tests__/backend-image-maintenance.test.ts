@@ -374,3 +374,37 @@ cp.execFileSync=(command,args,options)=>{if(command==='bash'&&args?.[0]?.endsWit
   expect(timeout).toBeLessThanOrEqual(60_000)
   expect(readFileSync(clock, 'utf8')).toBe(String(now))
 })
+
+it.each([
+  ['initial Docker pin', 1, 500, 900],
+  ['verification Docker pin', 2, 2000, 2400],
+  ['frontend inspection', 6, 2000, 2400],
+  ['inspection cleanup', 7, 2000, 2400],
+])('bounds %s by the remaining maintenance deadline before any source mutation', (_name, delayedCall, remainingMs, delayMs) => {
+  const value = fixture(), clock = join(value.root, 'entry-clock'), observed = join(value.root, 'entry-docker.jsonl')
+  const counter = join(value.root, 'entry-count'), entered = join(value.root, 'entry-delayed'), completed = join(value.root, 'entry-completed')
+  const preload = join(value.root, 'entry-clock.mjs'), dockerPath = join(value.bin, 'docker'), original = readFileSync(dockerPath, 'utf8'), newline = original.indexOf('\n')
+  writeFileSync(clock, String(Date.now()))
+  const delay = `const delayFs=require('node:fs'),counter=${JSON.stringify(counter)};const count=(delayFs.existsSync(counter)?Number(delayFs.readFileSync(counter,'utf8')):0)+1;delayFs.writeFileSync(counter,String(count));if(count===${delayedCall}){delayFs.writeFileSync(${JSON.stringify(entered)},'started');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,${delayMs});delayFs.writeFileSync(${JSON.stringify(completed)},'finished');}\n`
+  writeFileSync(dockerPath, original.slice(0, newline + 1) + delay + original.slice(newline + 1))
+  writeFileSync(preload, `import fs from 'node:fs';import cp from 'node:child_process';import{syncBuiltinESMExports}from'node:module';
+const read=fs.readFileSync,rename=fs.renameSync,exec=cp.execFileSync;Date.now=()=>Number(read(${JSON.stringify(clock)},'utf8'));
+fs.renameSync=(from,to)=>{const result=rename(from,to);if(String(to).endsWith('/maintenance-admission.json')){const value=JSON.parse(read(to,'utf8'));if(value.phase==='running')fs.writeFileSync(${JSON.stringify(clock)},String(value.workDeadline-${remainingMs}));}return result};
+cp.execFileSync=(command,args,options)=>{if(command==='docker')fs.appendFileSync(${JSON.stringify(observed)},JSON.stringify({args,timeout:options.timeout})+'\\n');return exec(command,args,options)};syncBuiltinESMExports();`)
+  const result = value.invoke(value.request.sourceSha, { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` })
+  expect(result.status).not.toBe(0)
+  expect(existsSync(entered)).toBe(true)
+  expect(existsSync(completed)).toBe(false)
+  const calls: { args: string[]; timeout: number }[] = readFileSync(observed, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  expect(calls).toHaveLength(delayedCall)
+  expect(calls.every(call => Number.isInteger(call.timeout) && call.timeout > 0 && call.timeout <= remainingMs)).toBe(true)
+  if (delayedCall >= 6) {
+    const create = calls.find(call => call.args[0] === 'create')?.args
+    if (!create) throw new Error('Inspection container creation was not observed')
+    const name = create[create.indexOf('--name') + 1]
+    expect(result.stderr).toContain(`inspection cleanup could not be confirmed for ${name}`)
+  }
+  expect(value.current().running).toBe(true)
+  expect(value.calls().some(call => call.args[0] === 'stop' || call.args.includes('check-live') || call.args.includes('up'))).toBe(false)
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv)
+})

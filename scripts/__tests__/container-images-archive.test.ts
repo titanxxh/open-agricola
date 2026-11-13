@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { parseContainerImageReceipt } from '../release/container-images'
@@ -187,4 +187,28 @@ it('accepts only the native BuildKit creation timestamp beside the fixed produce
     channel: 'prerelease', maxBytes: 1024 * 1024, allowProducerTag: true })
   expect(validate()).toMatchObject(value.transfer().archive)
   annotations['org.opencontainers.image.created'] = 'not-a-timestamp';pack();expect(validate).toThrow()
+})
+
+
+it('reports both inspection and exact container cleanup failures while removing its local temporary files', () => {
+  const value = fixture(), docker = join(value.bin, 'docker'), script = readFileSync(docker, 'utf8')
+  writeFileSync(docker, script.replace('prerelease-hosted', 'stable-hosted').replace("if(a[0]==='info'", "if(a[0]==='rm')process.exit(17);if(a[0]==='info'"))
+  let failed = false
+  try { value.load() }
+  catch (error) {
+    failed = true
+    expect(error).toBeInstanceOf(AggregateError)
+    if (!(error instanceof AggregateError)) throw error
+    expect(error.errors).toEqual([
+      expect.objectContaining({ message: 'Hosted frontend does not match the image receipt' }),
+      expect.objectContaining({ message: 'Container image rm failed; keep the original image binding and retry after inspection' }),
+    ])
+    const create = value.calls().find(args => args[0] === 'create')
+    if (!create) throw new Error('Inspection container creation was not observed', { cause: error })
+    expect(error.message).toBe(`Container image inspection cleanup could not be confirmed for ${create[create.indexOf('--name') + 1]}`)
+  }
+  expect(failed).toBe(true)
+  const copied = value.calls().find(args => args[0] === 'cp')?.at(-1)
+  if (!copied) throw new Error('Inspection metadata copy was not observed')
+  expect(existsSync(dirname(copied))).toBe(false)
 })
