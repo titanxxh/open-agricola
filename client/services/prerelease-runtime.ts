@@ -7,7 +7,11 @@ import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export type PrereleaseFailure = 'prerelease_auth_required' | 'prerelease_access_paused' | 'prerelease_access_expired' | 'prerelease_runtime_changed' | 'invalid_prerelease_handoff'
-export type PrereleaseAccess = { kind: 'checking' } | { kind: 'active'; session: PrereleaseSessionResponse } | { kind: 'blocked'; code: PrereleaseFailure }
+export type PrereleaseAccess =
+  | { kind: 'checking' }
+  | { kind: 'active'; session: PrereleaseSessionResponse }
+  | { kind: 'blocked'; code: PrereleaseFailure }
+  | { kind: 'ended'; code: 'prerelease_auth_required' }
 const listeners = new Set<() => void>()
 let runtime: PrereleaseRuntime | undefined
 let access: PrereleaseAccess = { kind: 'checking' }
@@ -27,10 +31,16 @@ export function subscribePrereleaseAccess(listener: () => void): () => void {
 }
 function publish(next: PrereleaseAccess) { access = next; for (const listener of listeners) listener() }
 export function rejectPrereleaseAccess(code: PrereleaseFailure): void {
-  if (!isPrereleaseClient() || access.kind === 'blocked' && access.code === 'prerelease_runtime_changed') return
+  if (!isPrereleaseClient() || access.kind === 'ended' || access.kind === 'blocked' && access.code === 'prerelease_runtime_changed') return
   clearTimeout(leaseTimer)
   revision++
   publish({ kind: 'blocked', code })
+}
+export function endPrereleaseSession(): void {
+  if (!isPrereleaseClient() || access.kind === 'ended') return
+  clearTimeout(leaseTimer)
+  revision++
+  publish({ kind: 'ended', code: 'prerelease_auth_required' })
 }
 const origin = (value: unknown): value is string => {
   if (typeof value !== 'string') return false
@@ -59,6 +69,7 @@ export async function loadPrereleaseRuntime(): Promise<PrereleaseRuntime | undef
   return pending
 }
 export function acceptPrereleaseSession(value: unknown, expectedRevision = revision, requestStarted = performance.now()): PrereleaseSessionResponse {
+  if (access.kind === 'ended') throw new Error('prerelease_auth_required')
   if (!runtime || !object(value) || value.ok !== true || !object(value.user) || !object(value.prerelease)
     || value.prerelease.buildId !== runtime.buildId || value.prerelease.generationId !== runtime.generationId) {
     rejectPrereleaseAccess('prerelease_runtime_changed'); throw new Error('prerelease_runtime_changed')
