@@ -114,6 +114,17 @@ function runIsolated(): void {
     '/run/oa-ci-isolation/candidate-user-environment.sh', 'systemctl', '--user', action, 'docker.service'], { timeout: 60_000 })
   try {
     inheritedStatus = executeProbe('inherited')
+    const removeLifecycleFixture = `
+      const {execFileSync}=require('node:child_process');
+      const format='{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Config.Image}},"command":{{json .Config.Cmd}},"user":{{json .Config.User}},"network":{{json .HostConfig.NetworkMode}}}';
+      const fixture=JSON.parse(execFileSync('docker',['inspect','--format',format,'oa-isolation-lifecycle'],{encoding:'utf8',timeout:15000}));
+      if(!/^[a-f0-9]{64}$/.test(fixture.id)||fixture.name!=='/oa-isolation-lifecycle'
+        ||fixture.image!=='postgres:18-bookworm@sha256:3725f4e2499eef5134592b3b4ab79a543ed7f8e533b05b5b637af926630f6650'
+        ||JSON.stringify(fixture.command)!=='["sleep","3600"]'||fixture.user!=='65534:65534'||fixture.network!=='none')
+        throw new Error('Refusing to remove an unexpected lifecycle fixture');
+      execFileSync('docker',['rm','--force',fixture.id],{stdio:'inherit',timeout:30000});
+    `
+    if (executeCandidate(execution, execution.node, ['-e', removeLifecycleFixture], 'remove-initial-lifecycle-fixture') !== 0) throw new Error('Initial lifecycle fixture was not safely removed')
     dockerService('stop')
     normalized = candidateAcls(true)
     dockerService('start')
