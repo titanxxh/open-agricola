@@ -91,7 +91,7 @@ it.each(['run', 'attempt', 'producer', 'repository', 'artifact source', 'artifac
   value.save();expect(value.verify).toThrow()
 })
 
-it.each(['complete', 'bounded export', 'failed pull', 'remote daemon', 'custom config local', 'custom config remote', 'context override local', 'context override remote', 'context changes after pull'])('prepares a private owner image archive: %s', async outcome => {
+it.each(['complete', 'bounded export', 'failed pull', 'remote daemon', 'different DOCKER_HOST', 'matching DOCKER_HOST', 'custom config local', 'custom config remote', 'context override local', 'context override remote', 'context changes after pull'])('prepares a private owner image archive: %s', async outcome => {
   const cwd = resolve(import.meta.dirname, '../..'), sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim()
   const config = JSON.stringify({ os: 'linux', architecture: 'amd64', config: { Labels: { 'org.opencontainers.image.revision': sourceSha, 'io.open-agricola.release-channel': 'stable' } }, rootfs: { type: 'layers', diff_ids: [] } })
   const imageId = `sha256:${createHash('sha256').update(config).digest('hex')}`, value = buildArtifactFixture({ imageId })
@@ -106,9 +106,10 @@ it.each(['complete', 'bounded export', 'failed pull', 'remote daemon', 'custom c
   const custom = outcome.startsWith('custom config') || outcome.startsWith('context ')
   const remoteContext = outcome === 'custom config remote' || outcome === 'context override local'
   writeFileSync(join(contextDirectory, 'config.json'), JSON.stringify({ currentContext: remoteContext ? 'remote-custom' : 'local-custom' }), { mode: 0o600 })
-  vi.stubEnv('DOCKER_HOST', '');vi.stubEnv('DOCKER_CONFIG', custom ? contextDirectory : '')
+  vi.stubEnv('DOCKER_HOST', outcome === 'different DOCKER_HOST' ? 'unix:///run/user/1000/other.sock' : outcome === 'matching DOCKER_HOST' ? 'unix:///var/run/docker.sock' : '')
+  vi.stubEnv('DOCKER_CONFIG', custom ? contextDirectory : '')
   vi.stubEnv('DOCKER_CONTEXT', outcome === 'context override local' ? 'local-custom' : outcome === 'context override remote' ? 'remote-custom' : '')
-  const rejectedContext = outcome === 'custom config remote' || outcome === 'context override remote'
+  const rejectedContext = outcome === 'custom config remote' || outcome === 'context override remote' || outcome === 'different DOCKER_HOST'
   const metadata = { format: 1, gameBuildId: sourceSha, basePath: '/open-agricola/', releaseChannel: 'stable', deploymentTarget: 'stable-hosted' }
   writeFileSync(join(value.bin, 'docker'), `#!${process.execPath}
 const fs=require('node:fs');const a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(log)},JSON.stringify(a)+'\\n');
