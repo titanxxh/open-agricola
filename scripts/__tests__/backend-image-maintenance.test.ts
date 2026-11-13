@@ -7,8 +7,10 @@ import { createBackendImageFixture } from './_helpers/backend-image-fixture'
 const repository = resolve(import.meta.dirname, '../..'), roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
-function fixture(failure = '') {
+function fixture(failure = '', bootstrap = false) {
   const value = createBackendImageFixture(); roots.push(value.root)
+  const caddyDigest = `caddy@sha256:${'d'.repeat(64)}`
+  if (bootstrap) writeFileSync(value.requestPath, JSON.stringify({ ...value.request, installation: { kind: 'bootstrap', caddyImage: caddyDigest } }))
   const imported = value.invoke()
   if (imported.status !== 0) throw new Error(imported.stderr)
   const policy = join(value.stage, 'policy')
@@ -21,10 +23,10 @@ function fixture(failure = '') {
   writeFileSync(join(value.directory, 'data/dependencies.compose.env'), 'DATABASE_URL=private-fixture\n')
   writeFileSync(join(value.directory, 'data/postgres-cutover.validated'), '')
   const oldId = '1'.repeat(64), caddyId = '2'.repeat(64), newId = '3'.repeat(64), sourceBuild = '7'.repeat(40), sourceImage = `sha256:${'8'.repeat(64)}`, caddyImage = `sha256:${'9'.repeat(64)}`
-  const originalEnv = `# owner configuration\nACCOUNT_REGISTRATION_POLICY=invite_only\nPUBLIC_API_BASE=https://api.example.test\nPRIVATE_SENTINEL='keep exactly this value'\nBACKEND_IMAGE=${sourceImage}\n`
+  const originalEnv = `# owner configuration\nACCOUNT_REGISTRATION_POLICY=invite_only\nPUBLIC_API_BASE=https://api.example.test\nPRIVATE_SENTINEL='keep exactly this value'\n${bootstrap ? '' : `BACKEND_IMAGE=${sourceImage}\nCADDY_IMAGE=${caddyImage}\n`}`
   writeFileSync(join(value.directory, '.env'), originalEnv)
   const data = { DATABASE_URL: 'postgres://private-fixture/formal', S3_ENDPOINT: 'http://objects:9000', S3_BUCKET: 'formal', S3_PREFIX: '', S3_REGION: 'fixture', S3_FORCE_PATH_STYLE: 'true', S3_ACCESS_KEY_ID: 'private-fixture-key', S3_SECRET_ACCESS_KEY: 'private-fixture-secret' }
-  const state = { failure, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
+  const state = { failure, bootstrap: bootstrap || failure === 'missing-app', caddyStarted: !bootstrap, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
   const statePath = join(value.root, 'maintenance.json'), callsPath = join(value.root, 'maintenance-calls.jsonl')
   writeFileSync(statePath, JSON.stringify(state))
   const prefix = `#!${process.execPath}
@@ -38,20 +40,22 @@ else if(a[0]==='checkout'){s.head=s.failure==='checkout'?'f'.repeat(40):a[2];sav
 `, { mode: 0o700 })
   renameSync(join(value.bin, 'docker'), join(value.bin, 'docker-intake'))
   writeFileSync(join(value.bin, 'docker'), prefix + `
+if(a[0]==='image'&&a.at(-1).startsWith('caddy@sha256:')){log('docker');out([{Id:s.caddyImage,Os:'linux',Architecture:s.failure==='caddy-architecture'?'arm64':'amd64',RepoDigests:s.failure==='caddy-digest'?[]:[${JSON.stringify(caddyDigest)}]}]);process.exit(0)}
 if(['context','info','image','create','cp','rm'].includes(a[0])){const r=cp.spawnSync(${JSON.stringify(join(value.bin, 'docker-intake'))},a,{stdio:'inherit'});process.exit(r.status??1)}
 log('docker');const oldId=${JSON.stringify(oldId)},caddyId=${JSON.stringify(caddyId)},newId=${JSON.stringify(newId)},data=${JSON.stringify(data)};
 if(a[0]==='inspect'){
- const id=a[1],isNew=id===newId;out([{Id:id,Image:id===caddyId?s.caddyImage:isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
- State:{Running:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0},
+ const id=a[1],isNew=id===newId;out([{Id:id,Image:id===caddyId?(s.failure==='caddy-up-identity'&&s.caddyStarted?'sha256:'+'e'.repeat(64):s.caddyImage):isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
+ State:{Running:id===caddyId?s.caddyStarted:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0},
  Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':'formal','com.docker.compose.service':id===caddyId?'caddy':'app'}}}]);
-}else if(a[0]==='stop'){if(a.at(-1)===newId)s.started=false;else s.running=false;save();}
+}else if(a[0]==='stop'){if(a.at(-1)===newId)s.started=false;else if(a.at(-1)===caddyId)s.caddyStarted=false;else s.running=false;save();}
 else if(a[0]==='start'){s.running=true;save();}
 else if(a[0]==='ps'){}
+else if(a[0]==='volume'){if(s.failure==='retained-volume')console.log('formal_app-data');}
 else if(a[0]==='compose'){
  const file=a[a.indexOf('-f')+1];
  if(a.includes('config'))out({name:'formal',services:{app:{image:'mutable:old',build:{context:'.'},environment:{...data,...(s.failure==='data-target'?{S3_BUCKET:'another'}:{})},volumes:[],networks:['default']},caddy:{image:'caddy:mutable',depends_on:['app']}},networks:{default:{name:'formal_default'}}});
- else if(a.includes('ps'))console.log(a.at(-1)==='caddy'?caddyId:file.endsWith('maintenance.compose.json')?newId:oldId);
- else if(a.includes('up')){s.started=true;save();if(s.failure==='up')process.exit(42);}
+ else if(a.includes('ps'))console.log(file.endsWith('maintenance.compose.json')?(a.at(-1)==='caddy'?caddyId:newId):s.bootstrap?(s.failure==='existing-caddy'&&a.at(-1)==='caddy'?caddyId:''):a.at(-1)==='caddy'?caddyId:oldId);
+ else if(a.includes('up')){s.started=true;s.caddyStarted=true;save();if(s.failure==='up')process.exit(42);}
  else if(a.includes('run')){
   const config=JSON.parse(fs.readFileSync(file,'utf8'));fs.writeFileSync(${JSON.stringify(join(value.root, 'observed-compose.json'))},JSON.stringify(config));
   if(a.includes('export')){
@@ -60,6 +64,7 @@ else if(a[0]==='compose'){
    fs.writeFileSync(path.join(directory,'database.dump'),'real fixture database bytes');fs.writeFileSync(path.join(directory,'archive.json'),JSON.stringify({version:1,sourceBuildId:s.sourceBuild,createdAt:new Date().toISOString(),schema:'public',objects:[]}));
   }else if(a.includes('ledger-export'))fs.writeFileSync(path.join(${JSON.stringify(value.directory)},'backups/replay-removals.latest.json'),'{"version":1,"batches":[]}');
   else if(a.includes('validate'))out({formatVersion:2,validatedAt:new Date().toISOString(),sourceBuildId:s.sourceBuild,targetBuildId:s.failure==='report-target'?s.sourceBuild:${JSON.stringify(value.request.sourceSha)}});
+  else if(a.includes('check-empty')){if(['nonempty','unsupported-empty'].includes(s.failure))process.exit(45);out({formatVersion:1,targetBuildId:${JSON.stringify(value.request.sourceSha)},database:'empty',objects:'empty'});}
   else if(a.includes('check-live')){if(s.failure==='live')process.exit(44);}
   else if(!a.includes('cleanup-scratch'))throw Error('Unexpected compose run: '+a.join(' '));
  }else throw Error('Unexpected compose: '+a.join(' '));
@@ -69,7 +74,7 @@ else if(a[0]==='compose'){
     [join(policy, 'scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, expectedSha, value.request.producerSha],
     { env: { ...process.env, CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }, encoding: 'utf8', timeout: 30_000 })
   const calls = (): { kind: string; args: string[] }[] => existsSync(callsPath) ? readFileSync(callsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
-  return { ...value, sourceBuild, sourceImage, oldId, originalEnv, invoke, calls,
+  return { ...value, sourceBuild, sourceImage, caddyImage, caddyDigest, oldId, originalEnv, invoke, calls,
     current: () => JSON.parse(readFileSync(statePath, 'utf8')),
     compose: () => JSON.parse(readFileSync(join(value.root, 'observed-compose.json'), 'utf8')) }
 }
@@ -208,4 +213,68 @@ it('rejects an installed selector that conflicts with the retained native applic
   const result = value.invoke()
   expect(result.status).not.toBe(0)
   expect(value.calls().some(call => call.args[0] === 'stop' || call.args[0] === 'checkout')).toBe(false)
+})
+
+it('bootstraps explicitly proven empty storage with a preloaded immutable Caddy and no invented source backup', () => {
+  const value = fixture('', true), result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  const commands = value.calls().map(call => call.args.join(' '))
+  expect(commands.some(command => command.includes(' export ') || command.includes(' validate ') || command.startsWith('stop'))).toBe(false)
+  expect(commands.findIndex(command => command.includes('check-empty'))).toBeLessThan(commands.findIndex(command => command.includes('check-live')))
+  expect(commands.findIndex(command => command.includes('check-live'))).toBeLessThan(commands.findIndex(command => command.includes(' up ')))
+  const config = value.compose()
+  expect(config.services.capture).toBeUndefined()
+  expect(config.services.caddy.image).toBe(value.caddyImage)
+  const native = nativeCompose(value.directory)
+  expect(native.status, native.stderr).toBe(0)
+  expect(JSON.parse(native.stdout).services.app.image).toBe(value.imageId)
+  expect(JSON.parse(native.stdout).services.caddy.image).toBe(value.caddyImage)
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv + `BACKEND_IMAGE=${value.imageId}\nCADDY_IMAGE=${value.caddyImage}\n`)
+})
+
+it.each(['nonempty', 'unsupported-empty', 'caddy-digest', 'caddy-architecture', 'existing-caddy', 'retained-volume'])('rejects bootstrap %s before initializing or starting a stack', failure => {
+  const value = fixture(failure, true), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('check-live') || call.args.includes('up'))).toBe(false)
+  expect(existsSync(join(value.directory, 'data/deployed-image.json'))).toBe(false)
+})
+
+it.each(['deployed', 'ledger', 'backup', 'legacy', 'sqlite', 'local-ledger'])('rejects local %s history even without application containers', history => {
+  const value = fixture('', true)
+  const file = { deployed: 'data/deployed-build-id', ledger: 'backups/replay-removals.latest.json', backup: 'backups/pre-old.tgz', legacy: 'legacy-data/database.sqlite', sqlite: 'data/open-agricola.db', 'local-ledger': 'data/replay-removals.jsonl' }[history]
+  if (!file) throw new Error('Missing fixture path')
+  mkdirSync(resolve(value.directory, file, '..'), { recursive: true })
+  writeFileSync(join(value.directory, file), 'retained')
+  const result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('check-empty') || call.args.includes('check-live') || call.args.includes('up'))).toBe(false)
+})
+
+it.each(['up-identity', 'caddy-up-identity', 'up'])('keeps an unaccepted bootstrap closed and drains both newly started services after %s', failure => {
+  const value = fixture(failure, true)
+  expect(value.invoke().status).not.toBe(0)
+  expect(value.current().started).toBe(false)
+  expect(value.current().caddyStarted).toBe(false)
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv + 'BACKEND_IMAGE=\nCADDY_IMAGE=\n')
+  expect(nativeCompose(value.directory).status).not.toBe(0)
+})
+
+it('does not infer bootstrap permission from a missing retained application', () => {
+  const value = fixture('missing-app'), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('check-empty') || call.args.includes('check-live') || call.args.includes('up'))).toBe(false)
+})
+
+it('refuses prior Caddy selector evidence in explicit bootstrap mode', () => {
+  const value = fixture('', true)
+  writeFileSync(join(value.directory, '.env'), value.originalEnv + `CADDY_IMAGE=${value.caddyImage}\n`)
+  expect(value.invoke().status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('check-empty'))).toBe(false)
+})
+
+it('rejects ambiguous Caddy selectors before source mutation', () => {
+  const value = fixture()
+  writeFileSync(join(value.directory, '.env'), value.originalEnv + `CADDY_IMAGE=${value.caddyImage}\n`)
+  expect(value.invoke().status).not.toBe(0)
+  expect(value.calls().some(call => call.kind === 'git')).toBe(false)
 })

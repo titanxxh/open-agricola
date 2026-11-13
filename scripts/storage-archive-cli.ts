@@ -8,7 +8,7 @@ import { ResourceStore } from '../server/storage/resource-store'
 import { migratePostgres } from '../server/database/migrations'
 import { applyReplayRemovalLedger } from '../server/game/replay-removal'
 import { validateStorage } from './storage-validation'
-import { decodeLedger, exportStorageArchive, mergeLedger, restoreStorageArchive, type StorageArchive } from './storage-archive'
+import { assertEmptyStorage, decodeLedger, exportStorageArchive, mergeLedger, restoreStorageArchive, type StorageArchive } from './storage-archive'
 import { cleanupBackupScratch, withBackupScratch } from './backup-scratch'
 
 /** Target-build validation never connects an application to historical data. */
@@ -30,8 +30,8 @@ export async function validateArchiveInIsolation(root: string, env: NodeJS.Proce
 
 export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const [command, path, flag] = args
-  if (!path || !['export-online', 'export', 'validate', 'restore', 'check-live', 'ledger-export', 'ledger-merge', 'cleanup-scratch'].includes(command)) {
-    throw new Error('Usage: storage-archive-cli.ts export-online|validate <directory> | cleanup-scratch <record-directory> | export|restore <directory> --applications-stopped | check-live <build-id> --applications-stopped | ledger-export|ledger-merge <ledger.json>')
+  if (!path || !['export-online', 'export', 'validate', 'restore', 'check-empty', 'check-live', 'ledger-export', 'ledger-merge', 'cleanup-scratch'].includes(command)) {
+    throw new Error('Usage: storage-archive-cli.ts export-online|validate <directory> | cleanup-scratch <record-directory> | export|restore <directory> --applications-stopped | check-empty|check-live <build-id> --applications-stopped | ledger-export|ledger-merge <ledger.json>')
   }
   const controller = new AbortController()
   const deadline = env.BACKUP_DEADLINE_EPOCH_MS === undefined ? undefined : Number(env.BACKUP_DEADLINE_EPOCH_MS)
@@ -68,6 +68,11 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       await exportStorageArchive({ connectionString: env.DATABASE_URL, db, objects, root: resolve(path),
         sourceBuildId: env.SOURCE_BUILD_ID || env.GAME_BUILD_ID || '', mode: 'online', deadlineEpochMs: deadline, signal: controller.signal })
       return
+    }
+    if (command === 'check-empty') {
+      if (!/^[a-f0-9]{40}$/.test(path) || path !== env.GAME_BUILD_ID) throw new Error('Empty-storage proof requires the fixed executing target build')
+      await assertEmptyStorage(db, objects)
+      console.log(JSON.stringify({ formatVersion: 1, targetBuildId: path, database: 'empty', objects: 'empty' })); return
     }
     if (command === 'check-live') {
       const existing = await db.prepare("SELECT to_regclass('app_instances') AS instances").get<{ instances: string | null }>()

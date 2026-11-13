@@ -410,6 +410,16 @@ describe('direct backend deployment entry', () => {
     expect(value.events().filter(event => event.kind === 'scp')).toEqual([])
   }, 30_000)
 
+  it('carries explicit immutable empty-installation input through the same owner transport and intake request', () => {
+    const value = fixture(), image = imageInputs(value), caddyImage = `caddy@sha256:${'d'.repeat(64)}`
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags, '--bootstrap-caddy-image', caddyImage)
+    expect(result.status, result.stderr).toBe(0)
+    const copies = value.events().filter(event => event.kind === 'scp'), request = copies.at(-1)?.args?.at(-1)
+    if (!request) throw new Error('Missing transmitted request')
+    expect(JSON.parse(readFileSync(request.slice(request.indexOf(':') + 1), 'utf8')).installation).toEqual({ kind: 'bootstrap', caddyImage })
+    expect(value.events().filter(event => event.kind === 'ssh')).toHaveLength(3)
+  }, 30_000)
+
   it('transports a fixed formal image and renews native authority before maintenance without forwarding credentials', () => {
     const value = fixture(), image = imageInputs(value)
     const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
