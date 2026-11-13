@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { delimiter, join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { stableConfiguration } from '../ci/candidate-verification'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
@@ -181,6 +181,7 @@ const path = require('node:path');
 fs.appendFileSync(path.join(process.env.RELEASE_TEST_ROOT, 'events.jsonl'), JSON.stringify({ kind: 'ssh', args: process.argv.slice(2) }) + '\\n');
 `)
   chmodSync(join(bin, 'ssh'), 0o755)
+  writeFileSync(join(bin, 'sudo'), `#!${process.execPath}\nrequire('node:fs').appendFileSync(${JSON.stringify(join(root, 'events.jsonl'))},JSON.stringify({kind:'sudo',args:process.argv.slice(2)})+'\\n');process.exit(99)\n`, { mode: 0o700 })
   const events = (): { kind: string; args?: string[]; endpoint?: string; body?: unknown; evidence?: string }[] => existsSync(join(root, 'events.jsonl'))
     ? readFileSync(join(root, 'events.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
   const publishVersion = (version: string, ...args: string[]) => spawnSync('pnpm', ['--silent', 'release', version, '--poll-seconds', '0.01', '--timeout-seconds', '0.1', ...args], {
@@ -191,7 +192,7 @@ fs.appendFileSync(path.join(process.env.RELEASE_TEST_ROOT, 'events.jsonl'), JSON
   return { root, bin, sha, state, save, env, invoke, publish, publishVersion, deploy, events }
 }
 
-function imageInputs(value: ReturnType<typeof fixture>, failure = '') {
+function imageInputs(value: ReturnType<typeof fixture>, failure = '', remoteDirectory?: string) {
   const prefix = 'repos/titanxxh/open-agricola/', payload = join(value.root, 'payload')
   mkdirSync(join(payload, 'blobs/sha256'), { recursive: true })
   execFileSync('git', ['checkout', '--detach', value.sha], { cwd: value.root, stdio: 'ignore' })
@@ -225,18 +226,23 @@ function imageInputs(value: ReturnType<typeof fixture>, failure = '') {
   writeFileSync(budget, JSON.stringify({ format: 1, import: { maxArchiveMiB: 1, memoryHeadroomMiB: 512, intake: { memoryMiB: 384, cpus: 1, pids: 64 } }, diskMiB: 256, reserveMemoryMiB: failure === 'budget' ? 0 : 512 }), { mode: 0o600 })
   const metadata = { format: 1, gameBuildId: value.sha, basePath: '/open-agricola/', releaseChannel: 'stable', deploymentTarget: 'stable-hosted' }
   writeFileSync(join(value.bin, 'docker'), `#!${process.execPath}
-const fs=require('node:fs'),a=process.argv.slice(2),cmd=a[0]==='--config'?a.slice(4):a;fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'owner-docker',args:cmd})+'\\n');
-if(cmd[0]==='context')console.log(JSON.stringify([{Endpoints:{docker:{Host:'unix:///var/run/docker.sock'}}}]));
+const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2),cmd=a[0]==='--config'?a.slice(4):a;fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'owner-docker',args:cmd})+'\\n');
+if(cmd[0]==='context'){if(process.env.OBSERVE_MAINTENANCE_LOCK){const locked=cp.spawnSync('flock',['-n',process.env.OBSERVE_MAINTENANCE_LOCK,'true']);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'maintenance-lock',body:{path:process.env.OBSERVE_MAINTENANCE_LOCK,status:locked.status}})+'\\n')}console.log(JSON.stringify([{Endpoints:{docker:{Host:'unix:///var/run/docker.sock'}}}]))}
 else if(cmd[0]==='info')console.log('[]');else if(cmd[0]==='login'){if(fs.readFileSync(0,'utf8').trim()!=='private-fixture-token')process.exit(2);}
 else if(cmd[0]==='pull'){if(${JSON.stringify(failure)}==='pull')process.exit(42);}
 else if(cmd[0]==='image'&&cmd[1]==='save')process.stdout.write(fs.readFileSync(${JSON.stringify(archive)}));
 else if(cmd[0]==='image')console.log(JSON.stringify([{Id:${JSON.stringify(imageId)},Os:'linux',Architecture:'amd64',Config:JSON.parse(${JSON.stringify(config)}).config,RepoDigests:[${JSON.stringify(receipt.registryRepository + '@' + digest)}]}]));
 else if(cmd[0]==='create')console.log('f'.repeat(64));else if(cmd[0]==='cp')fs.writeFileSync(cmd.at(-1),${JSON.stringify(JSON.stringify(metadata))});else if(cmd[0]!=='rm')process.exit(3);
 `, { mode: 0o700 })
+  const remote = join(value.root, 'remote'), targetDirectory = remoteDirectory ?? remote
+  mkdirSync(join(remote, 'data'), { recursive: true }); writeFileSync(join(remote, 'data/postgres-cutover.validated'), '')
   writeFileSync(join(value.bin, 'scp'), `#!${process.execPath}
-const fs=require('node:fs'),path=require('node:path'),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'scp',args:a})+'\\n');const source=a[1],target=a[2].slice(a[2].indexOf(':')+1);fs.copyFileSync(source,target);fs.chmodSync(target,0o600);
+const fs=require('node:fs'),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'scp',args:a})+'\\n');const source=a[1],requested=a[2].slice(a[2].indexOf(':')+1);if(!requested.startsWith(${JSON.stringify(targetDirectory + '/backups/.backend-image-')}))throw Error('Unexpected transfer namespace');const target=${JSON.stringify(remote)}+requested.slice(${JSON.stringify(targetDirectory)}.length);fs.copyFileSync(source,target);fs.chmodSync(target,0o600);
 `, { mode: 0o700 })
-  const remote = join(value.root, 'remote');mkdirSync(join(remote, 'data'), { recursive: true });writeFileSync(join(remote, 'data/postgres-cutover.validated'), '')
+  const remoteBin = join(value.root, 'remote-bin'); mkdirSync(remoteBin)
+  writeFileSync(join(remoteBin, 'node'), `#!${process.execPath}
+const fs=require('node:fs');fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'maintenance-entry',args:process.argv.slice(2),body:{policy:process.env.ACCOUNT_REGISTRATION_POLICY??null,stdinBytes:fs.readFileSync(0).length}})+'\\n');console.log('Current build: '+${JSON.stringify(value.sha)});
+`, { mode: 0o700 })
   const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
   writeFileSync(join(value.bin, 'git'), `#!${process.execPath}
 const cp=require('node:child_process'),a=process.argv.slice(2);if(process.cwd()===${JSON.stringify(remote)}){
@@ -245,11 +251,19 @@ if(a[0]==='archive')a.unshift('-C',${JSON.stringify(value.root)});}
 const result=cp.spawnSync(${JSON.stringify(realGit)},a,{stdio:'inherit'});process.exit(result.status??1);
 `, { mode: 0o700 })
   writeFileSync(join(value.bin, 'ssh'), `#!${process.execPath}
-const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'ssh',args:a})+'\\n');
-if(a[1].includes("'bash' '-s'")){const r=cp.spawnSync('bash',['-c',a[1]],{input:fs.readFileSync(0),encoding:'utf8'});process.stdout.write(r.stdout);process.stderr.write(r.stderr);process.exit(r.status??1)}
-if(a[1].includes('backend-image-receiver.ts'))console.log(${JSON.stringify(imageId)});else console.log('Current build: '+${JSON.stringify(value.sha)});
+const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2),input=fs.readFileSync(0);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'ssh',args:a,body:{stdinBytes:input.length}})+'\\n');
+const command=a[1].replaceAll(${JSON.stringify(targetDirectory)},${JSON.stringify(remote)});
+if(a[1].includes("'bash' '-s'")){const r=cp.spawnSync('bash',['-c',command],{input,encoding:'utf8'});process.stdout.write(r.stdout.replaceAll(${JSON.stringify(remote)},${JSON.stringify(targetDirectory)}));process.stderr.write(r.stderr);process.exit(r.status??1)}
+if(a[1].includes('backend-image-receiver.ts'))console.log(${JSON.stringify(imageId)});
+else {const r=cp.spawnSync('bash',['-c',command],{input,env:{...process.env,PATH:${JSON.stringify(remoteBin)}+':'+process.env.PATH},encoding:'utf8'});process.stdout.write(r.stdout);process.stderr.write(r.stderr);process.exit(r.status??1)}
 `, { mode: 0o700 })
-  return { remote, flags: ['--build-run', '80', '--build-attempt', '1', '--artifact-id', '90', '--auth-file', auth, '--import-budget', budget] }
+  const request = (): unknown => {
+    const destination = value.events().filter(event => event.kind === 'scp').at(-1)?.args?.at(-1)
+    if (!destination) throw new Error('Missing transferred image request')
+    const requested = destination.slice(destination.indexOf(':') + 1)
+    return JSON.parse(readFileSync(remote + requested.slice(targetDirectory.length), 'utf8'))
+  }
+  return { remote, targetDirectory, request, flags: ['--build-run', '80', '--build-attempt', '1', '--artifact-id', '90', '--auth-file', auth, '--import-budget', budget] }
 }
 
 describe('owner-machine release entry', () => {
@@ -387,6 +401,70 @@ describe('owner-machine release entry', () => {
 })
 
 describe('direct backend deployment entry', () => {
+  it.each(['default', 'explicit'])('preserves %s SSH, supported directory, ref and registration policy through fixed-image delivery', mode => {
+    const value = fixture(), defaultTarget = mode === 'default'
+    const directory = defaultTarget ? '/home/ubuntu/open-agricola' : '/srv/game'
+    const host = defaultTarget ? 'ubuntu@ten-kr' : 'operator@example.com'
+    const policy = defaultTarget ? 'invite_only' : 'open'
+    const image = imageInputs(value, '', directory)
+    value.env.ACCOUNT_REGISTRATION_POLICY = policy
+    if (!defaultTarget) {
+      value.state.provenance['repos/titanxxh/open-agricola/commits/v0.7.9'] = { sha: value.sha }
+      value.save()
+    }
+    const result = defaultTarget ? value.deploy(...image.flags) : value.deploy(host, 'v0.7.9', directory, ...image.flags)
+    expect(result.status, result.stderr).toBe(0)
+    const events = value.events()
+    expect(events.filter(event => event.kind === 'ssh').map(event => event.args?.[0])).toEqual([host, host, host])
+    expect(events.filter(event => event.kind === 'maintenance-entry').map(event => event.body)).toEqual([{ policy, stdinBytes: 0 }])
+    expect(events.filter(event => event.kind === 'sudo')).toEqual([])
+    expect(image.request()).toMatchObject({ directory, sourceSha: value.sha, producerSha: value.sha })
+    expect(events.some(event => event.endpoint === (defaultTarget ? 'git/ref/heads/main' : 'commits/v0.7.9'))).toBe(true)
+  }, 30_000)
+
+  it('keeps registration policy metacharacters literal through the executed remote argument boundary', () => {
+    const value = fixture(), image = imageInputs(value), policy = "invite_only; exit 73; $(printf literal); 'quoted'"
+    value.env.ACCOUNT_REGISTRATION_POLICY = policy
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(result.status, result.stderr).toBe(0)
+    expect(value.events().filter(event => event.kind === 'maintenance-entry').map(event => event.body)).toEqual([{ policy, stdinBytes: 0 }])
+    expect(value.events().filter(event => event.kind === 'sudo')).toEqual([])
+  }, 30_000)
+
+  it('resolves a metacharacter ref literally through GitHub and transports only its verified SHA', () => {
+    const value = fixture(), image = imageInputs(value), ref = 'topic/$(exit72)'
+    value.state.provenance[`repos/titanxxh/open-agricola/commits/${encodeURIComponent(ref)}`] = { sha: value.sha }
+    value.save()
+    const result = value.deploy('fixture-host', ref, image.remote, ...image.flags)
+    expect(result.status, result.stderr).toBe(0)
+    expect(value.events().some(event => event.endpoint === `commits/${encodeURIComponent(ref)}`)).toBe(true)
+    expect(image.request()).toMatchObject({ sourceSha: value.sha, producerSha: value.sha })
+    expect(value.events().filter(event => event.kind === 'ssh').some(event => event.args?.[1]?.includes(ref))).toBe(false)
+  }, 30_000)
+
+  it.each(['srv/game', '/srv/../game', '/srv/game/.'])('rejects the explicitly noncanonical directory %s before remote operations', directory => {
+    const value = fixture(), image = imageInputs(value)
+    const result = value.deploy('fixture-host', value.sha, directory, ...image.flags)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Expected a canonical backend directory')
+    expect(value.events().filter(event => ['ssh', 'scp', 'sudo'].includes(event.kind))).toEqual([])
+  }, 30_000)
+
+  it('enters native maintenance preflight while holding the same backup maintenance lock', () => {
+    const value = fixture(), image = imageInputs(value)
+    const transported = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(transported.status, transported.stderr).toBe(0)
+    const destination = value.events().filter(event => event.kind === 'scp').at(-1)?.args?.at(-1)
+    if (!destination) throw new Error('Missing transferred request')
+    const request = destination.slice(destination.indexOf(':') + 1), lock = join(image.remote, 'backups/.maintenance.lock')
+    const result = spawnSync(process.execPath, [join(dirname(request), 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', request, image.remote, value.sha, value.sha],
+      { cwd: image.remote, env: { ...value.env, OBSERVE_MAINTENANCE_LOCK: lock }, encoding: 'utf8', timeout: 10_000 })
+    // This fixture stops at the missing native intake report, after entering the lock.
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('image.json')
+    expect(value.events().filter(event => event.kind === 'maintenance-lock').map(event => event.body)).toEqual([{ path: lock, status: 1 }])
+  }, 30_000)
+
   it('requires verified fixed image input even after formal candidate verification passes', () => {
     const value = fixture()
     const result = value.deploy('fixture-host', value.sha)
@@ -427,6 +505,7 @@ describe('direct backend deployment entry', () => {
     expect(result.status, result.stderr).toBe(0)
     const events = value.events(), ssh = events.filter(event => event.kind === 'ssh'), copies = events.filter(event => event.kind === 'scp')
     expect(ssh).toHaveLength(3)
+    expect(ssh.slice(1).map(event => event.body)).toEqual([{ stdinBytes: 0 }, { stdinBytes: 0 }])
     expect(ssh[1]?.args?.[1]).toContain('backend-image-receiver.ts')
     expect(ssh[2]?.args?.[1]).toContain('backend-image-maintenance.ts')
     expect(copies).toHaveLength(3)
