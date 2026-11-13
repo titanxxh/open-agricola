@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
+import { dockerFixtureEnvironment } from './_helpers/docker-fixture-environment'
 import { createBackendImageFixture } from './_helpers/backend-image-fixture'
 
 const repository = resolve(import.meta.dirname, '../..'), roots: string[] = []
@@ -47,7 +48,7 @@ if(a[0]==='inspect'){
  const id=a[1],isNew=id===newId;out([{Id:id,Image:id===caddyId?(s.failure==='caddy-up-identity'&&s.caddyStarted?'sha256:'+'e'.repeat(64):s.caddyImage):isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
  State:{Running:id===caddyId?s.caddyStarted:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0},
  Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':'formal','com.docker.compose.service':id===caddyId?'caddy':'app'}}}]);
-}else if(a[0]==='stop'){if(a.at(-1)===newId)s.started=false;else if(a.at(-1)===caddyId)s.caddyStarted=false;else s.running=false;save();}
+}else if(a[0]==='stop'){if(s.failure==='up-app-stop'&&a.at(-1)===newId)process.exit(47);if(a.at(-1)===newId)s.started=false;else if(a.at(-1)===caddyId)s.caddyStarted=false;else s.running=false;save();}
 else if(a[0]==='start'){s.running=true;save();}
 else if(a[0]==='ps'){}
 else if(a[0]==='volume'){if(s.failure==='retained-volume')console.log('formal_app-data');}
@@ -55,7 +56,7 @@ else if(a[0]==='compose'){
  const file=a[a.indexOf('-f')+1];
  if(a.includes('config'))out({name:'formal',services:{app:{image:'mutable:old',build:{context:'.'},environment:{...data,...(s.failure==='data-target'?{S3_BUCKET:'another'}:{})},volumes:[],networks:['default']},caddy:{image:'caddy:mutable',depends_on:['app']}},networks:{default:{name:'formal_default'}}});
  else if(a.includes('ps'))console.log(file.endsWith('maintenance.compose.json')?(a.at(-1)==='caddy'?caddyId:newId):s.bootstrap?(s.failure==='existing-caddy'&&a.at(-1)==='caddy'?caddyId:''):a.at(-1)==='caddy'?caddyId:oldId);
- else if(a.includes('up')){s.started=true;s.caddyStarted=true;save();if(s.failure==='up')process.exit(42);}
+ else if(a.includes('up')){s.started=true;s.caddyStarted=true;save();if(['up','up-app-stop'].includes(s.failure))process.exit(42);}
  else if(a.includes('run')){
   const config=JSON.parse(fs.readFileSync(file,'utf8'));fs.writeFileSync(${JSON.stringify(join(value.root, 'observed-compose.json'))},JSON.stringify(config));
   if(a.includes('export')){
@@ -72,7 +73,7 @@ else if(a[0]==='compose'){
 `, { mode: 0o700 })
   const invoke = (expectedSha = value.request.sourceSha, extraEnv: NodeJS.ProcessEnv = {}) => spawnSync(process.execPath,
     [join(policy, 'scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, expectedSha, value.request.producerSha],
-    { env: { ...process.env, CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }, encoding: 'utf8', timeout: 30_000 })
+    { env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }), encoding: 'utf8', timeout: 30_000 })
   const calls = (): { kind: string; args: string[] }[] => existsSync(callsPath) ? readFileSync(callsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
   return { ...value, sourceBuild, sourceImage, caddyImage, caddyDigest, oldId, originalEnv, invoke, calls,
     current: () => JSON.parse(readFileSync(statePath, 'utf8')),
@@ -149,7 +150,7 @@ it.each(['drain', 'live', 'up', 'up-identity', 'backup-stopped', 'source-changed
 })
 
 function nativeCompose(directory: string, explicitEnvFile = false) {
-  const { BACKEND_IMAGE: _image, COMPOSE_ENV_FILES: _files, COMPOSE_DISABLE_ENV_FILE: _disabled, ...env } = process.env
+  const { BACKEND_IMAGE: _image, COMPOSE_ENV_FILES: _files, COMPOSE_DISABLE_ENV_FILE: _disabled, CADDY_IMAGE: _caddy, ...env } = dockerFixtureEnvironment()
   return spawnSync('docker', ['compose', ...(explicitEnvFile ? ['--env-file', '.env'] : []), '-f', 'docker-compose.prod.yml', 'config', '--format', 'json'],
     { cwd: directory, env, encoding: 'utf8', timeout: 30_000 })
 }
@@ -277,4 +278,14 @@ it('rejects ambiguous Caddy selectors before source mutation', () => {
   writeFileSync(join(value.directory, '.env'), value.originalEnv + `CADDY_IMAGE=${value.caddyImage}\n`)
   expect(value.invoke().status).not.toBe(0)
   expect(value.calls().some(call => call.kind === 'git')).toBe(false)
+})
+
+it('still attempts Caddy stop when an unaccepted bootstrap application cannot be drained', () => {
+  const value = fixture('up-app-stop', true), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('application drain could not be confirmed')
+  expect(value.current().started).toBe(true)
+  expect(value.current().caddyStarted).toBe(false)
+  expect(value.calls().filter(call => call.args[0] === 'stop').map(call => call.args.at(-1))).toEqual(['3'.repeat(64), '2'.repeat(64)])
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv + 'BACKEND_IMAGE=\nCADDY_IMAGE=\n')
 })
