@@ -1,4 +1,7 @@
-import { createServer, type Server } from 'node:http'
+import { createServer, request, type IncomingMessage, type IncomingHttpHeaders, type Server } from 'node:http'
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
@@ -7,6 +10,8 @@ import type { PrereleaseIdentityState, PrereleaseIdentityEvent } from '../../sha
 import { getDb } from '../db'
 import { getPrereleaseSessions } from '../prerelease-sessions'
 import { handlePrereleaseRoute } from '../prerelease-routes'
+import { createPrereleaseGateway } from '../../scripts/prerelease/gateway'
+import { formalBrowserPolicyFixture } from '../../scripts/__tests__/prerelease-browser-policy-fixture'
 
 vi.mock('../db', async () => {
   const { createTestDatabase } = await import('./_helpers/postgres')
@@ -99,6 +104,96 @@ function boundHeaders(cookie: string) {
 function exchange(input: Awaited<ReturnType<typeof begin>>, cookie = input.cookie) {
   return browserFetch(`${origin}/api/prerelease/session`, { method: 'POST', headers: boundHeaders(cookie), body: JSON.stringify(input.body) })
 }
+
+it('preserves session bindings through the actual gateway without forwarding formal credentials', async () => {
+  const formal = await formalBrowserPolicyFixture(), root = await mkdtemp(join(tmpdir(), 'pre-handoff-gateway-'))
+  let gateway: ReturnType<typeof createPrereleaseGateway> | undefined
+  const seen: IncomingHttpHeaders[] = []
+  const observe = (req: IncomingMessage) => { seen.push(req.headers) }
+  server!.on('request', observe)
+  try {
+    const healthyCycle = randomUUID(), observedAt = Date.now(), targetId = 'prerelease-main'
+    const stateFile = join(root, 'gate.json')
+    await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId, fingerprint: 'f'.repeat(64), status: 'healthy',
+      healthyCycle, observedAt, validUntil: observedAt + 120_000, operationsAllowed: true }))
+    await writeFile(stateFile, JSON.stringify({ format: 1, targetId, channel: 'prerelease', mode: 'open', buildId,
+      generation: generationId, acceptance: { healthyCycle, formalBuildId: formal.state.buildId } }))
+    gateway = createPrereleaseGateway({ stateFile, targetId, origin: appOrigin, upstream: origin, formal: formal.formal, ca: formal.ca })
+    await new Promise<void>(resolve => gateway!.server.listen(0, '127.0.0.1', resolve))
+    await gateway.refreshBrowserPolicy()
+    const address = gateway.server.address()
+    if (!address || typeof address === 'string') throw new Error('Gateway HTTP fixture did not start')
+    const base = `http://127.0.0.1:${address.port}`, Host = new URL(appOrigin).host
+    const forward = (path: string, headers: Record<string, string> = {}, body?: string) => new Promise<Response>((resolve, reject) => {
+      const outgoing = request(base + path, { method: body === undefined ? 'GET' : 'POST', headers: { Host, ...headers } }, response => {
+        const chunks: Buffer[] = []
+        response.on('data', chunk => { chunks.push(Buffer.from(chunk)) })
+        response.on('error', reject)
+        response.on('end', () => {
+          const received = new Headers()
+          for (let index = 0; index < response.rawHeaders.length; index += 2) received.append(response.rawHeaders[index]!, response.rawHeaders[index + 1]!)
+          resolve(new Response(Buffer.concat(chunks), { status: response.statusCode, headers: received }))
+        })
+      })
+      outgoing.on('error', reject); outgoing.end(body)
+    })
+    const start = await forward('/open-agricola/auth/start?returnPath=' + encodeURIComponent('/open-agricola/?room=retained'))
+    expect(start.status).toBe(302)
+    const handoffCookie = start.headers.getSetCookie()[0]?.split(';')[0], location = start.headers.get('location')
+    if (!handoffCookie || !location) throw new Error('Gateway did not deliver the browser handoff')
+    const params = new URLSearchParams(new URL(location).hash.slice(1))
+    const body = { protocolVersion: 1, code: 'c'.repeat(43), state: params.get('state'), browserChallenge: params.get('browserChallenge'), returnTo: 'https://formal.example.test/' }
+    const response = await forward('/api/prerelease/session', boundHeaders(handoffCookie), JSON.stringify(body))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ ok: true, user: { id: 'handoff-user' } })
+    const cookie = response.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+    if (!cookie) throw new Error('Gateway did not deliver the restricted session cookie')
+    const current = await forward('/api/auth/me', { ...boundHeaders(`${cookie}; __Host-oa-session=formal-source`),
+      Authorization: 'Bearer formal-service-key-must-not-cross', 'X-OA-Principal': 'forged' })
+    expect(current.status).toBe(200)
+    expect(await current.json()).toMatchObject({ ok: true, user: { id: 'handoff-user' } })
+    expect(seen.at(-1)).toMatchObject({ cookie, [PRERELEASE_BUILD_HEADER]: buildId, [PRERELEASE_GENERATION_HEADER]: generationId })
+    expect(seen.at(-1)?.authorization).toBeUndefined()
+    expect(seen.at(-1)?.['x-oa-principal']).toBeUndefined()
+    for (const stale of [{ [PRERELEASE_BUILD_HEADER]: 'b'.repeat(40) }, { [PRERELEASE_GENERATION_HEADER]: randomUUID() }]) {
+      const rejected = await forward('/api/auth/me', { ...boundHeaders(cookie), ...stale })
+      expect(rejected.status).toBe(426)
+    }
+    const anonymous = await forward('/api/auth/me', boundHeaders('__Host-oa-session=formal-source'))
+    expect(anonymous.status).toBe(401)
+  } finally {
+    server!.off('request', observe)
+    await gateway?.close(); await formal.close(); await rm(root, { recursive: true, force: true })
+  }
+})
+
+it.each(['revoked', 'unknown'])('classifies a %s second current-session resolution without publishing identity', async failure => {
+  const pending = await begin(), accepted = await exchange(pending)
+  const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+  if (!cookie) throw new Error('Missing issued session cookie')
+  const service = getPrereleaseSessions()
+  if (!service) throw new Error('Missing prerelease consumer')
+  const original = service.resolve.bind(service)
+  let calls = 0
+  const spy = vi.spyOn(service, 'resolve').mockImplementation(async token => {
+    if (++calls === 2) {
+      if (failure === 'revoked') await service.revoke(token)
+      else {
+        const stale = identity(); stale.validUntil = 0
+        await getDb().prepare('UPDATE prerelease_sessions SET identity_state=?').run(JSON.stringify(stale))
+        statusReply = () => { throw new Error('Authority temporarily unavailable') }
+      }
+    }
+    return original(token)
+  })
+  try {
+    const response = await browserFetch(`${origin}/api/auth/me`, { headers: boundHeaders(cookie) })
+    expect({ status: response.status, body: await response.json(), cookies: response.headers.getSetCookie() }).toEqual({
+      status: failure === 'revoked' ? 403 : 503,
+      body: { ok: false, code: failure === 'revoked' ? 'prerelease_access_expired' : 'prerelease_access_paused' }, cookies: [],
+    })
+  } finally { spy.mockRestore() }
+})
 
 it('pauses an unavailable exchange without consuming its browser binding, then permits the same valid handoff', async () => {
   const pending = await begin()

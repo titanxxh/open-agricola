@@ -83,7 +83,10 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
     const admission = await prereleaseRequestAdmission(req)
     if (!admission.ok) { send(res, admission.status, { ok: false, code: admission.code }); return true }
     const session = await service.resolve(prereleaseSessionToken(req))
-    if (!session) { send(res, 503, { ok: false, code: 'prerelease_access_paused' }); return true }
+    if (!session) {
+      const expired = service.status(prereleaseSessionToken(req)) === 'expired'
+      send(res, expired ? 403 : 503, { ok: false, code: expired ? 'prerelease_access_expired' : 'prerelease_access_paused' }); return true
+    }
     const body: PrereleaseSessionResponse = { ok: true, user: { ...session.user, isAdmin: false, betaAccess: true },
       prerelease: { buildId: service.runtime.buildId, generationId: service.runtime.generationId, expiresAt: session.expiresAt, validUntil: session.validUntil, serverTime: Date.now() } }
     guardResponse(req, res, prereleaseSessionToken(req), true)
@@ -103,7 +106,8 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
 export async function requirePrereleaseRequest(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   if (!isPrerelease() || prereleaseBootstrapRequest(req)) return true
   const path = new URL(req.url ?? '/', 'http://localhost').pathname
-  const resourceImage = path.startsWith('/card-art/') && req.method === 'GET' && req.headers['sec-fetch-site'] === 'same-origin'
+  const imagePath = path.startsWith('/card-art/') || path === '/api/community/wechat-qr' || path === '/api/community/feishu-qr'
+  const resourceImage = imagePath && req.method === 'GET' && req.headers['sec-fetch-site'] === 'same-origin'
     && req.headers['sec-fetch-dest'] === 'image' && !prereleaseRequestBinding(req)
   const service = getPrereleaseSessions()
   const token = prereleaseSessionToken(req)
