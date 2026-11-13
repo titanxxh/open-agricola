@@ -63,6 +63,7 @@ export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId
   identity(config, expected)
   const directory = mkdtempSync(join(tmpdir(), 'oa-image-inspection-')), name = `oa-image-inspection-${randomUUID()}`
   let created = false
+  let failure: { error: unknown } | undefined
   try {
     const volumes = config.Volumes === undefined || config.Volumes === null ? [] : Object.keys(object(config.Volumes))
     if (volumes.length > 128 || volumes.some(path => !/^\/[A-Za-z0-9_./-]*$/.test(path) || path.split('/').includes('..'))) throw new Error('Unsupported image volume declarations')
@@ -76,11 +77,16 @@ export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId
     const metadata = object(JSON.parse(readFileSync(path, 'utf8'))), channel = expected.purpose === 'candidate' ? 'prerelease' : 'stable'
     if (metadata.format !== 1 || metadata.gameBuildId !== expected.sourceSha || metadata.basePath !== '/open-agricola/'
       || metadata.releaseChannel !== channel || metadata.deploymentTarget !== `${channel}-hosted`) throw new Error('Hosted frontend does not match the image receipt')
-    return id
-  } finally {
-    if (created) runDocker(['rm', '-v', name])
-    rmSync(directory, { force: true, recursive: true })
+  } catch (error) { failure = { error } }
+  finally {
+    try { if (created) runDocker(['rm', '-v', name]) }
+    catch (error) {
+      failure = { error: new AggregateError(failure ? [failure.error, error] : [error],
+        `Container image inspection cleanup could not be confirmed for ${name}`, { cause: error }) }
+    } finally { rmSync(directory, { force: true, recursive: true }) }
   }
+  if (failure) throw failure.error
+  return id
 }
 
 type Entry = { offset: number; size: number; sha256: string }

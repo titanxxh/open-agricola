@@ -87,18 +87,18 @@ export function maintainBackendImage(path: string, expected: Target): void {
     if (remaining <= 0) throw new Error('Formal backend maintenance deadline expired')
     return execute(command, args, cwd, env, Math.min(timeout, remaining))
   }
-  const unpin = pinBackendDocker(request.stage)
+  const docker = (args: string[], timeout?: number): string => run('docker', args, root, process.env, timeout)
+  const unpin = pinBackendDocker(request.stage, docker)
   let restartOld = false
   let drainTarget: (() => void) | undefined
   let source: { id: string; image: string; build: string; running: boolean } | undefined
-  const docker = (args: string[], timeout?: number): string => run('docker', args, root, process.env, timeout)
   const inspect = (id: string): Record<string, unknown> => {
     const values: unknown = JSON.parse(docker(['inspect', id]))
     if (!Array.isArray(values) || values.length !== 1) throw new Error('Expected exactly one native application container')
     return object(values[0])
   }
   try {
-    const image = verifyReceivedBackendImage(path, expected, 'maintenance'), installed = installedImageBinding(root)
+    const image = verifyReceivedBackendImage(path, expected, 'maintenance', docker), installed = installedImageBinding(root)
     const env = { ...process.env, GIT_NO_REPLACE_OBJECTS: '1', APP_UID: String(process.getuid?.()), APP_GID: String(process.getgid?.()), BACKEND_IMAGE: image, GAME_BUILD_ID: request.sourceSha, RELEASE_CHANNEL: 'stable', CADDY_IMAGE: installed.caddyImage ?? 'caddy:alpine' }
     const git = (args: string[]): string => run('git', args, root, env)
     const config = (): Record<string, unknown> => object(JSON.parse(run('docker', ['compose', '-f', 'docker-compose.prod.yml', 'config', '--format', 'json'], root, env)))
