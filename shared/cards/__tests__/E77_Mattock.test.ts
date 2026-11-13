@@ -23,7 +23,7 @@ const moved = (overrides: Partial<Moved> = {}): Moved => ({
   ...overrides,
 })
 
-const context = (events: Moved[], actionEvents = events, spaceId = 'reed-bank'): CardListenerDispatchInput => {
+const context = (events: Moved[], actionEvents = events, spaceId = 'reed-bank', actionId: 'collect' | 'gain' = 'collect'): CardListenerDispatchInput => {
   const state = createInitialState(1689, { playerCount: spaceId === 'resource-market-4' ? 4 : 2 })
   const player = state.players[0]!
   player.id = 'p1'
@@ -31,14 +31,14 @@ const context = (events: Moved[], actionEvents = events, spaceId = 'reed-bank'):
   const space = state.actionSpaces.find(entry => entry.id === spaceId)!
   return {
     actionHooks: undefined, state, player, space,
-    actionId: space.id, actionSpaceUse: { newPlacement: false }, phase: 'after',
-    transactionEvents: events, actionEvents,
+    actionId, phase: 'after',
+    transactionEvents: events, actionEvents, ownActionEvents: actionEvents,
     result: { type: 'ok', resourcesGained: { reed: 99 } },
   }
 }
 
-const rewards = (events: Moved[], actionEvents = events) => {
-  const ctx = context(events, actionEvents)
+const rewards = (events: Moved[], actionEvents = events, actionId: 'collect' | 'gain' = 'collect') => {
+  const ctx = context(events, actionEvents, 'reed-bank', actionId)
   return getMatchingListeners(ctx)
     .filter(entry => entry.registration.cardIds?.includes(CARD_ID))
     .flatMap(entry => executeCardListener(entry.registration, ctx)?.flow ?? [])
@@ -58,18 +58,18 @@ describe('E077_Mattock action-space resource provenance', () => {
     { resources: { stone: 1 }, reason: 'gain' as const },
     { resources: { reed: 1, stone: 1 }, reason: 'gain' as const },
   ])('rewards actual $reason receipts $resources once without a new placement', receipt => {
-    expectOneClay(rewards([moved(receipt)]))
+    expectOneClay(rewards([moved(receipt)], undefined, receipt.reason))
   })
 
-  it('does not duplicate the reward when a complete use both collects reed and gains stone', () => {
+  it('rewards one acquisition once even when its own receipt has several resource moves', () => {
     expectOneClay(rewards([
       moved(),
-      moved({ resources: { stone: 1 }, reason: 'gain' }),
+      moved({ resources: { stone: 1 }, reason: 'collect' }),
     ]))
   })
 
   it('uses explicit action-space origin even when a granting card is attributed', () => {
-    expectOneClay(rewards([moved({ reason: 'gain', sourceCardId: 'Test_GrantingCard' })]))
+    expectOneClay(rewards([moved({ reason: 'gain', sourceCardId: 'Test_GrantingCard' })], undefined, 'gain'))
   })
 
   it.each([
@@ -91,6 +91,12 @@ describe('E077_Mattock action-space resource provenance', () => {
     expect(rewards([moved()], [])).toEqual([])
   })
 
+  it('does not reuse a descendant receipt when this host emitted no acquisition', () => {
+    const ctx = context([moved()])
+    ctx.ownActionEvents = []
+    expect(executeCardListener(getListenerById('E77-mattock-after-collect')!, ctx)).toBeUndefined()
+  })
+
   it('keeps a retained non-market placement activation dormant', () => {
     const ctx = context([moved()])
     ctx.actionId = 'place-farmer'
@@ -105,6 +111,7 @@ describe('E077_Mattock action-space resource provenance', () => {
     const spaceId = actionId === 'place-farmer' ? 'resource-market-4' : 'reed-bank'
     const events = [moved({ reason, from: { kind: 'actionSpace', spaceId } })]
     const ctx = context(events, events, spaceId)
+    ctx.ownActionEvents = undefined
     ctx.actionId = actionId
     ctx.actionSpaceUse = undefined
     const listener = getListenerById(id)

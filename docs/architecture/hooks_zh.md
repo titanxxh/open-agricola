@@ -33,13 +33,14 @@ anytime                  注册额外的 anytime 行动
 - 主体最后一步完成时，空间反应和已捕获的规则反应共用既有 owner/trigger-select 调度：所有 `immediatelyAfter` 完成后才进入普通 `after`。多步主体内较早完成的规则动作保留既有顺序。`space-use-runtime.ts` 分别在每个阶段入口捕获空间来源，因此立即反应可为随后 after 阶段引入新来源，但不会重放较早的规则反应。阶段内已捕获来源保持固定，handler 读取实时状态。scope 元数据和收据保存在私有引擎游标，跨 pending、恢复和撤销保留。
 - 完成反应使用普通阶段，不另设 listener settlement 模式。同窗来源共用 owner/trigger-select 调度。选中来源及其新引出的反应先结清，再返回原窗口，剩余来源按实时状态重新判断。反应奖励保留自己的收据，不为强制排序而继承主体归属。阶段优先级用于同一完成边界内的同级反应。
 - 真实行动格主体以 `actionContext.sourceLocation` 标记行动格来源，卡牌提供的格也一样。静态展开和选择后返回的 flow 保留此商品来源；授予用格的卡仍以 `sourceCard` 单独归因。反应、onBuy 和替代奖励保留卡牌来源。明确重复原格选项时可保留原格来源。`resource.moved.from` 是取得商品的权威事实，共享格上下文和主体归属都不能证明商品来自行动格。
+- 取得反应使用 `collect` / `gain` 的 after，不使用整格完成点。`hasActionSpaceAcquisition()` 读取直接的 `ownActionEvents`；独立拿取各有窗口。见 [actions](actions_zh.md)。
 - 卡牌阶段按 [ADR 0033](../adr/0033-card-listener-timing-follows-project-semantics.md)，由 OA 自身的生命周期和 Reaction Window 语义决定。牌面、官方裁定和已记录的 Project Rule Interpretation 确定资源可用时点与先后要求。参考实现的回调名称、先后和流程嵌套不决定 OA 阶段。同窗来源使用玩家选择和实时重新判断。`before` 奖励在同一次宿主内可用。核心当前步骤准入在适用 `before` flow 的第一个可执行步骤能开始时允许使用该格，不模拟奖励，也不保证宿主能够完成。各卡不为此增加准入守卫或重复的 `isDoable` 放宽；误判后可能进入 `engine-blocked`，需要玩家撤销。空累积格保留结构性准入条件。
 - Reap 在移除作物后捕获 listener 来源。`shared/actions/helpers/reap-listener.ts` 只规划按 owner 分组的 `activate-card`，不提前执行 handler。全部逐作物立即反应完成后，才进入一次普通 after 批次。批次收据保留 `reapedCropAmounts` 和 harvest/private-field trigger；激活时读取实时状态，收据跨 pending 和恢复保留。自然收获没有外层 Reap 行动节点，由 helper 负责 after 批次。显式 `reap` 行动只由引擎完成点分发普通 after，并返回相同收据，即使它返回立即反应 flow。空收获不创建手动批次。测试：`server/__tests__/{card-timing-after-order-session,reap-completion-session,private-field-phase-session}.test.ts`。
 - Moor before 发现保留全部匹配来源，不调用 handler。它与规则反应共用 owner 和打出顺序规划；只捕获一个来源时直接展开。多来源分组在首次进入 owner 时只自动进入唯一适用的强制来源；可选来源保留 Pass，休眠来源保留供后续重新判断。before 不携带提交快照。
 - Moor Special Action 订阅使用 `actions: ['moor-action']`，仅允许 `before` / `after`。原生 `CardListenerContext.moorAction` 保留具体行动、行动者、特殊行动牌、payload 和 after 结果。activation 参数和完成帧跨预览与恢复保留这些事实。listener 预览和执行均从这些事实重建具体 Moor space，普通子行动不通过 `actionContext` 继承它们。具体 ID 仍用于执行和事件来源，共同契约拒绝将其作为订阅目标。apply leaf 单独保留授予卡的 `sourceCard`，不会将它当作所用特殊行动牌身份。
 - Moor Special Action 以自己的领域帧复用同一主体完成调度。after 来源在基础行动提交后、改良、onBuy 与动物后续前固定。帧保留事件 listener、owner/card/zone、具体行动、payload、原始收据与触发快照。handler 在最终 gate 读取实时状态，后续打出的卡不加入本窗口。终点规则反应在共同 owner 分组中保留自己的快照与收据。选中反应先完成自身后续，再提供下个来源。不合成用格或放工。见 [ADR 0032](../adr/0032-unified-moor-special-action-lifecycle.md) 与 `server/__tests__/moor-completion-window-session.test.ts`。
 - 真实 `place-farmer` wrapper 保留自己的规则动作完成点，包括带工人和无工人的 jump。顶层放置和 `place-farmer-on-space` 没有该 wrapper，由 scope 仅将放置动作订阅加入共同 after 池。原生 scope 调度信息防止额外放置重复完成。移动不创建放置回调，合成完成点不重派主体事件订阅。每回合限次使用既有 Turn Scope 身份，不依赖某条反应最后被选择。
-- 领域事实订阅显式声明 `events`，只匹配已完成 host 捕获的 `actionEvents`。本次事实缺失或不相关时不匹配，即使更广的 transaction 含有同类事实。它复用既有尾随 owner 和 trigger-select；记录事件不会另建完成边界。
+- `events` 订阅匹配已捕获的宿主 `actionEvents`，不匹配无关 transaction 事实，复用既有 after owner/trigger-select。事件不另建完成边界。返回 flow 的收据可包含后代，因此这不是逐事件 exactly-once 投递。
 
 **事件是规则事实的来源。** `EventStore` 为每个公开行动或内部 leaf 开启 transaction，只在成功时提交（失败、取消、回滚和跳过都不追加），按 `state.nextEventSeq` 重新编号，校验可见性、JSON 安全、大小与已知字段，并追加 `publicEvents.committed` 包。`state.log` 是事件 mapper 派生的 UI 缓存。Listener 读取 `transactionEvents` / `eventQuery`，资源事实不读未提交的全局 `state.events` 或 `context.result`。
 
@@ -50,7 +51,7 @@ anytime                  注册额外的 anytime 行动
 - 印刷的围栏数量与触发只计算普通 `type='fence'` 段（`hasOrdinaryFenceBuiltEvent()`）。
 - 动物兑换经 exchange / trade 路径扣减，使已安置动物保持同步。按 trade 的资源门槛使用 `immediatelyAfter.trade-applied` 与 `extraData.preResources`。
 
-**触发帧。** 宿主行动提交时，引擎在任何 `afterHostCommitListeners` 修改之前冻结 `transactionEvents`、`actionEvents` 以及匹配到的尾随 listener 集合与顺序。延迟的续行复用这一帧，不重新匹配。`CardListenerContext.triggerSnapshot` 只存在于 `immediatelyAfter` / `after`，保存宿主提交时各玩家的 occupation / minor / major / improvement / played 列表；询问“这是第 N 张”的 listener 读取它，`check:card-impl-boundaries` 拒绝在这些阶段直接读取实时长度。激活时不再检查 owner 卡是否仍在原牌区。该帧随 `activate-card` 节点序列化。对返回 flow 的宿主的反应携带 `preservedTransactionEvents` / `preservedActionEvents`，后续每次提交都会扩展它们。
+**触发帧。** 宿主提交时，在 `afterHostCommitListeners` 前冻结 `transactionEvents`、`actionEvents`、`triggerSnapshot` 和尾随来源/顺序。续行复用帧，不重新匹配或检查卡牌区。只有 immediate/after 上下文提供 `triggerSnapshot`：提交时各玩家的 occupation/minor/major/improvement/played 列表。“第 N 张”查询读取它，边界门禁拒绝读取实时长度。`activate-card` 持久化该帧。返回 flow 的反应跨提交扩展 `preservedTransactionEvents` / `preservedActionEvents`，`ownActionEvents` 则保留直接发出的事实。见 [engine](engine_zh.md)。
 
 - 费用预览（`previewComputeCosts`）在查询纯度契约下求值 `computeCosts`，不克隆状态。
 

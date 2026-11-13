@@ -4,19 +4,19 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import { playerBoard } from '../../domain'
 import { areRequiredEmptyZoneGroupsSatisfied } from '../../domain/animal-zones'
-import { sumActionSpaceMovedToPlayer } from '../helpers/event-provenance'
+import { hasActionSpaceAcquisition } from '../helpers/event-provenance'
 import { bonusVpLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E033_BeaverColony'
 const REQUIRED_EMPTY_GROUP_ID = `${CARD_ID}:stabled-pastures`
-const afterSpaceUseListener: CardListenerRegistration = {
+const afterAcquisitionListener: CardListenerRegistration = {
   id: 'E33-beaver-colony-after-space-use',
   cardIds: [CARD_ID],
   phases: ['after'],
-  actionSpaces: 'all',
+  actions: ['collect', 'gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (sumActionSpaceMovedToPlayer(context.actionEvents ?? context.transactionEvents, 'reed', context.player.id) <= 0) return
+    if (!hasActionSpaceAcquisition(context, ['reed'])) return
     return {
       flow: bonusVpLeaf(CARD_ID),
       sourceCard: CARD_ID,
@@ -26,7 +26,7 @@ const afterSpaceUseListener: CardListenerRegistration = {
 
 const cardImpl = {
   prerequisiteCheck: (player) => getFencedStableCount(player) > 0,
-  listeners: [afterSpaceUseListener],
+  listeners: [afterAcquisitionListener],
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {

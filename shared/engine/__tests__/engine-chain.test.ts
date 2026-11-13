@@ -114,13 +114,20 @@ describe('engine follow-up actions', () => {
     const space = createSpace('day-laborer')
     const state = createState(space, player)
 
-    const first = engine.proceed({ state, player, space })
-    expect(first.type).toBe('ok')
+    const context = { state, player, space, actionHooks }
+    // The named action delegates to a standard gain; assert settlement order,
+    // not the number of private wrapper steps.
+    for (let step = 0; step < 8 && player.resources.food === 0; step++) {
+      expect(engine.proceed(context).type).toBe('ok')
+    }
     expect(player.resources.food).toBe(2)
-
-    const second = engine.proceed({ state, player, space })
-    expect(second.type).toBe('ok')
+    expect(player.resources.wood).toBe(0)
+    for (let step = 0; step < 8 && player.resources.wood === 0; step++) {
+      expect(engine.proceed(context).type).toBe('ok')
+    }
     expect(player.resources.wood).toBe(1)
+    expect(engine.proceed(context).type).toBe('done')
+    expect(player.resources.food).toBe(2)
   })
 
   it('keeps tree shape when parent is or node', () => {

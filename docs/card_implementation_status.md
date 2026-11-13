@@ -66,7 +66,7 @@ Register a cross-card mechanism here only while it is still unimplemented. Remov
 - Do not copy mutable PHP args or in-place cost rewriting; OA keeps structured modifiers and payment enumeration.
 - Derive counter-based infobox text in the owning card's `getStatePresentation`; do not synchronize a second copy through internal storage-action listeners.
 - Choose listener timing from OA's lifecycle and Reaction Window semantics under [ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md), preserving the card's required resource availability and player-chosen order. Reference callback names and order do not determine the phase.
-- Subscribe action-space before / complete reactions to the existing `place-farmer` lifecycle and filter `context.space`; do not approximate complete use with wildcard internal-node reactions.
+- Subscribe action-space before / complete reactions to `actionSpaces`, and acquisition reactions to standard `collect` / `gain` direct-host facts. Do not approximate complete use with wildcard internal-node reactions, or acquisition with a whole-use receipt; `place-farmer` identifies person placement, not either fact.
 - Keep listener permission in the shared closed target/phase contract; do not infer it from executable action registration, omit selectors, or mutate registered selector objects.
 - Reference platform status fields such as `banned` and `implemented` must not drive OA product behavior automatically.
 - Moor Special Action reactions use the unified `moor-action` before/after identity and typed native trigger facts; concrete special-action IDs are execution/filter/source data, never listener targets.

@@ -26,7 +26,7 @@ import {
   pendingEnvelopeChoices,
 } from './pending-validation'
 import { rejectProtectedActionCancel } from './protected-action-cancel'
-import { mergeContinuationEvents } from './continuation-events'
+import { mergeContinuationEvents, recordOwnActionEvents } from './continuation-events'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
   applyDefaultSourceCardToFlow,
@@ -253,7 +253,7 @@ const actionContextForNode = (
     int,
   )
 
-const paymentInfoFromResult = (result: ActionExecutionResult): unknown => {
+const paymentInfoFromResult = (result: ActionExecutionResult): ActionExecutionResult | Record<string, unknown> => {
   if (result.type !== 'ok') return result
   const extraData = result.extraData ?? {}
   const resourcesPaid = result.resourcesPaid ?? extraData.resourcesPaid
@@ -665,6 +665,7 @@ export function engineResolveChoice(
       eventBuffer.flushTo(eventFrame.sink)
       ensureEventState(context.state)
       completedEvents = eventFrame.complete(context.state)
+      recordOwnActionEvents(child, completedEvents)
       recordEventLogDerivation(int, completedEvents, result)
       if (result.type === 'ok' && (
         result.internalChildren?.beforeHostListeners?.length ||
@@ -787,7 +788,10 @@ export function engineResolveChoice(
           ),
         )
         .filter((action) => action)
-      const baseEvent = buildListenerEvent(executionContext, { result, choice })
+      const baseEvent = {
+        ...buildListenerEvent(executionContext, { result, choice }),
+        ownActionEvents: child.ownActionEvents,
+      }
       const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
       const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
       const trailingActionEventStartIndex = result.type === 'flow'
@@ -1035,6 +1039,7 @@ export function engineResolveChoice(
   } else {
     ensureEventState(context.state)
     completedEvents = eventFrame.complete(context.state)
+    if (pendingActionNode) recordOwnActionEvents(pendingActionNode, completedEvents)
     recordEventLogDerivation(int, completedEvents, result)
   }
   if (
@@ -1180,7 +1185,10 @@ export function engineResolveChoice(
       ),
     )
     .filter((action) => action)
-  const baseEvent2 = buildListenerEvent(executionContext, { result, choice })
+  const baseEvent2 = {
+    ...buildListenerEvent(executionContext, { result, choice }),
+    ownActionEvents: pendingActionNode?.ownActionEvents,
+  }
   const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
   const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
   const trailingActionEventStartIndex = result.type === 'flow'

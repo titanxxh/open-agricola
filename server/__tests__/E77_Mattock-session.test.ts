@@ -3,7 +3,9 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import type { GameState, Resource } from '../../shared/contract/types'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import { gainLeaf } from '../../shared/cards/helpers/pay-gain-node'
+import { gainLeaf, bonusVpLeaf } from '../../shared/cards/helpers/pay-gain-node'
+import { sumActionSpaceMovedToPlayer } from '../../shared/cards/helpers/event-provenance'
+import { E033_BeaverColony_impl } from '../../shared/cards/E/E033_BeaverColony'
 import { createWorkSession } from './_helpers/session-fixtures'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
@@ -103,8 +105,30 @@ describe('E077 Mattock resource-market placement', () => {
 
 // Capture genuine old-format pending trees, including dormant placement reactions,
 // then restore them with the current official registry rather than rewriting IDs.
-const installRetainedMattock = (session: GameSession) => session.withCtx(() => {
-  requireActiveCardRegistry('retained Mattock fixture').loadImpl(CARD_ID, { listeners: [
+const installRetainedMattock = (session: GameSession, generation: 'original' | 'whole-space') => session.withCtx(() => {
+  const registry = requireActiveCardRegistry('retained Mattock fixture')
+  registry.loadImpl('E033_BeaverColony', {
+    ...E033_BeaverColony_impl,
+    listeners: [{
+      id: 'E33-beaver-colony-after-space-use', cardIds: ['E033_BeaverColony'], actionSpaces: 'all', phases: ['after'],
+      handler: context => {
+        if (sumActionSpaceMovedToPlayer(context.actionEvents ?? context.transactionEvents, 'reed', context.player.id) <= 0) return
+        return { flow: bonusVpLeaf('E033_BeaverColony'), sourceCard: 'E033_BeaverColony' }
+      },
+    }],
+  })
+  if (generation === 'whole-space') {
+    registry.loadImpl(CARD_ID, { listeners: [{
+      id: 'E77-mattock-after-collect', previousIds: ['E77-mattock-place-farmer'], cardIds: [CARD_ID], actionSpaces: 'all', phases: ['after'],
+      handler: context => {
+        const events = context.actionEvents ?? context.transactionEvents
+        if (!(['reed', 'stone'] as const).some(resource => sumActionSpaceMovedToPlayer(events, resource, context.player.id) > 0)) return
+        return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
+      },
+    }] })
+    return
+  }
+  registry.loadImpl(CARD_ID, { listeners: [
     {
       id: 'E77-mattock-after-collect', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
       handler: context => {
@@ -122,9 +146,12 @@ const installRetainedMattock = (session: GameSession) => session.withCtx(() => {
   ] })
 })
 
-const restore = (session: GameSession) => {
+const restore = (session: GameSession, retainedFormat = false) => {
   const snapshot = session.withCtx(() => serializeSessionSnapshot(session.state, session))
-  const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+  // These deployed generations predate direct-host receipts, in nodes and activation frames.
+  const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot,
+    (key, value) => retainedFormat && key === 'ownActionEvents' ? undefined : value,
+  ))))
   sessions.push(restored)
   expect(restored.getState().interaction).toEqual(session.getState().interaction)
   expect(restored.getState().scores).toEqual(session.getState().scores)
@@ -216,7 +243,9 @@ describe('E077 Mattock actual action-space resource sources', () => {
     { playerCount: 4, space: 'resource-market-4', firstCard: CARD_ID },
     { playerCount: 4, space: 'resource-market-4', firstCard: 'E033_BeaverColony' },
   ].flatMap(scenario => [
-    { ...scenario, retained: false }, { ...scenario, retained: true },
+    { ...scenario, retained: false as const },
+    { ...scenario, retained: 'original' as const },
+    { ...scenario, retained: 'whole-space' as const },
   ]))('preserves $space reactions with $firstCard first through restore and undo (retained: $retained)', ({ playerCount, space, firstCard, retained }) => {
     const beaver = 'E033_BeaverColony'
     let session = setup({ playerCount, configure: state => {
@@ -230,7 +259,7 @@ describe('E077 Mattock actual action-space resource sources', () => {
       ]
       if (space === 'reed-bank') state.actionSpaces.find(entry => entry.id === space)!.resources.reed = 3
     } })
-    if (retained) installRetainedMattock(session)
+    if (retained) installRetainedMattock(session, retained)
     const before = session.getState()
     const resourcesBefore = { ...before.state.players[0]!.resources }
     const logsBefore = structuredClone(before.state.log)
@@ -239,7 +268,7 @@ describe('E077 Mattock actual action-space resource sources', () => {
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'select-trigger') throw new Error('Expected shared reaction window')
     expect(response.interaction.request.options.map(option => option.sourceCard)).toEqual(expect.arrayContaining([CARD_ID, beaver]))
-    session = restore(session)
+    session = restore(session, Boolean(retained))
     response = finishReactions(session, session.getState(), firstCard)
     const goods = space === 'reed-bank' ? { reed: 3 } : { reed: 1, stone: 1, food: 1 }
     expectReward(response, goods)

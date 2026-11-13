@@ -4,7 +4,7 @@ import { isActivateCardActionNode, type ActivateCardActionParams } from './activ
 import type { EngineInternals } from './engine-internals'
 import { ActionNode } from './nodes/action-node'
 
-const cloneEvent = (event: GameEvent): GameEvent => JSON.parse(JSON.stringify(event)) as GameEvent
+const cloneEvent = (event: GameEvent): GameEvent => structuredClone(event)
 
 /** Join captured and live event frames, keeping the first copy of each event id. */
 export function mergeContinuationEvents<T extends QueryableGameEvent>(...frames: Array<readonly T[]>): T[] {
@@ -16,6 +16,11 @@ export function mergeContinuationEvents<T extends QueryableGameEvent>(...frames:
     seen.add(event.id)
     return true
   }))
+}
+
+/** Capture direct host emissions before child flows can extend its completion receipt. */
+export function recordOwnActionEvents(node: ActionNode, events: readonly GameEvent[]): void {
+  node.ownActionEvents = mergeContinuationEvents(node.ownActionEvents ?? [], events).map(cloneEvent)
 }
 
 /**
