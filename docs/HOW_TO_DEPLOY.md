@@ -233,6 +233,8 @@ Prepare an owner-owned mode-0600 JSON file outside the candidate directory. `scr
 - `limits`: `sourceDatabaseBytes`, `validationDatabaseBytes`, `bucketBytes`, `multipartBytes`, `localBytes`, `offsiteBytes`, `hostFreeBytes`, `hostFreeInodes`, `offsiteFreeBytes`, `offsiteFreeInodes`, `operationReserveBytes`. Usage values are stop thresholds; free values are floors. The reserve is measured additional local/offsite space for the largest admitted operation. Include seven retained daily backups, validation scratch and failed-transfer peaks. Install the same positive `bucketBytes` as the native RustFS whole-bucket quota and verify actual rejection. Quota covers completed logical objects; multipart parts remain separately measured.
 - `intervalMs`, `probeTimeoutMs`, `leaseMs`: measured observation timing. `intervalMs + probeTimeoutMs` must be less than `leaseMs`, which cannot exceed 120 seconds. The template systemd watchdog is 90 seconds; select intervals and native stop timing that fit it. A complete sample must finish within its probe deadline.
 
+The unit allows 64 tasks because systemd counts Node loader and compiler threads as tasks. Include uncached CLI startup when measuring any adjustment; a 32-task limit can fail before the first observation.
+
 Run the one-shot probe before enabling the service:
 
 ```bash

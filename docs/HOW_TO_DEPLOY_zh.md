@@ -235,6 +235,8 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 - `limits` 包含 `sourceDatabaseBytes`、`validationDatabaseBytes`、`bucketBytes`、`multipartBytes`、`localBytes`、`offsiteBytes`、`hostFreeBytes`、`hostFreeInodes`、`offsiteFreeBytes`、`offsiteFreeInodes`、`operationReserveBytes`。用量值为停止阈值，free 值为保留余量。reserve 是允许的最大一次操作所需新增本地及离站空间。取数包括七份每日备份、validation scratch 和失败传输峰值。将相同正数 `bucketBytes` 安装为 RustFS 整桶原生 quota，并验证实际拒写。quota 覆盖已完成对象逻辑大小；multipart 分片另行测量。
 - `intervalMs`、`probeTimeoutMs`、`leaseMs` 记录已验证的采样时限。`intervalMs + probeTimeoutMs` 须小于 `leaseMs`，后者最多 120 秒。systemd 模板 watchdog 为 90 秒；采样与原生停止耗时须能容纳于此。完整采样必须在探测 deadline 内结束。
 
+unit 允许 64 个 task，因为 systemd 也将 Node loader 和编译器线程计入 task。调整额度时须测量无缓存的 CLI 启动；32 个 task 的上限可能在首次采样前就导致失败。
+
 启用 service 前先运行单次探测：
 
 ```bash
