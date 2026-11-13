@@ -343,7 +343,7 @@ export class WsGameTransport implements GameTransport {
     this.roomViewer = { kind: 'participant', playerIndex: this.seatHint ?? 0 }
     this.unsubscribePrerelease = subscribePrereleaseAccess(() => {
       const access = getPrereleaseAccess()
-      if (isPrereleaseClient() && access.kind === 'blocked') {
+      if (isPrereleaseClient() && (access.kind === 'blocked' || access.kind === 'ended')) {
         this.stop(access.code, access.code)
         this.ws?.close()
       }

@@ -1,5 +1,7 @@
 // @covers client/app/PrereleaseBoundary.tsx
 // @covers client/services/prerelease-runtime.ts
+// @covers client/contexts/AuthContext.tsx
+// @covers client/app/PageRouter.tsx
 // @covers server/prerelease-routes.ts
 // @covers server/prerelease-sessions.ts
 import { expect, type BrowserContext, type Page, type PlaywrightWorkerArgs } from '@playwright/test'
@@ -12,7 +14,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'no
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Duplex } from 'node:stream'
-import { createLocalUserForTests, createSession } from '../server/auth'
+import { createLocalUserForTests, createSession, validateSession } from '../server/auth'
 import { authCookieNames } from '../server/auth-cookies'
 import { createPrereleaseAuthorityHandler } from '../server/prerelease-authority-routes'
 import { requestSessionToken } from '../server/request-auth'
@@ -223,7 +225,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     const browser = await playwright.chromium.launch()
     const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
     await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-    await context.addCookies([{ name: authCookieNames().session, value: sourceToken, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
+    const formalCookieName = authCookieNames().session
+    await context.addCookies([{ name: formalCookieName, value: sourceToken, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
     const assertPrincipal = async (page: Page) => {
       const result: unknown = await page.evaluate(async ({ build, generation, header, version }) => {
         const response = await fetch('/api/auth/me', { credentials: 'include', headers: {
@@ -233,7 +236,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       }, { build: buildId, generation: generationId, header: BROWSER_AUTH_HEADER, version: BROWSER_AUTH_VERSION })
       expect(result).toMatchObject({ ok: true, user: { id: user.id, username: user.username, displayName: user.displayName } })
     }
-    return { context, browser, close, enter, assertPrincipal, preOrigin, user, source }
+    const assertFormalSession = async () => { expect(await validateSession(sourceToken)).toMatchObject({ id: user.id, username: user.username }) }
+    return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
     catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Prerelease fixture setup and cleanup failed', { cause: cleanupError }) }
@@ -277,9 +281,27 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
       await settings.goto(`${environment.preOrigin}/open-agricola/?page=settings`)
       await expect(settings.locator('input[type=password]')).toHaveCount(0)
       await expect(settings.locator('.prerelease-access-screen')).toContainText('Return to production')
+      await environment.assertFormalSession()
+      expect((await restored.cookies(environment.formalOrigin)).some(row => row.name === environment.formalCookieName)).toBe(true)
+      const signOut = await restored.newPage()
+      await signOut.goto(`${environment.preOrigin}/open-agricola/`)
+      await expect(signOut.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible()
+      const signedOut = signOut.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/logout' && response.request().method() === 'POST')
+      await signOut.getByRole('button', { name: 'Sign Out', exact: true }).click()
+      expect((await signedOut).status()).toBe(200)
+      await expect(signOut.locator('.prerelease-access-screen')).toContainText('Return to production')
+      await expect(signOut.locator('input[type=password]')).toHaveCount(0)
+      await expect(signOut.locator('a[href*="/api/auth/oauth/"]')).toHaveCount(0)
+      expect((await restored.cookies(environment.preOrigin)).some(row => row.name === '__Host-oa-pre-session')).toBe(false)
+      expect((await restored.cookies(environment.formalOrigin)).some(row => row.name === environment.formalCookieName)).toBe(true)
+      await environment.assertFormalSession()
+      const reentered = await environment.enter(restored), reenteredWire = observeRoomSocket(reentered)
+      await reentered.goto(roomUrl)
+      await expect.poll(() => reenteredWire.joined).toContainEqual(originalSeat)
+      await environment.assertPrincipal(reentered)
       await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
-      await expect(resumed.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
-      await expect(resumed.getByRole('link', { name: 'Return to production', exact: true })).toBeVisible()
+      await expect(reentered.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
+      await expect(reentered.getByRole('link', { name: 'Return to production', exact: true })).toBeVisible()
     } finally { await restored.close(); await reopened.close() }
   } catch (error) { failure = { error } }
   try {
