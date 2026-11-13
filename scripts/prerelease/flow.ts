@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import { join } from 'node:path'
 import { assertScopedPaths, loadPrereleaseEnvironment, type PrereleaseTarget, targetFingerprint } from './config'
 import { atomicJson, controlDirectory, readRuntime, recordPath, writeRuntime, type RuntimeRecord } from './runtime'
-import { archiveTool, assertCapacity, backupEnvironment, backupRoot, buildImage, candidateTool, command, compose, inspectImage, policyTool, stopWriters, verifyPermissions, verifyRunning } from './docker'
+import { archiveTool, assertCapacity, backupEnvironment, backupRoot, importedImage, trustedArchiveImage, candidateTool, command, compose, policyTool, stopWriters, verifyPermissions, verifyRunning } from './docker'
 import { canonicalJson } from '../../shared/contract/authoritative-command'
 import { prepareRestoreStaging, readPairedPrereleaseBackup, removeRestoreStaging } from './backup'
 import { compareIdentityRefs } from './identity-manifest'
@@ -119,6 +119,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     if (!record.installed || record.operation) throw new Error('Online backup requires a complete installed deployment')
     verifyRunning(target, record)
     verifyPermissions(target)
+    trustedArchiveImage(target)
     writeRuntime(target, record)
     command('bash', [join(target.policyDirectory, 'backup-offsite.sh')], { env: backupEnvironment(target, record), timeout: 30 * 60 * 1000 })
     return { channel: 'prerelease', targetId: target.targetId, mode: 'online', generation: record.generation }
@@ -282,8 +283,9 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     if (record.operation && (record.operation.id !== id || record.operation.kind !== 'restore' || record.operation.buildId !== buildId
       || record.operation.backupStem !== request.backupStem || record.generation !== next)) throw new Error('Resume the exact replacement restoration operation')
     if (!record.operation && (record.installed || record.buildId)) throw new Error('Restore requires fresh replacement resources')
-    const image = record.operation?.image ?? buildImage(target, buildId)
-    inspectImage(target, image, buildId)
+    const image = importedImage(target, 'candidate', buildId, record.operation?.image)
+    trustedArchiveImage(target)
+    trustedArchiveImage(source)
     const operation: NonNullable<RuntimeRecord['operation']> = record.operation ?? { id, kind: 'restore', buildId, image,
       sourceBuildId: null, sourceImage: null, stage: 'backup', backupStem: request.backupStem, generation: next }
     record = { ...record, generation: next, operation }
@@ -363,8 +365,8 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
   authorityReceipt(target, record, request.authorityFile, 'close')
   const operationId = request.operationId ?? randomUUID()
   if (record.operation && (record.operation.id !== operationId || record.operation.buildId !== buildId || record.operation.kind !== request.action)) throw new Error('A pending operation must resume the same fixed SHA, kind and operation ID')
-  const image = record.operation?.image ?? buildImage(target, buildId)
-  inspectImage(target, image, buildId)
+  const image = importedImage(target, 'candidate', buildId, record.operation?.image)
+  trustedArchiveImage(target)
   if (!record.operation) {
     record.operation = { id: generation(operationId), kind: request.action, buildId, image, sourceBuildId: record.buildId, sourceImage: record.installed?.image ?? null, stage: 'backup', backupStem: null,
       generation: record.generation }

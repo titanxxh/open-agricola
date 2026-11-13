@@ -18,7 +18,7 @@ function fixture(proxyNetwork?: string) {
   const root = join(temporary, 'open-agricola-prerelease-test')
   mkdirSync(join(root, 'data'), { recursive: true })
   const config = {
-    format: 1, channel: 'prerelease', targetId: 'prerelease-test',
+    format: 2, channel: 'prerelease', imageSource: 'owner-imported-ghcr', targetId: 'prerelease-test',
     directory: root, policyDirectory: resolve('.'), project: 'open-agricola-prerelease-test',
     origin: 'https://pre.agricola-beta.test', port: 18575, network: 'open-agricola-prerelease-test-dependencies',
     ...(proxyNetwork === undefined ? {} : { proxyNetwork }),
@@ -26,9 +26,8 @@ function fixture(proxyNetwork?: string) {
     validationDatabase: { host: '127.0.0.1', port: 5432, name: 'oa_prerelease_test_validation', role: 'oa_prerelease_test_validator' },
     objects: { endpoint: 'http://127.0.0.1:9000', bucket: 'oa-prerelease-test', prefix: 'live/', appKeyId: 'pre-app', backupKeyId: 'pre-backup' },
     offsite: { host: 'backup-fixture', directory: '/srv/backups/open-agricola-prerelease-test' },
-    builder: { name: 'prerelease-test', container: 'prerelease-test-builder' },
     formal: { project: 'open-agricola', directory: '/srv/open-agricola', appOrigin: 'https://app.agricola.test', apiOrigin: 'https://api.agricola.test', database: 'agricola', bucket: 'agricola', offsiteDirectory: '/srv/backups/open-agricola' },
-    budgets: { app: { memoryMiB: 512, cpus: 1, pids: 256 }, tools: { memoryMiB: 512, cpus: 1, pids: 128 }, build: { memoryMiB: 1024, cpus: 1, pids: 512 }, diskMiB: 4096, reserveMemoryMiB: 256 },
+    budgets: { app: { memoryMiB: 512, cpus: 1, pids: 256 }, tools: { memoryMiB: 512, cpus: 1, pids: 128 }, import: { maxArchiveMiB: 256, memoryHeadroomMiB: 128 }, diskMiB: 4096, reserveMemoryMiB: 256 },
   }
   writeFileSync(join(root, '.env'), 'DATABASE_URL=postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test\nS3_BUCKET=oa-prerelease-test\nS3_PREFIX=live/\nS3_ACCESS_KEY_ID=pre-app\nS3_SECRET_ACCESS_KEY=fixture-app\nS3_ENDPOINT=http://127.0.0.1:9000\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n')
   writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=postgres://oa_prerelease_test_backup:fixture@127.0.0.1/oa_prerelease_test\nVALIDATION_DATABASE_URL=postgres://oa_prerelease_test_validator:fixture@127.0.0.1/oa_prerelease_test_validation\nS3_BUCKET=oa-prerelease-test\nS3_PREFIX=live/\nS3_ACCESS_KEY_ID=pre-backup\nS3_SECRET_ACCESS_KEY=fixture-tools\nS3_ENDPOINT=http://127.0.0.1:9000\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n')
@@ -55,6 +54,39 @@ esac
   const invoke = (...args: string[]) => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', ...args, '--config', path], { encoding: 'utf8', env, timeout: 15000 })
   return { root, config, save, invoke, env, bin, temporary, fail: join(temporary, 'fail'), calls: () => existsSync(join(temporary, 'calls')) ? readFileSync(join(temporary, 'calls'), 'utf8') : '' }
 }
+
+function seedImportedImage(target: ReturnType<typeof parsePrereleaseTarget>, purpose: 'candidate' | 'trusted-policy', sourceSha: string, imageId: string) {
+  const producerSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const receipt = { format: 1, repository: 'titanxxh/open-agricola', repositoryId: 123, purpose,
+    channel: purpose === 'candidate' ? 'prerelease' : 'stable', sourceSha, producerSha, platform: 'linux/amd64',
+    registryRepository: 'ghcr.io/titanxxh/open-agricola-images', manifestDigest: `sha256:${'a'.repeat(64)}`, imageId, build: { runId: 10, runAttempt: 1 },
+    verification: purpose === 'candidate' ? { kind: 'prerelease', configuration: 'b'.repeat(64), producerConfiguration: 'c'.repeat(64),
+      tasks: FULL_TASK_IDS.map((id, index) => ({ id, runId: 9, jobId: index + 1, runAttempt: 1 })) } : { kind: 'main-policy', configuration: 'b'.repeat(64) } }
+  mkdirSync(join(target.directory, 'control'), { recursive: true })
+  writeFileSync(join(target.directory, 'control', `image-${purpose}-${sourceSha}-${producerSha}.json`), JSON.stringify({ fingerprint: targetFingerprint(target),
+    transfer: { format: 1, receipt, archive: { sha256: 'f'.repeat(64), bytes: 10240 } } }))
+}
+
+it('rejects the legacy on-host build target before planning or invoking Docker', () => {
+  const value = fixture()
+  writeFileSync(join(value.temporary, 'target.json'), JSON.stringify({ ...value.config, format: 1 }))
+  const result = value.invoke('plan')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('owner-imported')
+  expect(value.calls()).toBe('')
+  expect(existsSync(join(value.root, 'control'))).toBe(false)
+})
+
+it.each(['builder', 'build'])('rejects legacy %s settings inside an otherwise current target before Docker', field => {
+  const value = fixture()
+  const legacy = field === 'builder' ? { ...value.config, builder: { name: 'old', container: 'old' } }
+    : { ...value.config, budgets: { ...value.config.budgets, build: { memoryMiB: 32, cpus: 1, pids: 32 } } }
+  writeFileSync(join(value.temporary, 'target.json'), JSON.stringify(legacy))
+  const result = value.invoke('plan')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('On-host build configuration')
+  expect(value.calls()).toBe('')
+})
 
 it('plans a complete isolated target without creating deployment files or exposing secrets', () => {
   const value = fixture()
@@ -203,6 +235,7 @@ it('closes the gateway before draining its owned writer and never resumes after 
   expect(JSON.parse(readFileSync(statePath, 'utf8')).mode).toBe('maintenance')
   expect(value.calls()).not.toMatch(/(?:start|restart).*app/)
   expect(value.calls()).not.toContain('caddy')
+  expect(value.calls()).not.toMatch(/buildx|^build /m)
   expect(value.calls()).toContain(' stop --timeout 90 app')
 })
 
@@ -236,28 +269,23 @@ set -e
 printf '%s\n' "$*" >> '${value.temporary}/calls'
 case "$*" in
   'ps -q '*) exit 0;;
-  'start '*) touch '${value.temporary}/builder-running-'"$2";;
-  'stop --timeout 30 '*) rm -f '${value.temporary}/builder-running-'"$4";;
-  'buildx build '*) cat >/dev/null;;
-  'buildx inspect '*) exit 125;;
-  'buildx ls --format {{json .Builder}}') printf '%s\n' '${JSON.stringify({ Name: value.config.builder.name, Driver: 'remote', Nodes: [{ Name: 'prerelease-test0', Endpoint: `docker-container://${value.config.builder.container}` }] })}' '${JSON.stringify({ Name: value.config.builder.name, Driver: 'remote', Nodes: [{ Name: 'prerelease-test0', Endpoint: `docker-container://${value.config.builder.container}` }] })}';;
-  *'{{json .Config.Labels}}'*'${value.config.builder.container}') printf '{"org.open-agricola.environment":"prerelease-test"}';;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
-  *'{{json .State}}'*'${value.config.builder.container}') if [ -f '${value.temporary}/builder-running-${value.config.builder.container}' ]; then printf '{"Running":true}'; else printf '{"Running":false}'; fi;;
   *'{{json .State}}'*) printf '{"Running":false,"OOMKilled":false,"ExitCode":0}';;
   *' ps -a -q app') printf '${'c'.repeat(64)}';;
   *'{{.Image}}'*) printf 'sha256:${'d'.repeat(64)}';;
   *'com.docker.compose.project'*) printf '${value.config.project}';;
   *'{{json .Config}}'*) printf '{"User":"1000:1000"}';;
   *'{{json .Mounts}}'*) printf '[]';;
-  'image inspect --format {{json .Config.Labels}}'*) printf '{"org.opencontainers.image.revision":"${buildId}","io.open-agricola.release-channel":"prerelease"}';;
-  'image inspect --format {{.Id}}'*) printf 'sha256:${'d'.repeat(64)}';;
-  *'/app/frontend-dist/frontend-build.json'*) printf '{"format":1,"gameBuildId":"${buildId}","basePath":"/open-agricola/","releaseChannel":"prerelease","deploymentTarget":"prerelease-hosted"}';;
+  'image inspect --format {{json .Config.Labels}}'*) case "$*" in *'sha256:${'f'.repeat(64)}'*) channel=stable;; *) channel=prerelease;; esac; printf '{"org.opencontainers.image.revision":"${buildId}","io.open-agricola.release-channel":"%s"}' "$channel";;
+  'image inspect --format {{.Id}}'*) for arg do image="$arg"; done; printf '%s' "$image";;
+  *'/app/frontend-dist/frontend-build.json'*) case "$*" in *'sha256:${'f'.repeat(64)}'*) channel=stable;; *) channel=prerelease;; esac; printf '{"format":1,"gameBuildId":"${buildId}","basePath":"/open-agricola/","releaseChannel":"%s","deploymentTarget":"%s-hosted"}' "$channel" "$channel";;
   *'check-live '*) [ ! -f '${value.temporary}/migration-fail' ] || exit 42;;
   *' up -d --no-build --wait --wait-timeout 120 app') [ ! -f '${value.temporary}/startup-fail' ] || exit 43;;
   *' exec -T app node '*) printf '{"buildId":"${buildId}","channel":"prerelease","generation":"${generation}"}';;
 esac
 `, { mode: 0o700 })
+  seedImportedImage(parsePrereleaseTarget(value.config), 'candidate', buildId, `sha256:${'d'.repeat(64)}`)
+  seedImportedImage(parsePrereleaseTarget(value.config), 'trusted-policy', buildId, `sha256:${'f'.repeat(64)}`)
   const request = { action: 'deploy', expectedCurrent: 'empty', buildId, generation, operationId, authorityFile }
   const invoke = () => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
     input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(parsePrereleaseTarget(value.config)),
@@ -284,6 +312,7 @@ esac
   expect(value.calls().split('check-live')).toHaveLength(migrations)
   expect(value.calls()).toContain('/app/frontend-dist/frontend-build.json')
   expect(value.calls()).not.toContain('caddy')
+  expect(value.calls()).not.toMatch(/buildx|^build /m)
 })
 
 
@@ -293,6 +322,8 @@ function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNet
   const image = `sha256:${'e'.repeat(64)}`, sourceBuildId = sameBuild ? buildId : 'a'.repeat(40)
   const sourceImage = sameBuild ? image : `sha256:${'d'.repeat(64)}`
   const policyImage = `sha256:${'f'.repeat(64)}`
+  seedImportedImage(target, 'candidate', buildId, image)
+  seedImportedImage(target, 'trusted-policy', buildId, policyImage)
   const generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId = 'db4d6c82-676f-4dcc-a570-52377b3b32f5'
   expect(value.invoke('initialize', '--expected-current', 'empty', '--generation', generation).status).toBe(0)
   const state = () => readRuntime(target)
@@ -328,13 +359,7 @@ set -e
 printf '%s\n' "$*" >> '${value.temporary}/calls'
 case "$*" in
   'ps -q '*) exit 0;;
-  'start '*) touch '${value.temporary}/builder-running-'"$2";;
-  'stop --timeout 30 '*) rm -f '${value.temporary}/builder-running-'"$4";;
-  'buildx build '*) cat >/dev/null;;
-  'buildx ls --format {{json .Builder}}') printf '${JSON.stringify({ Name: target.builder.name, Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${target.builder.container}` }] })}';;
-  *'{{json .Config.Labels}}'*'${target.builder.container}') printf '{"org.open-agricola.environment":"${target.targetId}"}';;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
-  *'{{json .State}}'*'${target.builder.container}') if [ -f '${value.temporary}/builder-running-${target.builder.container}' ]; then printf '{"Running":true}'; else printf '{"Running":false}'; fi;;
   *'{{json .State}}'*) cat '${containerState}';;
   *' ps -a -q app') if [ -f '${containerImage}' ]; then printf '${'c'.repeat(64)}'; fi;;
   *'{{.Image}}'*) cat '${containerImage}';;
@@ -369,6 +394,30 @@ esac
   rmSync(join(value.temporary, 'startup-fail'))
   return { ...value, invoke, state, sourceImage, image, containerImage, containerState, generation, operationId, authorityFile }
 }
+
+it.each(['candidate', 'trusted-policy'])('refuses a missing %s import before resuming a pending deployment', purpose => {
+  const value = startupRetryFixture(), state = value.state()
+  const policySha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  rmSync(join(value.root, 'control', `image-${purpose}-${policySha}-${policySha}.json`))
+  writeFileSync(join(value.temporary, 'calls'), '')
+  const result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Missing verified imported image')
+  expect(value.state()).toEqual(state)
+  expect(value.calls()).not.toMatch(/buildx|stop --timeout|up -d|check-live/)
+})
+
+it('refuses a same-source imported image replacement when resuming a pending deployment', () => {
+  const value = startupRetryFixture(), state = value.state()
+  const policySha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  seedImportedImage(parsePrereleaseTarget(value.config), 'candidate', policySha, `sha256:${'b'.repeat(64)}`)
+  writeFileSync(join(value.temporary, 'calls'), '')
+  const result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('pending image ID')
+  expect(value.state()).toEqual(state)
+  expect(value.calls()).not.toMatch(/buildx|stop --timeout|up -d|check-live/)
+})
 
 it('retries the startup journal after migration while the drained source container still exists', () => {
   const value = startupRetryFixture()
@@ -421,7 +470,6 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
   replacement.config.validationDatabase.role = 'oa_prerelease_replacement_validator'
   Object.assign(replacement.config.objects, { bucket: 'oa-prerelease-replacement', appKeyId: 'replacement-app', backupKeyId: 'replacement-backup' })
   replacement.config.offsite.directory = '/srv/backups/open-agricola-prerelease-replacement'
-  Object.assign(replacement.config.builder, { name: 'prerelease-replacement', container: 'prerelease-replacement-builder' })
   for (const name of ['.env', 'data/dependencies.compose.env']) writeFileSync(join(directory, name), readFileSync(join(directory, name), 'utf8')
     .replaceAll('prerelease_test', 'prerelease_replacement').replaceAll('oa-prerelease-test', 'oa-prerelease-replacement')
     .replaceAll('pre-app', 'replacement-app').replaceAll('pre-backup', 'replacement-backup'))
@@ -436,18 +484,13 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
   const script = readFileSync(join(source.bin, 'docker'), 'utf8').replaceAll(source.temporary, replacement.temporary)
     .replaceAll(source.config.targetId, target.targetId).replaceAll(source.generation, next)
     .replace('case "$*" in', `case "$*" in\n  *' restore /backup/restore-'*) [ ! -f '${replacement.temporary}/restore-fail' ] || exit 44;;\n  *' stop --timeout 30 gateway') [ ! -f '${replacement.temporary}/gateway-stop-fail' ] || exit 45;;\nesac\ncase "$*" in`)
-  const sourceBuilder = `case "$*" in
-  'ps -q '*) exit 0;;
-  'buildx ls --format {{json .Builder}}') printf '%s\n' '${JSON.stringify({ Name: source.config.builder.name, Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${source.config.builder.container}` }] })}' '${JSON.stringify({ Name: target.builder.name, Driver: 'remote', Nodes: [{ Endpoint: `docker-container://${target.builder.container}` }] })}'; exit 0;;
-  *'{{json .Config.Labels}}'*'${source.config.builder.container}') printf '{"org.open-agricola.environment":"${source.config.targetId}"}'; exit 0;;
-  *'{{json .State}}'*'${source.config.builder.container}') if [ -f '${replacement.temporary}/builder-running-${source.config.builder.container}' ]; then printf '{"Running":true}'; else printf '{"Running":false}'; fi; exit 0;;
-esac
-`
-  writeFileSync(join(replacement.bin, 'docker'), script.replace('set -e\n', `set -e\n${sourceBuilder}`), { mode: 0o700 })
+  writeFileSync(join(replacement.bin, 'docker'), script, { mode: 0o700 })
   writeFileSync(join(replacement.bin, 'bash'), readFileSync(join(source.bin, 'bash')), { mode: 0o700 })
   writeFileSync(join(source.root, 'backups/replay-removals.latest.json'), '{"version":1,"batches":[]}')
   const point = readFileSync(join(source.root, 'backups', `${stem}.tgz`))
   const buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  seedImportedImage(target, 'candidate', buildId, `sha256:${'e'.repeat(64)}`)
+  seedImportedImage(target, 'trusted-policy', buildId, `sha256:${'f'.repeat(64)}`)
   const request: OperationRequest = { action: 'restore', expectedCurrent: 'empty', buildId, generation: next, operationId,
     sourceTarget: parsePrereleaseTarget(source.config), expectedSourceCurrent: buildId, acceptLoss: source.generation,
     backupStem: stem, backupGeneration: source.generation, authorityFile: source.authorityFile }
@@ -592,6 +635,9 @@ function ownerBackupFixture() {
   const value = fixture(), target = parsePrereleaseTarget(value.config)
   const buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`, generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5'
   writeRuntime(target, { ...readRuntime(target), generation, buildId, installed: { buildId, image, installedAt: 1 }, mode: 'open' })
+  const policySha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const policyImage = `sha256:${'b'.repeat(64)}`
+  seedImportedImage(target, 'trusted-policy', policySha, policyImage)
   const tools = [
     { id: 'e'.repeat(64), environment: target.targetId, run: 'abandoned-run', deadline: String(Date.now() - 60_000), service: 'tools', oneoff: 'True', removed: false },
     { id: 'f'.repeat(64), environment: 'stable', run: 'foreign-run', deadline: '0', service: 'app', oneoff: 'True', removed: false },
@@ -629,7 +675,11 @@ if(args[0]==='ps') {
   } else if(format==='{{.Image}}')output(${JSON.stringify(image)});
   else if(format==='{{json .}}')output({Image:${JSON.stringify(image)},State:{Running:true},HostConfig:{Memory:536870912},Config:{Labels:{'com.docker.compose.project':${JSON.stringify(target.project)},'com.docker.compose.service':'app'}}});
   else if(format.includes('com.docker.compose.project'))output(${JSON.stringify(target.project)});
-} else if(args[0]==='rm') {
+} else if(args[0]==='image') {
+  if(args[3]==='{{.Id}}')output(${JSON.stringify(policyImage)});
+  else output({'org.opencontainers.image.revision':${JSON.stringify(policySha)},'io.open-agricola.release-channel':'stable'});
+} else if(line.includes('/app/frontend-dist/frontend-build.json'))output({format:1,gameBuildId:${JSON.stringify(policySha)},basePath:'/open-agricola/',releaseChannel:'stable',deploymentTarget:'stable-hosted'});
+else if(args[0]==='rm') {
   if(state.failRemove)process.exit(42);
   if(!state.retainAfterRemove)for(const tool of state.tools)if(args.includes(tool.id))tool.removed=true;
   fs.writeFileSync(file,JSON.stringify(state));
@@ -663,7 +713,7 @@ it.each(['live', 'missing-run', 'bad-run', 'missing-deadline', 'bad-deadline', '
   value.save()
   const result = value.backup()
   expect(result.status).not.toBe(0)
-  expect(result.stderr).toContain('builder and other tools to be stopped')
+  expect(result.stderr).toContain('other tools to be stopped')
   expect(existsSync(value.completed)).toBe(false)
   expect(value.remaining()).toEqual(value.state.tools)
   expect(value.calls()).not.toMatch(/rm -f|stop.*app|restart.*app/)
