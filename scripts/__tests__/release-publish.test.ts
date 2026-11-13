@@ -1,9 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { stableConfiguration } from '../ci/candidate-verification'
+import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { prereleaseConfiguration } from '../ci/prerelease-verification'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
@@ -36,6 +38,8 @@ function fixture(prerelease = false) {
   cpSync(join(repository, 'scripts/release'), join(root, 'scripts/release'), { recursive: true })
   cpSync(join(repository, '.github/workflows/candidate-verification.yml'), join(root, '.github/workflows/candidate-verification.yml'))
   cpSync(join(repository, 'deploy-backend.sh'), join(root, 'deploy-backend.sh'))
+  cpSync(join(repository, 'scripts/image-intake.ts'), join(root, 'scripts/image-intake.ts'))
+  for (const name of ['backup-storage.sh', 'backup-process.sh', 'backup-files.mjs']) cpSync(join(repository, 'scripts', name), join(root, 'scripts', name))
   const packageValue: unknown = JSON.parse(readFileSync(join(repository, 'package.json'), 'utf8'))
   if (typeof packageValue !== 'object' || !packageValue || !('scripts' in packageValue)
     || typeof packageValue.scripts !== 'object' || !packageValue.scripts || !('release' in packageValue.scripts)
@@ -126,6 +130,7 @@ if (args.includes('POST')) {
 }
 if (Object.hasOwn(state.provenance, args[1])) {
   let metadata = state.provenance[args[1]];
+  if (metadata && metadata.binary) { process.stdout.write(fs.readFileSync(metadata.binary)); process.exit(0); }
   if (endpoint === 'git/ref/heads/main') metadata = { ...metadata, object: { type: 'commit', sha: state.mainSha } };
   if (Array.isArray(metadata) && args.includes('--paginate')) metadata.forEach(output); else output(metadata);
 } else if (endpoint.startsWith('commits/')) {
@@ -185,46 +190,65 @@ fs.appendFileSync(path.join(process.env.RELEASE_TEST_ROOT, 'events.jsonl'), JSON
   return { root, bin, sha, state, save, env, invoke, publish, publishVersion, deploy, events }
 }
 
-function remoteFixture(value: ReturnType<typeof fixture>, { fetchSha = value.sha, checkoutSha = value.sha } = {}) {
-  const remote = join(value.root, 'remote')
-  mkdirSync(join(remote, 'scripts'), { recursive: true })
-  mkdirSync(join(remote, 'data'), { recursive: true })
-  writeFileSync(join(remote, 'data/postgres-cutover.validated'), '')
-  writeFileSync(join(remote, '.env'), '')
-  writeFileSync(join(remote, 'scripts/backup-storage.sh'), '#!/usr/bin/env bash\nexit 0\n')
-  writeFileSync(join(remote, 'scripts/local-services.mjs'), `import { appendFileSync } from 'node:fs'; appendFileSync(process.env.RELEASE_TEST_ROOT + '/events.jsonl', JSON.stringify({ kind: 'remote-services' }) + '\\n');\n`)
-  writeFileSync(join(remote, 'state.json'), JSON.stringify({ head: 'a'.repeat(40), fetchSha, checkoutSha }))
+function imageInputs(value: ReturnType<typeof fixture>, failure = '') {
+  const prefix = 'repos/titanxxh/open-agricola/', payload = join(value.root, 'payload')
+  mkdirSync(join(payload, 'blobs/sha256'), { recursive: true })
+  execFileSync('git', ['checkout', '--detach', value.sha], { cwd: value.root, stdio: 'ignore' })
+  const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex')
+  const config = JSON.stringify({ os: 'linux', architecture: 'amd64', config: { Labels: { 'org.opencontainers.image.revision': value.sha, 'io.open-agricola.release-channel': 'stable' } }, rootfs: { type: 'layers', diff_ids: [] } })
+  const imageId = `sha256:${hash(config)}`, digest = `sha256:${'b'.repeat(64)}`
+  writeFileSync(join(payload, 'config.json'), config)
+  writeFileSync(join(payload, 'blobs/sha256', imageId.slice(7)), config)
+  writeFileSync(join(payload, 'manifest.json'), JSON.stringify([{ Config: 'config.json', RepoTags: null, Layers: [] }]))
+  const manifest = JSON.stringify({ schemaVersion: 2, mediaType: 'application/vnd.oci.image.manifest.v1+json', config: { mediaType: 'application/vnd.oci.image.config.v1+json', digest: imageId, size: Buffer.byteLength(config) }, layers: [] })
+  writeFileSync(join(payload, 'blobs/sha256', hash(manifest)), manifest)
+  writeFileSync(join(payload, 'index.json'), JSON.stringify({ schemaVersion: 2, manifests: [{ mediaType: 'application/vnd.oci.image.manifest.v1+json', digest: `sha256:${hash(manifest)}`, size: Buffer.byteLength(manifest) }] }))
+  const archive = join(value.root, 'image.tar')
+  execFileSync('tar', ['-cf', archive, '-C', payload, 'config.json', 'manifest.json', 'index.json', 'blobs'])
+  const receipt = { format: 1, repository: 'titanxxh/open-agricola', repositoryId: 1164782262, purpose: 'formal-candidate', channel: 'stable', sourceSha: value.sha, producerSha: value.sha,
+    platform: 'linux/amd64', registryRepository: 'ghcr.io/titanxxh/open-agricola-images', manifestDigest: digest, imageId, build: { runId: 80, runAttempt: 1 },
+    verification: { kind: 'stable', configuration: value.state.configuration, producerConfiguration: verificationConfiguration(value.root, value.sha),
+      tasks: FULL_TASK_IDS.map((id, index) => ({ id, runId: 1, jobId: index + 2, runAttempt: 1 })).sort((a, b) => a.id.localeCompare(b.id)) } }
+  const receiptPath = join(value.root, 'container-image-receipt.json'), zip = join(value.root, 'receipt.zip')
+  writeFileSync(receiptPath, JSON.stringify(receipt)); execFileSync('zip', ['-jq', zip, receiptPath])
+  const artifact = readFileSync(zip)
+  Object.assign(value.state.provenance, {
+    [prefix + 'actions/workflows/container-image-build.yml']: { id: 300, path: '.github/workflows/container-image-build.yml' },
+    [prefix + 'actions/runs/80/attempts/1']: { id: 80, run_attempt: 1, workflow_id: 300, path: '.github/workflows/container-image-build.yml', event: 'workflow_dispatch', head_branch: 'main', head_sha: value.sha, status: 'completed', conclusion: failure === 'provenance' ? 'failure' : 'success', run_started_at: '2026-11-13T00:00:00Z', updated_at: '2026-11-13T00:02:00Z', repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' } },
+    [prefix + 'actions/artifacts/90']: { id: 90, name: 'container-image-receipt-80-1', expired: false, size_in_bytes: artifact.length, digest: `sha256:${hash(artifact)}`, created_at: '2026-11-13T00:01:00Z', workflow_run: { id: 80, head_sha: value.sha, head_branch: 'main', repository_id: 1164782262, head_repository_id: 1164782262 } },
+    [prefix + 'actions/artifacts/90/zip']: { binary: zip },
+  })
+  FULL_TASK_IDS.forEach((_id, index) => { value.state.provenance[prefix + `actions/jobs/${index + 2}`] = { id: index + 2, run_id: 1, run_attempt: 1, status: 'completed', conclusion: 'success' } }); value.save()
+  const auth = join(value.root, 'auth.json'), budget = join(value.root, 'budget.json')
+  writeFileSync(auth, JSON.stringify({ username: 'fixture-owner', token: 'private-fixture-token' }), { mode: 0o600 })
+  writeFileSync(budget, JSON.stringify({ format: 1, import: { maxArchiveMiB: 1, memoryHeadroomMiB: 512, intake: { memoryMiB: 384, cpus: 1, pids: 64 } }, diskMiB: 256, reserveMemoryMiB: failure === 'budget' ? 0 : 512 }), { mode: 0o600 })
+  const metadata = { format: 1, gameBuildId: value.sha, basePath: '/open-agricola/', releaseChannel: 'stable', deploymentTarget: 'stable-hosted' }
+  writeFileSync(join(value.bin, 'docker'), `#!${process.execPath}
+const fs=require('node:fs'),a=process.argv.slice(2),cmd=a[0]==='--config'?a.slice(4):a;fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'owner-docker',args:cmd})+'\\n');
+if(cmd[0]==='context')console.log(JSON.stringify([{Endpoints:{docker:{Host:'unix:///var/run/docker.sock'}}}]));
+else if(cmd[0]==='info')console.log('[]');else if(cmd[0]==='login'){if(fs.readFileSync(0,'utf8').trim()!=='private-fixture-token')process.exit(2);}
+else if(cmd[0]==='pull'){if(${JSON.stringify(failure)}==='pull')process.exit(42);}
+else if(cmd[0]==='image'&&cmd[1]==='save')process.stdout.write(fs.readFileSync(${JSON.stringify(archive)}));
+else if(cmd[0]==='image')console.log(JSON.stringify([{Id:${JSON.stringify(imageId)},Os:'linux',Architecture:'amd64',Config:JSON.parse(${JSON.stringify(config)}).config,RepoDigests:[${JSON.stringify(receipt.registryRepository + '@' + digest)}]}]));
+else if(cmd[0]==='create')console.log('f'.repeat(64));else if(cmd[0]==='cp')fs.writeFileSync(cmd.at(-1),${JSON.stringify(JSON.stringify(metadata))});else if(cmd[0]!=='rm')process.exit(3);
+`, { mode: 0o700 })
+  writeFileSync(join(value.bin, 'scp'), `#!${process.execPath}
+const fs=require('node:fs'),path=require('node:path'),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'scp',args:a})+'\\n');const source=a[1],target=a[2].slice(a[2].indexOf(':')+1);fs.copyFileSync(source,target);fs.chmodSync(target,0o600);
+`, { mode: 0o700 })
+  const remote = join(value.root, 'remote');mkdirSync(join(remote, 'data'), { recursive: true });writeFileSync(join(remote, 'data/postgres-cutover.validated'), '')
   const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
-  const realPnpm = execFileSync('which', ['pnpm'], { encoding: 'utf8' }).trim()
-  const prefix = `#!${process.execPath}
-const fs = require('node:fs'); const path = require('node:path'); const { spawnSync } = require('node:child_process');
-const root = process.env.RELEASE_TEST_ROOT; const remote = path.join(root, 'remote'); const args = process.argv.slice(2);
-const event = value => fs.appendFileSync(path.join(root, 'events.jsonl'), JSON.stringify(value) + '\\n');
-`
-  writeFileSync(join(value.bin, 'git'), prefix + `
-if (process.cwd() !== remote) { const result = spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit' }); process.exit(result.status ?? 1); }
-event({ kind: 'remote-git', args });
-const file = path.join(remote, 'state.json'); const state = JSON.parse(fs.readFileSync(file, 'utf8'));
-if (args[0] === 'status') process.exit(0);
-if (args[0] === 'fetch') process.exit(0);
-if (args[0] === 'rev-parse') console.log(args[1].startsWith('FETCH_HEAD') ? state.fetchSha : state.head);
-else if (args[0] === 'checkout') { state.head = state.checkoutSha; fs.writeFileSync(file, JSON.stringify(state)); }
-else throw Error('Unexpected remote git: ' + args.join(' '));
-`)
-  writeFileSync(join(value.bin, 'pnpm'), prefix + `
-if (process.cwd() !== remote) { const result = spawnSync(${JSON.stringify(realPnpm)}, args, { stdio: 'inherit' }); process.exit(result.status ?? 1); }
-event({ kind: 'remote-pnpm', args });
-`)
-  writeFileSync(join(value.bin, 'docker'), prefix + `event({ kind: 'remote-docker', args });\n`)
-  writeFileSync(join(value.bin, 'ssh'), prefix + `
-event({ kind: 'ssh', args });
-const stateFile = path.join(root, 'state.json'); const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-if (state.moveMain) { state.mainSha = state.nextMainSha; fs.writeFileSync(stateFile, JSON.stringify(state)); }
-const result = spawnSync('bash', ['-c', args[1]], { input: fs.readFileSync(0), encoding: 'utf8' });
-process.stdout.write(result.stdout); process.stderr.write(result.stderr); process.exit(result.status ?? 1);
-`)
-  for (const name of ['git', 'pnpm', 'docker', 'ssh']) chmodSync(join(value.bin, name), 0o755)
-  return remote
+  writeFileSync(join(value.bin, 'git'), `#!${process.execPath}
+const cp=require('node:child_process'),a=process.argv.slice(2);if(process.cwd()===${JSON.stringify(remote)}){
+if(a[0]==='status'||a[0]==='fetch')process.exit(0);if(a[0]==='rev-parse'){console.log(${JSON.stringify(failure === 'fetch' ? 'f'.repeat(40) : value.sha)});process.exit(0)}
+if(a[0]==='archive')a.unshift('-C',${JSON.stringify(value.root)});}
+const result=cp.spawnSync(${JSON.stringify(realGit)},a,{stdio:'inherit'});process.exit(result.status??1);
+`, { mode: 0o700 })
+  writeFileSync(join(value.bin, 'ssh'), `#!${process.execPath}
+const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'ssh',args:a})+'\\n');
+if(a[1].includes("'bash' '-s'")){const r=cp.spawnSync('bash',['-c',a[1]],{input:fs.readFileSync(0),encoding:'utf8'});process.stdout.write(r.stdout);process.stderr.write(r.stderr);process.exit(r.status??1)}
+if(a[1].includes('backend-image-receiver.ts'))console.log(${JSON.stringify(imageId)});else console.log('Current build: '+${JSON.stringify(value.sha)});
+`, { mode: 0o700 })
+  return { remote, flags: ['--build-run', '80', '--build-attempt', '1', '--artifact-id', '90', '--auth-file', auth, '--import-budget', budget] }
 }
 
 describe('owner-machine release entry', () => {
@@ -362,6 +386,52 @@ describe('owner-machine release entry', () => {
 })
 
 describe('direct backend deployment entry', () => {
+  it('requires verified fixed image input even after formal candidate verification passes', () => {
+    const value = fixture()
+    const result = value.deploy('fixture-host', value.sha)
+    expect(result.status, result.stdout).not.toBe(0)
+    expect(result.stderr).toContain('Fixed formal image evidence is required')
+    expect(value.events().filter(event => event.kind === 'ssh')).toEqual([])
+  })
+
+  it.each(['provenance', 'budget', 'pull'])('rejects fixed image %s before first SSH', failure => {
+    const value = fixture(), image = imageInputs(value, failure)
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(result.status).not.toBe(0)
+    expect(value.events().filter(event => event.kind === 'ssh' || event.kind === 'scp')).toEqual([])
+    expect(result.stdout + result.stderr).not.toContain('private-fixture-token')
+  }, 30_000)
+
+  it('rejects a substituted remote fetch before intake or maintenance', () => {
+    const value = fixture(), image = imageInputs(value, 'fetch')
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Fetched backend candidate mismatch')
+    expect(value.events().filter(event => event.kind === 'scp')).toEqual([])
+  }, 30_000)
+
+  it('transports a fixed formal image and renews native authority before maintenance without forwarding credentials', () => {
+    const value = fixture(), image = imageInputs(value)
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(result.status, result.stderr).toBe(0)
+    const events = value.events(), ssh = events.filter(event => event.kind === 'ssh'), copies = events.filter(event => event.kind === 'scp')
+    expect(ssh).toHaveLength(3)
+    expect(ssh[1]?.args?.[1]).toContain('backend-image-receiver.ts')
+    expect(ssh[2]?.args?.[1]).toContain('backend-image-maintenance.ts')
+    expect(copies).toHaveLength(3)
+    expect(copies[0]?.args?.[1]).toMatch(/\/image.tar$/)
+    expect(copies.slice(1).every(event => event.args?.[1]?.endsWith('/request.json'))).toBe(true)
+    const nativeChecks = events.filter(event => event.endpoint === 'actions/runs/80/attempts/1')
+    expect(nativeChecks).toHaveLength(2)
+    const recheck = nativeChecks.at(1), intake = ssh.at(1), maintenance = ssh.at(2)
+    if (!recheck || !intake || !maintenance) throw new Error('Missing owner transport phases')
+    expect(events.indexOf(recheck)).toBeGreaterThan(events.indexOf(intake))
+    expect(events.indexOf(recheck)).toBeLessThan(events.indexOf(maintenance))
+    expect(JSON.stringify(copies)).not.toMatch(/auth.json|private-fixture-token/)
+    expect(JSON.stringify(ssh) + result.stdout + result.stderr).not.toContain('private-fixture-token')
+    expect(events.filter(event => event.kind === 'owner-docker').some(event => event.args?.[0] === 'pull' && event.args.at(-1)?.includes('@sha256:'))).toBe(true)
+  }, 30_000)
+
   it.each(['default', 'explicit ref'])('rejects %s deployment before any production SSH when full GitHub evidence is incomplete', mode => {
     const value = fixture()
     value.state.evidence = 'failed'
@@ -371,41 +441,6 @@ describe('direct backend deployment entry', () => {
     expect(result.stderr).toContain('Full GitHub verification is incomplete')
     expect(value.events().filter(event => event.kind === 'ssh' || event.kind === 'mutation')).toEqual([])
   })
-
-  it('refuses a remote fetch that does not contain the verified candidate before installing or building', () => {
-    const value = fixture()
-    const remote = remoteFixture(value, { fetchSha: 'b'.repeat(40) })
-    const result = value.deploy('fixture-host', value.sha, remote)
-    expect(result.status, result.stdout).not.toBe(0)
-    expect(result.stderr).toContain('Fetched backend candidate mismatch')
-    expect(value.events().filter(event => event.kind === 'remote-pnpm' || event.kind === 'remote-docker' || event.kind === 'remote-services')).toEqual([])
-  }, 30_000)
-
-  it('refuses a remote checkout that differs from the verified candidate before installing or building', () => {
-    const value = fixture()
-    const remote = remoteFixture(value, { checkoutSha: 'b'.repeat(40) })
-    const result = value.deploy('fixture-host', value.sha, remote)
-    expect(result.status).not.toBe(0)
-    expect(result.stderr).toContain('Checked-out backend candidate mismatch')
-    expect(value.events().filter(event => event.kind === 'remote-pnpm' || event.kind === 'remote-docker' || event.kind === 'remote-services')).toEqual([])
-  }, 30_000)
-
-  it('deploys the verified SHA when main moves after the local gate, and reports that SHA as the deployed build', () => {
-    const value = fixture()
-    const remote = remoteFixture(value)
-    value.state.moveMain = true
-    value.save()
-    const result = value.deploy('fixture-host', 'main', remote)
-    expect(result.status, result.stderr).toBe(0)
-    expect(readFileSync(join(remote, 'data/deployed-build-id'), 'utf8')).toBe(value.sha + '\n')
-    const events = value.events()
-    expect(events.filter(event => event.kind === 'remote-git' && event.args?.[0] === 'fetch')).toEqual([{
-      kind: 'remote-git', args: ['fetch', 'origin', value.sha],
-    }])
-    expect(events.findIndex(event => event.endpoint === 'actions/runs/1/jobs?filter=all&per_page=100')).toBeLessThan(events.findIndex(event => event.kind === 'ssh'))
-    expect(events.filter(event => event.kind === 'remote-docker' && event.args?.includes('build'))).toHaveLength(1)
-    expect(result.stdout).toContain(`Current build: ${value.sha}`)
-  }, 30_000)
 
   it('refuses execution in CI before GitHub or production access', () => {
     const value = fixture()

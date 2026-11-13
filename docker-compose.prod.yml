@@ -5,20 +5,17 @@
 #   2. Replace domain name in Caddyfile
 #   3. Set CORS_ORIGIN in .env to your GitHub Pages URL
 #   4. Public HTTPS traffic is exposed on host port 443 (8443 retained for existing clients)
-#   5. pnpm install --frozen-lockfile && node --env-file=.env scripts/local-services.mjs
-#   6. docker compose -f docker-compose.prod.yml up -d --build
+#   5. Complete the separately controlled dependency/cutover preparation.
+#   6. Run owner deploy-backend.sh with fixed formal image evidence.
 
 services:
   app:
     # Match the deployment account so persistent data stays writable by that account.
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
-    build:
-      context: .
-      target: production
-      args:
-        RELEASE_CHANNEL: stable
-        GAME_BUILD_ID: ${GAME_BUILD_ID:-development}
-    image: open-agricola:backend
+    # The owner entry supplies an immutable ID. The legacy name lets read-only
+    # inventory/backup commands resolve an existing deployment before pinning it.
+    image: ${BACKEND_IMAGE:-open-agricola:backend}
+    pull_policy: never
     env_file:
       - ${DEPENDENCIES_ENV_FILE:-./data/dependencies.compose.env}
     networks: [default, dependencies]

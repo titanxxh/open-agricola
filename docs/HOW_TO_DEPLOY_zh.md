@@ -330,14 +330,13 @@ ssh ubuntu@ten-kr \
 
 ### 1. 基础步骤（两种情况通用）
 
-准备 Node.js 24.15+（不支持 Node 25）、pnpm、Docker Compose、Git。生产 Compose 在同一台机器的 app 容器内启动两个独立应用进程，通过公开 HTTP/WS 路由进程接入，共享 PostgreSQL 18 和 RustFS。生产配置固定 `APP_INSTANCES=2`，即使 `.env` 中保留本地开发的 `1` 也会启动两个。无需申请外部服务。本地开发仍默认一个应用进程，使用 `./restart-local.sh --instances 2` 即可在本机验证相同的双进程路由。
+正式主机准备 Node.js 24.15+（不支持 Node 25）、Docker Compose、Git 和用户级 systemd/cgroup v2。生产 Compose 在同一台机器的 app 容器内启动两个独立应用进程，通过公开 HTTP/WS 路由进程接入，共享 PostgreSQL 18 和 RustFS。生产配置固定 `APP_INSTANCES=2`，即使 `.env` 中保留本地开发的 `1` 也会启动两个。无需申请外部服务。本地开发仍默认一个应用进程，使用 `./restart-local.sh --instances 2` 即可在本机验证相同的双进程路由。
 
 旧 SQLite 单实例的性能报告仅是历史基线；继续保留应用的既有容量上限，不把这些数字当作 PostgreSQL、双实例或高可用认证。本次只验正常功能和重启，不做故障注入或恢复计时。
 
 ```bash
 git clone https://github.com/YOUR_USER/open-agricola.git
 cd open-agricola
-pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
@@ -345,10 +344,7 @@ cp .env.example .env
 
 设置 `.env` 中原有 `PUBLIC_API_BASE`、`PUBLIC_APP_ORIGIN`、`CORS_ORIGIN` 和账号/OAuth 参数；已有 callback 不改。把 `DATABASE_URL` 与 `S3_*` 连接组留空即使用本机服务。配置外部 S3 时需要完整 endpoint、region、bucket、access key 和 secret，桶必须私有。
 
-```bash
-node --env-file=.env scripts/local-services.mjs
-GAME_BUILD_ID="$(git rev-parse HEAD)" docker compose -f docker-compose.prod.yml build app
-```
+依赖初始化或网络变更使用既有 owner 工具单独安排维护；应用交付入口只消费已准备的依赖和已验证的 PostgreSQL cutover。不要在正式主机安装或构建应用。
 
 依赖使用独立持久卷，生成凭据保存在 mode-600 的 `data/local-services.env`；主机工具使用 `data/dependencies.local`，容器使用 `data/dependencies.compose.env`。应用重建不清空数据库或资源。镜像包含 PostgreSQL 18 原生客户端和一个不可变 Viewer，启动时校验并上传到 S3。所有正式 Room 强制录制，资源不齐时拒绝开局。
 
@@ -372,7 +368,7 @@ networks:
 
 单独创建 external network。实际主机 helper 支持该 override 后才能宣称持久化；源码合入不会自动更新旧主机 helper。安装后可用 `docker network connect --alias` 给现有依赖原地接入，无需重启。使用 `docker compose --env-file data/local-services.env -f docker-compose.local.yml -f data/local-services.compose.override.yml config` 核对运行网络与 alias；手工协调配置时也须传入这两个文件。只有 PostgreSQL 和对象存储加入新依赖网络，候选服务不得加入任何正式网络。
 
-原地接入不会更新 Compose 保存的配置哈希。后续第一次协调配置可能重建共享依赖，应安排在正式维护中，先排空应用写入者。`deploy-backend.sh` 当前先启动依赖、后排空应用，首次 override 变更须处理这一顺序。之后重建依赖会保留声明的网络与 alias；单独执行 `docker network connect` 不提供该保证。
+原地接入不会更新 Compose 保存的配置哈希。后续第一次协调配置可能重建共享依赖，应安排在正式维护中，先排空应用写入者。`deploy-backend.sh` 仅复用已准备的依赖，不协调依赖；这类变更须单独维护。之后重建依赖会保留声明的网络与 alias；单独执行 `docker network connect` 不提供该保证。
 
 #### 首次 SQLite 迁移
 
@@ -756,7 +752,9 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
 2. 在 owner 本机部署同一固定后端候选。后端门禁不要求已有已发布的 Release：
 
     ```bash
-    ./deploy-backend.sh ubuntu@ten-kr <full-sha>
+    ./deploy-backend.sh ubuntu@ten-kr <full-sha> /home/ubuntu/open-agricola \
+      --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
+      --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
     ```
 
 3. 按现有部署流程核对后端构建标识、保留数据检查和健康状态。发布 Pages 前，确认公共 API 对以下预检返回204，并允许能力 header。将两个 origin 占位符替换为实际地址：
@@ -778,17 +776,35 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
 
 ### 后端
 
-在 owner 控制的本机准备锁定依赖和已认证的 `gh` CLI，再运行 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]`。默认参数为 `ubuntu@ten-kr`、`main` 和 `/home/ubuntu/open-agricola`。
+从 owner 控制的本机、可信 producer `P` 的干净 checkout 运行标准入口。需 Node.js 24.15+（不支持25）、已认证的 `gh`、本机 Unix Docker daemon（classic image store，导出含 OCI index）、SSH 和 SCP。正式主机需要同版本 Node、Docker Compose、用户级 systemd/cgroup v2 和已有依赖/已验证 PostgreSQL cutover；无需安装应用依赖。
 
-```bash
-./deploy-backend.sh ubuntu@ten-kr <full-sha>
-```
+1. 固定已合入的正式源码 `F` 并完成其全部候选验证。在可信 main `P` 上请求镜像，等待成功：
 
-第一次连接生产 SSH 前，脚本只解析一次 ref，并独立核验该 SHA 的完整 GitHub 证据。直接调用和默认 ref 使用同一门禁。证据缺失或失败时停止，不访问生产。fork 仓库可设置 `RELEASE_REPOSITORY=owner/name`。命令拒绝在 CI 中执行，生产 SSH 凭据继续只保存在 owner 本机。
+    ```bash
+    gh workflow run container-image-build.yml --ref main -f purpose=formal-candidate -f source_sha=<F>
+    ```
 
-远端按固定 SHA fetch，检查 `FETCH_HEAD` 与 detached checkout 均匹配，再把该 SHA 用作 `GAME_BUILD_ID`，分支移动不能替换源码。脚本拒绝覆盖远端已跟踪文件的本地修改。目标镜像构建时旧应用继续运行；之后停止整组应用，在维护锁内导出 PostgreSQL 和 S3，先在隔离数据库/对象 prefix 中使用目标镜像恢复与校验，再迁移并验证实际目标库，最后启动同一部署代际的全部应用。
+2. 从该次成功 run/attempt 取得唯一 receipt artifact ID。使用既有私有 GHCR 包、owner 本机0600凭据文件和独立0600资源预算：
 
-预检失败可重启未修改数据的旧容器。实际迁移开始后若校验失败，保持维护状态，不自动把旧程序连到可能已变更的 schema。`data_imports` 持久屏障阻止失败目标启动。脚本等待容器健康检查；这不是生产部署授权，也不是故障恢复认证。
+    ```bash
+    ./deploy-backend.sh ubuntu@ten-kr <F> /home/ubuntu/open-agricola \
+      --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
+      --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
+    ```
+
+    预算仅授予导入资源，不授予镜像或目标权限。结构如下；数值须由 owner 根据实时余量选择，示例不是主机容量认证：
+
+    ```json
+    {"format":1,"import":{"maxArchiveMiB":2048,"memoryHeadroomMiB":512,"intake":{"memoryMiB":384,"cpus":1,"pids":64}},"diskMiB":8192,"reserveMemoryMiB":512}
+    ```
+
+默认 host/ref/directory 仍为 `ubuntu@ten-kr`、`main`、`/home/ubuntu/open-agricola`，但五个镜像/资源参数必需，缺失时不回退为构建。命令拒绝在 CI 中运行。首次 SSH 前，入口固定 `F`、核对同 SHA 完整正式验证、原生 workflow/attempt/artifact 和 `formal-candidate/stable` 来源，再以 owner 私有凭据 digest pull、检查实际镜像并导出无 tag 的固定 archive。凭据和 Docker auth 不传服务器。
+
+服务器只从 `P` 提取可信控制文件。导入在独立受限 cgroup 中执行，零额外 swap，核对实时内存/磁盘余量、完整 archive、不可变 image ID 与镜像内前端描述。导入期间旧应用保持运行。传输/导入后 owner 重新核验正式授权，再签发短期维护请求；不能用旧 #1662 验收或工具镜像代替该应用的证据。
+
+维护锁内再次绑定目录、`F`、`P` 和实际 image。保留精确的旧 container/image/Build，检查固定 fetch/checkout 与数据目标，然后干净停止旧应用。旧 image 负责导出 PostgreSQL/S3，新 image 负责隔离恢复验证；通过后才执行 `check-live`，以 `--no-build --pull never` 启动 app 和原 Caddy image。正式主机没有 `pnpm install`、应用构建、registry 登录或自动依赖升级。共享依赖变更仍须单独维护。
+
+只有停机前正在运行、此次干净停止且身份未变化的旧容器，才会在 live migration 前的备份失败后恢复。OOM、未干净排空或开始 live migration 后的失败保持维护，不把旧程序接到可能已变化的 schema。`data_imports` 屏障和容器健康检查继续生效。私有操作目录保存导入、source 身份和 resolved Compose；后者含环境凭据，勿公开。`data/deployed-build-id` 与 `data/deployed-image.json` 记录成功交付；真实浏览器、保留对局和双实例现场验收仍须另做。
 
 ### 前端
 

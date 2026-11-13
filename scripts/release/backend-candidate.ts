@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkCandidateVerification } from '../ci/candidate-verification'
-import { candidateSha, ownerMachine, RELEASE_REPOSITORY } from './candidate'
+import { checkCandidateVerification } from '../ci/candidate-verification.ts'
+import { candidateSha, ownerMachine, RELEASE_REPOSITORY } from './candidate.ts'
 
 export function backendCandidate(cwd: string, input: string[]): string {
   ownerMachine()
