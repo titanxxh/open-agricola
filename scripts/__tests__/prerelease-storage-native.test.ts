@@ -51,7 +51,7 @@ else if(args[0]==='ps'&&args.join(' ').includes('com.docker.compose.project'))pr
 else if(args[0]==='inspect'&&args.includes('{{json .}}'))process.stdout.write(JSON.stringify({Config:{Labels:{'com.docker.compose.project':${JSON.stringify(fault === 'foreign-container' ? 'open-agricola' : target.project)},'com.docker.compose.service':'app','org.open-agricola.environment':${JSON.stringify(target.targetId)}}}}));
 else if(args[0]==='inspect')process.stdout.write('false');
 `, { mode: 0o700 })
-  writeFileSync(join(root, 'bin/ssh'), '#!/bin/sh\nprintf "17 /exclusive/pre\\n100 4096 500\\n"\n', { mode: 0o700 })
+  writeFileSync(join(root, 'bin/ssh'), '#!/bin/sh\ncat >/dev/null\nprintf "17 /exclusive/pre\\n100 4096 500\\n"\n', { mode: 0o700 })
   vi.stubEnv('PATH', `${join(root, 'bin')}:${process.env.PATH}`)
   try {
     const native = nativeStorageGuard(target, parseStorageGuardConfig(target, input))
