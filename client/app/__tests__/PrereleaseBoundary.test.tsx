@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"https://pre.agricola.test/open-agricola/"}
 import { StrictMode, useEffect } from 'react'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const build = 'a'.repeat(40), generation = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 vi.mock('../../contexts/LocaleContext', () => ({ useLocale: () => ({ t: (key: string, values?: { version?: string }) => values?.version ? `Prerelease ${values.version}` : key }) }))
@@ -131,4 +131,57 @@ it('pauses private pages when a confirmation fails instead of granting a fresh p
   await act(async () => { await vi.advanceTimersByTimeAsync(15_000) })
   expect(screen.queryByText('Private game context')).toBeNull()
   expect(screen.getByRole('alert')).toHaveTextContent('prerelease.accessPaused')
+})
+
+
+it.each(['unavailable', 'lost-body'])('retries the bound callback safely after an %s exchange without using an ambient account', async failure => {
+  vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
+  const callback = { protocolVersion: '1', code: 'c'.repeat(43), state: 's'.repeat(43), browserChallenge: 'b'.repeat(43), returnTo: 'https://formal.agricola.test/' }
+  window.history.replaceState(null, '', '/open-agricola/auth/handoff#' + new URLSearchParams(callback))
+  let exchanges = 0
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    expect(window.location.hash).toBe('')
+    if (url.endsWith('/runtime')) return Response.json({ ok: true, channel: 'prerelease', buildId: build, generationId: generation,
+      appOrigin: window.location.origin, formalAppOrigin: 'https://formal.agricola.test', formalApiBase: 'https://api.agricola.test', targetId: 'prerelease-main' })
+    expect(url).toBe('/api/prerelease/session')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({ ...callback, protocolVersion: 1 })
+    if (++exchanges === 1) return failure === 'unavailable'
+      ? Response.json({ ok: false, code: 'prerelease_access_paused' }, { status: 503 })
+      : new Response('{"ok":true', { status: 200 })
+    return Response.json({ ok: true, returnPath: '/open-agricola/?room=kept-room',
+      user: { id: 'u1', username: 'beta', displayName: 'Beta', isAdmin: false, betaAccess: true },
+      prerelease: { buildId: build, generationId: generation, expiresAt: 9_000_000_000_000,
+        validUntil: Date.now() + 30_000, serverTime: Date.now() } })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const { PrereleaseBoundary } = await import('../PrereleaseBoundary')
+  const runtime = await import('../../services/prerelease-runtime')
+  render(<StrictMode><PrereleaseBoundary><div>Private game context</div></PrereleaseBoundary></StrictMode>)
+  expect(await screen.findByText('prerelease.accessPaused')).toBeVisible()
+  expect(screen.queryByText('Private game context')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'platform.retry' }))
+  expect(await screen.findByText('Private game context')).toBeVisible()
+  expect(exchanges).toBe(2)
+  expect(fetchMock).toHaveBeenCalledTimes(3)
+  expect(runtime.getPrereleaseAccess()).toMatchObject({ kind: 'active', session: { user: { id: 'u1' } } })
+  expect(window.location.pathname + window.location.search).toBe('/open-agricola/?room=kept-room')
+})
+
+it.each([{ status: 400, code: 'invalid_prerelease_handoff' }, { status: 403, code: 'prerelease_access_expired' }])('requires a fresh entry after terminal handoff $status', async ({ status, code }) => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance', 'Date'] })
+  vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
+  window.history.replaceState(null, '', '/open-agricola/auth/handoff#' + new URLSearchParams({ protocolVersion: '1', code: 'c'.repeat(43), state: 's'.repeat(43), browserChallenge: 'b'.repeat(43), returnTo: 'https://formal.agricola.test/' }))
+  const fetchMock = vi.fn(async (url: string) => url.endsWith('/runtime')
+    ? Response.json({ ok: true, channel: 'prerelease', buildId: build, generationId: generation,
+      appOrigin: window.location.origin, formalAppOrigin: 'https://formal.agricola.test', formalApiBase: 'https://api.agricola.test', targetId: 'prerelease-main' })
+    : Response.json({ ok: false, code }, { status }))
+  vi.stubGlobal('fetch', fetchMock)
+  const { PrereleaseBoundary } = await import('../PrereleaseBoundary')
+  await act(async () => { render(<PrereleaseBoundary><div>Private game context</div></PrereleaseBoundary>) })
+  expect(screen.queryByText('Private game context')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'platform.retry' })).toBeNull()
+  expect(screen.getByRole('link', { name: 'prerelease.entry' })).toHaveAttribute('href', expect.stringContaining('/open-agricola/auth/start?returnPath='))
+  await act(async () => { await vi.advanceTimersByTimeAsync(16_000) })
+  expect(fetchMock).toHaveBeenCalledTimes(2)
 })
