@@ -43,17 +43,15 @@ async function command(program: string, args: string[], env: NodeJS.ProcessEnv, 
 }
 
 function observeRoomSocket(page: Page) {
-  const auth: Array<{ userId: string; username: string }> = []
   const created: string[] = [], joined: Array<{ roomId: string; playerIndex: number }> = []
   page.on('websocket', socket => socket.on('framereceived', frame => {
     let value: unknown
     try { value = JSON.parse(String(frame.payload)) } catch { return }
     if (!value || typeof value !== 'object' || !('type' in value)) return
-    if (value.type === 'authOk' && 'userId' in value && typeof value.userId === 'string' && 'username' in value && typeof value.username === 'string') auth.push({ userId: value.userId, username: value.username })
     if (value.type === 'roomCreated' && 'roomId' in value && typeof value.roomId === 'string') created.push(value.roomId)
     if (value.type === 'roomJoined' && 'roomId' in value && typeof value.roomId === 'string' && 'playerIndex' in value && typeof value.playerIndex === 'number') joined.push({ roomId: value.roomId, playerIndex: value.playerIndex })
   }))
-  return { auth, created, joined }
+  return { created, joined }
 }
 
 /** Actual pre application and sessions; the formal fixture uses the real authority protocol. */
@@ -216,7 +214,16 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
     await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     await context.addCookies([{ name: authCookieNames().session, value: sourceToken, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
-    return { context, browser, close, enter, preOrigin, user, source }
+    const assertPrincipal = async (page: Page) => {
+      const result: unknown = await page.evaluate(async ({ build, generation, header, version }) => {
+        const response = await fetch('/api/auth/me', { credentials: 'include', headers: {
+          [header]: String(version), 'x-oa-pre-build': build, 'x-oa-pre-generation': generation,
+        } })
+        return response.json()
+      }, { build: buildId, generation: generationId, header: BROWSER_AUTH_HEADER, version: BROWSER_AUTH_VERSION })
+      expect(result).toMatchObject({ ok: true, user: { id: user.id, username: user.username, displayName: user.displayName } })
+    }
+    return { context, browser, close, enter, assertPrincipal, preOrigin, user, source }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
     catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Prerelease fixture setup and cleanup failed', { cause: cleanupError }) }
@@ -233,8 +240,7 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
     await page.getByRole('button', { name: 'Create Multiplayer Game', exact: true }).click()
     await page.getByRole('button', { name: 'Create Game', exact: true }).click()
     await expect.poll(() => wire.created.length).toBeGreaterThan(0)
-    await expect.poll(() => wire.auth.length).toBeGreaterThan(0)
-    expect(wire.auth.every(row => row.userId === environment.user.id && row.username === environment.user.username)).toBe(true)
+    await environment.assertPrincipal(page)
     const roomId = wire.created[0]!
     await expect(page).toHaveURL(new RegExp(`room=${roomId}`))
     const roomUrl = page.url()
@@ -242,20 +248,19 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
     expect(cookie).toMatchObject({ secure: true, httpOnly: true, path: '/', sameSite: 'Lax' })
     expect(cookie?.expires).toBeGreaterThan(Date.now() / 1000)
     expect(await page.evaluate(() => document.cookie)).not.toContain('__Host-oa-pre-session')
-    const authenticatedBeforeReload = wire.auth.length
+    const joinedBeforeReload = wire.joined.length
     await page.reload()
-    await expect.poll(() => wire.auth.length).toBeGreaterThan(authenticatedBeforeReload)
+    await expect.poll(() => wire.joined.length).toBeGreaterThan(joinedBeforeReload)
     await expect.poll(() => wire.joined.some(row => row.roomId === roomId && row.playerIndex === 0)).toBe(true)
-    expect(wire.auth.every(row => row.userId === environment.user.id)).toBe(true)
+    await environment.assertPrincipal(page)
     const state = await environment.context.storageState()
     await environment.context.close(); await environment.browser.close()
     const reopened = await playwright.chromium.launch(), restored = await reopened.newContext({ ignoreHTTPSErrors: true, storageState: state })
     try {
       const resumed = await restored.newPage(), restoredWire = observeRoomSocket(resumed)
       await resumed.goto(roomUrl)
-      await expect.poll(() => restoredWire.auth.length).toBeGreaterThan(0)
-      expect(restoredWire.auth.every(row => row.userId === environment.user.id && row.username === environment.user.username)).toBe(true)
       await expect.poll(() => restoredWire.joined.some(row => row.roomId === roomId && row.playerIndex === 0)).toBe(true)
+      await environment.assertPrincipal(resumed)
       const settings = await restored.newPage()
       await settings.goto(`${environment.preOrigin}/open-agricola/?page=settings`)
       await expect(settings.locator('input[type=password]')).toHaveCount(0)
