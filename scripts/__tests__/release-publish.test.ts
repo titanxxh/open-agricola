@@ -237,7 +237,7 @@ else if(cmd[0]==='create')console.log('f'.repeat(64));else if(cmd[0]==='cp')fs.w
   const remote = join(value.root, 'remote'), targetDirectory = remoteDirectory ?? remote
   mkdirSync(join(remote, 'data'), { recursive: true }); writeFileSync(join(remote, 'data/postgres-cutover.validated'), '')
   writeFileSync(join(value.bin, 'scp'), `#!${process.execPath}
-const fs=require('node:fs'),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'scp',args:a})+'\\n');const source=a[1],requested=a[2].slice(a[2].indexOf(':')+1);if(!requested.startsWith(${JSON.stringify(targetDirectory + '/backups/.backend-image-')}))throw Error('Unexpected transfer namespace');const target=${JSON.stringify(remote)}+requested.slice(${JSON.stringify(targetDirectory)}.length);fs.copyFileSync(source,target);fs.chmodSync(target,0o600);
+const fs=require('node:fs'),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'scp',args:a})+'\\n');const source=a.at(-2),requested=a.at(-1).slice(a.at(-1).indexOf(':')+1);if(!requested.startsWith(${JSON.stringify(targetDirectory + '/backups/.backend-image-')}))throw Error('Unexpected transfer namespace');const target=${JSON.stringify(remote)}+requested.slice(${JSON.stringify(targetDirectory)}.length);if(${JSON.stringify(['archive-transfer', 'archive-cleanup'].includes(failure))}&&target.endsWith('/image.tar')){fs.writeFileSync(target,fs.readFileSync(source).subarray(0,3),{mode:0o600});process.exit(41)}fs.copyFileSync(source,target);
 `, { mode: 0o700 })
   const remoteBin = join(value.root, 'remote-bin'); mkdirSync(remoteBin)
   writeFileSync(join(remoteBin, 'node'), `#!${process.execPath}
@@ -254,7 +254,17 @@ const result=cp.spawnSync(${JSON.stringify(realGit)},a,{stdio:'inherit'});proces
 const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2),input=fs.readFileSync(0);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'ssh',args:a,body:{stdinBytes:input.length}})+'\\n');
 const command=a[1].replaceAll(${JSON.stringify(targetDirectory)},${JSON.stringify(remote)});
 if(a[1].includes("'bash' '-s'")){const r=cp.spawnSync('bash',['-c',command],{input,encoding:'utf8'});process.stdout.write(r.stdout.replaceAll(${JSON.stringify(remote)},${JSON.stringify(targetDirectory)}));process.stderr.write(r.stderr);process.exit(r.status??1)}
-if(a[1].includes('backend-image-receiver.ts'))console.log(${JSON.stringify(imageId)});
+if(a[1].includes('backend-image-receiver.ts')){
+ const mode=['preflight','discard-transfer','receive'].find(value=>a[1].includes("'"+value+"'"));
+ if(mode==='preflight'&&${JSON.stringify(failure === 'disk-preflight')}){console.error('Conservative disk reserve unavailable');process.exit(42)}
+ if(mode==='discard-transfer'){
+  if(${JSON.stringify(failure === 'archive-cleanup')}){console.error('An active intake owns this transfer');process.exit(43)}
+  const request=JSON.parse(fs.readFileSync(fs.readdirSync(${JSON.stringify(remote + '/backups')}).filter(name=>name.startsWith('.backend-image-')).map(name=>${JSON.stringify(remote + '/backups/')}+name+'/request.json')[0],'utf8'));
+  fs.rmSync(request.stage+'/image.tar',{force:true});
+ }
+ if(mode==='receive'&&${JSON.stringify(failure === 'late-provenance')}){const path=${JSON.stringify(join(value.root, 'state.json'))};const state=JSON.parse(fs.readFileSync(path,'utf8'));state.provenance[${JSON.stringify(prefix + 'actions/runs/80/attempts/1')}].conclusion='failure';fs.writeFileSync(path,JSON.stringify(state))}
+ console.log(${JSON.stringify(imageId)});
+}
 else {const r=cp.spawnSync('bash',['-c',command],{input,env:{...process.env,PATH:${JSON.stringify(remoteBin)}+':'+process.env.PATH},encoding:'utf8'});process.stdout.write(r.stdout);process.stderr.write(r.stderr);process.exit(r.status??1)}
 `, { mode: 0o700 })
   const request = (): unknown => {
@@ -415,7 +425,7 @@ describe('direct backend deployment entry', () => {
     const result = defaultTarget ? value.deploy(...image.flags) : value.deploy(host, 'v0.7.9', directory, ...image.flags)
     expect(result.status, result.stderr).toBe(0)
     const events = value.events()
-    expect(events.filter(event => event.kind === 'ssh').map(event => event.args?.[0])).toEqual([host, host, host])
+    expect(events.filter(event => event.kind === 'ssh').map(event => event.args?.[0])).toEqual([host, host, host, host])
     expect(events.filter(event => event.kind === 'maintenance-entry').map(event => event.body)).toEqual([{ policy, stdinBytes: 0 }])
     expect(events.filter(event => event.kind === 'sudo')).toEqual([])
     expect(image.request()).toMatchObject({ directory, sourceSha: value.sha, producerSha: value.sha })
@@ -496,7 +506,58 @@ describe('direct backend deployment entry', () => {
     const copies = value.events().filter(event => event.kind === 'scp'), request = copies.at(-1)?.args?.at(-1)
     if (!request) throw new Error('Missing transmitted request')
     expect(JSON.parse(readFileSync(request.slice(request.indexOf(':') + 1), 'utf8')).installation).toEqual({ kind: 'bootstrap', caddyImage })
-    expect(value.events().filter(event => event.kind === 'ssh')).toHaveLength(3)
+    expect(value.events().filter(event => event.kind === 'ssh')).toHaveLength(4)
+  }, 30_000)
+
+  it('rejects receiver disk exhaustion before transferring archive bytes or starting intake', () => {
+    const value = fixture(), image = imageInputs(value, 'disk-preflight')
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Conservative disk reserve unavailable')
+    const events = value.events(), copies = events.filter(event => event.kind === 'scp')
+    expect(copies).toHaveLength(1)
+    expect(copies[0]?.args?.at(-2)).toMatch(/\/request.json$/)
+    expect(events.filter(event => event.kind === 'ssh').some(event => event.args?.[1]?.includes("'preflight'"))).toBe(true)
+    expect(events.filter(event => event.kind === 'ssh').some(event => /'(receive|maintain)'/.test(event.args?.[1] ?? ''))).toBe(false)
+  }, 30_000)
+
+  it('discards an interrupted archive transfer while preserving the private request and policy evidence', () => {
+    const value = fixture(), image = imageInputs(value, 'archive-transfer')
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(result.status).not.toBe(0)
+    const events = value.events(), archive = events.find(event => event.kind === 'scp' && event.args?.at(-1)?.endsWith('/image.tar'))?.args?.at(-1)
+    if (!archive) throw new Error('Missing attempted archive transfer')
+    const path = archive.slice(archive.indexOf(':') + 1)
+    expect(existsSync(path)).toBe(false)
+    expect(existsSync(join(dirname(path), 'request.json'))).toBe(true)
+    expect(existsSync(join(dirname(path), 'policy/scripts/release/backend-image-receiver.ts'))).toBe(true)
+    const ssh = events.filter(event => event.kind === 'ssh')
+    expect(ssh.at(-1)?.args?.[1]).toContain("'discard-transfer'")
+    expect(ssh.some(event => /'(receive|maintain)'/.test(event.args?.[1] ?? ''))).toBe(false)
+  }, 30_000)
+
+  it('reports refused partial cleanup and retains evidence without starting intake or maintenance', () => {
+    const value = fixture(), image = imageInputs(value, 'archive-cleanup')
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('partial cleanup could not be confirmed')
+    const events = value.events(), archive = events.find(event => event.kind === 'scp' && event.args?.at(-1)?.endsWith('/image.tar'))?.args?.at(-1)
+    if (!archive) throw new Error('Missing interrupted archive transfer')
+    expect(readFileSync(archive.slice(archive.indexOf(':') + 1)).length).toBe(3)
+    const ssh = events.filter(event => event.kind === 'ssh')
+    expect(ssh.at(-1)?.args?.[1]).toContain("'discard-transfer'")
+    expect(ssh.some(event => /'(receive|maintain)'/.test(event.args?.[1] ?? ''))).toBe(false)
+    expect(result.stdout + result.stderr).not.toContain('private-fixture-token')
+  }, 30_000)
+
+  it('rejects changed image authority after intake and before maintenance', () => {
+    const value = fixture(), image = imageInputs(value, 'late-provenance')
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
+    expect(result.status).not.toBe(0)
+    const ssh = value.events().filter(event => event.kind === 'ssh')
+    expect(ssh.some(event => event.args?.[1]?.includes("'receive'"))).toBe(true)
+    expect(ssh.some(event => event.args?.[1]?.includes("'maintain'"))).toBe(false)
+    expect(value.events().filter(event => event.endpoint === 'actions/runs/80/attempts/1')).toHaveLength(2)
   }, 30_000)
 
   it('transports a fixed formal image and renews native authority before maintenance without forwarding credentials', () => {
@@ -504,17 +565,18 @@ describe('direct backend deployment entry', () => {
     const result = value.deploy('fixture-host', value.sha, image.remote, ...image.flags)
     expect(result.status, result.stderr).toBe(0)
     const events = value.events(), ssh = events.filter(event => event.kind === 'ssh'), copies = events.filter(event => event.kind === 'scp')
-    expect(ssh).toHaveLength(3)
-    expect(ssh.slice(1).map(event => event.body)).toEqual([{ stdinBytes: 0 }, { stdinBytes: 0 }])
-    expect(ssh[1]?.args?.[1]).toContain('backend-image-receiver.ts')
-    expect(ssh[2]?.args?.[1]).toContain('backend-image-maintenance.ts')
-    expect(copies).toHaveLength(3)
-    expect(copies[0]?.args?.[1]).toMatch(/\/image.tar$/)
-    expect(copies.slice(1).every(event => event.args?.[1]?.endsWith('/request.json'))).toBe(true)
+    expect(ssh).toHaveLength(4)
+    expect(ssh.slice(1).map(event => event.body)).toEqual([{ stdinBytes: 0 }, { stdinBytes: 0 }, { stdinBytes: 0 }])
+    expect(ssh[1]?.args?.[1]).toContain("'preflight'")
+    expect(ssh[2]?.args?.[1]).toContain("'receive'")
+    expect(ssh[3]?.args?.[1]).toContain('backend-image-maintenance.ts')
+    expect(copies.map(event => event.args?.at(-2)?.split('/').at(-1))).toEqual(['request.json', 'image.tar', 'request.json', 'request.json'])
+    expect(copies.every(event => event.args?.includes('-p'))).toBe(true)
     const nativeChecks = events.filter(event => event.endpoint === 'actions/runs/80/attempts/1')
     expect(nativeChecks).toHaveLength(2)
-    const recheck = nativeChecks.at(1), intake = ssh.at(1), maintenance = ssh.at(2)
-    if (!recheck || !intake || !maintenance) throw new Error('Missing owner transport phases')
+    const recheck = nativeChecks.at(1), preflight = ssh.at(1), archiveTransfer = copies.at(1), intake = ssh.at(2), maintenance = ssh.at(3)
+    if (!recheck || !preflight || !archiveTransfer || !intake || !maintenance) throw new Error('Missing owner transport phases')
+    expect(events.indexOf(preflight)).toBeLessThan(events.indexOf(archiveTransfer))
     expect(events.indexOf(recheck)).toBeGreaterThan(events.indexOf(intake))
     expect(events.indexOf(recheck)).toBeLessThan(events.indexOf(maintenance))
     expect(JSON.stringify(copies)).not.toMatch(/auth.json|private-fixture-token/)

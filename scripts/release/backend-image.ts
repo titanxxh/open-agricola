@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { backendCandidate } from './backend-candidate.ts'
-import { parseBackendInstallation, readBackendImportBudget } from './backend-image-receiver.ts'
+import { BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS, parseBackendInstallation, readBackendImportBudget } from './backend-image-receiver.ts'
 import { assertExpectedContainerImage, verifyContainerImageBuild } from './container-images.ts'
 import { prepareContainerImageArchive } from './container-images-owner.ts'
 
@@ -66,21 +66,30 @@ git archive "$3" package.json scripts/ci scripts/release scripts/image-intake.ts
 printf '%s\\n' "$4"
 `
   if (ssh(['bash', '-s', '--', directory, sourceSha, producerSha, stage], prepare, 120_000) !== stage) throw new Error('Backend returned another private image staging directory')
-  execute('scp', ['--', exported.archivePath, `${host}:${stage}/image.tar`], undefined, 20 * 60_000)
   const requestPath = join(local, 'request.json'), remoteRequest = join(stage, 'request.json')
   const request = { format: 1, operationId, directory, stage, sourceSha, producerSha, expiresAt: 0, installation, budget, transfer: exported.transfer }
   const authorize = (): void => {
     request.expiresAt = Date.now() + 300_000
     writeFileSync(requestPath, JSON.stringify(request) + '\n', { mode: 0o600, flush: true })
-    execute('scp', ['--', requestPath, `${host}:${remoteRequest}`])
+    execute('scp', ['-p', '--', requestPath, `${host}:${remoteRequest}`])
   }
   authorize()
-  ssh(['node', join(stage, 'policy/scripts/release/backend-image-receiver.ts'), 'receive', remoteRequest], undefined, 22 * 60_000)
+  const receiver = join(stage, 'policy/scripts/release/backend-image-receiver.ts')
+  const target = [remoteRequest, directory, sourceSha, producerSha]
+  ssh(['node', receiver, 'preflight', ...target], undefined, 120_000)
+  try { execute('scp', ['-p', '--', exported.archivePath, `${host}:${stage}/image.tar`], undefined, 20 * 60_000) }
+  catch (error) {
+    try { ssh(['node', receiver, 'discard-transfer', ...target], undefined, 120_000) }
+    catch (cleanupError) { throw new AggregateError([error], `Formal image archive transfer failed and partial cleanup could not be confirmed; inspect ${stage}`, { cause: cleanupError }) }
+    throw error
+  }
+  authorize()
+  ssh(['node', receiver, 'receive', remoteRequest], undefined, BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS)
   if (backendCandidate(cwd, [sourceSha]) !== sourceSha || JSON.stringify(verifyContainerImageBuild(build)) !== JSON.stringify(receipt)) throw new Error('Formal image authority changed during transport')
   authorize()
   const env = ['env']
   if (process.env.ACCOUNT_REGISTRATION_POLICY) env.push(`ACCOUNT_REGISTRATION_POLICY=${process.env.ACCOUNT_REGISTRATION_POLICY}`)
-  const result = ssh([...env, 'node', join(stage, 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', remoteRequest, directory, sourceSha, producerSha], undefined, 41 * 60_000)
+  const result = ssh([...env, 'node', join(stage, 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', ...target], undefined, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS)
   process.stdout.write(result + `\nOwner image evidence: ${local}\n`)
 }
 
