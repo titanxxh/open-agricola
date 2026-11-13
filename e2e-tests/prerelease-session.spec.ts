@@ -17,16 +17,20 @@ import { authCookieNames } from '../server/auth-cookies'
 import { createPrereleaseAuthorityHandler } from '../server/prerelease-authority-routes'
 import { requestSessionToken } from '../server/request-auth'
 import { getDb } from '../server/db'
+import { releaseAll } from '../server/__tests__/_helpers/release-all'
 import { databaseMaintenance, getTestDatabaseUrl } from '../server/__tests__/_helpers/postgres'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../shared/contract/browser-auth'
 import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { test } from './server-fixtures'
 
 const buildId = 'a'.repeat(40)
+const reservedPorts = new Set<number>()
 async function port(): Promise<number> {
   const server = createServer(); server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Missing loopback port')
-  await new Promise<void>(done => server.close(() => done())); return address.port
+  await new Promise<void>(done => server.close(() => done()))
+  if (reservedPorts.has(address.port)) return port()
+  reservedPorts.add(address.port); return address.port
 }
 const shell = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 const envText = (env: Record<string, string>) => Object.entries(env).map(([key, value]) => `${key}=${shell(value)}\n`).join('')
@@ -86,20 +90,24 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
   const dependencyKeys = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']
   const dependencies = Object.fromEntries(dependencyKeys.map(key => { const value = process.env[key]; if (!value) throw new Error(`Missing isolated ${key}`); return [key, value] }))
   const envFile = join(directory, 'pre.env'), owned = join(directory, 'owned.json')
-  const childEnv: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'development', RELEASE_CHANNEL: 'prerelease', GAME_BUILD_ID: buildId, VITE_BASE_PATH: '/open-agricola/', VITE_API_BASE: '', VITE_WS_BASE: '' }
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production', RELEASE_CHANNEL: 'prerelease', GAME_BUILD_ID: buildId, VITE_BASE_PATH: '/open-agricola/', VITE_API_BASE: '', VITE_WS_BASE: '' }
   delete childEnv.PRERELEASE_IDENTITY_SERVICE_KEY
   writeFileSync(envFile, envText({ ...dependencies, DATABASE_URL: databaseUrl, DATABASE_SCHEMA: schema, S3_PREFIX: prefix, RELEASE_CHANNEL: 'prerelease', GAME_BUILD_ID: buildId,
     PUBLIC_APP_ORIGIN: `${preOrigin}/open-agricola/`, PUBLIC_API_BASE: preOrigin, CORS_ORIGIN: preOrigin, FORMAL_APP_ORIGIN: formalOrigin, FORMAL_API_BASE: formalOrigin,
     PRERELEASE_DATA_GENERATION: generationId, PRERELEASE_TARGET_ID: targetId, PRERELEASE_IDENTITY_SERVICE_KEY: serviceKey, FRONTEND_ROOT: root,
-    NODE_EXTRA_CA_CERTS: join(directory, 'cert.pem'), SHARED_DATA_DIR: join(directory, 'data'), OWNED_PROCESSES_FILE: owned, BACKEND_PORT: String(backendPort),
+    NODE_EXTRA_CA_CERTS: join(directory, 'cert.pem'), SHARED_DATA_DIR: join(directory, 'data'), REPLAY_VIEWER_ROOT: join(directory, 'data/replay-viewers'),
+    BACKEND_LOG: join(directory, 'backend.log'), FRONTEND_LOG: join(directory, 'frontend.log'), OWNED_PROCESSES_FILE: owned, BACKEND_PORT: String(backendPort),
     FRONTEND_PORT: String(frontendPort), APP_BASE_PORT: String(appPort), OBSERVABILITY_ENABLED: 'false' }), { mode: 0o600 })
-  const launchEnv = { ...process.env, LOCAL_ENV_FILE: envFile }
-  const close = async () => {
-    try { if (existsSync(owned)) await command('bash', ['./restart-local.sh', '--kill-only'], launchEnv, join(directory, 'stop.log')) }
-    finally {
+  const launchEnv: NodeJS.ProcessEnv = { ...process.env, LOCAL_ENV_FILE: envFile }
+  delete launchEnv.REPLAY_VIEWER_BUILD_ID
+  const close = () => releaseAll([
+    async () => { if (existsSync(owned)) await command('bash', ['./restart-local.sh', '--kill-only'], launchEnv, join(directory, 'stop.log')) },
+    async () => {
       for (const socket of sockets) socket.destroy()
       await new Promise<void>(done => proxy.close(() => done()))
-      await admin.exec(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); await admin.close()
+    },
+    async () => { try { await admin.exec(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`) } finally { await admin.close() } },
+    async () => {
       const s3 = new S3Client({ endpoint: dependencies.S3_ENDPOINT, region: dependencies.S3_REGION, forcePathStyle: true,
         credentials: { accessKeyId: dependencies.S3_ACCESS_KEY_ID, secretAccessKey: dependencies.S3_SECRET_ACCESS_KEY } })
       try {
@@ -111,6 +119,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
           continuation = listing.NextContinuationToken
         } while (continuation)
       } finally { s3.destroy() }
+    },
+    async () => {
       await source.prepare('DELETE FROM prerelease_identity_events WHERE generation_id=?').run(generationId)
       await source.prepare('DELETE FROM prerelease_identity_handoffs WHERE generation_id=?').run(generationId)
       await source.prepare('DELETE FROM prerelease_identity_grants WHERE generation_id=?').run(generationId)
@@ -118,13 +128,15 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       await source.prepare('DELETE FROM prerelease_identity_owner_operations WHERE generation_id=?').run(generationId)
       await source.prepare('DELETE FROM prerelease_identity_generations WHERE id=?').run(generationId)
       await source.prepare('DELETE FROM users WHERE id=?').run(user.id)
+    },
+    () => {
       for (const key of envKeys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key] }
       rmSync(root, { recursive: true, force: true }); rmSync(envFile, { force: true }); rmSync(join(directory, 'key.pem'), { force: true })
-    }
-  }
+    },
+  ])
   try {
     await command('pnpm', ['exec', 'vite', 'build', '--outDir', root], childEnv, join(directory, 'build.log'))
-  writeFileSync(join(root, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: buildId, basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }) + '\n')
+    writeFileSync(join(root, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: buildId, basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }) + '\n')
     await command('bash', ['./restart-local.sh'], launchEnv, join(directory, 'launcher.log'))
   } catch (error) { await close(); throw error }
   const enter = async (context: BrowserContext) => {
