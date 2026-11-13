@@ -1,3 +1,4 @@
+import { isPrerelease, prereleaseCommandAllowed } from '../prerelease-access'
 import { addRoomSpectator, isRoomSpectator, removeRoomSpectator } from '../game/room-spectators'
 import { isPublicSpectatableRoom } from '../game/room'
 import type { FenceSelectionQuote } from '../../shared/contract/protocol/game'
@@ -478,7 +479,7 @@ const useSessionResponse = (
 const commandActor = (ctx: ConnectionCtx): string => {
   if (!ctx.authenticated) throw new CommandError('command_scope_expired', 'Authentication is required')
   if (ctx.currentUserId) return `user:${ctx.currentUserId}`
-  if (process.env.NODE_ENV !== 'production' && ['1', 'true'].includes(process.env.ALLOW_ANONYMOUS_WS ?? '')) return 'development-anonymous'
+  if (!isPrerelease() && process.env.NODE_ENV !== 'production' && ['1', 'true'].includes(process.env.ALLOW_ANONYMOUS_WS ?? '')) return 'development-anonymous'
   throw new CommandError('command_scope_expired', 'Authentication is required')
 }
 
@@ -1707,6 +1708,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
 }
 
 export async function dispatch(ctx: ConnectionCtx, msg: ClientCommand): Promise<void> {
+  if (isPrerelease() && (msg.type === 'auth' || !(await prereleaseCommandAllowed(ctx.ws)))) { ctx.ws.close(1008, 'prerelease access ended'); return }
   const run = () => observeCommand({ command: msg.type, requestId: msg.requestId, socket: ctx.ws, round: roundTag(ctx.currentRoom?.session.state) }, () => dispatchCommand(ctx, msg))
   const ids = ctx.currentRoom ? [ctx.currentRoom.id] : []
   if (msg.type === 'joinRoom' || msg.type === 'spectateRoom') ids.push(msg.roomId)
@@ -1743,6 +1745,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
     let request: CommandRequest | undefined
     const commands = ctx.commands
     try {
+      if (!(await prereleaseCommandAllowed(ctx.ws))) { commandOutcome('canceled'); ctx.ws.close(1008, 'prerelease access ended'); return }
       if (ctx.sessionToken && !(await validateSession(ctx.sessionToken))) { commandOutcome('canceled'); ctx.ws.close(1008, 'session revoked'); return }
       if (isRoomSpectator(ctx.currentRoom, ctx.ws) && !['auth', 'joinRoom', 'spectateRoom', 'getState', 'getHistory', 'getCommandScope', 'getCommandReceipt'].includes(msg.type)) {
         sendCommandError(ctx, 'Spectators cannot issue game commands', msg.requestId); return
