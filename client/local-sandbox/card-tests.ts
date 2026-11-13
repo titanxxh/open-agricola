@@ -1,3 +1,4 @@
+import { assertPrereleaseAccess, getPrereleaseAccess, isPrereleaseClient, subscribePrereleaseAccess } from '../services/prerelease-runtime'
 import type { WorkshopBrowserTestOutcome } from '../../shared/contract/workshop.ts'
 
 // The Vite plugin emits a self-contained classic Worker, including in dev.
@@ -41,6 +42,13 @@ function parseOutcome(value: unknown): WorkshopBrowserTestOutcome {
 export async function runBrowserCardTests(input: {
   source: string; tests: string; signal: AbortSignal
 }): Promise<{ browserRuntimeId: string; outcome: WorkshopBrowserTestOutcome }> {
+  assertPrereleaseAccess()
+  const revoked = new AbortController()
+  const unsubscribe = subscribePrereleaseAccess(() => {
+    if (isPrereleaseClient() && getPrereleaseAccess().kind !== 'active') revoked.abort(new Error('prerelease_access_expired'))
+  })
+  input = { ...input, signal: AbortSignal.any([input.signal, revoked.signal]) }
+  try {
   input.signal.throwIfAborted()
   const bundle = await new Promise<Awaited<ReturnType<typeof loadRuntime>>>((resolve, reject) => {
     const abort = () => { input.signal.removeEventListener('abort', abort); reject(input.signal.reason) }
@@ -143,5 +151,7 @@ export async function runBrowserCardTests(input: {
     if (input.signal.aborted) abort()
     else document.body.append(frame)
   })
+  assertPrereleaseAccess()
   return { browserRuntimeId: bundle.id, outcome }
+  } finally { unsubscribe() }
 }
