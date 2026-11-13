@@ -12,9 +12,9 @@ services:
   app:
     # Match the deployment account so persistent data stays writable by that account.
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
-    # The owner entry supplies an immutable ID. The legacy name lets read-only
-    # inventory/backup commands resolve an existing deployment before pinning it.
-    image: ${BACKEND_IMAGE:-open-agricola:backend}
+    # Successful owner delivery pins this immutable ID in the deployment .env.
+    # A missing/blank binding keeps ordinary run/up closed during maintenance.
+    image: ${BACKEND_IMAGE:?Use the owner fixed-image delivery before Compose maintenance}
     pull_policy: never
     env_file:
       - ${DEPENDENCIES_ENV_FILE:-./data/dependencies.compose.env}

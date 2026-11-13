@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fullSha } from '../ci/verification-tasks.ts'
@@ -16,6 +17,36 @@ function environment(value: unknown): Record<string, string> {
 function execute(command: string, args: string[], cwd: string, env = process.env, timeout = 30_000): string {
   try { return execFileSync(command, args, { cwd, env, encoding: 'utf8', timeout, maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim() }
   catch { throw new Error(`Backend maintenance command failed: ${command} ${args.slice(0, 2).join(' ')}`) }
+}
+// .env is Compose's durable image selector. The JSON receipt is audit evidence only.
+// Keep a blank selector after live migration starts until the exact target is accepted.
+function installedImageBinding(root: string) {
+  const path = join(root, '.env')
+  const read = (): string => {
+    const info = lstatSync(path)
+    if (!info.isFile() || info.nlink !== 1 || info.uid !== process.getuid?.() || info.size > 256 * 1024) throw new Error('Backend .env must be an owner-owned regular file')
+    return readFileSync(path, 'utf8')
+  }
+  let current = read()
+  const assignments = current.split('\n').filter(line => /^\s*(?:export\s+)?BACKEND_IMAGE(?:\s|=|$)/.test(line))
+  if (assignments.length > 1 || assignments.some(line => !/^BACKEND_IMAGE=(?:sha256:[a-f0-9]{64})?\r?$/.test(line))) throw new Error('Backend .env requires one unquoted immutable BACKEND_IMAGE assignment or none before the first delivery')
+  const image = assignments[0]?.trim().slice('BACKEND_IMAGE='.length) || null
+  let hasAssignment = assignments.length === 1
+  return { image, write(value: string) {
+    if (value !== '' && !/^sha256:[a-f0-9]{64}$/.test(value)) throw new Error('Installed backend image must be immutable')
+    if (read() !== current) throw new Error('Backend .env changed during maintenance')
+    const next = hasAssignment ? current.replace(/^BACKEND_IMAGE=[^\r\n]*/m, `BACKEND_IMAGE=${value}`)
+      : current + (current.endsWith('\n') ? '' : '\n') + `BACKEND_IMAGE=${value}\n`
+    const temporary = join(root, `.env.backend-image-${randomUUID()}`)
+    try {
+      writeFileSync(temporary, next, { flag: 'wx', mode: 0o600, flush: true })
+      renameSync(temporary, path)
+      const directory = openSync(root, 'r')
+      try { fsyncSync(directory) } finally { closeSync(directory) }
+      current = next
+      hasAssignment = true
+    } finally { if (existsSync(temporary)) unlinkSync(temporary) }
+  } }
 }
 type Target = Pick<BackendImageRequest, 'directory' | 'sourceSha' | 'producerSha'>
 function validateTarget(path: string, expected: Target): BackendImageRequest {
@@ -39,7 +70,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
     return object(values[0])
   }
   try {
-    const image = verifyReceivedBackendImage(path, expected)
+    const image = verifyReceivedBackendImage(path, expected), installed = installedImageBinding(root)
     const env = { ...process.env, GIT_NO_REPLACE_OBJECTS: '1', APP_UID: String(process.getuid?.()), APP_GID: String(process.getgid?.()), BACKEND_IMAGE: image, GAME_BUILD_ID: request.sourceSha, RELEASE_CHANNEL: 'stable' }
     const git = (args: string[]): string => execute('git', args, root, env)
     const config = (): Record<string, unknown> => object(JSON.parse(execute('docker', ['compose', '-f', 'docker-compose.prod.yml', 'config', '--format', 'json'], root, env)))
@@ -55,6 +86,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
       || labels['com.docker.compose.project'] !== sourceConfig.name || labels['com.docker.compose.service'] !== 'app'
       || typeof oldState.Running !== 'boolean' || oldState.OOMKilled !== false) throw new Error('Source application inventory or OOM boundary differs')
     source = { id: oldId, image: old.Image, build: fullSha(oldEnv.GAME_BUILD_ID ?? ''), running: oldState.Running }
+    if (installed.image && installed.image !== source.image) throw new Error('Installed Compose image differs from the retained source application')
     git(['fetch', 'origin', request.sourceSha])
     if (git(['rev-parse', 'FETCH_HEAD^{commit}']) !== request.sourceSha) throw new Error('Fetched backend candidate mismatch')
     git(['checkout', '--detach', request.sourceSha])
@@ -103,6 +135,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
     if (manifest.formatVersion !== 2 || manifest.environment !== 'stable' || manifest.backupStem !== stem
       || manifest.sourceBuildId !== source.build || manifest.targetBuildId !== request.sourceSha
       || typeof manifest.validatedAt !== 'string' || !Number.isFinite(Date.parse(manifest.validatedAt))) throw new Error('Sealed backup does not bind the retained source and fixed formal target')
+    installed.write('')
     restartOld = false
     compose(['run', '--rm', '--no-deps', '--pull', 'never', 'app', 'node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', 'check-live', request.sourceSha, '--applications-stopped'], 120_000)
     drainTarget = () => {
@@ -119,6 +152,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
       || currentEnv.GAME_BUILD_ID !== request.sourceSha || currentEnv.RELEASE_CHANNEL !== 'stable') throw new Error('Started application does not match the fixed formal image')
     writeFileSync(join(root, 'data/deployed-build-id'), request.sourceSha + '\n', { mode: 0o600, flush: true })
     writeFileSync(join(root, 'data/deployed-image.json'), readFileSync(join(request.stage, 'image.json')), { mode: 0o600, flush: true })
+    installed.write(image)
     drainTarget = undefined
     const archives = readdirSync(join(root, 'backups')).filter(name => /^pre-[A-Za-z0-9._-]+\.tgz$/.test(name))
       .map(name => ({ name, modified: statSync(join(root, 'backups', name)).mtimeMs })).sort((a, b) => b.modified - a.modified)
