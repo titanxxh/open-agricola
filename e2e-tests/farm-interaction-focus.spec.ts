@@ -30,7 +30,8 @@ async function expectFarmVisible(page: Page) {
   await expect.poll(() => farm(page).evaluate(element => {
     const bounds = element.getBoundingClientRect()
     const bar = document.querySelector('.interaction-bar')!.getBoundingClientRect()
-    return bounds.top >= 0 && bounds.bottom <= bar.top
+    const dock = document.querySelector('.section-nav')?.getBoundingClientRect()
+    return bounds.top >= 0 && bounds.bottom <= (dock && dock.height > 0 ? dock.top : bar.top)
   })).toBe(true)
 }
 async function action(page: Page, id: string): Promise<SessionResponse> {
