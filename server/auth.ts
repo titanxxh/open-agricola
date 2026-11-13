@@ -1,3 +1,4 @@
+import { getPrereleaseSessions } from './prerelease-sessions'
 import { BROWSER_AUTH_VERSION } from '../shared/contract/browser-auth'
 import type { PostgresDatabase } from './database/postgres'
 import { isUniqueViolation } from './database/errors'
@@ -533,13 +534,14 @@ export async function createLocalUserForTests(
  * login that verified the old password cannot outlive a concurrent password reset's session revocation.
  */
 export async function createSession(userId: string, verifiedPasswordHash?: string): Promise<Awaited<string | null>> {
+  if (process.env.RELEASE_CHANNEL === 'prerelease') return null
   const now = Date.now()
   const token = randomUUID()
   const db = getDb()
   return (await db.transaction(async () => {
   const user = verifiedPasswordHash === undefined
-    ? await db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
-    : await db.prepare('SELECT id FROM users WHERE id = ? AND password_hash = ? FOR UPDATE').get(userId, verifiedPasswordHash)
+    ? await db.prepare("SELECT id FROM users WHERE id = ? AND identity_origin='local' FOR UPDATE").get(userId)
+    : await db.prepare("SELECT id FROM users WHERE id = ? AND identity_origin='local' AND password_hash = ? FOR UPDATE").get(userId, verifiedPasswordHash)
   if (!user) return null
   const result = (await db.prepare(`
     INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version)
@@ -553,11 +555,11 @@ export async function createSession(userId: string, verifiedPasswordHash?: strin
 }
 
 export async function login(username: string, password: string): Promise<LoginResult> {
-  if (!password) return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
+  if (process.env.RELEASE_CHANNEL === 'prerelease' || !password) return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
 
   const db = getDb()
   const row = (await db.prepare(
-    'SELECT id, username, display_name, password_hash, email, email_verified_at FROM users WHERE username = ?',
+    "SELECT id, username, display_name, password_hash, email, email_verified_at FROM users WHERE username = ? AND identity_origin='local'",
   ).get(username)) as
     | {
       id: string
@@ -617,7 +619,7 @@ export async function requestAccountDeletion(userId: string): Promise<Awaited<vo
   const now = Date.now()
   const disabledPasswordHash = `${randomBytes(16).toString('hex')}:${randomBytes(SCRYPT_KEYLEN).toString('hex')}`
   ;(await db.transaction(async () => {
-    await db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+    await db.prepare("SELECT id FROM users WHERE id = ? AND identity_origin='local' FOR UPDATE").get(userId)
     ;(await db.prepare(`
       INSERT INTO account_deletion_requests (
         user_id, requested_at, next_attempt_at, last_error_code
@@ -637,7 +639,8 @@ export async function requestAccountDeletion(userId: string): Promise<Awaited<vo
     ;(await db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(userId))
     ;(await db.prepare(`
       UPDATE users
-      SET password_hash = ?, password_updated_at = ?
+      SET password_hash = CASE WHEN identity_origin='external' THEN NULL ELSE ? END,
+          password_updated_at = CASE WHEN identity_origin='external' THEN NULL ELSE ?::bigint END
       WHERE id = ?
     `).run(disabledPasswordHash, now, userId))
     ;(await db.prepare(`
@@ -723,13 +726,13 @@ export async function finishAccountDeletion(claim: AccountDeletionClaim): Promis
 
 const idPlaceholders = (ids: string[]): string => ids.map(() => '?').join(', ')
 
-export async function deleteAccount(userId: string): Promise<Awaited<{ ok: true }>> {
-  const db = getDb()
-  const now = Date.now()
+export async function deleteAccount(userId: string, options: { db?: PostgresDatabase; now?: number } = {}): Promise<Awaited<{ ok: true }>> {
+  const db = options.db ?? getDb()
+  const now = options.now ?? Date.now()
   const userRow = (await db.prepare('SELECT username FROM users WHERE id = ?').get(userId)) as { username: string } | undefined
   const authoredCardIds = ((await db.prepare('SELECT id FROM workshop_cards WHERE author_id = ?').all(userId)) as Array<{ id: string }>)
     .map(row => row.id)
-  const affectedRoomIds = (await getAccountDeletionRoomIds(userId))
+  const affectedRoomIds = (await getAccountDeletionRoomIds(userId, db))
 
   ;(await db.transaction(async () => {
     if (userRow && isAdmin(userRow.username)) {
@@ -781,8 +784,8 @@ export async function deleteAccount(userId: string): Promise<Awaited<{ ok: true 
   return { ok: true }
 }
 
-export async function getAccountDeletionRoomIds(userId: string): Promise<Awaited<string[]>> {
-  return ((await getDb().prepare(`
+export async function getAccountDeletionRoomIds(userId: string, db = getDb()): Promise<Awaited<string[]>> {
+  return ((await db.prepare(`
     SELECT id FROM rooms WHERE created_by = ?
     UNION
     SELECT room_id AS id FROM room_players WHERE user_id = ?
@@ -795,11 +798,12 @@ export async function getSessionByToken(token: string, options: {
   lock?: 'share' | 'update'
 } = {}): Promise<{ user: AuthUser; expiresAt: number } | null> {
   if (!token) return null
+  if (process.env.RELEASE_CHANNEL === 'prerelease') return await getPrereleaseSessions()?.resolve(token) ?? null
   const db = options.db ?? getDb()
   const row = await db.prepare(`
     SELECT u.id, u.username, u.display_name, s.expires_at
     FROM sessions s JOIN users u ON s.user_id = u.id
-    WHERE s.token = ? AND s.expires_at > ? AND s.auth_policy_version = ?
+    WHERE s.token = ? AND s.expires_at > ? AND s.auth_policy_version = ? AND u.identity_origin='local'
     ${options.lock === 'update' ? 'FOR UPDATE OF s' : options.lock === 'share' ? 'FOR SHARE OF s' : ''}
   `).get<{ id: string; username: string; display_name: string; expires_at: number }>(
     token, options.now ?? Date.now(), BROWSER_AUTH_VERSION,
@@ -826,11 +830,12 @@ export async function updateDisplayName(userId: string, displayName: string): Pr
   const name = displayName.trim()
   if (!name || name.length > 60) return 'Display name must be 1-60 characters'
   const db = getDb()
-  ;(await db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, userId))
-  return null
+  const result = await db.prepare("UPDATE users SET display_name = ? WHERE id = ? AND identity_origin='local'").run(name, userId)
+  return result.changes ? null : 'User not found'
 }
 
 export function isAdmin(username: string): boolean {
+  if (process.env.RELEASE_CHANNEL === 'prerelease') return false
   return (process.env.ADMIN_USERS ?? '')
     .split(',')
     .map(s => s.trim())
