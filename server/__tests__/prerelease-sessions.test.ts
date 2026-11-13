@@ -165,3 +165,69 @@ it('cannot attach a local password, email, session or OAuth credential to an ext
   await expect(context.db.prepare('INSERT INTO auth_identities(id,user_id,provider,provider_user_id,linked_at) VALUES(?,?,?,?,?)').run('forged-oauth', session.user.id, 'github', 'external-oauth-id', context.now())).rejects.toThrow('External prerelease principals')
   expect(await context.service.resolve(session.token)).toMatchObject({ user: session.user })
 })
+
+it('does not publish an old positive handoff after a known Beta change arrives during exchange', async () => {
+  const context = await setupConsumer(), oldState = context.state('g'.repeat(43))
+  let release: ((state: PrereleaseIdentityState) => void) | undefined, notify: (() => void) | undefined
+  const ready = new Promise<void>(done => { notify = done })
+  context.authority.exchange = async () => new Promise<PrereleaseIdentityState>(done => { release = done; notify?.() })
+  const opening = context.enter()
+  await ready
+  context.setBeta(false)
+  context.events.push({ id: '00000000-0000-4000-8000-000000000004', kind: 'beta_changed', userId: 'formal-user', grantId: null, createdAt: context.now() })
+  await context.service.processEvents()
+  if (!release) throw new Error('Missing deferred exchange')
+  release(oldState)
+  await expect(opening).rejects.toThrow('Identity changed during handoff')
+  expect(await context.db.prepare('SELECT id FROM users').all()).toEqual([])
+})
+
+it('keeps a newer Beta pause fenced while an older resolve finishes and its durable pause is still blocked', async () => {
+  const context = await setupConsumer(), session = await context.enter()
+  const latch = () => { let release = () => {}; const promise = new Promise<void>(done => { release = done }); return { promise, release } }
+  const userLocked = latch(), identityLocked = latch(), releaseUser = latch(), releaseIdentity = latch(), betaSeen = latch()
+  const holdingUser = context.db.transaction(async () => {
+    await context.db.prepare('SELECT id FROM users WHERE id=? FOR UPDATE').get(session.user.id)
+    userLocked.release(); await releaseUser.promise
+  })()
+  await userLocked.promise
+  const holdingIdentity = context.db.transaction(async () => {
+    await context.db.prepare('SELECT user_id FROM prerelease_external_identities WHERE user_id=? FOR UPDATE').get(session.user.id)
+    identityLocked.release(); await releaseIdentity.promise
+  })()
+  await identityLocked.promise
+  let resolving: Promise<unknown> | undefined, processing: Promise<unknown> | undefined
+  let statusCalls = 0
+  context.setStatus(async grantId => { if (++statusCalls > 1) throw new Error('source offline after invalidation'); return context.state(grantId) })
+  try {
+    context.advance(30_000)
+    resolving = context.service.resolve(session.token)
+    const deadline = Date.now() + 2000
+    for (;;) {
+      const stored = await context.db.prepare('SELECT identity_state FROM prerelease_sessions WHERE user_id=?').get<{ identity_state: string }>(session.user.id)
+      if (stored && JSON.parse(stored.identity_state).confirmedAt === context.now()) break
+      if (Date.now() > deadline) throw new Error('Refresh did not reach the profile lock')
+      await new Promise(done => setTimeout(done, 1))
+    }
+    context.service.subscribeInvalidation(event => { if (event.reason === 'beta_changed') betaSeen.release() })
+    context.events.push({ id: '00000000-0000-4000-8000-000000000005', kind: 'beta_changed', userId: session.user.id, grantId: null, createdAt: context.now() })
+    processing = context.service.processEvents().catch(error => error)
+    await betaSeen.promise
+    releaseUser.release()
+    expect(await resolving).toBeNull()
+    expect(await context.service.resolve(session.token)).toBeNull()
+    expect(statusCalls).toBe(2)
+  } finally {
+    releaseUser.release(); releaseIdentity.release()
+    await Promise.allSettled([holdingUser, holdingIdentity, resolving, processing])
+  }
+})
+
+it('does not persist a refresh response whose subject differs from the bound local session', async () => {
+  const context = await setupConsumer(), session = await context.enter()
+  context.advance(15_000)
+  context.setStatus(async grantId => ({ ...context.state(grantId), account: { kind: 'active', subject: { id: 'other-user', username: 'other', displayName: 'Other User' } } }))
+  await expect(context.service.refreshActive()).rejects.toThrow('Identity subject changed')
+  const stored = await context.db.prepare('SELECT identity_state FROM prerelease_sessions WHERE user_id=?').get<{ identity_state: string }>(session.user.id)
+  expect(stored && JSON.parse(stored.identity_state)).toMatchObject({ account: { subject: { id: 'formal-user' } }, confirmedAt: 1_800_000_000_000, validUntil: 1_800_000_030_000 })
+})
