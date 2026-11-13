@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { assertMainProtection, assertRawCommit, mainCommit } from '../ci/candidate-verification.ts'
+import { assertMainProtection, assertRawCommit, checkCandidateVerification, mainCommit } from '../ci/candidate-verification.ts'
 import { checkPrereleaseVerification } from '../ci/prerelease-verification.ts'
 import { FULL_TASK_IDS, fullSha, verificationConfiguration, type FullTaskId } from '../ci/verification-tasks.ts'
 import { github, ownerMachine, RELEASE_REPOSITORY } from './candidate.ts'
@@ -11,11 +11,14 @@ import { github, ownerMachine, RELEASE_REPOSITORY } from './candidate.ts'
 export const CONTAINER_IMAGE_WORKFLOW = '.github/workflows/container-image-build.yml'
 export const CONTAINER_IMAGE_REGISTRY = 'ghcr.io/titanxxh/open-agricola-images'
 export const CONTAINER_IMAGE_RECEIPT_FILE = 'container-image-receipt.json'
-export type ContainerImagePurpose = 'candidate' | 'trusted-policy'
-export type ImageVerification = {
-  kind: 'prerelease'; configuration: string; producerConfiguration: string
+export type ContainerImagePurpose = 'candidate' | 'formal-candidate' | 'trusted-policy'
+type CandidateImageVerification = {
+  configuration: string; producerConfiguration: string
   tasks: { id: FullTaskId; runId: number; jobId: number; runAttempt: number }[]
-} | { kind: 'main-policy'; configuration: string }
+}
+export type ImageVerification = (CandidateImageVerification & { kind: 'prerelease' })
+  | (CandidateImageVerification & { kind: 'stable' })
+  | { kind: 'main-policy'; configuration: string }
 
 type ImageIdentity = {
   format: 1; repository: typeof RELEASE_REPOSITORY; repositoryId: number
@@ -25,6 +28,7 @@ type ImageIdentity = {
 }
 export type ContainerImageReceipt = ImageIdentity & (
   { purpose: 'candidate'; channel: 'prerelease'; verification: Extract<ImageVerification, { kind: 'prerelease' }> }
+  | { purpose: 'formal-candidate'; channel: 'stable'; verification: Extract<ImageVerification, { kind: 'stable' }> }
   | { purpose: 'trusted-policy'; channel: 'stable'; verification: Extract<ImageVerification, { kind: 'main-policy' }> }
 )
 export type ContainerImageTransfer = { format: 1; receipt: ContainerImageReceipt; archive: { sha256: string; bytes: number } }
@@ -72,7 +76,8 @@ export function parseContainerImageReceipt(value: unknown): ContainerImageReceip
     if (common.sourceSha !== common.producerSha) throw new Error('Trusted policy source must be its fixed main producer')
     return { ...common, purpose: 'trusted-policy', channel: 'stable', verification: { kind: 'main-policy', configuration: hash(verification.configuration) } }
   }
-  if (input.purpose !== 'candidate' || input.channel !== 'prerelease' || verification.kind !== 'prerelease') throw new Error('Image purpose and channel do not match')
+  const formal = input.purpose === 'formal-candidate' && input.channel === 'stable' && verification.kind === 'stable'
+  if (!formal && (input.purpose !== 'candidate' || input.channel !== 'prerelease' || verification.kind !== 'prerelease')) throw new Error('Image purpose and channel do not match')
   keys(verification, ['kind', 'configuration', 'producerConfiguration', 'tasks'])
   if (!Array.isArray(verification.tasks)) throw new Error('Candidate verification tasks are missing')
   const tasks = verification.tasks.map(value => {
@@ -82,8 +87,10 @@ export function parseContainerImageReceipt(value: unknown): ContainerImageReceip
     return { id, runId: integer(task.runId), jobId: integer(task.jobId), runAttempt: integer(task.runAttempt) }
   }).sort((a, b) => a.id.localeCompare(b.id))
   if (tasks.length !== FULL_TASK_IDS.length || new Set(tasks.map(task => task.id)).size !== FULL_TASK_IDS.length) throw new Error('Complete candidate verification is required')
-  return { ...common, purpose: 'candidate', channel: 'prerelease', verification: { kind: 'prerelease', configuration: hash(verification.configuration),
-    producerConfiguration: hash(verification.producerConfiguration), tasks } }
+  const proof = { configuration: hash(verification.configuration), producerConfiguration: hash(verification.producerConfiguration), tasks }
+  return formal
+    ? { ...common, purpose: 'formal-candidate', channel: 'stable', verification: { ...proof, kind: 'stable' } }
+    : { ...common, purpose: 'candidate', channel: 'prerelease', verification: { ...proof, kind: 'prerelease' } }
 }
 
 export function containerImageArtifactName(runId: number, runAttempt: number): string {
@@ -123,15 +130,18 @@ export function containerImageVerification({ cwd, purpose, sourceSha, producerSh
     if (sourceSha !== producerSha) throw new Error('Trusted policy source must equal the main producer')
     return { kind: 'main-policy', configuration: verificationConfiguration(cwd, producerSha) }
   }
-  const verified = checkPrereleaseVerification(cwd, RELEASE_REPOSITORY, sourceSha)
-  if (verified.status !== 'passed') throw new Error('Complete current prerelease verification is required before image use')
+  const verified = purpose === 'formal-candidate'
+    ? checkCandidateVerification(cwd, RELEASE_REPOSITORY, sourceSha)
+    : checkPrereleaseVerification(cwd, RELEASE_REPOSITORY, sourceSha)
+  if (verified.status !== 'passed') throw new Error(`Complete current ${purpose === 'formal-candidate' ? 'stable' : 'prerelease'} verification is required before image use`)
   const tasks = verified.tasks.map(task => {
     if (task.status !== 'passed' || task.runId === null || task.jobId === null) throw new Error('Incomplete candidate verification')
     const job = record(github(RELEASE_REPOSITORY, `actions/jobs/${task.jobId}`))
     if (job.id !== task.jobId || job.run_id !== task.runId || job.status !== 'completed' || job.conclusion !== 'success') throw new Error('Candidate task attempt changed')
     return { id: task.id, runId: task.runId, jobId: task.jobId, runAttempt: integer(job.run_attempt) }
   }).sort((a, b) => a.id.localeCompare(b.id))
-  return { kind: 'prerelease', configuration: verified.configuration, producerConfiguration: verified.producerConfiguration, tasks }
+  const proof = { configuration: verified.configuration, producerConfiguration: verificationConfiguration(cwd, producerSha), tasks }
+  return purpose === 'formal-candidate' ? { ...proof, kind: 'stable' } : { ...proof, kind: 'prerelease' }
 }
 
 const verifiedImage = Symbol('GitHub verified container image')

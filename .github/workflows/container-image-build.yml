@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       purpose:
-        description: Prerelease candidate or the current trusted main archive tool
+        description: Formal or prerelease candidate, or the current trusted main archive tool
         type: choice
-        options: [candidate, trusted-policy]
+        options: [candidate, formal-candidate, trusted-policy]
         required: true
       source_sha:
         description: Full immutable source SHA; trusted-policy must equal this main producer

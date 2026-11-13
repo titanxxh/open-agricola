@@ -1,3 +1,5 @@
+import { checkCandidateVerification, stableConfiguration } from '../ci/candidate-verification'
+import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 import { checkPrereleaseVerification, prereleaseConfiguration } from '../ci/prerelease-verification'
 import { prepareContainerImageArchive } from '../release/container-images-owner'
 import { createHash } from 'node:crypto'
@@ -235,4 +237,37 @@ it('rejects an incomplete or duplicated candidate task set', () => {
   expect(parseContainerImageReceipt(receipt).purpose).toBe('candidate')
   receipt.verification.tasks.pop();expect(() => parseContainerImageReceipt(receipt)).toThrow(/Complete/)
   receipt.verification.tasks.push(receipt.verification.tasks[0]);expect(() => parseContainerImageReceipt(receipt)).toThrow(/Complete/)
+})
+
+
+it('requires complete stable verification before authorizing a formal candidate image', () => {
+  const value = githubFixture(), prefix = 'repos/titanxxh/open-agricola'
+  Object.assign(value.api, finalSnapshotMetadata(value.sha, value.sha, { id: 123, full_name: 'titanxxh/open-agricola' }))
+  const configuration = stableConfiguration(value.cwd, value.sha, value.sha)
+  const step = (name: string) => ({ name, status: 'completed', conclusion: 'success' })
+  const workflow = { id: 201, path: '.github/workflows/candidate-verification.yml' }
+  const run = { id: 61, workflow_id: 201, path: workflow.path, event: 'workflow_dispatch', head_sha: value.sha, head_branch: 'main',
+    display_title: `stable / ${value.sha} / all`, repository: { id: 123, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 123, full_name: 'titanxxh/open-agricola' },
+    status: 'completed', run_attempt: 2, updated_at: '2026-11-13T01:10:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/61' }
+  const jobs = FULL_TASK_IDS.map((id, index) => ({ id: index + 2000, run_id: 61, run_attempt: 2, name: `candidate / ${id} / ${configuration}`, status: 'completed', conclusion: 'success',
+    started_at: '2026-11-13T01:05:00Z', completed_at: '2026-11-13T01:06:00Z', html_url: `https://github.com/titanxxh/open-agricola/actions/runs/61/job/${id}`,
+    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }))
+  const manifest = { ...jobs[0], id: 1999, name: 'candidate-manifest', started_at: '2026-11-13T01:00:00Z', completed_at: '2026-11-13T01:01:00Z',
+    steps: [step('Generate candidate manifest'), step(`Stable manifest / 123 / stable / ${value.sha} / ${configuration} / ${value.sha} / ${FULL_TASK_IDS.join(',')}`)] }
+  value.api[`${prefix}/actions/workflows/candidate-verification.yml`] = workflow
+  value.api[`${prefix}/actions/workflows/201/runs?event=workflow_dispatch&per_page=100`] = [run]
+  value.api[`${prefix}/actions/runs/61/jobs?filter=all&per_page=100`] = [manifest, ...jobs]
+  for (const job of jobs) value.api[`${prefix}/actions/jobs/${job.id}`] = job
+  value.save()
+  expect(checkCandidateVerification(value.cwd, 'titanxxh/open-agricola', value.sha).status).toBe('passed')
+  const verified = containerImageVerification({ cwd: value.cwd, purpose: 'formal-candidate', sourceSha: value.sha, producerSha: value.sha })
+  expect(verified).toEqual({ kind: 'stable', configuration, producerConfiguration: verificationConfiguration(value.cwd, value.sha),
+    tasks: FULL_TASK_IDS.map((id, index) => ({ id, runId: 61, jobId: index + 2000, runAttempt: 2 })).sort((a, b) => a.id.localeCompare(b.id)) })
+  const receipt = { ...policyReceipt(), sourceSha: value.sha, producerSha: value.sha,
+    purpose: 'formal-candidate', channel: 'stable', verification: verified }
+  expect(parseContainerImageReceipt(receipt).purpose).toBe('formal-candidate')
+  expect(() => parseContainerImageReceipt({ ...receipt, purpose: 'trusted-policy' })).toThrow()
+  expect(() => parseContainerImageReceipt({ ...receipt, channel: 'prerelease' })).toThrow()
+  jobs[0].conclusion = 'failure'; value.save()
+  expect(() => containerImageVerification({ cwd: value.cwd, purpose: 'formal-candidate', sourceSha: value.sha, producerSha: value.sha })).toThrow(/Complete/)
 })
