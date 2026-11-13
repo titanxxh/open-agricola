@@ -88,6 +88,8 @@ Reference targets follow the English source meaning, independently of their tran
 
 ### Prerelease entry
 
+The prerelease build mounts its environment/session boundary before Context routing or private metadata loading. It consumes the published language pin, displays environment/build and a configured formal return link, and uses no local account-management flow. The callback clears its fragment before server-side exchange. HTTP, WebSocket and worker activity retain the mounted build/generation and absolute authorization deadline; a stale tab cannot adopt another tab's replacement cookie.
+
 `app/PrereleaseEntry.tsx` serves Lobby and Settings from account Beta qualification and the fresh authority entry response. It opens only the configured HTTPS hosted start URL in a new tab with `noopener noreferrer`; missing configuration stays visibly unavailable. Focus refresh discards older replies after denial.
 
 `?page=prerelease-handoff` is owned by `PrereleaseHandoffPage` and `services/prerelease.ts`. It consumes and clears browser-bound fragment metadata, checks the current configured target and formal root, and issues one short-lived code through the authenticated authority. Only the fixed pre callback receives the code in its fragment. It stores no login credentials or verifier, and never follows caller-supplied callback URLs. Errors return to the formal root. Tests: `PrereleaseEntry.test.tsx`, `PrereleaseHandoffPage.test.tsx`, and the HTTPS prerelease case in `hosted-password-login.spec.ts`.
