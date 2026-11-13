@@ -70,7 +70,7 @@ function PrereleaseApplication({ children }: { children: ReactNode }) {
       if (disposed) return
       clearTimeout(timer)
       const remaining = getPrereleaseLeaseRemainingMs()
-      timer = setTimeout(() => { void poll() }, remaining > 0 ? Math.min(15_000, Math.max(250, remaining / 2)) : 15_000)
+      timer = setTimeout(() => { void poll() }, remaining > 0 ? Math.min(15_000, Math.max(1, remaining / 2)) : 15_000)
     }
     retry.current = () => { void poll() }
     void poll()
