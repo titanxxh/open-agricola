@@ -4,7 +4,7 @@ import { createTestDatabase } from '../../server/__tests__/_helpers/postgres'
 import type { PostgresDatabase } from '../../server/database/postgres'
 import { readRetainedIdentityManifest } from '../prerelease/identity-manifest'
 import { deleteAccount } from '../../server/auth'
-import { parseRoomAccess } from '../../server/game/room-access'
+import { parseRoomAccess, persistedRoomAccessError } from '../../server/game/room-access'
 import { applyPrereleaseIdentityAudit } from '../prerelease/identity-audit'
 import { PrereleaseIdentityLifecycle } from '../../server/prerelease-identity-lifecycle'
 
@@ -18,21 +18,21 @@ async function externalPrincipal(db: PostgresDatabase, id: string, sourceGrantId
     .run(id, sourceGrantId, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
 }
 
-async function sourceAssociation(id: string, active: boolean) {
+async function sourceAssociation(id: string, active: boolean, others: Array<{ id: string; active: boolean }> = []) {
   const db = await createTestDatabase(); databases.push(db)
   const targetOrigin = 'https://pre.example.test'
   const generationId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
   const sourceGeneration = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-  const sourceGrantId = 'S'.repeat(43)
-  if (active) await db.prepare(`INSERT INTO users(id,username,display_name,password_hash,created_at)
-    VALUES(?,?,?,'unused-local-hash',1000)`).run(id, `source_${id}`, 'Current source name')
+  const subjects = [{ id, active }, ...others]
+  for (const subject of subjects) if (subject.active) await db.prepare(`INSERT INTO users(id,username,display_name,password_hash,created_at)
+    VALUES(?,?,?,'unused-local-hash',1000)`).run(subject.id, `source_${subject.id}`, 'Current source name')
   await db.prepare(`INSERT INTO prerelease_identity_generations(id,target_origin,target_id,prepared_at,is_current)
     VALUES(?,?,'prerelease-audit',1000,false),(?,?,'prerelease-audit',2000,true)`)
     .run(sourceGeneration, targetOrigin, generationId, targetOrigin)
-  await db.prepare(`INSERT INTO prerelease_identity_grants(id,user_id,source_token,target_origin,generation_id,created_at,expires_at,revoked_at)
-    VALUES(?,?,NULL,?,?,1000,1500,1500)`).run(sourceGrantId, id, targetOrigin, sourceGeneration)
+  const refs = subjects.map((subject, index) => ({ userId: subject.id, sourceGrantId: String.fromCharCode(83 + index).repeat(43) }))
+  for (const ref of refs) await db.prepare(`INSERT INTO prerelease_identity_grants(id,user_id,source_token,target_origin,generation_id,created_at,expires_at,revoked_at)
+    VALUES(?,?,NULL,?,?,1000,1500,1500)`).run(ref.sourceGrantId, ref.userId, targetOrigin, sourceGeneration)
   const lifecycle = new PrereleaseIdentityLifecycle(db, () => 3000)
-  const refs = [{ userId: id, sourceGrantId }]
   const receipt = await lifecycle.apply({ action: 'associate', targetOrigin, generationId,
     operationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', refs }, targetOrigin)
   const associations = await lifecycle.associations(generationId, refs)
@@ -103,6 +103,30 @@ it('erases a deleted invite/history-only account through source verification and
     .toEqual([{ user_id: null, display_name: 'Deleted player (seat 1)', score: 42 }])
   expect((await readRetainedIdentityManifest(db)).refs).toEqual([])
   expect(await applyPrereleaseIdentityAudit(db, packet, 4001)).toEqual({ identities: 0, erased: 1 })
+})
+
+it.each(['remaining-invite', 'owner-fallback', 'participant-fallback'])('keeps the same private room and confirmed state after erasing an invitee: %s', async mode => {
+  const db = await createTestDatabase(); databases.push(db)
+  await externalPrincipal(db, 'owner', 'T'.repeat(43))
+  await externalPrincipal(db, 'participant', 'U'.repeat(43))
+  const state = JSON.stringify({ state: { phase: 'playing', players: [{ id: 'game-player-0' }], round: 7 }, confirmed: 'preserved' })
+  const invited = mode === 'remaining-invite' ? ['deleted-subject', 'participant'] : ['deleted-subject']
+  await db.prepare(`INSERT INTO rooms(id,created_by,created_at,updated_at,invited_user_ids,state_json,status,version)
+    VALUES('private-room',?,1000,1000,?::jsonb,?,'playing',42)`)
+    .run(mode === 'participant-fallback' ? null : 'owner', JSON.stringify(invited), state)
+  if (mode !== 'owner-fallback') await db.prepare(`INSERT INTO room_players(room_id,user_id,player_index,joined_at)
+    VALUES('private-room','participant',0,1000)`).run()
+  const packet = await sourceAssociation('deleted-subject', false, [{ id: 'owner', active: true }, { id: 'participant', active: true }])
+  expect(await applyPrereleaseIdentityAudit(db, packet, 4000)).toEqual({ identities: 2, erased: 1 })
+  expect(await db.prepare('SELECT id,state_json,status,version FROM rooms').all())
+    .toEqual([{ id: 'private-room', state_json: state, status: 'playing', version: 42 }])
+  expect(await db.prepare('SELECT invited_user_ids FROM rooms').get())
+    .toEqual({ invited_user_ids: [mode === 'owner-fallback' ? 'owner' : 'participant'] })
+  expect(await persistedRoomAccessError(db, 'private-room', mode === 'participant-fallback' ? 'participant' : 'owner')).toBeNull()
+  if (mode !== 'owner-fallback') expect(await persistedRoomAccessError(db, 'private-room', 'participant')).toBeNull()
+  expect(await persistedRoomAccessError(db, 'private-room', 'outsider')).toMatchObject({ code: 'not_participant' })
+  expect(await persistedRoomAccessError(db, 'private-room')).toMatchObject({ code: 'login_required' })
+  expect((await readRetainedIdentityManifest(db)).refs.map(ref => ref.userId)).toEqual(['owner', 'participant'])
 })
 
 it('requires every native orphan to be audited and refuses to recreate an erased subject', async () => {
