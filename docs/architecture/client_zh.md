@@ -95,6 +95,8 @@
 
 ### 预发布入口
 
+预发布构建在 Context 路由和私有资料加载之前挂载环境/会话边界。它消费已发布语言 pin，持续展示环境/构建与配置的正式返回入口，不提供本地账号管理流程。回调先清除 fragment，再由服务端兑换。HTTP、WebSocket 及 worker 活动保留页面固定的构建/代次和绝对授权期限，旧标签不能借另一标签替换的 Cookie 恢复访问。
+
 `app/PrereleaseEntry.tsx` 在大厅及设置读取账号 Beta 资格和实时权威入口响应。只以 `noopener noreferrer` 新标签打开已配置的 HTTPS hosted 入口，缺少配置时明确不可用。窗口重新聚焦会复核，并丢弃晚于拒绝结果返回的旧响应。
 
 `PrereleaseHandoffPage` 与 `services/prerelease.ts` 负责 `?page=prerelease-handoff`。页面读取并清除浏览器绑定的 fragment，核对当前配置的目标和正式站根，通过已认证的正式权威只签发一次短期 code。code 仅以 fragment 交给固定 pre 回调；页面不保存登录凭据或 verifier，也不采用调用者提供的回调 URL。出错只返回正式站根。测试见 `PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx` 和 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例。
