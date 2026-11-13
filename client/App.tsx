@@ -1,3 +1,4 @@
+import { PrereleaseBoundary } from './app/PrereleaseBoundary'
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { LocaleProvider, useLocale } from './contexts/LocaleContext'
@@ -87,9 +88,9 @@ function App() {
   const reloadRequired = useSyncExternalStore(subscribeBrowserReload, getBrowserReloadRequired)
   return (
     <LocaleProvider>
-      {reloadRequired ? <AppLoadFailure /> : <GameContextRouter>
+      <PrereleaseBoundary>{reloadRequired ? <AppLoadFailure /> : <GameContextRouter>
         <AppContent />
-      </GameContextRouter>}
+      </GameContextRouter>}</PrereleaseBoundary>
     </LocaleProvider>
   )
 }
