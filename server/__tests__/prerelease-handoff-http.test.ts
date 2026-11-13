@@ -419,3 +419,34 @@ it.each(['source_revoked', 'account_deleted'])('does not publish a cookie or pro
     await db.exec('DROP TRIGGER hold_handoff_commit ON prerelease_sessions; DROP FUNCTION hold_handoff_commit()')
   }
 })
+
+
+it.each(['beta_true', 'status_unavailable', 'beta_false', 'source_revoked', 'account_deleted'])('distinguishes confirmed denial from a post-lease qualification notification for %s', async scenario => {
+    const service = getPrereleaseSessions()
+    if (!service) throw new Error('Missing prerelease consumer')
+    service.setAccountErasure(async userId => { await getDb().prepare('DELETE FROM users WHERE id=?').run(userId) })
+    const pending = await begin()
+    const original = service.exchangeHandoff.bind(service)
+    const spy = vi.spyOn(service, 'exchangeHandoff').mockImplementationOnce(async (...args) => {
+      const result = await original(...args)
+      const eventId = randomUUID()
+      events.push(scenario === 'source_revoked'
+        ? { id: eventId, kind: 'source_revoked', userId: 'handoff-user', grantId: 'g'.repeat(43), createdAt: Date.now() }
+        : { id: eventId, kind: scenario === 'account_deleted' ? 'account_deleted' : 'beta_changed', userId: 'handoff-user', grantId: null, createdAt: Date.now() })
+      statusReply = () => {
+        if (scenario === 'status_unavailable') throw new Error('Fresh qualification is unknown')
+        return Response.json({ ok: true, state: { ...identity(), betaAccess: scenario !== 'beta_false' } })
+      }
+      await service.processEvents().catch(error => {
+        if (scenario !== 'status_unavailable') throw error
+      })
+      return result
+    })
+    try {
+      const response = await exchange(pending)
+      const paused = scenario === 'beta_true' || scenario === 'status_unavailable'
+      expect({ status: response.status, body: await response.json(), cookies: response.headers.getSetCookie() })
+        .toEqual({ status: paused ? 503 : 403,
+          body: { ok: false, code: paused ? 'prerelease_access_paused' : 'prerelease_access_expired' }, cookies: [] })
+    } finally { spy.mockRestore() }
+  })
