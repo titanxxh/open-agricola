@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, statfsSync, writeFileSync } from '
 import { join, resolve, sep } from 'node:path'
 import { composePath, controlDirectory, readRuntime, type RuntimeRecord } from './runtime'
 import { parseContainerImageTransfer, assertExpectedContainerImage, type ContainerImagePurpose } from '../release/container-images.ts'
+import { nativeContainerImageId } from '../release/container-images-archive.ts'
 import { applicationDataEnvironment, assertOwnerPath, targetFingerprint, type PrereleaseTarget } from './config'
 
 export function command(program: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string | Buffer; timeout?: number } = {}): string {
@@ -71,7 +72,7 @@ export const inspectImage = (target: PrereleaseTarget, image: string, buildId: s
 export const importedImagePath = (target: PrereleaseTarget, purpose: ContainerImagePurpose, sourceSha: string, producerSha: string): string =>
   join(controlDirectory(target), `image-${purpose}-${sourceSha}-${producerSha}.json`)
 
-export function importedImage(target: PrereleaseTarget, purpose: ContainerImagePurpose, sourceSha: string, pendingImageId?: string): string {
+export function importedImage(target: PrereleaseTarget, purpose: ContainerImagePurpose, sourceSha: string, pendingNativeImageId?: string): string {
   const producerSha = command('git', ['rev-parse', 'HEAD'], { cwd: target.policyDirectory })
   if (!/^[a-f0-9]{40}$/.test(sourceSha) || !/^[a-f0-9]{40}$/.test(producerSha)) throw new Error('Imported image requires fixed source and policy SHAs')
   const path = importedImagePath(target, purpose, sourceSha, producerSha)
@@ -79,8 +80,11 @@ export function importedImage(target: PrereleaseTarget, purpose: ContainerImageP
   const cached = parsed(readFileSync(path, 'utf8'))
   if (cached.fingerprint !== targetFingerprint(target)) throw new Error('Imported image belongs to another target')
   const transfer = parseContainerImageTransfer(cached.transfer)
-  assertExpectedContainerImage(transfer.receipt, { purpose, sourceSha, producerSha, pendingImageId })
-  return inspectFixedImage(target, transfer.receipt.imageId, sourceSha, purpose === 'candidate' ? 'prerelease' : 'stable')
+  assertExpectedContainerImage(transfer.receipt, { purpose, sourceSha, producerSha })
+  if (typeof cached.nativeImageId !== 'string' || cached.archiveManifestDigest !== null && typeof cached.archiveManifestDigest !== 'string') throw new Error('Imported image has no native store binding; import it again')
+  const nativeImageId = nativeContainerImageId({ configDigest: transfer.receipt.imageId, manifestDigest: cached.archiveManifestDigest }, args => command('docker', args))
+  if (nativeImageId !== cached.nativeImageId || pendingNativeImageId !== undefined && pendingNativeImageId !== nativeImageId) throw new Error('Imported image differs from the native store or pending image ID')
+  return inspectFixedImage(target, nativeImageId, sourceSha, purpose === 'candidate' ? 'prerelease' : 'stable')
 }
 
 export const trustedArchiveImage = (target: PrereleaseTarget): string =>

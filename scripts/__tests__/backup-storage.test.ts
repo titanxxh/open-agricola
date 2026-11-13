@@ -61,7 +61,7 @@ function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
         build: { runId: 10, runAttempt: 1 }, verification: { kind: 'main-policy', configuration: 'f'.repeat(64) },
       }, archive: { sha256: 'e'.repeat(64), bytes: 10240 } }
       if (fail !== 'prerelease-missing-policy') atomicJson(importedImagePath(target, 'trusted-policy', policySha, policySha), {
-        fingerprint: targetFingerprint(target), transfer,
+        fingerprint: targetFingerprint(target), transfer, nativeImageId: policyImage, archiveManifestDigest: null,
       })
       const initial = readRuntime(target)
       writeRuntime(target, { ...initial, mode: stopped ? 'maintenance' : 'open', buildId: sourceBuild, installed: { buildId: sourceBuild, image, installedAt: Date.now() },
@@ -135,6 +135,7 @@ printf '%s\\n' "$*" >> "$PWD/docker-calls"
 printf 'docker:%s\\n' "$*" >> "$PWD/backup-events"
 printf '%s:%s\\n' "\${APP_UID:-$(id -u)}" "\${APP_GID:-$(id -g)}" >> "$PWD/docker-users"
 case "$*" in
+  'info --format {{json .DriverStatus}}') printf '[]';;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
   *'{{json .Config}}'*) printf '{"User":"1000:1000"}';;
   *'{{json .Mounts}}'*) printf '[]';;

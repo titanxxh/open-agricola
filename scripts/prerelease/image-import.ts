@@ -25,9 +25,9 @@ export function runImageImport(target: PrereleaseTarget, request: ReturnType<typ
   if (request.expectedCurrent !== (record.buildId ?? 'empty') && (!record.operation || request.expectedCurrent !== (record.operation.sourceBuildId ?? 'empty'))) throw new Error('Image import expected-current SHA differs')
   if (record.mode !== 'maintenance') throw new Error('Image import requires maintenance or an uninstalled target')
   const producerSha = command('git', ['rev-parse', 'HEAD'], { cwd: target.policyDirectory })
-  const pendingImageId = receipt.purpose === 'candidate' && record.operation && record.operation.buildId === receipt.sourceSha ? record.operation.image
+  const pendingNativeImageId = receipt.purpose === 'candidate' && record.operation && record.operation.buildId === receipt.sourceSha ? record.operation.image
     : receipt.purpose === 'candidate' && record.installed && record.installed.buildId === receipt.sourceSha ? record.installed.image : undefined
-  const expected = { purpose: receipt.purpose, sourceSha: receipt.sourceSha, producerSha, pendingImageId }
+  const expected = { purpose: receipt.purpose, sourceSha: receipt.sourceSha, producerSha }
   assertExpectedContainerImage(receipt, expected)
   const maxBytes = target.budgets.import.maxArchiveMiB * 1024 * 1024
   if (transfer.archive.bytes > maxBytes) throw new Error('Image archive exceeds the target import budget')
@@ -48,6 +48,8 @@ export function runImageImport(target: PrereleaseTarget, request: ReturnType<typ
       replacePartial = true
     }
   }
+  if (pendingNativeImageId !== undefined && (!existsSync(cachePath)
+    || object(JSON.parse(readFileSync(cachePath, 'utf8'))).nativeImageId !== pendingNativeImageId)) throw new Error('Import must preserve the pending image ID and its verified cache')
   if (command('docker', ['ps', '-q', '--filter', `label=com.docker.compose.project=${target.project}`, '--filter', 'label=com.docker.compose.service=app'])) throw new Error('Image import requires the application to be stopped through explicit maintenance')
   assertCapacity(target, 'import')
   const endpoint = object(JSON.parse(command('docker', ['context', 'inspect', '--format', '{{json .Endpoints.docker}}'])))
@@ -71,13 +73,13 @@ export function runImageImport(target: PrereleaseTarget, request: ReturnType<typ
   const upload = lstatSync(archivePath)
   if (!upload.isFile() || upload.uid !== process.getuid?.() || upload.mode & 0o077 || upload.size !== transfer.archive.bytes) throw new Error('Image transfer is incomplete or not owner-private')
   const snapshot = join(controlDirectory(target), `image-snapshot-${randomUUID()}.tar`)
-  let imageId: string
+  let loaded: ReturnType<typeof loadContainerImageArchive>
   try {
     // A concurrent SCP can change the upload, but cannot change this independent inode after copying.
     copyFileSync(archivePath, snapshot, constants.COPYFILE_EXCL | constants.COPYFILE_FICLONE)
-    imageId = loadContainerImageArchive({ archivePath: snapshot, transfer, expected, maxBytes })
+    loaded = loadContainerImageArchive({ archivePath: snapshot, transfer, expected, maxBytes, pendingNativeImageId })
   } finally { rmSync(snapshot, { force: true }) }
   rmSync(archivePath)
-  atomicJson(cachePath, binding)
-  return { imageId, sourceSha: receipt.sourceSha, purpose: receipt.purpose }
+  atomicJson(cachePath, { ...binding, ...loaded })
+  return { imageId: receipt.imageId, nativeImageId: loaded.nativeImageId, sourceSha: receipt.sourceSha, purpose: receipt.purpose }
 }

@@ -91,7 +91,7 @@ it.each(['run', 'attempt', 'producer', 'repository', 'artifact source', 'artifac
   value.save();expect(value.verify).toThrow()
 })
 
-it.each(['complete', 'bounded export', 'failed pull', 'remote daemon', 'different DOCKER_HOST', 'matching DOCKER_HOST', 'custom config local', 'custom config remote', 'context override local', 'context override remote', 'context changes after pull'])('prepares a private owner image archive: %s', async outcome => {
+it.each(['complete', 'bounded export', 'failed pull', 'remote daemon', 'containerd owner', 'different DOCKER_HOST', 'matching DOCKER_HOST', 'custom config local', 'custom config remote', 'context override local', 'context override remote', 'context changes after pull'])('prepares a private owner image archive: %s', async outcome => {
   const cwd = resolve(import.meta.dirname, '../..'), sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim()
   const config = JSON.stringify({ os: 'linux', architecture: 'amd64', config: { Labels: { 'org.opencontainers.image.revision': sourceSha, 'io.open-agricola.release-channel': 'stable' } }, rootfs: { type: 'layers', diff_ids: [] } })
   const imageId = `sha256:${createHash('sha256').update(config).digest('hex')}`, value = buildArtifactFixture({ imageId })
@@ -120,6 +120,7 @@ fs.appendFileSync(${JSON.stringify(transportLog)},JSON.stringify({args:a,socket,
 if(socket==='unknown-context')process.exit(62);
 if(a[0]==='context')console.log(JSON.stringify([{Endpoints:{docker:{Host:socket}}}]));
 else if(socket.startsWith('ssh:'))process.exit(61);
+else if(cmd[0]==='info')console.log(JSON.stringify(${JSON.stringify(outcome === 'containerd owner' ? [['driver-type','io.containerd.snapshotter.v1']] : [])}));
 else if(cmd[0]==='login'){if(fs.readFileSync(0,'utf8').trim()!=='fixture-private-registry-token')process.exit(2);fs.writeFileSync(a[1]+'/config.json','private auth');}
 else if(cmd[0]==='pull'){if(${JSON.stringify(outcome)}==='context changes after pull')fs.writeFileSync(${JSON.stringify(join(contextDirectory, 'config.json'))},JSON.stringify({currentContext:'remote-custom'}));process.exit(0);}
 else if(cmd[0]==='image'&&cmd[1]==='save')process.stdout.write(fs.readFileSync(${JSON.stringify(archive)}));
@@ -131,13 +132,18 @@ else if(cmd[0]!=='rm')process.exit(3);
   const docker = join(value.bin, 'docker')
   if (outcome === 'failed pull') writeFileSync(docker, readFileSync(docker, 'utf8').replace("else if(cmd[0]==='pull'){", "else if(cmd[0]==='pull'){process.exit(19);"))
   if (outcome === 'remote daemon') writeFileSync(docker, readFileSync(docker, 'utf8').replace('unix:///var/run/docker.sock', 'ssh://formal-host'))
-  if (['bounded export', 'failed pull', 'remote daemon'].includes(outcome) || rejectedContext) {
+  if (['bounded export', 'failed pull', 'remote daemon', 'containerd owner'].includes(outcome) || rejectedContext) {
     await expect(prepareContainerImageArchive({ receipt, authFile, directory: value.root, maxBytes: outcome === 'bounded export' ? 64 : 1024 * 1024 })).rejects.toThrow()
     const commands: string[][] = readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line))
     const login = commands.find(args => args.includes('login'))
     if (outcome === 'remote daemon' || rejectedContext) {
       expect(login).toBeUndefined()
       expect(commands).toEqual([['context', 'inspect']])
+    }
+    if (outcome === 'containerd owner') {
+      expect(login).toBeUndefined()
+      expect(commands).toHaveLength(2)
+      expect(commands[1].slice(4)).toEqual(['info', '--format', '{{json .DriverStatus}}'])
     }
     if (login) expect(existsSync(login[1])).toBe(false)
     for (const directory of readdirSync(value.root).filter(name => name.startsWith('image-'))) expect(existsSync(join(value.root, directory, 'transfer.json'))).toBe(false)

@@ -5,7 +5,7 @@ import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { ownerMachine } from './candidate.ts'
 import { assertVerifiedContainerImageReceipt, parseContainerImageReceipt, type ContainerImageTransfer, type VerifiedContainerImageReceipt } from './container-images.ts'
-import { inspectLoadedContainerImage, validateContainerImageArchive } from './container-images-archive.ts'
+import { inspectLoadedContainerImage, nativeContainerImageId, validateContainerImageArchive } from './container-images-archive.ts'
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid owner image input')
@@ -52,14 +52,16 @@ export async function prepareContainerImageArchive({ receipt: verified, authFile
   const prefix = ['--config', authDirectory, '--host', socket], reference = `${receipt.registryRepository}@${receipt.manifestDigest}`
   const partial = join(operation, 'image.tar.partial'), archivePath = join(operation, 'image.tar')
   try {
+    const nativeImageId = nativeContainerImageId({ configDigest: receipt.imageId, manifestDigest: receipt.manifestDigest }, args => invoke([...prefix, ...args]))
+    if (nativeImageId !== receipt.imageId) throw new Error('Owner image export requires the classic Docker image store; containerd may export compressed layers')
     invoke([...prefix, 'login', 'ghcr.io', '--username', username, '--password-stdin'], token + '\n')
     invoke([...prefix, 'pull', '--platform', 'linux/amd64', reference], undefined, 15 * 60_000)
     const pulled: unknown = JSON.parse(invoke([...prefix, 'image', 'inspect', reference]))
     if (!Array.isArray(pulled) || pulled.length !== 1) throw new Error('Expected one pulled image')
     const image = object(pulled[0]), digests = image.RepoDigests
-    if (image.Id !== receipt.imageId || !Array.isArray(digests) || !digests.includes(reference)) throw new Error('Pulled registry manifest does not match the verified image ID')
-    inspectLoadedContainerImage({ imageId: receipt.imageId, expected: receipt }, args => invoke([...prefix, ...args]))
-    const child = spawn('docker', [...prefix, 'image', 'save', '--platform', 'linux/amd64', receipt.imageId], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    if (image.Id !== nativeImageId || !Array.isArray(digests) || !digests.includes(reference)) throw new Error('Pulled registry manifest does not match the verified image ID')
+    inspectLoadedContainerImage({ imageId: nativeImageId, expected: receipt }, args => invoke([...prefix, ...args]))
+    const child = spawn('docker', [...prefix, 'image', 'save', '--platform', 'linux/amd64', nativeImageId], { env, stdio: ['ignore', 'pipe', 'pipe'] })
     child.stderr.resume()
     const completed = new Promise<boolean>(resolve => { child.once('error', () => resolve(false)); child.once('close', code => resolve(code === 0)) })
     const timer = setTimeout(() => child.kill('SIGKILL'), 15 * 60_000); timer.unref()
@@ -72,9 +74,9 @@ export async function prepareContainerImageArchive({ receipt: verified, authFile
       if (!await completed) throw new Error('Owner image export was interrupted')
     } catch (error) { child.kill('SIGKILL'); await completed; throw error }
     finally { clearTimeout(timer) }
-    const archive = validateContainerImageArchive({ archivePath: partial, imageId: receipt.imageId, sourceSha: receipt.sourceSha, channel: receipt.channel, maxBytes })
+    const { sha256, bytes: archiveBytes } = validateContainerImageArchive({ archivePath: partial, imageId: receipt.imageId, sourceSha: receipt.sourceSha, channel: receipt.channel, maxBytes })
     renameSync(partial, archivePath)
-    const transfer: ContainerImageTransfer = { format: 1, receipt, archive }
+    const transfer: ContainerImageTransfer = { format: 1, receipt, archive: { sha256, bytes: archiveBytes } }
     writeFileSync(join(operation, 'transfer.json'), JSON.stringify(transfer) + '\n', { flag: 'wx', mode: 0o600, flush: true })
     return { archivePath, transfer }
   } finally { rmSync(authDirectory, { recursive: true, force: true }) }
