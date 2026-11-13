@@ -22,6 +22,7 @@ import { getDb } from '../server/db'
 import { releaseAll, releaseQueue } from '../server/__tests__/_helpers/release-all'
 import { databaseMaintenance, getTestDatabaseUrl } from '../server/__tests__/_helpers/postgres'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../shared/contract/browser-auth'
+import { createPrereleaseGateway } from '../scripts/prerelease/gateway'
 import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { test } from './server-fixtures'
 
@@ -71,7 +72,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     const directory = mkdtempSync(join(tmpdir(), 'oa-pre-session-')), schema = `test_${randomUUID().replaceAll('-', '')}`
     acquired.register(() => { rmSync(join(directory, 'pre.env'), { force: true }); rmSync(join(directory, 'key.pem'), { force: true }) })
     const generationId = randomUUID(), targetId = 'prerelease-main', serviceKey = randomUUID() + randomUUID()
-    const backendPort = await port(), frontendPort = await port(), appPort = await port()
+    const backendPort = await port(), frontendPort = await port(), appPort = await port(), gatewayPort = await port()
+    let gateway: ReturnType<typeof createPrereleaseGateway> | undefined = undefined
     const dependencyKeys = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']
     const dependencies = Object.fromEntries(dependencyKeys.map(key => { const value = process.env[key]; if (!value) throw new Error(`Missing isolated ${key}`); return [key, value] }))
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(directory, 'key.pem'), '-out', join(directory, 'cert.pem'),
@@ -99,7 +101,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     const proxy = tlsServer({ key: readFileSync(join(directory, 'key.pem')), cert: readFileSync(join(directory, 'cert.pem')) }, (req, res) => {
       const host = new URL(`https://${req.headers.host}`).hostname
       if (host === 'localhost') {
-        const upstream = trackRequest(httpRequest({ hostname: '127.0.0.1', port: backendPort, path: req.url, method: req.method, headers: req.headers }, response => {
+        const upstream = trackRequest(httpRequest({ hostname: '127.0.0.1', port: gatewayPort, path: req.url, method: req.method, headers: req.headers }, response => {
           res.writeHead(response.statusCode ?? 502, response.headers); response.pipe(res)
         }))
         upstream.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
@@ -107,6 +109,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       }
       if ((req.url ?? '').startsWith('/api/prerelease/')) {
         void authority(req, res).then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
+      }
+      if (req.url === '/api/auth/browser-policy') {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+        res.end(JSON.stringify({ version: BROWSER_AUTH_VERSION, buildId, appOrigin: formalOrigin, apiOrigin: formalOrigin })); return
       }
       res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' }).end('<!doctype html><title>Formal identity fixture</title><h1>Formal identity fixture</h1>')
     })
@@ -117,7 +123,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       if (req.headers.host !== new URL(preOrigin).host || !/^\/nodes\/[A-Za-z0-9-]+\/ws$/.test(path)) {
         socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return
       }
-      const upstream = trackRequest(httpRequest({ hostname: '127.0.0.1', port: backendPort, path: req.url, headers: req.headers }))
+      const upstream = trackRequest(httpRequest({ hostname: '127.0.0.1', port: gatewayPort, path: req.url, headers: req.headers }))
       const writeHead = (response: IncomingMessage) => {
         const headers = response.rawHeaders.reduce((text, value, index, values) => index % 2 ? text : `${text}${value}: ${values[index + 1]}\r\n`, '')
         socket.write(`HTTP/${response.httpVersion} ${response.statusCode ?? 502} ${response.statusMessage ?? ''}\r\n${headers}\r\n`)
@@ -167,6 +173,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     const launchEnv: NodeJS.ProcessEnv = { ...process.env, LOCAL_ENV_FILE: envFile }
     delete launchEnv.REPLAY_VIEWER_BUILD_ID
     const close = () => releaseAll([
+      async () => { await gateway?.close() },
       async () => { if (existsSync(owned)) await command('bash', ['./restart-local.sh', '--kill-only'], launchEnv, join(directory, 'stop.log')) },
       async () => {
         for (const request of requests) request.destroy()
@@ -200,6 +207,15 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     await command('pnpm', ['exec', 'vite', 'build', '--outDir', root], childEnv, join(directory, 'build.log'))
     writeFileSync(join(root, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: buildId, basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }) + '\n')
     await command('bash', ['./restart-local.sh'], launchEnv, join(directory, 'launcher.log'))
+    const healthyCycle = randomUUID(), observedAt = Date.now(), stateFile = join(directory, 'gate.json')
+    writeFileSync(join(directory, 'storage-guard.json'), JSON.stringify({ format: 1, targetId, fingerprint: 'f'.repeat(64),
+      status: 'healthy', healthyCycle, observedAt, validUntil: observedAt + 120_000, operationsAllowed: true }))
+    writeFileSync(stateFile, JSON.stringify({ format: 1, targetId, channel: 'prerelease', mode: 'open', buildId,
+      generation: generationId, acceptance: { healthyCycle, formalBuildId: buildId } }))
+    gateway = createPrereleaseGateway({ stateFile, targetId, origin: preOrigin, upstream: `http://127.0.0.1:${backendPort}`,
+      formal: { appOrigin: formalOrigin, apiOrigin: formalOrigin }, ca: readFileSync(join(directory, 'cert.pem')) })
+    await new Promise<void>(resolve => gateway!.server.listen(gatewayPort, '127.0.0.1', resolve))
+    await gateway.refreshBrowserPolicy()
     const enter = async (context: BrowserContext) => {
       const page = await context.newPage()
       await page.goto(`${preOrigin}/open-agricola/auth/start`)
