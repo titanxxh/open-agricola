@@ -233,7 +233,7 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 - `filesystems` 列出 PostgreSQL、RustFS、Docker 实际 backing filesystem 上 owner 可读取的 mount root，包括独立的镜像 staging 文件系统。保护器还检查 target 目录，并按 device 去重。用 `docker inspect`、`docker info` 及 device ID 读回证明 mount root 覆盖这些实际存储路径。
 - `tempFileLimitBytes` 是三个 pre role 已配置的正数 `temp_file_limit`。每次采样均验证设置。它限制每个 backend 的隐式临时文件，不限制数据库总量、显式临时表或共享 WAL。
 - `limits` 包含 `sourceDatabaseBytes`、`validationDatabaseBytes`、`bucketBytes`、`multipartBytes`、`localBytes`、`offsiteBytes`、`hostFreeBytes`、`hostFreeInodes`、`offsiteFreeBytes`、`offsiteFreeInodes`、`operationReserveBytes`。用量值为停止阈值，free 值为保留余量。reserve 是允许的最大一次操作所需新增本地及离站空间。取数包括七份每日备份、validation scratch 和失败传输峰值。将相同正数 `bucketBytes` 安装为 RustFS 整桶原生 quota，并验证实际拒写。quota 覆盖已完成对象逻辑大小；multipart 分片另行测量。
-- `intervalMs`、`probeTimeoutMs`、`leaseMs` 记录已验证的采样时限。`intervalMs + probeTimeoutMs` 须小于 `leaseMs`，后者最多 120 秒。systemd 模板 watchdog 为 90 秒；采样与原生停止耗时须能容纳于此。完整采样必须在探测 deadline 内结束。
+- `intervalMs`、`probeTimeoutMs`、`leaseMs` 记录已验证的采样时限。`intervalMs + probeTimeoutMs` 须小于 `leaseMs`，后者最多 120 秒。`watch` 还要求 systemd 提供实际的正安全整数 `WATCHDOG_USEC`；缺失或格式非法时，在加锁和采集前失败。`intervalMs + probeTimeoutMs + 10000` 必须严格小于换算为毫秒的 watchdog 时限。10 秒余量包含最长 3 秒的通知及本地处理/I/O 开销。模板 watchdog 为 90 秒时，15/30/90 秒的配置可接受，80/30/120 秒会被拒绝。单次 `once` 和紧急 `trip` 不要求 watchdog 信息。完整采样必须在探测 deadline 内结束；原生停止耗时也须容纳于监督器预算。
 
 unit 允许 64 个 task，因为 systemd 也将 Node loader 和编译器线程计入 task。调整额度时须测量无缓存的 CLI 启动；32 个 task 的上限可能在首次采样前就导致失败。
 

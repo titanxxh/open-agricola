@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parsePrereleaseTarget, targetFingerprint } from './config'
-import { readStorageGuardConfig, nativeStorageGuard } from './storage-guard-native'
+import { readStorageGuardConfig, nativeStorageGuard, assertStorageGuardWatchdog } from './storage-guard-native'
 import { runStorageGuardCycle } from './storage-guard'
 
 export async function storageGuard(args: string[]) {
@@ -11,6 +11,7 @@ export async function storageGuard(args: string[]) {
   if (!['once', 'watch', 'trip', '_once', '_watch', '_trip'].includes(action) || !targetFile || !guardFile || args.length !== 3) throw new Error('Use storage-guard-cli.ts once|watch|trip <target.json> <private-guard.json>')
   const target = parsePrereleaseTarget(JSON.parse(readFileSync(targetFile, 'utf8')))
   const config = readStorageGuardConfig(target, guardFile)
+  if (action === 'watch' || action === '_watch') assertStorageGuardWatchdog(config, process.env.WATCHDOG_USEC)
   const fingerprint = targetFingerprint(target)
   if (!action.startsWith('_')) {
     try {
