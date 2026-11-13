@@ -5,7 +5,6 @@ import {
 } from '../shared/contract/prerelease-identity'
 import { normalizePrereleaseReturnPath, type PrereleaseRuntime } from '../shared/contract/prerelease-runtime'
 import type { AuthUser } from './auth'
-import { deleteAccount } from './auth'
 import { getDb } from './db'
 import type { PostgresDatabase } from './database/postgres'
 import { FormalPrereleaseIdentityClient, parsePrereleaseIdentityState, type PrereleaseIdentityClient } from './prerelease-identity-client'
@@ -57,7 +56,7 @@ export class PrereleaseSessions {
 
   constructor(options: { db: PostgresDatabase; runtime: PrereleaseRuntime; authority: PrereleaseIdentityClient; now?: () => number; eraseAccount?: (userId: string) => Promise<void> }) {
     this.db = options.db; this.runtime = options.runtime; this.authority = options.authority; this.now = options.now ?? Date.now
-    this.eraseAccount = options.eraseAccount ?? (async userId => { await deleteAccount(userId, { db: this.db, now: this.now() }) })
+    this.eraseAccount = options.eraseAccount ?? (async () => { throw new Error('Prerelease account erasure adapter is not configured') })
   }
   setAccountErasure(callback: (userId: string) => Promise<void>) { this.eraseAccount = callback }
   subscribeInvalidation(callback: (event: PrereleaseInvalidation) => void): () => void { this.listeners.add(callback); return () => this.listeners.delete(callback) }
@@ -126,7 +125,8 @@ export class PrereleaseSessions {
     if (!secret(token)) return null
     const operationEpoch = this.epoch
     const key = hash(token), row = await this.db.prepare(`SELECT s.*,p.revision FROM prerelease_sessions s JOIN prerelease_external_identities p ON p.user_id=s.user_id WHERE s.token_hash=?`).get<SessionRow>(key)
-    if (!row || this.deletedUsers.has(row.user_id) || row.revoked_at !== null || row.expires_at <= this.now() || row.generation_id !== this.runtime.generationId || row.build_id !== this.runtime.buildId) {
+    if (!row) { this.leases.delete(key); return null }
+    if (this.deletedUsers.has(row.user_id) || row.revoked_at !== null || row.expires_at <= this.now() || row.generation_id !== this.runtime.generationId || row.build_id !== this.runtime.buildId) {
       this.leases.delete(key); this.knownInvalid.add(key); return null
     }
     let state = parsePrereleaseIdentityState(JSON.parse(row.identity_state), this.runtime, row.grant_id)
