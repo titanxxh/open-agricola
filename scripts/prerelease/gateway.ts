@@ -13,7 +13,8 @@ const candidateCookies = new Set(['__Host-oa-pre-session', '__Host-oa-pre-handof
 const websocketTarget = /^\/(?:ws|nodes\/[A-Za-z0-9-]+\/ws)(?:\?[^#]*)?$/
 const forwardedHeaders = new Set(['accept', 'accept-language', 'cache-control', 'content-type', 'content-length', 'origin', 'referer', 'user-agent',
   'range', 'if-range', 'if-none-match', 'if-modified-since', 'connection', 'upgrade', 'sec-websocket-key', 'sec-websocket-version',
-  'sec-websocket-extensions', 'sec-websocket-protocol', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', 'sec-fetch-user', 'x-oa-browser-protocol'])
+  'sec-websocket-extensions', 'sec-websocket-protocol', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', 'sec-fetch-user', 'x-oa-browser-protocol',
+  'x-oa-pre-build', 'x-oa-pre-generation'])
 
 function candidateResponseHeaders(headers: IncomingHttpHeaders): IncomingHttpHeaders {
   const result = { ...headers }
