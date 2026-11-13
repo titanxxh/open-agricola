@@ -142,7 +142,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     verifyRunning(target, record)
     const token = randomBytes(32).toString('base64url')
     atomicJson(join(controlDirectory(target), 'verification.json'), { format: 1, targetId: target.targetId, buildId: record.buildId,
-      generation: record.generation, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 600_000 })
+      generation: record.generation, healthyCycle: assertStorageAdmission(target, targetFingerprint(target)).healthyCycle, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 600_000 })
     const path = join(controlDirectory(target), 'verification.token')
     writeFileSync(path, token + '\n', { mode: 0o600 })
     return { tokenFile: path, expiresInSeconds: 600, targetOrigin: target.origin, mode: 'maintenance' }
@@ -195,6 +195,9 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
   if (request.action === 'open') {
     if (request.buildId !== record.buildId) throw new Error('Opening requires the installed candidate SHA receipt')
     if (!record.installed || !record.operation || record.operation.kind === 'reset' || record.operation.stage !== 'acceptance' || !request.acceptanceFile) throw new Error('Complete target acceptance is required before opening')
+    const acceptance = json(request.acceptanceFile)
+    const { healthyCycle } = assertStorageAdmission(target, targetFingerprint(target))
+    if (acceptance.healthyCycle !== healthyCycle) throw new Error('Acceptance belongs to a different storage cycle; repeat owner verification')
     const authorityFile = request.authorityFile
     if (!authorityFile) throw new Error('A fresh authority activation receipt is required')
     authorityReceipt(target, record, authorityFile, 'activate')
@@ -208,7 +211,6 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
       || verification.generationId !== record.generation || verification.targetFingerprint !== targetFingerprint(target)
       || verification.buildId !== record.buildId || verification.operationId !== record.operation.id
       || verification.identityManifestSha256 !== live.identityManifestSha256 || verification.identityCount !== live.identityCount) throw new Error('Authority/native identity audit does not match the live restored target')
-    const acceptance = json(request.acceptanceFile)
     if (acceptance.format !== 1 || acceptance.channel !== 'prerelease' || acceptance.targetId !== target.targetId
       || acceptance.targetFingerprint !== targetFingerprint(target) || acceptance.buildId !== record.buildId
       || acceptance.image !== record.installed.image || acceptance.generation !== record.generation || acceptance.operationId !== record.operation.id
@@ -228,7 +230,8 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
       buildId: record.installed.buildId, generation: record.generation, operationId: record.operation.id,
     })
     verifyRunning(target, record)
-    const opened: RuntimeRecord = { ...record, mode: 'open', operation: null, acceptance: { acceptedAt: acceptance.acceptedAt, sha256: hash(request.acceptanceFile), formalBuildId: formalDeployment.buildId } }
+    if (assertStorageAdmission(target, targetFingerprint(target)).healthyCycle !== healthyCycle) throw new Error('Storage cycle changed during acceptance; repeat owner verification')
+    const opened: RuntimeRecord = { ...record, mode: 'open', operation: null, acceptance: { acceptedAt: acceptance.acceptedAt, sha256: hash(request.acceptanceFile), formalBuildId: formalDeployment.buildId, healthyCycle } }
     writeRuntime(target, opened)
     return opened
   }

@@ -64,10 +64,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: '
   const stateFile = join(root, 'gate.json'), tokenFile = join(root, 'token')
   writeFileSync(tokenFile, token, { mode: 0o600 })
   writeFileSync(stateFile, JSON.stringify({ format: 1, channel: 'prerelease', targetId: 'prerelease-test', buildId: 'a'.repeat(40), generation, mode,
-    acceptance: mode === 'open' ? { formalBuildId: capability.buildId } : null }))
+    acceptance: mode === 'open' ? { formalBuildId: capability.buildId, healthyCycle: 'ee4d6c82-676f-4dcc-a570-52377b3b32f5' } : null }))
   writeFileSync(join(root, 'verification.json'), JSON.stringify({ targetId: 'prerelease-test', buildId: 'a'.repeat(40), generation,
-    tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 600_000 }))
-  writeFileSync(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+    healthyCycle: 'ee4d6c82-676f-4dcc-a570-52377b3b32f5', tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 600_000 }))
+  writeFileSync(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', healthyCycle: 'ee4d6c82-676f-4dcc-a570-52377b3b32f5', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
   const gateway = createPrereleaseGateway({ stateFile, targetId: 'prerelease-test', origin, formal, ca,
     lookup: (_hostname, options, callback) => {
       if (options.all) callback(null, [{ address: '127.0.0.1', family: 4 }])

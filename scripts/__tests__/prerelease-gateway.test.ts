@@ -9,12 +9,15 @@ import { expect, it, vi } from 'vitest'
 import { createPrereleaseGateway, OWNER_VERIFICATION_COOKIE } from '../prerelease/gateway'
 import { formalBrowserPolicyFixture } from './prerelease-browser-policy-fixture'
 
+const healthyCycle = 'ee4d6c82-676f-4dcc-a570-52377b3b32f5'
+const recoveredCycle = 'ff4d6c82-676f-4dcc-a570-52377b3b32f5'
+
 it('rejects ambiguous credentials and foreign browser requests and closes streams when formal protection changes', async () => {
   const formal = await formalBrowserPolicyFixture(), root = await mkdtemp(join(tmpdir(), 'pre-gateway-policy-'))
-  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', healthyCycle, observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
   const stateFile = join(root, 'gate.json'), origin = 'https://pre.agricola.test'
   const state = { format: 1, targetId: 'prerelease-test', channel: 'prerelease', mode: 'open', buildId: 'a'.repeat(40),
-    generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', acceptance: { formalBuildId: formal.state.buildId } }
+    generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', acceptance: { healthyCycle, formalBuildId: formal.state.buildId } }
   await writeFile(stateFile, JSON.stringify(state))
   const seen: IncomingHttpHeaders[] = []
   const upgraded: Array<{ path: string | undefined; headers: IncomingHttpHeaders }> = []
@@ -102,7 +105,12 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
     await guardClosed
     expect(await read()).toBe(503)
     expect(messages).toEqual([])
-    await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+    await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', healthyCycle, observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+    await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', healthyCycle: recoveredCycle, observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+    expect(await read()).toBe(503)
+    expect(await upgradeStatus(routedPath)).toBe(503)
+    await writeFile(stateFile, JSON.stringify({ ...state, acceptance: { ...state.acceptance, healthyCycle: recoveredCycle } }))
+    expect(await read()).toBe(200)
     client = new WebSocket(base.replace('http:', 'ws:') + routedPath, { headers: { Host: 'pre.agricola.test', Origin: origin } })
     await once(client, 'open')
     const leaseExpired = once(client, 'close')
@@ -122,7 +130,7 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
 it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSocket input during maintenance', async () => {
   const root = await mkdtemp(join(tmpdir(), 'agricola-pre-gateway-'))
   const formal = await formalBrowserPolicyFixture()
-  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', healthyCycle, observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
   const stateFile = join(root, 'gate.json')
   let requests = 0
   const cookies: Array<string | undefined> = []
@@ -155,7 +163,7 @@ it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSock
   try {
     expect((await read()).status).toBe(503)
     expect(requests).toBe(0)
-    const state = { format: 1, targetId: 'prerelease-test', channel: 'prerelease', mode: 'open', buildId: 'a'.repeat(40), generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', acceptance: { formalBuildId: formal.state.buildId } }
+    const state = { format: 1, targetId: 'prerelease-test', channel: 'prerelease', mode: 'open', buildId: 'a'.repeat(40), generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', acceptance: { healthyCycle, formalBuildId: formal.state.buildId } }
     await writeFile(stateFile, JSON.stringify(state))
     await gateway.refreshBrowserPolicy()
     const proxied = await read()
@@ -173,7 +181,7 @@ it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSock
     client.send('accepted-before-maintenance')
     await committed
     const token = 'V'.repeat(43), cookie = `${OWNER_VERIFICATION_COOKIE}=${token}; oa_session=ignore-parent; __Host-oa-pre-session=pre-test`
-    const proof = { targetId: 'prerelease-test', buildId: state.buildId, generation: state.generation, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 600_000 }
+    const proof = { healthyCycle, targetId: 'prerelease-test', buildId: state.buildId, generation: state.generation, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 600_000 }
     await writeFile(join(root, 'verification.json'), JSON.stringify(proof))
     owner = new WebSocket(url.replace('http:', 'ws:') + '/nodes/bb4d6c82-676f-4dcc-a570-52377b3b32f5/ws?owner=verification', { headers: { ...headers, Cookie: cookie } })
     await once(owner, 'open')
@@ -189,6 +197,21 @@ it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSock
     await stillPrivate
     expect((await read(headers.Host, cookie)).body).toBe('pre-only')
     expect(cookies.filter(Boolean)).toEqual(['__Host-oa-pre-session=pre-test', '__Host-oa-pre-session=pre-test'])
+    const incidentClosed = once(owner, 'close')
+    await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', healthyCycle: recoveredCycle, observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+    owner.send('old-cycle-owner-must-not-run'); await incidentClosed
+    expect((await read(headers.Host, cookie)).status).toBe(503)
+    const exchange = () => new Promise<number>((done, reject) => {
+      const req = request(url + '/__prerelease_verify', { method: 'POST', headers }, response => {
+        response.resume(); response.on('end', () => done(response.statusCode ?? 0))
+      }); req.on('error', reject); req.end(JSON.stringify({ token }))
+    })
+    expect(await exchange()).toBe(403)
+    await writeFile(join(root, 'verification.json'), JSON.stringify({ ...proof, healthyCycle: recoveredCycle }))
+    expect(await exchange()).toBe(204)
+    expect((await read(headers.Host, cookie)).status).toBe(200)
+    owner = new WebSocket(url.replace('http:', 'ws:') + '/ws', { headers: { ...headers, Cookie: cookie } })
+    await once(owner, 'open')
     const ownerClosed = once(owner, 'close')
     await writeFile(join(root, 'verification.json'), JSON.stringify({ ...proof, expiresAt: Date.now() - 1 }))
     owner.send('expired-owner-must-not-run')
@@ -213,7 +236,7 @@ it('rejects authority-changing HTTP and WS request targets before forwarding pre
   unintended.listen(0, '127.0.0.1'); await once(unintended, 'listening')
   const address = unintended.address()
   if (!address || typeof address === 'string') throw new Error('Expected fixture port')
-  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', healthyCycle, observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
   const stateFile = join(root, 'gate.json')
   await writeFile(stateFile, JSON.stringify({ format: 1, channel: 'prerelease', targetId: 'prerelease-test', mode: 'open', buildId: 'a'.repeat(40), generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5' }))
   const gateway = createPrereleaseGateway({ stateFile, targetId: 'prerelease-test', origin: 'https://pre.agricola.test', upstream: 'http://127.0.0.1:1', formal: formal.formal, ca: formal.ca })

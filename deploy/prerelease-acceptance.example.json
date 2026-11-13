@@ -7,6 +7,7 @@
   "image": "sha256:REPLACE_IMMUTABLE_IMAGE_ID",
   "generation": "REPLACE_CURRENT_UUID",
   "operationId": "REPLACE_PENDING_OPERATION_UUID",
+  "healthyCycle": "REPLACE_CURRENT_STORAGE_GUARD_CYCLE_UUID",
   "acceptedAt": 0,
   "evidence": {
     "identity": { "path": "REPLACE_PRIVATE_ARTIFACT", "sha256": "REPLACE_SHA256" },
