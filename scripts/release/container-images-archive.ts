@@ -37,14 +37,25 @@ function docker(args: string[], timeout = 30_000): string {
   try { return execFileSync('docker', args, { env, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024, timeout, stdio: ['ignore', 'pipe', 'pipe'] }).trim() }
   catch { throw new Error(`Container image ${args[0]} failed; keep the original image binding and retry after inspection`) }
 }
+export function nativeContainerImageId({ configDigest, manifestDigest }: { configDigest: string; manifestDigest: string | null }, runDocker: (args: string[]) => string = docker): string {
+  imageId(configDigest)
+  if (manifestDigest !== null) imageId(manifestDigest)
+  const status: unknown = JSON.parse(runDocker(['info', '--format', '{{json .DriverStatus}}']))
+  if (!Array.isArray(status) || status.some(row => !Array.isArray(row) || row.length !== 2 || row.some(value => typeof value !== 'string'))) throw new Error('Unknown Docker image store')
+  const driver = status.find(row => row[0] === 'driver-type')?.[1]
+  if (driver === undefined) return configDigest
+  if (driver !== 'io.containerd.snapshotter.v1' || manifestDigest === null) throw new Error('Docker image store requires a verified single-platform manifest')
+  return manifestDigest
+}
+
 function identity(config: Record<string, unknown>, expected: Pick<ExpectedContainerImage, 'purpose' | 'sourceSha'>): void {
   const labels = object(config.Labels), channel = expected.purpose === 'candidate' ? 'prerelease' : 'stable'
+  if (labels['org.opencontainers.image.source'] !== undefined) throw new Error('Image contains automatic repository linkage')
   if (labels['org.opencontainers.image.revision'] !== expected.sourceSha || labels['io.open-agricola.release-channel'] !== channel) throw new Error('Image source or channel differs from the receipt')
 }
 
 export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId: string; expected: ExpectedContainerImage }, runDocker: (args: string[]) => string = docker): string {
   imageId(id)
-  if (expected.pendingImageId !== undefined && expected.pendingImageId !== id) throw new Error('Pending operation must retain its original image ID')
   const inspected: unknown = JSON.parse(runDocker(['image', 'inspect', id]))
   if (!Array.isArray(inspected) || inspected.length !== 1) throw new Error('Expected one loaded image')
   const image = object(inspected[0]), config = object(image.Config)
@@ -116,7 +127,7 @@ function fileHash(fd: number, offset: number, bytes: number): string {
   return hash.digest('hex')
 }
 
-function validateArchive(fd: number, bytes: number, receipt: { imageId: string; sourceSha: string; purpose: 'candidate' | 'trusted-policy' }, allowProducerTag: boolean): void {
+function validateArchive(fd: number, bytes: number, receipt: { imageId: string; sourceSha: string; purpose: 'candidate' | 'trusted-policy' }, allowProducerTag: boolean): string | null {
   const entries = archiveContents(fd, bytes)
   const entry = (name: string): Entry => { const result = entries.get(name); if (!result) throw new Error('Missing image archive member'); return result }
   const json = (name: string): unknown => {
@@ -154,51 +165,67 @@ function validateArchive(fd: number, bytes: number, receipt: { imageId: string; 
       || ['1f8b', '425a68', 'fd377a585a00', '28b52ffd', '04224d18'].some(magic => header.subarray(0, magic.length / 2).toString('hex') === magic)) throw new Error('Expected an uncompressed tar layer')
     if (`sha256:${fileHash(fd, layer.offset, layer.size)}` !== diffs[index]) throw new Error('Image layer differs from its uncompressed config digest')
   }
+  let archiveManifestDigest: string | null = null
   if (entries.has('index.json')) {
     const index = object(json('index.json')), descriptors = index.manifests
-    if (index.schemaVersion !== 2 || index.annotations !== undefined || !Array.isArray(descriptors) || descriptors.length !== 1) throw new Error('Unexpected OCI image index or tags')
+    if (Object.keys(index).some(key => !['schemaVersion', 'mediaType', 'manifests'].includes(key))
+      || index.mediaType !== undefined && index.mediaType !== 'application/vnd.oci.image.index.v1+json'
+      || index.schemaVersion !== 2 || index.annotations !== undefined || !Array.isArray(descriptors) || descriptors.length !== 1) throw new Error('Unexpected OCI image index or tags')
     const descriptor = object(descriptors[0]), digest = string(descriptor.digest)
     const annotations = descriptor.annotations === undefined ? {} : object(descriptor.annotations)
     const created = annotations['org.opencontainers.image.created']
     const creationTime = created === undefined || typeof created === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(created) && Number.isFinite(Date.parse(created))
-    const allowedAnnotations = tagged && creationTime && Object.keys(annotations).filter(key => key !== 'org.opencontainers.image.created').sort().join(',') === 'io.containerd.image.name,org.opencontainers.image.ref.name'
-      && annotations['io.containerd.image.name'] === `docker.io/library/${tag}` && annotations['org.opencontainers.image.ref.name'] === receipt.sourceSha
-    if (!/^sha256:[a-f0-9]{64}$/.test(digest) || Object.keys(annotations).length > 0 && !allowedAnnotations
+    const annotationNames = Object.keys(annotations).filter(key => key !== 'org.opencontainers.image.created')
+    const allowedAnnotations = creationTime && (annotationNames.length === 0 || tagged && annotationNames.sort().join(',') === 'io.containerd.image.name,org.opencontainers.image.ref.name'
+      && annotations['io.containerd.image.name'] === `docker.io/library/${tag}` && annotations['org.opencontainers.image.ref.name'] === receipt.sourceSha)
+    if (descriptor.platform !== undefined) {
+      const platform = object(descriptor.platform)
+      if (Object.keys(platform).sort().join(',') !== 'architecture,os' || platform.architecture !== 'amd64' || platform.os !== 'linux') throw new Error('Unexpected OCI platform')
+    }
+    if (Object.keys(descriptor).some(key => !['mediaType', 'digest', 'size', 'annotations', 'platform'].includes(key))
+      || !/^sha256:[a-f0-9]{64}$/.test(digest) || Object.keys(annotations).length > 0 && !allowedAnnotations
       || !['application/vnd.oci.image.manifest.v1+json', 'application/vnd.docker.distribution.manifest.v2+json'].includes(string(descriptor.mediaType))) throw new Error('Unexpected OCI image descriptor or tags')
     const path = 'blobs/sha256/' + digest.slice(7), blob = entry(path)
     if (`sha256:${fileHash(fd, blob.offset, blob.size)}` !== digest || descriptor.size !== blob.size) throw new Error('OCI manifest digest differs')
     const manifest = object(json(path)), config = object(manifest.config), descriptorsOfLayers = manifest.layers
-    if (config.digest !== receipt.imageId || manifest.annotations !== undefined || !Array.isArray(descriptorsOfLayers)
+    if (Object.keys(manifest).some(key => !['schemaVersion', 'mediaType', 'config', 'layers'].includes(key)) || manifest.schemaVersion !== 2
+      || Object.keys(config).some(key => !['mediaType', 'digest', 'size'].includes(key)) || config.size !== configEntry.size
+      || config.digest !== receipt.imageId || manifest.annotations !== undefined || !Array.isArray(descriptorsOfLayers)
       || descriptorsOfLayers.length !== layers.length) throw new Error('OCI image does not match Docker archive identity')
     for (const [index, value] of descriptorsOfLayers.entries()) {
       const descriptor = object(value)
-      if (descriptor.digest !== diffs[index] || descriptor.annotations !== undefined || descriptor.size !== entry(layers[index]).size
+      if (Object.keys(descriptor).some(key => !['mediaType', 'digest', 'size'].includes(key)) || descriptor.digest !== diffs[index] || descriptor.annotations !== undefined || descriptor.size !== entry(layers[index]).size
         || !['application/vnd.oci.image.layer.v1.tar', 'application/vnd.docker.image.rootfs.diff.tar'].includes(string(descriptor.mediaType))) throw new Error('OCI archive contains a compressed or mismatched layer')
     }
+    archiveManifestDigest = digest
   }
+  return archiveManifestDigest
 }
 
 export function validateContainerImageArchive({ archivePath, imageId: id, sourceSha, channel, maxBytes, allowProducerTag = false }: {
   archivePath: string; imageId: string; sourceSha: string; channel: 'stable' | 'prerelease'; maxBytes: number; allowProducerTag?: boolean
-}): { sha256: string; bytes: number } {
+}): { sha256: string; bytes: number; archiveManifestDigest: string | null } {
   imageId(id)
   if (!/^[a-f0-9]{40}$/.test(sourceSha) || !['stable', 'prerelease'].includes(channel)) throw new Error('Invalid expected image identity')
   const bytes = privateFile(archivePath)
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || bytes > maxBytes) throw new Error('Image archive exceeds its byte bound')
   const fd = openSync(archivePath, 'r')
   try {
-    validateArchive(fd, bytes, { imageId: id, sourceSha, purpose: channel === 'prerelease' ? 'candidate' : 'trusted-policy' }, allowProducerTag)
-    return { sha256: fileHash(fd, 0, bytes), bytes }
+    const archiveManifestDigest = validateArchive(fd, bytes, { imageId: id, sourceSha, purpose: channel === 'prerelease' ? 'candidate' : 'trusted-policy' }, allowProducerTag)
+    return { sha256: fileHash(fd, 0, bytes), bytes, archiveManifestDigest }
   } finally { closeSync(fd) }
 }
 
-export function loadContainerImageArchive({ archivePath, transfer: input, expected, maxBytes }: {
-  archivePath: string; transfer: unknown; expected: ExpectedContainerImage; maxBytes: number
-}): string {
+export function loadContainerImageArchive({ archivePath, transfer: input, expected, maxBytes, pendingNativeImageId }: {
+  archivePath: string; transfer: unknown; expected: ExpectedContainerImage; maxBytes: number; pendingNativeImageId?: string
+}): { nativeImageId: string; archiveManifestDigest: string | null } {
   const transfer = parseContainerImageTransfer(input); assertExpectedContainerImage(transfer.receipt, expected)
   if (privateFile(archivePath) !== transfer.archive.bytes) throw new Error('Image transfer is incomplete')
   const archive = validateContainerImageArchive({ archivePath, imageId: transfer.receipt.imageId, sourceSha: transfer.receipt.sourceSha, channel: transfer.receipt.channel, maxBytes })
   if (archive.sha256 !== transfer.archive.sha256) throw new Error('Image transfer digest differs')
+  const nativeImageId = nativeContainerImageId({ configDigest: transfer.receipt.imageId, manifestDigest: archive.archiveManifestDigest })
+  if (pendingNativeImageId !== undefined && pendingNativeImageId !== nativeImageId) throw new Error('Pending operation must retain its native image ID')
   docker(['load', '--platform', 'linux/amd64', '--input', archivePath], 15 * 60_000)
-  return inspectLoadedContainerImage({ imageId: transfer.receipt.imageId, expected })
+  inspectLoadedContainerImage({ imageId: nativeImageId, expected })
+  return { nativeImageId, archiveManifestDigest: archive.archiveManifestDigest }
 }

@@ -28,7 +28,7 @@ export type ContainerImageReceipt = ImageIdentity & (
   | { purpose: 'trusted-policy'; channel: 'stable'; verification: Extract<ImageVerification, { kind: 'main-policy' }> }
 )
 export type ContainerImageTransfer = { format: 1; receipt: ContainerImageReceipt; archive: { sha256: string; bytes: number } }
-export type ExpectedContainerImage = { purpose: ContainerImagePurpose; sourceSha: string; producerSha: string; pendingImageId?: string }
+export type ExpectedContainerImage = { purpose: ContainerImagePurpose; sourceSha: string; producerSha: string }
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid container image receipt object')
@@ -98,8 +98,7 @@ export function parseContainerImageTransfer(value: unknown): ContainerImageTrans
 }
 
 export function assertExpectedContainerImage(receipt: ContainerImageReceipt, expected: ExpectedContainerImage): void {
-  if (receipt.purpose !== expected.purpose || receipt.sourceSha !== expected.sourceSha || receipt.producerSha !== expected.producerSha
-    || expected.pendingImageId !== undefined && receipt.imageId !== expected.pendingImageId) throw new Error('Imported image differs from the fixed source, policy or pending image ID')
+  if (receipt.purpose !== expected.purpose || receipt.sourceSha !== expected.sourceSha || receipt.producerSha !== expected.producerSha) throw new Error('Imported image differs from the fixed source or policy')
 }
 
 function trustedProducer(cwd: string, producer: string): { repositoryId: number; main: string } {

@@ -40,6 +40,7 @@ set -e
 printf '%s\\n' "$*" >> '${temporary}/calls'
 if [ -f '${temporary}/fail' ] && [ "$(cat '${temporary}/fail')" != stop ]; then exit 42; fi
 case "$*" in
+  'info --format {{json .DriverStatus}}') printf '[]';;
   'ps -q '*) exit 0;;
   *' stop --timeout 90 app') [ ! -f '${temporary}/fail' ] || exit 42;;
   *' ps -a -q app') printf '${'c'.repeat(64)}';;
@@ -63,7 +64,7 @@ function seedImportedImage(target: ReturnType<typeof parsePrereleaseTarget>, pur
     verification: purpose === 'candidate' ? { kind: 'prerelease', configuration: 'b'.repeat(64), producerConfiguration: 'c'.repeat(64),
       tasks: FULL_TASK_IDS.map((id, index) => ({ id, runId: 9, jobId: index + 1, runAttempt: 1 })) } : { kind: 'main-policy', configuration: 'b'.repeat(64) } }
   mkdirSync(join(target.directory, 'control'), { recursive: true })
-  writeFileSync(join(target.directory, 'control', `image-${purpose}-${sourceSha}-${producerSha}.json`), JSON.stringify({ fingerprint: targetFingerprint(target),
+  writeFileSync(join(target.directory, 'control', `image-${purpose}-${sourceSha}-${producerSha}.json`), JSON.stringify({ fingerprint: targetFingerprint(target), nativeImageId: imageId, archiveManifestDigest: null,
     transfer: { format: 1, receipt, archive: { sha256: 'f'.repeat(64), bytes: 10240 } } }))
 }
 
@@ -268,6 +269,7 @@ it('journals migration/startup failures closed and resumes the same candidate wi
 set -e
 printf '%s\n' "$*" >> '${value.temporary}/calls'
 case "$*" in
+  'info --format {{json .DriverStatus}}') printf '[]';;
   'ps -q '*) exit 0;;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
   *'{{json .State}}'*) printf '{"Running":false,"OOMKilled":false,"ExitCode":0}';;
@@ -358,6 +360,7 @@ if [ "$1" = -euo ]; then exec /bin/bash "$@"; fi
 set -e
 printf '%s\n' "$*" >> '${value.temporary}/calls'
 case "$*" in
+  'info --format {{json .DriverStatus}}') printf '[]';;
   'ps -q '*) exit 0;;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
   *'{{json .State}}'*) cat '${containerState}';;
@@ -675,7 +678,8 @@ if(args[0]==='ps') {
   } else if(format==='{{.Image}}')output(${JSON.stringify(image)});
   else if(format==='{{json .}}')output({Image:${JSON.stringify(image)},State:{Running:true},HostConfig:{Memory:536870912},Config:{Labels:{'com.docker.compose.project':${JSON.stringify(target.project)},'com.docker.compose.service':'app'}}});
   else if(format.includes('com.docker.compose.project'))output(${JSON.stringify(target.project)});
-} else if(args[0]==='image') {
+} else if(args[0]==='info'){output([]);process.exit(0);}
+if(args[0]==='image') {
   if(args[3]==='{{.Id}}')output(${JSON.stringify(policyImage)});
   else output({'org.opencontainers.image.revision':${JSON.stringify(policySha)},'io.open-agricola.release-channel':'stable'});
 } else if(line.includes('/app/frontend-dist/frontend-build.json'))output({format:1,gameBuildId:${JSON.stringify(policySha)},basePath:'/open-agricola/',releaseChannel:'stable',deploymentTarget:'stable-hosted'});

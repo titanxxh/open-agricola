@@ -7,7 +7,7 @@ import { assertCandidateCheckout } from './candidate-verification.ts'
 import { candidateExecution, executeCandidate, printVerificationOutput, stopCandidateExecution } from './candidate-isolation.ts'
 import { CONTAINER_IMAGE_REGISTRY, CONTAINER_IMAGE_RECEIPT_FILE, CONTAINER_IMAGE_WORKFLOW, containerImageVerification, parseContainerImageReceipt } from '../release/container-images.ts'
 import { checkPrivateRegistry, assertPrivateReadDenials, publishedRegistryManifest } from './container-image-build-registry.ts'
-import { validateContainerImageArchive } from '../release/container-images-archive.ts'
+import { nativeContainerImageId, validateContainerImageArchive } from '../release/container-images-archive.ts'
 
 const repository = 'titanxxh/open-agricola'
 const workflow = CONTAINER_IMAGE_WORKFLOW
@@ -101,16 +101,17 @@ export function verifyBuiltImage(): string {
   const imageId = metadata['containerimage.config.digest']
   if (typeof imageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(imageId)) throw new Error('BuildKit did not identify the image config digest')
   // Archive structure is checked before native Docker accepts any candidate-selected tags.
-  validateContainerImageArchive({ archivePath: join(root, 'image.tar'), imageId, sourceSha: request.sourceSha, channel: request.channel,
+  const archive = validateContainerImageArchive({ archivePath: join(root, 'image.tar'), imageId, sourceSha: request.sourceSha, channel: request.channel,
     maxBytes: maxImageBytes, allowProducerTag: true })
+  const nativeImageId = nativeContainerImageId({ configDigest: imageId, manifestDigest: archive.archiveManifestDigest }, args => command('docker', args, { env }))
   command('docker', ['load', '--input', join(root, 'image.tar')], { env, timeout: 180_000 })
-  inspectPublishableImage(JSON.parse(command('docker', ['image', 'inspect', '--format', '{{json .}}', imageId], { env })), request)
+  if (inspectPublishableImage(JSON.parse(command('docker', ['image', 'inspect', '--format', '{{json .}}', nativeImageId], { env })), request) !== nativeImageId) throw new Error('Native producer image changed')
   const frontend = imageObject(JSON.parse(command('docker', ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
     '--security-opt', 'no-new-privileges', '--user', '1000:1000', '--memory', '512m', '--memory-swap', '512m', '--cpus', '1', '--pids-limit', '64',
-    '--entrypoint', 'node', imageId, '-e', 'require("isolated-vm");require("canvas");process.stdout.write(require("node:fs").readFileSync("/app/frontend-dist/frontend-build.json","utf8"))'], { env, timeout: 30_000 })))
+    '--entrypoint', 'node', nativeImageId, '-e', 'require("isolated-vm");require("canvas");process.stdout.write(require("node:fs").readFileSync("/app/frontend-dist/frontend-build.json","utf8"))'], { env, timeout: 30_000 })))
   if (frontend.format !== 1 || frontend.gameBuildId !== request.sourceSha || frontend.releaseChannel !== request.channel
     || frontend.deploymentTarget !== `${request.channel}-hosted` || frontend.basePath !== '/open-agricola/') throw new Error('Built hosted frontend differs from the fixed source/channel')
-  writeFileSync(join(root, 'verified-image-id'), imageId, { flag: 'wx', mode: 0o600 })
+  writeFileSync(join(root, 'verified-image.json'), JSON.stringify({ configDigest: imageId, nativeImageId, archiveManifestDigest: archive.archiveManifestDigest }), { flag: 'wx', mode: 0o600 })
   return imageId
 }
 
@@ -119,16 +120,21 @@ export async function publishBuiltImage(policy: string): Promise<void> {
   const request = readRequest(), root = privateRoot()
   assertCandidateCheckout(policy, request.producerSha, request.producerSha)
   const verification = containerImageVerification({ cwd: policy, purpose: request.purpose, sourceSha: request.sourceSha, producerSha: request.producerSha })
-  const imageId = readFileSync(join(root, 'verified-image-id'), 'utf8')
+  const verified = imageObject(JSON.parse(readFileSync(join(root, 'verified-image.json'), 'utf8')))
+  if (typeof verified.configDigest !== 'string' || typeof verified.nativeImageId !== 'string'
+    || verified.archiveManifestDigest !== null && typeof verified.archiveManifestDigest !== 'string') throw new Error('Missing native producer image binding')
+  const imageId = verified.configDigest
   const env = dockerEnvironment(join(root, 'publish-docker'))
-  inspectPublishableImage(JSON.parse(command('docker', ['image', 'inspect', '--format', '{{json .}}', imageId], { env })), request)
+  const nativeImageId = nativeContainerImageId({ configDigest: imageId, manifestDigest: verified.archiveManifestDigest }, args => command('docker', args, { env }))
+  if (nativeImageId !== verified.nativeImageId) throw new Error('Producer image store changed after verification')
+  if (inspectPublishableImage(JSON.parse(command('docker', ['image', 'inspect', '--format', '{{json .}}', nativeImageId], { env })), request) !== nativeImageId) throw new Error('Native producer image changed')
   const credentials = { publisher: process.env.GHCR_PUBLISH_USER ?? '', publishToken: process.env.GHCR_PUBLISH_TOKEN ?? '',
     probeToken: process.env.GH_TOKEN ?? '', expectedPackageId: process.env.GHCR_PRIVATE_PACKAGE_ID ?? '' }
   const packageId = await checkPrivateRegistry(credentials)
   const tag = `${request.purpose}-${request.sourceSha}-${request.build.runId}-${request.build.runAttempt}`
   try {
     command('docker', ['login', 'ghcr.io', '--username', credentials.publisher, '--password-stdin'], { env, input: credentials.publishToken })
-    command('docker', ['tag', imageId, `${CONTAINER_IMAGE_REGISTRY}:${tag}`], { env })
+    command('docker', ['tag', nativeImageId, `${CONTAINER_IMAGE_REGISTRY}:${tag}`], { env })
     command('docker', ['push', `${CONTAINER_IMAGE_REGISTRY}:${tag}`], { env, timeout: 600_000 })
     const manifestDigest = await publishedRegistryManifest(tag, imageId, credentials)
     const publishedPackageId = await checkPrivateRegistry(credentials, packageId === null)
