@@ -23,7 +23,12 @@ CREATE TABLE prerelease_sessions (
   created_at bigint NOT NULL,
   expires_at bigint NOT NULL,
   identity_state text NOT NULL,
-  revoked_at bigint
+  revoked_at bigint,
+  handoff_request_hash text,
+  handoff_return_path text,
+  CHECK ((handoff_request_hash IS NULL AND handoff_return_path IS NULL)
+    OR (handoff_request_hash IS NOT NULL AND handoff_return_path IS NOT NULL
+      AND handoff_request_hash ~ '^[A-Za-z0-9_-]{43}$' AND handoff_return_path LIKE '/open-agricola/%'))
 );
 CREATE INDEX idx_prerelease_sessions_grant ON prerelease_sessions(grant_id);
 CREATE INDEX idx_prerelease_sessions_user ON prerelease_sessions(user_id);
