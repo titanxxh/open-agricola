@@ -43,13 +43,19 @@ async function command(program: string, args: string[], env: NodeJS.ProcessEnv, 
 }
 
 function observeRoomSocket(page: Page) {
-  const created: string[] = [], joined: Array<{ roomId: string; playerIndex: number }> = []
+  const created: Array<{ roomId: string; playerIndex: number }> = []
+  const joined: typeof created = []
   page.on('websocket', socket => socket.on('framereceived', frame => {
     let value: unknown
     try { value = JSON.parse(String(frame.payload)) } catch { return }
     if (!value || typeof value !== 'object' || !('type' in value)) return
-    if (value.type === 'roomCreated' && 'roomId' in value && typeof value.roomId === 'string') created.push(value.roomId)
-    if (value.type === 'roomJoined' && 'roomId' in value && typeof value.roomId === 'string' && 'playerIndex' in value && typeof value.playerIndex === 'number') joined.push({ roomId: value.roomId, playerIndex: value.playerIndex })
+    if ((value.type === 'roomCreated' || value.type === 'roomJoined')
+      && 'roomId' in value && typeof value.roomId === 'string'
+      && 'playerIndex' in value && typeof value.playerIndex === 'number'
+      && Number.isInteger(value.playerIndex) && value.playerIndex >= 0) {
+      const seats = value.type === 'roomCreated' ? created : joined
+      seats.push({ roomId: value.roomId, playerIndex: value.playerIndex })
+    }
   }))
   return { created, joined }
 }
@@ -246,7 +252,8 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
     await page.getByRole('button', { name: 'Create Game', exact: true }).click()
     await expect.poll(() => wire.created.length).toBeGreaterThan(0)
     await environment.assertPrincipal(page)
-    const roomId = wire.created[0]!
+    const originalSeat = wire.created[0]!
+    const roomId = originalSeat.roomId
     await expect(page).toHaveURL(new RegExp(`room=${roomId}`))
     const roomUrl = page.url()
     const cookie = (await environment.context.cookies(environment.preOrigin)).find(row => row.name === '__Host-oa-pre-session')
@@ -256,7 +263,7 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
     const joinedBeforeReload = wire.joined.length
     await page.reload()
     await expect.poll(() => wire.joined.length).toBeGreaterThan(joinedBeforeReload)
-    await expect.poll(() => wire.joined.some(row => row.roomId === roomId && row.playerIndex === 0)).toBe(true)
+    await expect.poll(() => wire.joined.slice(joinedBeforeReload)).toContainEqual(originalSeat)
     await environment.assertPrincipal(page)
     const state = await environment.context.storageState()
     await environment.context.close(); await environment.browser.close()
@@ -264,7 +271,7 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
     try {
       const resumed = await restored.newPage(), restoredWire = observeRoomSocket(resumed)
       await resumed.goto(roomUrl)
-      await expect.poll(() => restoredWire.joined.some(row => row.roomId === roomId && row.playerIndex === 0)).toBe(true)
+      await expect.poll(() => restoredWire.joined).toContainEqual(originalSeat)
       await environment.assertPrincipal(resumed)
       const settings = await restored.newPage()
       await settings.goto(`${environment.preOrigin}/open-agricola/?page=settings`)
