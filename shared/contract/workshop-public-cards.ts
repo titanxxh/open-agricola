@@ -1,3 +1,5 @@
+import type { WorkshopCardType } from './workshop'
+
 /** Public source input, never a compiler artifact or author workspace. */
 export type WorkshopPublicCardInput = {
   protocolVersion: 1
@@ -16,6 +18,20 @@ export type WorkshopPublicCardSnapshot = {
   /** SHA-256 of canonicalJson(input), including the exact image byte identity. */
   sha256: string
   input: WorkshopPublicCardInput
+}
+
+/** Discovery does not grant permission to create or continue execution. */
+export type WorkshopPublicCardCatalogEntry = {
+  source: WorkshopPublicCardInput['source']
+  cardId: string
+  name: string
+  cardType: WorkshopCardType
+}
+
+export type WorkshopPublicCardCatalog = {
+  protocolVersion: 1
+  cards: WorkshopPublicCardCatalogEntry[]
+  nextCursor: string | null
 }
 
 /** checkedAt is the source read start; consumers never restart this deadline. */

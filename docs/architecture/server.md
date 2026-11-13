@@ -185,7 +185,7 @@ Viewer entry HTML revalidates its response policy; content-addressed assets rema
 - Approved `main` merges become read-only `merged` after exact-head reconciliation; other bases become stale/offline. Reviewed live snapshots serve until `markBuiltInMergedCards` hands them to built-in definitions at release.
 - Real Rooms load only reviewed live snapshots. Solo rejects changed/unavailable explicit selections with configuration adjustments; other Rooms reject the author's non-live cards and filter other unloadable IDs. Unreviewed code stays in author sandboxes.
 - Author unpublish permits existing games; administrator takedown ends affected Rooms without scoring or Replay.
-- `workshop-public-cards.ts` exports versioned, hashed public source/image inputs and 30-second creation/execution status. Publication history excludes private versions; reads never write sandbox state. Consumers own compilation and expired-status suspension. [Platform design](../PLATFORM_DESIGN.md#d3-sandbox-isolation-and-fault-tolerance) defines lifecycle policy.
+- `workshop-public-cards.ts` owns the catalog of live approved versions, fixed source and image inputs and 30-second status. Catalog pages exclude drafts and compiler output. Reads never write sandbox state; consumers compile and suspend on expiry. [Platform design](../PLATFORM_DESIGN.md#d3-sandbox-isolation-and-fault-tolerance) defines lifecycle policy.
 - `workshop_submissions` freezes operation/version before GitHub writes. The repository-scoped App uses expected-head CAS, reconciles uncertain PR creation and pauses generated-file conflicts. See the [GitHub App runbook](../operations/github-oauth-app-setup.md).
 - Draft errors use `shared/contract/workshop.ts`; live edits return HTTP 409 `live_edit_blocked`.
 
