@@ -36,6 +36,10 @@ A separate PR changes a stage to `general`. After at least one released version,
 
 `server/prerelease-authority{,-routes}.ts`, migrations 037/039 and `shared/contract/prerelease-identity.ts` implement the formal authority seam. This does not establish a live pre deployment or complete its environment admission; those remain separate dependency tickets. Main removes the Team/Multihand/cooperation business under #1661, including the named feature registry, stages and its game entry checks. Beta qualification, administrator grant controls, formal identity authority and prerelease entry remain on main. The original registry and graduation sections above are historical; a hidden control or an `off` stage does not satisfy this removal.
 
+## Pre-local enforcement
+
+The prerelease consumer stores explicit credential-free external principals and its own persistent host-only sessions. HTTP data entry, WebSocket commands and publication share an absolute authorization deadline and build/data-generation fence. Development defaults do not bypass this environment gate. Source or Beta loss disconnects without removing seats or confirmed state. Account deletion follows existing cleanup/anonymization and acknowledges completion only after local work succeeds. Restore identity remapping remains a key-free owner operation and never restores login rights.
+
 ## References
 
 - [PRD #1615](https://github.com/titanxxh/open-agricola/issues/1615)
