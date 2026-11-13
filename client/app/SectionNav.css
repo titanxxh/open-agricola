@@ -58,6 +58,10 @@
   }
 }
 
+.app:has(.section-nav) {
+  padding-bottom: calc(var(--app-edge-padding) + var(--interaction-bar-height, 0px) + var(--section-nav-height, 0px));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .section-nav {
     scroll-behavior: auto;

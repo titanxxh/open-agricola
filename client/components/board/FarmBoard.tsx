@@ -1020,12 +1020,17 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   ) : []
   const hasCardTargets = isInteractive && (extraSowTargets.length > 0 || cardFieldTargets.length > 0 || nearbyAnimalZones.length > 0)
 
+  const handVisible = visiblePlayerIds.includes(displayPlayer.id) || devMode
   const handPanel = (
-    <div className="hand-cards">
+    <div
+      className="hand-cards"
+      data-hand-anchor={handVisible ? displayPlayer.id : undefined}
+      data-section-target={handVisible ? 'hand' : undefined}
+    >
       <h3>{t(locale, 'ui.handCards')}</h3>
 
-      {visiblePlayerIds.includes(displayPlayer.id) || devMode ? (
-        <div className="hand-sections" data-hand-anchor={displayPlayer.id} data-section-target="hand">
+      {handVisible ? (
+        <div className="hand-sections">
           <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={displayPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
             <div className="hand-row">

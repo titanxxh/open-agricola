@@ -213,5 +213,31 @@ describe('SectionNav', () => {
     expect(css).toContain('max-width: calc(100vw - 156px')
     expect(css).toContain('@media (max-width: 1100px)')
     expect(css).toContain(':focus-visible')
+    expect(css).toContain('--section-nav-height')
+    expect(css).toContain('padding-bottom: calc(var(--app-edge-padding) + var(--interaction-bar-height, 0px) + var(--section-nav-height, 0px))')
+  })
+
+  it('scrolls a section that is clear of the action bar but still under the shortcut dock', () => {
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('header-compact')) return box(0, 48)
+      if (this.classList.contains('section-nav')) return box(640, 40)
+      if (this.classList.contains('interaction-bar')) return box(700, 120)
+      if (this.dataset.sectionTarget === 'farm' && !this.dataset.hiddenFarm) return box(600, 80)
+      return box(0, 0)
+    })
+    renderNav(sectionNavItems({
+      handPlayerId: null, viewedFarm: true, publicFarms: false, seasons: false, moor: false, majorSupply: false,
+    }))
+    fireEvent.click(screen.getByRole('button', { name: 'Player Farm' }))
+    expect(window.scrollBy).toHaveBeenCalledWith({ top: 600 - 48 - 12, behavior: 'smooth' })
+  })
+
+  it('reserves dock space above the action bar so the page can scroll past the shortcuts', () => {
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('section-nav')) return box(640, 44)
+      return box(0, 0)
+    })
+    const view = renderNav(itemsFor())
+    expect(view.container.querySelector('.app')).toHaveStyle({ '--section-nav-height': '52px' })
   })
 })
