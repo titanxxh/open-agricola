@@ -35,14 +35,20 @@ export async function applyPrereleaseIdentityAudit(db: PostgresDatabase, value: 
   }
   if (new Set(associations.map(row => row.userId)).size !== associations.length) throw new Error('Duplicate identity audit association')
   return db.transaction(async () => {
-    const current = await db.prepare('SELECT user_id,source_grant_id FROM prerelease_external_identities FOR UPDATE').all<{ user_id: string; source_grant_id: string }>()
-    if (await db.prepare(`SELECT 1 FROM users WHERE identity_origin!='external' OR NOT EXISTS(SELECT 1 FROM prerelease_external_identities p WHERE p.user_id=users.id) LIMIT 1`).get()) throw new Error('Audit does not cover every retained principal')
+    await db.prepare('SELECT user_id FROM prerelease_external_identities FOR UPDATE').all()
+    const current = await db.prepare('SELECT user_id,source_grant_id FROM prerelease_retained_identity_refs LIMIT 100001')
+      .all<{ user_id: string; source_grant_id: string | null }>()
+    if (current.length > 100000) throw new Error('Retained identity audit exceeds the bounded owner batch budget')
+    if (await db.prepare("SELECT 1 FROM users WHERE identity_origin!='external' LIMIT 1").get()) throw new Error('Audit does not cover every retained principal')
     const byId = new Map(associations.map(row => [row.userId, row]))
     const currentById = new Map(current.map(row => [row.user_id, row]))
     for (const association of associations) if (!currentById.has(association.userId) && !(association.account.kind === 'deleted' && await db.prepare('SELECT 1 FROM prerelease_deleted_subjects WHERE user_id=?').get(association.userId))) throw new Error('Unknown retained identity')
     for (const ref of current) {
       const association = byId.get(ref.user_id)
-      if (!association || ref.source_grant_id !== association.sourceGrantId && ref.source_grant_id !== association.associationId) throw new Error('Unbound retained identity reference')
+      if (!association || ref.source_grant_id !== null && ref.source_grant_id !== association.sourceGrantId && ref.source_grant_id !== association.associationId) throw new Error('Unbound retained identity reference')
+    }
+    for (const association of associations) {
+      if (association.account.kind === 'active' && await db.prepare('SELECT 1 FROM prerelease_deleted_subjects WHERE user_id=?').get(association.userId)) throw new Error('Deleted retained identity cannot be recreated')
     }
     // A restored browser Cookie must not become usable in the replacement generation.
     await db.prepare('DELETE FROM prerelease_sessions').run()
@@ -51,11 +57,19 @@ export async function applyPrereleaseIdentityAudit(db: PostgresDatabase, value: 
     for (const association of associations) {
       if (association.account.kind === 'deleted') {
         await db.prepare('INSERT INTO prerelease_deleted_subjects(user_id,deleted_at) VALUES(?,?) ON CONFLICT DO NOTHING').run(association.userId, now)
+        // Removing the last invite must never turn a private room into a public one.
+        await db.prepare('DELETE FROM rooms WHERE jsonb_exists(invited_user_ids,?)').run(association.userId)
         await deleteAccount(association.userId, { db, now })
         erased++
       } else {
-        await db.prepare('UPDATE prerelease_external_identities SET source_grant_id=?,generation_id=?,revision=revision+1 WHERE user_id=?').run(association.associationId, generationId, association.userId)
-        await db.prepare('UPDATE users SET username=?,display_name=? WHERE id=? AND identity_origin=\'external\'').run(association.account.subject.username, association.account.subject.displayName, association.userId)
+        await db.prepare(`INSERT INTO users(id,username,display_name,password_hash,created_at,identity_origin)
+          VALUES(?,?,?,NULL,?,'external') ON CONFLICT(id) DO UPDATE
+          SET username=excluded.username,display_name=excluded.display_name WHERE users.identity_origin='external'`)
+          .run(association.userId, association.account.subject.username, association.account.subject.displayName, now)
+        await db.prepare(`INSERT INTO prerelease_external_identities(user_id,source_grant_id,generation_id) VALUES(?,?,?)
+          ON CONFLICT(user_id) DO UPDATE SET source_grant_id=excluded.source_grant_id,
+          generation_id=excluded.generation_id,revision=prerelease_external_identities.revision+1`)
+          .run(association.userId, association.associationId, generationId)
       }
     }
     return { identities: associations.length - erased, erased }
