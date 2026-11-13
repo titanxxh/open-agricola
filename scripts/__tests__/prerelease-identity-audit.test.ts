@@ -91,6 +91,28 @@ it('remaps an active history-only account through an actual source-verified priv
   expect(await applyPrereleaseIdentityAudit(db, packet, 4001)).toEqual({ identities: 1, erased: 0 })
 })
 
+it('cleans deleted subjects before applying an active-first packet that reuses their source username', async () => {
+  const db = await createTestDatabase(); databases.push(db)
+  await externalPrincipal(db, 'z_deleted', 'T'.repeat(43))
+  await db.prepare('UPDATE users SET username=? WHERE id=?').run('SOURCE_A_ACTIVE', 'z_deleted')
+  await retainedResult(db, 'a_active')
+  await db.prepare(`INSERT INTO game_result_players(room_id,player_index,game_player_id,user_id,display_name,score)
+    VALUES('native-history',1,'old-game-player','z_deleted','Old retained name',13)`).run()
+  const packet = await sourceAssociation('a_active', true, [{ id: 'z_deleted', active: false }])
+  expect(packet.associations.map(row => [row.userId, row.account.kind]))
+    .toEqual([['a_active', 'active'], ['z_deleted', 'deleted']])
+  for (const now of [4000, 4001]) {
+    expect(await applyPrereleaseIdentityAudit(db, packet, now)).toEqual({ identities: 1, erased: 1 })
+    expect(await db.prepare('SELECT id,username FROM users').all()).toEqual([{ id: 'a_active', username: 'source_a_active' }])
+    expect((await readRetainedIdentityManifest(db)).refs)
+      .toEqual([{ userId: 'a_active', sourceGrantId: packet.associations[0]?.associationId }])
+    expect(await db.prepare('SELECT user_id,display_name,score FROM game_result_players ORDER BY player_index').all())
+      .toEqual([{ user_id: 'a_active', display_name: 'Retained player', score: 42 },
+        { user_id: null, display_name: 'Deleted player (seat 2)', score: 13 }])
+    expect(await db.prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+  }
+})
+
 it('erases a deleted invite/history-only account through source verification and rescans to an empty native set', async () => {
   const db = await createTestDatabase(); databases.push(db)
   await retainedResult(db, 'deleted-subject')
