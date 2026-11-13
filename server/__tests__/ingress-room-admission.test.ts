@@ -2,8 +2,9 @@ import { createServer, request, type IncomingHttpHeaders, type Server } from 'no
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { afterEach, expect, it, vi } from 'vitest'
-import { BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 import { getSessionByToken } from '../auth'
+import { authCookieNames } from '../auth-cookies'
 import { httpAdmission, requestSessionToken } from '../request-auth'
 import { RoomDirectory } from '../game/room-directory'
 import { createPublicIngress } from '../ingress'
@@ -133,5 +134,55 @@ it('routes authenticated dissolution to the existing owner across two live insta
     expect(await running.db.prepare('SELECT room_id,status FROM room_ownership WHERE room_id=?').get('unloaded-room'))
       .toEqual({ room_id: 'unloaded-room', status: 'reserved' })
     expect(running.calls.at(-1)?.authenticated).toBe(true)
+  } finally { await running.close() }
+})
+
+it('routes an authenticated unloaded room to spare capacity instead of its full affinity node', async () => {
+  const running = await fixture(2, 1)
+  try {
+    await running.room('busy-room')
+    const busy = await running.directory.claim('busy-room', 'one')
+    await running.db.transaction(async () => {
+      await running.directory.markActive('busy-room', busy.owner)
+      await running.directory.presence('busy-room', busy.owner, 1, 1)
+    })()
+    await running.room('retained-room')
+    const occupied = await running.db.prepare('SELECT * FROM room_ownership WHERE room_id=?').get('busy-room')
+    const response = await running.dissolve('retained-room', {
+      origin: 'https://open-agricola.titanxxh.com', [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION),
+      cookie: `${authCookieNames().session}=${running.token}; agricola_instance=one`,
+    })
+    expect(response.status).toBe(200)
+    expect(JSON.parse(response.body)).toEqual({ node: 'two', roomId: 'retained-room', userId: 'room-owner' })
+    expect(running.calls).toEqual([{ node: 'two', authenticated: true }])
+    expect(await running.db.prepare('SELECT room_id,instance_id,status FROM room_ownership WHERE room_id=?').get('retained-room'))
+      .toEqual({ room_id: 'retained-room', instance_id: 'two', status: 'reserved' })
+    expect(await running.db.prepare('SELECT * FROM room_ownership WHERE room_id=?').get('busy-room')).toEqual(occupied)
+  } finally { await running.close() }
+})
+
+it('still reaches authentication without reserving capacity when every ready instance is full', async () => {
+  const running = await fixture(2, 1)
+  try {
+    for (const node of ['one', 'two']) {
+      const roomId = `busy-${node}`
+      await running.room(roomId)
+      const occupied = await running.directory.claim(roomId, node)
+      await running.db.transaction(async () => {
+        await running.directory.markActive(roomId, occupied.owner)
+        await running.directory.presence(roomId, occupied.owner, 1, 1)
+      })()
+    }
+    await running.room('retained-room')
+    const before = await running.db.prepare('SELECT * FROM room_ownership ORDER BY room_id').all()
+    expect((await running.dissolve('retained-room', {
+      origin: 'https://pre.titanxxh.com', 'content-type': 'application/x-www-form-urlencoded', cookie: 'agricola_instance=one',
+    })).status).toBe(403)
+    expect((await running.dissolve('retained-room', { authorization: 'Bearer never-issued' })).status).toBe(401)
+    expect(running.calls).toHaveLength(2)
+    expect(running.calls.every(call => !call.authenticated)).toBe(true)
+    expect(await running.db.prepare('SELECT * FROM room_ownership ORDER BY room_id').all()).toEqual(before)
+    expect(await running.db.prepare('SELECT id,status,version FROM rooms WHERE id=?').get('retained-room'))
+      .toEqual({ id: 'retained-room', status: 'waiting', version: 0 })
   } finally { await running.close() }
 })
