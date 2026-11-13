@@ -8,6 +8,8 @@ import type { ServerEvent } from '../shared/contract/protocol/ws'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { finishWsOpening, observeWsOpening, type WsOpeningSeat } from './helpers/ws-opening'
 
+test.use({ trace: 'retain-on-failure' })
+
 const cookie = (response: APIResponse, name: string) => {
   const header = response.headersArray().find(item => item.name.toLowerCase() === 'set-cookie' && item.value.startsWith(`${name}=`))
   if (!header) throw new Error(`Missing ${name} cookie`)

@@ -13,6 +13,8 @@ import { once } from 'node:events'
 import { createPrereleaseGateway, OWNER_VERIFICATION_COOKIE } from '../scripts/prerelease/gateway'
 import { configureOwnerVerification } from '../scripts/prerelease/owner-browser'
 
+test.use({ trace: 'retain-on-failure' })
+
 async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: 'chromium' | 'firefox' | 'webkit', mode: 'open' | 'maintenance') {
   const root = mkdtempSync(join(tmpdir(), 'pre-owner-browser-'))
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=api.agricola.test',

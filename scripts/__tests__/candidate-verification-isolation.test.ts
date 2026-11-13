@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, linkSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, linkSync, truncateSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -39,6 +39,24 @@ it('collects only regular independent diagnostics, refusing symlink directories 
   expect(readFileSync(join(value.output, 'output/verification/result.json'), 'utf8')).toBe('{"completed":true}')
   for (const path of ['output/verification/link.json', 'output/verification/hard.json', 'output/playwright/sentinel']) expect(() => readFileSync(join(value.output, path))).toThrow()
   expect(readFileSync(sentinel, 'utf8')).toBe('private inert bytes')
+})
+it('collects a 20 MiB Playwright trace while retaining the ordinary diagnostic size limit', () => {
+  const value = fixture()
+  mkdirSync(join(value.work, 'output/playwright/case'), { recursive: true })
+  mkdirSync(join(value.work, 'output/playwright/oversized'), { recursive: true })
+  mkdirSync(join(value.work, 'output/verification'), { recursive: true })
+  const bytes = Buffer.alloc(20 * 1024 * 1024, 't')
+  writeFileSync(join(value.work, 'output/playwright/case/trace.zip'), bytes)
+  writeFileSync(join(value.work, 'output/playwright/case/task.log'), bytes)
+  writeFileSync(join(value.work, 'output/verification/trace.zip'), bytes)
+  const oversizedTrace = join(value.work, 'output/playwright/oversized/trace.zip')
+  writeFileSync(oversizedTrace, '')
+  truncateSync(oversizedTrace, 65 * 1024 * 1024)
+  collectCandidateDiagnostics(value.work, value.output)
+  expect(readFileSync(join(value.output, 'output/playwright/case/trace.zip')).equals(bytes)).toBe(true)
+  for (const path of ['output/playwright/case/task.log', 'output/verification/trace.zip', 'output/playwright/oversized/trace.zip']) {
+    expect(() => readFileSync(join(value.output, path))).toThrow()
+  }
 })
 it('renders captured output without inline workflow commands or carriage-return commands', () => {
   const value = fixture(), log = join(value.root, 'task.log')

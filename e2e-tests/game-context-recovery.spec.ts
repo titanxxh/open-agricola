@@ -13,6 +13,8 @@ import {
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { finishWsOpening, observeWsOpening } from './helpers/ws-opening'
 
+test.use({ trace: 'retain-on-failure' })
+
 type RecoveryState = {
   type: 'stateUpdate'
   payload: {

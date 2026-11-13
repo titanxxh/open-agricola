@@ -15,7 +15,7 @@ import { finishWsOpening, observeWsOpening } from './helpers/ws-opening'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeSessionSnapshot } from '../shared/session/serialization'
 
-test.use({ viewport: { width: 1920, height: 1080 } })
+test.use({ viewport: { width: 1920, height: 1080 }, trace: 'retain-on-failure' })
 
 const cookieValue = (response: APIResponse, name: string) => {
   const header = response.headersArray().find(({ name: headerName, value }) =>
