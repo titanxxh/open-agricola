@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"https://pre.agricola.test/open-agricola/"}
 import { afterEach, expect, it, vi } from 'vitest'
+import type { PrereleaseFailure } from '../prerelease-runtime'
 
 const build = 'a'.repeat(40)
 const generation = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
@@ -100,4 +101,27 @@ it('keeps an explicit local sign-out terminal despite later failures and fresh p
   expect(() => pre.acceptPrereleaseSession(session, revision)).toThrow('prerelease_auth_required')
   expect(pre.getPrereleaseLeaseRemainingMs()).toBe(0)
   expect(() => pre.assertPrereleaseAccess()).toThrow('prerelease_auth_required')
+})
+
+const terminalFailures: Array<Exclude<PrereleaseFailure, 'prerelease_access_paused'>> = [
+  'prerelease_auth_required', 'prerelease_access_expired', 'prerelease_runtime_changed', 'invalid_prerelease_handoff',
+]
+it.each(terminalFailures)('requires a fresh document after %s despite later pauses and positive confirmations', async code => {
+  vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json(runtime)))
+  const pre = await import('../prerelease-runtime')
+  await pre.loadPrereleaseRuntime(); pre.acceptPrereleaseSession(session)
+  pre.observePrereleaseFailure(code)
+  const revision = pre.getPrereleaseRevision()
+  pre.observePrereleaseFailure('prerelease_access_paused')
+  expect(pre.getPrereleaseAccess()).toEqual({ kind: 'blocked', code })
+  expect(pre.getPrereleaseRevision()).toBe(revision)
+  expect(() => pre.acceptPrereleaseSession(session, revision)).toThrow(code)
+  expect(() => pre.assertPrereleaseAccess()).toThrow(code)
+  expect(pre.getPrereleaseLeaseRemainingMs()).toBe(0)
+
+  vi.resetModules()
+  const fresh = await import('../prerelease-runtime')
+  await fresh.loadPrereleaseRuntime(); fresh.acceptPrereleaseSession(session)
+  expect(fresh.getPrereleaseAccess()).toMatchObject({ kind: 'active', session: { user: { id: 'u1' } } })
 })
