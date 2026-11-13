@@ -9,6 +9,13 @@ import { fullSha } from '../ci/verification-tasks.ts'
 import { assertExpectedContainerImage, parseContainerImageTransfer } from './container-images.ts'
 import { inspectLoadedContainerImage, loadContainerImageArchive, nativeContainerImageId } from './container-images-archive.ts'
 
+export const BACKEND_IMAGE_QUEUE_WAIT_MS = 30 * 60_000
+export const BACKEND_IMAGE_INTAKE_WORK_MS = 20 * 60_000
+export const BACKEND_IMAGE_MAINTENANCE_WORK_MS = 40 * 60_000
+export const BACKEND_IMAGE_CLEANUP_MS = 5 * 60_000
+export const BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS = BACKEND_IMAGE_QUEUE_WAIT_MS + BACKEND_IMAGE_INTAKE_WORK_MS + BACKEND_IMAGE_CLEANUP_MS + 60_000
+export const BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS = BACKEND_IMAGE_QUEUE_WAIT_MS + BACKEND_IMAGE_MAINTENANCE_WORK_MS + BACKEND_IMAGE_CLEANUP_MS + 60_000
+
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid formal image input')
   return Object.fromEntries(Object.entries(value))
