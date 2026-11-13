@@ -67,7 +67,8 @@ export function createPublicIngress(directory: RoomDirectory, secureCookies: boo
       const dissolve = /^\/api\/rooms\/([A-Za-z0-9-]+)\/dissolve$/.exec(req.url ?? '')
       if (req.method === 'POST' && dissolve && await directory.db.prepare('SELECT 1 FROM rooms WHERE id=?').get(dissolve[1])) {
         const owner = await directory.currentRoute(dissolve[1]!)
-        if (owner) selected = instances.find(instance => instance.instance_id === owner.owner.instanceId)
+        const instanceId = owner?.owner.instanceId ?? await directory.availableInstanceId()
+        if (instanceId) selected = instances.find(instance => instance.instance_id === instanceId)
       }
       if (!selected) { jsonError(res, 503, 'No application instance is ready'); return }
       const target = new URL(selected.internal_url)

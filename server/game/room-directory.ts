@@ -77,6 +77,15 @@ export class RoomDirectory {
     return owner ? route(owner) : undefined
   }
 
+  /** Suggest spare capacity without creating an owner or reserving its admission slot. */
+  async availableInstanceId(): Promise<string | undefined> {
+    try { return (await this.selectInstance()).instance_id }
+    catch (error) {
+      if (error instanceof RoomCapacityError) return undefined
+      throw error
+    }
+  }
+
   private async selectInstance(preferred?: string, development = false, replacing?: string): Promise<Instance> {
     const now = await this.now()
     const rows = await this.db.prepare(`SELECT i.*, count(o.room_id)::bigint AS rooms FROM app_instances i
