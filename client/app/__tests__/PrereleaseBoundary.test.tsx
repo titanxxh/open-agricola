@@ -133,6 +133,38 @@ it('pauses private pages when a confirmation fails instead of granting a fresh p
   expect(screen.getByRole('alert')).toHaveTextContent('prerelease.accessPaused')
 })
 
+it('keeps a known denial terminal when an older confirmation later pauses', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance', 'Date'] })
+  vi.setSystemTime(1_000_000)
+  vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
+  const confirmation = Promise.withResolvers<Response>()
+  let confirmations = 0
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url.endsWith('/runtime')) return Response.json({ ok: true, channel: 'prerelease', buildId: build, generationId: generation,
+      appOrigin: window.location.origin, formalAppOrigin: 'https://formal.agricola.test', formalApiBase: 'https://api.agricola.test', targetId: 'prerelease-main' })
+    if (url === '/api/v1/game-contexts/kept-room') return Response.json({ ok: false, code: 'prerelease_access_expired' }, { status: 403 })
+    if (++confirmations > 1) return confirmation.promise
+    return Response.json({ ok: true, user: { id: 'u1', username: 'beta', displayName: 'Beta', isAdmin: false, betaAccess: true },
+      prerelease: { buildId: build, generationId: generation, expiresAt: 9_000_000_000_000,
+        validUntil: Date.now() + 30_000, serverTime: Date.now() } })
+  }))
+  const { PrereleaseBoundary } = await import('../PrereleaseBoundary')
+  const { browserApiFetch } = await import('../../services/browser-api')
+  await act(async () => { render(<PrereleaseBoundary><div>Private game context</div></PrereleaseBoundary>) })
+  await act(async () => { await vi.advanceTimersByTimeAsync(15_000) })
+  expect(confirmations).toBe(2)
+  await act(async () => {
+    await expect(browserApiFetch('/api/v1/game-contexts/kept-room')).rejects.toThrow('prerelease_access_expired')
+  })
+  expect(screen.queryByText('Private game context')).toBeNull()
+  await act(async () => { confirmation.resolve(Response.json({ ok: false, code: 'prerelease_access_paused' }, { status: 503 })) })
+  expect(screen.getByRole('alert')).toHaveTextContent('prerelease.accessExpired')
+  expect(screen.queryByRole('button', { name: 'platform.retry' })).toBeNull()
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+  expect(confirmations).toBe(2)
+  expect(screen.queryByText('Private game context')).toBeNull()
+})
+
 
 it.each(['unavailable', 'lost-body'])('retries the bound callback safely after an %s exchange without using an ambient account', async failure => {
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
