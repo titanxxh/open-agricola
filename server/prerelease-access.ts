@@ -74,17 +74,36 @@ export function prereleaseSocketAllowed(ws: WebSocket): boolean {
   } catch { return false }
 }
 
+type PrereleaseSocketCloseReason = Extract<PrereleaseAccessErrorCode,
+  'prerelease_runtime_changed' | 'prerelease_access_expired' | 'prerelease_access_paused'>
+
+/** The browser uses this reason to stop local execution as soon as access ends. */
+export function closePrereleaseSocket(ws: WebSocket): void {
+  if (!isPrerelease()) return
+  const row = sockets.get(ws)
+  let reason: PrereleaseSocketCloseReason = 'prerelease_access_paused'
+  if (!row) reason = 'prerelease_runtime_changed'
+  else {
+    try {
+      const service = getPrereleaseSessions()
+      if (service && (row.binding.buildId !== service.runtime.buildId || row.binding.generationId !== service.runtime.generationId)) reason = 'prerelease_runtime_changed'
+      else if (service?.status(row.token) === 'expired') reason = 'prerelease_access_expired'
+    } catch { /* Unknown identity state pauses execution without asserting revocation. */ }
+  }
+  ws.close(1008, reason)
+}
+
 export function trackPrereleaseSocket(ws: WebSocket, req: IncomingMessage): void {
   if (!isPrerelease()) return
   const binding = prereleaseRequestBinding(req, true)
-  if (!binding) { ws.close(1008, 'prerelease runtime changed'); return }
+  if (!binding) { closePrereleaseSocket(ws); return }
   sockets.set(ws, { token: prereleaseSessionToken(req), binding })
   ws.once('close', () => {
     sockets.delete(ws)
     if (!sockets.size) { clearInterval(timer); timer = undefined; unsubscribe?.(); unsubscribe = undefined }
   })
   const sweep = () => {
-    for (const socket of sockets.keys()) if (!prereleaseSocketAllowed(socket)) socket.close(1008, 'prerelease access ended')
+    for (const socket of sockets.keys()) if (!prereleaseSocketAllowed(socket)) closePrereleaseSocket(socket)
   }
   if (!timer) { timer = setInterval(sweep, 1000); timer.unref() }
   if (!unsubscribe) unsubscribe = getPrereleaseSessions()?.subscribeInvalidation(sweep)
