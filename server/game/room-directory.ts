@@ -68,6 +68,15 @@ export class RoomDirectory {
     return this.db.prepare("SELECT * FROM app_instances WHERE status='ready' AND lease_until>? ORDER BY instance_id").all<Instance>(await this.now())
   }
 
+  /** Resolve an existing live owner without reserving capacity or extending admission. */
+  async currentRoute(roomId: string): Promise<RoomRoute | undefined> {
+    const now = await this.now()
+    const owner = await this.db.prepare(`SELECT o.* FROM room_ownership o JOIN app_instances i ON i.instance_id=o.instance_id
+      WHERE o.room_id=? AND o.status!='retired' AND o.lease_until>? AND i.lease_until>?
+        AND i.status IN ('starting','ready')`).get<Ownership>(roomId, now, now)
+    return owner ? route(owner) : undefined
+  }
+
   private async selectInstance(preferred?: string, development = false, replacing?: string): Promise<Instance> {
     const now = await this.now()
     const rows = await this.db.prepare(`SELECT i.*, count(o.room_id)::bigint AS rooms FROM app_instances i
