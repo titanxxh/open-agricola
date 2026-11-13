@@ -1,3 +1,4 @@
+import { resourceFetch } from './resource-fetch'
 import type { ActionReferenceCatalog } from '../../shared/contract/action-reference'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
@@ -6,7 +7,7 @@ let pending: Promise<ActionReferenceCatalog> | undefined
 
 /** Static build data, loaded on the first reference inspection. Failures can be retried. */
 export function loadActionReferences(): Promise<ActionReferenceCatalog> {
-  pending ??= fetch(`${import.meta.env.BASE_URL}action-references.json`, { cache: 'no-cache' }).then(async response => {
+  pending ??= resourceFetch(`${import.meta.env.BASE_URL}action-references.json`, { cache: 'no-cache' }).then(async response => {
     if (!response.ok) throw new Error(`Action references unavailable (${response.status})`)
     const manifest: unknown = await response.json()
     if (!manifest || typeof manifest !== 'object' || !('version' in manifest) || manifest.version !== 1
@@ -14,7 +15,7 @@ export function loadActionReferences(): Promise<ActionReferenceCatalog> {
       || !('file' in manifest) || manifest.file !== `action-references.${manifest.sha256.slice(0, 16)}.json`) {
       throw new Error('Invalid action reference manifest')
     }
-    const content = await fetch(`${import.meta.env.BASE_URL}${manifest.file}`)
+    const content = await resourceFetch(`${import.meta.env.BASE_URL}${manifest.file}`)
     if (!content.ok) throw new Error(`Action references unavailable (${content.status})`)
     const raw = await content.text()
     if (bytesToHex(sha256(utf8ToBytes(raw))) !== manifest.sha256) throw new Error('Action reference checksum mismatch')
