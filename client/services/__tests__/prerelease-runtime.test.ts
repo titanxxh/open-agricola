@@ -68,10 +68,13 @@ it('expires the worker lease using monotonic request time, including transit des
   await vi.advanceTimersByTimeAsync(1000)
   pre.acceptPrereleaseSession({ ...session, prerelease: { ...session.prerelease, serverTime: 1_000_000, validUntil: 1_003_000 } }, pre.getPrereleaseRevision(), started)
   expect(pre.prereleaseWebSocketProtocols()).toEqual(['oa.browser.v2', 'oa.pre.build.' + build, 'oa.pre.generation.' + generation])
+  expect(pre.getPrereleaseLeaseRemainingMs()).toBe(2000)
   await vi.advanceTimersByTimeAsync(1999)
   expect(pre.getPrereleaseAccess().kind).toBe('active')
+  expect(pre.getPrereleaseLeaseRemainingMs()).toBe(1)
   await vi.advanceTimersByTimeAsync(1)
   expect(pre.getPrereleaseAccess()).toEqual({ kind: 'blocked', code: 'prerelease_access_paused' })
+  expect(pre.getPrereleaseLeaseRemainingMs()).toBe(0)
   expect(() => pre.assertPrereleaseAccess()).toThrow('prerelease_access_paused')
 })
 

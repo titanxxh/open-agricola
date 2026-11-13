@@ -21,6 +21,7 @@ export const isPrereleaseClient = () => import.meta.env.VITE_RELEASE_CHANNEL ===
 export const getPrereleaseRuntime = () => runtime
 export const getPrereleaseAccess = () => access
 export const getPrereleaseRevision = () => revision
+export const getPrereleaseLeaseRemainingMs = () => access.kind === 'active' ? Math.max(0, leaseDeadline - performance.now()) : 0
 export function subscribePrereleaseAccess(listener: () => void): () => void {
   listeners.add(listener); return () => { listeners.delete(listener) }
 }
