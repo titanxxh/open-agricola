@@ -1,3 +1,4 @@
+import { prereleaseSocketAllowed } from '../prerelease-access'
 import { getSessionByToken } from '../auth'
 import { isRoomSpectator, roomSpectators, drainRoomSpectators } from '../game/room-spectators'
 import { ExecutionAccess } from '../game/execution-access'
@@ -43,6 +44,11 @@ export class Broadcaster {
   private readonly directory?: RoomDirectory
   constructor(directory?: RoomDirectory) { this.directory = directory }
 
+  private send(ws: WebSocket, event: ServerEvent, capturedRound?: string, encodedMessage?: string): number {
+    if (!prereleaseSocketAllowed(ws)) { ws.close(1008, 'prerelease access ended'); return 0 }
+    return sendObserved(ws, event, capturedRound, encodedMessage)
+  }
+
   private publish(room: Room, send: () => void, retired = false): void | Promise<void> {
     if (!this.directory) return send()
     if (!room.owner) return Promise.reject(new RoomOwnershipError('Room owner token is required'))
@@ -61,7 +67,7 @@ export class Broadcaster {
   }
 
   sendRoomEvent(ws: WebSocket, room: Room, event: ServerEvent): void | Promise<void> {
-    return this.publish(room, () => { sendObserved(ws, event, roundTag(room.session.state)) })
+    return this.publish(room, () => { this.send(ws, event, roundTag(room.session.state)) })
   }
 
   broadcastCommitted(
@@ -88,7 +94,7 @@ export class Broadcaster {
           emittedAt,
           mode: projectionModeFor(room),
       }))
-      bytes += sendObserved(ws, env)
+      bytes += this.send(ws, env)
       recipients++
     }
     const spectators = roomSpectators(room).filter(ws => ws.readyState === ws.OPEN)
@@ -96,7 +102,7 @@ export class Broadcaster {
       const envelope = measure('projection', () => buildEnvelope({ room, resp, visiblePlayerIds: [], controlledPlayerIndexes: [],
         version: room.version, cause, emittedAt, mode: 'viewer' }))
       const data = JSON.stringify(envelope)
-      for (const ws of spectators) { bytes += sendObserved(ws, envelope, roundTag(resp.state), data); recipients++ }
+      for (const ws of spectators) { bytes += this.send(ws, envelope, roundTag(resp.state), data); recipients++ }
     }
     if (resp.state.gameOver) this.endSpectating(room, 'completed')
     safe(() => {
@@ -126,7 +132,7 @@ export class Broadcaster {
         emittedAt: Date.now(),
         mode: isRoomSpectator(room, ws) ? 'viewer' : mode ?? projectionModeFor(room),
     }))
-    sendObserved(ws, env)
+    this.send(ws, env)
     }))
   }
 
@@ -135,11 +141,11 @@ export class Broadcaster {
     const data = JSON.stringify(event)
     const round = roundTag(room.session.state)
     for (const ws of roomConnections(room)) {
-      sendObserved(ws, event, round, data)
+      this.send(ws, event, round, data)
     }
     if (event.type === 'roomPersistencePaused' || event.type === 'roomPersistenceResumed'
       || event.type === 'playerJoined' || event.type === 'playerDisconnected') {
-      for (const ws of roomSpectators(room)) sendObserved(ws, event, round, data)
+      for (const ws of roomSpectators(room)) this.send(ws, event, round, data)
     }
     if (event.type === 'gameTerminated') this.endSpectating(room, 'terminated')
     else if (event.type === 'roomDissolved') this.endSpectating(room, 'removed')
@@ -150,13 +156,13 @@ export class Broadcaster {
   endSpectating(room: Room, reason: SpectatingEndReason): void {
     const viewers = drainRoomSpectators(room)
     try {
-      for (const ws of viewers) sendObserved(ws, { type: 'spectatingEnded', roomId: room.id, reason })
+      for (const ws of viewers) this.send(ws, { type: 'spectatingEnded', roomId: room.id, reason })
     } finally {
       for (const ws of viewers) ws.close(1000, 'spectating ended')
     }
   }
 
   sendTo(ws: WebSocket, event: ServerEvent): void {
-    sendObserved(ws, event)
+    this.send(ws, event)
   }
 }
