@@ -200,6 +200,9 @@ it('keeps the identity service key in the app and excludes it from migration and
   if (!('app' in composed.services) || !composed.services.app || !composed.services.migrate || !composed.services.capture) throw new Error('Expected installed candidate services')
   expect(composed.services.app.env_file).toEqual([join(value.root, '.env')])
   expect(composed.services.app.environment).toMatchObject({ APP_ROOM_CAPACITY: '10', CUSTOM_SESSION_WORKER_CAPACITY: '1' })
+  for (const service of Object.values(composed.services)) {
+    if (service) expect(service.memswap_limit).toBe(service.mem_limit)
+  }
   for (const service of [composed.services.migrate, composed.services.capture]) {
     expect(service.environment).toMatchObject({ DATABASE_URL: 'postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test' })
     expect(service.environment).not.toHaveProperty('PRERELEASE_IDENTITY_SERVICE_KEY')

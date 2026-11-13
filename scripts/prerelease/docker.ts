@@ -62,7 +62,7 @@ function inspectFixedImage(target: PrereleaseTarget, image: string, buildId: str
     || labels['io.open-agricola.release-channel'] !== channel) throw new Error('Image channel/SHA does not match the fixed tool or candidate')
   assertCapacity(target, 'inspect-image')
   const metadata = parsed(command('docker', ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-    '--memory', '64m', '--cpus', '0.25', '--pids-limit', '32', '--entrypoint', 'node', digest,
+    '--memory', '64m', '--memory-swap', '64m', '--cpus', '0.25', '--pids-limit', '32', '--entrypoint', 'node', digest,
     '-e', 'process.stdout.write(require("node:fs").readFileSync("/app/frontend-dist/frontend-build.json","utf8"))']))
   if (metadata.format !== 1 || metadata.gameBuildId !== buildId || metadata.basePath !== '/open-agricola/'
     || metadata.releaseChannel !== channel || metadata.deploymentTarget !== `${channel}-hosted`) throw new Error('Hosted frontend is not paired with the fixed image')
@@ -194,7 +194,7 @@ export function trustedArchiveTool(target: PrereleaseTarget, service: 'capture' 
     assertCapacity(target, 'tool')
     return command('docker', ['run', '--rm', ...labels, '--network', target.network,
     '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
-    '--memory', `${target.budgets.tools.memoryMiB}m`, '--cpus', String(target.budgets.tools.cpus), '--pids-limit', String(target.budgets.tools.pids),
+    '--memory', `${target.budgets.tools.memoryMiB}m`, '--memory-swap', `${target.budgets.tools.memoryMiB}m`, '--cpus', String(target.budgets.tools.cpus), '--pids-limit', String(target.budgets.tools.pids),
     '--tmpfs', '/tmp:size=67108864', ...credentials,
     '-e', 'PG_CLIENT_MODE=local', '-e', 'RELEASE_CHANNEL=prerelease', '-e', `SOURCE_BUILD_ID=${record.installed?.buildId ?? ''}`,
     '-e', `BACKUP_ENVIRONMENT=${target.targetId}`, '-e', `BACKUP_JOB_ID=${runId}`,
@@ -240,7 +240,7 @@ export function policyTool(target: PrereleaseTarget, operation: 'inspect' | 'emp
   const credentialArguments = credentials === 'tools' ? ['--env-file', join(target.directory, 'data/dependencies.compose.env')]
     : Object.keys(dataEnvironment).flatMap(key => ['-e', key])
   return boundedTool(target, (labels) => command('docker', ['run', '--rm', ...labels, '--network', target.network, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-    '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`, '--memory', `${target.budgets.tools.memoryMiB}m`, '--cpus', String(target.budgets.tools.cpus),
+    '--user', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`, '--memory', `${target.budgets.tools.memoryMiB}m`, '--memory-swap', `${target.budgets.tools.memoryMiB}m`, '--cpus', String(target.budgets.tools.cpus),
     '--pids-limit', String(target.budgets.tools.pids), '--tmpfs', '/tmp:size=67108864',
     ...credentialArguments, '-e', 'RELEASE_CHANNEL=prerelease', ...env,
     '-v', `${code}:/policy:ro`, '-v', `${join(target.policyDirectory, 'node_modules')}:/policy/node_modules:ro`, '-v', `${config}:/target.json:ro`,

@@ -81,10 +81,10 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
   const gatewayFiles = ['scripts/prerelease/gateway.ts', 'scripts/prerelease/storage-guard-state.ts', 'scripts/prerelease/browser-policy.ts', 'shared/contract/browser-auth.ts']
   const gatewayPolicy = createHash('sha256')
   for (const file of gatewayFiles) gatewayPolicy.update(file).update(readFileSync(join(target.policyDirectory, file)))
-  const limits = (kind: 'app' | 'tools') => ({ mem_limit: `${target.budgets[kind].memoryMiB}m`, cpus: target.budgets[kind].cpus, pids_limit: target.budgets[kind].pids })
+  const limits = (kind: 'app' | 'tools') => ({ mem_limit: `${target.budgets[kind].memoryMiB}m`, memswap_limit: `${target.budgets[kind].memoryMiB}m`, cpus: target.budgets[kind].cpus, pids_limit: target.budgets[kind].pids })
   const proxyNetwork = target.proxyNetwork ? { proxy: { external: true, name: target.proxyNetwork } } : {}
   const gateway = { image: 'node:24.19.0-slim', init: true, user: `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
-    read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'], mem_limit: '64m', cpus: 0.25, pids_limit: 32,
+    read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'], mem_limit: '64m', memswap_limit: '64m', cpus: 0.25, pids_limit: 32,
     ports: [`127.0.0.1:${target.port}:5176`], labels: { ...labels, 'org.open-agricola.gateway-policy': gatewayPolicy.digest('hex') }, restart: 'unless-stopped',
     environment: { PRERELEASE_TARGET_ID: target.targetId, PRERELEASE_PUBLIC_ORIGIN: target.origin,
       FORMAL_APP_ORIGIN: target.formal.appOrigin, FORMAL_API_BASE: target.formal.apiOrigin },

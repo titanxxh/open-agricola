@@ -102,6 +102,8 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 
 ### 操作隔离的预发布目标
 
+预发布 app、网关、镜像检查与工具容器的 memory/swap 合并上限等于 memory 上限，实测预算不允许额外 swap。共享 Docker daemon 不在这些容器限额内。
+
 `budgets.sessions.rooms` 与 `budgets.sessions.customWorkers` 是必须封存的准入上限。owner Compose 设置 `APP_ROOM_CAPACITY`（1–30）与 `CUSTOM_SESSION_WORKER_CAPACITY`（0–15）；Worker 预留和 HTTP executor 共用后者。示例 10/1 不代表容量验收，最终值须由原生负载实测确定。离线保留的普通对局不占在线准入配额。未配置这些环境变量时，应用仍默认 30/15。
 
 使用可信 main checkout、Node 24.15+、Docker Compose、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、依赖网络与可选代理网络、离站身份、导入镜像来源和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
