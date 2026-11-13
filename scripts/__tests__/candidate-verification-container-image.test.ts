@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { imageBuildRequest, inspectPublishableImage, verifyPublishEnvironment } from '../ci/container-image-build'
-import { checkPrivateRegistry, inspectRegistryManifest, publishedRegistryManifest } from '../ci/container-image-build-registry'
+import { assertPrivateReadDenials, checkPrivateRegistry, inspectRegistryManifest, publishedRegistryManifest } from '../ci/container-image-build-registry'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -53,6 +53,88 @@ describe('trusted container image production admission', () => {
 describe('private registry admission', () => {
   const credentials = { publishToken: 'private-publisher', probeToken: 'repository-reader', publisher: 'titanxxh', expectedPackageId: '17' }
   const imageId = `sha256:${'c'.repeat(64)}`
+  const manifestBody = JSON.stringify({ schemaVersion: 2, config: { digest: imageId } })
+  const manifestDigest = 'sha256:cf329e6f1bbe4b4a7426fa0a3a74ac5ae10855c82f160645cd360a3d71e20968'
+  const publisherAuth = `Basic ${Buffer.from('titanxxh:private-publisher').toString('base64')}`
+  it.each([401, 200])('accepts a verified immutable manifest concealed with 404 after anonymous token status %i', async anonymousTokenStatus => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      const auth = new Headers(options?.headers).get('Authorization')
+      if (url.includes('/token?')) {
+        if (!auth) return anonymousTokenStatus === 401 ? new Response('', { status: 401 }) : Response.json({ token: 'anonymous' })
+        return Response.json({ token: auth === publisherAuth ? 'publisher' : 'repository' })
+      }
+      return auth === 'Bearer publisher'
+        ? new Response(manifestBody, { headers: { 'docker-content-digest': manifestDigest } })
+        : new Response('', { status: 404 })
+    }))
+    await expect(assertPrivateReadDenials(manifestDigest, credentials)).resolves.toBeUndefined()
+  })
+  it.each([
+    { identity: 'publisher', stage: 'token', status: 401, error: /Publisher cannot read/ },
+    { identity: 'publisher', stage: 'token', status: 403, error: /Publisher cannot read/ },
+    { identity: 'publisher', stage: 'token', status: 404, error: /Registry access probe failed/ },
+    { identity: 'publisher', stage: 'manifest', status: 401, error: /Publisher cannot read/ },
+    { identity: 'publisher', stage: 'manifest', status: 403, error: /Publisher cannot read/ },
+    { identity: 'publisher', stage: 'manifest', status: 404, error: /Cannot establish access/ },
+    { identity: 'anonymous', stage: 'token', status: 404, error: /Registry access probe failed/ },
+    { identity: 'repository', stage: 'token', status: 404, error: /Registry access probe failed/ },
+    { identity: 'anonymous', stage: 'manifest', status: 200, error: /anonymous reads/ },
+    { identity: 'repository', stage: 'manifest', status: 200, error: /public repository access/ },
+    ...['publisher', 'anonymous', 'repository'].flatMap(identity => [
+      { identity, stage: 'token', status: 503, error: /Registry access probe failed/ },
+      { identity, stage: 'manifest', status: 503, error: /Cannot establish access/ },
+    ]),
+  ])('blocks $identity $stage status $status without treating it as a private read denial', async failure => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      const auth = new Headers(options?.headers).get('Authorization')
+      const identity = !auth || auth === 'Bearer anonymous' ? 'anonymous' : auth === publisherAuth || auth === 'Bearer publisher' ? 'publisher' : 'repository'
+      const stage = url.includes('/token?') ? 'token' : 'manifest'
+      if (identity === failure.identity && stage === failure.stage) return new Response('', { status: failure.status })
+      if (stage === 'token') return Response.json({ token: identity })
+      return identity === 'publisher' ? new Response(manifestBody, { headers: { 'docker-content-digest': manifestDigest } }) : new Response('', { status: 404 })
+    }))
+    await expect(assertPrivateReadDenials(manifestDigest, credentials)).rejects.toThrow(failure.error)
+  })
+  it.each(['publisher', 'anonymous', 'repository'])('blocks malformed tokens and transport failures for %s', async failedIdentity => {
+    for (const failure of ['missing-token', 'malformed-json', 'token-network', 'manifest-network']) {
+      vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+        const auth = new Headers(options?.headers).get('Authorization')
+        const identity = !auth || auth === 'Bearer anonymous' ? 'anonymous' : auth === publisherAuth || auth === 'Bearer publisher' ? 'publisher' : 'repository'
+        if (url.includes('/token?')) {
+          if (identity === failedIdentity) {
+            if (failure === 'missing-token') return Response.json({})
+            if (failure === 'malformed-json') return new Response('invalid JSON')
+            if (failure === 'token-network') throw new Error('fixture token connection failure')
+          }
+          return Response.json({ token: identity })
+        }
+        if (identity === failedIdentity && failure === 'manifest-network') throw new Error('fixture manifest connection failure')
+        return identity === 'publisher' ? new Response(manifestBody, { headers: { 'docker-content-digest': manifestDigest } }) : new Response('', { status: 404 })
+      }))
+      await expect(assertPrivateReadDenials(manifestDigest, credentials)).rejects.toThrow()
+    }
+  })
+  it.each(['header', 'bytes', 'reference'])('blocks a publisher manifest with a mismatched %s digest', async mismatch => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (new Headers(options?.headers).get('Authorization') !== (url.includes('/token?') ? publisherAuth : 'Bearer publisher')) {
+        return new Response('', { status: 403 })
+      }
+      if (url.includes('/token?')) return Response.json({ token: 'publisher' })
+      return new Response(mismatch === 'bytes' ? '{}' : manifestBody, {
+        headers: { 'docker-content-digest': mismatch === 'header' ? `sha256:${'d'.repeat(64)}` : manifestDigest },
+      })
+    }))
+    await expect(assertPrivateReadDenials(mismatch === 'reference' ? `sha256:${'e'.repeat(64)}` : manifestDigest, credentials))
+      .rejects.toThrow(mismatch === 'reference' ? /fixed digest/ : /content digest mismatch/)
+  })
+  it('rejects mutable tags for a private access check', async () => {
+    await expect(assertPrivateReadDenials('candidate-fixed', credentials)).rejects.toThrow(/immutable manifest digest/)
+  })
+  it('does not treat a publisher manifest 404 as successful publication', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.includes('/token?')
+      ? Response.json({ token: 'publisher' }) : new Response('', { status: 404 })))
+    await expect(publishedRegistryManifest('candidate-fixed', imageId, credentials)).rejects.toThrow(/Cannot establish access/)
+  })
   it('refuses an already public package before publication', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith('/user')
       ? { login: 'titanxxh', type: 'User' } : { id: 17, name: 'open-agricola-images', package_type: 'container', visibility: 'public', repository: null }), { status: 200 })))
@@ -65,17 +147,25 @@ describe('private registry admission', () => {
   it.each(['linked', 'unknown-id', 'reader-access', 'anonymous-access'])('blocks unsafe existing package state: %s', failure => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/user')) return Response.json({ login: 'titanxxh', type: 'User' })
-      if (url.includes('/versions')) return Response.json([{ name: `sha256:${'d'.repeat(64)}` }])
+      if (url.includes('/versions')) return Response.json([{ name: manifestDigest }])
       if (url.includes('ghcr.io/token')) {
         const auth = new Headers(options?.headers).get('Authorization')
+        if (auth === publisherAuth) return Response.json({ token: 'publisher' })
         return auth ? Response.json({ token: 'reader' }) : failure === 'anonymous-access' ? Response.json({ token: 'anonymous' }) : new Response('', { status: 403 })
       }
-      if (url.includes('/manifests/')) return failure === 'reader-access' || failure === 'anonymous-access'
-        ? Response.json({ schemaVersion: 2, config: { digest: imageId } }) : new Response('', { status: 401 })
+      if (url.includes('/manifests/')) {
+        if (new Headers(options?.headers).get('Authorization') === 'Bearer publisher') {
+          return new Response(manifestBody, { headers: { 'docker-content-digest': manifestDigest } })
+        }
+        return failure === 'reader-access' || failure === 'anonymous-access'
+          ? Response.json({ schemaVersion: 2, config: { digest: imageId } }) : new Response('', { status: 401 })
+      }
       return Response.json({ id: failure === 'unknown-id' ? 18 : 17, name: 'open-agricola-images', package_type: 'container',
         visibility: 'private', repository: failure === 'linked' ? { full_name: 'titanxxh/open-agricola' } : null })
     }))
-    return expect(checkPrivateRegistry(credentials)).rejects.toThrow()
+    const error = failure === 'linked' ? /private and independent/ : failure === 'unknown-id' ? /matching owner setup identity/
+      : failure === 'reader-access' ? /public repository access/ : /anonymous reads/
+    return expect(checkPrivateRegistry(credentials)).rejects.toThrow(error)
   })
   it('allows first publication only for the authenticated namespace owner when no package exists', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => url.endsWith('/user')
@@ -88,17 +178,21 @@ describe('private registry admission', () => {
     const reads: string[] = []
     vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/user')) return Response.json({ login: 'titanxxh', type: 'User' })
-      if (url.includes('/versions')) return Response.json([{ name: `sha256:${'d'.repeat(64)}` }])
+      if (url.includes('/versions')) return Response.json([{ name: manifestDigest }])
       if (url.includes('ghcr.io/token')) {
-        reads.push(new Headers(options?.headers).get('Authorization') ?? 'anonymous')
+        const auth = new Headers(options?.headers).get('Authorization')
+        reads.push(auth ?? 'anonymous')
+        if (auth === publisherAuth) return Response.json({ token: 'publisher' })
         return new Response('', { status: 403 })
       }
+      if (url.includes('/manifests/')) return new Response(manifestBody, { headers: { 'docker-content-digest': manifestDigest } })
       return Response.json({ id: 17, name: 'open-agricola-images', package_type: 'container', visibility: 'private', repository: null })
     }))
     await expect(checkPrivateRegistry(credentials)).resolves.toBe(17)
-    expect(reads).toHaveLength(2)
-    expect(reads[0]).toBe('anonymous')
-    expect(Buffer.from(reads[1].slice('Basic '.length), 'base64').toString()).toContain(':repository-reader')
+    expect(reads).toHaveLength(3)
+    expect(reads[0]).toBe(publisherAuth)
+    expect(reads[1]).toBe('anonymous')
+    expect(Buffer.from(reads[2].slice('Basic '.length), 'base64').toString()).toContain(':repository-reader')
   })
   it('does not misreport a registry outage as proof of denied access', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
