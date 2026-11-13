@@ -18,7 +18,7 @@ function fixture() {
   const template = parsePrereleaseTarget(JSON.parse(readFileSync('deploy/prerelease-target.example.json', 'utf8')))
   const target = { ...template, directory: join(temporary, 'open-agricola-prerelease-main'), policyDirectory: resolve('.'),
     budgets: { ...template.budgets, app: { memoryMiB: 512, cpus: 1, pids: 128 }, tools: { memoryMiB: 256, cpus: 1, pids: 128 },
-      import: { maxArchiveMiB: 256, memoryHeadroomMiB: 128 }, reserveMemoryMiB: 256, diskMiB: 256 } }
+      import: { maxArchiveMiB: 256, memoryHeadroomMiB: 128, intake: { memoryMiB: 128, cpus: 1, pids: 64 } }, reserveMemoryMiB: 256, diskMiB: 256 } }
   mkdirSync(target.directory)
   mkdirSync(join(target.directory, 'data'))
   const objects = `S3_BUCKET=${target.objects.bucket}\nS3_PREFIX=live/\nS3_SECRET_ACCESS_KEY=fixture\nS3_ENDPOINT=${target.objects.endpoint}\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n`

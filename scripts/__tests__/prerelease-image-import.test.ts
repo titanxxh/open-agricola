@@ -48,7 +48,7 @@ function fixture(containerd = false) {
     archive: { sha256: sha256(readFileSync(archivePath)), bytes: readFileSync(archivePath).length } }
   const metadata = { format: 1, gameBuildId: sourceSha, basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }
   const callsPath = join(root, 'calls.jsonl'), statePath = join(root, 'docker-state.json')
-  const state = { containerd, app: false, platform: 'x86_64', failLoad: false, badFrontend: false, pauseLoad: false }
+  const state = { containerd, app: false, platform: 'x86_64', failLoad: false, badFrontend: false, pauseLoad: false, intakeMismatch: '' }
   const save = () => writeFileSync(statePath, JSON.stringify(state)); save()
   writeFileSync(join(bin, 'docker'), `#!${process.execPath}
 const fs=require('node:fs'),a=process.argv.slice(2),s=JSON.parse(fs.readFileSync(${JSON.stringify(statePath)},'utf8'));
@@ -78,6 +78,23 @@ else if(a[0]==='create')out('f'.repeat(64));
 else if(a[0]==='cp')fs.writeFileSync(a.at(-1),JSON.stringify({...${JSON.stringify(metadata)},...(s.badFrontend?{gameBuildId:'bad'}:{})}));
 else if(a[0]==='rm'){}else process.exit(2);
 `, { mode: 0o700 })
+  const cgroup = join(root, 'cgroup'), preload = join(root, 'native-cgroup.mjs')
+  mkdirSync(cgroup)
+  writeFileSync(preload, `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+const original=fs.readFileSync;fs.readFileSync=(path,...args)=>original(path==='/proc/self/cgroup'?${JSON.stringify(join(cgroup, 'membership'))}:typeof path==='string'&&path.startsWith('/sys/fs/cgroup/fixture/')?${JSON.stringify(cgroup)}+'/'+path.split('/').at(-1):path,...args);syncBuiltinESMExports();`)
+  writeFileSync(join(bin, 'systemd-run'), `#!${process.execPath}
+const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2),s=JSON.parse(fs.readFileSync(${JSON.stringify(statePath)},'utf8'));
+const get=prefix=>a.find(x=>x.startsWith(prefix)).slice(prefix.length),unit=get('--unit=');
+const files={membership:'0::/fixture/'+(s.intakeMismatch==='unit'?'other.service':unit)+'\\n',
+ 'memory.max':s.intakeMismatch==='memory'?'max':get('--property=MemoryMax='),'memory.swap.max':s.intakeMismatch==='swap'?'1024':'0',
+ 'cpu.max':s.intakeMismatch==='cpu'?'max 100000':String(Number(get('--property=CPUQuota=').slice(0,-1))*1000)+' 100000',
+ 'pids.max':s.intakeMismatch==='pids'?'max':get('--property=TasksMax=')};
+for(const [key,value] of Object.entries(files))fs.writeFileSync(${JSON.stringify(cgroup)}+'/'+key,value);
+fs.writeFileSync(${JSON.stringify(join(root, 'intake-call.json'))},JSON.stringify(a));
+const command=a.slice(a.indexOf('--')+1),node=command.indexOf(${JSON.stringify(process.execPath)});command.splice(node+1,0,'--import',${JSON.stringify(preload)});
+const env={...process.env};for(const item of a.filter(x=>x.startsWith('--setenv='))){const pair=item.slice(9),index=pair.indexOf('=');env[pair.slice(0,index)]=pair.slice(index+1);}
+const result=cp.spawnSync(command[0],command.slice(1),{env,stdio:'inherit'});process.exit(result.status??1);
+`, { mode: 0o700 })
   const operationId = '7e1b543f-5ef1-4a03-8e3b-8dcefd63a665'
   type InvocationOptions = { transfer?: unknown; expiresAt?: number; expectedCurrent?: string; operationId?: string }
   const environment = { ...process.env, CI: '', GITHUB_ACTIONS: '', SSH_CONNECTION: 'owner fixture', PATH: `${bin}:${process.env.PATH}` }
@@ -106,6 +123,18 @@ else if(a[0]==='rm'){}else process.exit(2);
     calls: () => existsSync(callsPath) ? readFileSync(callsPath, 'utf8') : '' }
 }
 
+it('requires explicit intake limits independently of import admission headroom', () => {
+  const input = JSON.parse(readFileSync('deploy/prerelease-target.example.json', 'utf8'))
+  delete input.budgets.import.intake
+  expect(() => parsePrereleaseTarget(input)).toThrow()
+})
+
+it('requires admission headroom to cover the separately configured intake cap', () => {
+  const input = JSON.parse(readFileSync('deploy/prerelease-target.example.json', 'utf8'))
+  input.budgets.import.memoryHeadroomMiB = 32
+  expect(() => parsePrereleaseTarget(input)).toThrow('intake')
+})
+
 it('prepares a private fixed-image transfer through the owner receiver without runtime or credential setup', () => {
   const value = fixture(), result = value.invoke('prepare-image-import')
   expect(result.status, result.stderr).toBe(0)
@@ -125,6 +154,28 @@ it('validates and loads the bounded tag-free archive before publishing its targe
   expect(existsSync(join(value.target.directory, 'control/gate.json'))).toBe(false)
   expect(value.calls()).toContain('"load","--platform","linux/amd64"')
   expect(value.calls()).not.toMatch(/buildx|"run"|"start"|"tag"/)
+})
+
+it('refuses an import when its dedicated intake unit cannot start', () => {
+  const value = fixture(), path = value.stage()
+  writeFileSync(join(value.bin, 'systemd-run'), '#!/bin/sh\nexit 23\n', { mode: 0o700 })
+  const result = value.invoke('import-image')
+  expect(result.status).not.toBe(0)
+  expect(existsSync(path)).toBe(true)
+  expect(existsSync(value.cache)).toBe(false)
+  expect(value.calls()).not.toContain('"load"')
+})
+
+it.each(['memory', 'swap', 'cpu', 'pids', 'unit'])('refuses native intake %s drift before snapshotting or loading', mismatch => {
+  const value = fixture(), path = value.stage()
+  value.state.intakeMismatch = mismatch; value.save()
+  const result = value.invoke('import-image')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('intake')
+  expect(existsSync(path)).toBe(true)
+  expect(existsSync(value.cache)).toBe(false)
+  expect(readdirSync(join(value.target.directory, 'control')).some(name => name.startsWith('image-snapshot-'))).toBe(false)
+  expect(value.calls()).not.toContain('"load"')
 })
 
 it('binds a containerd runtime handle separately from its config digest and refuses another store on cache consumption', () => {
