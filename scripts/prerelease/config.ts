@@ -1,3 +1,4 @@
+import { parseImageImportBudget, parseRuntimeLimits } from '../image-intake.ts'
 import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync, lstatSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
@@ -29,11 +30,6 @@ const origin = (value: unknown): string => {
 const integer = (value: unknown, min: number, max: number): number => {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error('Invalid prerelease resource budget')
   return value
-}
-const budget = (value: unknown) => {
-  const limits = object(value)
-  if (typeof limits.cpus !== 'number' || limits.cpus < 0.1 || limits.cpus > 32) throw new Error('Invalid prerelease CPU budget')
-  return { memoryMiB: integer(limits.memoryMiB, 32, 131072), cpus: limits.cpus, pids: integer(limits.pids, 32, 65536) }
 }
 const overlaps = (left: string, right: string) => left === right || left.startsWith(`${right}${sep}`) || right.startsWith(`${left}${sep}`)
 
@@ -72,13 +68,10 @@ export function parsePrereleaseTarget(value: unknown) {
   if (overlaps(offsite.directory, formal.offsiteDirectory) || offsite.directory.split('/').at(-1) !== project) throw new Error('Offsite directory must belong exclusively to this prerelease target')
   const budgetsInput = object(input.budgets)
   if (Object.hasOwn(budgetsInput, 'build')) throw new Error('On-host build configuration is no longer supported')
-  const importInput = object(budgetsInput.import)
   const sessionsInput = object(budgetsInput.sessions)
-  const budgets = { app: budget(budgetsInput.app), tools: budget(budgetsInput.tools),
+  const budgets = { app: parseRuntimeLimits(budgetsInput.app), tools: parseRuntimeLimits(budgetsInput.tools),
     sessions: { rooms: integer(sessionsInput.rooms, 1, 30), customWorkers: integer(sessionsInput.customWorkers, 0, 15) },
-    import: { maxArchiveMiB: integer(importInput.maxArchiveMiB, 1, 131072), memoryHeadroomMiB: integer(importInput.memoryHeadroomMiB, 32, 131072), intake: budget(importInput.intake) },
-    diskMiB: integer(budgetsInput.diskMiB, 256, 4_194_304), reserveMemoryMiB: integer(budgetsInput.reserveMemoryMiB, 128, 1_048_576) }
-  if (budgets.import.memoryHeadroomMiB < budgets.import.intake.memoryMiB) throw new Error('Image intake cap exceeds import admission headroom')
+    ...parseImageImportBudget(budgetsInput) }
   const network = match(input.network, /^open-agricola-prerelease-[a-z0-9-]+$/, 'Expected an exclusive prerelease dependency network')
   const proxyNetwork = input.proxyNetwork === undefined ? undefined : match(input.proxyNetwork, /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'Expected an external proxy network name')
   if (proxyNetwork && [network, `${project}_default`, 'host', 'none', 'bridge'].includes(proxyNetwork)) throw new Error('External proxy network must be separate from prerelease and built-in networks')
