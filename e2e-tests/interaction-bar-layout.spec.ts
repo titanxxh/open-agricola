@@ -7,8 +7,11 @@ const bottomGap = async (page: Page) => {
   return page.evaluate(() => {
     const content = document.querySelector('.game-layout')
     const interactionBar = document.querySelector('.interaction-bar')
+    const dock = document.querySelector('.section-nav')
     if (!content || !interactionBar) throw new Error('Game layout is not ready')
-    return interactionBar.getBoundingClientRect().top - content.getBoundingClientRect().bottom
+    const dockBounds = dock?.getBoundingClientRect()
+    const limit = dockBounds && dockBounds.height > 0 ? dockBounds.top : interactionBar.getBoundingClientRect().top
+    return limit - content.getBoundingClientRect().bottom
   })
 }
 
