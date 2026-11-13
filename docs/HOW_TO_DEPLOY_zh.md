@@ -242,7 +242,7 @@ sudo systemctl enable --now open-agricola-prerelease-storage-guard.service
 ./deploy-prerelease.sh budget-check --config "$pre_config" --expected-current "$pre_current"
 ```
 
-`control/storage-guard.json` 与 `gate.json` 分开。网关及写入命令要求新鲜 healthy 记录；缺失、过期或 latched 均关闭准入，包括私有验证和已有 WebSocket。操作余量不足时拒绝新任务，健康 app 继续运行。探测失败、用量超限或 free 低于阈值时，先写永久 latch，再停止。保护器不等待 `.operation.lock`：终止精确登记的 owner 命令 session，给予所属 app 容器 20 秒 drain，停止 scoped 工具，仍在运行的所属容器执行 kill。随后对三个 pre role 验证 `NOLOGIN` 及会话清空，对两个所属对象账号禁用并读回状态。一个边界失败不会阻止其他停止动作，后续循环分别重试。正式 app、共享 PostgreSQL/RustFS、正式 role 和 bucket 不属于停止选择器。
+`control/storage-guard.json` 与 `gate.json` 分开。网关及写入命令要求新鲜 healthy 记录；缺失、过期或 latched 均关闭准入，包括私有验证和已有 WebSocket。操作余量不足时拒绝新任务，健康 app 继续运行。探测失败、用量超限或 free 低于阈值时，先写永久 latch，再停止。保护器不等待 `.operation.lock`：终止精确登记的 owner 命令 session，给予所属 app 容器 20 秒 drain，停止 scoped 工具，仍在运行的所属容器执行 kill。随后对三个 pre role 验证 `NOLOGIN` 及会话清空，对两个所属对象账号禁用并读回状态。一个边界失败不会阻止其他停止动作，后续循环分别重试。锁存后的循环先重试停止，再通过 owner 凭据刷新诊断观察；pre LOGIN 和 key 已禁用时仍可采样，新的诊断不会清除 latch。正式 app、共享 PostgreSQL/RustFS、正式 role 和 bucket 不属于停止选择器。
 
 受监督循环只在完整 cycle 后刷新 watchdog。进程退出或 watchdog 超时由 unit 的 `ExecStopPost` 执行 trip；重启保留 latch。常规 CLI 继续使用现有操作 lease，并运行在专用进程 session 中，长期备份不会阻止保护。Docker 导入存储与共享 WAL 由文件系统余量和导入预算保护，不能称为单库物理硬 quota。采样和停止存在延迟，越过阈值后仍可能增长；这仍属于已批准的共享故障域。
 

@@ -8,7 +8,7 @@ const freeKeys = ['hostFreeBytes', 'hostFreeInodes', 'offsiteFreeBytes', 'offsit
 export type StorageObservation = Record<typeof usageKeys[number] | typeof freeKeys[number], number>
 export type StorageGuardLimits = StorageObservation & { operationReserveBytes: number }
 export type StorageGuardPolicy = { limits: StorageGuardLimits; leaseMs: number }
-export type StorageGuardNative = { observe: () => Promise<StorageObservation>; stop: () => Promise<string[]> }
+export type StorageGuardNative = { observe: (mode?: 'admission' | 'diagnostic') => Promise<StorageObservation>; stop: () => Promise<string[]> }
 
 /** The guard alone owns this record; ordinary owner operations only read it. */
 export async function runStorageGuardCycle(target: PrereleaseTarget, policy: StorageGuardPolicy, native: StorageGuardNative) {
@@ -17,6 +17,7 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
   let reason: string | null = null
   const observedAt = Date.now()
   let observation: StorageObservation | null = null
+  let observationCompletedAt: number | null = null
   if (existsSync(path)) {
     try {
       const previous: unknown = JSON.parse(readFileSync(path, 'utf8'))
@@ -29,12 +30,18 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
       else if (!('validUntil' in previous) || typeof previous.validUntil !== 'number' || previous.validUntil <= observedAt) reason = 'expired-observation'
     } catch { reason = 'invalid-state' }
   }
+  const wasLatched = reason !== null
+  const observe = async (mode: 'admission' | 'diagnostic') => {
+    const value = await native.observe(mode)
+    for (const key of [...usageKeys, ...freeKeys]) {
+      if (!Number.isSafeInteger(value[key]) || value[key] < 0) throw new Error('Invalid storage observation')
+    }
+    observationCompletedAt = Date.now()
+    return value
+  }
   if (!reason) {
     try {
-      observation = await native.observe()
-      for (const key of [...usageKeys, ...freeKeys]) {
-        if (!Number.isSafeInteger(observation[key]) || observation[key] < 0) throw new Error('Invalid storage observation')
-      }
+      observation = await observe('admission')
       reason = usageKeys.find(key => observation !== null && observation[key] >= policy.limits[key])
         ?? freeKeys.find(key => observation !== null && observation[key] <= policy.limits[key]) ?? null
       if (Date.now() - observedAt >= policy.leaseMs) reason = 'observation-deadline'
@@ -45,7 +52,12 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
       validUntil: observedAt, operationsAllowed: false, observation }
     atomicJson(path, state)
     const failures = await native.stop().catch(() => ['stop-failed'])
-    const stopped = { ...state, stoppedAt: Date.now(), failures }
+    const stoppedAt = Date.now()
+    if (wasLatched) {
+      try { observation = await observe('diagnostic') } catch { observation = null }
+    }
+    const stopped = { ...state, stoppedAt, failures, observation,
+      diagnostics: observation ? 'available' : 'unavailable', observationCompletedAt }
     atomicJson(path, stopped)
     return stopped
   }

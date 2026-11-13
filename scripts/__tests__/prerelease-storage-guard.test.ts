@@ -46,10 +46,13 @@ it('latches a complete observation exceeding any storage limit and retries every
   expect(calls).toEqual(['stop'])
   expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).toThrow(/latched/)
   const recovered = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, {
-    observe: async () => { throw new Error('must not automatically recover') }, stop: async () => { calls.push('retry'); return [] },
+    observe: async mode => { calls.push(`observe-${mode}`); return { ...observation, sourceDatabaseBytes: 3 } }, stop: async () => { calls.push('retry'); return [] },
   })
   expect(recovered.status).toBe('latched')
-  expect(calls).toEqual(['stop', 'retry'])
+  expect(calls).toEqual(['stop', 'retry', 'observe-diagnostic'])
+  expect(recovered).toMatchObject({ status: 'latched', reason: 'sourceDatabaseBytes', operationsAllowed: false,
+    observation: { sourceDatabaseBytes: 3 }, diagnostics: 'available' })
+  expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).toThrow(/latched/)
 })
 
 it('closes admission on a probe failure without needing the deployment lock', async () => {
