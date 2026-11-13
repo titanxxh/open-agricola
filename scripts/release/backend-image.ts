@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { backendCandidate } from './backend-candidate.ts'
-import { readBackendImportBudget } from './backend-image-receiver.ts'
+import { parseBackendInstallation, readBackendImportBudget } from './backend-image-receiver.ts'
 import { assertExpectedContainerImage, verifyContainerImageBuild } from './container-images.ts'
 import { prepareContainerImageArchive } from './container-images-owner.ts'
 
@@ -19,13 +19,15 @@ export async function backendImageDeployment(cwd: string, input: string[]): Prom
   if (positional.length > 3) throw new Error('Usage: deploy-backend.sh [host] [ref] [remote-dir] --build-run N --build-attempt N --artifact-id N --auth-file FILE --import-budget FILE')
   const sourceSha = backendCandidate(cwd, [positional[1] ?? 'main'])
   const flags = split < 0 ? [] : input.slice(split), selected = new Map<string, string>()
-  const names = ['--build-run', '--build-attempt', '--artifact-id', '--auth-file', '--import-budget']
+  const required = ['--build-run', '--build-attempt', '--artifact-id', '--auth-file', '--import-budget']
+  const names = [...required, '--bootstrap-caddy-image']
   for (let index = 0; index < flags.length; index += 2) {
     const name = flags[index], value = flags[index + 1]
     if (!name || !names.includes(name) || !value || value.startsWith('--') || selected.has(name)) throw new Error('Invalid fixed formal image argument')
     selected.set(name, value)
   }
-  if (names.some(name => !selected.has(name))) throw new Error('Fixed formal image evidence is required: --build-run, --build-attempt, --artifact-id, --auth-file and --import-budget')
+  if (required.some(name => !selected.has(name))) throw new Error('Fixed formal image evidence is required: --build-run, --build-attempt, --artifact-id, --auth-file and --import-budget')
+  const installation = parseBackendInstallation(selected.has('--bootstrap-caddy-image') ? { kind: 'bootstrap', caddyImage: selected.get('--bootstrap-caddy-image') } : undefined)
   const integer = (name: string): number => {
     const value = selected.get(name) ?? ''
     if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) throw new Error('Invalid fixed formal image identifier')
@@ -66,7 +68,7 @@ printf '%s\\n' "$4"
   if (ssh(['bash', '-s', '--', directory, sourceSha, producerSha, stage], prepare, 120_000) !== stage) throw new Error('Backend returned another private image staging directory')
   execute('scp', ['--', exported.archivePath, `${host}:${stage}/image.tar`], undefined, 20 * 60_000)
   const requestPath = join(local, 'request.json'), remoteRequest = join(stage, 'request.json')
-  const request = { format: 1, operationId, directory, stage, sourceSha, producerSha, expiresAt: 0, budget, transfer: exported.transfer }
+  const request = { format: 1, operationId, directory, stage, sourceSha, producerSha, expiresAt: 0, installation, budget, transfer: exported.transfer }
   const authorize = (): void => {
     request.expiresAt = Date.now() + 300_000
     writeFileSync(requestPath, JSON.stringify(request) + '\n', { mode: 0o600, flush: true })

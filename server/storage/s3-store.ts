@@ -110,6 +110,12 @@ export class S3ObjectStore {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.prefix + key }), { abortSignal: this.signal })
   }
 
+  /** Read-only first-install proof; an existing ledger is retained data too. */
+  async assertEmpty(): Promise<void> {
+    const page = await this.client.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: this.prefix, MaxKeys: 1 }), { abortSignal: this.signal })
+    if (page.KeyCount !== 0 || page.IsTruncated !== false || page.Contents?.length || page.NextContinuationToken) throw new Error('Bootstrap requires an empty object namespace')
+  }
+
   /** Intended for test teardown and explicit namespace migration tooling only. */
   async clearPrefix(): Promise<void> {
     if (!this.prefix.startsWith('test/') || this.prefix.length < 10) throw new Error('Only isolated test prefixes may be cleared')

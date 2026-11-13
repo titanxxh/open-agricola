@@ -105,3 +105,21 @@ it.each(['public-request', 'hard-linked-upload'])('refuses aliased or public pri
   expect(result.stderr).toContain('Formal image input must be an owner-private regular file or directory')
   expect(value.calls().some(args => args[0] === 'load')).toBe(false)
 })
+
+it('binds explicit bootstrap inputs into the existing image intake authority', () => {
+  const value = fixture()
+  expect(value.invoke().status).toBe(0)
+  const before = value.calls().length
+  writeFileSync(value.requestPath, JSON.stringify({ ...value.request, installation: { kind: 'bootstrap', caddyImage: `caddy@sha256:${'d'.repeat(64)}` } }))
+  const result = value.invoke('check')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Imported formal image belongs to another input or operation')
+  expect(value.calls()).toHaveLength(before)
+})
+
+it('rejects a mutable Caddy tag as bootstrap authorization before importing an application', () => {
+  const value = fixture()
+  writeFileSync(value.requestPath, JSON.stringify({ ...value.request, installation: { kind: 'bootstrap', caddyImage: 'caddy:alpine' } }))
+  expect(value.invoke().status).not.toBe(0)
+  expect(value.calls()).toEqual([])
+})

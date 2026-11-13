@@ -156,6 +156,14 @@ export async function mergeLedger(objects: S3ObjectStore, batches: ErasureBatch[
   }
 }
 
+/** Read-only new-install admission, before any application migration or ledger write. */
+export async function assertEmptyStorage(db: PostgresDatabase, objects: S3ObjectStore): Promise<void> {
+  if (await db.prepare(`SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%'
+      AND c.relkind IN ('r','p','v','m','S','f') LIMIT 1`).get()) throw new Error('Bootstrap requires an empty target database')
+  await objects.assertEmpty()
+}
+
 /** Restore into an EMPTY database. Caller supplies current, independent erasure facts. */
 export async function restoreStorageArchive(connectionString: string, db: PostgresDatabase, objects: S3ObjectStore, root: string, currentErasureFacts: ErasureBatch[], signal?: AbortSignal) {
   signal?.throwIfAborted()

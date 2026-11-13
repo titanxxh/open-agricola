@@ -75,7 +75,7 @@ services:
     restart: unless-stopped
 
   caddy:
-    image: caddy:alpine
+    image: ${CADDY_IMAGE:?Use the owner fixed-image delivery before Compose maintenance}
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     environment:
       - XDG_CONFIG_HOME=/data/config

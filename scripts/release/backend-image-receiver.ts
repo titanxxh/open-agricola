@@ -33,6 +33,15 @@ export function readBackendImportBudget(path: string) {
   return parseBackendImportBudget(JSON.parse(readFileSync(path, 'utf8')))
 }
 
+export function parseBackendInstallation(value: unknown): { kind: 'upgrade' } | { kind: 'bootstrap'; caddyImage: string } {
+  if (value === undefined) return { kind: 'upgrade' }
+  const input = object(value)
+  if (input.kind === 'upgrade' && Object.keys(input).join(',') === 'kind') return { kind: 'upgrade' }
+  if (input.kind === 'bootstrap' && Object.keys(input).sort().join(',') === 'caddyImage,kind'
+    && typeof input.caddyImage === 'string' && /^caddy@sha256:[a-f0-9]{64}$/.test(input.caddyImage)) return { kind: 'bootstrap', caddyImage: input.caddyImage }
+  throw new Error('Expected an upgrade or explicit bootstrap with an immutable preloaded Caddy digest')
+}
+
 export function readBackendImageRequest(path: string) {
   ownerPath(path, false)
   const input = object(JSON.parse(readFileSync(path, 'utf8'))), operationId = text(input.operationId)
@@ -48,7 +57,7 @@ export function readBackendImageRequest(path: string) {
   if (typeof input.expiresAt !== 'number' || !Number.isSafeInteger(input.expiresAt) || input.expiresAt <= Date.now()
     || input.expiresAt > Date.now() + 300_000) throw new Error('Formal image authorization is expired or invalid')
   return { format: 1, operationId, directory, stage, sourceSha, producerSha, expiresAt: input.expiresAt,
-    budget: parseBackendImportBudget(input.budget), transfer: { ...transfer, receipt } }
+    installation: parseBackendInstallation(input.installation), budget: parseBackendImportBudget(input.budget), transfer: { ...transfer, receipt } }
 }
 
 export type BackendImageRequest = ReturnType<typeof readBackendImageRequest>
