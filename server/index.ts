@@ -502,7 +502,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   const requestUser = (await validateSession((await getAuthToken(req))))
 
   if (req.method === 'POST' && req.url === '/api/rooms/locate') {
-    const anonymous = allowAnonymousAccess()
+    const anonymous = process.env.NODE_ENV !== 'production' && allowAnonymousAccess()
     if (!requestUser && !anonymous) { sendJson(res, 401, { error: 'Login required', code: 'login_required' }); return }
     try {
       const input = JSON.parse(await readBody(req)) as RoomDiscoveryRequest
