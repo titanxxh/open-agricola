@@ -6,6 +6,7 @@ import { loadContainerImageArchive } from '../release/container-images-archive.t
 import { assertOwnerPath, targetFingerprint, type PrereleaseTarget } from './config'
 import { assertCapacity, command, importedImagePath } from './docker'
 import { atomicJson, controlDirectory, readRuntime } from './runtime'
+import { assertImageIntakeLimits } from './image-import-limits'
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid owner image import')
@@ -21,6 +22,7 @@ export function parseImageImportRequest(value: unknown) {
 }
 
 export function runImageImport(target: PrereleaseTarget, request: ReturnType<typeof parseImageImportRequest>) {
+  if (request.action === 'import-image') assertImageIntakeLimits(target, request.operationId)
   const record = readRuntime(target), { transfer } = request, receipt = transfer.receipt
   if (request.expectedCurrent !== (record.buildId ?? 'empty') && (!record.operation || request.expectedCurrent !== (record.operation.sourceBuildId ?? 'empty'))) throw new Error('Image import expected-current SHA differs')
   if (record.mode !== 'maintenance') throw new Error('Image import requires maintenance or an uninstalled target')

@@ -74,8 +74,9 @@ export function parsePrereleaseTarget(value: unknown) {
   if (Object.hasOwn(budgetsInput, 'build')) throw new Error('On-host build configuration is no longer supported')
   const importInput = object(budgetsInput.import)
   const budgets = { app: budget(budgetsInput.app), tools: budget(budgetsInput.tools),
-    import: { maxArchiveMiB: integer(importInput.maxArchiveMiB, 1, 131072), memoryHeadroomMiB: integer(importInput.memoryHeadroomMiB, 32, 131072) },
+    import: { maxArchiveMiB: integer(importInput.maxArchiveMiB, 1, 131072), memoryHeadroomMiB: integer(importInput.memoryHeadroomMiB, 32, 131072), intake: budget(importInput.intake) },
     diskMiB: integer(budgetsInput.diskMiB, 256, 4_194_304), reserveMemoryMiB: integer(budgetsInput.reserveMemoryMiB, 128, 1_048_576) }
+  if (budgets.import.memoryHeadroomMiB < budgets.import.intake.memoryMiB) throw new Error('Image intake cap exceeds import admission headroom')
   const network = match(input.network, /^open-agricola-prerelease-[a-z0-9-]+$/, 'Expected an exclusive prerelease dependency network')
   const proxyNetwork = input.proxyNetwork === undefined ? undefined : match(input.proxyNetwork, /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'Expected an external proxy network name')
   if (proxyNetwork && [network, `${project}_default`, 'host', 'none', 'bridge'].includes(proxyNetwork)) throw new Error('External proxy network must be separate from prerelease and built-in networks')

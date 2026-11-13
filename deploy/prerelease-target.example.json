@@ -57,7 +57,8 @@
     "reserveMemoryMiB": 512,
     "import": {
       "maxArchiveMiB": 2048,
-      "memoryHeadroomMiB": 512
+      "memoryHeadroomMiB": 512,
+      "intake": { "memoryMiB": 384, "cpus": 1, "pids": 64 }
     }
   },
   "imageSource": "owner-imported-ghcr"
