@@ -1,4 +1,4 @@
-import { isPrerelease, prereleaseCommandAllowed } from '../prerelease-access'
+import { closePrereleaseSocket, isPrerelease, prereleaseCommandAllowed } from '../prerelease-access'
 import { addRoomSpectator, isRoomSpectator, removeRoomSpectator } from '../game/room-spectators'
 import { isPublicSpectatableRoom } from '../game/room'
 import type { FenceSelectionQuote } from '../../shared/contract/protocol/game'
@@ -1708,7 +1708,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
 }
 
 export async function dispatch(ctx: ConnectionCtx, msg: ClientCommand): Promise<void> {
-  if (isPrerelease() && (msg.type === 'auth' || !(await prereleaseCommandAllowed(ctx.ws)))) { ctx.ws.close(1008, 'prerelease access ended'); return }
+  if (isPrerelease() && (msg.type === 'auth' || !(await prereleaseCommandAllowed(ctx.ws)))) { closePrereleaseSocket(ctx.ws); return }
   const run = () => observeCommand({ command: msg.type, requestId: msg.requestId, socket: ctx.ws, round: roundTag(ctx.currentRoom?.session.state) }, () => dispatchCommand(ctx, msg))
   const ids = ctx.currentRoom ? [ctx.currentRoom.id] : []
   if (msg.type === 'joinRoom' || msg.type === 'spectateRoom') ids.push(msg.roomId)
@@ -1745,8 +1745,8 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
     let request: CommandRequest | undefined
     const commands = ctx.commands
     try {
-      if (!(await prereleaseCommandAllowed(ctx.ws))) { commandOutcome('canceled'); ctx.ws.close(1008, 'prerelease access ended'); return }
-      if (ctx.sessionToken && !(await validateSession(ctx.sessionToken))) { commandOutcome('canceled'); ctx.ws.close(1008, 'session revoked'); return }
+      if (!(await prereleaseCommandAllowed(ctx.ws))) { commandOutcome('canceled'); closePrereleaseSocket(ctx.ws); return }
+      if (ctx.sessionToken && !(await validateSession(ctx.sessionToken))) { commandOutcome('canceled'); if (isPrerelease()) closePrereleaseSocket(ctx.ws); else ctx.ws.close(1008, 'session revoked'); return }
       if (isRoomSpectator(ctx.currentRoom, ctx.ws) && !['auth', 'joinRoom', 'spectateRoom', 'getState', 'getHistory', 'getCommandScope', 'getCommandReceipt'].includes(msg.type)) {
         sendCommandError(ctx, 'Spectators cannot issue game commands', msg.requestId); return
       }
@@ -1801,7 +1801,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
       }
     } catch (error) {
       endPreflight('error')
-      if (error instanceof ExecutionRevokedError) { commandOutcome('canceled'); ctx.ws.close(1008, error.message); return }
+      if (error instanceof ExecutionRevokedError) { commandOutcome('canceled'); if (isPrerelease()) closePrereleaseSocket(ctx.ws); else ctx.ws.close(1008, error.message); return }
       if (error instanceof RoomOwnershipError) { commandOutcome('stale'); ctx.ws.close(1012, 'room owner changed'); return }
       commandOutcome(error instanceof CommandError ? error.code === 'command_input_stale' ? 'stale' : 'rule_rejected' : 'error')
       if (!(error instanceof CommandError)) throw error

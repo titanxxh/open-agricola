@@ -13,12 +13,15 @@ const fixture = vi.hoisted(() => {
     formalAppOrigin: 'https://formal.example.test', formalApiBase: 'https://api.example.test', targetId: 'prerelease-main' }
   const user = { id: '', username: 'farmer', displayName: 'Farmer', isAdmin: false }
   let now = 0
-  return { runtime, user, advance: (value: number) => { now = value },
+  let revoked = false
+  const invalidations = new Set<() => void>()
+  return { runtime, user, advance: (value: number) => { now = value }, reset: () => { now = 0; revoked = false },
+    revoke: () => { revoked = true; for (const notify of invalidations) notify() },
     service: { runtime,
-      resolve: async (token: string) => token === 'pre-only' && now < 30000 ? { user, expiresAt: 700000, validUntil: 30000 } : null,
-      cachedAuthorized: (token: string, binding?: { buildId?: string; generationId?: string }) => token === 'pre-only' && now < 30000
+      resolve: async (token: string) => token === 'pre-only' && !revoked && now < 30000 ? { user, expiresAt: 700000, validUntil: 30000 } : null,
+      cachedAuthorized: (token: string, binding?: { buildId?: string; generationId?: string }) => token === 'pre-only' && !revoked && now < 30000
         && (!binding?.buildId || binding.buildId === runtime.buildId) && (!binding?.generationId || binding.generationId === runtime.generationId),
-      status: () => 'paused', subscribeInvalidation: () => () => {},
+      status: () => revoked ? 'expired' : 'paused', subscribeInvalidation: (notify: () => void) => { invalidations.add(notify); return () => { invalidations.delete(notify) } },
     } }
 })
 vi.mock('../../prerelease-sessions', () => ({ getPrereleaseSessions: () => process.env.RELEASE_CHANNEL === 'prerelease' ? fixture.service : undefined,
@@ -30,7 +33,7 @@ let releaseQueue: (() => void) | undefined
 afterEach(async () => {
   releaseQueue?.(); releaseQueue = undefined
   for (const socket of sockets.splice(0)) if (socket.readyState !== WebSocket.CLOSED) { const closed = once(socket, 'close'); socket.close(); await closed }
-  try { await host?.close() } finally { host = undefined; fixture.advance(0); vi.unstubAllEnvs(); vi.restoreAllMocks() }
+  try { await host?.close() } finally { host = undefined; fixture.reset(); vi.unstubAllEnvs(); vi.restoreAllMocks() }
 }, 30000)
 
 function socket(cookie: string, buildId = fixture.runtime.buildId): WebSocket {
@@ -42,6 +45,7 @@ function socket(cookie: string, buildId = fixture.runtime.buildId): WebSocket {
 }
 
 async function prepare() {
+  fixture.runtime.buildId = 'a'.repeat(40)
   host = await createSoloRecoveryHost()
   const created = await host.create()
   await created.peer.close()
@@ -94,7 +98,9 @@ it('rechecks a queued write after thirty seconds and closes access without chang
   fixture.advance(30000)
   const closed = once(value, 'close')
   releaseQueue!(); await blocked
-  await closed
+  const [closeCode, closeReason] = await closed
+  expect(closeCode).toBe(1008)
+  expect(closeReason.toString()).toBe('prerelease_access_paused')
   expect(await host!.runtime().persistence.load(created.roomId)).toEqual(before)
   expect(JSON.stringify(room.session.state)).toBe(stateBefore)
   expect(await host!.runtime().persistence.loadReplayHead(created.roomId)).toEqual(created.head)
@@ -116,8 +122,49 @@ it('stops idle access and refuses a direct publication at the absolute lease dea
   const closed = once(value, 'close')
   fixture.advance(30000)
   host!.runtime().backend.broadcaster.sendTo(connection, { type: 'error', error: 'private publication', requestId: 'expired-publication' })
-  await closed
+  const [closeCode, closeReason] = await closed
+  expect(closeCode).toBe(1008)
+  expect(closeReason.toString()).toBe('prerelease_access_paused')
   expect(events.some(event => 'requestId' in event && event.requestId === 'expired-publication')).toBe(false)
   expect(await host!.runtime().persistence.loadReplayHead(created.roomId)).toEqual(created.head)
   expect(room.seatOwners?.some(seat => seat.userId === host!.user.id)).toBe(true)
+})
+
+it('announces a known revocation immediately with the client admission code and retains the seat', async () => {
+  const created = await prepare()
+  const value = socket('__Host-oa-pre-session=pre-only')
+  const events: ServerEvent[] = []
+  value.on('message', raw => { const event: ServerEvent = JSON.parse(raw.toString()); events.push(event) })
+  await once(value, 'open')
+  value.send(JSON.stringify({ type: 'joinRoom', roomId: created.roomId, intent: 'resume' }))
+  await vi.waitFor(() => expect(events.some(event => event.type === 'stateUpdate')).toBe(true))
+  const room = host!.runtime().backend.registry.get(created.roomId)!
+  const connection = room.players.find(player => player.userId === host!.user.id)!.ws
+  const closed = once(value, 'close')
+  fixture.revoke()
+  expect(connection.readyState).toBe(WebSocket.CLOSING)
+  const [code, reason] = await closed
+  expect(code).toBe(1008)
+  expect(reason.toString()).toBe('prerelease_access_expired')
+  expect(room.seatOwners?.some(seat => seat.userId === host!.user.id)).toBe(true)
+  expect(await host!.runtime().persistence.loadReplayHead(created.roomId)).toEqual(created.head)
+})
+
+it('announces changed application identity through the same typed close contract', async () => {
+  const created = await prepare()
+  const value = socket('__Host-oa-pre-session=pre-only')
+  const events: ServerEvent[] = []
+  value.on('message', raw => { const event: ServerEvent = JSON.parse(raw.toString()); events.push(event) })
+  await once(value, 'open')
+  value.send(JSON.stringify({ type: 'joinRoom', roomId: created.roomId, intent: 'resume' }))
+  await vi.waitFor(() => expect(events.some(event => event.type === 'stateUpdate')).toBe(true))
+  const room = host!.runtime().backend.registry.get(created.roomId)!
+  const connection = room.players.find(player => player.userId === host!.user.id)!.ws
+  const closed = once(value, 'close')
+  fixture.runtime.buildId = 'd'.repeat(40)
+  host!.runtime().backend.broadcaster.sendTo(connection, { type: 'error', error: 'private publication', requestId: 'old-app' })
+  const [code, reason] = await closed
+  expect(code).toBe(1008)
+  expect(reason.toString()).toBe('prerelease_runtime_changed')
+  expect(events.some(event => 'requestId' in event && event.requestId === 'old-app')).toBe(false)
 })
