@@ -19,10 +19,10 @@ export function DesktopPlayerOverview({ locale, players, playerNames, scores, vi
   return (
     <div className="desktop-player-overview">
       {players.map(player => (
-        <section key={player.id} className="desktop-player-overview__player" data-player-color={player.color}>
-          <button type="button" className="desktop-player-overview__name" aria-pressed={player.id === viewedPlayerId} onClick={() => onViewPlayer(player.id)}>
+        <section key={player.id} className={`desktop-player-overview__player${player.id === currentPlayerId ? ' is-current-turn' : ''}`} data-player-color={player.color}>
+          <button type="button" className="desktop-player-overview__name" aria-pressed={player.id === viewedPlayerId} aria-current={player.id === currentPlayerId ? 'true' : undefined} onClick={() => onViewPlayer(player.id)}>
             <span>{playerNames[player.id]}</span>
-            {player.id === currentPlayerId ? <span className="desktop-player-overview__turn" aria-label={t(locale, 'ui.currentPlayer')}>◀</span> : null}
+            {player.id === currentPlayerId ? <span className="desktop-player-overview__turn turn-marker" aria-label={t(locale, 'ui.currentPlayer')}>◀</span> : null}
             <span className="desktop-player-overview__score">{formatScore(scores.find(summary => summary.playerId === player.id)?.total ?? 0)}</span>
           </button>
           <div className="desktop-player-overview__resources">

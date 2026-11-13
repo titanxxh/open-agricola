@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { t } from '../../../../shared/i18n'
 import { PlayerTabs, type PlayerSummary } from '../PlayerTabs'
 
 const PLAYERS: PlayerSummary[] = [
@@ -40,9 +41,46 @@ describe('PlayerTabs', () => {
     const youTab = screen.getByRole('tab', { name: /you/i })
     expect(youTab.textContent).toContain('☆')
   })
-  it('highlights the current-turn player', () => {
-    const { container } = render(<PlayerTabs locale="zh" players={PLAYERS} active="p2" onChange={() => {}} />)
-    expect(container.querySelector('[data-player="p1"].is-current-turn')).toBeInTheDocument()
+  it('marks the current turn independently of the viewed tab', () => {
+    render(<PlayerTabs locale="en" players={PLAYERS} active="p2" onChange={() => {}} />)
+    const current = screen.getByRole('tab', { name: /You/ })
+    const viewed = screen.getByRole('tab', { name: /AI/ })
+    expect(current).toHaveClass('is-current-turn')
+    expect(current).toHaveAttribute('aria-current', 'true')
+    expect(current).toHaveAttribute('aria-selected', 'false')
+    expect(current.querySelector('.turn-marker')).toHaveAccessibleName(t('en', 'ui.currentPlayer'))
+    expect(viewed).toHaveAttribute('aria-selected', 'true')
+    expect(viewed).not.toHaveClass('is-current-turn')
+    expect(viewed).not.toHaveAttribute('aria-current')
+  })
+  it('keeps the viewed-farm and current-turn cues when they belong to the same player', () => {
+    render(<PlayerTabs locale="en" players={PLAYERS} active="p1" onChange={() => {}} />)
+    const current = screen.getByRole('tab', { name: /You/ })
+    expect(current).toHaveClass('is-active', 'is-current-turn')
+    expect(current).toHaveAttribute('aria-selected', 'true')
+    expect(current).toHaveAttribute('aria-current', 'true')
+  })
+  it('names the current player in the narrow player switcher', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    const user = userEvent.setup()
+    render(<PlayerTabs locale="en" players={PLAYERS} active="p2" onChange={() => {}} />)
+    await user.click(screen.getByRole('button'))
+    expect(screen.getByRole('option', { name: /You/ })).toHaveTextContent(t('en', 'ui.currentPlayer'))
+    expect(screen.getByRole('option', { name: /AI/ })).not.toHaveTextContent(t('en', 'ui.currentPlayer'))
+  })
+  it('activates a player tab from the keyboard', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<PlayerTabs locale="en" players={PLAYERS} active="p2" onChange={onChange} />)
+    const current = screen.getByRole('tab', { name: /You/ })
+    current.focus()
+    expect(current).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(onChange).toHaveBeenCalledWith('p1')
   })
   it('calls onChange when clicked', async () => {
     const user = userEvent.setup()

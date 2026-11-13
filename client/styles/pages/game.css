@@ -996,6 +996,10 @@
   border: 1px solid #d9cfb7;
   border-radius: 8px;
 }
+.desktop-player-overview__player.is-current-turn {
+  background: #ffe0a8;
+  border: 2px solid #6b3418;
+}
 .desktop-player-overview__name {
   display: flex;
   align-items: center;
@@ -1013,7 +1017,6 @@
 .desktop-player-overview__name > span:first-child { overflow-wrap: anywhere; }
 .desktop-player-overview__name[aria-pressed="true"] { color: var(--color-primary); }
 .desktop-player-overview__score { margin-left: auto; font-variant-numeric: tabular-nums; }
-.desktop-player-overview__turn { color: #ab442e; }
 .desktop-player-overview__resources {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3158,9 +3161,6 @@
   align-items: center;
   gap: 4px;
 }
-.legend-text {
-  opacity: 0.8;
-}
 .player-tab {
   border: none;
   padding: 6px 12px;
@@ -3179,8 +3179,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #d14949;
-  font-size: 14px;
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 2px;
+  border-radius: 999px;
+  background: #4a2418;
+  color: #fff8ef;
+  box-shadow: 0 0 0 1px #fff8ef;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
 }
 .start-marker {
   display: inline-flex;
@@ -3203,6 +3212,22 @@
 .player-tab.active {
   background: var(--color-primary);
   color: #fff;
+}
+.player-tab.is-current-turn {
+  background: #ffe0a8;
+  color: #2e4b1e;
+  box-shadow: inset 0 0 0 2px #6b3418;
+}
+.player-tab.active.is-current-turn {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: inset 0 0 0 3px #fff8ef;
+}
+.player-tab:focus-visible,
+.desktop-player-overview__name:focus-visible,
+.player-tabs__tab:focus-visible {
+  outline: 2px solid #1e1e1e;
+  outline-offset: 2px;
 }
 /* ══════════ FARM GRID ══════════ */
 .farm-grid {
@@ -6216,7 +6241,13 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
 }
 .player-tabs__tab.is-current-turn {
   border-width: 2px;
-  border-color: var(--color-accent-strong);
+  border-color: #6b3418;
+  background: #ffe0a8;
+}
+.player-tabs__tab.is-active.is-current-turn {
+  background: var(--color-accent-bg);
+  border-color: #6b3418;
+  box-shadow: inset 0 0 0 1px #fff8ef;
 }
 .player-tabs__avatar {
   width: 28px;
