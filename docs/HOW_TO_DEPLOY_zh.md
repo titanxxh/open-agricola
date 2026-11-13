@@ -120,6 +120,8 @@ owner 导出镜像要求 Docker classic image store，且 `docker image save` �
 
 镜像导入、存储/归档工具、镜像检查容器和 app 启动前分别检查容量。额度包含 gateway 完整的 64 MiB、当前阶段完整限额、实际运行或即将启动的 app 限额，以及 `reserveMemoryMiB`。仅对正在运行的 app，从 app 预留中扣除经原生 cgroup v2 `memory.stat` 验证的匿名驻留字节；文件缓存、内核内存、gateway 和共享服务均不抵扣。采样前后必须核对本地 Unix Docker daemon、完整本目标容器 ID、镜像、PID/启动时间、cgroup 身份、原生内存上限及零 swap 上限/用量；读不到、格式错误或发生变化均阻断。匿名内存与主机可用内存分别采用两次读数中的较小值。支持的 Linux Node 上 `os.freemem()` 使用已估算可回收缓存的 `MemAvailable`。这仍是瞬时准入估计，不是内存预留或实测峰值，独立观察和停止规则仍须执行。导入另用 `budgets.import.memoryHeadroomMiB`；这是准入阈值，不能限制共享 Docker daemon。最终额度依实际 runtime、worker、共享服务、备份和导入测量确定，不能照搬示例或语法下限。准入前只回收属于本环境、run 标签有效且有效截止时间已过期的工具，并读回确认；未过期或标签无效工具保留并阻断。清理失败不停止 app。owner 调度仍须避免不同 target 的重任务重叠。
 
+owner 可在安排扩容期间明确暂缓完整负载验收。部署证据须记录临时 app、工具、并发限额，以及未完成的运行、Worker、备份和导入测量。保留原生内存、CPU、PID 限额、容器零 swap、宿主内存余量下限、OOM 停止、正式服务健康检查、存储隔离和 quota。全机后台 swap 或 PSI 增量本身不证明候选超出容量，记录为告警。重操作串行执行，备份安排在低峰。不将临时限额写成实测容量，不删除历史失败，不跳过镜像来源、认证或候选验证。扩容后先补容量验收，再提高并发。
+
 导入只允许未安装或维护中的 target，且实际 app 已停止；它不会代为停 app，已有安装须先明确执行 `maintain`。在线备份不会为获取余量停 app，缺少已验证 trusted-policy 镜像时直接给出导入提示。`budgets.import.maxArchiveMiB` 限制未压缩传输归档的字节数。暂存和加载前读回本地 Linux AMD64 daemon 平台与 Docker 数据目录，核对实际文件系统设备：共用设备需 reserve 加四份归档大小，分离设备则暂存/快照盘需 reserve 加两份、Docker 盘需 reserve 加两份。接收端持有 target 锁时，将上传文件复制成独占私有快照，对同一个独立 inode 校验并加载；并发 SCP 无法改变已检查的输入，正常完成和异常返回均清理快照。进程被强制终止可能留下私有快照；确认 intake unit 已停止后，只在 target 锁内检查并删除该精确的 target 自有文件。重试总是创建全新快照，绝不加载遗留快照。遗留文件仍计入 target 磁盘用量。校验通过一次有界顺序读取同时计算完整归档和各成员的哈希，元数据另做有界读取。进程缓冲区有界不代表文件系统缓存有界；导入测量必须包含快照复制和计入 cgroup 的文件缓存。这是保守余量，不是解包大小保证或 quota。`docker load` 在共享 daemon 中执行，中断客户端可能留下镜像字节；失败不更新 runtime 或就绪缓存。磁盘检查只补充 owner 存储限额。
 
 若 Caddy 在容器内运行，将可选 `proxyNetwork` 设为它现有的入口网络，例如 `open-agricola_default`，并安装 `deploy/prerelease.Caddyfile.example` 的固定路由。只有可信网关加入该外部网络，使用从 origin 派生的别名和容器端口 `5176`。Caddy 路由使用 `plan` 输出的 `proxyUpstream`；Caddy 容器里的 `127.0.0.1` 指向 Caddy 自己。候选 app 继续只接自己的 default/依赖网络，工具只接依赖网络。网关只连接候选 default 网络的 `<targetId>-app:5175` 别名，不使用共享的 `app` 服务名。替换恢复时内部别名随 target 改变，外部网关别名保持不变。选择入口网络，不能选择正式存储网络。解析器拒绝将 pre 依赖/default 网络或 Docker 内置网络作为代理网络。Compose 重建会保留网关网络和别名。替换恢复保留 origin 和别名，只有源网关退役并停止后才启动新网关。若 Caddy 直接运行在宿主上，省略 `proxyNetwork` 并转发到 `127.0.0.1:<target.port>`；两种模式均保留 loopback 绑定。初装前确定这一密封拓扑。
@@ -133,7 +135,7 @@ owner 导出镜像要求 Docker classic image store，且 `docker image save` �
 
 首次安装前 current 使用 `empty`。传输或 load 中断后，`control/` 私有 journal 保留原操作和 image ID；重试必须复用，不能用同源码的重构建镜像替换。trusted-policy 的 `stable` 仅标识工具，不能授权正式或预发布 app 部署。候选部署仍需独立完整 prerelease 验证。policy 变化后，消费前须具备对应导入工具镜像和候选 producer 绑定。
 
-正式生命周期 API 尚未部署时，先记录一个 UUID，再启动维护网关。先准备两个私有凭据文件和固定语言包；`plan` 即使带 `--ssh` 也验证本机路径，因此要在持有这些文件的宿主执行。预算必须固定为最终计划值，不能为维护初装临时调小：
+正式生命周期 API 尚未部署时，先记录一个 UUID，再启动维护网关。先准备两个私有凭据文件和固定语言包；`plan` 即使带 `--ssh` 也验证本机路径，因此要在持有这些文件的宿主执行。固定实际运行采用的限额。owner 可明确批准在完整容量验收前使用保守临时限额；交付证据须记录该决定和待补测量，初装后仍执行同一限额：
 
 ```bash
 ./deploy-prerelease.sh plan --config "$pre_config"
