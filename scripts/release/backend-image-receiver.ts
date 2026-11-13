@@ -51,14 +51,14 @@ export function readBackendImageRequest(path: string) {
     budget: parseBackendImportBudget(input.budget), transfer: { ...transfer, receipt } }
 }
 
-type BackendImageRequest = ReturnType<typeof readBackendImageRequest>
+export type BackendImageRequest = ReturnType<typeof readBackendImageRequest>
 const binding = ({ expiresAt: _expiresAt, ...request }: BackendImageRequest): string => createHash('sha256').update(JSON.stringify(request)).digest('hex')
 const unitName = (request: BackendImageRequest): string => `oa-formal-image-intake-${createHash('sha256').update(request.directory).digest('hex').slice(0, 16)}-${request.operationId}.service`
 
 function docker(args: string[]): string {
   return execFileSync('docker', args, { encoding: 'utf8', timeout: 30_000, maxBuffer: 2 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 }
-function pinLocalDocker(stage: string): () => void {
+export function pinBackendDocker(stage: string): () => void {
   const context: unknown = JSON.parse(docker(['context', 'inspect']))
   if (!Array.isArray(context) || context.length !== 1) throw new Error('Expected one native Docker context')
   const endpoint = object(object(object(context[0]).Endpoints).docker), socket = endpoint.Host
@@ -89,7 +89,7 @@ function requireDisk(request: BackendImageRequest, dockerRoot: string): void {
 export function receiveBackendImage(path: string): string {
   const request = readBackendImageRequest(path)
   assertNativeImageIntake(unitName(request), request.budget.import.intake)
-  const unpin = pinLocalDocker(request.stage)
+  const unpin = pinBackendDocker(request.stage)
   let snapshot: string | undefined
   try {
     const info = object(JSON.parse(docker(['info', '--format', '{{json .}}'])))
@@ -113,14 +113,15 @@ export function receiveBackendImage(path: string): string {
   }
 }
 
-export function verifyReceivedBackendImage(path: string): string {
+export function verifyReceivedBackendImage(path: string, expected: Pick<BackendImageRequest, 'directory' | 'sourceSha' | 'producerSha'>): string {
   const request = readBackendImageRequest(path), reportPath = join(request.stage, 'image.json')
+  if (request.directory !== expected.directory || request.sourceSha !== expected.sourceSha || request.producerSha !== expected.producerSha) throw new Error('Imported formal image does not match the owner deployment target')
   ownerPath(reportPath, false)
   const report = object(JSON.parse(readFileSync(reportPath, 'utf8')))
   if (report.format !== 1 || report.bindingSha256 !== binding(request) || report.sourceSha !== request.sourceSha
     || report.producerSha !== request.producerSha || report.imageId !== request.transfer.receipt.imageId
     || report.archiveManifestDigest !== null && (typeof report.archiveManifestDigest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(report.archiveManifestDigest))) throw new Error('Imported formal image belongs to another input or operation')
-  const unpin = pinLocalDocker(request.stage)
+  const unpin = pinBackendDocker(request.stage)
   try {
     requireMemory(request)
     const id = nativeContainerImageId({ configDigest: request.transfer.receipt.imageId, manifestDigest: report.archiveManifestDigest })
@@ -147,9 +148,9 @@ export function runBackendImageIntake(path: string): string {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const [mode, path] = process.argv.slice(2)
+    const [mode, path, directory, sourceSha, producerSha] = process.argv.slice(2)
     if (!path) throw new Error('Usage: backend-image-receiver.ts receive|check|_locked <private-request.json>')
-    const id = mode === 'receive' ? runBackendImageIntake(path) : mode === 'check' ? verifyReceivedBackendImage(path)
+    const id = mode === 'receive' ? runBackendImageIntake(path) : mode === 'check' && directory && sourceSha && producerSha ? verifyReceivedBackendImage(path, { directory, sourceSha, producerSha })
       : mode === '_locked' ? receiveBackendImage(path) : undefined
     if (!id) throw new Error('Unknown formal image intake action')
     process.stdout.write(id + '\n')

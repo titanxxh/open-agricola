@@ -261,7 +261,9 @@ set -a
 source .env
 set +a
 gh workflow run deploy-pages-broker.yml --ref main -f candidate_sha=<full-sha>
-./deploy-backend.sh root@your-game.duckdns.org main /root/open-agricola
+./deploy-backend.sh root@your-game.duckdns.org <fixed-sha> /root/open-agricola \
+  --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
+  --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
 ```
 
 ## 引用
@@ -290,3 +292,5 @@ Each access check first reads the exact immutable manifest with the publisher cr
 Only after all candidate execution has stopped does trusted code validate the bounded archive, load the image and check its native modules and hosted frontend metadata. The later publish step alone receives the dedicated PAT. The fixed registry manifest digest and config/image ID bind the receipt to source, purpose, producer, run/attempt and applicable verification. The sole uploaded artifact is `container-image-receipt-<run>-<attempt>/container-image-receipt.json`; images, layers, caches, credentials and build logs are never uploaded as public Actions artifacts. Owner download/import remains separate from publication, deployment and live acceptance. Missing CI quota or registry access fails without an on-host build fallback.
 
 `pnpm verify focus scripts/__tests__/candidate-verification-container-image.test.ts` covers producer admission, package privacy and workflow credential boundaries using API/command fixtures. Those checks do not certify a real GitHub BuildKit execution, private GHCR ACL or successful publication; the native build/push/digest-pull/import receipts are separate delivery evidence.
+
+Formal image delivery is rehearsed through the native owner entry, receiver and maintenance command harnesses in `release-publish.test.ts`, `backend-image-receiver.test.ts`, `backend-image-maintenance.test.ts`, plus actual Vite compilation in `container-image-frontend.test.ts`. The maintenance harness runs real locks, backup scripts, tar and manifest hashing, while external Docker/Git commands supply controlled inventories. It proves fixed-image ordering and refusal/rollback behavior, not native daemon/cgroup or live-host acceptance. Run the archive, provenance and existing backup suites for changes to these seams; #1668 retains the actual GitHub/GHCR/import/maintenance/browser evidence.

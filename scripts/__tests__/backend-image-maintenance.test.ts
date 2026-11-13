@@ -1,0 +1,142 @@
+import { spawnSync } from 'node:child_process'
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { afterEach, expect, it } from 'vitest'
+import { createBackendImageFixture } from './_helpers/backend-image-fixture'
+
+const repository = resolve(import.meta.dirname, '../..'), roots: string[] = []
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+
+function fixture(failure = '') {
+  const value = createBackendImageFixture(); roots.push(value.root)
+  const imported = value.invoke()
+  if (imported.status !== 0) throw new Error(imported.stderr)
+  const policy = join(value.stage, 'policy')
+  mkdirSync(join(policy, 'scripts'), { recursive: true })
+  for (const name of ['ci', 'release']) cpSync(join(repository, 'scripts', name), join(policy, 'scripts', name), { recursive: true })
+  for (const name of ['image-intake.ts', 'backup-storage.sh', 'backup-process.sh', 'backup-files.mjs']) cpSync(join(repository, 'scripts', name), join(policy, 'scripts', name))
+  writeFileSync(join(policy, 'package.json'), '{"type":"module"}')
+  mkdirSync(join(value.directory, 'data'))
+  writeFileSync(join(value.directory, '.env'), 'ACCOUNT_REGISTRATION_POLICY=invite_only\n')
+  writeFileSync(join(value.directory, 'data/dependencies.compose.env'), 'DATABASE_URL=private-fixture\n')
+  writeFileSync(join(value.directory, 'data/postgres-cutover.validated'), '')
+  const oldId = '1'.repeat(64), caddyId = '2'.repeat(64), newId = '3'.repeat(64), sourceBuild = '7'.repeat(40), sourceImage = `sha256:${'8'.repeat(64)}`, caddyImage = `sha256:${'9'.repeat(64)}`
+  const data = { DATABASE_URL: 'postgres://private-fixture/formal', S3_ENDPOINT: 'http://objects:9000', S3_BUCKET: 'formal', S3_PREFIX: '', S3_REGION: 'fixture', S3_FORCE_PATH_STYLE: 'true', S3_ACCESS_KEY_ID: 'private-fixture-key', S3_SECRET_ACCESS_KEY: 'private-fixture-secret' }
+  const state = { failure, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
+  const statePath = join(value.root, 'maintenance.json'), callsPath = join(value.root, 'maintenance-calls.jsonl')
+  writeFileSync(statePath, JSON.stringify(state))
+  const prefix = `#!${process.execPath}
+const fs=require('node:fs'),cp=require('node:child_process'),path=require('node:path');const a=process.argv.slice(2),file=${JSON.stringify(statePath)},s=JSON.parse(fs.readFileSync(file,'utf8'));
+const log=(kind,args=a)=>fs.appendFileSync(${JSON.stringify(callsPath)},JSON.stringify({kind,args})+'\\n');const save=()=>fs.writeFileSync(file,JSON.stringify(s));const out=x=>console.log(JSON.stringify(x));
+`
+  writeFileSync(join(value.bin, 'git'), prefix + `log('git');
+if(a[0]==='status')process.exit(0);if(a[0]==='fetch')process.exit(0);
+if(a[0]==='rev-parse')console.log(a[1].startsWith('FETCH_HEAD')?(s.failure==='fetch'?'f'.repeat(40):${JSON.stringify(value.request.sourceSha)}):s.head);
+else if(a[0]==='checkout'){s.head=s.failure==='checkout'?'f'.repeat(40):a[2];save();}else throw Error('Unexpected git');
+`, { mode: 0o700 })
+  renameSync(join(value.bin, 'docker'), join(value.bin, 'docker-intake'))
+  writeFileSync(join(value.bin, 'docker'), prefix + `
+if(['context','info','image','create','cp','rm'].includes(a[0])){const r=cp.spawnSync(${JSON.stringify(join(value.bin, 'docker-intake'))},a,{stdio:'inherit'});process.exit(r.status??1)}
+log('docker');const oldId=${JSON.stringify(oldId)},caddyId=${JSON.stringify(caddyId)},newId=${JSON.stringify(newId)},data=${JSON.stringify(data)};
+if(a[0]==='inspect'){
+ const id=a[1],isNew=id===newId;out([{Id:id,Image:id===caddyId?s.caddyImage:isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
+ State:{Running:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0},
+ Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':'formal','com.docker.compose.service':id===caddyId?'caddy':'app'}}}]);
+}else if(a[0]==='stop'){if(a.at(-1)===newId)s.started=false;else s.running=false;save();}
+else if(a[0]==='start'){s.running=true;save();}
+else if(a[0]==='ps'){}
+else if(a[0]==='compose'){
+ const file=a[a.indexOf('-f')+1];
+ if(a.includes('config'))out({name:'formal',services:{app:{image:'mutable:old',build:{context:'.'},environment:{...data,...(s.failure==='data-target'?{S3_BUCKET:'another'}:{})},volumes:[],networks:['default']},caddy:{image:'caddy:mutable',depends_on:['app']}},networks:{default:{name:'formal_default'}}});
+ else if(a.includes('ps'))console.log(a.at(-1)==='caddy'?caddyId:file.endsWith('maintenance.compose.json')?newId:oldId);
+ else if(a.includes('up')){s.started=true;save();if(s.failure==='up')process.exit(42);}
+ else if(a.includes('run')){
+  const config=JSON.parse(fs.readFileSync(file,'utf8'));fs.writeFileSync(${JSON.stringify(join(value.root, 'observed-compose.json'))},JSON.stringify(config));
+  if(a.includes('export')){
+   if(['backup','backup-stopped','source-changed'].includes(s.failure)){if(s.failure==='source-changed'){s.sourceImage='sha256:'+'a'.repeat(64);save();}process.exit(43);}
+   const destination=a.find(x=>x.startsWith('/backup/.pending-')&&x.endsWith('/capture')),directory=path.join(${JSON.stringify(value.directory)},'backups',destination.slice('/backup/'.length));fs.mkdirSync(directory,{recursive:true});
+   fs.writeFileSync(path.join(directory,'database.dump'),'real fixture database bytes');fs.writeFileSync(path.join(directory,'archive.json'),JSON.stringify({version:1,sourceBuildId:s.sourceBuild,createdAt:new Date().toISOString(),schema:'public',objects:[]}));
+  }else if(a.includes('ledger-export'))fs.writeFileSync(path.join(${JSON.stringify(value.directory)},'backups/replay-removals.latest.json'),'{"version":1,"batches":[]}');
+  else if(a.includes('validate'))out({formatVersion:2,validatedAt:new Date().toISOString(),sourceBuildId:s.sourceBuild,targetBuildId:s.failure==='report-target'?s.sourceBuild:${JSON.stringify(value.request.sourceSha)}});
+  else if(a.includes('check-live')){if(s.failure==='live')process.exit(44);}
+  else if(!a.includes('cleanup-scratch'))throw Error('Unexpected compose run: '+a.join(' '));
+ }else throw Error('Unexpected compose: '+a.join(' '));
+}else throw Error('Unexpected docker: '+a.join(' '));
+`, { mode: 0o700 })
+  const invoke = (expectedSha = value.request.sourceSha, extraEnv: NodeJS.ProcessEnv = {}) => spawnSync(process.execPath,
+    [join(policy, 'scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, expectedSha, value.request.producerSha],
+    { env: { ...process.env, CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }, encoding: 'utf8', timeout: 30_000 })
+  const calls = (): { kind: string; args: string[] }[] => existsSync(callsPath) ? readFileSync(callsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
+  return { ...value, sourceBuild, sourceImage, oldId, invoke, calls,
+    current: () => JSON.parse(readFileSync(statePath, 'utf8')),
+    compose: () => JSON.parse(readFileSync(join(value.root, 'observed-compose.json'), 'utf8')) }
+}
+
+it('delivers an imported immutable image with source capture, target restore validation and no host build', () => {
+  const value = fixture(), result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(readFileSync(join(value.directory, 'data/deployed-build-id'), 'utf8')).toBe(value.request.sourceSha + '\n')
+  const config = value.compose()
+  expect(config.services.app.image).toBe(value.imageId)
+  expect(config.services.app.environment.GAME_BUILD_ID).toBe(value.request.sourceSha)
+  expect(config.services.capture.image).toBe(value.sourceImage)
+  expect(config.services.capture.environment.GAME_BUILD_ID).toBe(value.sourceBuild)
+  expect(Object.values(config.services).some(service => Object.hasOwn(Object(service), 'build'))).toBe(false)
+  const calls = value.calls(), commands = calls.map(call => call.args.join(' '))
+  expect(calls.some(call => call.args.some(argument => ['build', 'install', 'pull'].includes(argument)))).toBe(false)
+  const index = (text: string) => commands.findIndex(command => command.includes(text))
+  expect(index('stop --time 90')).toBeLessThan(index(' export '))
+  expect(index(' export ')).toBeLessThan(index(' validate '))
+  expect(index(' validate ')).toBeLessThan(index('check-live'))
+  expect(index('check-live')).toBeLessThan(index(' up '))
+  expect(commands.find(command => command.includes(' export '))).toContain(' capture ')
+  expect(commands.find(command => command.includes(' validate '))).toContain(' app ')
+  const manifest = JSON.parse(readFileSync(join(value.directory, 'backups', `pre-${value.request.sourceSha.slice(0, 12)}-${value.request.operationId}.manifest.json`), 'utf8'))
+  expect(manifest.sourceBuildId).toBe(value.sourceBuild)
+  expect(manifest.targetBuildId).toBe(value.request.sourceSha)
+  expect(manifest.archiveSizeBytes).toBeGreaterThan(0)
+  expect(result.stdout).toContain(`Current build: ${value.request.sourceSha}`)
+  expect(result.stdout + result.stderr).not.toContain('private-fixture-secret')
+})
+
+it.each(['fetch', 'checkout', 'data-target', 'oom'])('rejects %s mismatch before stopping the retained application', failure => {
+  const value = fixture(failure), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args[0] === 'stop')).toBe(false)
+  expect(existsSync(join(value.directory, 'data/deployed-build-id'))).toBe(false)
+})
+
+it('rejects another owner target before native Docker or source commands', () => {
+  const value = fixture(), result = value.invoke('b'.repeat(40))
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('differs from the owner maintenance target')
+  expect(value.calls()).toEqual([])
+})
+
+it('restarts only the exact source after a pre-migration backup failure', () => {
+  const value = fixture('backup'), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().filter(call => call.args[0] === 'start')).toEqual([{ kind: 'docker', args: ['start', value.oldId] }])
+  expect(value.current().running).toBe(true)
+  expect(value.calls().some(call => call.args.includes('check-live'))).toBe(false)
+})
+
+it('requires the sealed backup to identify both retained source and fixed restore target before live migration', () => {
+  const value = fixture('report-target'), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('check-live'))).toBe(false)
+  expect(value.calls().filter(call => call.args[0] === 'start')).toEqual([{ kind: 'docker', args: ['start', value.oldId] }])
+})
+
+it('does not inherit unrelated backup service, environment or image overrides', () => {
+  const value = fixture(), result = value.invoke(value.request.sourceSha, { BACKUP_ENVIRONMENT: 'prerelease-other', BACKUP_SOURCE_IMAGE: value.sourceImage, BACKUP_COMPOSE_PROJECT: 'another-project' })
+  expect(result.status, result.stderr).toBe(0)
+  expect(value.calls().some(call => call.args.includes('another-project') || call.args.filter(arg => arg === '-f').length > 1)).toBe(false)
+})
+
+it.each(['drain', 'live', 'up', 'up-identity', 'backup-stopped', 'source-changed'])('keeps maintenance after %s instead of restarting the old executable', failure => {
+  const value = fixture(failure), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args[0] === 'start')).toBe(false)
+  expect(value.current().started).toBe(false)
+})

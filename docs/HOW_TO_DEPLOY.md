@@ -329,14 +329,13 @@ Both cases start with the common steps below.
 
 ### 1.1 Common Setup
 
-Install Node.js 24.15+ (excluding Node 25), pnpm, Docker Compose, and Git. Production Compose runs two independent application processes inside the app container on one host, sharing PostgreSQL 18 and RustFS through the public HTTP/WS routing process. It fixes `APP_INSTANCES=2`, including when `.env` contains the local-development value `1`. No external service account is required. Local development still defaults to one application process; use `./restart-local.sh --instances 2` to exercise the same two-process routing locally.
+On the formal host, install Node.js 24.15+ (excluding Node 25), Docker Compose, Git and user systemd/cgroup v2. Production Compose runs two independent application processes inside the app container on one host, sharing PostgreSQL 18 and RustFS through the public HTTP/WS routing process. It fixes `APP_INSTANCES=2`, including when `.env` contains the local-development value `1`. No external service account is required. Local development still defaults to one application process; use `./restart-local.sh --instances 2` to exercise the same two-process routing locally.
 
 Earlier SQLite single-instance performance reports are historical baselines only. Keep existing admission limits; those measurements do not certify PostgreSQL, two-instance capacity, or high availability. This delivery verifies normal behavior and restarts, without fault injection or recovery-time acceptance.
 
 ```bash
 git clone https://github.com/YOUR_USER/open-agricola.git
 cd open-agricola
-pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
@@ -344,10 +343,7 @@ The production image also includes the original `pnpm-lock.yaml` used by the fro
 
 Set the existing `PUBLIC_API_BASE`, `PUBLIC_APP_ORIGIN`, `CORS_ORIGIN`, and account/OAuth settings in `.env`; preserve registered callbacks. Leave `DATABASE_URL` and the S3 connection group blank to use local services. External S3 requires a complete endpoint, region, private bucket, access key, and secret.
 
-```bash
-node --env-file=.env scripts/local-services.mjs
-GAME_BUILD_ID="$(git rev-parse HEAD)" docker compose -f docker-compose.prod.yml build app
-```
+Arrange dependency initialization or network changes separately through the existing owner tools. Application delivery consumes prepared dependencies and the validated PostgreSQL cutover; it never installs or builds application code on the formal host.
 
 Dependencies use independent persistent volumes. Generated dependency credentials live in mode-600 `data/local-services.env`; host tools use `data/dependencies.local` and containers use `data/dependencies.compose.env`. Rebuilding applications never clears dependency data. The image contains PostgreSQL 18 native clients and an immutable Viewer, verified and uploaded to S3 at startup. Every hosted Room records; unavailable resources block game creation.
 
@@ -371,7 +367,7 @@ networks:
 
 Create the external network separately. The actual host helper must support this override before claiming persistence; a merged source change alone does not update an older host helper. Once installed, existing dependencies can join in place with `docker network connect --alias`, without restarting them. Verify their running networks/aliases against `docker compose --env-file data/local-services.env -f docker-compose.local.yml -f data/local-services.compose.override.yml config`; use both files for manual reconciliation too. Only PostgreSQL and object storage join the new dependency network; candidate services must not join either formal network.
 
-An in-place attachment does not update Compose's stored configuration hash. The first later reconciliation can recreate shared dependencies, so schedule it in formal maintenance after draining application writers. `deploy-backend.sh` currently bootstraps dependencies before its application drain; account for that ordering on the first override change. Subsequent dependency recreation retains these declared networks and aliases; a standalone `docker network connect` does not provide that guarantee.
+An in-place attachment does not update Compose's stored configuration hash. The first later reconciliation can recreate shared dependencies, so schedule it in formal maintenance after draining application writers. `deploy-backend.sh` reuses prepared dependencies and never reconciles them; perform that dependency maintenance separately. Subsequent dependency recreation retains these declared networks and aliases; a standalone `docker network connect` does not provide that guarantee.
 
 #### First SQLite migration
 
@@ -738,7 +734,9 @@ For this upgrade, use the existing independent verification and deployment entri
 2. Deploy that exact backend candidate from the owner machine. The backend gate does not require a published Release:
 
     ```bash
-    ./deploy-backend.sh ubuntu@ten-kr <full-sha>
+    ./deploy-backend.sh ubuntu@ten-kr <full-sha> /home/ubuntu/open-agricola \
+      --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
+      --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
     ```
 
 3. Verify the backend build identity, retained-data checks and health through the existing deployment procedure. Before publishing Pages, confirm that the public API answers this preflight with 204 and allows the capability header. Replace both origin placeholders with the deployed origins:
@@ -760,17 +758,35 @@ Wait for the Pages workflow and verify the served frontend build identity. A man
 
 ### Backend
 
-Run `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` from an owner-controlled machine with locked dependencies and an authenticated `gh` CLI. The defaults are `ubuntu@ten-kr`, `main`, and `/home/ubuntu/open-agricola`.
+Run the standard entry from the clean checkout of trusted image producer `P` on the owner machine. It needs Node.js 24.15+ (excluding25), authenticated `gh`, a local Unix Docker daemon with the classic image store and OCI-index exports, SSH and SCP. The formal host needs Node, Docker Compose, user systemd/cgroup v2, prepared dependencies and a validated PostgreSQL cutover. Application dependencies are not installed there.
 
-```bash
-./deploy-backend.sh ubuntu@ten-kr <full-sha>
-```
+1. Fix eligible merged formal source `F` and complete all of its candidate verification. Request the image on trusted main `P`, then wait for success:
 
-Before the first production SSH connection, the script resolves the requested ref once and independently checks complete GitHub verification for that exact SHA. Direct invocation and the default ref use the same gate. Missing or failed evidence stops deployment without production access. For a fork, set `RELEASE_REPOSITORY=owner/name`. The command rejects CI execution. Keep production SSH credentials on the owner's machine.
+    ```bash
+    gh workflow run container-image-build.yml --ref main -f purpose=formal-candidate -f source_sha=<F>
+    ```
 
-The remote host fetches the fixed SHA, verifies both `FETCH_HEAD` and the detached checkout, and uses that SHA as `GAME_BUILD_ID`. A moving branch cannot substitute another source. The script refuses to overwrite tracked local edits. The old application stays online during image build. Under the maintenance lock, the script then stops the application group, exports PostgreSQL and S3, restores a copy into an isolated database/object prefix using the target image, migrates and validates the actual target, and starts the whole application generation together.
+2. Select the sole receipt artifact ID from that successful run/attempt. Use the existing private GHCR package, an owner-local mode-0600 credential file and a separate mode-0600 resource budget:
 
-A preflight failure can restart the unchanged source container. After live migration starts, failure leaves maintenance active instead of starting an old executable against a possibly changed schema. The durable `data_imports` barrier blocks failed targets. Deployment waits for container health; this procedure does not itself authorize a deployment or certify failover.
+    ```bash
+    ./deploy-backend.sh ubuntu@ten-kr <F> /home/ubuntu/open-agricola \
+      --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
+      --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
+    ```
+
+    The budget grants import resources only, independently of image and target authority. The owner selects values against current headroom; this example does not certify host capacity:
+
+    ```json
+    {"format":1,"import":{"maxArchiveMiB":2048,"memoryHeadroomMiB":512,"intake":{"memoryMiB":384,"cpus":1,"pids":64}},"diskMiB":8192,"reserveMemoryMiB":512}
+    ```
+
+Host/ref/directory defaults remain `ubuntu@ten-kr`, `main` and `/home/ubuntu/open-agricola`. All five image/resource flags are mandatory; missing inputs never fall back to building. CI execution is rejected. Before the first SSH, the entry fixes `F`, checks its complete same-SHA formal verification and native workflow/attempt/artifact provenance, and requires `formal-candidate/stable`. Owner-only credentials pull by digest, inspect the actual image and export a fixed tag-free archive. Credentials and Docker auth never reach the server.
+
+The server extracts trusted controller files only from `P`. A separate bounded cgroup imports with zero additional swap after checking current memory/disk reserves, complete archive contents, immutable image identity and the image's frontend descriptor. The old application stays online through intake. After transfer/import, the owner rechecks formal authority and renews the short-lived maintenance request. Historical #1662 acceptance and tooling images cannot authorize this application.
+
+Inside the maintenance lock, the controller rebinds directory, `F`, `P` and actual image. It retains exact source container/image/Build identities, checks fixed fetch/checkout and data targets, then drains the source cleanly. The source image exports PostgreSQL/S3; the target image validates an isolated restore. Only then may `check-live` run and app plus the retained Caddy image start with `--no-build --pull never`. The formal host performs no `pnpm install`, application build, registry login or automatic dependency upgrade. Shared dependencies still require separate maintenance.
+
+Only a source that was running at entry, drained cleanly by this operation and retained its exact identity can restart after a pre-migration backup failure. OOM, unclean drain and failures after live migration begins keep maintenance active. The `data_imports` barrier and container health gate remain. The private operation directory retains import/source evidence and resolved Compose, which contains environment credentials and must remain private. Successful delivery records `data/deployed-build-id` and `data/deployed-image.json`. Real-browser, retained-game and two-instance acceptance remain separate field checks.
 
 ### Frontend
 
