@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { expect, it, vi } from 'vitest'
 import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config'
 import { nativeStorageGuard, parseStorageGuardConfig } from '../prerelease/storage-guard-native'
 
-it.each(['normal', 'postgres-failure', 'foreign-container'])('measures complete storage and stops only owned identities despite %s', async fault => {
+it.each(['normal', 'postgres-failure', 'foreign-container', 'control-unwritable', 'guard-lock-unwritable'])('measures complete storage and stops only owned identities despite %s', async fault => {
   const root = mkdtempSync(join(tmpdir(), 'oa-native-guard-')), calls: string[] = [], status = new Map<string, string>()
   const policy = { Statement: [], Version: '2012-10-17' }, policyHash = createHash('sha256').update(JSON.stringify(policy)).digest('hex')
   const server = createServer((req, res) => {
@@ -59,7 +59,21 @@ else if(args[0]==='inspect')process.stdout.write('false');
     expect(measured).toMatchObject({ sourceDatabaseBytes: 101, validationDatabaseBytes: 202, bucketBytes: 12, multipartBytes: 13,
       offsiteBytes: 17, offsiteFreeBytes: 409600, offsiteFreeInodes: 500 })
     if (fault === 'postgres-failure') writeFileSync(failureFile, 'failed')
-    expect(await native.stop()).toEqual(fault === 'normal' ? [] : [fault === 'postgres-failure' ? 'postgres-roles' : 'target-containers'])
+    if (fault === 'control-unwritable' || fault === 'guard-lock-unwritable') {
+      const { storageGuard } = await import('../prerelease/storage-guard-cli')
+      const targetFile = privateFile('target.json', target), guardFile = privateFile('guard.json', input)
+      const control = join(target.directory, 'control'); mkdirSync(control); chmodSync(control, 0o500)
+      const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+      try {
+        if (fault === 'control-unwritable') {
+          vi.stubEnv('PRERELEASE_GUARD_LOCK', targetFingerprint(target))
+          await storageGuard(['_trip', targetFile, guardFile])
+        } else await expect(storageGuard(['trip', targetFile, guardFile])).rejects.toThrow('independent stops were attempted')
+        const receipt = JSON.parse(String(output.mock.calls[0][0]))
+        expect(receipt).toMatchObject({ status: 'latched', failures: [] })
+        expect(receipt.persistenceFailures).toEqual(fault === 'control-unwritable' ? ['latch', 'stop-receipt'] : ['guard-lock'])
+      } finally { output.mockRestore(); chmodSync(control, 0o700) }
+    } else expect(await native.stop()).toEqual(fault === 'normal' ? [] : [fault === 'postgres-failure' ? 'postgres-roles' : 'target-containers'])
     expect([...status.values()]).toEqual(['disabled', 'disabled'])
     if (fault !== 'postgres-failure') {
       await expect(native.observe()).rejects.toThrow('login/temp-file')
