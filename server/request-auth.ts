@@ -114,6 +114,7 @@ export function httpAdmission(req: IncomingMessage): Admission {
 
 /** Resolve the original transport without rewriting Cookie into Authorization. */
 export function requestSessionToken(req: IncomingMessage, operations = false): string {
+  if (process.env.RELEASE_CHANNEL === 'prerelease' && (operations || req.headers.authorization !== undefined)) return ''
   const access = routeAccess(req)
   if (access === 'public' || access === 'navigation' || access === 'service' || access === 'oauth-form' || !httpAdmission(req).ok) return ''
   if (req.headers.authorization !== undefined) return native(req) ? bearer(req) : ''

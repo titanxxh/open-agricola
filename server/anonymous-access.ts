@@ -6,6 +6,7 @@
  * is allowed everywhere except production.
  */
 export function allowAnonymousAccess(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.RELEASE_CHANNEL === 'prerelease') return false
   if (env.ALLOW_ANONYMOUS_WS !== undefined) return env.ALLOW_ANONYMOUS_WS === 'true'
   return env.NODE_ENV !== 'production'
 }
