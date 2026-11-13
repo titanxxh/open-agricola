@@ -12,11 +12,11 @@ import { loadContainerImageArchive, validateContainerImageArchive } from '../rel
 const roots: string[] = []
 afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 const sha256 = (value: Buffer | string) => createHash('sha256').update(value).digest('hex')
-function fixture(tags: string[] = [], containerd = false) {
+function fixture(tags: string[] = [], containerd = false, layerBytes = 1024) {
   const root = mkdtempSync(join(tmpdir(), 'oa-image-archive-')); roots.push(root)
   const payload = join(root, 'payload'), bin = join(root, 'bin'); mkdirSync(payload); mkdirSync(bin)
   const sourceSha = 'a'.repeat(40), producerSha = 'b'.repeat(40)
-  const layer = Buffer.alloc(1024), config = JSON.stringify({ os: 'linux', architecture: 'amd64',
+  const layer = Buffer.alloc(layerBytes), config = JSON.stringify({ os: 'linux', architecture: 'amd64',
     config: { Labels: { 'org.opencontainers.image.revision': sourceSha, 'io.open-agricola.release-channel': 'prerelease' } },
     rootfs: { type: 'layers', diff_ids: [`sha256:${sha256(layer)}`] } })
   const imageId = `sha256:${sha256(config)}`
@@ -64,6 +64,17 @@ it('loads only the fixed tag-free image and validates its hosted identity withou
   expect(value.load()).toEqual({ nativeImageId: value.receipt.imageId, archiveManifestDigest: null })
   expect(value.calls().some(args => args[0] === 'load')).toBe(true)
   expect(value.calls().some(args => ['run', 'start', 'build', 'tag'].includes(args[0]))).toBe(false)
+})
+
+it.skipIf(process.platform !== 'linux')('validates all archive bytes within one archive-sized read budget', () => {
+  const value = fixture([], true, 4 * 1024 * 1024), archive = value.transfer().archive
+  const bytesRead = () => Number(/^rchar: (\d+)$/m.exec(readFileSync('/proc/self/io', 'utf8'))?.[1])
+  const before = bytesRead()
+  const checked = validateContainerImageArchive({ archivePath: value.archivePath, imageId: value.receipt.imageId,
+    sourceSha: value.receipt.sourceSha, channel: 'prerelease', maxBytes: archive.bytes })
+  const actualBytesRead = bytesRead() - before
+  expect(checked).toEqual({ ...archive, archiveManifestDigest: value.manifestDigest })
+  expect(actualBytesRead).toBeLessThanOrEqual(archive.bytes + 64 * 1024)
 })
 
 it('loads a containerd save archive by its verified manifest handle while retaining the separate config digest', () => {
