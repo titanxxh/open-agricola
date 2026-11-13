@@ -37,7 +37,7 @@ export async function prepareContainerImageArchive({ receipt: verified, authFile
     username = auth.username; token = auth.token
   } catch { throw new Error('Invalid private registry credential file; expected username and token') }
   const env: NodeJS.ProcessEnv = {}
-  for (const key of ['PATH', 'HOME', 'USER', 'DOCKER_HOST', 'DOCKER_CONTEXT']) if (process.env[key]) env[key] = process.env[key]
+  for (const key of ['PATH', 'HOME', 'USER', 'DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_CONFIG']) if (process.env[key]) env[key] = process.env[key]
   const invoke = (args: string[], input?: string, timeout = 30_000): string => {
     try { return execFileSync('docker', args, { env, input, encoding: 'utf8', timeout, maxBuffer: 2 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] }).trim() }
     catch { throw new Error('Owner registry/image command failed; no credential was forwarded to the target') }
@@ -47,7 +47,7 @@ export async function prepareContainerImageArchive({ receipt: verified, authFile
   const socket = object(object(object(context[0]).Endpoints).docker).Host
   if (typeof socket !== 'string' || !/^unix:\/\/\/[A-Za-z0-9_./-]+$/.test(socket)
     || process.env.DOCKER_HOST && process.env.DOCKER_HOST !== socket) throw new Error('Registry authentication requires a local Unix-socket Docker daemon')
-  delete env.DOCKER_HOST; delete env.DOCKER_CONTEXT
+  delete env.DOCKER_HOST; delete env.DOCKER_CONTEXT; delete env.DOCKER_CONFIG
   const operation = mkdtempSync(join(directory, 'image-')), authDirectory = mkdtempSync(join(operation, 'docker-auth-'))
   const prefix = ['--config', authDirectory, '--host', socket], reference = `${receipt.registryRepository}@${receipt.manifestDigest}`
   const partial = join(operation, 'image.tar.partial'), archivePath = join(operation, 'image.tar')
@@ -58,7 +58,7 @@ export async function prepareContainerImageArchive({ receipt: verified, authFile
     if (!Array.isArray(pulled) || pulled.length !== 1) throw new Error('Expected one pulled image')
     const image = object(pulled[0]), digests = image.RepoDigests
     if (image.Id !== receipt.imageId || !Array.isArray(digests) || !digests.includes(reference)) throw new Error('Pulled registry manifest does not match the verified image ID')
-    inspectLoadedContainerImage({ imageId: receipt.imageId, expected: receipt })
+    inspectLoadedContainerImage({ imageId: receipt.imageId, expected: receipt }, args => invoke([...prefix, ...args]))
     const child = spawn('docker', [...prefix, 'image', 'save', '--platform', 'linux/amd64', receipt.imageId], { env, stdio: ['ignore', 'pipe', 'pipe'] })
     child.stderr.resume()
     const completed = new Promise<boolean>(resolve => { child.once('error', () => resolve(false)); child.once('close', code => resolve(code === 0)) })
