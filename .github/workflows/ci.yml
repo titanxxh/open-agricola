@@ -48,7 +48,7 @@ jobs:
         run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash scripts/ci/setup-candidate-isolation.sh "$RUNNER_TEMP/native-image-probe-payload" "$PWD" "$(command -v node)" "$(id -u)"
       - name: Prove native candidate isolation
         run: node scripts/ci/candidate-isolation.ts smoke
-      - name: Compare production and native snapshotters
+      - name: Compare inherited and normalized candidate ACLs
         run: node scripts/ci/container-image-build-native-probe.ts run
       - name: Stop candidate execution
         if: always() && steps.isolation.outcome == 'success'
@@ -60,7 +60,10 @@ jobs:
           name: native-image-probe-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 7
           if-no-files-found: warn
-          path: ${{ runner.temp }}/candidate-isolation/output/verification/native-image-probe.json
+          path: |
+            ${{ runner.temp }}/candidate-isolation/output/verification/native-image-probe-inherited.json
+            ${{ runner.temp }}/candidate-isolation/output/verification/native-image-probe-cleared.json
+            ${{ runner.temp }}/candidate-isolation/output/verification/native-image-probe-acls.json
 
   plan:
     if: inputs.native_image_probe != true && (github.event_name == 'workflow_dispatch' || github.event.repository.private == false)
