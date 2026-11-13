@@ -228,7 +228,7 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 在候选目录之外准备 owner 所有、mode 0600 的 JSON 配置。`scripts/prerelease/storage-guard-native.ts` 验证以下字段；全部限额须为实测后的正整数，没有可直接部署的默认值：
 
 - `format: 1`，`fingerprint` 为完整目标指纹。
-- `databaseJournal`、`objectJournal` 指向已有私有 provisioning 凭据 journal。数据库 cluster ID、role/database 所有权 marker、精确 role/key ID 和对象 policy 哈希须读回一致。`rootEnvironmentFile` 是包含 `LOCAL_S3_ACCESS_KEY`、`LOCAL_S3_SECRET_KEY` 的 owner 私有环境文件。这些文件不能进入 app 或工具挂载。
+- `databaseJournal`、`objectJournal` 指向已有私有 provisioning 凭据 journal。数据库 cluster ID、role/database 所有权 marker、精确 role/key ID 和对象 policy 哈希须读回一致。对象 policy 哈希沿用原始 provisioning 格式：递归按规范 JSON 排序数组项、排序对象键，并省略对象中的 null 或缺失字段。因此响应中的排序变化可接受，但 grant、resource 或 condition 的变化仍会被拒绝；不能通过重写凭据 journal 放行哈希不匹配。`rootEnvironmentFile` 是包含 `LOCAL_S3_ACCESS_KEY`、`LOCAL_S3_SECRET_KEY` 的 owner 私有环境文件。这些文件不能进入 app 或工具挂载。
 - `postgresContainer` 是共享 PostgreSQL 完整 container ID，`postgresAdmin` 是其 owner SQL role，`objectEndpoint` 是 owner 可达的精确 RustFS origin。保护器不停止两个共享服务。
 - `filesystems` 列出 PostgreSQL、RustFS、Docker 实际 backing filesystem 上 owner 可读取的 mount root，包括独立的镜像 staging 文件系统。保护器还检查 target 目录，并按 device 去重。用 `docker inspect`、`docker info` 及 device ID 读回证明 mount root 覆盖这些实际存储路径。
 - `tempFileLimitBytes` 是三个 pre role 已配置的正数 `temp_file_limit`。每次采样均验证设置。它限制每个 backend 的隐式临时文件，不限制数据库总量、显式临时表或共享 WAL。

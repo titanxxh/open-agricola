@@ -26,10 +26,13 @@ const bytes = (value: unknown): number => {
   return result
 }
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
-const canonical = (value: unknown): string => {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
-  if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`).join(',')}}`
-  return JSON.stringify(value)
+// Match provisioning hashes: sort policy arrays and omit null/undefined object fields.
+const normalizedPolicy = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(normalizedPolicy).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value)
+    .filter(([, entry]) => entry !== null && entry !== undefined).sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, entry]) => [key, normalizedPolicy(entry)]))
+  return value
 }
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`
 
@@ -154,7 +157,7 @@ export function nativeStorageGuard(target: PrereleaseTarget, config: StorageGuar
     if (typeof user.policyName !== 'string' || !user.policyName || !Array.isArray(groups) || groups.length
       || !['enabled', 'disabled'].includes(String(user.status))) throw new Error('Guard object account binding mismatch')
     const policy = await admin('GET', 'info-canned-policy', { name: user.policyName })
-    if (hash(canonical(policy.policy)) !== policyHashes[index]) throw new Error('Guard object policy differs from private ownership journal')
+    if (hash(JSON.stringify(normalizedPolicy(policy.policy))) !== policyHashes[index]) throw new Error('Guard object policy differs from private ownership journal')
     return { accessKey, status: user.status }
   }
   const disk = (path: string) => {
