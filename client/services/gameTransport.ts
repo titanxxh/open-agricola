@@ -1,4 +1,4 @@
-import { assertPrereleaseAccess, getPrereleaseAccess, isPrereleaseClient, observePrereleaseFailure, prereleaseWebSocketProtocols, subscribePrereleaseAccess } from './prerelease-runtime'
+import { assertPrereleaseAccess, getPrereleaseAccess, isPrereleaseClient, observePrereleaseFailure, prereleaseStorageKey, prereleaseWebSocketProtocols, subscribePrereleaseAccess } from './prerelease-runtime'
 import { browserApiFetch } from './browser-api'
 import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { recordBugReportDisconnect } from './bug-report-diagnostics'
@@ -337,7 +337,7 @@ export class WsGameTransport implements GameTransport {
   constructor(wsUrl: string = WS_BASE, roomId?: string, playerIndex?: number, options: RoomConnectionOptions = {}) {
     this.options = options
     this.wsUrl = wsUrl
-    this.journal = new RoomCommandJournal(options.journalKey ?? `agricola.pending-commands:${wsUrl}`, roomId ?? '')
+    this.journal = new RoomCommandJournal(prereleaseStorageKey(options.journalKey ?? `agricola.pending-commands:${wsUrl}`), roomId ?? '')
     this.roomId = this.journal.roomId
     this.seatHint = playerIndex ?? this.journal.playerIndex
     this.roomViewer = { kind: 'participant', playerIndex: this.seatHint ?? 0 }
@@ -695,7 +695,7 @@ export class WsGameTransport implements GameTransport {
     this.eventWaiters.forEach(waiter => waiter.reject(error))
     this.setStatus({ phase: 'stopped', message, code })
   }
-  private scopeKey(): string { return `agricola.command-scope:${this.wsUrl}` }
+  private scopeKey(): string { return prereleaseStorageKey(`agricola.command-scope:${this.wsUrl}`) }
   private readScope(): CommandScope | undefined {
     const pending = [...this.journal.commands.values()][0]?.commandContext
     if (pending) return { scopeId: pending.scopeId, expiresAt: 0 } // Expired identities must be rejected, never silently replaced.
