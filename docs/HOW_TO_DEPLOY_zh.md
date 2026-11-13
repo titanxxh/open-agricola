@@ -102,6 +102,8 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 
 ### 操作隔离的预发布目标
 
+`budgets.sessions.rooms` 与 `budgets.sessions.customWorkers` 是必须封存的准入上限。owner Compose 设置 `APP_ROOM_CAPACITY`（1–30）与 `CUSTOM_SESSION_WORKER_CAPACITY`（0–15）；Worker 预留和 HTTP executor 共用后者。示例 10/1 不代表容量验收，最终值须由原生负载实测确定。离线保留的普通对局不占在线准入配额。未配置这些环境变量时，应用仍默认 30/15。
+
 使用可信 main checkout、Node 24.15+、Docker Compose、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、依赖网络与可选代理网络、离站身份、导入镜像来源和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
 
 owner #1662 负责独立源库、只读备份 role、独立一次性验证库/role、私有 bucket、app 的 `live/` 与工具的 `test/` 权限、依赖网络、1–40 的连接数限制、存储 quota、离站账户/目录以及实测 runtime、备份和镜像导入余量。撤销 PUBLIC CONNECT，使三个 pre role 均不能连接正式库、验证 role 不能连接源库。app 对象凭据必须不能读取正式 bucket 或验证 scratch；工具只获得源数据读取及自己的 scratch 操作权限。安装前真实权限探测不通过则阻断。`budget-check` 测量本地、数据库和对象字节数及主机余量，超额会关闭入口；它补充 owner 的 quota，不创建宿主 quota。

@@ -20,13 +20,14 @@ import {
 } from './authoritative-session.ts'
 import type { StateWithCursor } from '../../shared/session/session-core.ts'
 import { buildSyncPayload, type HistoryNameProjection } from '../../shared/session/sync-payload.ts'
+import { sessionCapacity } from './session-capacity.ts'
 
 const WORKER_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   'custom-session-worker-entry.mjs',
 )
 const COMMAND_TIMEOUT_MS = 10_000
-const MAX_CUSTOM_SESSION_WORKER_SLOTS = 15
+const MAX_CUSTOM_SESSION_WORKER_SLOTS = sessionCapacity.customWorkers
 let pendingWorkers = 0
 let busyWorkers = 0
 const activeSessionWorkers = new Set<CustomSessionExecutor>()

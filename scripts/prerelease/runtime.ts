@@ -99,6 +99,7 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
     tmpfs: ['/tmp:size=67108864'], volumes: [`${join(target.directory, 'output')}:/app/output`],
     networks: { default: { aliases: [candidateAlias(target.targetId)] }, dependencies: {} },
     environment: { RELEASE_CHANNEL: 'prerelease', NODE_ENV: 'production', APP_INSTANCES: '1', BACKEND_HOST: '0.0.0.0', BACKEND_PORT: '5175',
+      APP_ROOM_CAPACITY: String(target.budgets.sessions.rooms), CUSTOM_SESSION_WORKER_CAPACITY: String(target.budgets.sessions.customWorkers),
       ALLOW_ANONYMOUS_WS: 'false', ACCOUNT_REGISTRATION_POLICY: 'invite_only', REPLAY_TRUST_PROXY: 'true',
       GAME_BUILD_ID: record.installed?.buildId ?? record.operation?.buildId, CORS_ORIGIN: target.origin,
       PUBLIC_APP_ORIGIN: target.origin, PUBLIC_API_BASE: target.origin, FORMAL_APP_ORIGIN: target.formal.appOrigin, FORMAL_API_BASE: target.formal.apiOrigin,
