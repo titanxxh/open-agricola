@@ -99,6 +99,7 @@ export class PrereleaseSessions {
   }
   async exchangeHandoff(cookie: string, input: HandoffInput): Promise<PrereleaseSession & { token: string; returnPath: string }> {
     if (!secret(cookie) || input.protocolVersion !== 1 || !secret(input.code) || !secret(input.state) || !secret(input.browserChallenge) || input.returnTo !== `${this.runtime.formalAppOrigin}/`) throw new Error('Invalid prerelease handoff')
+    const operationEpoch = this.epoch
     return this.db.transaction(async () => {
       const pending = await this.db.prepare('SELECT * FROM prerelease_browser_handoffs WHERE cookie_hash=? FOR UPDATE').get<{ browser_verifier: string; state: string; return_path: string; expires_at: number }>(hash(cookie))
       if (!pending || !normalizePrereleaseReturnPath(pending.return_path) || pending.expires_at <= this.now() || pending.state !== input.state || hash(pending.browser_verifier) !== input.browserChallenge) throw new Error('Invalid prerelease handoff')
@@ -115,8 +116,9 @@ export class PrereleaseSessions {
         ON CONFLICT(user_id) DO UPDATE SET source_grant_id=excluded.source_grant_id,generation_id=excluded.generation_id`).run(user.id, state.grantId, this.runtime.generationId)
       await this.db.prepare('INSERT INTO prerelease_sessions(token_hash,user_id,grant_id,generation_id,build_id,created_at,expires_at,identity_state) VALUES(?,?,?,?,?,?,?,?)').run(hash(token), user.id, state.grantId, this.runtime.generationId, this.runtime.buildId, now, expiresAt, JSON.stringify(state))
       await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE cookie_hash=?').run(hash(cookie))
-      this.leases.set(hash(token), { state, userId: user.id, grantId: state.grantId, expiresAt, buildId: this.runtime.buildId, generationId: this.runtime.generationId })
+      if (operationEpoch !== this.epoch) throw new Error('Identity changed during handoff')
       this.blockedUsers.delete(user.id)
+      this.leases.set(hash(token), { state, userId: user.id, grantId: state.grantId, expiresAt, buildId: this.runtime.buildId, generationId: this.runtime.generationId })
       return { token, user, expiresAt, validUntil: state.validUntil, returnPath: pending.return_path }
     })()
   }
@@ -144,6 +146,7 @@ export class PrereleaseSessions {
       } catch { this.leases.delete(key); return null }
     }
     if (state.account.kind !== 'active' || state.account.subject.id !== row.user_id) return null
+    if (operationEpoch !== this.epoch) return null
     this.blockedUsers.delete(row.user_id)
     const lease = { state, userId: row.user_id, grantId: row.grant_id, expiresAt: row.expires_at, buildId: row.build_id, generationId: row.generation_id }
     if (!this.leaseAuthorized(lease)) {
@@ -151,7 +154,6 @@ export class PrereleaseSessions {
       if (!state.betaAccess) { this.knownInvalid.add(key); this.invalidate({ userId: row.user_id, reason: 'beta_changed' }) }
       return null
     }
-    if (operationEpoch !== this.epoch) return null
     this.knownInvalid.delete(key); this.leases.set(key, lease)
     return { user: this.user(state), expiresAt: row.expires_at, validUntil: Math.min(state.validUntil, row.expires_at) }
   }
@@ -235,12 +237,12 @@ export class PrereleaseSessions {
         if (!row) continue
         const operationEpoch = this.epoch
         const state = parsePrereleaseIdentityState(await this.authority.status(grantId), this.runtime, grantId)
+        if (state.account.kind === 'active' && state.account.subject.id !== row.user_id) throw new Error('Identity subject changed')
         const updated = await this.db.prepare(`UPDATE prerelease_sessions SET identity_state=? WHERE grant_id=? AND revoked_at IS NULL
           AND EXISTS(SELECT 1 FROM prerelease_external_identities p WHERE p.user_id=prerelease_sessions.user_id AND p.revision=?)
           AND NOT EXISTS(SELECT 1 FROM prerelease_revoked_grants g WHERE g.grant_id=prerelease_sessions.grant_id)
           AND NOT EXISTS(SELECT 1 FROM prerelease_deleted_subjects d WHERE d.user_id=prerelease_sessions.user_id)`).run(JSON.stringify(state), grantId, row.revision)
         if (!updated.changes || operationEpoch !== this.epoch) continue
-        if (state.account.kind === 'active' && state.account.subject.id !== row.user_id) throw new Error('Identity subject changed')
         if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) {
           await this.denyState(row, state)
           continue
