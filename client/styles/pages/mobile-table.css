@@ -9,6 +9,11 @@
     border-color: #baaa7d;
     background: #faf3d9;
   }
+  .game-layout__players .desktop-player-overview__player.is-current-turn {
+    background: #ffe0a8;
+    border-color: #6b3418;
+    border-width: 2px;
+  }
   .game-layout__players .desktop-player-overview__name {
     min-height: 36px;
     padding-bottom: 6px;

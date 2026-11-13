@@ -118,6 +118,7 @@ describe('nearby card targets', () => {
 })
 
 import { getPlayerPanelSupplySummary } from '../../../../shared/domain/player-panel-summary'
+import { t } from '../../../../shared/i18n'
 
 const resources = (): Resource => ({
   wood: 0,
@@ -1739,6 +1740,42 @@ describe('FarmBoard', () => {
     expect(html).toContain('resource-chip resource-bonusVp')
     expect(html).toContain('res-icon-bonusVp')
     expect(html).toContain('resource-chip-count">2</span>')
+  })
+
+  it('marks the current turn independently of the viewed farm', () => {
+    const viewed = createPlayer('p1', 'Ada', 'red')
+    const turn = createPlayer('p2', 'Bea', 'blue')
+    const setViewPlayerId = vi.fn()
+    const { container } = render(<FarmBoard {...createFarmBoardProps(viewed, {
+      players: [viewed, turn],
+      currentPlayer: turn,
+    }, { setViewPlayerId })} />)
+    const tabs = [...container.querySelectorAll('.player-tabs-container .player-tab')]
+    const ada = tabs.find(tab => tab.textContent?.includes('Ada'))
+    const bea = tabs.find(tab => tab.textContent?.includes('Bea'))
+    expect(ada).toHaveClass('active')
+    expect(ada).not.toHaveClass('is-current-turn')
+    expect(ada).toHaveAttribute('aria-pressed', 'true')
+    expect(ada).not.toHaveAttribute('aria-current')
+    expect(bea).toHaveClass('is-current-turn')
+    expect(bea).not.toHaveClass('active')
+    expect(bea).toHaveAttribute('aria-pressed', 'false')
+    expect(bea).toHaveAttribute('aria-current', 'true')
+    expect(bea?.querySelector('.turn-marker')).toHaveAccessibleName(t('en', 'ui.currentPlayer'))
+    bea?.focus()
+    expect(bea).toHaveFocus()
+    fireEvent.click(bea!)
+    expect(setViewPlayerId).toHaveBeenCalledWith('p2')
+  })
+
+  it('keeps the green viewed farm and the current-turn marker on the same player', () => {
+    const player = createPlayer('p1', 'Ada', 'red')
+    const { container } = render(<FarmBoard {...createFarmBoardProps(player)} />)
+    const tab = container.querySelector('.player-tabs-container .player-tab')
+    expect(tab).toHaveClass('active', 'is-current-turn')
+    expect(tab).toHaveAttribute('aria-pressed', 'true')
+    expect(tab).toHaveAttribute('aria-current', 'true')
+    expect(tab?.querySelector('.turn-marker')).toHaveAccessibleName(t('en', 'ui.currentPlayer'))
   })
 })
 

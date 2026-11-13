@@ -45,7 +45,7 @@ export function PlayerTabs({ locale, players, active, onChange }: Props) {
         onChange={onChange}
         options={players.map((p) => ({
           value: p.id,
-          label: `${p.isYou ? '☆ ' : ''}${p.name} · ${formatScore(p.score ?? 0)}`,
+          label: `${p.isYou ? '☆ ' : ''}${p.name}${p.isCurrent ? ` · ${translateMessage(locale, 'ui.currentPlayer')}` : ''} · ${formatScore(p.score ?? 0)}`,
         }))}
       />
     )
@@ -62,6 +62,7 @@ export function PlayerTabs({ locale, players, active, onChange }: Props) {
           data-owned={p.isYou}
           data-operating={p.isOperating}
           aria-selected={p.id === active}
+          aria-current={p.isCurrent ? 'true' : undefined}
           className={[
             'player-tabs__tab',
             p.id === active && 'is-active',
@@ -79,6 +80,7 @@ export function PlayerTabs({ locale, players, active, onChange }: Props) {
           <span className="player-tabs__name" title={p.name}>
             {p.isYou && <span aria-label="you">☆</span>} {p.name}
           </span>
+          {p.isCurrent ? <span className="turn-marker" aria-label={translateMessage(locale, 'ui.currentPlayer')}>◀</span> : null}
           {p.score !== undefined && <span className="player-tabs__score">{formatScore(p.score)}</span>}
         </button>
       ))}

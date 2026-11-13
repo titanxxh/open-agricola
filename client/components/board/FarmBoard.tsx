@@ -1230,7 +1230,10 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
           {players.map((player, index) => (
             <button
               key={player.id}
-              className={`player-tab ${player.id === displayPlayer.id ? 'active' : ''}`}
+              type="button"
+              className={`player-tab${player.id === displayPlayer.id ? ' active' : ''}${currentPlayer.id === player.id ? ' is-current-turn' : ''}`}
+              aria-pressed={player.id === displayPlayer.id}
+              aria-current={currentPlayer.id === player.id ? 'true' : undefined}
               onClick={() => setViewPlayerId(player.id)}
             >
               <span className="player-tab-label">
@@ -1238,7 +1241,8 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                 {currentPlayer.id === player.id ? (
                   <span
                     className="turn-marker"
-                    title={t(locale, 'ui.activePlayer')}
+                    title={t(locale, 'ui.currentPlayer')}
+                    aria-label={t(locale, 'ui.currentPlayer')}
                   >
                     ◀
                   </span>
