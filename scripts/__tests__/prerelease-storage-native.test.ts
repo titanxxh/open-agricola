@@ -61,6 +61,10 @@ else if(args[0]==='inspect')process.stdout.write('false');
     if (fault === 'postgres-failure') writeFileSync(failureFile, 'failed')
     expect(await native.stop()).toEqual(fault === 'normal' ? [] : [fault === 'postgres-failure' ? 'postgres-roles' : 'target-containers'])
     expect([...status.values()]).toEqual(['disabled', 'disabled'])
+    if (fault !== 'postgres-failure') {
+      await expect(native.observe()).rejects.toThrow('login/temp-file')
+      expect(await native.observe('diagnostic')).toMatchObject({ sourceDatabaseBytes: 101, bucketBytes: 12, multipartBytes: 13 })
+    }
     const requests = readFileSync(nativeCalls, 'utf8')
     if (fault !== 'postgres-failure') {
       expect(requests).toContain('pg_terminate_backend(pid,5000)')

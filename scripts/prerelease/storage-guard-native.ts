@@ -161,11 +161,11 @@ export function nativeStorageGuard(target: PrereleaseTarget, config: StorageGuar
     const value = statfsSync(path)
     return { bytes: value.bavail * value.bsize, inodes: value.ffree }
   }
-  const observe = async () => {
+  const observe = async (mode: 'admission' | 'diagnostic' = 'admission') => {
     deadline = Date.now() + config.probeTimeoutMs
     const { nativeRoles, databases } = databaseIdentity()
-    if (nativeRoles.some(row => row.login !== true || row.canSetTemp !== false || bytes(row.tempBytes) !== config.tempFileLimitBytes)) throw new Error('Pre role login/temp-file policy is not configured')
-    for (const index of [0, 1]) if ((await objectIdentity(index)).status !== 'enabled') throw new Error('Pre object credentials are disabled')
+    if (nativeRoles.some(row => mode === 'admission' && row.login !== true || row.canSetTemp !== false || bytes(row.tempBytes) !== config.tempFileLimitBytes)) throw new Error('Pre role login/temp-file policy is not configured')
+    for (const index of [0, 1]) if ((await objectIdentity(index)).status !== 'enabled' && mode === 'admission') throw new Error('Pre object credentials are disabled')
     const quota = await admin('GET', 'get-bucket-quota', { bucket: target.objects.bucket })
     if (bytes(quota.quota) !== config.limits.bucketBytes) throw new Error('Native bucket quota differs from measured limit')
     const client = new S3Client({ endpoint: config.objectEndpoint, region: 'us-east-1', forcePathStyle: true,
