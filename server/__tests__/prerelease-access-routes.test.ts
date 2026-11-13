@@ -7,15 +7,16 @@ const fixture = vi.hoisted(() => {
   const runtime = { buildId: 'a'.repeat(40), generationId: '11111111-2222-4333-8444-555555555555', appOrigin: 'https://pre.example.test',
     formalAppOrigin: 'https://formal.example.test', formalApiBase: 'https://api.example.test', targetId: 'prerelease-main' }
   let authorized = true
+  let invalidity: 'paused' | 'expired' = 'paused'
   const service = { runtime,
     resolve: vi.fn(async (token: string) => authorized && token === 'pre-only' ? { user: { id: 'formal-user', username: 'farmer', displayName: 'Farmer', isAdmin: false }, expiresAt: 700000, validUntil: 30000 } : null),
     cachedAuthorized: vi.fn((token: string) => authorized && token === 'pre-only'),
-    status: vi.fn(() => authorized ? 'paused' : 'expired'),
+    status: vi.fn(() => invalidity),
     beginHandoff: vi.fn(async () => ({ cookie: 'browser-binding', formalUrl: 'https://formal.example.test/?page=prerelease-handoff#challenge', expiresAt: Date.now() + 60000 })),
     exchangeHandoff: vi.fn(async () => ({ token: 'pre-only', returnPath: '/open-agricola/?room=retained', user: { id: 'formal-user', username: 'farmer', displayName: 'Farmer', isAdmin: false }, expiresAt: Date.now() + 86400000, validUntil: Date.now() + 30000 })),
     revoke: vi.fn(async () => { authorized = false }),
   }
-  return { runtime, service, authorize: (value: boolean) => { authorized = value } }
+  return { runtime, service, authorize: (value: boolean, reason: 'paused' | 'expired' = 'expired') => { authorized = value; invalidity = reason } }
 })
 vi.mock('../prerelease-sessions', () => ({ getPrereleaseSessions: () => process.env.RELEASE_CHANNEL === 'prerelease' ? fixture.service : undefined,
   readPrereleaseRuntime: () => process.env.RELEASE_CHANNEL === 'prerelease' ? fixture.runtime : undefined }))
@@ -102,6 +103,16 @@ it('does not publish data when access becomes invalid while an owner is awaiting
   fixture.authorize(false)
   releaseSlow!()
   const result = await response
+  expect(result.status).toBe(403)
+  expect(await result.json()).toEqual({ ok: false, code: 'prerelease_access_expired' })
+})
+
+it('keeps an unknown lease lapse paused while suppressing awaited data', async () => {
+  const response = fetch(origin + '/api/game/slow', { headers: headers() })
+  await vi.waitFor(() => expect(releaseSlow).toBeTypeOf('function'))
+  fixture.authorize(false, 'paused')
+  releaseSlow!()
+  const result = await response
   expect(result.status).toBe(503)
   expect(await result.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
 })
@@ -114,7 +125,7 @@ it('starts browser-bound handoff and exchanges only the dedicated handoff cookie
   const body = { protocolVersion: 1, code: 'code', state: 'state', browserChallenge: 'challenge', returnTo: 'https://formal.example.test/' }
   const response = await fetch(origin + '/api/prerelease/session', { method: 'POST', headers: { ...headers('__Host-oa-pre-handoff=browser-binding; __Host-oa-session=formal'), 'content-type': 'application/json' }, body: JSON.stringify(body) })
   expect(response.status).toBe(200)
-  expect(fixture.service.exchangeHandoff).toHaveBeenCalledWith('browser-binding', body)
+  expect(fixture.service.exchangeHandoff).toHaveBeenCalledWith('browser-binding', body, '')
   expect(response.headers.get('set-cookie')).toContain('__Host-oa-pre-session=pre-only; HttpOnly; SameSite=Lax; Path=/; Max-Age=')
   expect(response.headers.get('set-cookie')).not.toMatch(/(?:Domain|Partitioned)=?/)
 })
@@ -151,9 +162,9 @@ it('does not publish a new session cookie or identity when revocation wins after
   const response = await fetch(origin + '/api/prerelease/session', { method: 'POST',
     headers: { ...headers('__Host-oa-pre-handoff=browser-binding; __Host-oa-pre-session=older-session'), 'content-type': 'application/json' },
     body: JSON.stringify({ protocolVersion: 1, code: 'code', state: 'state', browserChallenge: 'challenge', returnTo: 'https://formal.example.test/' }) })
-  expect(response.status).toBe(503)
+  expect(response.status).toBe(403)
   expect(response.headers.get('set-cookie')).toBeNull()
-  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_expired' })
   expect(fixture.service.revoke).not.toHaveBeenCalled()
 })
 
@@ -164,9 +175,9 @@ it('does not publish an identity when revocation wins after the final current-se
     return result
   })
   const response = await fetch(origin + '/api/auth/me', { headers: headers() })
-  expect(response.status).toBe(503)
+  expect(response.status).toBe(403)
   expect(response.headers.get('set-cookie')).toBeNull()
-  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_expired' })
   expect(fixture.service.revoke).not.toHaveBeenCalled()
 })
 

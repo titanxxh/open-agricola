@@ -1,0 +1,421 @@
+import { createServer, type Server } from 'node:http'
+import { randomUUID } from 'node:crypto'
+import { afterAll, afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
+import { PRERELEASE_BUILD_HEADER, PRERELEASE_GENERATION_HEADER } from '../../shared/contract/prerelease-runtime'
+import type { PrereleaseIdentityState, PrereleaseIdentityEvent } from '../../shared/contract/prerelease-identity'
+import { getDb } from '../db'
+import { getPrereleaseSessions } from '../prerelease-sessions'
+import { handlePrereleaseRoute } from '../prerelease-routes'
+
+vi.mock('../db', async () => {
+  const { createTestDatabase } = await import('./_helpers/postgres')
+  const db = await createTestDatabase()
+  return { getDb: () => db }
+})
+
+const browserFetch = globalThis.fetch
+const buildId = 'a'.repeat(40)
+let server: Server | undefined
+let origin = ''
+let appOrigin = ''
+let generationId = ''
+let exchangeCalls = 0
+let authorityReply: () => Response | Promise<Response>
+let statusReply: () => Response | Promise<Response>
+let events: PrereleaseIdentityEvent[] = []
+let acknowledgements: string[] = []
+
+function identity(): PrereleaseIdentityState {
+  const now = Date.now()
+  return { protocolVersion: 1, channel: 'prerelease', targetOrigin: appOrigin, generationId,
+    grantId: 'g'.repeat(43), account: { kind: 'active', subject: { id: 'handoff-user', username: 'handoff_user', displayName: 'Handoff Farmer' } },
+    source: { kind: 'active', expiresAt: now + 86_400_000 }, grant: { kind: 'active', expiresAt: now + 86_400_000 },
+    betaAccess: true, confirmedAt: now, validUntil: now + 30_000 }
+}
+
+beforeEach(async () => {
+  server = createServer((req, res) => { void handlePrereleaseRoute(req, res).then(handled => {
+    if (!handled) { res.writeHead(404); res.end() }
+  }).catch(() => { res.writeHead(500); res.end() }) })
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Handoff HTTP fixture did not start')
+  origin = `http://127.0.0.1:${address.port}`; appOrigin = `https://127.0.0.1:${address.port}`
+  generationId = randomUUID(); exchangeCalls = 0; events = []; acknowledgements = []
+  for (const [key, value] of Object.entries({ RELEASE_CHANNEL: 'prerelease', NODE_ENV: 'production', PUBLIC_APP_ORIGIN: appOrigin,
+    PUBLIC_API_BASE: appOrigin, FORMAL_APP_ORIGIN: 'https://formal.example.test', FORMAL_API_BASE: 'https://formal-api.example.test',
+    PRERELEASE_DATA_GENERATION: generationId, PRERELEASE_TARGET_ID: 'prerelease-main', GAME_BUILD_ID: buildId,
+    PRERELEASE_IDENTITY_SERVICE_KEY: 'restricted-handoff-fixture-service-key' })) vi.stubEnv(key, value)
+  authorityReply = () => Response.json({ ok: true, state: identity() })
+  statusReply = () => Response.json({ ok: true, state: identity() })
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    expect(init).toMatchObject({ method: 'POST', credentials: 'omit', redirect: 'error' })
+    expect(new Headers(init?.headers).has('cookie')).toBe(false)
+    expect(new Headers(init?.headers).has('origin')).toBe(false)
+    const path = String(input)
+    if (path === 'https://formal-api.example.test/api/prerelease/exchange') { exchangeCalls++; return authorityReply() }
+    if (path === 'https://formal-api.example.test/api/prerelease/status') return statusReply()
+    if (path === 'https://formal-api.example.test/api/prerelease/events') return Response.json({ ok: true, protocolVersion: 1, events })
+    if (path === 'https://formal-api.example.test/api/prerelease/acknowledgements') {
+      const event = events[0]
+      if (!event) throw new Error('No identity event awaits acknowledgement')
+      const outcome = event.kind === 'source_revoked' ? 'revoked' : event.kind === 'account_deleted' ? 'deleted' : 'rechecked'
+      expect(JSON.parse(String(init?.body))).toMatchObject({ eventId: event.id, outcome })
+      acknowledgements.push(event.id)
+      return Response.json({ ok: true, receipt: { eventId: event.id, outcome, completedAt: Date.now() } })
+    }
+    throw new Error('Unexpected identity fixture request')
+  }))
+})
+
+afterEach(async () => {
+  getPrereleaseSessions()?.close()
+  if (server?.listening) await new Promise<void>((resolve, reject) => server!.close(error => error ? reject(error) : resolve()))
+  server = undefined
+  await getDb().prepare('DELETE FROM users').run()
+  await getDb().prepare('DELETE FROM prerelease_browser_handoffs').run()
+  await getDb().exec('DELETE FROM prerelease_revoked_grants; DELETE FROM prerelease_deleted_subjects; DELETE FROM prerelease_processed_identity_events')
+  vi.unstubAllEnvs(); vi.unstubAllGlobals()
+})
+afterAll(async () => { await getDb().close() })
+
+async function begin() {
+  const response = await browserFetch(`${origin}/open-agricola/auth/start?returnPath=` + encodeURIComponent('/open-agricola/?room=retained'), { redirect: 'manual' })
+  expect(response.status).toBe(302)
+  const location = response.headers.get('location'), cookie = response.headers.getSetCookie()[0]?.split(';')[0]
+  if (!location || !cookie) throw new Error('Handoff fixture did not issue a browser binding')
+  const params = new URLSearchParams(new URL(location).hash.slice(1))
+  const state = params.get('state'), browserChallenge = params.get('browserChallenge')
+  if (!state || !browserChallenge) throw new Error('Missing browser handoff fields')
+  return { cookie, body: { protocolVersion: 1, code: 'c'.repeat(43), state, browserChallenge, returnTo: 'https://formal.example.test/' } }
+}
+
+function boundHeaders(cookie: string) {
+  return { Cookie: cookie, Origin: appOrigin,
+    [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION), [PRERELEASE_BUILD_HEADER]: buildId,
+    [PRERELEASE_GENERATION_HEADER]: generationId, 'Content-Type': 'application/json' }
+}
+function exchange(input: Awaited<ReturnType<typeof begin>>, cookie = input.cookie) {
+  return browserFetch(`${origin}/api/prerelease/session`, { method: 'POST', headers: boundHeaders(cookie), body: JSON.stringify(input.body) })
+}
+
+it('pauses an unavailable exchange without consuming its browser binding, then permits the same valid handoff', async () => {
+  const pending = await begin()
+  authorityReply = () => { throw new Error('Formal service offline') }
+  const paused = await exchange(pending)
+  expect({ status: paused.status, body: await paused.json(), cookies: paused.headers.getSetCookie() }).toEqual({
+    status: 503, body: { ok: false, code: 'prerelease_access_paused' }, cookies: [],
+  })
+  expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions').all()).toEqual([])
+  expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
+  expect(await getDb().prepare('SELECT count(*)::int AS count FROM prerelease_browser_handoffs').get()).toEqual({ count: 1 })
+  authorityReply = () => Response.json({ ok: true, state: identity() })
+  const accepted = await exchange(pending)
+  expect(accepted.status).toBe(200)
+  expect(await accepted.json()).toMatchObject({ ok: true, returnPath: '/open-agricola/?room=retained', user: { id: 'handoff-user' } })
+  expect(accepted.headers.getSetCookie().some(cookie => cookie.startsWith('__Host-oa-pre-session='))).toBe(true)
+  expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions').all()).toEqual([{ user_id: 'handoff-user' }])
+  expect(await getDb().prepare('SELECT cookie_hash FROM prerelease_browser_handoffs').all()).toEqual([])
+  expect(exchangeCalls).toBe(2)
+})
+
+it('recovers only the matching committed handoff cookie without another exchange or a sliding session deadline', async () => {
+  const pending = await begin()
+  const accepted = await exchange(pending)
+  expect(accepted.status).toBe(200)
+  const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+  if (!cookie) throw new Error('Handoff response did not issue a session cookie')
+  await accepted.body?.cancel()
+  const before = await getDb().prepare('SELECT token_hash,user_id,grant_id,created_at,expires_at FROM prerelease_sessions').all()
+  const original = await getDb().prepare('SELECT expires_at FROM prerelease_sessions').get<{ expires_at: number }>()
+  if (!original) throw new Error('Missing committed handoff session')
+  expect(before).toHaveLength(1)
+  expect(await getDb().prepare('SELECT cookie_hash FROM prerelease_browser_handoffs').all()).toEqual([])
+  const missingReceipt = await exchange(pending, '')
+  expect(missingReceipt.status).toBe(400)
+  expect(await missingReceipt.json()).toEqual({ ok: false, code: 'invalid_prerelease_handoff' })
+  expect(exchangeCalls).toBe(1)
+  const recovered = await exchange(pending, cookie)
+  expect(recovered.status).toBe(200)
+  const body: unknown = await recovered.json()
+  expect(body).toMatchObject({ ok: true, returnPath: '/open-agricola/?room=retained', user: { id: 'handoff-user' }, prerelease: { expiresAt: original.expires_at } })
+  expect(body).not.toHaveProperty('token')
+  expect(recovered.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]).toBe(cookie)
+  expect(await getDb().prepare('SELECT token_hash,user_id,grant_id,created_at,expires_at FROM prerelease_sessions').all()).toEqual(before)
+  expect(exchangeCalls).toBe(1)
+  const loggedOut = await browserFetch(`${origin}/api/auth/logout`, { method: 'POST', headers: boundHeaders(cookie) })
+  expect(loggedOut.status).toBe(200)
+  const stale = await exchange(pending, cookie)
+  expect(stale.status).toBe(403)
+  expect(await stale.json()).toEqual({ ok: false, code: 'prerelease_access_expired' })
+  expect(stale.headers.getSetCookie().some(value => value.startsWith('__Host-oa-pre-session='))).toBe(false)
+  expect(exchangeCalls).toBe(1)
+})
+
+it('does not use an older principal cookie as proof of a different callback', async () => {
+  const first = await begin()
+  const accepted = await exchange(first)
+  const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+  if (!cookie) throw new Error('Handoff response did not issue a session cookie')
+  const next = await begin()
+  const invalid = await exchange({ ...next, body: { ...next.body, state: 'x'.repeat(43) } }, cookie)
+  expect(invalid.status).toBe(400)
+  expect(await invalid.json()).toEqual({ ok: false, code: 'invalid_prerelease_handoff' })
+  expect(exchangeCalls).toBe(1)
+  const nextIdentity = identity()
+  nextIdentity.grantId = 'b'.repeat(43)
+  nextIdentity.account = { kind: 'active', subject: { id: 'next-user', username: 'next_user', displayName: 'Next Farmer' } }
+  authorityReply = () => Response.json({ ok: true, state: nextIdentity })
+  const admitted = await exchange(next, `${next.cookie}; ${cookie}`)
+  expect(admitted.status).toBe(200)
+  expect(await admitted.json()).toMatchObject({ ok: true, user: { id: 'next-user' } })
+  expect(exchangeCalls).toBe(2)
+  expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions ORDER BY user_id').all())
+    .toEqual([{ user_id: 'handoff-user' }, { user_id: 'next-user' }])
+})
+
+it.each(['code', 'browserChallenge'] as const)('does not recover an old principal when the same callback state has a different %s', async field => {
+  const first = await begin()
+  const accepted = await exchange(first)
+  expect(accepted.status).toBe(200)
+  const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+  if (!cookie) throw new Error('Handoff response did not issue a session cookie')
+  const nextIdentity = identity()
+  nextIdentity.grantId = 'b'.repeat(43)
+  nextIdentity.account = { kind: 'active', subject: { id: 'next-user', username: 'next_user', displayName: 'Next Farmer' } }
+  authorityReply = () => Response.json({ ok: true, state: nextIdentity })
+  const response = await exchange({ ...first, body: { ...first.body, [field]: 'd'.repeat(43) } }, cookie)
+  expect(response.status).toBe(400)
+  expect(await response.json()).toEqual({ ok: false, code: 'invalid_prerelease_handoff' })
+  expect(response.headers.getSetCookie().some(value => value.startsWith('__Host-oa-pre-session='))).toBe(false)
+  expect(exchangeCalls).toBe(1)
+  expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions').all()).toEqual([{ user_id: 'handoff-user' }])
+})
+
+it.each([
+  { status: 409, code: 'prerelease_handoff_invalid', expected: 400, result: 'invalid_prerelease_handoff' },
+  { status: 401, code: 'not_authenticated', expected: 403, result: 'prerelease_access_expired' },
+  { status: 403, code: 'beta_access_required', expected: 403, result: 'prerelease_access_expired' },
+  { status: 409, code: 'prerelease_generation_unavailable', expected: 503, result: 'prerelease_access_paused' },
+  { status: 503, code: 'prerelease_entry_disabled', expected: 503, result: 'prerelease_access_paused' },
+])('reports the formal $code failure without issuing a local identity', async scenario => {
+  const pending = await begin()
+  authorityReply = () => Response.json({ ok: false, code: scenario.code }, { status: scenario.status })
+  const result = await exchange(pending)
+  expect(result.status).toBe(scenario.expected)
+  expect(await result.json()).toEqual({ ok: false, code: scenario.result })
+  expect(result.headers.getSetCookie().some(cookie => cookie.startsWith('__Host-oa-pre-session='))).toBe(false)
+  expect(result.headers.getSetCookie().length).toBe(scenario.expected === 503 ? 0 : 1)
+  expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
+  expect(await getDb().prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+})
+
+it.each(['beta_withdrawn', 'account_deleted', 'source_invalid', 'source_expired', 'grant_revoked', 'grant_expired'])(
+  'returns expired access for confirmed %s without publishing a positive cookie or principal', async reason => {
+    const pending = await begin(), state = identity()
+    if (reason === 'beta_withdrawn') state.betaAccess = false
+    if (reason === 'account_deleted') state.account = { kind: 'deleted' }
+    if (reason === 'source_invalid') state.source = { kind: 'invalid' }
+    if (reason === 'source_expired') state.source = { kind: 'active', expiresAt: Date.now() - 1 }
+    if (reason === 'grant_revoked') state.grant.kind = 'revoked'
+    if (reason === 'grant_expired') state.grant.expiresAt = Date.now() - 1
+    authorityReply = () => Response.json({ ok: true, state })
+    const response = await exchange(pending)
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_expired' })
+    expect(response.headers.getSetCookie().some(cookie => cookie.startsWith('__Host-oa-pre-session='))).toBe(false)
+    expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
+    expect(await getDb().prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+  })
+
+it.each(['freshness_elapsed', 'invalid_protocol', 'database_failure'])('pauses %s rather than declaring a malformed callback', async reason => {
+  const pending = await begin(), state = identity()
+  if (reason === 'freshness_elapsed') { state.confirmedAt -= 30_001; state.validUntil = state.confirmedAt + 30_000 }
+  if (reason === 'invalid_protocol') state.targetOrigin = 'https://wrong-target.example.test'
+  if (reason === 'database_failure') await getDb().exec(`CREATE FUNCTION reject_handoff_write() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'Controlled handoff storage failure'; END $$;
+    CREATE TRIGGER reject_handoff_write BEFORE INSERT ON prerelease_sessions FOR EACH ROW EXECUTE FUNCTION reject_handoff_write();`)
+  try {
+    authorityReply = () => Response.json({ ok: true, state })
+    const response = await exchange(pending)
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+    expect(response.headers.getSetCookie()).toEqual([])
+    expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
+    expect(await getDb().prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+    expect(await getDb().prepare('SELECT count(*)::int AS count FROM prerelease_browser_handoffs').get()).toEqual({ count: 1 })
+  } finally {
+    if (reason === 'database_failure') await getDb().exec('DROP TRIGGER reject_handoff_write ON prerelease_sessions; DROP FUNCTION reject_handoff_write()')
+  }
+})
+
+it('treats a contradictory formal error envelope as unavailable authority', async () => {
+  const pending = await begin()
+  authorityReply = () => Response.json({ ok: true, code: 'prerelease_handoff_invalid' }, { status: 409 })
+  const response = await exchange(pending)
+  expect(response.status).toBe(503)
+  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+  expect(response.headers.getSetCookie()).toEqual([])
+  expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
+  expect(await getDb().prepare('SELECT count(*)::int AS count FROM prerelease_browser_handoffs').get()).toEqual({ count: 1 })
+})
+
+it.each(['unrelated_source_revoked', 'beta_qualification_changed'])(
+  'pauses an unconfirmed %s epoch race without declaring this callback expired', async reason => {
+  const pending = await begin(), service = getPrereleaseSessions()
+  if (!service) throw new Error('Missing prerelease consumer')
+  const before = await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()
+  authorityReply = async () => {
+    events.push(reason === 'unrelated_source_revoked'
+      ? { id: randomUUID(), kind: 'source_revoked', userId: 'another-user', grantId: 'b'.repeat(43), createdAt: Date.now() }
+      : { id: randomUUID(), kind: 'beta_changed', userId: 'handoff-user', grantId: null, createdAt: Date.now() })
+    await service.processEvents()
+    return Response.json({ ok: true, state: identity() })
+  }
+  const response = await exchange(pending)
+  expect(response.status).toBe(503)
+  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+  expect(response.headers.getSetCookie()).toEqual([])
+  expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
+  expect(await getDb().prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+  expect(await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()).toEqual(before)
+})
+
+it('rejects malformed callback fields before calling the authority', async () => {
+  const pending = await begin()
+  const response = await exchange({ ...pending, body: { ...pending.body, code: 'invalid' } })
+  expect(response.status).toBe(400)
+  expect(await response.json()).toEqual({ ok: false, code: 'invalid_prerelease_handoff' })
+  expect(exchangeCalls).toBe(0)
+  expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
+})
+
+it('pauses receipt recovery when formal status is unavailable without returning stale identity data', async () => {
+  const pending = await begin(), accepted = await exchange(pending)
+  const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+  if (!cookie) throw new Error('Handoff response did not issue a session cookie')
+  const stale = identity()
+  stale.confirmedAt -= 30_001; stale.validUntil = stale.confirmedAt + 30_000
+  await getDb().prepare('UPDATE prerelease_sessions SET identity_state=?').run(JSON.stringify(stale))
+  statusReply = () => { throw new Error('Formal status offline') }
+  const response = await exchange(pending, cookie)
+  expect(response.status).toBe(503)
+  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+  expect(response.headers.getSetCookie()).toEqual([])
+  expect(exchangeCalls).toBe(1)
+  statusReply = () => Response.json({ ok: true, state: identity() })
+  const recovered = await exchange(pending, cookie)
+  expect(recovered.status).toBe(200)
+  expect(await recovered.json()).toMatchObject({ ok: true, user: { id: 'handoff-user' } })
+  expect(exchangeCalls).toBe(1)
+})
+
+it.each(['beta_withdrawn', 'account_deleted', 'source_invalid', 'source_expired', 'grant_revoked', 'grant_expired', 'freshness_elapsed', 'invalid_protocol'])(
+  'fails closed when receipt status confirms %s without returning or advancing an unauthorized identity', async reason => {
+    const pending = await begin(), accepted = await exchange(pending)
+    const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+    if (!cookie) throw new Error('Handoff response did not issue a session cookie')
+    const stale = identity()
+    stale.confirmedAt -= 30_001; stale.validUntil = stale.confirmedAt + 30_000
+    const stored = JSON.stringify(stale)
+    await getDb().prepare('UPDATE prerelease_sessions SET identity_state=?').run(stored)
+    const state = identity()
+    if (state.account.kind === 'active') state.account.subject.displayName = 'Unaccepted profile'
+    if (reason === 'beta_withdrawn') state.betaAccess = false
+    if (reason === 'account_deleted') state.account = { kind: 'deleted' }
+    if (reason === 'source_invalid') state.source = { kind: 'invalid' }
+    if (reason === 'source_expired') state.source = { kind: 'active', expiresAt: Date.now() - 1 }
+    if (reason === 'grant_revoked') state.grant.kind = 'revoked'
+    if (reason === 'grant_expired') state.grant.expiresAt = Date.now() - 1
+    if (reason === 'freshness_elapsed') { state.confirmedAt -= 30_001; state.validUntil = state.confirmedAt + 30_000 }
+    if (reason === 'invalid_protocol') state.targetOrigin = 'https://wrong-target.example.test'
+    statusReply = () => Response.json({ ok: true, state })
+    const response = await exchange(pending, cookie)
+    const paused = reason === 'freshness_elapsed' || reason === 'invalid_protocol'
+    expect(response.status).toBe(paused ? 503 : 403)
+    expect(await response.json()).toEqual({ ok: false, code: paused ? 'prerelease_access_paused' : 'prerelease_access_expired' })
+    expect(response.headers.getSetCookie().some(value => value.startsWith('__Host-oa-pre-session='))).toBe(false)
+    expect(await getDb().prepare('SELECT display_name FROM users').all()).toEqual([{ display_name: 'Handoff Farmer' }])
+    if (paused) expect(await getDb().prepare('SELECT identity_state FROM prerelease_sessions').all()).toEqual([{ identity_state: stored }])
+    expect(exchangeCalls).toBe(1)
+  })
+
+it('rolls back a receipt refresh when updating the principal fails after the session write', async () => {
+  const pending = await begin(), accepted = await exchange(pending)
+  const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+  if (!cookie) throw new Error('Handoff response did not issue a session cookie')
+  const stale = identity()
+  stale.confirmedAt -= 30_001; stale.validUntil = stale.confirmedAt + 30_000
+  const stored = JSON.stringify(stale)
+  await getDb().prepare('UPDATE prerelease_sessions SET identity_state=?').run(stored)
+  const state = identity()
+  if (state.account.kind === 'active') state.account.subject.displayName = 'Unaccepted profile'
+  statusReply = () => Response.json({ ok: true, state })
+  await getDb().exec(`CREATE FUNCTION reject_handoff_profile() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'Controlled handoff profile storage failure'; END $$;
+    CREATE TRIGGER reject_handoff_profile BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION reject_handoff_profile();`)
+  try {
+    const response = await exchange(pending, cookie)
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+    expect(response.headers.getSetCookie()).toEqual([])
+    expect(await getDb().prepare('SELECT display_name FROM users').all()).toEqual([{ display_name: 'Handoff Farmer' }])
+    expect(await getDb().prepare('SELECT identity_state FROM prerelease_sessions').all()).toEqual([{ identity_state: stored }])
+    expect(exchangeCalls).toBe(1)
+  } finally {
+    await getDb().exec('DROP TRIGGER reject_handoff_profile ON users; DROP FUNCTION reject_handoff_profile()')
+  }
+})
+
+it.each(['source_revoked', 'account_deleted'])('does not publish a cookie or profile when %s races the handoff COMMIT', async kind => {
+  const db = getDb(), service = getPrereleaseSessions()
+  if (!service) throw new Error('Missing prerelease consumer')
+  service.setAccountErasure(async userId => { await db.prepare('DELETE FROM users WHERE id=?').run(userId) })
+  const pending = await begin(), locked = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
+  const invalidated = Promise.withResolvers<void>()
+  service.subscribeInvalidation(() => invalidated.resolve())
+  let pid: number | undefined
+  authorityReply = async () => {
+    pid = (await db.prepare('SELECT pg_backend_pid() AS pid').get<{ pid: number }>())?.pid
+    return Response.json({ ok: true, state: identity() })
+  }
+  await db.exec(`CREATE FUNCTION hold_handoff_commit() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN PERFORM pg_advisory_xact_lock(166300015); RETURN NEW; END $$;
+    CREATE CONSTRAINT TRIGGER hold_handoff_commit AFTER INSERT ON prerelease_sessions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION hold_handoff_commit();`)
+  const holding = db.transaction(async () => { await db.prepare('SELECT pg_advisory_xact_lock(166300015)').get(); locked.resolve(); await release.promise })()
+  let response: Promise<Response> | undefined, processing: Promise<void> | undefined
+  try {
+    await locked.promise
+    response = exchange(pending)
+    await vi.waitFor(async () => {
+      const row = pid ? await db.prepare('SELECT query,wait_event FROM pg_stat_activity WHERE pid=?').get<{ query: string; wait_event: string }>(pid) : undefined
+      expect(row).toEqual({ query: 'COMMIT', wait_event: 'advisory' })
+    }, { timeout: 3000, interval: 5 })
+    const eventId = randomUUID()
+    events.push(kind === 'source_revoked'
+      ? { id: eventId, kind: 'source_revoked', userId: 'handoff-user', grantId: 'g'.repeat(43), createdAt: Date.now() }
+      : { id: eventId, kind: 'account_deleted', userId: 'handoff-user', grantId: null, createdAt: Date.now() })
+    processing = service.processEvents()
+    await invalidated.promise
+    expect(acknowledgements).toEqual([])
+    release.resolve(); await holding
+    const denied = await response
+    expect(denied.status).toBe(403)
+    expect(await denied.json()).toEqual({ ok: false, code: 'prerelease_access_expired' })
+    expect(denied.headers.getSetCookie().some(value => value.startsWith('__Host-oa-pre-session='))).toBe(false)
+    await processing
+    expect(acknowledgements).toEqual([eventId])
+    if (kind === 'account_deleted') {
+      expect(await db.prepare('SELECT id FROM users').all()).toEqual([])
+      expect(await db.prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+    } else {
+      expect(await db.prepare('SELECT revoked_at IS NOT NULL AS revoked FROM prerelease_sessions').all()).toEqual([{ revoked: true }])
+    }
+  } finally {
+    release.resolve()
+    await Promise.allSettled([holding, response, processing])
+    await db.exec('DROP TRIGGER hold_handoff_commit ON prerelease_sessions; DROP FUNCTION hold_handoff_commit()')
+  }
+})

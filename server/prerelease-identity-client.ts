@@ -4,6 +4,11 @@ import {
 } from '../shared/contract/prerelease-identity'
 import type { PrereleaseRuntime } from '../shared/contract/prerelease-runtime'
 
+export class PrereleaseIdentityError extends Error {
+  readonly kind: 'invalid' | 'expired' | 'paused'
+  constructor(kind: PrereleaseIdentityError['kind'], message: string) { super(message); this.kind = kind }
+}
+
 const isObject = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
 const object = (value: unknown): Record<string, unknown> => {
   if (!isObject(value)) throw new Error('Invalid prerelease authority response')
@@ -56,7 +61,7 @@ export class FormalPrereleaseIdentityClient implements PrereleaseIdentityClient 
       headers: { authorization: `Bearer ${this.serviceKey}`, 'content-type': 'application/json' },
       body: JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin: this.runtime.appOrigin, generationId: this.runtime.generationId, ...input }),
     })
-    if (!response.ok || Number(response.headers.get('content-length')) > 65536) throw new Error('Formal identity service unavailable')
+    if (Number(response.headers.get('content-length')) > 65536) throw new Error('Formal identity service unavailable')
     const reader = response.body?.getReader()
     if (!reader) throw new Error('Empty authority response')
     const chunks: Uint8Array[] = []
@@ -71,6 +76,13 @@ export class FormalPrereleaseIdentityClient implements PrereleaseIdentityClient 
       }
     } finally { reader.releaseLock() }
     const result = object(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+    if (path === 'exchange' && !response.ok && result.ok === false) {
+      if (response.status === 409 && result.code === 'prerelease_handoff_invalid') throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff')
+      if (response.status === 401 && result.code === 'not_authenticated' || response.status === 403 && result.code === 'beta_access_required') {
+        throw new PrereleaseIdentityError('expired', 'Prerelease source access expired')
+      }
+    }
+    if (!response.ok) throw new Error('Formal identity service unavailable')
     if (result.ok !== true) throw new Error('Authority refused identity operation')
     return result
   }
