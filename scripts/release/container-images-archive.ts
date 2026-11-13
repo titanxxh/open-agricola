@@ -42,10 +42,10 @@ function identity(config: Record<string, unknown>, expected: Pick<ExpectedContai
   if (labels['org.opencontainers.image.revision'] !== expected.sourceSha || labels['io.open-agricola.release-channel'] !== channel) throw new Error('Image source or channel differs from the receipt')
 }
 
-export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId: string; expected: ExpectedContainerImage }): string {
+export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId: string; expected: ExpectedContainerImage }, runDocker: (args: string[]) => string = docker): string {
   imageId(id)
   if (expected.pendingImageId !== undefined && expected.pendingImageId !== id) throw new Error('Pending operation must retain its original image ID')
-  const inspected: unknown = JSON.parse(docker(['image', 'inspect', id]))
+  const inspected: unknown = JSON.parse(runDocker(['image', 'inspect', id]))
   if (!Array.isArray(inspected) || inspected.length !== 1) throw new Error('Expected one loaded image')
   const image = object(inspected[0]), config = object(image.Config)
   if (image.Id !== id || image.Os !== 'linux' || image.Architecture !== 'amd64') throw new Error('Loaded image ID or platform differs')
@@ -55,11 +55,11 @@ export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId
   try {
     const volumes = config.Volumes === undefined || config.Volumes === null ? [] : Object.keys(object(config.Volumes))
     if (volumes.length > 128 || volumes.some(path => !/^\/[A-Za-z0-9_./-]*$/.test(path) || path.split('/').includes('..'))) throw new Error('Unsupported image volume declarations')
-    docker(['create', '--name', name, '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+    runDocker(['create', '--name', name, '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
       '--memory', '64m', '--cpus', '0.25', '--pids-limit', '32', ...volumes.flatMap(path => ['--mount', `type=tmpfs,destination=${path}`]), '--entrypoint', '/bin/false', id])
     created = true
     const path = join(directory, 'frontend-build.json')
-    docker(['cp', `${name}:/app/frontend-dist/frontend-build.json`, path])
+    runDocker(['cp', `${name}:/app/frontend-dist/frontend-build.json`, path])
     const info = lstatSync(path)
     if (!info.isFile() || info.isSymbolicLink() || info.size > 64 * 1024) throw new Error('Invalid hosted frontend metadata file')
     const metadata = object(JSON.parse(readFileSync(path, 'utf8'))), channel = expected.purpose === 'candidate' ? 'prerelease' : 'stable'
@@ -67,7 +67,7 @@ export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId
       || metadata.releaseChannel !== channel || metadata.deploymentTarget !== `${channel}-hosted`) throw new Error('Hosted frontend does not match the image receipt')
     return id
   } finally {
-    if (created) docker(['rm', '-v', name])
+    if (created) runDocker(['rm', '-v', name])
     rmSync(directory, { force: true, recursive: true })
   }
 }
