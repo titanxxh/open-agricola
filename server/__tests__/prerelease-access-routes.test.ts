@@ -29,6 +29,7 @@ let releaseSlow: (() => void) | undefined
 beforeEach(async () => {
   vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
   fixture.authorize(true)
+  fixture.runtime.buildId = 'a'.repeat(40)
   vi.clearAllMocks()
   dataReads = 0
   server = createServer((req, res) => { void (async () => {
@@ -137,4 +138,50 @@ it('preserves only canonical product locators through the browser handoff', asyn
     expect(response.status, target).toBe(400)
   }
   expect(fixture.service.beginHandoff).toHaveBeenCalledTimes(1)
+})
+
+it('does not publish a new session cookie or identity when revocation wins after exchange succeeds', async () => {
+  const result = { token: 'pre-only', returnPath: '/open-agricola/?room=retained',
+    user: { id: 'formal-user', username: 'farmer', displayName: 'Farmer', isAdmin: false },
+    expiresAt: Date.now() + 86400000, validUntil: Date.now() + 30000 }
+  fixture.service.exchangeHandoff.mockImplementationOnce(async () => {
+    queueMicrotask(() => fixture.authorize(false))
+    return result
+  })
+  const response = await fetch(origin + '/api/prerelease/session', { method: 'POST',
+    headers: { ...headers('__Host-oa-pre-handoff=browser-binding; __Host-oa-pre-session=older-session'), 'content-type': 'application/json' },
+    body: JSON.stringify({ protocolVersion: 1, code: 'code', state: 'state', browserChallenge: 'challenge', returnTo: 'https://formal.example.test/' }) })
+  expect(response.status).toBe(503)
+  expect(response.headers.get('set-cookie')).toBeNull()
+  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+  expect(fixture.service.revoke).not.toHaveBeenCalled()
+})
+
+it('does not publish an identity when revocation wins after the final current-session resolution', async () => {
+  const result = { user: { id: 'formal-user', username: 'farmer', displayName: 'Farmer', isAdmin: false }, expiresAt: 700000, validUntil: 30000 }
+  fixture.service.resolve.mockResolvedValueOnce(result).mockImplementationOnce(async () => {
+    queueMicrotask(() => fixture.authorize(false))
+    return result
+  })
+  const response = await fetch(origin + '/api/auth/me', { headers: headers() })
+  expect(response.status).toBe(503)
+  expect(response.headers.get('set-cookie')).toBeNull()
+  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+  expect(fixture.service.revoke).not.toHaveBeenCalled()
+})
+
+it('does not publish a session cookie when its immutable application binding changes during exchange', async () => {
+  fixture.service.exchangeHandoff.mockImplementationOnce(async () => {
+    queueMicrotask(() => { fixture.runtime.buildId = 'd'.repeat(40) })
+    return { token: 'pre-only', returnPath: '/open-agricola/',
+      user: { id: 'formal-user', username: 'farmer', displayName: 'Farmer', isAdmin: false },
+      expiresAt: Date.now() + 86400000, validUntil: Date.now() + 30000 }
+  })
+  const response = await fetch(origin + '/api/prerelease/session', { method: 'POST',
+    headers: { ...headers('__Host-oa-pre-handoff=browser-binding'), 'content-type': 'application/json' },
+    body: JSON.stringify({ protocolVersion: 1, code: 'code', state: 'state', browserChallenge: 'challenge', returnTo: 'https://formal.example.test/' }) })
+  expect(response.status).toBe(426)
+  expect(response.headers.get('set-cookie')).toBeNull()
+  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_runtime_changed' })
+  expect(fixture.service.revoke).not.toHaveBeenCalled()
 })
