@@ -64,6 +64,7 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
       const runtime = service.runtime
       const body: PrereleaseHandoffSessionResponse = { ok: true, returnPath: result.returnPath, user: { ...result.user, isAdmin: false, betaAccess: true },
         prerelease: { buildId: runtime.buildId, generationId: runtime.generationId, expiresAt: result.expiresAt, validUntil: result.validUntil, serverTime: Date.now() } }
+      guardResponse(req, res, result.token, true)
       send(res, 200, body, [serializePrereleaseCookie('session', result.token, result.expiresAt), serializePrereleaseCookie('handoff', '', 0)])
     } catch { send(res, 400, { ok: false, code: 'invalid_prerelease_handoff' }) }
     return true
@@ -75,6 +76,7 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
     if (!session) { send(res, 503, { ok: false, code: 'prerelease_access_paused' }); return true }
     const body: PrereleaseSessionResponse = { ok: true, user: { ...session.user, isAdmin: false, betaAccess: true },
       prerelease: { buildId: service.runtime.buildId, generationId: service.runtime.generationId, expiresAt: session.expiresAt, validUntil: session.validUntil, serverTime: Date.now() } }
+    guardResponse(req, res, prereleaseSessionToken(req), true)
     send(res, 200, body)
     return true
   }
@@ -112,25 +114,35 @@ export async function requirePrereleaseRequest(req: IncomingMessage, res: Server
 }
 
 /** Async owners may outlive a lease; check again before any headers or bytes leave. */
-function guardResponse(req: IncomingMessage, res: ServerResponse): void {
-  const service = getPrereleaseSessions(), token = prereleaseSessionToken(req)
-  const binding = prereleaseRequestBinding(req)
-  const allowed = () => !!service?.cachedAuthorized(token, binding)
+function guardResponse(req: IncomingMessage, res: ServerResponse, token = prereleaseSessionToken(req), requireBinding = false): void {
+  const service = getPrereleaseSessions(), binding = prereleaseRequestBinding(req)
+  type Rejection = Extract<PrereleaseAdmission, { ok: false }>
+  const rejection = (): Rejection | undefined => {
+    if (requireBinding) {
+      const admission = prereleaseBindingAdmission(req)
+      if (!admission.ok) return admission
+    }
+    if (!service?.cachedAuthorized(token, binding)) return { ok: false, status: 503, code: 'prerelease_access_paused' }
+    return undefined
+  }
   const writeHead = res.writeHead.bind(res), end = res.end.bind(res), write = res.write.bind(res)
-  let denied = false
+  let denied: Rejection | undefined
   res.writeHead = (status: number, messageOrHeaders?: string | OutgoingHttpHeaders | OutgoingHttpHeader[], headers?: OutgoingHttpHeaders | OutgoingHttpHeader[]) => {
-    if (!allowed()) { denied = true; return writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }) }
+    const failure = rejection()
+    if (failure) { denied = failure; return writeHead(failure.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }) }
     return typeof messageOrHeaders === 'string' ? writeHead(status, messageOrHeaders, headers) : writeHead(status, messageOrHeaders)
   }
   res.write = (chunk: unknown, encodingOrCallback?: BufferEncoding | ((error: Error | null | undefined) => void), callback?: (error: Error | null | undefined) => void): boolean => {
-    if (!allowed()) { denied = true; if (res.headersSent) res.destroy(); return false }
+    const failure = rejection()
+    if (failure) { denied = failure; if (res.headersSent) res.destroy(); return false }
     return typeof encodingOrCallback === 'string' ? write(chunk, encodingOrCallback, callback) : write(chunk, encodingOrCallback)
   }
   res.end = (chunk?: unknown, encodingOrCallback?: BufferEncoding | (() => void), callback?: () => void) => {
-    if (denied || !allowed()) {
-      if (!res.headersSent) writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+    const failure = denied ?? rejection()
+    if (failure) {
+      if (!res.headersSent) writeHead(failure.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
       else if (!denied) { res.destroy(); return res }
-      return end(JSON.stringify({ ok: false, code: 'prerelease_access_paused' }))
+      return end(JSON.stringify({ ok: false, code: failure.code }))
     }
     return typeof encodingOrCallback === 'string' ? end(chunk, encodingOrCallback, callback) : end(chunk, encodingOrCallback)
   }
