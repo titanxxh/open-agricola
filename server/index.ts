@@ -22,6 +22,7 @@ import { SandboxAuthority } from './game/sandbox-authority'
 import { RoomDirectory } from './game/room-directory'
 import { CommandStore } from './game/command-store'
 import { discoverRoom } from './game/room-discovery'
+import { forwardRoomRequest } from './room-http-routing'
 import type { RoomDiscoveryRequest } from '../shared/contract/protocol/routing'
 import { CLIENT_CAPABILITIES_HEADER } from '../shared/contract/client-capabilities'
 import { isUniqueViolation, isWorkshopSubmissionInProgress } from './database/errors'
@@ -1004,6 +1005,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const roomId = req.url.slice('/api/rooms/'.length, req.url.length - '/dissolve'.length)
+    if (await forwardRoomRequest(req, res, directory, wssCtx!.authority!.instanceId, roomId)) return
     await wssCtx!.authority?.load(roomId)
     const result = (await wssCtx!.lobby.dissolveRoomById(roomId, user.id))
     sendJson(res, result.ok ? 200 : 400, result)
