@@ -106,7 +106,7 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 
 使用可信 main checkout、Node 24.15+、Docker Compose、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、依赖网络与可选代理网络、离站身份、导入镜像来源和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
 
-owner #1662 负责独立源库、只读备份 role、独立一次性验证库/role、私有 bucket、app 的 `live/` 与工具的 `test/` 权限、依赖网络、1–40 的连接数限制、存储 quota、离站账户/目录以及实测 runtime、备份和镜像导入余量。撤销 PUBLIC CONNECT，使三个 pre role 均不能连接正式库、验证 role 不能连接源库。app 对象凭据必须不能读取正式 bucket 或验证 scratch；工具只获得源数据读取及自己的 scratch 操作权限。安装前真实权限探测不通过则阻断。`budget-check` 测量本地、数据库和对象字节数及主机余量，超额会关闭入口；它补充 owner 的 quota，不创建宿主 quota。
+owner #1662 负责独立源库、只读备份 role、独立一次性验证库/role、私有 bucket、app 的 `live/` 与工具的 `test/` 权限、依赖网络、1–40 的连接数限制、存储 quota、离站账户/目录以及实测 runtime、备份和镜像导入余量。撤销 PUBLIC CONNECT，使三个 pre role 均不能连接正式库、验证 role 不能连接源库。app 对象凭据必须不能读取正式 bucket 或验证 scratch；工具只获得源数据读取及自己的 scratch 操作权限。安装前真实权限探测不通过则阻断。`budget-check` 要求 owner storage guard 提供新鲜 healthy 观察。受监督的 guard 测量存储，并在失联或超限时锁存关闭准入及停止 pre writer，安装步骤见下文。它补充原生 quota，不提供宿主物理硬上限。
 
 owner 导出镜像要求 Docker classic image store，且 `docker image save` 产物须包含已验证的单平台 OCI 索引。缺少 `index.json` 时在本机拒绝，不开始传输；升级 owner Docker 后重试。containerd 可能保留归档中的压缩层，因此在 registry login 或 pull 前即拒绝。使用已有该存储的 owner 机器，不要为此切换现有 daemon 的 image store。producer 与 receiver 均支持两种存储。回执 `imageId` 表示 config digest，`manifestDigest` 表示注册表 manifest；目标绑定缓存另外保存 `archiveManifestDigest` 与实际 Docker handle `nativeImageId`，每次使用重新核对存储及 pending handle。
 
@@ -217,6 +217,37 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 
 
 恢复解包目录是可重新生成的缓存。解包前，owner 在独立保留期文件中固定操作、代次、target 指纹、归档哈希和原捕获时间。原生临时文件和重试不能刷新七天期限。startup 检查点持久化后清除缓存，startup 和 acceptance 重试会重复执行幂等清理。retention 只在固定 target 的备份目录内清理过期或缺少证明的缓存，保留尚有效的重试、其他 target 指纹及独立删除账本。
+#### 安装 owner 存储保护
+
+导入镜像或启动候选 writer 前，按实际 owner 账号、Node 24 路径及可信 checkout 安装 `deploy/open-agricola-prerelease-storage-guard.service`。宿主需要 `setsid`、`flock`、`systemd-notify`、`du`、`stat` 和 owner Docker 权限。离站专用账号须允许有时限的只读 `sh -s` 探测，使用 `realpath`、`du`、`stat`；保持原有独占目录与七天自治清理。安装前先验证此能力。
+
+在候选目录之外准备 owner 所有、mode 0600 的 JSON 配置。`scripts/prerelease/storage-guard-native.ts` 验证以下字段；全部限额须为实测后的正整数，没有可直接部署的默认值：
+
+- `format: 1`，`fingerprint` 为完整目标指纹。
+- `databaseJournal`、`objectJournal` 指向已有私有 provisioning 凭据 journal。数据库 cluster ID、role/database 所有权 marker、精确 role/key ID 和对象 policy 哈希须读回一致。`rootEnvironmentFile` 是包含 `LOCAL_S3_ACCESS_KEY`、`LOCAL_S3_SECRET_KEY` 的 owner 私有环境文件。这些文件不能进入 app 或工具挂载。
+- `postgresContainer` 是共享 PostgreSQL 完整 container ID，`postgresAdmin` 是其 owner SQL role，`objectEndpoint` 是 owner 可达的精确 RustFS origin。保护器不停止两个共享服务。
+- `filesystems` 列出 PostgreSQL、RustFS、Docker 实际 backing filesystem 上 owner 可读取的 mount root，包括独立的镜像 staging 文件系统。保护器还检查 target 目录，并按 device 去重。用 `docker inspect`、`docker info` 及 device ID 读回证明 mount root 覆盖这些实际存储路径。
+- `tempFileLimitBytes` 是三个 pre role 已配置的正数 `temp_file_limit`。每次采样均验证设置。它限制每个 backend 的隐式临时文件，不限制数据库总量、显式临时表或共享 WAL。
+- `limits` 包含 `sourceDatabaseBytes`、`validationDatabaseBytes`、`bucketBytes`、`multipartBytes`、`localBytes`、`offsiteBytes`、`hostFreeBytes`、`hostFreeInodes`、`offsiteFreeBytes`、`offsiteFreeInodes`、`operationReserveBytes`。用量值为停止阈值，free 值为保留余量。reserve 是允许的最大一次操作所需新增本地及离站空间。取数包括七份每日备份、validation scratch 和失败传输峰值。将相同正数 `bucketBytes` 安装为 RustFS 整桶原生 quota，并验证实际拒写。quota 覆盖已完成对象逻辑大小；multipart 分片另行测量。
+- `intervalMs`、`probeTimeoutMs`、`leaseMs` 记录已验证的采样时限。`intervalMs + probeTimeoutMs` 须小于 `leaseMs`，后者最多 120 秒。systemd 模板 watchdog 为 90 秒；采样与原生停止耗时须能容纳于此。完整采样必须在探测 deadline 内结束。
+
+启用 service 前先运行单次探测：
+
+```bash
+node --import tsx scripts/prerelease/storage-guard-cli.ts once "$pre_config" "$pre_storage_config"
+sudo systemctl daemon-reload
+sudo systemctl enable --now open-agricola-prerelease-storage-guard.service
+./deploy-prerelease.sh budget-check --config "$pre_config" --expected-current "$pre_current"
+```
+
+`control/storage-guard.json` 与 `gate.json` 分开。网关及写入命令要求新鲜 healthy 记录；缺失、过期或 latched 均关闭准入，包括私有验证和已有 WebSocket。操作余量不足时拒绝新任务，健康 app 继续运行。探测失败、用量超限或 free 低于阈值时，先写永久 latch，再停止。保护器不等待 `.operation.lock`：终止精确登记的 owner 命令 session，给予所属 app 容器 20 秒 drain，停止 scoped 工具，仍在运行的所属容器执行 kill。随后对三个 pre role 验证 `NOLOGIN` 及会话清空，对两个所属对象账号禁用并读回状态。一个边界失败不会阻止其他停止动作，后续循环分别重试。正式 app、共享 PostgreSQL/RustFS、正式 role 和 bucket 不属于停止选择器。
+
+受监督循环只在完整 cycle 后刷新 watchdog。进程退出或 watchdog 超时由 unit 的 `ExecStopPost` 执行 trip；重启保留 latch。常规 CLI 继续使用现有操作 lease，并运行在专用进程 session 中，长期备份不会阻止保护。Docker 导入存储与共享 WAL 由文件系统余量和导入预算保护，不能称为单库物理硬 quota。采样和停止存在延迟，越过阈值后仍可能增长；这仍属于已批准的共享故障域。
+
+完成安装前，在低额度隔离原生夹具验证实际超额拒写、pre role/key 拒绝、multipart 检测、优雅停止与强制停止耗时、探测失联及 watchdog 死亡、并行备份被中断，以及正式 HTTP/WS 和哨兵数据不变。命令 harness 测试不能替代原生验收。私下保留 latch、停止失败项、时间序列和完整配置指纹。
+
+恢复须由 owner 手工执行。保持公共入口关闭并保留 latch 证据，停止 guard service，检查失败项及精确操作 journal，修复容量或连接，保留所需可恢复备份，并验证已接受提交和 retained storage。一致性与原生 policy/quota 验证通过后，依据原始 owner journal 显式重新启用且仅启用三个 pre role 与两个 pre 对象账号。将 latch 归档到 control 之外，运行 `once` 后重启 service。新鲜 healthy 只允许 owner 验证工作，不代表开放。再次完成已有 authority close/audit/acceptance/open 流程后才允许用户进入。不能只删除 latch 来重启候选，timer 不能自动恢复 LOGIN、对象权限或公共入口。
+
 ## 核验生产修复并重试站内信
 
 正式 Release 发布且前后端部署完成后，在 owner 控制的本机运行：

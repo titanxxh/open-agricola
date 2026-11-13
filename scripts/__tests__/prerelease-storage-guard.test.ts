@@ -1,0 +1,75 @@
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, expect, it } from 'vitest'
+import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config'
+import { assertStorageAdmission } from '../prerelease/storage-guard-state'
+
+const roots: string[] = []
+afterEach(() => roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })))
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), 'oa-storage-guard-')); roots.push(root)
+  const target = parsePrereleaseTarget({ ...JSON.parse(readFileSync('deploy/prerelease-target.example.json', 'utf8')),
+    directory: join(root, 'open-agricola-prerelease-main') })
+  const control = join(target.directory, 'control'); mkdirSync(control, { recursive: true })
+  const healthy = { format: 1, targetId: target.targetId, fingerprint: targetFingerprint(target), status: 'healthy',
+    observedAt: Date.now(), validUntil: Date.now() + 60_000, operationsAllowed: true }
+  const save = (value: unknown) => writeFileSync(join(control, 'storage-guard.json'), JSON.stringify(value))
+  return { target, control, healthy, save }
+}
+it('admits only a fresh target-bound storage observation and never clears a stop latch', () => {
+  const value = fixture()
+  expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).toThrow(/storage guard/i)
+  value.save(value.healthy)
+  expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).not.toThrow()
+  for (const change of [{ status: 'latched' }, { fingerprint: 'a'.repeat(64) }, { validUntil: Date.now() - 1 }, { observedAt: Date.now() + 1000 }]) {
+    value.save({ ...value.healthy, ...change })
+    expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).toThrow(/storage guard/i)
+  }
+  value.save({ ...value.healthy, operationsAllowed: false })
+  expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target), 'operation')).toThrow(/headroom/i)
+  expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).not.toThrow()
+})
+
+it('latches a complete observation exceeding any storage limit and retries every stop boundary independently', async () => {
+  const { runStorageGuardCycle } = await import('../prerelease/storage-guard')
+  const value = fixture()
+  const observation = { sourceDatabaseBytes: 11, validationDatabaseBytes: 2, bucketBytes: 3, multipartBytes: 4,
+    localBytes: 5, offsiteBytes: 6, hostFreeBytes: 100, hostFreeInodes: 100, offsiteFreeBytes: 100, offsiteFreeInodes: 100 }
+  const limits = { ...observation, sourceDatabaseBytes: 10, hostFreeBytes: 10, hostFreeInodes: 10, offsiteFreeBytes: 10,
+    offsiteFreeInodes: 10, operationReserveBytes: 10 }
+  const calls: string[] = []
+  const native = { observe: async () => observation, stop: async () => { calls.push('stop'); return ['pg unavailable'] } }
+  const result = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, native)
+  expect(result.status).toBe('latched')
+  expect(result.reason).toBe('sourceDatabaseBytes')
+  expect(calls).toEqual(['stop'])
+  expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).toThrow(/latched/)
+  const recovered = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, {
+    observe: async () => { throw new Error('must not automatically recover') }, stop: async () => { calls.push('retry'); return [] },
+  })
+  expect(recovered.status).toBe('latched')
+  expect(calls).toEqual(['stop', 'retry'])
+})
+
+it('closes admission on a probe failure without needing the deployment lock', async () => {
+  const { runStorageGuardCycle } = await import('../prerelease/storage-guard')
+  const value = fixture(), calls: string[] = []
+  writeFileSync(join(value.control, '.operation.lock'), 'long-running-backup')
+  const limits = { sourceDatabaseBytes: 10, validationDatabaseBytes: 10, bucketBytes: 10, multipartBytes: 10,
+    localBytes: 10, offsiteBytes: 10, hostFreeBytes: 1, hostFreeInodes: 1, offsiteFreeBytes: 1, offsiteFreeInodes: 1, operationReserveBytes: 1 }
+  const result = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, {
+    observe: async () => { throw new Error('private credential must not leak') }, stop: async () => { calls.push('stopped'); return [] },
+  })
+  expect(result).toMatchObject({ status: 'latched', reason: 'observation-failed', failures: [] })
+  expect(JSON.stringify(result)).not.toContain('credential')
+  expect(calls).toEqual(['stopped'])
+})
+
+it('rejects unmeasured limits and owner credentials inside candidate paths before native calls', async () => {
+  const { parseStorageGuardConfig } = await import('../prerelease/storage-guard-native')
+  const value = fixture()
+  expect(() => parseStorageGuardConfig(value.target, {})).toThrow(/guard configuration/)
+  expect(() => parseStorageGuardConfig(value.target, { format: 1, fingerprint: targetFingerprint(value.target),
+    databaseJournal: join(value.target.directory, 'owner.json') })).toThrow(/outside|configuration/)
+})

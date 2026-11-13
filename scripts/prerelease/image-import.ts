@@ -1,3 +1,4 @@
+import { assertStorageAdmission } from './storage-guard-state'
 import { randomUUID } from 'node:crypto'
 import { constants, copyFileSync, lstatSync, existsSync, openSync, closeSync, readFileSync, rmSync, statfsSync, statSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
@@ -23,6 +24,7 @@ export function parseImageImportRequest(value: unknown) {
 
 export function runImageImport(target: PrereleaseTarget, request: ReturnType<typeof parseImageImportRequest>) {
   if (request.action === 'import-image') assertImageIntakeLimits(target, request.operationId)
+  assertStorageAdmission(target, targetFingerprint(target), 'operation')
   const record = readRuntime(target), { transfer } = request, receipt = transfer.receipt
   if (request.expectedCurrent !== (record.buildId ?? 'empty') && (!record.operation || request.expectedCurrent !== (record.operation.sourceBuildId ?? 'empty'))) throw new Error('Image import expected-current SHA differs')
   if (record.mode !== 'maintenance') throw new Error('Image import requires maintenance or an uninstalled target')

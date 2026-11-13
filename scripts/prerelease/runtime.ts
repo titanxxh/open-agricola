@@ -78,7 +78,7 @@ export function readRuntime(target: PrereleaseTarget): RuntimeRecord {
 
 export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, candidateImage?: string) {
   const labels = { 'org.open-agricola.environment': target.targetId, 'io.open-agricola.release-channel': 'prerelease' }
-  const gatewayFiles = ['scripts/prerelease/gateway.ts', 'scripts/prerelease/browser-policy.ts', 'shared/contract/browser-auth.ts']
+  const gatewayFiles = ['scripts/prerelease/gateway.ts', 'scripts/prerelease/storage-guard-state.ts', 'scripts/prerelease/browser-policy.ts', 'shared/contract/browser-auth.ts']
   const gatewayPolicy = createHash('sha256')
   for (const file of gatewayFiles) gatewayPolicy.update(file).update(readFileSync(join(target.policyDirectory, file)))
   const limits = (kind: 'app' | 'tools') => ({ mem_limit: `${target.budgets[kind].memoryMiB}m`, cpus: target.budgets[kind].cpus, pids_limit: target.budgets[kind].pids })

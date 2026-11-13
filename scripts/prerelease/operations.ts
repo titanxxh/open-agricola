@@ -1,3 +1,4 @@
+import { registerStorageOperation } from './storage-operation'
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -86,7 +87,9 @@ export async function operations(args: string[]): Promise<void> {
     if (!imageImport && request.action !== 'retention') loadPrereleaseEnvironment(target)
     if ('buildId' in request && (request.action === 'deploy' || request.action === 'open' || request.action === 'restore')) verifyReceipt(input.receipt, request.buildId)
     if (args[0] === 'receive') { process.stdout.write(locked(target, input)); return }
-    process.stdout.write(JSON.stringify('transfer' in request ? runImageImport(target, request) : await runPrereleaseOperation(target, request)) + '\n')
+    const cleanup = ['status', 'initialize', 'retention', 'maintain', 'reverify', 'finish-close', 'budget-check'].includes(request.action) ? () => {} : registerStorageOperation(target)
+    try { process.stdout.write(JSON.stringify('transfer' in request ? runImageImport(target, request) : await runPrereleaseOperation(target, request)) + '\n') }
+    finally { cleanup() }
     return
   }
   const values = new Map<string, string>()
@@ -169,7 +172,7 @@ function locked(target: ReturnType<typeof parsePrereleaseTarget>, envelope: Reco
   mkdirSync(controlDirectory(target), { recursive: true, mode: 0o700 })
   const request = object(envelope.request)
   const result = request.action === 'import-image' ? runBoundedImageImport(target, parseImageImportRequest(request).operationId, JSON.stringify(envelope))
-    : spawnSync('flock', ['-w', '60', join(controlDirectory(target), '.operation.lock'), process.execPath, '--import', 'tsx',
+    : spawnSync('setsid', ['--wait', 'flock', '-w', '60', join(controlDirectory(target), '.operation.lock'), process.execPath, '--import', 'tsx',
     join(target.policyDirectory, 'scripts/prerelease/operations.ts'), '_locked'], { cwd: target.policyDirectory,
     env: { ...process.env, PRERELEASE_LOCK_SCOPE: targetFingerprint(target) }, encoding: 'utf8', input: JSON.stringify(envelope), timeout: 60 * 60_000 })
   if (result.status !== 0 || result.error) throw new Error(result.stderr?.trim() || result.error?.message || 'Scoped prerelease operation failed')

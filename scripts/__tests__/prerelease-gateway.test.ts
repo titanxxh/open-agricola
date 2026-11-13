@@ -11,6 +11,7 @@ import { formalBrowserPolicyFixture } from './prerelease-browser-policy-fixture'
 
 it('rejects ambiguous credentials and foreign browser requests and closes streams when formal protection changes', async () => {
   const formal = await formalBrowserPolicyFixture(), root = await mkdtemp(join(tmpdir(), 'pre-gateway-policy-'))
+  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
   const stateFile = join(root, 'gate.json'), origin = 'https://pre.agricola.test'
   const state = { format: 1, targetId: 'prerelease-test', channel: 'prerelease', mode: 'open', buildId: 'a'.repeat(40),
     generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', acceptance: { formalBuildId: formal.state.buildId } }
@@ -95,6 +96,15 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
     expect(await read()).toBe(200)
     client = new WebSocket(base.replace('http:', 'ws:') + routedPath, { headers: { Host: 'pre.agricola.test', Origin: origin } })
     await once(client, 'open')
+    const guardClosed = once(client, 'close')
+    await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ status: 'latched' }))
+    client.send('storage-latch-must-not-forward')
+    await guardClosed
+    expect(await read()).toBe(503)
+    expect(messages).toEqual([])
+    await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
+    client = new WebSocket(base.replace('http:', 'ws:') + routedPath, { headers: { Host: 'pre.agricola.test', Origin: origin } })
+    await once(client, 'open')
     const leaseExpired = once(client, 'close')
     const now = Date.now(); vi.spyOn(Date, 'now').mockReturnValue(now + 31_000)
     client.send('expired-policy-must-not-forward')
@@ -112,6 +122,7 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
 it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSocket input during maintenance', async () => {
   const root = await mkdtemp(join(tmpdir(), 'agricola-pre-gateway-'))
   const formal = await formalBrowserPolicyFixture()
+  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
   const stateFile = join(root, 'gate.json')
   let requests = 0
   const cookies: Array<string | undefined> = []
@@ -202,6 +213,7 @@ it('rejects authority-changing HTTP and WS request targets before forwarding pre
   unintended.listen(0, '127.0.0.1'); await once(unintended, 'listening')
   const address = unintended.address()
   if (!address || typeof address === 'string') throw new Error('Expected fixture port')
+  await writeFile(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
   const stateFile = join(root, 'gate.json')
   await writeFile(stateFile, JSON.stringify({ format: 1, channel: 'prerelease', targetId: 'prerelease-test', mode: 'open', buildId: 'a'.repeat(40), generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5' }))
   const gateway = createPrereleaseGateway({ stateFile, targetId: 'prerelease-test', origin: 'https://pre.agricola.test', upstream: 'http://127.0.0.1:1', formal: formal.formal, ca: formal.ca })
