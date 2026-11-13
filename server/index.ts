@@ -430,6 +430,7 @@ const server = createServer((req, res) => {
 })
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (req.url === '/internal/metrics' && await handleOperations(req, res)) return
   if (await handlePrereleaseRoute(req, res)) return
   if (!(await requirePrereleaseRequest(req, res))) return
   if (await handleFrontend(req, res)) return

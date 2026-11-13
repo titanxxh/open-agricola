@@ -79,6 +79,31 @@ it('keeps the development default available for anonymous HTTP room location', a
     .toEqual({ actor_id: 'development-anonymous' })
 }, 30000)
 
+it('scrapes prerelease application metrics only through the dedicated metrics token', async () => {
+  const token = 'private-prerelease-metrics-fixture'
+  backend = await startFormalSoloBackend(getDb(), {
+    RELEASE_CHANNEL: 'prerelease', GAME_BUILD_ID: 'a'.repeat(40), OBSERVABILITY_METRICS_TOKEN: token,
+    PUBLIC_APP_ORIGIN: 'https://pre.example.test', PUBLIC_API_BASE: 'https://pre.example.test',
+    FORMAL_APP_ORIGIN: 'https://formal.example.test', FORMAL_API_BASE: 'https://formal-api.example.test',
+    PRERELEASE_DATA_GENERATION: randomUUID(), PRERELEASE_TARGET_ID: 'prerelease-main',
+    PRERELEASE_IDENTITY_SERVICE_KEY: 'metrics-fixture-identity-key-'.repeat(2),
+  })
+  const scraped = await fetch(`${backend.baseUrl}/internal/metrics`, { headers: { Authorization: `Bearer ${token}` } })
+  expect(scraped.status).toBe(200)
+  expect(scraped.headers.get('content-type')).toContain('text/plain')
+  expect(await scraped.text()).toContain('agricola_http_requests_total')
+  for (const headers of [undefined, { Authorization: 'Bearer wrong-metrics-token' }]) {
+    const rejected = await fetch(`${backend.baseUrl}/internal/metrics`, { headers })
+    expect(rejected.status).toBe(401)
+    expect(await rejected.json()).toMatchObject({ code: 'metrics_token_required' })
+  }
+  for (const path of ['/api/auth/me', '/api/admin/observability', '/ops/', '/internal/metrics/app/another', '/internal/metrics?other=1']) {
+    const rejected = await fetch(`${backend.baseUrl}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+    expect(rejected.status).toBe(401)
+    expect(await rejected.json()).toEqual({ ok: false, code: 'prerelease_auth_required' })
+  }
+}, 30000)
+
 it.each(['development', 'production'])('rejects anonymous prerelease HTTP location with the %s override', async nodeEnv => {
   let reads = 0
   gate = createServer((req, res) => { void (async () => {
