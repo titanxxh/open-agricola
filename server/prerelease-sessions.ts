@@ -85,6 +85,9 @@ export class PrereleaseSessions {
     if (state.account.kind !== 'active') throw new Error('Deleted external principal')
     return { ...state.account.subject, isAdmin: false }
   }
+  private async lockSubject(userId: string): Promise<void> {
+    await this.db.prepare("SELECT pg_advisory_xact_lock(hashtextextended('open-agricola:pre-subject:' || ?,0))").get(userId)
+  }
   async beginHandoff(returnPath = '/open-agricola/') {
     const canonicalPath = normalizePrereleaseReturnPath(returnPath)
     if (!canonicalPath) throw new Error('Invalid prerelease return path')
@@ -99,12 +102,13 @@ export class PrereleaseSessions {
   async exchangeHandoff(cookie: string, input: HandoffInput): Promise<PrereleaseSession & { token: string; returnPath: string }> {
     if (!secret(cookie) || input.protocolVersion !== 1 || !secret(input.code) || !secret(input.state) || !secret(input.browserChallenge) || input.returnTo !== `${this.runtime.formalAppOrigin}/`) throw new Error('Invalid prerelease handoff')
     const operationEpoch = this.epoch
-    return this.db.transaction(async () => {
+    const exchanged = await this.db.transaction(async () => {
       const pending = await this.db.prepare('SELECT * FROM prerelease_browser_handoffs WHERE cookie_hash=? FOR UPDATE').get<{ browser_verifier: string; state: string; return_path: string; expires_at: number }>(hash(cookie))
       if (!pending || !normalizePrereleaseReturnPath(pending.return_path) || pending.expires_at <= this.now() || pending.state !== input.state || hash(pending.browser_verifier) !== input.browserChallenge) throw new Error('Invalid prerelease handoff')
       const state = parsePrereleaseIdentityState(await this.authority.exchange({ code: input.code, browserVerifier: pending.browser_verifier, returnTo: input.returnTo }), this.runtime)
       if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) throw new Error('Prerelease access unavailable')
       const user = this.user(state), now = this.now(), token = opaque(), expiresAt = Math.min(now + PRERELEASE_SESSION_MAX_AGE_MS, state.grant.expiresAt, state.source.kind === 'active' ? state.source.expiresAt : now)
+      await this.lockSubject(user.id)
       if (this.deletedUsers.has(user.id) || await this.db.prepare('SELECT 1 FROM prerelease_deleted_subjects WHERE user_id=?').get(user.id)
         || await this.db.prepare('SELECT 1 FROM prerelease_revoked_grants WHERE grant_id=?').get(state.grantId)) throw new Error('Revoked prerelease identity')
       const existing = await this.db.prepare('SELECT identity_origin FROM users WHERE id=? OR username=?').get<{ identity_origin: string }>(user.id, user.username)
@@ -116,17 +120,25 @@ export class PrereleaseSessions {
       await this.db.prepare('INSERT INTO prerelease_sessions(token_hash,user_id,grant_id,generation_id,build_id,created_at,expires_at,identity_state) VALUES(?,?,?,?,?,?,?,?)').run(hash(token), user.id, state.grantId, this.runtime.generationId, this.runtime.buildId, now, expiresAt, JSON.stringify(state))
       await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE cookie_hash=?').run(hash(cookie))
       if (operationEpoch !== this.epoch) throw new Error('Identity changed during handoff')
-      this.blockedUsers.delete(user.id)
-      this.leases.set(hash(token), { state, userId: user.id, grantId: state.grantId, expiresAt, buildId: this.runtime.buildId, generationId: this.runtime.generationId })
-      return { token, user, expiresAt, validUntil: state.validUntil, returnPath: pending.return_path }
+      return { token, user, state, expiresAt, returnPath: pending.return_path }
     })()
+    if (operationEpoch !== this.epoch) throw new Error('Identity changed during handoff')
+    const { token, user, state, expiresAt, returnPath } = exchanged
+    this.blockedUsers.delete(user.id)
+    const lease = { state, userId: user.id, grantId: state.grantId, expiresAt, buildId: this.runtime.buildId, generationId: this.runtime.generationId }
+    if (!this.leaseAuthorized(lease)) throw new Error('Prerelease access unavailable')
+    this.leases.set(hash(token), lease)
+    return { token, user, expiresAt, validUntil: Math.min(state.validUntil, expiresAt), returnPath }
   }
   async resolve(token: string): Promise<PrereleaseSession | null> {
     if (!secret(token)) return null
     const operationEpoch = this.epoch
-    const key = hash(token), row = await this.db.prepare(`SELECT s.*,p.revision FROM prerelease_sessions s JOIN prerelease_external_identities p ON p.user_id=s.user_id WHERE s.token_hash=?`).get<SessionRow>(key)
+    const key = hash(token), row = await this.db.prepare(`SELECT s.*,p.revision,
+      EXISTS(SELECT 1 FROM prerelease_deleted_subjects d WHERE d.user_id=s.user_id)
+        OR EXISTS(SELECT 1 FROM prerelease_revoked_grants g WHERE g.grant_id=s.grant_id) AS invalidated
+      FROM prerelease_sessions s JOIN prerelease_external_identities p ON p.user_id=s.user_id WHERE s.token_hash=?`).get<SessionRow & { invalidated: boolean }>(key)
     if (!row) { this.leases.delete(key); return null }
-    if (this.deletedUsers.has(row.user_id) || row.revoked_at !== null || row.expires_at <= this.now() || row.generation_id !== this.runtime.generationId || row.build_id !== this.runtime.buildId) {
+    if (row.invalidated || this.deletedUsers.has(row.user_id) || row.revoked_at !== null || row.expires_at <= this.now() || row.generation_id !== this.runtime.generationId || row.build_id !== this.runtime.buildId) {
       this.leases.delete(key); this.knownInvalid.add(key); return null
     }
     let state = parsePrereleaseIdentityState(JSON.parse(row.identity_state), this.runtime, row.grant_id)
@@ -161,6 +173,7 @@ export class PrereleaseSessions {
     const reason = state.account.kind !== 'active' ? 'account_deleted' : !state.betaAccess ? 'beta_changed' : 'source_revoked'
     this.invalidate({ userId: row.user_id, ...(reason === 'source_revoked' ? { grantId: row.grant_id } : {}), reason })
     await this.db.transaction(async () => {
+      await this.lockSubject(row.user_id)
       if (reason === 'source_revoked') {
         await this.db.prepare('INSERT INTO prerelease_revoked_grants(grant_id,user_id,generation_id,revoked_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING').run(row.grant_id, row.user_id, this.runtime.generationId, this.now())
         await this.db.prepare('UPDATE prerelease_sessions SET revoked_at=? WHERE grant_id=?').run(this.now(), row.grant_id)
@@ -196,6 +209,7 @@ export class PrereleaseSessions {
       this.invalidate({ userId: event.userId, ...(event.kind === 'source_revoked' ? { grantId: event.grantId } : {}), reason: event.kind })
       if (event.kind === 'account_deleted') {
         await this.db.transaction(async () => {
+          await this.lockSubject(event.userId)
           await this.db.prepare('INSERT INTO prerelease_deleted_subjects(user_id,deleted_at) VALUES(?,?) ON CONFLICT DO NOTHING').run(event.userId, this.now())
           await this.db.prepare('UPDATE prerelease_external_identities SET revision=revision+1 WHERE user_id=?').run(event.userId)
           await this.db.prepare('UPDATE prerelease_sessions SET revoked_at=? WHERE user_id=?').run(this.now(), event.userId)
@@ -205,12 +219,13 @@ export class PrereleaseSessions {
         if (await this.db.prepare('SELECT 1 FROM users WHERE id=?').get(event.userId)) throw new Error('External account cleanup is incomplete')
       } else if (event.kind === 'source_revoked') {
         await this.db.transaction(async () => {
+          await this.lockSubject(event.userId)
           await this.db.prepare('UPDATE prerelease_external_identities SET revision=revision+1 WHERE user_id=?').run(event.userId)
           await this.db.prepare('INSERT INTO prerelease_revoked_grants(grant_id,user_id,generation_id,revoked_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING').run(event.grantId, event.userId, this.runtime.generationId, this.now())
           await this.db.prepare('UPDATE prerelease_sessions SET revoked_at=? WHERE grant_id=?').run(this.now(), event.grantId)
         })()
       } else {
-        await this.db.transaction(() => this.pauseSubject(event.userId))()
+        await this.db.transaction(async () => { await this.lockSubject(event.userId); await this.pauseSubject(event.userId) })()
         const grants = await this.db.prepare(`SELECT DISTINCT grant_id FROM prerelease_sessions WHERE user_id=? AND revoked_at IS NULL
           UNION SELECT source_grant_id AS grant_id FROM prerelease_external_identities WHERE user_id=?`).all<{ grant_id: string }>(event.userId, event.userId)
         for (const row of grants) {
