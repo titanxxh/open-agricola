@@ -84,3 +84,20 @@ it('preserves a Context locator for handoff while dropping fragments, developmen
   expect(new URL(pre.prereleaseStartUrl('?context=kept-room&step=4&frame=' + 'f'.repeat(64) + '&devMode=1&player=p1&token=secret'), window.location.origin).searchParams.get('returnPath'))
     .toBe('/open-agricola/?context=kept-room&step=4&frame=' + 'f'.repeat(64))
 })
+
+
+it('keeps an explicit local sign-out terminal despite later failures and fresh positive confirmations', async () => {
+  vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(runtime)))
+  const pre = await import('../prerelease-runtime')
+  await pre.loadPrereleaseRuntime()
+  pre.acceptPrereleaseSession(session)
+  pre.endPrereleaseSession()
+  const revision = pre.getPrereleaseRevision()
+  pre.rejectPrereleaseAccess('prerelease_access_paused')
+  expect(pre.getPrereleaseAccess()).toEqual({ kind: 'ended', code: 'prerelease_auth_required' })
+  expect(pre.getPrereleaseRevision()).toBe(revision)
+  expect(() => pre.acceptPrereleaseSession(session, revision)).toThrow('prerelease_auth_required')
+  expect(pre.getPrereleaseLeaseRemainingMs()).toBe(0)
+  expect(() => pre.assertPrereleaseAccess()).toThrow('prerelease_auth_required')
+})

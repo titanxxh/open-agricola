@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { FakeWorker } from './fake-worker'
 const build = 'a'.repeat(40), generation = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 afterEach(() => { vi.resetModules(); vi.unstubAllEnvs(); vi.unstubAllGlobals() })
-it('terminates an active local worker on lost qualification and refuses a stale restore without spawning another worker', async () => {
+it.each(['revoked', 'logout'])('terminates the active local worker on %s and refuses a stale restore without spawning another worker', async ending => {
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ ok: true, channel: 'prerelease', buildId: build, generationId: generation,
     appOrigin: window.location.origin, formalAppOrigin: 'https://formal.agricola.test', formalApiBase: 'https://api.agricola.test', targetId: 'prerelease-main' })))
@@ -18,11 +18,13 @@ it('terminates an active local worker on lost qualification and refuses a stale 
   const transport = new LocalGameTransport(config, { workerFactory: factory })
   const initial = await transport.start()
   expect(initial.state.players).toHaveLength(2)
-  pre.rejectPrereleaseAccess('prerelease_access_expired')
+  const code = ending === 'logout' ? 'prerelease_auth_required' : 'prerelease_access_expired'
+  if (ending === 'logout') pre.endPrereleaseSession()
+  else pre.rejectPrereleaseAccess(code)
   expect(worker.terminated).toBe(true)
-  await expect(transport.getState()).rejects.toThrow('prerelease_access_expired')
+  await expect(transport.getState()).rejects.toThrow(code)
   const stale = new LocalGameTransport(config, { workerFactory: factory })
-  await expect(stale.start()).rejects.toThrow('prerelease_access_expired')
+  await expect(stale.start()).rejects.toThrow(code)
   expect(factory).toHaveBeenCalledOnce()
   stale.destroy()
 })
