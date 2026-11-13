@@ -15,6 +15,7 @@ it.each(['settings', 'login', 'onboarding', 'reset-password', 'operations', 'wor
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease')
   window.history.replaceState(null, '', `/?page=${page}`)
   render(<PageRouter />)
+  if (!['login', 'onboarding'].includes(page)) expect(screen.getByText(page === 'workshop' ? 'prerelease.readonlyError' : 'prerelease.returnToProduction')).toBeVisible()
   expect(screen.queryByRole('form')).toBeNull()
   expect(screen.queryByRole('textbox')).toBeNull()
   expect(document.querySelector('input[type=password]')).toBeNull()
