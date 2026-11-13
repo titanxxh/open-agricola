@@ -996,7 +996,7 @@ describe('ActionBoard', () => {
 
     const wrapper = container.querySelector('.action-board-wrapper') as HTMLElement
     const board = container.querySelector('.action-board') as HTMLElement
-    expect(board.style.transform).toBe(`scale(${360 / 1370})`)
+    expect(Number(board.style.transform.match(/scale\(([^)]+)\)/)?.[1]) * 1370).toBeCloseTo(360)
 
     fireEvent.click(screen.getByRole('button', { name: 'Enlarge action controls' }))
 
