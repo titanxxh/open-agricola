@@ -67,6 +67,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: '
     acceptance: mode === 'open' ? { formalBuildId: capability.buildId } : null }))
   writeFileSync(join(root, 'verification.json'), JSON.stringify({ targetId: 'prerelease-test', buildId: 'a'.repeat(40), generation,
     tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: Date.now() + 600_000 }))
+  writeFileSync(join(root, 'storage-guard.json'), JSON.stringify({ format: 1, targetId: 'prerelease-test', fingerprint: 'f'.repeat(64), status: 'healthy', observedAt: Date.now(), validUntil: Date.now() + 120_000, operationsAllowed: true }))
   const gateway = createPrereleaseGateway({ stateFile, targetId: 'prerelease-test', origin, formal, ca,
     lookup: (_hostname, options, callback) => {
       if (options.all) callback(null, [{ address: '127.0.0.1', family: 4 }])

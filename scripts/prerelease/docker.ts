@@ -1,3 +1,4 @@
+import { assertStorageAdmission } from './storage-guard-state'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { freemem } from 'node:os'
@@ -28,6 +29,7 @@ const object = (value: unknown): Record<string, unknown> => {
 const parsed = (text: string): Record<string, unknown> => object(JSON.parse(text))
 
 export function assertCapacity(target: PrereleaseTarget, phase: 'import' | 'tool' | 'inspect-image' | 'app' | 'idle'): void {
+  assertStorageAdmission(target, targetFingerprint(target), phase === 'idle' ? 'idle' : 'operation')
   command('bash', ['-euo', 'pipefail', '-c', 'source "$1"; backup_reap_tools', 'prerelease-reap', join(target.policyDirectory, 'scripts/backup-process.sh')],
     { env: { BACKUP_ENVIRONMENT: target.targetId, BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + 30_000) } })
   if (command('docker', ['ps', '-q', '--filter', `label=org.open-agricola.backup.environment=${target.targetId}`])) {

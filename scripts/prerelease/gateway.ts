@@ -4,6 +4,7 @@ import type { Duplex } from 'node:stream'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
+import { readStorageGuard } from './storage-guard-state.ts'
 import { readBrowserAuthPolicy, type FormalOrigins, type FormalTlsOptions } from './browser-policy.ts'
 
 export const OWNER_VERIFICATION_COOKIE = '__Host-oa-pre-verify'
@@ -84,7 +85,9 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
         && 'tokenHash' in value && value.tokenHash === createHash('sha256').update(token).digest('hex')
     } catch { return false }
   }
+  const guardFile = resolve(options.stateFile, '../storage-guard.json')
   const allowed = (cookie = '') => {
+    if (!readStorageGuard(guardFile, options.targetId)) return false
     const current = state()
     if (!capability || capability.validUntil <= Date.now()) return false
     if (current?.mode === 'open') return current.formalBuildId === capability.buildId
@@ -194,6 +197,7 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     outgoing.end()
   })
   function closeInputs() { for (const [socket, permission] of connections) if (!permission()) socket.destroy() }
+  watchFile(guardFile, { interval: 100, persistent: false }, closeInputs)
   watchFile(options.stateFile, { interval: 100, persistent: false }, closeInputs)
   watchFile(verificationFile, { interval: 100, persistent: false }, closeInputs)
   const timer = setInterval(closeInputs, 1000); timer.unref()
@@ -202,6 +206,7 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
   return { server, refreshBrowserPolicy, close: async () => {
     stopped = true
     clearTimeout(capabilityExpiry)
+    unwatchFile(guardFile, closeInputs)
     unwatchFile(options.stateFile, closeInputs)
     unwatchFile(verificationFile, closeInputs); clearInterval(timer); clearInterval(policyTimer)
     for (const socket of connections.keys()) socket.destroy()

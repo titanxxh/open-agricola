@@ -1,3 +1,4 @@
+import { seedStorageGuard } from './prerelease-storage-guard-fixture'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -18,6 +19,7 @@ function fixture(containerd = false) {
   const target = parsePrereleaseTarget({ ...JSON.parse(readFileSync('deploy/prerelease-target.example.json', 'utf8')),
     directory: join(root, 'open-agricola-prerelease-main'), policyDirectory: resolve('.') })
   mkdirSync(target.directory)
+  seedStorageGuard(target)
   const bin = join(root, 'bin'), payload = join(root, 'payload'); mkdirSync(bin); mkdirSync(payload)
   const producerSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceSha = 'a'.repeat(40)
   const layer = Buffer.alloc(1024), config = JSON.stringify({ os: 'linux', architecture: 'amd64',

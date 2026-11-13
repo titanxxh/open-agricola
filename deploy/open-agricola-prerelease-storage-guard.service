@@ -1,0 +1,25 @@
+[Unit]
+Description=Open Agricola prerelease storage protection
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=all
+User=ubuntu
+WorkingDirectory=/srv/open-agricola-owner-tools
+ExecStart=/usr/bin/node --import tsx scripts/prerelease/storage-guard-cli.ts watch /etc/open-agricola/prerelease-main.json /etc/open-agricola/prerelease-main-storage.json
+ExecStopPost=/usr/bin/node --import tsx scripts/prerelease/storage-guard-cli.ts trip /etc/open-agricola/prerelease-main.json /etc/open-agricola/prerelease-main-storage.json
+Restart=on-failure
+RestartSec=5
+WatchdogSec=90
+TimeoutStartSec=15
+TimeoutStopSec=120
+KillMode=control-group
+MemoryMax=192M
+TasksMax=32
+CPUQuota=25%
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

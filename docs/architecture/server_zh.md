@@ -233,4 +233,4 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 
 `game-setup-options.ts` 在分配房间或替换状态之前拒绝已移出业务的配置。已移出命令按未知命令失败，不改变 Room 版本或 Replay。通用客户端能力声明、socket WeakMap、HTTP header 和 CORS 支持继续保留。测试：`experimental-feature-transport.test.ts` 和 `auth-routes.test.ts`。
 
-pre owner 门禁在 `scripts/prerelease/operations.ts`。只有可信网关加入代理网络。操作见 `HOW_TO_DEPLOY.md`。
+owner 门禁在 `scripts/prerelease/{operations,storage-guard*,gateway}.ts`。guard 独立管理停止 latch。只有网关加入代理网络。操作见 `HOW_TO_DEPLOY.md`。

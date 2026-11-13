@@ -1,3 +1,4 @@
+import { seedStorageGuard } from './prerelease-storage-guard-fixture'
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, renameSync, symlinkSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -52,11 +53,17 @@ esac
   const save = () => writeFileSync(path, JSON.stringify(config))
   save()
   const env: NodeJS.ProcessEnv = { ...process.env, CI: '', GITHUB_ACTIONS: '', PATH: `${bin}:${process.env.PATH}` }
-  const invoke = (...args: string[]) => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', ...args, '--config', path], { encoding: 'utf8', env, timeout: 15000 })
+  const invoke = (...args: string[]) => {
+    if (['backup', 'maintain', 'reverify', 'open', 'reset', 'identities', 'apply-identities', 'restore', 'verify-access', 'verify-formal-browser', 'budget-check'].includes(args[0])) {
+      try { seedStorageGuard(parsePrereleaseTarget(config)) } catch { /* Invalid targets are rejected by the CLI. */ }
+    }
+    return spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', ...args, '--config', path], { encoding: 'utf8', env, timeout: 15000 })
+  }
   return { root, config, save, invoke, env, bin, temporary, fail: join(temporary, 'fail'), calls: () => existsSync(join(temporary, 'calls')) ? readFileSync(join(temporary, 'calls'), 'utf8') : '' }
 }
 
 function seedImportedImage(target: ReturnType<typeof parsePrereleaseTarget>, purpose: 'candidate' | 'trusted-policy', sourceSha: string, imageId: string) {
+  seedStorageGuard(target)
   const producerSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   const receipt = { format: 1, repository: 'titanxxh/open-agricola', repositoryId: 123, purpose,
     channel: purpose === 'candidate' ? 'prerelease' : 'stable', sourceSha, producerSha, platform: 'linux/amd64',
@@ -507,7 +514,7 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
   if (completion === 'normal') {
     const changedProxy = invoke({ ...target, proxyNetwork: 'another-proxy' })
     expect(changedProxy.status).not.toBe(0)
-    expect(changedProxy.stderr).toContain('fixed origin')
+    expect(changedProxy.stderr).toContain('storage guard')
     expect(replacement.calls()).toBe('')
   }
   const staging = join(directory, 'backups', `restore-${operationId}`)
@@ -745,4 +752,14 @@ it.each(['failed-remove', 'still-present'])('fails public backup closed after %s
   expect(value.remaining()).toEqual(value.state.tools)
   expect(value.calls()).toContain(`rm -f ${'e'.repeat(64)}`)
   expect(value.calls()).not.toMatch(/scripts\/prerelease\/storage.ts inspect|stop.*app|restart.*app|rm -f c{64}|rm -f f{64}/)
+})
+
+it('refuses a storage-writing operation while its independent guard is latched, before Docker or authority work', () => {
+  const value = fixture()
+  mkdirSync(join(value.root, 'control'), { recursive: true })
+  writeFileSync(join(value.root, 'control/storage-guard.json'), JSON.stringify({ status: 'latched' }))
+  const result = value.invoke('backup', '--expected-current', 'empty')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('storage guard')
+  expect(value.calls()).toBe('')
 })

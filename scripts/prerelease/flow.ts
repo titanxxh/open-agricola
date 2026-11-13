@@ -1,3 +1,4 @@
+import { assertStorageAdmission } from './storage-guard-state'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -96,6 +97,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     compose(target, ['up', '-d', '--no-build', 'gateway'])
     return record
   }
+  if (!['maintain', 'reverify', 'finish-close', 'budget-check'].includes(request.action)) assertStorageAdmission(target, targetFingerprint(target), 'operation')
   if (request.action === 'maintain') {
     authorityReceipt(target, record, request.authorityFile, 'close')
     return maintenance(target, record)
@@ -125,18 +127,8 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     return { channel: 'prerelease', targetId: target.targetId, mode: 'online', generation: record.generation }
   }
   if (request.action === 'budget-check') {
-    try {
-      const usage = JSON.parse(policyTool(target, 'budget')) as unknown
-      if (!usage || typeof usage !== 'object' || !('databaseBytes' in usage) || typeof usage.databaseBytes !== 'number'
-        || !('objectBytes' in usage) || typeof usage.objectBytes !== 'number') throw new Error('Invalid measured storage usage')
-      const local = Number(command('du', ['-sx', '--block-size=1', target.directory]).split(/\s/)[0])
-      if (local + usage.databaseBytes + usage.objectBytes > target.budgets.diskMiB * 1024 * 1024) throw new Error('Prerelease storage budget exceeded')
-      assertCapacity(target, 'idle')
-      return { ...usage, localBytes: local }
-    } catch (error) {
-      writeRuntime(target, { ...record, mode: 'maintenance', acceptance: null })
-      throw error
-    }
+    assertStorageAdmission(target, targetFingerprint(target))
+    return json(join(controlDirectory(target), 'storage-guard.json'))
   }
   if (request.action === 'identities') {
     if (record.mode !== 'maintenance' || !record.installed) throw new Error('Identity audit requires an installed maintenance target')

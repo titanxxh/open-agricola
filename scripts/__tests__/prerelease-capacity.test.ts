@@ -1,3 +1,4 @@
+import { seedStorageGuard } from './prerelease-storage-guard-fixture'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -20,6 +21,7 @@ function fixture() {
     budgets: { ...template.budgets, app: { memoryMiB: 512, cpus: 1, pids: 128 }, tools: { memoryMiB: 256, cpus: 1, pids: 128 },
       import: { maxArchiveMiB: 256, memoryHeadroomMiB: 128, intake: { memoryMiB: 128, cpus: 1, pids: 64 } }, reserveMemoryMiB: 256, diskMiB: 256 } }
   mkdirSync(target.directory)
+  seedStorageGuard(target)
   mkdirSync(join(target.directory, 'data'))
   const objects = `S3_BUCKET=${target.objects.bucket}\nS3_PREFIX=live/\nS3_SECRET_ACCESS_KEY=fixture\nS3_ENDPOINT=${target.objects.endpoint}\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n`
   writeFileSync(join(target.directory, '.env'), `DATABASE_URL=postgres://${target.database.appRole}:fixture@${target.database.host}/${target.database.name}\nS3_ACCESS_KEY_ID=${target.objects.appKeyId}\n${objects}`, { mode: 0o600 })
