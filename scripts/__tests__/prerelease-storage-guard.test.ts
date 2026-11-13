@@ -1,7 +1,7 @@
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config'
 import { assertStorageAdmission } from '../prerelease/storage-guard-state'
 
@@ -123,4 +123,42 @@ it('preserves a healthy cycle across samples and requires a new acceptance cycle
   const recovered = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, native)
   expect(recovered.status).toBe('healthy')
   expect(recovered.healthyCycle).not.toBe(first.healthyCycle)
+})
+
+
+it('renews from probe completion without changing a live cycle and still latches when the prior lease expires', async () => {
+  const { runStorageGuardCycle } = await import('../prerelease/storage-guard')
+  let now = 1_000_000
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+  const value = fixture(), calls: string[] = []
+  const observation = { sourceDatabaseBytes: 2, validationDatabaseBytes: 2, bucketBytes: 2, multipartBytes: 2,
+    localBytes: 2, offsiteBytes: 2, hostFreeBytes: 100, hostFreeInodes: 100, offsiteFreeBytes: 100, offsiteFreeInodes: 100 }
+  const limits = { ...observation, sourceDatabaseBytes: 10, validationDatabaseBytes: 10, bucketBytes: 10, multipartBytes: 10,
+    localBytes: 10, offsiteBytes: 10, hostFreeBytes: 1, hostFreeInodes: 1, offsiteFreeBytes: 1, offsiteFreeInodes: 1, operationReserveBytes: 1 }
+  const native = { observe: async (mode?: 'admission' | 'diagnostic') => {
+    calls.push(mode ?? 'admission')
+    if (mode === 'diagnostic') return observation
+    now += 15_000
+    if (calls.length === 2) expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).not.toThrow()
+    now += 5000
+    return observation
+  }, stop: async () => { calls.push('stop'); return [] } }
+  try {
+    // Two 20-second probes fit a 25-second native deadline and a 5-second interval inside the 40-second lease.
+    const first = await runStorageGuardCycle(value.target, { limits, leaseMs: 40_000 }, native)
+    expect(first).toMatchObject({ status: 'healthy', observationStartedAt: 1_000_000, observedAt: 1_020_000, validUntil: 1_060_000 })
+    now += 5000
+    const second = await runStorageGuardCycle(value.target, { limits, leaseMs: 40_000 }, native)
+    expect(second).toMatchObject({ status: 'healthy', observationStartedAt: 1_025_000, observedAt: 1_045_000,
+      validUntil: 1_085_000, healthyCycle: first.healthyCycle })
+    expect(assertStorageAdmission(value.target, targetFingerprint(value.target)).healthyCycle).toBe(first.healthyCycle)
+    // A late wake still validates the prior cycle before its bounded probe, rather than replacing it at completion.
+    now = 1_084_000
+    const late = await runStorageGuardCycle(value.target, { limits, leaseMs: 40_000 }, native)
+    expect(late).toMatchObject({ status: 'healthy', observedAt: 1_104_000, validUntil: 1_144_000, healthyCycle: first.healthyCycle })
+    now = 1_144_000
+    expect(() => assertStorageAdmission(value.target, targetFingerprint(value.target))).toThrow(/storage guard/i)
+    expect(await runStorageGuardCycle(value.target, { limits, leaseMs: 40_000 }, native)).toMatchObject({ status: 'latched', reason: 'expired-observation' })
+    expect(calls).toEqual(['admission', 'admission', 'admission', 'stop', 'diagnostic'])
+  } finally { clock.mockRestore() }
 })

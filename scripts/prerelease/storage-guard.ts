@@ -23,7 +23,8 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
   const persist = (value: unknown, phase: string) => {
     try { atomicJson(path, value); return true } catch { persistenceFailures.push(phase); return false }
   }
-  const observedAt = Date.now()
+  const observationStartedAt = Date.now()
+  const previousHealthyCycle = readStorageGuard(path, target.targetId, fingerprint)?.healthyCycle
   let observation: StorageObservation | null = null
   let observationCompletedAt: number | null = null
   if (!reason && existsSync(path)) {
@@ -35,7 +36,7 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
           && 'reason' in previous && typeof previous.reason === 'string' && /^[a-zA-Z-]{1,80}$/.test(previous.reason)
           ? previous.reason : 'previous-latch-or-invalid-state'
       }
-      else if (!('validUntil' in previous) || typeof previous.validUntil !== 'number' || previous.validUntil <= observedAt) reason = 'expired-observation'
+      else if (!('validUntil' in previous) || typeof previous.validUntil !== 'number' || previous.validUntil <= observationStartedAt) reason = 'expired-observation'
     } catch { reason = 'invalid-state' }
   }
   const wasLatched = reason !== null
@@ -52,23 +53,23 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
       observation = await observe('admission')
       reason = usageKeys.find(key => observation !== null && observation[key] >= policy.limits[key])
         ?? freeKeys.find(key => observation !== null && observation[key] <= policy.limits[key]) ?? null
-      if (Date.now() - observedAt >= policy.leaseMs) reason = 'observation-deadline'
+      if (Date.now() - observationStartedAt >= policy.leaseMs) reason = 'observation-deadline'
     } catch { reason = 'observation-failed' }
   }
-  if (!reason && observation) {
+  if (!reason && observation && observationCompletedAt !== null) {
     const operationsAllowed = observation.hostFreeBytes - policy.limits.hostFreeBytes >= policy.limits.operationReserveBytes
       && observation.offsiteFreeBytes - policy.limits.offsiteFreeBytes >= policy.limits.operationReserveBytes
       && policy.limits.localBytes - observation.localBytes >= policy.limits.operationReserveBytes
       && policy.limits.offsiteBytes - observation.offsiteBytes >= policy.limits.operationReserveBytes
-    const state = { format: 1, targetId: target.targetId, fingerprint, status: 'healthy', healthyCycle: readStorageGuard(path, target.targetId, fingerprint)?.healthyCycle ?? randomUUID(), reason: null, observedAt,
-      validUntil: observedAt + policy.leaseMs, operationsAllowed, observation, persistenceFailures }
+    const state = { format: 1, targetId: target.targetId, fingerprint, status: 'healthy', healthyCycle: previousHealthyCycle ?? randomUUID(), reason: null,
+      observationStartedAt, observedAt: observationCompletedAt, validUntil: observationCompletedAt + policy.leaseMs, operationsAllowed, observation, persistenceFailures }
     if (persist(state, 'heartbeat')) return state
     reason = 'state-persistence-failed'
   }
   reason ??= 'observation-missing'
   unpersistedLatches.set(fingerprint, reason)
-  const state = { format: 1, targetId: target.targetId, fingerprint, status: 'latched', healthyCycle: null, reason, observedAt,
-    validUntil: observedAt, operationsAllowed: false, observation, persistenceFailures }
+  const state = { format: 1, targetId: target.targetId, fingerprint, status: 'latched', healthyCycle: null, reason, observedAt: observationStartedAt,
+    validUntil: observationStartedAt, operationsAllowed: false, observation, persistenceFailures }
   if (persist(state, 'latch')) unpersistedLatches.delete(fingerprint)
   const failures = await native.stop().catch(() => ['stop-failed'])
   const stoppedAt = Date.now()
