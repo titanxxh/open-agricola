@@ -74,7 +74,11 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     acquired.register(() => admin.exec(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`))
     const source = getDb(), username = `pre_${randomUUID().slice(0, 8)}`
     const user = await createLocalUserForTests(username, 'pre-session-password-926')
-    acquired.register(() => source.prepare('DELETE FROM users WHERE id=?').run(user.id))
+    const cleanSourceUser = async () => {
+      await source.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id)
+      await source.prepare('DELETE FROM users WHERE id=?').run(user.id)
+    }
+    acquired.register(cleanSourceUser)
     await source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
     const sourceToken = await createSession(user.id)
     if (!sourceToken) throw new Error('Could not create the formal fixture session')
@@ -177,7 +181,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       },
       async () => {
         await eraseGeneration()
-        await source.prepare('DELETE FROM users WHERE id=?').run(user.id)
+        await cleanSourceUser()
       },
       () => {
         for (const key of envKeys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key] }
@@ -234,6 +238,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
 test('real prerelease HTTP and room WebSocket restore the same principal after reload and browser restart', async ({ playwright }) => {
   test.setTimeout(300_000)
   const environment = await fixture(playwright)
+  let testError: unknown
   try {
     const page = await environment.enter(environment.context)
     const wire = observeRoomSocket(page)
@@ -269,5 +274,16 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
       await expect(resumed.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
       await expect(resumed.getByRole('link', { name: 'Return to production', exact: true })).toBeVisible()
     } finally { await restored.close(); await reopened.close() }
-  } finally { await environment.context.close().catch(() => {}); await environment.browser.close().catch(() => {}); await environment.close() }
+  } catch (error) { testError = error; throw error } finally {
+    try {
+      await releaseAll([
+        () => environment.context.close(),
+        () => environment.browser.close(),
+        () => environment.close(),
+      ])
+    } catch (error) {
+      if (testError) throw new AggregateError([testError, error], 'Prerelease browser test and cleanup failed', { cause: testError })
+      throw error
+    }
+  }
 })
