@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { deleteAccount } from '../../server/auth'
 import { getDb, initializeDatabase } from '../../server/db'
 import type { PostgresDatabase } from '../../server/database/postgres'
+import { decodeRoomAccess } from '../../server/game/room-access'
 
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(value)
@@ -57,8 +58,24 @@ export async function applyPrereleaseIdentityAudit(db: PostgresDatabase, value: 
     for (const association of associations) {
       if (association.account.kind === 'deleted') {
         await db.prepare('INSERT INTO prerelease_deleted_subjects(user_id,deleted_at) VALUES(?,?) ON CONFLICT DO NOTHING').run(association.userId, now)
-        // Removing the last invite must never turn a private room into a public one.
-        await db.prepare('DELETE FROM rooms WHERE jsonb_exists(invited_user_ids,?)').run(association.userId)
+        const rooms = await db.prepare('SELECT id,created_by,invited_user_ids FROM rooms WHERE jsonb_exists(invited_user_ids,?) FOR UPDATE')
+          .all<{ id: string; created_by: string | null; invited_user_ids: unknown }>(association.userId)
+        for (const room of rooms) {
+          const access = decodeRoomAccess(room.invited_user_ids)
+          if (!access || access.kind !== 'invited') throw new Error('Invalid retained private room')
+          let invites = access.invitedUserIds.filter(id => byId.get(id)?.account.kind === 'active')
+          if (!invites.length) {
+            const players = await db.prepare('SELECT user_id FROM room_players WHERE room_id=? ORDER BY player_index')
+              .all<{ user_id: string }>(room.id)
+            invites = [...new Set([room.created_by, ...players.map(player => player.user_id)]
+              .filter((id): id is string => id !== null && byId.get(id)?.account.kind === 'active'))]
+            // The creator retains implicit access and need not occupy an invitation slot.
+            if (invites.length > 5) invites = invites.filter(id => id !== room.created_by)
+          }
+          if (invites.length > 5) throw new Error('Retained private room exceeds the invitation budget')
+          if (invites.length) await db.prepare('UPDATE rooms SET invited_user_ids=?::jsonb WHERE id=?').run(JSON.stringify(invites), room.id)
+          else await db.prepare('DELETE FROM rooms WHERE id=?').run(room.id)
+        }
         await deleteAccount(association.userId, { db, now })
         erased++
       } else {
