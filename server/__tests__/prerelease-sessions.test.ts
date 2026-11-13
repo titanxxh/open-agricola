@@ -252,3 +252,72 @@ it('requires an installed erasure adapter before acknowledging account deletion'
   expect(await context.db.prepare('SELECT id FROM users WHERE id=?').get(session.user.id)).toEqual({ id: session.user.id })
   expect(await reopened.resolve(session.token)).toBeNull()
 })
+
+it.each(['deleted account', 'revoked source'])('honors a durable %s fence when reopening an older persisted session', async kind => {
+  const context = await setupConsumer(), session = await context.enter()
+  if (kind === 'deleted account') {
+    await context.db.prepare('INSERT INTO prerelease_deleted_subjects(user_id,deleted_at) VALUES(?,?)').run(session.user.id, context.now())
+  } else {
+    await context.db.prepare('INSERT INTO prerelease_revoked_grants(grant_id,user_id,generation_id,revoked_at) VALUES(?,?,?,?)')
+      .run('g'.repeat(42) + '1', session.user.id, runtime.generationId, context.now())
+  }
+  const reopened = new PrereleaseSessions({ db: context.db, runtime, authority: context.authority, now: context.now })
+  expect(await reopened.resolve(session.token)).toBeNull()
+  expect(reopened.cachedAuthorized(session.token)).toBe(false)
+})
+
+it('does not acknowledge deletion or publish a handoff while its identity transaction is waiting at COMMIT', async () => {
+  const context = await setupConsumer(), locked = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
+  let exchangePid: number | undefined
+  const changed = Promise.withResolvers<void>()
+  context.service.subscribeInvalidation(event => { if (event.reason === 'account_deleted') changed.resolve() })
+  context.authority.exchange = async () => {
+    exchangePid = (await context.db.prepare('SELECT pg_backend_pid() AS pid').get<{ pid: number }>())?.pid
+    return context.state('g'.repeat(43))
+  }
+  await context.db.exec(`CREATE FUNCTION test_delay_identity_commit() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN PERFORM pg_advisory_xact_lock(166300014); RETURN NEW; END $$;
+    CREATE CONSTRAINT TRIGGER test_delay_identity_commit AFTER INSERT ON prerelease_sessions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION test_delay_identity_commit();`)
+  const holding = context.db.transaction(async () => {
+    await context.db.prepare('SELECT pg_advisory_xact_lock(166300014)').get()
+    locked.resolve(); await release.promise
+  })()
+  const waitFor = async (predicate: () => Promise<boolean>) => {
+    const deadline = Date.now() + 3000
+    while (!await predicate()) {
+      if (Date.now() >= deadline) throw new Error('Identity transaction did not reach its controlled boundary')
+      await new Promise(done => setTimeout(done, 2))
+    }
+  }
+  let opening: Promise<unknown> | undefined, processing: Promise<unknown> | undefined
+  try {
+    await locked.promise
+    opening = context.enter().then(value => ({ opened: true, value }), error => ({ opened: false, error }))
+    await waitFor(async () => {
+      if (!exchangePid) return false
+      const row = await context.db.prepare('SELECT query,wait_event FROM pg_stat_activity WHERE pid=?').get<{ query: string; wait_event: string }>(exchangePid)
+      return row?.query === 'COMMIT' && row.wait_event === 'advisory'
+    })
+    context.events.push({ id: '00000000-0000-4000-8000-000000000007', kind: 'account_deleted', userId: 'formal-user', grantId: null, createdAt: context.now() })
+    processing = context.service.processEvents()
+    await changed.promise
+    await waitFor(async () => context.acknowledgements.length > 0 || !!await context.db.prepare(`SELECT 1 FROM pg_stat_activity
+      WHERE wait_event='advisory' AND query LIKE '%open-agricola:pre-subject:%' LIMIT 1`).get())
+    expect(context.acknowledgements).toEqual([])
+    release.resolve()
+    await holding
+    expect(await opening).toMatchObject({ opened: false, error: expect.objectContaining({ message: 'Identity changed during handoff' }) })
+    await processing
+    expect(context.acknowledgements).toEqual(['00000000-0000-4000-8000-000000000007'])
+    expect(await context.db.prepare('SELECT id FROM users').all()).toEqual([])
+    expect(await context.db.prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+    const reopened = new PrereleaseSessions({ db: context.db, runtime, authority: context.authority, now: context.now })
+    const begin = await reopened.beginHandoff(), params = new URLSearchParams(new URL(begin.formalUrl).hash.slice(1))
+    await expect(reopened.exchangeHandoff(begin.cookie, { protocolVersion: 1, code: 'c'.repeat(43), state: params.get('state')!,
+      browserChallenge: params.get('browserChallenge')!, returnTo: `${runtime.formalAppOrigin}/` })).rejects.toThrow('Revoked prerelease identity')
+  } finally {
+    release.resolve()
+    await Promise.allSettled([holding, opening, processing])
+  }
+})
