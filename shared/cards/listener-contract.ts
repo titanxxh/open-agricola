@@ -53,6 +53,7 @@ export type CardListenerEvent = typeof listenerEventContract[number]
 
 type ListenerFilters = {
   id?: unknown
+  previousIds?: unknown
   actions?: unknown
   actionSpaces?: unknown
   events?: unknown
@@ -62,6 +63,10 @@ type ListenerFilters = {
 
 export function listenerContractError(listener: ListenerFilters): string | undefined {
   const fail = (reason: string) => `Listener ${String(listener.id ?? '<unnamed>')}: ${reason}`
+  if (listener.previousIds !== undefined && (!Array.isArray(listener.previousIds)
+    || !listener.previousIds.every(id => typeof id === 'string' && id.trim().length > 0))) {
+    return fail('previousIds requires explicit nonempty activation IDs')
+  }
   const phases = listener.phases
   if (!Array.isArray(phases) || phases.length === 0) return fail('explicit nonempty phases are required')
   const selectors = [listener.actions, listener.actionSpaces, listener.events, listener.globalQuery].filter(value => value !== undefined).length
@@ -96,6 +101,7 @@ export function snapshotCardListener(listener: CardListenerRegistration, sourceC
   const error = listenerContractError(listener)
   if (error) throw new Error(error)
   const snapshot: CardListenerRegistration = { ...listener }
+  if (snapshot.previousIds) snapshot.previousIds = [...snapshot.previousIds]
   if (snapshot.cardIds) snapshot.cardIds = [...snapshot.cardIds]
   if (snapshot.actions) snapshot.actions = [...snapshot.actions]
   if (Array.isArray(snapshot.actionSpaces)) snapshot.actionSpaces = [...snapshot.actionSpaces]
