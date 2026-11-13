@@ -87,11 +87,12 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }
       const title = element.querySelector('.hand-section-title')!.getBoundingClientRect()
       const card = element.querySelector('.player-card.selectable')!.getBoundingClientRect()
       const bar = document.querySelector('.interaction-bar')!.getBoundingClientRect()
-      return { title: title.top, cardBottom: card.bottom, barTop: bar.top }
+      const dock = document.querySelector('.section-nav')?.getBoundingClientRect()
+      return { title: title.top, cardBottom: card.bottom, limit: dock && dock.height > 0 ? dock.top : bar.top }
     })
     await expect.poll(async () => {
       const bounds = await geometry()
-      return bounds.title >= 0 && bounds.cardBottom <= bounds.barTop
+      return bounds.title >= 0 && bounds.cardBottom <= bounds.limit
     }).toBe(true)
 
     await page.evaluate(() => window.scrollTo(0, 0))
@@ -99,7 +100,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }
     await page.getByRole('button', { name: 'Return to current action' }).click()
     await expect.poll(async () => {
       const bounds = await geometry()
-      return bounds.title >= 0 && bounds.cardBottom <= bounds.barTop
+      return bounds.title >= 0 && bounds.cardBottom <= bounds.limit
     }).toBe(true)
     await hand.locator('[data-card-anchor="A116_WoodCutter"]').click()
     const play = page.getByRole('button', { name: /Play this card|打出此牌/ })

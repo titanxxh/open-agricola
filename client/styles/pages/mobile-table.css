@@ -90,7 +90,7 @@
 
   @media (max-height: 500px) {
     .game-layout .hand-row .player-card {
-      max-width: min(100%, calc((100dvh - var(--interaction-bar-height, 0px) - 72px) * 188 / 299));
+      max-width: min(100%, calc((100dvh - var(--interaction-bar-height, 0px) - var(--section-nav-height, 0px) - 72px) * 188 / 299));
       justify-self: center;
     }
   }
