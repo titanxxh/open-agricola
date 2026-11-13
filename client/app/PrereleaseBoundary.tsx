@@ -4,7 +4,7 @@ import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
 import { useLocale } from '../contexts/LocaleContext'
 import { browserApiFetch } from '../services/browser-api'
 import {
-  acceptPrereleaseSession, getPrereleaseAccess, getPrereleaseRevision, getPrereleaseRuntime, isPrereleaseClient,
+  acceptPrereleaseSession, getPrereleaseAccess, getPrereleaseLeaseRemainingMs, getPrereleaseRevision, getPrereleaseRuntime, isPrereleaseClient,
   loadPrereleaseRuntime, prereleaseStartUrl, rejectPrereleaseAccess, subscribePrereleaseAccess,
 } from '../services/prerelease-runtime'
 import './PrereleaseBoundary.css'
@@ -25,6 +25,7 @@ function PrereleaseApplication({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
   const operation = useRef<Promise<void> | undefined>(undefined)
   const handoffAttempted = useRef(false)
+  const retry = useRef<() => void>(() => {})
   const check = useCallback(async () => {
     try {
       const runtime = await loadPrereleaseRuntime()
@@ -59,9 +60,21 @@ function PrereleaseApplication({ children }: { children: ReactNode }) {
   }, [callback])
   useEffect(() => {
     if (window.location.pathname === `${HOSTED_APP_PATH}auth/handoff`) window.history.replaceState(window.history.state, '', window.location.pathname)
-    operation.current ??= check()
-    const timer = setInterval(() => { void check() }, 15_000)
-    return () => clearInterval(timer)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let disposed = false
+    const poll = async () => {
+      if (disposed) return
+      clearTimeout(timer)
+      operation.current ??= check().finally(() => { operation.current = undefined })
+      await operation.current
+      if (disposed) return
+      clearTimeout(timer)
+      const remaining = getPrereleaseLeaseRemainingMs()
+      timer = setTimeout(() => { void poll() }, remaining > 0 ? Math.min(15_000, Math.max(250, remaining / 2)) : 15_000)
+    }
+    retry.current = () => { void poll() }
+    void poll()
+    return () => { disposed = true; clearTimeout(timer) }
   }, [callback, check])
   const runtime = getPrereleaseRuntime()
   const code = access.kind === 'blocked' ? access.code : undefined
@@ -80,7 +93,7 @@ function PrereleaseApplication({ children }: { children: ReactNode }) {
       <p role={access.kind === 'blocked' ? 'alert' : 'status'}>{t(message)}</p>
       {ready && <button type="button" className="btn-secondary" onClick={() => {
         if (callback || code === 'prerelease_runtime_changed') window.location.reload()
-        else void check()
+        else retry.current()
       }}>{t('platform.retry')}</button>}
       {runtime && <a className="btn-primary" href={prereleaseStartUrl()}>{t('prerelease.entry')}</a>}
     </main>}
