@@ -238,7 +238,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
 test('real prerelease HTTP and room WebSocket restore the same principal after reload and browser restart', async ({ playwright }) => {
   test.setTimeout(300_000)
   const environment = await fixture(playwright)
-  let testError: unknown
+  let failure: { error: unknown } | undefined
   try {
     const page = await environment.enter(environment.context)
     const wire = observeRoomSocket(page)
@@ -274,16 +274,16 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
       await expect(resumed.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
       await expect(resumed.getByRole('link', { name: 'Return to production', exact: true })).toBeVisible()
     } finally { await restored.close(); await reopened.close() }
-  } catch (error) { testError = error; throw error } finally {
-    try {
-      await releaseAll([
-        () => environment.context.close(),
-        () => environment.browser.close(),
-        () => environment.close(),
-      ])
-    } catch (error) {
-      if (testError) throw new AggregateError([testError, error], 'Prerelease browser test and cleanup failed', { cause: testError })
-      throw error
-    }
+  } catch (error) { failure = { error } }
+  try {
+    await releaseAll([
+      () => environment.context.close(),
+      () => environment.browser.close(),
+      () => environment.close(),
+    ])
+  } catch (error) {
+    if (failure) throw new AggregateError([failure.error, error], 'Prerelease browser test and cleanup failed', { cause: error })
+    throw error
   }
+  if (failure) throw failure.error
 })
