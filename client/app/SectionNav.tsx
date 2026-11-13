@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react'
+import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { t, type Locale } from '../../shared/i18n'
 import { findSectionTarget, scrollSectionIntoView, sectionNavName, type SectionNavItem } from './section-nav'
 import './SectionNav.css'
@@ -32,6 +32,25 @@ const focusShortcut = (current: HTMLButtonElement, key: string): boolean => {
 }
 
 export function SectionNav({ locale, items }: Props) {
+  const navRef = useRef<HTMLElement>(null)
+  const itemKey = items.map(item => item.id).join(',')
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    const app = nav?.closest<HTMLElement>('.app')
+    if (!nav || !app) return
+    const publish = () => {
+      const height = nav.getBoundingClientRect().height
+      app.style.setProperty('--section-nav-height', `${height > 0 ? height + 8 : 0}px`)
+    }
+    publish()
+    if (typeof ResizeObserver === 'undefined') return () => app.style.removeProperty('--section-nav-height')
+    const observer = new ResizeObserver(publish)
+    observer.observe(nav)
+    return () => {
+      observer.disconnect()
+      app.style.removeProperty('--section-nav-height')
+    }
+  }, [itemKey])
   if (items.length === 0) return null
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (!(event.target instanceof HTMLButtonElement)) return
@@ -39,7 +58,7 @@ export function SectionNav({ locale, items }: Props) {
     event.preventDefault()
   }
   return (
-    <nav className="section-nav" aria-label={sectionNavName(locale, items)} onKeyDown={onKeyDown}>
+    <nav ref={navRef} className="section-nav" aria-label={sectionNavName(locale, items)} onKeyDown={onKeyDown}>
       {items.map(item => (
         <button
           key={item.id}

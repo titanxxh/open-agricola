@@ -89,7 +89,9 @@ describe('game section navigation', () => {
     expect(container.querySelector('.desktop-public-farms [data-hand-anchor]')).not.toBeInTheDocument()
     expect(container.querySelectorAll('[data-interaction-focused]')).toHaveLength(0)
 
-    const hand = container.querySelector('[data-hand-anchor="p1"]') as HTMLElement
+    const hand = container.querySelector('[data-section-target="hand"][data-hand-anchor="p1"]') as HTMLElement
+    expect(hand).toHaveClass('hand-cards')
+    expect(hand.querySelector('h3')).toHaveTextContent('Hand Cards')
     const farms = container.querySelector('[data-section-target="public-farms"]') as HTMLElement
     const header = container.querySelector('.header-compact') as HTMLElement
     const bar = container.querySelector('.interaction-bar') as HTMLElement

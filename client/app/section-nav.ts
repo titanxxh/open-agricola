@@ -65,9 +65,11 @@ export function scrollSectionIntoView(node: HTMLElement): void {
   const header = app?.querySelector<HTMLElement>('.header-compact')
   const viewportTop = viewportOffset + (header?.getBoundingClientRect().height ?? 0) + PLAY_INSET
   const bar = app?.querySelector<HTMLElement>('.interaction-bar')
+  const navRect = app?.querySelector<HTMLElement>('.section-nav')?.getBoundingClientRect()
+  const overlayTop = navRect && navRect.height > 0 ? navRect.top : bar?.getBoundingClientRect().top
   const viewportBottom = Math.min(
     viewportOffset + (viewport?.height ?? window.innerHeight),
-    bar?.getBoundingClientRect().top ?? window.innerHeight,
+    overlayTop ?? window.innerHeight,
   ) - PLAY_INSET
   const bounds = node.getBoundingClientRect()
   if (bounds.top >= viewportTop && bounds.bottom <= viewportBottom) return
