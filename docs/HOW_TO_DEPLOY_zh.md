@@ -179,7 +179,7 @@ deploy 独立检查固定 SHA、同通道的完整 GitHub 回执，在修改准�
 
 候选必须提供真实 SQL view `prerelease_retained_identity_refs(user_id,source_grant_id)`，覆盖全部外部主体，包括仅存于房间/历史中的引用，并实现 `scripts/prerelease/identity-audit.ts apply <packet.json>`。adapter 删除/匿名化已删除主体，将每个保留活跃引用映射到返回的当前代次 `associationId`，不恢复会话或登录权。该持久化/清理实现由 #1663/#1667 负责；main 没有空 stub，缺 view/adapter 阻断开放。owner 读取真实行，拒绝遗漏、null 或无来源绑定，按二进制/C 顺序对 ASCII pair 去重排序并哈希共享 canonical JSON。正式 associate 校验旧来源，创建无 source、已撤销的关联，确保恢复后仍接收未来删除。
 
-原生 view 枚举房主、邀请、座位及结果/Context/终止/开局参与者中的 canonical 账号引用，用户或投影缺失时也保留该行；不扫描游戏玩家 ID、显示名或任意卡牌/历史 JSON。经正式来源验证的 owner packet 可为活跃 orphan 重建无凭据的外部投影，或清理/匿名化已删除 orphan。已删除主体的邀请引用会删除相应私密房间，不会将房间变为公开；删除 tombstone 仍有效。来源不明时保持关闭：须恢复原有已验证 grant 关联或有效备份，不能编造 grant 或省略引用。全部原生引用必须被覆盖，随后执行精确复扫。回归：`scripts/__tests__/prerelease-identity-audit.test.ts`。
+原生 view 枚举房主、邀请、座位及结果/Context/终止/开局参与者中的 canonical 账号引用，用户或投影缺失时也保留该行；不扫描游戏玩家 ID、显示名或任意卡牌/历史 JSON。经正式来源验证的 owner packet 可为活跃 orphan 重建无凭据的外部投影，或清理/匿名化已删除 orphan。移除已删除受邀者后，有其他邀请时保留同一房间和状态；列表清空时，只使用现有且经正式确认为活跃的房主/参与者补成非空私密列表，无任何合法存续者才清理无主房间，绝不转为公开。已删除房主/真正参与者仍沿用既定房间清理；删除 tombstone 仍有效。来源不明时保持关闭：须恢复原有已验证 grant 关联或有效备份，不能编造 grant 或省略引用。全部原生引用必须被覆盖，随后执行精确复扫。回归：`scripts/__tests__/prerelease-identity-audit.test.ts`。
 
 ```bash
 ./deploy-prerelease.sh identities --config "$pre_config" --expected-current "$pre_sha"
