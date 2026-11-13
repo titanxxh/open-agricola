@@ -10,6 +10,21 @@ import { readRuntime, writeRuntime } from '../prerelease/runtime'
 
 const memory = vi.hoisted(() => ({ bytes: 1408 * 1024 * 1024 }))
 vi.mock('node:os', async importOriginal => ({ ...await importOriginal<typeof import('node:os')>(), freemem: () => memory.bytes }))
+vi.mock('node:fs', async importOriginal => {
+  const fs = await importOriginal<typeof import('node:fs')>()
+  const native: Record<string, string> = {
+    '/proc/65432/cgroup': `0::/system.slice/docker-${'a'.repeat(64)}.scope\n`,
+    '/proc/65432/stat': `65432 (fixture) ${['S', ...Array(18).fill('0'), '100'].join(' ')}`,
+    'memory.max': '536870912', 'memory.swap.max': '0', 'memory.swap.current': '0', 'memory.stat': 'anon 0\nfile 0\n',
+  }
+  return { ...fs,
+    readFileSync: (path: Parameters<typeof fs.readFileSync>[0], options: Parameters<typeof fs.readFileSync>[1]) => {
+      const key = typeof path === 'string' && path.startsWith('/sys/fs/cgroup/system.slice/docker-') ? path.split('/').at(-1) : String(path)
+      return key && Object.hasOwn(native, key) ? native[key] : fs.readFileSync(path, options)
+    },
+    statSync: (path: Parameters<typeof fs.statSync>[0]) => fs.statSync(String(path).startsWith('/sys/fs/cgroup/system.slice/docker-') ? tmpdir() : path),
+  }
+})
 const roots: string[] = []
 afterEach(() => { vi.unstubAllEnvs(); roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })); memory.bytes = 1408 * 1024 * 1024 })
 
@@ -33,16 +48,18 @@ function fixture() {
   const save = () => writeFileSync(statePath, JSON.stringify(state))
   save()
   writeFileSync(join(bin, 'docker'), String.raw`#!${process.execPath}
-const fs = require('node:fs'), args = process.argv.slice(2), line = args.join(' ');
+const fs = require('node:fs'), raw = process.argv.slice(2), args = raw[0] === '--host' ? raw.slice(2) : raw, line = args.join(' ');
 const path = ${JSON.stringify(statePath)}, state = JSON.parse(fs.readFileSync(path, 'utf8'));
 fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args)+'\n');
 const output = value => process.stdout.write(typeof value === 'string' ? value : JSON.stringify(value));
-if (args[0] === 'ps') {
+if(args[0] === 'context') output({Host:'unix:///var/run/docker.sock'});
+else if(args[0] === 'info') output({OSType:'linux',CgroupVersion:'2'});
+else if (args[0] === 'ps') {
   if (line.includes('com.docker.compose.service=app') && state.app) output('${'a'.repeat(64)}');
   if (line.includes('org.open-agricola.backup.environment=') && state.tool) output('${'c'.repeat(64)}');
 } else if (args[0] === 'inspect') {
   const field=args[2];
-  if (field==='{{json .}}') output({Image:${JSON.stringify(image)},State:{Running:state.app},HostConfig:{Memory:state.appMemory},
+  if (field==='{{json .}}') output({Id:'${'a'.repeat(64)}',Image:${JSON.stringify(image)},State:{Running:state.app,Pid:65432,StartedAt:'2026-11-13T00:00:00Z'},HostConfig:{Memory:state.appMemory,MemorySwap:state.appMemory},
     Config:{Labels:{'com.docker.compose.project':state.appProject,'com.docker.compose.service':'app'}}});
   if(field==='{{json .Config.Labels}}') output({'org.open-agricola.environment':${JSON.stringify(target.targetId)}});
   if(field==='{{json .State}}') output({Running:state.app,OOMKilled:false,ExitCode:0});

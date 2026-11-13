@@ -647,6 +647,16 @@ it('rejects a shared hostname even when the port or final DNS dot differs', () =
 
 function ownerBackupFixture() {
   const value = fixture(), target = parsePrereleaseTarget(value.config)
+  const preload = join(value.temporary, 'application-memory.mjs')
+  writeFileSync(preload, String.raw`import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+const read=fs.readFileSync,stat=fs.statSync;
+const files={'/proc/65432/cgroup':'0::/system.slice/docker-${'c'.repeat(64)}.scope\n',
+ '/proc/65432/stat':'65432 (fixture) '+['S',...Array(18).fill('0'),'100'].join(' '),
+ 'memory.max':'536870912','memory.swap.max':'0','memory.swap.current':'0','memory.stat':'anon 0\nfile 0\n'};
+fs.readFileSync=(path,...args)=>{const key=typeof path==='string'&&path.startsWith('/sys/fs/cgroup/system.slice/docker-')?path.split('/').at(-1):String(path);return Object.hasOwn(files,key)?files[key]:read(path,...args);};
+fs.statSync=(path,...args)=>stat(typeof path==='string'&&path.startsWith('/sys/fs/cgroup/system.slice/docker-')?${JSON.stringify(value.temporary)}:path,...args);syncBuiltinESMExports();`)
+  value.env.NODE_OPTIONS = `--import=${preload}`
+  value.env.DOCKER_HOST = ''; value.env.DOCKER_CONTEXT = ''
   const buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`, generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5'
   writeRuntime(target, { ...readRuntime(target), generation, buildId, installed: { buildId, image, installedAt: 1 }, mode: 'open' })
   const policySha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
@@ -664,11 +674,12 @@ function ownerBackupFixture() {
 if [ "$1" = '${process.cwd()}/backup-offsite.sh' ]; then printf complete > '${completed}'; else exec /bin/bash "$@"; fi
 `, { mode: 0o700 })
   writeFileSync(join(value.bin, 'docker'), String.raw`#!${process.execPath}
-const fs=require('node:fs'), args=process.argv.slice(2), line=args.join(' '), file=${JSON.stringify(statePath)};
+const fs=require('node:fs'), raw=process.argv.slice(2), args=raw[0]==='--host'?raw.slice(2):raw, line=args.join(' '), file=${JSON.stringify(statePath)};
 const state=JSON.parse(fs.readFileSync(file,'utf8'));
 fs.appendFileSync(${JSON.stringify(join(value.temporary, 'calls'))},line+'\n');
 const output=value=>process.stdout.write(typeof value==='string'?value:JSON.stringify(value));
-if(args[0]==='ps') {
+if(args[0]==='context')output({Host:'unix:///var/run/docker.sock'});
+else if(args[0]==='ps') {
   if(line.includes('com.docker.compose.service=app'))output('${'c'.repeat(64)}');
   else {
     const filters=args.filter((_,i)=>args[i-1]==='--filter');
@@ -687,9 +698,9 @@ if(args[0]==='ps') {
     if(format==='{{json .Config.Labels}}')output(labels);
     else {const match=format.match(/index .Config.Labels "([^"]+)"/);if(match)output(labels[match[1]]??'<no value>');}
   } else if(format==='{{.Image}}')output(${JSON.stringify(image)});
-  else if(format==='{{json .}}')output({Image:${JSON.stringify(image)},State:{Running:true},HostConfig:{Memory:536870912},Config:{Labels:{'com.docker.compose.project':${JSON.stringify(target.project)},'com.docker.compose.service':'app'}}});
+  else if(format==='{{json .}}')output({Id:'${'c'.repeat(64)}',Image:${JSON.stringify(image)},State:{Running:true,Pid:65432,StartedAt:'2026-11-13T00:00:00Z'},HostConfig:{Memory:536870912,MemorySwap:536870912},Config:{Labels:{'com.docker.compose.project':${JSON.stringify(target.project)},'com.docker.compose.service':'app'}}});
   else if(format.includes('com.docker.compose.project'))output(${JSON.stringify(target.project)});
-} else if(args[0]==='info'){output([]);process.exit(0);}
+} else if(args[0]==='info'){output(args[2]==='{{json .DriverStatus}}'?[]:{OSType:'linux',CgroupVersion:'2'});process.exit(0);}
 if(args[0]==='image') {
   if(args[3]==='{{.Id}}')output(${JSON.stringify(policyImage)});
   else output({'org.opencontainers.image.revision':${JSON.stringify(policySha)},'io.open-agricola.release-channel':'stable'});

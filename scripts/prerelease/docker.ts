@@ -8,6 +8,7 @@ import { composePath, controlDirectory, readRuntime, type RuntimeRecord } from '
 import { parseContainerImageTransfer, assertExpectedContainerImage, type ContainerImagePurpose } from '../release/container-images.ts'
 import { nativeContainerImageId } from '../release/container-images-archive.ts'
 import { applicationDataEnvironment, assertOwnerPath, targetFingerprint, type PrereleaseTarget } from './config'
+import { readApplicationMemory } from './application-memory'
 
 export function command(program: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string | Buffer; timeout?: number } = {}): string {
   const env: NodeJS.ProcessEnv = {}
@@ -35,23 +36,15 @@ export function assertCapacity(target: PrereleaseTarget, phase: 'import' | 'tool
   if (command('docker', ['ps', '-q', '--filter', `label=org.open-agricola.backup.environment=${target.targetId}`])) {
     throw new Error(`Prerelease ${phase} requires other tools to be stopped`)
   }
-  const appId = command('docker', ['ps', '-q', '--filter', `label=com.docker.compose.project=${target.project}`, '--filter', 'label=com.docker.compose.service=app'])
-  if (appId) {
-    if (!/^[a-f0-9]{12,64}$/.test(appId)) throw new Error('Cannot identify one running prerelease application')
-    const app = parsed(command('docker', ['inspect', '--format', '{{json .}}', appId]))
-    const labels = object(object(app.Config).Labels), limits = object(app.HostConfig), record = readRuntime(target)
-    const images = [record.installed?.image, record.operation?.image, record.operation?.sourceImage]
-    if (labels['com.docker.compose.project'] !== target.project || labels['com.docker.compose.service'] !== 'app'
-      || object(app.State).Running !== true || typeof app.Image !== 'string' || !images.includes(app.Image)
-      || typeof limits.Memory !== 'number' || limits.Memory <= 0 || limits.Memory > target.budgets.app.memoryMiB * 1024 * 1024) {
-      throw new Error('Running prerelease application identity or memory limit differs from the target')
-    }
-  }
+  const appId = command('docker', ['ps', '-q', '--no-trunc', '--filter', `label=com.docker.compose.project=${target.project}`, '--filter', 'label=com.docker.compose.service=app'])
+  const record = readRuntime(target)
+  const running = appId ? readApplicationMemory({ target, appId, images: [record.installed?.image, record.operation?.image, record.operation?.sourceImage],
+    docker: args => command('docker', args) }) : { anonymousBytes: 0, availableBytes: freemem() }
   const phaseMemory = phase === 'import' ? target.budgets.import.memoryHeadroomMiB : phase === 'tool' ? target.budgets.tools.memoryMiB : phase === 'inspect-image' ? 64 : 0
-  const memory = 64 + (appId || phase === 'app' ? target.budgets.app.memoryMiB : 0) + phaseMemory + target.budgets.reserveMemoryMiB
-  const fs = statfsSync(target.directory), remaining = fs.bavail * fs.bsize, available = freemem()
-  if (available < memory * 1024 * 1024 || remaining < target.budgets.diskMiB * 1024 * 1024) {
-    throw new Error(`Prerelease ${phase} capacity is below the conservative budget: available memory ${available}, required ${memory * 1024 * 1024}, disk ${remaining}`)
+  const required = (64 + (appId || phase === 'app' ? target.budgets.app.memoryMiB : 0) + phaseMemory + target.budgets.reserveMemoryMiB) * 1024 * 1024 - running.anonymousBytes
+  const fs = statfsSync(target.directory), remaining = fs.bavail * fs.bsize, available = running.availableBytes
+  if (available < required || remaining < target.budgets.diskMiB * 1024 * 1024) {
+    throw new Error(`Prerelease ${phase} capacity is below the conservative budget: available memory ${available}, required ${required}, disk ${remaining}`)
   }
 }
 
