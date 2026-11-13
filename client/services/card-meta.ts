@@ -1,3 +1,4 @@
+import { resourceFetch } from './resource-fetch'
 /**
  * Client-side card metadata service.
  *
@@ -74,7 +75,7 @@ export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
   if (manifestCache) return Promise.resolve(manifestCache)
   if (!manifestPromise) {
     const url = resolveManifestUrl()
-    manifestPromise = fetch(url)
+    manifestPromise = resourceFetch(url)
       .then((res) => {
         if (!res.ok) {
           throw new Error(
