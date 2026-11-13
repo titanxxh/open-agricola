@@ -42,7 +42,7 @@ printf 'deb [arch=amd64 signed-by=/etc/apt/keyrings/docker-isolation.asc] https:
 apt-get update -qq
 version="$(apt-cache madison docker-ce | awk '$3 ~ /^5:29\.9\.3-/ && !found { first=$3; found=1 } END { print first }')"
 [[ -n $version ]] || { echo 'Pinned rootless Docker29.9.3 unavailable' >&2; exit 1; }
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends uidmap dbus-user-session docker-ce="$version" docker-ce-cli="$version" docker-ce-rootless-extras="$version"
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends acl uidmap dbus-user-session docker-ce="$version" docker-ce-cli="$version" docker-ce-rootless-extras="$version"
 # The official /usr/bin/rootlesskit path has the packaged AppArmor userns profile.
 [[ -x /usr/bin/rootlesskit && -f /etc/apparmor.d/rootlesskit ]] || isolation_failure 1 "$LINENO"
 apparmor_parser -r /etc/apparmor.d/rootlesskit
@@ -51,6 +51,8 @@ isolation_stage=identity
 # Override only this invocation so Shadow allocates its usual non-overlapping subids.
 groupadd --gid 61000 oa-candidate
 useradd --uid 61000 --gid 61000 -K UID_MAX=61000 --create-home --shell /bin/bash oa-candidate
+# Host default ACLs can contain IDs that rootless file-permission copies cannot map.
+setfacl --remove-all --remove-default /home/oa-candidate
 chmod 700 /home/oa-candidate
 # useradd allocates non-overlapping subordinate IDs using the host account database.
 grep -q '^oa-candidate:' /etc/subuid

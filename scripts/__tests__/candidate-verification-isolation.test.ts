@@ -85,19 +85,36 @@ it.each([
   expect(result.stdout).toBe(expected + '\n')
 })
 
-it('allocates the fixed candidate UID/GID and non-overlapping subordinate IDs in isolated Ubuntu', () => {
+it('creates a private candidate home without inherited host ACLs and allocates subordinate IDs', () => {
   const setup = readFileSync(resolve(import.meta.dirname, '../ci/setup-candidate-isolation.sh'), 'utf8')
   const before = setup.indexOf('# Candidate identity and automatic subordinate IDs.')
   const after = setup.indexOf('cp -a "$source_directory"', before)
   if (before < 0 || after < 0) throw new Error('Missing identity setup stage')
-  const result = spawnSync('docker', ['run', '--rm', '--network', 'none', '-i',
-    'ubuntu:26.04@sha256:065aa8626841f16057b78b027b464cd59c4fac36c204c72dcbf48d66f5fa8a96', 'bash', '-s'], {
-    encoding: 'utf8', timeout: 60000,
-    input: `set -euo pipefail\n${setup.slice(before, after)}\nid -u oa-candidate\nid -g oa-candidate\ngrep '^oa-candidate:' /etc/subuid\ngrep '^oa-candidate:' /etc/subgid\n`,
+  const result = spawnSync('docker', ['run', '--rm', '--network', 'bridge', '-i',
+    'ubuntu:26.04@sha256:065aa8626841f16057b78b027b464cd59c4fac36c204c72dcbf48d66f5fa8a96',
+    'timeout', '--signal=TERM', '--kill-after=5s', '60s', 'bash', '-s'], {
+    encoding: 'utf8', timeout: 90000,
+    input: `set -euo pipefail
+acl_fixture_apt=(-o Acquire::Retries=1 -o Acquire::http::Timeout=10 -o Acquire::https::Timeout=10)
+apt-get "\${acl_fixture_apt[@]}" update >/dev/null
+DEBIAN_FRONTEND=noninteractive apt-get "\${acl_fixture_apt[@]}" install -y --no-install-recommends acl >/dev/null
+setfacl -m d:u:1001:rwx /home
+${setup.slice(before, after)}
+id -u oa-candidate
+id -g oa-candidate
+grep '^oa-candidate:' /etc/subuid
+grep '^oa-candidate:' /etc/subgid
+mkdir -p /home/oa-candidate/.local/share/docker
+touch /home/oa-candidate/.local/share/docker/inert-file
+stat -c '%a' /home/oa-candidate
+getfacl -cpn /home/oa-candidate /home/oa-candidate/.local/share/docker/inert-file
+getfacl -cpn /home | grep '^default:user:1001:rwx$'
+`,
   })
   expect(result.status, result.stderr).toBe(0)
-  expect(result.stdout).toBe('61000\n61000\noa-candidate:165536:65536\noa-candidate:165536:65536\n')
-})
+  expect(result.stdout).toBe('61000\n61000\noa-candidate:165536:65536\noa-candidate:165536:65536\n'
+    + '700\nuser::rwx\ngroup::---\nother::---\n\nuser::rw-\ngroup::r--\nother::r--\n\ndefault:user:1001:rwx\n')
+}, 95_000)
 
 it('reports a failing setup stage and line without dumping its environment', () => {
   const setup = readFileSync(resolve(import.meta.dirname, '../ci/setup-candidate-isolation.sh'), 'utf8')
