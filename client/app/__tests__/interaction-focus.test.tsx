@@ -12,20 +12,30 @@ const occupation: ClientInteractionState = {
 }
 const idle: ClientInteractionState = { stateId: 'idle', allowedCommands: ['takeAction'], anytimeActions: [] }
 
-const Harness = ({ interaction = occupation, permitted = true, terrain = false, canReturnToActions }: {
+const rect = (top: number, height: number) => ({
+  x: 0, y: top, top, left: 0, right: 320, bottom: top + height, width: 320, height, toJSON: () => ({}),
+})
+
+const Harness = ({ interaction = occupation, permitted = true, terrain = false, canReturnToActions, coveredCard = false }: {
   interaction?: ClientInteractionState
   permitted?: boolean
   terrain?: boolean
   canReturnToActions?: boolean
+  coveredCard?: boolean
 }) => {
   const focus = useInteractionFocus({ interaction, canFocus: permitted, playerId: 'p1', onViewPlayer: () => {},
     canReturnToActions,
     localRequest: terrain ? { key: 'selected-terrain', target: 'farm' } : undefined })
   return <div className="app">
     <div data-interaction-focus="actions">Action spaces</div>
-    <div data-interaction-focus="occupation-hand" data-focus-player="p1">Occupations</div>
+    <div data-interaction-focus="occupation-hand" data-focus-player="p1">
+      Occupations
+      {coveredCard ? <div className="player-card">Covered card</div> : null}
+    </div>
     <div data-interaction-focus="controls">Payment controls</div>
     <div data-interaction-focus="farm" data-focus-player="p1">Farm targets</div>
+    {coveredCard ? <nav className="section-nav">Shortcuts</nav> : null}
+    {coveredCard ? <div className="interaction-bar">Actions</div> : null}
     {focus.hasTarget && <button onClick={focus.returnToTarget}>Return to current action</button>}
   </div>
 }
@@ -130,6 +140,20 @@ describe('Interaction Focus', () => {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)) })
     expect(window.scrollBy).toHaveBeenCalledTimes(calls)
     expect(document.querySelector('[data-interaction-focus="actions"]')).toHaveAttribute('data-interaction-focused', 'true')
+  })
+
+  it('scrolls an interaction target hidden by the shortcut dock even when it clears the action bar', async () => {
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('section-nav')) return rect(640, 40)
+      if (this.classList.contains('interaction-bar')) return rect(700, 80)
+      if (this.classList.contains('player-card')) return rect(600, 80)
+      if (this.dataset.interactionFocus === 'occupation-hand') return rect(600, 120)
+      return rect(10, 20)
+    })
+    render(<Harness coveredCard />)
+    await waitFor(() => expect(window.scrollBy).toHaveBeenCalledWith({ top: 600 - 12, behavior: 'instant' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Return to current action' }))
+    await waitFor(() => expect(window.scrollBy).toHaveBeenCalledTimes(2))
   })
 
   it('highlights a fully visible occupation hand without scrolling', async () => {

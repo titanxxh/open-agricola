@@ -36,9 +36,12 @@ const revealTarget = (target: InteractionFocusTarget, playerId: string): boolean
   if (target === 'controls') return true
   const viewport = window.visualViewport
   const viewportTop = (viewport?.offsetTop ?? 0) + 12
-  const bar = node.closest('.app')?.querySelector<HTMLElement>('.interaction-bar')
+  const app = node.closest('.app')
+  const bar = app?.querySelector<HTMLElement>('.interaction-bar')
+  const navRect = app?.querySelector<HTMLElement>('.section-nav')?.getBoundingClientRect()
+  const overlayTop = navRect && navRect.height > 0 ? navRect.top : bar?.getBoundingClientRect().top
   const viewportBottom = Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight),
-    bar?.getBoundingClientRect().top ?? window.innerHeight) - 12
+    overlayTop ?? window.innerHeight) - 12
   const bounds = node.getBoundingClientRect()
   const firstCard = node.querySelector<HTMLElement>('.player-card.selectable, .player-card')
   const bottom = firstCard?.getBoundingClientRect().bottom ?? bounds.bottom
