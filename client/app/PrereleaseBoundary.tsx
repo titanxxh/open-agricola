@@ -1,10 +1,11 @@
+import { normalizePrereleaseReturnPath } from '../../shared/contract/prerelease-runtime'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
 import { useLocale } from '../contexts/LocaleContext'
 import { browserApiFetch } from '../services/browser-api'
 import {
   acceptPrereleaseSession, getPrereleaseAccess, getPrereleaseRevision, getPrereleaseRuntime, isPrereleaseClient,
-  loadPrereleaseRuntime, rejectPrereleaseAccess, subscribePrereleaseAccess,
+  loadPrereleaseRuntime, prereleaseStartUrl, rejectPrereleaseAccess, subscribePrereleaseAccess,
 } from '../services/prerelease-runtime'
 import './PrereleaseBoundary.css'
 
@@ -42,8 +43,16 @@ function PrereleaseApplication({ children }: { children: ReactNode }) {
         if (![400, 401, 403, 426, 503].includes(response.status)) rejectPrereleaseAccess('prerelease_access_paused')
         return
       }
-      acceptPrereleaseSession(await response.json(), revision, requestStarted)
-      if (firstHandoff) window.history.replaceState(window.history.state, '', HOSTED_APP_PATH)
+      const result: unknown = await response.json()
+      let returnPath: string | undefined
+      if (firstHandoff) {
+        if (!result || typeof result !== 'object' || !('returnPath' in result) || typeof result.returnPath !== 'string'
+          || !(returnPath = normalizePrereleaseReturnPath(result.returnPath))) {
+          rejectPrereleaseAccess('invalid_prerelease_handoff'); return
+        }
+      }
+      if (returnPath) window.history.replaceState(window.history.state, '', returnPath)
+      acceptPrereleaseSession(result, revision, requestStarted)
     } catch {
       if (getPrereleaseAccess().kind !== 'blocked') rejectPrereleaseAccess('prerelease_access_paused')
     } finally { setReady(true) }
@@ -64,7 +73,7 @@ function PrereleaseApplication({ children }: { children: ReactNode }) {
     <aside className="prerelease-banner" aria-label={t('prerelease.environment')}>
       <strong>{t('prerelease.version', { version: (runtime?.buildId ?? import.meta.env.VITE_GAME_BUILD_ID ?? '').slice(0, 12) })}</strong>
       {runtime ? <a href={`${runtime.formalAppOrigin}/`}>{t('prerelease.returnToProduction')}</a>
-        : <a href={`${HOSTED_APP_PATH}auth/start`}>{t('prerelease.entry')}</a>}
+        : <a href={prereleaseStartUrl()}>{t('prerelease.entry')}</a>}
     </aside>
     {access.kind === 'active' ? children : <main className="prerelease-access-screen">
       <h1>{t('prerelease.environment')}</h1>
@@ -73,7 +82,7 @@ function PrereleaseApplication({ children }: { children: ReactNode }) {
         if (callback || code === 'prerelease_runtime_changed') window.location.reload()
         else void check()
       }}>{t('platform.retry')}</button>}
-      {runtime && <a className="btn-primary" href={`${HOSTED_APP_PATH}auth/start`}>{t('prerelease.entry')}</a>}
+      {runtime && <a className="btn-primary" href={prereleaseStartUrl()}>{t('prerelease.entry')}</a>}
     </main>}
   </>
 }
