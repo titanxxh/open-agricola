@@ -3,7 +3,6 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { applicationDataEnvironment, assertOwnerPath, assertScopedPaths, type PrereleaseTarget, targetFingerprint } from './config'
 import { candidateAlias } from './gateway'
-import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
 
 export type InstalledBuild = { buildId: string; image: string; installedAt: number }
 export type Operation = { id: string; kind: 'deploy' | 'reset' | 'restore' | 'reverify'; buildId: string; image: string;
@@ -104,7 +103,7 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
       APP_ROOM_CAPACITY: String(target.budgets.sessions.rooms), CUSTOM_SESSION_WORKER_CAPACITY: String(target.budgets.sessions.customWorkers),
       ALLOW_ANONYMOUS_WS: 'false', ACCOUNT_REGISTRATION_POLICY: 'invite_only', REPLAY_TRUST_PROXY: 'true',
       GAME_BUILD_ID: record.installed?.buildId ?? record.operation?.buildId, CORS_ORIGIN: target.origin,
-      PUBLIC_APP_ORIGIN: `${target.origin}${HOSTED_APP_PATH}`, PUBLIC_API_BASE: target.origin, FORMAL_APP_ORIGIN: target.formal.appOrigin, FORMAL_API_BASE: target.formal.apiOrigin,
+      PUBLIC_APP_ORIGIN: target.origin, PUBLIC_API_BASE: target.origin, FORMAL_APP_ORIGIN: target.formal.appOrigin, FORMAL_API_BASE: target.formal.apiOrigin,
       PRERELEASE_TARGET_ID: target.targetId, PRERELEASE_DATA_GENERATION: record.generation } }
   const tool = { image: candidateImage ?? image, init: true, user: gateway.user, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
     ...limits('tools'), profiles: ['tools'], labels, networks: ['dependencies'], tmpfs: ['/tmp:size=67108864'],

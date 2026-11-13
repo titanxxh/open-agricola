@@ -84,6 +84,7 @@ function immutable(relativePath: string): boolean {
 export function createFrontendHosting(env: NodeJS.ProcessEnv = process.env): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
   const app = configuredUrl(env.PUBLIC_APP_ORIGIN, 'PUBLIC_APP_ORIGIN')
   const api = configuredUrl(env.PUBLIC_API_BASE, 'PUBLIC_API_BASE')
+  if (env.RELEASE_CHANNEL === 'prerelease' && app?.pathname === '/') app.pathname = HOSTED_APP_PATH
   const pagesApp = app && api && app.protocol === 'https:' && app.origin !== api.origin && isSameSite(app, api) ? app : undefined
   let directory: string | undefined
   let location: AppLocationResponse = { mode: 'disabled' }
