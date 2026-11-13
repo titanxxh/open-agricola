@@ -298,8 +298,11 @@ export class PrereleaseSessions {
           const state = parsePrereleaseIdentityState(await this.authority.status(row.grant_id), this.runtime, row.grant_id)
           if (state.account.kind === 'active' && state.account.subject.id !== event.userId) throw new Error('Identity subject changed')
           if (statusEpoch !== this.epoch) continue
+          if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) {
+            if (handoffFailure(state, this.now()) === 'expired') await this.denyState({ user_id: event.userId, grant_id: row.grant_id }, state)
+            continue
+          }
           await this.db.prepare('UPDATE prerelease_sessions SET identity_state=? WHERE grant_id=? AND user_id=? AND revoked_at IS NULL').run(JSON.stringify(state), row.grant_id, event.userId)
-          if (statusEpoch === this.epoch && handoffFailure(state, this.now()) === 'expired') await this.denyState({ user_id: event.userId, grant_id: row.grant_id }, state)
         }
       }
       await this.db.prepare('INSERT INTO prerelease_processed_identity_events(event_id,generation_id,outcome,completed_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING').run(event.id, this.runtime.generationId, outcome, this.now())
@@ -322,14 +325,16 @@ export class PrereleaseSessions {
         const state = parsePrereleaseIdentityState(await this.authority.status(grantId), this.runtime, grantId)
         if (state.account.kind === 'active' && state.account.subject.id !== row.user_id) throw new Error('Identity subject changed')
         if (operationEpoch !== this.epoch) continue
+        const authorized = isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)
+        if (!authorized && handoffFailure(state, this.now()) === 'expired') { await this.denyState(row, state); continue }
+        const storedState = authorized ? state : { ...parsePrereleaseIdentityState(JSON.parse(row.identity_state), this.runtime, grantId), validUntil: 0 }
         const updated = await this.db.prepare(`UPDATE prerelease_sessions SET identity_state=? WHERE grant_id=? AND revoked_at IS NULL
           AND EXISTS(SELECT 1 FROM prerelease_external_identities p WHERE p.user_id=prerelease_sessions.user_id AND p.revision=?)
           AND NOT EXISTS(SELECT 1 FROM prerelease_revoked_grants g WHERE g.grant_id=prerelease_sessions.grant_id)
-          AND NOT EXISTS(SELECT 1 FROM prerelease_deleted_subjects d WHERE d.user_id=prerelease_sessions.user_id)`).run(JSON.stringify(state), grantId, row.revision)
+          AND NOT EXISTS(SELECT 1 FROM prerelease_deleted_subjects d WHERE d.user_id=prerelease_sessions.user_id)`).run(JSON.stringify(storedState), grantId, row.revision)
         if (!updated.changes || operationEpoch !== this.epoch) continue
-        if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) {
-          if (handoffFailure(state, this.now()) === 'expired') await this.denyState(row, state)
-          else for (const [key, lease] of this.leases) if (lease.grantId === grantId) {
+        if (!authorized) {
+          for (const [key, lease] of this.leases) if (lease.grantId === grantId) {
             this.leases.delete(key); this.recordFailure(key, lease, 'paused', 'expired')
           }
           continue
