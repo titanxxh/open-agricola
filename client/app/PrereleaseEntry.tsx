@@ -1,3 +1,4 @@
+import { isPrereleaseClient } from '../services/prerelease-runtime'
 import { useEffect, useState } from 'react'
 import type { PrereleaseEntry as Entry } from '../../shared/contract/prerelease-identity'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,7 +10,7 @@ type EntryState = { kind: 'hidden' } | Entry
 export function PrereleaseEntry() {
   const { user, apiFetch } = useAuth()
   const { t } = useLocale()
-  const eligible = user?.betaAccess === true || user?.isAdmin === true
+  const eligible = !isPrereleaseClient() && (user?.betaAccess === true || user?.isAdmin === true)
   const [entry, setEntry] = useState<EntryState>({ kind: 'disabled' })
   useEffect(() => {
     if (!eligible) return
