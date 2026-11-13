@@ -132,7 +132,10 @@ it.each(['logout', 'source_revoked', 'source_invalid', 'account_deleted', 'absol
   expect(context.service.cachedAuthorized(session.token)).toBe(false)
 })
 
-it.each(['elapsed', 'future'])('pauses a %s background confirmation without inventing source revocation', async freshness => {
+it.each([
+  { freshness: 'elapsed', path: 'background' }, { freshness: 'future', path: 'background' },
+  { freshness: 'elapsed', path: 'event' }, { freshness: 'future', path: 'event' },
+])('pauses a $freshness $path confirmation without inventing source revocation', async ({ freshness, path }) => {
   const context = await setupConsumer(), session = await context.enter()
   context.advance(15_000)
   context.setStatus(async grantId => {
@@ -141,11 +144,22 @@ it.each(['elapsed', 'future'])('pauses a %s background confirmation without inve
     state.validUntil = state.confirmedAt + 30_000
     return state
   })
-  await context.service.refreshActive()
+  if (path === 'background') await context.service.refreshActive()
+  else {
+    context.events.push({ id: '00000000-0000-4000-8000-000000000014', kind: 'beta_changed', userId: session.user.id, grantId: null, createdAt: context.now() })
+    await context.service.processEvents()
+  }
   expect(context.service.status(session.token)).toBe('paused')
   expect(context.service.cachedAuthorized(session.token)).toBe(false)
   expect(await context.db.prepare('SELECT grant_id FROM prerelease_revoked_grants').all()).toEqual([])
   expect(await context.db.prepare('SELECT revoked_at FROM prerelease_sessions').all()).toEqual([{ revoked_at: null }])
+  context.advance(2)
+  context.setStatus(async () => { throw new Error('source offline') })
+  expect(await context.service.resolve(session.token)).toBeNull()
+  const reopened = new PrereleaseSessions({ db: context.db, runtime, authority: context.authority, now: context.now })
+  cleanup.push(async () => { reopened.close() })
+  expect(await reopened.resolve(session.token)).toBeNull()
+  expect(context.service.status(session.token)).toBe('paused')
   context.setStatus(async grantId => context.state(grantId))
   expect(await context.service.resolve(session.token)).toMatchObject({ user: session.user, expiresAt: session.expiresAt })
 })
