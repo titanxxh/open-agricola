@@ -186,8 +186,10 @@ it('keeps a newer Beta pause fenced while an older resolve finishes and its dura
   const context = await setupConsumer(), session = await context.enter()
   const latch = () => { let release = () => {}; const promise = new Promise<void>(done => { release = done }); return { promise, release } }
   const userLocked = latch(), identityLocked = latch(), releaseUser = latch(), releaseIdentity = latch(), betaSeen = latch()
+  let lockingPid: number | undefined
   const holdingUser = context.db.transaction(async () => {
     await context.db.prepare('SELECT id FROM users WHERE id=? FOR UPDATE').get(session.user.id)
+    lockingPid = (await context.db.prepare('SELECT pg_backend_pid() AS pid').get<{ pid: number }>())?.pid
     userLocked.release(); await releaseUser.promise
   })()
   await userLocked.promise
@@ -204,8 +206,8 @@ it('keeps a newer Beta pause fenced while an older resolve finishes and its dura
     resolving = context.service.resolve(session.token)
     const deadline = Date.now() + 2000
     for (;;) {
-      const stored = await context.db.prepare('SELECT identity_state FROM prerelease_sessions WHERE user_id=?').get<{ identity_state: string }>(session.user.id)
-      if (stored && JSON.parse(stored.identity_state).confirmedAt === context.now()) break
+      const waiting = await context.db.prepare('SELECT query FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid))').all<{ query: string }>(lockingPid)
+      if (waiting.some(row => row.query.startsWith('UPDATE users SET username='))) break
       if (Date.now() > deadline) throw new Error('Refresh did not reach the profile lock')
       await new Promise(done => setTimeout(done, 1))
     }
