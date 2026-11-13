@@ -308,6 +308,7 @@ it('does not grant PUBLIC execution of either privileged aggregate function', as
 })
 
 it('keeps registration healthy before the game opening schema exists without installing game relations', async () => {
+  await db.exec('DROP VIEW prerelease_retained_identity_refs')
   await db.exec('DROP VIEW operations_current_openings; DROP TABLE game_opening_accounts; DROP TABLE game_opening_facts; DROP TABLE game_opening_tracking')
   await access.provision()
   await account('pre-opening-schema', now)
