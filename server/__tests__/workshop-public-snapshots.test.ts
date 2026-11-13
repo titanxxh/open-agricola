@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
-import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { createTestDatabase } from './_helpers/postgres'
 import { testStorageEnvironment } from './_helpers/objects'
 import { S3ObjectStore } from '../storage/s3-store'
 import { ResourceStore } from '../storage/resource-store'
 import { approveCurrentDraft, createCard, enterReview, publish, type WorkshopDraft } from '../workshop-drafts'
+import { httpAdmission } from '../request-auth'
+import { authCookieNames } from '../auth-cookies'
+import { createSession } from '../auth'
 
 const db = await createTestDatabase()
 const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
@@ -19,6 +22,8 @@ beforeAll(async () => {
   await db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES ('author','author','Author','hash',1)").run()
   const { handleWorkshopRoute } = await import('../workshop')
   server.on('request', (req, res) => {
+    const admission = httpAdmission(req)
+    if (!admission.ok) { res.writeHead(admission.status); res.end(JSON.stringify({ ok: false, code: admission.code })); return }
     void handleWorkshopRoute(req, res).then(handled => {
       if (!handled) { res.writeHead(404); res.end() }
     }).catch(() => { res.writeHead(500); res.end() })
@@ -32,6 +37,9 @@ afterAll(async () => {
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   await objects.clearPrefix(); objects.close(); await db.close()
 })
+
+beforeEach(async () => { await db.prepare('DELETE FROM workshop_cards').run() })
+afterEach(() => vi.unstubAllEnvs())
 
 let reviewNumber = 1000
 async function publicCard(name: string, overrides: Partial<WorkshopDraft> = {}) {
@@ -50,6 +58,128 @@ async function publicCard(name: string, overrides: Partial<WorkshopDraft> = {}) 
   const published = await publish(db, { cardId: card.id, authorId: 'author', baseRevision: card.revision })
   return { card, draft, versionId: published.versionId }
 }
+
+it('discovers only frozen approved display fields through the public directory', async () => {
+  vi.stubEnv('NODE_ENV', 'production')
+  const { card, versionId } = await publicCard('CatalogApproved')
+  await db.prepare(`UPDATE workshop_cards SET card_id='CUSTOM_PrivateDraft', card_type='occupation',
+    name='PRIVATE draft name', description='PRIVATE draft description', card_json=? WHERE id=?`)
+    .run(JSON.stringify({ id: 'CUSTOM_PrivateDraft', name: 'PRIVATE draft name', card_type: 'occupation', _compiledCode: 'PRIVATE compiler output' }), card.id)
+
+  const response = await fetch(`${origin}/api/workshop/public-cards/v1/cards`)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('cache-control')).toBe('no-store')
+  expect(await response.json()).toEqual({
+    ok: true, protocolVersion: 1,
+    cards: [{
+      source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: card.id, versionId },
+      cardId: 'CUSTOM_CatalogApproved', name: 'CatalogApproved', cardType: 'minor',
+    }],
+    nextCursor: null,
+  })
+  expect((await fetch(`${origin}/api/workshop/cards`)).status).toBe(403)
+})
+
+it('keeps private, offline, disabled and invalid approval bindings out of every caller directory', async () => {
+  vi.stubEnv('NODE_ENV', 'production')
+  const approved = await publicCard('CatalogLive')
+  const merged = await publicCard('CatalogMergedLive')
+  await db.prepare("UPDATE workshop_cards SET review_status='merged' WHERE id=?").run(merged.card.id)
+  const offline = await publicCard('CatalogOffline')
+  await db.prepare('UPDATE workshop_cards SET live=0 WHERE id=?').run(offline.card.id)
+  const mergedOffline = await publicCard('CatalogMergedOffline')
+  await db.prepare("UPDATE workshop_cards SET live=0,review_status='merged' WHERE id=?").run(mergedOffline.card.id)
+  const disabled = await publicCard('CatalogDisabled')
+  await db.prepare('UPDATE workshop_public_versions SET disabled_at=1 WHERE version_id=?').run(disabled.versionId)
+  const stale = await publicCard('CatalogStale')
+  await db.prepare("UPDATE workshop_cards SET review_status='stale' WHERE id=?").run(stale.card.id)
+  const noBinding = await publicCard('CatalogNoBinding')
+  await db.prepare('UPDATE workshop_cards SET approved_version_id=NULL WHERE id=?').run(noBinding.card.id)
+  const crossBinding = await publicCard('CatalogCrossBinding')
+  await db.prepare('UPDATE workshop_cards SET approved_version_id=? WHERE id=?').run(approved.versionId, crossBinding.card.id)
+  const noPublication = await publicCard('CatalogNoPublication')
+  await db.prepare('DELETE FROM workshop_public_versions WHERE version_id=?').run(noPublication.versionId)
+  const crossPublication = await publicCard('CatalogCrossPublication')
+  await db.prepare('UPDATE workshop_public_versions SET card_id=? WHERE version_id=?').run(approved.card.id, crossPublication.versionId)
+  await createCard(db, { authorId: 'author', draft: {
+    ...approved.draft, cardId: 'CUSTOM_PrivateOnly', name: 'PrivateOnly',
+    cardJson: { id: 'CUSTOM_PrivateOnly', name: 'PrivateOnly', card_type: 'minor' },
+  } })
+  const token = await createSession('author')
+  if (!token) throw new Error('Author test session was not created')
+  expect((await fetch(`${origin}/api/workshop/cards?scope=mine`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(200)
+  const expected = [
+    { source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: approved.card.id, versionId: approved.versionId }, cardId: 'CUSTOM_CatalogLive', name: 'CatalogLive', cardType: 'minor' },
+    { source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: merged.card.id, versionId: merged.versionId }, cardId: 'CUSTOM_CatalogMergedLive', name: 'CatalogMergedLive', cardType: 'minor' },
+  ].sort((left, right) => left.source.workshopCardId < right.source.workshopCardId ? -1 : 1)
+  for (const headers of [undefined, { cookie: `${authCookieNames().session}=${token}` }, { authorization: `Bearer ${token}` }]) {
+    const response = await fetch(`${origin}/api/workshop/public-cards/v1/cards`, { headers })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, protocolVersion: 1, cards: expected, nextCursor: null })
+  }
+})
+
+it('pages public discovery in bounded ID order without requiring the cursor card to remain public', async () => {
+  vi.stubEnv('NODE_ENV', 'production')
+  for (let index = 1; index <= 21; index++) {
+    const id = `catalog-${String(index).padStart(2, '0')}`, versionId = `${id}-v1`
+    const cardJson = JSON.stringify({ id: `CUSTOM_Catalog${index}`, name: `Catalog ${index}`, card_type: 'minor' })
+    await db.prepare(`INSERT INTO workshop_cards(id,author_id,card_id,card_type,name,card_json,created_at,updated_at,review_status,live,approved_version_id)
+      VALUES (?,'author',?,'minor',?,?,1,1,'approved',1,?)`).run(id, `CUSTOM_Catalog${index}`, `Catalog ${index}`, cardJson, versionId)
+    await db.prepare(`INSERT INTO workshop_card_versions(id,card_id,card_json,version_number,created_by,created_at)
+      VALUES (?,?,?,1,'author',1)`).run(versionId, id, cardJson)
+  }
+  const first = await fetch(`${origin}/api/workshop/public-cards/v1/cards`)
+  expect(first.status).toBe(200)
+  expect(await first.json()).toMatchObject({
+    ok: true, protocolVersion: 1, nextCursor: 'catalog-20',
+    cards: Array.from({ length: 20 }, (_, index) => ({ source: { workshopCardId: `catalog-${String(index + 1).padStart(2, '0')}` } })),
+  })
+  await db.prepare("UPDATE workshop_cards SET live=0 WHERE id='catalog-20'").run()
+  const second = await fetch(`${origin}/api/workshop/public-cards/v1/cards?after=catalog-20`)
+  expect(second.status).toBe(200)
+  expect(await second.json()).toEqual({
+    ok: true, protocolVersion: 1, nextCursor: null,
+    cards: [{
+      source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: 'catalog-21', versionId: 'catalog-21-v1' },
+      cardId: 'CUSTOM_Catalog21', name: 'Catalog 21', cardType: 'minor',
+    }],
+  })
+  expect(await fetch(`${origin}/api/workshop/public-cards/v1/cards?after=catalog-21`).then(response => response.json()))
+    .toEqual({ ok: true, protocolVersion: 1, cards: [], nextCursor: null })
+})
+
+it('rejects unsupported discovery queries and every attempted directory write', async () => {
+  vi.stubEnv('NODE_ENV', 'production')
+  await publicCard('CatalogBounds')
+  const queries = ['?after=', '?after=a&after=b', `?after=${'x'.repeat(129)}`, '?after=%2F', '?after=%E4%B8%AD',
+    '?after=a%27%20OR%20true--', '?page=2', '?limit=1000', '?scope=mine', '?source=https%3A%2F%2Fother.example']
+  for (const query of queries) {
+    const response = await fetch(`${origin}/api/workshop/public-cards/v1/cards${query}`)
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ ok: false, code: 'invalid_public_card_request', protocolVersion: 1 })
+  }
+  expect(await fetch(`${origin}/api/workshop/public-cards/v1/cards?after=${'z'.repeat(128)}`).then(response => response.json()))
+    .toEqual({ ok: true, protocolVersion: 1, cards: [], nextCursor: null })
+  const before = await fetch(`${origin}/api/workshop/public-cards/v1/cards`).then(response => response.json())
+  expect(before).toMatchObject({ cards: [{ name: 'CatalogBounds' }] })
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    expect((await fetch(`${origin}/api/workshop/public-cards/v1/cards`, { method })).status).toBe(403)
+    const native = await fetch(`${origin}/api/workshop/public-cards/v1/cards`, { method, headers: { authorization: 'Bearer read-only-test' } })
+    expect(native.status).toBe(405)
+    expect(await native.json()).toEqual({ ok: false, code: 'read_only' })
+  }
+  expect(await fetch(`${origin}/api/workshop/public-cards/v1/cards`).then(response => response.json())).toEqual(before)
+})
+
+it('does not replace malformed approved display fields with the author draft', async () => {
+  const { versionId } = await publicCard('CatalogMalformed')
+  await db.prepare('UPDATE workshop_card_versions SET card_json=? WHERE id=?')
+    .run(JSON.stringify({ id: 'CUSTOM_CatalogMalformed', name: { private: 'not a display name' }, card_type: 'minor' }), versionId)
+  const response = await fetch(`${origin}/api/workshop/public-cards/v1/cards`)
+  expect(response.status).toBe(503)
+  expect(await response.json()).toEqual({ ok: false, code: 'public_card_source_unavailable' })
+})
 
 it('exports only a live approved version and verifies the actual image bytes in a fixed public input', async () => {
   const { card, versionId } = await publicCard('PublicSnapshot')
@@ -157,7 +287,7 @@ it('does not refresh status after an expired read and keeps the API read-only', 
   } finally { delayedRead.mockRestore(); clock.mockRestore() }
   const methods = ['POST', 'PUT', 'DELETE']
   for (const method of methods) {
-    const response = await fetch(`${origin}/api/workshop/public-cards/v1/cards/${card.id}`, { method })
+    const response = await fetch(`${origin}/api/workshop/public-cards/v1/cards/${card.id}`, { method, headers: { authorization: 'Bearer read-only-test' } })
     expect(response.status).toBe(405)
     expect(await response.json()).toEqual({ ok: false, code: 'read_only' })
   }
