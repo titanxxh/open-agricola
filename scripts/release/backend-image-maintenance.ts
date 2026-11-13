@@ -1,10 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { accessSync, chmodSync, closeSync, constants, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+import { performance } from 'node:perf_hooks'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fullSha } from '../ci/verification-tasks.ts'
-import { pinBackendDocker, readBackendImageRequest, verifyReceivedBackendImage, type BackendImageRequest } from './backend-image-receiver.ts'
+import { BACKEND_IMAGE_CLEANUP_MS, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS, BACKEND_IMAGE_MAINTENANCE_WORK_MS, BACKEND_IMAGE_QUEUE_WAIT_MS, admitBackendImageOperation, pinBackendDocker, readBackendImageOperation, startBackendImageOperation, verifyReceivedBackendImage, type BackendImageRequest } from './backend-image-receiver.ts'
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid native backend inventory')
@@ -17,6 +18,11 @@ function environment(value: unknown): Record<string, string> {
 function execute(command: string, args: string[], cwd: string, env = process.env, timeout = 30_000): string {
   try { return execFileSync(command, args, { cwd, env, encoding: 'utf8', timeout, maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim() }
   catch { throw new Error(`Backend maintenance command failed: ${command} ${args.slice(0, 2).join(' ')}`) }
+}
+function caddyDigest(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const match = /^(?:caddy|docker\.io\/library\/caddy)@(sha256:[a-f0-9]{64})$/.exec(value)
+  return match?.[1] ?? null
 }
 function prepareCommunityStorage(root: string): void {
   const data = join(root, 'data'), path = join(data, 'community')
@@ -66,37 +72,42 @@ function installedImageBinding(root: string) {
   } }
 }
 type Target = Pick<BackendImageRequest, 'directory' | 'sourceSha' | 'producerSha'>
-function validateTarget(path: string, expected: Target): BackendImageRequest {
-  const request = readBackendImageRequest(path)
+function validateTarget(request: BackendImageRequest, expected: Target): BackendImageRequest {
   if (request.directory !== expected.directory || request.sourceSha !== fullSha(expected.sourceSha)
     || request.producerSha !== fullSha(expected.producerSha)) throw new Error('Formal image request differs from the owner maintenance target')
   return request
 }
 
 export function maintainBackendImage(path: string, expected: Target): void {
-  const request = validateTarget(path, expected), root = request.directory, policy = resolve(import.meta.dirname, '../..')
+  const operation = readBackendImageOperation(path, 'maintenance'), request = validateTarget(operation.request, expected), root = request.directory, policy = resolve(import.meta.dirname, '../..')
   if (policy !== join(request.stage, 'policy')) throw new Error('Maintenance controller must come from the staged trusted producer')
+  let deadline = performance.now() + Math.min(BACKEND_IMAGE_MAINTENANCE_WORK_MS, operation.workDeadline - Date.now())
+  const run = (command: string, args: string[], cwd: string, env = process.env, timeout = 30_000): string => {
+    const remaining = Math.floor(deadline - performance.now())
+    if (remaining <= 0) throw new Error('Formal backend maintenance deadline expired')
+    return execute(command, args, cwd, env, Math.min(timeout, remaining))
+  }
   const unpin = pinBackendDocker(request.stage)
   let restartOld = false
   let drainTarget: (() => void) | undefined
   let source: { id: string; image: string; build: string; running: boolean } | undefined
-  const docker = (args: string[], timeout?: number): string => execute('docker', args, root, process.env, timeout)
+  const docker = (args: string[], timeout?: number): string => run('docker', args, root, process.env, timeout)
   const inspect = (id: string): Record<string, unknown> => {
     const values: unknown = JSON.parse(docker(['inspect', id]))
     if (!Array.isArray(values) || values.length !== 1) throw new Error('Expected exactly one native application container')
     return object(values[0])
   }
   try {
-    const image = verifyReceivedBackendImage(path, expected), installed = installedImageBinding(root)
+    const image = verifyReceivedBackendImage(path, expected, 'maintenance'), installed = installedImageBinding(root)
     const env = { ...process.env, GIT_NO_REPLACE_OBJECTS: '1', APP_UID: String(process.getuid?.()), APP_GID: String(process.getgid?.()), BACKEND_IMAGE: image, GAME_BUILD_ID: request.sourceSha, RELEASE_CHANNEL: 'stable', CADDY_IMAGE: installed.caddyImage ?? 'caddy:alpine' }
-    const git = (args: string[]): string => execute('git', args, root, env)
-    const config = (): Record<string, unknown> => object(JSON.parse(execute('docker', ['compose', '-f', 'docker-compose.prod.yml', 'config', '--format', 'json'], root, env)))
+    const git = (args: string[]): string => run('git', args, root, env)
+    const config = (): Record<string, unknown> => object(JSON.parse(run('docker', ['compose', '-f', 'docker-compose.prod.yml', 'config', '--format', 'json'], root, env)))
     if (git(['status', '--porcelain', '--untracked-files=no'])) throw new Error('Tracked local edits must be resolved before deployment')
     if (!existsSync(join(root, 'data/postgres-cutover.validated'))) throw new Error('Validate the PostgreSQL cutover before deployment')
     prepareCommunityStorage(root)
     const previousRef = fullSha(git(['rev-parse', 'HEAD'])), sourceConfig = config(), sourceServices = object(sourceConfig.services)
     if (typeof sourceConfig.name !== 'string' || !sourceConfig.name) throw new Error('Source Compose project identity is missing')
-    const oldId = execute('docker', ['compose', '-f', 'docker-compose.prod.yml', 'ps', '-a', '-q', 'app'], root, env)
+    const oldId = run('docker', ['compose', '-f', 'docker-compose.prod.yml', 'ps', '-a', '-q', 'app'], root, env)
     let oldEnv: Record<string, unknown>, oldExitCode: unknown
     const bootstrap = request.installation.kind === 'bootstrap'
     if (bootstrap) {
@@ -126,7 +137,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
       if ((targetEnv[key] ?? '') !== (oldEnv[key] ?? '')) throw new Error('Target data configuration differs from the retained source application')
     }
     if (!oldEnv.DATABASE_URL || !oldEnv.S3_ENDPOINT || !oldEnv.S3_BUCKET) throw new Error('Source application data target is incomplete')
-    const caddyId = execute('docker', ['compose', '-f', 'docker-compose.prod.yml', 'ps', '-a', '-q', 'caddy'], root, env)
+    const caddyId = run('docker', ['compose', '-f', 'docker-compose.prod.yml', 'ps', '-a', '-q', 'caddy'], root, env)
     let caddyImage: unknown
     if (request.installation.kind === 'bootstrap') {
       if (caddyId) throw new Error('Bootstrap requires no retained Caddy container')
@@ -134,7 +145,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
       if (!Array.isArray(values) || values.length !== 1) throw new Error('Expected one preloaded immutable Caddy image')
       const caddy = object(values[0])
       if (caddy.Os !== 'linux' || caddy.Architecture !== 'amd64' || !Array.isArray(caddy.RepoDigests)
-        || !caddy.RepoDigests.includes(request.installation.caddyImage)) throw new Error('Preloaded Caddy digest or platform differs from the explicit bootstrap input')
+        || !caddy.RepoDigests.some(value => caddyDigest(value) === caddyDigest(request.installation.kind === 'bootstrap' ? request.installation.caddyImage : null))) throw new Error('Preloaded Caddy digest or platform differs from the explicit bootstrap input')
       caddyImage = caddy.Id
     } else {
       if (!/^[a-f0-9]{12,64}$/.test(caddyId)) throw new Error('Retained Caddy inventory is required')
@@ -160,7 +171,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
     targetConfig.services = services
     const composePath = join(request.stage, 'maintenance.compose.json')
     writeFileSync(composePath, JSON.stringify(targetConfig) + '\n', { flag: 'wx', mode: 0o600, flush: true })
-    const compose = (args: string[], timeout?: number): string => execute('docker', ['compose', '-f', composePath, ...args], root, env, timeout)
+    const compose = (args: string[], timeout?: number): string => run('docker', ['compose', '-f', composePath, ...args], root, env, timeout)
     if (source) {
       writeFileSync(join(request.stage, 'source.json'), JSON.stringify({ ...source, previousRef }) + '\n', { flag: 'wx', mode: 0o600, flush: true })
       if (source.running) {
@@ -171,7 +182,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
       } else if (oldExitCode !== 0) throw new Error('Stopped source application has an unclean exit; maintenance remains active')
       const stem = `pre-${request.sourceSha.slice(0, 12)}-${request.operationId}`
       const backupEnv = Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith('BACKUP_')))
-      execute('bash', [join(policy, 'scripts/backup-storage.sh'), stem, '--already-stopped'], root,
+      run('bash', [join(policy, 'scripts/backup-storage.sh'), stem, '--already-stopped'], root,
         { ...backupEnv, BACKUP_ENVIRONMENT: 'stable', BACKUP_POLICY_ROOT: policy, BACKUP_WORKING_DIRECTORY: root, BACKUP_COMPOSE_FILE: composePath,
           BACKUP_CAPTURE_SERVICE: 'capture', BACKUP_TOOL_SERVICE: 'app', SOURCE_BUILD_ID: source.build, MAINTENANCE_LOCK_HELD: '1' }, 31 * 60_000)
       const manifest = object(JSON.parse(readFileSync(join(root, 'backups', `${stem}.manifest.json`), 'utf8')))
@@ -179,7 +190,38 @@ export function maintainBackendImage(path: string, expected: Target): void {
         || manifest.sourceBuildId !== source.build || manifest.targetBuildId !== request.sourceSha
         || typeof manifest.validatedAt !== 'string' || !Number.isFinite(Date.parse(manifest.validatedAt))) throw new Error('Sealed backup does not bind the retained source and fixed formal target')
     } else {
-      const proof = object(JSON.parse(compose(['run', '--rm', '--no-deps', '--pull', 'never', 'app', 'node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', 'check-empty', request.sourceSha, '--applications-stopped'], 120_000)))
+      const network = object(object(targetConfig.networks).dependencies)
+      if (network.external !== true || typeof network.name !== 'string' || !network.name) throw new Error('Empty-storage proof requires the configured external dependency network')
+      const names = ['DATABASE_URL', 'DATABASE_SCHEMA', 'S3_ENDPOINT', 'S3_BUCKET', 'S3_PREFIX', 'S3_REGION', 'S3_FORCE_PATH_STYLE', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']
+      const entries = names.flatMap(name => {
+        const value = targetEnv[name]
+        if (value === undefined || value === null) return []
+        if (typeof value !== 'string' || /[\r\n\0]/.test(value)) throw new Error('Empty-storage environment must contain single-line values')
+        return [`${name}=${value}`]
+      })
+      const environmentPath = join(request.stage, 'empty-storage.env')
+      writeFileSync(environmentPath, entries.join('\n') + '\n', { flag: 'wx', mode: 0o600, flush: true })
+      const limits = request.budget.import.intake
+      const proofDeadline = Date.now() + Math.min(90_000, Math.max(1, Math.floor(deadline - performance.now())))
+      const id = run('docker', ['create', '--pull', 'never', '--read-only',
+        '--tmpfs', '/tmp:rw,nosuid,nodev,size=64m,mode=1777', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+        '--label', `org.open-agricola.backend-operation=${request.operationId}`, '--label', 'org.open-agricola.backend-phase=empty-proof',
+        '--memory', `${limits.memoryMiB}m`, '--memory-swap', `${limits.memoryMiB}m`, '--cpus', String(limits.cpus), '--pids-limit', String(limits.pids),
+        '--network', network.name, '--user', `${process.getuid?.()}:${process.getgid?.()}`, '--env-file', environmentPath,
+        '--env', `GAME_BUILD_ID=${request.sourceSha}`, '--env', 'NODE_ENV=production', '--env', `BACKUP_DEADLINE_EPOCH_MS=${proofDeadline}`, image,
+        'node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', 'check-empty', request.sourceSha, '--applications-stopped'], root, env)
+      if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Empty-storage tool returned no native container identity')
+      const remove = () => execute('docker', ['rm', '-f', '-v', id], root, process.env, 30_000)
+      let proof: Record<string, unknown>
+      try {
+        writeFileSync(join(request.stage, 'empty-storage-container.json'), JSON.stringify({ id, image, operationId: request.operationId, deadline: proofDeadline }) + '\n', { flag: 'wx', mode: 0o600, flush: true })
+        proof = object(JSON.parse(run('docker', ['start', '-a', id], root, env, 120_000)))
+      }
+      catch (error) {
+        try { remove() } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Empty-storage proof failed and its container cleanup could not be confirmed', { cause: cleanupError }) }
+        throw error
+      }
+      remove()
       if (proof.formatVersion !== 1 || proof.targetBuildId !== request.sourceSha || proof.database !== 'empty' || proof.objects !== 'empty') throw new Error('Fixed target did not prove the new storage empty')
       writeFileSync(join(request.stage, 'empty-storage.json'), JSON.stringify(proof) + '\n', { flag: 'wx', mode: 0o600, flush: true })
     }
@@ -210,6 +252,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
     if (currentCaddy.Image !== caddyImage || object(currentCaddy.State).Running !== true || object(currentCaddy.State).OOMKilled !== false) throw new Error('Started Caddy does not match the accepted immutable image')
     writeFileSync(join(root, 'data/deployed-build-id'), request.sourceSha + '\n', { mode: 0o600, flush: true })
     writeFileSync(join(root, 'data/deployed-image.json'), readFileSync(join(request.stage, 'image.json')), { mode: 0o600, flush: true })
+    if (performance.now() > deadline) throw new Error('Formal backend maintenance deadline expired before publication')
     installed.write(image, caddyImage)
     drainTarget = undefined
     const archives = readdirSync(join(root, 'backups')).filter(name => /^pre-[A-Za-z0-9._-]+\.tgz$/.test(name))
@@ -221,6 +264,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
     }
     process.stdout.write(`Previous build: ${source?.build ?? 'none (explicit empty installation)'}\nCurrent build: ${request.sourceSha}\nFixed formal image: ${image}\nBackend maintenance deployment and target-build validation completed.\n`)
   } catch (error) {
+    deadline = performance.now() + BACKEND_IMAGE_CLEANUP_MS
     if (drainTarget) {
       try { drainTarget() }
       catch (drainError) { throw new AggregateError([error], 'Target start failed and application drain could not be confirmed; inspect private operation evidence', { cause: drainError }) }
@@ -239,12 +283,16 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const [mode, path, directory, sourceSha, producerSha] = process.argv.slice(2)
     if (!path || !directory || !sourceSha || !producerSha) throw new Error('Usage: backend-image-maintenance.ts maintain <request> <directory> <source> <producer>')
-    const expected = { directory, sourceSha, producerSha }, request = validateTarget(path, expected)
+    const expected = { directory, sourceSha, producerSha }
     if (mode === 'maintain') {
-      const result = spawnSync('flock', ['-w', '60', join(directory, 'backups/.maintenance.lock'), process.execPath, fileURLToPath(import.meta.url), '_locked', path, directory, sourceSha, producerSha],
-        { stdio: 'inherit', timeout: 40 * 60_000, env: { ...process.env, BACKEND_MAINTENANCE_OPERATION: request.operationId } })
+      const request = admitBackendImageOperation(path, 'maintenance', expected)
+      const result = spawnSync('flock', ['-w', String(BACKEND_IMAGE_QUEUE_WAIT_MS / 1000), join(directory, 'backups/.maintenance.lock'), process.execPath, fileURLToPath(import.meta.url), '_locked', path, directory, sourceSha, producerSha],
+        { stdio: 'inherit', timeout: BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS - 60_000, env: { ...process.env, BACKEND_MAINTENANCE_OPERATION: request.operationId } })
       if (result.error || result.status !== 0) throw new Error('Fixed image maintenance failed; inspect the private operation evidence before retrying')
-    } else if (mode === '_locked' && process.env.BACKEND_MAINTENANCE_OPERATION === request.operationId) maintainBackendImage(path, expected)
+    } else if (mode === '_locked') {
+      startBackendImageOperation(path, { kind: 'maintenance', target: expected, operationId: process.env.BACKEND_MAINTENANCE_OPERATION ?? '' })
+      maintainBackendImage(path, expected)
+    }
     else throw new Error('Backend maintenance requires its operation lock')
   } catch (error) { console.error(error instanceof Error ? error.message : 'Formal image maintenance failed'); process.exitCode = 1 }
 }

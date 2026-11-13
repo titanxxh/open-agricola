@@ -792,7 +792,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
       --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
     ```
 
-    预算仅授予导入资源，不授予镜像或目标权限。结构如下；数值须由 owner 根据实时余量选择，示例不是主机容量认证：
+    预算仅授予临时导入与空存储证明资源，不授予镜像或目标权限。结构如下；数值须由 owner 根据实时余量选择，示例不是主机容量认证：
 
     ```json
     {"format":1,"import":{"maxArchiveMiB":2048,"memoryHeadroomMiB":512,"intake":{"memoryMiB":384,"cpus":1,"pids":64}},"diskMiB":8192,"reserveMemoryMiB":512}
@@ -800,7 +800,11 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
 
 默认 host/ref/directory 仍为 `ubuntu@ten-kr`、`main`、`/home/ubuntu/open-agricola`，但五个镜像/资源参数必需，缺失时不回退为构建。命令拒绝在 CI 中运行。首次 SSH 前，入口固定 `F`、核对同 SHA 完整正式验证、原生 workflow/attempt/artifact 和 `formal-candidate/stable` 来源，再以 owner 私有凭据 digest pull、检查实际镜像并导出无 tag 的固定 archive。凭据和 Docker auth 不传服务器。
 
-服务器只从 `P` 提取可信控制文件。导入在独立受限 cgroup 中执行，零额外 swap，核对实时内存/磁盘余量、完整 archive、不可变 image ID 与镜像内前端描述。导入期间旧应用保持运行。传输/导入后 owner 重新核验正式授权，再签发短期维护请求；不能用旧 #1662 验收或工具镜像代替该应用的证据。
+服务器只从 `P` 提取可信控制文件。owner 先发送小型私有请求；大 archive 上传前，`preflight` 按已知字节数和配置的 reserve 检查实际 staging 与 Docker 数据文件系统。两类 SCP 输入均保留私有文件权限。archive 传输失败时，只能凭同一操作的私有 preflight 证明，在 30 分钟内请求清理该 stage 的 `image.tar`。过期 client stamp 仅可用于这次清理，不能执行应用操作；已有 intake、已接收 image 或 maintenance 证据会阻断清理。request 与诊断记录保留；清理失败与原传输错误一起报告。
+
+intake 和 maintenance 各自在排队前接纳一次 fresh、不可变请求，随后最多等待共享备份锁 30 分钟。owner 仍签发五分钟 stamp；receiver 使用有界十分钟未来上限容忍时钟偏差，并在接纳时拒绝过期输入。server 记录原 stamp、完整 binding 与 queue deadline。刷新 stamp 不能续期已接纳阶段，没有原 admission 的过期请求不能执行。排队在停 app 前，且不占 intake unit 的工作时间。实际 intake 保持 20 分钟 unit 上限、零额外 swap 与原资源限额；maintenance 用单调时钟限定最多 40 分钟工作，清理另有最多五分钟。owner SSH 包络为 intake 56 分钟、maintenance 76 分钟，包含最大排队与边界余量。失败 stage 保留供检查；重试使用新操作，不延长旧 admission。
+
+receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可变 image ID 与镜像内前端描述。传输、排队和导入期间旧应用继续运行。导入后 owner 重新核验正式授权，再为下一阶段签发短期请求；不能用旧 #1662 验收或工具镜像代替该应用证据。
 
 维护锁内再次绑定目录、`F`、`P` 和实际 image。保留精确的旧 container/image/Build，检查固定 fetch/checkout 与数据目标，然后干净停止旧应用。旧 image 负责导出 PostgreSQL/S3，新 image 负责隔离恢复验证；通过后才执行 `check-live`，以 `--no-build --pull never` 启动 app 和原 Caddy image。正式主机没有 `pnpm install`、应用构建、registry 登录或自动依赖升级。共享依赖变更仍须单独维护。
 
@@ -820,7 +824,7 @@ docker pull --platform linux/amd64 caddy@sha256:<approved-manifest-sha256>
 # --bootstrap-caddy-image caddy@sha256:<approved-manifest-sha256>
 ```
 
-默认路径仍是既有部署升级。显式 bootstrap 要求不存在 app/Caddy 容器或保留的项目 volume、既有镜像选择器、部署记录、备份/ledger 或本地旧数据。同一维护锁内，固定目标镜像的 `check-empty` 只读查询所有非系统 schema 的 PostgreSQL relation，并列出 S3 namespace，不写表或 ledger。应用 S3 身份须有列举权限；未知响应、权限错误、任意数据库 relation 或对象（包括空删除 ledger）都会拒绝。旧候选没有该命令也会拒绝。预置 Caddy 的 digest、原生 image ID、Linux AMD64 平台须匹配，交付中不 pull 或 build。仅空证明成功后才复用 `check-live` 初始化和目标验证，随后核对 app/Caddy 实际身份并原子发布选择器。bootstrap 失败保持关闭，排空新启动的服务。既有数据升级仍执行旧 source 捕获、新 target 恢复验证，不能因为容器不存在就当成新数据。初始化失败后须明确设计既有数据恢复，不自动重试 bootstrap。
+默认路径仍是既有部署升级。显式 bootstrap 要求不存在 app/Caddy 容器或保留的项目 volume、既有镜像选择器、部署记录、备份/ledger 或本地旧数据。同一维护锁内，固定目标镜像的 `check-empty` 只读查询所有非系统 schema 的 PostgreSQL relation，并列出 S3 namespace，不写表或 ledger。应用 S3 身份须有列举权限；未知响应、权限错误、任意数据库 relation 或对象（包括空删除 ledger）都会拒绝。旧候选没有该命令也会拒绝。证明使用直接创建的只读临时容器，仅接依赖网络和选定私有数据环境，沿用临时资源限额及内存临时目录，不挂载 host 或项目 volume；失败时也按返回的 container ID 清理。空证明前不执行 `docker compose run`，因此临时证明失败不会创建保留的项目 volume。预置 Caddy 的 digest、原生 image ID、Linux AMD64 平台须匹配，交付中不 pull 或 build。仅同一 digest 的官方 `caddy@sha256:...` 与 `docker.io/library/caddy@sha256:...` 等价名称可接受，其他 registry 或仓库拒绝。仅空证明成功后才复用 `check-live` 初始化和目标验证，随后核对 app/Caddy 实际身份并原子发布选择器。bootstrap 失败保持关闭，排空新启动的服务。既有数据升级仍执行旧 source 捕获、新 target 恢复验证，不能因为容器不存在就当成新数据。初始化失败后须明确设计既有数据恢复，不自动重试 bootstrap。
 
 ### 前端
 

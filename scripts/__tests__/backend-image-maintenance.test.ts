@@ -27,7 +27,7 @@ function fixture(failure = '', bootstrap = false) {
   const originalEnv = `# owner configuration\nACCOUNT_REGISTRATION_POLICY=invite_only\nPUBLIC_API_BASE=https://api.example.test\nPRIVATE_SENTINEL='keep exactly this value'\n${bootstrap ? '' : `BACKEND_IMAGE=${sourceImage}\nCADDY_IMAGE=${caddyImage}\n`}`
   writeFileSync(join(value.directory, '.env'), originalEnv)
   const data = { DATABASE_URL: 'postgres://private-fixture/formal', S3_ENDPOINT: 'http://objects:9000', S3_BUCKET: 'formal', S3_PREFIX: '', S3_REGION: 'fixture', S3_FORCE_PATH_STYLE: 'true', S3_ACCESS_KEY_ID: 'private-fixture-key', S3_SECRET_ACCESS_KEY: 'private-fixture-secret' }
-  const state = { failure, bootstrap: bootstrap || failure === 'missing-app', caddyStarted: !bootstrap, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
+  const state = { failure, bootstrap: bootstrap || failure === 'missing-app', caddyStarted: !bootstrap, projectVolume: false, proofRemoved: false, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
   const statePath = join(value.root, 'maintenance.json'), callsPath = join(value.root, 'maintenance-calls.jsonl')
   writeFileSync(statePath, JSON.stringify(state))
   const prefix = `#!${process.execPath}
@@ -41,7 +41,9 @@ else if(a[0]==='checkout'){s.head=s.failure==='checkout'?'f'.repeat(40):a[2];sav
 `, { mode: 0o700 })
   renameSync(join(value.bin, 'docker'), join(value.bin, 'docker-intake'))
   writeFileSync(join(value.bin, 'docker'), prefix + `
-if(a[0]==='image'&&a.at(-1).startsWith('caddy@sha256:')){log('docker');out([{Id:s.caddyImage,Os:'linux',Architecture:s.failure==='caddy-architecture'?'arm64':'amd64',RepoDigests:s.failure==='caddy-digest'?[]:[${JSON.stringify(caddyDigest)}]}]);process.exit(0)}
+if(a[0]==='image'&&a.at(-1).startsWith('caddy@sha256:')){log('docker');out([{Id:s.caddyImage,Os:'linux',Architecture:s.failure==='caddy-architecture'?'arm64':'amd64',RepoDigests:s.failure==='caddy-digest'?[]:[(s.failure==='caddy-canonical'?'docker.io/library/caddy':s.failure==='caddy-foreign'?'evil.example/library/caddy':'caddy')+'@sha256:'+('d'.repeat(64))]}]);process.exit(0)}
+if(a[0]==='create'&&a.includes('check-empty')){log('docker');const community=${JSON.stringify(join(value.directory, 'data/community'))},info=fs.existsSync(community)?fs.lstatSync(community):null;fs.appendFileSync(${JSON.stringify(join(value.root, 'community-before-run.jsonl'))},JSON.stringify({exists:!!info,directory:info?.isDirectory(),uid:info?.uid,mode:info?info.mode&0o777:null})+'\\n');fs.writeFileSync(${JSON.stringify(join(value.root, 'empty-proof-create.json'))},JSON.stringify(a));console.log('4'.repeat(64));process.exit(0)}
+if(a[0]==='rm'&&a.includes('4'.repeat(64))){log('docker');s.proofRemoved=true;save();process.exit(0)}
 if(['context','info','image','create','cp','rm'].includes(a[0])){const r=cp.spawnSync(${JSON.stringify(join(value.bin, 'docker-intake'))},a,{stdio:'inherit'});process.exit(r.status??1)}
 log('docker');const oldId=${JSON.stringify(oldId)},caddyId=${JSON.stringify(caddyId)},newId=${JSON.stringify(newId)},data=${JSON.stringify(data)};
 if(a[0]==='inspect'){
@@ -49,15 +51,17 @@ if(a[0]==='inspect'){
  State:{Running:id===caddyId?s.caddyStarted:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0},
  Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':'formal','com.docker.compose.service':id===caddyId?'caddy':'app'}}}]);
 }else if(a[0]==='stop'){if(s.failure==='up-app-stop'&&a.at(-1)===newId)process.exit(47);if(a.at(-1)===newId)s.started=false;else if(a.at(-1)===caddyId)s.caddyStarted=false;else s.running=false;save();}
+else if(a[0]==='start'&&a.includes('4'.repeat(64))){if(['nonempty','unsupported-empty'].includes(s.failure))process.exit(45);out({formatVersion:1,targetBuildId:${JSON.stringify(value.request.sourceSha)},database:'empty',objects:'empty'});}
 else if(a[0]==='start'){s.running=true;save();}
 else if(a[0]==='ps'){}
-else if(a[0]==='volume'){if(s.failure==='retained-volume')console.log('formal_app-data');}
+else if(a[0]==='volume'){if(s.failure==='retained-volume'||s.projectVolume)console.log('formal_app-data');}
 else if(a[0]==='compose'){
  const file=a[a.indexOf('-f')+1];
- if(a.includes('config'))out({name:'formal',services:{app:{image:'mutable:old',build:{context:'.'},environment:{...data,...(s.failure==='data-target'?{S3_BUCKET:'another'}:{})},volumes:[],networks:['default']},caddy:{image:'caddy:mutable',depends_on:['app']}},networks:{default:{name:'formal_default'}}});
+ if(a.includes('config'))out({name:'formal',services:{app:{image:'mutable:old',build:{context:'.'},environment:{...data,...(s.failure==='data-target'?{S3_BUCKET:'another'}:{})},volumes:[],networks:['default']},caddy:{image:'caddy:mutable',depends_on:['app']}},networks:{default:{name:'formal_default'},dependencies:{external:true,name:'shared_dependencies'}}});
  else if(a.includes('ps'))console.log(file.endsWith('maintenance.compose.json')?(a.at(-1)==='caddy'?caddyId:newId):s.bootstrap?(s.failure==='existing-caddy'&&a.at(-1)==='caddy'?caddyId:''):a.at(-1)==='caddy'?caddyId:oldId);
  else if(a.includes('up')){s.started=true;s.caddyStarted=true;save();if(['up','up-app-stop'].includes(s.failure))process.exit(42);}
  else if(a.includes('run')){
+  if(s.bootstrap){s.projectVolume=true;save();}
   const community=${JSON.stringify(join(value.directory, 'data/community'))},info=fs.existsSync(community)?fs.lstatSync(community):null;fs.appendFileSync(${JSON.stringify(join(value.root, 'community-before-run.jsonl'))},JSON.stringify({exists:!!info,directory:info?.isDirectory(),uid:info?.uid,mode:info?info.mode&0o777:null})+'\\n');
   const config=JSON.parse(fs.readFileSync(file,'utf8'));fs.writeFileSync(${JSON.stringify(join(value.root, 'observed-compose.json'))},JSON.stringify(config));
   if(a.includes('export')){
@@ -118,7 +122,7 @@ it.each(['fetch', 'checkout', 'data-target', 'oom'])('rejects %s mismatch before
 it('rejects another owner target before native Docker or source commands', () => {
   const value = fixture(), result = value.invoke('b'.repeat(40))
   expect(result.status).not.toBe(0)
-  expect(result.stderr).toContain('differs from the owner maintenance target')
+  expect(result.stderr).toContain('differs from the owner target')
   expect(value.calls()).toEqual([])
 })
 
@@ -234,7 +238,7 @@ it('bootstraps explicitly proven empty storage with a preloaded immutable Caddy 
   expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv + `BACKEND_IMAGE=${value.imageId}\nCADDY_IMAGE=${value.caddyImage}\n`)
 })
 
-it.each(['nonempty', 'unsupported-empty', 'caddy-digest', 'caddy-architecture', 'existing-caddy', 'retained-volume'])('rejects bootstrap %s before initializing or starting a stack', failure => {
+it.each(['nonempty', 'unsupported-empty', 'caddy-digest', 'caddy-architecture', 'existing-caddy', 'retained-volume', 'caddy-foreign'])('rejects bootstrap %s before initializing or starting a stack', failure => {
   const value = fixture(failure, true), result = value.invoke()
   expect(result.status).not.toBe(0)
   expect(value.calls().some(call => call.args.includes('check-live') || call.args.includes('up'))).toBe(false)
@@ -323,4 +327,39 @@ it.each(['file', 'symlink', 'unwritable'])('refuses unsafe %s community storage 
   expect(value.calls().some(call => call.args[0] === 'stop' || call.args.includes('check-empty') || call.args.includes('check-live'))).toBe(false)
   if (kind === 'file') expect(readFileSync(community, 'utf8')).toBe('keep owner bytes')
   if (kind === 'unwritable') expect(statSync(community).mode & 0o777).toBe(0o500)
+})
+
+it('accepts the Docker Hub canonical spelling of the same preloaded Caddy digest', () => {
+  const value = fixture('caddy-canonical', true), result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(value.compose().services.caddy.image).toBe(value.caddyImage)
+})
+
+it('failed readonly empty proof creates no project volume and removes only its own transient container', () => {
+  const value = fixture('nonempty', true), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(value.current().projectVolume).toBe(false)
+  expect(value.current().proofRemoved).toBe(true)
+  const args: string[] = JSON.parse(readFileSync(join(value.root, 'empty-proof-create.json'), 'utf8'))
+  expect(args).toEqual(expect.arrayContaining(['--read-only', '--network', 'shared_dependencies', '--memory', '384m', '--memory-swap', '384m', '--cpus', '1', '--pids-limit', '64']))
+  expect(args.some(arg => ['--volume', '-v', '--mount', '--publish'].includes(arg))).toBe(false)
+  expect(value.calls().some(call => call.args.includes('check-live') || call.args.includes('up'))).toBe(false)
+  expect(value.calls().filter(call => call.args[0] === 'rm' && call.args.includes('4'.repeat(64))).map(call => call.args)).toEqual([['rm', '-f', '-v', '4'.repeat(64)]])
+})
+
+it('keeps the native maintenance timeout monotonic and integral when the server wall clock rolls back during work', () => {
+  const value = fixture(), now = Date.now(), clock = join(value.root, 'maintenance-clock'), observed = join(value.root, 'backup-timeout'), preload = join(value.root, 'maintenance-clock.mjs')
+  writeFileSync(clock, String(now))
+  writeFileSync(preload, `import fs from 'node:fs';import cp from 'node:child_process';import{syncBuiltinESMExports}from'node:module';
+const read=fs.readFileSync,rename=fs.renameSync,stat=fs.lstatSync,exec=cp.execFileSync;Date.now=()=>Number(read(${JSON.stringify(clock)},'utf8'));
+fs.renameSync=(from,to)=>{const result=rename(from,to);if(String(to).endsWith('/maintenance-admission.json')){const value=JSON.parse(read(to,'utf8'));if(value.phase==='running')fs.writeFileSync(${JSON.stringify(clock)},String(value.startedAt+39*60000));}return result};
+fs.lstatSync=(path,...args)=>{const result=stat(path,...args);if(String(path)===${JSON.stringify(join(value.directory, 'data/community'))})fs.writeFileSync(${JSON.stringify(clock)},${JSON.stringify(String(now))});return result};
+cp.execFileSync=(command,args,options)=>{if(command==='bash'&&args?.[0]?.endsWith('/backup-storage.sh'))fs.writeFileSync(${JSON.stringify(observed)},JSON.stringify({timeout:options.timeout}));return exec(command,args,options)};syncBuiltinESMExports();`)
+  const result = value.invoke(value.request.sourceSha, { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` })
+  expect(result.status, result.stderr).toBe(0)
+  const timeout = JSON.parse(readFileSync(observed, 'utf8')).timeout
+  expect(Number.isInteger(timeout)).toBe(true)
+  expect(timeout).toBeGreaterThan(0)
+  expect(timeout).toBeLessThanOrEqual(60_000)
+  expect(readFileSync(clock, 'utf8')).toBe(String(now))
 })

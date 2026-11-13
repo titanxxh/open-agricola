@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -49,6 +49,10 @@ const command=a.slice(a.indexOf('--')+1),node=command.indexOf(${JSON.stringify(p
 const env={...process.env};for(const item of a.filter(x=>x.startsWith('--setenv='))){const pair=item.slice(9),i=pair.indexOf('=');env[pair.slice(0,i)]=pair.slice(i+1);}
 const result=cp.spawnSync(command[0],command.slice(1),{env,stdio:'inherit'});process.exit(result.status??1);
 `, { mode: 0o700 })
+  const realFlock = execFileSync('which', ['flock'], { encoding: 'utf8' }).trim()
+  writeFileSync(join(bin, 'flock'), `#!${process.execPath}
+const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(join(root, 'flock.jsonl'))},JSON.stringify(a)+'\\n');const result=cp.spawnSync(${JSON.stringify(realFlock)},a,{stdio:'inherit'});process.exit(result.status??1);
+`, { mode: 0o700 })
   const metadata = { format: 1, gameBuildId: sourceSha, basePath: '/open-agricola/', releaseChannel: 'stable', deploymentTarget: 'stable-hosted' }
   writeFileSync(join(bin, 'docker'), `#!${process.execPath}
 const fs=require('node:fs'),crypto=require('node:crypto'),a=process.argv.slice(2),s=JSON.parse(fs.readFileSync(${JSON.stringify(statePath)},'utf8'));
@@ -61,9 +65,21 @@ else if(a[0]==='create')console.log('f'.repeat(64));
 else if(a[0]==='cp')fs.writeFileSync(a.at(-1),JSON.stringify({...${JSON.stringify(metadata)},...(s.badFrontend?{gameBuildId:'wrong'}:{})}));
 else if(a[0]!=='rm')process.exit(3);
 `, { mode: 0o700 })
-  const invoke = (mode = 'receive') => spawnSync(process.execPath, ['scripts/release/backend-image-receiver.ts', mode, requestPath, ...(mode === 'check' ? [directory, sourceSha, producerSha] : [])], {
-    cwd: resolve(import.meta.dirname, '../../..'), env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${bin}:${process.env.PATH}` }), encoding: 'utf8', timeout: 30000,
-  })
-  return { root, bin, directory, stage, requestPath, statePath, request, state, save, invoke, imageId, archivePath,
+  const args = (mode: string) => ['scripts/release/backend-image-receiver.ts', mode, requestPath,
+    ...(['check', 'preflight', 'discard-transfer'].includes(mode) ? [directory, sourceSha, producerSha] : [])]
+  const env = (extra: NodeJS.ProcessEnv = {}) => dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${bin}:${process.env.PATH}`, ...extra })
+  const cwd = resolve(import.meta.dirname, '../../..')
+  const invoke = (mode = 'receive', extra: NodeJS.ProcessEnv = {}) => spawnSync(process.execPath, args(mode), { cwd, env: env(extra), encoding: 'utf8', timeout: 30000 })
+  const launch = (mode: string, extra: NodeJS.ProcessEnv = {}) => {
+    const child = spawn(process.execPath, args(mode), { cwd, env: env(extra), stdio: ['pipe', 'pipe', 'pipe'] })
+    let stdout = '', stderr = ''
+    child.stdout.on('data', (data: Buffer) => { stdout += data.toString() })
+    child.stderr.on('data', (data: Buffer) => { stderr += data.toString() })
+    const result = new Promise<{ status: number | null; stdout: string; stderr: string }>((done, reject) => {
+      child.once('error', reject); child.once('close', status => done({ status, stdout, stderr }))
+    })
+    return { child, result }
+  }
+  return { root, bin, directory, stage, requestPath, statePath, request, state, save, invoke, launch, realFlock, imageId, archivePath,
     calls: (): string[][] => existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : [] }
 }
