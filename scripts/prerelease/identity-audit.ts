@@ -78,7 +78,10 @@ export async function applyPrereleaseIdentityAudit(db: PostgresDatabase, value: 
         }
         await deleteAccount(association.userId, { db, now })
         erased++
-      } else {
+      }
+    }
+    for (const association of associations) {
+      if (association.account.kind === 'active') {
         await db.prepare(`INSERT INTO users(id,username,display_name,password_hash,created_at,identity_origin)
           VALUES(?,?,?,NULL,?,'external') ON CONFLICT(id) DO UPDATE
           SET username=excluded.username,display_name=excluded.display_name WHERE users.identity_origin='external'`)
