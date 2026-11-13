@@ -2,7 +2,7 @@
   position: fixed;
   z-index: 40;
   left: max(8px, env(safe-area-inset-left, 0px));
-  bottom: calc(var(--interaction-bar-height, 72px) + 8px);
+  bottom: calc(max(var(--interaction-bar-height, 72px), var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) + 8px);
   display: flex;
   flex-flow: row nowrap;
   gap: 6px;
@@ -59,7 +59,7 @@
 }
 
 .app:has(.section-nav) {
-  padding-bottom: calc(var(--app-edge-padding) + var(--interaction-bar-height, 0px) + var(--section-nav-height, 0px));
+  padding-bottom: calc(var(--app-edge-padding) + max(var(--interaction-bar-height, 0px), var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) + var(--section-nav-height, 0px));
 }
 
 @media (prefers-reduced-motion: reduce) {
