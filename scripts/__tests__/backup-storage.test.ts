@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config'
-import { readRuntime, writeRuntime } from '../prerelease/runtime'
+import { atomicJson, readRuntime, writeRuntime } from '../prerelease/runtime'
+import { importedImagePath } from '../prerelease/docker'
+import type { ContainerImageTransfer } from '../release/container-images'
 import { readPairedPrereleaseBackup } from '../prerelease/backup'
 
 const sourceBuild = 'a'.repeat(40), image = `sha256:${'b'.repeat(64)}`, container = 'c'.repeat(64)
@@ -46,13 +48,21 @@ function backup(fail = '', stopped = false, duplicate = false, offsiteOptions: {
       validationDatabase: { host: '127.0.0.1', port: 5432, name: 'oa_prerelease_test_validation', role: 'oa_prerelease_test_validator' },
       objects: { endpoint: 'http://127.0.0.1:9000', bucket: 'oa-prerelease-test', prefix: 'live/', appKeyId: 'pre-app', backupKeyId: 'pre-backup' },
       offsite: { host: 'fixture', directory: '/srv/backups/open-agricola-prerelease-test' },
-      builder: { name: 'prerelease-test', container: 'prerelease-test-builder' },
     }) : undefined
     if (target) {
       const common = 'S3_BUCKET=oa-prerelease-test\nS3_PREFIX=live/\nS3_SECRET_ACCESS_KEY=inert-fixture\nS3_ENDPOINT=http://127.0.0.1:9000\nS3_REGION=us-east-1\nS3_FORCE_PATH_STYLE=true\n'
       writeFileSync(join(root, '.env'), 'DATABASE_URL=postgres://oa_prerelease_test_app:fixture@127.0.0.1/oa_prerelease_test\nS3_ACCESS_KEY_ID=pre-app\n' + common, { mode: 0o600 })
       writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=postgres://oa_prerelease_test_backup:fixture@127.0.0.1/oa_prerelease_test\nVALIDATION_DATABASE_URL=postgres://oa_prerelease_test_validator:fixture@127.0.0.1/oa_prerelease_test_validation\nS3_ACCESS_KEY_ID=pre-backup\n' + common, { mode: 0o600 })
       chmodSync(join(root, '.env'), 0o600); chmodSync(join(root, 'data/dependencies.compose.env'), 0o600)
+      const transfer: ContainerImageTransfer = { format: 1, receipt: {
+        format: 1, repository: 'titanxxh/open-agricola', repositoryId: 123, purpose: 'trusted-policy', channel: 'stable',
+        sourceSha: policySha, producerSha: policySha, platform: 'linux/amd64',
+        registryRepository: 'ghcr.io/titanxxh/open-agricola-images', manifestDigest: `sha256:${'e'.repeat(64)}`, imageId: policyImage,
+        build: { runId: 10, runAttempt: 1 }, verification: { kind: 'main-policy', configuration: 'f'.repeat(64) },
+      }, archive: { sha256: 'e'.repeat(64), bytes: 10240 } }
+      if (fail !== 'prerelease-missing-policy') atomicJson(importedImagePath(target, 'trusted-policy', policySha, policySha), {
+        fingerprint: targetFingerprint(target), transfer,
+      })
       const initial = readRuntime(target)
       writeRuntime(target, { ...initial, mode: stopped ? 'maintenance' : 'open', buildId: sourceBuild, installed: { buildId: sourceBuild, image, installedAt: Date.now() },
         operation: offsiteOptions.operation ? { id: '11111111-1111-4111-8111-111111111111', kind: offsiteOptions.operation, buildId: sourceBuild, image, sourceBuildId: sourceBuild, sourceImage: image, stage: 'backup', backupStem: 'manual-test', generation: initial.generation } : null, acceptance: { acceptedAt: Date.now(), sha256: 'f'.repeat(64) } })
@@ -125,13 +135,7 @@ printf '%s\\n' "$*" >> "$PWD/docker-calls"
 printf 'docker:%s\\n' "$*" >> "$PWD/backup-events"
 printf '%s:%s\\n' "\${APP_UID:-$(id -u)}" "\${APP_GID:-$(id -g)}" >> "$PWD/docker-users"
 case "$*" in
-  'buildx ls --format {{json .Builder}}') printf '${JSON.stringify({ Name: 'prerelease-test', Driver: 'remote', Nodes: [{ Endpoint: 'docker-container://prerelease-test-builder' }] })}';;
-  'start prerelease-test-builder') touch "$PWD/builder-running";;
-  'stop --timeout 30 prerelease-test-builder') rm -f "$PWD/builder-running";;
-  'buildx build '*) cat >/dev/null;;
-  *'{{json .Config.Labels}}'*'prerelease-test-builder') printf '{"org.open-agricola.environment":"prerelease-test"}';;
   *'{{json .HostConfig}}'*) printf '{"Privileged":false,"Memory":268435456,"NanoCpus":500000000,"PidsLimit":64}';;
-  *'{{json .State}}'*'prerelease-test-builder') if [[ -f "$PWD/builder-running" ]]; then printf '{"Running":true}'; else printf '{"Running":false}'; fi;;
   *'{{json .Config}}'*) printf '{"User":"1000:1000"}';;
   *'{{json .Mounts}}'*) printf '[]';;
   'image inspect --format {{.Id}}'*) printf '${policyImage}';;
@@ -297,6 +301,7 @@ it('captures an open prerelease source using the separate trusted policy image a
   expect(result.status, result.stderr).toBe(0)
   const exporter = result.calls.find(call => call.includes('export-online /backup/'))
   expect(exporter).toContain(result.policyImage)
+  expect(result.calls.some(call => /^(?:buildx|build|pull|load)\b/.test(call))).toBe(false)
   expect(exporter).not.toContain(' run --rm --no-deps ')
   const validator = result.calls.find(call => call.includes('validate /backup/'))
   expect(validator).toContain('/capture:ro')
@@ -308,6 +313,15 @@ it('captures an open prerelease source using the separate trusted policy image a
   expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
 }, 15000)
 
+it('requires an imported policy image before backup without building or exporting from the candidate', () => {
+  const result = backup('prerelease-missing-policy')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Missing verified imported image')
+  expect(result.report).toBeUndefined()
+  expect(result.calls.some(call => /^(?:buildx|build|pull|load)\b/.test(call) || call.includes('export-online /backup/'))).toBe(false)
+  expect(result.runtime).toMatchObject({ mode: 'open', installed: { buildId: sourceBuild, image } })
+})
+
 it('fails closed when prerelease backup has no trusted owner context', () => {
   const result = backup('prerelease-missing-context')
   expect(result.status).not.toBe(0)
@@ -318,6 +332,7 @@ it('fails closed when prerelease backup has no trusted owner context', () => {
 it.each(['channel', 'revision'])('rejects a policy tooling image with the wrong %s without falling back to candidate export', field => {
   const result = backup(`prerelease-bad-${field}`)
   expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Image channel/SHA does not match')
   expect(result.report).toBeUndefined()
   expect(result.calls.some(call => call.includes('export-online /backup/'))).toBe(false)
 })
