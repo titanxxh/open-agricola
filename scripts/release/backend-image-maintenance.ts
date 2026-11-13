@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { accessSync, chmodSync, closeSync, constants, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,6 +17,18 @@ function environment(value: unknown): Record<string, string> {
 function execute(command: string, args: string[], cwd: string, env = process.env, timeout = 30_000): string {
   try { return execFileSync(command, args, { cwd, env, encoding: 'utf8', timeout, maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim() }
   catch { throw new Error(`Backend maintenance command failed: ${command} ${args.slice(0, 2).join(' ')}`) }
+}
+function prepareCommunityStorage(root: string): void {
+  const data = join(root, 'data'), path = join(data, 'community')
+  if (!lstatSync(data).isDirectory()) throw new Error('Community storage requires a real data directory')
+  let created = false
+  try { mkdirSync(path, { mode: 0o755 }); created = true }
+  catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error }
+  const info = lstatSync(path)
+  if (!info.isDirectory() || info.uid !== process.getuid?.()) throw new Error('Community storage must be an owner-owned real directory')
+  if (created) chmodSync(path, 0o755)
+  else if ((info.mode & 0o700) !== 0o700) throw new Error('Community storage must be writable and traversable by its owner')
+  accessSync(path, constants.R_OK | constants.W_OK | constants.X_OK)
 }
 // .env is Compose's durable image selector. The JSON receipt is audit evidence only.
 // Keep a blank selector after live migration starts until the exact target is accepted.
@@ -81,6 +93,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
     const config = (): Record<string, unknown> => object(JSON.parse(execute('docker', ['compose', '-f', 'docker-compose.prod.yml', 'config', '--format', 'json'], root, env)))
     if (git(['status', '--porcelain', '--untracked-files=no'])) throw new Error('Tracked local edits must be resolved before deployment')
     if (!existsSync(join(root, 'data/postgres-cutover.validated'))) throw new Error('Validate the PostgreSQL cutover before deployment')
+    prepareCommunityStorage(root)
     const previousRef = fullSha(git(['rev-parse', 'HEAD'])), sourceConfig = config(), sourceServices = object(sourceConfig.services)
     if (typeof sourceConfig.name !== 'string' || !sourceConfig.name) throw new Error('Source Compose project identity is missing')
     const oldId = execute('docker', ['compose', '-f', 'docker-compose.prod.yml', 'ps', '-a', '-q', 'app'], root, env)
