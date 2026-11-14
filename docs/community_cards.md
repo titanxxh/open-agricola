@@ -12,6 +12,7 @@
 <!-- community-card-entries:begin -->
 | Card ID | Name | Type | Author | PR  |
 | ------- | ---- | ---- | ------ | --- |
+| CUSTOM_MedievalMallet | Medieval Mallet | minor | xxh | #1038 |
 <!-- community-card-entries:end -->
 
 
