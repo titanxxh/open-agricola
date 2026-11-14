@@ -1,4 +1,5 @@
 import { resourceFetch } from './resource-fetch'
+import { assertPrereleaseAccess, isPrereleaseClient } from './prerelease-runtime'
 /**
  * Client-side card metadata service.
  *
@@ -75,10 +76,18 @@ const fetchManifest = (): Promise<Response> => {
 let manifestPromise: Promise<Record<string, CardMeta>> | null = null
 let manifestCache: Record<string, CardMeta> | null = null
 
+const assertManifestReadable = (): void => {
+  if (isPrereleaseClient()) assertPrereleaseAccess()
+}
+
 export const hasCardsManifest = (): boolean => manifestCache !== null
 
 export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
-  if (manifestCache) return Promise.resolve(manifestCache)
+  const cached = manifestCache
+  if (cached) return Promise.resolve().then(() => {
+    assertManifestReadable()
+    return cached
+  })
   if (!manifestPromise) {
     manifestPromise = fetchManifest()
       .then((res) => {
@@ -94,6 +103,7 @@ export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
         for (const [id, entry] of Object.entries(payload)) {
           if (entry?.meta) flat[id] = entry.meta
         }
+        assertManifestReadable()
         manifestCache = flat
         return flat
       })
