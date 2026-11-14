@@ -1,3 +1,4 @@
+import { isPrerelease } from './prerelease-access'
 import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthUser } from './auth.ts'
@@ -54,7 +55,7 @@ const send = (
   payload: GameContextResponse,
 ): void => {
   const body = JSON.stringify(payload)
-  const isPublic = payload.ok && payload.lifecycle !== 'active'
+  const isPublic = !isPrerelease() && payload.ok && payload.lifecycle !== 'active'
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...corsHeaders({

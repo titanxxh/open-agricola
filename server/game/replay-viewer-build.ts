@@ -1,8 +1,9 @@
+import { readReplayViewerManifest, type ReplayViewerManifest } from '../../shared/contract/replay-viewer-build'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-export type ReplayViewerBuild = {
+export type ReplayViewerBuild = ReplayViewerManifest & {
   directory: string
   entrypoint: 'index.html'
   files: Record<string, string>
@@ -59,17 +60,9 @@ export const loadReplayViewerBuild = (
     const manifestPath = join(directory, 'manifest.json')
     const manifestRaw = readFileSync(manifestPath)
     if (createHash('sha256').update(manifestRaw).digest('hex') !== buildId) return null
-    const manifest = JSON.parse(manifestRaw.toString('utf8')) as {
-      entrypoint?: unknown
-      files?: unknown
-    }
-    if (
-      manifest.entrypoint !== 'index.html'
-      || !manifest.files
-      || typeof manifest.files !== 'object'
-      || Array.isArray(manifest.files)
-    ) return null
-    const expected = manifest.files as Record<string, unknown>
+    const manifest = readReplayViewerManifest(JSON.parse(manifestRaw.toString('utf8')))
+    if (!manifest) return null
+    const expected = manifest.files
     const files = viewerFiles(directory)
     if (
       files.length !== Object.keys(expected).length
@@ -84,7 +77,7 @@ export const loadReplayViewerBuild = (
         size: stat.size,
         mtimeMs: stat.mtimeMs,
       }
-      return /^[a-f0-9]{64}$/.test(expected[path] as string)
+      return /^[a-f0-9]{64}$/.test(expected[path]!)
         && fileHash(filePath) === expected[path]
     })) return null
     const manifestStat = lstatSync(manifestPath)
@@ -95,7 +88,8 @@ export const loadReplayViewerBuild = (
     const build: ReplayViewerBuild = {
       directory,
       entrypoint: 'index.html',
-      files: expected as Record<string, string>,
+      files: expected,
+      ...(manifest.bridge ? { bridge: manifest.bridge } : {}),
       fileMetadata,
     }
     verifiedBuilds.set(directory, { build, verifiedAt: Date.now() })

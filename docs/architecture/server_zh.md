@@ -107,7 +107,7 @@ ClientCommand
 - Replay 归档使用有界的权威状态差量（[ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)）。
 - 写入失败时冻结同一份 Frame 与 Intent，阻断 Room 并按退避重试；客户端等待，从不读取未提交状态。相同幂等 key 但 hash 不同会永久阻断并报警。
 - 单实例默认准入 30 个普通 Room。`APP_ROOM_CAPACITY`（1–30）与 `CUSTOM_SESSION_WORKER_CAPACITY`（0–15，默认 15）可降低上限；无效值阻止启动。`RoomDirectory` 对新建与首次恢复原子计算 OPEN 连接和 30 秒预留，包含缓存 Room。激活保留预留，直到正数在线 presence 消耗它。离线存档保留 owner，不占在线配额。Worker 限额计入保留的工坊 executor、恢复的 Room 与 HTTP 沙盒。满额 Room 可重连座位或通过 `newGame` 一换一替换。见 `room-directory.test.ts`、`session-capacity.test.ts` 与 `ws-server.test.ts`。
-- Game Context 链接按生命周期解析（[ADR 0013](../adr/0013-lifecycle-routed-game-context-access.md)）：completed、expired、removed 以及公开 Replay 不需登录；活动描述、恢复、Bug Report、证据与维护者取证执行座位或管理员授权。错误使用 `{ ok:false, code, lifecycle?, message }`。
+- 正式 Context 与完赛 Replay 保持公开（ADR 0010/0013），活动恢复与 Evidence 保留座位／管理员权限。pre 先查当前 Beta，再在发送前复核。Replay JSON 与 `/api/v1/replays/:roomId/assets/:hash` 使用 no-store，不走 ETag/Range；全局 `/replay-assets/:hash` 仍拒绝。`ReplayResources.asset` 检查本局引用、完整性与删除账本；Evidence 图片额外要求准确已提交 Anchor 和本人座位。测试：`prerelease-replay-routes.test.ts`。
 - 完成的 Replay 公开保留，直到被删除（[ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)）。
 - Bug Report（[ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)）是可恢复的 PostgreSQL 草稿，带稳定 `submissionId`、尝试记录与原子 claim。生产 GitHub App 客户端与测试 fake 是这一 seam 的两个 adapter。
 
