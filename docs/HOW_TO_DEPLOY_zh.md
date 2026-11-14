@@ -73,7 +73,7 @@ Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已
 
 ### 查询交付状态与验收现场
 
-`pnpm release:status --config /owner/status.json` 分别查询 Release、镜像构建、后端操作、Pages 和已保存浏览器验收。私有 JSON 必需字段为 `repository`、`version`、`candidateSha`、`apiOrigin`、`appOrigin`。可选 `image` 含 `runId`、`runAttempt`、`artifactId`，可选 `backend` 含 `host`、`directory`、`operationId`；`acceptanceFile` 指向已保存的 `release:accept` 结果。每阶段输出 `verified`、`absent`、`pending`、`conflict` 或 `unavailable`，并注明 `native`、`live` 或 `saved` 证据。缺输入时保持 unavailable；网络失败不会授权再次写入。保存的验收保留原完成时间并标记 saved，运行期探针另行展示。
+`pnpm release:status --config /owner/status.json` 分别查询 Release、镜像构建、后端操作、Pages 和已保存浏览器验收。私有 JSON 必需字段为 `repository`、`version`、`candidateSha`、`apiOrigin`、`appOrigin`。可选 `image` 含 `runId`、`runAttempt`、`artifactId`，可选 `backend` 含 `host`、`directory`、`operationId`；`acceptanceFile` 指向已保存的 `release:accept` 结果。每阶段输出 `verified`、`absent`、`pending`、`conflict` 或 `unavailable`，并注明 `native`、`live` 或 `saved` 证据。缺输入时保持 unavailable；网络失败不会授权再次写入。保存的验收保留原完成时间并标记 saved，运行期探针另行展示。其候选 SHA 与报告记录的实际受测 `appOrigin`、`apiOrigin` 必须和所选环境严格一致；其他环境的报告或缺少这两个 origin 的旧报告均返回 `conflict`。
 
 线上浏览器验收使用已有账号、该账号已参与的普通局和保留的已结束 Replay。先通过只读 repeatable-read 事务采集所需元数据，不扫描对局或回放 payload：
 
@@ -859,6 +859,8 @@ receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可�
 status 不需要 GitHub 或 registry 访问，不改原 request、admission 或 progress。临时原生 checkpoint probe 使用只读数据库事务，只清理自己的容器。输出含 `state`、`phase`、`nextAction` 和 `validatorExitCode`；原进程退出码未知时保留 `null`。维护锁或 validator 仍活跃时返回 `running` 和 `wait`。
 
 resume 在原锁内接受独立的新鲜十分钟授权，清理另有有限预算。它重新核对 staged producer 字节、原生镜像、数据配置、封存存储证据，以及精确目标构建已提交的完整验证报告和时间。启动前有活跃 writer、失败 import、foreign writer 或证据改变都会阻断。只续已验证、启动和接受后缀，原 request/admission 字节不变，不再次上传、备份或执行 live validation。Compose 已替换旧容器时，精确同操作的干净停止目标仍可续跑。已接受操作只补缺失接受步骤或清理自己的 archive，不重建容器。没有封存 progress 的早期操作需要调查，unknown 不授予启动资格。
+
+锁被占用时，`status` 成功报告 running，`resume` 则以非零状态退出。owner 只有确认同一操作与 binding 已接受后才报告续跑成功。续跑时间戳允许最多 60 秒时钟偏差，每次实际工作仍最多十分钟。
 
 `data/deployed-build-id` 与审计证据 `data/deployed-image.json` 记录成功交付，随后在实际部署目录的 owner 私有 `.env` 中原子写入无引号的 `BACKEND_IMAGE=sha256:...` 与 `CADDY_IMAGE=sha256:...`，固定已验收的原生不可变镜像。两项选择器共用一次原子写入。其他配置保持原字节；重复、带引号或使用可变 tag 的镜像配置会被拒绝。普通 Compose 默认读取该 `.env`，显式 `--env-file .env` 也读取同一绑定，不再回退旧 tag。不要用 shell、其他环境文件或备份配置覆盖该绑定。迁移前失败保留旧绑定；开始 live migration 前先写空绑定，此后失败会让普通 `run/up` 保持拒绝，直到固定镜像交付成功。JSON 回执是历史证据，不是另一套镜像选择。真实浏览器、保留对局和双实例现场验收仍须另做。
 

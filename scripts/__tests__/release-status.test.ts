@@ -45,11 +45,11 @@ else{console.error('Fixture native unavailable PRIVATE_TOKEN_SENTINEL');process.
   cleanups.push(closeServer)
   const config = { repository: 'titanxxh/open-agricola', version: 'v9.9.9', candidateSha: sha, apiOrigin: origin, appOrigin: origin,
     image: { runId: 42, runAttempt: 2, artifactId: 99 }, backend: { host: 'owner@host.test', directory: '/srv/formal', operationId }, acceptanceFile }
-  const report = { format: 1, expectedBuild: sha, startedAt: '2026-01-01T00:00:00Z', completedAt: '2026-01-01T00:01:00Z', passed: true,
+  const report = { format: 1, expectedBuild: sha, appOrigin: origin, apiOrigin: origin, startedAt: '2026-01-01T00:00:00Z', completedAt: '2026-01-01T00:01:00Z', passed: true,
     gamesCreated: 0, gameplayCommands: 0, privateSession: 'PRIVATE_TOKEN_SENTINEL', browsers: ['chromium', 'webkit'].map(engine => ({ engine,
       login: true, logout: true, cookie: true, lobby: true, routedInstances: 2, ordinaryRoom: true, reconnect: true, replay: true, blockedRequests: 0, cleanupFailures: Array<string>() })) }
   const writeConfig = (value: unknown = config) => writeFileSync(configPath, JSON.stringify(value), { mode: 0o600 })
-  const writeReport = () => writeFileSync(acceptanceFile, JSON.stringify(report), { mode: 0o600 })
+  const writeReport = (value: unknown = report) => writeFileSync(acceptanceFile, JSON.stringify(value), { mode: 0o600 })
   writeConfig(); writeReport()
   const run = () => new Promise<{ status: number | null; stdout: string; stderr: string }>((done, reject) => {
     const child = spawn(process.execPath, [cli, '--config', configPath], { cwd: root, env: { ...process.env, CI: '', GITHUB_ACTIONS: '', PATH: `${bin}:${process.env.PATH}` }, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -110,6 +110,22 @@ it.each(['candidate', 'game writes', 'browser', 'cleanup'])('rejects saved accep
   if (failure === 'cleanup') value.report.browsers[0]!.cleanupFailures = ['own-session-logout']
   value.writeReport()
   expect(JSON.parse((await value.run()).stdout).stages.acceptance.state).toBe('conflict')
+})
+
+it.each(['appOrigin', 'apiOrigin'] satisfies Array<'appOrigin' | 'apiOrigin'>)('rejects saved acceptance from another %s for the same candidate', async field => {
+  const value = await fixture()
+  value.report[field] = 'https://other.agricola.test'
+  value.writeReport()
+  const stages = JSON.parse((await value.run()).stdout).stages
+  expect(stages.pages).toMatchObject({ state: 'verified', evidence: 'live' })
+  expect(stages.acceptance).toMatchObject({ state: 'conflict', evidence: 'saved', reason: 'saved-acceptance-origin-mismatch' })
+})
+
+it.each(['appOrigin', 'apiOrigin'])('rejects legacy saved acceptance missing %s', async field => {
+  const value = await fixture()
+  value.writeReport(Object.fromEntries(Object.entries(value.report).filter(([key]) => key !== field)))
+  expect(JSON.parse((await value.run()).stdout).stages.acceptance)
+    .toMatchObject({ state: 'conflict', evidence: 'saved', reason: 'saved-acceptance-origins-missing' })
 })
 
 it('reports missing optional evidence explicitly instead of inferring stage success', async () => {

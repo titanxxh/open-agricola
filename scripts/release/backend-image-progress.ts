@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { backendImageRequestBinding, type BackendImageRequest } from './backend-image-receiver.ts'
 
 export const BACKEND_RESUME_WORK_MS = 10 * 60_000
+const BACKEND_RESUME_CLOCK_SKEW_MS = 60_000
 export type BackendProgress = {
   format: 1; operationId: string; bindingSha256: string;
   phase: 'validating' | 'starting' | 'accepted';
@@ -54,8 +55,9 @@ export function validateBackendResumeAuthorization(path: string, request: Backen
   if (Object.keys(input).sort().join(',') !== 'authorizedAt,bindingSha256,expiresAt,format,nonce,operationId,workMs'
     || input.format !== 1 || input.operationId !== request.operationId || input.bindingSha256 !== backendImageRequestBinding(request)
     || typeof input.nonce !== 'string' || !/^[a-f0-9-]{36}$/.test(input.nonce) || path !== join(request.stage, `resume-${input.nonce}.json`)
-    || typeof input.authorizedAt !== 'number' || !Number.isSafeInteger(input.authorizedAt) || input.authorizedAt > now
+    || typeof input.authorizedAt !== 'number' || !Number.isSafeInteger(input.authorizedAt) || input.authorizedAt <= 0 || input.authorizedAt > now + BACKEND_RESUME_CLOCK_SKEW_MS
     || typeof input.expiresAt !== 'number' || !Number.isSafeInteger(input.expiresAt) || input.expiresAt <= now
+    || input.expiresAt > now + BACKEND_RESUME_WORK_MS + BACKEND_RESUME_CLOCK_SKEW_MS
     || input.expiresAt <= input.authorizedAt || input.expiresAt - input.authorizedAt > BACKEND_RESUME_WORK_MS
     || input.workMs !== BACKEND_RESUME_WORK_MS) throw new Error('Backend continuation authorization expired or belongs to another operation')
   return Math.min(input.workMs, input.expiresAt - now)

@@ -1,14 +1,28 @@
 // @covers scripts/release/
 // @covers e2e-tests/helpers/release-browser.ts
 import { createServer } from 'node:http'
+import { createHash } from 'node:crypto'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { WebSocketServer } from 'ws'
 import { expect, test } from '@playwright/test'
 import { installLiveSmokeGuard } from '../scripts/release/live-smoke-guard'
+import { runLiveReleaseSmoke } from '../scripts/release/live-smoke'
 import { installReleaseLocale, signOutReleaseSession, submitReleaseLogin } from './helpers/release-browser'
 import { BROWSER_WS_PROTOCOL } from '../shared/contract/browser-auth'
 
 async function controlServer() {
   const requests: string[] = [], commands: string[] = []
+  const expectedBuild = 'a'.repeat(40)
+  const build = { format: 1, gameBuildId: expectedBuild, basePath: '/', releaseChannel: 'stable', deploymentTarget: 'stable-pages' }
+  const entry = '<!doctype html><title>Retained viewer control</title>'
+  const viewer = JSON.stringify({ entrypoint: 'index.html', files: { 'index.html': createHash('sha256').update(entry).digest('hex') } })
+  const viewerBuildId = createHash('sha256').update(viewer).digest('hex')
+  const index = `<style>@media(max-width:700px){.lobby-header__right{display:none}}</style><div class="lobby-page"><div class="lobby-header__right"><button>Sign Out</button></div></div>
+        <iframe sandbox="allow-scripts" srcdoc="<!doctype html><title>Opaque one</title>"></iframe><iframe sandbox="allow-scripts" srcdoc="<!doctype html><title>Opaque two</title>"></iframe>
+        <script>document.querySelector('button').onclick=async()=>{await fetch('/api/auth/logout',{method:'POST',body:'{}'});document.body.innerHTML='<input id="username">'}</script>`
+  let origin = ''
   const server = createServer((req, res) => {
     const path = new URL(req.url ?? '/', 'http://localhost').pathname
     if (req.method === 'POST') {
@@ -16,14 +30,20 @@ async function controlServer() {
       if (path === '/api/auth/login') { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{}'); return }
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); return
     }
+    if (path === '/frontend-build.json' || path === '/api/auth/browser-policy' || path === '/api/v1/replays/ended/manifest') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(path === '/frontend-build.json' ? build : path === '/api/auth/browser-policy'
+        ? { version: 2, buildId: expectedBuild, appOrigin: origin, apiOrigin: origin } : { ok: true, viewerBuildId }))
+      return
+    }
+    if (path === `/replay-viewers/${viewerBuildId}/manifest.json`) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(viewer); return }
+    if (path === `/replay-viewers/${viewerBuildId}/index.html`) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(entry); return }
     res.writeHead(200, { 'Content-Type': 'text/html' })
     if (new URL(req.url ?? '/', 'http://localhost').searchParams.get('page') === 'login') {
       res.end(`<form class="login-form"><input id="username"><input id="password"><button type="submit">Login</button></form>
         <script>document.querySelector('form').onsubmit=e=>{e.preventDefault();fetch('/api/auth/login',{method:'POST',body:'{}'})}</script>`)
     } else {
-      res.end(`<style>@media(max-width:700px){.lobby-header__right{display:none}}</style><div class="lobby-page"><div class="lobby-header__right"><button>Sign Out</button></div></div>
-        <iframe sandbox="allow-scripts" srcdoc="<!doctype html><title>Opaque one</title>"></iframe><iframe sandbox="allow-scripts" srcdoc="<!doctype html><title>Opaque two</title>"></iframe>
-        <script>document.querySelector('button').onclick=async()=>{await fetch('/api/auth/logout',{method:'POST',body:'{}'});document.body.innerHTML='<input id="username">'}</script>`)
+      res.end(index)
     }
   })
   const sockets = new WebSocketServer({ server })
@@ -34,7 +54,8 @@ async function controlServer() {
   }))
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Control server needs a loopback address')
-  return { origin: `http://127.0.0.1:${address.port}`, requests, commands, async close() {
+  origin = `http://127.0.0.1:${address.port}`
+  return { origin, expectedBuild, viewerBuildId, build, index, requests, commands, async close() {
     for (const socket of sockets.clients) socket.terminate()
     await new Promise<void>(resolve => sockets.close(() => resolve()))
     server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()))
@@ -98,4 +119,29 @@ test('release login waiter and desktop logout complete after the mobile viewport
     await expect(page.locator('#username')).toBeVisible()
     expect(control.requests).toEqual(['/api/auth/login', '/api/auth/logout'])
   } finally { await context.close(); await control.close() }
+})
+
+test('live smoke records the tested normalized origins in its actual failed browser report', async () => {
+  const control = await controlServer(), directory = mkdtempSync(join(tmpdir(), 'live-smoke-origins-'))
+  const artifact = join(directory, 'pages'), output = join(directory, 'attempt')
+  const credentials = join(directory, 'credentials.env'), inventory = join(directory, 'inventory.json')
+  try {
+    mkdirSync(artifact)
+    writeFileSync(join(artifact, 'frontend-build.json'), JSON.stringify(control.build))
+    writeFileSync(join(artifact, 'index.html'), control.index)
+    writeFileSync(credentials, 'MY_TEST_USER_ID=fixture\nMY_TEST_PASSWORD=fixture-password\n', { mode: 0o600 })
+    writeFileSync(inventory, JSON.stringify({ observedAt: new Date().toISOString(),
+      instances: ['one', 'two'].map(instance_id => ({ instance_id, generation: control.expectedBuild, status: 'ready', lease_valid: true })),
+      contexts: [{ room_id: 'ended', lifecycle: 'completed' }], replays: [{ room_id: 'ended', viewer_build_id: control.viewerBuildId }],
+    }), { mode: 0o600 })
+    await expect(runLiveReleaseSmoke({ format: 1, appUrl: `${control.origin}/`, apiUrl: `${control.origin}/`, expectedBuild: control.expectedBuild,
+      credentialsFile: credentials, inventoryFile: inventory, artifactDirectory: artifact, outputDirectory: output,
+    })).rejects.toThrow('Release smoke failed during chromium:login')
+    const result = JSON.parse(readFileSync(join(output, 'result.json'), 'utf8'))
+    expect(result).toMatchObject({ expectedBuild: control.expectedBuild, appOrigin: control.origin, apiOrigin: control.origin,
+      passed: false, failure: { stage: 'chromium:login' } })
+    expect(control.requests).toEqual(['/api/auth/login'])
+    expect(control.commands).toEqual([])
+    expect(result.browsers[0].cleanupFailures).toEqual([])
+  } finally { await control.close(); rmSync(directory, { recursive: true, force: true }) }
 })

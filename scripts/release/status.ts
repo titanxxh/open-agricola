@@ -167,6 +167,8 @@ function acceptance(selected: Config): Stage {
     throw new ObservationError('unavailable', 'saved-acceptance-unreadable')
   }
   if (value.format !== 1 || value.expectedBuild !== selected.candidateSha || value.gamesCreated !== 0 || value.gameplayCommands !== 0) throw new ObservationError('conflict', 'saved-acceptance-mismatch')
+  if (typeof value.appOrigin !== 'string' || typeof value.apiOrigin !== 'string') throw new ObservationError('conflict', 'saved-acceptance-origins-missing')
+  if (value.appOrigin !== selected.appOrigin || value.apiOrigin !== selected.apiOrigin) throw new ObservationError('conflict', 'saved-acceptance-origin-mismatch')
   if (value.passed !== true) throw new ObservationError('conflict', 'saved-acceptance-failed')
   const completedAt = typeof value.completedAt === 'string' ? Date.parse(value.completedAt) : NaN
   if (!Number.isFinite(completedAt) || completedAt > Date.now() + 60_000 || !Array.isArray(value.browsers)) throw new ObservationError('conflict', 'saved-acceptance-incomplete')

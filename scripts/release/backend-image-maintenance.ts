@@ -582,6 +582,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         let progress: BackendProgress | undefined
         try { progress = readBackendProgress(request) } catch { /* The first journal is written only after storage is sealed. */ }
         console.log(JSON.stringify({ ...operationSummary(request, progress), state: 'running', nextAction: 'wait' }))
+        if (mode === 'resume') {
+          console.error('Backend continuation did not run because the maintenance lock is busy; wait for the current operation')
+          process.exitCode = 75
+        }
       }
       else if (result.error || result.status !== 0) throw new Error('Backend observation or continuation failed; inspect private operation evidence')
     } else if (mode === '_status') {

@@ -6,6 +6,7 @@ import { afterEach, expect, it } from 'vitest'
 import { dockerFixtureEnvironment } from './_helpers/docker-fixture-environment'
 import { createBackendImageFixture } from './_helpers/backend-image-fixture'
 import { backendImageRequestBinding, readBackendImageEvidence } from '../release/backend-image-receiver'
+import { validateBackendResumeAuthorization } from '../release/backend-image-progress'
 
 const repository = resolve(import.meta.dirname, '../..'), roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -183,6 +184,27 @@ it.each([
   expect(value.current().running).toBe(false)
 })
 
+it('accepts a small owner clock lead without extending the continuation work budget', () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: '' })
+  const now = Date.now(), authorization = value.authorize({ authorizedAt: now + 10000, expiresAt: now + 610000 })
+  const request = readBackendImageEvidence(value.requestPath, value.request).request
+  const result = value.operation('resume', authorization)
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'accepted', validatorExitCode: null })
+  expect(validateBackendResumeAuthorization(authorization, request)).toBeLessThanOrEqual(600000)
+}, 15_000)
+
+it.each([
+  ['future outside clock tolerance', 120000, 600000],
+  ['overlong lease', 0, 600001],
+] as const)('rejects continuation authority with %s before any startup', (_failure, offset, lease) => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  const now = Date.now(), result = value.operation('resume', value.authorize({ authorizedAt: now + offset, expiresAt: now + offset + lease }))
+  expect(result.status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('up'))).toBe(false)
+}, 15_000)
+
 it.each(['expired', 'foreign'] as const)('rejects %s continuation authorization without changing admission', failure => {
   const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
   value.mutate({ failure: '' })
@@ -251,8 +273,13 @@ it('reports running while another actor holds the original maintenance lock', as
     expect(status.status, status.stderr).toBe(0)
     expect(JSON.parse(status.stdout)).toMatchObject({ state: 'running', nextAction: 'wait' })
     expect(value.calls()).toHaveLength(before)
+    const resume = value.operation('resume', value.authorize())
+    expect(resume.status).toBe(75)
+    expect(JSON.parse(resume.stdout)).toMatchObject({ state: 'running', nextAction: 'wait' })
+    expect(resume.stderr).toContain('did not run')
+    expect(value.calls()).toHaveLength(before)
   } finally { holder.stdin.end(); await new Promise<void>(resolve => holder.once('exit', () => resolve())) }
-})
+}, 15_000)
 
 it('drains only the unaccepted target when continuation startup fails and never restarts old', () => {
   const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
