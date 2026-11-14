@@ -88,7 +88,11 @@ export async function listMyActiveRooms(db: PostgresDatabase, userId: string): P
     const state = readLobbyState(state_json)
     const members = parseTeamRoomMembers(team_members_json)
     const self = members?.find(member => member.userId === userId)
-    const teamConfig = state && isRecord(state.team) ? parseTeamConfiguration(state.team.configuration, room.max_players) : undefined
+    let teamConfig: MyActiveRoom['teamConfig']
+    if (state && isRecord(state.team)) {
+      try { teamConfig = parseTeamConfiguration(state.team.configuration, room.max_players) }
+      catch { teamConfig = undefined }
+    }
     const teamWaiting = self && room.status === 'waiting' && teamConfig
       ? projectTeamWaitingRoom({ id: room.id, maxPlayers: room.max_players, createdBy: created_by ?? undefined, teamMembers: members }, teamConfig, userId) : undefined
     return { ...room, ...(teamConfig ? { teamConfig } : {}), ...(teamWaiting ? { teamWaiting } : {}), hotseat: Number(hotseat) === 1,
