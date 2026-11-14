@@ -63,9 +63,26 @@ The receipt records every actual `runCandidateTask` command, its exit code and l
 
 The publisher checks the authenticated owner's native user ID, prepares an exact-candidate draft, uploads only `owner-local-verification.json`, and creates the independent `owner-local-verification` commit status. Its description binds the receipt SHA-256; its target is the same repository's formal Release asset. The publisher reads back status creator, Release author, asset uploader and uploaded bytes before publishing. Retry with the same command and receipt to resume this tool's matching draft. The ordinary release path continues to reject drafts.
 
+If the publication PATCH loses its response, the publisher makes one bounded read-only reconciliation through the existing candidate gate and native Release ID. A matching published proof succeeds without repeating the write. An unavailable or conflicting readback remains a failure; inspect status before retrying the fixed candidate.
+
 Only the native owner's statuses select local proof; another actor's matching context cannot select or withdraw it. The owner's latest pending, failure or error status withdraws the local authorization without reviving an older success. Verification then uses the ordinary native GitHub evidence path. A malformed latest owner-success proof still blocks rather than silently falling back.
 
 Pages, backend delivery and private image production independently read this published proof through the common candidate gate. They recheck native identities, the unchanged tag, raw tree, both configurations, commands, times and receipt digest. They never accept arbitrary receipt URLs, another user's status, partial task results or invented Actions IDs. GitHub still performs the real private image and Pages builds. Image provenance, private registry checks, owner transport and runtime guards remain required. The separate Bug Report deployment-feedback command also uses this gate and retains owner-local authority without inventing Actions jobs. Install a backend that supports this feedback-proof type before recording it; the command never upgrades the application itself.
+
+### Observe delivery and accept the live site
+
+`pnpm release:status --config /owner/status.json` reads five independent stages: Release, image build, backend operation, Pages and saved browser acceptance. The private JSON requires `repository`, `version`, `candidateSha`, `apiOrigin` and `appOrigin`. Optional `image` contains `runId`, `runAttempt`, `artifactId`; optional `backend` contains `host`, `directory`, `operationId`; `acceptanceFile` points to a saved `release:accept` result. Each stage reports `verified`, `absent`, `pending`, `conflict` or `unavailable` with `native`, `live` or `saved` evidence. A missing input stays unavailable. Transport failure does not authorize another write. Saved acceptance carries its original completion time; it is labelled `saved`, while runtime probes are separate observations.
+
+The live browser entry uses the existing account, its participant game and a retained completed Replay. First collect only the needed metadata through a read-only repeatable-read transaction, without scanning game or replay payloads:
+
+```bash
+pnpm release:inventory --host ubuntu@ten-kr --directory /home/ubuntu/open-agricola \
+  --expected-build <full-sha> --output /owner/live-inventory.json
+pnpm release:accept --config /owner/live-acceptance.json
+pnpm release:accept --config /owner/live-acceptance.json --execute
+```
+
+The owner-private acceptance JSON has `format: 1`, `appUrl`, `apiUrl`, `expectedBuild`, `credentialsFile`, `inventoryFile`, `artifactDirectory` and `outputDirectory`. Use root HTTPS app/API URLs, the fixed SHA, the fresh inventory and the verified Pages artifact directory. A dedicated mode-0600 credentials file contains only `MY_TEST_USER_ID` and `MY_TEST_PASSWORD`; configuration stores its path. Choose a new private output directory for each attempt. Planning validates configuration without reading credentials. Execution requires inventory younger than ten minutes and checks Chromium/WebKit, both routed instances, an existing ordinary game, reload recovery, Replay, visible assets, mobile layout and current-session logout. All frames reject game writes and other-room joins; only the selected participant room's locate and join/resume requests are permitted. Primary and cleanup failures remain separate evidence. The isolated game-writing `release:rehearse` entry keeps its loopback restriction and now exercises these browser guards too.
 
 ## Publish a fixed prerelease candidate
 
@@ -772,7 +789,9 @@ For this upgrade, use the existing independent verification and deployment entri
     pnpm release vX.Y.Z --ref <full-sha>
     ```
 
-Wait for the Pages workflow and verify the served frontend build identity. A manual `deploy-pages-broker.yml` request for this candidate has the same backend-first prerequisite. The broker's verification gate does not prove that the live backend has been upgraded. Do not publish the Release first and assume the later manual backend step will finish before Pages.
+Configure repository variable `PUBLIC_APP_ORIGIN` with the production Pages HTTPS origin, alongside the existing `VITE_API_BASE`. The main broker reads the public `/api/auth/browser-policy` and `/api/health` endpoints before building and again after the deployment job's environment wait. It requires the exact candidate build, current browser protocol and matching configured app/API origins. Requests omit credentials, reject redirects, and bound both response size and time. Public probes cover the observed application; they do not replace owner validation of retained data or every application instance.
+
+Wait for the Pages workflow and verify the served frontend build identity. Automatic Release requests and manual `deploy-pages-broker.yml` dispatches use the same runtime gate. If publication precedes backend completion, Pages fails closed before installation. Once the owner confirms the backend, retry the same fixed-candidate workflow. Keep the requester enabled; this sequence needs no workflow-wide disable/restore operation. Backend installation and Pages remain independent owner-controlled stages.
 
 ### Backend
 
@@ -811,6 +830,17 @@ Inside the maintenance lock, the controller rebinds directory, `F`, `P` and actu
 Live target validation uses the remaining monotonic maintenance budget, capped at the storage tool's 30-minute deadline. Its container has an operation-specific name and labels. A failed or timed-out command inspects that exact native container's image and operation labels before removing it; unrelated containers are never cleanup targets. Failure to confirm cleanup keeps maintenance closed.
 
 Only a source that was running at entry, drained cleanly by this operation and retained its exact identity can restart after a pre-migration backup failure. OOM, unclean drain and failures after live migration begins keep maintenance active. The `data_imports` barrier and container health gate remain. The private operation directory retains import/source evidence and resolved Compose, which contains environment credentials and must remain private.
+
+From the same clean exact producer checkout, inspect an interrupted operation before continuing it:
+
+```bash
+./deploy-backend.sh status <host> <full-candidate-sha> <remote-dir> --operation-id <UUID>
+./deploy-backend.sh resume <host> <full-candidate-sha> <remote-dir> --operation-id <UUID>
+```
+
+Status reads the admitted operation without GitHub or registry access and leaves its request, admission and progress unchanged. Its temporary native checkpoint probe uses a read-only database transaction and removes only its own container. Output includes `state`, `phase`, `nextAction` and `validatorExitCode`; an unavailable original process exit remains `null`. An active maintenance lock or validator reports `running` with `wait`.
+
+Resume authorizes one fresh ten-minute continuation under the original lock, with a separate finite cleanup budget. It rechecks staged producer bytes, native images, data configuration, sealed storage evidence and the exact committed target-build validation report and time. Active writers block startup; failed imports, foreign writers or changed evidence block continuation. It continues only validated/startup/acceptance work, preserving the original request and admission bytes, without another upload, backup or live validation. A stopped exact target remains resumable after Compose has replaced the source container. Accepted operations reconcile missing acceptance/own-archive cleanup without recreating their containers. Earlier operations without sealed progress require investigation; an unknown result never grants startup.
 
 Successful delivery records `data/deployed-build-id` and the audit evidence `data/deployed-image.json`, then atomically pins the accepted native immutable image as unquoted `BACKEND_IMAGE=sha256:...` and `CADDY_IMAGE=sha256:...` assignments in the deployment directory's owner-private `.env`. Both selectors share one atomic write. Existing configuration is preserved; duplicate, quoted or mutable image assignments are rejected. Ordinary Compose uses this selector with its default `.env` or `--env-file .env`; it never falls back to a legacy tag. Do not override it through the shell, another environment file, or a configuration archive. Pre-migration failures retain the old selector. Immediately before live migration the selector is blanked; a later failure leaves ordinary `run/up` closed until a verified delivery succeeds. The JSON receipt is historical evidence, not another image selector. Real-browser, retained-game and two-instance acceptance remain separate field checks.
 
