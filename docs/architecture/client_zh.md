@@ -129,7 +129,7 @@ GameContextRouter
 - `?room=<roomId>` 在卡牌 manifest 与登录门之前解析；未登录的活动上下文保留完整的 `returnTo`，非活动上下文不加载认证依赖。
 - 上下文解析器在挂载、导航或生命周期变化事件发生时读取查询参数。WebSocket 静默更新房间 URL 后，切换语言不会重启活动对局。测试见 `GameContextRouter.test.tsx` 与 `setup-navigation.spec.ts`。
 - 房间链接通过 WebSocket 加入，不指定客户端座位；服务端恢复账号已有座位，或让新玩家加入候场空位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
-- `ReplayShell` 校验冻结 Build，创建 `credentialless`、`sandbox="allow-scripts"` iframe。pre 仅由 `replay-bridge.ts` 认证取数，`bridge-transport.ts` 只接收绑定 Window、nonce、环境、代次、room、Build、schema 与整档／准确 Evidence 模式的 typed MessagePort 请求。心跳扣除完整往返耗时，共用父页绝对期限；过期、父页失联或恢复时退役通道、Frame、metadata 和 blob 图片，丢弃晚到响应。正式公开回放与旧 Evidence 方式保留。测试：`replay-bridge.test.ts`、`prerelease-session.spec.ts`。
+- `ReplayShell` 校验冻结 Build，创建 `credentialless`、`sandbox="allow-scripts"` iframe。pre 仅由 `replay-bridge.ts` 认证取数，`bridge-transport.ts` 将 typed MessagePort 读取绑定到 Window、nonce、环境、代次、room、Build、schema 与整档／准确 Evidence 模式。心跳从父页期限扣除完整往返耗时；过期、父页失联、BFCache 或后台恢复会退役通道、Frame、metadata 和 blob 图片，丢弃晚到响应。首次可见 pageshow 保留通道。正式公开回放与旧 Evidence 保留。测试：`replay-bridge{,-lease}.test.ts`、`prerelease-session.spec.ts`。
 - 完成的单人 Game Context 在历史 Viewer 外保留公开分数和私下校验本人资格的再开入口。即时 `ScoringPad` 注入同一再开组件；私有配置读取或 Viewer 失败均不隐藏公开结果。完成的多人局不提供按原配置再开。`CompletedContext` 在摘要与 `ReplayShell` 之间分配同一个视口，让重开操作下方的回放控件保持可达。
 - 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。

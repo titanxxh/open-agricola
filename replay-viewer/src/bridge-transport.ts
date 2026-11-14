@@ -13,6 +13,7 @@ export class ReplayBridgeTransport {
   private deadline = 0
   private parentDeadline = 0
   private retired = false
+  private hidden = document.visibilityState === 'hidden'
   private readonly pending = new Map<string, { resolve(response: Response): void; reject(error: Error): void; clean(): void }>()
   private readonly leases = new Map<string, number>()
   private readonly listeners = new Set<() => void>()
@@ -33,8 +34,8 @@ export class ReplayBridgeTransport {
     // A closed bridge can precede the first read during iframe initialization.
     void this.ready.catch(() => {})
     window.addEventListener('message', this.connect)
-    window.addEventListener('pageshow', this.resume)
-    document.addEventListener('visibilitychange', this.resume)
+    window.addEventListener('pageshow', this.pageshow)
+    document.addEventListener('visibilitychange', this.visibility)
     const ready = () => {
       if (document.readyState === 'complete') window.parent.postMessage({ type: 'open-agricola-replay-bridge-ready', context }, parentOrigin)
     }
@@ -100,10 +101,13 @@ export class ReplayBridgeTransport {
     if (!this.deadline || performance.now() >= this.deadline || performance.now() >= this.parentDeadline) { this.close(); return false }
     return true
   }
-  private resume = () => {
-    if (this.retired) return
-    // Discard a background/bfcache display rather than showing data before a fresh lease check.
-    this.close()
+  private pageshow = (event: PageTransitionEvent) => {
+    if (event.persisted) this.close()
+  }
+  private visibility = () => {
+    const hidden = document.visibilityState === 'hidden'
+    if (hidden || this.hidden) this.close()
+    this.hidden = hidden
   }
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
@@ -149,8 +153,8 @@ export class ReplayBridgeTransport {
     clearInterval(this.heartbeat); clearInterval(this.handshake)
     this.port?.close(); this.port = undefined
     window.removeEventListener('message', this.connect)
-    window.removeEventListener('pageshow', this.resume)
-    document.removeEventListener('visibilitychange', this.resume)
+    window.removeEventListener('pageshow', this.pageshow)
+    document.removeEventListener('visibilitychange', this.visibility)
     this.rejectReady(new Error('replay_bridge_expired'))
     for (const pending of this.pending.values()) { pending.clean(); pending.reject(new Error('replay_bridge_expired')) }
     this.pending.clear(); this.leases.clear()
