@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { isArrayBuffer } from 'node:util/types'
-import { MessageChannel } from 'node:worker_threads'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { attachReplayBridge, serveReplayBridge } from '../replay-bridge'
 import type { ReplayBridgeContext } from '../../../shared/contract/protocol/replay-bridge'
 import type { ReplayManifest } from '../../../shared/contract/protocol/replay'
 
+const NativeMessageChannel = globalThis.MessageChannel
 const context: ReplayBridgeContext = {
   protocolVersion: 1, nonce: 'c'.repeat(32), environment: 'prerelease', targetId: 'pre',
   appBuildId: 'a'.repeat(40), generationId: '11111111-1111-1111-1111-111111111111',
@@ -19,7 +19,7 @@ const close: (() => void)[] = []
 afterEach(() => { close.splice(0).forEach(fn => fn()); vi.unstubAllGlobals(); document.body.innerHTML = '' })
 
 function fixture(options: { read?: typeof fetch; source?: ReplayManifest; context?: ReplayBridgeContext } = {}) {
-  const { port1, port2 } = new MessageChannel()
+  const { port1, port2 } = new NativeMessageChannel()
   let active = true
   const listeners = new Set<() => void>()
   close.push(() => { port1.close(); port2.close() })
@@ -32,7 +32,11 @@ function fixture(options: { read?: typeof fetch; source?: ReplayManifest; contex
     }),
   })
   close.push(stop)
-  const next = () => new Promise<unknown>(resolve => port2.once('message', resolve))
+  const next = () => {
+    const result = new Promise<unknown>(resolve => port2.addEventListener('message', event => resolve(event.data), { once: true }))
+    port2.start()
+    return result
+  }
   return { port: port2, next, revoke() { active = false; listeners.forEach(fn => fn()) } }
 }
 
@@ -116,7 +120,7 @@ describe('authenticated parent replay bridge', () => {
   })
 
   it('accepts a handshake only from the current iframe Window and exact nonce/context', () => {
-    const channels = vi.fn(function () { const channel = new MessageChannel(); close.push(()=>{channel.port1.close();channel.port2.close()}); return channel })
+    const channels = vi.fn(function () { const channel = new NativeMessageChannel(); close.push(()=>{channel.port1.close();channel.port2.close()}); return channel })
     vi.stubGlobal('MessageChannel',channels)
     const frame = document.createElement('iframe'), other = document.createElement('iframe')
     document.body.append(frame,other)
