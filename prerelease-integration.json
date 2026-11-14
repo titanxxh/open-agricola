@@ -1,13 +1,13 @@
 {
   "format": 1,
   "repository": "titanxxh/open-agricola",
-  "baselineMainSha": "53acde98437ff7140b69f93178cecbd1ce07c2ef",
+  "baselineMainSha": "a7b4bb0cc7269f1f48e7166747f50a0ac0d0b4c3",
   "features": [
     {
       "id": "pre-identity",
       "dependsOn": [],
       "sourceSha": "087e71b429fb2316972ab57db65369f8d928a619",
-      "integratedSha": "50535223ce1d46eab4a001fe3e7a22a56a64ff6b"
+      "integratedSha": "a2a565e5775e582302c7c95c16ec49a7a1e2e230"
     }
   ]
 }
