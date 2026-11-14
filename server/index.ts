@@ -1,3 +1,4 @@
+import { handlePrereleasePublicSandbox } from './prerelease-public-sandbox'
 import { handlePrereleaseRoute, requirePrereleaseRequest } from './prerelease-routes'
 import { getPrereleaseSessions } from './prerelease-sessions'
 import { allowAnonymousAccess } from './anonymous-access'
@@ -478,6 +479,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     return
   }
 
+  if (await handlePrereleasePublicSandbox(req, res)) return
   if (await handleCommunityQr(req, res)) return
   if (await handleWhatsNew(req, res)) return
   if (await handlePrereleaseLifecycle(req, res)) return

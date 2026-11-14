@@ -18,7 +18,10 @@ export async function browserApiFetch(input: string | URL, init?: RequestInit): 
   const response = await fetch(input, { ...init, credentials: 'include', headers })
   if ([400, 401, 403, 426, 503].includes(response.status)) {
     const preBody: unknown = await response.clone().json().catch(() => null)
-    if (preBody && typeof preBody === 'object' && 'code' in preBody) observePrereleaseFailure(preBody.code)
+    if (preBody && typeof preBody === 'object' && 'code' in preBody) {
+      observePrereleaseFailure(preBody.code)
+      if (preBody.code === 'public_card_execution_paused') window.dispatchEvent(new Event('oa-public-sandbox-paused'))
+    }
   }
   if (response.status === 426) {
     const body: unknown = await response.clone().json().catch(() => null)

@@ -188,7 +188,7 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 - 真实 Room 中的 `customCardIds` 只接受已批准、已上线的卡，并使用其审核过的快照。正式单人保留全部显式选择，卡源不可用或来源变化时拒绝创建并返回配置调整；其他 Room 对作者自己未上线的卡给出指引，过滤其他无法加载的 ID。未审核的代码只在工坊沙盒中运行，从不进入多人 `GameSession`。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。
-- `workshop-public-cards.ts` 提供当前审核上线版本目录、固定公共输入与图片和 30 秒状态，排除草稿、编译产物和写入。发布记录保留曾上线版本，作者下线只拒新建，管理员下架禁用所有公共版本。`prerelease-public-cards.ts` 校验 hash、自行编译并共享单调来源期限；失败不续期，旧正向响应不能恢复已知拒绝。
+- `workshop-public-cards.ts` 提供当前审核上线目录、固定公共输入和图片及 30 秒状态，排除草稿、编译产物和写入；发布记录保留曾上线版本，作者下线只拒新建，管理员下架禁用所有公共版本。`prerelease-public-{cards,sandbox}.ts` 校验 hash、自行编译，以有界单调租约守住执行和下发；失败不续期，旧正向响应不能恢复已知拒绝。其他工坊路由保持关闭。测试：`prerelease-public-sandbox.test.ts`。
 - 工坊草稿错误暴露 `shared/contract/workshop.ts` 中的类型化 `code`；在线编辑守卫以 HTTP 409 返回 `live_edit_blocked`。
 
 测试：`server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submissions}.test.ts`、`server/workshop-pr/__tests__/`。

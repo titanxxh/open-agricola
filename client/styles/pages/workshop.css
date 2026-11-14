@@ -20,6 +20,17 @@
   display: flex;
   flex-direction: column;
 }
+.prerelease-workshop-page { gap: 16px; padding: clamp(12px, 2vw, 28px); }
+.prerelease-workshop-panel {
+  padding: 16px;
+  background: var(--bg-parchment);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-paper);
+}
+.prerelease-workshop-panel h1 { margin: 0; font-family: var(--agricola-font); }
+.prerelease-workshop-panel > label { display: inline-flex; align-items: center; gap: 8px; margin: 8px 16px 8px 0; }
+.prerelease-workshop-panel select { padding: 6px; max-width: 100%; }
 .ws-nav {
   display: flex;
   align-items: center;

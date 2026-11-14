@@ -1,3 +1,4 @@
+import { PrereleaseWorkshopPage } from './PrereleaseWorkshopPage'
 import { isPrereleaseClient, prereleaseStartUrl } from '../services/prerelease-runtime'
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
@@ -94,8 +95,8 @@ export function PageRouter() {
   }
 
   // A reset link may be opened while another account is signed in; completing it switches accounts.
-  if (isPrereleaseClient() && ['login', 'onboarding', 'reset-password', 'settings', 'operations', 'prerelease-handoff', 'workshop'].includes(page)) {
-    return <main className="prerelease-access-screen"><p>{t(page === 'workshop' ? 'prerelease.readonlyError' : 'prerelease.returnToProduction')}</p></main>
+  if (isPrereleaseClient() && ['login', 'onboarding', 'reset-password', 'settings', 'operations', 'prerelease-handoff'].includes(page)) {
+    return <main className="prerelease-access-screen"><p>{t('prerelease.returnToProduction')}</p></main>
   }
   if (page === 'reset-password') return <ResetPasswordPage />
   if (page === 'prerelease-handoff') return <PrereleaseHandoffPage />
@@ -121,7 +122,7 @@ export function PageRouter() {
     case 'workshop':
       pageNode = (
         <Suspense fallback={<AppShellLoadScreen />}>
-          <SandboxAppLazy />
+          {isPrereleaseClient() ? <PrereleaseWorkshopPage /> : <SandboxAppLazy />}
         </Suspense>
       )
       break

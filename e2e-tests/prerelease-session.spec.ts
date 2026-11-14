@@ -67,7 +67,7 @@ function observeRoomSocket(page: Page) {
 }
 
 /** Actual pre application and sessions; the formal fixture uses the real authority protocol. */
-async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
+async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPublicSandbox = false) {
   expect(process.env.DATABASE_SCHEMA).toMatch(/^test_[a-f0-9]{32}$/)
   const acquired = releaseQueue()
   let closeAfterSetup: (() => Promise<void>) | undefined
@@ -95,6 +95,32 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     await source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
     const sourceToken = await createSession(user.id)
     if (!sourceToken) throw new Error('Could not create the formal fixture session')
+    let publicFixture: { cardId: string; versionId: string; ruleId: string; name: string } | undefined
+    let publicSourceOnline = true
+    const publicRequests: Array<{ path: string; cookie: string | undefined; authorization: string | undefined; origin: string | undefined }> = []
+    const cleanPublicFixture = async () => {
+      if (!publicFixture) return
+      await source.prepare('DELETE FROM object_references WHERE owner_id=? OR owner_id=?').run(publicFixture.cardId, publicFixture.versionId)
+      await source.prepare('DELETE FROM workshop_cards WHERE id=?').run(publicFixture.cardId)
+      const { getResources } = await import('../server/storage/runtime')
+      await getResources().removeUnreferenced([`card-art/${publicFixture.ruleId}.png`])
+    }
+    if (withPublicSandbox) {
+      const { prepareWorkshopDraft } = await import('../server/workshop-draft-validation')
+      const { createCard, approveCurrentDraft, publish } = await import('../server/workshop-drafts')
+      const { getResources } = await import('../server/storage/runtime')
+      const ruleId = `CUSTOM_PublicBrowser_${randomUUID().replaceAll('-', '')}`, name = 'Published browser fixture'
+      const effectCode = `const CARD_ID='${ruleId}';const CARD_DEF=MinorImprovement({id:CARD_ID,name:'${name}',desc:['Gain 2 food.'],cost:{},vp:0});const CARD_IMPL={effect:{id:CARD_ID,onBuy:()=>gainLeaf(CARD_ID,{food:2})}}`
+      const prepared = await prepareWorkshopDraft({ cardId: ruleId, cardType: 'minor', name, description: 'Gain two food', effectCode,
+        cardJson: { id: ruleId, name, deck: 'CUSTOM', number: 0, card_type: 'minor', implemented: true, desc: ['Gain 2 food.'], cost: {}, vp: 0 }, artUrl: `/card-art/${ruleId}.png` })
+      if (!prepared.ok) throw new Error(prepared.error)
+      await getResources().stage(`card-art/${ruleId}.png`, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jErkAAAAASUVORK5CYII=', 'base64'), 'image/png')
+      const card = await createCard(source, { authorId: user.id, draft: prepared.draft })
+      const version = await approveCurrentDraft(source, { cardId: card.id, authorId: user.id })
+      await publish(source, { cardId: card.id, authorId: user.id, baseRevision: card.revision })
+      publicFixture = { cardId: card.id, versionId: version.versionId, ruleId, name }
+      acquired.register(cleanPublicFixture)
+    }
     const envKeys = ['NODE_ENV', 'PUBLIC_APP_ORIGIN', 'PUBLIC_API_BASE', 'CORS_ORIGIN', 'PRERELEASE_APP_ORIGIN', 'PRERELEASE_IDENTITY_SERVICE_KEY', 'PRERELEASE_ENTRY_ENABLED', 'GAME_BUILD_ID']
     const previous = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
     const sockets = new Set<Duplex>(), requests = new Set<ClientRequest>()
@@ -109,6 +135,19 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
         }))
         upstream.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
         req.once('aborted', () => upstream.destroy()); res.once('close', () => { if (!res.writableEnded) upstream.destroy() }); req.pipe(upstream); return
+      }
+      if ((req.url ?? '').startsWith('/api/workshop/public-cards/')) {
+        publicRequests.push({ path: req.url ?? '', cookie: req.headers.cookie, authorization: req.headers.authorization, origin: req.headers.origin })
+        if (!publicSourceOnline) { res.writeHead(503).end(); return }
+        if (req.url === '/api/workshop/public-cards/v1/cards' && publicFixture) {
+          // The catalog transport follows the separately delivered formal v1 contract.
+          // Immutable snapshots/status below use the native PG/S3 source handler.
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+          res.end(JSON.stringify({ ok: true, protocolVersion: 1, cards: [{ source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: publicFixture.cardId, versionId: publicFixture.versionId },
+            cardId: publicFixture.ruleId, name: publicFixture.name, cardType: 'minor' }], nextCursor: null })); return
+        }
+        void import('../server/workshop-public-cards').then(({ handleWorkshopPublicCards }) => handleWorkshopPublicCards(req, res, source))
+          .then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
       }
       if ((req.url ?? '').startsWith('/api/prerelease/')) {
         void authority(req, res).then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
@@ -199,6 +238,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       },
       async () => {
         await eraseGeneration()
+        await cleanPublicFixture()
         await cleanSourceUser()
       },
       () => {
@@ -257,7 +297,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     }
     const assertFormalSession = async () => { expect(await validateSession(sourceToken)).toMatchObject({ id: user.id, username: user.username }) }
     return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
-      seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }) }
+      seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }),
+      publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value } }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
     catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Prerelease fixture setup and cleanup failed', { cause: cleanupError }) }
@@ -407,5 +448,95 @@ test('private replay uses an authenticated parent bridge and clears idle display
     await expect(page.locator('.prerelease-access-screen')).toBeVisible()
   } finally {
     await releaseAll([()=>environment.context.close(),()=>environment.browser.close(),()=>environment.close()])
+  }
+})
+
+test('prerelease public sandbox renders fixed art and executes dynamic effects in both modes, then stops idle execution on disable', async ({ playwright }, testInfo) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright, true)
+  const diagnostics: unknown[] = []
+  try {
+    const fixtureCard = environment.publicFixture
+    if (!fixtureCard) throw new Error('Missing published fixture')
+    const page = await environment.enter(environment.context), workers: string[] = []
+    page.on('console', message => { if (message.type() === 'error') diagnostics.push({ console: message.text() }) })
+    page.on('response', response => {
+      if (new URL(response.url()).pathname.includes('/public-sandbox/')) void response.text().then(body => diagnostics.push({ url: response.url(), status: response.status(), body }))
+    })
+    page.on('worker', worker => workers.push(worker.url()))
+    await page.goto(`${environment.preOrigin}/open-agricola/?page=workshop`)
+    await expect(page.getByRole('heading', { name: 'Public card sandbox' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Design|Generate|Publish/i })).toHaveCount(0)
+    await page.getByLabel(fixtureCard.name, { exact: true }).check()
+    const modes = ['server', 'browser']
+    let serverWorkerCount = 0
+    for (const mode of modes) {
+      await page.getByRole('combobox', { name: 'Run game' }).selectOption(mode)
+      const started = mode === 'server' ? page.waitForResponse(response => new URL(response.url()).pathname === '/api/game/new-sandbox' && response.request().method() === 'POST') : undefined
+      await page.getByRole('button', { name: 'Start Sandbox', exact: true }).click()
+      if (started) { const response = await started; expect(response.status(), await response.text()).toBe(200) }
+      await expect(page.getByRole('img', { name: fixtureCard.name, exact: true })).toBeVisible()
+      await expect.poll(() => page.getByRole('img', { name: fixtureCard.name, exact: true }).evaluate((element: HTMLImageElement) => element.naturalWidth)).toBe(1)
+      const frame = page.frameLocator('iframe.sandbox-embed-frame')
+      await expect(frame.locator('.action-board').first()).toBeVisible({ timeout: 30_000 })
+      await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 2"]').first()).toBeVisible()
+      await frame.locator('.dev-field', { hasText: 'Card ID' }).getByRole('textbox').fill(fixtureCard.ruleId)
+      await frame.getByRole('button', { name: 'Play Card', exact: true }).click()
+      await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible()
+      if (mode === 'server') {
+        serverWorkerCount = workers.length
+        await page.getByRole('button', { name: 'Close Sandbox', exact: true }).click()
+      }
+    }
+    expect(workers.length).toBeGreaterThan(serverWorkerCount)
+    const frame = page.frameLocator('iframe.sandbox-embed-frame')
+    const frameUrl = await page.locator('iframe.sandbox-embed-frame').getAttribute('src')
+    expect(frameUrl).toContain('localSandbox=1')
+    await expect.poll(() => page.evaluate(() => new Promise<unknown[]>((resolve, reject) => {
+      const opening = indexedDB.open('open-agricola-local-sandbox', 1)
+      opening.onerror = () => reject(opening.error)
+      opening.onsuccess = () => {
+        const db = opening.result, tx = db.transaction('games', 'readonly'), request = tx.objectStore('games').getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+        tx.oncomplete = () => db.close()
+      }
+    }))).toEqual(expect.arrayContaining([expect.objectContaining({ serializedState: expect.objectContaining({ state: expect.objectContaining({
+      players: expect.arrayContaining([expect.objectContaining({ id: 'p1', resources: expect.objectContaining({ food: 4 }) })]),
+    }) }) })]))
+    await environment.source.prepare('UPDATE workshop_cards SET live=0 WHERE id=?').run(fixtureCard.cardId)
+    const resumed = page.waitForEvent('dialog').then(dialog => dialog.accept())
+    const navigated = page.waitForEvent('framenavigated', candidate => new URL(candidate.url()).pathname === '/open-agricola/workshop-game.html')
+    await page.locator('iframe.sandbox-embed-frame').evaluate((element: HTMLIFrameElement) => element.contentWindow?.location.reload())
+    await navigated; await resumed
+    await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.action-board').first()).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('sandbox-restored.png'), fullPage: true })
+    await environment.source.prepare('UPDATE workshop_public_versions SET disabled_at=? WHERE card_id=?').run(Date.now(), fixtureCard.cardId)
+    await expect(frame.getByText('This playtest is paused. Check access and card availability before continuing.', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.action-board')).toHaveCount(0)
+    const resume = async () => {
+      const confirmed = page.waitForEvent('dialog').then(dialog => dialog.accept())
+      const navigation = page.waitForEvent('framenavigated', candidate => new URL(candidate.url()).pathname === '/open-agricola/workshop-game.html')
+      await frame.getByRole('button', { name: 'Retry', exact: true }).click()
+      await navigation; await confirmed
+      await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible({ timeout: 30_000 })
+    }
+    await environment.source.prepare('UPDATE workshop_public_versions SET disabled_at=NULL WHERE card_id=?').run(fixtureCard.cardId)
+    await resume()
+    environment.setPublicSourceOnline(false)
+    await expect(frame.getByText('This playtest is paused. Check access and card availability before continuing.', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.action-board')).toHaveCount(0)
+    environment.setPublicSourceOnline(true)
+    await resume()
+    await environment.assertPrincipal(page)
+    for (const request of environment.publicRequests) {
+      expect(request.cookie).toBeUndefined(); expect(request.authorization).toBeUndefined(); expect(request.origin).toBeUndefined()
+      expect(request.path).toMatch(/^\/api\/workshop\/public-cards\/v1\/cards(?:$|\/)/)
+    }
+  } finally {
+    writeFileSync(testInfo.outputPath('public-sandbox-responses.json'), JSON.stringify(diagnostics, null, 2))
+    await testInfo.attach('public-sandbox-responses', { body: JSON.stringify(diagnostics, null, 2), contentType: 'application/json' })
+    await releaseAll([() => environment.context.close(), () => environment.browser.close(), () => environment.close()])
   }
 })

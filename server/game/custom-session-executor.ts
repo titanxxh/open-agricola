@@ -171,10 +171,12 @@ export class CustomSessionExecutor {
     return true
   }
 
-  execute(method: CustomSessionMethod, args: unknown[]): Promise<SessionResponse> {
+  execute(method: CustomSessionMethod, args: unknown[], assertAccess?: () => void): Promise<SessionResponse> {
     const result = this.enqueue(async () => {
+      this.revalidate(assertAccess)
       try {
         const message = await this.request(method, args)
+        this.revalidate(assertAccess)
         if (!message.ok) {
           return message.response && message.snapshot && message.payloads
             ? this.applyWorkerState({
@@ -186,6 +188,7 @@ export class CustomSessionExecutor {
         }
         return this.applyWorkerState(message)
       } catch (error) {
+        this.revalidate(assertAccess)
         return this.failed(error instanceof Error ? error.message : String(error))
       }
     })
@@ -214,9 +217,11 @@ export class CustomSessionExecutor {
     return this.lastScores
   }
 
-  async query<T>(method: 'getAvailableActions' | 'validateFarmChoice' | 'quoteFenceSelection', args: unknown[]): Promise<T> {
+  async query<T>(method: 'getAvailableActions' | 'validateFarmChoice' | 'quoteFenceSelection', args: unknown[], assertAccess?: () => void): Promise<T> {
     return this.enqueue(async () => {
+      this.revalidate(assertAccess)
       const message = await this.request(method, args)
+      this.revalidate(assertAccess)
       if (!message.ok) {
         if (message.response && message.snapshot && message.payloads) {
           this.applyWorkerState({
@@ -239,6 +244,14 @@ export class CustomSessionExecutor {
     void this.worker?.terminate()
     this.worker = null
     this.workerInitialized = false
+  }
+
+  private revalidate(assertAccess?: () => void): void {
+    try { assertAccess?.() } catch (error) {
+      void this.worker?.terminate(); this.worker = null; this.workerInitialized = false
+      activeSessionWorkers.delete(this)
+      throw error
+    }
   }
 
   private enqueue<T>(run: () => Promise<T>): Promise<T> {
