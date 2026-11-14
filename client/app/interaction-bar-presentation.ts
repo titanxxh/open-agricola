@@ -1,3 +1,4 @@
+import type { MarketplaceRequest, MarketplaceTransfer } from '../../shared/contract/marketplace'
 import type { AnimalKey } from '../../shared/contract/animals'
 import type {
   ActionChoiceOption,
@@ -57,6 +58,13 @@ export type InteractionBarResourceBatchExchangeSelect = {
   onCancel: () => void
 }
 
+export type InteractionBarMarketplaceSelect = {
+  request: MarketplaceRequest
+  actorName: string
+  isConfirmDisabled?: (transfers: MarketplaceTransfer[]) => boolean
+  onConfirm: (transfers: MarketplaceTransfer[]) => void
+}
+
 export type InteractionBarPresentationInput = {
   locale: Locale
   /** Display names already resolved from each seat's authoritative name provenance. */
@@ -77,6 +85,7 @@ export type InteractionBarPresentationInput = {
     nextPlayerConfirmDisabled?: boolean
     playerSwitchConfirmDisabled?: boolean
     heating: HeatingPending | null
+    marketplaceSelect?: InteractionBarMarketplaceSelect | null
     resourceQuantitySelect: InteractionBarResourceQuantitySelect | null
     resourceBatchExchangeSelect: InteractionBarResourceBatchExchangeSelect | null
     suppressChoiceOptions: boolean
@@ -139,6 +148,7 @@ export type InteractionBarBodyKind =
   | 'none'
   | 'animalReorg'
   | 'resourceBatchExchangeSelect'
+  | 'marketplaceSelect'
   | 'resourceQuantitySelect'
   | 'heating'
   | 'harvestFeed'
@@ -263,6 +273,7 @@ const buildBodyModel = (input: InteractionBarPresentationInput): InteractionBarB
       subtitle: textKey('ui.interactionReorgAnimalsSubtitle'),
     }
   }
+  if (pending.marketplaceSelect) return { kind: 'marketplaceSelect' }
   if (pending.resourceBatchExchangeSelect) return { kind: 'resourceBatchExchangeSelect' }
   if (pending.resourceQuantitySelect) return { kind: 'resourceQuantitySelect' }
   if (pending.heating) {

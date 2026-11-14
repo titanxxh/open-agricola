@@ -38,7 +38,6 @@ export function parseTeamConfiguration(value: unknown, playerCount: number): Tea
   if (value === undefined) return undefined
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid team configuration')
   const config: Record<string, unknown> = { ...value }
-  if (config.cooperationRules === true) throw new Error('Cooperation rules are not available')
   if ((config.seatsPerTeam !== 2 && config.seatsPerTeam !== 3)
     || !((playerCount === 4 && config.seatsPerTeam === 2) || playerCount === 6)
     || (config.seating !== 'separated' && config.seating !== 'random')

@@ -1,3 +1,4 @@
+import type { MarketplaceRequest, MarketplaceTransfer } from '../../shared/contract/marketplace'
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
 import { authoritativeCommandKey } from '../../shared/contract/authoritative-command'
 import type {
@@ -31,6 +32,7 @@ type ResourceBatchExchangeRequest = Extract<InteractionRequest, { kind: 'resourc
 type SelectionRequest = Extract<InteractionRequest, { kind: 'selection' }>
 
 export type InteractionPresentationPlan =
+  | { kind: 'marketplace-select'; request: MarketplaceRequest }
   | { kind: 'none' }
   | {
       kind: 'farm-fence-selection'
@@ -139,6 +141,7 @@ export type InteractionSubmitDraft = {
   occupationCardIds?: readonly string[]
   resourceCounts?: Partial<Record<keyof Resource, number>>
   resourceBatchExchange?: ResourceBatchExchangePayload
+  marketplaceTransfers?: MarketplaceTransfer[]
   positionSelectionKeys?: readonly string[]
   fenceEdges?: readonly string[]
   palisadeEdges?: readonly string[]
@@ -342,6 +345,7 @@ export const buildInteractionPresentationPlan = (
       promptParams: interaction.promptParams,
     }
   }
+  if (interaction.request.kind === 'marketplace-select') return { kind: 'marketplace-select', request: interaction.request }
   if (interaction.request.kind === 'resource-quantity-select') {
     return {
       kind: 'resource-quantity-select',
@@ -485,6 +489,10 @@ const buildInteractionSubmitCommandUnchecked = (
       playerIndex: interaction.playerIndex,
       payload: { positions: positionsFromKeys(draft.positionSelectionKeys) },
     }
+  }
+  if (interaction.request.kind === 'marketplace-select') {
+    if (draft.value === 'cancel') return { kind: 'undoStep' }
+    return { kind: 'commitSelection', playerIndex: interaction.playerIndex, payload: { marketplaceTransfers: draft.marketplaceTransfers } }
   }
   if (interaction.request.kind === 'resource-quantity-select') {
     if (draft.value === 'cancel') return { kind: 'undoStep' }
