@@ -822,6 +822,8 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
 
 intake 和 maintenance 各自在排队前接纳一次 fresh、不可变请求，随后最多等待共享备份锁 30 分钟。owner 仍签发五分钟 stamp；receiver 使用有界十分钟未来上限容忍时钟偏差，并在接纳时拒绝过期输入。server 记录原 stamp、完整 binding 与 queue deadline。刷新 stamp 不能续期已接纳阶段，没有原 admission 的过期请求不能执行。排队在停 app 前，且不占 intake unit 的工作时间。实际 intake 保持 20 分钟 unit 上限、零额外 swap 与原资源限额；maintenance 用单调时钟限定最多 40 分钟工作，清理另有最多五分钟。owner SSH 包络为 intake 56 分钟、maintenance 76 分钟，包含最大排队与边界余量。失败 stage 保留供检查；重试使用新操作，不延长旧 admission。
 
+在线目标验证使用 maintenance 单调时钟的剩余预算，并受存储工具 30 分钟 deadline 的限制。验证容器使用本次 operation 专属名称和标签。命令失败或超时后，控制器先核对该原生容器的镜像与 operation 标签，再精确删除；不会清理无关容器。无法确认清理成功时，maintenance 保持关闭。
+
 receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可变 image ID 与镜像内前端描述。传输、排队和导入期间旧应用继续运行。导入后 owner 重新核验正式授权，再为下一阶段签发短期请求；不能用旧 #1662 验收或工具镜像代替该应用证据。
 
 维护锁内再次绑定目录、`F`、`P` 和实际 image。保留精确的旧 container/image/Build，检查固定 fetch/checkout 与数据目标，然后干净停止旧应用。旧 image 负责导出 PostgreSQL/S3，新 image 负责隔离恢复验证；通过后才执行 `check-live`，以 `--no-build --pull never` 启动 app 和原 Caddy image。正式主机没有 `pnpm install`、应用构建、registry 登录或自动依赖升级。共享依赖变更仍须单独维护。
