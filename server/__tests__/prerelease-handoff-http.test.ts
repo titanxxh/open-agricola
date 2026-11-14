@@ -81,7 +81,7 @@ afterEach(async () => {
   await getDb().prepare('DELETE FROM users').run()
   await getDb().prepare('DELETE FROM prerelease_browser_handoffs').run()
   await getDb().exec('DELETE FROM prerelease_revoked_grants; DELETE FROM prerelease_deleted_subjects; DELETE FROM prerelease_processed_identity_events')
-  vi.unstubAllEnvs(); vi.unstubAllGlobals()
+  vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals()
 })
 afterAll(async () => { await getDb().close() })
 
@@ -193,6 +193,54 @@ it.each(['revoked', 'unknown'])('classifies a %s second current-session resoluti
       body: { ok: false, code: failure === 'revoked' ? 'prerelease_access_expired' : 'prerelease_access_paused' }, cookies: [],
     })
   } finally { spy.mockRestore() }
+})
+
+it('requires a current caller for account-wide logout while keeping single logout idempotent', async () => {
+  const enter = async () => {
+    const accepted = await exchange(await begin())
+    expect(accepted.status).toBe(200)
+    const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+    if (!cookie) throw new Error('Missing issued session cookie')
+    return cookie
+  }
+  const post = (path: string, cookie: string) => browserFetch(origin + path, { method: 'POST', headers: boundHeaders(cookie) })
+  const me = (cookie: string) => browserFetch(origin + '/api/auth/me', { headers: boundHeaders(cookie) })
+  const old = await enter()
+  expect((await post('/api/auth/logout', old)).status).toBe(200)
+  const current = await enter()
+  const denied = await post('/api/auth/logout-all', old)
+  expect((await me(current)).status).toBe(200)
+  expect(denied.status).toBe(403)
+  expect(await denied.json()).toEqual({ ok: false, code: 'prerelease_access_expired' })
+  expect((await post('/api/auth/logout', old)).status).toBe(200)
+  expect((await me(current)).status).toBe(200)
+  const other = await enter()
+  expect((await post('/api/auth/logout-all', current)).status).toBe(200)
+  expect((await me(current)).status).toBe(403)
+  expect((await me(other)).status).toBe(403)
+})
+
+it.each(['expired', 'unknown'])('rejects account-wide logout from an %s source without clearing or revoking a current session', async reason => {
+  let now = Date.now()
+  vi.spyOn(Date, 'now').mockImplementation(() => now)
+  const enter = async () => {
+    const accepted = await exchange(await begin())
+    expect(accepted.status).toBe(200)
+    const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+    if (!cookie) throw new Error('Missing issued session cookie')
+    return cookie
+  }
+  const old = await enter()
+  now += reason === 'expired' ? 86_400_000 : 30_000
+  authorityReply = () => Response.json({ ok: true, state: { ...identity(), grantId: 'h'.repeat(43) } })
+  const current = await enter()
+  if (reason === 'unknown') statusReply = () => { throw new Error('Authority temporarily unavailable') }
+  const denied = await browserFetch(origin + '/api/auth/logout-all', { method: 'POST', headers: boundHeaders(old) })
+  expect(denied.status).toBe(reason === 'expired' ? 403 : 503)
+  expect(await denied.json()).toEqual({ ok: false, code: reason === 'expired' ? 'prerelease_access_expired' : 'prerelease_access_paused' })
+  expect(denied.headers.getSetCookie()).toEqual([])
+  const currentResponse = await browserFetch(origin + '/api/auth/me', { headers: boundHeaders(current) })
+  expect(currentResponse.status).toBe(200)
 })
 
 it('pauses an unavailable exchange without consuming its browser binding, then permits the same valid handoff', async () => {
