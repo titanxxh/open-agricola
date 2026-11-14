@@ -1,3 +1,4 @@
+import { supportsReplayBridge } from '../../shared/contract/replay-viewer-build'
 import { closePrereleaseSocket, isPrerelease, prereleaseRequestAdmission, trackPrereleaseSocket } from '../prerelease-access'
 import { drainRoomSpectators, removeRoomSpectator } from '../game/room-spectators'
 import { operationsMetrics, safe } from '../observability/metrics'
@@ -37,7 +38,7 @@ import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { websocketAdmission, websocketSessionToken } from '../request-auth'
 import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { validateSession } from '../auth.ts'
-import { RoomCommitter } from '../game/room-committer.ts'
+import { REPLAY_SCHEMA_VERSION, RoomCommitter } from '../game/room-committer.ts'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter.ts'
 import type { GameContextStore } from '../game/game-context-store.ts'
 import { getResources } from '../storage/runtime'
@@ -387,7 +388,10 @@ export async function createWsServer(
         persistence: deps.persistence,
         viewerBuildId: replay.viewerBuildId,
         gameBuildId: replay.gameBuildId,
-        viewerBuildExists: async (buildId) => !!await resources.viewer(buildId),
+        viewerBuildExists: async (buildId) => {
+          const viewer = await resources.viewer(buildId)
+          return !!viewer && (!isPrerelease() || supportsReplayBridge(viewer, REPLAY_SCHEMA_VERSION))
+        },
         resources,
       })
   const instanceId = deps.instanceId ?? randomUUID()

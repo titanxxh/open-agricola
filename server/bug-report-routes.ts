@@ -1,3 +1,7 @@
+import { isPrerelease } from './prerelease-access'
+import { getResources } from './storage/runtime'
+import { ReplayResources } from './storage/replay-resources'
+import { replayBridgeImageType } from '../shared/contract/protocol/replay-bridge'
 import type { PostgresDatabase as Database } from './database/postgres'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthUser } from './auth.ts'
@@ -17,7 +21,7 @@ import {
   parseCustomCards,
   projectReplayParticipantNames,
 } from './game/replay-store.ts'
-import type { ReplayGameState } from '../shared/contract/protocol/replay.ts'
+import type { ReplayGameState, ReportedEvidence } from '../shared/contract/protocol/replay.ts'
 import type { SerializedGameState } from '../shared/session/serialization.ts'
 import { filterSerializedStateForPlayer } from '../shared/session/serialization.ts'
 import { checkRateLimit } from './rate-limit.ts'
@@ -26,6 +30,7 @@ import { prereleaseArchiveReadState } from './game/prerelease-archive-retention'
 const DRAFT_ROUTE = /^\/api\/v1\/game-contexts\/([^/]+)\/bug-reports$/
 const PARTICIPANT_EVIDENCE_ROUTE =
   /^\/api\/v1\/game-contexts\/([^/]+)\/evidence\/(0|[1-9]\d*)$/
+const PARTICIPANT_EVIDENCE_ASSET_ROUTE = /^\/api\/v1\/game-contexts\/([^/]+)\/evidence\/(0|[1-9]\d*)\/assets\/([a-f0-9]{64})$/
 const REPORT_ROUTE = /^\/api\/v1\/bug-reports\/([^/]+)$/
 const SUBMIT_ROUTE = /^\/api\/v1\/bug-reports\/([^/]+)\/submit$/
 const EVIDENCE_ROUTE = /^\/api\/v1\/bug-reports\/([^/]+)\/evidence\/inspect$/
@@ -43,6 +48,7 @@ const ACCOUNT_REQUEST_WINDOW_MS = 60 * 1000
 
 type BugReportRuntime = {
   db: Database
+  resources?: ReplayResources
   store: BugReportStore
   delivery: BugReportDelivery | null
   github: GitHubIssueClient | null
@@ -412,7 +418,7 @@ const participantEvidence = async (
   stepNo: number,
   frameHash: string,
   participant: AuthUser,
-): Promise<Awaited<unknown>> => {
+): Promise<ReportedEvidence> => {
   const context = (await runtime.db.prepare(`
     SELECT lifecycle FROM game_contexts WHERE room_id = ?
   `).get(roomId)) as { lifecycle: string } | undefined
@@ -485,6 +491,7 @@ export async function handleBugReportRoute(
   const pathname = url.pathname
   const isBugReportPath = pathname.includes('/bug-reports')
     || PARTICIPANT_EVIDENCE_ROUTE.test(pathname)
+    || isPrerelease() && PARTICIPANT_EVIDENCE_ASSET_ROUTE.test(pathname)
     || pathname.startsWith('/api/v1/issue-submission-connection')
     || pathname === WEBHOOK_ROUTE
   if (!isBugReportPath) return false
@@ -683,6 +690,20 @@ export async function handleBugReportRoute(
     }
 
     if (!runtime) throw new BugReportError('bug_report_unavailable', 503)
+    const evidenceAsset = isPrerelease() ? PARTICIPANT_EVIDENCE_ASSET_ROUTE.exec(pathname) : null
+    if (evidenceAsset && req.method === 'GET') {
+      const current = await requireAccountRequest(res, user, 'evidence')
+      const frameHash = url.searchParams.get('frame') ?? ''
+      if (!/^[a-f0-9]{64}$/.test(frameHash)) throw new BugReportError('anchor_mismatch', 409)
+      const evidence = await participantEvidence(runtime, decodeId(evidenceAsset[1]!), Number(evidenceAsset[2]), frameHash, current)
+      const resources = runtime.resources ?? new ReplayResources(getResources())
+      const object = await resources.asset(evidence.roomId, evidenceAsset[3]!, evidence.customCards)
+      if (!object || !replayBridgeImageType(object.contentType)) throw new BugReportError('replay_segment_unavailable', 503)
+      res.writeHead(200, { 'Content-Type': object.contentType, 'Cache-Control': 'no-store',
+        'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff' })
+      res.end(object.body)
+      return true
+    }
     const participantEvidenceMatch = PARTICIPANT_EVIDENCE_ROUTE.exec(pathname)
     if (participantEvidenceMatch && req.method === 'GET') {
       const current = (await requireAccountRequest(res, user, 'evidence'))

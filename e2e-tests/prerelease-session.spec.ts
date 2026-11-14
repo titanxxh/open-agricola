@@ -1,3 +1,6 @@
+// @covers client/app/replay-bridge.ts
+// @covers replay-viewer/src/bridge-transport.ts
+import { seedPrivateReplay } from './_helpers/prerelease-replay'
 // @covers client/app/PrereleaseBoundary.tsx
 // @covers client/services/prerelease-runtime.ts
 // @covers client/contexts/AuthContext.tsx
@@ -253,7 +256,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       expect(result).toMatchObject({ ok: true, user: { id: user.id, username: user.username, displayName: user.displayName } })
     }
     const assertFormalSession = async () => { expect(await validateSession(sourceToken)).toMatchObject({ id: user.id, username: user.username }) }
-    return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source }
+    return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
+      seedReplay: () => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id }) }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
     catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Prerelease fixture setup and cleanup failed', { cause: cleanupError }) }
@@ -331,4 +335,66 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
     throw error
   }
   if (failure) throw failure.error
+})
+
+
+test('private replay uses an authenticated parent bridge and clears idle display on source revocation', async ({playwright}) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright)
+  try {
+    const page = await environment.enter(environment.context)
+    const replay = await environment.seedReplay()
+    const debug: unknown[] = []
+    page.on('console', message => { if(message.type() === 'error') debug.push({kind:'console',text:message.text()}) })
+    page.on('pageerror', error => debug.push({kind:'pageerror',text:error.message}))
+    page.on('response', response => { if(response.url().includes('/replay-viewers/')) debug.push({kind:'response',url:response.url(),status:response.status()}) })
+    const iframeRequests: Array<{url:string;cookie:string|undefined}> = []
+    page.on('request', request => {
+      if (request.frame() !== page.mainFrame()) iframeRequests.push({url:request.url(),cookie:request.headers().cookie})
+    })
+    await page.addInitScript(() => {
+      const revoked: string[] = []
+      Object.defineProperty(window,'__revokedReplayBlobs',{value:revoked})
+      const original = URL.revokeObjectURL
+      URL.revokeObjectURL = url => { revoked.push(url); original(url) }
+    })
+    await page.goto(`${environment.preOrigin}/open-agricola/?room=${replay.roomId}&perspective=p1`)
+    const frame = page.frameLocator('iframe')
+    try { await expect(frame.locator('.replay-app')).toBeVisible() } catch(error) {
+      debug.push(await page.locator('iframe').getAttribute('src'))
+      for(const child of page.frames()) debug.push({url:child.url(),text:await child.locator('body').innerText().catch(()=>'(unavailable)')})
+      writeFileSync('/tmp/oa-1655-state/1665-browser-debug.json',JSON.stringify(debug,null,2))
+      throw error
+    }
+    await expect(page.locator('iframe')).toHaveAttribute('sandbox','allow-scripts')
+    await expect(page.locator('iframe')).toHaveAttribute('credentialless','')
+    await expect(frame.locator('[data-card-anchor="CUSTOM_PRIVATE_REPLAY"]')).toBeVisible()
+    await expect.poll(async () => frame.locator('[data-card-anchor="CUSTOM_PRIVATE_REPLAY"] .card-icon').first().evaluate(element => getComputedStyle(element).backgroundImage)).toContain('blob:')
+    expect(iframeRequests.filter(request => /\/api\/v1\/|\/replay-assets\//.test(request.url))).toEqual([])
+    expect(iframeRequests.some(request => request.cookie?.includes('__Host-oa-pre-session'))).toBe(false)
+    await frame.locator('.replay-transport button').nth(2).click()
+    await expect(frame.locator('.replay-transport output')).toContainText('1 / 1')
+    await frame.locator('.replay-header select').selectOption('open')
+    const direct = await page.evaluate(async ({room,hash}) => {
+      const response = await fetch(`/api/v1/replays/${room}/assets/${hash}`,{headers:{range:'bytes=0-1','if-none-match':'*'}})
+      return {status:response.status,cache:response.headers.get('cache-control')}
+    },{room:replay.roomId,hash:replay.assetHash})
+    expect(direct).toEqual({status:426,cache:'no-store'})
+    await page.evaluate(() => {
+      const original = MessagePort.prototype.postMessage
+      MessagePort.prototype.postMessage = function(data: unknown, options?: Transferable[] | StructuredSerializeOptions) {
+        if (data && typeof data === 'object' && 'type' in data && data.type === 'lease') return
+        Reflect.apply(original,this,options === undefined ? [data] : [data,options])
+      }
+    })
+    await expect(frame.locator('.replay-app')).toHaveCount(0,{timeout:5_000})
+    await expect.poll(() => frame.locator('html').evaluate(() => '__revokedReplayBlobs' in window && Array.isArray(window.__revokedReplayBlobs) ? window.__revokedReplayBlobs.length : 0)).toBeGreaterThan(0)
+    await page.reload()
+    await expect(frame.locator('.replay-app')).toBeVisible()
+    await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
+    await expect(page.locator('iframe')).toHaveCount(0,{timeout:35_000})
+    await expect(page.locator('.prerelease-access-screen')).toBeVisible()
+  } finally {
+    await releaseAll([()=>environment.context.close(),()=>environment.browser.close(),()=>environment.close()])
+  }
 })

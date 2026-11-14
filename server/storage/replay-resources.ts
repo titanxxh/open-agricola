@@ -1,20 +1,17 @@
+import { readReplayViewerManifest, validViewerPath, type ReplayViewerManifest } from '../../shared/contract/replay-viewer-build'
+export { validViewerPath }
 import type { CustomCardDef } from '../../shared/contract/protocol/game'
 import type { ResourceStore } from './resource-store'
 import { objectHash } from './s3-store'
 import { cardArtKey } from '../../shared/utils/card-art-url'
 
 export class ReplayAssetValidationError extends Error {}
-export type ViewerManifest = { entrypoint: 'index.html'; files: Record<string, string> }
+export type ViewerManifest = ReplayViewerManifest
 const HASH = /^[a-f0-9]{64}$/
-export function validViewerPath(path: string): boolean {
-  return !!path && !path.includes('\\') && path.split('/').every(part => !!part && part !== '.' && part !== '..')
-}
 export function parseViewerManifest(body: Buffer, buildId: string): ViewerManifest {
   if (!HASH.test(buildId) || objectHash(body) !== buildId) throw new Error('Invalid viewer manifest hash')
-  const value = JSON.parse(body.toString('utf8')) as ViewerManifest
-  if (value.entrypoint !== 'index.html' || !value.files || typeof value.files !== 'object' || Array.isArray(value.files)
-    || !Object.hasOwn(value.files, 'index.html')
-    || Object.entries(value.files).some(([path, hash]) => path === 'manifest.json' || !validViewerPath(path) || typeof hash !== 'string' || !HASH.test(hash))) throw new Error('Invalid viewer manifest')
+  const value = readReplayViewerManifest(JSON.parse(body.toString('utf8')))
+  if (!value) throw new Error('Invalid viewer manifest')
   return value
 }
 
@@ -47,6 +44,16 @@ export class ReplayResources {
     const object = await this.storage.read(`replay-viewers/${buildId}/manifest.json`)
     if (!object || object.body.toString('utf8') !== row.manifest_text) return null
     return parseViewerManifest(object.body, buildId)
+  }
+
+  async asset(roomId: string, hash: string, definitions: CustomCardDef[]) {
+    if (!HASH.test(hash) || !definitions.some(card => card.artUrl === `/replay-assets/${hash}`)) return null
+    const key = `replay-assets/${hash}`
+    const referenced = () => this.storage.db.prepare("SELECT 1 FROM object_references WHERE owner_kind = 'replay' AND owner_id = ? AND object_key = ?").get(roomId, key)
+    if (!await referenced()) return null
+    const object = await this.storage.read(key)
+    if (!object || objectHash(object.body) !== hash || !await referenced()) return null
+    return object
   }
 
   async archiveCards(roomId: string, definitions: CustomCardDef[]): Promise<CustomCardDef[]> {
