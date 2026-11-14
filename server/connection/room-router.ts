@@ -554,7 +554,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   const draftOptions = parseDraftOptions(input)
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
   let setup: ReturnType<typeof parseGameSetupRequest>
-  try { setup = parseGameSetupRequest(input, draftOptions.value) }
+  try { setup = parseGameSetupRequest(input, draftOptions.value, { allowTeamRooms: isPrerelease() }) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid game configuration', msg.requestId); return }
   const maxPlayers = setup.playerCount
   const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers: setup.teamConfig?.mode === 'multihand' ? maxPlayers / setup.teamConfig.seatsPerTeam : maxPlayers, hotseat: setup.hotseat }, getDb())
@@ -1875,8 +1875,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
   }
   if (msg.type === 'createRoom') {
     try {
-      if (msg.teamConfig && !isPrerelease()) throw new Error('Unsupported game configuration')
-      assertSupportedGameConfiguration(msg)
+      assertSupportedGameConfiguration(msg, { allowTeamRooms: isPrerelease() })
     }
     catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Unsupported game configuration', msg.requestId); return }
   }
