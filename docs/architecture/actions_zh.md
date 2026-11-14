@@ -144,3 +144,5 @@ type ActionDefinition = {
 
 测试：`shared/session/__tests__/anytime-policy.test.ts`、`server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session,exchange-batch-session}.test.ts`。
 
+
+预发布Marketplace在改状态前验证整批转移；赠与者支付物资及一份同种税。`receiveFromPlayerLeaf` 给真正接收者入账，复用receive/动物整理hook，不计为卡牌收入。`marketplace-session.test.ts`、`marketplace-animals-session.test.ts` 覆盖拒绝、pending恢复与undo。
