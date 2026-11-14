@@ -10,6 +10,7 @@ import { createTestDatabase } from '../../__tests__/_helpers/postgres'
 import { GameContextStore } from '../game-context-store'
 import { ReplayStore } from '../replay-store'
 import { listEndedGames, prereleaseArchiveExpired, PRERELEASE_ARCHIVE_RETENTION_MS } from '../prerelease-archive-retention'
+import type { GameCreationRecord } from '../../../shared/contract/game-creation'
 
 const db = await createTestDatabase()
 afterAll(() => db.close())
@@ -129,4 +130,30 @@ it('uses the original termination time at the exact thirty-day boundary', async 
   now++
   expect(await listEndedGames(db, 'owner', () => now)).not.toContainEqual(expect.objectContaining({ id: 'pre-termination' }))
   expect(await new GameContextStore(db, () => now).resolve('pre-termination')).toEqual({ ok: true, roomId: 'pre-termination', lifecycle: 'expired' })
+})
+
+it('withholds creation metadata when its source is erased after the source transaction commits', async () => {
+  vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+  const roomId = 'pre-creation-erasure', userId = 'creation-owner', endedAt = Date.now()
+  await db.prepare(`INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES (?,?,?,'',1)`).run(userId, userId, userId)
+  await completed(roomId, endedAt)
+  await db.prepare('UPDATE game_results SET player_count=1 WHERE room_id=?').run(roomId)
+  await db.prepare('UPDATE game_result_players SET user_id=? WHERE room_id=?').run(userId, roomId)
+  const record = { configuration: { kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random', customCardIds: [],
+    officialCardPool: 'default-implemented-A-E', enableCommunityDeck: false, enableParentCards: false, draftParents: false,
+    enableThroughTheSeasons: false, enableFarmersOfTheMoor: false, enableMoorBalanceRules: false }, resolvedWorkshopSources: [] } satisfies GameCreationRecord
+  await db.prepare('INSERT INTO game_creation_configurations(room_id,configuration_json) VALUES (?,?)').run(roomId, JSON.stringify(record))
+  const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/creation-race-${randomUUID()}/`)
+  const source = GameCreationStore.prototype.completedSource
+  const held = vi.spyOn(GameCreationStore.prototype, 'completedSource').mockImplementation(async function (this: GameCreationStore, ...args) {
+    const result = await source.apply(this, args)
+    expect(result.ok).toBe(true)
+    await expirePrereleaseReplay(db, { roomId, resources: new ResourceStore(db, objects), now: () => endedAt + PRERELEASE_ARCHIVE_RETENTION_MS })
+    return result
+  })
+  try {
+    expect(await new GameContextStore(db, () => endedAt + PRERELEASE_ARCHIVE_RETENTION_MS - 1).readCreationConfiguration(roomId, userId))
+      .toMatchObject({ ok: false, code: 'source_removed' })
+    expect(await db.prepare('SELECT 1 FROM game_creation_configurations WHERE room_id=?').get(roomId)).toBeUndefined()
+  } finally { held.mockRestore(); await objects.clearPrefix(); objects.close() }
 })
