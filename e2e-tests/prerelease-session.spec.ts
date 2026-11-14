@@ -160,6 +160,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
     const track = (socket: Duplex) => { if (sockets.has(socket)) return; sockets.add(socket); socket.once('close', () => sockets.delete(socket)); socket.on('error', () => socket.destroy()) }
     const trackRequest = (request: ClientRequest) => { requests.add(request); request.once('close', () => requests.delete(request)); request.once('socket', track); return request }
     let formalOrigin = '', preOrigin = '', authority = createPrereleaseAuthorityHandler({ db: source, getSourceToken: async req => requestSessionToken(req) })
+    let beforeNextExchange: (() => Promise<void>) | undefined
     const proxy = tlsServer({ key: readFileSync(join(directory, 'key.pem')), cert: readFileSync(join(directory, 'cert.pem')) }, (req, res) => {
       const host = new URL(`https://${req.headers.host}`).hostname
       if (host === 'localhost') {
@@ -183,7 +184,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
           .then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
       }
       if ((req.url ?? '').startsWith('/api/prerelease/')) {
-        void authority(req, res).then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
+        const before = req.url === '/api/prerelease/exchange' ? beforeNextExchange : undefined
+        if (before) beforeNextExchange = undefined
+        void Promise.resolve().then(() => before?.()).then(() => authority(req, res))
+          .then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
       }
       if (req.url === '/api/auth/browser-policy') {
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
@@ -292,27 +296,51 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       formal: { appOrigin: formalOrigin, apiOrigin: formalOrigin }, ca: readFileSync(join(directory, 'cert.pem')) })
     await new Promise<void>(resolve => gateway!.server.listen(gatewayPort, '127.0.0.1', resolve))
     await gateway.refreshBrowserPolicy()
-    const enter = async (context: BrowserContext, principal = user) => {
+    const enter = async (context: BrowserContext, principal = user, expected?: 'paused') => {
       const page = await context.newPage()
-      await page.goto(`${preOrigin}/open-agricola/auth/start`)
-      await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toBeVisible()
-      const fragment = new URL(page.url()).hash
-      const input = Object.fromEntries(new URLSearchParams(fragment.slice(1)))
-      const issued = await page.evaluate(async ({ formal, input, header, version }) => {
-        const response = await fetch(`${formal}/api/prerelease/handoffs`, { method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json', [header]: String(version) },
-          body: JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin: input.targetOrigin, browserChallenge: input.browserChallenge, returnTo: input.returnTo }) })
-        if (!response.ok) throw new Error('Formal authority refused browser handoff')
-        return response.json()
-      }, { formal: formalOrigin, input, header: BROWSER_AUTH_HEADER, version: BROWSER_AUTH_VERSION })
-      const callback = new URL(issued.callbackUrl)
-      callback.hash = new URLSearchParams({ protocolVersion: '1', code: issued.code, state: input.state!, browserChallenge: input.browserChallenge!, returnTo: issued.returnTo }).toString()
-      await page.goto(callback.href)
-      await expect(page.locator('.prerelease-banner')).toContainText('Prerelease aaaaaaaaaaaa')
-      await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toHaveCount(0)
-      await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible()
-      await expect(page.locator('.lobby-user-pill')).toHaveText(principal.displayName)
-      return page
+      const responses: Array<Promise<{ at: number; path: string; status: number; code?: string }>> = []
+      page.on('response', response => {
+        const path = new URL(response.url()).pathname
+        if (!['/api/prerelease/session', '/api/auth/me'].includes(path)) return
+        const at = Date.now()
+        responses.push(response.json().then((body: unknown) => ({ at, path, status: response.status(),
+          ...(body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' ? { code: body.code } : {}),
+        }), () => ({ at, path, status: response.status() })))
+      })
+      try {
+        await page.goto(`${preOrigin}/open-agricola/auth/start`)
+        await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toBeVisible()
+        const fragment = new URL(page.url()).hash
+        const input = Object.fromEntries(new URLSearchParams(fragment.slice(1)))
+        const issued = await page.evaluate(async ({ formal, input, header, version }) => {
+          const response = await fetch(`${formal}/api/prerelease/handoffs`, { method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json', [header]: String(version) },
+            body: JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin: input.targetOrigin, browserChallenge: input.browserChallenge, returnTo: input.returnTo }) })
+          if (!response.ok) throw new Error('Formal authority refused browser handoff')
+          return response.json()
+        }, { formal: formalOrigin, input, header: BROWSER_AUTH_HEADER, version: BROWSER_AUTH_VERSION })
+        const callback = new URL(issued.callbackUrl)
+        callback.hash = new URLSearchParams({ protocolVersion: '1', code: issued.code, state: input.state!, browserChallenge: input.browserChallenge!, returnTo: issued.returnTo }).toString()
+        const initialResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/prerelease/session' && response.request().method() === 'POST')
+        await page.goto(callback.href)
+        await expect(page.locator('.prerelease-banner')).toContainText('Prerelease aaaaaaaaaaaa')
+        await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toHaveCount(0)
+        const response = await initialResponse
+        if (expected === 'paused') expect(response.status()).toBe(503)
+        if (response.status() === 503) {
+          expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+          await expect(page.locator('.prerelease-access-screen')).toContainText('Access is paused')
+          await page.getByRole('button', { name: 'Retry', exact: true }).click()
+        }
+        await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible()
+        await expect(page.locator('.lobby-user-pill')).toHaveText(principal.displayName)
+        return page
+      } finally {
+        const events = await source.prepare('SELECT kind,created_at,acknowledged_at FROM prerelease_identity_events WHERE target_origin=? AND user_id=? ORDER BY created_at,id').all(preOrigin, principal.id)
+        const path = test.info().outputPath(`prerelease-entry-observations-${randomUUID()}.json`)
+        writeFileSync(path, JSON.stringify({ responses: await Promise.all(responses), events }, null, 2), { mode: 0o600 })
+        await test.info().attach('prerelease-entry-observations', { path, contentType: 'application/json' })
+      }
     }
     const browser = await playwright.chromium.launch()
     const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
@@ -375,7 +403,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
     const retainedRoom = async (roomId: string) => admin.prepare(`SELECT status,state_json,team_members_json FROM "${schema}".rooms WHERE id=?`).get(roomId)
     return { context, browser, close, enter, createParticipant, retainedRoom, prepareRetainedRoom, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
       seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }),
-      publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value } }
+      publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value },
+      beforeNextExchange: (callback: () => Promise<void>) => { beforeNextExchange = callback } }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
     catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Prerelease fixture setup and cleanup failed', { cause: cleanupError }) }
@@ -730,7 +759,13 @@ test('real prerelease Multihand binds two seats per principal and survives brows
     await expect(host.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
     expect(await environment.retainedRoom(roomId!)).toEqual(persisted)
     await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
-    const returned = await environment.enter(environment.context)
+    environment.beforeNextExchange(async () => {
+      await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
+      await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
+      await expect.poll(async () => (await environment.source.prepare('SELECT count(*)::int AS pending FROM prerelease_identity_events WHERE target_origin=? AND user_id=? AND acknowledged_at IS NULL')
+        .get<{ pending: number }>(environment.preOrigin, environment.user.id))?.pending).toBe(0)
+    })
+    const returned = await environment.enter(environment.context, environment.user, 'paused')
     const returnedWire = observeGameSocket(returned)
     await returned.goto(roomUrl)
     await expect.poll(() => returnedWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
