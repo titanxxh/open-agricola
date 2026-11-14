@@ -7,6 +7,7 @@ import type { WorkshopPublicCardCatalogEntry, WorkshopPublicCardSnapshot } from 
 import { loadPublicSandboxInputs } from '../local-sandbox/public-access'
 import { stashLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 import { workshopGameUrl } from '../workshop-game/bootstrap'
+import { BrandMark } from '../components/common/BrandMark'
 import '../styles/pages/workshop.css'
 
 /** This entry never mounts author workspaces, AI tools or shared settings effects. */
@@ -57,6 +58,7 @@ export function PrereleaseWorkshopPage() {
   }
   return <main className="ws-page prerelease-workshop-page" data-testid="prerelease-workshop">
     <header className="prerelease-workshop-panel">
+    <BrandMark title="Open Agricola" homeLinkLabel={t('platform.backToLobbyPlain')} />
     <h1>{t('platform.publicSandboxTitle')}</h1>
     <p>{t('platform.publicSandboxDescription')}</p>
     </header>
