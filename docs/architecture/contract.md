@@ -202,7 +202,7 @@ type InteractionState =
 | kind | Payload shape |
 |---|---|
 | `choice` | `{ options: ActionChoiceOption[], multiSelect?: { valuePrefix, minSelections, maxSelections } }` |
-| `farm-select` | `{ farm: { farmType: 'plow'\|'sow'\|'fence'\|'room'\|'stable', selectable*..., maxSelections? }, options? }` |
+| `farm-select` | `{ farmOwnerPlayerId?: string, farm: { farmType: 'plow'\|'sow'\|'fence'\|'room'\|'stable', selectable*..., maxSelections? }, options? }` |
 | `selection` | `{ selection: { selectionType: 'farm-position'\|'occupation-hand', ... } }` |
 | `animal-reorg` | `{ zones: InteractionAnimalReorgZone[] }` |
 | `feed` | `{ remaining; foodUsed; feedQueue? }` |
