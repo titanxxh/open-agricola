@@ -10,6 +10,10 @@
     {"file":"e2e-tests/release-rendering.spec.ts","titlePath":["release rendering decodes visible PNG backgrounds, masks and images without exposing query strings"],"project":"chromium","browser":"chromium"},
     {"file":"e2e-tests/release-rendering.spec.ts","titlePath":["release rendering rejects a visible image returning 404"],"project":"chromium","browser":"chromium"},
     {"file":"e2e-tests/choice-previews.spec.ts","titlePath":["a scheduled Cut Peat offer commits its single physical card from the farm"],"project":"chromium","browser":"chromium"},
-    {"file":"e2e-tests/choice-previews.spec.ts","titlePath":["one farm cell with multiple authoritative options requires an explicit action-card choice"],"project":"chromium","browser":"chromium"}
+    {"file":"e2e-tests/choice-previews.spec.ts","titlePath":["one farm cell with multiple authoritative options requires an explicit action-card choice"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/live-release-smoke.spec.ts","titlePath":["live smoke read guard and locale cover opaque frames in chromium"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/live-release-smoke.spec.ts","titlePath":["live smoke read guard and locale cover opaque frames in webkit"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/live-release-smoke.spec.ts","titlePath":["release login waiter and desktop logout complete after the mobile viewport test"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/release-diagnostics.spec.ts","titlePath":["release snapshot checkpoint survives bounded evidence eviction and requires a new reload document"],"project":"chromium","browser":"chromium"}
   ]
 }

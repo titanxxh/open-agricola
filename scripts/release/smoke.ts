@@ -8,6 +8,7 @@ import { SoloBrowserDriver } from '../../e2e-tests/helpers/standard-solo-accepta
 import { observeReleasePage, type ReleaseDiagnosticSnapshot } from '../../e2e-tests/helpers/release-diagnostics'
 import { verifyVisibleReleaseAssets } from './render'
 import { isSameSite } from '../../server/http-origin'
+import { clearOwnReleaseSession, installReleaseLocale, submitReleaseLogin } from '../../e2e-tests/helpers/release-browser'
 
 export type SmokeMode = 'random' | 'choose-7'
 export type SmokeTarget = { appUrl: string; apiUrl: string; buildId: string }
@@ -41,9 +42,9 @@ export function writeEvidence(directory: string, name: string, value: unknown): 
   renameSync(temporary, file)
 }
 
-export function createFailureRecorder(directory: string, diagnostics: () => ReleaseDiagnosticSnapshot) {
+export function createFailureRecorder<Diagnostics = ReleaseDiagnosticSnapshot>(directory: string, diagnostics: () => Diagnostics) {
   let firstFailure: Error | undefined
-  return (stage: ReleaseFailureStage, error: unknown, snapshot = diagnostics()) => {
+  return (stage: string, error: unknown, snapshot = diagnostics()) => {
     if (firstFailure && error === firstFailure) return { primary: false, error: firstFailure }
     const primary = !firstFailure
     const errorCategory = error instanceof Error && ['AssertionError', 'Error', 'TypeError', 'TimeoutError', 'SyntaxError', 'RangeError', 'ReferenceError'].includes(error.name) ? error.name : 'unknown'
@@ -113,7 +114,7 @@ export async function runReleaseSmoke({ page, target, credentials, outputDirecto
   const diagnostics = observeReleasePage(page, { capacity: 512 }), driver = new SoloBrowserDriver(page)
   const errors: string[] = [], onError = (error: Error) => errors.push(error.name)
   page.on('pageerror', onError)
-  await page.context().addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+  await installReleaseLocale(page.context())
   let stage: ReleaseFailureStage = 'build-metadata', authenticated = false, result: SmokeEvidence | undefined
   let primaryFailure: Error | undefined
   const recordFailure = failureRecorder ?? createFailureRecorder(outputDirectory, () => diagnostics.snapshot())
@@ -132,9 +133,7 @@ export async function runReleaseSmoke({ page, target, credentials, outputDirecto
     assert.ok(object(build) && build.format === 1 && build.gameBuildId === target.buildId && build.basePath === new URL(target.appUrl).pathname, 'Frontend must match the selected build and base path')
     stage = 'login'
     await page.goto(`${target.appUrl}?page=login`, { waitUntil: 'domcontentloaded' })
-    await page.locator('#username').fill(credentials.username); await page.locator('#password').fill(credentials.password)
-    const login = page.waitForResponse(response => response.url() === `${target.apiUrl}/api/auth/login` && response.request().method() === 'POST')
-    await page.locator('.login-form button[type="submit"]').click(); assert.equal((await login).status(), 200); authenticated = true
+    await submitReleaseLogin(page, target.apiUrl, credentials); authenticated = true
     const me = await page.context().request.get(`${target.apiUrl}/api/auth/me`, { headers: browserHeaders }); assert.equal(me.status(), 200)
     const identity: unknown = await me.json()
     assert.ok(object(identity) && object(identity.user) && typeof identity.user.id === 'string')
@@ -198,11 +197,13 @@ export async function runReleaseSmoke({ page, target, credentials, outputDirecto
       }
       stage = `${mode}:reload`
       const before = snapshot(driver), sentHands = driver.commands.filter(command => command.type === 'soloHandSubmit').length
-      const prior = diagnostics.snapshot().entries.findLast(event => event.kind === 'frame' && event.messageType === 'stateUpdate' && event.roomId === room.roomId && event.sync === 'snapshot')
-      assert.ok(prior && prior.kind === 'frame')
+      const prior = diagnostics.checkpoint()
+      assert.ok(prior && prior.roomId === room.roomId)
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expect.poll(() => diagnostics.snapshot().entries.some(event => event.kind === 'frame' && event.messageType === 'stateUpdate'
-        && event.roomId === room.roomId && event.sync === 'snapshot' && event.documentId > prior.documentId && event.socketId !== prior.socketId)).toBe(true)
+      await expect.poll(() => {
+        const next = diagnostics.checkpoint()
+        return next?.roomId === room.roomId && next.sequence > prior.sequence && next.documentId > prior.documentId && next.socketId !== prior.socketId
+      }).toBe(true)
       assert.deepEqual(snapshot(driver), before, 'A fresh document must restore the exact same game, hand and pending interaction')
       assert.equal(driver.commands.filter(command => command.type === 'soloHandSubmit').length, sentHands)
       stage = `${mode}:render`
@@ -225,8 +226,7 @@ export async function runReleaseSmoke({ page, target, credentials, outputDirecto
     try {
       if (authenticated) {
         stage = 'logout'
-        assert.equal((await page.context().request.post(`${target.apiUrl}/api/auth/logout`, { headers: browserHeaders, data: {} })).status(), 200)
-        assert.equal((await page.context().request.get(`${target.apiUrl}/api/auth/me`, { headers: browserHeaders })).status(), 401)
+        await clearOwnReleaseSession(page.context().request, target.apiUrl, browserHeaders)
       }
     } catch (error) {
       const failure = fail(error)
