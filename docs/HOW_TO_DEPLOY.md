@@ -828,6 +828,31 @@ docker pull --platform linux/amd64 caddy@sha256:<approved-manifest-sha256>
 
 The default is an existing-deployment upgrade. Explicit bootstrap requires no app/Caddy containers or retained project volumes, prior image selectors, deployment records, backup/ledger or legacy local data. Under the same maintenance lock, the fixed target image's `check-empty` command queries PostgreSQL relations across all non-system schemas and lists the S3 namespace with no writes. The application S3 identity needs listing permission; unknown responses, permission errors, any database relation or object including an empty deletion ledger reject bootstrap. Older targets without this command also reject it. The proof uses one directly created read-only container with only the dependency network and selected private data environment, the existing transient resource caps and temporary memory storage. It mounts no host or project volumes and is removed by its returned container ID even on failure. No `docker compose run` occurs before the empty proof, so a transient proof failure cannot create a retained project volume. Caddy's preloaded digest, native image ID and Linux AMD64 platform are checked without a pull or build. The equivalent official `caddy@sha256:...` and `docker.io/library/caddy@sha256:...` spellings are accepted only for the same digest; another registry or repository is rejected. Only a successful empty proof permits existing `check-live` initialization and target validation, followed by exact app/Caddy identity checks and atomic selector publication. A failed bootstrap stays closed and drains newly started services. Existing-data upgrades still require source capture and target restore validation; missing containers never authorize treating retained data as new. Recovery after a failed initialization requires an explicit existing-data recovery plan, not an automatic bootstrap retry.
 
+### Remove obsolete formal application images
+
+After accepting the formal deployment, run the owner maintenance entry to review the server's current inventory. It streams the checked-out tool over SSH and defaults to a read-only plan:
+
+```bash
+./cleanup-backend-images.sh ubuntu@ten-kr /home/ubuntu/open-agricola > image-cleanup-plan.json
+```
+
+Review every `remove` entry, then execute against the accepted full build SHA:
+
+```bash
+./cleanup-backend-images.sh ubuntu@ten-kr /home/ubuntu/open-agricola \
+  --execute --expected-build <accepted-full-sha>
+```
+
+Both modes acquire `backups/.maintenance.lock`. Execution inventories and plans again inside that lock and before each candidate. The expected build must match the running formal app, `data/deployed-build-id`, `data/deployed-image.json`, and the immutable `.env` selector. A saved plan never authorizes deletion.
+
+Cleanup protects every image referenced by any container, including stopped containers, the current deployment bindings, and up to five recent historical application builds created within 30 days. Every still-retained backup archive and its manifest protect their source and target builds. The latest five image import/source audit records within 30 days also protect their bound images. Imported images with an unexpired owner request or maintenance admission remain protected outside that count. Older audit files remain evidence without pinning images forever. A known legacy application without a build identity stays protected for its first 30 days; its native creation time determines this window.
+
+For a separate recovery in progress, create the owner-owned `data/backend-image-recovery.json` with `format: 1`, UTC `createdAt` and `expiresAt`, full native IDs in `images`, and full build SHAs in `builds`. The expiry must follow creation by at most 30 days. An expired binding stops protecting images. Retained backup bindings remain effective until their archives are removed by the backup retention policy.
+
+Only images bound by a formal-candidate import receipt or the legacy `open-agricola` Compose project and `app` service can be candidates. Stable channel labels alone do not prove formal application ownership, because prerelease policy-tool images also use that channel. All historical formal import receipts can prove ownership without extending the protection window. Unknown image ownership, build metadata, tags, or digest repositories are retained. For a historical image with multiple known project references, cleanup rechecks each reference before removing the extras with `docker image rm --no-prune`, then removes the complete native image ID without force. A newly referenced image is retained or Docker refuses deletion. Cleanup never stops containers and never prunes volumes, dependencies, Caddy, monitoring images, another project, the owner's local Docker, or GHCR packages.
+
+Execution writes its plan and results to the server's private `backups/.image-cleanup-<UUID>/result.json`, with directory mode `0700` and file mode `0600`. Failures retain diagnostics and return a nonzero status. Inspect the result before retrying the same command; each retry builds a fresh plan. Inventory output includes only image identities, references, selected labels, creation times, sizes, and build bindings. It does not print application environment values or credentials.
+
 ### Frontend
 
 The Pages frontend and backend use the same selected build identity. Publish a GitHub Release to deploy `dist-pages/` through the existing workflow, as described in [Trigger a Deployment](#trigger-a-deployment), and verify the actual files served from the frontend domain. The optional same-origin frontend continues to ship in the backend image.
