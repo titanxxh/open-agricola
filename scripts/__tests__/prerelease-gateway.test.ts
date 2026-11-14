@@ -239,6 +239,11 @@ it('fails closed, proxies only the pre Host, and stops HTTP and existing WebSock
 it('rejects authority-changing HTTP and WS request targets before forwarding pre cookies', async () => {
   const root = await mkdtemp(join(tmpdir(), 'agricola-pre-target-'))
   const formal = await formalBrowserPolicyFixture()
+  const forwardedCookies: Array<string | undefined> = []
+  const upstream = createServer((req, res) => { forwardedCookies.push(req.headers.cookie); res.end('candidate-open') })
+  upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening')
+  const upstreamAddress = upstream.address()
+  if (!upstreamAddress || typeof upstreamAddress === 'string') throw new Error('Expected upstream port')
   let leaked = 0
   const unintended = createServer((_req, res) => { leaked++; res.end('leaked') })
   unintended.listen(0, '127.0.0.1'); await once(unintended, 'listening')
@@ -246,23 +251,43 @@ it('rejects authority-changing HTTP and WS request targets before forwarding pre
   if (!address || typeof address === 'string') throw new Error('Expected fixture port')
   await writeFile(join(root, 'storage-guard.json'), JSON.stringify(healthyGuard()))
   const stateFile = join(root, 'gate.json')
-  await writeFile(stateFile, JSON.stringify({ format: 1, channel: 'prerelease', targetId: 'prerelease-test', mode: 'open', buildId: 'a'.repeat(40), generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5' }))
-  const gateway = createPrereleaseGateway({ stateFile, targetId: 'prerelease-test', origin: 'https://pre.agricola.test', upstream: 'http://127.0.0.1:1', formal: formal.formal, ca: formal.ca })
-  gateway.server.listen(0, '127.0.0.1'); await once(gateway.server, 'listening')
+  const state = { format: 1, channel: 'prerelease', targetId: 'prerelease-test', mode: 'open', buildId: 'a'.repeat(40),
+    generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', acceptance: { healthyCycle, formalBuildId: formal.state.buildId } }
+  await writeFile(stateFile, JSON.stringify(state))
+  const gateway = createPrereleaseGateway({ stateFile, targetId: state.targetId, origin: 'https://pre.agricola.test',
+    upstream: `http://127.0.0.1:${upstreamAddress.port}`, formal: formal.formal, ca: formal.ca })
+  gateway.server.listen(0, '127.0.0.1'); await once(gateway.server, 'listening'); await gateway.refreshBrowserPolicy()
   const listener = gateway.server.address()
   if (!listener || typeof listener === 'string') throw new Error('Expected gateway port')
   const base = `http://127.0.0.1:${listener.port}`, path = `//127.0.0.1:${address.port}/collect`
+  const headers = { Host: 'pre.agricola.test', Origin: 'https://pre.agricola.test', Cookie: '__Host-oa-pre-session=real-pre-cookie' }
+  const read = (path: string) => new Promise<{ status: number; body: string }>((done, reject) => get(base, { path, agent: false, headers }, response => {
+    let body = ''
+    response.on('data', chunk => { body += chunk.toString() })
+    response.on('end', () => done({ status: response.statusCode ?? 0, body })); response.on('error', reject)
+  }).on('error', reject))
+  let socket: WebSocket | undefined
   try {
-    const status = await new Promise<number>((done, reject) => get(base, { path, headers: { Host: 'pre.agricola.test', Cookie: 'oa_session=private-pre' } }, response => {
-      response.resume(); response.on('end', () => done(response.statusCode ?? 0))
-    }).on('error', reject))
-    expect(status).toBe(400)
-    const socket = new WebSocket(base.replace('http:', 'ws:') + path, { headers: { Host: 'pre.agricola.test', Cookie: 'oa_session=private-pre' } })
-    await new Promise<void>(done => { socket.on('unexpected-response', (_req, res) => { res.resume(); socket.terminate(); done() }); socket.on('error', () => done()) })
+    expect(await read('/')).toEqual({ status: 200, body: 'candidate-open' })
+    expect(forwardedCookies).toEqual(['__Host-oa-pre-session=real-pre-cookie'])
+    expect((await read(path)).status).toBe(400)
+    const client = new WebSocket(base.replace('http:', 'ws:') + path, { headers }); socket = client
+    const status = await new Promise<number>((done, reject) => {
+      let responseReceived = false
+      client.on('unexpected-response', (_req, res) => { responseReceived = true; res.resume(); done(res.statusCode ?? 0); client.terminate() })
+      client.on('open', () => { client.terminate(); reject(new Error('Unexpected authority-changing WebSocket upgrade')) })
+      client.on('error', error => { if (!responseReceived) reject(error) })
+    })
+    expect(status).toBe(503)
+    expect(forwardedCookies).toEqual(['__Host-oa-pre-session=real-pre-cookie'])
     expect(leaked).toBe(0)
   } finally {
-    await gateway.close(); unintended.closeAllConnections()
-    await new Promise<void>(done => unintended.close(() => done()))
+    socket?.terminate()
+    await gateway.close(); unintended.closeAllConnections(); upstream.closeAllConnections()
+    await Promise.all([
+      new Promise<void>(done => unintended.close(() => done())),
+      new Promise<void>(done => upstream.close(() => done())),
+    ])
     await formal.close()
     await rm(root, { recursive: true, force: true })
   }
