@@ -27,6 +27,7 @@ export async function seedPrivateReplay({ databaseUrl, schema, prefix, dependenc
     const first = capture()
     session.state.players[0]!.resources.wood += 3
     const second = capture()
+    session.dispose()
     const now = Date.now()
     await db.prepare("INSERT INTO game_contexts(room_id,lifecycle,replay_status,created_at,updated_at) VALUES (?,'completed','available',?,?)").run(roomId,now,now)
     await db.prepare("INSERT INTO game_replays(room_id,schema_version,viewer_build_id,game_build_id,status,latest_step_no,missing_prefix,custom_cards_json,created_at,completed_at) VALUES (?,1,?,?,'completed',1,0,?,?,?)")

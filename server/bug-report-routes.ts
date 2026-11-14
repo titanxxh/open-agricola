@@ -415,16 +415,16 @@ const inspectEvidence = async (
   }
 }
 
-const participantEvidence = async (
+const participantEvidenceGrant = async (
   runtime: EvidenceRuntime,
   roomId: string,
   stepNo: number,
   frameHash: string,
   participant: AuthUser,
-): Promise<ReportedEvidence> => {
-  const context = (await runtime.db.prepare(`
+) => {
+  const context = await runtime.db.prepare(`
     SELECT lifecycle FROM game_contexts WHERE room_id = ?
-  `).get(roomId)) as { lifecycle: string } | undefined
+  `).get<{ lifecycle: string }>(roomId)
   if (!context) throw new BugReportError('unknown_context', 404)
   if (context.lifecycle !== 'active' && context.lifecycle !== 'expired') {
     throw new BugReportError(`context_${context.lifecycle}`, 410)
@@ -436,16 +436,16 @@ const participantEvidence = async (
           FROM room_players
           WHERE room_id = ? AND user_id = ?
           ORDER BY player_index LIMIT 1
-        `).get(roomId, participant.id))
+        `).get<{ player_index: number }>(roomId, participant.id))
       : (await runtime.db.prepare(`
           SELECT player_index
           FROM game_context_participants
           WHERE room_id = ? AND user_id = ?
           ORDER BY player_index LIMIT 1
-        `).get(roomId, participant.id))
-  ) as { player_index: number } | undefined
+        `).get<{ player_index: number }>(roomId, participant.id))
+  )
   if (!seat) throw new BugReportError('not_participant', 403)
-  const report = (await runtime.db.prepare(`
+  const report = await runtime.db.prepare(`
     SELECT room_id, step_no, frame_hash, evidence_expires_at
     FROM bug_reports
     WHERE room_id = ?
@@ -455,8 +455,15 @@ const participantEvidence = async (
       AND submitted_at IS NOT NULL
     ORDER BY evidence_expires_at DESC
     LIMIT 1
-  `).get(roomId, stepNo, frameHash)) as EvidenceAnchor | undefined
+  `).get<EvidenceAnchor>(roomId, stepNo, frameHash)
   if (!report) throw new BugReportError('anchor_mismatch', 409)
+  return { playerIndex: seat.player_index, report }
+}
+
+const participantEvidence = async (
+  runtime: EvidenceRuntime, roomId: string, stepNo: number, frameHash: string, participant: AuthUser,
+): Promise<ReportedEvidence> => {
+  const grant = await participantEvidenceGrant(runtime, roomId, stepNo, frameHash, participant)
   const replay = (await runtime.db.prepare(`
     SELECT schema_version, viewer_build_id, custom_cards_json
     FROM game_replays
@@ -467,6 +474,13 @@ const participantEvidence = async (
     custom_cards_json: string
   } | undefined
   if (!replay) throw new BugReportError('replay_segment_unavailable', 503)
+  const frame = await loadEvidenceFrame(runtime, grant.report, grant.playerIndex)
+  const current = await participantEvidenceGrant(runtime, roomId, stepNo, frameHash, participant)
+  if (current.playerIndex !== grant.playerIndex) throw new BugReportError('not_participant', 403)
+  if (await prereleaseArchiveExpired(runtime.db, roomId)
+    || current.report.evidence_expires_at === null || current.report.evidence_expires_at <= Date.now()) {
+    throw new BugReportError('replay_segment_unavailable', 503)
+  }
   return {
     ok: true,
     kind: 'reportedEvidence',
@@ -476,8 +490,8 @@ const participantEvidence = async (
     viewerBuildId: replay.viewer_build_id,
     stepNo,
     frameHash,
-    perspective: `p${seat.player_index + 1}`,
-    frame: (await loadEvidenceFrame(runtime, report, seat.player_index)),
+    perspective: `p${grant.playerIndex + 1}`,
+    frame,
     customCards: parseCustomCards(replay.custom_cards_json),
   }
 }
