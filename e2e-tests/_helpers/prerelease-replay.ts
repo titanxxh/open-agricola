@@ -7,8 +7,8 @@ import { objectHash, S3ObjectStore } from '../../server/storage/s3-store'
 import { encodeReplayFrame, type JsonValue } from '../../server/game/replay-codec'
 import type { CustomCardDef } from '../../shared/contract/protocol/game'
 
-export async function seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId }: {
-  databaseUrl: string; schema: string; prefix: string; dependencies: NodeJS.ProcessEnv; userId: string
+export async function seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId, evidence = false }: {
+  databaseUrl: string; schema: string; prefix: string; dependencies: NodeJS.ProcessEnv; userId: string; evidence?: boolean
 }) {
   const db = new PostgresDatabase({ connectionString: databaseUrl, schema, max: 1 })
   const resources = new ReplayResources(new ResourceStore(db, S3ObjectStore.fromEnv(dependencies, prefix)))
@@ -41,6 +41,14 @@ export async function seedPrivateReplay({ databaseUrl, schema, prefix, dependenc
     }
     await db.prepare('INSERT INTO game_results(room_id,started_at,finished_at,rounds_played,player_count,enable_community_deck,enable_parent_cards,enable_through_the_seasons,enable_farmers_of_the_moor) VALUES (?,?,?,?,2,0,0,0,0)').run(roomId,now-1000,now,14)
     for (let index=0;index<2;index++) await db.prepare('INSERT INTO game_result_players(room_id,player_index,game_player_id,user_id,display_name,score) VALUES (?,?,?,?,?,0)').run(roomId,index,`p${index+1}`,index===0?userId:null,index===0?'Alice':'Bob')
+    if (evidence) {
+      await db.prepare("UPDATE game_contexts SET lifecycle='expired',replay_status=NULL WHERE room_id=?").run(roomId)
+      await db.prepare("UPDATE game_replays SET status='recording',completed_at=NULL WHERE room_id=?").run(roomId)
+      await db.prepare('DELETE FROM game_results WHERE room_id=?').run(roomId)
+      await db.prepare('INSERT INTO game_context_participants(room_id,player_index,user_id) VALUES (?,0,?),(?,1,NULL)').run(roomId,userId,roomId)
+      await db.prepare("INSERT INTO bug_reports(submission_id,reporter_user_id,room_id,player_index,lifecycle,room_version,step_no,frame_hash,status,submitted_at,evidence_expires_at,created_at,updated_at) VALUES (?, ?, ?, 0, 'active', 0, 0, ?, 'submitted', ?, ?, ?, ?)")
+        .run(randomUUID(),userId,roomId,firstHash,now,now+60_000,now,now)
+    }
     return {roomId,firstHash,assetHash,viewerBuildId:viewer.build_id}
   } finally { resources.storage.objects.close(); await db.close() }
 }
