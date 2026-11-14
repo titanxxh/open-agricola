@@ -84,3 +84,40 @@ it('rejects correctly fingerprinted bytes arriving after a known access denial',
   await expect(cards.loadCardsManifest()).rejects.toThrow('prerelease_access_expired')
   expect(fetchMock).toHaveBeenCalledTimes(2)
 })
+
+it.each([undefined, fingerprint])('does not publish manifest %s when access ends during JSON decoding', async hash => {
+  vi.stubEnv('VITE_CARDS_MANIFEST_SHA256', hash)
+  const { cards, fetchMock, runtime } = await prepare(true)
+  let startJson = () => { throw new Error('JSON decoding was not started') }
+  let releaseJson = () => { throw new Error('JSON decoding was not held') }
+  const started = new Promise<void>(resolve => { startJson = resolve })
+  const held = new Promise<void>(resolve => { releaseJson = resolve })
+  const response = Response.json(payload)
+  const decode = response.json.bind(response)
+  vi.spyOn(response, 'json').mockImplementation(async () => {
+    startJson()
+    await held
+    return decode()
+  })
+  fetchMock.mockResolvedValueOnce(response)
+  const loading = cards.loadCardsManifest()
+  await started
+  runtime.rejectPrereleaseAccess('prerelease_access_expired')
+  releaseJson()
+
+  await expect(loading).rejects.toThrow('prerelease_access_expired')
+
+  expect(cards.hasCardsManifest()).toBe(false)
+  expect(cards.getCardMeta('A123_FrameBuilder')).toBeUndefined()
+})
+
+it('refuses a cached manifest after access ends without making another request', async () => {
+  const { cards, fetchMock, runtime } = await prepare(true)
+  fetchMock.mockResolvedValueOnce(Response.json(payload))
+  await cards.loadCardsManifest()
+  runtime.rejectPrereleaseAccess('prerelease_access_expired')
+
+  await expect(cards.loadCardsManifest()).rejects.toThrow('prerelease_access_expired')
+
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+})
