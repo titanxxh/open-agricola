@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"https://pre.agricola.test/open-agricola/"}
 import { StrictMode } from 'react'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 const build = 'a'.repeat(40)
@@ -17,10 +17,11 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-async function renderPrerelease({ handoff, status, code }: {
+async function renderPrerelease({ handoff, status, code, runtimeFailure = false }: {
   handoff: boolean
   status: number
   code: string
+  runtimeFailure?: boolean
 }) {
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease')
   vi.stubEnv('VITE_GAME_BUILD_ID', build)
@@ -38,16 +39,24 @@ async function renderPrerelease({ handoff, status, code }: {
     'prerelease.environment': 'Prerelease environment',
     'prerelease.version': 'Prerelease {version}',
     'prerelease.returnToProduction': 'Return to production',
+    'prerelease.entry': 'Prerelease entry',
   } })
   const endpoint = handoff ? '/api/prerelease/session' : '/api/auth/me'
   const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input)
     const path = new URL(url, window.location.origin).pathname
-    if (path === '/api/prerelease/runtime') return Response.json({
-      ok: true, channel: 'prerelease', buildId: build, generationId: generation,
-      appOrigin: window.location.origin, formalAppOrigin: 'https://formal.agricola.test',
-      formalApiBase: 'https://api.agricola.test', targetId: 'prerelease-main',
-    })
+    if (path === '/api/prerelease/runtime') {
+      expect(init?.credentials).toBe('include')
+      expect(init?.cache).toBe('no-store')
+      expect(new Headers(init?.headers).get('x-oa-browser-protocol')).toBe('2')
+      expect(new Headers(init?.headers).get('x-oa-pre-build')).toBeNull()
+      expect(new Headers(init?.headers).get('x-oa-pre-generation')).toBeNull()
+      return runtimeFailure ? Response.json({ ok: false, code }, { status }) : Response.json({
+        ok: true, channel: 'prerelease', buildId: build, generationId: generation,
+        appOrigin: window.location.origin, formalAppOrigin: 'https://formal.agricola.test',
+        formalApiBase: 'https://api.agricola.test', targetId: 'prerelease-main',
+      })
+    }
     expect(path).toBe(endpoint)
     expect(init?.method ?? 'GET').toBe(handoff ? 'POST' : 'GET')
     expect(window.location.hash).toBe('')
@@ -68,36 +77,44 @@ async function renderPrerelease({ handoff, status, code }: {
   return { api, fetchMock, privateRenders }
 }
 
-function expectPrereleaseBanner() {
+function expectPrereleaseBanner(runtimeKnown = true) {
   const banner = screen.getByRole('complementary', { name: 'Prerelease environment' })
   expect(within(banner).getByText('Prerelease aaaaaaaaaaaa')).toBeVisible()
-  expect(within(banner).getByRole('link', { name: 'Return to production' })).toHaveAttribute('href', 'https://formal.agricola.test/')
+  if (runtimeKnown) expect(within(banner).getByRole('link', { name: 'Return to production' })).toHaveAttribute('href', 'https://formal.agricola.test/')
+  else expect(within(banner).getByRole('link', { name: 'Prerelease entry' })).toHaveAttribute('href', '/open-agricola/auth/start?returnPath=%2Fopen-agricola%2F')
 }
 
 it.each([
-  { route: 'session check', handoff: false },
-  { route: 'handoff exchange', handoff: true },
-])('shows global recovery for reload_required from the $route without mounting private pages', async ({ handoff }) => {
-  const { api, fetchMock, privateRenders } = await renderPrerelease({ handoff, status: 426, code: 'reload_required' })
+  { route: 'runtime session bootstrap', handoff: false, runtimeFailure: true },
+  { route: 'runtime handoff bootstrap', handoff: true, runtimeFailure: true },
+  { route: 'session check', handoff: false, runtimeFailure: false },
+  { route: 'handoff exchange', handoff: true, runtimeFailure: false },
+])('shows global recovery for reload_required from the $route without mounting private pages', async ({ handoff, runtimeFailure }) => {
+  const { api, fetchMock, privateRenders } = await renderPrerelease({ handoff, runtimeFailure, status: 426, code: 'reload_required' })
 
   await waitFor(() => expect(api.getBrowserReloadRequired()).toBe(true))
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Reload the application')
   expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible()
   expect(screen.queryByText('Access is paused')).toBeNull()
-  expectPrereleaseBanner()
+  expectPrereleaseBanner(!runtimeFailure)
   for (const renderPrivate of privateRenders) expect(renderPrivate).not.toHaveBeenCalled()
-  expect(fetchMock).toHaveBeenCalledTimes(2)
+  expect(fetchMock).toHaveBeenCalledTimes(runtimeFailure ? 1 : 2)
 })
 
-it('keeps a retryable pause behind the prerelease boundary without mounting private pages', async () => {
-  const { api, fetchMock, privateRenders } = await renderPrerelease({ handoff: false, status: 503, code: 'prerelease_access_paused' })
+it.each([true, false])('keeps a retryable pause behind the prerelease boundary for runtime failure %s without mounting private pages', async runtimeFailure => {
+  const { api, fetchMock, privateRenders } = await renderPrerelease({ handoff: false, runtimeFailure, status: 503, code: 'prerelease_access_paused' })
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Access is paused')
   expect(api.getBrowserReloadRequired()).toBe(false)
   expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible()
   expect(screen.queryByText('Reload the application')).toBeNull()
-  expectPrereleaseBanner()
+  expectPrereleaseBanner(!runtimeFailure)
   for (const renderPrivate of privateRenders) expect(renderPrivate).not.toHaveBeenCalled()
-  expect(fetchMock).toHaveBeenCalledTimes(2)
+  expect(fetchMock).toHaveBeenCalledTimes(runtimeFailure ? 1 : 2)
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(runtimeFailure ? 2 : 3))
+  expect(screen.getByRole('alert')).toHaveTextContent('Access is paused')
+  expect(api.getBrowserReloadRequired()).toBe(false)
+  for (const renderPrivate of privateRenders) expect(renderPrivate).not.toHaveBeenCalled()
 })

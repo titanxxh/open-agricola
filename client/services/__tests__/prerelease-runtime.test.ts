@@ -12,6 +12,27 @@ const session = { ok: true, user: { id: 'u1', username: 'beta', displayName: 'Be
   prerelease: { buildId: build, generationId: generation, expiresAt: 9_000_000_000_000, validUntil: Date.now() + 30_000, serverTime: Date.now() } }
 afterEach(() => { vi.resetModules(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks() })
 
+it.each([
+  { status: 426, code: 'reload_required', reload: true },
+  { status: 426, code: 'prerelease_access_paused', reload: false },
+  { status: 503, code: 'reload_required', reload: false },
+  { status: 503, code: 'prerelease_access_paused', reload: false },
+])('classifies runtime bootstrap $status/$code before a session exists', async ({ status, code, reload }) => {
+  vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
+  const fetchMock = vi.fn().mockResolvedValue(Response.json({ ok: false, code }, { status }))
+  vi.stubGlobal('fetch', fetchMock)
+  const pre = await import('../prerelease-runtime')
+  const api = await import('../browser-api')
+  await expect(pre.loadPrereleaseRuntime()).rejects.toThrow('prerelease_access_paused')
+  expect(api.getBrowserReloadRequired()).toBe(reload)
+  expect(pre.getPrereleaseRuntime()).toBeUndefined()
+  if (reload) {
+    await expect(pre.loadPrereleaseRuntime()).rejects.toThrow('reload_required')
+    await expect(api.browserApiFetch('/api/auth/me')).rejects.toThrow('reload_required')
+  }
+  expect(fetchMock).toHaveBeenCalledOnce()
+})
+
 it('binds authenticated API work to this tab build and generation, refusing a replacement generation', async () => {
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
   const fetchMock = vi.fn().mockResolvedValueOnce(Response.json(runtime)).mockResolvedValue(Response.json({ ok: true }))

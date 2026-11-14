@@ -35,7 +35,7 @@
 
 服务器沙盒保留固定的 `player=p1` 路由。浏览器沙盒省略 `player`，沿用拥有本地配置的登录账号；只有启用开发认证快捷方式的构建中，显式携带 `player=p1&devMode=1` 的工坊父页面才会向子页面传递 `player=p1`。准入检查要求子页面参数与父页面的身份模式一致，不接受任意玩家覆盖。
 
-`application-bootstrap.ts` 在语言、Auth 和连接初始化前要求主应用位于顶层窗口；被嵌入时只显示独立打开根地址的链接。`browser-api.ts` 给正式 API 加当前协议版本，收到 reload-required 后停止后续请求并显示现有刷新界面。WS 使用匹配子协议；公开素材、无凭据 Viewer 与第三方模型请求保持各自运输方式。测试：`application-bootstrap.test.ts`、`browser-api.test.ts`、`hosted-password-login.spec.ts`。
+`application-bootstrap.ts` 在语言/Auth/连接初始化前要求顶层窗口；嵌入页只显示独立打开根地址的链接。`browser-protocol.ts` 在 session 准入前，让 API 与 prerelease runtime bootstrap 共用协议 header 和刷新状态。HTTP 426/`reload_required` 停止后续请求并显示刷新界面；503 保持可重试。WS 使用匹配协议；素材、无凭据 Viewer 和模型请求保持各自运输方式。测试：`application-bootstrap.test.ts`、`browser-api.test.ts`、`App.prerelease-reload.test.tsx`。
 
 - 生产启动保留前端 origin。GitHub Pages 提供 `https://open-agricola.titanxxh.com/`，HTTP 与 WS 使用单独配置的 API origin。两个 HTTPS 子域同站，账号会话继续使用仅属于 API host 的 HttpOnly Cookie。本地偏好和草稿不会自动跨源迁移。见 ADR 0035。
 - `build:pages-frontend` 生成根路径生产构建，显式配置 API/WS origin 并写入构建元数据；可选的 `build:hosted-frontend` 保留同源自托管。`hosted-password-login.spec.ts` 在两个 HTTPS 同站子域提供实际 Pages 构建，验证严格 WebKit 与 Chromium 下的登录、浏览器重开和 routed Room 恢复。引擎测试不能替代实体 Safari 验收。
