@@ -1,9 +1,10 @@
-import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION, BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
+import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import {
   PRERELEASE_BUILD_HEADER, PRERELEASE_GENERATION_HEADER, PRERELEASE_BUILD_PROTOCOL_PREFIX,
   PRERELEASE_GENERATION_PROTOCOL_PREFIX, normalizePrereleaseReturnPath, type PrereleaseRuntime, type PrereleaseSessionResponse,
 } from '../../shared/contract/prerelease-runtime'
 import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
+import { browserProtocolFetch } from './browser-protocol'
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export type PrereleaseFailure = 'prerelease_auth_required' | 'prerelease_access_paused' | 'prerelease_access_expired' | 'prerelease_runtime_changed' | 'invalid_prerelease_handoff'
@@ -50,8 +51,7 @@ const origin = (value: unknown): value is string => {
 export async function loadPrereleaseRuntime(): Promise<PrereleaseRuntime | undefined> {
   if (!isPrereleaseClient()) return undefined
   pending ??= (async () => {
-    const response = await fetch(`${API_BASE}/api/prerelease/runtime`, { credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(10_000),
-      headers: { [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) } })
+    const response = await browserProtocolFetch(`${API_BASE}/api/prerelease/runtime`, { cache: 'no-store', signal: AbortSignal.timeout(10_000) })
     if (!response.ok) throw new Error('prerelease_access_paused')
     const value: unknown = await response.json()
     const compiled = import.meta.env.VITE_GAME_BUILD_ID
