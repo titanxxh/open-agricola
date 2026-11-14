@@ -104,7 +104,7 @@ type ActionDefinition = {
 
 每种农场类型都在 `shared/actions/effects/` 下自己的 `ActionDefinition.resolveChoice` 中闭环：
 
-- **房间**（`construct.ts`）：`room-payment.ts` 从执行玩家派生可负担性和材质；`FarmInteraction` 接收明确的数量上限，只负责几何。`actionContext.allowedRoomTypes` 在可达性和提交时限制目标材质。摆放、预览和恢复后的提示共用 `constructFarmSelection`。屋内动物按真实房间保存在 `houseAnimals`。
+- **房间**（`construct.ts`）：`room-payment.ts` 从付款者派生可负担性、从农场主派生材质；替建房间的基础加价先于折扣，来源明确的 exact/free 价格保持原义；`FarmInteraction` 接收明确的数量上限，只负责几何。`actionContext.allowedRoomTypes` 在可达性和提交时限制目标材质。摆放、预览和恢复后的提示共用 `constructFarmSelection`。屋内动物按真实房间保存在 `houseAnimals`。
 - **马厩 / 犁地**（`stables.ts`、`plow.ts`）：typed-flat 支付；马厩定价由默认价、`exactCost` 或 `costOverride` 与一次完整的农场选择查询得出单价。`plow.actionContext.allowedTiles` / `adjacencyPolicy` 只影响本次犁地。
 - **犁地结算**：`farm.fieldPlowed.payment` 保留选中的 typed-flat 实付与实际季节附加费用。`sourceActionId` 标识宿主行动格，因此完整田地事件替代宿主的后备明细日志，不另产生支付事实。无法继续执行的必做宿主，仅由当前事务中该玩家实际获得的田地满足，不依赖宿主来源名；卡牌来源继续由 `sourceCardId` 保留。测试：`server/__tests__/seasonal-plow-payment-session.test.ts`、`server/__tests__/future-meeple-action-session.test.ts`。
 - **围栏**（`fencing.ts`）：校验边、来源、连通性与区域；通过农场选择的 `computeCosts` pass 计算费用；把 trade、bonus、provider 与预算传入 `pay:fence:*`。`before` 贡献按来源写回宿主：木材折扣不增加实体，卡上围栏由玩家显式选择，只为本次新建的普通围栏消耗。

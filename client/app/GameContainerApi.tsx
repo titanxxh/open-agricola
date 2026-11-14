@@ -661,7 +661,7 @@ export const GameContainerApi = () => {
   const farmSelectionDraft = useFarmSelectionDraftPresentation({
     interactionPresentationPlan,
     locale,
-    // Budgets and geometry belong to the responder, even while inspecting another farm.
+    // Placement uses the bound farm; the server supplies the builder payment budget.
     displayPlayer: targetFarmOwner ?? (isHotseat ? activePlayer : displayPlayer),
     players: state?.players,
   })
@@ -2128,7 +2128,7 @@ export const GameContainerApi = () => {
   const sectionItems = sectionNavItems({
     handPlayerId: ownHandSectionAvailable({
       selfPlayerId: selfPlayer?.id ?? null,
-      displayPlayerId: displayPlayer.id,
+      displayPlayerId: farmBoardView.handPlayer?.id ?? displayPlayer.id,
       visiblePlayerIds: farmBoardView.visiblePlayerIds,
       devMode: farmBoardView.devMode,
     }),
