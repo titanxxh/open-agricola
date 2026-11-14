@@ -243,7 +243,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     }
     const browser = await playwright.chromium.launch()
     const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
-    await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    await context.addInitScript(() => { if (window.top === window) localStorage.setItem('open-agricola-locale-v2', 'en') })
     const formalCookieName = authCookieNames().session
     await context.addCookies([{ name: formalCookieName, value: sourceToken, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
     const assertPrincipal = async (page: Page) => {
@@ -257,7 +257,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     }
     const assertFormalSession = async () => { expect(await validateSession(sourceToken)).toMatchObject({ id: user.id, username: user.username }) }
     return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
-      seedReplay: () => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id }) }
+      seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }) }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
     catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Prerelease fixture setup and cleanup failed', { cause: cleanupError }) }
@@ -391,6 +391,13 @@ test('private replay uses an authenticated parent bridge and clears idle display
     await expect.poll(() => frame.locator('html').evaluate(() => '__revokedReplayBlobs' in window && Array.isArray(window.__revokedReplayBlobs) ? window.__revokedReplayBlobs.length : 0)).toBeGreaterThan(0)
     await page.reload()
     await expect(frame.locator('.replay-app')).toBeVisible()
+    const evidence = await environment.seedReplay(true)
+    await page.goto(`${environment.preOrigin}/open-agricola/?room=${evidence.roomId}&step=0&frame=${evidence.firstHash}`)
+    await expect(frame.locator('.replay-app--board')).toBeVisible()
+    await expect(frame.locator('[data-hand-anchor="p1"] [data-card-anchor="CUSTOM_PRIVATE_REPLAY"]')).toBeVisible()
+    await expect(frame.locator('[data-hand-anchor="p2"]')).toHaveCount(0)
+    await expect(frame.locator('.replay-header select')).toHaveCount(0)
+    expect(iframeRequests.filter(request => /\/api\/v1\/|\/replay-assets\//.test(request.url))).toEqual([])
     await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
     await expect(page.locator('iframe')).toHaveCount(0,{timeout:35_000})
     await expect(page.locator('.prerelease-access-screen')).toBeVisible()

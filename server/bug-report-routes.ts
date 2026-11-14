@@ -1,7 +1,8 @@
+import { prereleaseArchiveExpired } from './game/prerelease-archive-retention'
 import { isPrerelease } from './prerelease-access'
 import { getResources } from './storage/runtime'
 import { ReplayResources } from './storage/replay-resources'
-import { replayBridgeImageType } from '../shared/contract/protocol/replay-bridge'
+import { replayBridgeImageType, REPLAY_BRIDGE_MAX_BYTES } from '../shared/contract/protocol/replay-bridge'
 import type { PostgresDatabase as Database } from './database/postgres'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthUser } from './auth.ts'
@@ -698,7 +699,8 @@ export async function handleBugReportRoute(
       const evidence = await participantEvidence(runtime, decodeId(evidenceAsset[1]!), Number(evidenceAsset[2]), frameHash, current)
       const resources = runtime.resources ?? new ReplayResources(getResources())
       const object = await resources.asset(evidence.roomId, evidenceAsset[3]!, evidence.customCards)
-      if (!object || !replayBridgeImageType(object.contentType)) throw new BugReportError('replay_segment_unavailable', 503)
+      if (!object || !replayBridgeImageType(object.contentType) || object.body.byteLength > REPLAY_BRIDGE_MAX_BYTES || await prereleaseArchiveExpired(runtime.db, evidence.roomId)) throw new BugReportError('replay_segment_unavailable', 503)
+      await participantEvidence(runtime, evidence.roomId, evidence.stepNo, evidence.frameHash, current)
       res.writeHead(200, { 'Content-Type': object.contentType, 'Cache-Control': 'no-store',
         'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff' })
       res.end(object.body)
