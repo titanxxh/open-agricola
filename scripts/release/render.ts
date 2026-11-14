@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 
 export type VisibleReleaseAsset = { origin: string; path: string; width: number; height: number }
 
-export async function verifyVisibleReleaseAssets(page: Page): Promise<VisibleReleaseAsset[]> {
+export async function verifyVisibleReleaseAssets(page: Pick<Page, 'evaluate'>): Promise<VisibleReleaseAsset[]> {
   const decoding = page.evaluate(async () => {
     const urls = new Set<string>()
     const images = {

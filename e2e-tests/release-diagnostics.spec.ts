@@ -184,3 +184,27 @@ test('release diagnostics bounds and sanitizes evidence and detaches observers b
     await page.close(); await server.close()
   }
 })
+
+test('release snapshot checkpoint survives bounded evidence eviction and requires a new reload document', async ({ page }) => {
+  const server = await controlServer(), diagnostics = observeReleasePage(page, { capacity: 4 })
+  try {
+    await page.goto(`${server.url}/?context=${roomId}`)
+    await page.waitForFunction(() => document.body.dataset.received === 'snapshot')
+    const before = diagnostics.checkpoint()
+    expect(before?.roomId).toBe(roomId)
+    if (!before) throw new Error('Expected first snapshot checkpoint')
+    await page.evaluate(async () => { for (let n = 0; n < 6; n++) await fetch('/api/status') })
+    expect(diagnostics.snapshot().dropped).toBeGreaterThan(0)
+    expect(diagnostics.snapshot().entries.some(entry => entry.kind === 'frame' && entry.messageType === 'stateUpdate')).toBe(false)
+    expect(diagnostics.checkpoint()).toEqual(before)
+    await page.reload()
+    await expect.poll(() => {
+      const next = diagnostics.checkpoint()
+      return next?.roomId === roomId && next.sequence > before.sequence && next.documentId > before.documentId && next.socketId !== before.socketId
+    }).toBe(true)
+    diagnostics.dispose()
+    const frozen = diagnostics.checkpoint()
+    await page.reload(); await page.waitForFunction(() => document.body.dataset.received === 'snapshot')
+    expect(diagnostics.checkpoint()).toEqual(frozen)
+  } finally { diagnostics.dispose(); await page.close(); await server.close() }
+})

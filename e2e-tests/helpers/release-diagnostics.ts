@@ -33,7 +33,8 @@ export type ReleaseDiagnosticEntry = DiagnosticEvent & {
   documentId: number
 }
 export type ReleaseDiagnosticSnapshot = { entries: ReleaseDiagnosticEntry[]; dropped: number }
-export type ReleasePageDiagnostics = { snapshot(): ReleaseDiagnosticSnapshot; dispose(): void }
+export type ReleaseSnapshotCheckpoint = { sequence: number; documentId: number; socketId: number; roomId?: string }
+export type ReleasePageDiagnostics = { snapshot(): ReleaseDiagnosticSnapshot; checkpoint(): ReleaseSnapshotCheckpoint | undefined; dispose(): void }
 
 let pageSequence = 0
 const roomIdPattern = /^(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|dev[2-6](?:-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?)$/i
@@ -87,10 +88,14 @@ export function observeReleasePage(page: Page, { capacity = 128 }: { capacity?: 
   const pageId = ++pageSequence, entries: ReleaseDiagnosticEntry[] = [], requests = new WeakMap<Request, number>()
   const socketDisposers = new Set<() => void>()
   let sequence = 0, requestSequence = 0, socketSequence = 0, documentId = 0, dropped = 0, disposed = false
+  let latestSnapshot: ReleaseSnapshotCheckpoint | undefined
   let pendingNavigation: { request: Request; responseReceived: boolean } | undefined
   const record = (event: DiagnosticEvent, sourceDocumentId = documentId) => {
     if (disposed) return
     entries.push({ sequence: ++sequence, at: Date.now(), pageId, documentId: sourceDocumentId, ...event })
+    if (event.kind === 'frame' && event.direction === 'received' && event.messageType === 'stateUpdate' && event.sync === 'snapshot') {
+      latestSnapshot = { sequence, documentId: sourceDocumentId, socketId: event.socketId, ...(event.roomId ? { roomId: event.roomId } : {}) }
+    }
     if (entries.length > capacity) { entries.shift(); dropped++ }
   }
   const onRequest = (request: Request) => {
@@ -140,6 +145,7 @@ export function observeReleasePage(page: Page, { capacity = 128 }: { capacity?: 
   page.on('framenavigated', onNavigation); page.on('websocket', onSocket); page.on('pageerror', onPageError)
   return {
     snapshot: () => ({ entries: entries.map(entry => ({ ...entry })), dropped }),
+    checkpoint: () => latestSnapshot ? { ...latestSnapshot } : undefined,
     dispose() {
       if (disposed) return
       disposed = true
