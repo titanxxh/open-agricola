@@ -101,6 +101,8 @@ type ClientCommandBody =
 
 export type ClientCommand = ClientCommandBody & { requestId?: string; commandContext?: CommandIdentity & Partial<CommandInput> & { roomId?: string; allocationId?: string } }
 
+export type RoomTeamErrorCode = 'team_change_failed' | 'team_start_failed'
+
 export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid_color' | 'color_save_failed' | 'color_confirmation_unavailable' | 'color_confirmation_failed'
 
 export type SpectatingEndReason = 'offline' | 'completed' | 'terminated' | 'removed'
