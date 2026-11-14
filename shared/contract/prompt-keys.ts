@@ -16,6 +16,7 @@ export type PromptKey =
   | 'ui.interactionSelectReplacement'
   | 'ui.interactionOptionalAction'
   | 'ui.interactionEngineBlocked'
+  | 'ui.targetFarm.prompt'
   | 'ui.interactionBeforeAnytime'
   | 'ui.interactionIndividualFoodCost'
   // Farm action prompts (with both bare and -Select suffix variants)

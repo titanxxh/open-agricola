@@ -252,6 +252,8 @@ export type ComplexCost = {
   feeIdentities?: number[]
   unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   roomMaterial?: PlayerState['houseType']
+  /** Added to each alternative unit price; unitFee already includes this increase. */
+  unitPriceIncrease?: PaymentResourceMap
   /** A source-specific exact room price excludes ordinary room-price alternatives. */
   unitPriceAlternatives?: boolean
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
@@ -751,6 +753,8 @@ export type CanBeExecutedByPlayer = (
 
 /** Serializable inputs owned by one action invocation. */
 export type ActionContext = Record<string, unknown> & {
+  /** Farm owner for this build; the action executor remains its builder and payer. */
+  targetFarmPlayerId?: string
   allowedRoomTypes?: readonly PlayerState['houseType'][]
   /** Renovation bonuses supplied by this invocation, separate from computeCosts results. */
   costBonuses?: Bonus[]
@@ -1126,6 +1130,7 @@ export type ActionDefinition = {
   anytime?: boolean
   allowAnytimeReentry?: boolean
   idleOnly?: boolean
+  farmBuild?: { kinds: readonly ('rooms' | 'stables' | 'fences')[] }
   canBeExecutedByPlayer: CanBeExecutedByPlayer
   /** Structural eligibility of the original body; independent replacement flows remain available. */
   originalActionCondition?: (context: ActionExecutionContext) => boolean
@@ -1282,6 +1287,7 @@ export type InteractionRequest = (
     }
   | {
       kind: 'farm-select'
+      farmOwnerPlayerId?: string
       farm:
         | { farmType: 'plow'; selectableTiles: FarmTilePosition[] }
         | {

@@ -419,6 +419,10 @@ const mapFenceBuilt = (
   const fencing = fences.filter((fence) => fence.type === 'fence').length
   const palisading = fences.filter((fence) => fence.type === 'palisade').length
   if (fencing === 0 && palisading === 0) return null
+  if (event.targetPlayerId && event.targetPlayerId !== event.actorPlayerId) return {
+    key: 'log.partnerFencesBuilt', playerId: event.actorPlayerId, playerRefs: { owner: event.targetPlayerId },
+    params: { player: playerName(ctx, event.actorPlayerId), owner: playerName(ctx, event.targetPlayerId), count: fencing + palisading },
+  }
   const bonusSources = [...new Set([
     ...(payment?.bonusSources ?? []),
     ...(payment?.sourceCardId ? [payment.sourceCardId] : []),
@@ -798,7 +802,10 @@ const mapStableBuilt = (
   ctx: EventLogMapperContext,
   payment: ResourcePaidEvent | undefined,
 ): LogEntry =>
-  actionDetailLog(
+  event.targetPlayerId && event.targetPlayerId !== event.actorPlayerId ? {
+    key: 'log.partnerStablesBuilt', playerId: event.actorPlayerId, playerRefs: { owner: event.targetPlayerId },
+    params: { player: playerName(ctx, event.actorPlayerId), owner: playerName(ctx, event.targetPlayerId), count: event.stables.length },
+  } : actionDetailLog(
     ctx,
     event.actorPlayerId,
     containingActionId(events, event, event.sourceActionId ?? 'stables'),
@@ -1087,6 +1094,13 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'farm.roomBuilt') {
+        if (event.targetPlayerId && event.targetPlayerId !== event.actorPlayerId) {
+          const material = event.rooms[0]?.type
+          const key = material === 'clay' ? 'log.partnerRoomsBuiltClay' : material === 'stone' ? 'log.partnerRoomsBuiltStone' : 'log.partnerRoomsBuiltWood'
+          return presentationRows(event, [{ key, playerId: event.actorPlayerId, playerRefs: { owner: event.targetPlayerId },
+            params: { player: playerName(ctx, event.actorPlayerId), owner: playerName(ctx, event.targetPlayerId), count: event.rooms.length },
+          }])
+        }
         return presentationRows(event, [actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? 'construct', {
           effects: { buildRoom: event.rooms.length },
         })])
