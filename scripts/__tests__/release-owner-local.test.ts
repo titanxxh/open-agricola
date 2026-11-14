@@ -17,9 +17,11 @@ type Asset = { id: number; name: string; size: number; state: string; uploader: 
 type NativeRelease = { id: number; tag_name: string; target_commitish: string; html_url: string; prerelease: boolean; draft: boolean;
   author: Actor; assets: Asset[]; body: string; created_at: string; published_at: string | null }
 type Status = { id: number; context: string; state: string; creator: Actor; target_url: string; description: string; created_at: string }
+type PublishResponseFailure = 'none' | 'response lost' | 'still draft' | 'wrong release' | 'wrong asset' | 'wrong owner' | 'wrong tag' | 'wrong digest' | 'wrong published URL' | 'unavailable'
 type FixtureState = { sha: string; owner: Actor; user: Actor; refs: Record<string, string>; release: NativeRelease | null;
   assetBytes: string; statuses: Status[]; dropStatus: boolean; foreignStatus: boolean; foreignAsset: boolean; hideDraftByTag: boolean;
   wrongStatusField: 'target' | 'digest' | null; moveTagAfterStatus: boolean; preserveDraftAssetUrlOnPublish: boolean;
+  publishResponseFailure: PublishResponseFailure; publishAttempted: boolean;
   releaseTime: string; assetTime: string; statusTime: string; publishedTime: string; provenance: Record<string, unknown> }
 type Event = { endpoint: string; method: string; body?: { context?: string; state?: string; draft?: boolean; sha?: string } }
 
@@ -51,6 +53,7 @@ function fixture(rebound = false) {
   const owner: Actor = { id: 7, login: 'titanxxh', type: 'User' }
   const state: FixtureState = { sha, owner, user: owner, refs: {}, release: null, assetBytes: '', statuses: [], dropStatus: false, foreignStatus: false, foreignAsset: false, hideDraftByTag: false,
     wrongStatusField: null, moveTagAfterStatus: false, preserveDraftAssetUrlOnPublish: false,
+    publishResponseFailure: 'none', publishAttempted: false,
     releaseTime: at(61), assetTime: at(62), statusTime: at(63), publishedTime: at(64),
     provenance: finalSnapshotMetadata(sha, sha, { id: 123, full_name: 'titanxxh/open-agricola' }) }
   const save = () => writeFileSync(join(root, 'state.json'), JSON.stringify(state))
@@ -92,20 +95,32 @@ if (method !== 'GET') {
       ...(state.wrongStatusField === 'target' ? { target_url: 'https://evil.example/proof.json' } : {}),
       ...(state.wrongStatusField === 'digest' ? { description: 'owner-local sha256:' + 'f'.repeat(64) } : {}) });
     if (state.moveTagAfterStatus) state.refs['tags/v9.9.9'] = 'f'.repeat(40);
-  } else if (endpoint === prefix + '/releases/11' && method === 'PATCH') state.release = { ...state.release, ...body, published_at: state.publishedTime,
-    html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/v9.9.9', assets: state.release.assets.map(asset => ({ ...asset,
-      browser_download_url: state.preserveDraftAssetUrlOnPublish ? asset.browser_download_url : 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9/owner-local-verification.json' })) };
+  } else if (endpoint === prefix + '/releases/11' && method === 'PATCH') {
+    state.publishAttempted = true;
+    if (state.publishResponseFailure !== 'still draft') state.release = { ...state.release, ...body, published_at: state.publishedTime,
+      html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/v9.9.9', assets: state.release.assets.map(asset => ({ ...asset,
+        browser_download_url: state.preserveDraftAssetUrlOnPublish ? asset.browser_download_url : 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9/owner-local-verification.json' })) };
+    if (state.publishResponseFailure === 'wrong release') state.release.id = 99;
+    if (state.publishResponseFailure === 'wrong asset') state.release.assets[0].id = 13;
+    if (state.publishResponseFailure === 'wrong owner') state.release.author = { id: 8, login: 'collaborator', type: 'User' };
+    if (state.publishResponseFailure === 'wrong tag') state.refs['tags/v9.9.9'] = 'f'.repeat(40);
+    if (state.publishResponseFailure === 'wrong digest') state.statuses[0].description = 'owner-local sha256:' + 'f'.repeat(64);
+    if (state.publishResponseFailure === 'wrong published URL') state.release.html_url = 'https://evil.example/release';
+  }
   else throw Error('Unexpected mutation: ' + endpoint);
-  save(); output(state.release ?? {}); process.exit(0);
+  save();
+  if (method === 'PATCH' && state.publishResponseFailure !== 'none') { console.error('Fixture publication response timed out'); process.exit(1); }
+  output(state.release ?? {}); process.exit(0);
 }
 event();
+if (state.publishAttempted && state.publishResponseFailure === 'unavailable') { console.error('Fixture native readback unavailable'); process.exit(1); }
 if (endpoint === 'user') output(state.user);
 else if (endpoint === prefix) output({ id: 123, full_name: 'titanxxh/open-agricola', default_branch: 'main', owner: state.owner });
 else if (endpoint === prefix + '/commits/' + state.sha) output({ sha: state.sha });
 else if (endpoint === prefix + '/commits/' + state.sha + '/statuses?per_page=100') state.statuses.forEach(output);
 else if (endpoint === prefix + '/releases?per_page=100') { if (state.release) output(state.release); }
 else if (endpoint === prefix + '/releases/11') { if (!state.release) absent(); output(state.release); }
-else if (endpoint === prefix + '/releases/assets/12') process.stdout.write(state.assetBytes);
+else if (endpoint === prefix + '/releases/assets/' + state.release?.assets[0]?.id) process.stdout.write(state.assetBytes);
 else if (endpoint.startsWith(prefix + '/releases/tags/')) { if (!state.release || state.hideDraftByTag && state.release.draft) absent(); output(state.release); }
 else if (endpoint.startsWith(prefix + '/git/ref/tags/')) {
   const tag = endpoint.slice((prefix + '/git/ref/').length); if (!state.refs[tag]) absent();
@@ -129,6 +144,42 @@ else if (Object.hasOwn(state.provenance, endpoint)) {
 }
 
 describe('owner-local public release entry', () => {
+  it('reconciles a lost publication response through native proof and retries without another mutation', () => {
+    const value = fixture(); value.state.publishResponseFailure = 'response lost'; value.save()
+    const result = value.run()
+    expect(result.status, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({ status: 'published', verification: 'owner-local', sha: value.sha,
+      url: 'https://github.com/titanxxh/open-agricola/releases/tag/v9.9.9' })
+    expect(value.load().release?.draft).toBe(false)
+    expect(value.events().filter(event => event.method === 'PATCH')).toHaveLength(1)
+    expect(value.events().filter(event => event.endpoint.startsWith('https://uploads.github.com/'))).toHaveLength(1)
+    const publishedCheck = value.check()
+    expect(publishedCheck.status, publishedCheck.stderr).toBe(0)
+    expect(JSON.parse(publishedCheck.stdout).ownerLocal).toMatchObject({ releaseId: 11, assetId: 12, ownerId: 7 })
+    const beforeRetry = value.events().filter(event => event.method !== 'GET')
+    const retry = value.run()
+    expect(retry.status, retry.stderr).toBe(0)
+    expect(JSON.parse(retry.stdout)).toMatchObject({ status: 'existing', sha: value.sha })
+    expect(value.events().filter(event => event.method !== 'GET')).toEqual(beforeRetry)
+  })
+
+  it.each(['still draft', 'wrong release', 'wrong asset', 'wrong owner', 'wrong tag', 'wrong digest', 'wrong published URL', 'unavailable'] as const)(
+    'keeps a lost publication response failed when native readback is %s', failure => {
+      const value = fixture(); value.state.publishResponseFailure = failure; value.save()
+      const result = value.run()
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toContain('publication response')
+      expect(value.events().filter(event => event.method === 'PATCH')).toHaveLength(1)
+      expect(value.events().filter(event => event.endpoint.startsWith('https://uploads.github.com/'))).toHaveLength(1)
+      expect(value.load().release?.draft).toBe(failure === 'still draft')
+      if (failure === 'unavailable') {
+        const beforeRetry = value.events().filter(event => event.method !== 'GET')
+        expect(value.run().status).not.toBe(0)
+        expect(value.events().filter(event => event.method !== 'GET')).toEqual(beforeRetry)
+      }
+    },
+  )
+
   it('publishes a fixed full-plan receipt through its draft, asset and owner status without dispatching tests', () => {
     const value = fixture(); value.state.hideDraftByTag = true; value.save()
     const result = value.run()

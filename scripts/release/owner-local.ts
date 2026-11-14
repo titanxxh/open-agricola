@@ -63,11 +63,25 @@ function verifyDraftStatus(binding: DraftBinding, digest: string, target: string
   if (nativeTime(latest.created_at) < assetCreatedAt) throw new Error('Native owner-local status predates the prepared asset')
 }
 function publishedReleaseUrl(binding: DraftBinding): string {
-  const release = object(github(binding.repository, `releases/${binding.releaseId}`))
+  const release = object(JSON.parse(execFileSync('gh', ['api', `repos/${binding.repository}/releases/${binding.releaseId}`], {
+    encoding: 'utf8', timeout: 30_000, maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+  })))
   const url = `https://github.com/${binding.repository}/releases/tag/${binding.version}`
   if (release.id !== binding.releaseId || release.tag_name !== binding.version || release.draft !== false || release.prerelease !== false
-    || object(release.author).id !== binding.ownerId || release.html_url !== url || commitRef(binding.repository, `tags/${binding.version}`) !== binding.sha) throw new Error('Published owner-local release identity differs')
+    || object(release.author).id !== binding.ownerId || release.html_url !== url) throw new Error('Published owner-local release identity differs')
   return url
+}
+
+function reconcilePublishedRelease(cwd: string, binding: DraftBinding, digest: string, assetId: number): string {
+  const output = execFileSync(process.execPath, [join(import.meta.dirname, '../ci/candidate-verification.ts'), 'check',
+    '--repository', binding.repository, '--sha', binding.sha], {
+    cwd, encoding: 'utf8', timeout: 60_000, maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const result = object(JSON.parse(output)), proof = object(result.ownerLocal)
+  if (result.status !== 'passed' || result.repository !== binding.repository || result.sha !== binding.sha
+    || proof.kind !== 'owner-local' || proof.receiptSha256 !== digest || proof.releaseId !== binding.releaseId
+    || proof.assetId !== assetId || proof.ownerId !== binding.ownerId) throw new Error('Native published proof differs from the owner-local publication')
+  return publishedReleaseUrl(binding)
 }
 
 export function publishOwnerLocalRelease(cwd: string, selected: { version: string; repository: string; sha: string; path: string }): void {
@@ -119,7 +133,16 @@ export function publishOwnerLocalRelease(cwd: string, selected: { version: strin
     if (draftAsset(binding, bytes, Date.parse(receipt.completedAt)).id !== asset.id) throw new Error('Owner-local draft receipt changed before publication')
     const final = admitFinalSnapshot(cwd, repository, sha)
     rebindOwnerLocalReceipt(cwd, receipt, { repository, repositoryId: final.repositoryId, candidateSha: sha, producerSha: final.main })
-    api(repository, `releases/${releaseId}`, 'PATCH', { draft: false, make_latest: 'true' })
+    try { api(repository, `releases/${releaseId}`, 'PATCH', { draft: false, make_latest: 'true' }) }
+    catch (publicationError) {
+      let publishedUrl: string
+      try { publishedUrl = reconcilePublishedRelease(cwd, binding, digest, asset.id) }
+      catch (readbackError) {
+        throw new AggregateError([publicationError, readbackError], 'Owner-local publication response failed and native published proof could not be confirmed; inspect the existing release before retrying', { cause: readbackError })
+      }
+      console.log(JSON.stringify({ status: 'published', channel: 'stable', verification: 'owner-local', version, sha, url: publishedUrl }))
+      return
+    }
     const published = checkCandidateVerification(cwd, repository, sha)
     if (published.ownerLocal?.receiptSha256 !== digest || published.ownerLocal.releaseId !== releaseId || published.ownerLocal.assetId !== asset.id) throw new Error('Published owner-local release could not be verified')
     const publishedUrl = publishedReleaseUrl(binding)
