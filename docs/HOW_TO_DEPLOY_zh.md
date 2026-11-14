@@ -53,6 +53,20 @@ fork 仓库可传入 `--repository owner/name`，并在该仓库配置候选验�
 
 标准命令在发布前核验 GitHub run 和 job 证据。通过网页或裸 `gh release create` 创建的 Release 可能尚无这些证据，Pages 与后端部署会各自拒绝未验证的候选。本机 `pnpm release:rehearse` 记录不能替代 GitHub 证据。
 
+### 授权完整本机候选验证
+
+正式版本明确采用本机验收时，仓库原生 User owner 可提交同一完整十任务候选计划的回执：
+
+```bash
+pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/verification.json
+```
+
+回执记录每条实际 `runCandidateTask` 命令、退出码与日志 SHA-256，以及执行时间、Node、平台、架构、受测提交、原始源码树和候选/producer 验证配置。完整十任务及其 canonical 命令必须全部通过。日常 affected 检查或单独 `release:rehearse` 不满足此路径。rebase 后仅当完整原始树和验证配置与受测源码相同时，publisher 才能重绑 `candidateSha`；保留 `testedSha`，不把本机命令记为 GitHub job。
+
+publisher 核对当前认证用户与仓库 owner 的原生用户 ID，准备固定候选 draft，仅上传 `owner-local-verification.json`，再创建独立 `owner-local-verification` commit status。描述绑定回执 SHA-256，target 只能是本仓正式 Release asset。发布前读回 status creator、Release author、asset uploader 和实际字节。相同命令与回执可恢复本工具准备的同一 draft；普通发布路径继续拒绝 draft。
+
+Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已发布证明，重新核对原生身份、未变更 tag、原始树、双方配置、命令、时间和回执摘要。不接受任意 URL、其他用户 status、不完整任务或虚构 Actions ID。GitHub 仍实际构建私有镜像与 Pages；镜像来源、私有 registry、owner 传输和运行期门禁保持必需。独立 Bug Report 部署反馈命令暂不支持本机证明；该可选命令不属于发版或后端交付主链路。
+
 ## 发布固定预发布候选
 
 owner 验收独立目标前保持 `PRERELEASE_ENTRY_ENABLED=false`。正式 app 需要 `PUBLIC_APP_ORIGIN`、`PUBLIC_API_BASE`、`PRERELEASE_APP_ORIGIN` 及仅目标服务端持有的密钥，两个 Compose 入口均显式传入。正式大厅和设置只向 Beta 账号或管理员显示入口，目标缺失或关闭时明确不可用。应用发布消费新 pin 前，语言源及 packs 必须先发布并通过其独立 CI。

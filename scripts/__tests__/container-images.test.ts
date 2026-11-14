@@ -20,6 +20,13 @@ const policyReceipt = () => ({
 })
 
 describe('container image receipts', () => {
+  it('retains owner-local authorization without inventing GitHub candidate job identifiers', () => {
+    const receipt = { ...policyReceipt(), purpose: 'formal-candidate', verification: { kind: 'owner-local', configuration: 'd'.repeat(64),
+      producerConfiguration: 'e'.repeat(64), receiptSha256: 'f'.repeat(64), statusId: 10, releaseId: 11, assetId: 12, ownerId: 7,
+      url: 'https://github.com/titanxxh/open-agricola/releases/download/v0.12.9/owner-local-verification.json' } }
+    expect(parseContainerImageReceipt(receipt)).toEqual(receipt)
+    expect(() => parseContainerImageReceipt({ ...receipt, purpose: 'candidate', channel: 'prerelease' })).toThrow()
+  })
   it('accepts an exact trusted-policy image without granting candidate deployment authority', () => {
     expect(parseContainerImageReceipt(policyReceipt())).toEqual(policyReceipt())
     expect(() => parseContainerImageReceipt({ ...policyReceipt(), channel: 'prerelease' })).toThrow()
