@@ -27,9 +27,9 @@
 
 ## 服务与同步状态
 
-主入口通过准入检查后，并行下载 App、PageRouter 代码和所选语言包，再挂载已翻译的界面。`AuthProvider` 无需等待卡牌元数据。`CardMetadataBoundary` 在同步卡牌查询组件渲染前保护公开百科与已登录应用子树；匿名登录、账号恢复不等待卡牌数据。公开 Game Context 路由仍位于账号初始化之外。覆盖：`application-loading.spec.ts`、`application-bootstrap.test.ts`、`hosted-password-login.spec.ts`。
+启动并行加载 App、PageRouter 和所选语言，再挂载已翻译 UI。Auth/公开 Context 不等待卡牌元数据。`CardMetadataBoundary` 保护百科/已登录卡牌查询；登录/恢复保持独立。测试：`application-loading.spec.ts`、`application-bootstrap.test.ts`、`hosted-password-login.spec.ts`。
 
-生产构建以 SHA-256 文件名发布卡牌元数据，共用加载器在公开同步查询结果前校验内容，并复用浏览器缓存中的内容命名卡牌与语言包；缓存的 HTTP 错误或完整性不匹配只允许一次绕过旧缓存的请求。开发环境的可变元数据和语言发现仍重新校验。主应用与后续 Replay 构建通过 `scripts/browser-data.ts` 派生相同的卡牌身份。精简品牌素材由 `scripts/build-brand-assets.mjs` 从保留的原图生成，并使用 Vite 内容文件名。独立素材站的版本更新不依赖应用发版。覆盖：card-meta、language-pack、browser-data 测试及 `BrandMark.test.tsx`。
+卡牌/语言包采用内容文件名和校验后的缓存；校验完成才公开同步查询。HTTP/完整性错误只允许一次重新请求；开发环境可变元数据/语言发现仍重新校验。`scripts/browser-data.ts` 共用 main/Replay 卡牌身份。`scripts/build-brand-assets.mjs` 从保留原图生成精简 Vite 内容命名素材；素材站独立发版。测试：card-meta、language-pack、browser-data、`BrandMark.test.tsx`。
 
 `workshop-game/bootstrap.ts` 只接纳应用 base 下 `workshop-game.html` 的固定 HTTP／浏览器沙盒参数。父窗口必须是同源、顶层且带 `page=workshop` 的主页面；直接打开、嵌套、跨源及意外模式均保持静态。准入后 `initialize.tsx` 只挂载 Locale、Auth 和 `GameContainerApi`；未登录时提供独立打开应用的链接，不渲染账号路由。自托管主 HTML 保留 `frame-ancestors 'none'`，只有独立对局 HTML 允许 `'self'`；Pages 同样执行 JavaScript 准入检查。覆盖：`bootstrap.test.ts`、`workshop-game-entry.spec.ts`、`frontend-hosting.test.ts`。
 
@@ -87,9 +87,9 @@
 - `app/solo/SoloHandOverlay.tsx` 按权威候选分组收集一次本地选择并原子提交。重复快照和语言切换保留可编辑勾选；刷新恢复候选并清空未确认勾选。Moor 准备和保留继续使用 `InteractionBar` 原生选择；`SpecialActionsPanel` 读取公开当前牌、弃牌及 `soloSupply` 投影。覆盖见 `standard-solo-ui.spec.ts` 与单人组件测试。
 - 对局布局共用玩家总览与只读公开农场。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。
 - 不支持容器单位或 CSS 长度除法的浏览器通过 `useElementWidth` 与 `ResizeObserver` 测量卡牌和农场容器，提供卡牌缩放比例与农场宽度；支持这些特性的浏览器继续使用 CSS 容器尺寸。旧浏览器尺寸、横竖屏切换与农场输入由 `touch-card-play.spec.ts` 覆盖。
-- `common/CardWithCopy.tsx` 负责触摸查看和绑定请求的出牌确认；`CardDetails.tsx` 的模态内容独立滚动，关闭／出牌控件固定。`useCardPlayChoice` 防止手牌／供应区重复提交，观察结算，在当前权威选项和座位权限下重试失败。`useRequestActivation` 在重复快照中保留激活，重新进入同一 key 时换代，忽略其他激活的晚到结果；职业多选保留组确认。测试：`PlayerCard.touch.test.tsx`、`touch-card-play.spec.ts`、`card-play-undo.spec.ts`。
-- `improvement-selection.ts` 将可用选项与应答者手牌、主要改良供应区求交，依次聚焦小发展候选、合法主要改良、操作控件。`PlayerFarmPanel.improvementSupply` 在手牌旁渲染唯一供应区，`GameContainerApi` 的请求级展开状态跨快照及响应式重挂载保留。测试：`GameContainerApi.presentation.test.tsx`、`MajorImprovements.test.tsx`、`improvement-focus.spec.ts`。
-- `FarmBoard` 将 Card Field 和动物控件放在网格旁。`farm-board-projection.ts` 保留权威槽位、共享 draft 回调及动物区 ID，含借用容纳者；opaque 选项继续使用目标选择器。网格与托盘共用焦点锚点，短横屏将两者放在固定控件上方；公开农场不暴露应答者 draft 或交互托盘。测试：`farm-card-slots-session.test.ts`、`FarmBoard.test.tsx`、`GameContainerApi.presentation.test.tsx`、`farm-card-targets.spec.ts`。
+- `common/CardWithCopy.tsx` 负责触摸查看和绑定请求的出牌确认；`CardDetails.tsx` 的模态内容独立滚动，关闭／出牌控件固定。`useCardPlayChoice` 防止手牌／供应区重复提交，观察结算，在当前权威选项和座位权限下重试失败。`useRequestActivation` 在重复快照中保留激活，重新进入同一 key 时换代，忽略其他激活的晚到结果；职业多选保留组确认。测试：`touch-card-play.spec.ts`、`card-play-undo.spec.ts`。
+- `improvement-selection.ts` 将可用选项与应答者手牌、主要改良供应区求交，依次聚焦小发展候选、合法主要改良、操作控件。`PlayerFarmPanel.improvementSupply` 在手牌旁渲染唯一供应区，`GameContainerApi` 的请求级展开状态跨快照及响应式重挂载保留。测试：`improvement-focus.spec.ts`。
+- `FarmBoard` 将 Card Field 和动物控件放在网格旁。`farm-board-projection.ts` 保留权威槽位、共享 draft 回调及动物区 ID，含借用容纳者；opaque 选项继续使用目标选择器。网格与托盘共用焦点锚点，短横屏将两者放在固定控件上方；公开农场不暴露应答者 draft 或交互托盘。测试：`farm-card-slots-session.test.ts`、`farm-card-targets.spec.ts`。
 - 工坊默认使用后端 `POST /api/game/new-sandbox`，`exactVersionId` 仍走后端。`VITE_SANDBOX_EXECUTOR=browser` 选择 `LocalGameTransport` 和 Worker，在共享 `GameCore` 中运行本地校验的代码。十秒超时从最后 IndexedDB 快照（含 `engineStackCursor`）恢复并报告回滚，schema 不匹配时删除该槽。行为一致性：`server/__tests__/local-sandbox-parity.test.ts`。
 - pre 的 `PrereleaseWorkshopPage` 只接收公共输入，支持两种执行模式，并保留来源及编译拒因。`local-sandbox/public-access.ts` 复核来源，按绝对期限停止空闲展示和 Worker，并拦截在途响应。stash/IndexedDB 绑定 build/generation；恢复不保留权限。固定输入 Worker 在注册失败时拒绝整组选牌，只接收有界期限，不增加网络 API；iframe 经过 `PrereleaseBoundary`。测试：`public-access.test.ts`、`prerelease-session.spec.ts`。
 - `AuthContext` 是站点登录会话（密码、GitHub 或 Google），不保存 Issue 写入授权；`LocaleContext` 切换语言。
