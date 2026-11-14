@@ -92,11 +92,13 @@ Reference targets follow the English source meaning, independently of their tran
 
 ### Prerelease entry
 
-`app/PrereleaseEntry.tsx` serves Lobby and Settings from account Beta qualification and the fresh authority entry response. It opens only the configured HTTPS hosted start URL in a new tab with `noopener noreferrer`; missing configuration stays visibly unavailable. Focus refresh discards older replies after denial.
+`PrereleaseBoundary` precedes Context/private metadata, uses pinned language, shows environment/build and formal return, without account management. HTTP/WS/workers bind the tab's build/generation and absolute deadline; replacement cookies cannot revive stale tabs. Checks serialize against a monotonic lease including transit. Sign-out ends admission before network completion. Confirmed auth/access/handoff/runtime denial requires a new document; late pauses or successes cannot revive it. Pauses permit recheck. Callbacks clear fragments before exchange; retries retain only the same bound exchange in memory.
 
-`?page=prerelease-handoff` is owned by `PrereleaseHandoffPage` and `services/prerelease.ts`. It consumes and clears browser-bound fragment metadata, checks the current configured target and formal root, and issues one short-lived code through the authenticated authority. Only the fixed pre callback receives the code in its fragment. It stores no login credentials or verifier, and never follows caller-supplied callback URLs. Errors return to the formal root. Tests: `PrereleaseEntry.test.tsx`, `PrereleaseHandoffPage.test.tsx`, and the HTTPS prerelease case in `hosted-password-login.spec.ts`.
+`app/PrereleaseEntry.tsx` uses Beta qualification and fresh authority status in Lobby/Settings. Only the configured HTTPS entry opens with `noopener noreferrer`; missing configuration is unavailable. Focus refresh discards replies predating denial.
 
-The browser validates timestamp shape and destination only. Code expiry is enforced by the authority at exchange using its own clock; browser wall-clock skew cannot decide authorization. The independent-clock and malformed-response cases use the public helper in `services/__tests__/prerelease.test.ts`.
+`PrereleaseHandoffPage` and `services/prerelease.ts` clear bound fragments, validate the configured target/formal root, and request one short-lived code. Only the fixed callback receives its fragment. No credentials/verifier persist or caller callback is followed; errors return to the formal root. Browser checks cover timestamp shape/destination; authority-clock expiry controls exchange.
+
+Coverage: `PrereleaseEntry.test.tsx`, `PrereleaseHandoffPage.test.tsx`, `services/__tests__/prerelease.test.ts` (clock skew/malformed replies), and HTTPS `hosted-password-login.spec.ts`.
 
 ### Card encyclopedia
 

@@ -9,6 +9,10 @@ import { targetFingerprint, parsePrereleaseTarget } from '../prerelease/config'
 import { readRuntime, writeRuntime, renderCompose } from '../prerelease/runtime'
 import type { OperationRequest } from '../prerelease/flow'
 import { afterEach, expect, it } from 'vitest'
+import { createServer } from 'node:http'
+import { once } from 'node:events'
+import { createFrontendHosting } from '../../server/frontend-hosting'
+import { createTestDatabase, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 
 const roots: string[] = []
 afterEach(() => roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })))
@@ -74,6 +78,72 @@ function seedImportedImage(target: ReturnType<typeof parsePrereleaseTarget>, pur
   writeFileSync(join(target.directory, 'control', `image-${purpose}-${sourceSha}-${producerSha}.json`), JSON.stringify({ fingerprint: targetFingerprint(target), nativeImageId: imageId, archiveManifestDigest: null,
     transfer: { format: 1, receipt, archive: { sha256: 'f'.repeat(64), bytes: 10240 } } }))
 }
+
+it('applies a known-source orphan packet through the owner CLI before its strict native identity rescan', async () => {
+  const value = fixture(), target = parsePrereleaseTarget(value.config)
+  const generation = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`
+  const db = await createTestDatabase()
+  try {
+    const schema = (await db.prepare('SELECT current_schema() AS name').get<{ name: string }>())?.name
+    if (!schema) throw new Error('Native test schema is missing')
+    await db.prepare(`INSERT INTO game_results(room_id,started_at,finished_at,rounds_played,player_count,
+      enable_community_deck,enable_parent_cards,enable_through_the_seasons,enable_farmers_of_the_moor)
+      VALUES('orphan-history',500,1000,14,2,0,0,0,0)`).run()
+    await db.prepare(`INSERT INTO game_result_players(room_id,player_index,game_player_id,user_id,display_name,score)
+      VALUES('orphan-history',0,'game-player','retained-account','Retained name',42)`).run()
+    expect(value.invoke('initialize', '--expected-current', 'empty', '--generation', generation).status).toBe(0)
+    writeRuntime(target, { ...readRuntime(target), buildId, installed: { buildId, image, installedAt: 1000 }, operation: {
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', kind: 'reverify', stage: 'acceptance', buildId, image,
+      sourceBuildId: buildId, sourceImage: image, backupStem: null, generation,
+    } })
+    const packet = join(value.temporary, 'associations.json')
+    writeFileSync(packet, JSON.stringify({ generationId: generation, targetId: target.targetId, targetOrigin: target.origin,
+      targetFingerprint: targetFingerprint(target), receipts: [], associations: [{ userId: 'retained-account', sourceGrantId: 'S'.repeat(43),
+        associationId: 'R'.repeat(43), account: { kind: 'active', subject: { id: 'retained-account', username: 'retained_account', displayName: 'Current name' } } }] }))
+    const driver = join(value.temporary, 'native-docker.mjs')
+    writeFileSync(driver, `import { appendFileSync, readFileSync } from 'node:fs';
+import { PostgresDatabase } from ${JSON.stringify(resolve('server/database/postgres.ts'))};
+import { applyPrereleaseIdentityAudit } from ${JSON.stringify(resolve('scripts/prerelease/identity-audit.ts'))};
+import { readRetainedIdentityManifest } from ${JSON.stringify(resolve('scripts/prerelease/identity-manifest.ts'))};
+const args=process.argv.slice(2),line=args.join(' ');
+appendFileSync(${JSON.stringify(join(value.temporary, 'calls'))},line+'\\n');
+if(line.includes('scripts/prerelease/identity-audit.ts apply')||line.includes('scripts/prerelease/storage.ts identities')) {
+  const db=new PostgresDatabase({connectionString:${JSON.stringify(getTestDatabaseUrl())},schema:${JSON.stringify(schema)}});
+  try {
+    const result=line.includes('identity-audit.ts apply')
+      ? await applyPrereleaseIdentityAudit(db,JSON.parse(readFileSync(${JSON.stringify(join(value.root, 'backups', `identity-associations-${generation}.json`))},'utf8')),4000)
+      : await readRetainedIdentityManifest(db);
+    process.stdout.write(JSON.stringify(result));
+  } finally { await db.close(); }
+} else if(line.includes(' ps -a -q app'))process.stdout.write('${'c'.repeat(64)}');
+else if(args[0]==='ps')process.stdout.write('');
+else if(line.includes('{{.Image}}'))process.stdout.write(${JSON.stringify(image)});
+else if(line.includes('com.docker.compose.project'))process.stdout.write(${JSON.stringify(target.project)});
+else if(line.includes('{{json .State}}'))process.stdout.write('{"Running":false,"OOMKilled":false,"ExitCode":0}');
+else if(line.includes(' exec -T app node '))process.stdout.write(JSON.stringify({buildId:${JSON.stringify(buildId)},channel:'prerelease',generation:${JSON.stringify(generation)}}));
+`, { mode: 0o600 })
+    writeFileSync(join(value.bin, 'docker'), `#!/bin/sh\nexec '${process.execPath}' --import '${import.meta.resolve('tsx')}' '${driver}' "$@"\n`, { mode: 0o700 })
+    const unbound = value.invoke('identities', '--expected-current', buildId)
+    expect(unbound.status, unbound.stdout).not.toBe(0)
+    expect(value.calls()).toContain('scripts/prerelease/storage.ts identities')
+    expect(value.calls()).not.toContain('scripts/prerelease/identity-audit.ts apply')
+    expect(existsSync(join(value.root, 'control', `identities-${generation}.json`))).toBe(false)
+    writeFileSync(join(value.temporary, 'calls'), '')
+    const repaired = value.invoke('apply-identities', '--expected-current', buildId, '--associations', packet)
+    expect(repaired.status, repaired.stderr).toBe(0)
+    const calls = value.calls().split('\n')
+    const applyIndex = calls.findIndex(line => line.includes('identity-audit.ts apply'))
+    const scanIndex = calls.findIndex(line => line.includes('storage.ts identities'))
+    expect(applyIndex).toBeGreaterThanOrEqual(0)
+    expect(scanIndex).toBeGreaterThan(applyIndex)
+    expect(calls.filter(line => line.includes('storage.ts identities'))).toHaveLength(1)
+    expect(JSON.parse(repaired.stdout)).toMatchObject({ identityCount: 1 })
+    expect(await db.prepare('SELECT user_id,source_grant_id FROM prerelease_retained_identity_refs').all())
+      .toEqual([{ user_id: 'retained-account', source_grant_id: 'R'.repeat(43) }])
+    expect(await db.prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+    expect(readRuntime(target).mode).toBe('maintenance')
+  } finally { await db.close() }
+}, 15_000)
 
 it('rejects the legacy on-host build target before planning or invoking Docker', () => {
   const value = fixture()
@@ -194,6 +264,34 @@ it('revalidates a changed formal deployment without reinstalling pre or changing
     acceptance: null, operation: { id: operationId, kind: 'reverify', stage: 'acceptance', buildId, image, generation } })
   expect(invoke().status).toBe(0)
   expect(value.calls()).not.toMatch(/buildx|migrate|stop.*app|restart.*app/)
+})
+
+it('serves the hosted prerelease application with the actual owner Compose environment', async () => {
+  const value = fixture(), target = parsePrereleaseTarget(value.config), buildId = 'a'.repeat(40)
+  const composed = renderCompose(target, { ...readRuntime(target), buildId,
+    installed: { buildId, image: `sha256:${'d'.repeat(64)}`, installedAt: 1 } })
+  if (!('app' in composed.services) || !composed.services.app) throw new Error('Expected an installed app')
+  const frontend = join(value.temporary, 'frontend')
+  mkdirSync(frontend)
+  writeFileSync(join(frontend, 'index.html'), '<!doctype html><title>Prerelease app</title>')
+  writeFileSync(join(frontend, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: buildId,
+    basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }))
+  const hosting = createFrontendHosting({ ...composed.services.app.environment, FRONTEND_ROOT: frontend })
+  const server = createServer((req, res) => { void hosting(req, res).then(handled => { if (!handled) res.writeHead(404).end() }) })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Expected a local HTTP port')
+  try {
+    const base = `http://127.0.0.1:${address.port}`
+    expect(await (await fetch(`${base}/api/app-location`)).json()).toEqual({ mode: 'canonical',
+      appUrl: 'https://pre.agricola-beta.test/open-agricola/', buildId })
+    const response = await fetch(`${base}/open-agricola/`)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('<title>Prerelease app</title>')
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
 })
 
 it('keeps the identity service key in the app and excludes it from migration and capture processes', () => {

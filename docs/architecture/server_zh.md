@@ -56,7 +56,7 @@ server/game/
 - 候场命令 `setPlayerColor` 只修改发送者自己的座位。已入座和保留座位独占颜色；选择空位颜色时交换两处颜色。`GameSession.updatePlayerColors` 同步更新隔离 Worker。Room 队列串行处理竞争请求，checkpoint 把颜色与命令回执一同持久化后再广播；开局后锁定颜色。
 - 普通 Room 等最后到达者发送 `confirmPlayerColor`，持久化的 `colorConfirmationPlayerIndex` 标识该玩家。Step 0 提交后才进入游戏。热座与开发 Room 自动开局，Room 状态是权威。测试见 `room-router.test.ts`、`room-invitations.spec.ts`。
 - `room-queue.ts` 按 Room 串行化授权、规则、异步提交与发布；移动连接会同时占用两个 Room 队列与连接队列。关闭时停止输入、排空已接受的工作并关闭连接池。
-- **分布式 Room**（[ADR 0022](../adr/0022-distributed-room-recovery.md)）：`RoomDirectory` 用 PostgreSQL 租约与单调 epoch 把每个 Room 分配给一个应用进程；提交与发布都校验 owner 与期望版本。`POST /api/rooms/locate` 返回由只读 `ingress.ts` 转发的 `/nodes/<instanceId>/ws` 路由。`CommandStore` 为每个命令预留内容指纹，并把回执与 Room 状态转换一同提交；重复的命令返回原回执。`InvalidationStore` 提交卡牌 / 用户屏障与按实例的任务，每次执行与发布都检查屏障；只有每个相关实例都确认或失去租约后操作才完成。
+- **分布式 Room**（[ADR 0022](../adr/0022-distributed-room-recovery.md)）：`RoomDirectory` 用租约与单调 epoch 把 Room 绑定到实例；提交与发布都校验 owner 与期望版本。`/api/rooms/locate` 返回由只读 ingress 转发的 `/nodes/<instanceId>/ws` 路由。HTTP 解散请求先认证，再由 `room-http-routing.ts` 转发给 owner；owner 重复准入和创建者检查。`CommandStore` 预留内容指纹，并把回执与 Room 状态转换一同提交；重试返回原回执。`InvalidationStore` 持久记录卡牌 / 用户屏障与实例任务，执行与发布都检查屏障；全部相关实例确认或租约到期后操作才完成。
 - **历史与恢复**（[ADR 0021](../adr/0021-room-owned-history-branches-and-recovery-snapshots.md)）：不可变的历史节点与恢复记录是 Room 拥有的行，随 Room transaction 写入。恢复会还原权威会话、撤销历史与暂定检查点，而不解码 Replay payload。查询失败原样向上抛出，供存储重试；只有已读取数据的解码与完整性失败才以 `RoomHistoryCorruptionError` 封闭失败。
 - **快照所有权**：`serializeSessionSnapshot` 只捕获一次权威核心；`state` 与 `frame` 共享不可变值；`rehydrateState` 在规范化之前复制。`RoomCommitter` 持有已捕获的 Frame 与 payload，用于比较与重试。
 - **历史窗口**：视角快照携带最近 20 个完整操作组，带稳定记录 ID、按视角绑定的分支 ID、`projectionHash` 锚点与更早一页的游标。`getHistory` / `historyPage` 使用活动座位授权与完整视角过滤；分支或投影变化时返回 `history_branch_changed` / `history_projection_changed`。读取从不写 Room。HTTP、本地与 debug payload 保持完整。
@@ -142,7 +142,8 @@ HTTP 负责产品 API、运维与调试。WebSocket 命令仍是对局同步主�
 - `GET /api/health`、`/api/rooms`、`/api/game/state` 与 `/cards-manifest.json` 提供健康、发现、快照与 metadata。
 - `POST /api/game/new` 经 `game/game-setup-options.ts` 映射 WebSocket 创建选项；`load`、`dev/*` 与 `new-sandbox` 为调试及工坊入口。
 - `oauth/{handler,store}.ts` 负责 provider 发起、回调与完成。PKCE 绑定账号关联，浏览器 challenge 绑定注册票据；显式无效凭证不回退 Cookie 身份。账号、身份、邀请与票据消费同事务提交。回调用 fragment，设置 `no-store` 与 `no-referrer`。
-- `prerelease-authority{,-routes}.ts` 负责 `/api/prerelease/*` 的正式会话交接、目标 key 兑换/复核及持久撤销/删除回执。迁移 037/039 捕获撤销与代次清除；账号删除等待仍保留的投影清理。`prerelease-lifecycle-routes.ts` 提供仅正式管理员可用的退役及恢复审计，以原生身份清单和最新来源事实控制开放。`prerelease-identity.ts` 固定绝对 30 秒、来源及七天期限。目标默认关闭。浏览器入口与交接遵循统一来源策略及当前协议；仅正式前后端同源且具备可信 same-origin 元数据时允许缺失 Origin。测试：`{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`；政策见 ADR 0042。
+- `prerelease-sessions.ts` 拥有无凭据主体与绝对会话期限。浏览器回执先于身份投影提交；重试重新核对同一来源 grant。logout-all 阻断此前的回调。有界失效记录按主体收窄，读取保留调用方的数据库、时间和行锁。会话和 Cookie 响应持有原生共享行锁直至发送，跨实例退出不能穿过发布边界。`prerelease-access.ts` 在 HTTP、命令和下发前把关，撤销后断连。删除先于确认；原生 view 与无服务 key 的 `scripts/prerelease/identity-audit.ts` 负责恢复重绑。
+- `prerelease-authority{,-routes}.ts` 拥有正式交接、目标 key 兑换/复核及持久事件。迁移 037/039 绑定来源撤销和 owner 代次审计；仅正式管理员可开放或退役代次。浏览器入口遵循统一 Origin/协议策略。测试：`{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`；政策见 ADR 0042。
 
 认证测试：`auth-routes.test.ts`、`oauth/__tests__/store.test.ts`、`e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`。
 

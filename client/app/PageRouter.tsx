@@ -1,3 +1,4 @@
+import { isPrereleaseClient, prereleaseStartUrl } from '../services/prerelease-runtime'
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -94,10 +95,17 @@ export function PageRouter() {
   }
 
   // A reset link may be opened while another account is signed in; completing it switches accounts.
+  if (isPrereleaseClient() && ['login', 'onboarding', 'reset-password', 'settings', 'operations', 'prerelease-handoff', 'workshop'].includes(page)) {
+    return <main className="prerelease-access-screen"><p>{t(page === 'workshop' ? 'prerelease.readonlyError' : 'prerelease.returnToProduction')}</p></main>
+  }
   if (page === 'reset-password') return <ResetPasswordPage />
   if (page === 'prerelease-handoff') return <PrereleaseHandoffPage />
 
   if (!user) {
+    if (isPrereleaseClient()) return <main className="prerelease-access-screen">
+      <p>{t('prerelease.returnToProduction')}</p>
+      <a className="btn-primary" href={prereleaseStartUrl()}>{t('prerelease.entry')}</a>
+    </main>
     if (page === 'onboarding') return <OnboardingPage />
     return <LoginPage />
   }

@@ -90,7 +90,7 @@ owner 私有验收 JSON 包含 `format: 1`、`appUrl`、`apiUrl`、`expectedBuil
 
 owner 验收独立目标前保持 `PRERELEASE_ENTRY_ENABLED=false`。正式 app 需要 `PUBLIC_APP_ORIGIN`、`PUBLIC_API_BASE`、`PRERELEASE_APP_ORIGIN` 及仅目标服务端持有的密钥，两个 Compose 入口均显式传入。正式大厅和设置只向 Beta 账号或管理员显示入口，目标缺失或关闭时明确不可用。应用发布消费新 pin 前，语言源及 packs 必须先发布并通过其独立 CI。
 
-pre start 先建立 host-only HttpOnly verifier/state Cookie，再前往正式站根的 `?page=prerelease-handoff`，fragment 严格包含 `browserChallenge`、`state`、`targetOrigin`、`returnTo`。challenge 与 state 均为43字符base64url值。主站页面清除此片段，复核当前目标和正式根后只签发一次code。仅固定的 pre `/open-agricola/auth/handoff` 回调收到 `protocolVersion=1`、`code`、`state`、`browserChallenge`、`returnTo` fragment。pre 须校验自身state及verifier后服务端兑换。code过期由正式权威时钟在兑换时裁决，浏览器时钟偏差不参与授权。正式凭据留在正式API主机；pre认证及本地会话另行实现和验收。失败时回正式站根重新发起。
+pre start 先建立 host-only HttpOnly verifier/state Cookie，再前往正式站根的 `?page=prerelease-handoff`，fragment 严格包含 `browserChallenge`、`state`、`targetOrigin`、`returnTo`。challenge 与 state 均为43字符base64url值。主站页面清除此片段，复核当前目标和正式根后只签发一次code。仅固定的 pre `/open-agricola/auth/handoff` 回调收到 `protocolVersion=1`、`code`、`state`、`browserChallenge`、`returnTo` fragment。pre 须校验自身state及verifier后服务端兑换。code过期由正式权威时钟在兑换时裁决，浏览器时钟偏差不参与授权。正式凭据留在正式API主机；pre认证及本地会话另行实现和验收。pre 回调清除 fragment，只在当前页面内存保留交接包。503 暂停时重试同一交接包，不延长有效期。恢复使用已签发的会话 Cookie，或原浏览器交接 Cookie 及已提交的 build/代次绑定回执；后者保持原一分钟截止，并重新核对同一来源 grant，不能替代为其他会话。来源兑换结果不可判定且没有已验证回执时，须重新进入。无效、过期或运行时代次变化时须回正式站根重新进入。
 
 预发布使用独立通道。`prerelease` 日常 push 和 PR 运行 canonical routine plan，不自动部署。完整候选验证由可信 `main` 手动编排；候选任务只有仓库读取权限，不取得正式部署凭据。回执身份使用 VERIFICATION_CHANNEL=prerelease，普通回归命令使用正式运行默认值，预发布专用测试显式选择 prerelease。生产构建任务以 RELEASE_CHANNEL=prerelease 运行 build:hosted-frontend，包含正常类型检查及 Vite 构建。
 
@@ -208,6 +208,8 @@ node --import tsx scripts/prerelease/authority.ts close --config "$pre_config" -
 deploy 独立检查固定 SHA、同通道的完整原生 workflow 或 owner-local 回执，在修改准入或数据前，解析已验证导入的候选与 trusted-policy 镜像，核对前端元数据及 OCI revision/channel，固定候选不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份，最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
 
 候选必须提供真实 SQL view `prerelease_retained_identity_refs(user_id,source_grant_id)`，覆盖全部外部主体，包括仅存于房间/历史中的引用，并实现 `scripts/prerelease/identity-audit.ts apply <packet.json>`。adapter 删除/匿名化已删除主体，将每个保留活跃引用映射到返回的当前代次 `associationId`，不恢复会话或登录权。该持久化/清理实现由 #1663/#1667 负责；main 没有空 stub，缺 view/adapter 阻断开放。owner 读取真实行，拒绝遗漏、null 或无来源绑定，按二进制/C 顺序对 ASCII pair 去重排序并哈希共享 canonical JSON。正式 associate 校验旧来源，创建无 source、已撤销的关联，确保恢复后仍接收未来删除。
+
+原生 view 枚举房主、邀请、座位及结果/Context/终止/开局参与者中的 canonical 账号引用，用户或投影缺失时也保留该行；不扫描游戏玩家 ID、显示名或任意卡牌/历史 JSON。经正式来源验证的 owner packet 可为活跃 orphan 重建无凭据的外部投影，或清理/匿名化已删除 orphan。移除已删除受邀者后，有其他邀请时保留同一房间和状态；列表清空时，只使用现有且经正式确认为活跃的房主/参与者补成非空私密列表，无任何合法存续者才清理无主房间，绝不转为公开。已删除房主/真正参与者仍沿用既定房间清理；删除 tombstone 仍有效。来源不明时保持关闭：须恢复原有已验证 grant 关联或有效备份，不能编造 grant 或省略引用。全部原生引用必须被覆盖，随后执行精确复扫。回归：`scripts/__tests__/prerelease-identity-audit.test.ts`。
 
 ```bash
 ./deploy-prerelease.sh identities --config "$pre_config" --expected-current "$pre_sha"

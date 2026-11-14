@@ -41,7 +41,7 @@ describe('Room reconnect and durable commands', () => {
     vi.stubGlobal('window', { location: { hostname: 'localhost' } })
     vi.stubGlobal('WebSocket', Socket)
   })
-  afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.resetModules() })
 
   it('keeps the connection alive for its durable rejection before stopping for a required refresh', async () => {
     const { WsGameTransport } = await import('../gameTransport')
@@ -483,4 +483,33 @@ describe('Room reconnect and durable commands', () => {
     expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'stopped', code: 'seat_replaced' }))
     transport.destroy()
   })
+
+  it('closes an admitted prerelease socket on local sign-out and refuses another connection', async () => {
+    const build = 'a'.repeat(40), generation = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
+    vi.stubGlobal('window', { location: new URL('https://pre.agricola.test/open-agricola/') })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ ok: true, channel: 'prerelease', buildId: build, generationId: generation,
+      appOrigin: window.location.origin, formalAppOrigin: 'https://formal.agricola.test', formalApiBase: 'https://api.agricola.test', targetId: 'prerelease-main' })))
+    const pre = await import('../prerelease-runtime')
+    await pre.loadPrereleaseRuntime()
+    pre.acceptPrereleaseSession({ ok: true, user: { id: 'u1', username: 'beta', displayName: 'Beta', isAdmin: false, betaAccess: true },
+      prerelease: { buildId: build, generationId: generation, expiresAt: Date.now() + 100_000, validUntil: Date.now() + 30_000, serverTime: Date.now() } })
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('wss://pre.agricola.test/ws', undefined, undefined, { route: false, reconnectDelayMs: 1 })
+    const status = vi.fn(); transport.onConnectionStatus(status)
+    try {
+      await transport.connect()
+      pre.endPrereleaseSession()
+      expect(Socket.all[0]!.readyState).toBe(3)
+      expect(transport.connected).toBe(false)
+      expect(status).toHaveBeenLastCalledWith({ phase: 'stopped', code: 'prerelease_auth_required', message: 'prerelease_auth_required' })
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(Socket.all).toHaveLength(1)
+      const stale = new WsGameTransport('wss://pre.agricola.test/ws', undefined, undefined, { route: false })
+      try { await expect(stale.connect()).rejects.toThrow('prerelease_auth_required') }
+      finally { stale.destroy() }
+      expect(Socket.all).toHaveLength(1)
+    } finally { transport.destroy() }
+  })
+
 })

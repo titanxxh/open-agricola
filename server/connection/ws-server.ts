@@ -1,3 +1,4 @@
+import { closePrereleaseSocket, isPrerelease, prereleaseRequestAdmission, trackPrereleaseSocket } from '../prerelease-access'
 import { drainRoomSpectators, removeRoomSpectator } from '../game/room-spectators'
 import { operationsMetrics, safe } from '../observability/metrics'
 import { selectDevelopmentRoom } from '../game/development-room-slots'
@@ -58,7 +59,7 @@ const ensureFixedDevRooms = async (
   committer: RoomCommitter,
   authority?: RoomAuthority,
 ): Promise<Awaited<void>> => {
-  if (process.env.NODE_ENV === 'production') return
+  if (process.env.NODE_ENV === 'production' || isPrerelease()) return
   const startupOptions = parseFixedDevRoomStartupOptions()
   for (const { id: rootId, playerCount } of FIXED_DEV_ROOMS) {
     let owner
@@ -231,11 +232,14 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
     else ws.close(1008, 'too many pending messages')
   }
   ws.on('message', bufferMessage)
+  const preAdmission = await prereleaseRequestAdmission(req, true)
+  if (!preAdmission.ok) { ws.off('message', bufferMessage); ws.close(1008, preAdmission.code); return }
   const token = websocketSessionToken(req)
   const user = (await validateSession(token))
   if (ws.readyState !== ws.OPEN) { ws.off('message', bufferMessage); return }
   const ctx = createConnectionCtx(ws, deps, deps.allowAnonymous || !!user, user?.id)
   ctx.sessionToken = user ? token : undefined
+  trackPrereleaseSocket(ws, req)
   deps.broadcaster.authenticate(ws, ctx.sessionToken)
   let trackedUserId = user?.id
 
@@ -437,8 +441,11 @@ export async function createWsServer(
     server, path: '/ws',
     verifyClient: ({ req }: { req: IncomingMessage }, done) => {
       const admission = websocketAdmission(req)
-      if (admission.ok) done(true)
-      else done(false, admission.status, admission.code)
+      if (!admission.ok) { done(false, admission.status, admission.code); return }
+      void prereleaseRequestAdmission(req, true).then(result => {
+        if (result.ok) done(true)
+        else done(false, result.status, result.code)
+      }, () => done(false, 503, 'prerelease_access_paused'))
     },
     handleProtocols: protocols => protocols.has(BROWSER_WS_PROTOCOL) ? BROWSER_WS_PROTOCOL : false,
   })
@@ -465,7 +472,7 @@ export async function createWsServer(
     const sockets = activeUserSockets.get(userId)
     if (!sockets) return
     for (const ws of [...sockets]) {
-      ws.close(1008, 'session revoked')
+      if (isPrerelease()) closePrereleaseSocket(ws); else ws.close(1008, 'session revoked')
     }
     activeUserSockets.delete(userId)
   }
@@ -484,7 +491,7 @@ export async function createWsServer(
         } catch (error) { if (!(error instanceof RoomOwnershipError)) throw error }
         registry.delete(room.id)
         registry.clearActivity(room.id)
-        for (const ws of roomConnections(room)) ws.close(1008, 'session invalidated')
+        for (const ws of roomConnections(room)) { if (isPrerelease()) closePrereleaseSocket(ws); else ws.close(1008, 'session invalidated') }
         room.players = []
         room.session.dispose()
       })

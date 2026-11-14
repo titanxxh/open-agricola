@@ -1,3 +1,6 @@
+import { handlePrereleaseRoute, requirePrereleaseRequest } from './prerelease-routes'
+import { getPrereleaseSessions } from './prerelease-sessions'
+import { allowAnonymousAccess } from './anonymous-access'
 import { BetaAccessStore } from './beta-access-store'
 import { createBetaAccessHandler } from './beta-access-routes'
 import { createPrereleaseAuthorityHandler } from './prerelease-authority-routes'
@@ -19,6 +22,7 @@ import { SandboxAuthority } from './game/sandbox-authority'
 import { RoomDirectory } from './game/room-directory'
 import { CommandStore } from './game/command-store'
 import { discoverRoom } from './game/room-discovery'
+import { forwardRoomRequest } from './room-http-routing'
 import type { RoomDiscoveryRequest } from '../shared/contract/protocol/routing'
 import { CLIENT_CAPABILITIES_HEADER } from '../shared/contract/client-capabilities'
 import { isUniqueViolation, isWorkshopSubmissionInProgress } from './database/errors'
@@ -35,6 +39,7 @@ import { initializeDatabase, getDb, cleanExpiredSessions } from './db.ts'
 import { PostgresRoomPersistence } from './game/persistence/postgres-adapter.ts'
 import {
   login,
+  deleteAccount,
   logout,
   logoutAll,
   validateSession,
@@ -426,6 +431,9 @@ const server = createServer((req, res) => {
 })
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (req.url === '/internal/metrics' && await handleOperations(req, res)) return
+  if (await handlePrereleaseRoute(req, res)) return
+  if (!(await requirePrereleaseRequest(req, res))) return
   if (await handleFrontend(req, res)) return
   res.setHeader('Cache-Control', 'no-store')
   if (!req.url) {
@@ -496,7 +504,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   const requestUser = (await validateSession((await getAuthToken(req))))
 
   if (req.method === 'POST' && req.url === '/api/rooms/locate') {
-    const anonymous = process.env.NODE_ENV !== 'production' && process.env.ALLOW_ANONYMOUS_WS !== 'false'
+    const anonymous = process.env.NODE_ENV !== 'production' && allowAnonymousAccess()
     if (!requestUser && !anonymous) { sendJson(res, 401, { error: 'Login required', code: 'login_required' }); return }
     try {
       const input = JSON.parse(await readBody(req)) as RoomDiscoveryRequest
@@ -997,6 +1005,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const roomId = req.url.slice('/api/rooms/'.length, req.url.length - '/dissolve'.length)
+    if (await forwardRoomRequest(req, res, directory, wssCtx!.authority!.instanceId, roomId)) return
     await wssCtx!.authority?.load(roomId)
     const result = (await wssCtx!.lobby.dissolveRoomById(roomId, user.id))
     sendJson(res, result.ok ? 200 : 400, result)
@@ -1111,6 +1120,15 @@ wssCtx = (await createWsServer(server, {
 
 configureSandboxAuthority(new SandboxAuthority(directory, wssCtx.authority!.instanceId))
 await processInvalidations()
+const prereleaseSessions = getPrereleaseSessions()
+prereleaseSessions?.setAccountErasure(async userId => {
+  if (!(await getDb().prepare('SELECT id FROM users WHERE id=?').get(userId))) return
+  const operation = await invalidations.begin('user', userId, () => requestAccountDeletion(userId))
+  await processInvalidations()
+  if ((await invalidations.status(operation.id))?.pending) throw new Error('Prerelease identity cleanup is pending')
+  await deleteAccount(userId)
+})
+prereleaseSessions?.start()
 
 const PORT = Number(process.env.BACKEND_PORT) || 5175
 const HOST = process.env.BACKEND_HOST || undefined
@@ -1122,6 +1140,7 @@ server.listen(PORT, HOST, () => {
 
 installShutdownHandlers(async () => {
   const closed = new Promise<void>(resolve => server.close(() => resolve()))
+  prereleaseSessions?.close()
   clearInterval(sessionCleanupTimer)
   clearInterval(invalidationTimer)
   shutdownSandboxSessions()

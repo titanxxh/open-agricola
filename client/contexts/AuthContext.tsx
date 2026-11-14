@@ -1,3 +1,4 @@
+import { endPrereleaseSession, isPrereleaseClient } from '../services/prerelease-runtime'
 import { browserApiFetch } from '../services/browser-api'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
@@ -56,7 +57,7 @@ type AuthContextValue = AuthState & {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 const devAuthShortcutsEnabled = (): boolean =>
-  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1'
+  !isPrereleaseClient() && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1')
 
 function devShortcutUserFromLocation(): AuthUser | null {
   const params = new URLSearchParams(window.location.search)
@@ -191,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshSessionFn])
 
   const logoutFn = useCallback(async () => {
+    endPrereleaseSession()
     await browserApiFetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
@@ -199,6 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logoutAllFn = useCallback(async () => {
+    endPrereleaseSession()
     await browserApiFetch(`${API_BASE}/api/auth/logout-all`, {
       method: 'POST',
       credentials: 'include',
