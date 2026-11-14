@@ -5,7 +5,8 @@ import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertCandidateCheckout, assertMainProtection, assertRawCommit, evaluateCandidateVerification, mainCommit, parseGitHubJsonLines, PRERELEASE_CANDIDATE_WORKFLOW, repositoryName, runCandidateTask } from './candidate-verification.ts'
-import { fullSha, selectedTasks, verificationConfiguration } from './verification-tasks.ts'
+import { checkPrereleaseOwnerLocalVerification } from './owner-local-verification.ts'
+import { fullSha, FULL_TASK_IDS, selectedTasks, verificationConfiguration } from './verification-tasks.ts'
 import { commitRef, ensureCommitRef, github, ownerMachine } from '../release/candidate.ts'
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -77,9 +78,10 @@ function authority(cwd: string, repository: string) {
   return { repositoryId: metadata.id, main }
 }
 
-function fixedSnapshot(cwd: string, repository: string, sha: string) {
+export function admitPrereleaseSnapshot(cwd: string, repository: string, sha: string) {
   fullSha(sha)
   const source = authority(cwd, repository)
+  requireRules(repository, 'prerelease', ['pull_request', 'deletion', 'required_linear_history'])
   assertRawCommit(cwd, repository, sha)
   if (commitRef(repository, `heads/${prereleaseCandidateRef(sha)}`) !== sha) throw new Error('Prerelease candidate lacks its matching immutable reference')
   requireRules(repository, prereleaseCandidateRef(sha), ['non_fast_forward', 'deletion', 'update'])
@@ -95,12 +97,12 @@ export function fixPrereleaseCandidate(cwd: string, repository: string, sha: str
   fullSha(sha)
   const source = authority(cwd, repository)
   const existing = commitRef(repository, `heads/${prereleaseCandidateRef(sha)}`)
-  if (existing !== null) { fixedSnapshot(cwd, repository, sha); return }
+  if (existing !== null) { admitPrereleaseSnapshot(cwd, repository, sha); return }
   requireRules(repository, 'prerelease', ['pull_request', 'deletion', 'required_linear_history'])
   if (commitRef(repository, 'heads/prerelease') !== sha) throw new Error('Selected prerelease ref changed before candidate fixation')
   validateIntegrationManifest(cwd, repository, sha, source.main)
   ensureCommitRef(repository, `heads/${prereleaseCandidateRef(sha)}`, sha)
-  fixedSnapshot(cwd, repository, sha)
+  admitPrereleaseSnapshot(cwd, repository, sha)
 }
 
 export function prereleaseConfiguration(cwd: string, sha: string, producer: string): string {
@@ -109,7 +111,17 @@ export function prereleaseConfiguration(cwd: string, sha: string, producer: stri
 }
 
 export function checkPrereleaseVerification(cwd: string, repository: string, sha: string) {
-  const source = fixedSnapshot(cwd, repository, sha)
+  const source = admitPrereleaseSnapshot(cwd, repository, sha)
+  const ownerLocal = checkPrereleaseOwnerLocalVerification({ cwd, repository, repositoryId: source.repositoryId, candidateSha: sha, producerSha: source.main,
+    read: (endpoint, collection) => {
+      const relative = endpoint.slice(`repos/${repository}/`.length)
+      return collection ? list(repository, relative) : github(repository, endpoint === `repos/${repository}` ? '' : relative)
+    },
+    download: endpoint => execFileSync('gh', ['api', endpoint, '-H', 'Accept: application/octet-stream'], { maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }),
+  })
+  if (ownerLocal) return { status: 'passed' as const, repository, sha, channel: 'prerelease' as const,
+    configuration: ownerLocal.configuration, producerConfiguration: ownerLocal.producerConfiguration, ownerLocal,
+    tasks: FULL_TASK_IDS.map(id => ({ id, status: 'passed' as const, reason: 'Owner-authorized local prerelease verification', runId: null, jobId: null, url: ownerLocal.url })) }
   const workflow = object(github(repository, 'actions/workflows/prerelease-candidate-verification.yml'))
   if (workflow.path !== PRERELEASE_CANDIDATE_WORKFLOW || typeof workflow.id !== 'number') throw new Error('Unexpected prerelease producer workflow')
   const policyConfiguration = verificationConfiguration(cwd, source.main)
@@ -129,11 +141,11 @@ export function checkPrereleaseVerification(cwd: string, repository: string, sha
   }
   return { ...evaluateCandidateVerification({ repository, repositoryId: source.repositoryId, sha,
     configuration: prereleaseConfiguration(cwd, sha, source.main), workflowId: workflow.id, channel: 'prerelease', producerShas, execution: 'uid-rootless-v1',
-  }, evidence), channel: 'prerelease' as const, producerConfiguration: policyConfiguration }
+  }, evidence), channel: 'prerelease' as const, producerConfiguration: policyConfiguration, ownerLocal: undefined }
 }
 
 export function requestPrereleaseVerification(cwd: string, repository: string, sha: string, tasks: string) {
-  fixedSnapshot(cwd, repository, sha)
+  admitPrereleaseSnapshot(cwd, repository, sha)
   const selected = selectedTasks(tasks)
   const workflow = object(github(repository, 'actions/workflows/prerelease-candidate-verification.yml'))
   if (workflow.path !== PRERELEASE_CANDIDATE_WORKFLOW || typeof workflow.id !== 'number') throw new Error('Unexpected prerelease producer workflow')
@@ -214,7 +226,7 @@ export function prereleaseVerificationCli(cwd: string, input: string[]): number 
   const candidate = resolve(cwd, option('--candidate-directory'))
   assertCandidateCheckout(candidate, sha, producer)
   if (mode === 'manifest') {
-    const source = fixedSnapshot(candidate, repository, sha)
+    const source = admitPrereleaseSnapshot(candidate, repository, sha)
     if (option('--ref') !== prereleaseCandidateRef(sha)) throw new Error('Wrong immutable prerelease candidate ref')
     const tasks = selectedTasks(option('--tasks', 'all'))
     const configuration = prereleaseConfiguration(candidate, sha, producer)

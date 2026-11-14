@@ -124,7 +124,10 @@ console.log('[services] PostgreSQL and S3 configuration ready; application and t
 
 // Monitoring and application containers join this network. A host without
 // Docker runs neither, so external dependencies then need no Docker at all.
-if (spawnSync('docker', ['--version'], { stdio: 'ignore' }).error?.code === 'ENOENT') {
+const dedicatedProject = process.env.COMPOSE_PROJECT_NAME && process.env.COMPOSE_PROJECT_NAME !== 'open-agricola-local'
+if (dedicatedProject) {
+  console.log('[services] Dedicated Compose project; leaving the shared container network unchanged.')
+} else if (spawnSync('docker', ['--version'], { stdio: 'ignore' }).error?.code === 'ENOENT') {
   console.log('[services] Docker is not installed; skipping the shared container network.')
 } else {
   try { execFileSync('docker', ['network', 'inspect', 'open-agricola-local_default'], { stdio: 'ignore' }) }

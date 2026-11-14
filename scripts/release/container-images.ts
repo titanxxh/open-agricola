@@ -7,7 +7,7 @@ import { assertMainProtection, assertRawCommit, checkCandidateVerification, main
 import { checkPrereleaseVerification } from '../ci/prerelease-verification.ts'
 import { FULL_TASK_IDS, fullSha, verificationConfiguration, type FullTaskId } from '../ci/verification-tasks.ts'
 import { github, ownerMachine, RELEASE_REPOSITORY } from './candidate.ts'
-import { parseOwnerLocalProof, type OwnerLocalProof } from '../ci/owner-local-verification.ts'
+import { parseOwnerLocalProof, parsePrereleaseOwnerLocalProof, type OwnerLocalProof, type PrereleaseOwnerLocalProof } from '../ci/owner-local-verification.ts'
 
 export const CONTAINER_IMAGE_WORKFLOW = '.github/workflows/container-image-build.yml'
 export const CONTAINER_IMAGE_REGISTRY = 'ghcr.io/titanxxh/open-agricola-images'
@@ -20,6 +20,7 @@ type CandidateImageVerification = {
 export type ImageVerification = (CandidateImageVerification & { kind: 'prerelease' })
   | (CandidateImageVerification & { kind: 'stable' })
   | OwnerLocalProof
+  | PrereleaseOwnerLocalProof
   | { kind: 'main-policy'; configuration: string }
 
 type ImageIdentity = {
@@ -29,7 +30,7 @@ type ImageIdentity = {
   build: { runId: number; runAttempt: number }
 }
 export type ContainerImageReceipt = ImageIdentity & (
-  { purpose: 'candidate'; channel: 'prerelease'; verification: Extract<ImageVerification, { kind: 'prerelease' }> }
+  { purpose: 'candidate'; channel: 'prerelease'; verification: Extract<ImageVerification, { kind: 'prerelease' | 'owner-local-prerelease' }> }
   | { purpose: 'formal-candidate'; channel: 'stable'; verification: Extract<ImageVerification, { kind: 'stable' | 'owner-local' }> }
   | { purpose: 'trusted-policy'; channel: 'stable'; verification: Extract<ImageVerification, { kind: 'main-policy' }> }
 )
@@ -75,6 +76,9 @@ export function parseContainerImageReceipt(value: unknown): ContainerImageReceip
   const verification = record(input.verification)
   if (input.purpose === 'formal-candidate' && input.channel === 'stable' && verification.kind === 'owner-local') {
     return { ...common, purpose: 'formal-candidate', channel: 'stable', verification: parseOwnerLocalProof(verification) }
+  }
+  if (input.purpose === 'candidate' && input.channel === 'prerelease' && verification.kind === 'owner-local-prerelease') {
+    return { ...common, purpose: 'candidate', channel: 'prerelease', verification: parsePrereleaseOwnerLocalProof(verification) }
   }
   if (input.purpose === 'trusted-policy' && input.channel === 'stable' && verification.kind === 'main-policy') {
     keys(verification, ['kind', 'configuration'])

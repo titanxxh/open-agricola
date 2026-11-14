@@ -6,6 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { assertScopedPaths, loadPrereleaseEnvironment, parsePrereleaseTarget, targetFingerprint } from './config'
 import { checkPrereleaseVerification } from '../ci/prerelease-verification'
+import { parsePrereleaseOwnerLocalProof } from '../ci/owner-local-verification.ts'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { ownerMachine, RELEASE_REPOSITORY } from '../release/candidate'
 import { runPrereleaseOperation, type OperationRequest } from './flow'
@@ -37,13 +38,17 @@ function verifyReceipt(value: unknown, buildId: string | undefined): void {
   if (!buildId || !/^[a-f0-9]{40}$/.test(buildId)) throw new Error('A complete fixed-SHA candidate receipt is required')
   const receipt = object(value)
   const tasks = receipt.tasks
+  const local = receipt.ownerLocal === undefined ? null : parsePrereleaseOwnerLocalProof(receipt.ownerLocal)
+  if (local && (local.configuration !== receipt.configuration || local.producerConfiguration !== receipt.producerConfiguration
+    || !local.url.startsWith(`https://github.com/${RELEASE_REPOSITORY}/releases/download/`))) throw new Error('Owner-local prerelease receipt binding differs')
   if (receipt.status !== 'passed' || receipt.channel !== 'prerelease' || receipt.repository !== RELEASE_REPOSITORY || receipt.sha !== buildId
     || typeof receipt.configuration !== 'string' || !/^[a-f0-9]{64}$/.test(receipt.configuration)
     || typeof receipt.producerConfiguration !== 'string' || !/^[a-f0-9]{64}$/.test(receipt.producerConfiguration) || !Array.isArray(tasks)
     || tasks.length !== FULL_TASK_IDS.length || FULL_TASK_IDS.some(id => !tasks.some(task => {
       const row = object(task)
-      return row.id === id && row.status === 'passed' && typeof row.runId === 'number' && row.runId > 0 && typeof row.jobId === 'number' && row.jobId > 0
-    }))) throw new Error('A complete same-channel fixed-candidate GitHub receipt is required')
+      return row.id === id && row.status === 'passed' && (local ? row.runId === null && row.jobId === null
+        : typeof row.runId === 'number' && row.runId > 0 && typeof row.jobId === 'number' && row.jobId > 0)
+    }))) throw new Error('A complete same-channel fixed-candidate verification receipt is required')
 }
 
 function parseRequest(value: unknown): OperationRequest {

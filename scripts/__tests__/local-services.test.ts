@@ -47,7 +47,11 @@ const runServices = (env: Record<string, string>, { docker, override, stopCompos
       const target = join(root, 'override.yml')
       if (override === 'symlink') writeFileSync(target, 'services: {}\n', { mode: 0o600 })
       symlinkSync(target, overridePath)
-    } else writeFileSync(overridePath, 'services: {}\n', { mode: override === 'private' ? 0o600 : 0o644 })
+    } else {
+      const mode = override === 'private' ? 0o600 : 0o644
+      writeFileSync(overridePath, 'services: {}\n', { mode })
+      chmodSync(overridePath, mode)
+    }
   }
   const result = spawnSync(process.execPath, ['scripts/local-services.mjs'], {
     cwd: repository, encoding: 'utf8', timeout: 30_000,
@@ -78,7 +82,9 @@ describe('local-services Docker use', () => {
     const privateDatabase = 'postgresql://qualifier:private@127.0.0.1:55432/temporary_qualification'
     const result = runServices({ ...external, TEST_DATABASE_URL: privateDatabase }, { docker: false })
     expect(result.status, result.output).toBe(0)
-    const saved = new URL(parseEnv(result.dependencies).TEST_DATABASE_URL)
+    const savedUrl = parseEnv(result.dependencies).TEST_DATABASE_URL
+    if (!savedUrl) throw new Error('Missing persistent test database default')
+    const saved = new URL(savedUrl)
     expect({ hostname: saved.hostname, port: saved.port, username: saved.username, pathname: saved.pathname })
       .toEqual({ hostname: '127.0.0.1', port: '55432', username: 'agricola', pathname: '/agricola_test' })
     expect(result.dependencies).not.toContain('temporary_qualification')
@@ -94,6 +100,22 @@ describe('local-services Docker use', () => {
       'network create open-agricola-local_default',
     ])
     expect(result.monitoringPrepared).toBe(true)
+  })
+
+  it.each(['oa-canonical-private', 'oa-canonical-another'])('leaves the shared network untouched for the dedicated Compose project %s even when inspect would fail', project => {
+    const result = runServices({ ...external, COMPOSE_PROJECT_NAME: project }, { docker: true })
+
+    expect(result.status, result.output).toBe(0)
+    expect(result.dockerCalls).toEqual([])
+    expect(result.output).toContain('Dedicated Compose project; leaving the shared container network unchanged.')
+    expect(result.dependencies).toContain(`DATABASE_URL='${external.DATABASE_URL}'`)
+    expect(result.monitoringPrepared).toBe(true)
+  })
+
+  it('preserves shared network setup for an explicit default Compose project', () => {
+    const result = runServices({ ...external, COMPOSE_PROJECT_NAME: 'open-agricola-local' }, { docker: true })
+    expect(result.status, result.output).toBe(0)
+    expect(result.dockerCalls).toEqual(['--version', 'network inspect open-agricola-local_default', 'network create open-agricola-local_default'])
   })
 
   it('still starts the local database with Compose when no external database is configured', async () => {
