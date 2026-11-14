@@ -79,7 +79,8 @@ export function createLobby(deps: {
         const belongsToUser = affected.has(room.id) ||
           room.createdBy === userId ||
           room.players.some((player) => player.userId === userId) ||
-          room.seatOwners?.some((owner) => owner.userId === userId)
+          room.seatOwners?.some((owner) => owner.userId === userId) ||
+          room.teamMembers?.some(member => member.userId === userId)
         if (!belongsToUser) continue
         await enqueueRoomTask(room, async () => {
           if (registry.has(room.id)) await retire(room)

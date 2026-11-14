@@ -300,6 +300,12 @@ export class GameContextStore {
         ORDER BY room_players.player_index LIMIT 1
       `).get(userId, roomId)) as ActiveRow | undefined
       if (!active) {
+        const waiting = await this.db.prepare(`SELECT version FROM rooms WHERE id=? AND status='waiting'
+          AND EXISTS(SELECT 1 FROM jsonb_array_elements(team_members_json) member WHERE member->>'userId'=?)`)
+          .get<{ version: number }>(roomId, userId)
+        if (waiting) return { ok: true, roomId, lifecycle: 'active', phase: 'waiting', playerIndex: null,
+          roomVersion: waiting.version, stepNo: 0,
+          ...(context.expires_at === null ? {} : { expiresAt: context.expires_at }) }
         if (intent === 'join' && await spectatorRoute(this.db, roomId)) {
           const snapshot = await this.db.prepare(`SELECT r.version, g.latest_step_no FROM rooms r
             LEFT JOIN game_replays g ON g.room_id=r.id WHERE r.id=?`)
