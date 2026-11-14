@@ -401,9 +401,12 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       } finally { await db.close() }
     }
     const retainedRoom = async (roomId: string) => admin.prepare(`SELECT status,state_json,team_members_json FROM "${schema}".rooms WHERE id=?`).get(roomId)
+    const waitForIdentityEvents = () => expect.poll(async () => (await source.prepare('SELECT count(*)::int AS pending FROM prerelease_identity_events WHERE target_origin=? AND user_id=? AND acknowledged_at IS NULL')
+      .get<{ pending: number }>(preOrigin, user.id))?.pending).toBe(0)
     return { context, browser, close, enter, createParticipant, retainedRoom, prepareRetainedRoom, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
       seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }),
       publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value },
+      waitForIdentityEvents,
       beforeNextExchange: (callback: () => Promise<void>) => { beforeNextExchange = callback } }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
@@ -724,6 +727,30 @@ test('real prerelease Multihand binds two seats per principal and survives brows
     expect(hostWire.latest()?.payload.state.team?.configuration.cooperationRules).toBe(true)
     const pages = [host, guest]
     const wires = [hostWire, guestWire]
+    for (let opening = 0; opening < 8; opening++) {
+      const current = hostWire.latest()!
+      if (current.payload.interaction.stateId === 'idle') break
+      if (current.payload.interaction.stateId !== 'wait') throw new Error('Expected a pending opening interaction')
+      expect(current.payload.state).toMatchObject({ phase: 'playing', round: 1, roundPhase: 'preparation' })
+      const actor = current.payload.interaction.playerIndex, side = actor % 2
+      const page = pages[side]!, wire = wires[side]!
+      await expect.poll(() => wire.latest()?.version).toBe(current.version)
+      const interaction = wire.latest()!.payload.interaction
+      if (interaction.stateId !== 'wait') throw new Error('Expected an owned opening interaction')
+      const request = interaction.request
+      const control = request.kind === 'choice' && request.options.some(option => option.value === '__skip__' && !option.disabled)
+        ? page.locator('.interaction-bar [data-choice-value="__skip__"]')
+        : request.kind === 'confirm-player-switch'
+          ? page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+          : undefined
+      if (!control) throw new Error(`Unexpected opening interaction: ${request.kind}`)
+      await expect(control).toBeEnabled()
+      await control.click()
+      await expect.poll(() => wire.latest()?.version ?? -1).toBeGreaterThan(current.version)
+      await expect.poll(() => hostWire.latest()?.version).toBe(wire.latest()!.version)
+    }
+    await expect.poll(() => hostWire.latest()?.payload.interaction.stateId).toBe('idle')
+    expect(hostWire.latest()?.payload.state.actionSpaces.flatMap(space => space.takenBy)).toEqual([])
     const acted = new Set<number>()
     for (let step = 0; step < 4; step++) {
       const state = hostWire.latest()!
@@ -739,7 +766,9 @@ test('real prerelease Multihand binds two seats per principal and survives brows
       await expect.poll(() => wire.latest()!.version).toBeGreaterThan(before)
       acted.add(actor)
       const confirm = page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
-      if (await confirm.isVisible()) {
+      const pending = wire.latest()!.payload.interaction
+      if (pending.stateId === 'wait' && (pending.request.kind === 'confirm-next-player' || pending.request.kind === 'confirm-player-switch')) {
+        await expect(confirm).toBeVisible()
         const previous = wire.latest()!.version
         await confirm.click()
         await expect.poll(() => wire.latest()!.version).toBeGreaterThan(previous)
@@ -762,8 +791,7 @@ test('real prerelease Multihand binds two seats per principal and survives brows
     environment.beforeNextExchange(async () => {
       await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
       await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
-      await expect.poll(async () => (await environment.source.prepare('SELECT count(*)::int AS pending FROM prerelease_identity_events WHERE target_origin=? AND user_id=? AND acknowledged_at IS NULL')
-        .get<{ pending: number }>(environment.preOrigin, environment.user.id))?.pending).toBe(0)
+      await environment.waitForIdentityEvents()
     })
     const returned = await environment.enter(environment.context, environment.user, 'paused')
     const returnedWire = observeGameSocket(returned)
@@ -972,6 +1000,7 @@ test('real cooperative builds keep the builder, target farm and Stablehand conti
     await expect(host.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
     expect(await environment.retainedRoom(roomId)).toEqual(persisted)
     await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
+    await environment.waitForIdentityEvents()
     await host.close()
     host = await environment.enter(environment.context)
     hostWire = observeGameSocket(host)
