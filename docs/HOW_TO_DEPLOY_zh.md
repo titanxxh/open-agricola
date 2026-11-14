@@ -65,9 +65,26 @@ pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/verificat
 
 publisher 核对当前认证用户与仓库 owner 的原生用户 ID，准备固定候选 draft，仅上传 `owner-local-verification.json`，再创建独立 `owner-local-verification` commit status。描述绑定回执 SHA-256，target 只能是本仓正式 Release asset。发布前读回 status creator、Release author、asset uploader 和实际字节。相同命令与回执可恢复本工具准备的同一 draft；普通发布路径继续拒绝 draft。
 
+发布 PATCH 响应丢失时，publisher 通过现有候选门禁与原生 Release ID 做一次有界只读核验。已发布且证明一致时直接成功，不重复写入。读回不可用或证据冲突时仍报失败，重试固定候选前先查状态。
+
 只有原生 owner 创建的 status 能选择本机证明，其他用户的同名 context 不能选择或撤销它。owner 最新 pending、failure 或 error 撤销本机授权，不复活较旧成功；随后继续普通原生 GitHub 证据路径。owner 最新 success 的证明若格式或内容无效，仍阻断，不静默回退。
 
 Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已发布证明，重新核对原生身份、未变更 tag、原始树、双方配置、命令、时间和回执摘要。不接受任意 URL、其他用户 status、不完整任务或虚构 Actions ID。GitHub 仍实际构建私有镜像与 Pages；镜像来源、私有 registry、owner 传输和运行期门禁保持必需。独立 Bug Report 部署反馈命令也复用该门禁，保留 owner-local 权威依据而不虚构 Actions job。登记前须先部署支持此反馈证明类型的后端；命令本身不会升级应用。
+
+### 查询交付状态与验收现场
+
+`pnpm release:status --config /owner/status.json` 分别查询 Release、镜像构建、后端操作、Pages 和已保存浏览器验收。私有 JSON 必需字段为 `repository`、`version`、`candidateSha`、`apiOrigin`、`appOrigin`。可选 `image` 含 `runId`、`runAttempt`、`artifactId`，可选 `backend` 含 `host`、`directory`、`operationId`；`acceptanceFile` 指向已保存的 `release:accept` 结果。每阶段输出 `verified`、`absent`、`pending`、`conflict` 或 `unavailable`，并注明 `native`、`live` 或 `saved` 证据。缺输入时保持 unavailable；网络失败不会授权再次写入。保存的验收保留原完成时间并标记 saved，运行期探针另行展示。
+
+线上浏览器验收使用已有账号、该账号已参与的普通局和保留的已结束 Replay。先通过只读 repeatable-read 事务采集所需元数据，不扫描对局或回放 payload：
+
+```bash
+pnpm release:inventory --host ubuntu@ten-kr --directory /home/ubuntu/open-agricola \
+  --expected-build <full-sha> --output /owner/live-inventory.json
+pnpm release:accept --config /owner/live-acceptance.json
+pnpm release:accept --config /owner/live-acceptance.json --execute
+```
+
+owner 私有验收 JSON 包含 `format: 1`、`appUrl`、`apiUrl`、`expectedBuild`、`credentialsFile`、`inventoryFile`、`artifactDirectory`、`outputDirectory`。使用根路径 HTTPS 应用/API URL、固定 SHA、新鲜清单与已校验 Pages 产物目录。专用 0600 凭据文件仅含 `MY_TEST_USER_ID` 和 `MY_TEST_PASSWORD`，配置只存路径。每次尝试使用新的私有输出目录。规划模式只校验配置，不读取凭据；执行要求清单在十分钟内，覆盖 Chromium/WebKit、双实例路由、已有普通局及刷新恢复、Replay、可见素材、移动布局和当前 session 退出。所有 frame 拒绝游戏写入和其他房间 join，只允许已选参与者房间的 locate 与 join/resume 请求。首失败与清理失败分别留证。会创建和操作测试局的 `release:rehearse` 仍限定回环环境，并覆盖这些浏览器保护回归。
 
 ## 发布固定预发布候选
 
@@ -790,7 +807,9 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
     pnpm release vX.Y.Z --ref <full-sha>
     ```
 
-等待 Pages workflow 完成，并核对前端实际构建标识。手动调用 `deploy-pages-broker.yml` 也必须先满足后端已升级的条件；broker 的验证门禁不证明线上后端已更新。不要先发布 Release，再假设手动后端部署会先于 Pages 完成。
+除已有 `VITE_API_BASE` 外，仓库 variable `PUBLIC_APP_ORIGIN` 应配置正式 Pages 的 HTTPS origin。main broker 在构建前，以及部署 job 完成 environment 等待后，读取公开的 `/api/auth/browser-policy` 与 `/api/health`。后端必须健康，构建标识等于固定候选，浏览器协议及应用/API 来源均匹配。请求不带凭据、不跟随重定向，并限制响应体积和耗时。公开探针只覆盖实际响应的应用，不能替代 owner 对保留数据与全部实例的验证。
+
+等待 Pages workflow 完成，并核对前端实际构建标识。自动 Release 请求与手动 `deploy-pages-broker.yml` 都走同一运行期门禁。Release 早于后端完成时，Pages 在安装前阻断；owner 确认后端后，重试同一固定候选的 workflow 即可。requester 保持启用，无需全局禁用再恢复。后端安装和 Pages 仍是独立的 owner 控制阶段。
 
 ### 后端
 
@@ -829,6 +848,17 @@ receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可�
 维护锁内再次绑定目录、`F`、`P` 和实际 image。保留精确的旧 container/image/Build，检查固定 fetch/checkout 与数据目标，然后干净停止旧应用。旧 image 负责导出 PostgreSQL/S3，新 image 负责隔离恢复验证；通过后才执行 `check-live`，以 `--no-build --pull never` 启动 app 和原 Caddy image。正式主机没有 `pnpm install`、应用构建、registry 登录或自动依赖升级。共享依赖变更仍须单独维护。
 
 只有停机前正在运行、此次干净停止且身份未变化的旧容器，才会在 live migration 前的备份失败后恢复。OOM、未干净排空或开始 live migration 后的失败保持维护，不把旧程序接到可能已变化的 schema。`data_imports` 屏障和容器健康检查继续生效。私有操作目录保存导入、source 身份和 resolved Compose；后者含环境凭据，勿公开。
+
+从同一 clean exact producer checkout 查询中断操作，再决定续跑：
+
+```bash
+./deploy-backend.sh status <host> <full-candidate-sha> <remote-dir> --operation-id <UUID>
+./deploy-backend.sh resume <host> <full-candidate-sha> <remote-dir> --operation-id <UUID>
+```
+
+status 不需要 GitHub 或 registry 访问，不改原 request、admission 或 progress。临时原生 checkpoint probe 使用只读数据库事务，只清理自己的容器。输出含 `state`、`phase`、`nextAction` 和 `validatorExitCode`；原进程退出码未知时保留 `null`。维护锁或 validator 仍活跃时返回 `running` 和 `wait`。
+
+resume 在原锁内接受独立的新鲜十分钟授权，清理另有有限预算。它重新核对 staged producer 字节、原生镜像、数据配置、封存存储证据，以及精确目标构建已提交的完整验证报告和时间。启动前有活跃 writer、失败 import、foreign writer 或证据改变都会阻断。只续已验证、启动和接受后缀，原 request/admission 字节不变，不再次上传、备份或执行 live validation。Compose 已替换旧容器时，精确同操作的干净停止目标仍可续跑。已接受操作只补缺失接受步骤或清理自己的 archive，不重建容器。没有封存 progress 的早期操作需要调查，unknown 不授予启动资格。
 
 `data/deployed-build-id` 与审计证据 `data/deployed-image.json` 记录成功交付，随后在实际部署目录的 owner 私有 `.env` 中原子写入无引号的 `BACKEND_IMAGE=sha256:...` 与 `CADDY_IMAGE=sha256:...`，固定已验收的原生不可变镜像。两项选择器共用一次原子写入。其他配置保持原字节；重复、带引号或使用可变 tag 的镜像配置会被拒绝。普通 Compose 默认读取该 `.env`，显式 `--env-file .env` 也读取同一绑定，不再回退旧 tag。不要用 shell、其他环境文件或备份配置覆盖该绑定。迁移前失败保留旧绑定；开始 live migration 前先写空绑定，此后失败会让普通 `run/up` 保持拒绝，直到固定镜像交付成功。JSON 回执是历史证据，不是另一套镜像选择。真实浏览器、保留对局和双实例现场验收仍须另做。
 

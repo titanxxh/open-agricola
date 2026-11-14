@@ -156,9 +156,9 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 1. 调试用 `pnpm verify focus <file.test.ts>` 验证最小范围。定向 Vitest 及纯测试、工具、文档调试不要求启动应用。
 2. 本机复现应用行为、UI 或 WS 时，先通过 `./restart-local.sh` 重启，再用浏览器、Playwright 或命令行检查。`pnpm verify <file.spec.ts>` 在隔离环境调用该入口。本机结果写明实际范围；`pnpm verify prepush` 是可选的完整 fast 门禁，不是 push 的前置条件。
-3. PR 与 main 使用同一 canonical plan 执行受影响文件、业务组与浏览器检查，由始终运行的 `verify` 汇总。日常验证按依赖证据尽力选择，证据不全做有界扩大，只有完整触发项才跑完整目录。GitHub Actions 是集成与发布的正式证据；本机通过不能替代或补齐远端结果。
-4. 源码或 rebase 改变文件内容后，重新运行受影响检查并等待对应新 head 的 CI。`pnpm verify status` 仅核对本机记录及其实际范围，不自动跳过检查。
-5. 发布候选必须取得同一 SHA 与验证配置的完整 GitHub 回执，重试只补兼容的失败任务；缺失、失败、取消或跳过的必需任务均阻断。标准发布与独立部署门禁见 `docs/HOW_TO_DEPLOY.md`，不增加定时全量。
+3. PR 与 main 使用同一 canonical plan 执行受影响检查，由 `verify` 汇总；选择范围与证据规则以 `docs/operations/ci-checks.md` 为准。
+4. 源码或 rebase 改变文件内容后，按实际变化重新取得当前源码的验证证据。`pnpm verify status` 仅核对本机记录及其实际范围，不自动跳过检查。
+5. 发布证据的唯一契约在 `docs/HOW_TO_DEPLOY.md`：默认使用完整原生 GitHub 回执；owner 明确授权时可使用该文档规定的完整 owner-local 通路。本机定向检查或 `release:rehearse` 不能充当完整候选证明，本机命令也不能冒充 GitHub jobs。镜像、Pages 的真实构建与部署门禁仍独立执行。
 
 </important>
 
@@ -167,7 +167,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 ## Commit and CI workflow
 
 - 永远使用 rebase，禁止 merge。每次 push 前先 rebase main 并解决冲突，按需运行受影响的本机检查。无需重复运行远端相同的完整门禁；检查入口与范围规则见 `docs/operations/ci-checks.md`。
-- push 后必须等待相关 GitHub Actions run 结束。运行中或失败时任务不算完成；失败立即定位修复。
+- push 后按本次已授权的验证通路完成当前 head 的检查；使用 GitHub Actions 时必须等待相关 run 结束，失败立即定位修复。检查选择和正式回执分别遵循上述 CI 与部署文档。
 - Commit 标题使用 `feat:` / `fix:` / `refactor:` / `docs:`，英文、简洁。
 - `.env` 已有 `GH_TOKEN`，source 后可调 GitHub API；查 run、失败日志、手动触发 workflow 和 repo variables 的命令见 `docs/operations/ci-checks.md`。
 - 除非用户明确要求，不提交 `docs/superpowers/*` 中的 spec、plan 或 working notes，即使 skill 默认要求提交。每次 `git add` 显式排除 `docs/superpowers/`。

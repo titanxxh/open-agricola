@@ -146,6 +146,8 @@ pnpm run check:bundle-size
 
 ## 固定候选完整回执
 
+发布证明的选择以 [标准 owner 发布契约](../HOW_TO_DEPLOY.md#standard-owner-machine-release) 为准。下述原生 GitHub 回执是默认通路；owner 明确授权的完整本机通路按该文档执行，不把本机命令记录成 GitHub run 或 job。日常定向检查不能替代任一完整候选通路。
+
 `candidate-verification.yml` is a main-only formal workflow_dispatch producer P for an admitted candidate C. P supplies every privileged setup and controller command; its readonly token can read PR metadata and effective rules and never reaches candidate execution. Native receipts bind repository ID, stable channel, C, P and both configuration trees. The candidate ref remains a request lease, while dispatch uses main. `candidate-rehearsal.yml` is the separate ten-task implementation rehearsal called by ordinary CI; its native workflow identity cannot authorize publication or deployment.
 
 正式 request/check 新增最终快照准入：候选必须等于所选仓库 `main` 上一个已合入 PR 的最终 `merge_commit_sha`，并可从明确解析的 `refs/heads/main` 原始提交到达。门禁核对仓库、PR base、producer run/head 的原生数字 ID，以及有效的 PR、线性历史、禁止 force update 和删除规则。关联 PR 或祖先关系本身不够；未合入、中间 rebase 提交和开放的 test merge 均拒绝。该策略也适用于显式选择的 fork。当前受保护 main 的固定 P 提供策略，配置哈希只区分兼容执行。普通 PR implementation rehearsal 不要求正式准入，也不提供正式授权。
