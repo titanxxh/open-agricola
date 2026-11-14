@@ -29,7 +29,9 @@ async function prepare(activate: boolean) {
     prerelease: { buildId: build, generationId: generation, expiresAt: Date.now() + 60_000,
       validUntil: Date.now() + 30_000, serverTime: Date.now() },
   })
-  return { fetchMock, runtime, cards: await import('../card-meta') }
+  const cards = await import('../card-meta')
+  cards.__resetCardsManifestCache()
+  return { fetchMock, runtime, cards }
 }
 
 afterEach(() => { vi.resetModules(); vi.unstubAllEnvs(); vi.unstubAllGlobals() })
