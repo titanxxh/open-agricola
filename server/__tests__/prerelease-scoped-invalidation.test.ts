@@ -153,6 +153,33 @@ it('recovers a consumed callback after its session commits but its response leas
   } finally { spy.mockRestore() }
 })
 
+it('never republishes a receipt session logged out after its recovery transaction commits', async () => {
+  const context = await setup(), packet = await context.packet('alice')
+  const original = await context.service.exchangeHandoff(packet.cookie, packet.input)
+  const transaction = context.pre.transaction.bind(context.pre)
+  let commits = 0, loggedOut = false
+  function logoutAfterRecoveryCommit<Args extends unknown[], Result>(work: (...args: Args) => Result) {
+    const run = transaction(work)
+    return async (...args: Args): Promise<Awaited<Result>> => {
+      const result = await run(...args)
+      if (++commits === 2) {
+        await context.service.revoke(original.token)
+        loggedOut = true
+      }
+      return result
+    }
+  }
+  const spy = vi.spyOn(context.pre, 'transaction').mockImplementation(logoutAfterRecoveryCommit)
+  try {
+    await expect(context.service.exchangeHandoff(packet.cookie, packet.input)).rejects.toMatchObject({ kind: 'paused' })
+    expect(loggedOut).toBe(true)
+    expect(context.service.cachedAuthorized(original.token)).toBe(false)
+    expect(context.service.status(original.token)).toBe('expired')
+    expect(await context.service.resolve(original.token)).toBeNull()
+    expect(context.exchanges()).toBe(1)
+  } finally { spy.mockRestore() }
+})
+
 it.each(['beta', 'source', 'deletion', 'expiry', 'buildId', 'generationId'] as const)(
   'never recovers a receipt after %s invalidates its original authority', async reason => {
     const context = await setup(), packet = await context.packet('alice')
