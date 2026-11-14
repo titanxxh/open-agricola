@@ -36,6 +36,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          PUBLIC_APP_ORIGIN: ${{ vars.PUBLIC_APP_ORIGIN }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
           VITE_ENABLE_COMMUNITY_DECK: ${{ vars.VITE_ENABLE_COMMUNITY_DECK }}
           VITE_SANDBOX_EXECUTOR: ${{ vars.VITE_SANDBOX_EXECUTOR }}
@@ -52,11 +53,27 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
+      contents: read
+      actions: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Recheck candidate and live backend after the deployment wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          PUBLIC_APP_ORIGIN: ${{ vars.PUBLIC_APP_ORIGIN }}
+        run: node scripts/ci/pages-deployment.ts ready --repository "$GITHUB_REPOSITORY"
       - id: deployment
         uses: actions/deploy-pages@v5
