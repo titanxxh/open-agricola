@@ -57,8 +57,7 @@ export function parseReplayBridgeContext(value: unknown): ReplayBridgeContext | 
   if (value.mode.kind === 'archive' && keys(value.mode, ['kind'])) mode = { kind: 'archive' }
   else if (value.mode.kind === 'evidence' && keys(value.mode, ['kind', 'stepNo', 'frameHash', 'perspective'])
     && step(value.mode.stepNo) && hash(value.mode.frameHash) && typeof value.mode.perspective === 'string'
-    && /^p[1-9]\d*$/.test(value.mode.perspective)) {
-    // The prefix is checked above, and construction keeps the template-literal type truthful.
+    && /^p[1-9]\d*$/.test(value.mode.perspective) && Number.isSafeInteger(Number(value.mode.perspective.slice(1)))) {
     mode = { kind: 'evidence', stepNo: value.mode.stepNo, frameHash: value.mode.frameHash, perspective: `p${Number(value.mode.perspective.slice(1))}` }
   } else return null
   return { protocolVersion: 1, nonce: value.nonce, environment: 'prerelease', targetId: value.targetId,
@@ -101,7 +100,7 @@ export function parseReplayBridgeReply(value: unknown): ReplayBridgeReply | null
   if (value.type === 'data' && keys(value, ['type', 'nonce', 'requestId', 'bytes', 'contentType', 'status'])
     && value.bytes instanceof ArrayBuffer && value.bytes.byteLength <= REPLAY_BRIDGE_MAX_BYTES
     && typeof value.contentType === 'string' && (value.contentType === 'application/json' || replayBridgeImageType(value.contentType))
-    && step(value.status) && value.status >= 200 && value.status <= 599) return { type: 'data', nonce: value.nonce, requestId: value.requestId,
+    && step(value.status) && (value.status === 200 || value.status >= 400 && value.status <= 599)) return { type: 'data', nonce: value.nonce, requestId: value.requestId,
       bytes: value.bytes, contentType: value.contentType, status: value.status }
   return null
 }
