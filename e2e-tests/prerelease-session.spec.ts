@@ -28,6 +28,7 @@ import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../shared/contract/br
 import { createPrereleaseGateway } from '../scripts/prerelease/gateway'
 import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { test } from './server-fixtures'
+import type { ServerEvent } from '../shared/contract/protocol/ws'
 
 const buildId = 'a'.repeat(40)
 const reservedPorts = new Set<number>()
@@ -85,11 +86,14 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
     acquired.register(() => admin.close())
     await admin.exec(`CREATE SCHEMA "${schema}"`)
     acquired.register(() => admin.exec(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`))
+    const additionalUsers: string[] = []
     const source = getDb(), username = `pre_${randomUUID().slice(0, 8)}`
     const user = await createLocalUserForTests(username, 'pre-session-password-926')
     const cleanSourceUser = async () => {
-      await source.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id)
-      await source.prepare('DELETE FROM users WHERE id=?').run(user.id)
+      for (const id of [user.id, ...additionalUsers]) {
+        await source.prepare('DELETE FROM sessions WHERE user_id=?').run(id)
+        await source.prepare('DELETE FROM users WHERE id=?').run(id)
+      }
     }
     acquired.register(cleanSourceUser)
     await source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
@@ -259,7 +263,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       formal: { appOrigin: formalOrigin, apiOrigin: formalOrigin }, ca: readFileSync(join(directory, 'cert.pem')) })
     await new Promise<void>(resolve => gateway!.server.listen(gatewayPort, '127.0.0.1', resolve))
     await gateway.refreshBrowserPolicy()
-    const enter = async (context: BrowserContext) => {
+    const enter = async (context: BrowserContext, principal = user) => {
       const page = await context.newPage()
       await page.goto(`${preOrigin}/open-agricola/auth/start`)
       await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toBeVisible()
@@ -278,7 +282,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       await expect(page.locator('.prerelease-banner')).toContainText('Prerelease aaaaaaaaaaaa')
       await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toHaveCount(0)
       await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible()
-      await expect(page.locator('.lobby-user-pill')).toHaveText(user.displayName)
+      await expect(page.locator('.lobby-user-pill')).toHaveText(principal.displayName)
       return page
     }
     const browser = await playwright.chromium.launch()
@@ -296,7 +300,15 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       expect(result).toMatchObject({ ok: true, user: { id: user.id, username: user.username, displayName: user.displayName } })
     }
     const assertFormalSession = async () => { expect(await validateSession(sourceToken)).toMatchObject({ id: user.id, username: user.username }) }
-    return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
+    const createParticipant = async () => {
+      const participant = await createLocalUserForTests(`team_${randomUUID().slice(0, 8)}`, 'team-session-password-926')
+      additionalUsers.push(participant.id)
+      await source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(participant.id, Date.now())
+      const token = await createSession(participant.id)
+      const other = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
+      await other.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+      await other.addCookies([{ name: formalCookieName, value: token, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
+      return { context, browser, close, enter, createParticipant, retainedRoom, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
       seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }),
       publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value } }
   } catch (error) {
@@ -585,4 +597,94 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
     await testInfo.attach('public-sandbox-responses', { body: JSON.stringify(diagnostics, null, 2), contentType: 'application/json' })
     await releaseAll([() => environment.context.close(), () => environment.browser.close(), () => environment.close()])
   }
+})
+
+test('real prerelease Multihand binds two seats per principal and survives browser reentry without losing the game', async ({ playwright }) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright)
+  let other: Awaited<ReturnType<typeof environment.createParticipant>> | undefined
+  let failure: { error: unknown } | undefined
+  try {
+    const host = await environment.enter(environment.context)
+    other = await environment.createParticipant()
+    const guest = await environment.enter(other.context, other.user)
+    const observe = (page: Page) => {
+      const states: Array<Extract<ServerEvent, { type: 'stateUpdate' }>> = []
+      const joins: Array<Extract<ServerEvent, { type: 'roomJoined' }>> = []
+      page.on('websocket', socket => socket.on('framereceived', frame => {
+        const event: ServerEvent = JSON.parse(String(frame.payload))
+        if (event.type === 'stateUpdate') states.push(event)
+        if (event.type === 'roomJoined') joins.push(event)
+      }))
+      return { states, joins, latest: () => states.at(-1) }
+    }
+    const hostWire = observe(host), guestWire = observe(guest)
+    await host.getByRole('button', { name: 'Multihand game', exact: true }).click()
+    await host.getByRole('button', { name: 'Create Game', exact: true }).click()
+    await expect(host.locator('.team-waiting-room')).toBeVisible()
+    await expect(host.getByRole('button', { name: 'Start game', exact: true })).toBeDisabled()
+    const roomUrl = host.url(), roomId = new URL(roomUrl).searchParams.get('room')
+    expect(roomId).toMatch(/^[a-f0-9-]{36}$/)
+    await guest.goto(roomUrl)
+    await expect(guest.locator('.team-waiting-room')).toContainText('4/4 seats filled')
+    await expect(host.getByRole('button', { name: 'Start game', exact: true })).toBeEnabled()
+    expect(hostWire.latest()).toBeUndefined()
+    expect(guestWire.latest()).toBeUndefined()
+    await host.getByRole('button', { name: 'Start game', exact: true }).click()
+    await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await expect.poll(() => guestWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([1, 3])
+    await expect.poll(() => hostWire.latest()?.payload.state.team?.playerTeams).toEqual([0, 1, 0, 1])
+    const pages = [host, guest]
+    const wires = [hostWire, guestWire]
+    const acted = new Set<number>()
+    for (let step = 0; step < 4; step++) {
+      const state = hostWire.latest()!
+      const actor = state.payload.interaction.stateId === 'wait'
+        ? state.payload.interaction.playerIndex : state.payload.state.currentPlayerIndex
+      const side = actor % 2, page = pages[side]!, wire = wires[side]!
+      await expect(page.locator(`.multihand-operation[data-operation-player-id="p${actor + 1}"]`).first()).toBeVisible()
+      const before = wire.latest()!.version
+      const action = page.locator(['forest', 'clay-pit', 'reed-bank', 'grain-seeds']
+        .map(id => `[data-action-id="${id}"] button:enabled`).join(', ')).first()
+      await expect(action).toBeVisible()
+      await action.click()
+      await expect.poll(() => wire.latest()!.version).toBeGreaterThan(before)
+      acted.add(actor)
+      const confirm = page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+      if (await confirm.isVisible()) {
+        const previous = wire.latest()!.version
+        await confirm.click()
+        await expect.poll(() => wire.latest()!.version).toBeGreaterThan(previous)
+      }
+      await expect.poll(() => hostWire.latest()?.version).toBe(wire.latest()!.version)
+    }
+    expect([...acted].sort()).toEqual([0, 1, 2, 3])
+    const persisted = await environment.retainedRoom(roomId!)
+    await host.reload()
+    await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await expect(host.locator('.multihand-seat-controls')).toBeVisible()
+    await expect(host.getByRole('button', { name: 'View your hand', exact: true })).toBeVisible()
+    await host.getByRole('button', { name: 'View your hand', exact: true }).click()
+    await expect(host.locator('.multihand-hand-dialog select option')).toHaveCount(2)
+    await host.locator('.multihand-hand-dialog').getByRole('button', { name: 'Close', exact: true }).click()
+    await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
+    await expect(host.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
+    expect(await environment.retainedRoom(roomId!)).toEqual(persisted)
+    await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
+    const returned = await environment.enter(environment.context)
+    const returnedWire = observe(returned)
+    await returned.goto(roomUrl)
+    await expect.poll(() => returnedWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await expect(returned.locator('.multihand-seat-controls')).toBeVisible()
+  } catch (error) { failure = { error } }
+  try {
+    await releaseAll([
+      async () => { await other?.context.close() },
+      () => environment.context.close(), () => environment.browser.close(), () => environment.close(),
+    ])
+  } catch (error) {
+    if (failure) throw new AggregateError([failure.error, error], 'Team browser test and cleanup failed', { cause: error })
+    throw error
+  }
+  if (failure) throw failure.error
 })
