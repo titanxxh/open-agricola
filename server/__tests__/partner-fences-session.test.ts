@@ -4,7 +4,7 @@ import type { ActionContext, GameState } from '../../shared/contract/types'
 import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { GameSession } from '../game/authoritative-session'
-import { partnerTable } from './_helpers/partner-build-fixture'
+import { partnerTable, restorePartnerTable } from './_helpers/partner-build-fixture'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
@@ -299,4 +299,96 @@ describe('Partner Build fences', () => {
     ])
   })
 
+  it('does not count the geometry-free cost estimate again when deciding whether a partner can be offered', () => {
+    const session = table(state => {
+      state.players[0]!.resources.wood = 2
+      state.players[0]!.minorPlayed = ['C016_FieldFences']
+      state.players[0]!.cardStates.C016_FieldFences = { extraData: { c16Active: true } }
+      state.players[2]!.fields = [{ row: 0, col: 1, stacks: [] }]
+    })
+    assertRejectedUnchanged(session, () => session.takeAction(0, 'fencing'))
+  })
+
+  it('reads field-adjacency discounts from the target farm while keeping the source card on the builder', () => {
+    const session = table(state => {
+      state.players[0]!.minorHand = ['C016_FieldFences']
+      state.players[0]!.resources.food = 2
+      state.players[0]!.resources.wood = 5
+      state.players[2]!.fields = [{ row: 0, col: 1, stacks: [] }]
+    })
+    let response = session.takeAction(0, 'meeting-place')
+    for (let step = 0; step < 8 && response.interaction.stateId === 'wait'; step += 1) {
+      if (response.interaction.request.kind !== 'choice') break
+      if (response.interaction.request.options.some(option => option.value === 'target-farm:p3')) break
+      const choose = response.interaction.request.options.find(option => option.value === 'C016_FieldFences')
+        ?? response.interaction.request.options.find(option => option.value !== '__skip__' && !option.disabled)
+      if (!choose) break
+      response = session.resolveChoice(response.interaction.playerIndex, choose.value)
+    }
+    expect(response.ok, response.error).toBe(true)
+    expect(session.resolveChoice(0, 'target-farm:p3').ok).toBe(true)
+    const built = session.commitSelectionChoice(0, { edges: square, palisadeEdges: [] })
+    expect(built.ok, built.error).toBe(true)
+    expect(built.state.players[0]!.resources.wood).toBe(0)
+    expect(built.state.players[0]!.resources.food).toBe(0)
+    expect(built.state.players[2]!.fenceSegments).toHaveLength(4)
+  })
+
+  it('applies the builder Carpenter Apprentice free band to the target thirteenth to fifteenth pieces', () => {
+    const session = table(state => {
+      state.players[0]!.occupationPlayed = ['C088_CarpentersApprentice']
+      state.players[0]!.resources.wood = 1
+      const owner = state.players[2]!
+      const tiles = [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 1, col: 2 }, { row: 1, col: 3 }]
+      const edges = new Set<string>()
+      for (const tile of tiles) {
+        edges.add(`H-${tile.row}-${tile.col}`); edges.add(`H-${tile.row + 1}-${tile.col}`)
+        edges.add(`V-${tile.row}-${tile.col}`); edges.add(`V-${tile.row}-${tile.col + 1}`)
+      }
+      owner.fenceSegments = [...edges].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: owner.id } }))
+      owner.pastures = tiles.map((tile, index) => ({ id: `pasture-${index}`, tiles: [tile], animalType: null, animalCount: 0 }))
+    })
+    expect(session.takeAction(0, 'fencing').ok).toBe(true)
+    const chosen = session.resolveChoice(0, 'target-farm:p3')
+    expect(chosen.ok, chosen.error).toBe(true)
+    const built = session.commitSelectionChoice(0, { edges: ['H-0-4', 'H-1-4', 'V-0-5'], palisadeEdges: [] })
+    expect(built.ok, built.error).toBe(true)
+    expect(built.state.players[0]!.resources.wood).toBe(0)
+    expect(built.state.players[2]!.fenceSegments).toHaveLength(15)
+    expect(built.state.players[0]!.fenceSegments).toEqual([])
+  })
+
+})
+
+it('Briar Hedge reads the target extension border instead of the builder board', () => {
+  const session = partnerTable(state => {
+    state.players[0]!.minorPlayed = ['E016_BriarHedge']
+    state.players[0]!.resources.wood = 4
+    state.players[2]!.farmyardExtensions = [{id:'target-extension',tiles:[{row:0,col:5},{row:1,col:5}]}]
+  })
+  expect(session.takeAction(0,'fencing').ok).toBe(true)
+  const chosen=session.resolveChoice(0,'target-farm:p3')
+  expect(chosen.ok,chosen.error).toBe(true)
+  if(chosen.interaction.stateId!=='wait'||!chosen.interaction.requestKey)throw new Error('Missing fence request')
+  const edges=['H-0-5','H-1-5','V-0-5','V-0-6']
+  expect(session.quoteFenceSelection(0,chosen.interaction.requestKey,{edges})).toMatchObject({woodCost:4,valid:true})
+  const built=session.commitSelectionChoice(0,{edges})
+  expect(built.ok,built.error).toBe(true)
+  expect(built.state.players[0]!.resources.wood).toBe(0)
+  expect(built.state.players[2]!.pastures).toMatchObject([{tiles:[{row:0,col:5}]}])
+})
+
+it.each([{ordinary:true,cardSeat:0,wood:3,target:0},{ordinary:false,cardSeat:0,wood:5,target:2},{ordinary:false,cardSeat:2,wood:6,target:2}])('Briar Hedge keeps ordinary and partner quotes truthful for $ordinary / card seat $cardSeat',({ordinary,cardSeat,wood,target})=>{
+  const session=partnerTable(state=>{state.players[cardSeat]!.minorPlayed=['E016_BriarHedge'];state.players[0]!.resources.wood=wood},{ordinary})
+  const initial=session.takeAction(0,'fencing')
+  expect(initial.ok,initial.error).toBe(true)
+  const chosen=ordinary?initial:session.resolveChoice(0,'target-farm:p3')
+  if(chosen.interaction.stateId!=='wait'||!chosen.interaction.requestKey)throw new Error('Missing fence request')
+  const edges=['H-0-2','H-1-2','V-0-2','V-0-3']
+  expect(session.quoteFenceSelection(0,chosen.interaction.requestKey,{edges})).toMatchObject({woodCost:wood,valid:true})
+  const resumed=restorePartnerTable(session)
+  const built=resumed.commitSelectionChoice(0,{edges})
+  expect(built.ok,built.error).toBe(true)
+  expect(built.state.players[0]!.resources.wood).toBe(0)
+  expect(built.state.players[target]!.pastures).toHaveLength(1)
 })
