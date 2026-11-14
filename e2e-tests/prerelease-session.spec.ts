@@ -12,6 +12,9 @@ import { seedPrivateReplay } from './_helpers/prerelease-replay'
 // @covers server/game/room-committer.ts
 // @covers client/app/MultihandSeatControls.tsx
 // @covers client/app/TeamWaitingRoom.tsx
+// @covers client/app/LobbyPage.tsx
+// @covers client/app/GameContainerApi.tsx
+// @covers shared/actions/effects/internal/select-target-farm.ts
 import { expect, type BrowserContext, type Page, type PlaywrightWorkerArgs } from '@playwright/test'
 import { execFileSync, spawn } from 'node:child_process'
 import { createServer as tlsServer } from 'node:https'
@@ -672,6 +675,9 @@ test('real prerelease Multihand binds two seats per principal and survives brows
     const guest = await environment.enter(other.context, other.user)
     const hostWire = observeGameSocket(host), guestWire = observeGameSocket(guest)
     await host.getByRole('button', { name: 'Multihand game', exact: true }).click()
+    const cooperation = host.getByRole('checkbox', { name: 'Official cooperation rules', exact: true })
+    await expect(cooperation).not.toBeChecked()
+    await cooperation.check()
     await host.getByRole('button', { name: 'Create Game', exact: true }).click()
     await expect(host.locator('.team-waiting-room')).toBeVisible()
     await expect(host.getByRole('button', { name: 'Start game', exact: true })).toBeDisabled()
@@ -686,6 +692,7 @@ test('real prerelease Multihand binds two seats per principal and survives brows
     await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
     await expect.poll(() => guestWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([1, 3])
     await expect.poll(() => hostWire.latest()?.payload.state.team?.playerTeams).toEqual([0, 1, 0, 1])
+    expect(hostWire.latest()?.payload.state.team?.configuration.cooperationRules).toBe(true)
     const pages = [host, guest]
     const wires = [hostWire, guestWire]
     const acted = new Set<number>()
@@ -801,6 +808,162 @@ test('real retained cooperative Marketplace charges the giver once and resumes a
     ])
   } catch (error) {
     if (failure) throw new AggregateError([failure.error, error], 'Marketplace browser test and cleanup failed', { cause: error })
+    throw error
+  }
+  if (failure) throw failure.error
+})
+
+
+test('real cooperative builds keep the builder, target farm and Stablehand continuation through revoked access and reentry', async ({ playwright }) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright)
+  let other: Awaited<ReturnType<typeof environment.createParticipant>> | undefined
+  let failure: { error: unknown } | undefined
+  try {
+    let host = await environment.enter(environment.context)
+    other = await environment.createParticipant()
+    const guestUser = other.user, guest = await environment.enter(other.context, guestUser)
+    let hostWire = observeGameSocket(host)
+    const guestWire = observeGameSocket(guest)
+    const session = createWorkSession({ seed: 1666, options: { playerCount: 4,
+      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', cooperationRules: true },
+    }, configure: state => {
+      state.round = 14
+      for (const [index, player] of state.players.entries()) {
+        player.name = index % 2 === 0 ? environment.user.displayName : guestUser.displayName
+        player.workers.push({ id: `${player.id}-family-third`, isActive: true, isNewborn: false })
+      }
+      const builder = state.players[0]
+      if (!builder) throw new Error('Missing build actor')
+      Object.assign(builder.resources, { wood: 20, reed: 3 })
+      builder.occupationPlayed = ['D089_Stablehand']
+    } })
+    let roomId: string
+    try { roomId = await environment.prepareRetainedRoom(session, [environment.user.id, guestUser.id, environment.user.id, guestUser.id]) }
+    finally { session.dispose() }
+    const roomUrl = `${environment.preOrigin}/open-agricola/?room=${roomId}`
+    await host.goto(roomUrl); await guest.goto(roomUrl)
+    await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await expect.poll(() => guestWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([1, 3])
+    const latest = () => {
+      const event = hostWire.latest()
+      if (!event) throw new Error('Missing confirmed room state')
+      return event.payload
+    }
+    const command = async (wire: ReturnType<typeof observeGameSocket>, action: () => Promise<unknown>) => {
+      const version = wire.latest()?.version ?? -1
+      await action()
+      await expect.poll(() => wire.latest()?.version ?? -1).toBeGreaterThan(version)
+      await expect.poll(() => hostWire.latest()?.version).toBe(wire.latest()?.version)
+    }
+    const confirmSwitch = async (page: Page, wire: ReturnType<typeof observeGameSocket>, next: number) => {
+      await command(wire, () => page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true }).click())
+      await expect.poll(() => latest().state.currentPlayerIndex).toBe(next)
+    }
+    const take = async (page: Page, wire: ReturnType<typeof observeGameSocket>, spaceId: string) =>
+      command(wire, () => page.locator(`[data-action-id="${spaceId}"] button`).click())
+    const chooseTarget = async (playerId: string) => {
+      await host.locator(`.interaction-bar [data-choice-value="target-farm:${playerId}"]`).click()
+      await command(hostWire, () => host.getByRole('button', { name: 'Build on this farm', exact: true }).click())
+    }
+    const chooseBuild = async (kind: 'construct' | 'stables') => {
+      const interaction = latest().interaction
+      if (interaction.stateId !== 'wait' || interaction.request.kind !== 'choice') throw new Error(`Expected ${kind} branch`)
+      const option = interaction.request.options.find(option => option.labelKey === `actions.${kind}.name`)
+      if (!option) throw new Error(`Missing ${kind} option`)
+      await command(hostWire, () => host.locator(`.interaction-bar [data-choice-value="${option.value}"]`).click())
+    }
+    const place = async (playerId: string, tile: string) => {
+      await expect(host.locator(`.hand-cards[data-hand-anchor="p1"]`).first()).toBeVisible()
+      await host.locator(`[data-farm-tile-player="${playerId}"][data-farm-tile-key="${tile}"]`).click()
+      await command(hostWire, () => host.locator('.interaction-bar [data-choice-value="confirm"]').click())
+    }
+    const otherSeats = async (actions: [string, string, string]) => {
+      for (const [index, spaceId] of actions.entries()) {
+        const actor = index + 1, page = actor % 2 === 0 ? host : guest, wire = actor % 2 === 0 ? hostWire : guestWire
+        await expect.poll(() => latest().state.currentPlayerIndex).toBe(actor)
+        await take(page, wire, spaceId)
+        await confirmSwitch(page, wire, actor === 3 ? 0 : actor + 1)
+      }
+    }
+    await take(host, hostWire, 'marketplace')
+    const food = host.locator('[data-marketplace-resource="food"]')
+    await food.locator('select').first().selectOption('take')
+    await food.locator('input').fill('1')
+    await command(hostWire, () => host.getByRole('button', { name: 'Confirm transfers', exact: true }).click())
+    expect(latest().state.players.map(player => player.resources.food)).toEqual([3, 3, 1, 3])
+    await confirmSwitch(host, hostWire, 1)
+    await otherSeats(['day-laborer', 'grain-seeds', 'forest'])
+    await take(host, hostWire, 'farm-expansion')
+    await chooseTarget('p3')
+    await chooseBuild('construct')
+    await expect.poll(() => latest().interaction).toMatchObject({ stateId: 'wait', playerIndex: 0,
+      request: { kind: 'farm-select', farmOwnerPlayerId: 'p3', farm: { farmType: 'room' } } })
+    await place('p3', '1-1')
+    expect(latest().state.players[0]?.resources).toMatchObject({ wood: 14, reed: 0 })
+    expect(latest().state.players[0]?.rooms).toBe(2)
+    expect(latest().state.players[2]?.rooms).toBe(3)
+    await chooseBuild('stables')
+    await place('p3', '0-2')
+    expect(latest().state.players[0]?.resources.wood).toBe(11)
+    expect(latest().state.players[0]?.stableTiles).toEqual([])
+    expect(latest().state.players[2]?.stableTiles).toEqual([{ row: 0, col: 2 }])
+    await confirmSwitch(host, hostWire, 1)
+    await otherSeats(['clay-pit', 'reed-bank', 'copse'])
+    await take(host, hostWire, 'fencing')
+    await chooseTarget('p3')
+    for (const edge of ['H-0-3', 'H-1-3', 'V-0-3', 'V-0-4']) {
+      await host.locator(`[data-fence-player="p3"][data-fence-edge="${edge}"] .farm-fence-hit`).click()
+    }
+    await expect(host.getByTestId('fence-selection-cost')).toHaveText('Cost: 6 wood')
+    await command(hostWire, () => host.locator('.interaction-bar [data-choice-value="confirm"]').click())
+    expect(latest().state.players[0]?.resources.wood).toBe(5)
+    expect(latest().state.players[2]?.pastures).toHaveLength(1)
+    for (let step = 0; step < 4; step++) {
+      const interaction = latest().interaction
+      if (interaction.stateId !== 'wait' || (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger')) throw new Error('Expected Stablehand continuation')
+      if (interaction.request.options.some(option => option.value === 'target-farm:p1')) break
+      const option = interaction.request.options.find(option => option.value === 'D089_Stablehand')
+        ?? interaction.request.options.find(option => option.value !== '__skip__' && !option.disabled)
+      if (!option) throw new Error('Missing Stablehand continuation choice')
+      await command(hostWire, () => host.locator(`.interaction-bar [data-choice-value="${option.value}"]`).click())
+    }
+    await expect(host.locator('.interaction-bar [data-choice-value="target-farm:p1"]')).toBeVisible()
+    const persisted = await environment.retainedRoom(roomId)
+    await host.reload()
+    await expect(host.locator('.interaction-bar [data-choice-value="target-farm:p1"]')).toBeVisible()
+    expect(await environment.retainedRoom(roomId)).toEqual(persisted)
+    await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
+    await expect(host.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
+    expect(await environment.retainedRoom(roomId)).toEqual(persisted)
+    await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
+    await host.close()
+    host = await environment.enter(environment.context)
+    hostWire = observeGameSocket(host)
+    await host.goto(roomUrl)
+    await expect(host.locator('.interaction-bar [data-choice-value="target-farm:p1"]')).toBeVisible()
+    await chooseTarget('p1')
+    await place('p1', '0-4')
+    expect(latest().state.players[0]?.resources.wood).toBe(5)
+    expect(latest().state.players[0]?.stableTiles).toEqual([{ row: 0, col: 4 }])
+    expect(latest().state.players[2]?.stableTiles).toEqual([{ row: 0, col: 2 }])
+    expect(latest().state.players[2]?.pastures[0]?.tiles).toEqual([{ row: 0, col: 3 }])
+    expect(latest().state.log.filter(entry => entry.key === 'log.marketplaceTransfer')).toHaveLength(1)
+    expect(latest().state.log).toContainEqual(expect.objectContaining({ key: 'log.partnerRoomsBuiltWood', playerId: 'p1', playerRefs: { owner: 'p3' } }))
+    expect(latest().state.log).toContainEqual(expect.objectContaining({ key: 'log.partnerStablesBuilt', playerId: 'p1', playerRefs: { owner: 'p3' } }))
+    expect(latest().scores?.find(score => score.playerId === 'p1')?.categories.find(category => category.key === 'empty')?.total).toBe(-12)
+    expect(latest().scores?.find(score => score.playerId === 'p3')?.categories.find(category => category.key === 'empty')?.total).toBe(-10)
+    await confirmSwitch(host, hostWire, 1)
+    await take(guest, guestWire, 'vegetable-seeds')
+    expect(latest().state.players[1]?.resources.vegetable).toBe(1)
+  } catch (error) { failure = { error } }
+  try {
+    await releaseAll([
+      async () => { await other?.context.close() },
+      () => environment.context.close(), () => environment.browser.close(), () => environment.close(),
+    ])
+  } catch (error) {
+    if (failure) throw new AggregateError([failure.error, error], 'Cooperation browser test and cleanup failed', { cause: error })
     throw error
   }
   if (failure) throw failure.error
