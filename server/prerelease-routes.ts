@@ -67,11 +67,18 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
         protocolVersion: 1, code: input.code, state: input.state, browserChallenge: input.browserChallenge, returnTo: input.returnTo,
       }, prereleaseSessionToken(req))
       const runtime = service.runtime
-      const body: PrereleaseHandoffSessionResponse = { ok: true, returnPath: result.returnPath, user: { ...result.user, isAdmin: false, betaAccess: true },
-        prerelease: { buildId: runtime.buildId, generationId: runtime.generationId, expiresAt: result.expiresAt, validUntil: result.validUntil, serverTime: Date.now() } }
-      guardResponse(req, res, result.token, true)
-      send(res, 200, body, [serializePrereleaseCookie('session', result.token, result.expiresAt), serializePrereleaseCookie('handoff', '', 0)])
+      const published = await service.publishSession(result.token, session => {
+        const body: PrereleaseHandoffSessionResponse = { ok: true, returnPath: result.returnPath, user: { ...session.user, isAdmin: false, betaAccess: true },
+          prerelease: { buildId: runtime.buildId, generationId: runtime.generationId, expiresAt: session.expiresAt, validUntil: Math.min(session.validUntil, result.validUntil), serverTime: Date.now() } }
+        guardResponse(req, res, result.token, true)
+        send(res, 200, body, [serializePrereleaseCookie('session', result.token, session.expiresAt), serializePrereleaseCookie('handoff', '', 0)])
+      })
+      if (!published) {
+        const expired = service.status(result.token) === 'expired'
+        send(res, expired ? 403 : 503, { ok: false, code: expired ? 'prerelease_access_expired' : 'prerelease_access_paused' })
+      }
     } catch (error) {
+      if (res.headersSent) { if (!res.writableEnded) res.destroy(); return true }
       const kind = error instanceof PrereleaseIdentityError ? error.kind : 'paused'
       if (kind === 'invalid') send(res, 400, { ok: false, code: 'invalid_prerelease_handoff' }, [serializePrereleaseCookie('handoff', '', 0)])
       else if (kind === 'expired') send(res, 403, { ok: false, code: 'prerelease_access_expired' }, [serializePrereleaseCookie('handoff', '', 0)])
@@ -87,10 +94,21 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
       const expired = service.status(prereleaseSessionToken(req)) === 'expired'
       send(res, expired ? 403 : 503, { ok: false, code: expired ? 'prerelease_access_expired' : 'prerelease_access_paused' }); return true
     }
-    const body: PrereleaseSessionResponse = { ok: true, user: { ...session.user, isAdmin: false, betaAccess: true },
-      prerelease: { buildId: service.runtime.buildId, generationId: service.runtime.generationId, expiresAt: session.expiresAt, validUntil: session.validUntil, serverTime: Date.now() } }
-    guardResponse(req, res, prereleaseSessionToken(req), true)
-    send(res, 200, body)
+    try {
+      const published = await service.publishSession(prereleaseSessionToken(req), current => {
+        const body: PrereleaseSessionResponse = { ok: true, user: { ...current.user, isAdmin: false, betaAccess: true },
+          prerelease: { buildId: service.runtime.buildId, generationId: service.runtime.generationId, expiresAt: current.expiresAt, validUntil: Math.min(current.validUntil, session.validUntil), serverTime: Date.now() } }
+        guardResponse(req, res, prereleaseSessionToken(req), true)
+        send(res, 200, body)
+      })
+      if (!published) {
+        const expired = service.status(prereleaseSessionToken(req)) === 'expired'
+        send(res, expired ? 403 : 503, { ok: false, code: expired ? 'prerelease_access_expired' : 'prerelease_access_paused' })
+      }
+    } catch {
+      if (!res.headersSent) send(res, 503, { ok: false, code: 'prerelease_access_paused' })
+      else if (!res.writableEnded) res.destroy()
+    }
     return true
   }
   if (['/api/auth/logout', '/api/auth/logout-all'].includes(path) && req.method === 'POST') {
