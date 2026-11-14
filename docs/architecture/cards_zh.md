@@ -115,3 +115,5 @@ cardField?: {
 
 `actions/helpers/minor-card-passing.ts` 负责购买及显式 `pass-minor-card-to-left` 行动的传递终点和公开事件。只有一名真实参与者时，卡移出游戏并发出 reason 为 `passed` 的 `card.destroyed`，不回到本人手牌或普通抽牌供给。支付和完整的 `onBuy` continuation 仍各执行一次；已有对局恢复时保留耗尽的空手牌。多人传递使用真实下家并保留普通交牌事件。Session 回归位于 Clay Embankment、Shifting Cultivation 与 Savings Deposit 的测试文件。
 
+
+- 牌面或卡上构件限定本方农场的建造声明 `targetFarmPolicy: 'own'`；特殊畜栏与 palisade 能力也声明所有权策略。费用 listener 用 `resolveBuildPlayers`，反应保留真实 actor/target。测试见 `card-own-farm-builds-session.test.ts` 与 `partner-build-reactions-session.test.ts`。
