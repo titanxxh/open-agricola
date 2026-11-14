@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 import { PRERELEASE_BUILD_HEADER, PRERELEASE_GENERATION_HEADER } from '../../shared/contract/prerelease-runtime'
 import { createCommunityQrHandler } from '../community-qr'
+import type { PrereleaseSession } from '../prerelease-sessions'
 
 const fixture = vi.hoisted(() => {
   const runtime = { buildId: 'a'.repeat(40), generationId: '11111111-2222-4333-8444-555555555555', appOrigin: 'https://pre.example.test',
@@ -18,6 +19,11 @@ const fixture = vi.hoisted(() => {
     status: vi.fn(() => invalidity),
     beginHandoff: vi.fn(async () => ({ cookie: 'browser-binding', formalUrl: 'https://formal.example.test/?page=prerelease-handoff#challenge', expiresAt: Date.now() + 60000 })),
     exchangeHandoff: vi.fn(async () => ({ token: 'pre-only', returnPath: '/open-agricola/?room=retained', user: { id: 'formal-user', username: 'farmer', displayName: 'Farmer', isAdmin: false }, expiresAt: Date.now() + 86400000, validUntil: Date.now() + 30000 })),
+    publishSession: vi.fn(async (token: string, publish: (session: PrereleaseSession) => void) => {
+      if (!authorized || token !== 'pre-only') return false
+      publish({ user: { id: 'formal-user', username: 'farmer', displayName: 'Farmer', isAdmin: false }, expiresAt: Date.now() + 86400000, validUntil: Date.now() + 30000 })
+      return true
+    }),
     revoke: vi.fn(async () => { authorized = false }),
   }
   return { runtime, service, authorize: (value: boolean, reason: 'paused' | 'expired' = 'expired') => { authorized = value; invalidity = reason } }
