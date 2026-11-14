@@ -56,6 +56,14 @@ export class ReplayResources {
     return object
   }
 
+  async assetAvailable(roomId: string, hash: string, definitions: CustomCardDef[]): Promise<boolean> {
+    if (!HASH.test(hash) || !definitions.some(card => card.artUrl === `/replay-assets/${hash}`)
+      || await this.storage.ledger.isHashRemoved(hash)) return false
+    return Boolean(await this.storage.db.prepare(`SELECT 1 FROM object_references r JOIN stored_objects o USING(object_key)
+      WHERE r.owner_kind='replay' AND r.owner_id=? AND r.object_key=? AND o.content_hash=? AND o.state='ready' AND NOT o.blocked`)
+      .get(roomId,`replay-assets/${hash}`,hash))
+  }
+
   async archiveCards(roomId: string, definitions: CustomCardDef[]): Promise<CustomCardDef[]> {
     const archived: CustomCardDef[] = []
     for (const definition of definitions) {

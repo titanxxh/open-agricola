@@ -462,7 +462,7 @@ const participantEvidenceGrant = async (
 
 const participantEvidence = async (
   runtime: EvidenceRuntime, roomId: string, stepNo: number, frameHash: string, participant: AuthUser,
-): Promise<ReportedEvidence> => {
+): Promise<{ evidence: ReportedEvidence; expiresAt: number }> => {
   const grant = await participantEvidenceGrant(runtime, roomId, stepNo, frameHash, participant)
   const replay = (await runtime.db.prepare(`
     SELECT schema_version, viewer_build_id, custom_cards_json
@@ -477,11 +477,12 @@ const participantEvidence = async (
   const frame = await loadEvidenceFrame(runtime, grant.report, grant.playerIndex)
   const current = await participantEvidenceGrant(runtime, roomId, stepNo, frameHash, participant)
   if (current.playerIndex !== grant.playerIndex) throw new BugReportError('not_participant', 403)
+  const expiresAt = current.report.evidence_expires_at
   if (await prereleaseArchiveExpired(runtime.db, roomId)
-    || current.report.evidence_expires_at === null || current.report.evidence_expires_at <= Date.now()) {
+    || expiresAt === null || expiresAt <= Date.now()) {
     throw new BugReportError('replay_segment_unavailable', 503)
   }
-  return {
+  return { expiresAt, evidence: {
     ok: true,
     kind: 'reportedEvidence',
     apiVersion: 1,
@@ -493,7 +494,7 @@ const participantEvidence = async (
     perspective: `p${grant.playerIndex + 1}`,
     frame,
     customCards: parseCustomCards(replay.custom_cards_json),
-  }
+  } }
 }
 
 export async function handleBugReportRoute(
@@ -714,11 +715,12 @@ export async function handleBugReportRoute(
       if (!reader) throw new BugReportError('bug_report_unavailable', 503)
       const frameHash = url.searchParams.get('frame') ?? ''
       if (!/^[a-f0-9]{64}$/.test(frameHash)) throw new BugReportError('anchor_mismatch', 409)
-      const evidence = await participantEvidence(reader, decodeId(evidenceAsset[1]!), Number(evidenceAsset[2]), frameHash, current)
+      const { evidence } = await participantEvidence(reader, decodeId(evidenceAsset[1]!), Number(evidenceAsset[2]), frameHash, current)
       const resources = reader.resources ?? new ReplayResources(getResources())
       const object = await resources.asset(evidence.roomId, evidenceAsset[3]!, evidence.customCards)
       if (!object || !replayBridgeImageType(object.contentType) || object.body.byteLength > REPLAY_BRIDGE_MAX_BYTES || await prereleaseArchiveExpired(reader.db, evidence.roomId)) throw new BugReportError('replay_segment_unavailable', 503)
-      await participantEvidence(reader, evidence.roomId, evidence.stepNo, evidence.frameHash, current)
+      const publication = await participantEvidence(reader, evidence.roomId, evidence.stepNo, evidence.frameHash, current)
+      if (!await resources.assetAvailable(evidence.roomId,evidenceAsset[3]!,evidence.customCards) || Date.now() >= publication.expiresAt) throw new BugReportError('replay_segment_unavailable',503)
       res.writeHead(200, { 'Content-Type': object.contentType, 'Cache-Control': 'no-store',
         'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff' })
       res.end(object.body)
@@ -741,7 +743,7 @@ export async function handleBugReportRoute(
           Number(participantEvidenceMatch[2]),
           frameHash,
           current,
-        )),
+        )).evidence,
       )
       return true
     }

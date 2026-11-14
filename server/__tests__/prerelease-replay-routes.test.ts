@@ -186,6 +186,16 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
       await db.prepare("UPDATE game_contexts SET lifecycle='active' WHERE room_id='room-1'").run()
       if (fault === 'seat') await db.prepare("INSERT INTO room_players(room_id,user_id,player_index,joined_at) VALUES ('room-1','u1',0,?)").run(now)
     }
+    const readAsset=resources.asset.bind(resources)
+    const removedAfterRead=vi.spyOn(resources,'asset').mockImplementation(async (...args)=>{
+      const object=await readAsset(...args)
+      await resources.storage.release('replay','room-1')
+      return object
+    })
+    const erasedImage=await read(path)
+    removedAfterRead.mockRestore()
+    expect(erasedImage.status).toBe(503)
+    expect(await erasedImage.json()).toMatchObject({ok:false,code:'replay_segment_unavailable'})
     expect((await read(path.replace(encoded.frameHash,'0'.repeat(64)))).status).toBe(409)
     expect((await read('/api/v1/replays/room-1/manifest')).status).toBe(409)
     await db.prepare("UPDATE bug_reports SET submitted_at=NULL WHERE submission_id='reported'").run()
@@ -212,6 +222,20 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
     expect(result.headers.get('cache-control')).toBe('no-store')
     expect(result.headers.get('etag')).toBeNull()
     expect(await result.text()).not.toContain(image.toString())
+  })
+
+  it('denies image bytes removed after their S3 read while the final archive fence is pending', async () => {
+    const original=store.archiveUnavailable.bind(store)
+    vi.spyOn(store,'archiveUnavailable').mockImplementation(async roomId=>{
+      const result=await original(roomId)
+      await resources.storage.ledger.append({version:1,entries:[],assetTakedowns:[{hash:assetHash,reason:'moderation',removedAt:Date.now()}]})
+      await resources.storage.blockHash(assetHash)
+      return result
+    })
+    const response=await read(`/api/v1/replays/room-1/assets/${assetHash}`)
+    expect(response.status).toBe(403)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(await response.json()).toMatchObject({ok:false,code:'not_participant'})
   })
 
   it('rechecks the original archive deadline after a slow image read', async () => {
