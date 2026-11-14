@@ -67,7 +67,7 @@ it.each(['logout', 'beta', 'lease-expiry'])('preserves Alice\'s consumed handoff
   const pending = context.service.exchangeHandoff(packet.cookie, packet.input)
   const firstResult = pending.then(value => ({ value }), error => ({ error }))
   try {
-    await entered.promise
+    await Promise.race([entered.promise, firstResult.then(result => { if ('error' in result) throw result.error; throw new Error('Exchange completed before its barrier') })])
     expect(await context.source.prepare('SELECT 1 FROM prerelease_identity_handoffs WHERE user_id=?').get('alice')).toBeUndefined()
     expect(await context.source.prepare('SELECT count(*)::integer AS count FROM prerelease_identity_grants WHERE user_id=?').get('alice')).toEqual({ count: 1 })
     if (reason === 'logout') await context.service.revoke(bob.token)
@@ -101,6 +101,76 @@ it('publishes Alice\'s fresh status when Bob logs out during the source response
     expect(context.service.cachedAuthorized(alice.token)).toBe(true)
   } finally { release.resolve(); await pending }
 })
+
+it('retries a consumed callback after a transient same-user recheck without needing a session Cookie', async () => {
+  const context = await setup(), packet = await context.packet('alice')
+  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
+  context.onExchange(async () => { entered.resolve(); await release.promise })
+  const pending = context.service.exchangeHandoff(packet.cookie, packet.input)
+  const outcome = pending.then(value => ({ value }), error => ({ error }))
+  try {
+    await Promise.race([entered.promise, outcome.then(result => { if ('error' in result) throw result.error; throw new Error('Exchange completed before its barrier') })])
+    await context.source.prepare('DELETE FROM beta_access WHERE user_id=?').run('alice')
+    await context.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run('alice', 1_800_000_000_001)
+    await context.service.processEvents()
+    release.resolve()
+    expect(await outcome).toMatchObject({ error: { kind: 'paused' } })
+  } finally { release.resolve(); await outcome }
+  expect(await context.source.prepare('SELECT count(*)::int AS count FROM prerelease_identity_handoffs WHERE user_id=?').get('alice')).toEqual({ count: 0 })
+  expect(await context.pre.prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+  const retried = await context.service.exchangeHandoff(packet.cookie, packet.input)
+  expect(retried.user.id).toBe('alice')
+  expect(context.exchanges()).toBe(1)
+})
+
+it('recovers a consumed callback after its session commits but its response lease expires', async () => {
+  const context = await setup(), packet = await context.packet('alice')
+  const transaction = context.pre.transaction.bind(context.pre)
+  let expired = false
+  function expireAfterSessionCommit<Args extends unknown[], Result>(work: (...args: Args) => Result) {
+    const run = transaction(work)
+    return async (...args: Args): Promise<Awaited<Result>> => {
+      const result = await run(...args)
+      if (!expired && await context.pre.prepare('SELECT 1 FROM prerelease_sessions').get()) {
+        expired = true
+        context.advance(31_000)
+      }
+      return result
+    }
+  }
+  const spy = vi.spyOn(context.pre, 'transaction').mockImplementation(expireAfterSessionCommit)
+  try {
+    await expect(context.service.exchangeHandoff(packet.cookie, packet.input)).rejects.toMatchObject({ kind: 'paused' })
+    expect(expired).toBe(true)
+    const committed = await context.pre.prepare('SELECT token_hash,user_id,grant_id,created_at,expires_at FROM prerelease_sessions').all()
+    expect(committed).toHaveLength(1)
+    expect(await context.source.prepare('SELECT 1 FROM prerelease_identity_handoffs WHERE user_id=?').get('alice')).toBeUndefined()
+    const recovered = await context.service.exchangeHandoff(packet.cookie, packet.input)
+    expect(recovered.user.id).toBe('alice')
+    expect(createHash('sha256').update(recovered.token).digest('base64url')).toBe(committed[0]?.token_hash)
+    expect(await context.pre.prepare('SELECT token_hash,user_id,grant_id,created_at,expires_at FROM prerelease_sessions').all()).toEqual(committed)
+    expect(context.exchanges()).toBe(1)
+  } finally { spy.mockRestore() }
+})
+
+it.each(['beta', 'source', 'deletion', 'expiry', 'buildId', 'generationId'] as const)(
+  'never recovers a receipt after %s invalidates its original authority', async reason => {
+    const context = await setup(), packet = await context.packet('alice')
+    await context.service.exchangeHandoff(packet.cookie, packet.input)
+    if (reason === 'expiry') context.advance(60_000)
+    else if (reason === 'buildId') context.service.runtime.buildId = 'b'.repeat(40)
+    else if (reason === 'generationId') context.service.runtime.generationId = randomUUID()
+    else {
+      if (reason === 'deletion') await context.source.prepare('INSERT INTO account_deletion_requests(user_id,requested_at,next_attempt_at) VALUES(?,0,0)').run('alice')
+      else await context.source.prepare(reason === 'beta' ? 'DELETE FROM beta_access WHERE user_id=?' : 'DELETE FROM sessions WHERE user_id=?').run('alice')
+      await context.service.processEvents()
+    }
+    await expect(context.service.exchangeHandoff(packet.cookie, packet.input)).rejects.toMatchObject({
+      kind: ['expiry', 'buildId', 'generationId', 'deletion'].includes(reason) ? 'invalid' : 'expired',
+    })
+    expect(context.exchanges()).toBe(1)
+  },
+)
 
 it.each(['beta', 'source', 'deletion', 'close'])('still fences an unknown Alice handoff during her own %s invalidation', async reason => {
   const context = await setup(), packet = await context.packet('alice')
@@ -153,8 +223,12 @@ it('fences a new grant when Alice logs out all of her local sessions during exch
     await entered.promise
     await context.service.revoke(old.token, true)
     release.resolve()
-    expect(await pending).toMatchObject({ kind: 'paused' })
+    expect(await pending).toMatchObject({ kind: 'expired' })
     expect(await context.pre.prepare('SELECT 1 FROM prerelease_sessions WHERE revoked_at IS NULL').get()).toBeUndefined()
+    await expect(context.service.exchangeHandoff(packet.cookie, packet.input)).rejects.toMatchObject({ kind: 'expired' })
+    const fresh = await context.enter('alice')
+    expect(fresh.user.id).toBe('alice')
+    expect(await context.service.resolve(old.token)).toBeNull()
   } finally { release.resolve(); await pending }
 })
 
