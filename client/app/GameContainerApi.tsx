@@ -1,5 +1,6 @@
 import { PublicSandboxAccess, pausePublicSandbox, PUBLIC_SANDBOX_PAUSED_EVENT } from '../local-sandbox/public-access'
 import { isPrereleaseClient } from '../services/prerelease-runtime'
+import type { MarketplaceTransfer } from '../../shared/contract/marketplace'
 import { TeamWaitingRoom } from './TeamWaitingRoom'
 import { nextMultihandPlayerId, pendingMultihandInputs, type MultihandInput } from './multihand-seat'
 import { MultihandSeatControls } from './MultihandSeatControls'
@@ -1900,6 +1901,17 @@ export const GameContainerApi = () => {
           },
         }
       : null
+  const interactionBarMarketplaceSelect = interactionPresentationPlan.kind === 'marketplace-select'
+    ? {
+        request: interactionPresentationPlan.request,
+        actorName: interaction.stateId === 'wait' ? playerNames[state.players[interaction.playerIndex]?.id ?? ''] ?? '' : '',
+        isConfirmDisabled: (transfers: MarketplaceTransfer[]) => !isInteractive || isInteractionSubmitDraftRejected({ value: 'confirm', marketplaceTransfers: transfers }),
+        onConfirm: (transfers: MarketplaceTransfer[]) => {
+          if (!isInteractive) return
+          runInteractionSubmitCommand(buildInteractionSubmitCommand(interaction, { value: 'confirm', marketplaceTransfers: transfers }))
+        },
+      }
+    : null
   const interactionBarResourceBatchExchangeSelect =
     interactionPresentationPlan.kind === 'resource-batch-exchange-select'
       ? {
@@ -1951,6 +1963,7 @@ export const GameContainerApi = () => {
       nextPlayerConfirmDisabled: currentConfirmRejected,
       playerSwitchConfirmDisabled: currentConfirmRejected,
       heating: heatingPending,
+      marketplaceSelect: interactionBarMarketplaceSelect,
       resourceQuantitySelect: interactionBarResourceQuantitySelect,
       resourceBatchExchangeSelect: interactionBarResourceBatchExchangeSelect,
       suppressChoiceOptions: suppressPendingChoiceOptions,

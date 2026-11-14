@@ -1,3 +1,4 @@
+import { validateMarketplaceTransfers } from '../team/marketplace'
 import { constructFarmSelection } from '../actions/effects/construct'
 import type { FenceSelectionPayload, FenceSelectionQuote } from '../contract/protocol/game'
 import type { RoundPreparationContext } from '../contract/card-effect-hooks'
@@ -5250,6 +5251,37 @@ export class GameCore {
       if (this.engineStack.peekPendingEnvelope()) return this.respond()
       return this.continueAfterResolvedFarmChoice(playerIndex)
     }
+
+    if (plan.isMarketplace && envelope && envelope.request.kind === 'marketplace-select') {
+      const validation = validateMarketplaceTransfers(this.state, player, payload.marketplaceTransfers)
+      if (!validation.ok) return this.rejectInput(validation.error)
+      const transfers = validation.transfers
+      this.pushHistory()
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('marketplace')
+      const result = this.engine?.resolveChoice('confirm', {
+        ...this.buildEngineExecutionContext(player, space),
+      }, { marketplaceTransfers: transfers })
+      this.recordAcceptedResponse(playerIndex, result)
+      if (result?.type === 'fail') {
+        if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
+        if (!result.recoverable) this.blockFailedMandatoryAction()
+        this.flushEngineLog()
+        return this.respond(false, result.errorKey ?? 'invalid marketplace transfer')
+      }
+      if (result?.type === 'ok') {
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+          pendingSourceCard,
+        )
+      }
+      this.flushEngineLog()
+      this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
+
 
     if (plan.isResourceBatchExchange && envelope && envelope.request.kind === 'resource-batch-exchange-select') {
       const validation = validateResourceBatchExchangeCommit({
