@@ -38,3 +38,7 @@ A permanently public Replay with seat and all-open perspectives keeps hands, cho
 - Step-by-step redaction: cannot prove every copy is gone and may break playback.
 - Keeping raw private events, prompts and custom-card source: the Replay needs only rule state, accepted choices and visible cards.
 - Returning 404 or reusing the `roomId` after deletion: breaks the permanent identity.
+
+## Prerelease retention, 2026-11-14
+
+The independent prerelease environment limits completed results and Replay archives to 30 days from their earliest durable ending. Reads stop at that deadline even before collection; restoring a backup never restarts the period. The formal channel retains its existing policy. See `server/game/prerelease-archive-retention.ts`.
