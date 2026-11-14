@@ -83,10 +83,10 @@
 - `app/solo/SoloHandOverlay.tsx` 按权威候选分组收集一次本地选择并原子提交。重复快照和语言切换保留可编辑勾选；刷新恢复候选并清空未确认勾选。Moor 准备和保留继续使用 `InteractionBar` 原生选择；`SpecialActionsPanel` 读取公开当前牌、弃牌及 `soloSupply` 投影。覆盖见 `standard-solo-ui.spec.ts` 与单人组件测试。
 - 对局布局共用玩家总览与只读公开农场。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。
 - 不支持容器单位或 CSS 长度除法的浏览器通过 `useElementWidth` 与 `ResizeObserver` 测量卡牌和农场容器，提供卡牌缩放比例与农场宽度；支持这些特性的浏览器继续使用 CSS 容器尺寸。旧浏览器尺寸、横竖屏切换与农场输入由 `touch-card-play.spec.ts` 覆盖。
-- `common/CardWithCopy.tsx` 负责触屏查看详情和绑定当前请求的出牌确认。`CardDetails.tsx` 使用模态对话框，内容独立滚动，关闭与打出按钮持续可见。`useCardPlayChoice` 防止手牌或供应区重复提交，跟随传输结果解除失败请求的提交锁；提交权限取自当前权威选项与本机座位。提交锁与详情权限使用 `useRequestActivation`：重复快照保留当前激活阶段，离开请求后即使恢复同一标识，也建立新的激活阶段；迟到结果仅影响所属阶段。职业多选保留整组确认。覆盖见 `PlayerCard.touch.test.tsx`、`touch-card-play.spec.ts` 与 `card-play-undo.spec.ts`。
-- `improvement-selection.ts` 将当前可用请求选项与应答玩家手牌、主要改良供应区求交。发展请求有小发展候选时聚焦手牌，仅主要改良合法时展开并聚焦供应区，两者皆无候选时聚焦操作控件。`PlayerFarmPanel.improvementSupply` 将唯一供应区视图放在手牌旁；`GameContainerApi` 持有绑定请求标识的展开状态，重复快照及响应式手牌挂载位置变化都保留该状态。覆盖见 `GameContainerApi.presentation.test.tsx`、`MajorImprovements.test.tsx` 与 `improvement-focus.spec.ts`。
-- `FarmBoard` 在格盘旁显示当前 Card Field 与牌上动物控件。`farm-board-projection.ts` 保留权威槽位 metadata；托盘与按时序排列的牌面共用草稿回调及动物区域 ID，包含借用的牌上区域。多个不透明选项继续使用既有目标选项器。统一农场聚焦区域包含格盘与托盘，短屏横屏时并排显示在固定操作栏上方。公开浏览不展示交互玩家草稿或可操作托盘。覆盖见 `farm-card-slots-session.test.ts`、`FarmBoard.test.tsx`、`GameContainerApi.presentation.test.tsx` 与 `farm-card-targets.spec.ts`。
-- 默认试玩路径是后端 `POST /api/game/new-sandbox`。设置 `VITE_SANDBOX_EXECUTOR=browser` 时，工坊试玩在浏览器中运行：`LocalGameTransport` 实现 `GameTransport`，Worker 用本地校验过的自定义代码组装共享的 `GameCore`，`server/__tests__/local-sandbox-parity.test.ts` 把行为锁定到服务端执行器。十秒超时会从最后持久化的快照（含 `engineStackCursor`）重建 Worker，并告知 UI 已回滚。对局保存在一个 IndexedDB 槽中，schema 不匹配时删除。固定到 `exactVersionId` 的试玩仍使用后端沙盒。
+- `common/CardWithCopy.tsx` 负责触摸查看和绑定请求的出牌确认；`CardDetails.tsx` 的模态内容独立滚动，关闭／出牌控件固定。`useCardPlayChoice` 防止手牌／供应区重复提交，观察结算，在当前权威选项和座位权限下重试失败。`useRequestActivation` 在重复快照中保留激活，重新进入同一 key 时换代，忽略其他激活的晚到结果；职业多选保留组确认。测试：`PlayerCard.touch.test.tsx`、`touch-card-play.spec.ts`、`card-play-undo.spec.ts`。
+- `improvement-selection.ts` 将可用选项与应答者手牌、主要改良供应区求交，依次聚焦小发展候选、合法主要改良、操作控件。`PlayerFarmPanel.improvementSupply` 在手牌旁渲染唯一供应区，`GameContainerApi` 的请求级展开状态跨快照及响应式重挂载保留。测试：`GameContainerApi.presentation.test.tsx`、`MajorImprovements.test.tsx`、`improvement-focus.spec.ts`。
+- `FarmBoard` 将 Card Field 和动物控件放在网格旁。`farm-board-projection.ts` 保留权威槽位、共享 draft 回调及动物区 ID，含借用容纳者；opaque 选项继续使用目标选择器。网格与托盘共用焦点锚点，短横屏将两者放在固定控件上方；公开农场不暴露应答者 draft 或交互托盘。测试：`farm-card-slots-session.test.ts`、`FarmBoard.test.tsx`、`GameContainerApi.presentation.test.tsx`、`farm-card-targets.spec.ts`。
+- 工坊默认使用后端 `POST /api/game/new-sandbox`，`exactVersionId` 仍走后端。`VITE_SANDBOX_EXECUTOR=browser` 选择 `LocalGameTransport` 和 Worker，在共享 `GameCore` 中运行本地校验的代码。十秒超时从最后 IndexedDB 快照（含 `engineStackCursor`）恢复并报告回滚，schema 不匹配时删除该槽。行为一致性：`server/__tests__/local-sandbox-parity.test.ts`。
 - pre 的 `PrereleaseWorkshopPage` 只接收公共输入，支持两种执行模式，并保留来源及编译拒因。`local-sandbox/public-access.ts` 复核来源，按绝对期限停止空闲展示和 Worker，并拦截在途响应。stash/IndexedDB 绑定 build/generation；恢复不保留权限。固定输入 Worker 在注册失败时拒绝整组选牌，只接收有界期限，不增加网络 API；iframe 经过 `PrereleaseBoundary`。测试：`public-access.test.ts`、`prerelease-session.spec.ts`。
 - `AuthContext` 是站点登录会话（密码、GitHub 或 Google），不保存 Issue 写入授权；`LocaleContext` 切换语言。
 
@@ -144,6 +144,6 @@ GameContextRouter
 
 `WsGameTransport` 在每个新 socket 声明能力，`HttpGameTransport` 发送请求 header。要求刷新时沿用可读 reload 界面，并在停止重试前结算未完成的持久 receipt。认证和 journal 的命令身份保持独立。见[客户端能力](contract.md#client-capabilities)。
 
-预发布Team创建复用持久命令路径；`TeamWaitingRoom` 在host开局前显示账号成员，`team-waiting` 无需游戏快照。Multihand独立跟随自有响应座位，不把农场浏览当作命令控制；`ScoringPad` 与 `ArchivedTeamResults` 展示后端团队结果。验证入口为 `team-network.test.ts`、`prerelease-session.spec.ts`。
+pre Team 复用持久建房命令，`TeamWaitingRoom` 在开局前展示账号成员，无需游戏快照。Multihand 独立跟随自有应答者，与农场浏览分离；`ScoringPad` 与 `ArchivedTeamResults` 展示后端权威团队分数。测试：`team-network.test.ts`、`prerelease-session.spec.ts`。
 
 - 合作建造展示 `farmOwnerPlayerId` 的农场，`FarmBoard.handPlayer` 保持已认证响应者的手牌。几何属于目标，命令与费用属于 builder；palisade 元数据限制自家权限。测试见 `player-palisades.test.ts` 与预发布合作 E2E。
