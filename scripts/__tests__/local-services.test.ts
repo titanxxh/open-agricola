@@ -47,7 +47,11 @@ const runServices = (env: Record<string, string>, { docker, override, stopCompos
       const target = join(root, 'override.yml')
       if (override === 'symlink') writeFileSync(target, 'services: {}\n', { mode: 0o600 })
       symlinkSync(target, overridePath)
-    } else writeFileSync(overridePath, 'services: {}\n', { mode: override === 'private' ? 0o600 : 0o644 })
+    } else {
+      const mode = override === 'private' ? 0o600 : 0o644
+      writeFileSync(overridePath, 'services: {}\n', { mode })
+      chmodSync(overridePath, mode)
+    }
   }
   const result = spawnSync(process.execPath, ['scripts/local-services.mjs'], {
     cwd: repository, encoding: 'utf8', timeout: 30_000,
