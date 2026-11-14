@@ -20,6 +20,10 @@ describe('BrandMark', () => {
     expect(link).toHaveAttribute('href', import.meta.env.BASE_URL)
     expect(link).toHaveAttribute('title', 'Back to Lobby')
     expect(link).toHaveTextContent('Open Agricola')
+    const image = screen.getByRole('img', { name: 'Open Agricola logo' })
+    expect(image).toHaveAttribute('src', expect.stringMatching(/\/brand-logo(?:-[\w-]+)?\.png$/))
+    expect(image).toHaveAttribute('width', '128')
+    expect(image).toHaveAttribute('height', '128')
   })
 
   it('preserves a saved bug report while dropping page-scoped parameters', () => {

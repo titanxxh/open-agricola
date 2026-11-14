@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -42,12 +43,8 @@ const samplePayload: CardsManifestPayload = {
   },
 }
 
-const makeFetchResponse = (body: unknown) =>
-  ({
-    ok: true,
-    status: 200,
-    json: async () => body,
-  }) as unknown as Response
+const makeFetchResponse = (body: unknown) => new Response(JSON.stringify(body))
+const manifestHash = createHash('sha256').update(JSON.stringify(samplePayload)).digest('hex')
 
 describe('card-meta service', () => {
   const fetchSpy = vi.fn<typeof fetch>()
@@ -62,6 +59,7 @@ describe('card-meta service', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   it('loads manifest once and flattens payload to id → meta', async () => {
@@ -92,7 +90,75 @@ describe('card-meta service', () => {
 
   it('fetches manifest from BASE_URL + cards-manifest.json', async () => {
     await loadCardsManifest()
-    expect(fetchSpy).toHaveBeenCalledWith(expect.stringMatching(/cards-manifest\.json$/))
+    expect(fetchSpy).toHaveBeenCalledWith('/cards-manifest.json', { cache: 'no-cache' })
+  })
+
+  it.each(['/', '/open-agricola/', './'])('loads the pinned content from the %s application base', async base => {
+    vi.stubEnv('BASE_URL', base)
+    vi.stubEnv('VITE_CARDS_MANIFEST_SHA256', manifestHash)
+
+    await loadCardsManifest()
+
+    expect(getCardMeta('A123_FrameBuilder')?.name).toBe('Frame Builder')
+    expect(fetchSpy).toHaveBeenCalledWith(`${base}cards-manifest.${manifestHash}.json`, { cache: 'force-cache' })
+  })
+
+  it('repairs corrupt cached content once before publishing card metadata', async () => {
+    vi.stubEnv('VITE_CARDS_MANIFEST_SHA256', manifestHash)
+    fetchSpy.mockResolvedValueOnce(makeFetchResponse({})).mockResolvedValueOnce(makeFetchResponse(samplePayload))
+
+    await loadCardsManifest()
+
+    expect(getCardMeta('A123_FrameBuilder')?.name).toBe('Frame Builder')
+    expect(fetchSpy.mock.calls.map(([, init]) => init?.cache)).toEqual(['force-cache', 'reload'])
+  })
+
+  it('rejects repeated corruption and allows a later successful load', async () => {
+    vi.stubEnv('VITE_CARDS_MANIFEST_SHA256', manifestHash)
+    fetchSpy.mockResolvedValueOnce(makeFetchResponse({})).mockResolvedValueOnce(makeFetchResponse({}))
+
+    await expect(loadCardsManifest()).rejects.toThrow('checksum')
+    expect(getCardMeta('A123_FrameBuilder')).toBeUndefined()
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+
+    await loadCardsManifest()
+    expect(getCardMeta('A123_FrameBuilder')?.name).toBe('Frame Builder')
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not treat network failure as cached corruption', async () => {
+    vi.stubEnv('VITE_CARDS_MANIFEST_SHA256', manifestHash)
+    fetchSpy.mockRejectedValueOnce(new Error('offline'))
+
+    await expect(loadCardsManifest()).rejects.toThrow('offline')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    await loadCardsManifest()
+    expect(getCardMeta('A123_FrameBuilder')?.name).toBe('Frame Builder')
+  })
+
+  it('repairs a cached missing-file response before publishing card metadata', async () => {
+    vi.stubEnv('VITE_CARDS_MANIFEST_SHA256', manifestHash)
+    fetchSpy.mockResolvedValueOnce(new Response('missing', { status: 404 }))
+
+    await loadCardsManifest()
+
+    expect(getCardMeta('A123_FrameBuilder')?.name).toBe('Frame Builder')
+    expect(fetchSpy.mock.calls.map(([, init]) => init?.cache)).toEqual(['force-cache', 'reload'])
+  })
+
+  it('bounds repeated missing-file responses and repairs the cache on a later retry', async () => {
+    vi.stubEnv('VITE_CARDS_MANIFEST_SHA256', manifestHash)
+    fetchSpy.mockResolvedValueOnce(new Response('missing', { status: 404 }))
+      .mockResolvedValueOnce(new Response('missing', { status: 404 }))
+      .mockResolvedValueOnce(new Response('missing', { status: 404 }))
+
+    await expect(loadCardsManifest()).rejects.toThrow('manifest fetch failed 404')
+    expect(getCardMeta('A123_FrameBuilder')).toBeUndefined()
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+
+    await loadCardsManifest()
+    expect(getCardMeta('A123_FrameBuilder')?.name).toBe('Frame Builder')
+    expect(fetchSpy.mock.calls.map(([, init]) => init?.cache)).toEqual(['force-cache', 'reload', 'force-cache', 'reload'])
   })
 
   it('preserves supplemental rules and locales from runtime custom-card metadata', () => {

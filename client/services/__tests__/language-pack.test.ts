@@ -10,7 +10,7 @@ const manifest = { version: 1, defaultLocale: 'fr', languages: [{
 }] }
 
 beforeEach(() => vi.resetModules())
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
 describe('independent language packages', () => {
   it('loads a manifest-defined locale without loading English and coalesces concurrent requests', async () => {
@@ -37,5 +37,70 @@ describe('independent language packages', () => {
     corrupt = false
     await loadLanguagePack('fr')
     expect(hasLanguagePack('fr')).toBe(true)
+  })
+
+  it('revalidates the language list while reusing a verified content-named pack', async () => {
+    const fetch = vi.fn(async (url: string) => url.endsWith('manifest.json')
+      ? new Response(JSON.stringify(manifest)) : new Response(raw))
+    vi.stubGlobal('fetch', fetch)
+    const { loadLanguagePack, getLanguageManifest } = await import('../language-pack')
+
+    await loadLanguagePack('fr')
+
+    const { t } = await import('../../../shared/i18n')
+    expect(t('fr', 'ui.title')).toBe('Ferme')
+    expect(getLanguageManifest()?.defaultLocale).toBe('fr')
+    expect(fetch).toHaveBeenNthCalledWith(1, '/i18n/manifest.json', { cache: 'no-cache' })
+    expect(fetch).toHaveBeenNthCalledWith(2, `/i18n/${manifest.languages[0].file}`, { cache: 'force-cache' })
+  })
+
+  it('repairs corrupt cached language bytes once and publishes the repaired translation', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(manifest)))
+      .mockResolvedValueOnce(new Response('{}'))
+      .mockResolvedValueOnce(new Response(raw))
+    vi.stubGlobal('fetch', fetch)
+    const { loadLanguagePack } = await import('../language-pack')
+
+    await loadLanguagePack('fr')
+
+    const { t } = await import('../../../shared/i18n')
+    expect(t('fr', 'ui.title')).toBe('Ferme')
+    expect(fetch.mock.calls.map(([, init]) => init?.cache)).toEqual(['no-cache', 'force-cache', 'reload'])
+  })
+
+  it('repairs a cached missing language package before publishing its translations', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(manifest)))
+      .mockResolvedValueOnce(new Response('missing', { status: 404 }))
+      .mockResolvedValueOnce(new Response(raw))
+    vi.stubGlobal('fetch', fetch)
+    const { loadLanguagePack } = await import('../language-pack')
+
+    await loadLanguagePack('fr')
+
+    const { t } = await import('../../../shared/i18n')
+    expect(t('fr', 'ui.title')).toBe('Ferme')
+    expect(fetch.mock.calls.map(([, init]) => init?.cache)).toEqual(['no-cache', 'force-cache', 'reload'])
+  })
+
+  it('bounds missing language package retries and permits later recovery', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(manifest)))
+      .mockResolvedValueOnce(new Response('missing', { status: 404 }))
+      .mockResolvedValueOnce(new Response('missing', { status: 404 }))
+      .mockResolvedValueOnce(new Response('missing', { status: 404 }))
+      .mockResolvedValueOnce(new Response(raw))
+    vi.stubGlobal('fetch', fetch)
+    const { loadLanguagePack } = await import('../language-pack')
+
+    await expect(loadLanguagePack('fr')).rejects.toThrow('Language unavailable (404)')
+    const { hasLanguagePack, t } = await import('../../../shared/i18n')
+    expect(hasLanguagePack('fr')).toBe(false)
+    expect(fetch).toHaveBeenCalledTimes(3)
+
+    await loadLanguagePack('fr')
+    expect(t('fr', 'ui.title')).toBe('Ferme')
+    expect(fetch.mock.calls.map(([, init]) => init?.cache)).toEqual(['no-cache', 'force-cache', 'reload', 'force-cache', 'reload'])
   })
 })

@@ -1,4 +1,5 @@
 import { buildPlatformPageUrl } from '../../utils/platform-page-url'
+import brandLogo from '../../assets/brand-logo.png'
 
 type BrandMarkProps = {
   title: string
@@ -8,8 +9,6 @@ type BrandMarkProps = {
   imageClassName?: string
   homeLinkLabel?: string
 }
-
-const BRAND_LOGO_SRC = `${import.meta.env.BASE_URL}logo.png`
 
 export function BrandMark({
   title,
@@ -24,8 +23,10 @@ export function BrandMark({
     <>
       <img
         className={`brand-mark-image ${imageClassName}`.trim()}
-        src={BRAND_LOGO_SRC}
+        src={brandLogo}
         alt="Open Agricola logo"
+        width={128}
+        height={128}
       />
       <TitleTag className={titleClassName}>{title}</TitleTag>
     </>

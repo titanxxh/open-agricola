@@ -1,8 +1,8 @@
 /**
  * Client-side card metadata service.
  *
- * Fetches `public/cards-manifest.json` at app startup (see `App.tsx`) and
- * exposes synchronous lookups for UI components. Replaces direct imports of
+ * Loads generated card metadata and exposes synchronous lookups for UI components.
+ * Production builds pin an exact content fingerprint. Replaces direct imports of
  * `shared/cards/catalog.ts` / `shared/cards/major` from the client, which
  * would otherwise pull 886 card instances (~260KB gzip) into the main bundle.
  *
@@ -14,6 +14,7 @@ import {
   type CustomCardMetadata,
 } from '../../shared/cards/custom-card-metadata'
 import type { CardExchange } from '../../shared/contract/cards'
+import { fetchVerifiedResource } from './fetch-verified-resource'
 
 export type CardMeta = {
   authored?: true
@@ -60,11 +61,14 @@ export type CardManifestEntry = {
 
 export type CardsManifestPayload = Record<string, CardManifestEntry>
 
-const resolveManifestUrl = (): string => {
+const fetchManifest = (): Promise<Response> => {
   const base =
     (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'
   const normalised = base.endsWith('/') ? base : `${base}/`
-  return `${normalised}cards-manifest.json`
+  const sha256: string | undefined = import.meta.env.VITE_CARDS_MANIFEST_SHA256
+  if (!sha256) return fetch(`${normalised}cards-manifest.json`, { cache: 'no-cache' })
+  if (!/^[a-f0-9]{64}$/.test(sha256)) return Promise.reject(new Error('Invalid cards manifest fingerprint'))
+  return fetchVerifiedResource(`${normalised}cards-manifest.${sha256}.json`, sha256)
 }
 
 let manifestPromise: Promise<Record<string, CardMeta>> | null = null
@@ -73,8 +77,7 @@ let manifestCache: Record<string, CardMeta> | null = null
 export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
   if (manifestCache) return Promise.resolve(manifestCache)
   if (!manifestPromise) {
-    const url = resolveManifestUrl()
-    manifestPromise = fetch(url)
+    manifestPromise = fetchManifest()
       .then((res) => {
         if (!res.ok) {
           throw new Error(

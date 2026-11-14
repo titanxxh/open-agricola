@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -228,6 +229,25 @@ describe('writeCardsManifest', () => {
     expect(fs.existsSync(outputPath)).toBe(true)
     const parsed = JSON.parse(fs.readFileSync(outputPath, 'utf8')) as Record<string, { meta: { id: string } }>
     expect(parsed['A999_TestCard']?.meta.id).toBe('A999_TestCard')
+
+    const firstBytes = fs.readFileSync(outputPath)
+    const firstHash = createHash('sha256').update(firstBytes).digest('hex')
+    const firstAsset = path.join(tmp, 'public', `cards-manifest.${firstHash}.json`)
+    expect(fs.readFileSync(firstAsset)).toEqual(firstBytes)
+    writeCardsManifest(tmp)
+    expect(fs.readdirSync(path.dirname(outputPath)).sort()).toEqual([
+      `cards-manifest.${firstHash}.json`, 'cards-manifest.json',
+    ].sort())
+
+    const cardPath = path.join(deckDir, 'A999_TestCard.ts')
+    fs.writeFileSync(cardPath, fs.readFileSync(cardPath, 'utf8').replace("name: 'Test Card'", "name: 'Updated Card'"))
+    writeCardsManifest(tmp)
+    const nextBytes = fs.readFileSync(outputPath)
+    const nextHash = createHash('sha256').update(nextBytes).digest('hex')
+    expect(nextHash).not.toBe(firstHash)
+    expect(fs.existsSync(firstAsset)).toBe(false)
+    expect(fs.readFileSync(path.join(tmp, 'public', `cards-manifest.${nextHash}.json`))).toEqual(nextBytes)
+    expect(JSON.parse(nextBytes.toString()).A999_TestCard.meta.name).toBe('Updated Card')
 
     fs.rmSync(tmp, { recursive: true, force: true })
   })

@@ -4,6 +4,7 @@ import path from 'path'
 import fs from 'fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { browserCardTestsPlugin } from './scripts/vite-browser-card-tests.ts'
+import { loadBrowserDataDefines } from './scripts/browser-data.ts'
 import {
   loadPublicAssetConfig,
   publicAssetUrls,
@@ -13,6 +14,9 @@ const publicAssets = await loadPublicAssetConfig({
   allowLocal: !process.argv.includes('build') && !process.env.CI,
   validateRemote: process.env.VITEST !== 'true',
 })
+const browserDataDefines = process.argv.includes('build') && process.env.VITEST !== 'true'
+  ? loadBrowserDataDefines(import.meta.dirname)
+  : {}
 
 const servePublicAssets = (assetRoot: string) => {
   const contentTypes: Record<string, string> = {
@@ -100,6 +104,7 @@ export default defineConfig({
     },
   },
   define: {
+    ...browserDataDefines,
     'import.meta.env.VITE_GAME_BUILD_ID': JSON.stringify(process.env.GAME_BUILD_ID ?? 'development'),
     'import.meta.env.VITE_RELEASE_CHANNEL': JSON.stringify(process.env.RELEASE_CHANNEL ?? 'stable'),
     'import.meta.env.VITE_PUBLIC_ASSET_BASE_URL': JSON.stringify(publicAssets.baseUrl),

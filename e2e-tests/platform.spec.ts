@@ -139,17 +139,17 @@ test.describe('Platform: auth', () => {
   })
 
   test('bootstrap loading and failure keep a native home route', async ({ page }) => {
-    await page.route('**/cards-manifest.json', async route => {
+    await page.route('**/cards-manifest*.json', async route => {
       await new Promise(resolve => setTimeout(resolve, 800))
       await route.continue()
     })
-    await page.goto(`${FRONTEND_URL}/?page=login`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${FRONTEND_URL}/?page=encyclopedia`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('progressbar')).toBeVisible()
     await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
-    await expect(page.locator('#username')).toBeVisible()
+    await expect(page.locator('.encyclopedia-page')).toBeVisible()
 
-    await page.unroute('**/cards-manifest.json')
-    await page.route('**/cards-manifest.json', route => route.abort())
+    await page.unroute('**/cards-manifest*.json')
+    await page.route('**/cards-manifest*.json', route => route.abort())
     await page.setViewportSize({ width: 390, height: 844 })
     await page.reload()
 
