@@ -42,3 +42,7 @@ A permanently public Replay with seat and all-open perspectives keeps hands, cho
 ## Prerelease retention, 2026-11-14
 
 The independent prerelease environment limits completed results and Replay archives to 30 days from their earliest durable ending. Reads stop at that deadline even before collection; restoring a backup never restarts the period. The formal channel retains its existing policy. See `server/game/prerelease-archive-retention.ts`.
+
+## Prerelease environment override
+
+Formal public retention remains this ADR's policy. In prerelease, ADR 0042 requires current Beta access for Context, results, Replay, Evidence and images. The authenticated parent uses no-store reads and the isolated Viewer receives only page-bound data; static code grants no archive authority.

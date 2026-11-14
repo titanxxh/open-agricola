@@ -125,9 +125,9 @@ it('admits a current bound session and rejects a cookie retained by an old tab o
   expect(crossed.status).toBe(401)
 })
 
-it('blocks local account management and unsupported Viewer data for qualified sessions', async () => {
+it('blocks local account management and unscoped Viewer data for qualified sessions', async () => {
   for (const path of ['/api/auth/register', '/api/auth/change-password', '/api/auth/oauth/github/start', '/api/admin/beta-access', '/api/prerelease/handoffs',
-    '/api/v1/replays/room/manifest', '/replay-assets/' + 'b'.repeat(64)]) {
+    '/api/v1/replays/room/raw', '/api/v1/replays/room/manifest/extra', '/replay-assets/' + 'b'.repeat(64)]) {
     const response = await fetch(origin + path, { headers: headers() })
     expect(response.status, path).toBe(403)
     expect(await response.json()).toEqual({ ok: false, code: 'prerelease_readonly' })

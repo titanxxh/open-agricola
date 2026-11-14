@@ -106,8 +106,7 @@ ClientCommand
 - Replay archives use bounded authoritative state deltas ([ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)).
 - A write failure freezes the same Frame and Intent, blocks the Room and retries with backoff; clients wait and never read uncommitted state. The same idempotency key with a different hash blocks permanently and alerts.
 - Each instance defaults to 30 online ordinary Rooms. `APP_ROOM_CAPACITY` (1–30) and `CUSTOM_SESSION_WORKER_CAPACITY` (0–15, default 15) can lower limits; invalid values stop startup. `RoomDirectory` atomically checks OPEN connections and 30-second reservations on creation and first resume, including cached Rooms. Activation keeps its reservation until positive presence consumes it. Offline saves retain ownership without using online quota. Worker limits include retained Workshop executors, restored Rooms and HTTP sandboxes. Full Rooms may reconnect seats or replace themselves one-for-one with `newGame`. See `room-directory.test.ts`, `session-capacity.test.ts` and `ws-server.test.ts`.
-- Game Context links resolve by lifecycle ([ADR 0013](../adr/0013-lifecycle-routed-game-context-access.md)): completed, expired and removed contexts and public Replay need no login; active descriptors, recovery, Bug Report, evidence and maintainer forensics enforce seat or administrator authorization. Errors use `{ ok:false, code, lifecycle?, message }`.
-- Completed Replay is public and retained until erasure ([ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)).
+- Formal Context and completed Replay reads remain public (ADRs 0010/0013); active recovery and Evidence retain seat/admin permissions. Pre first requires current Beta admission and a final send fence. Replay JSON and room-scoped `/api/v1/replays/:roomId/assets/:hash` use `no-store`, without ETag/Range shortcuts; `/replay-assets/:hash` stays blocked. `ReplayResources.asset` checks room references, integrity and erasure. Evidence assets additionally require the exact submitted Anchor and participant seat. Tests: `prerelease-replay-routes.test.ts`.
 - Bug Reports ([ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)) keep PostgreSQL drafts, stable `submissionId`, attempts, atomic claims, and GitHub App/test adapters.
 
 Tests: `server/game/__tests__/{room-committer,room-committer-private-cursor,replay-delta-shared-history}.test.ts`, `server/__tests__/{bug-report-routes,bug-report-store}.test.ts`, `e2e-tests/{replay-viewer,bug-report}.spec.ts`.
@@ -175,7 +174,7 @@ POST   /api/v1/github-app/webhook
 
 Public Replay APIs return versioned JSON, never PostgreSQL encoding. A Segment expands at most one checkpoint chain with every Frame Hash verified; an Anchor must match `stepNo + frameHash` exactly. Public reads have per-IP quotas and size caps; authenticated evidence and report endpoints are rate-limited per account.
 
-Viewer entry HTML revalidates its response policy; content-addressed assets remain immutable. Its CSP explicitly allows the `PUBLIC_API_BASE` origin (the request origin in local development) for public reads from the opaque sandbox, while scripts remain restricted to `'self'`. Coverage: `replay-routes.test.ts` and `replay-viewer-csp.spec.ts`.
+Viewer HTML revalidates CSP; immutable scripts stay self-only. Public Replay allows the configured API origin. Pre bridge builds allow blob images. `replay-routes.test.ts` and `replay-viewer-csp.spec.ts` cover both policies.
 
 ## Workshop backend
 

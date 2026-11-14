@@ -273,3 +273,5 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 `shared/contract/client-capabilities.ts` 负责解析能力声明。`getCommandScope.clientCapabilities` 为当前 WebSocket 声明支持；省略字段保留该 socket 声明，重连后的新 socket 重新声明。HTTP 每次请求发送 `X-Open-Agricola-Client-Capabilities`，CORS 预检允许该 header。普通请求可省略声明，也可使用空声明或未知 token；未知 token 不授予能力。`Broadcaster` 持有私有 socket WeakMap。声明不进入 GameState、Room 快照、Replay 或账号记录。
 
 命令 scope 和持久 receipt 独立于能力声明。要求刷新时，transport 先结算未完成的持久 receipt，再停止重试；不撤销认证，也不重新执行已确认命令。测试：`experimental-feature-transport.test.ts`、`gameTransport-reconnect.test.ts` 和 `auth-routes.test.ts` 的 CORS 用例。部署重叠边界见 [HOW_TO_DEPLOY](../HOW_TO_DEPLOY.md#supported-browser-and-backend-overlap)。
+
+私有 Replay 桥（`protocol/replay-bridge.ts`）仅允许 manifest、checkpoint Segment、准确 Anchor、本局图片和单帧 Evidence。上下文绑定临时 nonce、环境／目标、应用 SHA、数据代次、room、Viewer hash、schema 与模式，不携带登录或远程读取凭证。请求限制并发／字节数并使用单调 ID，取消与关闭会退役在途工作。`replay-viewer-build.ts` 统一解析不可变 manifest 及桥／schema 声明；旧公开 Build 仍有效，但不能用于 pre。测试：`replay-bridge.test.ts`、`publish-replay-viewer.test.ts`。

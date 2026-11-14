@@ -38,3 +38,7 @@ A Game Bug Reporter must be able to submit a symptom and Bug Report Anchor from 
 - Treating retries as new submissions: duplicates Issues and bypasses quotas.
 
 References: GitHub documentation on [user access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app), [installation tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app), [issues](https://docs.github.com/en/rest/issues/issues) and [rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
+
+## Prerelease environment override
+
+Prerelease Viewer handoff changes no report permission or public Issue content. Exact submitted Anchor, participant masking and maintainer reason/audit checks remain server authority. The bridge never expands Evidence into complete Replay or attaches private Frames/images to GitHub.

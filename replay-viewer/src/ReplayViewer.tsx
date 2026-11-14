@@ -1,3 +1,4 @@
+import { bridgeFromLocation, type ReplayBridgeTransport } from './bridge-transport'
 import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getPlayerDisplayName } from '../../client/utils/player-name'
@@ -41,7 +42,7 @@ const readInitialStep = (manifest: ReplayManifest): number => {
     : manifest.firstStepNo
 }
 
-function ReportedEvidenceViewer({ locale }: { locale: Locale }) {
+function ReportedEvidenceViewer({ locale, bridge }: { locale: Locale; bridge?: ReplayBridgeTransport }) {
   const params = new URLSearchParams(window.location.search)
   const roomId = params.get('room') ?? ''
   const viewerBuildId = params.get('viewer') ?? ''
@@ -58,6 +59,18 @@ function ReportedEvidenceViewer({ locale }: { locale: Locale }) {
   }
 
   useEffect(() => {
+    if (bridge) {
+      const controller = new AbortController()
+      void bridge.read({ kind: 'evidence' }, controller.signal).then(async response => {
+        const next = await response.json() as ReportedEvidence
+        if (!next.ok || next.kind !== 'reportedEvidence' || next.roomId !== roomId || next.viewerBuildId !== viewerBuildId
+          || next.schemaVersion !== bridge.context.schemaVersion || next.stepNo !== stepNo || next.perspective !== perspective
+          || bridge.context.mode.kind !== 'evidence' || next.frameHash !== bridge.context.mode.frameHash) throw new Error('evidence_context_mismatch')
+        await bridge.cards(next.customCards, controller.signal)
+        if (bridge.check() && !controller.signal.aborted) setEvidence(next)
+      }).catch(() => { if (!controller.signal.aborted) bridge.close() })
+      return () => controller.abort()
+    }
     if (!parentOrigin) return
     const onMessage = (event: MessageEvent) => {
       if (event.source !== window.parent || event.origin !== parentOrigin) return
@@ -85,7 +98,7 @@ function ReportedEvidenceViewer({ locale }: { locale: Locale }) {
       type: 'open-agricola-reported-evidence-ready',
     } satisfies ReportedEvidenceViewerReadyMessage, parentOrigin)
     return () => window.removeEventListener('message', onMessage)
-  }, [apiBase, parentOrigin, perspective, roomId, stepNo, viewerBuildId])
+  }, [apiBase, bridge, parentOrigin, perspective, roomId, stepNo, viewerBuildId])
 
   if (!evidence) {
     return <main className="replay-loading">{text.loading}</main>
@@ -113,7 +126,7 @@ function ReportedEvidenceViewer({ locale }: { locale: Locale }) {
   )
 }
 
-function ArchiveReplayViewer({ locale }: { locale: Locale }) {
+function ArchiveReplayViewer({ locale, bridge }: { locale: Locale; bridge?: ReplayBridgeTransport }) {
   const params = new URLSearchParams(window.location.search)
   const roomId = params.get('room') ?? ''
   const apiBase = (params.get('api') ?? window.location.origin).replace(/\/$/, '')
@@ -136,20 +149,22 @@ function ArchiveReplayViewer({ locale }: { locale: Locale }) {
       return
     }
     const controller = new AbortController()
-    fetch(`${apiBase}/api/v1/replays/${encodeURIComponent(roomId)}/manifest`, {
-      credentials: 'omit',
-      signal: controller.signal,
+    const result = bridge ? bridge.read({ kind: 'manifest' }, controller.signal) : fetch(`${apiBase}/api/v1/replays/${encodeURIComponent(roomId)}/manifest`, {
+      credentials: 'omit', signal: controller.signal,
     })
+    result
       .then(async (result) => await result.json() as ReplayManifestResponse)
-      .then((response) => {
+      .then(async (response) => {
         if (!response.ok) {
           setError(response)
           return
         }
-        response.customCards.forEach((card) => registerCustomCardMetadata({
+        if (bridge) await bridge.cards(response.customCards, controller.signal)
+        else response.customCards.forEach((card) => registerCustomCardMetadata({
           ...card,
           artUrl: replayAssetUrl(card.artUrl, apiBase),
         }))
+        if (controller.signal.aborted || bridge && !bridge.check()) return
         setManifest(response)
         setPerspective(validPerspective(params.get('perspective'), response))
         setStepNo(readInitialStep(response))
@@ -159,16 +174,17 @@ function ArchiveReplayViewer({ locale }: { locale: Locale }) {
         setError({ ok: false, code: 'viewer_unavailable', message: 'Replay manifest is unavailable' })
       })
     return () => controller.abort()
-  }, [apiBase, roomId])
+  }, [apiBase, bridge, roomId])
 
   const descriptor = manifest ? segmentForStep(manifest, stepNo) : null
   useEffect(() => {
     if (!descriptor || segments[descriptor.checkpointStepNo]) return
     const controller = new AbortController()
-    fetch(
+    const result = bridge ? bridge.read({ kind: 'segment', checkpointStepNo: descriptor.checkpointStepNo }, controller.signal) : fetch(
       `${apiBase}/api/v1/replays/${encodeURIComponent(roomId)}/segments/${descriptor.checkpointStepNo}`,
       { credentials: 'omit', signal: controller.signal },
     )
+    result
       .then(async (result) => await result.json() as ReplaySegmentResponse)
       .then((response) => {
         if (!response.ok) {
@@ -176,6 +192,7 @@ function ArchiveReplayViewer({ locale }: { locale: Locale }) {
           setPlaying(false)
           return
         }
+        if (controller.signal.aborted || bridge && !bridge.check()) return
         setSegments((current) => ({
           ...current,
           [response.checkpointStepNo]: response,
@@ -188,7 +205,7 @@ function ArchiveReplayViewer({ locale }: { locale: Locale }) {
         setPlaying(false)
       })
     return () => controller.abort()
-  }, [apiBase, descriptor, roomId, segmentRetry, segments])
+  }, [apiBase, bridge, descriptor, roomId, segmentRetry, segments])
 
   const current = descriptor
     ? segments[descriptor.checkpointStepNo]?.steps.find((step) => step.stepNo === stepNo)
@@ -469,7 +486,22 @@ function ArchiveReplayViewer({ locale }: { locale: Locale }) {
 }
 
 export function ReplayViewer({ locale }: { locale: Locale }) {
+  const privateMode = new URLSearchParams(window.location.search).has('bridge')
+  const [state, setState] = useState<{ kind: 'public' } | { kind: 'checking' } | { kind: 'active'; bridge: ReplayBridgeTransport } | { kind: 'closed' }>(() => privateMode ? { kind: 'checking' } : { kind: 'public' })
+  useEffect(() => {
+    if (!privateMode) return
+    let bridge: ReplayBridgeTransport | null = null
+    try {
+      bridge = bridgeFromLocation()
+      if (!bridge) throw new Error('bridge_missing')
+      const unsubscribe = bridge.subscribe(() => setState({ kind: 'closed' }))
+      setState({ kind: 'active', bridge })
+      return () => { unsubscribe(); bridge?.close() }
+    } catch { bridge?.close(); setState({ kind: 'closed' }) }
+  }, [privateMode])
+  if (state.kind === 'checking' || state.kind === 'closed') return <main className="replay-loading">{labels(locale).unavailable}</main>
+  const bridge = state.kind === 'active' ? state.bridge : undefined
   return new URLSearchParams(window.location.search).get('mode') === 'reported-evidence'
-    ? <ReportedEvidenceViewer locale={locale} />
-    : <ArchiveReplayViewer locale={locale} />
+    ? <ReportedEvidenceViewer locale={locale} bridge={bridge} />
+    : <ArchiveReplayViewer locale={locale} bridge={bridge} />
 }

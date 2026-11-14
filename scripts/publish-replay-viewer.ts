@@ -13,6 +13,7 @@ import {
 } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { REPLAY_BRIDGE_PROTOCOL_VERSION, REPLAY_BRIDGE_SCHEMA_VERSIONS } from '../shared/contract/replay-viewer-build'
 import { loadReplayViewerBuild } from '../server/game/replay-viewer-build.ts'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -40,6 +41,7 @@ export const publishReplayViewer = (
     .sort()
   const manifest = Buffer.from(JSON.stringify({
     entrypoint: 'index.html',
+    bridge: { protocolVersion: REPLAY_BRIDGE_PROTOCOL_VERSION, replaySchemaVersions: REPLAY_BRIDGE_SCHEMA_VERSIONS },
     files: Object.fromEntries(files.map((path) => [path, hashFile(join(staging, path))])),
   }))
   const buildId = createHash('sha256').update(manifest).digest('hex')
