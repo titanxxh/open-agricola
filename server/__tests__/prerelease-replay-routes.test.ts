@@ -1,4 +1,5 @@
 import * as database from '../db'
+import type { QueryResultRow } from 'pg'
 import { GameSession } from '../game/authoritative-session'
 import { BugReportStore, TokenCipher } from '../bug-report/bug-report-store'
 import { handleBugReportRoute } from '../bug-report-routes'
@@ -147,6 +148,7 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
     await db.prepare("UPDATE game_contexts SET lifecycle='active' WHERE room_id='room-1'").run()
     const session = new GameSession(42,undefined,{playerCount:2})
     const encoded = encodeReplayFrame({frame:JSON.parse(JSON.stringify(session.buildSyncPayload(session.getState(),[],'debug').state)),previousFrame:null,stepNo:0,previousCheckpointStepNo:0})
+    session.dispose()
     await db.prepare("UPDATE game_replay_steps SET payload_kind=?,payload_gzip=?,frame_hash=? WHERE room_id='room-1'").run(encoded.payloadKind,encoded.payloadGzip,encoded.frameHash)
     await db.prepare("INSERT INTO bug_reports(submission_id,reporter_user_id,room_id,player_index,lifecycle,room_version,step_no,frame_hash,status,submitted_at,evidence_expires_at,created_at,updated_at) VALUES ('reported','u1','room-1',0,'active',0,0,?,'submitted',?,?,?,?)")
       .run(encoded.frameHash,now,now+60_000,now,now)
@@ -158,6 +160,32 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(Buffer.from(await response.arrayBuffer())).toEqual(image)
+    const prepare = db.prepare.bind(db)
+    for (const fault of ['deadline','seat','anchor','removed'] as const) {
+      const delayed = vi.spyOn(db,'prepare').mockImplementation(sql => {
+        const statement = prepare(sql)
+        if (sql.includes('SELECT step_no, checkpoint_step_no, payload_kind, payload_gzip, frame_hash')) {
+          const all = statement.all
+          statement.all = async <Row extends QueryResultRow = QueryResultRow>(...values: unknown[]): Promise<Row[]> => {
+            const rows = await all<Row>(...values)
+            if (fault === 'deadline') await prepare("UPDATE bug_reports SET evidence_expires_at=0 WHERE submission_id='reported'").run()
+            if (fault === 'seat') await prepare("DELETE FROM room_players WHERE room_id='room-1'").run()
+            if (fault === 'anchor') await prepare("UPDATE bug_reports SET submitted_at=NULL WHERE submission_id='reported'").run()
+            if (fault === 'removed') await prepare("UPDATE game_contexts SET lifecycle='removed' WHERE room_id='room-1'").run()
+            return rows
+          }
+        }
+        return statement
+      })
+      const changedDuringRead = await read(`/api/v1/game-contexts/room-1/evidence/0?frame=${encoded.frameHash}`)
+      delayed.mockRestore()
+      const expected = {deadline:{status:503,code:'replay_segment_unavailable'},seat:{status:403,code:'not_participant'},anchor:{status:409,code:'anchor_mismatch'},removed:{status:410,code:'context_removed'}}[fault]
+      expect(changedDuringRead.status,fault).toBe(expected.status)
+      expect(await changedDuringRead.json()).toMatchObject({ok:false,code:expected.code})
+      await db.prepare("UPDATE bug_reports SET evidence_expires_at=?,submitted_at=? WHERE submission_id='reported'").run(now+60_000,now)
+      await db.prepare("UPDATE game_contexts SET lifecycle='active' WHERE room_id='room-1'").run()
+      if (fault === 'seat') await db.prepare("INSERT INTO room_players(room_id,user_id,player_index,joined_at) VALUES ('room-1','u1',0,?)").run(now)
+    }
     expect((await read(path.replace(encoded.frameHash,'0'.repeat(64)))).status).toBe(409)
     expect((await read('/api/v1/replays/room-1/manifest')).status).toBe(409)
     await db.prepare("UPDATE bug_reports SET submitted_at=NULL WHERE submission_id='reported'").run()
