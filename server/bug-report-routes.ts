@@ -256,7 +256,8 @@ const loadEvidenceFrame = async (
   playerIndex: number | null,
 ): Promise<Awaited<SerializedGameState>> => {
   const initial = await prereleaseArchiveReadState(runtime.db, report.room_id)
-  if (initial?.expired || initial?.lifecycle === 'removed') throw new BugReportError('replay_segment_unavailable', 410)
+  if (initial?.lifecycle === 'removed') throw new BugReportError('context_removed', 410)
+  if (initial?.expired) throw new BugReportError('replay_segment_unavailable', 410)
   const now = Date.now()
   const context = (await runtime.db.prepare(`
     SELECT lifecycle FROM game_contexts WHERE room_id = ?
@@ -345,7 +346,8 @@ const loadEvidenceFrame = async (
     participantNames,
   ) as unknown as SerializedGameState
   const current = await prereleaseArchiveReadState(runtime.db, report.room_id)
-  if (current?.expired || current?.lifecycle === 'removed'
+  if (current?.lifecycle === 'removed') throw new BugReportError('context_removed', 410)
+  if (current?.expired
     || process.env.RELEASE_CHANNEL === 'prerelease' && !current) throw new BugReportError('replay_segment_unavailable', 410)
   if (playerIndex === null) return projected
   const playerId = projected.players[playerIndex]?.id ?? null

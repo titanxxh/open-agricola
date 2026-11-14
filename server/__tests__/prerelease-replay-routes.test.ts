@@ -161,9 +161,16 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(Buffer.from(await response.arrayBuffer())).toEqual(image)
     const prepare = db.prepare.bind(db)
-    for (const fault of ['deadline','seat','anchor','removed'] as const) {
+    for (const fault of ['deadline','seat','anchor','removed-before-frame','removed'] as const) {
       const delayed = vi.spyOn(db,'prepare').mockImplementation(sql => {
         const statement = prepare(sql)
+        if (fault === 'removed-before-frame' && sql.includes('SELECT c.lifecycle, c.removal_reason')) {
+          const get = statement.get
+          statement.get = async <Row extends QueryResultRow = QueryResultRow>(...values: unknown[]): Promise<Row | undefined> => {
+            await prepare("UPDATE game_contexts SET lifecycle='removed' WHERE room_id='room-1'").run()
+            return get<Row>(...values)
+          }
+        }
         if (sql.includes('SELECT step_no, checkpoint_step_no, payload_kind, payload_gzip, frame_hash')) {
           const all = statement.all
           statement.all = async <Row extends QueryResultRow = QueryResultRow>(...values: unknown[]): Promise<Row[]> => {
@@ -179,9 +186,11 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
       })
       const changedDuringRead = await read(`/api/v1/game-contexts/room-1/evidence/0?frame=${encoded.frameHash}`)
       delayed.mockRestore()
-      const expected = {deadline:{status:503,code:'replay_segment_unavailable'},seat:{status:403,code:'not_participant'},anchor:{status:409,code:'anchor_mismatch'},removed:{status:410,code:'context_removed'}}[fault]
+      const expected = {deadline:{status:503,code:'replay_segment_unavailable'},seat:{status:403,code:'not_participant'},anchor:{status:409,code:'anchor_mismatch'},'removed-before-frame':{status:410,code:'context_removed'},removed:{status:410,code:'context_removed'}}[fault]
       expect(changedDuringRead.status,fault).toBe(expected.status)
-      expect(await changedDuringRead.json()).toMatchObject({ok:false,code:expected.code})
+      const body = await changedDuringRead.json()
+      expect(body,fault).toMatchObject({ok:false,code:expected.code})
+      expect(body).not.toHaveProperty('frame')
       await db.prepare("UPDATE bug_reports SET evidence_expires_at=?,submitted_at=? WHERE submission_id='reported'").run(now+60_000,now)
       await db.prepare("UPDATE game_contexts SET lifecycle='active' WHERE room_id='room-1'").run()
       if (fault === 'seat') await db.prepare("INSERT INTO room_players(room_id,user_id,player_index,joined_at) VALUES ('room-1','u1',0,?)").run(now)
