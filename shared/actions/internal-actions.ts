@@ -1,3 +1,4 @@
+import { selectTargetFarmAction } from './effects/internal/select-target-farm'
 import { marketplaceAction } from './effects/marketplace'
 import { ruleOperationAction } from './effects/internal/rule-operation'
 import { createResolveTimedRuleAction } from './effects/internal/resolve-timed-rule'
@@ -68,6 +69,7 @@ import { moorSoloRetentionAction } from './effects/internal/moor-solo-retention'
 import type { FlowActionResolver } from './flow'
 
 export const createInternalActionDefinitions = (resolveAction: FlowActionResolver): ActionDefinition[] => [
+  selectTargetFarmAction,
   marketplaceAction,
   futureMeeplesAction,
   completePreparationAction,

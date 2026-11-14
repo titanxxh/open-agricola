@@ -108,7 +108,7 @@ const mergeCosts = (results: ActionHookResult[]): Partial<Resource> => {
 }
 
 const buildCost = (player: PlayerState, results: ActionHookResult[]): ComplexCost => {
-  const cost = PaymentSolver.buildConstructCost({ state: makeState(player), player: player, costs: mergeCosts(results), roomCount: 1 })
+  const cost = PaymentSolver.buildConstructCost({ state: makeState(player), payer: player, farmOwner: player, costs: mergeCosts(results), roomCount: 1 })
   expect(cost).not.toBeNull()
   return {
     ...cost!,
