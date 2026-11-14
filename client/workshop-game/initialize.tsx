@@ -1,4 +1,6 @@
-import { StrictMode, useSyncExternalStore } from 'react'
+import { PrereleaseBoundary } from '../app/PrereleaseBoundary'
+import { isPrereleaseClient } from '../services/prerelease-runtime'
+import { StrictMode, useEffect, useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AppErrorBoundary } from '../app/AppErrorBoundary'
 import { GameContainerApi } from '../app/GameContainerApi'
@@ -20,10 +22,17 @@ function StandaloneLink() {
 
 function WorkshopGame() {
   const { loading, user } = useAuth()
+  const [cardsReady, setCardsReady] = useState(!isPrereleaseClient())
+  useEffect(() => {
+    if (!isPrereleaseClient() || !user) return
+    let active = true
+    void loadCardsManifest().then(() => { if (active) setCardsReady(true) }).catch(() => { if (active) setCardsReady(false) })
+    return () => { active = false }
+  }, [user])
   const { t } = useLocale()
   const reloadRequired = useSyncExternalStore(subscribeBrowserReload, getBrowserReloadRequired)
   if (reloadRequired) return <StandaloneLink />
-  if (loading) {
+  if (loading || user && !cardsReady) {
     const { percent, labelKey } = getGameLoadProgress('auth')
     return <GameLoadScreen percent={percent} label={t(labelKey)} />
   }
@@ -36,11 +45,12 @@ export async function initializeWorkshopGame(root: HTMLElement): Promise<void> {
   let saved: string | null = null
   try { saved = localStorage.getItem('open-agricola-locale-v2') } catch { /* storage may be disabled */ }
   const locale = manifest.languages.find(language => language.id === saved)?.id ?? manifest.defaultLocale
-  await Promise.all([loadLanguagePack(locale), loadCardsManifest()])
+  await loadLanguagePack(locale)
+  if (!isPrereleaseClient()) await loadCardsManifest()
   createRoot(root).render(
     <StrictMode>
       <AppErrorBoundary fallback={<StandaloneLink />}>
-        <LocaleProvider><AuthProvider><WorkshopGame /></AuthProvider></LocaleProvider>
+        <LocaleProvider><PrereleaseBoundary><AuthProvider><WorkshopGame /></AuthProvider></PrereleaseBoundary></LocaleProvider>
       </AppErrorBoundary>
     </StrictMode>,
   )

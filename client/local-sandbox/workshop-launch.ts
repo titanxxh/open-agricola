@@ -1,3 +1,4 @@
+import { prereleaseStorageKey } from '../services/prerelease-runtime'
 /**
  * Workshop-side glue for the browser-local sandbox: decides whether the
  * playtest runs locally, assembles a `LocalGameConfig` from workshop state,
@@ -45,7 +46,7 @@ export const buildLocalGameConfig = (
 })
 
 export const stashLocalSandboxConfig = (config: LocalGameConfig, ownerKey: string): void => {
-  sessionStorage.setItem(STASH_KEY, JSON.stringify({ owner: ownerKey, config }))
+  sessionStorage.setItem(prereleaseStorageKey(STASH_KEY), JSON.stringify({ owner: ownerKey, config }))
 }
 
 // Reject a stash left by a different account on a shared browser (the config
@@ -53,11 +54,11 @@ export const stashLocalSandboxConfig = (config: LocalGameConfig, ownerKey: strin
 // logout within a tab, so ownership is verified on read rather than trusted.
 export const readLocalSandboxConfig = (ownerKey: string): LocalGameConfig | null => {
   try {
-    const raw = sessionStorage.getItem(STASH_KEY)
+    const raw = sessionStorage.getItem(prereleaseStorageKey(STASH_KEY))
     if (!raw) return null
     const parsed = JSON.parse(raw) as { owner?: string; config?: LocalGameConfig }
     if (parsed.owner !== ownerKey || !parsed.config) {
-      sessionStorage.removeItem(STASH_KEY)
+      sessionStorage.removeItem(prereleaseStorageKey(STASH_KEY))
       return null
     }
     return parsed.config

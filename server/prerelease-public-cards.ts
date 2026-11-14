@@ -1,4 +1,4 @@
-import { parsePublicCardSnapshot, parsePublicCardStatus, publicCardId } from '../shared/contract/public-card-input'
+import { parsePublicCardCatalog, parsePublicCardSnapshot, parsePublicCardStatus, publicCardId, type PublicCardReference } from '../shared/contract/public-card-input'
 import type { WorkshopPublicCardSnapshot, WorkshopPublicCardStatus } from '../shared/contract/workshop-public-cards'
 
 type Clock = { now(): number; monotonic(): number }
@@ -42,6 +42,10 @@ export class FormalPublicCards {
     if (result.ok !== true) throw new Error('Public source refused request')
     return result
   }
+  async catalog(query = new URLSearchParams()) {
+    if (query.size && (query.size !== 1 || !query.has('after') || !/^[A-Za-z0-9_-]{1,128}$/.test(query.get('after') ?? ''))) throw new Error('Invalid catalog query')
+    return parsePublicCardCatalog(await this.get(query.size ? `?${query}` : ''))
+  }
   async snapshot(cardId: string) {
     const result = await this.get(`/${publicCardId(cardId)}`)
     const snapshot = parsePublicCardSnapshot(result.snapshot, cardId)
@@ -49,8 +53,8 @@ export class FormalPublicCards {
     if (!status.access.allowNew || status.validUntil <= this.clock.now()) throw new Error('Public card unavailable for new execution')
     return { snapshot, status }
   }
-  async status(snapshot: WorkshopPublicCardSnapshot) {
-    const { source } = snapshot.input
+  async status(snapshot: WorkshopPublicCardSnapshot | PublicCardReference) {
+    const source = 'input' in snapshot ? snapshot.input.source : snapshot.source
     return parsePublicCardStatus(await this.get(`/${publicCardId(source.workshopCardId)}/versions/${publicCardId(source.versionId)}/status?sha256=${snapshot.sha256}`), snapshot.sha256)
   }
   async create(cardId: string): Promise<PublicCardExecutionLease> {
@@ -60,24 +64,30 @@ export class FormalPublicCards {
 }
 
 /** A source failure never grants more time, and an older reply cannot undo denial. */
-export class PublicCardExecutionLease {
-  readonly snapshot: WorkshopPublicCardSnapshot
+export class PublicCardExecutionLease<T extends WorkshopPublicCardSnapshot | PublicCardReference = WorkshopPublicCardSnapshot> {
+  readonly snapshot: T
   private readonly source: FormalPublicCards
   private deadline = 0
+  private wallDeadline = 0
+  private allowNew = false
   private revision = 0
-  constructor(source: FormalPublicCards, snapshot: WorkshopPublicCardSnapshot, status: WorkshopPublicCardStatus, started: number) {
+  constructor(source: FormalPublicCards, snapshot: T, status: WorkshopPublicCardStatus, started: number) {
     this.source = source; this.snapshot = snapshot; this.accept(status, started)
   }
   private accept(status: WorkshopPublicCardStatus, started: number): void {
     const remaining = Math.min(status.validUntil - this.source.clock.now(), 30_000 - (this.source.clock.monotonic() - started))
+    this.allowNew = status.access.allowNew
+    this.wallDeadline = status.access.allowExisting ? status.validUntil : 0
     this.deadline = status.access.allowExisting ? this.source.clock.monotonic() + Math.max(0, remaining) : 0
   }
-  authorized(): boolean { return this.source.clock.monotonic() < this.deadline }
+  remainingMs(): number { return Math.max(0, Math.min(this.deadline - this.source.clock.monotonic(), this.wallDeadline - this.source.clock.now())) }
+  authorized(): boolean { return this.remainingMs() > 0 }
+  assertNew(): void { this.assert(); if (!this.allowNew) throw new Error('Public card unavailable for new execution') }
   assert(): void { if (!this.authorized()) throw new Error('Public card execution paused') }
   async refresh(): Promise<void> {
     const revision = ++this.revision, started = this.source.clock.monotonic()
     const status = await this.source.status(this.snapshot)
-    if (!status.access.allowExisting) { ++this.revision; this.deadline = 0 }
+    if (!status.access.allowExisting) { ++this.revision; this.deadline = 0; this.wallDeadline = 0; this.allowNew = false }
     else if (revision === this.revision) this.accept(status, started)
   }
 }
