@@ -17,14 +17,57 @@ function api(repository: string, endpoint: string, method: 'POST' | 'PATCH' | 'D
   })
   return output.trim() ? JSON.parse(output) : null
 }
-function releases(repository: string): Record<string, unknown>[] {
-  return execFileSync('gh', ['api', `repos/${repository}/releases?per_page=100`, '--paginate', '--jq', '.[] | @json'], {
+function collection(repository: string, endpoint: string): Record<string, unknown>[] {
+  return execFileSync('gh', ['api', `repos/${repository}/${endpoint}`, '--paginate', '--jq', '.[] | @json'], {
     encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
   }).split('\n').filter(line => line.trim()).map(line => object(JSON.parse(line)))
 }
 function nativeId(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) throw new Error('Invalid native owner release identity')
   return value
+}
+function nativeTime(value: unknown): number {
+  const time = typeof value === 'string' ? Date.parse(value) : NaN
+  if (!Number.isFinite(time) || time > Date.now() + 60_000) throw new Error('Invalid native owner release chronology')
+  return time
+}
+type DraftBinding = { repository: string; version: string; sha: string; releaseId: number; ownerId: number; marker: string }
+function draftRelease(binding: DraftBinding) {
+  const { repository, version, sha, releaseId, ownerId, marker } = binding
+  const release = object(github(repository, `releases/${releaseId}`))
+  if (release.id !== releaseId || release.tag_name !== version || release.target_commitish !== sha || release.draft !== true
+    || release.prerelease !== false || object(release.author).id !== ownerId || typeof release.body !== 'string'
+    || !release.body.includes(marker) || !Array.isArray(release.assets) || commitRef(repository, `tags/${version}`) !== sha) throw new Error('Owner-local prepared draft identity changed')
+  return { createdAt: nativeTime(release.created_at), assets: release.assets.map(object) }
+}
+function draftAsset(binding: DraftBinding, bytes: Buffer, completedAt: number) {
+  const release = draftRelease(binding), assets = release.assets.filter(asset => asset.name === OWNER_LOCAL_ASSET), asset = assets[0]
+  const prefix = `https://github.com/${binding.repository}/releases/download/`
+  const url = asset?.browser_download_url
+  const validUrl = typeof url === 'string' && (url === `${prefix}${binding.version}/${OWNER_LOCAL_ASSET}`
+    || url.startsWith(prefix) && new RegExp(`^untagged-[a-f0-9]{1,64}/${OWNER_LOCAL_ASSET.replace('.', '\\.')}$`).test(url.slice(prefix.length)))
+  if (assets.length !== 1 || !asset || asset.state !== 'uploaded' || asset.size !== bytes.length
+    || object(asset.uploader).id !== binding.ownerId || !validUrl) throw new Error('Owner-local uploaded receipt identity differs')
+  const id = nativeId(asset.id), createdAt = nativeTime(asset.created_at)
+  if (createdAt + 1000 < completedAt || release.createdAt > createdAt) throw new Error('Owner-local draft asset chronology differs')
+  const uploaded = execFileSync('gh', ['api', `repos/${binding.repository}/releases/assets/${id}`, '-H', 'Accept: application/octet-stream'], { maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+  if (!uploaded.equals(bytes)) throw new Error('Existing owner-local receipt bytes differ; preserve the draft and inspect it')
+  return { id, createdAt }
+}
+function verifyDraftStatus(binding: DraftBinding, digest: string, target: string, assetCreatedAt: number): void {
+  const latest = collection(binding.repository, `commits/${binding.sha}/statuses?per_page=100`)
+    .filter(status => status.context === OWNER_LOCAL_CONTEXT && status.creator !== null && typeof status.creator === 'object'
+      && 'id' in status.creator && status.creator.id === binding.ownerId).sort((a, b) => nativeId(b.id) - nativeId(a.id))[0]
+  if (!latest || latest.state !== 'success' || latest.target_url !== target || latest.description !== `owner-local sha256:${digest}`) throw new Error('Native owner-local authorization did not bind the prepared draft')
+  nativeId(latest.id)
+  if (nativeTime(latest.created_at) < assetCreatedAt) throw new Error('Native owner-local status predates the prepared asset')
+}
+function publishedReleaseUrl(binding: DraftBinding): string {
+  const release = object(github(binding.repository, `releases/${binding.releaseId}`))
+  const url = `https://github.com/${binding.repository}/releases/tag/${binding.version}`
+  if (release.id !== binding.releaseId || release.tag_name !== binding.version || release.draft !== false || release.prerelease !== false
+    || object(release.author).id !== binding.ownerId || release.html_url !== url || commitRef(binding.repository, `tags/${binding.version}`) !== binding.sha) throw new Error('Published owner-local release identity differs')
+  return url
 }
 
 export function publishOwnerLocalRelease(cwd: string, selected: { version: string; repository: string; sha: string; path: string }): void {
@@ -38,14 +81,15 @@ export function publishOwnerLocalRelease(cwd: string, selected: { version: strin
   const receipt = rebindOwnerLocalReceipt(cwd, JSON.parse(readFileSync(selected.path, 'utf8')), { repository, repositoryId, candidateSha: sha, producerSha: main })
   const bytes = Buffer.from(JSON.stringify(receipt) + '\n'), digest = createHash('sha256').update(bytes).digest('hex')
   const marker = `<!-- owner-local-verification:v1 ${sha} ${digest} -->`
-  const existing = releases(repository).filter(release => release.tag_name === version)
+  const existing = collection(repository, 'releases?per_page=100').filter(release => release.tag_name === version)
   if (existing.length > 1) throw new Error('Multiple releases identify the local candidate version')
   let release = existing[0]
   if (release && (release.prerelease !== false || object(release.author).id !== authority.ownerId || commitRef(repository, `tags/${version}`) !== sha)) throw new Error('Existing local release differs from its owner, channel or fixed candidate')
   if (release?.draft === false) {
     const result = checkCandidateVerification(cwd, repository, sha)
     if (result.ownerLocal?.receiptSha256 !== digest || result.ownerLocal.releaseId !== nativeId(release.id)) throw new Error('Existing published release lacks the same owner-local authorization')
-    console.log(JSON.stringify({ status: 'existing', channel: 'stable', verification: 'owner-local', version, sha, url: release.html_url }))
+    const url = publishedReleaseUrl({ repository, version, sha, releaseId: nativeId(release.id), ownerId: authority.ownerId, marker })
+    console.log(JSON.stringify({ status: 'existing', channel: 'stable', verification: 'owner-local', version, sha, url }))
     return
   }
   if (release && (release.draft !== true || typeof release.body !== 'string' || !release.body.includes(marker) || release.target_commitish !== sha)) throw new Error('Only the matching draft prepared by owner-local publication may resume')
@@ -57,30 +101,28 @@ export function publishOwnerLocalRelease(cwd: string, selected: { version: strin
       draft: true, prerelease: false, body: `${marker}\n\n${notes.body}\n\nVerified on the owner's machine using the complete candidate task plan. Tested source: ${receipt.testedSha}. Candidate: ${sha}. Their source trees and verification configuration are identical.\n` }))
   }
   const releaseId = nativeId(release.id)
+  const binding = { repository, version, sha, releaseId, ownerId: authority.ownerId, marker }
   const root = mkdtempSync(join(tmpdir(), 'oa-owner-local-publish-'))
   try {
     const path = join(root, OWNER_LOCAL_ASSET); writeFileSync(path, bytes, { mode: 0o600 })
-    const current = object(github(repository, `releases/${releaseId}`))
-    if (!Array.isArray(current.assets) || current.draft !== true || object(current.author).id !== authority.ownerId) throw new Error('Owner-local draft changed before receipt upload')
-    const assets = current.assets.map(object).filter(asset => asset.name === OWNER_LOCAL_ASSET)
+    const current = draftRelease(binding)
+    const assets = current.assets.filter(asset => asset.name === OWNER_LOCAL_ASSET)
     if (assets.length > 1) throw new Error('Duplicate owner-local receipt assets')
     if (assets.length === 0) {
       execFileSync('gh', ['api', `https://uploads.github.com/repos/${repository}/releases/${releaseId}/assets?name=${OWNER_LOCAL_ASSET}`,
         '--method', 'POST', '-H', 'Content-Type: application/json', '--input', path], { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 })
     }
-    const updated = object(github(repository, `releases/${releaseId}`))
-    if (!Array.isArray(updated.assets)) throw new Error('Owner-local uploaded receipt is missing')
-    const asset = updated.assets.map(object).find(asset => asset.name === OWNER_LOCAL_ASSET)
     const url = `https://github.com/${repository}/releases/download/${version}/${OWNER_LOCAL_ASSET}`
-    if (!asset || asset.browser_download_url !== url || object(asset.uploader).id !== authority.ownerId) throw new Error('Owner-local uploaded receipt identity differs')
-    const uploaded = execFileSync('gh', ['api', `repos/${repository}/releases/assets/${nativeId(asset.id)}`, '-H', 'Accept: application/octet-stream'], { maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
-    if (!uploaded.equals(bytes)) throw new Error('Existing owner-local receipt bytes differ; preserve the draft and inspect it')
+    const asset = draftAsset(binding, bytes, Date.parse(receipt.completedAt))
     api(repository, `statuses/${sha}`, 'POST', { state: 'success', context: OWNER_LOCAL_CONTEXT, description: `owner-local sha256:${digest}`, target_url: url })
-    const authorized = checkCandidateVerification(cwd, repository, sha, { ownerDraftReleaseId: releaseId })
-    if (authorized.ownerLocal?.receiptSha256 !== digest || authorized.ownerLocal.releaseId !== releaseId) throw new Error('Native owner-local authorization did not bind the prepared draft')
+    verifyDraftStatus(binding, digest, url, asset.createdAt)
+    if (draftAsset(binding, bytes, Date.parse(receipt.completedAt)).id !== asset.id) throw new Error('Owner-local draft receipt changed before publication')
+    const final = admitFinalSnapshot(cwd, repository, sha)
+    rebindOwnerLocalReceipt(cwd, receipt, { repository, repositoryId: final.repositoryId, candidateSha: sha, producerSha: final.main })
     api(repository, `releases/${releaseId}`, 'PATCH', { draft: false, make_latest: 'true' })
     const published = checkCandidateVerification(cwd, repository, sha)
-    if (published.ownerLocal?.receiptSha256 !== digest || published.ownerLocal.releaseId !== releaseId) throw new Error('Published owner-local release could not be verified')
-    console.log(JSON.stringify({ status: 'published', channel: 'stable', verification: 'owner-local', version, sha, url: updated.html_url }))
+    if (published.ownerLocal?.receiptSha256 !== digest || published.ownerLocal.releaseId !== releaseId || published.ownerLocal.assetId !== asset.id) throw new Error('Published owner-local release could not be verified')
+    const publishedUrl = publishedReleaseUrl(binding)
+    console.log(JSON.stringify({ status: 'published', channel: 'stable', verification: 'owner-local', version, sha, url: publishedUrl }))
   } finally { rmSync(root, { recursive: true, force: true }) }
 }

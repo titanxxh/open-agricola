@@ -19,6 +19,7 @@ type NativeRelease = { id: number; tag_name: string; target_commitish: string; h
 type Status = { id: number; context: string; state: string; creator: Actor; target_url: string; description: string; created_at: string }
 type FixtureState = { sha: string; owner: Actor; user: Actor; refs: Record<string, string>; release: NativeRelease | null;
   assetBytes: string; statuses: Status[]; dropStatus: boolean; foreignStatus: boolean; foreignAsset: boolean; hideDraftByTag: boolean;
+  wrongStatusField: 'target' | 'digest' | null; moveTagAfterStatus: boolean; preserveDraftAssetUrlOnPublish: boolean;
   releaseTime: string; assetTime: string; statusTime: string; publishedTime: string; provenance: Record<string, unknown> }
 type Event = { endpoint: string; method: string; body?: { context?: string; state?: string; draft?: boolean; sha?: string } }
 
@@ -49,6 +50,7 @@ function fixture(rebound = false) {
   const receiptPath = join(root, 'receipt.json'); writeFileSync(receiptPath, JSON.stringify(receipt) + '\n')
   const owner: Actor = { id: 7, login: 'titanxxh', type: 'User' }
   const state: FixtureState = { sha, owner, user: owner, refs: {}, release: null, assetBytes: '', statuses: [], dropStatus: false, foreignStatus: false, foreignAsset: false, hideDraftByTag: false,
+    wrongStatusField: null, moveTagAfterStatus: false, preserveDraftAssetUrlOnPublish: false,
     releaseTime: at(61), assetTime: at(62), statusTime: at(63), publishedTime: at(64),
     provenance: finalSnapshotMetadata(sha, sha, { id: 123, full_name: 'titanxxh/open-agricola' }) }
   const save = () => writeFileSync(join(root, 'state.json'), JSON.stringify(state))
@@ -75,7 +77,7 @@ if (method === 'POST' && endpoint.startsWith('https://uploads.github.com/')) {
   state.assetBytes = fs.readFileSync(args[args.indexOf('--input') + 1], 'utf8');
   state.release.assets.push({ id: 12, name: 'owner-local-verification.json', size: Buffer.byteLength(state.assetBytes), state: 'uploaded',
     uploader: state.foreignAsset ? { id: 8, login: 'collaborator', type: 'User' } : state.owner,
-    browser_download_url: 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9/owner-local-verification.json', created_at: state.assetTime });
+    browser_download_url: 'https://github.com/titanxxh/open-agricola/releases/download/untagged-0123456789abcdef0123/owner-local-verification.json', created_at: state.assetTime });
   save(); output(state.release.assets[0]); process.exit(0);
 }
 if (method !== 'GET') {
@@ -83,11 +85,16 @@ if (method !== 'GET') {
   if (endpoint === prefix + '/releases/generate-notes') { output({ body: 'Fixture generated release notes', name: 'v9.9.9' }); process.exit(0); }
   else if (endpoint === prefix + '/git/refs') state.refs[body.ref.replace('refs/', '')] = body.sha;
   else if (endpoint === prefix + '/releases') state.release = { ...body, id: 11, author: state.owner, assets: [], created_at: state.releaseTime,
-    published_at: null, html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/v9.9.9' };
+    published_at: null, html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/untagged-0123456789abcdef0123' };
   else if (endpoint === prefix + '/statuses/' + state.sha) {
     if (!state.dropStatus) state.statuses.unshift({ ...body, id: 20 + state.statuses.length, created_at: state.statusTime,
-      creator: state.foreignStatus ? { id: 8, login: 'collaborator', type: 'User' } : state.owner });
-  } else if (endpoint === prefix + '/releases/11' && method === 'PATCH') state.release = { ...state.release, ...body, published_at: state.publishedTime };
+      creator: state.foreignStatus ? { id: 8, login: 'collaborator', type: 'User' } : state.owner,
+      ...(state.wrongStatusField === 'target' ? { target_url: 'https://evil.example/proof.json' } : {}),
+      ...(state.wrongStatusField === 'digest' ? { description: 'owner-local sha256:' + 'f'.repeat(64) } : {}) });
+    if (state.moveTagAfterStatus) state.refs['tags/v9.9.9'] = 'f'.repeat(40);
+  } else if (endpoint === prefix + '/releases/11' && method === 'PATCH') state.release = { ...state.release, ...body, published_at: state.publishedTime,
+    html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/v9.9.9', assets: state.release.assets.map(asset => ({ ...asset,
+      browser_download_url: state.preserveDraftAssetUrlOnPublish ? asset.browser_download_url : 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9/owner-local-verification.json' })) };
   else throw Error('Unexpected mutation: ' + endpoint);
   save(); output(state.release ?? {}); process.exit(0);
 }
@@ -126,7 +133,8 @@ describe('owner-local public release entry', () => {
     const value = fixture(); value.state.hideDraftByTag = true; value.save()
     const result = value.run()
     expect(result.status, result.stderr).toBe(0)
-    expect(JSON.parse(result.stdout)).toMatchObject({ status: 'published', verification: 'owner-local', version: 'v9.9.9', sha: value.sha })
+    expect(JSON.parse(result.stdout)).toMatchObject({ status: 'published', verification: 'owner-local', version: 'v9.9.9', sha: value.sha,
+      url: 'https://github.com/titanxxh/open-agricola/releases/tag/v9.9.9' })
     const stored = value.load()
     expect(stored.release).toMatchObject({ draft: false, target_commitish: value.sha, author: { id: 7 } })
     expect(stored.release?.body).toContain('Fixture generated release notes')
@@ -136,6 +144,7 @@ describe('owner-local public release entry', () => {
     expect(stored.refs).toEqual({ 'tags/v9.9.9': value.sha })
     expect(stored.statuses).toHaveLength(1)
     expect(stored.statuses[0]).toMatchObject({ context: 'owner-local-verification', state: 'success', creator: { id: 7 } })
+    expect(stored.statuses[0].target_url).toBe('https://github.com/titanxxh/open-agricola/releases/download/v9.9.9/owner-local-verification.json')
     expect(value.events().some(event => event.endpoint.includes('dispatches'))).toBe(false)
     expect(value.events().filter(event => event.method === 'PATCH')).toEqual([expect.objectContaining({ endpoint: 'repos/titanxxh/open-agricola/releases/11', body: { draft: false, make_latest: 'true' } })])
     const check = value.check()
@@ -196,5 +205,56 @@ describe('owner-local public release entry', () => {
     expect(result.stderr).toContain('is a draft')
     expect(value.load().release?.draft).toBe(true)
     expect(value.events().filter(event => event.method !== 'GET')).toHaveLength(before)
+  })
+
+  it.each(['wrong origin', 'wrong repository', 'invalid untagged path', 'foreign uploader', 'foreign author', 'changed tag', 'changed bytes', 'changed marker'])('refuses to resume a prepared draft with %s', failure => {
+    const value = fixture(); value.state.dropStatus = true; value.save()
+    expect(value.run().status).not.toBe(0)
+    const interrupted = value.load(), release = interrupted.release
+    if (!release || release.assets.length !== 1) throw new Error('Missing prepared draft fixture')
+    const asset = release.assets[0]
+    if (failure === 'wrong origin') asset.browser_download_url = 'https://evil.example/releases/download/untagged-0123456789abcdef0123/owner-local-verification.json'
+    if (failure === 'wrong repository') asset.browser_download_url = 'https://github.com/other/repository/releases/download/untagged-0123456789abcdef0123/owner-local-verification.json'
+    if (failure === 'invalid untagged path') asset.browser_download_url = 'https://github.com/titanxxh/open-agricola/releases/download/untagged-anything/owner-local-verification.json'
+    if (failure === 'foreign uploader') asset.uploader = { id: 8, login: 'collaborator', type: 'User' }
+    if (failure === 'foreign author') release.author = { id: 8, login: 'collaborator', type: 'User' }
+    if (failure === 'changed tag') interrupted.refs['tags/v9.9.9'] = 'f'.repeat(40)
+    if (failure === 'changed bytes') interrupted.assetBytes += '\n'
+    if (failure === 'changed marker') release.body = 'Unrelated draft'
+    interrupted.dropStatus = false
+    writeFileSync(join(value.root, 'state.json'), JSON.stringify(interrupted))
+    const before = value.events().filter(event => event.method !== 'GET').length
+    const resumed = value.run()
+    expect(resumed.status).not.toBe(0)
+    expect(value.load().release?.draft).toBe(true)
+    expect(value.events().filter(event => event.method !== 'GET')).toHaveLength(before)
+    expect(value.events().filter(event => event.method === 'PATCH')).toEqual([])
+  })
+
+  it.each(['target', 'digest'] as const)('keeps a prepared draft closed when native status readback has another %s', field => {
+    const value = fixture(); value.state.wrongStatusField = field; value.save()
+    const result = value.run()
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Native owner-local authorization did not bind the prepared draft')
+    expect(value.load().release?.draft).toBe(true)
+    expect(value.events().filter(event => event.method === 'PATCH')).toEqual([])
+  })
+
+  it('rechecks the fixed tag after status publication before publishing the release', () => {
+    const value = fixture(); value.state.moveTagAfterStatus = true; value.save()
+    const result = value.run()
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Owner-local prepared draft identity changed')
+    expect(value.load().release?.draft).toBe(true)
+    expect(value.events().filter(event => event.method === 'PATCH')).toEqual([])
+  })
+
+  it('keeps the unchanged public gate strict if a published asset still exposes its temporary draft URL', () => {
+    const value = fixture(); value.state.preserveDraftAssetUrlOnPublish = true; value.save()
+    const result = value.run()
+    expect(result.status).not.toBe(0)
+    expect(value.load().release?.draft).toBe(false)
+    expect(result.stderr).toContain('Owner-local receipt asset is missing, unbounded or not uploaded by the owner')
+    expect(value.check().status).not.toBe(0)
   })
 })
