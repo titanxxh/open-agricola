@@ -176,7 +176,7 @@ POST   /api/v1/github-app/webhook
 
 公开 Replay API 返回版本化 JSON，从不暴露 PostgreSQL 编码。一个 Segment 最多展开一条 checkpoint 链，并校验每个 Frame Hash；Anchor 必须精确匹配 `stepNo + frameHash`。公开读取有按 IP 的配额与大小上限；需认证的证据与报告端点按账号限流。
 
-Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓存。其 CSP 显式允许 `PUBLIC_API_BASE` 的来源（本地开发使用请求来源），供不透明来源的沙箱读取公开资源，脚本仍限于 `'self'`。覆盖：`replay-routes.test.ts` 与 `replay-viewer-csp.spec.ts`。
+Viewer HTML 重新验证 CSP，不可变脚本仅允许 'self'。公开 Replay 允许已配置的 API 来源；pre 桥接 Build 允许 blob 图片。`replay-routes.test.ts` 与 `replay-viewer-csp.spec.ts` 覆盖这两种策略。
 
 ## 工坊后端
 
