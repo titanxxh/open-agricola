@@ -292,3 +292,39 @@ it('rejects authority-changing HTTP and WS request targets before forwarding pre
     await rm(root, { recursive: true, force: true })
   }
 })
+
+it('admits credentialless opaque-origin Viewer programs without opening private or credential-bearing reads', async () => {
+  const formal = await formalBrowserPolicyFixture(), root = await mkdtemp(join(tmpdir(), 'pre-viewer-program-'))
+  const stateFile = join(root,'gate.json')
+  await writeFile(join(root,'storage-guard.json'),JSON.stringify(healthyGuard()))
+  await writeFile(stateFile,JSON.stringify({format:1,targetId:'prerelease-test',channel:'prerelease',mode:'open',buildId:'a'.repeat(40),
+    generation:'bb4d6c82-676f-4dcc-a570-52377b3b32f5',acceptance:{healthyCycle,formalBuildId:formal.state.buildId}}))
+  const seen: Array<{path:string|undefined;headers:IncomingHttpHeaders}> = []
+  const upstream = createServer((req,res)=>{seen.push({path:req.url,headers:req.headers});res.setHeader('Access-Control-Allow-Origin','*');res.end('immutable program')})
+  upstream.listen(0,'127.0.0.1'); await once(upstream,'listening')
+  const address = upstream.address()
+  if(!address || typeof address === 'string') throw new Error('Missing program upstream')
+  const gateway = createPrereleaseGateway({stateFile,targetId:'prerelease-test',origin:'https://pre.agricola.test',formal:formal.formal,ca:formal.ca,upstream:`http://127.0.0.1:${address.port}`})
+  gateway.server.listen(0,'127.0.0.1'); await once(gateway.server,'listening'); await gateway.refreshBrowserPolicy()
+  const listener = gateway.server.address()
+  if(!listener || typeof listener === 'string') throw new Error('Missing program gateway')
+  const program = `/replay-viewers/${'b'.repeat(64)}/assets/viewer.js`
+  const read = (path:string,headers:Record<string,string>={},method='GET')=>new Promise<number>((resolve,reject)=>{
+    const req=request(`http://127.0.0.1:${listener.port}`,{path,method,agent:false,headers:{host:'pre.agricola.test',origin:'null',...headers}},response=>{response.resume();response.on('end',()=>resolve(response.statusCode??0))})
+    req.on('error',reject);req.end()
+  })
+  try {
+    expect(await read(program)).toBe(200)
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatchObject({path:program,headers:{origin:'null',host:'pre.agricola.test'}})
+    expect(seen[0].headers.cookie).toBeUndefined();expect(seen[0].headers.authorization).toBeUndefined()
+    const deniedHeaders: Record<string,string>[] = [{cookie:'__Host-oa-pre-session=private'},{authorization:'Bearer private'},{'proxy-authorization':'Basic private'},{'x-oa-browser-protocol':'2'},{'sec-websocket-protocol':'oa-browser-v2'},{'x-open-agricola-client-capabilities':'private'},{'x-oa-pre-build':'a'.repeat(40)},{'x-oa-pre-generation':'bb4d6c82-676f-4dcc-a570-52377b3b32f5'},{origin:'https://sibling.agricola.test'}]
+    for(const headers of deniedHeaders) expect(await read(program,headers)).toBe(403)
+    for(const path of ['/api/v1/replays/room/manifest',`/replay-assets/${'b'.repeat(64)}`,`/card-art/image.png`,program.replace('b'.repeat(64),'current'),program+'/../viewer.js',program.replace('viewer.js','%2e%2e/private'),program+'?unexpected=private']) expect(await read(path)).toBe(403)
+    expect(await read(program,{},'POST')).toBe(403)
+    expect(seen).toHaveLength(1)
+    await writeFile(stateFile,JSON.stringify({format:1,targetId:'prerelease-test',channel:'prerelease',mode:'maintenance',buildId:'a'.repeat(40),generation:'bb4d6c82-676f-4dcc-a570-52377b3b32f5'}))
+    expect(await read(program)).toBe(503)
+    expect(seen).toHaveLength(1)
+  } finally {await gateway.close();upstream.closeAllConnections();await new Promise<void>(resolve=>upstream.close(()=>resolve()));await formal.close();await rm(root,{recursive:true,force:true})}
+})

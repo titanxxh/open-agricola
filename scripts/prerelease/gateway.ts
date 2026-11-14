@@ -10,6 +10,7 @@ import { readBrowserAuthPolicy, type FormalOrigins, type FormalTlsOptions } from
 export const OWNER_VERIFICATION_COOKIE = '__Host-oa-pre-verify'
 export const candidateAlias = (targetId: string) => `${targetId}-app`
 const candidateCookies = new Set(['__Host-oa-pre-session', '__Host-oa-pre-handoff'])
+const publicViewerProgram = /^\/replay-viewers\/[a-f0-9]{64}\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*$/
 const websocketTarget = /^\/(?:ws|nodes\/[A-Za-z0-9-]+\/ws)(?:\?[^#]*)?$/
 const forwardedHeaders = new Set(['accept', 'accept-language', 'cache-control', 'content-type', 'content-length', 'origin', 'referer', 'user-agent',
   'range', 'if-range', 'if-none-match', 'if-modified-since', 'connection', 'upgrade', 'sec-websocket-key', 'sec-websocket-version',
@@ -147,8 +148,11 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
       })
       return
     }
-    if (req.headers.origin !== undefined && req.headers.origin !== options.origin
-      || !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? '') && req.headers.origin !== options.origin) { res.writeHead(403); res.end(); return }
+    const viewerProgram = req.method === 'GET' && req.headers.origin === 'null' && publicViewerProgram.test(req.url ?? '')
+      && !Object.keys(req.headers).some(name => name === 'cookie' || name === 'authorization' || name === 'proxy-authorization'
+        || name.startsWith('x-oa-') || name === 'x-open-agricola-client-capabilities' || name === 'sec-websocket-protocol')
+    if (!viewerProgram && (req.headers.origin !== undefined && req.headers.origin !== options.origin
+      || !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? '') && req.headers.origin !== options.origin)) { res.writeHead(403); res.end(); return }
     const permission = () => allowed(req.headers.cookie)
     track(req.socket, permission)
     if (!permission()) {
