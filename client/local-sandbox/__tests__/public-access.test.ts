@@ -131,3 +131,9 @@ it('checks a fresh allowNew before resetting an existing game without revoking i
   await expect(transport.newGame(43)).rejects.toThrow('Public card unavailable for new execution')
   expect((await transport.getState()).state).toEqual(initial.state)
 })
+
+it('preserves the specific source refusal when loading fixed inputs', async () => {
+  const fixture = await setup(), { loadPublicSandboxInputs } = await import('../public-access')
+  fixture.reply(async () => Response.json({ ok: false, code: 'public_card_execution_paused', error: 'Public image checksum mismatch' }, { status: 400 }))
+  await expect(loadPublicSandboxInputs(['public'])).rejects.toThrow('Public image checksum mismatch')
+})
