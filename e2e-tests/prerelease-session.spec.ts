@@ -451,6 +451,47 @@ test('private replay uses an authenticated parent bridge and clears idle display
   }
 })
 
+for (const mode of ['server', 'browser']) test(`prerelease public sandbox rejects malformed registration metadata in ${mode} mode`, async ({ playwright }) => {
+  test.setTimeout(180_000)
+  const environment = await fixture(playwright, true)
+  try {
+    const card = environment.publicFixture
+    if (!card) throw new Error('Missing published fixture')
+    await environment.source.prepare("UPDATE workshop_card_versions SET card_json=jsonb_set(card_json::jsonb,'{modifiers}','{\"type\":\"bonus\"}'::jsonb)::text WHERE id=?").run(card.versionId)
+    const page = await environment.enter(environment.context), dialogs: string[] = []
+    page.on('dialog', dialog => { dialogs.push(dialog.message()); void dialog.accept() })
+    await page.goto(`${environment.preOrigin}/open-agricola/?page=workshop`)
+    await page.getByLabel(card.name, { exact: true }).check()
+    await page.getByRole('combobox', { name: 'Run game' }).selectOption(mode)
+    const started = mode === 'server' ? page.waitForResponse(response => new URL(response.url()).pathname === '/api/game/new-sandbox' && response.request().method() === 'POST') : undefined
+    await page.getByRole('button', { name: 'Start Sandbox', exact: true }).click()
+    if (started) {
+      expect((await started).status()).toBe(400)
+      await expect(page.getByRole('alert')).toContainText('modifiers')
+    } else {
+      await expect.poll(() => dialogs.join('\n'), { timeout: 5000 }).toContain('modifiers')
+      await expect(page.frameLocator('iframe.sandbox-embed-frame').locator('.action-board')).toHaveCount(0)
+    }
+  } finally { await releaseAll([() => environment.context.close(), () => environment.browser.close(), () => environment.close()]) }
+})
+
+test('prerelease public sandbox displays the HTTP compiler refusal', async ({ playwright }) => {
+  test.setTimeout(180_000)
+  const environment = await fixture(playwright, true)
+  try {
+    const card = environment.publicFixture
+    if (!card) throw new Error('Missing published fixture')
+    await environment.source.prepare("UPDATE workshop_card_versions SET card_json=jsonb_set(card_json::jsonb,'{_code}',to_jsonb(?::text))::text WHERE id=?")
+      .run(`const CARD_ID='${card.ruleId}';const CARD_IMPL={effect:{id:CARD_ID,unsupportedCapability:()=>1}}`, card.versionId)
+    const page = await environment.enter(environment.context)
+    await page.goto(`${environment.preOrigin}/open-agricola/?page=workshop`)
+    await page.getByLabel(card.name, { exact: true }).check()
+    await page.getByRole('button', { name: 'Start Sandbox', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('unsupported')
+    await expect(page.locator('iframe.sandbox-embed-frame')).toHaveCount(0)
+  } finally { await releaseAll([() => environment.context.close(), () => environment.browser.close(), () => environment.close()]) }
+})
+
 test('prerelease public sandbox renders fixed art and executes dynamic effects in both modes, then stops idle execution on disable', async ({ playwright }, testInfo) => {
   test.setTimeout(300_000)
   const environment = await fixture(playwright, true)
@@ -458,6 +499,9 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
   try {
     const fixtureCard = environment.publicFixture
     if (!fixtureCard) throw new Error('Missing published fixture')
+    const modifier = { type: 'bonus', cardId: fixtureCard.ruleId, appliesTo: ['construct'], discount: { wood: 1 } }
+    await environment.source.prepare("UPDATE workshop_card_versions SET card_json=jsonb_set(card_json::jsonb,'{modifiers}',?::jsonb)::text WHERE id=?")
+      .run(JSON.stringify([modifier]), fixtureCard.versionId)
     const page = await environment.enter(environment.context), workers: string[] = []
     page.on('console', message => { if (message.type() === 'error') diagnostics.push({ console: message.text() }) })
     page.on('response', response => {
@@ -481,7 +525,9 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
       await expect(frame.locator('.action-board').first()).toBeVisible({ timeout: 30_000 })
       await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 2"]').first()).toBeVisible()
       await frame.locator('.dev-field', { hasText: 'Card ID' }).getByRole('textbox').fill(fixtureCard.ruleId)
+      const played = mode === 'server' ? page.waitForResponse(response => new URL(response.url()).pathname === '/api/game/dev/play-card' && response.request().method() === 'POST') : undefined
       await frame.getByRole('button', { name: 'Play Card', exact: true }).click()
+      if (played) expect((await (await played).json()).state.players[0].activeModifiers).toContainEqual(modifier)
       await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible()
       if (mode === 'server') {
         serverWorkerCount = workers.length
@@ -502,7 +548,7 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
         tx.oncomplete = () => db.close()
       }
     }))).toEqual(expect.arrayContaining([expect.objectContaining({ serializedState: expect.objectContaining({ state: expect.objectContaining({
-      players: expect.arrayContaining([expect.objectContaining({ id: 'p1', resources: expect.objectContaining({ food: 4 }) })]),
+      players: expect.arrayContaining([expect.objectContaining({ id: 'p1', resources: expect.objectContaining({ food: 4 }), activeModifiers: expect.arrayContaining([modifier]) })]),
     }) }) })]))
     await environment.source.prepare('UPDATE workshop_cards SET live=0 WHERE id=?').run(fixtureCard.cardId)
     const resumed = page.waitForEvent('dialog').then(dialog => dialog.accept())
