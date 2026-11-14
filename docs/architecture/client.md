@@ -142,3 +142,5 @@ GameContextRouter
 `WsGameTransport` declares capabilities on each new socket; `HttpGameTransport` sends the request header. A refresh-required error retains the readable reload UI and waits for outstanding durable receipts before stopping retries. Authentication and journal command identities remain separate. See [client capabilities](contract.md#client-capabilities).
 
 Prerelease Team creation uses the durable room-creation path. `TeamWaitingRoom` renders account membership before host start; `team-waiting` needs no game snapshot. Multihand follows an owned responder independently of farm browsing. `ScoringPad` and `ArchivedTeamResults` display authoritative team results. Coverage: `team-network.test.ts`, `prerelease-session.spec.ts`.
+
+- Partner builds display `farmOwnerPlayerId`; `FarmBoard.handPlayer` keeps the responder's hand. Geometry belongs to the target; commands and costs belong to the builder. Palisade permission stays owner-scoped.

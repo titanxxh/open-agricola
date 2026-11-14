@@ -113,3 +113,5 @@ Tests: `shared/cards/__tests__/{AB,CD,EM}-logical-field-boundary.test.ts`, `shar
 
 `actions/helpers/minor-card-passing.ts` owns the passing destination and public event for purchases and the explicit `pass-minor-card-to-left` action. With one actual participant, the card leaves the game and emits `card.destroyed` with reason `passed`; it never returns to its owner's hand or enters the ordinary draw supply. Payment and the full `onBuy` continuation still execute once. Existing-game recovery preserves an exhausted hand. With multiple participants, passing uses the actual next participant and retains the ordinary hand-transfer event. Session regressions live with Clay Embankment, Shifting Cultivation and Savings Deposit.
 
+
+- Build grants declare `targetFarmPolicy: 'own'` when their text or reserved pieces bind the owner's farm. Special-stable and palisade capabilities declare the same ownership policy. Cost listeners use `resolveBuildPlayers`; reactions retain truthful actor/target facts. Tests: `card-own-farm-builds-session.test.ts`, `partner-build-reactions-session.test.ts`.

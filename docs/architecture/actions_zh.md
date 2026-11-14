@@ -98,6 +98,8 @@ type ActionDefinition = {
 
 卡牌授予的本方建造、卡上构件与 pending 恢复由 `server/__tests__/own-farm-card-session.test.ts` 覆盖。
 
+`farmBuild` 声明建造类别；`select-target-farm` 绑定合法本方或队友农场，`targetFarmPlayerId` 贯穿组合行动及恢复，新的卡赠 leaf 重新选择。`helpers/build-players.ts` 区分 builder 付款/费用牌与目标农场几何/构件/动物整理。`targetFarmPolicy: 'own'` 限定自家建造与卡上构件。测试见 `server/__tests__/{partner-stables,partner-rooms,partner-fences,card-own-farm-builds,card-granted-builds}-session.test.ts`。
+
 ## 农场类提交
 
 每种农场类型都在 `shared/actions/effects/` 下自己的 `ActionDefinition.resolveChoice` 中闭环：

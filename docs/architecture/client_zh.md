@@ -145,3 +145,5 @@ GameContextRouter
 `WsGameTransport` 在每个新 socket 声明能力，`HttpGameTransport` 发送请求 header。要求刷新时沿用可读 reload 界面，并在停止重试前结算未完成的持久 receipt。认证和 journal 的命令身份保持独立。见[客户端能力](contract.md#client-capabilities)。
 
 预发布Team创建复用持久命令路径；`TeamWaitingRoom` 在host开局前显示账号成员，`team-waiting` 无需游戏快照。Multihand独立跟随自有响应座位，不把农场浏览当作命令控制；`ScoringPad` 与 `ArchivedTeamResults` 展示后端团队结果。验证入口为 `team-network.test.ts`、`prerelease-session.spec.ts`。
+
+- 合作建造展示 `farmOwnerPlayerId` 的农场，`FarmBoard.handPlayer` 保持已认证响应者的手牌。几何属于目标，命令与费用属于 builder；palisade 元数据限制自家权限。测试见 `player-palisades.test.ts` 与预发布合作 E2E。

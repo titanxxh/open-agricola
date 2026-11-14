@@ -547,10 +547,13 @@ export const GameContainerApi = () => {
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
   // Browsing a public farm never changes the interaction or confirmed seat.
   // HTTP sandbox follows the responder rather than a browsing preference.
-  const displayPlayer = isWs
+  const targetFarmOwnerId = interaction.stateId === 'wait' && interaction.request.kind === 'farm-select'
+    ? interaction.request.farmOwnerPlayerId : undefined
+  const targetFarmOwner = state?.players.find(player => player.id === targetFarmOwnerId)
+  const displayPlayer = targetFarmOwner ?? (isWs
     ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
-    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
-  const isPublicFarmView = isHotseat && displayPlayer?.id !== activePlayer?.id
+    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null))
+  const isPublicFarmView = isHotseat && !targetFarmOwner && displayPlayer?.id !== activePlayer?.id
   const hotseatRoomId = isHotseat && wsStatus.phase === 'ready' ? wsStatus.roomId : null
   const hotseatAudienceId = isHotseat && state
     ? state.phase === 'draft' && state.draft
@@ -580,7 +583,7 @@ export const GameContainerApi = () => {
     ? !persistencePaused && !!activePlayer && hotseatSeatConfirmed === hotseatAudienceKey && !isPublicFarmView
     : isWs
       ? !persistencePaused && (!isWs || wsStatus.phase === 'ready') && !!(activePlayer && selfPlayer && displayPlayer &&
-           activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
+           activePlayer.id === selfPlayer.id && (displayPlayer.id === selfPlayer.id || displayPlayer.id === targetFarmOwner?.id))
       : !!(activePlayer && displayPlayer))
   const hasGameView = !!(state && currentPlayer && displayPlayer)
   const canResetGame = !isSpectator && hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
@@ -659,7 +662,7 @@ export const GameContainerApi = () => {
     interactionPresentationPlan,
     locale,
     // Budgets and geometry belong to the responder, even while inspecting another farm.
-    displayPlayer: (isHotseat ? activePlayer : displayPlayer),
+    displayPlayer: targetFarmOwner ?? (isHotseat ? activePlayer : displayPlayer),
     players: state?.players,
   })
   const farmInteraction = farmSelectionDraft.farmInteraction
@@ -1812,6 +1815,7 @@ export const GameContainerApi = () => {
   const farmBoardView = {
     ...farmBoardProjection,
     ...farmSelectionDraft.farmBoardDraft,
+    handPlayer: targetFarmOwner ? selfPlayer ?? activePlayer ?? undefined : undefined,
     ...(isPublicFarmView ? {
       plowSelectableSet: new Set<string>(),
       pendingPlowTile: null,
@@ -1994,7 +1998,7 @@ export const GameContainerApi = () => {
         sow: isSelectingSow,
       },
       fence: {
-        canBuildPalisades: !!activePlayer && playerCanBuildPalisades(activePlayer),
+        canBuildPalisades: !!activePlayer && playerCanBuildPalisades(activePlayer, targetFarmOwner ?? activePlayer),
         placementMode: farmSelectionDraft.interactionBarDraft.fencePlacementMode,
         setPlacementMode: farmSelectionDraft.controls.setFencePlacementMode,
         borrowedSources: farmSelectionDraft.borrowedFenceSources,

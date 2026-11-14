@@ -9,7 +9,7 @@ Under [PRD #1655](https://github.com/titanxxh/open-agricola/issues/1655) and [#1
 
 ## Prerelease implementation
 
-The prerelease Team foundation separates waiting account members from rule seats. Host start fixes Team/Multihand ownership; teammate visibility does not grant command control. Four authoritative scoring modes persist with seat memberships in result archives. The forward tests are `team-network.test.ts` and `team-scoring-session.test.ts`; ordinary main behavior and the cooperation rules below retain their separate boundaries.
+The prerelease Team foundation separates waiting account members from rule seats. Host start fixes Team/Multihand ownership; teammate visibility does not grant command control. Four authoritative scoring modes persist with seat memberships in result archives. The forward tests are `team-network.test.ts` and `team-scoring-session.test.ts`; ordinary main behavior remains unchanged. Prerelease cooperation adds Marketplace giver tax, one target per build, builder payment/modifiers, target supply/geometry and owner animal rearrangement. Own-farm grants and reserved pieces declare local policies; fresh card builds choose again. Tests: `partner-{stables,rooms,fences}-session.test.ts`, `card-{own-farm,granted}-builds-session.test.ts` and `partner-build-reactions-session.test.ts`. Opening still requires native prerelease delivery and browser acceptance.
 
 ## Forward reconstruction provenance
 
@@ -43,7 +43,7 @@ Issue #1597 adds the official partner game rules on top of the team seating and 
 ## Consequences
 
 - Build events and cards that use the actor's house type as the material of the room being built must read the built objects instead. Before the beta, a card audit slice reviews the build reaction cards and the card-granted builds against these categories, with at least one Session test per category.
-- Delivery order: Marketplace, Target Farm with stables, rooms, fences, card audit, then the Experimental Feature moves from `off` to `beta`.
+- Delivery order: Marketplace, Target Farm with stables, rooms, fences and card audit, then prerelease candidate qualification. Formal main has no cooperation feature toggle; prerelease environment admission remains authoritative.
 
 ## Alternatives considered
 
