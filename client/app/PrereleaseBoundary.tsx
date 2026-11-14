@@ -1,13 +1,13 @@
 import { normalizePrereleaseReturnPath } from '../../shared/contract/prerelease-runtime'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
+import { PrereleaseBanner } from './PrereleaseBanner'
 import { useLocale } from '../contexts/LocaleContext'
 import { browserApiFetch } from '../services/browser-api'
 import {
   acceptPrereleaseSession, getPrereleaseAccess, getPrereleaseLeaseRemainingMs, getPrereleaseRevision, getPrereleaseRuntime, isPrereleaseClient,
   loadPrereleaseRuntime, prereleaseStartUrl, rejectPrereleaseAccess, subscribePrereleaseAccess,
 } from '../services/prerelease-runtime'
-import './PrereleaseBoundary.css'
 
 type HandoffState =
   | { kind: 'session' }
@@ -101,11 +101,7 @@ function PrereleaseApplication({ children }: { children: ReactNode }) {
       : code === 'invalid_prerelease_handoff' ? 'prerelease.handoffInvalid'
         : code ? 'prerelease.accessExpired' : 'prerelease.connecting'
   return <>
-    <aside className="prerelease-banner" aria-label={t('prerelease.environment')}>
-      <strong>{t('prerelease.version', { version: (runtime?.buildId ?? import.meta.env.VITE_GAME_BUILD_ID ?? '').slice(0, 12) })}</strong>
-      {runtime ? <a href={`${runtime.formalAppOrigin}/`}>{t('prerelease.returnToProduction')}</a>
-        : <a href={prereleaseStartUrl()}>{t('prerelease.entry')}</a>}
-    </aside>
+    <PrereleaseBanner />
     {access.kind === 'active' ? children : <main className="prerelease-access-screen">
       <h1>{t('prerelease.environment')}</h1>
       <p role={code ? 'alert' : 'status'}>{t(message)}</p>
