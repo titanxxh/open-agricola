@@ -174,7 +174,7 @@ POST   /api/v1/github-app/webhook
 
 Public Replay APIs return versioned JSON, never PostgreSQL encoding. A Segment expands at most one checkpoint chain with every Frame Hash verified; an Anchor must match `stepNo + frameHash` exactly. Public reads have IP quotas/size caps; Evidence/reports have account quotas.
 
-Viewer HTML revalidates CSP; immutable scripts stay self-only. Public Replay allows the configured API origin. Pre bridge builds allow blob images. `replay-routes.test.ts` and `replay-viewer-csp.spec.ts` cover both policies.
+Viewer HTML revalidates CSP; immutable scripts stay 'self'. Public Replay allows the configured API origin. Pre bridge builds allow blob images. `replay-routes.test.ts` and `replay-viewer-csp.spec.ts` cover both policies.
 
 ## Workshop backend
 
