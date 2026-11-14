@@ -32,7 +32,7 @@ async function setup() {
   }
   let onExchange = async (_state: PrereleaseIdentityState) => {}, onStatus = async (_state: PrereleaseIdentityState) => {}
   let exchanges = 0
-  const service = new PrereleaseSessions({ db: pre, now: () => now, eraseAccount: async userId => { await pre.prepare('DELETE FROM users WHERE id=?').run(userId) },
+  const options: ConstructorParameters<typeof PrereleaseSessions>[0] = { db: pre, now: () => now, eraseAccount: async userId => { await pre.prepare('DELETE FROM users WHERE id=?').run(userId) },
     runtime: { buildId: 'a'.repeat(40), generationId, appOrigin: target.targetOrigin, formalAppOrigin: target.sourceOrigin, formalApiBase: target.sourceOrigin, targetId },
     authority: {
       exchange: async input => {
@@ -45,8 +45,14 @@ async function setup() {
       events: () => formal.events(target, generationId),
       acknowledge: async (id, outcome) => { await formal.acknowledge(target, generationId, id, outcome) },
     },
-  })
+  }
+  const service = new PrereleaseSessions(options)
   cleanup.push(async () => { service.close() })
+  const peer = () => {
+    const consumer = new PrereleaseSessions({ ...options, runtime: { ...options.runtime } })
+    cleanup.push(async () => { consumer.close() })
+    return consumer
+  }
   async function packet(userId: string) {
     const begin = await service.beginHandoff(), params = new URLSearchParams(new URL(begin.formalUrl).hash.slice(1))
     const state = params.get('state'), browserChallenge = params.get('browserChallenge')
@@ -55,7 +61,7 @@ async function setup() {
     return { cookie: begin.cookie, input: { protocolVersion: 1, code: issued.code, state, browserChallenge, returnTo: `${target.sourceOrigin}/` } }
   }
   async function enter(userId: string) { const value = await packet(userId); return service.exchangeHandoff(value.cookie, value.input) }
-  return { source, pre, service, packet, enter, advance: (ms: number) => { now += ms }, exchanges: () => exchanges,
+  return { source, pre, service, peer, packet, enter, advance: (ms: number) => { now += ms }, exchanges: () => exchanges,
     onExchange: (callback: typeof onExchange) => { onExchange = callback }, onStatus: (callback: typeof onStatus) => { onStatus = callback } }
 }
 
@@ -153,9 +159,10 @@ it('recovers a consumed callback after its session commits but its response leas
   } finally { spy.mockRestore() }
 })
 
-it('never republishes a receipt session logged out after its recovery transaction commits', async () => {
+it.each(['same', 'peer'] as const)('never republishes a receipt session logged out by the %s consumer after recovery commits', async consumer => {
   const context = await setup(), packet = await context.packet('alice')
   const original = await context.service.exchangeHandoff(packet.cookie, packet.input)
+  const revoker = consumer === 'peer' ? context.peer() : context.service
   const transaction = context.pre.transaction.bind(context.pre)
   let commits = 0, loggedOut = false
   function logoutAfterRecoveryCommit<Args extends unknown[], Result>(work: (...args: Args) => Result) {
@@ -163,7 +170,7 @@ it('never republishes a receipt session logged out after its recovery transactio
     return async (...args: Args): Promise<Awaited<Result>> => {
       const result = await run(...args)
       if (++commits === 2) {
-        await context.service.revoke(original.token)
+        await revoker.revoke(original.token)
         loggedOut = true
       }
       return result
@@ -174,8 +181,8 @@ it('never republishes a receipt session logged out after its recovery transactio
     await expect(context.service.exchangeHandoff(packet.cookie, packet.input)).rejects.toMatchObject({ kind: 'paused' })
     expect(loggedOut).toBe(true)
     expect(context.service.cachedAuthorized(original.token)).toBe(false)
-    expect(context.service.status(original.token)).toBe('expired')
     expect(await context.service.resolve(original.token)).toBeNull()
+    expect(context.service.status(original.token)).toBe('expired')
     expect(context.exchanges()).toBe(1)
   } finally { spy.mockRestore() }
 })
