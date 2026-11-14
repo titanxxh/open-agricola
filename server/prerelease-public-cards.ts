@@ -71,6 +71,8 @@ export class PublicCardExecutionLease<T extends WorkshopPublicCardSnapshot | Pub
   private wallDeadline = 0
   private allowNew = false
   private revision = 0
+  private pendingRefreshes = 0
+  private retired = false
   constructor(source: FormalPublicCards, snapshot: T, status: WorkshopPublicCardStatus, started: number) {
     this.source = source; this.snapshot = snapshot; this.accept(status, started)
   }
@@ -80,14 +82,24 @@ export class PublicCardExecutionLease<T extends WorkshopPublicCardSnapshot | Pub
     this.wallDeadline = status.access.allowExisting ? status.validUntil : 0
     this.deadline = status.access.allowExisting ? this.source.clock.monotonic() + Math.max(0, remaining) : 0
   }
-  remainingMs(): number { return Math.max(0, Math.min(this.deadline - this.source.clock.monotonic(), this.wallDeadline - this.source.clock.now())) }
+  remainingMs(): number { return this.retired ? 0 : Math.max(0, Math.min(this.deadline - this.source.clock.monotonic(), this.wallDeadline - this.source.clock.now())) }
   authorized(): boolean { return this.remainingMs() > 0 }
   assertNew(): void { this.assert(); if (!this.allowNew) throw new Error('Public card unavailable for new execution') }
   assert(): void { if (!this.authorized()) throw new Error('Public card execution paused') }
+  retireIfExpired(): boolean {
+    // Keep one lease identity until every pending reply can apply its denial.
+    if (this.pendingRefreshes || this.authorized()) return false
+    this.retired = true
+    return true
+  }
   async refresh(): Promise<void> {
+    if (this.retired) throw new Error('Public card execution paused')
     const revision = ++this.revision, started = this.source.clock.monotonic()
-    const status = await this.source.status(this.snapshot)
-    if (!status.access.allowExisting) { ++this.revision; this.deadline = 0; this.wallDeadline = 0; this.allowNew = false }
-    else if (revision === this.revision) this.accept(status, started)
+    ++this.pendingRefreshes
+    try {
+      const status = await this.source.status(this.snapshot)
+      if (!status.access.allowExisting) { ++this.revision; this.deadline = 0; this.wallDeadline = 0; this.allowNew = false }
+      else if (revision === this.revision) this.accept(status, started)
+    } finally { --this.pendingRefreshes }
   }
 }

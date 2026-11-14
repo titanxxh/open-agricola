@@ -70,17 +70,24 @@ export class PrereleasePublicSandbox {
     if (!lease) {
       let pending = this.loading.get(ref.sha256)
       if (!pending) {
+        for (const [hash, cached] of this.leases) {
+          if (cached.retireIfExpired()) this.leases.delete(hash)
+        }
         if (this.leases.size + this.loading.size >= 256) throw new Error('Public sandbox input capacity reached')
         const started = this.source.clock.monotonic()
         pending = this.source.status(ref).then(status => {
           const created = new PublicCardExecutionLease(this.source, ref, status, started)
+          created.assert()
           this.leases.set(ref.sha256, created)
           return created
         }).finally(() => { this.loading.delete(ref.sha256) })
         this.loading.set(ref.sha256, pending)
       }
       lease = await pending
-    } else if (force || lease.remainingMs() <= 15_000) await lease.refresh().catch(() => {})
+    } else if (force || lease.remainingMs() <= 15_000) {
+      await lease.refresh().catch(() => {})
+      if (lease.retireIfExpired() && this.leases.get(ref.sha256) === lease) this.leases.delete(ref.sha256)
+    }
     lease.assert()
     return lease
   }
