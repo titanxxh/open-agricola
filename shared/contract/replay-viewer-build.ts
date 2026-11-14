@@ -19,11 +19,12 @@ export function validViewerPath(path: string): boolean {
 export function readReplayViewerManifest(value: unknown): ReplayViewerManifest | null {
   if (!object(value) || value.entrypoint !== 'index.html' || !object(value.files)
     || !Object.hasOwn(value.files, 'index.html')) return null
-  const files: Record<string, string> = {}
+  const entries: Array<[string, string]> = []
   for (const [path, hash] of Object.entries(value.files)) {
     if (path === 'manifest.json' || !validViewerPath(path) || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) return null
-    files[path] = hash
+    entries.push([path, hash])
   }
+  const files = Object.fromEntries(entries)
   if (value.bridge === undefined) return { entrypoint: 'index.html', files }
   if (!object(value.bridge) || !positiveInteger(value.bridge.protocolVersion)
     || !Array.isArray(value.bridge.replaySchemaVersions) || !value.bridge.replaySchemaVersions.length

@@ -1,6 +1,6 @@
 import { isPrerelease } from './prerelease-access'
 import { supportsReplayBridge } from '../shared/contract/replay-viewer-build'
-import { replayBridgeImageType } from '../shared/contract/protocol/replay-bridge'
+import { replayBridgeImageType, REPLAY_BRIDGE_MAX_BYTES } from '../shared/contract/protocol/replay-bridge'
 import { clientIp } from './client-ip'
 import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -24,7 +24,7 @@ const VIEWER_ROUTE = /^\/replay-viewers\/([a-f0-9]{64})\/(.+)$/
 const PRIVATE_ASSET_ROUTE = /^\/api\/v1\/replays\/([^/]+)\/assets\/([a-f0-9]{64})$/
 const ASSET_ROUTE = /^\/replay-assets\/([a-f0-9]{64})$/
 const CONTEXT_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/
-const MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+const MAX_RESPONSE_BYTES = REPLAY_BRIDGE_MAX_BYTES
 const READ_LIMIT_PER_MINUTE = 240
 type ReplayResponse = ReplayManifestResponse | ReplaySegmentResponse | ReplayAnchorResponse
 
@@ -280,6 +280,10 @@ export async function handleReplayRoute(
     sendInvalidLink(req, res)
     return true
   }
+  const respond = async (response: ReplayResponse) => {
+    const unavailable = isPrerelease() && response.ok ? await store.archiveUnavailable(roomId) : null
+    sendJson(req, res, unavailable ?? response)
+  }
   const manifest = manifestMatch || isPrerelease() ? await store.manifest(roomId) : null
   if (manifest?.ok) {
     const viewer = await options.resources.viewer(manifest.viewerBuildId)
@@ -289,7 +293,7 @@ export async function handleReplayRoute(
     }
   }
   if (manifestMatch || manifest && !manifest.ok) {
-    sendJson(req, res, manifest!)
+    await respond(manifest!)
     return true
   }
   if (privateAssetMatch) {
@@ -297,9 +301,13 @@ export async function handleReplayRoute(
     const hash = privateAssetMatch[2]!
     try {
       const object = await options.resources.asset(roomId, hash, manifest.customCards)
-      if (!object || !replayBridgeImageType(object.contentType)) {
+      if (!object || !replayBridgeImageType(object.contentType) || object.body.byteLength > MAX_RESPONSE_BYTES) {
         sendJson(req, res, { ok: false, code: 'not_participant', message: 'Replay asset is unavailable in this context' })
-      } else { res.writeHead(200, privateHeaders(object.contentType)); res.end(object.body) }
+      } else {
+        const unavailable = await store.archiveUnavailable(roomId)
+        if (unavailable) sendJson(req, res, unavailable)
+        else { res.writeHead(200, privateHeaders(object.contentType)); res.end(object.body) }
+      }
     } catch (error) {
       if (!(error instanceof ResourceIntegrityError)) throw error
       sendJson(req, res, { ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' })
@@ -312,7 +320,7 @@ export async function handleReplayRoute(
       sendInvalidLink(req, res)
       return true
     }
-    sendJson(req, res, (await store.segment(roomId, checkpointStepNo)))
+    await respond(await store.segment(roomId, checkpointStepNo))
     return true
   }
   const stepNo = parseStepNo(anchorMatch![2]!)
@@ -321,6 +329,6 @@ export async function handleReplayRoute(
     sendInvalidLink(req, res)
     return true
   }
-  sendJson(req, res, (await store.anchor(roomId, stepNo, frameHash)))
+  await respond(await store.anchor(roomId, stepNo, frameHash))
   return true
 }

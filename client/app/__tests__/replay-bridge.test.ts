@@ -116,4 +116,26 @@ describe('authenticated parent replay bridge', () => {
     expect(channels).toHaveBeenCalledTimes(1)
   })
 
+  it.each([{roomId:'another-room'},{viewerBuildId:'f'.repeat(64)},{schemaVersion:2},{checkpointStepNo:4},{kind:'replayManifest'}])('rejects a response for a different bound context %j', async patch => {
+    const {port,next}=fixture({read:async()=>new Response(JSON.stringify({ok:true,kind:'replaySegment',roomId:'room-1',viewerBuildId:context.viewerBuildId,schemaVersion:1,checkpointStepNo:0,steps:[],...patch}))})
+    const result=next()
+    port.postMessage({type:'read',nonce:context.nonce,requestId:'r1',read:{kind:'segment',checkpointStepNo:0}})
+    expect(await result).toEqual({type:'error',nonce:context.nonce,requestId:'r1',code:'unavailable'})
+  })
+
+  it('bounds in-flight work and aborts all reads when a peer exceeds the limit', async () => {
+    let entered=()=>{},release=()=>{}
+    const reached=new Promise<void>(resolve=>{entered=resolve}),wait=new Promise<void>(resolve=>{release=resolve})
+    const signals: Array<AbortSignal|null|undefined>=[]
+    const {port,next}=fixture({read:async(_url,init)=>{signals.push(init?.signal);if(signals.length===4)entered();await wait;throw new Error('late')}})
+    for(let id=1;id<=4;id++)port.postMessage({type:'read',nonce:context.nonce,requestId:`r${id}`,read:{kind:'segment',checkpointStepNo:0}})
+    await reached
+    const result=next()
+    port.postMessage({type:'read',nonce:context.nonce,requestId:'r5',read:{kind:'segment',checkpointStepNo:0}})
+    expect(await result).toEqual({type:'close',nonce:context.nonce})
+    expect(signals).toHaveLength(4)
+    expect(signals.every(signal=>signal?.aborted)).toBe(true)
+    release()
+  })
+
 })
