@@ -114,6 +114,45 @@ it('delivers an imported immutable image with source capture, target restore val
   expect(result.stdout + result.stderr).not.toContain('private-fixture-secret')
 })
 
+it('removes only the accepted operation archive after successful maintenance and retains its audit records', () => {
+  const value = fixture()
+  const other = join(value.directory, 'backups', '.backend-image-other')
+  mkdirSync(other, { mode: 0o700 })
+  writeFileSync(join(other, 'image.tar'), 'other operation archive')
+  const before = ['request.json', 'image.json', 'intake-admission.json'].map(name => ({ name, bytes: readFileSync(join(value.stage, name)) }))
+  const result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(existsSync(value.archivePath)).toBe(false)
+  for (const { name, bytes } of before) expect(readFileSync(join(value.stage, name))).toEqual(bytes)
+  expect(existsSync(join(value.stage, 'source.json'))).toBe(true)
+  expect(existsSync(join(value.stage, 'maintenance.compose.json'))).toBe(true)
+  expect(existsSync(join(value.stage, 'maintenance-admission.json'))).toBe(true)
+  expect(readFileSync(join(other, 'image.tar'), 'utf8')).toBe('other operation archive')
+  expect(readFileSync(join(value.directory, 'data/deployed-build-id'), 'utf8')).toBe(value.request.sourceSha + '\n')
+})
+
+it.each(['backup', 'live', 'up-identity'])('preserves the uploaded archive and diagnostic records after %s failure', failure => {
+  const value = fixture(failure), bytes = readFileSync(value.archivePath), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(readFileSync(value.archivePath)).toEqual(bytes)
+  expect(existsSync(value.requestPath)).toBe(true)
+  expect(existsSync(join(value.stage, 'image.json'))).toBe(true)
+})
+
+it('reports archive cleanup failure after acceptance without recursively deleting evidence or stopping the accepted app', () => {
+  const value = fixture()
+  rmSync(value.archivePath)
+  mkdirSync(value.archivePath)
+  writeFileSync(join(value.archivePath, 'diagnostic.txt'), 'retain unexpected archive path')
+  const result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Backend deployment accepted, but its uploaded image archive could not be removed')
+  expect(value.current().started).toBe(true)
+  expect(readFileSync(join(value.directory, 'data/deployed-build-id'), 'utf8')).toBe(value.request.sourceSha + '\n')
+  expect(readFileSync(join(value.archivePath, 'diagnostic.txt'), 'utf8')).toBe('retain unexpected archive path')
+  expect(existsSync(join(value.stage, 'image.json'))).toBe(true)
+})
+
 it('passes the deployment owner UID and GID to Compose despite inherited user overrides', () => {
   const value = fixture(), result = value.invoke(value.request.sourceSha, { APP_UID: '424242', APP_GID: '424243' })
   expect(result.status, result.stderr).toBe(0)

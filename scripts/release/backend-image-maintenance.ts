@@ -262,6 +262,8 @@ export function maintainBackendImage(path: string, expected: Target): void {
       const stem = archive.name.slice(0, -4)
       for (const name of [archive.name, `${stem}.manifest.json`, `env-${stem}`]) if (existsSync(join(root, 'backups', name))) unlinkSync(join(root, 'backups', name))
     }
+    try { unlinkSync(join(request.stage, 'image.tar')) }
+    catch (error) { throw new Error('Backend deployment accepted, but its uploaded image archive could not be removed; inspect the retained private operation evidence', { cause: error }) }
     process.stdout.write(`Previous build: ${source?.build ?? 'none (explicit empty installation)'}\nCurrent build: ${request.sourceSha}\nFixed formal image: ${image}\nBackend maintenance deployment and target-build validation completed.\n`)
   } catch (error) {
     deadline = performance.now() + BACKEND_IMAGE_CLEANUP_MS
