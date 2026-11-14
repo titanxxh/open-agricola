@@ -296,7 +296,7 @@ registry。
 
 公共来源交接通过 `GET /api/workshop/public-cards/v1/cards/:id` 读取当前审核通过且已上线的版本，也包括仍公开上线的 merged 卡。输入绑定工坊来源、卡牌/版本 ID、公开定义、源码与经校验的图片字节。SHA-256 覆盖 `canonicalJson(input)`；图片另有字节 SHA-256。不交付编译产物、私有草稿或生成溯源，消费环境按自身能力契约校验和编译。
 
-`GET /api/workshop/public-cards/v1/cards/:id/versions/:versionId/status?sha256=<input-hash>` 明确返回新建和继续执行权限。发布记录只接纳实际存在且属于该卡的公共版本，并保护其不被普通五版本清理删除。升级回填跳过缺失或指向其他卡的历史批准绑定；受控导入先写卡牌时，等匹配版本到达后才登记。作者下线、编辑或更新阻止旧版本新建，允许既有固定输入继续执行；管理员下架禁用该卡全部公共版本，删除后拒绝继续执行。图片缺失、字节变化、来源读取失败或超时均不返回新鲜状态。`checkedAt` 从来源读取前开始，`validUntil` 最多延后 30 秒；消费者保留该期限，到期后暂停。快照读取附带相同初始状态。GET 接口不写共享沙盒设置或确认结果；消费侧沙盒执行由独立实施票交付。
+`GET /api/workshop/public-cards/v1/cards/:id/versions/:versionId/status?sha256=<input-hash>` 明确返回新建和继续执行权限。发布记录只接纳实际存在且属于该卡的公共版本，并保护其不被普通五版本清理删除。升级回填跳过缺失或指向其他卡的历史批准绑定；受控导入先写卡牌时，等匹配版本到达后才登记。作者下线、编辑或更新阻止旧版本新建，允许既有固定输入继续执行；管理员下架禁用该卡全部公共版本，删除后拒绝继续执行。图片缺失、字节变化、来源读取失败或超时均不返回新鲜状态。`checkedAt` 从来源读取前开始，`validUntil` 最多延后 30 秒；消费者保留该期限，到期后暂停。快照读取附带相同初始状态。GET 接口不写共享沙盒设置或确认结果；消费侧沙盒执行由独立实施票交付。 pre 经 `/api/workshop/public-sandbox/v1/{cards,inputs,status}` 消费此接口，使用独立只读页面选择固定输入及服务器或浏览器执行，不挂载作者编辑副作用。两种模式均校验源码和图片 hash，并在候选内编译；作者下线或更新只影响新建。执行与下发要求来源及 Beta 租约同时有效；浏览器墙钟与单调期限计入传输、空闲及休眠，撤销后丢弃在途结果并卸载棋盘。恢复按当前 build/generation 复核相同 hash，不恢复权限。其他工坊私读、设计、生成、上传及共享 pass/settings 写入均拒绝。测试：`prerelease-public-sandbox.test.ts`、`public-access.test.ts`、`prerelease-session.spec.ts`。
 
 ### D4. 工坊 UI 页面结构
 

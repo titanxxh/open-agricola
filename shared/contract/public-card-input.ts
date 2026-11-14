@@ -1,7 +1,8 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 import { canonicalJson } from './authoritative-command'
-import type { WorkshopPublicCardInput, WorkshopPublicCardSnapshot, WorkshopPublicCardStatus } from './workshop-public-cards'
+import type { CardDefinition } from './cards'
+import type { WorkshopPublicCardCatalog, WorkshopPublicCardCatalogEntry, WorkshopPublicCardInput, WorkshopPublicCardSnapshot, WorkshopPublicCardStatus } from './workshop-public-cards'
 
 const isObject = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
 const object = (value: unknown): Record<string, unknown> => {
@@ -54,4 +55,41 @@ export function parsePublicCardStatus(value: unknown, expectedHash: string): Wor
   else if ((access.kind === 'disabled' || access.kind === 'not_public' || access.kind === 'content_mismatch') && access.allowNew === false && access.allowExisting === false) parsed = { kind: access.kind, allowNew: false, allowExisting: false }
   else throw new Error('Invalid public source permission')
   return { protocolVersion: 1, sha256: expectedHash, checkedAt: packet.checkedAt, validUntil: packet.validUntil, access: parsed }
+}
+
+
+export type PublicCardReference = { sha256: string; source: WorkshopPublicCardInput['source'] }
+export const publicCardReference = (snapshot: WorkshopPublicCardSnapshot): PublicCardReference => ({ sha256: snapshot.sha256, source: snapshot.input.source })
+
+export function parsePublicCardReference(value: unknown): PublicCardReference {
+  const packet = object(value), source = object(packet.source)
+  if (source.kind !== 'workshop-public' || source.authority !== 'titanxxh/open-agricola') throw new Error('Invalid public card authority')
+  return { sha256: hash(packet.sha256), source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola',
+    workshopCardId: publicCardId(source.workshopCardId), versionId: publicCardId(source.versionId) } }
+}
+
+export function publicCardDefinition(snapshot: WorkshopPublicCardSnapshot): { cardType: 'minor' | 'occupation'; cardJson: CardDefinition; artUrl: string | null } {
+  const raw = snapshot.input.cardJson, { id, name, deck, number, desc } = raw
+  const cardType = raw.card_type ?? raw.playerActionCardType
+  if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(id) || typeof name !== 'string' || !name.trim()
+    || typeof deck !== 'string' || typeof number !== 'number' || !Number.isFinite(number)
+    || !Array.isArray(desc) || !desc.every((line): line is string => typeof line === 'string')
+    || cardType !== 'minor' && cardType !== 'occupation') throw new Error('Invalid public card definition')
+  const cardJson: CardDefinition = { ...raw, id, name, deck, number, desc }
+  const art = snapshot.input.art
+  return { cardType, cardJson, artUrl: art ? `data:${art.contentType};base64,${art.base64}` : null }
+}
+
+export function parsePublicCardCatalog(value: unknown): WorkshopPublicCardCatalog {
+  const packet = object(value)
+  if (packet.protocolVersion !== 1 || !Array.isArray(packet.cards) || packet.cards.length > 100
+    || packet.nextCursor !== null && (typeof packet.nextCursor !== 'string' || !/^[A-Za-z0-9_-]{1,512}$/.test(packet.nextCursor))) throw new Error('Invalid public catalog')
+  const cards = packet.cards.map((value: unknown): WorkshopPublicCardCatalogEntry => {
+    const entry = object(value), source = object(entry.source)
+    if (source.kind !== 'workshop-public' || source.authority !== 'titanxxh/open-agricola' || typeof entry.name !== 'string' || entry.name.length > 512
+      || entry.cardType !== 'minor' && entry.cardType !== 'occupation') throw new Error('Invalid public catalog entry')
+    return { source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: publicCardId(source.workshopCardId), versionId: publicCardId(source.versionId) },
+      cardId: publicCardId(entry.cardId), name: entry.name, cardType: entry.cardType }
+  })
+  return { protocolVersion: 1, cards, nextCursor: packet.nextCursor }
 }

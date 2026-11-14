@@ -13,7 +13,8 @@ it.each(['revoked', 'logout'])('terminates the active local worker on %s and ref
   pre.acceptPrereleaseSession({ ok: true, user: { id: 'u1', username: 'beta', displayName: 'Beta', isAdmin: false, betaAccess: true },
     prerelease: { buildId: build, generationId: generation, expiresAt: Date.now() + 100_000, validUntil: Date.now() + 30_000, serverTime: Date.now() } })
   const { LocalGameTransport } = await import('../local-transport')
-  const worker = new FakeWorker(), factory = vi.fn(() => worker)
+  let worker: FakeWorker | undefined
+  const factory = vi.fn(() => { worker = new FakeWorker(); return worker })
   const config = { cards: [], playerCount: 2, seed: 42 }
   const transport = new LocalGameTransport(config, { workerFactory: factory })
   const initial = await transport.start()
@@ -21,7 +22,7 @@ it.each(['revoked', 'logout'])('terminates the active local worker on %s and ref
   const code = ending === 'logout' ? 'prerelease_auth_required' : 'prerelease_access_expired'
   if (ending === 'logout') pre.endPrereleaseSession()
   else pre.rejectPrereleaseAccess(code)
-  expect(worker.terminated).toBe(true)
+  expect(worker?.terminated).toBe(true)
   await expect(transport.getState()).rejects.toThrow(code)
   const stale = new LocalGameTransport(config, { workerFactory: factory })
   await expect(stale.start()).rejects.toThrow(code)

@@ -16,7 +16,7 @@ export function prereleaseBootstrapRequest(req: IncomingMessage): boolean {
   if (req.method !== 'GET' && req.method !== 'HEAD') return false
   const path = new URL(req.url ?? '/', 'http://localhost').pathname
   return ['/api/health', '/api/prerelease/runtime', '/api/auth/browser-policy', '/api/app-location', HOSTED_APP_PATH,
-    HOSTED_APP_PATH.slice(0, -1), `${HOSTED_APP_PATH}index.html`, `${HOSTED_APP_PATH}auth/handoff`].includes(path)
+    HOSTED_APP_PATH.slice(0, -1), `${HOSTED_APP_PATH}index.html`, `${HOSTED_APP_PATH}workshop-game.html`, `${HOSTED_APP_PATH}auth/handoff`].includes(path)
     || /^\/open-agricola\/(?:assets|i18n|card-encyclopedia)\//.test(path)
     || /^\/replay-viewers\/[a-f0-9]{64}\//.test(path)
 }
@@ -145,6 +145,11 @@ export async function requirePrereleaseRequest(req: IncomingMessage, res: Server
   if (!admission.ok) { send(res, admission.status, { ok: false, code: admission.code }); return false }
   guardResponse(req, res)
   const blockedPath = new URL(req.url ?? '/', 'http://localhost').pathname
+  const publicSandboxRead = /^\/api\/workshop\/public-sandbox\/v1\/(?:cards|inputs|status)$/.test(blockedPath)
+    && (blockedPath.endsWith('/cards') ? req.method === 'GET' : req.method === 'POST')
+  if (blockedPath === '/api/github/webhook' || blockedPath.startsWith('/api/workshop/') && !publicSandboxRead) {
+    send(res, 403, { ok: false, code: 'prerelease_readonly' }); return false
+  }
   if (blockedPath.startsWith('/api/auth/') || blockedPath.startsWith('/api/admin/') || blockedPath.startsWith('/api/prerelease/')
     || blockedPath.startsWith('/ops/') || blockedPath.startsWith('/api/v1/issue-submission-connection') || blockedPath.includes('/oauth/')
     || blockedPath.startsWith('/api/v1/replays/') && !(req.method === 'GET'
