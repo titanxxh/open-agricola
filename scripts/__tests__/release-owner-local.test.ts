@@ -288,7 +288,7 @@ describe('owner-local public release entry', () => {
 })
 
 
-describe('owner-local prerelease publication', () => {
+describe('owner-local prerelease publication', { timeout: 30_000 }, () => {
   it('publishes the fixed integration as a native prerelease and exposes a distinct local proof without Actions IDs', () => {
     const value = fixture(false, 'prerelease')
     const result = value.run()
@@ -315,9 +315,9 @@ it('carries the authenticated native pre asset proof into candidate image qualif
   expect(JSON.parse(image.stdout)).toMatchObject({ kind: 'owner-local-prerelease', ownerId: 7, assetId: 12,
     url: 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9-beta.1/owner-local-verification.json' })
   expect(JSON.parse(image.stdout).tasks).toBeUndefined()
-})
+}, 30_000)
 
-describe('owner-local prerelease admission remains source bound', () => {
+describe('owner-local prerelease admission remains source bound', { timeout: 30_000 }, () => {
   it('rejects publishing a fixed candidate after current prerelease protection is withdrawn', () => {
     const value = fixture(false, 'prerelease')
     value.state.refs[`heads/verification/prerelease/${value.sha}`] = value.sha

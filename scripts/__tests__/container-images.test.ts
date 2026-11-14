@@ -226,6 +226,7 @@ it('requires the current complete prerelease verification and binds every native
     steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }))
   const manifest = { ...jobs[0], id: 999, name: 'candidate-manifest', started_at: '2026-11-13T01:00:00Z', completed_at: '2026-11-13T01:01:00Z', steps: [step('Generate candidate manifest'), step(`Prerelease manifest / 123 / prerelease / ${sha} / ${configuration} / ${value.sha} / ${FULL_TASK_IDS.join(',')}`)] }
   value.api[`${prefix}/git/ref/heads/verification/prerelease/${sha}`] = { object: { type: 'commit', sha } }
+  value.api[`${prefix}/rules/branches/prerelease?per_page=100`] = ['pull_request', 'deletion', 'required_linear_history'].map(type => ({ type }))
   value.api[`${prefix}/rules/branches/${encodeURIComponent('verification/prerelease/' + sha)}?per_page=100`] = ['non_fast_forward', 'deletion', 'update'].map(type => ({ type }))
   value.api[`${prefix}/actions/workflows/prerelease-candidate-verification.yml`] = workflow
   value.api[`${prefix}/actions/workflows/200/runs?event=workflow_dispatch&per_page=100`] = [run]
