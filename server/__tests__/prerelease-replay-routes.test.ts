@@ -27,6 +27,7 @@ const fixture = vi.hoisted(() => {
 vi.mock('../prerelease-sessions', () => ({ getPrereleaseSessions: () => fixture.service, readPrereleaseRuntime: () => fixture.runtime }))
 import { requirePrereleaseRequest } from '../prerelease-routes'
 
+let reportEncryptionAvailable = true
 let resources: ReplayResources, store: ReplayStore, server: Server, origin: string, buildId: string, assetHash: string, frameHash: string
 const image = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3])
 const headers = () => ({ origin: fixture.runtime.appOrigin, cookie: '__Host-oa-pre-session=pre-session',
@@ -37,6 +38,7 @@ const read = (path: string, extra: Record<string, string> = {}) => fetch(origin 
 beforeEach(async () => {
   vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
   fixture.authorize(true)
+  reportEncryptionAvailable = true
   const db = await createTestDatabase()
   resources = new ReplayResources(new ResourceStore(db, S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)))
   store = new ReplayStore(db)
@@ -60,7 +62,7 @@ beforeEach(async () => {
   server = createServer((req,res) => { void (async () => {
     if (!await requirePrereleaseRequest(req,res)) return
     if (await handleReplayRoute(req,res,store,{resources,limiter:new ReplayReadLimiter()})) return
-    if (await handleBugReportRoute(req,res,reports,{id:'u1',username:'u1',displayName:'One'},false)) return
+    if (await handleBugReportRoute(req,res,reportEncryptionAvailable ? reports : null,{id:'u1',username:'u1',displayName:'One'},false,{db,resources})) return
     res.writeHead(404); res.end()
   })().catch(error => { res.writeHead(500); res.end(String(error)) }) })
   await new Promise<void>(resolve => server.listen(0,'127.0.0.1',resolve))
@@ -136,7 +138,8 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
     expect(await result.json()).toMatchObject({ok:false,code:'viewer_unavailable'})
     expect((await resources.storage.read(`replay-viewers/${oldBuild}/index.html`))?.body).toEqual(html)
   })
-  it('keeps Evidence images behind the exact submitted Anchor, participant and expiry checks', async () => {
+  it.each([true,false])('keeps Evidence Anchor, participant and expiry checks with report encryption %s', async encrypted => {
+    reportEncryptionAvailable = encrypted
     const db = resources.storage.db, now = Date.now()
     await db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES ('u1','u1','One','hash',?)").run(now)
     await db.prepare("INSERT INTO rooms(id,created_by,state_json,status,version,created_at,updated_at) VALUES ('room-1','u1','{}','playing',0,?,?)").run(now,now)
@@ -147,6 +150,9 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
     await db.prepare("UPDATE game_replay_steps SET payload_kind=?,payload_gzip=?,frame_hash=? WHERE room_id='room-1'").run(encoded.payloadKind,encoded.payloadGzip,encoded.frameHash)
     await db.prepare("INSERT INTO bug_reports(submission_id,reporter_user_id,room_id,player_index,lifecycle,room_version,step_no,frame_hash,status,submitted_at,evidence_expires_at,created_at,updated_at) VALUES ('reported','u1','room-1',0,'active',0,0,?,'submitted',?,?,?,?)")
       .run(encoded.frameHash,now,now+60_000,now,now)
+    const evidence = await read(`/api/v1/game-contexts/room-1/evidence/0?frame=${encoded.frameHash}`)
+    expect(evidence.status).toBe(200)
+    expect(await evidence.json()).toMatchObject({ok:true,kind:'reportedEvidence',perspective:'p1'})
     const path = `/api/v1/game-contexts/room-1/evidence/0/assets/${assetHash}?frame=${encoded.frameHash}`
     const response = await read(path,{'if-none-match':'*',range:'bytes=0-1'})
     expect(response.status).toBe(200)

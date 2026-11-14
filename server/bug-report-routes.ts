@@ -55,6 +55,8 @@ type BugReportRuntime = {
   github: GitHubIssueClient | null
 }
 
+type EvidenceRuntime = Pick<BugReportRuntime, 'db' | 'resources'>
+
 type ReplayStepRow = {
   step_no: number
   checkpoint_step_no: number
@@ -249,7 +251,7 @@ const errorPayload = (error: BugReportError) => ({
 })
 
 const loadEvidenceFrame = async (
-  runtime: BugReportRuntime,
+  runtime: EvidenceRuntime,
   report: EvidenceAnchor,
   playerIndex: number | null,
 ): Promise<Awaited<SerializedGameState>> => {
@@ -414,7 +416,7 @@ const inspectEvidence = async (
 }
 
 const participantEvidence = async (
-  runtime: BugReportRuntime,
+  runtime: EvidenceRuntime,
   roomId: string,
   stepNo: number,
   frameHash: string,
@@ -486,6 +488,7 @@ export async function handleBugReportRoute(
   runtime: BugReportRuntime | null,
   user: AuthUser | null,
   isMaintainer: boolean,
+  evidenceRuntime: EvidenceRuntime | null = runtime,
 ): Promise<boolean> {
   if (!req.url) return false
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
@@ -690,17 +693,18 @@ export async function handleBugReportRoute(
       return true
     }
 
-    if (!runtime) throw new BugReportError('bug_report_unavailable', 503)
+    const reader = runtime ?? evidenceRuntime
     const evidenceAsset = isPrerelease() ? PARTICIPANT_EVIDENCE_ASSET_ROUTE.exec(pathname) : null
     if (evidenceAsset && req.method === 'GET') {
       const current = await requireAccountRequest(res, user, 'evidence')
+      if (!reader) throw new BugReportError('bug_report_unavailable', 503)
       const frameHash = url.searchParams.get('frame') ?? ''
       if (!/^[a-f0-9]{64}$/.test(frameHash)) throw new BugReportError('anchor_mismatch', 409)
-      const evidence = await participantEvidence(runtime, decodeId(evidenceAsset[1]!), Number(evidenceAsset[2]), frameHash, current)
-      const resources = runtime.resources ?? new ReplayResources(getResources())
+      const evidence = await participantEvidence(reader, decodeId(evidenceAsset[1]!), Number(evidenceAsset[2]), frameHash, current)
+      const resources = reader.resources ?? new ReplayResources(getResources())
       const object = await resources.asset(evidence.roomId, evidenceAsset[3]!, evidence.customCards)
-      if (!object || !replayBridgeImageType(object.contentType) || object.body.byteLength > REPLAY_BRIDGE_MAX_BYTES || await prereleaseArchiveExpired(runtime.db, evidence.roomId)) throw new BugReportError('replay_segment_unavailable', 503)
-      await participantEvidence(runtime, evidence.roomId, evidence.stepNo, evidence.frameHash, current)
+      if (!object || !replayBridgeImageType(object.contentType) || object.body.byteLength > REPLAY_BRIDGE_MAX_BYTES || await prereleaseArchiveExpired(reader.db, evidence.roomId)) throw new BugReportError('replay_segment_unavailable', 503)
+      await participantEvidence(reader, evidence.roomId, evidence.stepNo, evidence.frameHash, current)
       res.writeHead(200, { 'Content-Type': object.contentType, 'Cache-Control': 'no-store',
         'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff' })
       res.end(object.body)
@@ -709,6 +713,7 @@ export async function handleBugReportRoute(
     const participantEvidenceMatch = PARTICIPANT_EVIDENCE_ROUTE.exec(pathname)
     if (participantEvidenceMatch && req.method === 'GET') {
       const current = (await requireAccountRequest(res, user, 'evidence'))
+      if (!reader) throw new BugReportError('bug_report_unavailable', 503)
       const frameHash = url.searchParams.get('frame') ?? ''
       if (!/^[a-f0-9]{64}$/.test(frameHash)) {
         throw new BugReportError('anchor_mismatch', 409)
@@ -717,7 +722,7 @@ export async function handleBugReportRoute(
         res,
         200,
         (await participantEvidence(
-          runtime,
+          reader,
           decodeId(participantEvidenceMatch[1]!),
           Number(participantEvidenceMatch[2]),
           frameHash,
@@ -726,6 +731,7 @@ export async function handleBugReportRoute(
       )
       return true
     }
+    if (!runtime) throw new BugReportError('bug_report_unavailable', 503)
     const current = req.method === 'GET'
       ? requireUser(res, user)
       : (await requireAccountRequest(res, user, 'mutation'))
