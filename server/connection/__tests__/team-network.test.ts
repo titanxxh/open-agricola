@@ -23,7 +23,7 @@ class Peer {
     const existing = this.events.find(predicate)
     if (existing) return Promise.resolve(existing)
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.socket.off('message', receive); reject(new Error(`Expected Team event; received ${JSON.stringify(this.events)}`)) }, 8_000)
+      const timer = setTimeout(() => { this.socket.off('message', receive); reject(new Error(`Expected Team event; received ${this.events.map(event => event.type + ('playerIndex' in event ? `(seat ${event.playerIndex})` : '')).join(', ')}`)) }, 8_000)
       const receive = () => { const event = this.events.find(predicate); if (event) { clearTimeout(timer); this.socket.off('message', receive); resolve(event) } }
       this.socket.on('message', receive)
     })
@@ -42,7 +42,7 @@ class Peer {
   async close() { if (this.socket.readyState !== WebSocket.CLOSED) { const closed = once(this.socket, 'close'); this.socket.close(); await closed } }
 }
 
-it('keeps prerelease Multihand accounts unseated until the host starts, then binds all controlled seats', async () => {
+async function teamNetwork(count = 2) {
   const db = await createTestDatabase()
   const runtime = { buildId: 'a'.repeat(40), generationId: randomUUID(), appOrigin: 'https://pre.example.test',
     formalAppOrigin: 'https://formal.example.test', formalApiBase: 'https://formal-api.example.test', targetId: 'prerelease-main' }
@@ -63,7 +63,7 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
       PUBLIC_APP_ORIGIN: runtime.appOrigin, PUBLIC_API_BASE: runtime.appOrigin, FORMAL_APP_ORIGIN: runtime.formalAppOrigin,
       FORMAL_API_BASE: runtime.formalApiBase, PRERELEASE_DATA_GENERATION: runtime.generationId,
       PRERELEASE_TARGET_ID: runtime.targetId, PRERELEASE_IDENTITY_SERVICE_KEY: 'team-fixture-service-key-'.repeat(2) })
-    for (let index = 0; index < 2; index++) {
+    for (let index = 0; index < count; index++) {
       subject = { id: randomUUID(), username: `team_farmer_${index}`, displayName: `Farmer ${index}` }; userIds.push(subject.id)
       const pending = await service.beginHandoff(), params = new URLSearchParams(new URL(pending.formalUrl).hash.slice(1))
       const issued = await service.exchangeHandoff(pending.cookie, { protocolVersion: 1, code: 'c'.repeat(43),
@@ -74,20 +74,48 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
       { headers: { Host: new URL(runtime.appOrigin).host, Origin: runtime.appOrigin, Cookie: `__Host-oa-pre-session=${issued.token}` } }))
       peers.push(peer); await once(peer.socket, 'open')
     }
-    const allocationId = randomUUID()
-    const locate = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      const req = request(`${backend!.baseUrl}/api/rooms/locate`, { method: 'POST',
-        headers: { Host: new URL(runtime.appOrigin).host, Origin: runtime.appOrigin,
-          Cookie: `__Host-oa-pre-session=${tokens[0]}`, 'Content-Type': 'application/json',
-          'x-oa-browser-protocol': '2', 'x-oa-pre-build': runtime.buildId, 'x-oa-pre-generation': runtime.generationId } }, res => {
-        let body = ''; res.setEncoding('utf8'); res.on('data', chunk => { body += chunk })
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, body }))
+    const reconnect = async (index: number) => {
+      const peer = new Peer(new WebSocket(backend!.baseUrl.replace('http:', 'ws:') + '/ws', [BROWSER_WS_PROTOCOL,
+        PRERELEASE_BUILD_PROTOCOL_PREFIX + runtime.buildId, PRERELEASE_GENERATION_PROTOCOL_PREFIX + runtime.generationId],
+      { headers: { Host: new URL(runtime.appOrigin).host, Origin: runtime.appOrigin, Cookie: `__Host-oa-pre-session=${tokens[index]}` } }))
+      peers[index] = peer
+      await once(peer.socket, 'open')
+      return peer
+    }
+    const create = async (configuration: import('../../../shared/contract/team').TeamConfiguration) => {
+      const allocationId = randomUUID()
+      const locate = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const req = request(`${backend!.baseUrl}/api/rooms/locate`, { method: 'POST',
+            headers: { Host: new URL(runtime.appOrigin).host, Origin: runtime.appOrigin,
+              Cookie: `__Host-oa-pre-session=${tokens[0]}`, 'Content-Type': 'application/json',
+              'x-oa-browser-protocol': '2', 'x-oa-pre-build': runtime.buildId, 'x-oa-pre-generation': runtime.generationId } }, res => {
+            let body = ''; res.setEncoding('utf8'); res.on('data', chunk => { body += chunk })
+            res.on('end', () => resolve({ status: res.statusCode ?? 0, body }))
+        })
+        req.on('error', reject); req.end(JSON.stringify({ allocationId }))
       })
-      req.on('error', reject); req.end(JSON.stringify({ allocationId }))
-    })
-    expect(locate.status, locate.body).toBe(200)
-    const created = await peers[0]!.mutate({ type: 'createRoom', maxPlayers: 4, enableCommunityDeck: false, customCardIds: [],
-      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' } }, allocationId)
+      expect(locate.status, locate.body).toBe(200)
+      return peers[0]!.mutate({ type: 'createRoom', maxPlayers: 4, enableCommunityDeck: false, customCardIds: [], teamConfig: configuration }, allocationId)
+    }
+    const close = async () => {
+      service.close()
+      for (const peer of peers) await peer.close()
+      await backend?.close(); await db.close()
+    }
+    return { db, peers, userIds, create, reconnect, close }
+  } catch (error) {
+    service.close()
+    for (const peer of peers) await peer.close()
+    await backend?.close(); await db.close()
+    throw error
+  }
+}
+
+it('keeps prerelease Multihand accounts unseated until the host starts, then binds all controlled seats', async () => {
+  const fixture = await teamNetwork()
+  const { db, peers, userIds } = fixture
+  try {
+    const created = await fixture.create({ mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' })
     expect(created.ok).toBe(true)
     if (!created.roomId) throw new Error('Missing created Team room')
     const roomId = created.roomId
@@ -129,9 +157,55 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
       { player_index: 0, user_id: userIds[0] }, { player_index: 1, user_id: userIds[1] },
       { player_index: 2, user_id: userIds[0] }, { player_index: 3, user_id: userIds[1] },
     ])
-  } finally {
-    service.close()
-    for (const peer of peers) await peer.close()
-    await backend?.close(); await db.close()
-  }
+    const retained = await db.prepare('SELECT state_json FROM rooms WHERE id=?').get(proposed.proposal.nextRoomId)
+    expect((await fixture.create({ mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' })).ok).toBe(true)
+    for (const playerIndex of [0, 2]) await peers[1]!.wait((event): event is Extract<ServerEvent, { type: 'playerDisconnected' }> =>
+      event.type === 'playerDisconnected' && event.playerIndex === playerIndex)
+    expect(await db.prepare('SELECT state_json FROM rooms WHERE id=?').get(proposed.proposal.nextRoomId)).toEqual(retained)
+  } finally { await fixture.close() }
+}, 60_000)
+
+it.each(['shared', 'private'] as const)('publishes %s Team hands without granting teammate command authority and updates waiting disconnects', async teammateVisibility => {
+  const fixture = await teamNetwork(4)
+  const { db, peers } = fixture
+  try {
+    const created = await fixture.create({ mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility })
+    if (!created.roomId) throw new Error('Missing Team room')
+    const roomId = created.roomId
+    peers[1]!.socket.send(JSON.stringify({ type: 'joinRoom', roomId }))
+    await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> =>
+      event.type === 'teamRoomWaiting' && event.members.some(member => member.name === 'Farmer 1' && member.connected === true))
+    await peers[1]!.close()
+    await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> =>
+      event.type === 'teamRoomWaiting' && event.members.some(member => member.name === 'Farmer 1' && member.connected === false))
+    await fixture.reconnect(1)
+    for (let index = 1; index < peers.length; index++) {
+      peers[index]!.socket.send(JSON.stringify({ type: 'joinRoom', roomId, intent: index === 1 ? 'resume' : 'join' }))
+      await peers[index]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting')
+    }
+    await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting' && event.canStart)
+    expect((await peers[0]!.mutate({ type: 'startTeamGame' }, undefined, roomId)).ok).toBe(true)
+    const joins = await Promise.all(peers.map(peer => peer.wait((event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined' && event.status === 'playing')))
+    const states = await Promise.all(peers.map(peer => peer.wait((event): event is Extract<ServerEvent, { type: 'stateUpdate' }> => event.type === 'stateUpdate')))
+    for (const [index, joined] of joins.entries()) {
+      expect(joined.controlledPlayerIndexes).toEqual([joined.playerIndex])
+      const visible = teammateVisibility === 'shared' ? joined.playerIndex % 2 === 0 ? ['p1', 'p3'] : ['p2', 'p4'] : [`p${joined.playerIndex + 1}`]
+      expect(joined.visiblePlayerIds).toEqual(visible)
+      for (const player of states[index]!.payload.state.players) {
+        expect(player.occupationHand).toHaveLength(7)
+        expect(player.minorHand).toHaveLength(7)
+        if (visible.includes(player.id)) expect(player.occupationHand.every(id => id !== '?')).toBe(true)
+        else expect(player.occupationHand.every(id => id === '?')).toBe(true)
+      }
+    }
+    const actor = states[0]!.payload.state.currentPlayerIndex
+    const teammate = joins.findIndex(joined => joined.playerIndex !== actor && joined.playerIndex % 2 === actor % 2)
+    expect(teammate).toBeGreaterThanOrEqual(0)
+    expect(states[teammate]!.payload.interaction.allowedCommands).toEqual([])
+    const before = await db.prepare('SELECT state_json FROM rooms WHERE id=?').get(roomId)
+    const replay = await db.prepare('SELECT * FROM game_replays WHERE room_id=?').get(roomId)
+    expect(await peers[teammate]!.mutate({ type: 'action', spaceId: 'grain-seeds' }, undefined, roomId)).toMatchObject({ ok: false, error: 'seat mismatch: you cannot act on another player' })
+    expect(await db.prepare('SELECT state_json FROM rooms WHERE id=?').get(roomId)).toEqual(before)
+    expect(await db.prepare('SELECT * FROM game_replays WHERE room_id=?').get(roomId)).toEqual(replay)
+  } finally { await fixture.close() }
 }, 60_000)

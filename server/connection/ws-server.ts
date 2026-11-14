@@ -1,4 +1,5 @@
 import { supportsReplayBridge } from '../../shared/contract/replay-viewer-build'
+import { publishTeamWaitingRoom } from '../game/team-room'
 import { closePrereleaseSocket, isPrerelease, prereleaseRequestAdmission, trackPrereleaseSocket } from '../prerelease-access'
 import { drainRoomSpectators, removeRoomSpectator } from '../game/room-spectators'
 import { operationsMetrics, safe } from '../observability/metrics'
@@ -322,6 +323,9 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
       if (removeRoomSpectator(ctx.currentRoom, ws)) return
       const disconnectedSeats = controlledSeatIndexes(ctx.currentRoom, ws)
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
+      if (removal !== 'not-present' && ctx.currentRoom.status === 'waiting' && ctx.currentRoom.session.state.team) {
+        await publishTeamWaitingRoom({ room: ctx.currentRoom, broadcaster: deps.broadcaster })
+      }
       if (removal === 'remaining') {
         for (const playerIndex of disconnectedSeats) await deps.broadcaster.broadcastEvent(ctx.currentRoom, {
           type: 'playerDisconnected', playerIndex,

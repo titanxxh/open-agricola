@@ -1,3 +1,4 @@
+import type { Broadcaster } from '../connection/broadcaster'
 import { randomUUID } from 'node:crypto'
 import type { TeamRoomMember, TeamWaitingRoomState } from '../../shared/contract/team-room'
 import type { Room } from './room'
@@ -62,4 +63,11 @@ export function teamWaitingState(room: Room, userId: string): TeamWaitingRoomSta
   return { ...waiting, members: waiting.members.map(member => ({ ...member,
     connected: room.waitingTeamConnections?.get(member.memberId)?.readyState === 1,
   })) }
+}
+
+export async function publishTeamWaitingRoom({ room, broadcaster }: { room: Room; broadcaster: Pick<Broadcaster, 'sendRoomEvent'> }): Promise<void> {
+  for (const member of room.teamMembers ?? []) {
+    const connection = room.waitingTeamConnections?.get(member.memberId)
+    if (connection) await broadcaster.sendRoomEvent(connection, room, { type: 'teamRoomWaiting', ...teamWaitingState(room, member.userId) })
+  }
 }

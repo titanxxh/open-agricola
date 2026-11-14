@@ -28,7 +28,7 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('044-historical-feedback-subjects.sql')
     migrations.push('045-feedback-summary-and-deletion.sql')
     migrations.push('046-browser-auth-policy.sql')
-    migrations.push('047-prerelease-sessions.sql')
+    migrations.push('047-prerelease-sessions.sql', '048-team-room-members.sql')
     migrations.push('050-prerelease-handoff-receipts.sql')
     for (const filename of migrations) {
       const version = filename === 'schema.sql' ? 1 : Number.parseInt(filename.slice(0, 3), 10)
