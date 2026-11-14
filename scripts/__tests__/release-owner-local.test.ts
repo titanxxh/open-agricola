@@ -318,6 +318,18 @@ it('carries the authenticated native pre asset proof into candidate image qualif
 })
 
 describe('owner-local prerelease admission remains source bound', () => {
+  it('rejects publishing a fixed candidate after current prerelease protection is withdrawn', () => {
+    const value = fixture(false, 'prerelease')
+    value.state.refs[`heads/verification/prerelease/${value.sha}`] = value.sha
+    value.state.provenance['repos/titanxxh/open-agricola/rules/branches/prerelease?per_page=100'] = []
+    value.save()
+    const result = value.run()
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Missing prerelease reference protection for prerelease')
+    expect(value.load().release).toBeNull()
+    expect(value.events().filter(event => event.method !== 'GET')).toEqual([])
+  })
+
   it.each(['stable receipt', 'producer', 'partial tasks', 'stable build', 'configuration', 'pre head', 'fixed ref', 'protections', 'baseline', 'collaborator', 'candidate tools'])('refuses %s before publishing any receipt asset', failure => {
     const value = fixture(false, 'prerelease')
     const receipt = JSON.parse(readFileSync(value.receiptPath, 'utf8'))

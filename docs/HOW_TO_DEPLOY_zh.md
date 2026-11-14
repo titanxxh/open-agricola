@@ -118,7 +118,7 @@ pnpm release vX.Y.Z-beta.N --channel prerelease --ref "$pre_sha" \
   --local-verification "$private_owner_directory/pre-verification.json"
 ```
 
-recorder 执行同一完整十任务 pre 计划，记录实际命令退出码和私有日志 SHA256。命令失败或源码变化时不产生成功回执。它核对真实当前 pre SHA、不可变候选 ref、manifest 来源以及干净的当前 protected-main producer。普通回归沿用 stable 运行期默认值，生产 hosted build 使用 prerelease；执行期间 producer 或 pre head 变化需要重新验收。
+recorder 执行同一完整十任务 pre 计划，记录实际命令退出码和私有日志 SHA256。命令失败或源码变化时不产生成功回执。它核对真实当前 pre SHA、不可变候选 ref、manifest 来源以及干净的当前 protected-main producer。每次候选准入都重新检查当前 prerelease 分支的 PR、禁止删除和线性历史保护，不可变 ref 已存在时也不豁免。普通回归沿用 stable 运行期默认值，生产 hosted build 使用 prerelease；执行期间 producer 或 pre head 变化需要重新验收。
 
 pre owner-local 使用独立 receipt/proof variant 和原生 owner 的 `owner-local-prerelease-verification` status，固定 beta Release 必须为 `prerelease=true`、`latest=false`。stable 与 pre 证明不能互相授权。公共 pre checker 重验固定源码、完整计划、双方配置、producer 祖先关系、原生 owner、tag 和绑定摘要的 asset ID/实际字节。完整同树 rebase 保留实际受测 SHA；源码树或 producer 配置不兼容时重新执行。owner、接收端 deploy/open/restore 和 candidate 镜像生产保留真实 typed 本机证明，不虚构 Actions ID。本机授权缺失或撤销时仍可用原生 workflow 回退；owner 最新 success 的证明无效时阻断。原生 PR/ref 规则、同步 lease、真实私有镜像生产/import 和目标验收仍为独立门禁；候选内工具不能自授权，必须先把 producer 正当交付到 protected main。
 

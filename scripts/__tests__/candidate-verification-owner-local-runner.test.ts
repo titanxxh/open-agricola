@@ -8,7 +8,7 @@ import { afterEach, expect, it } from 'vitest'
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
-function fixture(mode = 'success') {
+function fixture(mode = 'success', prereleaseRules = ['pull_request', 'deletion', 'required_linear_history']) {
   const root = mkdtempSync(join(tmpdir(), 'oa-pre-local-runner-')); roots.push(root)
   const repository = resolve(import.meta.dirname, '../..')
   cpSync(join(repository, 'scripts/ci'), join(root, 'scripts/ci'), { recursive: true })
@@ -38,6 +38,7 @@ function fixture(mode = 'success') {
     [`${prefix}/git/ref/heads/prerelease`]: { object: { type: 'commit', sha } },
     [`${prefix}/git/ref/heads/verification/prerelease/${sha}`]: { object: { type: 'commit', sha } },
     [`${prefix}/rules/branches/main?per_page=100`]: ['pull_request', 'non_fast_forward', 'deletion', 'required_linear_history'].map(type => ({ type })),
+    [`${prefix}/rules/branches/prerelease?per_page=100`]: prereleaseRules.map(type => ({ type })),
     [`${prefix}/rules/branches/verification%2Fprerelease%2F${sha}?per_page=100`]: ['non_fast_forward', 'deletion', 'update'].map(type => ({ type })),
   }
   const bin = join(root, 'bin'); mkdirSync(bin)
@@ -84,4 +85,12 @@ it.each(['failed', 'changed'])('preserves real logs without writing a successful
   expect(logs).toBeDefined()
   if (!logs) throw new Error('Missing failed command logs')
   expect(readdirSync(join(value.owner, logs)).length).toBeGreaterThan(0)
+})
+
+it('rejects recording a fixed candidate after current prerelease protection is withdrawn', () => {
+  const value = fixture('success', []), result = value.run()
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Missing prerelease reference protection for prerelease')
+  expect(existsSync(value.output)).toBe(false)
+  expect(existsSync(join(value.candidate, 'events.jsonl'))).toBe(false)
 })

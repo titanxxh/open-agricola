@@ -81,6 +81,7 @@ function authority(cwd: string, repository: string) {
 export function admitPrereleaseSnapshot(cwd: string, repository: string, sha: string) {
   fullSha(sha)
   const source = authority(cwd, repository)
+  requireRules(repository, 'prerelease', ['pull_request', 'deletion', 'required_linear_history'])
   assertRawCommit(cwd, repository, sha)
   if (commitRef(repository, `heads/${prereleaseCandidateRef(sha)}`) !== sha) throw new Error('Prerelease candidate lacks its matching immutable reference')
   requireRules(repository, prereleaseCandidateRef(sha), ['non_fast_forward', 'deletion', 'update'])
