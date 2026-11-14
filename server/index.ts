@@ -1111,6 +1111,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     bugReportRuntime,
     requestUser,
     requestUser ? isAdmin(requestUser.username) : false,
+    { db: getDb() },
   )) return
 
   sendJson(res, 404, { error: 'Not found' })
