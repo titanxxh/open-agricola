@@ -1,9 +1,11 @@
-import { spawnSync } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { spawn, spawnSync } from 'node:child_process'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { dockerFixtureEnvironment } from './_helpers/docker-fixture-environment'
 import { createBackendImageFixture } from './_helpers/backend-image-fixture'
+import { backendImageRequestBinding, readBackendImageEvidence } from '../release/backend-image-receiver'
 
 const repository = resolve(import.meta.dirname, '../..'), roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -30,11 +32,22 @@ function fixture(failure = '', bootstrap = false) {
   const state = { failure, bootstrap: bootstrap || failure === 'missing-app', caddyStarted: !bootstrap, projectVolume: false, proofRemoved: false, livePresent: false, liveRemoved: false, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
   const statePath = join(value.root, 'maintenance.json'), callsPath = join(value.root, 'maintenance-calls.jsonl')
   writeFileSync(statePath, JSON.stringify(state))
+  const tree: string[] = []
+  const collect = (directory: string, relative = '') => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const file = join(directory, entry.name), name = relative ? `${relative}/${entry.name}` : entry.name
+      if (entry.isDirectory()) collect(file, name)
+      else { const bytes = readFileSync(file); tree.push(createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex') + '\t' + name) }
+    }
+  }
+  collect(policy)
+  const policyTree = join(value.root, 'policy-tree.txt'); writeFileSync(policyTree, tree.join('\n') + '\n')
   const prefix = `#!${process.execPath}
 const fs=require('node:fs'),cp=require('node:child_process'),path=require('node:path');const a=process.argv.slice(2),file=${JSON.stringify(statePath)},s=JSON.parse(fs.readFileSync(file,'utf8'));
 const log=(kind,args=a)=>fs.appendFileSync(${JSON.stringify(callsPath)},JSON.stringify({kind,args})+'\\n');const save=()=>fs.writeFileSync(file,JSON.stringify(s));const out=x=>console.log(JSON.stringify(x));
 `
   writeFileSync(join(value.bin, 'git'), prefix + `log('git');
+if(a[0]==='ls-tree'){process.stdout.write(fs.readFileSync(${JSON.stringify(policyTree)},'utf8'));process.exit(0)}
 if(a[0]==='status')process.exit(0);if(a[0]==='fetch')process.exit(0);
 if(a[0]==='rev-parse')console.log(a[1].startsWith('FETCH_HEAD')?(s.failure==='fetch'?'f'.repeat(40):${JSON.stringify(value.request.sourceSha)}):s.head);
 else if(a[0]==='checkout'){s.head=s.failure==='checkout'?'f'.repeat(40):a[2];save();}else throw Error('Unexpected git');
@@ -48,9 +61,9 @@ if(a[0]==='rm'&&a.includes('5'.repeat(64))){log('docker');if(s.failure==='live-r
 if(['context','info','image','create','cp','rm'].includes(a[0])){const r=cp.spawnSync(${JSON.stringify(join(value.bin, 'docker-intake'))},a,{stdio:'inherit'});process.exit(r.status??1)}
 log('docker');const oldId=${JSON.stringify(oldId)},caddyId=${JSON.stringify(caddyId)},newId=${JSON.stringify(newId)},data=${JSON.stringify(data)};
 if(a[0]==='inspect'){
- const id=a[1],isNew=id===newId||id==='5'.repeat(64);out([{Id:id,Image:id===caddyId?(s.failure==='caddy-up-identity'&&s.caddyStarted?'sha256:'+'e'.repeat(64):s.caddyImage):isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
- State:{Running:id===caddyId?s.caddyStarted:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0},
- Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':'formal','com.docker.compose.service':id===caddyId?'caddy':'app',...(id==='5'.repeat(64)?{'org.open-agricola.backend-operation':s.failure==='live-foreign'?'foreign':${JSON.stringify(value.request.operationId)},'org.open-agricola.backend-phase':'live-validation'}:{})}}}]);
+ const id=a[1],isNew=id===newId||id==='5'.repeat(64);if(id===oldId&&s.sourceRemoved)process.exit(48);out([{Id:id,Image:id===caddyId?(s.failure==='caddy-up-identity'&&s.caddyStarted?'sha256:'+'e'.repeat(64):s.caddyImage):isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
+ State:{Running:id===caddyId?s.caddyStarted:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0,Health:{Status:s.failure==='unhealthy'?'unhealthy':'healthy'}},
+ Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':(s.foreignCaddy&&id===caddyId&&s.caddyStarted)||(s.foreignApp&&isNew)?'foreign':'formal','com.docker.compose.service':id===caddyId?'caddy':'app',...(isNew?{'org.open-agricola.backend-operation':s.foreignOperation?'another-operation':${JSON.stringify(value.request.operationId)}}:{}),...(id==='5'.repeat(64)?{'org.open-agricola.backend-operation':s.failure==='live-foreign'?'foreign':${JSON.stringify(value.request.operationId)},'org.open-agricola.backend-phase':'live-validation'}:{})}}}]);
 }else if(a[0]==='stop'){if(s.failure==='up-app-stop'&&a.at(-1)===newId)process.exit(47);if(a.at(-1)===newId)s.started=false;else if(a.at(-1)===caddyId)s.caddyStarted=false;else s.running=false;save();}
 else if(a[0]==='start'&&a.includes('4'.repeat(64))){if(['nonempty','unsupported-empty'].includes(s.failure))process.exit(45);out({formatVersion:1,targetBuildId:${JSON.stringify(value.request.sourceSha)},database:'empty',objects:'empty'});}
 else if(a[0]==='start'){s.running=true;save();}
@@ -60,8 +73,8 @@ else if(a[0]==='compose'){
  log('compose-owner',[process.env.APP_UID??'<unset>',process.env.APP_GID??'<unset>']);
  const file=a[a.indexOf('-f')+1];
  if(a.includes('config'))out({name:'formal',services:{app:{image:'mutable:old',build:{context:'.'},environment:{...data,...(s.failure==='data-target'?{S3_BUCKET:'another'}:{})},volumes:[],networks:['default']},caddy:{image:'caddy:mutable',depends_on:['app']}},networks:{default:{name:'formal_default'},dependencies:{external:true,name:'shared_dependencies'}}});
- else if(a.includes('ps'))console.log(file.endsWith('maintenance.compose.json')?(a.at(-1)==='caddy'?caddyId:newId):s.bootstrap?(s.failure==='existing-caddy'&&a.at(-1)==='caddy'?caddyId:''):a.at(-1)==='caddy'?caddyId:oldId);
- else if(a.includes('up')){s.started=true;s.caddyStarted=true;save();if(['up','up-app-stop'].includes(s.failure))process.exit(42);}
+ else if(a.includes('ps'))console.log(file.endsWith('maintenance.compose.json')?(a.at(-1)==='caddy'?(s.caddyStarted||!s.bootstrap?caddyId:''):(s.started||s.sourceRemoved?newId:s.bootstrap?'':oldId)):s.bootstrap?(s.failure==='existing-caddy'&&a.at(-1)==='caddy'?caddyId:''):a.at(-1)==='caddy'?caddyId:oldId);
+ else if(a.includes('up')){s.started=true;s.caddyStarted=true;if(s.recreateSource)s.sourceRemoved=true;save();if(['up','up-app-stop'].includes(s.failure))process.exit(42);}
  else if(a.includes('run')){
   if(s.bootstrap){s.projectVolume=true;save();}
   const community=${JSON.stringify(join(value.directory, 'data/community'))},info=fs.existsSync(community)?fs.lstatSync(community):null;fs.appendFileSync(${JSON.stringify(join(value.root, 'community-before-run.jsonl'))},JSON.stringify({exists:!!info,directory:info?.isDirectory(),uid:info?.uid,mode:info?info.mode&0o777:null})+'\\n');
@@ -71,9 +84,10 @@ else if(a[0]==='compose'){
    const destination=a.find(x=>x.startsWith('/backup/.pending-')&&x.endsWith('/capture')),directory=path.join(${JSON.stringify(value.directory)},'backups',destination.slice('/backup/'.length));fs.mkdirSync(directory,{recursive:true});
    fs.writeFileSync(path.join(directory,'database.dump'),'real fixture database bytes');fs.writeFileSync(path.join(directory,'archive.json'),JSON.stringify({version:1,sourceBuildId:s.sourceBuild,createdAt:new Date().toISOString(),schema:'public',objects:[]}));
   }else if(a.includes('ledger-export'))fs.writeFileSync(path.join(${JSON.stringify(value.directory)},'backups/replay-removals.latest.json'),'{"version":1,"batches":[]}');
-  else if(a.includes('validate'))out({formatVersion:2,validatedAt:new Date().toISOString(),sourceBuildId:s.sourceBuild,targetBuildId:s.failure==='report-target'?s.sourceBuild:${JSON.stringify(value.request.sourceSha)}});
+  else if(a.includes('validate'))out({formatVersion:2,validatedAt:new Date().toISOString(),sourceBuildId:s.sourceBuild,targetBuildId:s.failure==='report-target'?s.sourceBuild:${JSON.stringify(value.request.sourceSha)},roomCount:0,replayCount:0,replayHeadCount:0,replayStepCount:0,replaySegmentCount:0,retainedObjectCount:0,replaySchemaVersions:[]});
   else if(a.includes('check-empty')){if(['nonempty','unsupported-empty'].includes(s.failure))process.exit(45);out({formatVersion:1,targetBuildId:${JSON.stringify(value.request.sourceSha)},database:'empty',objects:'empty'});}
-  else if(a.includes('check-live')){s.livePresent=true;save();if(['live','live-foreign','live-remove'].includes(s.failure))process.exit(44);if(s.failure==='live-delay')Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,2000);s.livePresent=false;save();}
+  else if(a.includes('--input-type=module')){if(s.proofUnavailable)process.exit(50);out({barrier:{status:s.proofStatus??'validated',updated_at:s.checkpointAt??Date.now(),report_json:JSON.stringify({roomCount:0,replayCount:0,replayHeadCount:0,replayStepCount:s.badReport?1:0,replaySegmentCount:0,retainedObjectCount:0,replaySchemaVersions:[]})},bad:s.badImports??0,active:s.active??(s.started?1:0),foreign:s.foreign??0});}
+  else if(a.includes('check-live')){s.livePresent=true;s.checkpointAt=Date.now();save();if(['live','live-foreign','live-remove'].includes(s.failure))process.exit(44);if(s.failure==='live-delay')Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,2000);s.livePresent=false;save();}
   else if(!a.includes('cleanup-scratch'))throw Error('Unexpected compose run: '+a.join(' '));
  }else throw Error('Unexpected compose: '+a.join(' '));
 }else throw Error('Unexpected docker: '+a.join(' '));
@@ -82,10 +96,257 @@ else if(a[0]==='compose'){
     [join(policy, 'scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, expectedSha, value.request.producerSha],
     { env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }), encoding: 'utf8', timeout: 30_000 })
   const calls = (): { kind: string; args: string[] }[] => existsSync(callsPath) ? readFileSync(callsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
-  return { ...value, sourceBuild, sourceImage, caddyImage, caddyDigest, oldId, originalEnv, invoke, calls,
+  const operation = (mode: string, authorization?: string, extraEnv: NodeJS.ProcessEnv = {}) => spawnSync(process.execPath,
+    [join(policy, 'scripts/release/backend-image-maintenance.ts'), mode, value.requestPath, value.directory, value.request.sourceSha, value.request.producerSha, ...(authorization ? [authorization] : [])],
+    { env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }), encoding: 'utf8', timeout: 30000 })
+  const authorize = (extra = {}) => {
+    const nonce = randomUUID(), path = join(value.stage, `resume-${nonce}.json`), now = Date.now()
+    writeFileSync(path, JSON.stringify({ format: 1, nonce, operationId: value.request.operationId, bindingSha256: backendImageRequestBinding(readBackendImageEvidence(value.requestPath, value.request).request), authorizedAt: now, expiresAt: now + 600000, workMs: 600000, ...extra }), { mode: 0o600 })
+    return path
+  }
+  const mutate = (changes: Record<string, unknown>) => writeFileSync(statePath, JSON.stringify({ ...JSON.parse(readFileSync(statePath, 'utf8')), ...changes }))
+  return { ...value, operation, authorize, mutate, sourceBuild, sourceImage, caddyImage, caddyDigest, oldId, originalEnv, invoke, calls,
     current: () => JSON.parse(readFileSync(statePath, 'utf8')),
     compose: () => JSON.parse(readFileSync(join(value.root, 'observed-compose.json'), 'utf8')) }
 }
+
+it('observes accepted operations without changing the request, admission or progress and resumes idempotently', () => {
+  const value = fixture(), first = value.invoke()
+  expect(first.status, first.stderr).toBe(0)
+  const files = [value.requestPath, join(value.stage, 'maintenance-admission.json'), join(value.stage, 'maintenance-progress.json')]
+  const before = files.map(file => readFileSync(file, 'utf8'))
+  const status = value.operation('status')
+  expect(status.status, status.stderr).toBe(0)
+  expect(JSON.parse(status.stdout)).toMatchObject({ kind: 'backend-image-operation', state: 'accepted', phase: 'accepted', validatorExitCode: 0 })
+  expect(files.map(file => readFileSync(file, 'utf8'))).toEqual(before)
+  const commandsBefore = value.calls().filter(call => call.args.includes('up') || call.args.includes('check-live') || call.args.includes('export')).length
+  const result = value.operation('resume', value.authorize())
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout).state).toBe('accepted')
+  expect(value.calls().filter(call => call.args.includes('up') || call.args.includes('check-live') || call.args.includes('export'))).toHaveLength(commandsBefore)
+  expect(files.slice(0, 2).map(file => readFileSync(file, 'utf8'))).toEqual(before.slice(0, 2))
+})
+
+it('resumes the same operation from committed validation when the validator exit was lost', () => {
+  const value = fixture('live'), first = value.invoke()
+  expect(first.status).not.toBe(0)
+  const request = readFileSync(value.requestPath, 'utf8'), admission = readFileSync(join(value.stage, 'maintenance-admission.json'), 'utf8')
+  value.mutate({ failure: '' })
+  const status = value.operation('status')
+  expect(status.status, status.stderr).toBe(0)
+  expect(JSON.parse(status.stdout)).toMatchObject({ state: 'resumable', phase: 'validating', validatorExitCode: null })
+  const result = value.operation('resume', value.authorize())
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'accepted', validatorExitCode: null })
+  expect(value.calls().filter(call => call.args.includes('check-live'))).toHaveLength(1)
+  expect(value.calls().filter(call => call.args.includes('export'))).toHaveLength(1)
+  expect(value.calls().filter(call => call.args.includes('up'))).toHaveLength(1)
+  expect(value.calls().some(call => call.args[0] === 'start')).toBe(false)
+  expect(readFileSync(value.requestPath, 'utf8')).toBe(request)
+  expect(readFileSync(join(value.stage, 'maintenance-admission.json'), 'utf8')).toBe(admission)
+  const query = value.calls().find(call => call.args.includes('--input-type=module'))?.args.find(arg => arg.includes('REPEATABLE READ READ ONLY'))
+  expect(query).toContain('db.transaction(')
+  expect(query).not.toMatch(/UPDATE|INSERT|DELETE/)
+  expect(result.stdout).not.toContain('private-fixture')
+})
+
+it('uses fresh continuation authority after original work expiry without rewriting the original request or admission', () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: '' })
+  const original = [value.requestPath, join(value.stage, 'maintenance-admission.json')].map(file => readFileSync(file, 'utf8'))
+  const preload = join(value.root, 'resume-clock.mjs')
+  writeFileSync(preload, 'const now=Date.now;Date.now=()=>now()+3600000;')
+  const env = { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` }
+  const authorization = value.authorize({ authorizedAt: Date.now() + 3600000, expiresAt: Date.now() + 4200000 })
+  const result = value.operation('resume', authorization, env)
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'accepted', validatorExitCode: null })
+  expect([value.requestPath, join(value.stage, 'maintenance-admission.json')].map(file => readFileSync(file, 'utf8'))).toEqual(original)
+  expect(value.calls().filter(call => call.args.includes('check-live'))).toHaveLength(1)
+})
+
+it.each([
+  ['old checkpoint', { checkpointAt: 1 }],
+  ['incomplete checkpoint', { proofStatus: 'importing' }],
+  ['changed validation report', { badReport: true }],
+  ['failed import', { badImports: 1 }],
+  ['foreign writer', { active: 1, foreign: 1 }],
+  ['unproven live writer', { active: 1 }],
+] as const)('blocks continuation with %s before starting any application', (_name, changes) => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: '', ...changes })
+  const status = value.operation('status')
+  expect(status.status, status.stderr).toBe(0)
+  expect(JSON.parse(status.stdout).state).toBe('blocked')
+  expect(value.operation('resume', value.authorize()).status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('up') || call.args[0] === 'start')).toBe(false)
+  expect(value.current().running).toBe(false)
+})
+
+it.each(['expired', 'foreign'] as const)('rejects %s continuation authorization without changing admission', failure => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: '' })
+  const admission = readFileSync(join(value.stage, 'maintenance-admission.json'), 'utf8')
+  const auth = value.authorize(failure === 'expired' ? { authorizedAt: Date.now() - 10000, expiresAt: Date.now() - 1 } : { bindingSha256: 'f'.repeat(64) })
+  expect(value.operation('resume', auth).status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('up'))).toBe(false)
+  expect(readFileSync(join(value.stage, 'maintenance-admission.json'), 'utf8')).toBe(admission)
+})
+
+it('rejects changed staged producer files rather than trusting the journal', () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  writeFileSync(join(value.stage, 'policy/package.json'), '{"changed":true}')
+  const result = value.operation('status')
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'blocked', reason: 'staged-producer-changed' })
+  expect(value.calls().some(call => call.args.includes('up'))).toBe(false)
+})
+
+it('preserves the explicit empty-storage boundary while resuming bootstrap', () => {
+  const value = fixture('live', true); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: '' })
+  const result = value.operation('resume', value.authorize())
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'accepted', validatorExitCode: null })
+  expect(value.calls().filter(call => call.args.includes('check-empty'))).toHaveLength(1)
+  expect(value.calls().some(call => call.args.includes('export'))).toBe(false)
+})
+
+it('reports running without inspecting or stopping a live validator', () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: '', livePresent: true })
+  const result = value.operation('status')
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'running', nextAction: 'wait', reason: 'validator-still-present' })
+  const callsBefore = value.calls().length
+  expect(value.operation('resume', value.authorize()).status).not.toBe(0)
+  expect(value.calls().slice(callsBefore).some(call => call.args.includes('up') || call.args[0] === 'stop' || call.args[0] === 'rm')).toBe(false)
+})
+
+it('does not create a missing maintenance lock while reporting read-only status', () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  const lock = join(value.directory, 'backups/.maintenance.lock'); rmSync(lock)
+  const result = value.operation('status')
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'unknown', reason: 'operation-lock-missing' })
+  expect(existsSync(lock)).toBe(false)
+})
+
+it('reports unknown for unavailable native checkpoint evidence and never starts an application', () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: '', proofUnavailable: true })
+  const result = value.operation('status')
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'unknown', reason: 'native-evidence-unavailable-or-invalid' })
+  expect(value.operation('resume', value.authorize()).status).not.toBe(0)
+  expect(value.calls().some(call => call.args.includes('up'))).toBe(false)
+})
+
+it('reports running while another actor holds the original maintenance lock', async () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  const holder = spawn(value.realFlock, ['-x', join(value.directory, 'backups/.maintenance.lock'), process.execPath, '-e', "process.stdout.write('held');process.stdin.resume()"], { stdio: ['pipe', 'pipe', 'pipe'] })
+  await new Promise<void>((resolve, reject) => { holder.stdout.once('data', () => resolve()); holder.once('error', reject) })
+  try {
+    const before = value.calls().length, status = value.operation('status')
+    expect(status.status, status.stderr).toBe(0)
+    expect(JSON.parse(status.stdout)).toMatchObject({ state: 'running', nextAction: 'wait' })
+    expect(value.calls()).toHaveLength(before)
+  } finally { holder.stdin.end(); await new Promise<void>(resolve => holder.once('exit', () => resolve())) }
+})
+
+it('drains only the unaccepted target when continuation startup fails and never restarts old', () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: 'up' })
+  const result = value.operation('resume', value.authorize())
+  expect(result.status).not.toBe(0)
+  expect(value.current()).toMatchObject({ running: false, started: false })
+  expect(value.calls().some(call => call.args[0] === 'start')).toBe(false)
+  expect(value.calls().some(call => call.args[0] === 'stop' && call.args.at(-1) === '3'.repeat(64))).toBe(true)
+})
+
+it('resumes a stopped exact target after real Compose recreation removed the original source container', () => {
+  const value = fixture('up'); value.mutate({ recreateSource: true })
+  expect(value.invoke().status).not.toBe(0)
+  expect(value.current()).toMatchObject({ sourceRemoved: true, started: false, running: false })
+  const afterFailure = value.calls().length
+  value.mutate({ failure: '' })
+  const status = value.operation('status')
+  expect(status.status, status.stderr).toBe(0)
+  expect(JSON.parse(status.stdout)).toMatchObject({ state: 'resumable', phase: 'starting', validatorExitCode: 0 })
+  const result = value.operation('resume', value.authorize())
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout)).toMatchObject({ state: 'accepted', validatorExitCode: 0 })
+  expect(value.calls().slice(afterFailure).some(call => call.args[0] === 'inspect' && call.args[1] === value.oldId)).toBe(false)
+  expect(value.calls().filter(call => call.args.includes('check-live'))).toHaveLength(1)
+  expect(value.calls().filter(call => call.args.includes('export'))).toHaveLength(1)
+  expect(value.calls().filter(call => call.args.includes('up'))).toHaveLength(2)
+  expect(value.calls().some(call => call.args[0] === 'start' && call.args.includes(value.oldId))).toBe(false)
+})
+
+it.each(['oom', 'foreign project', 'foreign operation'])('rejects a stopped recreated target with %s instead of treating it as an accepted native target', failure => {
+  const value = fixture('up'); value.mutate({ recreateSource: true })
+  expect(value.invoke().status).not.toBe(0)
+  value.mutate(failure === 'oom' ? { failure: 'oom' } : failure === 'foreign project' ? { failure: '', foreignApp: true } : { failure: '', foreignOperation: true })
+  const result = value.operation('status')
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout).state).toBe('blocked')
+  expect(value.operation('resume', value.authorize()).status).not.toBe(0)
+  expect(value.calls().filter(call => call.args.includes('up'))).toHaveLength(1)
+})
+
+it('finishes an interrupted startup when the exact target app is healthy but retained Caddy is stopped', () => {
+  const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: '', started: true, caddyStarted: false })
+  const result = value.operation('resume', value.authorize())
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout).state).toBe('accepted')
+  expect(value.current()).toMatchObject({ started: true, caddyStarted: true })
+  expect(value.calls().filter(call => call.args.includes('up'))).toHaveLength(1)
+  expect(value.calls().filter(call => call.args.includes('check-live'))).toHaveLength(1)
+})
+
+it('drains bootstrap app and owned Caddy within the finite cleanup budget after continuation failure', () => {
+  const value = fixture('live', true); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: 'up' })
+  const preload = join(value.root, 'resume-cleanup-budget.mjs'), observed = join(value.root, 'resume-stop-timeouts.jsonl')
+  writeFileSync(preload, `import cp from 'node:child_process';import fs from 'node:fs';import{syncBuiltinESMExports}from'node:module';
+const exec=cp.execFileSync;cp.execFileSync=(command,args,options)=>{if(command==='docker'&&args?.[0]==='stop')fs.appendFileSync(${JSON.stringify(observed)},JSON.stringify({args,timeout:options.timeout})+'\\n');return exec(command,args,options)};syncBuiltinESMExports();`)
+  const result = value.operation('resume', value.authorize(), { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` })
+  expect(result.status).not.toBe(0)
+  expect(value.current()).toMatchObject({ started: false, caddyStarted: false })
+  const stops: { args: string[]; timeout: number }[] = readFileSync(observed, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  expect(stops.map(call => call.args.at(-1))).toEqual(['3'.repeat(64), '2'.repeat(64)])
+  expect(stops.every(call => call.args[2] === '90' && Number.isInteger(call.timeout) && call.timeout >= 100000 && call.timeout <= 300000)).toBe(true)
+  expect(value.calls().some(call => call.args[0] === 'start' && call.args.includes(value.oldId))).toBe(false)
+})
+
+it('refuses foreign bootstrap Caddy during continuation cleanup while still draining owned app', () => {
+  const value = fixture('live', true); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: 'up', foreignCaddy: true })
+  const result = value.operation('resume', value.authorize())
+  expect(result.status).not.toBe(0)
+  expect(value.current()).toMatchObject({ started: false, caddyStarted: true })
+  expect(value.calls().some(call => call.args[0] === 'stop' && call.args.at(-1) === '2'.repeat(64))).toBe(false)
+})
+
+it('attempts owned bootstrap Caddy drain even when unaccepted app drain fails', () => {
+  const value = fixture('live', true); expect(value.invoke().status).not.toBe(0)
+  value.mutate({ failure: 'up-app-stop' })
+  const result = value.operation('resume', value.authorize())
+  expect(result.status).not.toBe(0)
+  expect(value.current()).toMatchObject({ started: true, caddyStarted: false })
+  expect(value.calls().some(call => call.args[0] === 'start' && call.args.includes(value.oldId))).toBe(false)
+})
+
+it('can observe an accepted operation after normal backup rotation without replaying maintenance', () => {
+  const value = fixture(); expect(value.invoke().status).toBe(0)
+  const stem = `pre-${value.request.sourceSha.slice(0, 12)}-${value.request.operationId}`
+  for (const file of [`${stem}.manifest.json`, `${stem}.tgz`, `env-${stem}`]) rmSync(join(value.directory, 'backups', file))
+  const result = value.operation('resume', value.authorize())
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout).state).toBe('accepted')
+  expect(value.calls().filter(call => call.args.includes('up'))).toHaveLength(1)
+})
 
 it('delivers an imported immutable image with source capture, target restore validation and no host build', () => {
   const value = fixture(), result = value.invoke()

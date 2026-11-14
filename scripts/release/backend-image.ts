@@ -4,10 +4,12 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { fullSha } from '../ci/verification-tasks.ts'
 import { backendCandidate } from './backend-candidate.ts'
-import { BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS, parseBackendInstallation, readBackendImportBudget } from './backend-image-receiver.ts'
+import { BACKEND_IMAGE_CLEANUP_MS, BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS, parseBackendInstallation, readBackendImportBudget } from './backend-image-receiver.ts'
 import { assertExpectedContainerImage, verifyContainerImageBuild } from './container-images.ts'
 import { prepareContainerImageArchive } from './container-images-owner.ts'
+import { BACKEND_RESUME_WORK_MS } from './backend-image-progress.ts'
 
 const quote = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 function execute(command: string, args: string[], input?: string, timeout = 30_000): string {
@@ -15,6 +17,10 @@ function execute(command: string, args: string[], input?: string, timeout = 30_0
 }
 
 export async function backendImageDeployment(cwd: string, input: string[]): Promise<void> {
+  if (input[0] === 'status' || input[0] === 'resume') {
+    backendOperationCommand(cwd, input)
+    return
+  }
   const split = input.findIndex(value => value.startsWith('--')), positional = split < 0 ? input : input.slice(0, split)
   if (positional.length > 3) throw new Error('Usage: deploy-backend.sh [host] [ref] [remote-dir] --build-run N --build-attempt N --artifact-id N --auth-file FILE --import-budget FILE')
   const sourceSha = backendCandidate(cwd, [positional[1] ?? 'main'])
@@ -47,6 +53,7 @@ export async function backendImageDeployment(cwd: string, input: string[]): Prom
   const local = mkdtempSync(join(tmpdir(), 'oa-formal-image-')), operationId = randomUUID()
   const exported = await prepareContainerImageArchive({ receipt, authFile: resolve(selected.get('--auth-file') ?? ''), directory: local, maxBytes: budget.import.maxArchiveMiB * 1024 * 1024 })
   const stage = join(directory, 'backups', `.backend-image-${operationId}`)
+  process.stderr.write(`Backend operation: ${operationId}\nOwner image evidence: ${local}\nStatus: ./deploy-backend.sh status ${host} ${sourceSha} ${directory} --operation-id ${operationId}\n`)
   const ssh = (args: string[], script?: string, timeout = 30_000): string => execute('ssh', [host, args.map(quote).join(' ')], script, timeout)
   const prepare = `set -euo pipefail
 umask 077
@@ -91,6 +98,35 @@ printf '%s\\n' "$4"
   if (process.env.ACCOUNT_REGISTRATION_POLICY) env.push(`ACCOUNT_REGISTRATION_POLICY=${process.env.ACCOUNT_REGISTRATION_POLICY}`)
   const result = ssh([...env, 'node', join(stage, 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', ...target], undefined, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS)
   process.stdout.write(result + `\nOwner image evidence: ${local}\n`)
+}
+
+function backendOperationCommand(cwd: string, input: string[]): void {
+  const [mode, selectedHost, selectedSha, directory, flag, operationId] = input
+  if (input.length !== 6 || !['status', 'resume'].includes(mode) || flag !== '--operation-id'
+    || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(operationId ?? '')) throw new Error('Usage: deploy-backend.sh status|resume <host> <full-sha> <remote-dir> --operation-id <UUID>')
+  const host = selectedHost.includes('@') ? selectedHost : `ubuntu@${selectedHost}`, sourceSha = fullSha(selectedSha)
+  if (!/^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+$/.test(host)
+    || !/^\/[A-Za-z0-9_./-]+$/.test(directory) || resolve(directory) !== directory || directory === '/') throw new Error('Invalid backend operation target')
+  const producerSha = fullSha(execute('git', ['-C', cwd, 'rev-parse', 'HEAD']))
+  if (execute('git', ['-C', cwd, 'status', '--porcelain', '--untracked-files=no'])) throw new Error('Run backend operation commands from the clean exact producer checkout')
+  const stage = join(directory, 'backups', `.backend-image-${operationId}`), path = join(stage, 'request.json')
+  const controller = join(stage, 'policy/scripts/release/backend-image-maintenance.ts')
+  const ssh = (args: string[], input?: string, timeout = 150_000) => execute('ssh', [host, args.map(quote).join(' ')], input, timeout)
+  const output = ssh(['node', controller, 'status', path, directory, sourceSha, producerSha])
+  const value: unknown = JSON.parse(output)
+  if (!value || typeof value !== 'object' || !('kind' in value) || value.kind !== 'backend-image-operation'
+    || !('operationId' in value) || value.operationId !== operationId || !('sourceSha' in value) || value.sourceSha !== sourceSha
+    || !('producerSha' in value) || value.producerSha !== producerSha || !('bindingSha256' in value)
+    || typeof value.bindingSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.bindingSha256)
+    || !('state' in value) || !['running', 'resumable', 'accepted', 'blocked', 'unknown'].includes(String(value.state))) throw new Error('Backend returned another operation or invalid status')
+  if (mode === 'status') { process.stdout.write(output + '\n'); return }
+  if (value.state !== 'resumable' && value.state !== 'accepted') throw new Error(`Backend operation is ${String(value.state)}; inspect its status before continuing`)
+  if (backendCandidate(cwd, [sourceSha]) !== sourceSha) throw new Error('Backend continuation candidate authority changed')
+  const nonce = randomUUID(), now = Date.now(), authorizationPath = join(stage, `resume-${nonce}.json`)
+  const authorization = { format: 1, nonce, operationId, bindingSha256: value.bindingSha256, authorizedAt: now, expiresAt: now + BACKEND_RESUME_WORK_MS, workMs: BACKEND_RESUME_WORK_MS }
+  const store = 'require("node:fs").writeFileSync(process.argv[1],require("node:fs").readFileSync(0),{flag:"wx",mode:0o600,flush:true})'
+  ssh(['node', '-e', store, authorizationPath], JSON.stringify(authorization) + '\n', 30_000)
+  process.stdout.write(ssh(['node', controller, 'resume', path, directory, sourceSha, producerSha, authorizationPath], undefined, BACKEND_RESUME_WORK_MS + BACKEND_IMAGE_CLEANUP_MS + 60_000) + '\n')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

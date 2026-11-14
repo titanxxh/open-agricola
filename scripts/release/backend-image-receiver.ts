@@ -75,7 +75,8 @@ export function readBackendImageRequest(path: string) {
 export type BackendImageRequest = ReturnType<typeof parseBackendImageRequest>
 export type BackendImageTarget = Pick<BackendImageRequest, 'directory' | 'sourceSha' | 'producerSha'>
 type OperationKind = 'intake' | 'maintenance'
-const binding = ({ expiresAt: _expiresAt, ...request }: BackendImageRequest): string => createHash('sha256').update(JSON.stringify(request)).digest('hex')
+export const backendImageRequestBinding = ({ expiresAt: _expiresAt, ...request }: BackendImageRequest): string => createHash('sha256').update(JSON.stringify(request)).digest('hex')
+const binding = backendImageRequestBinding
 const operationPath = (request: BackendImageRequest, kind: OperationKind) => join(request.stage, `${kind}-admission.json`)
 const workBudget = (kind: OperationKind) => kind === 'intake' ? BACKEND_IMAGE_INTAKE_WORK_MS : BACKEND_IMAGE_MAINTENANCE_WORK_MS
 function target(request: BackendImageRequest, expected?: BackendImageTarget): void {
@@ -134,6 +135,13 @@ export function readBackendImageOperation(path: string, kind: OperationKind) {
   const request = parseBackendImageRequest(path), running = admission(request, kind)
   if (running.phase !== 'running' || Date.now() > running.workDeadline) throw new Error('Formal image operation is not running or its deadline expired')
   return { request, ...running }
+}
+
+// Observation/continuation must preserve, rather than renew, the original admission.
+export function readBackendImageEvidence(path: string, expected: BackendImageTarget) {
+  const request = parseBackendImageRequest(path)
+  target(request, expected)
+  return { request, admission: existsSync(operationPath(request, 'maintenance')) ? admission(request, 'maintenance') : null }
 }
 
 const unitName = (request: BackendImageRequest): string => `oa-formal-image-intake-${createHash('sha256').update(request.directory).digest('hex').slice(0, 16)}-${request.operationId}.service`
@@ -238,8 +246,8 @@ export function receiveBackendImage(path: string): string {
   }
 }
 
-export function verifyReceivedBackendImage(path: string, expected: BackendImageTarget, admitted?: 'maintenance', runDocker?: (args: string[]) => string): string {
-  const request = admitted ? readBackendImageOperation(path, admitted).request : readBackendImageRequest(path), reportPath = join(request.stage, 'image.json')
+function verifyImageEvidence(request: BackendImageRequest, expected: BackendImageTarget, runDocker?: (args: string[]) => string): string {
+  const reportPath = join(request.stage, 'image.json')
   if (request.directory !== expected.directory || request.sourceSha !== expected.sourceSha || request.producerSha !== expected.producerSha) throw new Error('Imported formal image does not match the owner deployment target')
   ownerPath(reportPath, false)
   const report = object(JSON.parse(readFileSync(reportPath, 'utf8')))
@@ -253,6 +261,14 @@ export function verifyReceivedBackendImage(path: string, expected: BackendImageT
     if (id !== report.nativeImageId) throw new Error('Formal image store changed after intake')
     return inspectLoadedContainerImage({ imageId: id, expected: { purpose: 'formal-candidate', sourceSha: request.sourceSha, producerSha: request.producerSha } }, runDocker)
   } finally { unpin() }
+}
+
+export function verifyReceivedBackendImage(path: string, expected: BackendImageTarget, admitted?: 'maintenance', runDocker?: (args: string[]) => string): string {
+  return verifyImageEvidence(admitted ? readBackendImageOperation(path, admitted).request : readBackendImageRequest(path), expected, runDocker)
+}
+
+export function inspectReceivedBackendImage(path: string, expected: BackendImageTarget, runDocker?: (args: string[]) => string): string {
+  return verifyImageEvidence(readBackendImageEvidence(path, expected).request, expected, runDocker)
 }
 
 function runAdmittedBackendImageIntake(path: string): string {
