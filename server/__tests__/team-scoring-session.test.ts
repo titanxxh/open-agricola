@@ -10,7 +10,7 @@ it.each([
 ])('starts, restores and finishes a four-seat Multihand game with $scoring results', ({ scoring, total }) => {
   const options = buildInitialStateOptions(parseGameSetupRequest({ playerCount: 4,
     teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring },
-  }, null))
+  }, null, { allowTeamRooms: true }))
   const session = createOpeningSession({ seed: 42, options,
     expected: { phase: 'playing', roundPhase: 'work', interaction: { stateId: 'idle' } } })
   try {
