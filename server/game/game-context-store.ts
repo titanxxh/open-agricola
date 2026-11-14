@@ -75,9 +75,13 @@ export class GameContextStore {
   private readonly db: StoreDatabase
 
   async readCreationConfiguration(roomId: string, userId?: string): Promise<SoloCreationConfigurationResponse> {
-    const source = await new GameCreationStore(this.db).completedSource(roomId, userId)
+    const source = await new GameCreationStore(this.db, this.now).completedSource(roomId, userId)
     if (!source.ok) return source
     const resolved = await resolveSoloWorkshopCards(this.db, source.record.configuration)
+    const current = await prereleaseArchiveReadState(this.db, roomId, this.now)
+    if (process.env.RELEASE_CHANNEL === 'prerelease' && (!current || current.lifecycle !== 'completed' || current.expired)) {
+      return { ok: false, code: 'source_removed', message: 'This game context is unavailable' }
+    }
     return { ok: true, configuration: source.record.configuration, issues: resolved.issues }
   }
   private readonly now: () => number
