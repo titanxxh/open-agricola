@@ -236,11 +236,11 @@ export class PrereleaseSessions {
       await this.db.prepare(`INSERT INTO prerelease_sessions(token_hash,user_id,grant_id,generation_id,build_id,created_at,expires_at,identity_state,handoff_request_hash,handoff_return_path)
         VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(token_hash) DO UPDATE SET identity_state=excluded.identity_state`)
         .run(hash(token), user.id, state.grantId, this.runtime.generationId, this.runtime.buildId, now, expiresAt, JSON.stringify(state), requestHash, receipt.returnPath)
-      if (this.invalidatedSince(checkpoint, { userId: user.id, grantId: state.grantId })) throw this.handoffRace(state)
+      if (this.invalidatedSince(checkpoint, { userId: user.id, grantId: state.grantId, tokenHash: hash(token) })) throw this.handoffRace(state)
       return { expiresAt, returnPath: receipt.returnPath }
     })()
     const { expiresAt, returnPath } = exchanged
-    if (this.invalidatedSince(checkpoint, { userId: user.id, grantId: state.grantId })) throw this.handoffRace(state)
+    if (this.invalidatedSince(checkpoint, { userId: user.id, grantId: state.grantId, tokenHash: hash(token) })) throw this.handoffRace(state)
     this.blockedUsers.delete(user.id)
     const lease = { state, userId: user.id, grantId: state.grantId, expiresAt, buildId: this.runtime.buildId, generationId: this.runtime.generationId }
     if (!this.leaseAuthorized(lease)) throw new PrereleaseIdentityError(handoffFailure(state, this.now()), 'Prerelease access unavailable')
