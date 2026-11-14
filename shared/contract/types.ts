@@ -1,3 +1,4 @@
+import type { MarketplaceRequest } from './marketplace'
 import type { MoorCompletionFrame } from '../moor/completion-types'
 import type { AnytimeActivation } from './anytime-activation'
 import type { PersonUseReceipt } from './person-use'
@@ -1241,6 +1242,7 @@ export type SubFlowKind =
   | 'engine-blocked'
   | 'resource-quantity-select'
   | 'resource-batch-exchange-select'
+  | 'marketplace-select'
 
 export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
@@ -1253,6 +1255,7 @@ export type ChoiceMultiSelect = {
 }
 
 export type InteractionRequest = (
+  | MarketplaceRequest
   | { kind: 'solo-hand-selection'; groups: SoloHandSelectionGroup[] }
   | { kind: 'choice'; options: ActionChoiceOption[]; defaultValue?: string; confirmLabelKey?: string; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean; moorSolo?: MoorSoloChoice }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
