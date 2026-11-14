@@ -1,5 +1,5 @@
 import { spectatorRoute } from './room-spectators'
-import { prereleaseArchiveExpired } from './prerelease-archive-retention'
+import { prereleaseArchiveReadState } from './prerelease-archive-retention'
 import type { PostgresDatabase as Database } from '../database/postgres'
 import { isDevRoom } from './room.ts'
 import { RoomRetentionStore } from './room-retention-store'
@@ -64,6 +64,12 @@ const removedReason = (
   value: string | null,
 ): RemovedGameContextDescriptor['reason'] =>
   value === 'moderation' || value === 'legal' ? value : 'removed'
+
+const archiveReadUnavailable = (roomId: string, state: Awaited<ReturnType<typeof prereleaseArchiveReadState>>): GameContextResponse | null => {
+  if (state?.lifecycle === 'removed') return { ok:true, roomId, lifecycle:'removed', reason:removedReason(state.removalReason) }
+  if (state?.expired || state?.lifecycle === 'expired') return { ok:true, roomId, lifecycle:'expired' }
+  return null
+}
 
 export class GameContextStore {
   private readonly db: StoreDatabase
@@ -211,9 +217,15 @@ export class GameContextStore {
   }
 
   async resolve(roomId: string, userId?: string, intent: 'join' | 'resume' = 'resume'): Promise<Awaited<GameContextResponse>> {
-    if (await prereleaseArchiveExpired(this.db, roomId, this.now)) return { ok: true, roomId, lifecycle: 'expired' }
+    const initial = archiveReadUnavailable(roomId, await prereleaseArchiveReadState(this.db, roomId, this.now))
+    if (initial) return initial
     const response = await this.resolveAvailable(roomId, userId, intent)
-    return await prereleaseArchiveExpired(this.db, roomId, this.now) ? { ok: true, roomId, lifecycle: 'expired' } : response
+    if (process.env.RELEASE_CHANNEL !== 'prerelease') return response
+    const current = await prereleaseArchiveReadState(this.db, roomId, this.now)
+    if (!current) return { ok:false, code:'unknown_context', message:'Game context not found' }
+    const unavailable = archiveReadUnavailable(roomId, current)
+    if (unavailable) return unavailable
+    return response.ok && response.lifecycle !== current.lifecycle ? this.resolve(roomId, userId, intent) : response
   }
 
   private async resolveAvailable(roomId: string, userId?: string, intent: 'join' | 'resume' = 'resume'): Promise<Awaited<GameContextResponse>> {

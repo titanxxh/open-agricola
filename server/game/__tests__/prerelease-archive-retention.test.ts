@@ -1,3 +1,9 @@
+import type { QueryResultRow } from 'pg'
+import { randomUUID } from 'node:crypto'
+import { testStorageEnvironment } from '../../__tests__/_helpers/objects'
+import { S3ObjectStore } from '../../storage/s3-store'
+import { ResourceStore } from '../../storage/resource-store'
+import { removeReplay } from '../replay-removal'
 import { afterAll, afterEach, expect, it, vi } from 'vitest'
 import { createTestDatabase } from '../../__tests__/_helpers/postgres'
 import { GameContextStore } from '../game-context-store'
@@ -46,4 +52,34 @@ it('keeps the formal archive policy and expires pre by the earliest persisted co
     VALUES (?,1,?,'game','completed',0,0,'[]',1,5)`).run('formal-durable-result', 'a'.repeat(64))
   expect(await prereleaseArchiveExpired(db, 'formal-durable-result', () => 5 + PRERELEASE_ARCHIVE_RETENTION_MS)).toBe(true)
   expect(await prereleaseArchiveExpired(db, 'unknown-room', () => oldNow)).toBe(false)
+})
+
+it('publishes the tombstone when a legal result erasure completes during a summary read', async () => {
+  vi.stubEnv('RELEASE_CHANNEL','prerelease')
+  const roomId='pre-result-erasure-race', now=Date.now()
+  await completed(roomId,now)
+  await db.prepare("INSERT INTO game_replays(room_id,schema_version,viewer_build_id,game_build_id,status,latest_step_no,missing_prefix,custom_cards_json,created_at,completed_at) VALUES (?,1,?,'game','completed',0,0,'[]',?,?)").run(roomId,'a'.repeat(64),now,now)
+  await db.prepare("UPDATE game_contexts SET replay_status='available' WHERE room_id=?").run(roomId)
+  await db.prepare("INSERT INTO game_replay_steps(room_id,step_no,room_version,checkpoint_step_no,command_type,intent_json,payload_kind,payload_gzip,frame_hash,created_at) VALUES (?,0,1,0,'initial','{}','checkpoint',?,?,?)").run(roomId,Buffer.from('unused'),'b'.repeat(64),now)
+  const objects=S3ObjectStore.fromEnv(testStorageEnvironment(),`test/context-race-${randomUUID()}/`)
+  const resources=new ResourceStore(db,objects)
+  const prepare=db.prepare.bind(db)
+  const held=vi.spyOn(db,'prepare').mockImplementation(sql=>{
+    const statement=prepare(sql)
+    if(sql.includes('SELECT player_index, display_name, score, name_is_default')) {
+      const all=statement.all
+      statement.all=async<Row extends QueryResultRow=QueryResultRow>(...values:unknown[]):Promise<Row[]>=>{
+        const rows=await all<Row>(...values)
+        await removeReplay(db,{roomId,reason:'legal',eraseResult:true,resources})
+        return rows
+      }
+    }
+    return statement
+  })
+  try {
+    const response=await new GameContextStore(db).resolve(roomId)
+    expect(await prepare('SELECT COUNT(*) AS count FROM game_results WHERE room_id=?').get(roomId)).toEqual({count:0})
+    expect(response).toEqual({ok:true,roomId,lifecycle:'removed',reason:'legal'})
+    expect(JSON.stringify(response)).not.toContain('Alice')
+  } finally {held.mockRestore();await objects.clearPrefix();objects.close()}
 })
