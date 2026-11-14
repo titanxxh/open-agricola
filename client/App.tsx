@@ -13,11 +13,13 @@ function App() {
   const reloadRequired = useSyncExternalStore(subscribeBrowserReload, getBrowserReloadRequired)
   return (
     <LocaleProvider>
-      <PrereleaseBoundary>{reloadRequired ? <AppLoadFailure /> : <GameContextRouter>
-        <AppErrorBoundary fallback={<AppLoadFailure />}>
-          <AuthProvider><PageRouter /></AuthProvider>
-        </AppErrorBoundary>
-      </GameContextRouter>}</PrereleaseBoundary>
+      {reloadRequired ? <AppLoadFailure /> : <PrereleaseBoundary>
+        <GameContextRouter>
+          <AppErrorBoundary fallback={<AppLoadFailure />}>
+            <AuthProvider><PageRouter /></AuthProvider>
+          </AppErrorBoundary>
+        </GameContextRouter>
+      </PrereleaseBoundary>}
     </LocaleProvider>
   )
 }
