@@ -220,6 +220,7 @@ const useTransportSetup = (
         setLocalTransport(transport)
         setLocalReady(true)
       } catch (err) {
+        transport.destroy()
         if (isPrereleaseClient()) pausePublicSandbox()
         console.error('[local-sandbox] failed to start:', err)
         window.alert(err instanceof Error ? err.message : String(err))
