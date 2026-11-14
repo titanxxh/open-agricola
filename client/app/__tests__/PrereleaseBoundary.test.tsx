@@ -192,7 +192,7 @@ it.each(['unavailable', 'lost-body'])('retries the bound callback safely after a
   render(<StrictMode><PrereleaseBoundary><div>Private game context</div></PrereleaseBoundary></StrictMode>)
   expect(await screen.findByText('prerelease.accessPaused')).toBeVisible()
   expect(screen.queryByText('Private game context')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'platform.retry' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'platform.retry' }))
   expect(await screen.findByText('Private game context')).toBeVisible()
   expect(exchanges).toBe(2)
   expect(fetchMock).toHaveBeenCalledTimes(3)
