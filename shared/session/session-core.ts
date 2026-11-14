@@ -1680,12 +1680,7 @@ export class GameCore {
     this.runEngineSteps()
   }
 
-  private startTopLevelReorganizeFlow(playerIndex: number): void {
-    const flow: ActionFlow = {
-      type: 'leaf',
-      actionId: 'reorganize',
-      actionContext: { trigger: 'anytime' },
-    }
+  private startTopLevelFlow(playerIndex: number, flow: ActionFlow): void {
     this.engineStack.push({
       engine: this.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
@@ -5381,7 +5376,7 @@ export class GameCore {
       }
     })
     if (increasedAnimals) {
-      this.startTopLevelReorganizeFlow(playerIndex)
+      this.startTopLevelFlow(playerIndex, { type: 'leaf', actionId: 'reorganize', actionContext: { trigger: 'anytime' } })
     }
     return this.respond()
   }
@@ -5522,9 +5517,11 @@ export class GameCore {
     }
     ensureCardModifiers(player, cardId)
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
-    runCardEffectHook(this.state, player, cardId, 'onBuy', undefined, { actionHooks: this.actionHooks,
+    const flow = runCardEffectHook(this.state, player, cardId, 'onBuy', undefined, { actionHooks: this.actionHooks,
       reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
     })
+    if (flow && this.engineStack.depth() > 0) return this.rejectInput('pending action exists')
+    if (flow) this.startTopLevelFlow(playerIndex, flow)
     this.syncDynamicActionSpaces()
     const dynamicSpace = findActionSpaceById(this.state, cardId)
     if (dynamicSpace && getPlayerActionSpaceConfig(cardId)) {
