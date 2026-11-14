@@ -362,7 +362,7 @@ export function LobbyPage() {
                   </button>
                 ))}
               </div>
-              {isTeamMode && <TeamSetupFields maxPlayers={selectedMaxPlayers} value={teamConfiguration} onChange={setTeamConfiguration} canUseCooperation={false} />}
+              {isTeamMode && <TeamSetupFields maxPlayers={selectedMaxPlayers} value={teamConfiguration} onChange={setTeamConfiguration} canUseCooperation={isPrereleaseClient()} />}
               {selectMode !== 'hotseat' && (
                 <fieldset className="room-access-options">
                   <legend className="player-select-label">{t('platform.roomAccessLabel')}</legend>
