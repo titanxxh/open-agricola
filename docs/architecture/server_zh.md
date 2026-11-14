@@ -198,7 +198,8 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 - `server/db.ts` 通过 `pg` 持有异步 PostgreSQL 连接：transaction 跨 await 保持同一连接，嵌套 transaction 使用 savepoint，原生迁移在启动前于 advisory lock 下执行。运行时没有 SQLite 或 JSON 回退。
 - `scripts/import-sqlite.ts` 通过精确比对导入停机的 schema-33 SQLite 数据库，遇到损坏的已录制对局会阻断，`data_imports` 让失败的导入停在启动屏障之后；`scripts/validate-backup.ts` 校验 PostgreSQL / S3 的恢复。
 - `schema.sql` 与有序迁移定义产品表。回放片段由 `checkpointStepNo` 表示；证据 payload、配额和 webhook 投递不另建并行存储表。
-- 录制前的 `legacy_no_replay` 只有结果，没有 Replay header 或 Frame。pre 归档由 `game/prerelease-archive-retention.ts` 在读取时检查最早持久结束时间起 30 天截止，恢复也不重算；正式保留政策不变。
+- 录制前的 `legacy_no_replay` 只有结果，没有 Replay header 或 Frame。`game/prerelease-archive-retention.ts` 将 pre 结果、结束列表、开局配置、Replay 和 Evidence 限制为最早持久结束时间起 30 天，恢复也不重算。缺失结束事实时关闭读取，但不能据此删除；下发前重新检查生命周期与截止。正式保留政策不变。
+- `game/prerelease-archive-cleanup.ts` 通过恢复工具兼容的独立删除账本回收已证明到期的 pre 归档，删除结果、参与者与开局配置关联。保留当前安装的 Viewer、活动录制和精确匹配的有效未完局 Evidence；最后引用回收遵循备份删除保护。测试：`prerelease-archive-{retention,cleanup}.test.ts`、`online-storage-archive.test.ts`、`prerelease-lifecycle-native.test.ts`。
 
 ## GitHub 投递、安全与删除
 

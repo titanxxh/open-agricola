@@ -1,14 +1,15 @@
+import { GameCreationStore } from '../game-creation-store'
 import type { QueryResultRow } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { testStorageEnvironment } from '../../__tests__/_helpers/objects'
 import { S3ObjectStore } from '../../storage/s3-store'
 import { ResourceStore } from '../../storage/resource-store'
-import { removeReplay } from '../replay-removal'
+import { expirePrereleaseReplay, removeReplay } from '../replay-removal'
 import { afterAll, afterEach, expect, it, vi } from 'vitest'
 import { createTestDatabase } from '../../__tests__/_helpers/postgres'
 import { GameContextStore } from '../game-context-store'
 import { ReplayStore } from '../replay-store'
-import { prereleaseArchiveExpired, PRERELEASE_ARCHIVE_RETENTION_MS } from '../prerelease-archive-retention'
+import { listEndedGames, prereleaseArchiveExpired, PRERELEASE_ARCHIVE_RETENTION_MS } from '../prerelease-archive-retention'
 
 const db = await createTestDatabase()
 afterAll(() => db.close())
@@ -82,4 +83,50 @@ it('publishes the tombstone when a legal result erasure completes during a summa
     expect(response).toEqual({ok:true,roomId,lifecycle:'removed',reason:'legal'})
     expect(JSON.stringify(response)).not.toContain('Alice')
   } finally {held.mockRestore();await objects.clearPrefix();objects.close()}
+})
+
+it('excludes expired games from participant lists and refuses creation metadata without running a collector', async () => {
+  vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+  await db.prepare(`INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES ('owner','owner','Owner','',1)`).run()
+  await completed('pre-listed-result', 2_000)
+  await db.prepare('UPDATE game_result_players SET user_id=? WHERE room_id=?').run('owner', 'pre-listed-result')
+  let now = 2_000 + PRERELEASE_ARCHIVE_RETENTION_MS - 1
+  expect(await listEndedGames(db, 'owner', () => now)).toEqual([{ id: 'pre-listed-result', outcome: 'completed', ended_at: 2_000 }])
+  now++
+  expect(await listEndedGames(db, 'owner', () => now)).toEqual([])
+  expect(await new GameCreationStore(db, () => now).completedSource('pre-listed-result', 'owner')).toMatchObject({ ok: false, code: 'source_removed' })
+  vi.stubEnv('RELEASE_CHANNEL', 'stable')
+  expect(await listEndedGames(db, 'owner', () => now)).toHaveLength(1)
+})
+
+it('closes unknown-age completed and terminated reads without authorizing their destruction', async () => {
+  vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+  const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
+  try {
+    for (const lifecycle of ['completed', 'terminated']) {
+      const roomId = `unknown-age-${lifecycle}`
+      await db.prepare(`INSERT INTO game_contexts(room_id,lifecycle,replay_status,created_at,updated_at)
+        VALUES (?,?,'legacy_no_replay',1,1)`).run(roomId, lifecycle)
+      expect(await prereleaseArchiveExpired(db, roomId)).toBe(true)
+      expect(await new GameContextStore(db).resolve(roomId)).toEqual({ ok: true, roomId, lifecycle: 'expired' })
+      expect(await expirePrereleaseReplay(db, { roomId, resources: new ResourceStore(db, objects) })).toBe(false)
+      expect(await db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id=?').get(roomId)).toEqual({ lifecycle })
+    }
+    expect(await objects.get('erasure/ledger.json')).toBeNull()
+  } finally { await objects.clearPrefix(); objects.close() }
+})
+
+it('uses the original termination time at the exact thirty-day boundary', async () => {
+  vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+  await db.prepare(`INSERT INTO game_contexts(room_id,lifecycle,created_at,updated_at) VALUES ('pre-termination','terminated',1,1)`).run()
+  await db.prepare(`INSERT INTO game_terminations(room_id,reason,intent,proposer_index,started_at,ended_at,round)
+    VALUES ('pre-termination','agreement','end',0,1,3000,5)`).run()
+  await db.prepare(`INSERT INTO game_termination_players(room_id,player_index,user_id,display_name,agreed_at)
+    VALUES ('pre-termination',0,'owner','Terminated farmer',3000)`).run()
+  let now = 3_000 + PRERELEASE_ARCHIVE_RETENTION_MS - 1
+  expect(await listEndedGames(db, 'owner', () => now)).toContainEqual({ id: 'pre-termination', outcome: 'terminated', ended_at: 3_000 })
+  expect(await new GameContextStore(db, () => now).resolve('pre-termination')).toMatchObject({ lifecycle: 'terminated' })
+  now++
+  expect(await listEndedGames(db, 'owner', () => now)).not.toContainEqual(expect.objectContaining({ id: 'pre-termination' }))
+  expect(await new GameContextStore(db, () => now).resolve('pre-termination')).toEqual({ ok: true, roomId: 'pre-termination', lifecycle: 'expired' })
 })

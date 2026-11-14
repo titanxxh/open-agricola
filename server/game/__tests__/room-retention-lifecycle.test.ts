@@ -68,6 +68,7 @@ describe('room retention lifecycle', () => {
     sessions.clear()
     objects.close()
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
     await db.close()
   })
 
@@ -111,6 +112,28 @@ describe('room retention lifecycle', () => {
     await contexts.clearActiveExpiry(room.id)
     expect(await contexts.ensureActiveExpiry(room.id, 'playing', now)).toBe(now + 9 * DAY)
   })
+
+  it.each([{ status: 'waiting', days: 3 }, { status: 'playing', days: 7 }] as const)(
+    'preserves the pre $status deadline through cold loading and rejects at its exact $days-day boundary', async ({ status, days }) => {
+      vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+      const room = await createRoom(`pre-${status}-deadline`, status)
+      const retained = await contexts.readActiveRetention(room.id)
+      if (retained.kind !== 'active' || retained.expiresAt === null) throw new Error('Missing fixed offline deadline')
+      const deadline = retained.expiresAt
+      expect(deadline - Date.now()).toBeGreaterThan(days * DAY - 1000)
+      expect(deadline - Date.now()).toBeLessThanOrEqual(days * DAY)
+      await authority.cleanupIdle(room, deadline - 1)
+      expect(registry.get(room.id)).toBeUndefined()
+      const restored = await authority.load(room.id)
+      if (!restored) throw new Error('Missing retained pre room')
+      sessions.add(restored.session)
+      expect(await new GameContextStore(db).ensureActiveExpiry(room.id, status, deadline - 1)).toBe(deadline)
+      await db.prepare('UPDATE room_ownership SET admission_until=0 WHERE room_id=?').run(room.id)
+      await authority.cleanupIdle(restored, deadline)
+      expect(await persistence.load(room.id)).toBeNull()
+      expect(await contexts.lifecycle(room.id)).toBe('expired')
+    },
+  )
 
   it('preserves an existing deadline and expires a loaded room from that deadline', async () => {
     const room = await createRoom('old-retention')

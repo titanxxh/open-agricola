@@ -21,6 +21,7 @@ import type { ReplayGameState } from '../shared/contract/protocol/replay.ts'
 import type { SerializedGameState } from '../shared/session/serialization.ts'
 import { filterSerializedStateForPlayer } from '../shared/session/serialization.ts'
 import { checkRateLimit } from './rate-limit.ts'
+import { prereleaseArchiveReadState } from './game/prerelease-archive-retention'
 
 const DRAFT_ROUTE = /^\/api\/v1\/game-contexts\/([^/]+)\/bug-reports$/
 const PARTICIPANT_EVIDENCE_ROUTE =
@@ -245,6 +246,8 @@ const loadEvidenceFrame = async (
   report: EvidenceAnchor,
   playerIndex: number | null,
 ): Promise<Awaited<SerializedGameState>> => {
+  const initial = await prereleaseArchiveReadState(runtime.db, report.room_id)
+  if (initial?.expired || initial?.lifecycle === 'removed') throw new BugReportError('replay_segment_unavailable', 410)
   const now = Date.now()
   const context = (await runtime.db.prepare(`
     SELECT lifecycle FROM game_contexts WHERE room_id = ?
@@ -332,6 +335,9 @@ const loadEvidenceFrame = async (
     serialized as unknown as ReplayGameState,
     participantNames,
   ) as unknown as SerializedGameState
+  const current = await prereleaseArchiveReadState(runtime.db, report.room_id)
+  if (current?.expired || current?.lifecycle === 'removed'
+    || process.env.RELEASE_CHANNEL === 'prerelease' && !current) throw new BugReportError('replay_segment_unavailable', 410)
   if (playerIndex === null) return projected
   const playerId = projected.players[playerIndex]?.id ?? null
   if (!playerId) throw new BugReportError('not_participant', 403)

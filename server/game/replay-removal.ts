@@ -1,5 +1,6 @@
 import type { ResourceStore } from '../storage/resource-store'
 import type { PostgresDatabase as Database } from '../database/postgres'
+import { prereleaseArchiveReadState } from './prerelease-archive-retention'
 
 export type ReplayRemovalReason = 'removed' | 'moderation' | 'legal'
 
@@ -254,6 +255,8 @@ const applyEntries = async (
     if (entry.eraseResult) {
       ;(await db.prepare('DELETE FROM game_results WHERE room_id = ?').run(entry.roomId))
       await db.prepare('DELETE FROM game_terminations WHERE room_id=?').run(entry.roomId)
+      await db.prepare('DELETE FROM game_creation_configurations WHERE room_id=?').run(entry.roomId)
+      await db.prepare('DELETE FROM game_opening_facts WHERE room_id=?').run(entry.roomId)
     } else {
       ;(await db.prepare(`
         UPDATE game_result_players
@@ -623,4 +626,24 @@ export async function applyReplayRemovalLedger(
     )),
     assetTakedownHashes,
   }
+}
+
+/** Internal pre retention, using the existing restore-compatible erasure format. */
+export async function expirePrereleaseReplay(
+  db: Database,
+  options: { roomId: string; resources: ResourceStore; now?: () => number },
+): Promise<boolean> {
+  if (process.env.RELEASE_CHANNEL !== 'prerelease') throw new Error('Archive expiration is restricted to prerelease')
+  if (!ROOM_ID.test(options.roomId) || options.roomId.length > 128) throw new Error('invalid room id')
+  const state = await prereleaseArchiveReadState(db, options.roomId, options.now)
+  if (!state?.expired || state.endedAt === null) return false
+  const target = await loadReplay(db, options.roomId)
+  if (!target) return false
+  const ledger = await readLedger(options.resources)
+  const existing = ledger.entries.find(entry => entry.roomId === options.roomId && entry.eraseResult)
+  const entry = existing ?? entryForRow(target, 'removed', validateRemovedAt((options.now ?? Date.now)()), true)
+  if (!existing) await appendLedger(options.resources, { version: 1, entries: [entry], assetTakedowns: [] })
+  await applyEntries(db, [entry])
+  await cleanupAssets(db, options.resources, entry.assetHashes, [])
+  return true
 }
