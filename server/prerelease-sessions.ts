@@ -274,10 +274,22 @@ export class PrereleaseSessions {
     await this.classifyIssued(userId, undefined, kind, 'beta_changed', expectedEpoch)
   }
   async revoke(token: string, all = false): Promise<void> {
+    const denial = () => new PrereleaseIdentityError(this.status(token) === 'expired' ? 'expired' : 'paused', 'Prerelease access unavailable')
+    if (all && !await this.resolve(token)) throw denial()
     const row = await this.db.prepare('SELECT user_id,grant_id FROM prerelease_sessions WHERE token_hash=?').get<{ user_id: string; grant_id: string }>(hash(token))
-    if (!row) return
-    const revoked = await this.db.prepare(`UPDATE prerelease_sessions SET revoked_at=? WHERE ${all ? 'user_id' : 'token_hash'}=?
+    if (!row) { if (all) throw denial(); return }
+    const revoke = () => this.db.prepare(`UPDATE prerelease_sessions SET revoked_at=? WHERE ${all ? 'user_id' : 'token_hash'}=?
       RETURNING token_hash,user_id,grant_id,expires_at,revoked_at,generation_id,build_id`).all<IssuedSession>(this.now(), all ? row.user_id : hash(token))
+    const revoked = all ? await this.db.transaction(async () => {
+      await this.lockSubject(row.user_id)
+      const current = await this.readPersisted(token, { lock: 'update' })
+      if (!current || current.user.id !== row.user_id) return null
+      return revoke()
+    })() : await revoke()
+    if (revoked === null) {
+      await this.resolve(token)
+      throw denial()
+    }
     for (const issued of revoked) this.recordIssuedFailure(issued, 'expired', 'logout')
     this.invalidate({ userId: row.user_id, ...(all ? {} : { token, grantId: row.grant_id }), reason: 'logout' })
   }
