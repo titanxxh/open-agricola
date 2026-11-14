@@ -95,13 +95,13 @@
 
 ### 预发布入口
 
-预发布构建在 Context 路由和私有资料加载之前挂载环境/会话边界。它消费已发布语言 pin，持续展示环境/构建与配置的正式返回入口，不提供本地账号管理流程。回调先清除 fragment，再由服务端兑换；重试只在内存保留待完成回调，并复用同一绑定兑换。已确认的认证、访问、交接或运行时代次拒绝必须在新文档中重新进入；晚到的暂停或正向响应不能重新打开当前文档。暂停状态仍可复核。显式退出在网络完成前终止准入。HTTP、WebSocket 及 worker 活动保留页面固定的构建/代次和绝对授权期限，旧标签不能借另一标签替换的 Cookie 恢复访问。会话复核串行执行，并按同一单调时钟下扣除请求耗时后的剩余授权期限调度。
+`PrereleaseBoundary` 先于 Context/私有资料，使用已发布语言 pin，展示环境/构建及配置的正式返回入口，不提供本地账号管理。HTTP/WS/worker 绑定当前标签的构建/代次和绝对期限；替换 Cookie 不能恢复旧标签。复核串行执行，单调 lease 包含请求耗时。退出在网络完成前终止准入。已确认的认证/访问/交接/运行时代次拒绝要求新文档；迟到的暂停或成功不能恢复它。暂停允许复核。回调先清除 fragment；重试只在内存保留同一绑定兑换。
 
-`app/PrereleaseEntry.tsx` 在大厅及设置读取账号 Beta 资格和实时权威入口响应。只以 `noopener noreferrer` 新标签打开已配置的 HTTPS hosted 入口，缺少配置时明确不可用。窗口重新聚焦会复核，并丢弃晚于拒绝结果返回的旧响应。
+`app/PrereleaseEntry.tsx` 在大厅/设置使用 Beta 资格和实时权威状态。只以 `noopener noreferrer` 打开配置的 HTTPS 入口；缺少配置则不可用。窗口聚焦复核丢弃早于拒绝的响应。
 
-`PrereleaseHandoffPage` 与 `services/prerelease.ts` 负责 `?page=prerelease-handoff`。页面读取并清除浏览器绑定的 fragment，核对当前配置的目标和正式站根，通过已认证的正式权威只签发一次短期 code。code 仅以 fragment 交给固定 pre 回调；页面不保存登录凭据或 verifier，也不采用调用者提供的回调 URL。出错只返回正式站根。测试见 `PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx` 和 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例。
+`PrereleaseHandoffPage` 和 `services/prerelease.ts` 清除绑定 fragment，校验配置的目标/正式根，只请求一个短期 code。仅固定回调接收 fragment；不持久化凭据/verifier，不跟随调用者回调，错误返回正式根。浏览器仅验证时间戳格式/目标；兑换过期由正式权威时钟裁决。
 
-浏览器只校验时间戳格式与目标。code 过期由正式权威按自身时钟在兑换时裁决，浏览器时钟偏差不参与授权。独立时钟与错误响应的反例通过 `services/__tests__/prerelease.test.ts` 中的公开 helper 验证。
+覆盖：`PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx`、`services/__tests__/prerelease.test.ts`（时钟偏差/错误响应）及 HTTPS `hosted-password-login.spec.ts`。
 
 ### 卡牌百科
 
