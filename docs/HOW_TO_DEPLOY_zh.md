@@ -867,7 +867,7 @@ docker pull --platform linux/amd64 caddy@sha256:<approved-manifest-sha256>
 
 单独进行恢复时，可创建 owner 拥有的 `data/backend-image-recovery.json`，字段为 `format: 1`、UTC 格式的 `createdAt` 与 `expiresAt`、包含完整原生 ID 的 `images` 和包含完整 build SHA 的 `builds`。到期时间必须晚于创建时间，间隔最多 30 天。到期绑定不再保护镜像；保留备份的绑定则持续有效，直到备份保留策略删除对应 archive。
 
-候选必须由 formal-candidate 导入回执，或旧版 Compose 的 `open-agricola` 项目及 `app` service 标签证明归属。仅有 stable 通道标签不足以证明正式应用归属，因为预发布 policy 工具镜像也使用该通道。全部历史正式导入回执都可证明归属，但不会延长保护窗口。归属、build 元数据、tag 或 digest repository 未知的镜像保持不动。历史镜像有多个已知项目引用时，工具逐个重验后用 `docker image rm --no-prune` 删除多余引用，再按完整原生 image ID 无 force 删除。新增容器引用会让镜像保留，或由 Docker 拒绝删除。工具不停止容器，不清理 volume、依赖、Caddy、监控镜像、其他项目、owner 本机 Docker 或 GHCR package。
+候选必须由 formal-candidate 导入回执，或旧版 Compose 的 `open-agricola` 项目及 `app` service 标签证明归属。仅有 stable 通道标签不足以证明正式应用归属，因为预发布 policy 工具镜像也使用该通道。全部历史正式导入回执都可证明归属，但不会延长保护窗口。同一原生镜像的 source 或 config 绑定冲突会阻止清理；相同 source 和 config 使用不同 producer 仍允许。归属、build 元数据、tag 或 digest repository 未知的镜像保持不动。历史镜像有多个已知项目引用时，工具逐个重验后用 `docker image rm --no-prune` 删除多余引用，再按完整原生 image ID 无 force 删除。新增容器引用会让镜像保留，或由 Docker 拒绝删除。工具不停止容器，不清理 volume、依赖、Caddy、监控镜像、其他项目、owner 本机 Docker 或 GHCR package。
 
 执行计划与结果写入服务器私有的 `backups/.image-cleanup-<UUID>/result.json`，目录权限为 `0700`，文件权限为 `0600`。失败保留诊断并返回非零状态。重试前检查结果；每次重试都会重新生成计划。库存输出只包含镜像身份、引用、选定标签、创建时间、大小和 build 绑定，不打印应用环境变量值或凭据。
 

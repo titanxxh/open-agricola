@@ -1,12 +1,13 @@
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { executeBackendImageCleanup, planBackendImageCleanup } from '../release/backend-image-cleanup'
 import { readBackendImageRequest } from '../release/backend-image-receiver'
 import { createBackendImageFixture } from './_helpers/backend-image-fixture'
+import { dockerFixtureEnvironment } from './_helpers/docker-fixture-environment'
 
 const roots: string[] = [], now = Date.now(), day = 86_400_000
 const imageId = (number: number): string => `sha256:${number.toString(16).padStart(64, '0')}`
@@ -58,14 +59,15 @@ function fixture() {
     writeFileSync(join(directory, 'backups', `env-${stem}`), 'private-configuration')
     writeFileSync(join(directory, 'backups', `${stem}.manifest.json`), JSON.stringify({ formatVersion: 2, backupStem: stem, sourceBuildId: buildId(source), targetBuildId: buildId(target), validatedAt: new Date(now).toISOString() }))
   }
-  const stage = (target: number, source: number, age: number) => {
+  const stage = (target: number, source: number, age: number, ownership: { sourceSha: string; nativeImageId: string; configId?: string } = { sourceSha: buildId(target), nativeImageId: imageId(target) }) => {
     const operationId = `00000000-0000-0000-0000-${target.toString().padStart(12, '0')}`
     const path = join(directory, 'backups', `.backend-image-${operationId}`)
     mkdirSync(path)
-    const request = { format: 1, operationId, directory, stage: path, sourceSha: buildId(target), producerSha: buildId(1), expiresAt: now - day, transfer: { receipt: { purpose: 'formal-candidate', channel: 'stable', repository: 'titanxxh/open-agricola', sourceSha: buildId(target), producerSha: buildId(1), imageId: imageId(target) } } }
+    const configId = ownership.configId ?? imageId(target)
+    const request = { format: 1, operationId, directory, stage: path, sourceSha: ownership.sourceSha, producerSha: buildId(1), expiresAt: now - day, transfer: { receipt: { purpose: 'formal-candidate', channel: 'stable', repository: 'titanxxh/open-agricola', sourceSha: ownership.sourceSha, producerSha: buildId(1), imageId: configId } } }
     const boundRequest = Object.fromEntries(Object.entries(request).filter(([key]) => key !== 'expiresAt'))
     const bindingSha256 = createHash('sha256').update(JSON.stringify(boundRequest)).digest('hex')
-    writeFileSync(join(path, 'image.json'), JSON.stringify({ format: 1, bindingSha256, sourceSha: buildId(target), producerSha: buildId(1), nativeImageId: imageId(target), imageId: imageId(target) }))
+    writeFileSync(join(path, 'image.json'), JSON.stringify({ format: 1, bindingSha256, sourceSha: ownership.sourceSha, producerSha: buildId(1), nativeImageId: ownership.nativeImageId, imageId: configId }))
     writeFileSync(join(path, 'request.json'), JSON.stringify(request))
     writeFileSync(join(path, 'source.json'), JSON.stringify({ build: buildId(source), image: imageId(source) }))
     utimesSync(join(path, 'image.json'), new Date(now - age * day), new Date(now - age * day))
@@ -176,6 +178,23 @@ it('rejects incomplete audit identities and a spliced request instead of classif
   expect(value.calls.some(call => call.includes('rm'))).toBe(false)
 })
 
+it.each([[4, 5], [5, 4]])('rejects conflicting native-image source bindings in audit order %i, %i', (firstSource, secondSource) => {
+  const value = fixture(); value.add({ ...image(4), project: '', service: '' })
+  value.stage(10, 1, 31, { sourceSha: buildId(firstSource), nativeImageId: imageId(4), configId: imageId(4) })
+  value.stage(11, 1, 31, { sourceSha: buildId(secondSource), nativeImageId: imageId(4), configId: imageId(4) })
+  expect(value.plan).toThrow('Conflicting formal image source or config bindings')
+  expect(value.execute).toThrow('Conflicting formal image source or config bindings')
+  expect(value.calls.some(call => call.includes('rm'))).toBe(false)
+})
+
+it('rejects conflicting config identities for one native image even when the source agrees', () => {
+  const value = fixture(); value.add({ ...image(4), project: '', service: '' })
+  value.stage(10, 1, 31, { sourceSha: buildId(4), nativeImageId: imageId(4) })
+  value.stage(11, 1, 31, { sourceSha: buildId(4), nativeImageId: imageId(4) })
+  expect(value.plan).toThrow('Conflicting formal image source or config bindings')
+  expect(value.calls.some(call => call.includes('rm'))).toBe(false)
+})
+
 it('consumes an actual receiver-sealed canonical owner request, including renewed authorization', () => {
   const value = fixture(), imported = createBackendImageFixture(); roots.push(imported.root)
   const canonical = readBackendImageRequest(imported.requestPath)
@@ -190,6 +209,34 @@ it('consumes an actual receiver-sealed canonical owner request, including renewe
   value.add({ ...image(4), id: imported.imageId, revision: imported.request.sourceSha, build: `GAME_BUILD_ID=${imported.request.sourceSha}`, project: '', service: '' })
   const plan = planBackendImageCleanup({ directory: imported.directory, docker: value.docker, now })
   expect(plan.images.find(image => image.id === imported.imageId)?.action).toBe('remove')
+})
+
+it('accepts real receiver-sealed imports of the same source and native image from different producers', () => {
+  const value = fixture(), imported = createBackendImageFixture(); roots.push(imported.root)
+  const first = readBackendImageRequest(imported.requestPath)
+  writeFileSync(imported.requestPath, JSON.stringify(first), { mode: 0o600 })
+  const received = imported.invoke()
+  expect(received.status, received.stderr).toBe(0)
+  const second = structuredClone(first)
+  second.operationId = randomUUID(); second.stage = join(imported.directory, 'backups', `.backend-image-${second.operationId}`)
+  second.producerSha = buildId(2); second.transfer.receipt.producerSha = second.producerSha
+  mkdirSync(second.stage, { mode: 0o700 }); copyFileSync(imported.archivePath, join(second.stage, 'image.tar'))
+  const secondPath = join(second.stage, 'request.json')
+  writeFileSync(secondPath, JSON.stringify(second), { mode: 0o600 })
+  const secondReceived = spawnSync(process.execPath, [resolve(import.meta.dirname, '../release/backend-image-receiver.ts'), 'receive', secondPath], {
+    cwd: resolve(import.meta.dirname, '../..'), encoding: 'utf8', timeout: 30_000,
+    env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${imported.bin}:${process.env.PATH}` }),
+  })
+  expect(secondReceived.status, secondReceived.stderr).toBe(0)
+  first.expiresAt = now - day; second.expiresAt = now - day
+  writeFileSync(imported.requestPath, JSON.stringify(first), { mode: 0o600 }); writeFileSync(secondPath, JSON.stringify(second), { mode: 0o600 })
+  utimesSync(join(imported.stage, 'image.json'), new Date(now - 31 * day), new Date(now - 31 * day))
+  mkdirSync(join(imported.directory, 'data'))
+  for (const name of ['.env', 'data/deployed-build-id', 'data/deployed-image.json']) writeFileSync(join(imported.directory, name), readFileSync(join(value.directory, name)))
+  value.add({ ...image(4), id: imported.imageId, revision: imported.request.sourceSha, build: `GAME_BUILD_ID=${imported.request.sourceSha}`, project: '', service: '' })
+  const plan = planBackendImageCleanup({ directory: imported.directory, docker: value.docker, now })
+  expect(plan.images.find(image => image.id === imported.imageId)?.action).toBe('keep')
+  expect(plan.images.find(image => image.id === imported.imageId)?.reasons).toContain(`recent-import:.backend-image-${second.operationId}`)
 })
 
 it('replans execution and refuses newly referenced or retagged candidates without stopping containers', () => {
