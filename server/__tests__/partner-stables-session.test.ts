@@ -68,3 +68,44 @@ describe('Partner Build stables',()=>{
   })
 
 })
+
+it('Carpenter Apprentice counts the target third and fourth stable while charging the builder', () => {
+  const session = partnerTable(state => {
+    state.players[0]!.occupationPlayed = ['C088_CarpentersApprentice']
+    state.players[0]!.resources.wood = 4
+    state.players[2]!.stableTiles = [{row:0,col:0},{row:0,col:1}]
+  })
+  expect(session.takeAction(0, 'farm-expansion').ok).toBe(true)
+  expect(session.resolveChoice(0, 'target-farm:p3').ok).toBe(true)
+  const built = session.commitSelectionChoice(0, {stables:[{row:0,col:2},{row:0,col:3}]})
+  expect(built.ok,built.error).toBe(true)
+  expect(built.state.players[0]!.resources.wood).toBe(0)
+  expect(built.state.players[0]!.stableTiles).toEqual([])
+  expect(built.state.players[2]!.stableTiles).toHaveLength(4)
+  expect(built.state.events).toContainEqual(expect.objectContaining({type:'resource.paid',actorPlayerId:'p1',resources:{wood:4},paymentFor:'stables'}))
+})
+
+it.each(['team','multihand'] as const)('allows only the builder team farms in a six-player %s game',mode=>{
+  const session=partnerTable(state=>{state.players[0]!.resources.wood=3},{playerCount:6,teamConfig:{mode,seatsPerTeam:3,seating:'separated',scoring:'sum',teammateVisibility:'private',cooperationRules:true}})
+  const offered=session.takeAction(0,'farm-expansion')
+  expect(offered.interaction).toMatchObject({stateId:'wait',request:{kind:'choice',options:[{value:'target-farm:p1'},{value:'target-farm:p3'},{value:'target-farm:p5'}]}})
+  assertRejectedUnchanged(session,()=>session.resolveChoice(0,'target-farm:p4'))
+  const resumed=restorePartnerTable(session)
+  expect(resumed.resolveChoice(0,'target-farm:p5').ok).toBe(true)
+  const built=resumed.commitSelectionChoice(0,{stables:[{row:0,col:2}]})
+  expect(built.ok,built.error).toBe(true)
+  expect(built.state.players[0]!.resources.wood).toBe(0)
+  expect(built.state.players[4]!.stableTiles).toEqual([{row:0,col:2}])
+  expect(built.state.players[2]!.stableTiles).toEqual([])
+})
+
+it('retains self-only builds and the ordinary two-wood price when cooperation is disabled',()=>{
+  const session=partnerTable(state=>{state.players[0]!.resources.wood=2},{teamConfig:{mode:'team',seatsPerTeam:2,seating:'separated',scoring:'sum',teammateVisibility:'private',cooperationRules:false}})
+  expect(session.takeAction(0,'farm-expansion').interaction).toMatchObject({stateId:'wait',request:{kind:'farm-select'}})
+  assertRejectedUnchanged(session,()=>session.resolveChoice(0,'target-farm:p3'))
+  const built=session.commitSelectionChoice(0,{stables:[{row:0,col:2}]})
+  expect(built.ok,built.error).toBe(true)
+  expect(built.state.players[0]!.resources.wood).toBe(0)
+  expect(built.state.players[0]!.stableTiles).toHaveLength(1)
+  expect(built.state.players[2]!.stableTiles).toEqual([])
+})

@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { getFarmyardEdgeIds, isFarmyardBorderEdge } from '../../domain/farm'
+import { resolveBuildPlayers } from '../../actions/helpers/build-players'
 import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
@@ -24,7 +25,8 @@ const E16FenceListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['fence'],
   handler: (ctx: CardListenerContext): ActionHookResult | void => {
-    const farm = ctx.player
+    const farm = resolveBuildPlayers(ctx)?.farmOwner
+    if (!farm) return
     const params = ctx.params as { newFenceEdges?: string[] } | undefined
     const newFenceEdges = params?.newFenceEdges
     if (newFenceEdges === undefined) {

@@ -40,6 +40,8 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
+    const target = context.actionContext?.targetFarmPlayerId
+    if (target !== undefined && target !== context.player.id) return
     if (context.actionContext?.skipBeforeTriggers === true) return
     if (context.trueAction === false) return
     return { doable: true }
