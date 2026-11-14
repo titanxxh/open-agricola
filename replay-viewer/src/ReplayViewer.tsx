@@ -171,6 +171,7 @@ function ArchiveReplayViewer({ locale, bridge }: { locale: Locale; bridge?: Repl
       })
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return
+        if (bridge) { bridge.close(); return }
         setError({ ok: false, code: 'viewer_unavailable', message: 'Replay manifest is unavailable' })
       })
     return () => controller.abort()

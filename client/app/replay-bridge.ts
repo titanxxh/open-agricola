@@ -79,7 +79,23 @@ export function serveReplayBridge(port: ReplayBridgePort, context: ReplayBridgeC
         assert()
         const length = Number(response.headers.get('content-length'))
         if (Number.isFinite(length) && length > REPLAY_BRIDGE_MAX_BYTES) throw new Error('unavailable')
-        bytes = await response.arrayBuffer()
+        const reader = response.body?.getReader()
+        const chunks: Uint8Array<ArrayBufferLike>[] = []
+        let total = 0
+        try {
+          if (reader) for (;;) {
+            const next = await reader.read()
+            assert()
+            if (next.done) break
+            total += next.value.byteLength
+            if (total > REPLAY_BRIDGE_MAX_BYTES) { void reader.cancel().catch(() => {}); throw new Error('unavailable') }
+            chunks.push(next.value)
+          }
+        } finally { reader?.releaseLock() }
+        const joined = new Uint8Array(total)
+        let offset = 0
+        for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.byteLength }
+        bytes = joined.buffer
         assert()
         status = response.status
         if (read.kind === 'asset') {
@@ -90,7 +106,10 @@ export function serveReplayBridge(port: ReplayBridgePort, context: ReplayBridgeC
           if (!value || typeof value !== 'object' || !('ok' in value) || typeof value.ok !== 'boolean') throw new Error('unavailable')
           if (value.ok && (!('roomId' in value) || value.roomId !== context.roomId || !('viewerBuildId' in value)
             || value.viewerBuildId !== context.viewerBuildId || !('schemaVersion' in value) || value.schemaVersion !== context.schemaVersion
-            || read.kind === 'segment' && (!('checkpointStepNo' in value) || value.checkpointStepNo !== read.checkpointStepNo))) throw new Error('unavailable')
+            || read.kind === 'segment' && (!('kind' in value) || value.kind !== 'replaySegment' || !('checkpointStepNo' in value) || value.checkpointStepNo !== read.checkpointStepNo)
+            || read.kind === 'anchor' && (!('kind' in value) || value.kind !== 'replayAnchor' || !('anchor' in value)
+              || !value.anchor || typeof value.anchor !== 'object' || !('stepNo' in value.anchor) || value.anchor.stepNo !== read.stepNo
+              || !('frameHash' in value.anchor) || value.anchor.frameHash !== read.frameHash))) throw new Error('unavailable')
         }
       }
       assert()

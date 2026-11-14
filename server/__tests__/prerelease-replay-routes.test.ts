@@ -1,3 +1,7 @@
+import * as database from '../db'
+import { GameSession } from '../game/authoritative-session'
+import { BugReportStore, TokenCipher } from '../bug-report/bug-report-store'
+import { handleBugReportRoute } from '../bug-report-routes'
 import { createServer, type Server } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -36,6 +40,8 @@ beforeEach(async () => {
   const db = await createTestDatabase()
   resources = new ReplayResources(new ResourceStore(db, S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)))
   store = new ReplayStore(db)
+  vi.spyOn(database,'getDb').mockReturnValue(db)
+  const reports = {db,resources,store:new BugReportStore(db,new TokenCipher('test',new Map([['test',Buffer.alloc(32,7)]]))),delivery:null,github:null}
   const html = Buffer.from('<main>Frozen viewer</main>')
   const manifest = Buffer.from(JSON.stringify({ entrypoint: 'index.html', files: { 'index.html': objectHash(html) }, bridge: { protocolVersion: 1, replaySchemaVersions: [1] } }))
   buildId = objectHash(manifest)
@@ -54,6 +60,7 @@ beforeEach(async () => {
   server = createServer((req,res) => { void (async () => {
     if (!await requirePrereleaseRequest(req,res)) return
     if (await handleReplayRoute(req,res,store,{resources,limiter:new ReplayReadLimiter()})) return
+    if (await handleBugReportRoute(req,res,reports,{id:'u1',username:'u1',displayName:'One'},false)) return
     res.writeHead(404); res.end()
   })().catch(error => { res.writeHead(500); res.end(String(error)) }) })
   await new Promise<void>(resolve => server.listen(0,'127.0.0.1',resolve))
@@ -80,6 +87,7 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
       else expect(await result.json()).toMatchObject({ ok: true, roomId: 'room-1', viewerBuildId: buildId })
     }
     expect((await read(`/replay-assets/${assetHash}`)).status).toBe(403)
+    await resources.storage.reference('replay','room-2',[`replay-assets/${assetHash}`])
     await resources.storage.release('replay','room-1')
     expect((await read(`/api/v1/replays/room-1/assets/${assetHash}`)).status).toBe(403)
   })
@@ -128,4 +136,60 @@ describe('private prerelease replay HTTP against PostgreSQL and S3', () => {
     expect(await result.json()).toMatchObject({ok:false,code:'viewer_unavailable'})
     expect((await resources.storage.read(`replay-viewers/${oldBuild}/index.html`))?.body).toEqual(html)
   })
+  it('keeps Evidence images behind the exact submitted Anchor, participant and expiry checks', async () => {
+    const db = resources.storage.db, now = Date.now()
+    await db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES ('u1','u1','One','hash',?)").run(now)
+    await db.prepare("INSERT INTO rooms(id,created_by,state_json,status,version,created_at,updated_at) VALUES ('room-1','u1','{}','playing',0,?,?)").run(now,now)
+    await db.prepare("INSERT INTO room_players(room_id,user_id,player_index,joined_at) VALUES ('room-1','u1',0,?)").run(now)
+    await db.prepare("UPDATE game_contexts SET lifecycle='active' WHERE room_id='room-1'").run()
+    const session = new GameSession(42,undefined,{playerCount:2})
+    const encoded = encodeReplayFrame({frame:JSON.parse(JSON.stringify(session.buildSyncPayload(session.getState(),[],'debug').state)),previousFrame:null,stepNo:0,previousCheckpointStepNo:0})
+    await db.prepare("UPDATE game_replay_steps SET payload_kind=?,payload_gzip=?,frame_hash=? WHERE room_id='room-1'").run(encoded.payloadKind,encoded.payloadGzip,encoded.frameHash)
+    await db.prepare("INSERT INTO bug_reports(submission_id,reporter_user_id,room_id,player_index,lifecycle,room_version,step_no,frame_hash,status,submitted_at,evidence_expires_at,created_at,updated_at) VALUES ('reported','u1','room-1',0,'active',0,0,?,'submitted',?,?,?,?)")
+      .run(encoded.frameHash,now,now+60_000,now,now)
+    const path = `/api/v1/game-contexts/room-1/evidence/0/assets/${assetHash}?frame=${encoded.frameHash}`
+    const response = await read(path,{'if-none-match':'*',range:'bytes=0-1'})
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(image)
+    expect((await read(path.replace(encoded.frameHash,'0'.repeat(64)))).status).toBe(409)
+    expect((await read('/api/v1/replays/room-1/manifest')).status).toBe(409)
+    await db.prepare("UPDATE bug_reports SET submitted_at=NULL WHERE submission_id='reported'").run()
+    expect((await read(path)).status).toBe(409)
+    await db.prepare("UPDATE bug_reports SET submitted_at=?,evidence_expires_at=0 WHERE submission_id='reported'").run(now)
+    expect((await read(path)).status).toBe(503)
+    await db.prepare("UPDATE bug_reports SET evidence_expires_at=? WHERE submission_id='reported'").run(now+60_000)
+    await db.prepare("DELETE FROM room_players WHERE room_id='room-1'").run()
+    expect((await read(path)).status).toBe(403)
+  })
+
+  it.each(['corrupt','removed'])('refuses %s referenced image bytes before conditional responses', async mode => {
+    const key = `replay-assets/${assetHash}`
+    if (mode === 'corrupt') {
+      const current = await resources.storage.objects.get(key)
+      if (!current) throw new Error('fixture image missing')
+      await resources.storage.objects.replace(key,Buffer.from('tampered'),current.etag)
+    } else {
+      await resources.storage.ledger.append({version:1,entries:[],assetTakedowns:[{hash:assetHash,reason:'moderation',removedAt:Date.now()}]})
+      await resources.storage.blockHash(assetHash)
+    }
+    const result = await read(`/api/v1/replays/room-1/assets/${assetHash}`,{'if-none-match':'*',range:'bytes=0-1'})
+    expect(result.status).toBe(mode === 'corrupt' ? 503 : 403)
+    expect(result.headers.get('cache-control')).toBe('no-store')
+    expect(result.headers.get('etag')).toBeNull()
+    expect(await result.text()).not.toContain(image.toString())
+  })
+
+  it('rechecks the original archive deadline after a slow image read', async () => {
+    const original = resources.storage.objects.get.bind(resources.storage.objects)
+    vi.spyOn(resources.storage.objects,'get').mockImplementation(async key => {
+      const object = await original(key)
+      if (key === `replay-assets/${assetHash}`) await resources.storage.db.prepare("UPDATE game_replays SET completed_at=? WHERE room_id='room-1'").run(Date.now()-30*86_400_000)
+      return object
+    })
+    const result = await read(`/api/v1/replays/room-1/assets/${assetHash}`)
+    expect(result.status).toBe(410)
+    expect(await result.json()).toMatchObject({ok:false,code:'context_expired'})
+  })
+
 })
