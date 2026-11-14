@@ -1,4 +1,5 @@
 import { spectatorRoute } from './room-spectators'
+import { prereleaseArchiveExpired } from './prerelease-archive-retention'
 import type { PostgresDatabase as Database } from '../database/postgres'
 import { isDevRoom } from './room.ts'
 import { RoomRetentionStore } from './room-retention-store'
@@ -210,6 +211,12 @@ export class GameContextStore {
   }
 
   async resolve(roomId: string, userId?: string, intent: 'join' | 'resume' = 'resume'): Promise<Awaited<GameContextResponse>> {
+    if (await prereleaseArchiveExpired(this.db, roomId, this.now)) return { ok: true, roomId, lifecycle: 'expired' }
+    const response = await this.resolveAvailable(roomId, userId, intent)
+    return await prereleaseArchiveExpired(this.db, roomId, this.now) ? { ok: true, roomId, lifecycle: 'expired' } : response
+  }
+
+  private async resolveAvailable(roomId: string, userId?: string, intent: 'join' | 'resume' = 'resume'): Promise<Awaited<GameContextResponse>> {
     const context = (await this.currentContext(roomId))
     if (!context) {
       return {
