@@ -392,7 +392,11 @@ test('private replay uses an authenticated parent bridge and clears idle display
     await page.reload()
     await expect(frame.locator('.replay-app')).toBeVisible()
     const evidence = await environment.seedReplay(true)
+    const evidenceReply = page.waitForResponse(response => new URL(response.url()).pathname === `/api/v1/game-contexts/${evidence.roomId}/evidence/0`)
     await page.goto(`${environment.preOrigin}/open-agricola/?room=${evidence.roomId}&step=0&frame=${evidence.firstHash}`)
+    const evidenceHttp = await evidenceReply
+    expect(await evidenceHttp.json()).toMatchObject({ok:true,kind:'reportedEvidence',perspective:'p1'})
+    expect(evidenceHttp.status()).toBe(200)
     await expect(frame.locator('.replay-app--board')).toBeVisible()
     await expect(frame.locator('[data-hand-anchor="p1"] [data-card-anchor="CUSTOM_PRIVATE_REPLAY"]')).toBeVisible()
     await expect(frame.locator('[data-hand-anchor="p2"]')).toHaveCount(0)
