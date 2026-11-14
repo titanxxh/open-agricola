@@ -826,6 +826,8 @@ receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可�
 
 `data/deployed-build-id` 与审计证据 `data/deployed-image.json` 记录成功交付，随后在实际部署目录的 owner 私有 `.env` 中原子写入无引号的 `BACKEND_IMAGE=sha256:...` 与 `CADDY_IMAGE=sha256:...`，固定已验收的原生不可变镜像。两项选择器共用一次原子写入。其他配置保持原字节；重复、带引号或使用可变 tag 的镜像配置会被拒绝。普通 Compose 默认读取该 `.env`，显式 `--env-file .env` 也读取同一绑定，不再回退旧 tag。不要用 shell、其他环境文件或备份配置覆盖该绑定。迁移前失败保留旧绑定；开始 live migration 前先写空绑定，此后失败会让普通 `run/up` 保持拒绝，直到固定镜像交付成功。JSON 回执是历史证据，不是另一套镜像选择。真实浏览器、保留对局和双实例现场验收仍须另做。
 
+验收成功并完成备份轮换后，maintenance 只删除当次操作上传的 `image.tar`。request、import/source 回执和解析后的 maintenance Compose 保留为私有审计记录；此前失败保留 archive 供诊断。验收后的 unlink 失败会明确报告清理失败，并保留已验收 app 运行，不递归删除操作目录。
+
 仅全新安装可使用显式 bootstrap。先单独准备依赖和连接配置，保持应用 PostgreSQL 数据库与 S3 namespace 为空。cutover 标记记录独立准备完成，不能替代后续空存储证明。不要先运行旧迁移说明中的 `check-live`。在独立主机准备阶段预置 owner 选定的不可变 Caddy digest，再将相同 digest 加到本机交付命令：
 
 ```bash
