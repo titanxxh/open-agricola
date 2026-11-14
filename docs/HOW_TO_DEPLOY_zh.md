@@ -219,6 +219,8 @@ pre 可以使用 `https://pre.titanxxh.com`，保留正式 Pages/API 地址；�
 
 有效的私有验收窗口内，匿名 GET 还可读取固定 hash 下的 Viewer 程序，包括带展示 query 的入口 HTML；网关转发前剥离该 query。携带 Cookie、认证或客户端绑定头的请求不能使用此例外。程序不含归档数据，也不授予数据读取权；正常获准的程序导航在转发前也剥离 Cookie 与客户端绑定，覆盖不支持 credentialless 的浏览器。target/build/代次、存储健康和正式策略租约仍须有效，窗口缺失或过期时保持维护关闭。
 
+新 TCP 连接在 Node 原有的请求头/请求超时内等待 HTTP 头，此时没有转发权限。HTTP 与 WebSocket handler 在转发前分别分类并鉴权；权限巡检只撤销已分类连接，不提前断开待接收请求头的连接，全局关闭仍销毁两者。
+
 helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的十分钟 Secure/HttpOnly/host-only Cookie 绑定 build/代次，在转发 HTTP/WS 给候选前剥离；普通浏览器仍为 503。私有浏览器执行正常正式登录和真实 pre 准入，profile 不能挂载给候选。只有候选实现完整流程后，现场才能取得身份/Beta、HTTP/WS、公开卡、Viewer、保留对局/撤回、删除、容量和正式不受影响的真实证据。复制 `deploy/prerelease-acceptance.example.json`，填写精确操作/build/image/代次/指纹、当前毫秒时间 `acceptedAt`、非空证据文件路径和 SHA256；验收三十分钟过期。
 
 增加实际部署的正式前端/API 与同父域浏览器测试的 `browser-boundary` 证据，并采集独立的 `formal-browser-policy` 产物：

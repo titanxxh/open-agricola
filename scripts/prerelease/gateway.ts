@@ -40,7 +40,7 @@ function candidateResponseHeaders(headers: IncomingHttpHeaders): IncomingHttpHea
 export function createPrereleaseGateway(options: { stateFile: string; targetId: string; origin: string; upstream: string; formal: FormalOrigins; verificationFile?: string } & FormalTlsOptions) {
   const host = new URL(options.origin).host
   const upstream = new URL(options.upstream)
-  const connections = new Map<Duplex, () => boolean>()
+  const connections = new Map<Duplex, (() => boolean) | null>()
   const state = () => {
     try {
       const state: unknown = JSON.parse(readFileSync(options.stateFile, 'utf8'))
@@ -107,7 +107,8 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     const token = tokens.length === 1 ? tokens[0].slice(OWNER_VERIFICATION_COOKIE.length + 1) : undefined
     return current?.mode === 'maintenance' && token !== undefined && validToken(token)
   }
-  const track = (socket: Duplex, permission = () => allowed()) => {
+  // Pending headers grant no authority; HTTP/WS handlers classify before forwarding.
+  const track = (socket: Duplex, permission: (() => boolean) | null = null) => {
     connections.set(socket, permission)
     socket.on('close', () => connections.delete(socket))
     socket.on('error', () => socket.destroy())
@@ -221,7 +222,7 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     outgoing.on('error', () => socket.destroy())
     outgoing.end()
   })
-  function closeInputs() { for (const [socket, permission] of connections) if (!permission()) socket.destroy() }
+  function closeInputs() { for (const [socket, permission] of connections) if (permission && !permission()) socket.destroy() }
   watchFile(guardFile, { interval: 100, persistent: false }, closeInputs)
   watchFile(options.stateFile, { interval: 100, persistent: false }, closeInputs)
   watchFile(verificationFile, { interval: 100, persistent: false }, closeInputs)
