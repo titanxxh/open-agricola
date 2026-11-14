@@ -747,7 +747,7 @@ const handleAuthorizedGameRoute = async (
         enableFarmersOfTheMoor: body.enableFarmersOfTheMoor === true,
         allowIncompleteFarmersOfTheMoorMinorDeal: body.enableFarmersOfTheMoor === true && body.allowIncompleteFarmersOfTheMoorMinorDeal === true,
         enableSnakeOpening: body.enableSnakeOpening === true,
-      })
+      }, { customCardRegistration: 'strict' })
       if (created.executor && !created.executor.reserveWorkerSlot()) throw new Error('Executable session worker capacity reached')
       const resp = created.executor ? await created.executor.execute('getState', []) : created.session.getState()
       await scope.checkNew()

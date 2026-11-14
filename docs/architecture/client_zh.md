@@ -87,7 +87,7 @@
 - `improvement-selection.ts` 将当前可用请求选项与应答玩家手牌、主要改良供应区求交。发展请求有小发展候选时聚焦手牌，仅主要改良合法时展开并聚焦供应区，两者皆无候选时聚焦操作控件。`PlayerFarmPanel.improvementSupply` 将唯一供应区视图放在手牌旁；`GameContainerApi` 持有绑定请求标识的展开状态，重复快照及响应式手牌挂载位置变化都保留该状态。覆盖见 `GameContainerApi.presentation.test.tsx`、`MajorImprovements.test.tsx` 与 `improvement-focus.spec.ts`。
 - `FarmBoard` 在格盘旁显示当前 Card Field 与牌上动物控件。`farm-board-projection.ts` 保留权威槽位 metadata；托盘与按时序排列的牌面共用草稿回调及动物区域 ID，包含借用的牌上区域。多个不透明选项继续使用既有目标选项器。统一农场聚焦区域包含格盘与托盘，短屏横屏时并排显示在固定操作栏上方。公开浏览不展示交互玩家草稿或可操作托盘。覆盖见 `farm-card-slots-session.test.ts`、`FarmBoard.test.tsx`、`GameContainerApi.presentation.test.tsx` 与 `farm-card-targets.spec.ts`。
 - 默认试玩路径是后端 `POST /api/game/new-sandbox`。设置 `VITE_SANDBOX_EXECUTOR=browser` 时，工坊试玩在浏览器中运行：`LocalGameTransport` 实现 `GameTransport`，Worker 用本地校验过的自定义代码组装共享的 `GameCore`，`server/__tests__/local-sandbox-parity.test.ts` 把行为锁定到服务端执行器。十秒超时会从最后持久化的快照（含 `engineStackCursor`）重建 Worker，并告知 UI 已回滚。对局保存在一个 IndexedDB 槽中，schema 不匹配时删除。固定到 `exactVersionId` 的试玩仍使用后端沙盒。
-- pre 使用只接收公共输入的 `PrereleaseWorkshopPage`。`local-sandbox/public-access.ts` 复核来源，按绝对期限停止空闲展示和 Worker，并拦截在途响应。stash/IndexedDB key 绑定 build/generation；恢复不保留权限。隔离 Worker 只接收有界期限，不增加网络 API；iframe 经过 `PrereleaseBoundary`。测试：`public-access.test.ts`、`prerelease-session.spec.ts`。
+- pre 的 `PrereleaseWorkshopPage` 只接收公共输入，支持两种执行模式，并保留来源及编译拒因。`local-sandbox/public-access.ts` 复核来源，按绝对期限停止空闲展示和 Worker，并拦截在途响应。stash/IndexedDB 绑定 build/generation；恢复不保留权限。固定输入 Worker 在注册失败时拒绝整组选牌，只接收有界期限，不增加网络 API；iframe 经过 `PrereleaseBoundary`。测试：`public-access.test.ts`、`prerelease-session.spec.ts`。
 - `AuthContext` 是站点登录会话（密码、GitHub 或 Google），不保存 Issue 写入授权；`LocaleContext` 切换语言。
 
 ### 预发布入口

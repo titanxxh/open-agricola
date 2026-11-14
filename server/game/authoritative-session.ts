@@ -11,7 +11,7 @@ import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { SerializedGameState } from '../../shared/session/serialization.ts'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
-import { GameCore, type SessionResponse as CoreSessionResponse, type StateWithCursor } from '../../shared/session/session-core.ts'
+import { GameCore, type GameCoreOptions, type SessionResponse as CoreSessionResponse, type StateWithCursor } from '../../shared/session/session-core.ts'
 import { buildSyncPayload, type HistoryNameProjection, type SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 
@@ -24,12 +24,14 @@ export class GameSession extends GameCore {
     stateOrSeed?: GameState | number | StateWithCursor,
     customCards?: CustomCardData[],
     initialStateOptions?: InitialStateOptions,
+    options: Pick<GameCoreOptions, 'customCardRegistration'> = {},
   ) {
     super({
       stateOrSeed,
       customCards,
       initialStateOptions,
       registerCustomCardImpl: registerExecutorBackedCustomCard,
+      ...options,
     })
   }
 

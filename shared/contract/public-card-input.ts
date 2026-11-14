@@ -75,6 +75,8 @@ export function publicCardDefinition(snapshot: WorkshopPublicCardSnapshot): { ca
     || typeof deck !== 'string' || typeof number !== 'number' || !Number.isFinite(number)
     || !Array.isArray(desc) || !desc.every((line): line is string => typeof line === 'string')
     || cardType !== 'minor' && cardType !== 'occupation') throw new Error('Invalid public card definition')
+  if (raw.modifier !== undefined && raw.modifier !== null && !isObject(raw.modifier)) throw new Error(`Public card ${id} has invalid modifier metadata`)
+  if (raw.modifiers !== undefined && raw.modifiers !== null && (!Array.isArray(raw.modifiers) || !raw.modifiers.every(isObject))) throw new Error(`Public card ${id} has invalid modifiers metadata`)
   const cardJson: CardDefinition = { ...raw, id, name, deck, number, desc }
   const art = snapshot.input.art
   return { cardType, cardJson, artUrl: art ? `data:${art.contentType};base64,${art.base64}` : null }

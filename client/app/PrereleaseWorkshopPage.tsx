@@ -47,7 +47,9 @@ export function PrereleaseWorkshopPage() {
           enableThroughTheSeasons: seasons, enableFarmersOfTheMoor: moor, enableSnakeOpening: snake,
         }) })
         const value: unknown = await response.json()
-        if (!response.ok || !value || typeof value !== 'object' || !('ok' in value) || value.ok !== true) throw new Error(t('platform.publicSandboxPaused'))
+        if (!response.ok || !value || typeof value !== 'object' || !('ok' in value) || value.ok !== true) {
+          throw new Error(value && typeof value === 'object' && 'error' in value && typeof value.error === 'string' ? value.error : t('platform.publicSandboxPaused'))
+        }
       }
       if (current !== launch.current) return
       setFixed(publicInputs.snapshots); setGame({ key: current, browser })

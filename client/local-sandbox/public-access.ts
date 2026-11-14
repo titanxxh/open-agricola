@@ -74,6 +74,7 @@ export async function loadPublicSandboxInputs(cardIds: string[]): Promise<Public
   const response = await browserApiFetch('/api/workshop/public-sandbox/v1/inputs', { method: 'POST', cache: 'no-store',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardIds }) })
   const value: unknown = await response.json(), runtime = getPrereleaseRuntime()
+  if (!response.ok && value && typeof value === 'object' && 'error' in value && typeof value.error === 'string') throw new Error(value.error)
   if (!response.ok || !runtime || !value || typeof value !== 'object' || !('ok' in value) || value.ok !== true
     || !('snapshots' in value) || !Array.isArray(value.snapshots) || value.snapshots.length !== cardIds.length
     || !('lease' in value) || !value.lease || typeof value.lease !== 'object' || !('buildId' in value.lease) || value.lease.buildId !== runtime.buildId

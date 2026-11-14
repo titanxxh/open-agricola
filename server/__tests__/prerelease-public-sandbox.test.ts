@@ -204,6 +204,44 @@ it('rejects a whole selection when an authoritative public input needs an unsupp
   expect(retained.body.state).toEqual(initial.body.state)
 })
 
+it.each([{ modifiers: { type: 'bonus' } }, { modifier: 1 }, { modifiers: [null] }])('rejects malformed public registration metadata in HTTP and browser execution: %j', async metadata => {
+  const valid = await published(`MetadataValid${++serial}`), invalid = await published(`MetadataInvalid${++serial}`)
+  const initial = await api('/api/game/new-sandbox', { seed: 42, customCardIds: [valid.card.id] })
+  const version = await sourceDb.prepare('SELECT card_json FROM workshop_card_versions WHERE id=?').get<{ card_json: string }>(invalid.version.versionId)
+  if (!version) throw new Error('Missing fixture version')
+  await sourceDb.prepare('UPDATE workshop_card_versions SET card_json=? WHERE id=?').run(JSON.stringify({ ...JSON.parse(version.card_json), ...metadata }), invalid.version.versionId)
+  const fixed = await api('/api/workshop/public-sandbox/v1/inputs', { cardIds: [valid.card.id, invalid.card.id] })
+  expect(fixed.status).toBe(200)
+  const snapshots: WorkshopPublicCardSnapshot[] = fixed.body.snapshots
+  const denied = await api('/api/game/new-sandbox', { seed: 42, customCardIds: [valid.card.id, invalid.card.id], publicCardBindings: snapshots.map(publicCardReference) })
+  expect(denied.status).toBe(400)
+  expect(denied.body.error).toContain(invalid.id)
+  expect(denied.body.error).toContain('modifier')
+  expect((await api('/api/game/state')).body.state).toEqual(initial.body.state)
+  const config = { cards: [], playerCount: 2, seed: 42, publicInputs: { snapshots, buildId, generationId, contractId: fixed.body.lease.contractId } }
+  const core = new LocalSandboxCore()
+  core.admit({ buildId, generationId, runtimeId: `browser-local:${buildId}`, hashes: snapshots.map(snapshot => snapshot.sha256), wallDeadline: Date.now() + 20_000, monotonicDeadline: performance.timeOrigin + performance.now() + 20_000 }, config)
+  expect(() => core.init(config, { mode: 'debug', visiblePlayerIds: [] })).toThrow('modifier')
+  expect(() => core.call('getState', [], { mode: 'debug', visiblePlayerIds: [] })).toThrow()
+})
+
+it('preserves valid legacy modifier metadata in both executors', async () => {
+  const input = await published('PublicLegacyModifier')
+  const modifier = { type: 'bonus', cardId: input.id, appliesTo: ['construct'], discount: { wood: 1 } }
+  const version = await sourceDb.prepare('SELECT card_json FROM workshop_card_versions WHERE id=?').get<{ card_json: string }>(input.version.versionId)
+  if (!version) throw new Error('Missing fixture version')
+  await sourceDb.prepare('UPDATE workshop_card_versions SET card_json=? WHERE id=?').run(JSON.stringify({ ...JSON.parse(version.card_json), modifiers: [modifier] }), input.version.versionId)
+  const fixed = await api('/api/workshop/public-sandbox/v1/inputs', { cardIds: [input.card.id] })
+  expect((await api('/api/game/new-sandbox', { seed: 42, customCardIds: [input.card.id] })).status).toBe(200)
+  expect((await api('/api/game/dev/play-card', { playerIndex: 0, cardId: input.id })).body.state.players[0].activeModifiers).toContainEqual(modifier)
+  const snapshots: WorkshopPublicCardSnapshot[] = fixed.body.snapshots
+  const config = { cards: [], playerCount: 2, seed: 42, publicInputs: { snapshots, buildId, generationId, contractId: fixed.body.lease.contractId } }
+  const core = new LocalSandboxCore()
+  core.admit({ buildId, generationId, runtimeId: `browser-local:${buildId}`, hashes: snapshots.map(snapshot => snapshot.sha256), wallDeadline: Date.now() + 20_000, monotonicDeadline: performance.timeOrigin + performance.now() + 20_000 }, config)
+  core.init(config, { mode: 'debug', visiblePlayerIds: [] })
+  expect(core.call('devPlayCard', [0, input.id], { mode: 'debug', visiblePlayerIds: [] }).payload.state.players[0]?.activeModifiers).toContainEqual(modifier)
+})
+
 it('discards a real custom worker reply after authorization ends and restores only the last accepted state', async () => {
   const input = await published('PublicCommitFence'), { getPrereleasePublicSandbox } = await import('../prerelease-public-sandbox')
   const source = getPrereleasePublicSandbox(), scope = await source.create([input.card.id]), cards = await source.compile(scope)
