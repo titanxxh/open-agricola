@@ -1,3 +1,4 @@
+import { prereleaseArchiveReadState, PRERELEASE_ARCHIVE_RETENTION_MS } from './game/prerelease-archive-retention'
 import { isPrerelease } from './prerelease-access'
 import { supportsReplayBridge } from '../shared/contract/replay-viewer-build'
 import { replayBridgeImageType, REPLAY_BRIDGE_MAX_BYTES } from '../shared/contract/protocol/replay-bridge'
@@ -306,7 +307,15 @@ export async function handleReplayRoute(
       } else {
         const unavailable = await store.archiveUnavailable(roomId)
         if (unavailable) sendJson(req, res, unavailable)
-        else { res.writeHead(200, privateHeaders(object.contentType)); res.end(object.body) }
+        else {
+          const state = await prereleaseArchiveReadState(options.resources.storage.db,roomId)
+          const available = await options.resources.assetAvailable(roomId,hash,manifest.customCards)
+          if (!available || !state || state.lifecycle !== 'completed' && state.lifecycle !== 'terminated') {
+            sendJson(req,res,{ok:false,code:'not_participant',message:'Replay asset is unavailable in this context'})
+          } else if (state.expired || state.endedAt !== null && Date.now() >= state.endedAt + PRERELEASE_ARCHIVE_RETENTION_MS) {
+            sendJson(req,res,{ok:false,code:'context_expired',message:'Replay archive expired'})
+          } else { res.writeHead(200, privateHeaders(object.contentType)); res.end(object.body) }
+        }
       }
     } catch (error) {
       if (!(error instanceof ResourceIntegrityError)) throw error
