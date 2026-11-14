@@ -98,11 +98,13 @@ type ActionDefinition = {
 
 卡牌授予的本方建造、卡上构件与 pending 恢复由 `server/__tests__/own-farm-card-session.test.ts` 覆盖。
 
+`farmBuild` 声明建造类别；`select-target-farm` 绑定合法本方或队友农场，`targetFarmPlayerId` 贯穿组合行动及恢复，新的卡赠 leaf 重新选择。`helpers/build-players.ts` 区分 builder 付款/费用牌与目标农场几何/构件/动物整理。`targetFarmPolicy: 'own'` 限定自家建造与卡上构件。测试见 `server/__tests__/{partner-stables,partner-rooms,partner-fences,card-own-farm-builds,card-granted-builds}-session.test.ts`。
+
 ## 农场类提交
 
 每种农场类型都在 `shared/actions/effects/` 下自己的 `ActionDefinition.resolveChoice` 中闭环：
 
-- **房间**（`construct.ts`）：`room-payment.ts` 从执行玩家派生可负担性和材质；`FarmInteraction` 接收明确的数量上限，只负责几何。`actionContext.allowedRoomTypes` 在可达性和提交时限制目标材质。摆放、预览和恢复后的提示共用 `constructFarmSelection`。屋内动物按真实房间保存在 `houseAnimals`。
+- **房间**（`construct.ts`）：`room-payment.ts` 从付款者派生可负担性、从农场主派生材质；替建房间的基础加价先于折扣，来源明确的 exact/free 价格保持原义；`FarmInteraction` 接收明确的数量上限，只负责几何。`actionContext.allowedRoomTypes` 在可达性和提交时限制目标材质。摆放、预览和恢复后的提示共用 `constructFarmSelection`。屋内动物按真实房间保存在 `houseAnimals`。
 - **马厩 / 犁地**（`stables.ts`、`plow.ts`）：typed-flat 支付；马厩定价由默认价、`exactCost` 或 `costOverride` 与一次完整的农场选择查询得出单价。`plow.actionContext.allowedTiles` / `adjacencyPolicy` 只影响本次犁地。
 - **犁地结算**：`farm.fieldPlowed.payment` 保留选中的 typed-flat 实付与实际季节附加费用。`sourceActionId` 标识宿主行动格，因此完整田地事件替代宿主的后备明细日志，不另产生支付事实。无法继续执行的必做宿主，仅由当前事务中该玩家实际获得的田地满足，不依赖宿主来源名；卡牌来源继续由 `sourceCardId` 保留。测试：`server/__tests__/seasonal-plow-payment-session.test.ts`、`server/__tests__/future-meeple-action-session.test.ts`。
 - **围栏**（`fencing.ts`）：校验边、来源、连通性与区域；通过农场选择的 `computeCosts` pass 计算费用；把 trade、bonus、provider 与预算传入 `pay:fence:*`。`before` 贡献按来源写回宿主：木材折扣不增加实体，卡上围栏由玩家显式选择，只为本次新建的普通围栏消耗。
@@ -144,3 +146,5 @@ type ActionDefinition = {
 
 测试：`shared/session/__tests__/anytime-policy.test.ts`、`server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session,exchange-batch-session}.test.ts`。
 
+
+预发布Marketplace在改状态前验证整批转移；赠与者支付物资及一份同种税。`receiveFromPlayerLeaf` 给真正接收者入账，复用receive/动物整理hook，不计为卡牌收入。`marketplace-session.test.ts`、`marketplace-animals-session.test.ts` 覆盖拒绝、pending恢复与undo。

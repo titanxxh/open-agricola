@@ -1,3 +1,5 @@
+import { supportsReplayBridge } from '../../shared/contract/replay-viewer-build'
+import { publishTeamWaitingRoom } from '../game/team-room'
 import { closePrereleaseSocket, isPrerelease, prereleaseRequestAdmission, trackPrereleaseSocket } from '../prerelease-access'
 import { drainRoomSpectators, removeRoomSpectator } from '../game/room-spectators'
 import { operationsMetrics, safe } from '../observability/metrics'
@@ -37,7 +39,7 @@ import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { websocketAdmission, websocketSessionToken } from '../request-auth'
 import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { validateSession } from '../auth.ts'
-import { RoomCommitter } from '../game/room-committer.ts'
+import { REPLAY_SCHEMA_VERSION, RoomCommitter } from '../game/room-committer.ts'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter.ts'
 import type { GameContextStore } from '../game/game-context-store.ts'
 import { getResources } from '../storage/runtime'
@@ -321,6 +323,9 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
       if (removeRoomSpectator(ctx.currentRoom, ws)) return
       const disconnectedSeats = controlledSeatIndexes(ctx.currentRoom, ws)
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
+      if (removal !== 'not-present' && ctx.currentRoom.status === 'waiting' && ctx.currentRoom.session.state.team) {
+        await publishTeamWaitingRoom({ room: ctx.currentRoom, broadcaster: deps.broadcaster })
+      }
       if (removal === 'remaining') {
         for (const playerIndex of disconnectedSeats) await deps.broadcaster.broadcastEvent(ctx.currentRoom, {
           type: 'playerDisconnected', playerIndex,
@@ -387,7 +392,10 @@ export async function createWsServer(
         persistence: deps.persistence,
         viewerBuildId: replay.viewerBuildId,
         gameBuildId: replay.gameBuildId,
-        viewerBuildExists: async (buildId) => !!await resources.viewer(buildId),
+        viewerBuildExists: async (buildId) => {
+          const viewer = await resources.viewer(buildId)
+          return !!viewer && (!isPrerelease() || supportsReplayBridge(viewer, REPLAY_SCHEMA_VERSION))
+        },
         resources,
       })
   const instanceId = deps.instanceId ?? randomUUID()

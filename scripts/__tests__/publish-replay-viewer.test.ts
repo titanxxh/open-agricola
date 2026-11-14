@@ -2,6 +2,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   unlinkSync,
   writeFileSync,
@@ -36,7 +37,10 @@ describe('publishReplayViewer', () => {
     const target = join(root, 'published')
     const first = publishReplayViewer(target, createStaging(root))
 
-    expect(loadReplayViewerBuild(target, first.buildId)).not.toBeNull()
+    expect(JSON.parse(readFileSync(join(first.directory, 'manifest.json'), 'utf8'))).toMatchObject({
+      bridge: { protocolVersion: 1, replaySchemaVersions: [1] },
+    })
+    expect(loadReplayViewerBuild(target, first.buildId)?.bridge).toEqual({ protocolVersion: 1, replaySchemaVersions: [1] })
     expect(readdirSync(target)).toEqual([first.buildId])
 
     const second = publishReplayViewer(target, createStaging(root))

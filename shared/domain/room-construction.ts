@@ -10,8 +10,9 @@ export function commitRoomConstruction(
   positions: readonly FarmTilePosition[],
   sourceCardId?: string,
   eventSink?: EventSink,
+  builder: PlayerState = player,
 ) {
-  const receipt = commitFarmOperation(player, { kind: 'rooms', positions, sourceCardId }, eventSink)
+  const receipt = commitFarmOperation(player, { kind: 'rooms', positions, sourceCardId }, eventSink, builder)
   reconcileOrdinaryHousePet(player, state)
   return receipt
 }

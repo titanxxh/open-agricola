@@ -1,3 +1,6 @@
+import { prereleaseRequestBinding, prereleaseSessionToken } from './prerelease-access'
+import { getPrereleaseSessions } from './prerelease-sessions'
+import { getPrereleasePublicSandbox, PublicSandboxPaused, PublicSandboxScope, parsePublicSandboxIds, parsePublicSandboxReferences, readPublicSandboxBody } from './prerelease-public-sandbox'
 import { requestSessionToken } from './request-auth'
 import { CLIENT_CAPABILITIES_HEADER } from '../shared/contract/client-capabilities'
 import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
@@ -60,6 +63,12 @@ export const configureSandboxAuthority = (value: SandboxAuthority): void => { au
 const sessionStamps = new Map<string, ExecutionStamp>()
 const requests = new WeakMap<IncomingMessage, { stamp: ExecutionStamp; revision?: number }>()
 const responses = new WeakMap<ServerResponse, IncomingMessage>()
+const publicSessionScopes = new WeakMap<GameSession, PublicSandboxScope>()
+const publicRequestScopes = new WeakMap<IncomingMessage, PublicSandboxScope>()
+const assertSandboxRequestAccess = (req: IncomingMessage): void => {
+  publicRequestScopes.get(req)?.assert()
+  if (process.env.RELEASE_CHANNEL === 'prerelease' && !getPrereleaseSessions()?.cachedAuthorized(prereleaseSessionToken(req), prereleaseRequestBinding(req))) throw new PublicSandboxPaused('Prerelease access unavailable')
+}
 export const disposeSandboxSessionsForUser = (userId: string): void => {
   sessionExecutors.get(userId)?.dispose()
   userSessions.get(userId)?.dispose()
@@ -118,7 +127,13 @@ const getSessionForRequest = async (req: IncomingMessage): Promise<Awaited<GameS
     requests.set(req, { ...requests.get(req), stamp })
   }
   sessionLastAccess.set(key, Date.now())
-  return userSessions.get(key)!
+  const session = userSessions.get(key)!
+  if (process.env.RELEASE_CHANNEL === 'prerelease') {
+    const scope = publicSessionScopes.get(session) ?? new PublicSandboxScope([], [])
+    await scope.check()
+    publicRequestScopes.set(req, scope)
+  }
+  return session
 }
 
 const setSessionForRequest = async (
@@ -212,7 +227,7 @@ const callAndRespond = async (
   const session = (await getSessionForRequest(req))
   const executor = sessionExecutors.get((await getSessionKey(req)))
   const resp = executor
-    ? await executor.execute(method, args)
+    ? await executor.execute(method, args, () => assertSandboxRequestAccess(req))
     : session.withCtx(() => fn(session))
   if (method === 'loadState' && resp.ok) gameInstanceIds.delete(session)
   const viewerId = resolveViewerPlayerId(req, session)
@@ -277,9 +292,9 @@ const rawJson = (res: ServerResponse, status: number, payload: unknown) => {
 const sendJson = async (res: ServerResponse, status: number, payload: unknown): Promise<void> => {
   const request = responses.get(res)
   const scope = request && requests.get(request)
-  if (authority && scope) {
-    await authority.publish(scope.stamp, () => rawJson(res, status, payload))
-  } else rawJson(res, status, payload)
+  const publish = () => { if (request) assertSandboxRequestAccess(request); rawJson(res, status, payload) }
+  if (authority && scope) await authority.publish(scope.stamp, publish)
+  else publish()
 }
 
 const respondWith = (
@@ -545,7 +560,7 @@ const handleAuthorizedGameRoute = async (
     const executor = sessionExecutors.get((await getSessionKey(req)))
     try {
       const actions = executor
-        ? await executor.query<{ spaceId: string; nameKey: string }[]>('getAvailableActions', [playerIndex])
+        ? await executor.query<{ spaceId: string; nameKey: string }[]>('getAvailableActions', [playerIndex], () => assertSandboxRequestAccess(req))
         : session.withCtx(() => session.getAvailableActions(playerIndex))
       await sendJson(res, 200, { ok: true, actions })
     } catch (error) {
@@ -595,7 +610,7 @@ const handleAuthorizedGameRoute = async (
       if (!await enforceSeatBinding(req, res, body.playerIndex)) return true
       const executor = sessionExecutors.get(await getSessionKey(req))
       const quote = executor
-        ? await executor.query<FenceSelectionQuote>('quoteFenceSelection', [body.playerIndex, body.requestKey, payload])
+        ? await executor.query<FenceSelectionQuote>('quoteFenceSelection', [body.playerIndex, body.requestKey, payload], () => assertSandboxRequestAccess(req))
         : session.quoteFenceSelection(body.playerIndex, body.requestKey, payload)
       await sendJson(res, 200, quote)
     } catch (error) {
@@ -633,7 +648,7 @@ const handleAuthorizedGameRoute = async (
     return true
   }
 
-  if (req.method === 'POST' && req.url === '/api/game/new') {
+  if (process.env.RELEASE_CHANNEL !== 'prerelease' && req.method === 'POST' && req.url === '/api/game/new') {
     const sessionKey = (await getSessionKey(req))
     let seed: number | undefined
     let raw: Record<string, unknown> = {}
@@ -705,6 +720,51 @@ const handleAuthorizedGameRoute = async (
     const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     await sendJson(res, 200, result)
     return true
+  }
+
+  if (process.env.RELEASE_CHANNEL === 'prerelease' && req.method === 'POST' && ['/api/game/new-sandbox', '/api/game/new'].includes(req.url ?? '')) {
+    let created: ReturnType<typeof createIsolatedGameSession> | undefined
+    try {
+      const body = await readPublicSandboxBody(req)
+      const allowed = ['seed', 'customCardIds', 'publicCardBindings', 'playerCount', 'deckIds', 'enableThroughTheSeasons', 'enableFarmersOfTheMoor', 'allowIncompleteFarmersOfTheMoorMinorDeal', 'enableSnakeOpening']
+      if (Object.keys(body).some(key => !allowed.includes(key))) throw new Error('Only public sandbox configuration is accepted')
+      if (body.customCardVersions !== undefined || body.customCards !== undefined || body.source !== undefined || body.publicInputs !== undefined
+        || req.url === '/api/game/new' && body.customCardIds !== undefined) throw new Error('Only public card identities may be selected')
+      assertSupportedGameConfiguration(body)
+      const ids = parsePublicSandboxIds(body.customCardIds ?? [])
+      const service = getPrereleasePublicSandbox(), scope = await service.create(ids)
+      if (body.publicCardBindings !== undefined) {
+        const expected = parsePublicSandboxReferences(body.publicCardBindings)
+        if (expected.length !== scope.snapshots.length || expected.some((ref, index) => ref.sha256 !== scope.snapshots[index]?.sha256)) throw new Error('Public card selection changed; select again')
+      }
+      const cards = await service.compile(scope)
+      await scope.checkNew()
+      const key = await getSessionKey(req), generation = (sessionReplacementGenerations.get(key) ?? 0) + 1
+      sessionReplacementGenerations.set(key, generation)
+      created = createIsolatedGameSession(typeof body.seed === 'number' ? body.seed : undefined, cards, {
+        playerCount: typeof body.playerCount === 'number' ? Math.max(2, Math.min(6, Math.floor(body.playerCount))) : 2,
+        deckIds: Array.isArray(body.deckIds) && body.deckIds.length ? body.deckIds.filter((id): id is string => typeof id === 'string' && defaultSandboxDeckIds.some(deck => deck === id)) : [...defaultSandboxDeckIds], enableThroughTheSeasons: body.enableThroughTheSeasons === true,
+        enableFarmersOfTheMoor: body.enableFarmersOfTheMoor === true,
+        allowIncompleteFarmersOfTheMoorMinorDeal: body.enableFarmersOfTheMoor === true && body.allowIncompleteFarmersOfTheMoorMinorDeal === true,
+        enableSnakeOpening: body.enableSnakeOpening === true,
+      }, { customCardRegistration: 'strict' })
+      if (created.executor && !created.executor.reserveWorkerSlot()) throw new Error('Executable session worker capacity reached')
+      const resp = created.executor ? await created.executor.execute('getState', []) : created.session.getState()
+      await scope.checkNew()
+      if (!resp.ok || sessionReplacementGenerations.get(key) !== generation) throw new Error('Public sandbox initialization failed or was superseded')
+      publicSessionScopes.set(created.session, scope)
+      publicRequestScopes.set(req, scope)
+      await setSessionForRequest(req, created.session, [], created.executor)
+      await sendJson(res, 200, { ...respondWith(resp, created.session, resolveViewerPlayerId(req, created.session)),
+        publicInputs: scope.snapshots.map(snapshot => ({ sha256: snapshot.sha256, source: snapshot.input.source })),
+        publicLease: service.packet(scope), customCardsLoaded: cards.length })
+      return true
+    } catch (error) {
+      created?.executor?.dispose(); created?.session.dispose()
+      publicRequestScopes.delete(req)
+      await sendJson(res, error instanceof PublicSandboxPaused ? 503 : 400, { ok: false, code: 'public_card_execution_paused', error: error instanceof Error ? error.message : 'Public sandbox unavailable' })
+      return true
+    }
   }
 
   // Sandbox game: start a new single-player game with custom workshop cards loaded
@@ -1075,6 +1135,7 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
     return true
   }
   try {
+    responses.set(res, req)
     if (!authority) return await handleAuthorizedGameRoute(req, res)
     const key = await getSessionKey(req)
     const stamp = sessionStamps.get(key) ?? await authority.access.capture([], key === 'anonymous' ? [] : [key])
@@ -1083,6 +1144,7 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
     responses.set(res, req)
     return await handleAuthorizedGameRoute(req, res)
   } catch (error) {
+    if (error instanceof PublicSandboxPaused) { rawJson(res, 503, { ok: false, code: error.code }); return true }
     if (error instanceof UnsupportedSandboxListenerError) {
       rawJson(res, 400, { ok: false, code: error.code, error: error.message })
       return true

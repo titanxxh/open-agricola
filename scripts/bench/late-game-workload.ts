@@ -118,7 +118,7 @@ const prepareLateGame = (): { session: GameSession; prefixCommands: number } => 
     player.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }, { row: 0, col: 3, stacks: [] }]
     player.stableTiles = [{ row: 2, col: 4 }]
     player.fenceSegments = ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'].map(edge => ({ edge, type: 'fence' }))
-    player.pastures = [{ id: 'pasture-2-4', size: 1, tiles: [{ row: 2, col: 4 }], stables: 1, animalType: null, animalCount: 0 }]
+    player.pastures = [{ id: 'pasture-2-4', tiles: [{ row: 2, col: 4 }], animalType: null, animalCount: 0 }]
     player.houseAnimals = {};
     player.stableAnimals = {}
     writeCardExtraData(player, cards.minors[1]!, 'cardFieldStacks', [{ crop: index === 2 ? 'wood' : 'vegetable', remaining: index === 2 ? 3 : 2 }])

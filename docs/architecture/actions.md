@@ -94,13 +94,13 @@ Tests: `shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,pla
 
 `ActionFlow.targetPlayerId` and `actionContext.targetPlayerId` route an effect to its authorized player. Card listeners keep the card owner as the recipient; ordinary cross-player rewards, payment and pending choices retain that identity. See `helpers/target-player.ts`, `server/__tests__/before-placement-owner-target-session.test.ts` and the Custom Code admission and execution tests.
 
-Own-farm card-granted construction, card-held components and pending recovery are covered by `server/__tests__/own-farm-card-session.test.ts`.
+`farmBuild` declares build kinds. `select-target-farm` binds one legal own or teammate farm before execution, then `targetFarmPlayerId` survives the wrapper and recovery. A new card-granted leaf chooses again. `helpers/build-players.ts` separates builder payment and card modifiers from target geometry, supply and animal rearrangement. `targetFarmPolicy: 'own'` binds card-local builds and reserved pieces. Tests: `server/__tests__/{partner-stables,partner-rooms,partner-fences,card-own-farm-builds,card-granted-builds}-session.test.ts`.
 
 ## Farm-type commit
 
 Each farm type closes its logic inside its own `ActionDefinition.resolveChoice` under `shared/actions/effects/`:
 
-- **Room** (`construct.ts`): `room-payment.ts` derives affordability and material from the executing player. `FarmInteraction` receives an explicit maximum and owns only geometry. `actionContext.allowedRoomTypes` constrains the target material at availability and commit. Placement, preview and restored prompts share `constructFarmSelection`. House animals persist per real room in `houseAnimals`.
+- **Room** (`construct.ts`): `room-payment.ts` derives affordability from the payer and material from the farm owner. Partner room base increases precede discounts; source exact/free prices stay explicit. `FarmInteraction` receives an explicit maximum and owns only geometry. `actionContext.allowedRoomTypes` constrains the target material at availability and commit. Placement, preview and restored prompts share `constructFarmSelection`. House animals persist per real room in `houseAnimals`.
 - **Stable / plow** (`stables.ts`, `plow.ts`): typed-flat payment; stable pricing derives one unit fee from the default, `exactCost` or `costOverride` and one complete farm-choice query. `plow.actionContext.allowedTiles` / `adjacencyPolicy` affect only that plow.
 - **Plow settlement**: `farm.fieldPlowed.payment` retains the selected typed-flat payment and actual seasonal surcharge. Its `sourceActionId` identifies the host space, so the complete field event replaces the host's fallback detail log without another payment fact. An unavailable mandatory host is already satisfied only by an actual field for that player in the current transaction, independently of the host's source name. Card provenance remains on `sourceCardId`. Tests: `server/__tests__/seasonal-plow-payment-session.test.ts`, `server/__tests__/future-meeple-action-session.test.ts`.
 - **Fence** (`fencing.ts`): validate edges, sources, connectivity and regions; compute cost through the farm-choice `computeCosts` pass; pass trades, bonuses, providers and budget into `pay:fence:*`. `before` contributions write back to the host by source: wood discounts add no entity, and card-held fences are chosen explicitly and consumed only for ordinary fences built in this action.
@@ -142,3 +142,5 @@ Tests: `shared/actions/__tests__/fencing.test.ts`, `shared/actions/effects/__tes
 
 Tests: `shared/session/__tests__/anytime-policy.test.ts`, `server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session,exchange-batch-session}.test.ts`.
 
+
+Prerelease Marketplace settlement validates the entire transfer batch before mutation. The giver pays the transferred amount plus one same-good tax. `receiveFromPlayerLeaf` credits the actual recipient, runs existing receive/animal settlement hooks and does not count transfers as card income. `marketplace-session.test.ts` and `marketplace-animals-session.test.ts` cover rejects, pending restoration and undo.

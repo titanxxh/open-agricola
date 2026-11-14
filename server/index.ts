@@ -1,3 +1,4 @@
+import { handlePrereleasePublicSandbox } from './prerelease-public-sandbox'
 import { handlePrereleaseRoute, requirePrereleaseRequest } from './prerelease-routes'
 import { getPrereleaseSessions } from './prerelease-sessions'
 import { allowAnonymousAccess } from './anonymous-access'
@@ -102,6 +103,8 @@ import {
 } from './bug-report/bug-report-store.ts'
 import { GitHubIssueClient } from './bug-report/github-issue-client.ts'
 import { applyReplayRemovalLedger } from './game/replay-removal.ts'
+import { listEndedGames } from './game/prerelease-archive-retention'
+import { collectPrereleaseArchives } from './game/prerelease-archive-cleanup'
 import { adminTakedownCard, markBuiltInMergedCards, reconcilePendingMerges } from './workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../shared/cards/register-all.ts'
 import { createFrontendHosting } from './frontend-hosting'
@@ -187,6 +190,7 @@ await initializeDatabase()
 }
 if (process.env.NODE_ENV !== 'test') {
   await applyReplayRemovalLedger(getDb(), { resources: getResources() })
+  await collectPrereleaseArchives(getDb(), getResources(), process.env.REPLAY_VIEWER_BUILD_ID ?? '')
 }
 
 // Wire up room persistence adapter before creating the WS server
@@ -396,6 +400,15 @@ const sessionCleanupTimer = setInterval(async () => {
     await wssCtx?.committer?.cleanupReplayAssets()
   } catch (error) { console.error('[storage] periodic cleanup pending', error) }
 }, 60 * 60 * 1000)
+let prereleaseArchiveCleanupRunning = false
+const prereleaseArchiveCleanupTimer = process.env.RELEASE_CHANNEL === 'prerelease' ? setInterval(() => {
+  if (prereleaseArchiveCleanupRunning) return
+  prereleaseArchiveCleanupRunning = true
+  void collectPrereleaseArchives(getDb(), getResources(), process.env.REPLAY_VIEWER_BUILD_ID ?? '')
+    .catch(error => console.error('[storage] prerelease archive cleanup pending', error))
+    .finally(() => { prereleaseArchiveCleanupRunning = false })
+}, 60_000) : undefined
+prereleaseArchiveCleanupTimer?.unref()
 const bugReportDeliveryTimer = setInterval(() => {
   void retryPendingAccountDeletion().then(
     () => bugReportDelivery?.retryGrantRevocation(),
@@ -466,6 +479,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     return
   }
 
+  if (await handlePrereleasePublicSandbox(req, res)) return
   if (await handleCommunityQr(req, res)) return
   if (await handleWhatsNew(req, res)) return
   if (await handlePrereleaseLifecycle(req, res)) return
@@ -1016,14 +1030,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   if (req.method === 'GET' && req.url === '/api/lobby/ended-games') {
     const user = await validateSession(await getAuthToken(req))
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
-    const games = await getDb().prepare(`
-      SELECT g.room_id AS id, 'completed' AS outcome, g.finished_at AS ended_at
-      FROM game_results g JOIN game_result_players p USING(room_id) WHERE p.user_id=?
-      UNION
-      SELECT t.room_id AS id, 'terminated' AS outcome, t.ended_at
-      FROM game_terminations t JOIN game_termination_players p USING(room_id) WHERE p.user_id=?
-      ORDER BY ended_at DESC LIMIT 20
-    `).all(user.id, user.id)
+    const games = await listEndedGames(getDb(), user.id)
     sendJson(res, 200, { ok: true, games })
     return
   }
@@ -1106,6 +1113,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     bugReportRuntime,
     requestUser,
     requestUser ? isAdmin(requestUser.username) : false,
+    { db: getDb() },
   )) return
 
   sendJson(res, 404, { error: 'Not found' })
@@ -1142,6 +1150,7 @@ installShutdownHandlers(async () => {
   const closed = new Promise<void>(resolve => server.close(() => resolve()))
   prereleaseSessions?.close()
   clearInterval(sessionCleanupTimer)
+  if (prereleaseArchiveCleanupTimer) clearInterval(prereleaseArchiveCleanupTimer)
   clearInterval(invalidationTimer)
   shutdownSandboxSessions()
   clearInterval(bugReportDeliveryTimer)

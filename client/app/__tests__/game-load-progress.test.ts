@@ -34,6 +34,13 @@ describe('getGameLoadProgress', () => {
 })
 
 describe('resolveGameLoadPhase', () => {
+  it('shows the Team waiting page before any game snapshot exists', () => {
+    expect(resolveGameLoadPhase({ wsStatus: { phase: 'team-waiting', roomId: 'team', maxPlayers: 4,
+      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' },
+      members: [], selfMemberId: 'host', isHost: true, canStart: false,
+    }, hasGameView: false })).toBeNull()
+  })
+
   it('prefers manifest before auth', () => {
     expect(resolveGameLoadPhase({ manifestReady: false, authLoading: true })).toBe('manifest')
   })

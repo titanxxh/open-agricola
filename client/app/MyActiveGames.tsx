@@ -1,3 +1,4 @@
+import { TeamConfigurationSummary } from './TeamSetupFields'
 import type { LobbyExpansion, MyActiveRoom } from '../../shared/contract/lobby'
 import { Section } from '../components/common/Section'
 import { useLocale } from '../contexts/LocaleContext'
@@ -28,6 +29,8 @@ export function MyActiveGames({ rooms, onResume }: { rooms: MyActiveRoom[]; onRe
           return (
             <li key={`${room.id}:${room.player_index}`} className={`room-item my-game${room.my_turn === 1 ? ' room-item--my-turn' : ''}`}>
               <div className="my-game__details">
+                {room.teamConfig && <TeamConfigurationSummary maxPlayers={room.max_players} value={room.teamConfig} />}
+                {room.teamWaiting && <span>{t('team.seatsFilled', { current: room.teamWaiting.members.reduce((sum, member) => sum + member.seatCount, 0), max: room.max_players })}</span>}
                 <div className="my-game__players">
                   {room.players.map(player => (
                     <span key={player.playerIndex} className="my-game__player" data-current={room.waiting_player_indexes.includes(player.playerIndex)}

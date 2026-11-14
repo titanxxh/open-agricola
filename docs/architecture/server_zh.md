@@ -107,7 +107,7 @@ ClientCommand
 - Replay 归档使用有界的权威状态差量（[ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)）。
 - 写入失败时冻结同一份 Frame 与 Intent，阻断 Room 并按退避重试；客户端等待，从不读取未提交状态。相同幂等 key 但 hash 不同会永久阻断并报警。
 - 单实例默认准入 30 个普通 Room。`APP_ROOM_CAPACITY`（1–30）与 `CUSTOM_SESSION_WORKER_CAPACITY`（0–15，默认 15）可降低上限；无效值阻止启动。`RoomDirectory` 对新建与首次恢复原子计算 OPEN 连接和 30 秒预留，包含缓存 Room。激活保留预留，直到正数在线 presence 消耗它。离线存档保留 owner，不占在线配额。Worker 限额计入保留的工坊 executor、恢复的 Room 与 HTTP 沙盒。满额 Room 可重连座位或通过 `newGame` 一换一替换。见 `room-directory.test.ts`、`session-capacity.test.ts` 与 `ws-server.test.ts`。
-- Game Context 链接按生命周期解析（[ADR 0013](../adr/0013-lifecycle-routed-game-context-access.md)）：completed、expired、removed 以及公开 Replay 不需登录；活动描述、恢复、Bug Report、证据与维护者取证执行座位或管理员授权。错误使用 `{ ok:false, code, lifecycle?, message }`。
+- 正式 Context/完赛 Replay 保持公开（ADR 0010/0013），恢复/Evidence 保留座位或管理员权限。pre 要求 Beta 准入及最终发送门禁。私有 Replay JSON/图片用 no-store，不走 ETag/Range，全局 `/replay-assets/:hash` 仍拒绝。`prereleaseArchiveReadState` 检查生命周期/期限；`ReplayResources.assetAvailable` 在异步门禁后重查本局引用、目录状态和删除账本。Evidence 解码后仍重查准确已提交 Anchor 和本人座位。测试：`prerelease-replay-routes.test.ts`。
 - 完成的 Replay 公开保留，直到被删除（[ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)）。
 - Bug Report（[ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)）是可恢复的 PostgreSQL 草稿，带稳定 `submissionId`、尝试记录与原子 claim。生产 GitHub App 客户端与测试 fake 是这一 seam 的两个 adapter。
 
@@ -176,7 +176,7 @@ POST   /api/v1/github-app/webhook
 
 公开 Replay API 返回版本化 JSON，从不暴露 PostgreSQL 编码。一个 Segment 最多展开一条 checkpoint 链，并校验每个 Frame Hash；Anchor 必须精确匹配 `stepNo + frameHash`。公开读取有按 IP 的配额与大小上限；需认证的证据与报告端点按账号限流。
 
-Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓存。其 CSP 显式允许 `PUBLIC_API_BASE` 的来源（本地开发使用请求来源），供不透明来源的沙箱读取公开资源，脚本仍限于 `'self'`。覆盖：`replay-routes.test.ts` 与 `replay-viewer-csp.spec.ts`。
+Viewer HTML 复验 CSP，不可变脚本仅允许 'self'。公开 Replay 允许已配置的 API 来源；pre 桥接 Build 允许 blob 图片。`replay-routes.test.ts` 与 `replay-viewer-csp.spec.ts` 覆盖这两种策略。
 
 ## 工坊后端
 
@@ -188,7 +188,7 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 - 真实 Room 中的 `customCardIds` 只接受已批准、已上线的卡，并使用其审核过的快照。正式单人保留全部显式选择，卡源不可用或来源变化时拒绝创建并返回配置调整；其他 Room 对作者自己未上线的卡给出指引，过滤其他无法加载的 ID。未审核的代码只在工坊沙盒中运行，从不进入多人 `GameSession`。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。
-- `workshop-public-cards.ts` 提供当前审核上线版本的目录、固定公共输入和 30 秒状态。目录只投影批准定义，不交付草稿或编译产物。读取不写沙盒状态；输入以 SHA-256 绑定来源、版本、公开定义与源码及图片字节。发布记录保留曾上线版本，状态区分新建和固定输入继续执行；失败不续期，管理员下架禁用全部公共版本。消费环境负责校验、编译与到期暂停。
+- `workshop-public-cards.ts` 只读提供上线目录、固定输入与图片、30 秒状态，排除草稿和编译产物。`prerelease-public-{cards,sandbox}.ts` 校验 hash/元数据、按候选编译，以单调租约约束执行和下发；失败不续期，旧成功不覆盖拒绝。pre 注册失败拒绝整组，其他会话警告；其他工坊路由关闭。见 `prerelease-public-sandbox.test.ts`。
 - 工坊草稿错误暴露 `shared/contract/workshop.ts` 中的类型化 `code`；在线编辑守卫以 HTTP 409 返回 `live_edit_blocked`。
 
 测试：`server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submissions}.test.ts`、`server/workshop-pr/__tests__/`。
@@ -198,7 +198,7 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 - `server/db.ts` 通过 `pg` 持有异步 PostgreSQL 连接：transaction 跨 await 保持同一连接，嵌套 transaction 使用 savepoint，原生迁移在启动前于 advisory lock 下执行。运行时没有 SQLite 或 JSON 回退。
 - `scripts/import-sqlite.ts` 通过精确比对导入停机的 schema-33 SQLite 数据库，遇到损坏的已录制对局会阻断，`data_imports` 让失败的导入停在启动屏障之后；`scripts/validate-backup.ts` 校验 PostgreSQL / S3 的恢复。
 - `schema.sql` 与有序迁移定义产品表。回放片段由 `checkpointStepNo` 表示；证据 payload、配额和 webhook 投递不另建并行存储表。
-- 录制上线前完成的对局为 `legacy_no_replay`：保留结果摘要，但没有 Replay header 或 Frame。
+- `game/prerelease-archive-{retention,cleanup}.ts` 负责 pre 到期、可靠删除与资源回收。保留数据政策见 `HOW_TO_DEPLOY.md`。
 
 ## GitHub 投递、安全与删除
 
@@ -209,7 +209,7 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 - `github-issue-client` 在服务端固定仓库和安装 ID；对账只接受由指定 App 在尝试之后创建且以唯一 marker 结尾的 Issue，浏览器只轮询站内状态。本人投递使用加密 App 用户 token（AES-256-GCM、`keyId`）并确认公开身份；Hosted Issue Identity 使用安装 token。连接失效不切换作者。
 - `bug-report/feedback-service.ts` 统一管理结论、站内信、根修复摘要和上线操作。通知对象将历史导入与原生取证权限分开，删除时仍由同一 App 匿名化公开站点 ID。写入按 1673001、排序账号、排序对象加锁；持久历史意图校验接收人/修复版本及范围，账号/根修复去重保留消息和已读状态。HTTP 检查 Origin；生产证明只经 owner 入口并保留原生/owner-local 类型，完整祖先集合支持晚到关联。当前修复可用性以最新部署为准，包含回滚；首次核验仍保留历史事实。测试：`bug-report-{feedback,feedback-routes,fix-links,release-feedback,historical-feedback,historical-deletion}.test.ts`。
 - 删号时持久化 `deletion_pending`、登出所有会话，并通过安装 adapter 编辑已知 Issue 正文，持续重试直到 GitHub 确认站点用户 ID 已消失。
-- 维护者读取证据需要填写理由，永久审计、限流，并重新应用当前参与者的 tombstone 投影。
+- 维护者读取证据需要填写理由，永久审计、限流，并重新应用当前参与者的 tombstone 投影。 参与者 Evidence 只读接口不依赖 Issue 凭据，解码后重查座位、已提交 Anchor、生命周期和期限。
 - 删除（[ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)）：`server/game/replay-removal.ts` 在删除 payload 前，用 ETag CAS 把每个批次追加到私有 S3 中独立的 `erasure/ledger.json`；启动与恢复会幂等应用它，格式错误的 ledger 会阻断恢复，资源读取与上传会查询其永久哈希拒绝规则。日志从不包含 token、Frame payload、现象文字或原始 GitHub 响应。
 
 ## 部署、回滚与观测
@@ -235,3 +235,5 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 `game-setup-options.ts` 在分配房间或替换状态之前拒绝已移出业务的配置。已移出命令按未知命令失败，不改变 Room 版本或 Replay。通用客户端能力声明、socket WeakMap、HTTP header 和 CORS 支持继续保留。测试：`experimental-feature-transport.test.ts` 和 `auth-routes.test.ts`。
 
 `scripts/prerelease/{operations,storage-guard*,gateway}.ts` 负责生命周期及 HTTP/WS 门禁。请求头未到齐的连接没有权限，已分类流持续受撤权约束；只有网关加入代理网络。操作见 `HOW_TO_DEPLOY.md`。
+
+只有预发布 WebSocket 房间允许 Team；HTTP 创建与加载仍只支持普通对局。`team-room.ts` 在 host 开局前持久化等待成员，不提前分配座位；执行权限、账号删除及原生身份审计覆盖这些主体。Multihand 控制全部自有座位，Team 共享可见集合不扩大命令权。验证入口为 `team-network.test.ts` 与 `team-scoring-session.test.ts`。

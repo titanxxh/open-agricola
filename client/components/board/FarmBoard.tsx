@@ -398,6 +398,7 @@ export type FarmBoardView = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
+  handPlayer?: Pick<PlayerState, 'id' | 'occupationHand' | 'minorHand'>
   visiblePlayerIds: readonly string[]
   activePlayerId?: string
   playerPanelSummary: PlayerPanelSupplySummary
@@ -842,6 +843,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     players,
     currentPlayer,
     displayPlayer,
+    handPlayer = displayPlayer,
     visiblePlayerIds,
     activePlayerId,
     playerPanelSummary,
@@ -910,7 +912,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     isOccupationHandSelectionRejected,
   } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
-  const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
+  const canInteractHand = handPlayer.id === activeFarmPlayerId && isInteractive
   const playCardChoice = actions.playCardChoice ?? resolveChoice
   const summary = playerPanelSummary
   const farmContainerRef = useRef<HTMLDivElement>(null)
@@ -1020,24 +1022,24 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   ) : []
   const hasCardTargets = isInteractive && (extraSowTargets.length > 0 || cardFieldTargets.length > 0 || nearbyAnimalZones.length > 0)
 
-  const handVisible = visiblePlayerIds.includes(displayPlayer.id) || devMode
+  const handVisible = visiblePlayerIds.includes(handPlayer.id) || devMode
   const handPanel = (
     <div
       className="hand-cards"
-      data-hand-anchor={handVisible ? displayPlayer.id : undefined}
+      data-hand-anchor={handVisible ? handPlayer.id : undefined}
       data-section-target={handVisible ? 'hand' : undefined}
     >
       <h3>{t(locale, 'ui.handCards')}</h3>
 
       {handVisible ? (
         <div className="hand-sections">
-          <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={displayPlayer.id}>
+          <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={handPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
             <div className="hand-row">
-              {displayPlayer.occupationHand.length === 0 ? (
+              {handPlayer.occupationHand.length === 0 ? (
                 <div className="hand-empty">{t(locale, 'ui.noOccupationCards')}</div>
               ) : (
-                displayPlayer.occupationHand.map((cardId) => {
+                handPlayer.occupationHand.map((cardId) => {
                   if (isMultiOccupationSelect) {
                     const isSelectable = occupationHandSelection!.selectableCards.includes(cardId)
                     return (
@@ -1110,14 +1112,14 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               </div>
             )}
           </div>
-          <div className="hand-section minor" data-interaction-focus="minor-hand" data-focus-player={displayPlayer.id}>
+          <div className="hand-section minor" data-interaction-focus="minor-hand" data-focus-player={handPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.minorCards')}</div>
             {improvementSupply}
             <div className="hand-row">
-              {displayPlayer.minorHand.length === 0 ? (
+              {handPlayer.minorHand.length === 0 ? (
                 <div className="hand-empty">{t(locale, 'ui.noHandCards')}</div>
               ) : (
-                displayPlayer.minorHand.map((cardId) => {
+                handPlayer.minorHand.map((cardId) => {
                   const canPlay = cardAvailability[`minor:${cardId}`] !== false
                   const isSelectingThisHand =
                     isSelectingMinor || isSelectingImprovementAny

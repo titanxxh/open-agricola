@@ -1,3 +1,4 @@
+import { validateMarketplaceTransfers } from '../team/marketplace'
 import { constructFarmSelection } from '../actions/effects/construct'
 import type { FenceSelectionPayload, FenceSelectionQuote } from '../contract/protocol/game'
 import type { RoundPreparationContext } from '../contract/card-effect-hooks'
@@ -124,6 +125,8 @@ import {
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../cards/card-listeners.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
+import { computeTeamScores } from '../domain/team-scoring'
+import type { TeamScoreSummary } from '../contract/team'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
 import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-feeding-requirement.ts'
@@ -472,6 +475,7 @@ export type SessionResponse = {
   historyLength: number
   hasActionStartSnapshot: boolean
   scores?: PlayerScoreSummary[]
+  teamScores?: TeamScoreSummary[]
   pastureCapacities?: Record<string, Record<string, number>>
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
@@ -533,6 +537,7 @@ export interface GameCoreOptions {
   stateOrSeed?: GameState | number | StateWithCursor
   /** Workshop custom cards to register into a per-session context. */
   customCards?: CustomCardData[]
+  customCardRegistration?: 'strict' | 'warn'
   /** Options forwarded to `createInitialState`. */
   initialStateOptions?: InitialStateOptions
   /**
@@ -948,6 +953,10 @@ export class GameCore {
             this.registerCustomCardImpl(cardData)
           } catch (err) {
             const msg = `Failed to register card ${cardData.cardJson.id}: ${err instanceof Error ? err.message : String(err)}`
+            if (options.customCardRegistration === 'strict') {
+              this.dispose()
+              throw new Error(msg, { cause: err })
+            }
             console.warn(`[game-core] ${msg}`)
             this.cardWarnings.push(msg)
           }
@@ -1680,12 +1689,7 @@ export class GameCore {
     this.runEngineSteps()
   }
 
-  private startTopLevelReorganizeFlow(playerIndex: number): void {
-    const flow: ActionFlow = {
-      type: 'leaf',
-      actionId: 'reorganize',
-      actionContext: { trigger: 'anytime' },
-    }
+  private startTopLevelFlow(playerIndex: number, flow: ActionFlow): void {
     this.engineStack.push({
       engine: this.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
@@ -2414,6 +2418,9 @@ export class GameCore {
   private computeWinnerIds(): string[] {
     const summary = Scoring.computeAll(this.state)
     if (summary.length === 0) return []
+    if (this.state.team) {
+      return computeTeamScores(summary, this.state.team, this.state.players).filter(team => team.rank === 1).flatMap(team => team.playerIds)
+    }
     const top = summary.reduce((a, b) => (a.total >= b.total ? a : b))
     return summary.filter((s) => s.total === top.total).map((s) => s.playerId)
   }
@@ -2457,6 +2464,7 @@ export class GameCore {
       scores: Scoring.computeAll(this.state),
       pastureCapacities: this.getPastureCapacities(),
     }
+    if (this.state.team) resp.teamScores = computeTeamScores(resp.scores ?? [], this.state.team, this.state.players)
     // Include backend-computed availability for the current player when
     // they're free to act (idle interaction, not gameover, not drafting).
     if (!this.state.gameOver && interaction.stateId === 'idle' && !isDrafting && !isParentSelecting) {
@@ -5244,6 +5252,37 @@ export class GameCore {
       return this.continueAfterResolvedFarmChoice(playerIndex)
     }
 
+    if (plan.isMarketplace && envelope && envelope.request.kind === 'marketplace-select') {
+      const validation = validateMarketplaceTransfers(this.state, player, payload.marketplaceTransfers)
+      if (!validation.ok) return this.rejectInput(validation.error)
+      const transfers = validation.transfers
+      this.pushHistory()
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('marketplace')
+      const result = this.engine?.resolveChoice('confirm', {
+        ...this.buildEngineExecutionContext(player, space),
+      }, { marketplaceTransfers: transfers })
+      this.recordAcceptedResponse(playerIndex, result)
+      if (result?.type === 'fail') {
+        if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
+        if (!result.recoverable) this.blockFailedMandatoryAction()
+        this.flushEngineLog()
+        return this.respond(false, result.errorKey ?? 'invalid marketplace transfer')
+      }
+      if (result?.type === 'ok') {
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+          pendingSourceCard,
+        )
+      }
+      this.flushEngineLog()
+      this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
+
+
     if (plan.isResourceBatchExchange && envelope && envelope.request.kind === 'resource-batch-exchange-select') {
       const validation = validateResourceBatchExchangeCommit({
         request: envelope.request,
@@ -5381,7 +5420,7 @@ export class GameCore {
       }
     })
     if (increasedAnimals) {
-      this.startTopLevelReorganizeFlow(playerIndex)
+      this.startTopLevelFlow(playerIndex, { type: 'leaf', actionId: 'reorganize', actionContext: { trigger: 'anytime' } })
     }
     return this.respond()
   }
@@ -5522,9 +5561,11 @@ export class GameCore {
     }
     ensureCardModifiers(player, cardId)
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
-    runCardEffectHook(this.state, player, cardId, 'onBuy', undefined, { actionHooks: this.actionHooks,
+    const flow = runCardEffectHook(this.state, player, cardId, 'onBuy', undefined, { actionHooks: this.actionHooks,
       reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
     })
+    if (flow && this.engineStack.depth() > 0) return this.rejectInput('pending action exists')
+    if (flow) this.startTopLevelFlow(playerIndex, flow)
     this.syncDynamicActionSpaces()
     const dynamicSpace = findActionSpaceById(this.state, cardId)
     if (dynamicSpace && getPlayerActionSpaceConfig(cardId)) {

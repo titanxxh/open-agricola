@@ -40,6 +40,7 @@ export type CardMeta = {
   returnCards?: string[]
   alsoCountsAs?: string[]
   enablesPalisades?: boolean
+  palisadeTargetFarmPolicy?: 'own'
   artUrl?: string
   scanDeck?: 'L' | 'X' | 'legendairy-forest'
   scanNumber?: string

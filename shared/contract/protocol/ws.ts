@@ -9,6 +9,7 @@ import type { MoorSpecialActionId } from '../../moor/types'
 import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 import type { SoloHandMode } from '../game-creation'
 import type { SoloHandSelectionSubmission } from '../solo-hand-selection'
+import type { TeamWaitingRoomState } from '../team-room'
 
 import type { GameEndProposal } from './game-termination'
 
@@ -48,6 +49,7 @@ type ClientCommandBody =
   | { type: 'quoteFenceSelection'; playerIndex: number; requestKey: string; payload: FenceSelectionPayload; expectedVersion: number }
   | {
       type: 'createRoom'
+      teamConfig?: import('../team').TeamConfiguration
       access?: RoomAccess
       maxPlayers?: number
       soloHandMode?: SoloHandMode
@@ -88,6 +90,8 @@ type ClientCommandBody =
     }
   | { type: 'setPlayerColor'; color: PlayerState['color'] }
   | { type: 'confirmPlayerColor' }
+  | { type: 'startTeamGame' }
+  | { type: 'setTeam'; memberId?: string; teamIndex: number }
   | { type: 'dissolveRoom' }
   | { type: 'proposeGameEnd'; intent: 'end' | 'rematch' }
   | { type: 'respondGameEnd'; proposalId: string; agree: boolean }
@@ -97,14 +101,17 @@ type ClientCommandBody =
 
 export type ClientCommand = ClientCommandBody & { requestId?: string; commandContext?: CommandIdentity & Partial<CommandInput> & { roomId?: string; allocationId?: string } }
 
+export type RoomTeamErrorCode = 'team_change_failed' | 'team_start_failed'
+
 export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid_color' | 'color_save_failed' | 'color_confirmation_unavailable' | 'color_confirmation_failed'
 
 export type SpectatingEndReason = 'offline' | 'completed' | 'terminated' | 'removed'
 
 export type RoomViewer = { kind: 'participant'; playerIndex: number; controlledPlayerIndexes?: number[]; visiblePlayerIds?: string[] }
-  | { kind: 'spectator' }
+  | { kind: 'spectator' } | { kind: 'team-member'; memberId: string }
 
 export type ServerEvent =
+  | ({ type: 'teamRoomWaiting' } & TeamWaitingRoomState)
   | { type: 'roomSpectated'; roomId: string }
   | { type: 'spectatingEnded'; roomId: string; reason: SpectatingEndReason }
   | { type: 'gameEndProposal'; roomId: string; proposal: GameEndProposal | null }
@@ -118,7 +125,7 @@ export type ServerEvent =
   | {
       type: 'error'
       error: string
-      code?: RoomColorErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
+      code?: RoomColorErrorCode | 'team_change_failed' | 'team_start_failed' | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }
@@ -156,6 +163,7 @@ export type ServerEvent =
   | { type: 'seat_replaced'; roomId: string; playerIndex: number }
 
 export type RoomSummary = {
+  teamConfig?: import('../team').TeamConfiguration
   id: string
   playerCount: number
   maxPlayers: number

@@ -1,3 +1,6 @@
+import { isPrereleaseClient } from '../services/prerelease-runtime'
+import { TeamSetupFields, TeamConfigurationSummary } from './TeamSetupFields'
+import type { TeamConfiguration } from '../../shared/contract/team'
 import { browserApiFetch } from '../services/browser-api'
 import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
@@ -40,11 +43,19 @@ export function LobbyPage() {
   const [endedGames, setEndedGames] = useState<Array<{ id: string; outcome: 'completed' | 'terminated'; ended_at: number }>>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
-  const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | null>(null)
+  const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | 'team' | 'multihand' | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [soloSetup, setSoloSetup] = useState(false)
   const roomCreation = useRoomCreation()
+  const [teamConfiguration, setTeamConfiguration] = useState<TeamConfiguration>({ mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'category-min', teammateVisibility: 'shared' })
+  const isTeamMode = selectMode === 'team' || selectMode === 'multihand'
+  const beginTeamGame = (mode: 'team' | 'multihand') => {
+    setSelectMode(mode); setSelectedMaxPlayers(4); setError('')
+    const common = { seatsPerTeam: 2, seating: 'separated', scoring: 'category-min' } as const
+    setTeamConfiguration(mode === 'team' ? { ...common, mode, teammateVisibility: 'shared' } : { ...common, mode })
+  }
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
+  const invitedCount = selectMode === 'multihand' ? selectedMaxPlayers / teamConfiguration.seatsPerTeam - 1 : selectedMaxPlayers - 1
   const [roomAccess, setRoomAccess] = useState<'public' | 'invited'>('public')
   const [invitedPlayers, setInvitedPlayers] = useState<InvitablePlayer[]>([])
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
@@ -117,6 +128,19 @@ export function LobbyPage() {
   }, [enableCommunityDeck, selectMode, showCommunityDeckToggle])
 
   const handleCreateGame = () => {
+    if (isTeamMode) {
+      if (roomAccess === 'invited' && invitedPlayers.length !== invitedCount) {
+        setError(t('platform.invitedPlayerCountError', { count: String(invitedCount) })); return
+      }
+      roomCreation.create({ maxPlayers: selectedMaxPlayers, teamConfig: teamConfiguration,
+        name: user?.displayName || user?.username,
+        ...(roomAccess === 'invited' ? { access: { kind: 'invited', invitedUserIds: invitedPlayers.map(player => player.id) } } : {}),
+        enableCommunityDeck, customCardIds: selectedWorkshopCardIds, enableParentCards,
+        enableThroughTheSeasons, enableFarmersOfTheMoor, enableMoorBalanceRules,
+        allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening,
+        ...(draftMode === 'simultaneous' ? { draftMode, draftPoolSize } : {}) })
+      return
+    }
     // Hotseat is an ordinary authoritative room — it just belongs to one device,
     // so it takes the same transport and only adds the hotseat flag.
     const params: Record<string, string> = {
@@ -306,6 +330,10 @@ export function LobbyPage() {
               >
                 {t('platform.createMultiplayer')}
               </button>
+              {isPrereleaseClient() && <>
+                <button type="button" className="btn-secondary" onClick={() => beginTeamGame('team')}>{t('team.entry')}</button>
+                <button type="button" className="btn-secondary" onClick={() => beginTeamGame('multihand')}>{t('team.multihandEntry')}</button>
+              </>}
               <button type="button" className="btn-secondary" onClick={() => setSelectMode('hotseat')}>
                 {t('platform.localHotseat')}
               </button>
@@ -320,19 +348,21 @@ export function LobbyPage() {
               )}
               <div className="player-select-label">{t('platform.selectPlayerCount')}</div>
               <div className="player-select-options">
-                {[2, 3, 4, 5, 6].map(n => (
+                {(isTeamMode ? [4, 6] : [2, 3, 4, 5, 6]).map(n => (
                   <button
                     key={n}
                     type="button"
                     className={`player-select-btn${selectedMaxPlayers === n ? ' active' : ''}`}
                     onClick={() => {
                       setSelectedMaxPlayers(n)
+                      if (isTeamMode && n === 4) setTeamConfiguration(value => ({ ...value, seatsPerTeam: 2 }))
                     }}
                   >
                     {t(`platform.players${n}`)}
                   </button>
                 ))}
               </div>
+              {isTeamMode && <TeamSetupFields maxPlayers={selectedMaxPlayers} value={teamConfiguration} onChange={setTeamConfiguration} canUseCooperation={isPrereleaseClient()} />}
               {selectMode !== 'hotseat' && (
                 <fieldset className="room-access-options">
                   <legend className="player-select-label">{t('platform.roomAccessLabel')}</legend>
@@ -351,7 +381,7 @@ export function LobbyPage() {
                       <label htmlFor="invited-players">{t('platform.invitedPlayerIdsLabel')}</label>
                       <RoomInvitePicker value={invitedPlayers} onChange={value => { setInvitedPlayers(value); setError('') }} />
                       <p id="invited-players-hint" className="community-deck-toggle-hint">
-                        {t('platform.invitedPlayerIdsHint', { count: String(selectedMaxPlayers - 1) })}
+                        {t('platform.invitedPlayerIdsHint', { count: String(invitedCount) })}
                       </p>
                     </div>
                   )}
@@ -505,7 +535,7 @@ export function LobbyPage() {
                 </label>
               )}
               <div className="player-select-actions">
-                <button type="button" className="btn-primary" onClick={handleCreateGame}>
+                <button type="button" className="btn-primary" disabled={roomCreation.creating} onClick={handleCreateGame}>
                   {t(selectMode === 'hotseat' ? 'platform.startHotseat' : 'platform.createGame')}
                 </button>
                 <button type="button" className="btn-link" onClick={() => setSelectMode(null)}>
@@ -561,7 +591,8 @@ export function LobbyPage() {
                   {t('platform.roomLabel', { id: room.id })}
                   {room.access === 'invited' && <small className="room-access-badge">{t('platform.roomAccessInvited')}</small>}
                 </span>
-                <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
+                <span className="room-players">{t(room.teamConfig ? 'team.seatsFilled' : 'platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
+                {room.teamConfig && <TeamConfigurationSummary maxPlayers={room.maxPlayers} value={room.teamConfig} />}
                 <span className="room-status" data-status={room.status}>
                   {room.status === 'playing' ? t('platform.statusPlaying') : t('platform.statusWaiting')}
                 </span>

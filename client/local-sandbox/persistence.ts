@@ -1,3 +1,4 @@
+import { prereleaseStorageKey } from '../services/prerelease-runtime'
 /**
  * Single-slot persistence for browser-local sandbox games.
  *
@@ -103,7 +104,7 @@ export class IndexedDbGameStore implements LocalGameStore {
  * playtest.
  */
 export const openLocalGameStore = (ownerKey = 'anon'): LocalGameStore => {
-  const slotKey = `current:${ownerKey}`
+  const slotKey = prereleaseStorageKey(`current:${ownerKey}`)
   return typeof indexedDB === 'undefined' ? new MemoryGameStore() : new IndexedDbGameStore(slotKey)
 }
 

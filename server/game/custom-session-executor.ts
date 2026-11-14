@@ -17,6 +17,7 @@ import {
   GameSession,
   type SessionResponse,
   type SyncPayloadMode,
+  type GameSessionOptions,
 } from './authoritative-session.ts'
 import type { StateWithCursor } from '../../shared/session/session-core.ts'
 import { buildSyncPayload, type HistoryNameProjection } from '../../shared/session/sync-payload.ts'
@@ -67,11 +68,13 @@ export type CustomSessionMethod =
   | 'updatePlayerNames'
   | 'updatePlayerColors'
 
+export type CustomCardRegistrationOptions = Pick<GameSessionOptions, 'customCardRegistration'>
+
 type WorkerRequest = {
   id: number
   method: CustomSessionMethod
   args: unknown[]
-  init?: {
+  init?: CustomCardRegistrationOptions & {
     snapshot: PersistedSessionSnapshot
     cardWarnings: string[]
     customCards: CustomCardData[]
@@ -145,6 +148,7 @@ const withoutExecutableCode = (customCards: CustomCardData[] | undefined): Custo
 export class CustomSessionExecutor {
   readonly session: GameSession
   private readonly customCards: CustomCardData[]
+  private readonly options: CustomCardRegistrationOptions
   private worker: Worker | null = null
   private workerInitialized = false
   private lastSnapshot: PersistedSessionSnapshot | null = null
@@ -157,9 +161,11 @@ export class CustomSessionExecutor {
   constructor(
     session: GameSession,
     customCards: CustomCardData[],
+    options: CustomCardRegistrationOptions = {},
   ) {
     this.session = session
     this.customCards = customCards
+    this.options = options
   }
 
   reserveWorkerSlot(): boolean {
@@ -171,10 +177,12 @@ export class CustomSessionExecutor {
     return true
   }
 
-  execute(method: CustomSessionMethod, args: unknown[]): Promise<SessionResponse> {
+  execute(method: CustomSessionMethod, args: unknown[], assertAccess?: () => void): Promise<SessionResponse> {
     const result = this.enqueue(async () => {
+      this.revalidate(assertAccess)
       try {
         const message = await this.request(method, args)
+        this.revalidate(assertAccess)
         if (!message.ok) {
           return message.response && message.snapshot && message.payloads
             ? this.applyWorkerState({
@@ -186,6 +194,7 @@ export class CustomSessionExecutor {
         }
         return this.applyWorkerState(message)
       } catch (error) {
+        this.revalidate(assertAccess)
         return this.failed(error instanceof Error ? error.message : String(error))
       }
     })
@@ -214,9 +223,11 @@ export class CustomSessionExecutor {
     return this.lastScores
   }
 
-  async query<T>(method: 'getAvailableActions' | 'validateFarmChoice' | 'quoteFenceSelection', args: unknown[]): Promise<T> {
+  async query<T>(method: 'getAvailableActions' | 'validateFarmChoice' | 'quoteFenceSelection', args: unknown[], assertAccess?: () => void): Promise<T> {
     return this.enqueue(async () => {
+      this.revalidate(assertAccess)
       const message = await this.request(method, args)
+      this.revalidate(assertAccess)
       if (!message.ok) {
         if (message.response && message.snapshot && message.payloads) {
           this.applyWorkerState({
@@ -239,6 +250,14 @@ export class CustomSessionExecutor {
     void this.worker?.terminate()
     this.worker = null
     this.workerInitialized = false
+  }
+
+  private revalidate(assertAccess?: () => void): void {
+    try { assertAccess?.() } catch (error) {
+      void this.worker?.terminate(); this.worker = null; this.workerInitialized = false
+      activeSessionWorkers.delete(this)
+      throw error
+    }
   }
 
   private enqueue<T>(run: () => Promise<T>): Promise<T> {
@@ -340,6 +359,7 @@ export class CustomSessionExecutor {
               snapshot: snapshotForWorker(this.initialSerialized()),
               cardWarnings: [...this.session.cardWarnings],
               customCards: this.customCards,
+              ...this.options,
             },
           }
         : {}),
@@ -400,6 +420,7 @@ export const createIsolatedGameSession = (
   stateOrSeed?: GameState | number | StateWithCursor,
   customCards?: CustomCardData[],
   initialStateOptions?: InitialStateOptions,
+  options: CustomCardRegistrationOptions = {},
 ): { session: GameSession; executor?: CustomSessionExecutor } => {
   // The parent facade strips executable fields; reject incompatible cards while
   // their original manifests are still available, before creating a Room/session.
@@ -411,8 +432,9 @@ export const createIsolatedGameSession = (
     stateOrSeed,
     executable ? withoutExecutableCode(customCards) : customCards,
     initialStateOptions,
+    options,
   )
   return executable
-    ? { session, executor: new CustomSessionExecutor(session, customCards!) }
+    ? { session, executor: new CustomSessionExecutor(session, customCards!, options) }
     : { session }
 }

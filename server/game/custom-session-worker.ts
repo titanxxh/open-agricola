@@ -10,14 +10,14 @@ import {
   type PersistedSessionSnapshot,
 } from '../../shared/session/serialization.ts'
 import { GameSession, type SessionResponse } from './authoritative-session.ts'
-import type { CustomSessionMethod } from './custom-session-executor.ts'
+import type { CustomCardRegistrationOptions, CustomSessionMethod } from './custom-session-executor.ts'
 import type { FarmChoiceType } from '../../shared/session/farm-choice-validation.ts'
 
 type Request = {
   id: number
   method: CustomSessionMethod
   args: unknown[]
-  init?: {
+  init?: CustomCardRegistrationOptions & {
     snapshot: PersistedSessionSnapshot
     cardWarnings: string[]
     customCards: CustomCardData[]
@@ -40,13 +40,14 @@ type Success = {
 
 let session: GameSession | null = null
 let customCards: CustomCardData[] = []
+let customCardRegistration: CustomCardRegistrationOptions['customCardRegistration']
 
 const restore = (
   snapshot: PersistedSessionSnapshot,
   cardWarnings: string[],
 ): void => {
   session?.dispose()
-  session = new GameSession(rehydrateState(snapshot), customCards)
+  session = new GameSession(rehydrateState(snapshot), customCards, undefined, { customCardRegistration })
   session.cardWarnings.splice(0, session.cardWarnings.length, ...cardWarnings)
 }
 
@@ -118,6 +119,7 @@ parentPort?.on('message', (request: Request) => {
   try {
     if (request.init) {
       customCards = request.init.customCards
+      customCardRegistration = request.init.customCardRegistration
       importRecoveryCatalog(request.init.snapshot)
       restore(request.init.snapshot, request.init.cardWarnings)
     }

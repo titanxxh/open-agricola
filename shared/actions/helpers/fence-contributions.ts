@@ -1,7 +1,7 @@
 import type { ActionCostAttribution, PlayerState } from '../../contract/types'
 
 export type FenceCostDiscount = { sourceCard: string; fenceCount: number }
-export type FenceSupplyReservation = { sourceCard: string; counterKey: string; selectedCount: number }
+export type FenceSupplyReservation = { sourceCard: string; counterKey: string; selectedCount: number; targetFarmPolicy?: 'own' }
 export type FenceSupplyUsage = { sourceCard: string; counterKey: string; usedCount: number }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -22,8 +22,12 @@ export const readFenceSupplyReservations = (
   if (!isRecord(context?.fenceSupplyReservations)) return []
   return Object.entries(context.fenceSupplyReservations).flatMap(([sourceCard, entry]) => {
     if (!isRecord(entry) || typeof entry.counterKey !== 'string' || !isCount(entry.selectedCount)) return []
+    if (entry.targetFarmPolicy !== undefined && entry.targetFarmPolicy !== 'own') return []
+    if (entry.targetFarmPolicy === 'own' && typeof context.targetFarmPlayerId === 'string'
+      && context.targetFarmPlayerId !== player.id) return []
     const available = Math.max(0, player.cardStates[sourceCard]?.counters?.[entry.counterKey] ?? 0)
-    return [{ sourceCard, counterKey: entry.counterKey, selectedCount: Math.min(entry.selectedCount, available) }]
+    return [{ sourceCard, counterKey: entry.counterKey, selectedCount: Math.min(entry.selectedCount, available),
+      ...(entry.targetFarmPolicy === 'own' ? { targetFarmPolicy: 'own' as const } : {}) }]
   }).sort((left, right) => left.sourceCard.localeCompare(right.sourceCard))
 }
 

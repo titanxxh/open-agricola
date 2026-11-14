@@ -1,3 +1,4 @@
+import type { TeamScoreSummary } from '../../shared/contract/team'
 import { transferSnapshotObservation, snapshotCommitted } from '../services/observability'
 import type { HistoryWindow } from '../../shared/contract/protocol/history'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -14,6 +15,7 @@ export const useGameSync = () => {
     anytimeActions: [],
   })
   const [scores, setScores] = useState<PlayerScoreSummary[] | null>(null)
+  const [teamScores, setTeamScores] = useState<TeamScoreSummary[]>([])
   const [pastureCapacities, setPastureCapacities] = useState<Record<string, Record<string, number>>>({})
   const [error, setError] = useState<string | null>(null)
   const [historyWindow, setHistoryWindow] = useState<HistoryWindow | undefined>()
@@ -45,6 +47,7 @@ export const useGameSync = () => {
     setState(hydrated)
     setInteraction(payload.interaction)
     setScores(payload.scores ?? null)
+    setTeamScores(payload.teamScores ?? [])
     setPastureCapacities(payload.pastureCapacities ?? {})
     setError(payload.ok ? null : (payload.error ?? 'unknown error'))
     setHistoryWindow(payload.historyWindow)
@@ -60,6 +63,7 @@ export const useGameSync = () => {
     state,
     interaction,
     scores,
+    teamScores,
     pastureCapacities,
     error,
     historyLength,

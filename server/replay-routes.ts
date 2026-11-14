@@ -1,3 +1,7 @@
+import { prereleaseArchiveReadState, PRERELEASE_ARCHIVE_RETENTION_MS } from './game/prerelease-archive-retention'
+import { isPrerelease } from './prerelease-access'
+import { supportsReplayBridge } from '../shared/contract/replay-viewer-build'
+import { replayBridgeImageType, REPLAY_BRIDGE_MAX_BYTES } from '../shared/contract/protocol/replay-bridge'
 import { clientIp } from './client-ip'
 import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -18,9 +22,10 @@ const MANIFEST_ROUTE = /^\/api\/v1\/replays\/([^/]+)\/manifest$/
 const SEGMENT_ROUTE = /^\/api\/v1\/replays\/([^/]+)\/segments\/(\d+)$/
 const ANCHOR_ROUTE = /^\/api\/v1\/replays\/([^/]+)\/anchors\/(\d+)$/
 const VIEWER_ROUTE = /^\/replay-viewers\/([a-f0-9]{64})\/(.+)$/
+const PRIVATE_ASSET_ROUTE = /^\/api\/v1\/replays\/([^/]+)\/assets\/([a-f0-9]{64})$/
 const ASSET_ROUTE = /^\/replay-assets\/([a-f0-9]{64})$/
 const CONTEXT_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/
-const MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+const MAX_RESPONSE_BYTES = REPLAY_BRIDGE_MAX_BYTES
 const READ_LIMIT_PER_MINUTE = 240
 type ReplayResponse = ReplayManifestResponse | ReplaySegmentResponse | ReplayAnchorResponse
 
@@ -59,6 +64,9 @@ const publicHeaders = (contentType: string, cacheControl: string): Record<string
   'X-Content-Type-Options': 'nosniff',
 })
 
+const privateHeaders = (contentType: string): Record<string, string> => ({ 'Cache-Control': 'no-store',
+  'Content-Type': contentType, 'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff' })
+
 const sendJson = (
   req: IncomingMessage,
   res: ServerResponse,
@@ -75,8 +83,8 @@ const sendJson = (
       message: 'Replay response exceeds the public size limit',
     })
   }
-  const headers = publicHeaders('application/json; charset=utf-8', 'no-cache')
-  if (status === 200) {
+  const headers = isPrerelease() ? privateHeaders('application/json; charset=utf-8') : publicHeaders('application/json; charset=utf-8', 'no-cache')
+  if (status === 200 && !isPrerelease()) {
     const etag = `"${createHash('sha256').update(body).digest('hex')}"`
     headers.ETag = etag
     if (req.headers['if-none-match'] === etag) {
@@ -190,7 +198,7 @@ const serveViewerFile = async (req: IncomingMessage, res: ServerResponse, resour
     const apiOrigin = new URL(process.env.PUBLIC_API_BASE || getRequestOrigin(req)).origin
     headers['Content-Security-Policy'] = [
       "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/",
+      `img-src 'self' data: https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/${isPrerelease() && supportsReplayBridge(build, 1) ? " blob:" : ""}`,
       "font-src 'self' https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/",
       `connect-src 'self' ${apiOrigin}`, "frame-ancestors *", "base-uri 'none'", "form-action 'none'",
     ].join('; ')
@@ -227,6 +235,7 @@ export async function handleReplayRoute(
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
   const viewerMatch = VIEWER_ROUTE.exec(url.pathname)
   const assetMatch = ASSET_ROUTE.exec(url.pathname)
+  const privateAssetMatch = isPrerelease() ? PRIVATE_ASSET_ROUTE.exec(url.pathname) : null
   const manifestMatch = MANIFEST_ROUTE.exec(url.pathname)
   const segmentMatch = SEGMENT_ROUTE.exec(url.pathname)
   const anchorMatch = ANCHOR_ROUTE.exec(url.pathname)
@@ -236,6 +245,7 @@ export async function handleReplayRoute(
     && !manifestMatch
     && !segmentMatch
     && !anchorMatch
+    && !privateAssetMatch
   ) return false
   if (!options.limiter.allow(clientIp(req))) {
     sendJson(req, res, {
@@ -265,27 +275,52 @@ export async function handleReplayRoute(
     }
     return true
   }
-  const match = manifestMatch ?? segmentMatch ?? anchorMatch
+  const match = manifestMatch ?? segmentMatch ?? anchorMatch ?? privateAssetMatch
   const roomId = decodeRoomId(match![1]!)
   if (!roomId) {
     sendInvalidLink(req, res)
     return true
   }
-  if (manifestMatch) {
-    const response = (await store.manifest(roomId))
-    if (
-      response.ok
-      && !await options.resources.viewer(response.viewerBuildId)
-    ) {
-      sendJson(req, res, {
-        ok: false,
-        code: 'viewer_unavailable',
-        lifecycle: 'completed',
-        message: 'Replay viewer is unavailable',
-      })
+  const respond = async (response: ReplayResponse) => {
+    const unavailable = isPrerelease() && response.ok ? await store.archiveUnavailable(roomId) : null
+    sendJson(req, res, unavailable ?? response)
+  }
+  const manifest = manifestMatch || isPrerelease() ? await store.manifest(roomId) : null
+  if (manifest?.ok) {
+    const viewer = await options.resources.viewer(manifest.viewerBuildId)
+    if (!viewer || isPrerelease() && !supportsReplayBridge(viewer, manifest.schemaVersion)) {
+      sendJson(req, res, { ok: false, code: 'viewer_unavailable', message: 'Replay viewer is unavailable' })
       return true
     }
-    sendJson(req, res, response)
+  }
+  if (manifestMatch || manifest && !manifest.ok) {
+    await respond(manifest!)
+    return true
+  }
+  if (privateAssetMatch) {
+    if (!manifest?.ok) { sendInvalidLink(req, res); return true }
+    const hash = privateAssetMatch[2]!
+    try {
+      const object = await options.resources.asset(roomId, hash, manifest.customCards)
+      if (!object || !replayBridgeImageType(object.contentType) || object.body.byteLength > MAX_RESPONSE_BYTES) {
+        sendJson(req, res, { ok: false, code: 'not_participant', message: 'Replay asset is unavailable in this context' })
+      } else {
+        const unavailable = await store.archiveUnavailable(roomId)
+        if (unavailable) sendJson(req, res, unavailable)
+        else {
+          const state = await prereleaseArchiveReadState(options.resources.storage.db,roomId)
+          const available = await options.resources.assetAvailable(roomId,hash,manifest.customCards)
+          if (!available || !state || state.lifecycle !== 'completed' && state.lifecycle !== 'terminated') {
+            sendJson(req,res,{ok:false,code:'not_participant',message:'Replay asset is unavailable in this context'})
+          } else if (state.expired || state.endedAt !== null && Date.now() >= state.endedAt + PRERELEASE_ARCHIVE_RETENTION_MS) {
+            sendJson(req,res,{ok:false,code:'context_expired',message:'Replay archive expired'})
+          } else { res.writeHead(200, privateHeaders(object.contentType)); res.end(object.body) }
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof ResourceIntegrityError)) throw error
+      sendJson(req, res, { ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' })
+    }
     return true
   }
   if (segmentMatch) {
@@ -294,7 +329,7 @@ export async function handleReplayRoute(
       sendInvalidLink(req, res)
       return true
     }
-    sendJson(req, res, (await store.segment(roomId, checkpointStepNo)))
+    await respond(await store.segment(roomId, checkpointStepNo))
     return true
   }
   const stepNo = parseStepNo(anchorMatch![2]!)
@@ -303,6 +338,6 @@ export async function handleReplayRoute(
     sendInvalidLink(req, res)
     return true
   }
-  sendJson(req, res, (await store.anchor(roomId, stepNo, frameHash)))
+  await respond(await store.anchor(roomId, stepNo, frameHash))
   return true
 }

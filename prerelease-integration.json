@@ -8,6 +8,39 @@
       "dependsOn": [],
       "sourceSha": "087e71b429fb2316972ab57db65369f8d928a619",
       "integratedSha": "a2a565e5775e582302c7c95c16ec49a7a1e2e230"
+    },
+    {
+      "id": "pre-lifecycle",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "88732a632071d533033076deeb8714ce539b4709",
+      "integratedSha": "88732a632071d533033076deeb8714ce539b4709"
+    },
+    {
+      "id": "private-replay",
+      "dependsOn": [
+        "pre-identity",
+        "pre-lifecycle"
+      ],
+      "sourceSha": "051d128f5f46e56aaba7f46979d4287775061b95",
+      "integratedSha": "051d128f5f46e56aaba7f46979d4287775061b95"
+    },
+    {
+      "id": "public-sandbox",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "41d9482ae45a6d1ea8e4c6cee3cce1e3d2a0862c",
+      "integratedSha": "41d9482ae45a6d1ea8e4c6cee3cce1e3d2a0862c"
+    },
+    {
+      "id": "team-cooperation",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "051d128f5f46e56aaba7f46979d4287775061b95",
+      "integratedSha": "051d128f5f46e56aaba7f46979d4287775061b95"
     }
   ]
 }

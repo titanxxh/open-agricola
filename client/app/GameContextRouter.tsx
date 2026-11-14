@@ -1,3 +1,5 @@
+import { isPrereleaseClient } from '../services/prerelease-runtime'
+import { ArchivedTeamResults } from '../components/board/ArchivedTeamResults'
 import { browserApiFetch } from '../services/browser-api'
 import { isDevRoomId, roomIdFromQuery } from '../utils/game-room-url'
 import {
@@ -124,7 +126,7 @@ function ReportedEvidenceContext({
           return
         }
         if (body.ok) {
-          await verifyReplayViewerBuild(body.viewerBuildId, controller.signal)
+          await verifyReplayViewerBuild(body.viewerBuildId, controller.signal, body.schemaVersion)
         }
         setResolution({ key: evidenceKey, evidence: body })
       })
@@ -150,7 +152,7 @@ function ReportedEvidenceContext({
   }, [evidence])
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== iframeRef.current?.contentWindow) return
+      if (isPrereleaseClient() || event.source !== iframeRef.current?.contentWindow) return
       const message = event.data as Partial<ReportedEvidenceViewerReadyMessage>
       if (message.type !== 'open-agricola-reported-evidence-ready') return
       const currentEvidence = evidenceRef.current
@@ -206,6 +208,7 @@ function ReportedEvidenceContext({
         </dl>
       </header>
       <ReplayFrame
+        source={evidence}
         key={`${roomId}:${evidence.viewerBuildId}:${locale}`}
         roomId={roomId}
         viewerBuildId={evidence.viewerBuildId}
@@ -240,7 +243,7 @@ function CompletedContext({
       <h1>{t('platform.gameContext.completedTitle')}</h1>
       <p>{t('solo.scoreHint')}: <strong>{formatScore(player?.score ?? 0)}</strong></p>
       {rematch}
-    </section> : null}<ReplayShell context={context} /></div>
+    </section> : null}{context.result.team ? <ArchivedTeamResults result={context.result} locale={locale} /> : null}<ReplayShell context={context} /></div>
   }
   return statusPage(
     t('platform.backToLobbyPlain'),
@@ -249,13 +252,13 @@ function CompletedContext({
     t('platform.gameContext.legacyNoReplay'),
     <div>
       <h2 className="ws-status-title">{t('platform.gameContext.players')}</h2>
-      <ul>
+      {context.result.team ? <ArchivedTeamResults result={context.result} locale={locale} /> : <ul>
         {context.result.players.map((player) => (
           <li key={player.playerIndex}>
             {getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)}: {t('platform.gameContext.score', { score: player.score })}
           </li>
         ))}
-      </ul>
+      </ul>}
       {rematch}
     </div>,
   )
