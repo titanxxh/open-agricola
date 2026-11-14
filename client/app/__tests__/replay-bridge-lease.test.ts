@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { MessageChannel } from 'node:worker_threads'
 import { Buffer } from 'node:buffer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ReplayBridgeTransport } from '../../../replay-viewer/src/bridge-transport'
 import { parseReplayBridgeRequest, type ReplayBridgeContext } from '../../../shared/contract/protocol/replay-bridge'
 
+const NativeMessageChannel = globalThis.MessageChannel
 const context: ReplayBridgeContext = { protocolVersion:1,nonce:'c'.repeat(32),environment:'prerelease',targetId:'pre',
   appBuildId:'a'.repeat(40),generationId:'11111111-1111-1111-1111-111111111111',roomId:'room-1',viewerBuildId:'b'.repeat(64),schemaVersion:1,mode:{kind:'archive'} }
 const cleanups: (()=>void)[]=[]
@@ -13,10 +13,11 @@ async function fixture() {
   vi.useFakeTimers({toFake:['performance','setTimeout','clearTimeout','setInterval','clearInterval']})
   // Native Node MessagePorts deliver ArrayBuffers in Node's realm, outside jsdom.
   vi.stubGlobal('ArrayBuffer',Buffer.alloc(0).buffer.constructor)
-  const channel = new MessageChannel()
+  const channel = new NativeMessageChannel()
   const transport = new ReplayBridgeTransport(context,window.location.origin)
   cleanups.push(()=>{transport.close();channel.port1.close();channel.port2.close()})
-  const first = new Promise<unknown>(resolve=>channel.port1.once('message',resolve))
+  const first = new Promise<unknown>(resolve=>channel.port1.addEventListener('message',event=>resolve(event.data),{once:true}))
+  channel.port1.start()
   window.dispatchEvent(new MessageEvent('message',{source:window.parent,origin:window.location.origin,
     data:{type:'open-agricola-replay-bridge-connect',context},ports:[channel.port2]}))
   const request = parseReplayBridgeRequest(await first)
@@ -68,8 +69,8 @@ describe('Viewer shared authorization lease',()=>{
       schemaVersion:1,gameBuildId:'a'.repeat(40),firstStepNo:0,lastStepNo:0,participants:[],customCards:[],
       segments:[{checkpointStepNo:0,firstStepNo:0,lastStepNo:0}],steps:[],corruptRanges:[],missingPrefix:false}
     const reads: unknown[]=[]
-    port.on('message',data=>{
-      const request=parseReplayBridgeRequest(data)
+    port.addEventListener('message',event=>{
+      const request=parseReplayBridgeRequest(event.data)
       if(request?.type!=='read') return
       reads.push(request.read)
       const bytes=new TextEncoder().encode(JSON.stringify(manifest)).buffer
@@ -88,7 +89,7 @@ describe('Viewer shared authorization lease',()=>{
     await reply(30_000)
     const closed=vi.fn()
     transport.subscribe(closed)
-    const next=new Promise<unknown>(resolve=>port.once('message',resolve))
+    const next=new Promise<unknown>(resolve=>port.addEventListener('message',event=>resolve(event.data),{once:true}))
     const pending=transport.read({kind:'manifest'},new AbortController().signal)
     const rejected=expect(pending).rejects.toThrow('replay_bridge_expired')
     const request=parseReplayBridgeRequest(await next)
