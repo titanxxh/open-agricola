@@ -9,6 +9,7 @@ const project = 'open-agricola'
 type Docker = (args: string[]) => string
 type Image = { id: string; tags: string[]; digests: string[]; created: string; size: number; revision: string; channel: string; project: string; service: string; build: string }
 type Container = { id: string; image: string; project: string; service: string; build: string; running: boolean }
+type FormalImageBinding = { sourceSha: string; configId: string }
 type Decision = Image & { action: 'keep' | 'remove'; reasons: string[] }
 type Plan = { format: 1; directory: string; createdAt: string; currentBuild: string; currentImage: string; images: Decision[]; containers: Container[]; protectedBuilds: string[]; auditStages: string[] }
 
@@ -98,8 +99,8 @@ const ownDigest = (digest: string): boolean => /^(?:open-agricola|open-agricola-
 const repository = (reference: string): string => reference.split(/[:@]/)[0] ?? ''
 const knownReferences = (image: Image): boolean => image.tags.every(ownTag) && image.digests.every(ownDigest)
   && new Set(image.digests.map(repository)).size === image.digests.length
-function owned(image: Image, formalImages: ReadonlyMap<string, string>): boolean {
-  return image.channel === 'stable' && formalImages.get(image.id) === image.revision && sha.test(image.revision)
+function owned(image: Image, formalImages: ReadonlyMap<string, FormalImageBinding>): boolean {
+  return image.channel === 'stable' && formalImages.get(image.id)?.sourceSha === image.revision && sha.test(image.revision)
     || image.project === project && image.service === 'app' && image.channel !== 'prerelease'
 }
 function sameIdentity(a: Image, b: Image): boolean {
@@ -141,7 +142,7 @@ export function planBackendImageCleanup({ directory, docker = runDocker(director
     timestamp(report.validatedAt)
     builds.add(checked(report.sourceBuildId, sha)); builds.add(checked(report.targetBuildId, sha))
   }
-  const formalImages = new Map<string, string>()
+  const formalImages = new Map<string, FormalImageBinding>()
   const inventoryStages = readdirSync(backupRoot).filter(name => /^\.backend-image-[a-f0-9-]{36}$/.test(name)).flatMap(name => {
     const path = join(backupRoot, name); ownerPath(path, true)
     const receiptPath = join(path, 'image.json')
@@ -163,7 +164,9 @@ export function planBackendImageCleanup({ directory, docker = runDocker(director
       || receipt.purpose !== 'formal-candidate' || receipt.channel !== 'stable' || receipt.repository !== 'titanxxh/open-agricola'
       || receipt.sourceSha !== sourceSha || receipt.producerSha !== producerSha
       || report.format !== 1 || report.sourceSha !== sourceSha || report.producerSha !== producerSha || report.imageId !== configId) throw new Error('Formal image audit does not prove application ownership')
-    formalImages.set(nativeImageId, sourceSha)
+    const previous = formalImages.get(nativeImageId)
+    if (previous && (previous.sourceSha !== sourceSha || previous.configId !== configId)) throw new Error('Conflicting formal image source or config bindings')
+    formalImages.set(nativeImageId, { sourceSha, configId })
     let active = false
     for (const file of ['request.json', 'maintenance-admission.json']) {
       if (!existsSync(join(path, file))) continue
