@@ -275,3 +275,5 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 命令 scope 和持久 receipt 独立于能力声明。要求刷新时，transport 先结算未完成的持久 receipt，再停止重试；不撤销认证，也不重新执行已确认命令。测试：`experimental-feature-transport.test.ts`、`gameTransport-reconnect.test.ts` 和 `auth-routes.test.ts` 的 CORS 用例。部署重叠边界见 [HOW_TO_DEPLOY](../HOW_TO_DEPLOY.md#supported-browser-and-backend-overlap)。
 
 私有 Replay 桥（`protocol/replay-bridge.ts`）仅允许 manifest、checkpoint Segment、准确 Anchor、本局图片和单帧 Evidence。上下文绑定临时 nonce、环境／目标、应用 SHA、数据代次、room、Viewer hash、schema 与模式，不携带登录或远程读取凭证。请求限制并发／字节数并使用单调 ID，取消与关闭会退役在途工作。`replay-viewer-build.ts` 统一解析不可变 manifest 及桥／schema 声明；旧公开 Build 仍有效，但不能用于 pre。测试：`replay-bridge.test.ts`、`publish-replay-viewer.test.ts`。
+
+预发布 `team.ts` 定义Team/Multihand配置、座位分队和四种计分；`team-room.ts` 分离账号等待成员与规则座位。`teamRoomWaiting` 不含账号ID，host开局固定座位归属，`setTeam` 仅更新等待元数据；共享可见集合不扩大命令权。

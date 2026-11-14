@@ -657,6 +657,7 @@ export type SnakeOpeningState = {
 export type GameSeed = number | string
 
 export type GameState = {
+  team?: import('./team').TeamState
   round: number
   /** Opening hands, multiplayer draft, parent selection, or ordinary play. */
   phase: 'draft' | 'solo-hand-selection' | 'parent-selection' | 'playing'

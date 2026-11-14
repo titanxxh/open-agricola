@@ -117,6 +117,8 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
     case 'joinRoom':
     case 'spectateRoom':
     case 'setPlayerColor':
+    case 'startTeamGame':
+    case 'setTeam':
     case 'confirmPlayerColor':
     case 'dissolveRoom':
     case 'proposeGameEnd':
@@ -191,6 +193,7 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
 const replayFrame = (
   room: Room,
   scores?: SessionResponse['scores'],
+  teamScores?: SessionResponse['teamScores'],
 ): {
   serialized: PersistedSessionSnapshot
   frame: JsonValue
@@ -200,10 +203,11 @@ const replayFrame = (
   // Native serialization transfers a fresh, detached Frame. Worker snapshots
   // remain cached outside the committer and still require an owned body copy.
   const frame = workerSnapshot
-    ? captureStateWithHistory(scores === undefined ? serialized.frame : { ...serialized.frame, scores })
+    ? captureStateWithHistory(scores === undefined ? serialized.frame : { ...serialized.frame, scores, ...(teamScores ? { teamScores } : {}) })
     : scores === undefined
       ? serialized.frame
-      : { ...serialized.frame, scores: JSON.parse(JSON.stringify(scores)) as SessionResponse['scores'] }
+      : { ...serialized.frame, scores: JSON.parse(JSON.stringify(scores)) as SessionResponse['scores'],
+          ...(teamScores ? { teamScores: structuredClone(teamScores) } : {}) }
   return { serialized, frame: frame as unknown as JsonValue }
 }
 
@@ -441,6 +445,7 @@ export class RoomCommitter {
     const { serialized, frame } = measure('snapshot', () => replayFrame(
       room,
       response.state.gameOver ? response.scores ?? [] : undefined,
+      response.state.gameOver ? response.teamScores : undefined,
     ))
     const stepNo = head.stepNo + 1
     const roomVersion = head.roomVersion + 1

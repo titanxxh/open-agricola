@@ -235,3 +235,5 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 `game-setup-options.ts` 在分配房间或替换状态之前拒绝已移出业务的配置。已移出命令按未知命令失败，不改变 Room 版本或 Replay。通用客户端能力声明、socket WeakMap、HTTP header 和 CORS 支持继续保留。测试：`experimental-feature-transport.test.ts` 和 `auth-routes.test.ts`。
 
 `scripts/prerelease/{operations,storage-guard*,gateway}.ts` 负责生命周期及 HTTP/WS 门禁。请求头未到齐的连接没有权限，已分类流持续受撤权约束；只有网关加入代理网络。操作见 `HOW_TO_DEPLOY.md`。
+
+预发布 `team-room.ts` 在host开局前持久化等待成员，不提前分配座位；执行权限、账号删除及原生身份审计覆盖这些主体。Multihand控制全部自有座位，Team共享可见集合不扩大命令权。验证入口为 `team-network.test.ts` 与 `team-scoring-session.test.ts`。
