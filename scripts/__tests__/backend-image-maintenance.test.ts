@@ -2,11 +2,14 @@ import { createHash, randomUUID } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { dockerFixtureEnvironment } from './_helpers/docker-fixture-environment'
 import { createBackendImageFixture } from './_helpers/backend-image-fixture'
 import { backendImageRequestBinding, readBackendImageEvidence } from '../release/backend-image-receiver'
 import { validateBackendResumeAuthorization } from '../release/backend-image-progress'
+
+// These integration cases launch multiple helper processes; low-core CI needs a file-local test budget.
+vi.setConfig({ testTimeout: 15_000 })
 
 const repository = resolve(import.meta.dirname, '../..'), roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
