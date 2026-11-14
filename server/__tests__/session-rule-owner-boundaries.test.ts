@@ -43,6 +43,7 @@ describe('rule entry points retain their owning session', () => {
       flow: {
         type: 'leaf', actionId: 'fence', sourceCard: 'C170_AmateurFencer', optional: true,
         actionContext: {
+          targetFarmPolicy: 'own',
           trueAction: false,
           fencePolicy: {
             segmentBounds: { total: { min: 1, max: 4 } },
