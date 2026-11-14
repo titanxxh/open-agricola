@@ -277,3 +277,5 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 私有 Replay 桥（`protocol/replay-bridge.ts`）仅允许 manifest、checkpoint Segment、准确 Anchor、本局图片和单帧 Evidence。上下文绑定临时 nonce、环境／目标、应用 SHA、数据代次、room、Viewer hash、schema 与模式，不携带登录或远程读取凭证。请求限制并发／字节数并使用单调 ID，取消与关闭会退役在途工作。`replay-viewer-build.ts` 统一解析不可变 manifest 及桥／schema 声明；旧公开 Build 仍有效，但不能用于 pre。测试：`replay-bridge.test.ts`、`publish-replay-viewer.test.ts`。
 
 预发布 `team.ts` 定义Team/Multihand配置、座位分队和四种计分；`team-room.ts` 分离账号等待成员与规则座位。`teamRoomWaiting` 不含账号ID，host开局固定座位归属，`setTeam` 仅更新等待元数据；共享可见集合不扩大命令权。
+
+`marketplace.ts` 定义有界物资转移及 `marketplace-select` 请求；每种物资固定一个赠与者、接收者和同种税费。它复用 `commitSelection`，receive事件分别记录赠与者和接收者。

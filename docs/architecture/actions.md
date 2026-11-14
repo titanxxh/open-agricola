@@ -142,3 +142,5 @@ Tests: `shared/actions/__tests__/fencing.test.ts`, `shared/actions/effects/__tes
 
 Tests: `shared/session/__tests__/anytime-policy.test.ts`, `server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session,exchange-batch-session}.test.ts`.
 
+
+Prerelease Marketplace settlement validates the entire transfer batch before mutation. The giver pays the transferred amount plus one same-good tax. `receiveFromPlayerLeaf` credits the actual recipient, runs existing receive/animal settlement hooks and does not count transfers as card income. `marketplace-session.test.ts` and `marketplace-animals-session.test.ts` cover rejects, pending restoration and undo.
