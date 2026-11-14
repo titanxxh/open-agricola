@@ -5,6 +5,7 @@ import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
+import { checkOwnerLocalVerification, type OwnerLocalProof } from './owner-local-verification.ts'
 
 export const CANDIDATE_WORKFLOW = '.github/workflows/candidate-verification.yml'
 export const PRERELEASE_CANDIDATE_WORKFLOW = '.github/workflows/prerelease-candidate-verification.yml'
@@ -27,6 +28,7 @@ export type CandidateVerificationResult = {
   sha: string
   configuration: string
   tasks: CandidateTaskResult[]
+  ownerLocal?: OwnerLocalProof
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -295,9 +297,14 @@ export function stableConfiguration(cwd: string, sha: string, producer: string):
     .update(verificationConfiguration(cwd, sha)).update('\0').update(verificationConfiguration(cwd, producer)).digest('hex')
 }
 
-export function checkCandidateVerification(cwd: string, repository: string, sha: string): CandidateVerificationResult {
+export function checkCandidateVerification(cwd: string, repository: string, sha: string, options: { ownerDraftReleaseId?: number } = {}): CandidateVerificationResult {
   repositoryName(repository); fullSha(sha)
   const { repositoryId, main } = admitFinalSnapshot(cwd, repository, sha)
+  const ownerLocal = checkOwnerLocalVerification({ cwd, repository, repositoryId, candidateSha: sha, producerSha: main, read: github,
+    download: endpoint => execFileSync('gh', ['api', endpoint, '-H', 'Accept: application/octet-stream'], { maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }),
+    draftReleaseId: options.ownerDraftReleaseId })
+  if (ownerLocal) return { status: 'passed', repository, sha, configuration: ownerLocal.configuration, ownerLocal,
+    tasks: FULL_TASK_IDS.map(id => ({ id, status: 'passed', reason: 'Owner-authorized local candidate verification', runId: null, jobId: null, url: ownerLocal.url })) }
   const workflow = object(github(`repos/${repository}/actions/workflows/candidate-verification.yml`))
   if (workflow.path !== CANDIDATE_WORKFLOW) throw new Error('Unexpected candidate workflow identity')
   const runs = github(`repos/${repository}/actions/workflows/${integer(workflow.id)}/runs?event=workflow_dispatch&per_page=100`, 'workflow_runs')

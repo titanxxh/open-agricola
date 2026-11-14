@@ -7,6 +7,7 @@ import { assertMainProtection, assertRawCommit, checkCandidateVerification, main
 import { checkPrereleaseVerification } from '../ci/prerelease-verification.ts'
 import { FULL_TASK_IDS, fullSha, verificationConfiguration, type FullTaskId } from '../ci/verification-tasks.ts'
 import { github, ownerMachine, RELEASE_REPOSITORY } from './candidate.ts'
+import { parseOwnerLocalProof, type OwnerLocalProof } from '../ci/owner-local-verification.ts'
 
 export const CONTAINER_IMAGE_WORKFLOW = '.github/workflows/container-image-build.yml'
 export const CONTAINER_IMAGE_REGISTRY = 'ghcr.io/titanxxh/open-agricola-images'
@@ -18,6 +19,7 @@ type CandidateImageVerification = {
 }
 export type ImageVerification = (CandidateImageVerification & { kind: 'prerelease' })
   | (CandidateImageVerification & { kind: 'stable' })
+  | OwnerLocalProof
   | { kind: 'main-policy'; configuration: string }
 
 type ImageIdentity = {
@@ -28,7 +30,7 @@ type ImageIdentity = {
 }
 export type ContainerImageReceipt = ImageIdentity & (
   { purpose: 'candidate'; channel: 'prerelease'; verification: Extract<ImageVerification, { kind: 'prerelease' }> }
-  | { purpose: 'formal-candidate'; channel: 'stable'; verification: Extract<ImageVerification, { kind: 'stable' }> }
+  | { purpose: 'formal-candidate'; channel: 'stable'; verification: Extract<ImageVerification, { kind: 'stable' | 'owner-local' }> }
   | { purpose: 'trusted-policy'; channel: 'stable'; verification: Extract<ImageVerification, { kind: 'main-policy' }> }
 )
 export type ContainerImageTransfer = { format: 1; receipt: ContainerImageReceipt; archive: { sha256: string; bytes: number } }
@@ -71,6 +73,9 @@ export function parseContainerImageReceipt(value: unknown): ContainerImageReceip
     registryRepository: CONTAINER_IMAGE_REGISTRY, manifestDigest: digest(input.manifestDigest), imageId: digest(input.imageId),
     build: { runId: integer(build.runId), runAttempt: integer(build.runAttempt) } }
   const verification = record(input.verification)
+  if (input.purpose === 'formal-candidate' && input.channel === 'stable' && verification.kind === 'owner-local') {
+    return { ...common, purpose: 'formal-candidate', channel: 'stable', verification: parseOwnerLocalProof(verification) }
+  }
   if (input.purpose === 'trusted-policy' && input.channel === 'stable' && verification.kind === 'main-policy') {
     keys(verification, ['kind', 'configuration'])
     if (common.sourceSha !== common.producerSha) throw new Error('Trusted policy source must be its fixed main producer')
@@ -136,6 +141,7 @@ export function containerImageVerification({ cwd, purpose, sourceSha, producerSh
     ? checkCandidateVerification(cwd, RELEASE_REPOSITORY, sourceSha)
     : checkPrereleaseVerification(cwd, RELEASE_REPOSITORY, sourceSha)
   if (verified.status !== 'passed') throw new Error(`Complete current ${purpose === 'formal-candidate' ? 'stable' : 'prerelease'} verification is required before image use`)
+  if ('ownerLocal' in verified && verified.ownerLocal) return verified.ownerLocal
   const tasks = verified.tasks.map(task => {
     if (task.status !== 'passed' || task.runId === null || task.jobId === null) throw new Error('Incomplete candidate verification')
     const job = record(github(RELEASE_REPOSITORY, `actions/jobs/${task.jobId}`))

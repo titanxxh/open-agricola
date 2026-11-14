@@ -51,6 +51,20 @@ Use `--repository owner/name` for a fork with its own candidate-verification wor
 
 The standard command checks GitHub run and job evidence before publication. A Release created through the website or bare `gh release create` can exist without this evidence. Pages and backend deployment independently reject an unverified candidate. Local `pnpm release:rehearse` results do not replace GitHub evidence.
 
+### Authorize complete owner-local verification
+
+For a formal release explicitly accepted through local verification, the native repository User owner may publish a receipt from the same complete ten-task candidate plan:
+
+```bash
+pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/verification.json
+```
+
+The receipt records every actual `runCandidateTask` command, its exit code and log SHA-256, execution times, Node/platform/architecture, tested commit, raw source tree and candidate/producer verification configurations. All ten tasks and their canonical commands must pass. Routine affected checks and `release:rehearse` alone do not satisfy this path. The publisher may rebind only `candidateSha` after a rebase whose entire raw tree and verification configuration equal the tested source. It retains `testedSha` and never represents local commands as GitHub jobs.
+
+The publisher checks the authenticated owner's native user ID, prepares an exact-candidate draft, uploads only `owner-local-verification.json`, and creates the independent `owner-local-verification` commit status. Its description binds the receipt SHA-256; its target is the same repository's formal Release asset. The publisher reads back status creator, Release author, asset uploader and uploaded bytes before publishing. Retry with the same command and receipt to resume this tool's matching draft. The ordinary release path continues to reject drafts.
+
+Pages, backend delivery and private image production independently read this published proof through the common candidate gate. They recheck native identities, the unchanged tag, raw tree, both configurations, commands, times and receipt digest. They never accept arbitrary receipt URLs, another user's status, partial task results or invented Actions IDs. GitHub still performs the real private image and Pages builds. Image provenance, private registry checks, owner transport and runtime guards remain required. The separate Bug Report deployment-feedback command currently rejects owner-local proof; that optional command is not part of release or backend delivery.
+
 ## Publish a fixed prerelease candidate
 
 Keep `PRERELEASE_ENTRY_ENABLED=false` until the owner has accepted the independent target. The formal app needs `PUBLIC_APP_ORIGIN`, `PUBLIC_API_BASE`, `PRERELEASE_APP_ORIGIN` and the target-only server key; both Compose entry points pass these explicitly. Main Lobby and Settings show the configured entry only to Beta accounts or administrators. A missing or closed target is visibly unavailable. Language sources and packs must be published and pass their own CI before publishing an application pin that consumes them.

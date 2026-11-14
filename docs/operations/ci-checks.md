@@ -4,6 +4,8 @@
 
 GitHub Actions 是集成与发布的正式证据。本机按需定向调试或主动运行完整检查，不要求每次 push 前把远端相同检查完整跑一遍。push 后等待当前 head 的所有选中任务结束并修复失败。所需任务被跳过不算成功；私有仓库的自动 job 仍受 visibility 条件限制，可在 GitHub 手动运行。工作流配置不证明远端 required check 已启用，必须实际读回核对。
 
+正式版本另有显式 owner-local 授权路径，见[完整本机候选验证](../HOW_TO_DEPLOY.md#authorize-complete-owner-local-verification)。它执行相同完整十任务，记录真实命令、退出码和日志摘要，由原生仓库 owner 通过独立 status 与 Release asset 授权；不是普通本机结果补齐 GitHub job。所有发布消费者重验身份、原始树、配置、完整计划和回执摘要。仅完整同树 rebase 可保留受测 SHA 并重绑候选，不支持跨源码复用。该路径不改变日常 required check，也不改变预发布的 GitHub 任务要求。
+
 选中的浏览器检查在 GitHub runner 上通过 `pnpm verify` 运行。本机同一入口用于调试与复现，不能补齐正式 CI 结果。工作流使用只读 `contents` 权限、`ubuntu-latest`，按 workflow + PR/ref 隔离 concurrency，并取消同一 PR 的过期 run。
 
 完整 catalog 保留四个 Chromium shard、browser-local sandbox 和 Linux WebKit 六个独立浏览器 runner，以及 quality、fast、slow、build，合计十个任务。四个 Chromium 任务保持原 ID，将排序后的 spec 路径按索引轮流分配到四组，每份 spec 恰好执行一次，各组文件数最多相差一份。同一代码树与验证配置始终得到同一组成员，兼容重试也使用相同分组。实际耗时保存在自动生成的验证记录、测试报告和 CI 日志中，不维护 Git 耗时表。新增测试由源码发现机制自动纳入。每个浏览器 runner 使用独立应用、数据库 schema、S3 前缀和构建目录。任务失败不取消其余任务，诊断保留 7 天，catalog 产物名为 `candidate-<run-id>-<attempt>-<task>`。日常验证仍按计划选择任务或明确的文件与标签。

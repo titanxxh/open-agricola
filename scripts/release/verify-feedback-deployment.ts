@@ -156,6 +156,7 @@ export async function verifyFeedbackDeployment(cwd: string, input: string[]): Pr
   if (sha !== tagSha) throw new Error('Release tag commit changed')
   const commits = ancestry(cwd, sha)
   const candidate = checkCandidateVerification(cwd, RELEASE_REPOSITORY, sha)
+  if (candidate.ownerLocal) throw new Error('Bug Report deployment feedback does not yet support owner-local verification; release and deployment remain independently valid')
   if (candidate.status !== 'passed' || candidate.sha !== sha || candidate.repository !== RELEASE_REPOSITORY
     || !candidate.tasks.length || candidate.tasks.some(task => task.status !== 'passed')) throw new Error('Full same-SHA GitHub candidate verification is incomplete')
   const basePath = options.get('--base-path') ?? '/'
