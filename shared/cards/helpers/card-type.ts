@@ -138,5 +138,6 @@ export const isCookingHearthIdentityCard = (cardId: string): boolean => {
  * but main-path code must query the marker, not the card id, so future
  * cards with the same ability slot in without further changes.
  */
-export const playerCanBuildPalisades = (player: PlayerState): boolean =>
-  getPlayedCardDefinitions(player).some(card => card.enablesPalisades === true)
+export const playerCanBuildPalisades = (builder: PlayerState, farmOwner: PlayerState): boolean =>
+  getPlayedCardDefinitions(builder).some(card => card.enablesPalisades === true
+    && (card.palisadeTargetFarmPolicy !== 'own' || builder.id === farmOwner.id))

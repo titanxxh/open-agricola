@@ -24,6 +24,7 @@ export class ActionNode extends BaseNode {
   public resolvedReplacement?: { actionId: string; sourceCard?: string }
   public beforePhaseResolved = false
   public bodyStarted = false
+  public farmTargetSelection = true
   /** OR/XOR branch value that selected this leaf; completion reactions read it as `choice`. */
   public selectedBranchChoice?: string
   public continuationParentHostNodeId?: string
@@ -125,6 +126,7 @@ export class ActionNode extends BaseNode {
       resolvedReplacement: this.resolvedReplacement,
       beforePhaseResolved: this.beforePhaseResolved,
       bodyStarted: this.bodyStarted,
+      farmTargetSelection: this.farmTargetSelection,
       selectedBranchChoice: this.selectedBranchChoice,
       continuationParentHostNodeId: this.continuationParentHostNodeId,
       emittedRequest: this.emittedRequest,
