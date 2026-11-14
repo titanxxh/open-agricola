@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"https://pre.agricola.test/open-agricola/"}
 import type { ReactNode } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+
+const componentStyles = readFileSync('client/styles/components.css', 'utf8')
 
 vi.mock('../LobbyPage', () => ({ LobbyPage: () => <main>Lobby page</main> }))
 vi.mock('../CardMetadataBoundary', () => ({ CardMetadataBoundary: ({ children }: { children: ReactNode }) => children }))
@@ -13,10 +16,7 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-it.each([
-  { tab: 'Settings', message: 'Return to production' },
-  { tab: 'Workshop', message: 'Read-only prerelease' },
-])('returns from the restricted $tab route through the real navigation', async ({ tab, message }) => {
+async function renderPrereleaseRouter() {
   const build = 'a'.repeat(40), generation = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
   const { registerLanguagePack } = await import('../../../shared/i18n')
@@ -24,6 +24,7 @@ it.each([
     'platform.mainNavigation': 'Main navigation',
     'platform.tabLobby': 'Lobby', 'platform.tabWorkshop': 'Workshop',
     'platform.tabEncyclopedia': 'Encyclopedia', 'platform.tabSettings': 'Settings',
+    'platform.backToLobbyPlain': 'Back to lobby',
     'prerelease.readonlyError': 'Read-only prerelease',
     'prerelease.returnToProduction': 'Return to production',
   } })
@@ -40,6 +41,13 @@ it.each([
   const { PrereleaseBoundary } = await import('../PrereleaseBoundary')
   const { PageRouter } = await import('../PageRouter')
   render(<LocaleProvider><PrereleaseBoundary><AuthProvider><PageRouter /></AuthProvider></PrereleaseBoundary></LocaleProvider>)
+}
+
+it.each([
+  { tab: 'Settings', message: 'Return to production' },
+  { tab: 'Workshop', message: 'Read-only prerelease' },
+])('returns from the restricted $tab route through the real navigation', async ({ tab, message }) => {
+  await renderPrereleaseRouter()
   expect(await screen.findByText('Lobby page')).toBeVisible()
 
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: tab }))
@@ -52,4 +60,28 @@ it.each([
   fireEvent.click(within(navigation).getByRole('button', { name: 'Lobby' }))
   expect(await screen.findByText('Lobby page')).toBeVisible()
   expect(window.location.search).toBe('')
+})
+
+it.each([
+  { page: 'settings', message: 'Return to production' },
+  { page: 'workshop', message: 'Read-only prerelease' },
+])('keeps a visible Lobby link on $page when the real stylesheet hides mobile navigation', async ({ page, message }) => {
+  window.history.replaceState(null, '', `/open-agricola/?page=${page}`)
+  const style = document.createElement('style')
+  style.textContent = componentStyles
+  document.head.append(style)
+  try {
+    await renderPrereleaseRouter()
+    await waitFor(() => { expect(screen.getByRole('main')).toHaveTextContent(message) })
+    expect(window.innerWidth).toBeGreaterThan(640)
+    expect(document.querySelector('.mobile-tab-bar')).not.toBeVisible()
+
+    const main = screen.getByRole('main')
+    const lobby = within(main).getByRole('link', { name: 'Open Agricola: Back to lobby' })
+    expect(lobby).toBeVisible()
+    expect(lobby).toHaveAttribute('href', '/open-agricola/')
+    expect(lobby.closest('.mobile-tab-bar')).toBeNull()
+    expect(within(main).queryByRole('textbox')).toBeNull()
+    expect(main.querySelector('form')).toBeNull()
+  } finally { style.remove() }
 })
