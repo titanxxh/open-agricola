@@ -338,7 +338,7 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
 })
 
 
-test('private replay uses an authenticated parent bridge and clears idle display on source revocation', async ({playwright}) => {
+test('private replay uses an authenticated parent bridge and clears idle display on source revocation', async ({playwright}, testInfo) => {
   test.setTimeout(300_000)
   const environment = await fixture(playwright)
   try {
@@ -361,9 +361,9 @@ test('private replay uses an authenticated parent bridge and clears idle display
     await page.goto(`${environment.preOrigin}/open-agricola/?room=${replay.roomId}&perspective=p1`)
     const frame = page.frameLocator('iframe')
     try { await expect(frame.locator('.replay-app')).toBeVisible() } catch(error) {
-      debug.push(await page.locator('iframe').getAttribute('src'))
+      debug.push(await page.locator('iframe').getAttribute('src').catch(()=>null))
       for(const child of page.frames()) debug.push({url:child.url(),text:await child.locator('body').innerText().catch(()=>'(unavailable)')})
-      writeFileSync('/tmp/oa-1655-state/1665-browser-debug.json',JSON.stringify(debug,null,2))
+      writeFileSync(testInfo.outputPath('replay-bridge-debug.json'),JSON.stringify(debug,null,2))
       throw error
     }
     await expect(page.locator('iframe')).toHaveAttribute('sandbox','allow-scripts')
