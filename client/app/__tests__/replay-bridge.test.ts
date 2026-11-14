@@ -26,7 +26,10 @@ function fixture(options: { read?: typeof fetch; source?: ReplayManifest; contex
   const stop = serveReplayBridge(port1, options.context ?? context, options.source ?? manifest, {
     authority: { assert() { if (!active) throw new Error('expired') }, remainingMs: () => active ? 1000 : 0,
       revision: () => active ? 1 : 2, subscribe(fn) { listeners.add(fn); return () => { listeners.delete(fn) } } },
-    read: options.read ?? (async () => { throw new Error('unexpected_network') }),
+    read: options.read ?? (async url => {
+      if (url === '/api/v1/replays/room-1/manifest') return new Response(JSON.stringify(options.source ?? manifest))
+      throw new Error('unexpected_network')
+    }),
   })
   close.push(stop)
   const next = () => new Promise<unknown>(resolve => port2.once('message', resolve))
@@ -46,6 +49,18 @@ describe('authenticated parent replay bridge', () => {
     revoke()
     expect(await closed).toEqual({ type: 'close', nonce: context.nonce })
   })
+  it('rechecks the current server lifecycle before forwarding an initial manifest', async () => {
+    const read = vi.fn(async () => new Response(JSON.stringify({ok:false,code:'context_expired'}), {status:410}))
+    const {port,next} = fixture({read})
+    const result = next()
+    port.postMessage({type:'read',nonce:context.nonce,requestId:'r1',read:{kind:'manifest'}})
+    const message = await result
+    expect(message).toMatchObject({type:'data',requestId:'r1',status:410})
+    expect(read).toHaveBeenCalledWith('/api/v1/replays/room-1/manifest',expect.objectContaining({credentials:'include',cache:'no-store'}))
+    if (!message || typeof message !== 'object' || !('bytes' in message) || !isArrayBuffer(message.bytes)) throw new Error('missing bytes')
+    expect(JSON.parse(new TextDecoder().decode(message.bytes))).toEqual({ok:false,code:'context_expired'})
+  })
+
   it.each([
     { type: 'read', nonce: 'old', requestId: 'r1', read: { kind: 'manifest' } },
     { type: 'read', nonce: context.nonce, requestId: 'r1', read: { kind: 'manifest', url: 'https://attacker.example' } },
@@ -112,6 +127,8 @@ describe('authenticated parent replay bridge', () => {
     window.dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,origin:'null',data:{...ready,context:{...context,nonce:'d'.repeat(32)}}}))
     window.dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,origin:'null',data:{...ready,context:{...context,roomId:'other'}}}))
     expect(channels).not.toHaveBeenCalled()
+    window.dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,origin:'null',data:ready}))
+    expect(channels).toHaveBeenCalledTimes(1)
     window.dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,origin:'null',data:ready}))
     expect(channels).toHaveBeenCalledTimes(1)
   })

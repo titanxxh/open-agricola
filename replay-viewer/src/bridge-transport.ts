@@ -35,7 +35,9 @@ export class ReplayBridgeTransport {
     window.addEventListener('message', this.connect)
     window.addEventListener('pageshow', this.resume)
     document.addEventListener('visibilitychange', this.resume)
-    const ready = () => window.parent.postMessage({ type: 'open-agricola-replay-bridge-ready', context }, parentOrigin)
+    const ready = () => {
+      if (document.readyState === 'complete') window.parent.postMessage({ type: 'open-agricola-replay-bridge-ready', context }, parentOrigin)
+    }
     ready()
     this.handshake = setInterval(ready, 250)
     this.handshakeTimeout = setTimeout(this.close, 10_000)

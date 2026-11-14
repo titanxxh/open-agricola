@@ -22,8 +22,9 @@ const sourceMatches = (source: Source, context: ReplayBridgeContext) => source.r
 function readPath(context: ReplayBridgeContext, source: Source, read: ReplayBridgeRead): string | null {
   const root = `${API_BASE}/api/v1/replays/${encodeURIComponent(context.roomId)}`
   if (context.mode.kind === 'evidence') {
-    if (read.kind !== 'asset') return null
-    return `${API_BASE}/api/v1/game-contexts/${encodeURIComponent(context.roomId)}/evidence/${context.mode.stepNo}/assets/${read.hash}?frame=${context.mode.frameHash}`
+    const evidence = `${API_BASE}/api/v1/game-contexts/${encodeURIComponent(context.roomId)}/evidence/${context.mode.stepNo}`
+    if (read.kind === 'evidence') return `${evidence}?frame=${context.mode.frameHash}`
+    return read.kind === 'asset' ? `${evidence}/assets/${read.hash}?frame=${context.mode.frameHash}` : null
   }
   if (source.kind !== 'replayManifest') return null
   switch (read.kind) {
@@ -32,7 +33,8 @@ function readPath(context: ReplayBridgeContext, source: Source, read: ReplayBrid
     case 'anchor': return source.steps.some(step => step.stepNo === read.stepNo && step.frameHash === read.frameHash)
       ? `${root}/anchors/${read.stepNo}?frame=${read.frameHash}` : null
     case 'asset': return `${root}/assets/${read.hash}`
-    case 'manifest': case 'evidence': return null
+    case 'manifest': return `${root}/manifest`
+    case 'evidence': return null
   }
 }
 
@@ -68,49 +70,49 @@ export function serveReplayBridge(port: ReplayBridgePort, context: ReplayBridgeC
   async function respond(requestId: string, read: ReplayBridgeRead, controller: AbortController) {
     try {
       assert()
-      let bytes: ArrayBuffer, contentType = 'application/json', status = 200
-      if (read.kind === 'manifest' && context.mode.kind === 'archive' || read.kind === 'evidence' && context.mode.kind === 'evidence') {
-        bytes = new TextEncoder().encode(JSON.stringify(source)).buffer
-      } else {
-        if (read.kind === 'asset' && !assets.has(read.hash)) throw new Error('denied')
-        const path = readPath(context, source, read)
-        if (!path) throw new Error('denied')
-        const response = await fetchData(path, { method: 'GET', credentials: 'include', cache: 'no-store', signal: controller.signal })
-        assert()
-        const length = Number(response.headers.get('content-length'))
-        if (Number.isFinite(length) && length > REPLAY_BRIDGE_MAX_BYTES) throw new Error('unavailable')
-        const reader = response.body?.getReader()
-        const chunks: Uint8Array<ArrayBufferLike>[] = []
-        let total = 0
-        try {
-          if (reader) for (;;) {
-            const next = await reader.read()
-            assert()
-            if (next.done) break
-            total += next.value.byteLength
-            if (total > REPLAY_BRIDGE_MAX_BYTES) { void reader.cancel().catch(() => {}); throw new Error('unavailable') }
-            chunks.push(next.value)
-          }
-        } finally { reader?.releaseLock() }
-        const joined = new Uint8Array(total)
-        let offset = 0
-        for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.byteLength }
-        bytes = joined.buffer
-        assert()
-        status = response.status
-        if (read.kind === 'asset') {
-          contentType = response.headers.get('content-type')?.split(';')[0] ?? ''
-          if (!response.ok || !replayBridgeImageType(contentType) || await hashBytes(bytes) !== read.hash) throw new Error('unavailable')
-        } else {
-          const value: unknown = JSON.parse(new TextDecoder().decode(bytes))
-          if (!value || typeof value !== 'object' || !('ok' in value) || typeof value.ok !== 'boolean') throw new Error('unavailable')
-          if (value.ok && (!('roomId' in value) || value.roomId !== context.roomId || !('viewerBuildId' in value)
-            || value.viewerBuildId !== context.viewerBuildId || !('schemaVersion' in value) || value.schemaVersion !== context.schemaVersion
-            || read.kind === 'segment' && (!('kind' in value) || value.kind !== 'replaySegment' || !('checkpointStepNo' in value) || value.checkpointStepNo !== read.checkpointStepNo)
-            || read.kind === 'anchor' && (!('kind' in value) || value.kind !== 'replayAnchor' || !('anchor' in value)
-              || !value.anchor || typeof value.anchor !== 'object' || !('stepNo' in value.anchor) || value.anchor.stepNo !== read.stepNo
-              || !('frameHash' in value.anchor) || value.anchor.frameHash !== read.frameHash))) throw new Error('unavailable')
+      let contentType = 'application/json'
+      if (read.kind === 'asset' && !assets.has(read.hash)) throw new Error('denied')
+      const path = readPath(context, source, read)
+      if (!path) throw new Error('denied')
+      const response = await fetchData(path, { method: 'GET', credentials: 'include', cache: 'no-store', signal: controller.signal })
+      assert()
+      const length = Number(response.headers.get('content-length'))
+      if (Number.isFinite(length) && length > REPLAY_BRIDGE_MAX_BYTES) throw new Error('unavailable')
+      const reader = response.body?.getReader()
+      const chunks: Uint8Array<ArrayBufferLike>[] = []
+      let total = 0
+      try {
+        if (reader) for (;;) {
+          const next = await reader.read()
+          assert()
+          if (next.done) break
+          total += next.value.byteLength
+          if (total > REPLAY_BRIDGE_MAX_BYTES) { void reader.cancel().catch(() => {}); throw new Error('unavailable') }
+          chunks.push(next.value)
         }
+      } finally { reader?.releaseLock() }
+      const joined = new Uint8Array(total)
+      let offset = 0
+      for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.byteLength }
+      const bytes = joined.buffer
+      assert()
+      const status = response.status
+      if (read.kind === 'asset') {
+        contentType = response.headers.get('content-type')?.split(';')[0] ?? ''
+        if (!response.ok || !replayBridgeImageType(contentType) || await hashBytes(bytes) !== read.hash) throw new Error('unavailable')
+      } else {
+        const value: unknown = JSON.parse(new TextDecoder().decode(bytes))
+        if (!value || typeof value !== 'object' || !('ok' in value) || typeof value.ok !== 'boolean') throw new Error('unavailable')
+        if (value.ok && (!('roomId' in value) || value.roomId !== context.roomId || !('viewerBuildId' in value)
+          || value.viewerBuildId !== context.viewerBuildId || !('schemaVersion' in value) || value.schemaVersion !== context.schemaVersion
+          || read.kind === 'manifest' && (!('kind' in value) || value.kind !== 'replayManifest')
+          || read.kind === 'evidence' && (context.mode.kind !== 'evidence' || !('kind' in value) || value.kind !== 'reportedEvidence'
+            || !('stepNo' in value) || value.stepNo !== context.mode.stepNo || !('frameHash' in value) || value.frameHash !== context.mode.frameHash
+            || !('perspective' in value) || value.perspective !== context.mode.perspective)
+          || read.kind === 'segment' && (!('kind' in value) || value.kind !== 'replaySegment' || !('checkpointStepNo' in value) || value.checkpointStepNo !== read.checkpointStepNo)
+          || read.kind === 'anchor' && (!('kind' in value) || value.kind !== 'replayAnchor' || !('anchor' in value)
+            || !value.anchor || typeof value.anchor !== 'object' || !('stepNo' in value.anchor) || value.anchor.stepNo !== read.stepNo
+            || !('frameHash' in value.anchor) || value.anchor.frameHash !== read.frameHash))) throw new Error('unavailable')
       }
       assert()
       if (controller.signal.aborted) return
@@ -153,7 +155,7 @@ export function attachReplayBridge(frame: HTMLIFrameElement, context: ReplayBrid
     if (retired || event.source !== frame.contentWindow || !event.data || typeof event.data !== 'object'
       || !('type' in event.data) || event.data.type !== 'open-agricola-replay-bridge-ready'
       || !('context' in event.data) || !sameReplayBridgeContext(context, event.data.context)) return
-    stop?.()
+    if (stop) return
     try { assertPrereleaseAccess() } catch { return }
     const channel = new MessageChannel()
     stop = serveReplayBridge(channel.port1, context, source)

@@ -7,7 +7,7 @@ import { parseReplayBridgeRequest, type ReplayBridgeContext } from '../../../sha
 const context: ReplayBridgeContext = { protocolVersion:1,nonce:'c'.repeat(32),environment:'prerelease',targetId:'pre',
   appBuildId:'a'.repeat(40),generationId:'11111111-1111-1111-1111-111111111111',roomId:'room-1',viewerBuildId:'b'.repeat(64),schemaVersion:1,mode:{kind:'archive'} }
 const cleanups: (()=>void)[]=[]
-afterEach(()=>{cleanups.splice(0).forEach(clean=>clean());vi.useRealTimers()})
+afterEach(()=>{cleanups.splice(0).forEach(clean=>clean());vi.useRealTimers();vi.restoreAllMocks()})
 async function fixture() {
   vi.useFakeTimers({toFake:['performance','setTimeout','clearTimeout','setInterval','clearInterval']})
   const channel = new MessageChannel()
@@ -27,6 +27,17 @@ async function fixture() {
 }
 
 describe('Viewer shared authorization lease',()=>{
+  it('waits until the iframe load completes before announcing its channel',()=>{
+    vi.useFakeTimers()
+    const state=vi.spyOn(document,'readyState','get').mockReturnValue('loading')
+    const announce=vi.spyOn(window.parent,'postMessage')
+    const transport=new ReplayBridgeTransport(context,window.location.origin)
+    cleanups.push(()=>transport.close())
+    expect(announce).not.toHaveBeenCalled()
+    state.mockReturnValue('complete')
+    vi.advanceTimersByTime(250)
+    expect(announce).toHaveBeenCalledTimes(1)
+  })
   it('subtracts the entire message round trip and cannot create a new lease on receipt',async()=>{
     const {transport,reply}=await fixture()
     vi.advanceTimersByTime(200)
