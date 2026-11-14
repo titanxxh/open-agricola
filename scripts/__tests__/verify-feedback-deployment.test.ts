@@ -1,11 +1,14 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 import { stableConfiguration } from '../ci/candidate-verification'
+import { canonicalOwnerLocalCommands, type OwnerLocalReceipt } from '../ci/owner-local-verification'
+import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { createTestDatabase, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 
 const repository = resolve(import.meta.dirname, '../..')
@@ -22,7 +25,7 @@ type State = { sha: string; configuration: string; evidence: string; provenance:
 
 async function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'oa-feedback-deploy-')); roots.push(root)
-  for (const directory of ['scripts/ci', 'scripts/release', 'server/bug-report', 'shared/contract', '.github/workflows', 'bin']) mkdirSync(join(root, directory), { recursive: true })
+  for (const directory of ['scripts/ci', 'scripts/release', 'server/bug-report', 'shared/contract', '.github/workflows', 'e2e-tests', 'bin']) mkdirSync(join(root, directory), { recursive: true })
   cpSync(join(repository, 'scripts/ci'), join(root, 'scripts/ci'), { recursive: true })
   cpSync(join(repository, 'scripts/release'), join(root, 'scripts/release'), { recursive: true })
   cpSync(join(repository, 'server/bug-report/deployment-proof.ts'), join(root, 'server/bug-report/deployment-proof.ts'))
@@ -30,6 +33,7 @@ async function fixture() {
   cpSync(join(repository, '.github/workflows/candidate-verification.yml'), join(root, '.github/workflows/candidate-verification.yml'))
   writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { 'check:architecture': 'pnpm run lint' } }))
   writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
+  writeFileSync(join(root, 'e2e-tests', 'fixture.spec.ts'), '// fixture\n')
   writeFileSync(join(root, '.gitignore'), 'bin/\nstate.json\nevents.jsonl\nreceipt.json\n')
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   git('init', '-b', 'main'); git('config', 'user.name', 'Feedback test'); git('config', 'user.email', 'feedback@example.test')
@@ -64,7 +68,8 @@ if(args[0] !== 'api' || args.includes('POST')) throw Error('Unexpected GitHub wr
 const endpoint = args[1].replace('repos/titanxxh/open-agricola/', ''); event({ kind: 'github', endpoint });
 const tasks = ['quality','fast','slow','build','chromium-1','chromium-2','chromium-3','chromium-4','browser-sandbox','webkit'];
 const step = name => ({name,status:'completed',conclusion:'success'});
-if (Object.hasOwn(state.provenance, args[1])) { const value = state.provenance[args[1]]; if(Array.isArray(value) && args.includes('--paginate')) value.forEach(output); else output(value); }
+if (args.includes('Accept: application/octet-stream')) { const value = state.provenance[args[1]]; if(typeof value !== 'string') throw Error('Missing receipt bytes'); process.stdout.write(value); }
+else if (Object.hasOwn(state.provenance, args[1])) { const value = state.provenance[args[1]]; if(Array.isArray(value) && args.includes('--paginate')) value.forEach(output); else output(value); }
 else if(endpoint === 'releases/tags/v9.9.9') output(state.release);
 else if(endpoint === 'git/ref/tags/v9.9.9') { output({ref:'refs/tags/v9.9.9',object:{type:'commit',sha:state.tag}}); if(state.tagAfterRead){state.tag=state.tagAfterRead;fs.writeFileSync(path.join(root,'state.json'),JSON.stringify(state));} }
 else if(endpoint === 'commits/' + state.sha || endpoint === 'commits/' + state.tag) output({sha:endpoint.slice(8)});
@@ -100,7 +105,109 @@ else if(args.some(arg => arg.includes('feedback-owner-cli.ts'))) {
   return {root,sha,fixSha,state,save,env,git,events,confirm,invoke}
 }
 
+async function ownerLocalFixture() {
+  const value = await fixture()
+  const repository = 'titanxxh/open-agricola'
+  const owner = { id: 7, login: 'titanxxh', type: 'User' }
+  const started = Date.now() - 300_000
+  const at = (seconds: number) => new Date(started + seconds * 1000).toISOString()
+  const commands = canonicalOwnerLocalCommands(value.root, value.sha)
+  const receipt: OwnerLocalReceipt = {
+    format: 1, kind: 'owner-local-verification', repository, repositoryId: 1164782262,
+    testedSha: value.sha, candidateSha: value.sha, tree: value.git('rev-parse', 'HEAD^{tree}'),
+    configuration: verificationConfiguration(value.root, value.sha), producerConfiguration: verificationConfiguration(value.root, value.sha),
+    startedAt: at(0), completedAt: at(60),
+    environment: { node: process.version, platform: process.platform, arch: process.arch, nodeExecutable: process.execPath },
+    tasks: FULL_TASK_IDS.map(id => ({ id, startedAt: at(0), completedAt: at(60),
+      commands: commands[id].map(command => ({ ...command, exitCode: 0, logSha256: 'a'.repeat(64) })) })),
+  }
+  const url = `https://github.com/${repository}/releases/download/v9.9.9/owner-local-verification.json`
+  const asset = { id: 12, name: 'owner-local-verification.json', size: 0, state: 'uploaded', uploader: owner,
+    browser_download_url: url, created_at: at(62) }
+  const status = { id: 10, context: 'owner-local-verification', state: 'success', creator: owner,
+    created_at: at(63), target_url: url, description: '' }
+  const release = { ...value.state.release, id: 11, author: owner, assets: [asset], created_at: at(61), published_at: at(64) }
+  Object.assign(value.state.provenance, {
+    [`repos/${repository}`]: { id: 1164782262, full_name: repository, default_branch: 'main', owner },
+    [`repos/${repository}/commits/${value.sha}/statuses?per_page=100`]: [status],
+    [`repos/${repository}/releases/tags/v9.9.9`]: release,
+  })
+  value.state.evidence = 'missing'
+  const saveReceipt = () => {
+    const bytes = JSON.stringify(receipt) + '\n'
+    asset.size = Buffer.byteLength(bytes)
+    status.description = `owner-local sha256:${createHash('sha256').update(bytes).digest('hex')}`
+    value.state.provenance[`repos/${repository}/releases/assets/12`] = bytes
+    value.save()
+  }
+  saveReceipt()
+  return { ...value, receipt, owner, asset, status, release, saveReceipt }
+}
+
 describe('owner verified feedback deployment', () => {
+  it('retains actual owner-local authorization and null Actions identities after the common native gate', async () => {
+    const value = await ownerLocalFixture()
+    const result = await value.confirm()
+    expect(result.status, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({ verification: 'passed', notification: { status: 'completed' } })
+    const saved = JSON.parse(readFileSync(join(value.root, 'receipt.json'), 'utf8'))
+    expect(statSync(join(value.root, 'receipt.json')).mode & 0o777).toBe(0o600)
+    expect(saved.proof.candidate.ownerLocal).toMatchObject({ kind: 'owner-local', ownerId: 7, statusId: 10, releaseId: 11, assetId: 12,
+      receiptSha256: value.status.description.slice('owner-local sha256:'.length), url: value.asset.browser_download_url })
+    expect(saved.proof.candidate.tasks.map((task: { id: string }) => task.id)).toEqual(FULL_TASK_IDS)
+    expect(saved.proof.candidate.tasks.every((task: { runId: unknown; jobId: unknown; url: string }) =>
+      task.runId === null && task.jobId === null && task.url === value.asset.browser_download_url)).toBe(true)
+    expect(value.events().find(event => event.kind === 'notification')?.input).toEqual(saved)
+    expect(value.events().some(event => event.endpoint?.includes('/dispatches'))).toBe(false)
+  })
+
+  it.each(['foreign status', 'withdrawn owner status', 'foreign release author', 'foreign asset uploader', 'digest mismatch',
+    'missing canonical task', 'failed local command', 'configuration mismatch'] as const)('blocks owner-local %s before observing or writing feedback', async failure => {
+    const value = await ownerLocalFixture()
+    if (failure === 'foreign status') value.status.creator = { ...value.owner, id: 8 }
+    if (failure === 'withdrawn owner status') value.status.state = 'failure'
+    if (failure === 'foreign release author') value.release.author = { ...value.owner, id: 8 }
+    if (failure === 'foreign asset uploader') value.asset.uploader = { ...value.owner, id: 8 }
+    if (failure === 'missing canonical task') value.receipt.tasks.pop()
+    if (failure === 'failed local command') value.receipt.tasks[0].commands[0].exitCode = 1
+    if (failure === 'configuration mismatch') value.receipt.configuration = 'f'.repeat(64)
+    value.saveReceipt()
+    if (failure === 'digest mismatch') { value.status.description = `owner-local sha256:${'f'.repeat(64)}`; value.save() }
+    const result = await value.confirm()
+    expect(result.status).toBe(1)
+    expect(value.events().some(event => event.kind === 'http' || event.kind === 'ssh' || event.kind === 'notification')).toBe(false)
+    expect(existsSync(join(value.root, 'receipt.json'))).toBe(false)
+  })
+
+  it.each(['frontend mismatch', 'backend mismatch', 'unready backend'] as const)('still blocks owner-local %s before notification', async failure => {
+    const value = await ownerLocalFixture()
+    if (failure === 'frontend mismatch') value.state.frontendSha = 'b'.repeat(40)
+    if (failure === 'backend mismatch') value.state.backendSha = 'b'.repeat(40)
+    if (failure === 'unready backend') value.state.ready = false
+    value.save()
+    const result = await value.confirm()
+    expect(result.status).toBe(1)
+    expect(value.events().filter(event => event.kind === 'notification')).toEqual([])
+    expect(existsSync(join(value.root, 'receipt.json'))).toBe(false)
+  })
+
+  it('retries an owner-local receipt without reselecting proof or changing its operation, evidence or target', async () => {
+    const value = await ownerLocalFixture()
+    value.state.notification = 'offline'; value.save()
+    const first = await value.confirm()
+    expect(first.status, first.stderr).toBe(2)
+    const path = join(value.root, 'receipt.json')
+    const receipt = readFileSync(path, 'utf8')
+    const before = value.events().length
+    value.state.notification = 'completed'; value.state.frontendStatus = 500; value.state.ready = false
+    value.status.state = 'failure'; value.save()
+    const retried = await value.invoke('scripts/release/verify-feedback-deployment.ts', ['--retry', path])
+    expect(retried.status, retried.stderr).toBe(0)
+    expect(value.events().slice(before).map(event => event.kind)).toEqual(['ssh', 'notification'])
+    expect(value.events().slice(before).at(-1)?.input).toEqual(JSON.parse(receipt))
+    expect(readFileSync(path, 'utf8')).toBe(receipt)
+  })
+
   it('observes a formal complete release and records its exact full ancestry without publishing or deploying', async () => {
     const value = await fixture()
     const result = await value.confirm()
@@ -214,8 +321,8 @@ describe('owner verified feedback deployment', () => {
     expect(value.events().filter(event => event.kind === 'notification')).toHaveLength(before)
   })
 
-  it('records and retries the original operation through the actual PostgreSQL owner process', async () => {
-    const value = await fixture()
+  it.each(['native', 'owner-local'] as const)('records and retries the original %s operation through the actual PostgreSQL owner process', async kind => {
+    const value = kind === 'owner-local' ? await ownerLocalFixture() : await fixture()
     expect((await value.confirm()).status).toBe(0)
     const receipt: unknown = JSON.parse(readFileSync(join(value.root, 'receipt.json'), 'utf8'))
     if (!receipt || typeof receipt !== 'object' || !('operationId' in receipt)) throw new Error('No operation identity')

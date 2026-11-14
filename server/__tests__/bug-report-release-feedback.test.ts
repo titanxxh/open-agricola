@@ -28,6 +28,15 @@ const proof: DeploymentProof = { repository, observedAt: 2000,
   frontend: { format: 1, gameBuildId: deployed, basePath: '/open-agricola/', url: 'https://example.test/open-agricola/frontend-build.json' },
   backend: { gameBuildId: deployed, running: true, ready: true, containerId: 'container-1' },
   ancestry: { format: 'git-raw-closure-v1', commits: [commit, merge, deployed] } }
+function ownerLocalProof() {
+  const url = `https://github.com/${repository}/releases/download/v0.20.0/owner-local-verification.json`
+  return { ...proof, candidate: { ...proof.candidate,
+    ownerLocal: { kind: 'owner-local' as const, configuration: proof.candidate.configuration,
+      producerConfiguration: 'e'.repeat(64), receiptSha256: 'f'.repeat(64), statusId: 10, releaseId: 11, assetId: 12, ownerId: 7, url },
+    tasks: proof.candidate.requiredTaskIds.map(id => ({ id, status: 'passed' as const,
+      reason: 'Owner-authorized local candidate verification', runId: null, jobId: null, url })),
+  } }
+}
 const fix = { issueNumber: 1465, requestId: 'fix-request-01', expectedVersion: 0, purpose: 'fix', fixSummary: 'Adds an explicit discard action for supply goods without advancing the current turn.',
   pullRequests: [{ number: 1500, requiredCommits: [commit] }] }
 async function report(issue = 1465, recipient = 'reporter') {
@@ -47,6 +56,62 @@ beforeEach(async () => {
 afterEach(async () => { vi.restoreAllMocks(); await db?.close() })
 
 describe('verified production fix feedback', () => {
+  it('persists owner-local authority across service reconstruction without inventing Actions jobs or redelivering read messages', async () => {
+    await service.associateFix('admin', fix)
+    const local = ownerLocalProof()
+    const result = await service.recordVerifiedDeployment('owner-local-production', local)
+    expect(result).toMatchObject({ status: 'completed', result: { sentMessages: 1, pendingFixes: [] } })
+    const stored = await db.prepare('SELECT proof FROM bug_report_feedback_operations WHERE operation_id=?')
+      .get<{ proof: unknown }>('owner-local-production')
+    expect(stored?.proof).toEqual(local)
+    const reconstructed = new BugReportFeedbackService(db, () => 4000)
+    const original = (await reconstructed.listInbox('reporter')).messages[0]
+    expect(original).toMatchObject({ kind: 'fix_released', release: { firstVerified: { version: 'v0.20.0', verifiedAt: 2000 } } })
+    const read = await reconstructed.markRead('reporter', original.id)
+    await reconstructed.retryFeedbackOperation('owner-local-production')
+    await reconstructed.recordVerifiedDeployment('owner-local-production', local)
+    await reconstructed.recordVerifiedDeployment('later-native-proof', { ...proof, observedAt: 2500 })
+    expect((await reconstructed.listInbox('reporter')).messages.filter(message => message.kind === 'fix_released')).toEqual([
+      { ...read, currentProduction: { ...read.currentProduction, verifiedAt: 2500 } },
+    ])
+    await expect(reconstructed.recordVerifiedDeployment('owner-local-production', { ...local,
+      candidate: { ...local.candidate, ownerLocal: { ...local.candidate.ownerLocal, receiptSha256: '0'.repeat(64) } } }))
+      .rejects.toMatchObject({ code: 'feedback_operation_conflict' })
+  })
+
+  it('rejects malformed owner-local or mixed proof rather than silently treating it as native evidence', async () => {
+    await service.associateFix('admin', fix)
+    const local = ownerLocalProof()
+    const authorization = local.candidate.ownerLocal
+    const invalid = [
+      { ...proof, candidate: { ...proof.candidate, ownerLocal: null } },
+      { ...proof, candidate: { ...proof.candidate, ownerLocal: undefined } },
+      { ...proof, candidate: { ...proof.candidate, ownerLocal: [] } },
+      { ...proof, candidate: { ...proof.candidate, ownerLocal: authorization } },
+      { ...local, candidate: { ...local.candidate, ownerLocal: { ...authorization, extra: 'ignored authority' } } },
+      { ...local, candidate: { ...local.candidate, ownerLocal: { ...authorization, kind: 'github-actions' } } },
+      ...[
+        { configuration: '0'.repeat(64) }, { producerConfiguration: 'bad' }, { receiptSha256: 'bad' },
+        { statusId: 0 }, { releaseId: -1 }, { assetId: '12' }, { ownerId: 0 },
+        { url: 'https://github.com/foreign/project/releases/download/v0.20.0/owner-local-verification.json' },
+        { url: `https://github.com/${repository}/releases/download/v0.19.0/owner-local-verification.json` },
+      ].map(change => ({ ...local, candidate: { ...local.candidate, ownerLocal: { ...authorization, ...change } } })),
+      { ...local, candidate: { ...local.candidate, tasks: local.candidate.tasks.slice(1) } },
+      { ...local, candidate: { ...local.candidate, tasks: local.candidate.tasks.map((task, index) =>
+        index === 1 ? { ...task, id: local.candidate.tasks[0].id } : task) } },
+      { ...local, candidate: { ...local.candidate, tasks: local.candidate.tasks.map(task => ({ ...task, runId: 1234, jobId: 4321 })) } },
+      { ...local, candidate: { ...local.candidate, tasks: local.candidate.tasks.map(task => ({ ...task, reason: null })) } },
+      { ...local, candidate: { ...local.candidate, tasks: local.candidate.tasks.map(task => ({ ...task, url: proof.candidate.tasks[0].url })) } },
+      { ...proof, candidate: { ...proof.candidate, tasks: local.candidate.tasks } },
+    ]
+    for (const [index, value] of invalid.entries()) {
+      await expect(service.recordVerifiedDeployment(`invalid-owner-proof-${index}`, value)).rejects.toMatchObject({ code: 'invalid_deployment_proof' })
+    }
+    expect((await service.listInbox('reporter')).messages.map(message => message.kind)).toEqual(['confirmed_bug'])
+    expect((await service.getReport(1465)).fix?.status).toBe('pending_release')
+    expect((await service.listFeedbackOperations()).filter(operation => operation.kind === 'deployment')).toEqual([])
+  })
+
   it('persists a verified deployment and one release message independently of triage versions', async () => {
     await service.associateFix('admin', fix)
     const result = await service.recordVerifiedDeployment('deployment-01', proof)
@@ -130,12 +195,13 @@ describe('verified production fix feedback', () => {
     expect((await service.getReport(1465)).version).toBe(3)
   })
 
-  it('recovers the original operation after an actual PostgreSQL inbox transaction rollback', async () => {
+  it.each(['native', 'owner-local'] as const)('recovers the original %s operation after an actual PostgreSQL inbox transaction rollback', async kind => {
+    const deploymentProof = kind === 'owner-local' ? ownerLocalProof() : proof
     await service.associateFix('admin', fix)
     await db.exec(`CREATE FUNCTION fail_release_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
       IF NEW.kind='fix_released' THEN RAISE EXCEPTION 'isolated release failure'; END IF; RETURN NEW; END $$;
       CREATE TRIGGER fail_release BEFORE INSERT ON bug_report_feedback FOR EACH ROW EXECUTE FUNCTION fail_release_insert()`)
-    const failed = await service.recordVerifiedDeployment('recoverable-deployment', proof)
+    const failed = await service.recordVerifiedDeployment('recoverable-deployment', deploymentProof)
     expect(failed).toMatchObject({ operationId: 'recoverable-deployment', status: 'pending', error: 'notification_transaction_failed', completedAt: null })
     expect((await service.listInbox('reporter')).messages.map(entry => entry.kind)).toEqual(['confirmed_bug'])
     expect((await service.listFeedbackOperations()).find(entry => entry.operationId === 'recoverable-deployment')).toEqual(failed)
@@ -146,9 +212,9 @@ describe('verified production fix feedback', () => {
     expect(message.kind).toBe('fix_released')
     const read = await reconstructed.markRead('reporter', message.id)
     await reconstructed.retryFeedbackOperation('recoverable-deployment')
-    await reconstructed.recordVerifiedDeployment('recoverable-deployment', proof)
+    await reconstructed.recordVerifiedDeployment('recoverable-deployment', deploymentProof)
     expect((await reconstructed.listInbox('reporter')).messages.filter(entry => entry.kind === 'fix_released')).toEqual([read])
-    await expect(reconstructed.recordVerifiedDeployment('recoverable-deployment', { ...proof, observedAt: 2001 }))
+    await expect(reconstructed.recordVerifiedDeployment('recoverable-deployment', { ...deploymentProof, observedAt: 2001 }))
       .rejects.toMatchObject({ code: 'feedback_operation_conflict' })
   })
 
@@ -225,23 +291,24 @@ describe('verified production fix feedback', () => {
     expect((await service.getReport(1465)).fix?.status).toBe('released')
   })
 
-  it('never reconstructs a deleting or anonymized root reporter while confirmed duplicates remain deliverable', async () => {
+  it.each(['native', 'owner-local'] as const)('never reconstructs a deleting or anonymized root reporter with %s proof while confirmed duplicates remain deliverable', async kind => {
+    const deploymentProof = kind === 'owner-local' ? ownerLocalProof() : proof
     await report(1466, 'other')
     await service.associateDuplicate('admin', { issueNumber: 1466, rootIssueNumber: 1465, requestId: 'root-deletion-duplicate', expectedVersion: 0 })
     await service.associateFix('admin', fix)
     vi.spyOn(database, 'getDb').mockReturnValue(db)
     await requestAccountDeletion('reporter')
-    expect((await service.recordVerifiedDeployment('deletion-production', proof)).status).toBe('completed')
+    expect((await service.recordVerifiedDeployment('deletion-production', deploymentProof)).status).toBe('completed')
     expect((await service.listInbox('reporter')).messages).toEqual([])
     expect((await service.listInbox('other')).messages.filter(entry => entry.kind === 'fix_released')).toHaveLength(1)
     await new BugReportStore(db, new TokenCipher('test', new Map([['test', Buffer.alloc(32, 1)]]))).anonymizeReporter('reporter')
-    await service.recordVerifiedDeployment('deletion-replay-production', proof)
+    await service.recordVerifiedDeployment('deletion-replay-production', deploymentProof)
     await service.retryFeedbackOperation('deletion-production')
     expect((await service.listInbox('reporter')).messages).toEqual([])
     expect((await service.getReport(1465)).feedback).toEqual([])
     expect((await service.getReport(1466)).fix?.status).toBe('released')
     await requestAccountDeletion('other')
-    await service.recordVerifiedDeployment('all-deleted-replay', proof)
+    await service.recordVerifiedDeployment('all-deleted-replay', deploymentProof)
     expect((await service.listInbox('other')).messages).toEqual([])
   })
 

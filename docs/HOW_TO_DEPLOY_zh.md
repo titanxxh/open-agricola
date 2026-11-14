@@ -67,7 +67,7 @@ publisher 核对当前认证用户与仓库 owner 的原生用户 ID，准备固
 
 只有原生 owner 创建的 status 能选择本机证明，其他用户的同名 context 不能选择或撤销它。owner 最新 pending、failure 或 error 撤销本机授权，不复活较旧成功；随后继续普通原生 GitHub 证据路径。owner 最新 success 的证明若格式或内容无效，仍阻断，不静默回退。
 
-Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已发布证明，重新核对原生身份、未变更 tag、原始树、双方配置、命令、时间和回执摘要。不接受任意 URL、其他用户 status、不完整任务或虚构 Actions ID。GitHub 仍实际构建私有镜像与 Pages；镜像来源、私有 registry、owner 传输和运行期门禁保持必需。独立 Bug Report 部署反馈命令暂不支持本机证明；该可选命令不属于发版或后端交付主链路。
+Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已发布证明，重新核对原生身份、未变更 tag、原始树、双方配置、命令、时间和回执摘要。不接受任意 URL、其他用户 status、不完整任务或虚构 Actions ID。GitHub 仍实际构建私有镜像与 Pages；镜像来源、私有 registry、owner 传输和运行期门禁保持必需。独立 Bug Report 部署反馈命令也复用该门禁，保留 owner-local 权威依据而不虚构 Actions job。登记前须先部署支持此反馈证明类型的后端；命令本身不会升级应用。
 
 ## 发布固定预发布候选
 
@@ -287,9 +287,9 @@ pnpm exec tsx scripts/release/verify-feedback-deployment.ts vX.Y.Z \
   --receipt /path/to/private/feedback-vX.Y.Z.json
 ```
 
-工具读取固定仓库的正式 Release 与准确 tag SHA，通过现有 `checkCandidateVerification` 核对同 SHA 的完整 GitHub 回执，再读取实际服务的 `frontend-build.json`。它复用 owner SSH，读取运行中 Compose app 容器的 `GAME_BUILD_ID`、健康状态和实时 readiness 响应。所有构建身份必须等于 Release SHA。非根路径前端还需传 `--base-path /expected/path/`，且 `--frontend` 必须使用完全相同的路径。
+工具读取固定仓库的正式 Release 与准确 tag SHA，通过现有 `checkCandidateVerification` 核对同 SHA 的完整原生 GitHub 证据或 owner 显式授权的完整本机验证，再读取实际服务的 `frontend-build.json`。它复用 owner SSH，读取运行中 Compose app 容器的 `GAME_BUILD_ID`、健康状态和实时 readiness 响应。所有构建身份必须等于 Release SHA。非根路径前端还需传 `--base-path /expected/path/`，且 `--frontend` 必须使用完全相同的路径。
 
-调用运行中容器内的 `BugReportFeedbackService` 前，工具先保存 mode-600 私有回执。回执保留原操作 ID、不可变核验证据和逐个 SHA 校验的完整原始 Git 祖先集合。本机仓库必须完整且不是 shallow clone。祖先遍历忽略 replace refs 和 grafts，晚到的确认结论或修复关联可复用该证据，无需再次部署。只有全部必需合入提交及每个 PR 的实际合入末提交均在集合中，修复才满足上线条件。反馈服务同时处理账号删除隔离，并按账号和稳定根修复去重。
+调用运行中容器内的 `BugReportFeedbackService` 前，工具先保存 mode-600 私有回执。回执保留原操作 ID、不可变核验证据和逐个 SHA 校验的完整原始 Git 祖先集合。原生证明保留真实 run/job ID；owner-local 证明保留原生 owner/status/Release/asset ID 及回执摘要，run/job ID 必须为 null，URL 绑定准确正式 Release asset。格式错误或混合证明直接拒绝，不降级为原生证明；既有原生回执仍可读取。登记 owner-local 证明后，应用回退仍须保留兼容读取器；不得删除操作、已发消息或已读状态来迁就只支持原生证明的旧后端。本机仓库必须完整且不是 shallow clone。祖先遍历忽略 replace refs 和 grafts，晚到的确认结论或修复关联可复用该证据，无需再次部署。只有全部必需合入提交及每个 PR 的实际合入末提交均在集合中，修复才满足上线条件。反馈服务同时处理账号删除隔离，并按账号和稳定根修复去重。
 
 JSON 结果分别报告 `release`、`deployment`、`verification` 和 `notification`。服务结果中的 `sentMessages` 记录本次新增信件数，`pendingFixes` 列出尚缺必需提交的根修复；这些修复继续等待后续核验。`deployment: "observed"` 表示读取了已有部署。工具不会创建 Release、dispatch 验证、部署前后端、更新 What's New 或扩大 Bug Report App 权限。Release 不合格、验证不全、前端不可读、后端停止或未就绪、构建不一致、tag 移动时均在通知前停止。通知失败退出码为 2，成功的部署观测与原回执仍然保留。
 
@@ -308,7 +308,7 @@ pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr
 pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --retry-operation <operation-id>
 ```
 
-回执绑定核验时的 SSH host 和远端目录。重试未传目标时使用原目标，显式传入不一致目标会在 SSH 前被拒绝。重试保留原操作身份和已存证据，不重复创建 Release、请求候选验证、部署或读取生产构建。保留回执至操作完成。重复核验、重试和晚到重复关联不会为同账号同根修复再发一封信。已有消息和已读时间保持不变。
+回执绑定核验时的 SSH host 和远端目录。重试未传目标时使用原目标，显式传入不一致目标会在 SSH 前被拒绝。两种验证类型的重试都保留原操作身份和已存证据，不重新选择可变授权，不重复创建 Release、请求候选验证、部署或读取生产构建；新的核验仍通过当前候选门禁。保留回执至操作完成。重复核验、重试和晚到重复关联不会为同账号同根修复再发一封信。已有消息和已读时间保持不变。
 
 
 登记修复关联时，维护者必须填写具体修复摘要，说明改变了什么；空白或仅“已修复”等状态词会被拒绝。摘要与完整 PR/提交集合共同形成根修复修订。新上线信将摘要原文固定在消息中，根修复后来修订也不改写旧信或重复发信。升级前没有摘要的根修复返回 `missing_fix_summary`，补充摘要后可复用已有正式核验证据，无需重新部署；历史已发空摘要消息保留原貌。
