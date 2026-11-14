@@ -104,7 +104,7 @@ const values = {
   TEST_S3_ACCESS_KEY_ID: config.LOCAL_S3_ACCESS_KEY,
   TEST_S3_SECRET_ACCESS_KEY: config.LOCAL_S3_SECRET_KEY,
   DATABASE_URL: process.env.DATABASE_URL || localUrl,
-  TEST_DATABASE_URL: process.env.TEST_DATABASE_URL ?? localUrl.replace(/\/agricola$/, '/agricola_test'),
+  TEST_DATABASE_URL: localUrl.replace(/\/agricola$/, '/agricola_test'),
 }
 // Quoted shell values also parse with Node's parseEnv. Credentials stay untracked.
 const text = Object.entries(values).map(([key, value]) => `${key}='${value.replaceAll("'", "'\\''")}'`).join('\n') + '\n'

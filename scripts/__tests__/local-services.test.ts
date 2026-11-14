@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, sy
 import { tmpdir } from 'node:os'
 import { join, resolve, basename } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { parseEnv } from 'node:util'
 import { allocateTestPort } from '../test-ports'
 
 const repository = resolve(import.meta.dirname, '../..')
@@ -71,6 +72,16 @@ describe('local-services Docker use', () => {
     expect(result.dependencies).toContain(`DATABASE_URL='${external.DATABASE_URL}'`)
     expect(result.dependencies).toContain(`S3_ENDPOINT='${external.S3_ENDPOINT}'`)
     expect(result.monitoringPrepared).toBe(true)
+  })
+
+  it('keeps an ephemeral test database override out of the persistent shared default', () => {
+    const privateDatabase = 'postgresql://qualifier:private@127.0.0.1:55432/temporary_qualification'
+    const result = runServices({ ...external, TEST_DATABASE_URL: privateDatabase }, { docker: false })
+    expect(result.status, result.output).toBe(0)
+    const saved = new URL(parseEnv(result.dependencies).TEST_DATABASE_URL)
+    expect({ hostname: saved.hostname, port: saved.port, username: saved.username, pathname: saved.pathname })
+      .toEqual({ hostname: '127.0.0.1', port: '55432', username: 'agricola', pathname: '/agricola_test' })
+    expect(result.dependencies).not.toContain('temporary_qualification')
   })
 
   it('keeps the shared container network and monitoring configuration when Docker is installed', () => {
