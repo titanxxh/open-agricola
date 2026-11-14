@@ -638,18 +638,25 @@ if [ "$TAILSCALE_ENABLED" -eq 1 ]; then
 else
   PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$BIND_IP:$BACKEND_PORT}"
 fi
+FRONTEND_API_BASE="http://$BIND_IP:$BACKEND_PORT"
+FRONTEND_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws"
+FRONTEND_API_ENV=()
 # Isolated prerelease rehearsals retain explicit HTTPS origins.
 if [ "${RELEASE_CHANNEL:-stable}" = "prerelease" ]; then
   : "${PUBLIC_APP_ORIGIN:?Explicit HTTPS prerelease app origin is required}"
   : "${PUBLIC_API_BASE:?Explicit HTTPS prerelease API origin is required}"
   : "${CORS_ORIGIN:?Explicit HTTPS prerelease browser origin is required}"
-  node --input-type=module - "$PUBLIC_APP_ORIGIN" "$PUBLIC_API_BASE" "$CORS_ORIGIN" <<'JS'
+  FRONTEND_API_BASE="$(node --input-type=module - "$PUBLIC_APP_ORIGIN" "$PUBLIC_API_BASE" "$CORS_ORIGIN" <<'JS'
 const [app, api, cors] = process.argv.slice(2).map(value => new URL(value));
 if ([app, api, cors].some(url => url.protocol !== 'https:' || url.username || url.password || url.search || url.hash)
   || app.origin !== api.origin || app.origin !== cors.origin || api.pathname !== '/' || cors.pathname !== '/') {
   throw Error('Prerelease local rehearsal requires one explicit HTTPS app/API/browser origin');
 }
+process.stdout.write(api.origin);
 JS
+)"
+  FRONTEND_WS_BASE="${FRONTEND_API_BASE/https:/wss:}/ws"
+  FRONTEND_API_ENV=("VITE_API_BASE=$FRONTEND_API_BASE")
 else
   PUBLIC_APP_ORIGIN="http://$BIND_IP:${FRONTEND_PORT:-5173}"
   CORS_ORIGIN="$PUBLIC_APP_ORIGIN"
@@ -673,8 +680,8 @@ fi
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   echo "Building frontend preview bundle..."
   env \
-    VITE_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
-    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
+    VITE_API_BASE="$FRONTEND_API_BASE" \
+    VITE_WS_BASE="$FRONTEND_WS_BASE" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$PNPM_BIN" run build
 fi
@@ -712,16 +719,16 @@ fi
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   echo "Starting frontend preview (port $FRONTEND_PORT on $BIND_IP)..."
   start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
-    VITE_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
-    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
+    VITE_API_BASE="$FRONTEND_API_BASE" \
+    VITE_WS_BASE="$FRONTEND_WS_BASE" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$FRONTEND_BIN" preview --host "$BIND_IP" --port "$FRONTEND_PORT" --strictPort
 else
   echo "Starting frontend (port $FRONTEND_PORT on $BIND_IP)..."
-  start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
+  start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env "${FRONTEND_API_ENV[@]}" \
     NODE_ENV=development \
     BACKEND_HOST="$BIND_IP" \
-    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
+    VITE_WS_BASE="$FRONTEND_WS_BASE" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$FRONTEND_BIN" --host "$BIND_IP" --port "$FRONTEND_PORT" --strictPort
 fi
