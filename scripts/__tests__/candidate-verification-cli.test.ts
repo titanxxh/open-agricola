@@ -94,6 +94,38 @@ const prefix = 'repos/titanxxh/open-agricola'
 const mergedPr = (sha: string) => ({ number: 1, state: 'closed', merged: true, merged_at: '2026-10-30T00:00:00Z',
   merge_commit_sha: sha, base: { ref: 'main', repo: { ...candidateRepository } } })
 
+it.each(['foreign-only', 'owner-pending', 'owner-failure', 'owner-error'])('uses native GitHub evidence when local authorization is %s', outcome => {
+  const value = fixture(), owner = { id: 7, login: 'titanxxh', type: 'User' }
+  githubFixture(value)
+  const old = { id: 10, context: 'owner-local-verification', state: 'success', creator: owner,
+    target_url: 'https://invalid.example/old-local-proof', description: 'This old proof must not be selected' }
+  const status = outcome === 'foreign-only' ? { ...old, id: 12, creator: { ...owner, id: 8 } }
+    : { ...old, id: 12, state: outcome.slice('owner-'.length) }
+  replaceMetadata(value, { [prefix]: { ...candidateRepository, default_branch: 'main', owner },
+    [`${prefix}/commits/${value.sha}/statuses?per_page=100`]: outcome === 'foreign-only' ? [status] : [old, status] })
+  const result = value.run('check', '--sha', value.sha, '--repository', candidateRepository.full_name)
+  expect(result.status, result.stderr).toBe(0)
+  const evidence = JSON.parse(result.stdout)
+  expect(evidence.status).toBe('passed')
+  expect(evidence.ownerLocal).toBeUndefined()
+  expect(evidence.tasks.every((task: { runId: number; jobId: number }) => task.runId === 1 && task.jobId > 0)).toBe(true)
+})
+
+it('keeps a withdrawn local authorization blocked when no native GitHub tasks passed', () => {
+  const value = fixture(), owner = { id: 7, login: 'titanxxh', type: 'User' }
+  githubFixture(value)
+  replaceMetadata(value, { [prefix]: { ...candidateRepository, default_branch: 'main', owner },
+    [`${prefix}/commits/${value.sha}/statuses?per_page=100`]: [
+      { id: 10, context: 'owner-local-verification', state: 'success', creator: owner },
+      { id: 12, context: 'owner-local-verification', state: 'failure', creator: owner },
+    ], [`${prefix}/actions/workflows/100/runs?event=workflow_dispatch&per_page=100`]: { workflow_runs: [] } })
+  const result = value.run('check', '--sha', value.sha, '--repository', candidateRepository.full_name)
+  expect(result.status, result.stderr).toBe(1)
+  const evidence = JSON.parse(result.stdout)
+  expect(evidence.status).toBe('blocked'); expect(evidence.ownerLocal).toBeUndefined()
+  expect(evidence.tasks.every((task: { status: string }) => task.status === 'blocked')).toBe(true)
+})
+
 describe('historical stable Git ancestry', () => {
   const older = execFileSync('git', ['rev-parse', `${LEGACY_STABLE_CUTOFF}~3`], { cwd: repoRoot, encoding: 'utf8' }).trim()
   const newer = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()

@@ -74,17 +74,46 @@ it.each(['task missing', 'failed command', 'changed command', 'unsupported Node'
     candidateSha: value.git('rev-parse', 'HEAD'), producerSha: value.git('rev-parse', 'HEAD') })).toThrow()
 })
 
-it.each(['status creator', 'uploader', 'release author', 'status failure', 'other URL', 'digest', 'tag', 'draft', 'newer failure', 'status predates task'])('rejects forged or invalid native %s', failure => {
+it('ignores a newer foreign context status when selecting the native owner authorization', () => {
   const value = fixture()
-  if (failure === 'status creator') value.status.creator = { ...value.owner, id: 99 }
+  value.api[`repos/titanxxh/open-agricola/commits/${value.candidateSha}/statuses?per_page=100`] = [value.status,
+    { ...value.status, id: 99, creator: { ...value.owner, id: 8 }, target_url: 'https://foreign.example/invalid', state: 'failure' }]
+  expect(value.check()).toMatchObject({ kind: 'owner-local', statusId: 10, ownerId: 7 })
+})
+
+it('returns no local authorization when only foreign actors posted the same context', () => {
+  const value = fixture()
+  value.status.creator = { ...value.owner, id: 8 }
+  value.status.target_url = 'https://foreign.example/invalid'
+  expect(value.check()).toBeNull()
+})
+
+it.each([
+  { name: 'deleted creator', creator: null },
+  { name: 'missing creator', creator: undefined },
+  { name: 'scalar creator', creator: 'foreign' },
+  { name: 'wrong creator ID type', creator: { id: '7' } },
+  { name: 'foreign creator', creator: { id: 8 } },
+])('ignores context statuses with $name before validating their IDs or proof', ({ creator }) => {
+  const value = fixture()
+  value.api[`repos/titanxxh/open-agricola/commits/${value.candidateSha}/statuses?per_page=100`] = [{ ...value.status, id: 'ignored foreign ID', creator, target_url: null }]
+  expect(value.check()).toBeNull()
+})
+
+it.each(['pending', 'failure', 'error'])('withdraws local authorization after the owner latest %s without reviving an older success', state => {
+  const value = fixture()
+  value.api[`repos/titanxxh/open-agricola/commits/${value.candidateSha}/statuses?per_page=100`] = [value.status, { ...value.status, id: 13, state }]
+  expect(value.check()).toBeNull()
+})
+
+it.each(['uploader', 'release author', 'other URL', 'digest', 'tag', 'draft', 'status predates task'])('rejects forged or invalid native %s', failure => {
+  const value = fixture()
   if (failure === 'uploader') value.asset.uploader = { ...value.owner, id: 99 }
   if (failure === 'release author') value.release.author = { ...value.owner, id: 99 }
-  if (failure === 'status failure') value.status.state = 'failure'
   if (failure === 'other URL') value.status.target_url = 'https://example.test/receipt.json'
   if (failure === 'digest') value.status.description = `owner-local sha256:${'f'.repeat(64)}`
   if (failure === 'tag') value.api['repos/titanxxh/open-agricola/git/ref/tags/v0.12.9'] = { object: { type: 'commit', sha: value.receipt.testedSha } }
   if (failure === 'draft') value.release.draft = true
-  if (failure === 'newer failure') value.api[`repos/titanxxh/open-agricola/commits/${value.candidateSha}/statuses?per_page=100`] = [value.status, { ...value.status, id: 13, state: 'failure' }]
   if (failure === 'status predates task') value.status.created_at = '2026-11-13T00:00:00Z'
   expect(value.check).toThrow()
 })

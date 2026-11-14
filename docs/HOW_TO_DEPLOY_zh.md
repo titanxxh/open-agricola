@@ -65,6 +65,8 @@ pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/verificat
 
 publisher 核对当前认证用户与仓库 owner 的原生用户 ID，准备固定候选 draft，仅上传 `owner-local-verification.json`，再创建独立 `owner-local-verification` commit status。描述绑定回执 SHA-256，target 只能是本仓正式 Release asset。发布前读回 status creator、Release author、asset uploader 和实际字节。相同命令与回执可恢复本工具准备的同一 draft；普通发布路径继续拒绝 draft。
 
+只有原生 owner 创建的 status 能选择本机证明，其他用户的同名 context 不能选择或撤销它。owner 最新 pending、failure 或 error 撤销本机授权，不复活较旧成功；随后继续普通原生 GitHub 证据路径。owner 最新 success 的证明若格式或内容无效，仍阻断，不静默回退。
+
 Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已发布证明，重新核对原生身份、未变更 tag、原始树、双方配置、命令、时间和回执摘要。不接受任意 URL、其他用户 status、不完整任务或虚构 Actions ID。GitHub 仍实际构建私有镜像与 Pages；镜像来源、私有 registry、owner 传输和运行期门禁保持必需。独立 Bug Report 部署反馈命令暂不支持本机证明；该可选命令不属于发版或后端交付主链路。
 
 ## 发布固定预发布候选
