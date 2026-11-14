@@ -77,26 +77,32 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     return refresh
   }
   const verificationFile = options.verificationFile ?? resolve(options.stateFile, '../verification.json')
-  const validToken = (token: string) => {
+  const verificationHash = (): string | null => {
     const current = state()
     const guard = readStorageGuard(guardFile, options.targetId)
-    if (!guard || !current || !/^[A-Za-z0-9_-]{43}$/.test(token)) return false
+    if (!guard || !current) return null
     try {
       const value: unknown = JSON.parse(readFileSync(verificationFile, 'utf8'))
       return !!value && typeof value === 'object' && 'targetId' in value && value.targetId === options.targetId
         && 'buildId' in value && value.buildId === current.buildId && 'generation' in value && value.generation === current.generation
         && 'healthyCycle' in value && value.healthyCycle === guard.healthyCycle
         && 'expiresAt' in value && typeof value.expiresAt === 'number' && value.expiresAt > Date.now() && value.expiresAt <= Date.now() + 600_000
-        && 'tokenHash' in value && value.tokenHash === createHash('sha256').update(token).digest('hex')
-    } catch { return false }
+        && 'tokenHash' in value && typeof value.tokenHash === 'string' && /^[a-f0-9]{64}$/.test(value.tokenHash)
+        ? value.tokenHash : null
+    } catch { return null }
   }
+  const validToken = (token: string) => /^[A-Za-z0-9_-]{43}$/.test(token)
+    && verificationHash() === createHash('sha256').update(token).digest('hex')
   const guardFile = resolve(options.stateFile, '../storage-guard.json')
-  const allowed = (cookie = '') => {
+  const allowed = (cookie = '', viewerProgram = false) => {
     const guard = readStorageGuard(guardFile, options.targetId)
     if (!guard) return false
     const current = state()
     if (!capability || capability.validUntil <= Date.now()) return false
     if (current?.mode === 'open') return current.formalBuildId === capability.buildId && current.healthyCycle === guard.healthyCycle
+    // Public immutable programs carry no archive data or credentials. During
+    // private acceptance only, their anonymous iframe can use the active window.
+    if (current?.mode === 'maintenance' && viewerProgram) return verificationHash() !== null
     const tokens = cookie.split(';').map(value => value.trim()).filter(value => value.startsWith(`${OWNER_VERIFICATION_COOKIE}=`))
     const token = tokens.length === 1 ? tokens[0].slice(OWNER_VERIFICATION_COOKIE.length + 1) : undefined
     return current?.mode === 'maintenance' && token !== undefined && validToken(token)
@@ -148,12 +154,15 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
       })
       return
     }
-    const viewerProgram = req.method === 'GET' && req.headers.origin === 'null' && publicViewerProgram.test(req.url ?? '')
+    const programPath = (req.url ?? '').split('?')[0]
+    const programRequest = req.method === 'GET' && publicViewerProgram.test(programPath)
+      && (!req.url?.includes('?') || programPath.endsWith('/index.html'))
+    const viewerProgram = programRequest && (req.headers.origin === undefined || req.headers.origin === 'null')
       && !Object.keys(req.headers).some(name => name === 'cookie' || name === 'authorization' || name === 'proxy-authorization'
         || name.startsWith('x-oa-') || name === 'x-open-agricola-client-capabilities' || name === 'sec-websocket-protocol')
     if (!viewerProgram && (req.headers.origin !== undefined && req.headers.origin !== options.origin
       || !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? '') && req.headers.origin !== options.origin)) { res.writeHead(403); res.end(); return }
-    const permission = () => allowed(req.headers.cookie)
+    const permission = () => allowed(req.headers.cookie, viewerProgram)
     track(req.socket, permission)
     if (!permission()) {
       const html = req.headers.accept?.includes('text/html') ? maintenanceHtml(req.headers['accept-language']) : null
@@ -163,7 +172,14 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     }
     const forwarded = headers(req.headers)
     if (!forwarded) { res.writeHead(400); res.end(); return }
-    const outgoing = request({ protocol: upstream.protocol, hostname: upstream.hostname, port: upstream.port, path: req.url ?? '/', method: req.method, headers: forwarded }, response => {
+    // Browsers without credentialless support can attach cookies to the entry
+    // navigation. Static programs never consume them, even on an admitted read.
+    if (programRequest) {
+      delete forwarded.cookie
+      for (const name of Object.keys(forwarded)) if (name.startsWith('x-oa-')) delete forwarded[name]
+    }
+    const outgoing = request({ protocol: upstream.protocol, hostname: upstream.hostname, port: upstream.port,
+      path: programRequest ? programPath : req.url ?? '/', method: req.method, headers: forwarded }, response => {
       if (!permission()) { response.destroy(); res.destroy(); return }
       res.writeHead(response.statusCode ?? 502, candidateResponseHeaders(response.headers))
       response.on('data', chunk => { if (permission()) res.write(chunk); else { response.destroy(); res.destroy() } })
