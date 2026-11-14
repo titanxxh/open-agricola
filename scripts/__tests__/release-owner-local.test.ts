@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -17,13 +18,13 @@ type Asset = { id: number; name: string; size: number; state: string; uploader: 
 type NativeRelease = { id: number; tag_name: string; target_commitish: string; html_url: string; prerelease: boolean; draft: boolean;
   author: Actor; assets: Asset[]; body: string; created_at: string; published_at: string | null }
 type Status = { id: number; context: string; state: string; creator: Actor; target_url: string; description: string; created_at: string }
-type FixtureState = { sha: string; owner: Actor; user: Actor; refs: Record<string, string>; release: NativeRelease | null;
+type FixtureState = { sha: string; version: string; owner: Actor; user: Actor; refs: Record<string, string>; release: NativeRelease | null;
   assetBytes: string; statuses: Status[]; dropStatus: boolean; foreignStatus: boolean; foreignAsset: boolean; hideDraftByTag: boolean;
   wrongStatusField: 'target' | 'digest' | null; moveTagAfterStatus: boolean; preserveDraftAssetUrlOnPublish: boolean;
   releaseTime: string; assetTime: string; statusTime: string; publishedTime: string; provenance: Record<string, unknown> }
 type Event = { endpoint: string; method: string; body?: { context?: string; state?: string; draft?: boolean; sha?: string } }
 
-function fixture(rebound = false) {
+function fixture(rebound = false, channel: 'stable' | 'prerelease' = 'stable') {
   const root = mkdtempSync(join(tmpdir(), 'oa-release-owner-local-')); roots.push(root)
   mkdirSync(join(root, 'scripts'), { recursive: true }); mkdirSync(join(root, '.github/workflows'), { recursive: true })
   cpSync(join(repositoryRoot, 'scripts/ci'), join(root, 'scripts/ci'), { recursive: true })
@@ -33,10 +34,19 @@ function fixture(rebound = false) {
   for (const name of ['a', 'b', 'c', 'd']) writeFileSync(join(root, 'e2e-tests', `${name}.spec.ts`), '')
   writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { release: 'tsx scripts/release/publish.ts', 'check:architecture': 'pnpm run lint' } }))
   writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
-  writeFileSync(join(root, '.gitignore'), 'bin/\nstate.json\nevents.jsonl\nreceipt.json\n')
+  writeFileSync(join(root, '.gitignore'), 'bin/\npolicy/\nstate.json\nevents.jsonl\nreceipt.json\n')
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   git('init', '-b', 'main'); git('config', 'user.name', 'Local Verification Test'); git('config', 'user.email', 'local@example.test')
   git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**'); git('commit', '-m', 'local verification fixture')
+  const mainSha = git('rev-parse', 'HEAD')
+  if (channel === 'prerelease') {
+    writeFileSync(join(root, 'feature.txt'), 'private candidate source')
+    git('add', 'feature.txt'); git('commit', '-m', 'independent feature')
+    const featureSha = git('rev-parse', 'HEAD')
+    writeFileSync(join(root, 'prerelease-integration.json'), JSON.stringify({ format: 1, repository: 'titanxxh/open-agricola',
+      baselineMainSha: mainSha, features: [{ id: 'identity', dependsOn: [], sourceSha: featureSha, integratedSha: featureSha }] }))
+    git('add', 'prerelease-integration.json'); git('commit', '-m', 'fixed integration manifest')
+  }
   const testedSha = git('rev-parse', 'HEAD')
   if (rebound) git('commit', '--allow-empty', '-m', 'final integration with identical source')
   const sha = git('rev-parse', 'HEAD'), tree = git('rev-parse', `${sha}^{tree}`)
@@ -47,12 +57,24 @@ function fixture(rebound = false) {
     testedSha, candidateSha: testedSha, tree, configuration: verificationConfiguration(root, testedSha), producerConfiguration: verificationConfiguration(root, sha),
     startedAt: at(0), completedAt: at(60), environment: { node: 'v24.15.0', platform: 'linux', arch: 'arm64', nodeExecutable: process.execPath },
     tasks: FULL_TASK_IDS.map(id => ({ id, startedAt: at(0), completedAt: at(60), commands: commands[id].map(command => ({ ...command, exitCode: 0, logSha256: 'a'.repeat(64) })) })) }
-  const receiptPath = join(root, 'receipt.json'); writeFileSync(receiptPath, JSON.stringify(receipt) + '\n')
+  const preCommands = Object.fromEntries(Object.entries(commands).map(([id, rows]) => [id, rows.map(command =>
+    command.command === 'pnpm' && command.args.join(',') === 'run,build' ? { command: 'pnpm', args: ['run', 'build:hosted-frontend'] } : command)]))
+  const localReceipt = channel === 'stable' ? receipt : { ...receipt, kind: 'owner-local-prerelease-verification', channel,
+    producerSha: mainSha, tasks: receipt.tasks.map(task => ({ ...task,
+      commands: preCommands[task.id].map(command => ({ ...command, exitCode: 0, logSha256: 'a'.repeat(64) })) })) }
+  const receiptPath = join(root, 'receipt.json'); writeFileSync(receiptPath, JSON.stringify(localReceipt) + '\n')
   const owner: Actor = { id: 7, login: 'titanxxh', type: 'User' }
-  const state: FixtureState = { sha, owner, user: owner, refs: {}, release: null, assetBytes: '', statuses: [], dropStatus: false, foreignStatus: false, foreignAsset: false, hideDraftByTag: false,
+  const policy = channel === 'stable' ? root : join(root, 'policy')
+  if (channel === 'prerelease') git('worktree', 'add', '--detach', policy, mainSha)
+  const version = channel === 'stable' ? 'v9.9.9' : 'v9.9.9-beta.1'
+  const state: FixtureState = { sha, version, owner, user: owner, refs: {}, release: null, assetBytes: '', statuses: [], dropStatus: false, foreignStatus: false, foreignAsset: false, hideDraftByTag: false,
     wrongStatusField: null, moveTagAfterStatus: false, preserveDraftAssetUrlOnPublish: false,
     releaseTime: at(61), assetTime: at(62), statusTime: at(63), publishedTime: at(64),
-    provenance: finalSnapshotMetadata(sha, sha, { id: 123, full_name: 'titanxxh/open-agricola' }) }
+    provenance: { ...finalSnapshotMetadata(sha, channel === 'stable' ? sha : mainSha, { id: 123, full_name: 'titanxxh/open-agricola' }),
+      'repos/titanxxh/open-agricola/git/ref/heads/prerelease': { ref: 'refs/heads/prerelease', object: { type: 'commit', sha } },
+      'repos/titanxxh/open-agricola/rules/branches/prerelease?per_page=100': ['pull_request', 'deletion', 'required_linear_history'].map(type => ({ type })),
+      [`repos/titanxxh/open-agricola/rules/branches/verification%2Fprerelease%2F${sha}?per_page=100`]: ['non_fast_forward', 'deletion', 'update'].map(type => ({ type })),
+    } }
   const save = () => writeFileSync(join(root, 'state.json'), JSON.stringify(state))
   const load = (): FixtureState => JSON.parse(readFileSync(join(root, 'state.json'), 'utf8'))
   save()
@@ -91,10 +113,10 @@ if (method !== 'GET') {
       creator: state.foreignStatus ? { id: 8, login: 'collaborator', type: 'User' } : state.owner,
       ...(state.wrongStatusField === 'target' ? { target_url: 'https://evil.example/proof.json' } : {}),
       ...(state.wrongStatusField === 'digest' ? { description: 'owner-local sha256:' + 'f'.repeat(64) } : {}) });
-    if (state.moveTagAfterStatus) state.refs['tags/v9.9.9'] = 'f'.repeat(40);
+    if (state.moveTagAfterStatus) state.refs['tags/' + state.version] = 'f'.repeat(40);
   } else if (endpoint === prefix + '/releases/11' && method === 'PATCH') state.release = { ...state.release, ...body, published_at: state.publishedTime,
-    html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/v9.9.9', assets: state.release.assets.map(asset => ({ ...asset,
-      browser_download_url: state.preserveDraftAssetUrlOnPublish ? asset.browser_download_url : 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9/owner-local-verification.json' })) };
+    html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/' + state.version, assets: state.release.assets.map(asset => ({ ...asset,
+      browser_download_url: state.preserveDraftAssetUrlOnPublish ? asset.browser_download_url : 'https://github.com/titanxxh/open-agricola/releases/download/' + state.version + '/owner-local-verification.json' })) };
   else throw Error('Unexpected mutation: ' + endpoint);
   save(); output(state.release ?? {}); process.exit(0);
 }
@@ -107,11 +129,13 @@ else if (endpoint === prefix + '/releases?per_page=100') { if (state.release) ou
 else if (endpoint === prefix + '/releases/11') { if (!state.release) absent(); output(state.release); }
 else if (endpoint === prefix + '/releases/assets/12') process.stdout.write(state.assetBytes);
 else if (endpoint.startsWith(prefix + '/releases/tags/')) { if (!state.release || state.hideDraftByTag && state.release.draft) absent(); output(state.release); }
-else if (endpoint.startsWith(prefix + '/git/ref/tags/')) {
+else if (endpoint.startsWith(prefix + '/git/ref/') && Object.hasOwn(state.refs, endpoint.slice((prefix + '/git/ref/').length))) {
   const tag = endpoint.slice((prefix + '/git/ref/').length); if (!state.refs[tag]) absent();
   output({ ref: 'refs/' + tag, object: { type: 'commit', sha: state.refs[tag] } });
-} else if (endpoint === prefix + '/actions/workflows/candidate-verification.yml') output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
-else if (endpoint === prefix + '/actions/workflows/100/runs?event=workflow_dispatch&per_page=100') {}
+} else if (endpoint.startsWith(prefix + '/git/ref/') && !Object.hasOwn(state.provenance, endpoint)) absent();
+else if (endpoint === prefix + '/actions/workflows/candidate-verification.yml') output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
+else if (endpoint === prefix + '/actions/workflows/prerelease-candidate-verification.yml') output({ id: 200, path: '.github/workflows/prerelease-candidate-verification.yml' });
+else if (endpoint === prefix + '/actions/workflows/100/runs?event=workflow_dispatch&per_page=100' || endpoint === prefix + '/actions/workflows/200/runs?event=workflow_dispatch&per_page=100') {}
 else if (Object.hasOwn(state.provenance, endpoint)) {
   const value = state.provenance[endpoint]; if (Array.isArray(value) && args.includes('--paginate')) value.forEach(output); else output(value);
 } else throw Error('Unexpected GitHub read: ' + endpoint);
@@ -119,13 +143,17 @@ else if (Object.hasOwn(state.provenance, endpoint)) {
   chmodSync(join(bin, 'gh'), 0o700)
   const env: NodeJS.ProcessEnv = { ...process.env, PATH: [bin, join(repositoryRoot, 'node_modules/.bin'), process.env.PATH].join(delimiter),
     CI: '', GITHUB_ACTIONS: '', GITHUB_SHA: '', GITHUB_OUTPUT: '', OWNER_LOCAL_TEST_ROOT: root }
-  const run = (local = true) => spawnSync(tsx, [join(root, 'scripts/release/publish.ts'), 'v9.9.9', '--ref', sha,
+  const run = (local = true, trusted = true) => spawnSync(tsx, [join(trusted ? policy : root, 'scripts/release/publish.ts'), version, '--channel', channel, '--ref', sha,
     ...(local ? ['--local-verification', receiptPath] : []), '--poll-seconds', '0.01', '--timeout-seconds', '0.05'], { cwd: root, env, encoding: 'utf8', timeout: 30_000 })
-  const check = () => spawnSync(tsx, [join(root, 'scripts/ci/candidate-verification.ts'), 'check', '--repository', 'titanxxh/open-agricola', '--sha', sha], {
+  const check = () => spawnSync(tsx, [join(root, channel === 'stable' ? 'scripts/ci/candidate-verification.ts' : 'scripts/ci/prerelease-verification.ts'), 'check', '--repository', 'titanxxh/open-agricola', '--sha', sha], {
     cwd: root, env, encoding: 'utf8', timeout: 30_000,
   })
+  const image = () => spawnSync(tsx, ['--eval',
+    `import { containerImageVerification } from ${JSON.stringify(join(root, 'scripts/release/container-images.ts'))};
+    console.log(JSON.stringify(containerImageVerification({ cwd: ${JSON.stringify(root)}, purpose: 'candidate', sourceSha: ${JSON.stringify(sha)}, producerSha: ${JSON.stringify(mainSha)} })));`],
+    { cwd: root, env, encoding: 'utf8', timeout: 30_000 })
   const events = (): Event[] => existsSync(join(root, 'events.jsonl')) ? readFileSync(join(root, 'events.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : []
-  return { root, sha, testedSha, receipt, receiptPath, state, save, load, run, check, events }
+  return { root, sha, mainSha, testedSha, receipt: localReceipt, receiptPath, state, save, load, run, check, image, events }
 }
 
 describe('owner-local public release entry', () => {
@@ -257,4 +285,115 @@ describe('owner-local public release entry', () => {
     expect(result.stderr).toContain('Owner-local receipt asset is missing, unbounded or not uploaded by the owner')
     expect(value.check().status).not.toBe(0)
   })
+})
+
+
+describe('owner-local prerelease publication', { timeout: 30_000 }, () => {
+  it('publishes the fixed integration as a native prerelease and exposes a distinct local proof without Actions IDs', () => {
+    const value = fixture(false, 'prerelease')
+    const result = value.run()
+    expect(result.status, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({ status: 'published', channel: 'prerelease', verification: 'owner-local', sha: value.sha })
+    expect(value.load().release).toMatchObject({ draft: false, prerelease: true, make_latest: 'false' })
+    expect(value.load().refs[`heads/verification/prerelease/${value.sha}`]).toBe(value.sha)
+    const checked = value.check()
+    expect(checked.status, checked.stderr).toBe(0)
+    expect(JSON.parse(checked.stdout)).toMatchObject({ status: 'passed', channel: 'prerelease',
+      ownerLocal: { kind: 'owner-local-prerelease', ownerId: 7, assetId: 12 } })
+    expect(JSON.parse(checked.stdout).tasks.every((task: { runId: unknown; jobId: unknown }) => task.runId === null && task.jobId === null)).toBe(true)
+    expect(value.events().some(event => event.endpoint.includes('dispatches'))).toBe(false)
+  })
+})
+
+
+it('carries the authenticated native pre asset proof into candidate image qualification', () => {
+  const value = fixture(false, 'prerelease')
+  const published = value.run()
+  expect(published.status, published.stderr).toBe(0)
+  const image = value.image()
+  expect(image.status, image.stderr).toBe(0)
+  expect(JSON.parse(image.stdout)).toMatchObject({ kind: 'owner-local-prerelease', ownerId: 7, assetId: 12,
+    url: 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9-beta.1/owner-local-verification.json' })
+  expect(JSON.parse(image.stdout).tasks).toBeUndefined()
+}, 30_000)
+
+describe('owner-local prerelease admission remains source bound', { timeout: 30_000 }, () => {
+  it('rejects publishing a fixed candidate after current prerelease protection is withdrawn', () => {
+    const value = fixture(false, 'prerelease')
+    value.state.refs[`heads/verification/prerelease/${value.sha}`] = value.sha
+    value.state.provenance['repos/titanxxh/open-agricola/rules/branches/prerelease?per_page=100'] = []
+    value.save()
+    const result = value.run()
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Missing prerelease reference protection for prerelease')
+    expect(value.load().release).toBeNull()
+    expect(value.events().filter(event => event.method !== 'GET')).toEqual([])
+  })
+
+  it.each(['stable receipt', 'producer', 'partial tasks', 'stable build', 'configuration', 'pre head', 'fixed ref', 'protections', 'baseline', 'collaborator', 'candidate tools'])('refuses %s before publishing any receipt asset', failure => {
+    const value = fixture(false, 'prerelease')
+    const receipt = JSON.parse(readFileSync(value.receiptPath, 'utf8'))
+    if (failure === 'stable receipt') { delete receipt.channel; delete receipt.producerSha; receipt.kind = 'owner-local-verification' }
+    if (failure === 'producer') receipt.producerSha = value.sha
+    if (failure === 'partial tasks') receipt.tasks.pop()
+    if (failure === 'stable build') receipt.tasks.find((task: { id: string }) => task.id === 'build').commands[0].args = ['run', 'build']
+    if (failure === 'configuration') receipt.producerConfiguration = 'f'.repeat(64)
+    const prefix = 'repos/titanxxh/open-agricola'
+    if (failure === 'pre head') value.state.provenance[`${prefix}/git/ref/heads/prerelease`] = { object: { type: 'commit', sha: value.mainSha } }
+    if (failure === 'fixed ref') value.state.refs[`heads/verification/prerelease/${value.sha}`] = value.mainSha
+    if (failure === 'protections') value.state.provenance[`${prefix}/rules/branches/verification%2Fprerelease%2F${value.sha}?per_page=100`] = []
+    if (failure === 'baseline') value.state.provenance[`${prefix}/git/ref/heads/main`] = { object: { type: 'commit', sha: value.sha } }
+    if (failure === 'collaborator') value.state.user = { id: 8, type: 'User', login: 'collaborator' }
+    writeFileSync(value.receiptPath, JSON.stringify(receipt)); value.save()
+    expect(value.run(true, failure !== 'candidate tools').status).not.toBe(0)
+    expect(value.load().release).toBeNull()
+    expect(value.events().some(event => event.endpoint.startsWith('https://uploads.github.com/'))).toBe(false)
+    expect(value.events().some(event => event.endpoint.includes('/statuses/'))).toBe(false)
+  })
+
+  it.each(['pending', 'failure', 'error'])('withdraws pre local authority on the latest native owner %s and uses real native fallback', state => {
+    const value = fixture(false, 'prerelease')
+    expect(value.run().status).toBe(0)
+    const stored = value.load()
+    stored.statuses.unshift({ ...stored.statuses[0], id: 999, state })
+    writeFileSync(join(value.root, 'state.json'), JSON.stringify(stored))
+    const result = value.check()
+    expect(result.status).toBe(1)
+    expect(JSON.parse(result.stdout)).toMatchObject({ status: 'blocked', channel: 'prerelease' })
+    expect(JSON.parse(result.stdout).ownerLocal).toBeUndefined()
+    expect(value.events().some(event => event.endpoint.includes('/actions/workflows/200/runs'))).toBe(true)
+  })
+
+  it('ignores a foreign latest context but rejects a malformed latest owner success without falling back', () => {
+    const value = fixture(false, 'prerelease')
+    expect(value.run().status).toBe(0)
+    const stored = value.load()
+    stored.statuses.unshift({ ...stored.statuses[0], id: 999, state: 'failure', creator: { id: 8, login: 'collaborator', type: 'User' } })
+    writeFileSync(join(value.root, 'state.json'), JSON.stringify(stored))
+    expect(value.check().status).toBe(0)
+    const receipt = JSON.parse(stored.assetBytes); receipt.tasks.pop()
+    stored.assetBytes = JSON.stringify(receipt) + '\n'
+    if (!stored.release) throw new Error('Missing published fixture')
+    stored.release.assets[0].size = Buffer.byteLength(stored.assetBytes)
+    stored.statuses[1].description = `owner-local sha256:${createHash('sha256').update(stored.assetBytes).digest('hex')}`
+    writeFileSync(join(value.root, 'state.json'), JSON.stringify(stored))
+    const count = value.events().length
+    const rejected = value.check()
+    expect(rejected.status).toBe(1)
+    expect(rejected.stderr).toContain('Complete canonical owner-local tasks')
+    expect(value.events().slice(count).some(event => event.endpoint.includes('/actions/workflows/200/runs'))).toBe(false)
+  })
+})
+
+
+it('retains a recorded protected producer after a compatible native main advance', () => {
+  const value = fixture(false, 'prerelease'), policy = join(value.root, 'policy')
+  execFileSync('git', ['-c', 'user.name=Producer Test', '-c', 'user.email=producer@example.test', 'commit', '--allow-empty', '-m', 'compatible protected producer'], { cwd: policy, stdio: 'ignore' })
+  const advanced = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: policy, encoding: 'utf8' }).trim()
+  value.state.provenance['repos/titanxxh/open-agricola/git/ref/heads/main'] = { ref: 'refs/heads/main', object: { type: 'commit', sha: advanced } }
+  value.state.refs[`heads/verification/prerelease/${value.sha}`] = value.sha
+  value.save()
+  const result = value.run()
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(value.load().assetBytes).producerSha).toBe(value.mainSha)
 })

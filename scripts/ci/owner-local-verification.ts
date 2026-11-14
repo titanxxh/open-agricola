@@ -6,11 +6,14 @@ import { join } from 'node:path'
 import { FULL_TASK_IDS, fullSha, taskCommands, verificationConfiguration, verificationTask, type FullTaskId, type VerificationCommand } from './verification-tasks.ts'
 
 export const OWNER_LOCAL_CONTEXT = 'owner-local-verification'
+export const PRERELEASE_OWNER_LOCAL_CONTEXT = 'owner-local-prerelease-verification'
 export const OWNER_LOCAL_ASSET = 'owner-local-verification.json'
 export type OwnerLocalProof = {
   kind: 'owner-local'; configuration: string; producerConfiguration: string; receiptSha256: string
   statusId: number; releaseId: number; assetId: number; ownerId: number; url: string
 }
+export type PrereleaseOwnerLocalProof = Omit<OwnerLocalProof, 'kind'> & { kind: 'owner-local-prerelease' }
+type LocalProof = OwnerLocalProof | PrereleaseOwnerLocalProof
 type LocalCommand = VerificationCommand & { exitCode: number; logSha256: string }
 export type OwnerLocalReceipt = {
   format: 1; kind: 'owner-local-verification'; repository: string; repositoryId: number
@@ -19,6 +22,10 @@ export type OwnerLocalReceipt = {
   environment: { node: string; platform: string; arch: string; nodeExecutable: string }
   tasks: { id: FullTaskId; startedAt: string; completedAt: string; commands: LocalCommand[] }[]
 }
+export type PrereleaseOwnerLocalReceipt = Omit<OwnerLocalReceipt, 'kind'> & {
+  kind: typeof PRERELEASE_OWNER_LOCAL_CONTEXT; channel: 'prerelease'; producerSha: string
+}
+type LocalReceipt = OwnerLocalReceipt | PrereleaseOwnerLocalReceipt
 export type OwnerLocalGitHubReader = (endpoint: string, collection?: string) => unknown
 export type OwnerLocalSelection = { repository: string; repositoryId: number; candidateSha: string; producerSha: string }
 
@@ -57,14 +64,15 @@ function rawTree(cwd: string, sha: string, repository: string): string {
   return tree
 }
 
-export function canonicalOwnerLocalCommands(cwd: string, sha: string): Record<FullTaskId, VerificationCommand[]> {
+export function canonicalOwnerLocalCommands(cwd: string, sha: string, channel: 'stable' | 'prerelease' = 'stable'): Record<FullTaskId, VerificationCommand[]> {
   const root = mkdtempSync(join(tmpdir(), 'oa-local-plan-'))
   try {
     const archive = git(cwd, ['archive', fullSha(sha), 'package.json', 'e2e-tests'])
     execFileSync('tar', ['-x', '-C', root], { input: archive, stdio: ['pipe', 'ignore', 'pipe'] })
     const commands = (id: FullTaskId): VerificationCommand[] => [
       ...(verificationTask(id).services ? [{ command: 'node', args: ['scripts/local-services.mjs', '--test'] }] : []),
-      ...taskCommands(root, id),
+      ...taskCommands(root, id).map(command => channel === 'prerelease' && id === 'build' && command.command === 'pnpm'
+        && command.args.length === 2 && command.args[0] === 'run' && command.args[1] === 'build' ? { command: 'pnpm', args: ['run', 'build:hosted-frontend'] } : command),
     ]
     return { quality: commands('quality'), fast: commands('fast'), slow: commands('slow'), build: commands('build'),
       'chromium-1': commands('chromium-1'), 'chromium-2': commands('chromium-2'), 'chromium-3': commands('chromium-3'), 'chromium-4': commands('chromium-4'),
@@ -72,10 +80,11 @@ export function canonicalOwnerLocalCommands(cwd: string, sha: string): Record<Fu
   } finally { rmSync(root, { recursive: true, force: true }) }
 }
 
-function parseReceipt(value: unknown): OwnerLocalReceipt {
+function parseReceipt(value: unknown): LocalReceipt {
   const input = object(value)
-  keys(input, ['format', 'kind', 'repository', 'repositoryId', 'testedSha', 'candidateSha', 'tree', 'configuration', 'producerConfiguration', 'startedAt', 'completedAt', 'environment', 'tasks'])
-  if (input.format !== 1 || input.kind !== OWNER_LOCAL_CONTEXT) throw new Error('Invalid owner-local receipt version')
+  const prerelease = input.kind === PRERELEASE_OWNER_LOCAL_CONTEXT
+  keys(input, ['format', 'kind', 'repository', 'repositoryId', 'testedSha', 'candidateSha', 'tree', 'configuration', 'producerConfiguration', 'startedAt', 'completedAt', 'environment', 'tasks', ...(prerelease ? ['channel', 'producerSha'] : [])])
+  if (input.format !== 1 || !prerelease && input.kind !== OWNER_LOCAL_CONTEXT) throw new Error('Invalid owner-local receipt version')
   const repository = text(input.repository)
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw new Error('Invalid owner-local repository')
   const startedAt = text(input.startedAt), completedAt = text(input.completedAt)
@@ -100,33 +109,68 @@ function parseReceipt(value: unknown): OwnerLocalReceipt {
     return { id, startedAt: taskStart, completedAt: taskEnd, commands }
   })
   if (tasks.length !== FULL_TASK_IDS.length || tasks.map(task => task.id).join(',') !== FULL_TASK_IDS.join(',')) throw new Error('Complete canonical owner-local tasks are required exactly once')
-  return { format: 1, kind: OWNER_LOCAL_CONTEXT, repository, repositoryId: integer(input.repositoryId), testedSha: fullSha(text(input.testedSha)),
+  const receipt: OwnerLocalReceipt = { format: 1, kind: OWNER_LOCAL_CONTEXT, repository, repositoryId: integer(input.repositoryId), testedSha: fullSha(text(input.testedSha)),
     candidateSha: fullSha(text(input.candidateSha)), tree: fullSha(text(input.tree)), configuration: hash(input.configuration), producerConfiguration: hash(input.producerConfiguration),
     startedAt, completedAt, environment: { node, platform, arch, nodeExecutable }, tasks }
+  if (!prerelease) return receipt
+  if (input.channel !== 'prerelease') throw new Error('Owner-local receipt channel differs')
+  return { ...receipt, kind: PRERELEASE_OWNER_LOCAL_CONTEXT, channel: 'prerelease', producerSha: fullSha(text(input.producerSha)) }
 }
 
-export function rebindOwnerLocalReceipt(cwd: string, value: unknown, selected: OwnerLocalSelection): OwnerLocalReceipt {
+function rebindReceipt(cwd: string, value: unknown, selected: OwnerLocalSelection, channel: 'stable' | 'prerelease'): LocalReceipt {
   const receipt = parseReceipt(value)
+  if ((receipt.kind === PRERELEASE_OWNER_LOCAL_CONTEXT) !== (channel === 'prerelease')) throw new Error('Owner-local receipt channel differs')
+  if (receipt.kind === PRERELEASE_OWNER_LOCAL_CONTEXT) {
+    rawTree(cwd, receipt.producerSha, selected.repository)
+    if (spawnSync('git', ['merge-base', '--is-ancestor', receipt.producerSha, selected.producerSha], { cwd, env: { ...process.env, GIT_NO_REPLACE_OBJECTS: '1' }, stdio: 'ignore' }).status !== 0
+      || verificationConfiguration(cwd, receipt.producerSha) !== receipt.producerConfiguration) throw new Error('Owner-local receipt producer is not compatible protected main')
+  }
   if (receipt.repository !== selected.repository || receipt.repositoryId !== selected.repositoryId
     || receipt.tree !== rawTree(cwd, receipt.testedSha, selected.repository) || receipt.tree !== rawTree(cwd, receipt.candidateSha, selected.repository)
     || receipt.tree !== rawTree(cwd, selected.candidateSha, selected.repository)
     || receipt.configuration !== verificationConfiguration(cwd, receipt.testedSha)
     || receipt.configuration !== verificationConfiguration(cwd, selected.candidateSha)
     || receipt.producerConfiguration !== verificationConfiguration(cwd, selected.producerSha)) throw new Error('Owner-local source tree or verification configuration differs')
-  const commands = canonicalOwnerLocalCommands(cwd, receipt.testedSha)
+  const commands = canonicalOwnerLocalCommands(cwd, receipt.testedSha, channel)
   for (const task of receipt.tasks) {
     if (JSON.stringify(task.commands.map(({ command, args }) => ({ command, args }))) !== JSON.stringify(commands[task.id])) throw new Error(`Owner-local ${task.id} commands differ from the complete candidate plan`)
   }
   return { ...receipt, candidateSha: fullSha(selected.candidateSha) }
 }
 
-export function parseOwnerLocalProof(value: unknown): OwnerLocalProof {
+export function rebindOwnerLocalReceipt(cwd: string, value: unknown, selected: OwnerLocalSelection): OwnerLocalReceipt {
+  const receipt = rebindReceipt(cwd, value, selected, 'stable')
+  if (receipt.kind !== OWNER_LOCAL_CONTEXT) throw new Error('Expected stable owner-local receipt')
+  return receipt
+}
+export function rebindPrereleaseOwnerLocalReceipt(cwd: string, value: unknown, selected: OwnerLocalSelection): PrereleaseOwnerLocalReceipt {
+  const receipt = rebindReceipt(cwd, value, selected, 'prerelease')
+  if (receipt.kind !== PRERELEASE_OWNER_LOCAL_CONTEXT) throw new Error('Expected prerelease owner-local receipt')
+  return receipt
+}
+
+function parseLocalProof(value: unknown, channel: 'stable' | 'prerelease'): LocalProof {
   const input = object(value)
   keys(input, ['kind', 'configuration', 'producerConfiguration', 'receiptSha256', 'statusId', 'releaseId', 'assetId', 'ownerId', 'url'])
   const url = text(input.url)
-  if (input.kind !== 'owner-local' || !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\/v\d+\.\d+\.\d+\/owner-local-verification\.json$/.test(url)) throw new Error('Invalid owner-local authorization reference')
-  return { kind: 'owner-local', configuration: hash(input.configuration), producerConfiguration: hash(input.producerConfiguration), receiptSha256: hash(input.receiptSha256),
+  const kind = channel === 'stable' ? 'owner-local' : 'owner-local-prerelease'
+  const pattern = channel === 'stable'
+    ? /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\/v\d+\.\d+\.\d+\/owner-local-verification\.json$/
+    : /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\/v\d+\.\d+\.\d+-beta\.[1-9]\d*\/owner-local-verification\.json$/
+  if (input.kind !== kind || !pattern.test(url)) throw new Error('Invalid owner-local authorization reference')
+  return { kind, configuration: hash(input.configuration), producerConfiguration: hash(input.producerConfiguration), receiptSha256: hash(input.receiptSha256),
     statusId: integer(input.statusId), releaseId: integer(input.releaseId), assetId: integer(input.assetId), ownerId: integer(input.ownerId), url }
+}
+
+export function parseOwnerLocalProof(value: unknown): OwnerLocalProof {
+  const proof = parseLocalProof(value, 'stable')
+  if (proof.kind !== 'owner-local') throw new Error('Expected stable owner-local proof')
+  return proof
+}
+export function parsePrereleaseOwnerLocalProof(value: unknown): PrereleaseOwnerLocalProof {
+  const proof = parseLocalProof(value, 'prerelease')
+  if (proof.kind !== 'owner-local-prerelease') throw new Error('Expected prerelease owner-local proof')
+  return proof
 }
 
 export function ownerLocalRepository(value: unknown, repository: string): { repositoryId: number; ownerId: number } {
@@ -146,14 +190,15 @@ function tagSha(read: OwnerLocalGitHubReader, prefix: string, tag: string): stri
   throw new Error('Owner-local release tag does not identify an immutable commit')
 }
 
-export function checkOwnerLocalVerification({ cwd, repository, repositoryId, candidateSha, producerSha, read, download, draftReleaseId }: OwnerLocalSelection & {
+type LocalVerificationInput = OwnerLocalSelection & {
   cwd: string; read: OwnerLocalGitHubReader; download: (endpoint: string) => Buffer; draftReleaseId?: number
-}): OwnerLocalProof | null {
+}
+function checkLocalVerification({ cwd, repository, repositoryId, candidateSha, producerSha, read, download, draftReleaseId }: LocalVerificationInput, channel: 'stable' | 'prerelease'): LocalProof | null {
   const prefix = `repos/${repository}`
   let statuses: unknown
   try { statuses = read(`${prefix}/commits/${candidateSha}/statuses?per_page=100`, '[]') } catch { return null }
   if (!Array.isArray(statuses)) throw new Error('Invalid native owner-local statuses')
-  const candidates = statuses.map(object).filter(status => status.context === OWNER_LOCAL_CONTEXT)
+  const candidates = statuses.map(object).filter(status => status.context === (channel === 'stable' ? OWNER_LOCAL_CONTEXT : PRERELEASE_OWNER_LOCAL_CONTEXT))
   if (!candidates.length) return null
   const authority = ownerLocalRepository(read(prefix), repository)
   if (authority.repositoryId !== repositoryId) throw new Error('Owner-local native repository identity differs')
@@ -164,9 +209,10 @@ export function checkOwnerLocalVerification({ cwd, repository, repositoryId, can
   const expectedPrefix = `https://github.com/${repository}/releases/download/`
   if (!marker || !url.startsWith(expectedPrefix)) throw new Error('Owner-local status must bind its exact native release asset digest')
   const version = url.slice(expectedPrefix.length).split('/')[0]
-  if (!/^v\d+\.\d+\.\d+$/.test(version) || url !== `${expectedPrefix}${version}/${OWNER_LOCAL_ASSET}`) throw new Error('Owner-local status target is not a formal release receipt')
+  const versionPattern = channel === 'stable' ? /^v\d+\.\d+\.\d+$/ : /^v\d+\.\d+\.\d+-beta\.[1-9]\d*$/
+  if (!versionPattern.test(version) || url !== `${expectedPrefix}${version}/${OWNER_LOCAL_ASSET}`) throw new Error('Owner-local status target does not match its release channel')
   const release = object(read(draftReleaseId === undefined ? `${prefix}/releases/tags/${version}` : `${prefix}/releases/${integer(draftReleaseId)}`))
-  if (draftReleaseId !== undefined && release.id !== draftReleaseId || release.tag_name !== version || release.prerelease !== false
+  if (draftReleaseId !== undefined && release.id !== draftReleaseId || release.tag_name !== version || release.prerelease !== (channel === 'prerelease')
     || release.draft !== false && !(draftReleaseId !== undefined && release.draft === true)
     || integer(object(release.author).id) !== authority.ownerId || tagSha(read, prefix, version) !== candidateSha || !Array.isArray(release.assets)) throw new Error('Owner-local release identity or publication differs')
   const assets = release.assets.map(object).filter(asset => asset.name === OWNER_LOCAL_ASSET), asset = assets[0]
@@ -175,12 +221,23 @@ export function checkOwnerLocalVerification({ cwd, repository, repositoryId, can
   const bytes = download(`${prefix}/releases/assets/${integer(asset.id)}`)
   if (bytes.length !== asset.size || sha256(bytes) !== marker[1]) throw new Error('Owner-local receipt bytes differ from the owner status')
   const uploaded: unknown = JSON.parse(bytes.toString('utf8'))
-  const receipt = rebindOwnerLocalReceipt(cwd, uploaded, { repository, repositoryId, candidateSha, producerSha })
+  const receipt = rebindReceipt(cwd, uploaded, { repository, repositoryId, candidateSha, producerSha }, channel)
   if (receipt.candidateSha !== candidateSha || object(uploaded).candidateSha !== candidateSha
     || time(status.created_at) + 1000 < time(receipt.completedAt) || time(asset.created_at) + 1000 < time(receipt.completedAt)
     || time(status.created_at) < time(asset.created_at) || time(release.created_at) > time(asset.created_at)
     || release.draft === false && time(release.published_at) + 1000 < time(receipt.completedAt)) throw new Error('Owner-local native evidence chronology differs from execution')
-  const configuration = createHash('sha256').update('open-agricola-stable-main-verification-v1\0').update(receipt.configuration).update('\0').update(receipt.producerConfiguration).digest('hex')
-  return { kind: 'owner-local', configuration, producerConfiguration: receipt.producerConfiguration, receiptSha256: marker[1], statusId: integer(status.id),
+  const configuration = createHash('sha256').update(channel === 'stable' ? 'open-agricola-stable-main-verification-v1\0' : 'open-agricola-prerelease-verification-v1\0').update(receipt.configuration).update('\0').update(receipt.producerConfiguration).digest('hex')
+  return { kind: channel === 'stable' ? 'owner-local' : 'owner-local-prerelease', configuration, producerConfiguration: receipt.producerConfiguration, receiptSha256: marker[1], statusId: integer(status.id),
     releaseId: integer(release.id), assetId: integer(asset.id), ownerId: authority.ownerId, url }
+}
+
+export function checkOwnerLocalVerification(input: LocalVerificationInput): OwnerLocalProof | null {
+  const proof = checkLocalVerification(input, 'stable')
+  if (proof && proof.kind !== 'owner-local') throw new Error('Expected stable owner-local authorization')
+  return proof
+}
+export function checkPrereleaseOwnerLocalVerification(input: LocalVerificationInput): PrereleaseOwnerLocalProof | null {
+  const proof = checkLocalVerification(input, 'prerelease')
+  if (proof && proof.kind !== 'owner-local-prerelease') throw new Error('Expected prerelease owner-local authorization')
+  return proof
 }

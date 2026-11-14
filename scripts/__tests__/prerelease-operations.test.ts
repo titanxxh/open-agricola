@@ -273,7 +273,7 @@ it.each(['database', 'bucket', 'validation', 'credentials', 'bug-report', 'unsea
 
 // Public SSH receiver + real flock/FS/git/child processes. Docker is a command
 // harness here; native storage and gateway/browser checks are separate evidence.
-it('journals migration/startup failures closed and resumes the same candidate without a second migration', () => {
+it.each(['native', 'owner-local'])('journals migration/startup failures closed and resumes without a second migration using %s proof', proof => {
   const value = fixture(), buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   const generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId = 'db4d6c82-676f-4dcc-a570-52377b3b32f5'
   const authorityFile = join(value.temporary, 'close.json')
@@ -306,7 +306,11 @@ esac
   const invoke = () => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
     input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(parsePrereleaseTarget(value.config)),
       target: value.config, request, receipt: { status: 'passed', channel: 'prerelease', repository: 'titanxxh/open-agricola', sha: buildId,
-        configuration: 'e'.repeat(64), producerConfiguration: 'f'.repeat(64), tasks: FULL_TASK_IDS.map((id, index) => ({ id, status: 'passed', runId: 1, jobId: index + 1 })) } }),
+        configuration: 'e'.repeat(64), producerConfiguration: 'f'.repeat(64),
+        ...(proof === 'owner-local' ? { ownerLocal: { kind: 'owner-local-prerelease', configuration: 'e'.repeat(64), producerConfiguration: 'f'.repeat(64),
+          receiptSha256: 'a'.repeat(64), statusId: 20, releaseId: 11, assetId: 12, ownerId: 7,
+          url: 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9-beta.1/owner-local-verification.json' } } : {}),
+        tasks: FULL_TASK_IDS.map((id, index) => ({ id, status: 'passed', runId: proof === 'owner-local' ? null : 1, jobId: proof === 'owner-local' ? null : index + 1 })) } }),
     encoding: 'utf8', timeout: 30000, env: { ...value.env, SSH_CONNECTION: 'owner fixture' },
   })
   writeFileSync(join(value.temporary, 'migration-fail'), '')
@@ -806,4 +810,24 @@ it.each([undefined, 'ff4d6c82-676f-4dcc-a570-52377b3b32f5'])('refuses acceptance
   const { runPrereleaseOperation } = await import('../prerelease/flow')
   await expect(runPrereleaseOperation(target, { action: 'open', expectedCurrent: buildId, buildId, acceptanceFile: path })).rejects.toThrow('storage cycle')
   expect(readRuntime(target).mode).toBe('maintenance')
+})
+
+it.each(['stable proof', 'partial tasks', 'invented jobs', 'foreign repository', 'changed configuration'])('rejects owner-local %s before receiver side effects', failure => {
+  const value = fixture(), buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const proof = { kind: failure === 'stable proof' ? 'owner-local' : 'owner-local-prerelease', configuration: 'e'.repeat(64),
+    producerConfiguration: 'f'.repeat(64), receiptSha256: 'a'.repeat(64), statusId: 20, releaseId: 11, assetId: 12, ownerId: 7,
+    url: `https://github.com/${failure === 'foreign repository' ? 'foreign/project' : 'titanxxh/open-agricola'}/releases/download/v9.9.9-beta.1/owner-local-verification.json` }
+  const receipt = { status: 'passed', channel: 'prerelease', repository: 'titanxxh/open-agricola', sha: buildId,
+    configuration: failure === 'changed configuration' ? 'd'.repeat(64) : 'e'.repeat(64), producerConfiguration: 'f'.repeat(64), ownerLocal: proof,
+    tasks: FULL_TASK_IDS.map(id => ({ id, status: 'passed', runId: failure === 'invented jobs' ? 1 : null, jobId: failure === 'invented jobs' ? 2 : null })) }
+  if (failure === 'partial tasks') receipt.tasks.pop()
+  const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
+    input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(parsePrereleaseTarget(value.config)),
+      target: value.config, request: { action: 'deploy', expectedCurrent: 'empty', buildId, generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId: 'db4d6c82-676f-4dcc-a570-52377b3b32f5' }, receipt }),
+    encoding: 'utf8', timeout: 15000, env: { ...value.env, SSH_CONNECTION: 'owner fixture' },
+  })
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toMatch(/owner-local|receipt/i)
+  expect(value.calls()).toBe('')
+  expect(existsSync(join(value.root, 'control/gate.json'))).toBe(false)
 })

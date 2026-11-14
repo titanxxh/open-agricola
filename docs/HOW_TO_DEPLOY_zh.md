@@ -108,6 +108,20 @@ pnpm release vX.Y.Z-beta.N --channel prerelease --ref prerelease
 pnpm release vX.Y.Z-beta.N --channel prerelease --ref <fixed-pre-sha>
 ```
 
+owner 明确采用完整本机候选验收时，先完成原生集成并固定候选，再从已交付的 protected-main 可信工具 checkout 执行。受测候选 checkout 必须干净；回执与日志放在两个 checkout 之外的私有 owner 目录：
+
+```bash
+pnpm exec tsx scripts/ci/prerelease-verification.ts select --repository titanxxh/open-agricola --sha "$pre_sha"
+pnpm exec tsx scripts/ci/owner-local-prerelease.ts verify --sha "$pre_sha" \
+  --candidate-directory "$pre_candidate_directory" --output "$private_owner_directory/pre-verification.json"
+pnpm release vX.Y.Z-beta.N --channel prerelease --ref "$pre_sha" \
+  --local-verification "$private_owner_directory/pre-verification.json"
+```
+
+recorder 执行同一完整十任务 pre 计划，记录实际命令退出码和私有日志 SHA256。命令失败或源码变化时不产生成功回执。它核对真实当前 pre SHA、不可变候选 ref、manifest 来源以及干净的当前 protected-main producer。每次候选准入都重新检查当前 prerelease 分支的 PR、禁止删除和线性历史保护，不可变 ref 已存在时也不豁免。普通回归沿用 stable 运行期默认值，生产 hosted build 使用 prerelease；执行期间 producer 或 pre head 变化需要重新验收。
+
+pre owner-local 使用独立 receipt/proof variant 和原生 owner 的 `owner-local-prerelease-verification` status，固定 beta Release 必须为 `prerelease=true`、`latest=false`。stable 与 pre 证明不能互相授权。公共 pre checker 重验固定源码、完整计划、双方配置、producer 祖先关系、原生 owner、tag 和绑定摘要的 asset ID/实际字节。完整同树 rebase 保留实际受测 SHA；源码树或 producer 配置不兼容时重新执行。owner、接收端 deploy/open/restore 和 candidate 镜像生产保留真实 typed 本机证明，不虚构 Actions ID。本机授权缺失或撤销时仍可用原生 workflow 回退；owner 最新 success 的证明无效时阻断。原生 PR/ref 规则、同步 lease、真实私有镜像生产/import 和目标验收仍为独立门禁；候选内工具不能自授权，必须先把 producer 正当交付到 protected main。
+
 N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当前 main 为基线。命令固定 `verification/prerelease/<SHA>`，读取有效原生引用保护，然后在 main 派发 `prerelease-candidate-verification.yml`。回执绑定原生仓库 ID、prerelease 通道、候选 SHA、候选与可信策略配置以及 main producer 提交。producer 必须仍可从受保护 main 到达。兼容任务可分别补跑；缺失、失败、取消、跳过或配置不符均阻断。集成分支移动后仍可使用原固定候选。
 
 所有必需任务通过后创建固定 tag 及原生 GitHub prerelease，并设置 latest=false。匹配的已有发布可复用；tag、SHA 或原生通道不符时拒绝。正式通道继续要求实际已合入 main 的最终 PR 快照，且版本只接受 vX.Y.Z；预发布回执不能授权正式发布。
@@ -175,7 +189,7 @@ node --import tsx scripts/prerelease/authority.ts close --config "$pre_config" -
 ./deploy-prerelease.sh deploy --config "$pre_config" --expected-current "$pre_current" --sha "$pre_sha" --generation "$pre_generation" --operation-id "$pre_op" --authority-receipt close.json
 ```
 
-deploy 独立检查固定 SHA、同通道的完整 GitHub 回执，在修改准入或数据前，解析已验证导入的候选与 trusted-policy 镜像，核对前端元数据及 OCI revision/channel，固定候选不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份，最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
+deploy 独立检查固定 SHA、同通道的完整原生 workflow 或 owner-local 回执，在修改准入或数据前，解析已验证导入的候选与 trusted-policy 镜像，核对前端元数据及 OCI revision/channel，固定候选不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份，最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
 
 候选必须提供真实 SQL view `prerelease_retained_identity_refs(user_id,source_grant_id)`，覆盖全部外部主体，包括仅存于房间/历史中的引用，并实现 `scripts/prerelease/identity-audit.ts apply <packet.json>`。adapter 删除/匿名化已删除主体，将每个保留活跃引用映射到返回的当前代次 `associationId`，不恢复会话或登录权。该持久化/清理实现由 #1663/#1667 负责；main 没有空 stub，缺 view/adapter 阻断开放。owner 读取真实行，拒绝遗漏、null 或无来源绑定，按二进制/C 顺序对 ASCII pair 去重排序并哈希共享 canonical JSON。正式 associate 校验旧来源，创建无 source、已撤销的关联，确保恢复后仍接收未来删除。
 

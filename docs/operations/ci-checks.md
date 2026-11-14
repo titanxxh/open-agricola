@@ -4,7 +4,7 @@
 
 GitHub Actions 是集成与发布的正式证据。本机按需定向调试或主动运行完整检查，不要求每次 push 前把远端相同检查完整跑一遍。push 后等待当前 head 的所有选中任务结束并修复失败。所需任务被跳过不算成功；私有仓库的自动 job 仍受 visibility 条件限制，可在 GitHub 手动运行。工作流配置不证明远端 required check 已启用，必须实际读回核对。
 
-正式版本另有显式 owner-local 授权路径，见[完整本机候选验证](../HOW_TO_DEPLOY.md#authorize-complete-owner-local-verification)。它执行相同完整十任务，记录真实命令、退出码和日志摘要，由原生仓库 owner 通过独立 status 与 Release asset 授权；不是普通本机结果补齐 GitHub job。所有发布消费者重验身份、原始树、配置、完整计划和回执摘要。仅完整同树 rebase 可保留受测 SHA 并重绑候选，不支持跨源码复用。该路径不改变日常 required check，也不改变预发布的 GitHub 任务要求。
+正式与预发布版本另有显式 owner-local 授权路径，见[完整本机候选验证](../HOW_TO_DEPLOY.md#authorize-complete-owner-local-verification)。它执行相同完整十任务，记录真实命令、退出码和日志摘要，由原生仓库 owner 通过独立 status 与 Release asset 授权；不是普通本机结果补齐 GitHub job。所有发布消费者重验身份、原始树、配置、完整计划和回执摘要。仅完整同树 rebase 可保留受测 SHA 并重绑候选，不支持跨源码复用。该路径不改变日常 required check。预发布使用独立 typed 本机证明与原生 owner status，不伪造 run/job ID；原生来源/ref 规则和真实镜像生产回执仍必需。
 
 选中的浏览器检查在 GitHub runner 上通过 `pnpm verify` 运行。本机同一入口用于调试与复现，不能补齐正式 CI 结果。工作流使用只读 `contents` 权限、`ubuntu-latest`，按 workflow + PR/ref 隔离 concurrency，并取消同一 PR 的过期 run。
 
@@ -175,7 +175,7 @@ pnpm exec tsx scripts/ci/prerelease-verification.ts check --repository titanxxh/
 pnpm exec tsx scripts/ci/prerelease-verification.ts request --repository titanxxh/open-agricola --sha <fixed-pre-sha> --tasks <failed-task-ids>
 ```
 
-The immutable `verification/prerelease/<SHA>` reference and `prerelease-integration.json` establish selection and feature provenance. Check reads the effective native protections, producer main ancestry, run metadata, and actual job/step results. It binds the repository ID, channel, candidate, both verification configurations, and trusted main producer. Runs for other candidates do not supersede this candidate's evidence. Compatible retries reuse successful tasks; incomplete or incompatible tasks block publication. Stable evidence remains separate and still requires the protected-main final PR snapshot. Release suffixes do not grant authority. Native prereleases cannot enter formal Pages. Commands, manifest format, lease synchronization, channel metadata, and phase recovery are in [deployment operations](../HOW_TO_DEPLOY.md#publish-a-fixed-prerelease-candidate). Native resource configuration and live acceptance remain owner work.
+The immutable `verification/prerelease/<SHA>` reference and `prerelease-integration.json` establish selection and feature provenance. Check reads the effective native protections, producer main ancestry, run metadata, and actual job/step results. It binds the repository ID, channel, candidate, both verification configurations, and trusted main producer. Runs for other candidates do not supersede this candidate's evidence. Compatible retries reuse successful tasks; incomplete or incompatible tasks block publication. An explicit native-owner local proof may authorize the same complete pre task plan without native test jobs. It retains fixed ref/manifest admission, a distinct channel proof, native Release asset identity, actual command logs and producer compatibility. Missing or withdrawn owner authority uses native workflow evidence; malformed owner success fails closed. Stable evidence remains separate and still requires the protected-main final PR snapshot. Release suffixes do not grant authority. Native prereleases cannot enter formal Pages. Commands, manifest format, lease synchronization, channel metadata, and phase recovery are in [deployment operations](../HOW_TO_DEPLOY.md#publish-a-fixed-prerelease-candidate). Native resource configuration and live acceptance remain owner work.
 
 ## 核对 GitHub 必需检查
 
