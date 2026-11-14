@@ -10,6 +10,7 @@ import { PrereleaseHandoffPage } from './PrereleaseHandoffPage'
 import { MobileTabBar } from '../components/common/MobileTabBar'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { AppShellLoadScreen } from './AppShellLoadScreen'
+import { CardMetadataBoundary } from './CardMetadataBoundary'
 import { getGameLoadProgress } from './game-load-progress'
 import { isHotseatSetupQuery } from './game-setup-query'
 import { SandboxAppLazy } from '../sandbox'
@@ -78,12 +79,12 @@ export function PageRouter() {
 
   if (page === 'encyclopedia') {
     return (
-      <>
+      <CardMetadataBoundary>
         <Suspense fallback={<AppShellLoadScreen />}>
           <EncyclopediaPageLazy />
         </Suspense>
         <MobileTabBar current="encyclopedia" onNavigate={(t) => setPage(t)} />
-      </>
+      </CardMetadataBoundary>
     )
   }
 
@@ -133,7 +134,7 @@ export function PageRouter() {
   const showTabBar = page === 'lobby' || page === 'workshop' || page === 'settings'
 
   return (
-    <>
+    <CardMetadataBoundary>
       {pageNode}
       {showTabBar && (
         <MobileTabBar
@@ -141,6 +142,6 @@ export function PageRouter() {
           onNavigate={(t) => setPage(t)}
         />
       )}
-    </>
+    </CardMetadataBoundary>
   )
 }

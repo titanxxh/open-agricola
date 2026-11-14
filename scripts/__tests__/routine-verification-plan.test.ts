@@ -1193,7 +1193,9 @@ describe('dependency routine verification plan', () => {
     expect(farm.warnings.filter(warning => warning.includes('@covers'))).toEqual([])
     expect(farm.browserFiles).toEqual(board)
     expect(main.fullTrigger).toBe(false)
-    expect(main.browserFiles).toEqual(routineBrowserSmokeSet)
+    expect(main.browserFiles).toEqual([
+      { file: 'e2e-tests/application-loading.spec.ts', grep: null },
+    ])
     expect(replay.fullTrigger).toBe(false)
     expect(replay.browserFiles).toEqual([
       ...replayViewerSpecs,

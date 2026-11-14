@@ -11,6 +11,7 @@ import ts from 'typescript'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cardsManifestAsset } from './browser-data.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -528,8 +529,16 @@ export function writeCardsManifest(repoRoot: string): string {
   const cardsRoot = path.join(repoRoot, 'shared', 'cards')
   const outputPath = path.join(repoRoot, 'public', 'cards-manifest.json')
   const manifest = buildCardsManifest(cardsRoot)
+  const content = JSON.stringify(manifest, null, 2) + '\n'
+  const { fileName } = cardsManifestAsset(content)
   fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-  fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
+  fs.writeFileSync(path.join(path.dirname(outputPath), fileName), content, 'utf8')
+  fs.writeFileSync(outputPath, content, 'utf8')
+  for (const file of fs.readdirSync(path.dirname(outputPath))) {
+    if (/^cards-manifest\.[a-f0-9]{64}\.json$/.test(file) && file !== fileName) {
+      fs.unlinkSync(path.join(path.dirname(outputPath), file))
+    }
+  }
   return outputPath
 }
 

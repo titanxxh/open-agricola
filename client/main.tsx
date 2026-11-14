@@ -10,15 +10,21 @@ import { startApplication } from './app/application-bootstrap'
 const container = document.getElementById('root')
 if (!container) throw new Error('Application root is missing')
 
-void startApplication(container, async () => {
-  installStaleChunkRecovery()
-  forgetEncyclopediaBrowseOnReload()
+async function loadInitialLanguage() {
   const manifest = await loadLanguageManifest()
   let saved: string | null = null
   try { saved = localStorage.getItem('open-agricola-locale-v2') } catch { /* storage may be disabled */ }
   const locale = manifest.languages.find(language => language.id === saved)?.id ?? manifest.defaultLocale
   await loadLanguagePack(locale)
-  const { default: App } = await import('./App.tsx')
+}
+
+void startApplication(container, async () => {
+  installStaleChunkRecovery()
+  forgetEncyclopediaBrowseOnReload()
+  const [{ default: App }] = await Promise.all([
+    import('./App.tsx'),
+    loadInitialLanguage(),
+  ])
   createRoot(container).render(<StrictMode><App /></StrictMode>)
 }).catch(() => {
   // No language package is available yet, so this bootstrap failure cannot use translations.

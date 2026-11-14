@@ -1,6 +1,5 @@
 import { hasLanguagePack, parseLanguageManifest, registerLanguagePack, type LanguageManifest, type Locale } from '../../shared/i18n'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
+import { fetchVerifiedResource } from './fetch-verified-resource'
 
 let manifest: Promise<LanguageManifest> | undefined
 let loadedManifest: LanguageManifest | undefined
@@ -25,11 +24,9 @@ export async function loadLanguagePack(locale: Locale): Promise<void> {
     const list = await loadLanguageManifest()
     const language = list.languages.find(item => item.id === locale)
     if (!language) throw new Error(`Unknown language: ${locale}`)
-    const response = await fetch(`${base}${language.file}`)
+    const response = await fetchVerifiedResource(`${base}${language.file}`, language.sha256)
     if (!response.ok) throw new Error(`Language unavailable (${response.status})`)
     const raw = await response.text()
-    const hash = bytesToHex(sha256(utf8ToBytes(raw)))
-    if (hash !== language.sha256) throw new Error('Language checksum mismatch')
     const value: unknown = JSON.parse(raw)
     if (!value || typeof value !== 'object' || !('locale' in value) || value.locale !== locale) throw new Error('Language identity mismatch')
     registerLanguagePack(value)

@@ -3,10 +3,14 @@ import { dirname, resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { loadPublicAssetConfig, publicAssetUrls } from '../scripts/public-assets.ts'
+import { loadBrowserDataDefines } from '../scripts/browser-data.ts'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(root, '..')
 const publicAssets = await loadPublicAssetConfig({ rootDir: repoRoot, allowLocal: false })
+const browserDataDefines = process.argv.includes('build') && process.env.VITEST !== 'true'
+  ? loadBrowserDataDefines(repoRoot)
+  : {}
 
 export default defineConfig({
   root,
@@ -17,6 +21,7 @@ export default defineConfig({
     publicAssetUrls(publicAssets, ['/', './', '../']),
   ],
   define: {
+    ...browserDataDefines,
     'import.meta.env.VITE_PUBLIC_ASSET_BASE_URL': JSON.stringify(publicAssets.baseUrl),
   },
   build: {
