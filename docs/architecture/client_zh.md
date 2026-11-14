@@ -143,3 +143,5 @@ GameContextRouter
 `AuthContext` 消费服务端账号状态 `betaAccess` 和 `isAdmin`，密码登录或重置密码后重读 `/api/auth/me`。设置页展示当前资格及管理员 `BetaAccessSettings` 授予控件。账号搜索包含未验证邮箱的账号，排除待删除账号。撤销后预发布访问在 30 秒内停止，已保存的对局及其他状态继续保留。测试：`BetaAccessSettings.test.tsx`、`SettingsPage.test.tsx`、`beta-access-admin.spec.ts`。
 
 `WsGameTransport` 在每个新 socket 声明能力，`HttpGameTransport` 发送请求 header。要求刷新时沿用可读 reload 界面，并在停止重试前结算未完成的持久 receipt。认证和 journal 的命令身份保持独立。见[客户端能力](contract.md#client-capabilities)。
+
+预发布Team创建复用持久命令路径；`TeamWaitingRoom` 在host开局前显示账号成员，`team-waiting` 无需游戏快照。Multihand独立跟随自有响应座位，不把农场浏览当作命令控制；`ScoringPad` 与 `ArchivedTeamResults` 展示后端团队结果。验证入口为 `team-network.test.ts`、`prerelease-session.spec.ts`。

@@ -43,6 +43,38 @@ describe('Room reconnect and durable commands', () => {
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.resetModules() })
 
+  it('acknowledges a Team member without a player seat and resumes its waiting room before any game command', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    const waiting: Extract<ServerEvent, { type: 'teamRoomWaiting' }> = { type: 'teamRoomWaiting', roomId: 'team-room',
+      maxPlayers: 4, teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' },
+      selfMemberId: 'member-a', isHost: true, canStart: false,
+      members: [{ memberId: 'member-a', name: 'Alice', teamIndex: 0, seatCount: 2, isHost: true, connected: true }] }
+    try {
+      await transport.connect()
+      const socket = Socket.all[0]!
+      const creating = transport.createRoom({ maxPlayers: 4, teamConfig: waiting.teamConfig })
+      const command = socket.sent.at(-1)!
+      socket.emit(waiting)
+      socket.emit({ type: 'commandReceipt', status: 'completed', receipt: { scopeId: command.commandContext.scopeId,
+        commandId: command.commandContext.commandId, outcome: { ok: true, roomId: waiting.roomId, roomVersion: 0 } } })
+      await creating
+      expect(transport.viewer).toEqual({ kind: 'team-member', memberId: 'member-a' })
+      expect(transport.playerIndex).toBeNull()
+      await expect(transport.takeAction(0, 'day-laborer')).rejects.toThrow('Game has not started')
+      expect(socket.sent.some(message => message.type === 'action')).toBe(false)
+      socket.close(1006)
+      await tick()
+      const resumed = Socket.all[1]!
+      await vi.waitFor(() => expect(resumed.sent.some(message => message.type === 'joinRoom' && message.intent === 'resume')).toBe(true))
+      resumed.emit(waiting)
+      await vi.waitFor(() => expect(transport.connected).toBe(true))
+      expect(transport.viewer).toEqual({ kind: 'team-member', memberId: 'member-a' })
+      transport.sendRoomCommand('startTeamGame')
+      expect(resumed.sent.at(-1)).toMatchObject({ type: 'startTeamGame', commandContext: { roomId: 'team-room', expectedVersion: 0 } })
+    } finally { transport.destroy() }
+  })
+
   it('keeps the connection alive for its durable rejection before stopping for a required refresh', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })

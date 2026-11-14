@@ -7,6 +7,10 @@
 
 Under [PRD #1655](https://github.com/titanxxh/open-agricola/issues/1655) and [#1661](https://github.com/titanxxh/open-agricola/issues/1661), main removes this Beta business, including Team, Multihand, Marketplace, target-farm selection and partner construction prices. The accepted rules below remain the historical basis for the forward prerelease reconstruction in #1666. They do not describe current main runtime support. No old-Beta migration, drain or compensation is added. Ordinary construction facts, owner-target card flows and the complete unit-price policy in ADR 0044 remain formal functionality.
 
+## Prerelease implementation
+
+The prerelease Team foundation separates waiting account members from rule seats. Host start fixes Team/Multihand ownership; teammate visibility does not grant command control. Four authoritative scoring modes persist with seat memberships in result archives. The forward tests are `team-network.test.ts` and `team-scoring-session.test.ts`; ordinary main behavior and the cooperation rules below retain their separate boundaries.
+
 ## Forward reconstruction provenance
 
 The fixed Beta business source is `53b8a0ccf5649ce3bb7084303f0677e46c1d20e7`. Main cleanup started at integration `642c6c2ae2099a98bc07dd2568c1ffdaf35ad4d6`. After the independent operations test correction, the cleanup and formal-consumer fixes occupy `b9387d4e1a16721e197a21be73607f206f06bfa3..72af5db6227966a5755f7bce67ced881d1b6e182`.
