@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"https://pre.agricola.test/open-agricola/"}
 import { StrictMode } from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 const build = 'a'.repeat(40)
@@ -35,6 +35,9 @@ async function renderPrerelease({ handoff, status, code }: {
     'platform.appLoadFailed': 'Reload the application',
     'platform.retry': 'Retry',
     'prerelease.accessPaused': 'Access is paused',
+    'prerelease.environment': 'Prerelease environment',
+    'prerelease.version': 'Prerelease {version}',
+    'prerelease.returnToProduction': 'Return to production',
   } })
   const endpoint = handoff ? '/api/prerelease/session' : '/api/auth/me'
   const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
@@ -65,6 +68,12 @@ async function renderPrerelease({ handoff, status, code }: {
   return { api, fetchMock, privateRenders }
 }
 
+function expectPrereleaseBanner() {
+  const banner = screen.getByRole('complementary', { name: 'Prerelease environment' })
+  expect(within(banner).getByText('Prerelease aaaaaaaaaaaa')).toBeVisible()
+  expect(within(banner).getByRole('link', { name: 'Return to production' })).toHaveAttribute('href', 'https://formal.agricola.test/')
+}
+
 it.each([
   { route: 'session check', handoff: false },
   { route: 'handoff exchange', handoff: true },
@@ -76,6 +85,7 @@ it.each([
   expect(await screen.findByRole('alert')).toHaveTextContent('Reload the application')
   expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible()
   expect(screen.queryByText('Access is paused')).toBeNull()
+  expectPrereleaseBanner()
   for (const renderPrivate of privateRenders) expect(renderPrivate).not.toHaveBeenCalled()
   expect(fetchMock).toHaveBeenCalledTimes(2)
 })
@@ -87,6 +97,7 @@ it('keeps a retryable pause behind the prerelease boundary without mounting priv
   expect(api.getBrowserReloadRequired()).toBe(false)
   expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible()
   expect(screen.queryByText('Reload the application')).toBeNull()
+  expectPrereleaseBanner()
   for (const renderPrivate of privateRenders) expect(renderPrivate).not.toHaveBeenCalled()
   expect(fetchMock).toHaveBeenCalledTimes(2)
 })
