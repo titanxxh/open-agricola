@@ -125,13 +125,13 @@ it('purges real isolated storage before owner retirement and rejects old HTTP, W
       PRERELEASE_ENTRY_ENABLED: 'true', PRERELEASE_IDENTITY_SERVICE_KEY: authorityTarget.serviceKey },
   })
   cleanup.register(async () => { await formalWorker.terminate() })
-  const started = Promise.withResolvers<string>()
-  formalWorker.once('error', started.reject)
-  formalWorker.once('message', (message: unknown) => {
-    if (message && typeof message === 'object' && 'base' in message && typeof message.base === 'string') started.resolve(message.base)
-    else started.reject(new Error('Formal HTTP worker did not start'))
+  const formalBase = await new Promise<string>((resolve, reject) => {
+    formalWorker.once('error', reject)
+    formalWorker.once('message', (message: unknown) => {
+      if (message && typeof message === 'object' && 'base' in message && typeof message.base === 'string') resolve(message.base)
+      else reject(new Error('Formal HTTP worker did not start'))
+    })
   })
-  const formalBase = await started.promise
   const formalFetch: typeof fetch = (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input))
     if (url.origin !== target.formal.apiOrigin) throw new Error('Unexpected formal protocol destination')
@@ -221,11 +221,12 @@ it('purges real isolated storage before owner retirement and rejects old HTTP, W
   expect((await fetch(base + '/api/game/state', { headers: headers(generation2, fresh.token) })).status).toBe(200)
   const denied = new WebSocket(base.replace('http:', 'ws:'), protocols(generation1), { headers: { origin, cookie: `__Host-oa-pre-session=${fresh.token}` } })
   cleanup.register(() => denied.terminate())
-  const rejected = Promise.withResolvers<number>()
-  denied.once('unexpected-response', (_req, res) => { res.resume(); denied.terminate(); rejected.resolve(res.statusCode ?? 0) })
-  denied.once('open', () => rejected.reject(new Error('Old generation WebSocket was admitted')))
-  denied.on('error', () => {})
-  expect(await rejected.promise).toBe(426)
+  const rejected = new Promise<number>((resolve, reject) => {
+    denied.once('unexpected-response', (_req, res) => { res.resume(); denied.terminate(); resolve(res.statusCode ?? 0) })
+    denied.once('open', () => reject(new Error('Old generation WebSocket was admitted')))
+    denied.on('error', () => {})
+  })
+  expect(await rejected).toBe(426)
   expect(await pre.db.prepare('SELECT user_id,generation_id FROM prerelease_sessions').all()).toEqual([{ user_id: 'same-formal-id', generation_id: generation2 }])
   expect(await formal.db.prepare("SELECT display_name,password_hash FROM users WHERE id='same-formal-id'").get()).toEqual({ display_name: 'Formal sentinel', password_hash: 'private-hash' })
   expect((await formalObjects.get('sentinel'))?.body.toString()).toBe('formal bucket sentinel')
