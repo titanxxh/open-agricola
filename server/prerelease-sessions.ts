@@ -242,10 +242,25 @@ export class PrereleaseSessions {
     const { expiresAt, returnPath } = exchanged
     if (this.invalidatedSince(checkpoint, { userId: user.id, grantId: state.grantId, tokenHash: hash(token) })) throw this.handoffRace(state)
     this.blockedUsers.delete(user.id)
+    const persisted = await this.readPersisted(token)
+    if (!persisted) {
+      this.leases.delete(hash(token))
+      throw new PrereleaseIdentityError('paused', 'Persisted session changed during handoff')
+    }
+    if (this.invalidatedSince(checkpoint, { userId: user.id, grantId: state.grantId, tokenHash: hash(token) })) throw this.handoffRace(state)
     const lease = { state, userId: user.id, grantId: state.grantId, expiresAt, buildId: this.runtime.buildId, generationId: this.runtime.generationId }
     if (!this.leaseAuthorized(lease)) throw new PrereleaseIdentityError(handoffFailure(state, this.now()), 'Prerelease access unavailable')
     this.leases.set(hash(token), lease)
-    return { token, user, expiresAt, validUntil: Math.min(state.validUntil, expiresAt), returnPath }
+    return { token, user: persisted.user, expiresAt, validUntil: Math.min(state.validUntil, persisted.validUntil, expiresAt), returnPath }
+  }
+  /** Keep shared revocation serialized through the actual HTTP publication. */
+  async publishSession(token: string, publish: (session: PrereleaseSession) => void): Promise<boolean> {
+    return this.db.transaction(async () => {
+      const session = await this.readPersisted(token, { lock: 'share' })
+      if (!session) { this.leases.delete(hash(token)); return false }
+      publish(session)
+      return true
+    })()
   }
   async resolve(token: string): Promise<PrereleaseSession | null> {
     if (!secret(token)) return null
