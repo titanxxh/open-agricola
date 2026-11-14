@@ -124,6 +124,8 @@ type SessionResponse = {
 
 `shared/actions/helpers/harvest-feeding-requirement.ts` 统一计算喂养需求：实际参与者为一人时成人每人三食，其他人数每人两食；新生儿每人一食。现有卡牌 modifier 在此基数上叠加，然后才提供报价或结算。测试：`shared/actions/helpers/__tests__/harvest-feeding-requirement.test.ts`、`server/__tests__/standard-solo-core-session.test.ts`。
 
+`computeHarvestFeedingOrderPriority()` 只调整喂食队列，数值较高者较晚，相同数值保持正常收获玩家顺序。队列在喂食阶段 hook 后冻结，并在 pending / 恢复时保留；田间和繁殖顺序不变。测试：`server/__tests__/classic-slaughterhouse-session.test.ts`。
+
 `handleFeedResolved()` 解析已提供目录与实时配方，完整校验批次后，把原等待帧替换为普通 Exchange flow。私有 `harvestSettlementResume` 保存剩余需求、已付食物、转换成本和玩家队列。完整批次反应与必需的动物整理结束后，才支付剩余食物、补乞讨和供暖。快照恢复与撤销同时恢复续行和引擎游标，不重做已完成兑换或重复扣除已付食物。
 
 `startHeatingOrContinue()` 在各参与玩家的喂养续行结束后结算其供暖。`shared/moor/heating.ts` 的 `computeHeatingRequirementBeforeSeason()` 是保留房屋与当前卡牌折扣、上限的纯需求查询；普通查询随后应用季节。夏季正常需求大于零时，通过原有 `harvest.heated` 事实记录豁免，不打开支付交互。它在此 seam 读取玩家当前卡牌状态，不修改季节来重建假设支付。测试：`server/__tests__/season-heating-log-session.test.ts`。

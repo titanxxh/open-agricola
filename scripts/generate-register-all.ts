@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { parseCardFile, type CardMeta } from './build-cards-manifest'
 
 const CATALOG_DECKS = ['A', 'B', 'C', 'D', 'E', 'M', 'community'] as const
-const RUNTIME_DECKS = [...CATALOG_DECKS, '__stubs__'] as const
+const RUNTIME_DECKS = [...CATALOG_DECKS, 'classic/I', '__stubs__'] as const
 const MAJOR_DECK = 'major'
 
 export type RegisterAllBuildResult = {

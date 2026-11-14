@@ -134,6 +134,7 @@ export type CardEffectField = CardEffectHook
   | 'computeResourceCommitments'
   | 'computeExtraRoomCapacity'
   | 'computeHarvestBreedOrderPriority'
+  | 'computeHarvestFeedingOrderPriority'
   | 'enforceReorganizeOnLastHarvest'
   | 'computeBreedThreshold' | 'computeBreedableAnimalCount' | 'computeAnimalScoreAdjustment'
   | 'onComputeAnimalZones' | 'onComputeSharedAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
@@ -288,6 +289,8 @@ export type CardEffect = {
   /** Deterministic read-only facts, aggregated by generic rule queries. */
   getRuleContributions?: (player: Readonly<PlayerState>) => CardRuleContributions | void
   getStatePresentation?: (player: Readonly<PlayerState>) => CardStatePresentation | void
+  /** Higher values feed later; ties retain normal Harvest player order. */
+  computeHarvestFeedingOrderPriority?: (state: GameState, player: PlayerState) => number | void
   computeHarvestBreedOrderPriority?: (state: GameState, player: PlayerState) => number | void
   computePastureCapacityModifiers?: (
     player: PlayerState,
@@ -641,6 +644,38 @@ export const getHarvestBreedOrderPriority = (
     } catch (err) {
       if (isCustomCard(cardId)) {
         console.warn(`[card-effects] custom card ${cardId} computeHarvestBreedOrderPriority threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return priority
+}
+
+export const getHarvestFeedingOrderPriority = (
+  state: GameState,
+  player: PlayerState,
+): number => {
+  const allCards = [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ]
+  let priority = 0
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.computeHarvestFeedingOrderPriority
+    if (!handler) continue
+    try {
+      const next = handler(state, player)
+      if (typeof next !== 'number' || Number.isNaN(next)) continue
+      priority = Math.max(priority, Math.floor(next))
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(
+          `[card-effects] custom card ${cardId} computeHarvestFeedingOrderPriority threw, skipping:`,
+          err,
+        )
         continue
       }
       throw err

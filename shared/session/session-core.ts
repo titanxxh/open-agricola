@@ -114,7 +114,12 @@ import * as roundPhase from './phases/round.ts'
 import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { ensureCardModifiers } from '../cards/card-modifiers.ts'
-import { getCardEffect, getHarvestBreedOrderPriority, resourceCommitmentsSatisfied } from '../cards/card-effects.ts'
+import {
+  getCardEffect,
+  getHarvestBreedOrderPriority,
+  getHarvestFeedingOrderPriority,
+  resourceCommitmentsSatisfied,
+} from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { StageDispatch, type StageResumeState } from './stage-dispatch.ts'
 import {
@@ -3289,7 +3294,14 @@ export class GameCore {
   }
 
   private executeFeedingLogic(): SessionResponse {
-    return this.continueHarvestFeedingQueue(this.getHarvestPlayerIndices().map((index) => ({ index })))
+    const feedQueue = this.getHarvestPlayerIndices()
+      .map((index) => ({
+        index,
+        priority: getHarvestFeedingOrderPriority(this.state, this.state.players[index]!),
+      }))
+      .sort((left, right) => left.priority - right.priority)
+      .map(({ index }) => ({ index }))
+    return this.continueHarvestFeedingQueue(feedQueue)
   }
 
   private continueEndHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
