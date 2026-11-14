@@ -89,6 +89,35 @@ async function revoke(kind: string) {
   await consumer.processEvents()
 }
 
+it('holds peer logout until the native session response publication completes', async () => {
+  const read = service.readPersisted.bind(service)
+  let completed = false, revocation: Promise<void> | undefined
+  vi.spyOn(service, 'readPersisted').mockImplementation(async (value, options) => {
+    const session = await read(value, options)
+    if (options?.lock === 'share') {
+      const pid = (await db.prepare('SELECT pg_backend_pid() AS pid').get<{ pid: number }>())!.pid
+      revocation = consumer.revoke(token).then(() => { completed = true })
+      await vi.waitFor(async () => {
+        const blocked = await other.prepare('SELECT 1 FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid)) LIMIT 1').get(pid)
+        expect(completed || !!blocked).toBe(true)
+      })
+      expect(completed).toBe(false)
+    }
+    return session
+  })
+  const published: string[] = []
+  try {
+    expect(await service.publishSession(token, session => {
+      expect(completed).toBe(false)
+      published.push(session.user.id)
+    })).toBe(true)
+    await revocation
+    expect(completed).toBe(true)
+    expect(published).toEqual(['publication-user'])
+    expect(await service.resolve(token)).toBeNull()
+  } finally { await revocation }
+})
+
 it.each(['logout', 'beta_changed', 'source_revoked', 'account_deleted'])('holds %s until the native Room publication transaction completes', async kind => {
   const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
   let pid = 0, committed = false, revocation: Promise<void> | undefined

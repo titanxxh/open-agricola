@@ -8,7 +8,10 @@ import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract
 import { PRERELEASE_BUILD_HEADER, PRERELEASE_GENERATION_HEADER } from '../../shared/contract/prerelease-runtime'
 import type { PrereleaseIdentityState, PrereleaseIdentityEvent } from '../../shared/contract/prerelease-identity'
 import { getDb } from '../db'
-import { getPrereleaseSessions } from '../prerelease-sessions'
+import { getPrereleaseSessions, PrereleaseSessions } from '../prerelease-sessions'
+import { FormalPrereleaseIdentityClient } from '../prerelease-identity-client'
+import { PostgresDatabase } from '../database/postgres'
+import { getTestDatabaseUrl } from './_helpers/postgres'
 import { handlePrereleaseRoute } from '../prerelease-routes'
 import { createPrereleaseGateway } from '../../scripts/prerelease/gateway'
 import { formalBrowserPolicyFixture } from '../../scripts/__tests__/prerelease-browser-policy-fixture'
@@ -334,6 +337,44 @@ it('recovers a lost session Cookie only from the original browser receipt and ne
   const denied = await exchange({ ...pending, body: { ...pending.body, code: 'x'.repeat(43) } })
   expect(denied.status).toBe(400)
   expect(exchangeCalls).toBe(1)
+})
+
+it.each(['handoff', 'me'] as const)('rejects %s publication after another consumer logs out the resolved session', async path => {
+  const pending = await begin(), service = getPrereleaseSessions()
+  if (!service) throw new Error('Missing prerelease service')
+  const schema = await getDb().prepare('SELECT current_schema() AS name').get<{ name: string }>()
+  if (!schema) throw new Error('Missing test schema')
+  const other = new PostgresDatabase({ connectionString: getTestDatabaseUrl(), schema: schema.name })
+  const peer = new PrereleaseSessions({ db: other, runtime: { ...service.runtime },
+    authority: new FormalPrereleaseIdentityClient(service.runtime, 'restricted-handoff-fixture-service-key') })
+  try {
+    const accepted = await exchange(pending)
+    const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+    expect(accepted.status).toBe(200)
+    if (!cookie) throw new Error('Missing original session Cookie')
+    await accepted.body?.cancel()
+    if (path === 'handoff') {
+      const exchangeHandoff = service.exchangeHandoff.bind(service)
+      vi.spyOn(service, 'exchangeHandoff').mockImplementation(async (...args) => {
+        const session = await exchangeHandoff(...args)
+        await peer.revoke(session.token)
+        return session
+      })
+    } else {
+      const resolve = service.resolve.bind(service)
+      let resolved = 0
+      vi.spyOn(service, 'resolve').mockImplementation(async token => {
+        const session = await resolve(token)
+        if (++resolved === 2) await peer.revoke(token)
+        return session
+      })
+    }
+    const response = path === 'handoff' ? await exchange(pending)
+      : await browserFetch(`${origin}/api/auth/me`, { headers: boundHeaders(cookie) })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+    expect(response.headers.getSetCookie().some(value => value.startsWith('__Host-oa-pre-session='))).toBe(false)
+  } finally { peer.close(); await other.close() }
 })
 
 it('serializes simultaneous callback retries into one source exchange and one local session', async () => {
