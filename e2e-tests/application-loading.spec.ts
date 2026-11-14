@@ -25,6 +25,11 @@ test('anonymous login remains usable when card metadata is unavailable', async (
   const logo = page.getByRole('img', { name: 'Open Agricola logo' })
   await expect.poll(() => logo.evaluate(image => image instanceof HTMLImageElement && image.naturalWidth)).toBe(128)
   await expect(logo).toHaveAttribute('src', /\/assets\/brand-logo-[\w-]+\.png$/)
+  const icon = page.locator('link[rel="icon"]')
+  await expect(icon).toHaveAttribute('href', /\/assets\/favicon-[\w-]+\.png$/)
+  const iconResponse = await page.request.get(await icon.evaluate(link => link instanceof HTMLLinkElement ? link.href : ''))
+  expect(iconResponse.status()).toBe(200)
+  expect(iconResponse.headers()['content-type']).toBe('image/png')
 })
 
 test('application code downloads while the selected language pack is pending', async ({ page }) => {

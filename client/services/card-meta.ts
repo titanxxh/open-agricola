@@ -74,6 +74,8 @@ const fetchManifest = (): Promise<Response> => {
 let manifestPromise: Promise<Record<string, CardMeta>> | null = null
 let manifestCache: Record<string, CardMeta> | null = null
 
+export const hasCardsManifest = (): boolean => manifestCache !== null
+
 export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
   if (manifestCache) return Promise.resolve(manifestCache)
   if (!manifestPromise) {

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { useLocale } from '../contexts/LocaleContext'
-import { loadCardsManifest } from '../services/card-meta'
+import { hasCardsManifest, loadCardsManifest } from '../services/card-meta'
 import { AppLoadFailure } from './AppLoadFailure'
 import { getGameLoadProgress } from './game-load-progress'
 
@@ -9,7 +9,7 @@ type Readiness = { status: 'loading' } | { status: 'ready' } | { status: 'error'
 
 export function CardMetadataBoundary({ children }: { children: ReactNode }) {
   const { t } = useLocale()
-  const [readiness, setReadiness] = useState<Readiness>({ status: 'loading' })
+  const [readiness, setReadiness] = useState<Readiness>(() => ({ status: hasCardsManifest() ? 'ready' : 'loading' }))
 
   useEffect(() => {
     let cancelled = false
