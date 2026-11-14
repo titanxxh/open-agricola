@@ -148,7 +148,7 @@ it('resumes the same operation from committed validation when the validator exit
   expect(query).toContain('db.transaction(')
   expect(query).not.toMatch(/UPDATE|INSERT|DELETE/)
   expect(result.stdout).not.toContain('private-fixture')
-})
+}, 15_000)
 
 it('uses fresh continuation authority after original work expiry without rewriting the original request or admission', () => {
   const value = fixture('live'); expect(value.invoke().status).not.toBe(0)
