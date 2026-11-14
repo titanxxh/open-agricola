@@ -96,7 +96,15 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
   if (['/api/auth/logout', '/api/auth/logout-all'].includes(path) && req.method === 'POST') {
     const admission = prereleaseBindingAdmission(req)
     if (!admission.ok) { send(res, admission.status, { ok: false, code: admission.code }); return true }
-    await service.revoke(prereleaseSessionToken(req), path.endsWith('logout-all'))
+    const token = prereleaseSessionToken(req), all = path.endsWith('logout-all')
+    if (all && !token) { send(res, 401, { ok: false, code: 'prerelease_auth_required' }); return true }
+    try { await service.revoke(token, all) }
+    catch (error) {
+      if (!all) throw error
+      const expired = error instanceof PrereleaseIdentityError && error.kind === 'expired'
+      send(res, expired ? 403 : 503, { ok: false, code: expired ? 'prerelease_access_expired' : 'prerelease_access_paused' })
+      return true
+    }
     send(res, 200, { ok: true }, [serializePrereleaseCookie('session', '', 0), serializePrereleaseCookie('handoff', '', 0)])
     return true
   }

@@ -1,5 +1,6 @@
-import { afterEach, expect, it } from 'vitest'
-import { createTestDatabase } from './_helpers/postgres'
+import { afterEach, expect, it, vi } from 'vitest'
+import { createTestDatabase, getTestDatabaseUrl } from './_helpers/postgres'
+import { PostgresDatabase } from '../database/postgres'
 import { applyPrereleaseIdentityAudit } from '../../scripts/prerelease/identity-audit'
 import { PrereleaseSessions } from '../prerelease-sessions'
 import type { PrereleaseIdentityState } from '../../shared/contract/prerelease-identity'
@@ -42,15 +43,83 @@ async function setupConsumer({ sourceRemaining = 9 * 86_400_000 } = {}) {
   let status = async (grantId: string) => { if (unavailable) throw new Error('source offline'); return state(grantId) }
   const authority = { exchange: async () => state(String(++serial).padStart(43, 'g')), status: (grantId: string) => status(grantId), events: async () => [...events], acknowledge: async (id: string) => { acknowledgements.push(id); events.splice(events.findIndex(event => event.id === id), 1) } }
   const service = new PrereleaseSessions({ db, runtime, authority, now: () => now, eraseAccount: async id => { await db.prepare('DELETE FROM users WHERE id=?').run(id) } })
-  async function enter() {
-    const begin = await service.beginHandoff('/open-agricola/?room=existing'), params = new URLSearchParams(new URL(begin.formalUrl).hash.slice(1))
+  async function enter(consumer = service) {
+    const begin = await consumer.beginHandoff('/open-agricola/?room=existing'), params = new URLSearchParams(new URL(begin.formalUrl).hash.slice(1))
     const browserState = params.get('state'), browserChallenge = params.get('browserChallenge')
     if (!browserState || !browserChallenge) throw new Error('Missing browser challenge')
-    return service.exchangeHandoff(begin.cookie, { protocolVersion: 1, code: 'c'.repeat(43), state: browserState, browserChallenge, returnTo: `${runtime.formalAppOrigin}/` })
+    return consumer.exchangeHandoff(begin.cookie, { protocolVersion: 1, code: 'c'.repeat(43), state: browserState, browserChallenge, returnTo: `${runtime.formalAppOrigin}/` })
   }
   return { db, service, enter, runtime, state, events, acknowledgements, revoked, authority, now: () => now,
     advance: (ms: number) => { now += ms }, setBeta: (value: boolean) => { betaAccess = value }, offline: (value: boolean) => { unavailable = value }, setStatus: (fn: typeof status) => { status = fn } }
 }
+
+it('rejects account-wide logout from a revoked token without revoking a newer session', async () => {
+  const context = await setupConsumer(), old = await context.enter()
+  await context.service.revoke(old.token)
+  const current = await context.enter()
+  let denial: unknown
+  try { await context.service.revoke(old.token, true) } catch (error) { denial = error }
+  expect(await context.service.resolve(current.token)).toMatchObject({ user: current.user })
+  expect(denial).toMatchObject({ kind: 'expired' })
+})
+
+it.each(['expired', 'build', 'generation', 'source-invalid', 'source-unknown'])('rejects account-wide logout from a %s caller while preserving a currently authorized session', async reason => {
+  const context = await setupConsumer({ sourceRemaining: reason === 'expired' ? 20_000 : 9 * 86_400_000 }), old = await context.enter()
+  let consumer = context.service
+  const nextGrant = 'g'.repeat(42) + '2'
+  if (reason === 'expired') {
+    context.advance(20_000)
+    const currentState = { ...context.state(nextGrant), source: { kind: 'active', expiresAt: context.now() + 86_400_000 }, grant: { kind: 'active', expiresAt: context.now() + 86_400_000 }, validUntil: context.now() + 30_000 } satisfies PrereleaseIdentityState
+    context.authority.exchange = async () => currentState
+    context.setStatus(async grantId => grantId === nextGrant ? currentState : context.state(grantId))
+  } else if (reason === 'build' || reason === 'generation') {
+    const nextRuntime = { ...runtime, ...(reason === 'build' ? { buildId: 'b'.repeat(40) } : { generationId: '00000000-0000-4000-8000-000000000002' }) }
+    if (reason === 'generation') context.authority.exchange = async () => ({ ...context.state(nextGrant), generationId: nextRuntime.generationId })
+    consumer = new PrereleaseSessions({ db: context.db, runtime: nextRuntime, authority: context.authority, now: context.now })
+    cleanup.push(async () => { consumer.close() })
+  } else {
+    context.advance(30_000)
+    if (reason === 'source-invalid') context.revoked.add('g'.repeat(42) + '1')
+  }
+  const current = await context.enter(consumer)
+  if (reason === 'source-unknown') context.offline(true)
+  let denial: unknown
+  try { await consumer.revoke(old.token, true) } catch (error) { denial = error }
+  expect(await consumer.resolve(current.token)).toMatchObject({ user: current.user })
+  expect(denial).toMatchObject({ kind: reason === 'source-unknown' ? 'paused' : 'expired' })
+})
+
+it.each(['revoked', 'lease-expired'])('rechecks account-wide logout after waiting for a %s caller row', async reason => {
+  const context = await setupConsumer(), old = await context.enter()
+  context.advance(15_000)
+  const current = await context.enter()
+  const schema = (await context.db.prepare('SELECT current_schema() AS name').get<{ name: string }>())!.name
+  const other = new PostgresDatabase({ connectionString: getTestDatabaseUrl(), schema, max: 3 })
+  const revoker = new PrereleaseSessions({ db: other, runtime, authority: context.authority, now: context.now })
+  cleanup.push(async () => { revoker.close(); await other.close() })
+  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
+  let pid = 0, logout: Promise<void> | undefined
+  const blocker = other.transaction(async () => {
+    pid = (await other.prepare('SELECT pg_backend_pid() AS pid').get<{ pid: number }>())!.pid
+    if (reason === 'revoked') await revoker.revoke(old.token)
+    else await other.prepare('SELECT token_hash FROM prerelease_sessions WHERE grant_id=? FOR UPDATE').get('g'.repeat(42) + '1')
+    entered.resolve(); await release.promise
+  })()
+  try {
+    await entered.promise
+    logout = context.service.revoke(old.token, true)
+    const result = logout.catch((error: unknown) => error)
+    await vi.waitFor(async () => {
+      const blocked = await context.db.prepare('SELECT 1 FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid)) LIMIT 1').get(pid)
+      expect(blocked).toBeDefined()
+    })
+    if (reason === 'lease-expired') { context.advance(15_000); context.offline(true) }
+    release.resolve(); await blocker
+    const denial = await result
+    expect(await context.service.resolve(current.token)).toMatchObject({ user: current.user })
+    expect(denial).toMatchObject({ kind: reason === 'revoked' ? 'expired' : 'paused' })
+  } finally { release.resolve(); await Promise.allSettled([blocker, logout]) }
+})
 
 it('applies known Beta withdrawal to every local source immediately and restores it only after fresh confirmation', async () => {
   const context = await setupConsumer(), first = await context.enter()
