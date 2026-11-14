@@ -506,6 +506,7 @@ export class WsGameTransport implements GameTransport {
       // in the same event-loop turn. A playing Room never becomes ready on ack alone.
       const ready = this.waitEvent(event => event.type === 'stateUpdate' && event.roomId === this.roomId && event.sync === 'snapshot'
         || event.type === 'roomJoined' && event.roomId === this.roomId && event.status === 'waiting'
+        || event.type === 'teamRoomWaiting' && event.roomId === this.roomId
 )
       this.sendRaw(this.roomViewer.kind === 'spectator'
         ? { type: 'spectateRoom', roomId: this.roomId }
@@ -560,6 +561,12 @@ export class WsGameTransport implements GameTransport {
       this.spectatingEndReason = undefined
       this.seatHint = undefined
       this.setRoom(msg.roomId)
+    } else if (msg.type === 'teamRoomWaiting') {
+      this.roomViewer = { kind: 'team-member', memberId: msg.selfMemberId }
+      this.seatHint = undefined
+      this.setRoom(msg.roomId)
+      this.acknowledgedRoomId = msg.roomId
+      for (const [commandId, outcome] of this.completed) this.finishCommand(commandId, outcome)
     } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined' || msg.type === 'roomWaiting') {
       if ('playerIndex' in msg) {
         this.roomViewer = { kind: 'participant', playerIndex: msg.playerIndex,
@@ -706,6 +713,7 @@ export class WsGameTransport implements GameTransport {
   }
   private identify(cmd: ClientCommand): ClientCommand {
     if (this.roomViewer.kind === 'spectator' && !['auth', 'joinRoom', 'spectateRoom', 'getState', 'getHistory', 'getCommandScope', 'getCommandReceipt'].includes(cmd.type)) throw new Error('Spectators cannot issue game commands')
+    if (this.roomViewer.kind === 'team-member' && !['auth', 'joinRoom', 'getCommandScope', 'getCommandReceipt', 'setTeam', 'startTeamGame', 'dissolveRoom'].includes(cmd.type)) throw new Error('Game has not started')
     if (readOnlyCommand(cmd)) return cmd
     if (!this.commandScope) throw new Error('Command scope is unavailable')
     if (this.journal.commands.size >= 32) throw new Error('Too many unconfirmed commands')
@@ -922,6 +930,8 @@ export class WsGameTransport implements GameTransport {
   }): void
   sendRoomCommand(type: 'setPlayerColor', opts: { color: PlayerState['color'] }): void
   sendRoomCommand(type: 'confirmPlayerColor', opts?: Record<string, never>): void
+  sendRoomCommand(type: 'setTeam', opts: { teamIndex: number; memberId?: string }): void
+  sendRoomCommand(type: 'startTeamGame', opts?: Record<string, never>): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
   sendRoomCommand(type: 'getGameEndProposal', opts?: Record<string, unknown>): void
   sendRoomCommand(type: 'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd', opts: Record<string, unknown>): void

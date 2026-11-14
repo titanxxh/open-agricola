@@ -1,3 +1,4 @@
+import type { TeamResultArchive } from '../team'
 import type { GameTermination } from './game-termination'
 
 export type GameContextLifecycle = 'active' | 'completed' | 'terminated' | 'expired' | 'removed'
@@ -38,11 +39,13 @@ export type CompletedGameContextDescriptor = {
     enableFarmersOfTheMoor: boolean
     enableMoorBalanceRules?: boolean
     enableSnakeOpening: boolean
+    team?: TeamResultArchive
     players: Array<{
       playerIndex: number
       displayName: string
       nameIsDefault?: boolean
       score: number
+      teamIndex?: number
     }>
   }
   replay?: {
