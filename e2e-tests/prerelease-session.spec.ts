@@ -8,6 +8,8 @@ import { seedPrivateReplay } from './_helpers/prerelease-replay'
 // @covers server/prerelease-routes.ts
 // @covers server/prerelease-sessions.ts
 // @covers client/components/interaction/MarketplacePanel.tsx
+// @covers server/game/room.ts
+// @covers server/game/room-committer.ts
 // @covers client/app/MultihandSeatControls.tsx
 // @covers client/app/TeamWaitingRoom.tsx
 import { expect, type BrowserContext, type Page, type PlaywrightWorkerArgs } from '@playwright/test'
@@ -16,6 +18,7 @@ import { createServer as tlsServer } from 'node:https'
 import { createServer, request as httpRequest, type ClientRequest, type IncomingMessage } from 'node:http'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -32,10 +35,15 @@ import { createPrereleaseGateway } from '../scripts/prerelease/gateway'
 import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { test } from './server-fixtures'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
-import { GAME_CLIENT_CAPABILITIES } from '../shared/contract/client-capabilities'
-import { BROWSER_WS_PROTOCOL } from '../shared/contract/browser-auth'
-import { PRERELEASE_BUILD_PROTOCOL_PREFIX, PRERELEASE_GENERATION_PROTOCOL_PREFIX } from '../shared/contract/prerelease-runtime'
-import type { TeamConfiguration } from '../shared/contract/team'
+import { PostgresDatabase } from '../server/database/postgres'
+import { RoomDirectory } from '../server/game/room-directory'
+import { PostgresRoomPersistence } from '../server/game/persistence/postgres-adapter'
+import { ExecutionAccess } from '../server/game/execution-access'
+import { serializeSessionSnapshot } from '../shared/session/serialization'
+import type { GameSession } from '../server/game/authoritative-session'
+import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
+import { canonicalJson, frameHash } from '../server/game/replay-codec'
+import { REPLAY_SCHEMA_VERSION } from '../server/game/room-committer'
 
 const buildId = 'a'.repeat(40)
 const reservedPorts = new Set<number>()
@@ -329,50 +337,40 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       await other.addCookies([{ name: formalCookieName, value: token, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
       return { context: other, user: participant }
     }
-    // Create through the public allocation and durable command protocols. The browser supplies its real HttpOnly session.
-    const allocateTeamRoom = (page: Page, teamConfig: TeamConfiguration) => page.evaluate(async args => {
-      const allocationId = crypto.randomUUID()
-      const response = await fetch('/api/rooms/locate', { method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json', [args.header]: String(args.version),
-          'x-oa-pre-build': args.build, 'x-oa-pre-generation': args.generation }, body: JSON.stringify({ allocationId }) })
-      const route: unknown = await response.json()
-      if (!response.ok || !route || typeof route !== 'object' || !('wsPath' in route)
-        || typeof route.wsPath !== 'string' || !/^\/nodes\/[A-Za-z0-9-]+\/ws$/.test(route.wsPath)) throw new Error('Expected a native room allocation')
-      const url = new URL(route.wsPath, location.origin); url.protocol = 'wss:'
-      return new Promise<string>((resolve, reject) => {
-        const socket = new WebSocket(url, [args.protocol, args.buildPrefix + args.build, args.generationPrefix + args.generation])
-        const requestId = crypto.randomUUID()
-        let completedRoom: string | undefined
-        let waitingRoom: string | undefined
-        const finish = (error?: Error) => {
-          clearTimeout(timer); socket.onclose = null; socket.close()
-          if (error) reject(error)
-          else if (completedRoom) resolve(completedRoom)
-        }
-        const timer = setTimeout(() => finish(new Error('Team creation did not produce a durable receipt and waiting event')), 15_000)
-        socket.onerror = () => finish(new Error('Team allocation WebSocket failed'))
-        socket.onclose = () => finish(new Error('Team allocation WebSocket closed'))
-        socket.onopen = () => socket.send(JSON.stringify({ type: 'getCommandScope', clientCapabilities: args.capabilities }))
-        socket.onmessage = message => {
-          const event: ServerEvent = JSON.parse(String(message.data))
-          if (event.type === 'commandScope') socket.send(JSON.stringify({ type: 'createRoom', maxPlayers: 4,
-            enableCommunityDeck: false, customCardIds: [], teamConfig: args.teamConfig, requestId,
-            commandContext: { scopeId: event.scope.scopeId, commandId: crypto.randomUUID(), allocationId } }))
-          if (event.type === 'teamRoomWaiting') waitingRoom = event.roomId
-          if (event.type === 'commandReceipt' && event.requestId === requestId && event.status === 'completed') {
-            if (!event.receipt.outcome.ok || !event.receipt.outcome.roomId) {
-              finish(new Error('Team creation receipt rejected')); return
-            }
-            completedRoom = event.receipt.outcome.roomId
-          }
-          if (completedRoom && completedRoom === waitingRoom) finish()
-        }
-      })
-    }, { build: buildId, generation: generationId, teamConfig, capabilities: GAME_CLIENT_CAPABILITIES,
-      header: BROWSER_AUTH_HEADER, version: BROWSER_AUTH_VERSION, protocol: BROWSER_WS_PROTOCOL,
-      buildPrefix: PRERELEASE_BUILD_PROTOCOL_PREFIX, generationPrefix: PRERELEASE_GENERATION_PROTOCOL_PREFIX })
+    // A prepared native snapshot is restored before this owner has loaded the room. No browser command can mutate its setup.
+    const prepareRetainedRoom = async (session: GameSession, seatUserIds: string[]) => {
+      const db = new PostgresDatabase({ connectionString: databaseUrl, schema })
+      try {
+        const state = session.state, team = state.team
+        if (!team || state.players.length !== seatUserIds.length) throw new Error('Expected explicit Team seat ownership')
+        const viewer = await db.prepare('SELECT build_id FROM replay_viewer_builds ORDER BY created_at DESC LIMIT 1').get<{ build_id: string }>()
+        if (!viewer) throw new Error('The actual prerelease app has not installed its immutable viewer')
+        const roomId = randomUUID(), directory = new RoomDirectory(db)
+        const { owner } = await directory.claim(roomId)
+        const executionStamp = await new ExecutionAccess(db).capture([], seatUserIds)
+        const teamMembers = [...new Set(seatUserIds)].map(userId => {
+          const playerIndex = seatUserIds.indexOf(userId), player = state.players[playerIndex], teamIndex = team.playerTeams[playerIndex]
+          if (!player || teamIndex === undefined) throw new Error('Missing native Team member')
+          return { memberId: randomUUID(), userId, name: player.name, teamIndex,
+            seatCount: seatUserIds.filter(id => id === userId).length }
+        })
+        const serialized = session.withCtx(() => serializeSessionSnapshot(state, session)), createdAt = Date.now()
+        expect(await new PostgresRoomPersistence(db, directory).commitReplay({
+          roomId, serialized, meta: {
+            createdBy: seatUserIds[0] ?? null, startedAt: createdAt, status: 'playing', maxPlayers: state.players.length,
+            customCardDbIds: [], replayRecording: true, replayViewerBuildId: viewer.build_id, replayGameBuildId: buildId,
+            teamMembers, players: seatUserIds.map((userId, playerIndex) => ({ userId, playerIndex })), owner, executionStamp,
+          }, header: { schemaVersion: REPLAY_SCHEMA_VERSION, viewerBuildId: viewer.build_id,
+            gameBuildId: buildId, missingPrefix: false, customCardsJson: '[]' },
+          step: { stepNo: 0, roomVersion: 0, checkpointStepNo: 0, playerIndex: null, commandType: 'initial',
+            intentJson: '{}', payloadKind: 'checkpoint', payloadGzip: gzipSync(canonicalJson(serialized.frame)),
+            frameHash: frameHash(serialized.frame), createdAt },
+        })).toEqual({ kind: 'committed' })
+        return roomId
+      } finally { await db.close() }
+    }
     const retainedRoom = async (roomId: string) => admin.prepare(`SELECT status,state_json,team_members_json FROM "${schema}".rooms WHERE id=?`).get(roomId)
-    return { context, browser, close, enter, createParticipant, retainedRoom, allocateTeamRoom, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
+    return { context, browser, close, enter, createParticipant, retainedRoom, prepareRetainedRoom, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
       seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }),
       publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value } }
   } catch (error) {
@@ -744,7 +742,7 @@ test('real prerelease Multihand binds two seats per principal and survives brows
 })
 
 
-test('real cooperative Marketplace charges the giver once and resumes after reloading the pending switch', async ({ playwright }) => {
+test('real retained cooperative Marketplace charges the giver once and resumes after reloading the pending switch', async ({ playwright }) => {
   test.setTimeout(300_000)
   const environment = await fixture(playwright)
   let other: Awaited<ReturnType<typeof environment.createParticipant>> | undefined
@@ -754,14 +752,18 @@ test('real cooperative Marketplace charges the giver once and resumes after relo
     other = await environment.createParticipant()
     const guest = await environment.enter(other.context, other.user)
     const hostWire = observeGameSocket(host), guestWire = observeGameSocket(guest)
-    const roomId = await environment.allocateTeamRoom(host, {
-      mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', cooperationRules: true,
-    })
+    const guestUser = other.user
+    const session = createWorkSession({ options: { playerCount: 4,
+      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', cooperationRules: true },
+    }, configure: state => {
+      for (const [index, player] of state.players.entries()) player.name = index % 2 === 0 ? environment.user.displayName : guestUser.displayName
+    } })
+    let roomId: string
+    try { roomId = await environment.prepareRetainedRoom(session, [environment.user.id, other.user.id, environment.user.id, other.user.id]) }
+    finally { session.dispose() }
     const roomUrl = `${environment.preOrigin}/open-agricola/?room=${roomId}`
     await host.goto(roomUrl)
     await guest.goto(roomUrl)
-    await expect(host.getByRole('button', { name: 'Start game', exact: true })).toBeEnabled()
-    await host.getByRole('button', { name: 'Start game', exact: true }).click()
     await expect.poll(() => hostWire.latest()?.payload.state.players.map(player => player.resources.food)).toEqual([2, 3, 3, 3])
     await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
     await host.locator('[data-action-id="marketplace"] button').click()
