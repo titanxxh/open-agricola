@@ -236,4 +236,4 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 
 `scripts/prerelease/{operations,storage-guard*,gateway}.ts` 负责生命周期及 HTTP/WS 门禁。请求头未到齐的连接没有权限，已分类流持续受撤权约束；只有网关加入代理网络。操作见 `HOW_TO_DEPLOY.md`。
 
-预发布 `team-room.ts` 在host开局前持久化等待成员，不提前分配座位；执行权限、账号删除及原生身份审计覆盖这些主体。Multihand控制全部自有座位，Team共享可见集合不扩大命令权。验证入口为 `team-network.test.ts` 与 `team-scoring-session.test.ts`。
+只有预发布 WebSocket 房间允许 Team；HTTP 创建与加载仍只支持普通对局。`team-room.ts` 在 host 开局前持久化等待成员，不提前分配座位；执行权限、账号删除及原生身份审计覆盖这些主体。Multihand 控制全部自有座位，Team 共享可见集合不扩大命令权。验证入口为 `team-network.test.ts` 与 `team-scoring-session.test.ts`。

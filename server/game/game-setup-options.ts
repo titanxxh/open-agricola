@@ -50,11 +50,14 @@ export const asSetupPayload = (parsed: unknown): Record<string, unknown> =>
  * `maxPlayers` is the room wording, `playerCount` the hotseat one; accept both
  * so the lobby can post either without a second mapping table.
  */
+type GameSetupPermissions = { allowTeamRooms?: boolean }
+
 export const parseGameSetupRequest = (
   raw: Record<string, unknown>,
   draft: DraftSetupOptions | null,
+  permissions: GameSetupPermissions = {},
 ): GameSetupRequest => {
-  assertSupportedGameConfiguration(raw)
+  assertSupportedGameConfiguration(raw, permissions)
   const teamConfig = parseTeamConfiguration(raw.teamConfig, clampPlayerCount(raw.maxPlayers ?? raw.playerCount))
   if (teamConfig && raw.hotseat === true) throw new Error('Team games do not support hotseat')
   return {
@@ -114,8 +117,9 @@ export const resolveCustomCardDbIds = (
 }
 
 /** Removed game modes must fail at ingress rather than becoming ordinary games. */
-export const assertSupportedGameConfiguration = (raw: object): void => {
-  if (['team', 'multihand', 'cooperationRules'].some(key => Object.hasOwn(raw, key))) {
+export const assertSupportedGameConfiguration = (raw: object, permissions: GameSetupPermissions = {}): void => {
+  if (['team', 'multihand', 'cooperationRules'].some(key => Object.hasOwn(raw, key))
+    || Object.hasOwn(raw, 'teamConfig') && !permissions.allowTeamRooms) {
     throw new Error('Unsupported game configuration')
   }
 }
