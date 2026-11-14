@@ -1,5 +1,7 @@
 // @covers client/app/replay-bridge.ts
 // @covers replay-viewer/src/bridge-transport.ts
+// @covers scripts/prerelease/gateway.ts
+// @covers scripts/prerelease/owner-browser.ts
 import { seedPrivateReplay } from './_helpers/prerelease-replay'
 // @covers client/app/PrereleaseBoundary.tsx
 // @covers client/services/prerelease-runtime.ts
@@ -15,12 +17,12 @@ import { seedPrivateReplay } from './_helpers/prerelease-replay'
 // @covers client/app/LobbyPage.tsx
 // @covers client/app/GameContainerApi.tsx
 // @covers shared/actions/effects/internal/select-target-farm.ts
-import { expect, type BrowserContext, type Page, type PlaywrightWorkerArgs } from '@playwright/test'
+import { expect, type BrowserContext, type Page, type PlaywrightWorkerArgs, type PlaywrightWorkerOptions } from '@playwright/test'
 import { execFileSync, spawn } from 'node:child_process'
 import { createServer as tlsServer } from 'node:https'
 import { createServer, request as httpRequest, type ClientRequest, type IncomingMessage } from 'node:http'
 import { once } from 'node:events'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -34,7 +36,8 @@ import { getDb } from '../server/db'
 import { releaseAll, releaseQueue } from '../server/__tests__/_helpers/release-all'
 import { databaseMaintenance, getTestDatabaseUrl } from '../server/__tests__/_helpers/postgres'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../shared/contract/browser-auth'
-import { createPrereleaseGateway } from '../scripts/prerelease/gateway'
+import { createPrereleaseGateway, OWNER_VERIFICATION_COOKIE } from '../scripts/prerelease/gateway'
+import { configureOwnerVerification } from '../scripts/prerelease/owner-browser'
 import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { test } from './server-fixtures'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
@@ -97,13 +100,14 @@ function observeGameSocket(page: Page) {
 }
 
 /** Actual pre application and sessions; the formal fixture uses the real authority protocol. */
-async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPublicSandbox = false) {
+async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPublicSandbox = false,
+  options: { browserName?: PlaywrightWorkerOptions['browserName']; ownerVerification?: boolean } = {}) {
   expect(process.env.DATABASE_SCHEMA).toMatch(/^test_[a-f0-9]{32}$/)
   const acquired = releaseQueue()
   let closeAfterSetup: (() => Promise<void>) | undefined
   try {
     const directory = mkdtempSync(join(tmpdir(), 'oa-pre-session-')), schema = `test_${randomUUID().replaceAll('-', '')}`
-    acquired.register(() => { rmSync(join(directory, 'pre.env'), { force: true }); rmSync(join(directory, 'key.pem'), { force: true }) })
+    acquired.register(() => { for (const name of ['pre.env', 'key.pem', 'owner-token']) rmSync(join(directory, name), { force: true }) })
     const generationId = randomUUID(), targetId = 'prerelease-main', serviceKey = randomUUID() + randomUUID()
     const backendPort = await port(), frontendPort = await port(), appPort = await port(), gatewayPort = await port()
     let gateway: ReturnType<typeof createPrereleaseGateway> | undefined = undefined
@@ -157,6 +161,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
     const envKeys = ['NODE_ENV', 'PUBLIC_APP_ORIGIN', 'PUBLIC_API_BASE', 'CORS_ORIGIN', 'PRERELEASE_APP_ORIGIN', 'PRERELEASE_IDENTITY_SERVICE_KEY', 'PRERELEASE_ENTRY_ENABLED', 'GAME_BUILD_ID']
     const previous = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
     const sockets = new Set<Duplex>(), requests = new Set<ClientRequest>()
+    const upstreamReads: Array<{ path: string; method: string; cookieNames: string[]; authorization: boolean; status: number; contentType: string; bytes: number; sha256: string }> = []
+    let observer: ReturnType<typeof createServer> | undefined
     const track = (socket: Duplex) => { if (sockets.has(socket)) return; sockets.add(socket); socket.once('close', () => sockets.delete(socket)); socket.on('error', () => socket.destroy()) }
     const trackRequest = (request: ClientRequest) => { requests.add(request); request.once('close', () => requests.delete(request)); request.once('socket', track); return request }
     let formalOrigin = '', preOrigin = '', authority = createPrereleaseAuthorityHandler({ db: source, getSourceToken: async req => requestSessionToken(req) })
@@ -257,7 +263,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       async () => {
         for (const request of requests) request.destroy()
         for (const socket of sockets) socket.destroy()
-        await new Promise<void>(done => proxy.close(() => done()))
+        await Promise.all([proxy, ...(observer ? [observer] : [])].map(server => new Promise<void>(done => {
+          if (!server.listening) { done(); return }
+          server.close(() => done())
+        })))
       },
       async () => { try { await admin.exec(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`) } finally { await admin.close() } },
       async () => {
@@ -280,7 +289,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       },
       () => {
         for (const key of envKeys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key] }
-        rmSync(root, { recursive: true, force: true }); rmSync(envFile, { force: true }); rmSync(join(directory, 'key.pem'), { force: true })
+        rmSync(root, { recursive: true, force: true }); rmSync(envFile, { force: true }); rmSync(join(directory, 'key.pem'), { force: true }); rmSync(join(directory, 'owner-token'), { force: true })
       },
     ])
     closeAfterSetup = close
@@ -288,11 +297,53 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
     writeFileSync(join(root, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: buildId, basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }) + '\n')
     await command('bash', ['./restart-local.sh'], launchEnv, join(directory, 'launcher.log'))
     const healthyCycle = randomUUID(), observedAt = Date.now(), stateFile = join(directory, 'gate.json')
+    let upstreamPort = backendPort
+    if (options.ownerVerification) {
+      observer = createServer((req, res) => {
+        const path = req.url ?? '/', capture = /^\/(?:replay-viewers\/|api\/v1\/(?:replays\/|game-contexts\/))/.test(path)
+          ? { path, method: req.method ?? '', cookieNames: (req.headers.cookie ?? '').split(';').map(value => value.trim().split('=')[0]).filter(Boolean),
+            authorization: req.headers.authorization !== undefined, status: 0, contentType: '', bytes: 0, sha256: '' } : undefined
+        if (capture) upstreamReads.push(capture)
+        const outgoing = trackRequest(httpRequest({ hostname: '127.0.0.1', port: backendPort, path, method: req.method, headers: req.headers }, response => {
+          if (capture) { capture.status = response.statusCode ?? 0; capture.contentType = String(response.headers['content-type'] ?? '') }
+          const digest = createHash('sha256')
+          response.on('data', (chunk: Buffer) => { if (capture) { capture.bytes += chunk.length; digest.update(chunk) } })
+          response.on('end', () => { if (capture) capture.sha256 = digest.digest('hex') })
+          res.writeHead(response.statusCode ?? 502, response.headers); response.pipe(res)
+        }))
+        outgoing.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
+        req.once('aborted', () => outgoing.destroy()); res.once('close', () => { if (!res.writableEnded) outgoing.destroy() }); req.pipe(outgoing)
+      })
+      observer.on('connection', track)
+      observer.on('upgrade', (req, socket, head) => {
+        track(socket)
+        const outgoing = trackRequest(httpRequest({ hostname: '127.0.0.1', port: backendPort, path: req.url, headers: req.headers }))
+        outgoing.on('upgrade', (response, transport, upstreamHead) => {
+          track(transport)
+          socket.write(`HTTP/${response.httpVersion} ${response.statusCode ?? 502} ${response.statusMessage ?? ''}\r\n${response.rawHeaders.reduce((text, value, index, values) => index % 2 ? text : `${text}${value}: ${values[index + 1]}\r\n`, '')}\r\n`)
+          if (head.length) transport.write(head)
+          if (upstreamHead.length) socket.write(upstreamHead)
+          socket.once('close', () => transport.destroy()); transport.once('close', () => socket.destroy()); socket.pipe(transport).pipe(socket)
+        })
+        outgoing.on('response', response => { response.destroy(); socket.destroy() })
+        outgoing.on('error', () => socket.destroy()); socket.once('close', () => outgoing.destroy()); outgoing.end()
+      })
+      await new Promise<void>(done => observer!.listen(0, '127.0.0.1', done))
+      const address = observer.address(); if (!address || typeof address === 'string') throw new Error('Missing native upstream observer port')
+      upstreamPort = address.port
+    }
+    const ownerToken = options.ownerVerification ? randomBytes(32).toString('base64url') : undefined
+    const tokenFile = join(directory, 'owner-token'), expiresAt = Date.now() + 600_000
+    if (ownerToken) {
+      writeFileSync(tokenFile, ownerToken, { mode: 0o600 })
+      writeFileSync(join(directory, 'verification.json'), JSON.stringify({ targetId, buildId, generation: generationId, healthyCycle,
+        tokenHash: createHash('sha256').update(ownerToken).digest('hex'), expiresAt }), { mode: 0o600 })
+    }
     writeFileSync(join(directory, 'storage-guard.json'), JSON.stringify({ format: 1, targetId, fingerprint: 'f'.repeat(64),
       status: 'healthy', healthyCycle, observedAt, validUntil: observedAt + 120_000, operationsAllowed: true }))
-    writeFileSync(stateFile, JSON.stringify({ format: 1, targetId, channel: 'prerelease', mode: 'open', buildId,
-      generation: generationId, acceptance: { healthyCycle, formalBuildId: buildId } }))
-    gateway = createPrereleaseGateway({ stateFile, targetId, origin: preOrigin, upstream: `http://127.0.0.1:${backendPort}`,
+    writeFileSync(stateFile, JSON.stringify({ format: 1, targetId, channel: 'prerelease', mode: options.ownerVerification ? 'maintenance' : 'open', buildId,
+      generation: generationId, acceptance: options.ownerVerification ? null : { healthyCycle, formalBuildId: buildId } }))
+    gateway = createPrereleaseGateway({ stateFile, targetId, origin: preOrigin, upstream: `http://127.0.0.1:${upstreamPort}`,
       formal: { appOrigin: formalOrigin, apiOrigin: formalOrigin }, ca: readFileSync(join(directory, 'cert.pem')) })
     await new Promise<void>(resolve => gateway!.server.listen(gatewayPort, '127.0.0.1', resolve))
     await gateway.refreshBrowserPolicy()
@@ -342,11 +393,15 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
         await test.info().attach('prerelease-entry-observations', { path, contentType: 'application/json' })
       }
     }
-    const browser = await playwright.chromium.launch()
+    const browser = await playwright[options.browserName ?? 'chromium'].launch()
     const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
     await context.addInitScript(() => { if (window.top === window) localStorage.setItem('open-agricola-locale-v2', 'en') })
     const formalCookieName = authCookieNames().session
     await context.addCookies([{ name: formalCookieName, value: sourceToken, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
+    if (options.ownerVerification) {
+      try { await configureOwnerVerification(context, preOrigin, tokenFile) }
+      catch (error) { await releaseAll([() => context.close(), () => browser.close()]); throw error }
+    }
     const assertPrincipal = async (page: Page) => {
       const result: unknown = await page.evaluate(async ({ build, generation, header, version }) => {
         const response = await fetch('/api/auth/me', { credentials: 'include', headers: {
@@ -404,6 +459,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
     const waitForIdentityEvents = () => expect.poll(async () => (await source.prepare('SELECT count(*)::int AS pending FROM prerelease_identity_events WHERE target_origin=? AND user_id=? AND acknowledged_at IS NULL')
       .get<{ pending: number }>(preOrigin, user.id))?.pending).toBe(0)
     return { context, browser, close, enter, createParticipant, retainedRoom, prepareRetainedRoom, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
+      upstreamReads, verificationBinding: { targetId, buildId, generation: generationId, healthyCycle, expiresAt, mode: options.ownerVerification ? 'maintenance' : 'open' },
       seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }),
       publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value },
       waitForIdentityEvents,
@@ -488,19 +544,33 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
 })
 
 
-test('private replay uses an authenticated parent bridge and clears idle display on source revocation', async ({playwright}, testInfo) => {
+test('private replay uses an authenticated parent bridge and clears idle display on source revocation', async ({ playwright, browserName }, testInfo) => {
   test.setTimeout(300_000)
-  const environment = await fixture(playwright)
+  const environment = await fixture(playwright, false, { browserName, ownerVerification: true })
+  const ordinary = await environment.browser.newContext({ ignoreHTTPSErrors: true })
+  const probes: Array<{ path: string; status: number }> = []
+  const iframeRequests: Array<Promise<{ url: string; cookieNames: string[]; authorization: boolean }>> = []
+  let viewerUrl: string | null = null
   try {
+    expect(environment.verificationBinding.mode).toBe('maintenance')
+    expect((await environment.context.cookies(environment.preOrigin)).find(cookie => cookie.name === OWNER_VERIFICATION_COOKIE))
+      .toMatchObject({ httpOnly: true, secure: true, sameSite: 'Lax', path: '/' })
     const page = await environment.enter(environment.context)
     const replay = await environment.seedReplay()
+    for (const path of ['/', '/api/auth/me', `/api/v1/replays/${replay.roomId}/manifest`,
+      `/api/v1/replays/${replay.roomId}/assets/${replay.assetHash}`, `/replay-assets/${replay.assetHash}`]) {
+      const response = await ordinary.request.get(environment.preOrigin + path)
+      probes.push({ path, status: response.status() })
+      expect(response.status(), path).toBe(503)
+    }
     const debug: unknown[] = []
     page.on('console', message => { if(message.type() === 'error') debug.push({kind:'console',text:message.text()}) })
     page.on('pageerror', error => debug.push({kind:'pageerror',text:error.message}))
     page.on('response', response => { if(response.url().includes('/replay-viewers/')) debug.push({kind:'response',url:response.url(),status:response.status()}) })
-    const iframeRequests: Array<{url:string;cookie:string|undefined}> = []
     page.on('request', request => {
-      if (request.frame() !== page.mainFrame()) iframeRequests.push({url:request.url(),cookie:request.headers().cookie})
+      if (request.frame() !== page.mainFrame()) iframeRequests.push(request.allHeaders().then(headers => ({ url: request.url(),
+        cookieNames: (headers.cookie ?? '').split(';').map(value => value.trim().split('=')[0]).filter(Boolean),
+        authorization: headers.authorization !== undefined })))
     })
     await page.addInitScript(() => {
       const revoked: string[] = []
@@ -518,10 +588,22 @@ test('private replay uses an authenticated parent bridge and clears idle display
     }
     await expect(page.locator('iframe')).toHaveAttribute('sandbox','allow-scripts')
     await expect(page.locator('iframe')).toHaveAttribute('credentialless','')
+    viewerUrl = await page.locator('iframe').getAttribute('src')
+    expect(viewerUrl).toMatch(/\/replay-viewers\/[a-f0-9]{64}\/index\.html\?/)
+    expect(new URL(viewerUrl!, environment.preOrigin).searchParams.get('room')).toBe(replay.roomId)
     await expect(frame.locator('[data-card-anchor="CUSTOM_PRIVATE_REPLAY"]')).toBeVisible()
     await expect.poll(async () => frame.locator('[data-card-anchor="CUSTOM_PRIVATE_REPLAY"] .card-icon').first().evaluate(element => getComputedStyle(element).backgroundImage)).toContain('blob:')
-    expect(iframeRequests.filter(request => /\/api\/v1\/|\/replay-assets\//.test(request.url))).toEqual([])
-    expect(iframeRequests.some(request => request.cookie?.includes('__Host-oa-pre-session'))).toBe(false)
+    const browserRequests = await Promise.all(iframeRequests)
+    expect(browserRequests.filter(request => /\/api\/v1\/|\/replay-assets\//.test(request.url))).toEqual([])
+    if (await page.evaluate(() => 'credentialless' in HTMLIFrameElement.prototype)) {
+      expect(browserRequests.some(request => request.cookieNames.includes('__Host-oa-pre-session') || request.cookieNames.includes(OWNER_VERIFICATION_COOKIE))).toBe(false)
+    }
+    await expect.poll(() => environment.upstreamReads.some(read => /\/replay-viewers\/.+\/index\.html$/.test(read.path) && read.status === 200 && read.bytes > 0)).toBe(true)
+    await expect.poll(() => environment.upstreamReads.some(read => /\/replay-viewers\/.+\.js$/.test(read.path) && read.status === 200 && read.bytes > 0)).toBe(true)
+    const programs = environment.upstreamReads.filter(read => read.path.startsWith('/replay-viewers/'))
+    expect(programs.every(read => read.cookieNames.length === 0 && !read.authorization && !read.path.includes('?'))).toBe(true)
+    expect(environment.upstreamReads.some(read => read.path.startsWith(`/api/v1/replays/${replay.roomId}/`) && read.status === 200 && read.cookieNames.includes('__Host-oa-pre-session'))).toBe(true)
+    await page.screenshot({ path: testInfo.outputPath('owner-maintenance-replay.png'), fullPage: true })
     await frame.locator('.replay-transport button').nth(2).click()
     await expect(frame.locator('.replay-transport output')).toContainText('1 / 1')
     await frame.locator('.replay-header select').selectOption('open')
@@ -551,12 +633,17 @@ test('private replay uses an authenticated parent bridge and clears idle display
     await expect(frame.locator('[data-hand-anchor="p1"] [data-card-anchor="CUSTOM_PRIVATE_REPLAY"]')).toBeVisible()
     await expect(frame.locator('[data-hand-anchor="p2"]')).toHaveCount(0)
     await expect(frame.locator('.replay-header select')).toHaveCount(0)
-    expect(iframeRequests.filter(request => /\/api\/v1\/|\/replay-assets\//.test(request.url))).toEqual([])
+    expect((await Promise.all(iframeRequests)).filter(request => /\/api\/v1\/|\/replay-assets\//.test(request.url))).toEqual([])
+    await page.screenshot({ path: testInfo.outputPath('owner-maintenance-evidence.png'), fullPage: true })
     await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
     await expect(page.locator('iframe')).toHaveCount(0,{timeout:35_000})
     await expect(page.locator('.prerelease-access-screen')).toBeVisible()
   } finally {
-    await releaseAll([()=>environment.context.close(),()=>environment.browser.close(),()=>environment.close()])
+    const path = testInfo.outputPath('owner-maintenance-replay-http.json')
+    writeFileSync(path, JSON.stringify({ browserName, verification: environment.verificationBinding, viewerUrl, ordinary: probes,
+      browserRequests: await Promise.all(iframeRequests), upstreamReads: environment.upstreamReads }, null, 2), { mode: 0o600 })
+    await testInfo.attach('owner-maintenance-replay-http', { path, contentType: 'application/json' })
+    await releaseAll([() => ordinary.close(),()=>environment.context.close(),()=>environment.browser.close(),()=>environment.close()])
   }
 })
 
