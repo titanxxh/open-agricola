@@ -1,3 +1,4 @@
+import { createTeamActionSpaces } from '../team/action-spaces'
 import { createTeamState } from '../domain/team-scoring'
 import { restoreSessionState } from './state-recovery'
 import { isMoorBalanceRulesEnabled } from '../contract/game-variants'
@@ -266,7 +267,7 @@ export const normalizeState = (raw: GameState, getActionDefinition?: ActionDefin
     raw.roundActionOrder?.length === 14
       ? raw.roundActionOrder
       : generateRoundActionOrder(seed)
-  const baseSpaces = createActionSpaces(raw.players?.length)
+  const baseSpaces = [...createActionSpaces(raw.players?.length), ...createTeamActionSpaces(raw.team?.configuration, raw.players?.length ?? 2)]
   const spaceMap = new Map(
     (raw.actionSpaces ?? []).map((space) => [space.id, space]),
   )
@@ -326,7 +327,7 @@ export const normalizeState = (raw: GameState, getActionDefinition?: ActionDefin
   const knownIds = new Set(actionSpaces.map((s) => s.id))
   for (const stored of raw.actionSpaces ?? []) {
     if (knownIds.has(stored.id)) continue
-    if (allBaseActionIds.has(stored.id) || seasonActionIds.includes(stored.id)) continue
+    if (allBaseActionIds.has(stored.id) || seasonActionIds.includes(stored.id) || stored.id === 'marketplace') continue
     // Same-Core history can recover caller-added definitions from its existing
     // ActionRegistry. A new Core cannot execute unknown serialized space data.
     const definition = typeof stored.canBeExecutedByPlayer === 'function' && typeof stored.execute === 'function'
@@ -930,6 +931,7 @@ export const createInitialState = (
     players,
     actionSpaces: [
       ...createActionSpaces(players.length),
+      ...createTeamActionSpaces(options.teamConfig, players.length),
       ...(enableFarmersOfTheMoor ? createMoorActionSpaces(players.length) : []),
       ...(options.enableThroughTheSeasons ? createSeasonActionSpaces(players.length) : []),
     ],
