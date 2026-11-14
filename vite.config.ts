@@ -103,6 +103,5 @@ export default defineConfig({
     'import.meta.env.VITE_GAME_BUILD_ID': JSON.stringify(process.env.GAME_BUILD_ID ?? 'development'),
     'import.meta.env.VITE_RELEASE_CHANNEL': JSON.stringify(process.env.RELEASE_CHANNEL ?? 'stable'),
     'import.meta.env.VITE_PUBLIC_ASSET_BASE_URL': JSON.stringify(publicAssets.baseUrl),
-    'import.meta.env.VITE_PUBLIC_ASSET_VERSION': JSON.stringify(publicAssets.version),
   },
 })

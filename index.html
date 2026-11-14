@@ -11,7 +11,6 @@
       // Mirrors logic in client/utils/seasonalBackground.ts.
       (function () {
         var base = "__PUBLIC_ASSET_BASE_URL__";
-        var version = "__PUBLIC_ASSET_VERSION__";
         var map = {
           1: "winter-2", 2: "winter-3", 3: "spring-1", 4: "spring-2",
           5: "spring-3", 6: "summer-2", 7: "summer-1", 8: "summer-3",
@@ -50,7 +49,7 @@
           }
         }
         if (variant) {
-          var href = base + "assets/website-bg/" + variant + ".webp?v=" + encodeURIComponent(version);
+          var href = base + "assets/website-bg/" + variant + ".webp";
           document.documentElement.style.setProperty("--bg-monthly", 'url("' + href + '")');
           var l = document.createElement("link");
           l.rel = "preload"; l.as = "image"; l.href = href;

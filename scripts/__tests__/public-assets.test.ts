@@ -242,7 +242,7 @@ describe('public asset contract', () => {
     expect(rewriteCssPublicAssetUrls(
       "background: url('/assets/a.png')",
       '/',
-      { baseUrl, version: VERSION },
-    )).toBe(`background: url('${baseUrl}assets/a.png?v=${VERSION}')`)
+      { baseUrl },
+    )).toBe(`background: url('${baseUrl}assets/a.png')`)
   })
 })
