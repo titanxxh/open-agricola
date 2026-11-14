@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { browserApiFetch } from '../../services/browser-api'
 import { PageRouter } from '../PageRouter'
@@ -16,6 +17,7 @@ vi.mock('../LoginPage', () => ({ LoginPage: () => <form aria-label="Password log
 vi.mock('../OnboardingPage', () => ({ OnboardingPage: () => <form aria-label="Registration"><input /></form> }))
 vi.mock('../ResetPasswordPage', () => ({ ResetPasswordPage: () => <form aria-label="Password reset"><input type="password" /></form> }))
 vi.mock('../LobbyPage', () => ({ LobbyPage: () => <main>Admitted lobby</main> }))
+vi.mock('../CardMetadataBoundary', () => ({ CardMetadataBoundary: ({ children }: { children: ReactNode }) => children }))
 vi.mock('../../components/common/MobileTabBar', () => ({ MobileTabBar: () => null }))
 beforeEach(() => {
   auth.mockReturnValue({ user: { id: 'u1', username: 'beta', displayName: 'Beta', betaAccess: true }, loading: false })
@@ -38,14 +40,15 @@ it.each(['settings', 'login', 'onboarding', 'reset-password', 'operations'])('of
 it('offers no independent account-management UI at the direct prerelease workshop URL', async () => {
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease')
   window.history.replaceState(null, '', '/?page=workshop')
-  const catalog = Promise.withResolvers<Response>()
-  vi.mocked(browserApiFetch).mockReturnValue(catalog.promise)
+  let resolveCatalog: (response: Response) => void = () => { throw new Error('Catalog was not requested') }
+  const catalog = new Promise<Response>(resolve => { resolveCatalog = resolve })
+  vi.mocked(browserApiFetch).mockReturnValue(catalog)
   render(<PageRouter />)
   expectNoAccountManagement()
   expect(screen.getByRole('heading', { name: 'platform.publicSandboxTitle' })).toBeVisible()
   expect(screen.getByRole('group', { name: 'platform.sandbox' })).toBeDisabled()
 
-  await act(async () => { catalog.resolve(Response.json({ protocolVersion: 1, cards: [], nextCursor: null })) })
+  await act(async () => { resolveCatalog(Response.json({ protocolVersion: 1, cards: [], nextCursor: null })) })
 
   expect(browserApiFetch).toHaveBeenCalledExactlyOnceWith('/api/workshop/public-sandbox/v1/cards', { cache: 'no-store' })
   expect(screen.getByRole('group', { name: 'platform.sandbox' })).not.toBeDisabled()
