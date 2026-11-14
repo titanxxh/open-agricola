@@ -8,7 +8,6 @@ import {
 import { buildPagesFrontend, PAGES_API_ORIGIN, servePagesFrontend } from './helpers/pages-frontend'
 
 const ASSET_ORIGIN = 'https://titanxxh.github.io'
-const ASSET_VERSION = readFileSync('public-assets.ref', 'utf8').trim()
 const CARD_ART = /\/assets\/.+\/([A-Z]+\d+)\.png$/
 const ENCYCLOPEDIA_RUNTIME_CONTENT = /["'`]encyclopedia-[a-z-]+|\/card-encyclopedia\//
 
@@ -100,7 +99,7 @@ for (const layout of [DESKTOP, MOBILE]) {
       expect(await context.cookies()).toEqual([])
 
       const sources = requests.all().map(({ url, status, failure }) => ({
-        origin: url.origin, path: url.pathname, version: url.searchParams.get('v'), status, failure,
+        origin: url.origin, path: url.pathname, search: url.search, status, failure,
       }))
       writeFileSync(testInfo.outputPath('sources.json'), `${JSON.stringify(sources, null, 2)}\n`)
       await testInfo.attach('sources.json', { path: testInfo.outputPath('sources.json'), contentType: 'application/json' })
@@ -113,7 +112,7 @@ for (const layout of [DESKTOP, MOBILE]) {
       const art = from(({ origin }) => origin === ASSET_ORIGIN)
       expect(art.map(({ path }) => path)).toContain('/open-agricola-assets/assets/revised/deckA/A004.png')
       for (const source of [...catalogData, ...languages]) expect(source).toMatchObject({ origin: site.origin, status: 200 })
-      for (const source of art) expect(source.version).toBe(ASSET_VERSION)
+      for (const source of art) expect(source.search).toBe('')
       expect(from(({ origin }) => ![site.origin, ASSET_ORIGIN, PAGES_API_ORIGIN].includes(origin))).toEqual([])
     })
   })

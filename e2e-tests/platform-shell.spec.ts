@@ -1,6 +1,5 @@
 // @covers client/styles/pages/
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { readFileSync } from 'node:fs'
 import { LOCAL_PUBLIC_ASSET_BASE_URL, publicAssetBaseUrl } from '../scripts/public-assets'
 import { FRONTEND_URL } from './fixtures'
 
@@ -88,9 +87,8 @@ test('button-styled links stay undecorated across interaction states', async ({ 
 
 test('the first seasonal background request uses the runtime asset path', async ({ page }) => {
   await mockPlatformApis(page)
-  const version = readFileSync(new URL('../public-assets.ref', import.meta.url), 'utf8').trim()
   const baseUrl = process.env.PUBLIC_ASSET_LOCAL_DIR ? LOCAL_PUBLIC_ASSET_BASE_URL : publicAssetBaseUrl()
-  const assetUrl = `${baseUrl}assets/website-bg/summer-1.webp?v=${version}`
+  const assetUrl = `${baseUrl}assets/website-bg/summer-1.webp`
   const seasonalRequests: string[] = []
   page.on('request', (request) => {
     const pathname = new URL(request.url()).pathname

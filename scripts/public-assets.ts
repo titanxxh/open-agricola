@@ -194,7 +194,7 @@ const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\
 export const rewriteCssPublicAssetUrls = (
   code: string,
   prefix: string,
-  config: Pick<PublicAssetConfig, 'baseUrl' | 'version'>,
+  config: Pick<PublicAssetConfig, 'baseUrl'>,
 ): string => {
   const pattern = new RegExp(
     `url\\(\\s*(['"]?)${escapeRegExp(prefix)}assets\\/([^'")]+)\\1\\s*\\)`,
@@ -203,7 +203,7 @@ export const rewriteCssPublicAssetUrls = (
   return code.replace(
     pattern,
     (_match: string, quote: string, relative: string) =>
-      `url(${quote}${config.baseUrl}assets/${relative}?v=${encodeURIComponent(config.version)}${quote})`,
+      `url(${quote}${config.baseUrl}assets/${relative}${quote})`,
   )
 }
 
@@ -226,9 +226,7 @@ export const publicAssetUrls = (
       return transformed === code ? null : { code: transformed, map: null }
     },
     transformIndexHtml(html: string) {
-      return html
-        .replaceAll('"__PUBLIC_ASSET_BASE_URL__"', JSON.stringify(config.baseUrl))
-        .replaceAll('"__PUBLIC_ASSET_VERSION__"', JSON.stringify(config.version))
+      return html.replaceAll('"__PUBLIC_ASSET_BASE_URL__"', JSON.stringify(config.baseUrl))
     },
     generateBundle(
       _options: unknown,
