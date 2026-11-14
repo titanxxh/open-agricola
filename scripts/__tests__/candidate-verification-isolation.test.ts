@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, linkSync, truncateSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { parseEnv } from 'node:util'
 import { afterEach, expect, it } from 'vitest'
 import { taskCommands } from '../ci/verification-tasks'
 import { collectCandidateDiagnostics, displayCandidateLog, verifyCandidateSources, escapeWorkflowCommands, candidateEnvironment } from '../ci/candidate-isolation'
@@ -208,11 +209,18 @@ it('shares the public dependency file between CI service preparation and existin
   })
   expect(prepared.status, prepared.stderr).toBe(0)
   const read = spawnSync(process.execPath, [join(repository, 'node_modules/tsx/dist/cli.mjs'), '-e',
-    `import {getTestDatabaseUrl} from ${JSON.stringify(join(repository, 'server/__tests__/_helpers/postgres.ts'))}; import {testStorageEnvironment} from ${JSON.stringify(join(repository, 'server/__tests__/_helpers/objects.ts'))}; console.log(JSON.stringify({database:getTestDatabaseUrl(),bucket:testStorageEnvironment().S3_BUCKET}))`], {
+    `import {getTestDatabaseUrl} from ${JSON.stringify(join(repository, 'server/__tests__/_helpers/postgres.ts'))}; import {testStorageEnvironment} from ${JSON.stringify(join(repository, 'server/__tests__/_helpers/objects.ts'))};
+      const database=getTestDatabaseUrl(); process.env.TEST_DATABASE_URL='postgres://inert@127.0.0.1/inert_test';
+      console.log(JSON.stringify({database,override:getTestDatabaseUrl(),bucket:testStorageEnvironment().S3_BUCKET}))`], {
     cwd: value.work, encoding: 'utf8', env,
   })
   expect(read.status, read.stderr).toBe(0)
-  expect(JSON.parse(read.stdout)).toEqual({ database: 'postgres://inert@127.0.0.1/inert_test', bucket: 'agricola-test' })
+  const saved = parseEnv(readFileSync(join(value.work, 'data/dependencies.local'), 'utf8')).TEST_DATABASE_URL
+  if (!saved) throw new Error('Service preparation did not persist a test database default')
+  expect(JSON.parse(read.stdout)).toEqual({ database: saved, override: 'postgres://inert@127.0.0.1/inert_test', bucket: 'agricola-test' })
+  const database = new URL(saved)
+  expect({ host: database.hostname, port: database.port, user: database.username, path: database.pathname })
+    .toEqual({ host: '127.0.0.1', port: '55432', user: 'agricola', path: '/agricola_test' })
 })
 
 it('keeps a temporary launcher from overwriting its parent candidate dependency file', () => {
