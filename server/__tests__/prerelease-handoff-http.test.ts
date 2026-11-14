@@ -259,7 +259,7 @@ it('pauses an unavailable exchange without consuming its browser binding, then p
   expect(await accepted.json()).toMatchObject({ ok: true, returnPath: '/open-agricola/?room=retained', user: { id: 'handoff-user' } })
   expect(accepted.headers.getSetCookie().some(cookie => cookie.startsWith('__Host-oa-pre-session='))).toBe(true)
   expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions').all()).toEqual([{ user_id: 'handoff-user' }])
-  expect(await getDb().prepare('SELECT cookie_hash FROM prerelease_browser_handoffs').all()).toEqual([])
+  expect(await getDb().prepare('SELECT source_user_id,source_grant_id FROM prerelease_browser_handoffs').all()).toEqual([{ source_user_id: 'handoff-user', source_grant_id: 'g'.repeat(43) }])
   expect(exchangeCalls).toBe(2)
 })
 
@@ -274,7 +274,7 @@ it('recovers only the matching committed handoff cookie without another exchange
   const original = await getDb().prepare('SELECT expires_at FROM prerelease_sessions').get<{ expires_at: number }>()
   if (!original) throw new Error('Missing committed handoff session')
   expect(before).toHaveLength(1)
-  expect(await getDb().prepare('SELECT cookie_hash FROM prerelease_browser_handoffs').all()).toEqual([])
+  expect(await getDb().prepare('SELECT source_user_id,source_grant_id FROM prerelease_browser_handoffs').all()).toEqual([{ source_user_id: 'handoff-user', source_grant_id: 'g'.repeat(43) }])
   const missingReceipt = await exchange(pending, '')
   expect(missingReceipt.status).toBe(400)
   expect(await missingReceipt.json()).toEqual({ ok: false, code: 'invalid_prerelease_handoff' })
@@ -316,6 +316,42 @@ it('does not use an older principal cookie as proof of a different callback', as
   expect(exchangeCalls).toBe(2)
   expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions ORDER BY user_id').all())
     .toEqual([{ user_id: 'handoff-user' }, { user_id: 'next-user' }])
+})
+
+it('recovers a lost session Cookie only from the original browser receipt and never extends its session', async () => {
+  const pending = await begin(), accepted = await exchange(pending)
+  expect(accepted.status).toBe(200)
+  const cookie = accepted.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]
+  if (!cookie) throw new Error('Missing original session Cookie')
+  await accepted.body?.cancel()
+  const before = await getDb().prepare('SELECT token_hash,user_id,grant_id,created_at,expires_at FROM prerelease_sessions').all()
+  const recovered = await exchange(pending)
+  expect(recovered.status).toBe(200)
+  expect(recovered.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0]).toBe(cookie)
+  expect(await recovered.json()).toMatchObject({ ok: true, user: { id: 'handoff-user' } })
+  expect(await getDb().prepare('SELECT token_hash,user_id,grant_id,created_at,expires_at FROM prerelease_sessions').all()).toEqual(before)
+  expect(exchangeCalls).toBe(1)
+  const denied = await exchange({ ...pending, body: { ...pending.body, code: 'x'.repeat(43) } })
+  expect(denied.status).toBe(400)
+  expect(exchangeCalls).toBe(1)
+})
+
+it('serializes simultaneous callback retries into one source exchange and one local session', async () => {
+  const pending = await begin(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
+  authorityReply = async () => { entered.resolve(); await release.promise; return Response.json({ ok: true, state: identity() }) }
+  const first = exchange(pending), second = exchange(pending)
+  try {
+    await entered.promise
+    release.resolve()
+    const responses = await Promise.all([first, second])
+    expect(responses.map(response => response.status)).toEqual([200, 200])
+    const cookies = responses.map(response => response.headers.getSetCookie().find(value => value.startsWith('__Host-oa-pre-session='))?.split(';')[0])
+    expect(cookies[0]).toBeTruthy()
+    expect(cookies[1]).toBe(cookies[0])
+    expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions').all()).toEqual([{ user_id: 'handoff-user' }])
+    expect(exchangeCalls).toBe(1)
+    for (const response of responses) await response.body?.cancel()
+  } finally { release.resolve(); await Promise.allSettled([first, second]) }
 })
 
 it.each(['code', 'browserChallenge'] as const)('does not recover an old principal when the same callback state has a different %s', async field => {
@@ -408,7 +444,7 @@ it.each(['unrelated_source_revoked', 'beta_qualification_changed'])(
   'applies only matching %s invalidation to an in-flight callback', async reason => {
   const pending = await begin(), service = getPrereleaseSessions()
   if (!service) throw new Error('Missing prerelease consumer')
-  const before = await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()
+  const before = await getDb().prepare('SELECT cookie_hash,browser_verifier,state,return_path,expires_at FROM prerelease_browser_handoffs').all()
   authorityReply = async () => {
     events.push(reason === 'unrelated_source_revoked'
       ? { id: randomUUID(), kind: 'source_revoked', userId: 'another-user', grantId: 'b'.repeat(43), createdAt: Date.now() }
@@ -422,14 +458,18 @@ it.each(['unrelated_source_revoked', 'beta_qualification_changed'])(
     expect(await response.json()).toMatchObject({ ok: true, user: { id: 'handoff-user' } })
     expect(response.headers.getSetCookie().some(cookie => cookie.startsWith('__Host-oa-pre-session='))).toBe(true)
     expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions').all()).toEqual([{ user_id: 'handoff-user' }])
-    expect(await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()).toEqual([])
+    expect(await getDb().prepare('SELECT source_user_id,source_grant_id FROM prerelease_browser_handoffs').all()).toEqual([{ source_user_id: 'handoff-user', source_grant_id: 'g'.repeat(43) }])
   } else {
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
     expect(response.headers.getSetCookie()).toEqual([])
     expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
     expect(await getDb().prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
-    expect(await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()).toEqual(before)
+    expect(await getDb().prepare('SELECT cookie_hash,browser_verifier,state,return_path,expires_at FROM prerelease_browser_handoffs').all()).toEqual(before)
+    const resumed = await exchange(pending)
+    expect(resumed.status).toBe(200)
+    expect(await resumed.json()).toMatchObject({ ok: true, user: { id: 'handoff-user' } })
+    expect(exchangeCalls).toBe(1)
   }
 })
 
