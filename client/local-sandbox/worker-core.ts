@@ -136,6 +136,7 @@ export class LocalSandboxCore {
       customCards: customCards.length > 0 ? customCards : undefined,
       initialStateOptions: toInitialStateOptions(config),
       registerCustomCardImpl: registerBrowserBackedCustomCard,
+      customCardRegistration: config.publicInputs ? 'strict' : 'warn',
     })
     this.core = core
     return this.respond(core.withCtx(() => core.getState()), viewer)
@@ -153,6 +154,7 @@ export class LocalSandboxCore {
       stateOrSeed: rehydrateState(persisted.serializedState),
       customCards: customCards.length > 0 ? customCards : undefined,
       registerCustomCardImpl: registerBrowserBackedCustomCard,
+      customCardRegistration: persisted.config.publicInputs ? 'strict' : 'warn',
     })
     this.core = core
     return this.respond(core.withCtx(() => core.getState()), viewer)
@@ -230,6 +232,7 @@ export class LocalSandboxCore {
       customCards: customCards.length > 0 ? customCards : undefined,
       initialStateOptions: toInitialStateOptions(config),
       registerCustomCardImpl: registerBrowserBackedCustomCard,
+      customCardRegistration: config.publicInputs ? 'strict' : 'warn',
     })
     this.core = core
     return core.withCtx(() => core.getState())
