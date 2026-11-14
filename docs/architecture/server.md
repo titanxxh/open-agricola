@@ -197,7 +197,7 @@ Tests: `server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submis
 - `server/db.ts` owns PostgreSQL through `pg`: transactions retain one connection across awaits, nesting uses savepoints, and startup migrations take an advisory lock. There is no runtime database fallback.
 - `scripts/import-sqlite.ts` imports a stopped schema-33 SQLite database through exact comparisons and blocks on damaged recorded games, and `data_imports` keeps a failed import behind a startup barrier; `scripts/validate-backup.ts` validates a PostgreSQL / S3 restore.
 - `schema.sql` and migrations define product tables. Replay uses `checkpointStepNo`; evidence, quotas and webhooks have no parallel storage.
-- `legacy_no_replay` results have no Replay header/Frames. Pre archive reads use `game/prerelease-archive-retention.ts`: 30 days from the earliest durable ending, also after restore; stable retention is unchanged.
+- `game/prerelease-archive-{retention,cleanup}.ts` owns pre 30-day read fences and ledger-first expiry. Unknown age cannot authorize reads or deletion. Tombstones win. GC keeps Viewer/Evidence references and backup locks. Restore keeps deadlines; stable is unchanged.
 
 ## GitHub delivery, security and deletion
 
