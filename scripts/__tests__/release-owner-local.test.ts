@@ -3,13 +3,15 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { canonicalOwnerLocalCommands, type OwnerLocalReceipt } from '../ci/owner-local-verification'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
 const repositoryRoot = resolve(import.meta.dirname, '../..')
 const tsxLoader = import.meta.resolve('tsx')
+// These release-tool cases drive git and CLI subprocesses; several take ~5 s locally, so low-core CI needs a file-local test budget.
+vi.setConfig({ testTimeout: 30_000 })
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
