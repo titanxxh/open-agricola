@@ -309,8 +309,9 @@ it('admits credentialless opaque-origin Viewer programs without opening private 
   const listener = gateway.server.address()
   if(!listener || typeof listener === 'string') throw new Error('Missing program gateway')
   const program = `/replay-viewers/${'b'.repeat(64)}/assets/viewer.js`
-  const read = (path:string,headers:Record<string,string>={},method='GET')=>new Promise<number>((resolve,reject)=>{
-    const req=request(`http://127.0.0.1:${listener.port}`,{path,method,agent:false,headers:{host:'pre.agricola.test',origin:'null',...headers}},response=>{response.resume();response.on('end',()=>resolve(response.statusCode??0))})
+  const read = (path:string,headers:Record<string,string | undefined>={},method='GET')=>new Promise<number>((resolve,reject)=>{
+    const req=request(`http://127.0.0.1:${listener.port}`,{path,method,agent:false,
+      headers:Object.fromEntries(Object.entries({host:'pre.agricola.test',origin:'null',...headers}).filter(([,value])=>value!==undefined))},response=>{response.resume();response.on('end',()=>resolve(response.statusCode??0))})
     req.on('error',reject);req.end()
   })
   try {
@@ -326,5 +327,32 @@ it('admits credentialless opaque-origin Viewer programs without opening private 
     await writeFile(stateFile,JSON.stringify({format:1,targetId:'prerelease-test',channel:'prerelease',mode:'maintenance',buildId:'a'.repeat(40),generation:'bb4d6c82-676f-4dcc-a570-52377b3b32f5'}))
     expect(await read(program)).toBe(503)
     expect(seen).toHaveLength(1)
+    const verification = { targetId: 'prerelease-test', buildId: 'a'.repeat(40), generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5',
+      healthyCycle, tokenHash: createHash('sha256').update('V'.repeat(43)).digest('hex'), expiresAt: Date.now() + 600_000 }
+    const verificationFile = join(root, 'verification.json')
+    await writeFile(verificationFile, JSON.stringify(verification))
+    expect(await read(program)).toBe(200)
+    const entry = `/replay-viewers/${'b'.repeat(64)}/index.html`
+    expect(await read(entry + '?room=fixture&bridge=opaque', { origin: undefined })).toBe(200)
+    expect(seen.at(-1)?.path).toBe(entry)
+    expect(await read(entry + '?room=fixture', { origin: undefined,
+      cookie: `${OWNER_VERIFICATION_COOKIE}=${'V'.repeat(43)}; __Host-oa-pre-session=private`, 'x-oa-pre-build': 'a'.repeat(40) })).toBe(200)
+    expect(seen.at(-1)).toMatchObject({ path: entry })
+    expect(seen.at(-1)?.headers.cookie).toBeUndefined()
+    expect(seen.at(-1)?.headers['x-oa-pre-build']).toBeUndefined()
+    for (const headers of deniedHeaders) expect(await read(program, headers)).toBe(403)
+    for (const path of ['/', '/api/v1/replays/room/manifest', `/replay-assets/${'b'.repeat(64)}`]) {
+      expect(await read(path, { origin: undefined })).toBe(503)
+    }
+    for (const invalid of [{ targetId: 'prerelease-other' }, { buildId: 'c'.repeat(40) }, { generation: 'other' },
+      { healthyCycle: recoveredCycle }, { tokenHash: '' }, { expiresAt: Date.now() - 1 }, { expiresAt: Date.now() + 700_000 }]) {
+      await writeFile(verificationFile, JSON.stringify({ ...verification, ...invalid }))
+      expect(await read(program)).toBe(503)
+    }
+    await writeFile(verificationFile, JSON.stringify(verification))
+    expect(await read(program)).toBe(200)
+    formal.state.version = 1
+    await gateway.refreshBrowserPolicy()
+    expect(await read(program)).toBe(503)
   } finally {await gateway.close();upstream.closeAllConnections();await new Promise<void>(resolve=>upstream.close(()=>resolve()));await formal.close();await rm(root,{recursive:true,force:true})}
 })

@@ -15,20 +15,35 @@ import { configureOwnerVerification } from '../scripts/prerelease/owner-browser'
 
 test.use({ trace: 'retain-on-failure' })
 
-async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: 'chromium' | 'firefox' | 'webkit', mode: 'open' | 'maintenance') {
+async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: 'chromium' | 'firefox' | 'webkit', mode: 'open' | 'maintenance', viewer = false) {
   const root = mkdtempSync(join(tmpdir(), 'pre-owner-browser-'))
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=api.agricola.test',
     '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:api.agricola.test,DNS:pre.agricola.test', '-keyout', join(root, 'key.pem'), '-out', join(root, 'cert.pem')], { stdio: 'ignore' })
   const ca = readFileSync(join(root, 'cert.pem'))
-  const seen: string[] = [], sockets = new Set<Duplex>()
+  const seen: string[] = [], programs: Array<{ path: string; cookie: string | undefined; authorization: string | undefined }> = [], sockets = new Set<Duplex>()
   const track = (socket: Duplex) => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); socket.on('error', () => socket.destroy()) }
+  const viewerPath = `/replay-viewers/${'c'.repeat(64)}`
   const upstream = httpServer((req, res) => {
+    if (viewer && req.url?.startsWith(`${viewerPath}/`)) {
+      programs.push({ path: req.url, cookie: req.headers.cookie, authorization: req.headers.authorization })
+      res.setHeader('Cache-Control', 'no-store')
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      if (req.url.split('?')[0] === `${viewerPath}/index.html`) {
+        res.setHeader('Content-Type', 'text/html')
+        res.end('<!doctype html><main id="viewer">Loading</main><script type="module" src="./assets/viewer.js"></script>')
+      } else {
+        res.setHeader('Content-Type', 'text/javascript')
+        res.end('document.querySelector("#viewer").textContent = "Viewer running: " + new URLSearchParams(location.search).get("room")')
+      }
+      return
+    }
     seen.push(req.headers.cookie ?? '')
     res.setHeader('Set-Cookie', ['__Host-oa-pre-session=inert-pre; Path=/; Secure; HttpOnly; SameSite=Lax',
       'parent_fixture=inert; Domain=agricola.test; Path=/; Secure', `${OWNER_VERIFICATION_COOKIE}=inert; Path=/; Secure; HttpOnly`])
     res.setHeader('Clear-Site-Data', '"cookies"')
     res.setHeader('Content-Type', 'text/html')
-    res.end('<!doctype html><title>Private pre candidate</title><main>Candidate content</main>')
+    res.end('<!doctype html><title>Private pre candidate</title><main>Candidate content</main>' + (viewer
+      ? `<iframe title="Private Viewer" credentialless sandbox="allow-scripts" src="${viewerPath}/index.html?room=fixture"></iframe>` : ''))
   })
   upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening')
   const upstreamAddress = upstream.address()
@@ -90,7 +105,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: '
   const proxyAddress = proxy.address()
   if (!proxyAddress || typeof proxyAddress === 'string') throw new Error('Expected proxy port')
   const browser = await playwright[engine].launch({ proxy: { server: `http://127.0.0.1:${proxyAddress.port}` } })
-  return { browser, origin, formal, tokenFile, root, gateway, capability, seen, close: async () => {
+  return { browser, origin, formal, tokenFile, root, gateway, capability, seen, programs, viewerPath, close: async () => {
     await browser.close(); await gateway.close()
     for (const socket of sockets) socket.destroy()
     for (const server of [tls, upstream, proxy]) server.closeAllConnections()
@@ -114,6 +129,26 @@ test('private owner verification isolates its Secure HttpOnly cookie on same-sit
     expect((await ordinary.request.get(value.origin)).status()).toBe(503)
     writeFileSync(join(value.root, 'verification.json'), '{}')
     expect((await owner.request.get(value.origin)).status()).toBe(503)
+  } finally { await owner.close(); await ordinary.close(); await value.close() }
+})
+
+test('private owner acceptance loads an isolated credentialless Viewer while ordinary data stays closed @webkit', async ({ playwright, browserName }) => {
+  const value = await fixture(playwright, browserName, 'maintenance', true)
+  const owner = await value.browser.newContext({ ignoreHTTPSErrors: true })
+  const ordinary = await value.browser.newContext({ ignoreHTTPSErrors: true })
+  try {
+    expect((await ordinary.request.get(value.origin)).status()).toBe(503)
+    await configureOwnerVerification(owner, value.origin, value.tokenFile)
+    const page = await owner.newPage()
+    await page.goto(value.origin)
+    await expect(page.frameLocator('iframe').getByText('Viewer running: fixture', { exact: true })).toBeVisible()
+    expect(value.programs.some(program => program.path.endsWith('/assets/viewer.js'))).toBe(true)
+    expect(value.programs.every(program => !program.cookie && !program.authorization)).toBe(true)
+    for (const path of ['/', '/api/v1/replays/fixture/manifest', '/replay-assets/' + 'd'.repeat(64)]) {
+      expect((await ordinary.request.get(value.origin + path)).status()).toBe(503)
+    }
+    writeFileSync(join(value.root, 'verification.json'), '{}')
+    expect((await ordinary.request.get(`${value.origin}${value.viewerPath}/index.html?room=fixture`)).status()).toBe(503)
   } finally { await owner.close(); await ordinary.close(); await value.close() }
 })
 

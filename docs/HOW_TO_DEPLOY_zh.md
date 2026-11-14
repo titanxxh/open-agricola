@@ -200,6 +200,8 @@ pre 可以使用 `https://pre.titanxxh.com`，保留正式 Pages/API 地址；�
 
 网关只接受声明的 `__Host-oa-pre-session`、`__Host-oa-pre-handoff` 候选 Cookie，要求 Secure、HttpOnly、Path=/、SameSite=Lax 且没有 Domain。它移除其他候选 Cookie、Clear-Site-Data、入站 Authorization 和未声明的身份头；owner 验收 Cookie 不传给候选。HTTP 拒绝其他 Origin 及没有精确 pre Origin 的不安全方法；WS 要求精确 pre Origin 和 `/ws`。候选身份和房间权限仍由 app 负责。迁移、捕获和存储策略工具只取得数据凭据，不取得 target identity service key。同父域仍共享部分浏览器容量限制，不能承诺独立站点级的 Cookie 可用性隔离。
 
+有效的私有验收窗口内，匿名 GET 还可读取固定 hash 下的 Viewer 程序，包括带展示 query 的入口 HTML；网关转发前剥离该 query。携带 Cookie、认证或客户端绑定头的请求不能使用此例外。程序不含归档数据，也不授予数据读取权；正常获准的程序导航在转发前也剥离 Cookie 与客户端绑定，覆盖不支持 credentialless 的浏览器。target/build/代次、存储健康和正式策略租约仍须有效，窗口缺失或过期时保持维护关闭。
+
 helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的十分钟 Secure/HttpOnly/host-only Cookie 绑定 build/代次，在转发 HTTP/WS 给候选前剥离；普通浏览器仍为 503。私有浏览器执行正常正式登录和真实 pre 准入，profile 不能挂载给候选。只有候选实现完整流程后，现场才能取得身份/Beta、HTTP/WS、公开卡、Viewer、保留对局/撤回、删除、容量和正式不受影响的真实证据。复制 `deploy/prerelease-acceptance.example.json`，填写精确操作/build/image/代次/指纹、当前毫秒时间 `acceptedAt`、非空证据文件路径和 SHA256；验收三十分钟过期。
 
 增加实际部署的正式前端/API 与同父域浏览器测试的 `browser-boundary` 证据，并采集独立的 `formal-browser-policy` 产物：
