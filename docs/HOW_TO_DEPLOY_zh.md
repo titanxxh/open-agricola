@@ -73,7 +73,7 @@ Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已
 
 owner 验收独立目标前保持 `PRERELEASE_ENTRY_ENABLED=false`。正式 app 需要 `PUBLIC_APP_ORIGIN`、`PUBLIC_API_BASE`、`PRERELEASE_APP_ORIGIN` 及仅目标服务端持有的密钥，两个 Compose 入口均显式传入。正式大厅和设置只向 Beta 账号或管理员显示入口，目标缺失或关闭时明确不可用。应用发布消费新 pin 前，语言源及 packs 必须先发布并通过其独立 CI。
 
-pre start 先建立 host-only HttpOnly verifier/state Cookie，再前往正式站根的 `?page=prerelease-handoff`，fragment 严格包含 `browserChallenge`、`state`、`targetOrigin`、`returnTo`。challenge 与 state 均为43字符base64url值。主站页面清除此片段，复核当前目标和正式根后只签发一次code。仅固定的 pre `/open-agricola/auth/handoff` 回调收到 `protocolVersion=1`、`code`、`state`、`browserChallenge`、`returnTo` fragment。pre 须校验自身state及verifier后服务端兑换。code过期由正式权威时钟在兑换时裁决，浏览器时钟偏差不参与授权。正式凭据留在正式API主机；pre认证及本地会话另行实现和验收。pre 回调清除 fragment，只在当前页面内存保留交接包。503 暂停时重试同一交接包，不延长有效期。恢复须匹配已签发的会话 Cookie 和交接包回执，已有的其他会话不能完成新回调。无效、过期或运行时代次变化时须回正式站根重新进入。
+pre start 先建立 host-only HttpOnly verifier/state Cookie，再前往正式站根的 `?page=prerelease-handoff`，fragment 严格包含 `browserChallenge`、`state`、`targetOrigin`、`returnTo`。challenge 与 state 均为43字符base64url值。主站页面清除此片段，复核当前目标和正式根后只签发一次code。仅固定的 pre `/open-agricola/auth/handoff` 回调收到 `protocolVersion=1`、`code`、`state`、`browserChallenge`、`returnTo` fragment。pre 须校验自身state及verifier后服务端兑换。code过期由正式权威时钟在兑换时裁决，浏览器时钟偏差不参与授权。正式凭据留在正式API主机；pre认证及本地会话另行实现和验收。pre 回调清除 fragment，只在当前页面内存保留交接包。503 暂停时重试同一交接包，不延长有效期。恢复使用已签发的会话 Cookie，或原浏览器交接 Cookie 及已提交的 build/代次绑定回执；后者保持原一分钟截止，并重新核对同一来源 grant，不能替代为其他会话。来源兑换结果不可判定且没有已验证回执时，须重新进入。无效、过期或运行时代次变化时须回正式站根重新进入。
 
 预发布使用独立通道。`prerelease` 日常 push 和 PR 运行 canonical routine plan，不自动部署。完整候选验证由可信 `main` 手动编排；候选任务只有仓库读取权限，不取得正式部署凭据。回执身份使用 VERIFICATION_CHANNEL=prerelease，普通回归命令使用正式运行默认值，预发布专用测试显式选择 prerelease。生产构建任务以 RELEASE_CHANNEL=prerelease 运行 build:hosted-frontend，包含正常类型检查及 Vite 构建。
 
