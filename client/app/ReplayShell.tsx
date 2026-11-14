@@ -1,11 +1,14 @@
 import { browserApiFetch } from '../services/browser-api'
-import { isPrereleaseClient } from '../services/prerelease-runtime'
+import { assertPrereleaseAccess, getPrereleaseRuntime, isPrereleaseClient, subscribePrereleaseAccess } from '../services/prerelease-runtime'
+import { attachReplayBridge } from './replay-bridge'
+import type { ReplayBridgeContext } from '../../shared/contract/protocol/replay-bridge'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CompletedGameContextDescriptor, TerminatedGameContextDescriptor } from '../../shared/contract/protocol/game-context'
 import type {
   ReplayAnchorResponse,
   ReplayManifest,
   ReplayManifestResponse,
+  ReportedEvidence,
 } from '../../shared/contract/protocol/replay'
 import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
@@ -80,6 +83,7 @@ export function ReplayFrame({
   setFrame,
   title,
   mode,
+  source,
 }: {
   roomId: string
   viewerBuildId: string
@@ -88,7 +92,27 @@ export function ReplayFrame({
   setFrame: (node: HTMLIFrameElement | null) => void
   title: string
   mode?: 'reported-evidence'
+  source?: ReplayManifest | ReportedEvidence
 }) {
+  const [retired, setRetired] = useState(false)
+  const stopBridge = useRef<(() => void) | undefined>(undefined)
+  const [bridge] = useState<ReplayBridgeContext | undefined>(() => {
+    if (!isPrereleaseClient()) return undefined
+    assertPrereleaseAccess()
+    const runtime = getPrereleaseRuntime()
+    if (!runtime || !source) throw new Error('replay_bridge_context_missing')
+    return { protocolVersion: 1, nonce: Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join(''),
+      environment: 'prerelease', targetId: runtime.targetId, appBuildId: runtime.buildId, generationId: runtime.generationId,
+      roomId, viewerBuildId, schemaVersion: source.schemaVersion,
+      mode: source.kind === 'reportedEvidence' ? { kind: 'evidence', stepNo: source.stepNo, frameHash: source.frameHash, perspective: source.perspective } : { kind: 'archive' } }
+  })
+  useEffect(() => {
+    if (!bridge) return
+    const unsubscribe = subscribePrereleaseAccess(() => {
+      try { assertPrereleaseAccess() } catch { stopBridge.current?.(); setRetired(true) }
+    })
+    return () => { unsubscribe(); stopBridge.current?.() }
+  }, [bridge])
   const [src] = useState(() => {
     const params = new URLSearchParams({
       room: roomId,
@@ -100,6 +124,11 @@ export function ReplayFrame({
     })
     if (initialLocation.layout) params.set('layout', initialLocation.layout)
     if (initialLocation.step !== null) params.set('step', String(initialLocation.step))
+    if (bridge) {
+      params.set('bridge', JSON.stringify(bridge))
+      params.set('parentOrigin', window.location.origin)
+      params.set('viewer', viewerBuildId)
+    }
     if (mode) {
       params.set('mode', mode)
       params.set('parentOrigin', window.location.origin)
@@ -108,13 +137,16 @@ export function ReplayFrame({
     return `${API_BASE}/replay-viewers/${viewerBuildId}/index.html?${params}`
   })
   const attachFrame = useCallback((node: HTMLIFrameElement | null) => {
+    stopBridge.current?.()
     if (node) {
+      if (bridge && source) stopBridge.current = attachReplayBridge(node, bridge, source)
       node.setAttribute('credentialless', '')
       node.src = src
     }
     setFrame(node)
-  }, [setFrame, src])
+  }, [bridge, setFrame, source, src])
 
+  if (retired) return null
   return (
     <iframe
       ref={attachFrame}
@@ -191,7 +223,7 @@ export function ReplayShell({
         }
       }
 
-      await verifyReplayViewerBuild(replay.viewerBuildId, controller.signal)
+      await verifyReplayViewerBuild(replay.viewerBuildId, controller.signal, replay.schemaVersion)
 
       setManifest(replayManifest)
       setLocation(readLocation(replayManifest))
@@ -344,6 +376,7 @@ export function ReplayShell({
     <main className="replay-shell replay-shell--viewer">
       {navigation}
       <ReplayFrame
+        source={manifest}
         key={`${context.roomId}:${replay.viewerBuildId}:${locale}`}
         roomId={context.roomId}
         viewerBuildId={replay.viewerBuildId}
