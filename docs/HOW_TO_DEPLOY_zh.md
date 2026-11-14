@@ -844,6 +844,31 @@ docker pull --platform linux/amd64 caddy@sha256:<approved-manifest-sha256>
 
 默认路径仍是既有部署升级。显式 bootstrap 要求不存在 app/Caddy 容器或保留的项目 volume、既有镜像选择器、部署记录、备份/ledger 或本地旧数据。同一维护锁内，固定目标镜像的 `check-empty` 只读查询所有非系统 schema 的 PostgreSQL relation，并列出 S3 namespace，不写表或 ledger。应用 S3 身份须有列举权限；未知响应、权限错误、任意数据库 relation 或对象（包括空删除 ledger）都会拒绝。旧候选没有该命令也会拒绝。证明使用直接创建的只读临时容器，仅接依赖网络和选定私有数据环境，沿用临时资源限额及内存临时目录，不挂载 host 或项目 volume；失败时也按返回的 container ID 清理。空证明前不执行 `docker compose run`，因此临时证明失败不会创建保留的项目 volume。预置 Caddy 的 digest、原生 image ID、Linux AMD64 平台须匹配，交付中不 pull 或 build。仅同一 digest 的官方 `caddy@sha256:...` 与 `docker.io/library/caddy@sha256:...` 等价名称可接受，其他 registry 或仓库拒绝。仅空证明成功后才复用 `check-live` 初始化和目标验证，随后核对 app/Caddy 实际身份并原子发布选择器。bootstrap 失败保持关闭，排空新启动的服务。既有数据升级仍执行旧 source 捕获、新 target 恢复验证，不能因为容器不存在就当成新数据。初始化失败后须明确设计既有数据恢复，不自动重试 bootstrap。
 
+### 清理正式应用旧镜像
+
+正式部署验收通过后，先用 owner 维护入口查看服务器当前库存。工具通过 SSH 流式执行当前 checkout 中的代码，默认只生成只读计划：
+
+```bash
+./cleanup-backend-images.sh ubuntu@ten-kr /home/ubuntu/open-agricola > image-cleanup-plan.json
+```
+
+核对全部 `remove` 项，再固定已验收的完整 build SHA 执行：
+
+```bash
+./cleanup-backend-images.sh ubuntu@ten-kr /home/ubuntu/open-agricola \
+  --execute --expected-build <accepted-full-sha>
+```
+
+两种模式均取得 `backups/.maintenance.lock`。执行模式在锁内重新盘点并生成计划，每个候选删除前再次核对。预期 build 必须与运行中的正式 app、`data/deployed-build-id`、`data/deployed-image.json` 和 `.env` 中的不可变选择器一致。保存的计划不能直接授权删除。
+
+清理会保护任意容器引用的镜像，包括已停止的容器，以及当前部署绑定和最近 30 天内创建的最多 5 个历史应用 build。所有仍保留的备份 archive 及其 manifest 都会保护 source 和 target build。最近 30 天内最新 5 次 image import/source 审计记录也保护绑定的镜像。owner request 或 maintenance admission 尚未过期的已导入镜像，在这 5 次限制之外继续保护。更早的审计文件继续保留为证据，不永久固定镜像。已确认属于正式应用、但没有 build 标识的旧镜像，在创建后的前 30 天内保护；时间窗口依据原生创建时间。
+
+单独进行恢复时，可创建 owner 拥有的 `data/backend-image-recovery.json`，字段为 `format: 1`、UTC 格式的 `createdAt` 与 `expiresAt`、包含完整原生 ID 的 `images` 和包含完整 build SHA 的 `builds`。到期时间必须晚于创建时间，间隔最多 30 天。到期绑定不再保护镜像；保留备份的绑定则持续有效，直到备份保留策略删除对应 archive。
+
+候选必须由 formal-candidate 导入回执，或旧版 Compose 的 `open-agricola` 项目及 `app` service 标签证明归属。仅有 stable 通道标签不足以证明正式应用归属，因为预发布 policy 工具镜像也使用该通道。全部历史正式导入回执都可证明归属，但不会延长保护窗口。归属、build 元数据、tag 或 digest repository 未知的镜像保持不动。历史镜像有多个已知项目引用时，工具逐个重验后用 `docker image rm --no-prune` 删除多余引用，再按完整原生 image ID 无 force 删除。新增容器引用会让镜像保留，或由 Docker 拒绝删除。工具不停止容器，不清理 volume、依赖、Caddy、监控镜像、其他项目、owner 本机 Docker 或 GHCR package。
+
+执行计划与结果写入服务器私有的 `backups/.image-cleanup-<UUID>/result.json`，目录权限为 `0700`，文件权限为 `0600`。失败保留诊断并返回非零状态。重试前检查结果；每次重试都会重新生成计划。库存输出只包含镜像身份、引用、选定标签、创建时间、大小和 build 绑定，不打印应用环境变量值或凭据。
+
 ### 前端
 
 Pages 前端与后端使用相同的目标构建标识。发布 GitHub Release 后，既有 workflow 部署 `dist-pages/`（见上文「触发部署」），随后校验前端域实际提供的文件。可选同源前端仍随后端镜像交付。
