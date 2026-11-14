@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, randomBytes } from 'node:crypto'
 import {
   isPrereleaseIdentityAuthorized, PRERELEASE_SESSION_MAX_AGE_MS,
   type PrereleaseIdentityState, type PrereleaseIdentityEvent,
@@ -23,6 +23,16 @@ type FailureKind = 'paused' | 'expired'
 type SessionFailure = Pick<Lease, 'userId' | 'grantId'> & { kind: FailureKind; reason: PrereleaseInvalidation['reason'] }
 type IssuedSession = Pick<SessionRow, 'token_hash' | 'user_id' | 'grant_id' | 'expires_at' | 'revoked_at' | 'generation_id' | 'build_id'>
 type InvalidationCheckpoint = Pick<PrereleaseRuntime, 'buildId' | 'generationId'> & { sequence: number; runtimeSequence: number }
+type BrowserHandoff = {
+  browser_verifier: string; state: string; return_path: string; expires_at: number
+  source_user_id: string | null; source_grant_id: string | null; handoff_request_hash: string | null; exchanged_at: number | null
+  binding_build_id: string | null; binding_generation_id: string | null; binding_target_origin: string | null
+  started_sequence: number | null
+}
+type HandoffReceipt = {
+  pending: BrowserHandoff; returnPath: string; userId: string; grantId: string; exchangedAt: number; startedSequence: number
+  initialState?: PrereleaseIdentityState
+}
 
 const handoffFailure = (state: PrereleaseIdentityState, now: number): 'expired' | 'paused' =>
   state.account.kind === 'deleted' || !state.betaAccess || state.source.kind === 'invalid' || state.source.expiresAt <= now
@@ -55,6 +65,7 @@ export class PrereleaseSessions {
   private eraseAccount: (userId: string) => Promise<void>
   private readonly leases = new Map<string, Lease>()
   private runtimeSequence = 0
+  private closed = false
   private readonly invalidations = new PrereleaseInvalidations()
   private readonly deletedUsers = new Set<string>()
   private readonly blockedUsers = new Set<string>()
@@ -87,7 +98,7 @@ export class PrereleaseSessions {
     return { sequence: this.invalidations.checkpoint(), runtimeSequence: this.runtimeSequence, buildId: this.runtime.buildId, generationId: this.runtime.generationId }
   }
   private invalidatedSince(checkpoint: InvalidationCheckpoint, subject: InvalidationSubject): boolean {
-    return checkpoint.runtimeSequence !== this.runtimeSequence || checkpoint.buildId !== this.runtime.buildId || checkpoint.generationId !== this.runtime.generationId
+    return this.closed || checkpoint.runtimeSequence !== this.runtimeSequence || checkpoint.buildId !== this.runtime.buildId || checkpoint.generationId !== this.runtime.generationId
       || this.invalidations.changedSince(checkpoint.sequence, subject)
   }
   private async classifyIssued(userId: string, grantId: string | undefined, kind: FailureKind, reason: PrereleaseInvalidation['reason'], checkpoint = this.checkpoint()) {
@@ -114,7 +125,7 @@ export class PrereleaseSessions {
     for (const listener of this.listeners) listener(event)
   }
   private leaseAuthorized(lease: Lease): boolean {
-    return !this.deletedUsers.has(lease.userId) && !this.blockedUsers.has(lease.userId) && !this.blockedGrants.has(lease.grantId) && lease.buildId === this.runtime.buildId && lease.generationId === this.runtime.generationId && this.now() < lease.expiresAt
+    return !this.closed && !this.deletedUsers.has(lease.userId) && !this.blockedUsers.has(lease.userId) && !this.blockedGrants.has(lease.grantId) && lease.buildId === this.runtime.buildId && lease.generationId === this.runtime.generationId && this.now() < lease.expiresAt
       && isPrereleaseIdentityAuthorized(lease.state, this.now(), this.runtime.generationId)
   }
   cachedAuthorized(token: string, expected: { buildId?: string; generationId?: string } = {}): boolean {
@@ -136,17 +147,46 @@ export class PrereleaseSessions {
     return new PrereleaseIdentityError(denied ? 'expired' : 'paused', 'Identity changed during handoff')
   }
   async beginHandoff(returnPath = '/open-agricola/') {
+    if (this.closed) throw new PrereleaseIdentityError('paused', 'Prerelease consumer is closed')
     const canonicalPath = normalizePrereleaseReturnPath(returnPath)
     if (!canonicalPath) throw new Error('Invalid prerelease return path')
     const cookie = opaque(), verifier = opaque(), state = opaque(), expiresAt = this.now() + 60_000
     await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE expires_at<=?').run(this.now())
-    await this.db.prepare('INSERT INTO prerelease_browser_handoffs(cookie_hash,browser_verifier,state,return_path,expires_at) VALUES(?,?,?,?,?)').run(hash(cookie), verifier, state, canonicalPath, expiresAt)
+    await this.db.prepare(`INSERT INTO prerelease_browser_handoffs(cookie_hash,browser_verifier,state,return_path,expires_at,binding_build_id,binding_generation_id,binding_target_origin,started_sequence)
+      VALUES(?,?,?,?,?,?,?,?,nextval('prerelease_handoff_sequence'))`).run(hash(cookie), verifier, state, canonicalPath, expiresAt, this.runtime.buildId, this.runtime.generationId, this.runtime.appOrigin)
     const formal = new URL(this.runtime.formalAppOrigin)
     formal.searchParams.set('page', 'prerelease-handoff')
     formal.hash = new URLSearchParams({ browserChallenge: hash(verifier), state, targetOrigin: this.runtime.appOrigin, returnTo: `${this.runtime.formalAppOrigin}/` }).toString()
     return { cookie, formalUrl: formal.href, expiresAt }
   }
+  private async prepareHandoffReceipt(cookie: string, input: HandoffInput, requestHash: string): Promise<HandoffReceipt> {
+    return this.db.transaction(async () => {
+      const pending = await this.db.prepare('SELECT * FROM prerelease_browser_handoffs WHERE cookie_hash=? FOR UPDATE').get<BrowserHandoff>(hash(cookie))
+      if (!pending) throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff')
+      const returnPath = normalizePrereleaseReturnPath(pending.return_path)
+      if (!returnPath || pending.started_sequence === null || pending.expires_at <= this.now() || pending.state !== input.state || hash(pending.browser_verifier) !== input.browserChallenge
+        || pending.binding_build_id !== this.runtime.buildId || pending.binding_generation_id !== this.runtime.generationId || pending.binding_target_origin !== this.runtime.appOrigin) throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff')
+      if (pending.source_grant_id !== null) {
+        if (pending.handoff_request_hash !== requestHash || pending.source_user_id === null || pending.exchanged_at === null) throw new PrereleaseIdentityError('invalid', 'Handoff receipt binding changed')
+        return { pending, returnPath, userId: pending.source_user_id, grantId: pending.source_grant_id, exchangedAt: pending.exchanged_at, startedSequence: pending.started_sequence }
+      }
+      const state = parsePrereleaseIdentityState(await this.authority.exchange({ code: input.code, browserVerifier: pending.browser_verifier, returnTo: input.returnTo }), this.runtime)
+      if (state.account.kind !== 'active') throw new PrereleaseIdentityError('expired', 'Prerelease source account is unavailable')
+      const userId = state.account.subject.id, exchangedAt = this.now()
+      await this.lockSubject(userId)
+      if (this.deletedUsers.has(userId) || await this.db.prepare('SELECT 1 FROM prerelease_deleted_subjects WHERE user_id=?').get(userId)
+        || await this.db.prepare('SELECT 1 FROM prerelease_revoked_grants WHERE grant_id=?').get(state.grantId)) throw new PrereleaseIdentityError('expired', 'Revoked prerelease identity')
+      await this.db.prepare(`UPDATE prerelease_browser_handoffs SET source_user_id=?,source_grant_id=?,handoff_request_hash=?,exchanged_at=? WHERE cookie_hash=?`)
+        .run(userId, state.grantId, requestHash, exchangedAt, hash(cookie))
+      return { pending, returnPath, userId, grantId: state.grantId, exchangedAt, initialState: state, startedSequence: pending.started_sequence }
+    })()
+  }
+  private async assertCallbackNotLoggedOut(userId: string, startedSequence: number): Promise<void> {
+    const row = await this.db.prepare('SELECT logout_all_sequence FROM prerelease_external_identities WHERE user_id=?').get<{ logout_all_sequence: number }>(userId)
+    if (row && row.logout_all_sequence > startedSequence) throw new PrereleaseIdentityError('expired', 'Callback predates account-wide logout')
+  }
   async exchangeHandoff(cookie: string, input: HandoffInput, currentToken = ''): Promise<PrereleaseSession & { token: string; returnPath: string }> {
+    if (this.closed) throw new PrereleaseIdentityError('paused', 'Prerelease consumer is closed')
     if (input.protocolVersion !== 1 || !secret(input.code) || !secret(input.state) || !secret(input.browserChallenge) || input.returnTo !== `${this.runtime.formalAppOrigin}/`) throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff')
     const requestHash = hash(JSON.stringify([input.protocolVersion, input.code, input.state, input.browserChallenge, input.returnTo]))
     const checkpoint = this.checkpoint()
@@ -163,15 +203,24 @@ export class PrereleaseSessions {
       }
     }
     if (!secret(cookie)) throw new PrereleaseIdentityError(this.status(currentToken) === 'expired' ? 'expired' : 'invalid', 'Invalid prerelease handoff')
+    const receipt = await this.prepareHandoffReceipt(cookie, input, requestHash)
+    const state = receipt.initialState ?? parsePrereleaseIdentityState(await this.authority.status(receipt.grantId), this.runtime, receipt.grantId)
+    if (state.account.kind !== 'active' || state.account.subject.id !== receipt.userId) throw new PrereleaseIdentityError('expired', 'Handoff subject changed')
+    if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) throw new PrereleaseIdentityError(handoffFailure(state, this.now()), 'Prerelease access unavailable')
+    await this.assertCallbackNotLoggedOut(receipt.userId, receipt.startedSequence)
+    if (this.invalidatedSince(checkpoint, { userId: receipt.userId, grantId: receipt.grantId })) throw this.handoffRace(state)
+    const user = this.user(state)
+    const token = createHmac('sha256', receipt.pending.browser_verifier).update(JSON.stringify([
+      'open-agricola:pre-callback-session:v1', cookie, requestHash, this.runtime.appOrigin, this.runtime.buildId, this.runtime.generationId,
+    ])).digest('base64url')
     const exchanged = await this.db.transaction(async () => {
-      const pending = await this.db.prepare('SELECT * FROM prerelease_browser_handoffs WHERE cookie_hash=? FOR UPDATE').get<{ browser_verifier: string; state: string; return_path: string; expires_at: number }>(hash(cookie))
-      if (!pending) throw new PrereleaseIdentityError(this.status(currentToken) === 'expired' ? 'expired' : 'invalid', 'Invalid prerelease handoff')
-      const returnPath = normalizePrereleaseReturnPath(pending.return_path)
-      if (!returnPath || pending.expires_at <= this.now() || pending.state !== input.state || hash(pending.browser_verifier) !== input.browserChallenge) throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff')
-      const state = parsePrereleaseIdentityState(await this.authority.exchange({ code: input.code, browserVerifier: pending.browser_verifier, returnTo: input.returnTo }), this.runtime)
-      if (!isPrereleaseIdentityAuthorized(state, this.now(), this.runtime.generationId)) throw new PrereleaseIdentityError(handoffFailure(state, this.now()), 'Prerelease access unavailable')
-      const user = this.user(state), now = this.now(), token = opaque(), expiresAt = Math.min(now + PRERELEASE_SESSION_MAX_AGE_MS, state.grant.expiresAt, state.source.kind === 'active' ? state.source.expiresAt : now)
       await this.lockSubject(user.id)
+      await this.assertCallbackNotLoggedOut(user.id, receipt.startedSequence)
+      const pending = await this.db.prepare('SELECT * FROM prerelease_browser_handoffs WHERE cookie_hash=? FOR UPDATE').get<BrowserHandoff>(hash(cookie))
+      if (!pending || pending.expires_at <= this.now() || pending.handoff_request_hash !== requestHash
+        || pending.source_user_id !== user.id || pending.source_grant_id !== state.grantId || pending.binding_build_id !== this.runtime.buildId
+        || pending.binding_generation_id !== this.runtime.generationId || pending.binding_target_origin !== this.runtime.appOrigin) throw new PrereleaseIdentityError('invalid', 'Invalid prerelease handoff receipt')
+      const now = this.now()
       if (this.deletedUsers.has(user.id) || await this.db.prepare('SELECT 1 FROM prerelease_deleted_subjects WHERE user_id=?').get(user.id)
         || await this.db.prepare('SELECT 1 FROM prerelease_revoked_grants WHERE grant_id=?').get(state.grantId)) throw new PrereleaseIdentityError('expired', 'Revoked prerelease identity')
       const existing = await this.db.prepare('SELECT identity_origin FROM users WHERE id=? OR username=?').get<{ identity_origin: string }>(user.id, user.username)
@@ -180,13 +229,17 @@ export class PrereleaseSessions {
         ON CONFLICT(id) DO UPDATE SET username=excluded.username,display_name=excluded.display_name`).run(user.id, user.username, user.displayName, now)
       await this.db.prepare(`INSERT INTO prerelease_external_identities(user_id,source_grant_id,generation_id) VALUES(?,?,?)
         ON CONFLICT(user_id) DO UPDATE SET source_grant_id=excluded.source_grant_id,generation_id=excluded.generation_id`).run(user.id, state.grantId, this.runtime.generationId)
+      const previous = await this.db.prepare('SELECT * FROM prerelease_sessions WHERE token_hash=? FOR UPDATE').get<SessionRow>(hash(token))
+      if (previous && (previous.user_id !== user.id || previous.grant_id !== state.grantId || previous.revoked_at !== null
+        || previous.expires_at <= now || previous.build_id !== this.runtime.buildId || previous.generation_id !== this.runtime.generationId)) throw new PrereleaseIdentityError('expired', 'Callback session was revoked')
+      const expiresAt = previous?.expires_at ?? Math.min(receipt.exchangedAt + PRERELEASE_SESSION_MAX_AGE_MS, state.grant.expiresAt, state.source.kind === 'active' ? state.source.expiresAt : now)
       await this.db.prepare(`INSERT INTO prerelease_sessions(token_hash,user_id,grant_id,generation_id,build_id,created_at,expires_at,identity_state,handoff_request_hash,handoff_return_path)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(hash(token), user.id, state.grantId, this.runtime.generationId, this.runtime.buildId, now, expiresAt, JSON.stringify(state), requestHash, returnPath)
-      await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE cookie_hash=?').run(hash(cookie))
+        VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(token_hash) DO UPDATE SET identity_state=excluded.identity_state`)
+        .run(hash(token), user.id, state.grantId, this.runtime.generationId, this.runtime.buildId, now, expiresAt, JSON.stringify(state), requestHash, receipt.returnPath)
       if (this.invalidatedSince(checkpoint, { userId: user.id, grantId: state.grantId })) throw this.handoffRace(state)
-      return { token, user, state, expiresAt, returnPath }
+      return { expiresAt, returnPath: receipt.returnPath }
     })()
-    const { token, user, state, expiresAt, returnPath } = exchanged
+    const { expiresAt, returnPath } = exchanged
     if (this.invalidatedSince(checkpoint, { userId: user.id, grantId: state.grantId })) throw this.handoffRace(state)
     this.blockedUsers.delete(user.id)
     const lease = { state, userId: user.id, grantId: state.grantId, expiresAt, buildId: this.runtime.buildId, generationId: this.runtime.generationId }
@@ -271,6 +324,7 @@ export class PrereleaseSessions {
       } else if (reason === 'account_deleted') {
         await this.db.prepare('INSERT INTO prerelease_deleted_subjects(user_id,deleted_at) VALUES(?,?) ON CONFLICT DO NOTHING').run(row.user_id, this.now())
         await this.db.prepare('UPDATE prerelease_sessions SET revoked_at=? WHERE user_id=?').run(this.now(), row.user_id)
+        await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE source_user_id=?').run(row.user_id)
       } else await this.pauseSubject(row.user_id, 'expired', checkpoint)
       if (reason !== 'beta_changed') await this.classifyIssued(row.user_id, reason === 'source_revoked' ? row.grant_id : undefined, 'expired', reason)
     })()
@@ -296,6 +350,8 @@ export class PrereleaseSessions {
       await this.lockSubject(row.user_id)
       const current = await this.readPersisted(token, { lock: 'update' })
       if (!current || current.user.id !== row.user_id) return null
+      await this.db.prepare(`UPDATE prerelease_external_identities SET logout_all_sequence=nextval('prerelease_handoff_sequence'),revision=revision+1 WHERE user_id=?`).run(row.user_id)
+      await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE source_user_id=?').run(row.user_id)
       return revoke()
     })() : await revoke()
     if (revoked === null) {
@@ -320,6 +376,7 @@ export class PrereleaseSessions {
           await this.db.prepare('INSERT INTO prerelease_deleted_subjects(user_id,deleted_at) VALUES(?,?) ON CONFLICT DO NOTHING').run(event.userId, this.now())
           await this.db.prepare('UPDATE prerelease_external_identities SET revision=revision+1 WHERE user_id=?').run(event.userId)
           await this.db.prepare('UPDATE prerelease_sessions SET revoked_at=? WHERE user_id=?').run(this.now(), event.userId)
+          await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE source_user_id=?').run(event.userId)
           await this.classifyIssued(event.userId, undefined, 'expired', 'account_deleted')
         })()
         // Shared invalidation must commit before it drains Room queues and erases payloads.
@@ -355,8 +412,10 @@ export class PrereleaseSessions {
     await this.db.prepare('UPDATE prerelease_processed_identity_events SET acknowledged_at=? WHERE event_id=?').run(this.now(), event.id)
   }
   async refreshActive(): Promise<void> {
+    if (this.closed) return
     if (this.refreshing) return this.refreshing
     this.refreshing = (async () => {
+      await this.db.prepare('DELETE FROM prerelease_browser_handoffs WHERE expires_at<=?').run(this.now())
       for (const lease of this.leases.values()) if (!this.leaseAuthorized(lease)) {
         this.invalidate({ userId: lease.userId, grantId: lease.grantId, reason: 'expired' })
       }
@@ -393,7 +452,7 @@ export class PrereleaseSessions {
     this.timer = setInterval(() => { void this.refreshActive().catch(() => { /* Existing absolute leases remain unchanged on an outage. */ }) }, 1000)
     this.timer.unref()
   }
-  close() { this.runtimeSequence++; if (this.timer) clearInterval(this.timer); this.timer = undefined; this.leases.clear() }
+  close() { this.closed = true; this.runtimeSequence++; if (this.timer) clearInterval(this.timer); this.timer = undefined; this.leases.clear() }
 }
 
 let singleton: PrereleaseSessions | undefined

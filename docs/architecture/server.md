@@ -141,7 +141,7 @@ HTTP owns product APIs, operations and debugging. WebSocket commands remain the 
 - `GET /api/health`, `/api/rooms`, `/api/game/state` and `/cards-manifest.json` expose health, discovery, snapshots and metadata.
 - `POST /api/game/new` maps WebSocket creation options through `game/game-setup-options.ts`; `load`, `dev/*` and `new-sandbox` are debugging and Workshop entry points.
 - `oauth/{handler,store}.ts` owns provider start/callback/completion. PKCE binds account linking; a browser challenge binds registration tickets. Explicit invalid credentials never fall back to Cookie identity. Account, identity, invite and ticket consumption commit together. Callbacks use fragments, `no-store` and `no-referrer`.
-- `prerelease-sessions.ts` owns external principals, session hashes, retries and absolute leases. Bounded token/grant/user fences cover unknown handoffs and runtime closure. Reads honor caller DB/time/locks without refresh/cache. `prerelease-access.ts` gates HTTP, commands and publication; revocation disconnects. Erasure precedes receipts. Native views and key-free `scripts/prerelease/identity-audit.ts` own restore remapping.
+- `prerelease-sessions.ts` owns external principals and absolute leases. Browser-bound receipts commit before projection; retries recheck the same grant without consuming code again. Logout-all fences earlier callbacks. Bounded token/grant/user fences and closure remain; reads honor DB/time/locks without refresh/cache. `prerelease-access.ts` gates HTTP/commands/publication and disconnects revocations. Erasure precedes ACK; native views and key-free `scripts/prerelease/identity-audit.ts` own restore remapping.
 - `prerelease-authority{,-routes}.ts` owns formal handoff, target-key exchange/status and durable events. Migrations 037/039 bind source revocation and owner generation audits; only formal administrators activate or retire generations. Browser entry uses the shared Origin/protocol policy. Tests: `{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`; policy: ADR 0042.
 
 Auth tests: `auth-routes.test.ts`, `oauth/__tests__/store.test.ts`, `e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`.
@@ -194,9 +194,9 @@ Tests: `server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submis
 
 ## Database
 
-- `server/db.ts` owns the asynchronous PostgreSQL connection through `pg`: transactions keep one connection across awaits, nested transactions use savepoints, and native migrations run under an advisory lock before startup. There is no SQLite or JSON runtime fallback.
+- `server/db.ts` owns PostgreSQL through `pg`: transactions retain one connection across awaits, nesting uses savepoints, and startup migrations take an advisory lock. There is no runtime database fallback.
 - `scripts/import-sqlite.ts` imports a stopped schema-33 SQLite database through exact comparisons and blocks on damaged recorded games, and `data_imports` keeps a failed import behind a startup barrier; `scripts/validate-backup.ts` validates a PostgreSQL / S3 restore.
-- `schema.sql` and ordered migrations define product tables. Replay segments use `checkpointStepNo`; evidence payloads, quotas and webhook delivery have no parallel storage tables.
+- `schema.sql` and migrations define product tables. Replay uses `checkpointStepNo`; evidence, quotas and webhooks have no parallel storage.
 - Games completed before recording are `legacy_no_replay`: they keep their result summary but have no Replay header or Frames.
 
 ## GitHub delivery, security and deletion
