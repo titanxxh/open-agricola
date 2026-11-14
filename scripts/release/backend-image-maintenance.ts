@@ -1,11 +1,12 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { accessSync, chmodSync, closeSync, constants, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { performance } from 'node:perf_hooks'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fullSha } from '../ci/verification-tasks.ts'
-import { BACKEND_IMAGE_CLEANUP_MS, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS, BACKEND_IMAGE_MAINTENANCE_WORK_MS, BACKEND_IMAGE_QUEUE_WAIT_MS, admitBackendImageOperation, pinBackendDocker, readBackendImageOperation, startBackendImageOperation, verifyReceivedBackendImage, type BackendImageRequest } from './backend-image-receiver.ts'
+import { BACKEND_IMAGE_CLEANUP_MS, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS, BACKEND_IMAGE_MAINTENANCE_WORK_MS, BACKEND_IMAGE_QUEUE_WAIT_MS, admitBackendImageOperation, backendImageRequestBinding, inspectReceivedBackendImage, pinBackendDocker, readBackendImageEvidence, readBackendImageOperation, startBackendImageOperation, verifyReceivedBackendImage, type BackendImageRequest } from './backend-image-receiver.ts'
+import { BACKEND_RESUME_WORK_MS, backendEvidenceHash, privateBackendEvidence, readBackendProgress, validateBackendResumeAuthorization, writeBackendProgress, type BackendProgress } from './backend-image-progress.ts'
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid native backend inventory')
@@ -159,6 +160,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
       service.pull_policy = 'never'
       if (name === 'app') {
         service.image = image
+        service.labels = { ...object(service.labels ?? {}), 'org.open-agricola.backend-operation': request.operationId }
         service.environment = { ...targetEnv, GAME_BUILD_ID: request.sourceSha, RELEASE_CHANNEL: 'stable', NODE_ENV: 'production' }
       } else service.image = caddyImage
       services[name] = service
@@ -225,6 +227,14 @@ export function maintainBackendImage(path: string, expected: Target): void {
       if (proof.formatVersion !== 1 || proof.targetBuildId !== request.sourceSha || proof.database !== 'empty' || proof.objects !== 'empty') throw new Error('Fixed target did not prove the new storage empty')
       writeFileSync(join(request.stage, 'empty-storage.json'), JSON.stringify(proof) + '\n', { flag: 'wx', mode: 0o600, flush: true })
     }
+    const storagePath = bootstrap ? join(request.stage, 'empty-storage.json') : join(root, 'backups', `pre-${request.sourceSha.slice(0, 12)}-${request.operationId}.manifest.json`)
+    const sealedStorage = object(JSON.parse(privateBackendEvidence(storagePath).toString('utf8'))), liveStartedAt = Date.now()
+    let progress: BackendProgress = { format: 1, operationId: request.operationId, bindingSha256: backendImageRequestBinding(request), phase: 'validating',
+      liveStartedAt, updatedAt: liveStartedAt, validatorExitCode: null,
+      composeSha256: backendEvidenceHash(privateBackendEvidence(composePath)), imageSha256: backendEvidenceHash(privateBackendEvidence(join(request.stage, 'image.json'))),
+      storageSha256: backendEvidenceHash(privateBackendEvidence(storagePath)), sourceSha256: bootstrap ? null : backendEvidenceHash(privateBackendEvidence(join(request.stage, 'source.json'))),
+      validationSha256: backendEvidenceHash(JSON.stringify(Object.fromEntries(validationKeys.map(key => [key, bootstrap ? key === 'replaySchemaVersions' ? [] : 0 : sealedStorage[key]])))) }
+    writeBackendProgress(request, progress)
     installed.write('', bootstrap ? '' : undefined)
     restartOld = false
     const liveName = `oa-formal-live-${request.operationId}`
@@ -252,6 +262,8 @@ export function maintainBackendImage(path: string, expected: Target): void {
       catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Live target validation failed and its owned container cleanup could not be confirmed', { cause: cleanupError }) }
       throw error
     }
+    progress = { ...progress, phase: 'starting', updatedAt: Math.max(progress.liveStartedAt, Date.now()), validatorExitCode: 0 }
+    writeBackendProgress(request, progress)
     drainTarget = () => {
       const failures: unknown[] = []
       for (const service of bootstrap ? ['app', 'caddy'] : ['app']) {
@@ -279,6 +291,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
     if (performance.now() > deadline) throw new Error('Formal backend maintenance deadline expired before publication')
     installed.write(image, caddyImage)
     drainTarget = undefined
+    writeBackendProgress(request, { ...progress, phase: 'accepted', updatedAt: Math.max(progress.liveStartedAt, Date.now()) })
     const archives = readdirSync(join(root, 'backups')).filter(name => /^pre-[A-Za-z0-9._-]+\.tgz$/.test(name))
       .map(name => ({ name, modified: statSync(join(root, 'backups', name)).mtimeMs })).sort((a, b) => b.modified - a.modified)
     for (const [index, archive] of archives.entries()) {
@@ -305,9 +318,247 @@ export function maintainBackendImage(path: string, expected: Target): void {
   } finally { unpin() }
 }
 
+export type BackendOperationStatus = {
+  kind: 'backend-image-operation'; operationId: string; sourceSha: string; producerSha: string; bindingSha256: string;
+  state: 'running' | 'resumable' | 'accepted' | 'blocked' | 'unknown'; phase: 'prepared' | BackendProgress['phase'];
+  nextAction: 'wait' | 'resume' | 'none' | 'inspect'; validatorExitCode: 0 | null; reason?: string;
+}
+
+class BackendEvidenceMismatch extends Error {}
+function requireEvidence(condition: unknown, reason: string): asserts condition {
+  if (!condition) throw new BackendEvidenceMismatch(reason)
+}
+export const BACKEND_CHECKPOINT_QUERY = `import {PostgresDatabase} from './server/database/postgres.ts';
+const db=new PostgresDatabase({connectionString:process.env.DATABASE_URL,schema:process.env.DATABASE_SCHEMA});
+try{const result=await db.transaction(async()=>{
+await db.exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+await db.exec('SET LOCAL statement_timeout=8000');
+const barrier=await db.prepare('SELECT status,report_json,updated_at FROM data_imports WHERE source_hash=?').get('target-build:'+process.argv[1]);
+const bad=await db.prepare("SELECT count(*) AS count FROM data_imports WHERE status!='validated'").get();
+const active=await db.prepare("SELECT count(*) AS count FROM app_instances WHERE status!='stopped' AND lease_until>(extract(epoch FROM clock_timestamp())*1000)::bigint").get();
+const foreign=await db.prepare("SELECT count(*) AS count FROM app_instances WHERE status!='stopped' AND generation<>? AND lease_until>(extract(epoch FROM clock_timestamp())*1000)::bigint").get(process.argv[1]);
+return {barrier,bad:Number(bad.count),active:Number(active.count),foreign:Number(foreign.count)};})();console.log(JSON.stringify(result));}finally{await db.close();}`
+const validationKeys = ['roomCount', 'replayCount', 'replayHeadCount', 'replayStepCount', 'replaySegmentCount', 'retainedObjectCount', 'replaySchemaVersions']
+
+function operationSummary(request: BackendImageRequest, progress?: BackendProgress): BackendOperationStatus {
+  return { kind: 'backend-image-operation', operationId: request.operationId, sourceSha: request.sourceSha, producerSha: request.producerSha,
+    bindingSha256: backendImageRequestBinding(request), state: 'unknown', phase: progress?.phase ?? 'prepared', nextAction: 'inspect', validatorExitCode: progress?.validatorExitCode ?? null }
+}
+
+function observeBackendOperation(path: string, expected: Target, workMs: number) {
+  const { request, admission } = readBackendImageEvidence(path, expected), progress = readBackendProgress(request), root = request.directory
+  requireEvidence(admission?.phase === 'running' && progress.liveStartedAt >= admission.startedAt && progress.liveStartedAt <= admission.workDeadline,
+    'progress-outside-original-admission')
+  requireEvidence(resolve(import.meta.dirname, '../..') === join(request.stage, 'policy'), 'staged-producer-required')
+  const deadline = performance.now() + workMs
+  const run = (command: string, args: string[], timeout = 30_000): string => {
+    const remaining = Math.floor(deadline - performance.now())
+    requireEvidence(remaining > 0, 'observation-deadline-expired')
+    return execute(command, args, root, process.env, Math.min(remaining, timeout))
+  }
+  const docker = (args: string[]) => run('docker', args)
+  const inspect = (id: string): Record<string, unknown> => {
+    requireEvidence(/^[a-f0-9]{12,64}$/.test(id), 'invalid-native-container')
+    const result: unknown = JSON.parse(docker(['inspect', id]))
+    requireEvidence(Array.isArray(result) && result.length === 1, 'ambiguous-native-container')
+    const value = object(result[0]); requireEvidence(value.Id === id, 'native-container-identity-changed'); return value
+  }
+  const policy = join(request.stage, 'policy')
+  const tree = run('git', ['ls-tree', '-r', '--format=%(objectname)%x09%(path)', request.producerSha, 'package.json', 'scripts/ci', 'scripts/release', 'scripts/image-intake.ts', 'scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs'])
+  requireEvidence(tree.length > 0, 'producer-policy-missing')
+  for (const row of tree.split('\n')) {
+    const [blob, file] = row.split('\t')
+    requireEvidence(/^[a-f0-9]{40}$/.test(blob ?? '') && typeof file === 'string' && !file.split('/').includes('..'), 'invalid-producer-tree')
+    const filePath = join(policy, file), info = lstatSync(filePath)
+    requireEvidence(info.isFile() && !info.isSymbolicLink() && info.size <= 8 * 1024 * 1024, 'invalid-producer-file')
+    const bytes = readFileSync(filePath), actual = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
+    requireEvidence(actual === blob, 'staged-producer-changed')
+  }
+  requireEvidence(run('git', ['rev-parse', 'HEAD']) === request.sourceSha && !run('git', ['status', '--porcelain', '--untracked-files=no']), 'candidate-source-changed')
+  const composePath = join(request.stage, 'maintenance.compose.json'), composeBytes = privateBackendEvidence(composePath)
+  requireEvidence(backendEvidenceHash(composeBytes) === progress.composeSha256
+    && backendEvidenceHash(privateBackendEvidence(join(request.stage, 'image.json'))) === progress.imageSha256, 'staged-image-or-compose-changed')
+  const config = object(JSON.parse(composeBytes.toString('utf8'))), services = object(config.services), app = object(services.app), caddy = object(services.caddy), targetEnv = object(app.environment)
+  const image = inspectReceivedBackendImage(path, expected, docker)
+  requireEvidence(typeof config.name === 'string' && !!config.name && app.image === image && app.pull_policy === 'never' && !app.build
+    && caddy.pull_policy === 'never' && !caddy.build && typeof caddy.image === 'string' && /^sha256:[a-f0-9]{64}$/.test(caddy.image)
+    && targetEnv.GAME_BUILD_ID === request.sourceSha && targetEnv.RELEASE_CHANNEL === 'stable', 'staged-native-target-changed')
+  const compose = (args: string[], timeout?: number): string => run('docker', ['compose', '-f', composePath, ...args], timeout)
+  const live = docker(['ps', '-a', '-q', '--filter', `name=^/oa-formal-live-${request.operationId}$`]).split('\n').filter(Boolean)
+  requireEvidence(live.length === 0, 'validator-still-present')
+  const installed = installedImageBinding(root)
+  const appIds = compose(['ps', '-a', '-q', 'app']).split('\n').filter(Boolean)
+  requireEvidence(appIds.length === 1 || request.installation.kind === 'bootstrap' && appIds.length === 0, 'ambiguous-application-inventory')
+  const current = appIds.length ? inspect(appIds[0]) : null, currentState = current ? object(current.State) : { Running: false }, currentEnv = current ? environment(object(current.Config).Env) : {}
+  const running = currentState.Running === true
+  const currentLabels = current ? object(object(current.Config).Labels) : {}
+  const exactTarget = current !== null && current.Image === image && currentEnv.GAME_BUILD_ID === request.sourceSha && currentEnv.RELEASE_CHANNEL === 'stable'
+    && currentLabels['com.docker.compose.project'] === config.name && currentLabels['com.docker.compose.service'] === 'app'
+    && currentLabels['org.open-agricola.backend-operation'] === request.operationId
+  const nativeTarget = running && exactTarget
+  requireEvidence(!running || nativeTarget, 'foreign-application-running')
+  if (nativeTarget) {
+    requireEvidence(currentState.OOMKilled === false && object(currentState.Health).Status === 'healthy', 'target-not-healthy')
+  } else if (exactTarget) {
+    requireEvidence(currentState.Running === false && currentState.OOMKilled === false && currentState.ExitCode === 0, 'stopped-target-not-clean')
+  } else if (request.installation.kind !== 'bootstrap') {
+    const source = object(JSON.parse(privateBackendEvidence(join(request.stage, 'source.json')).toString('utf8')))
+    requireEvidence(current !== null && current.Id === source.id, 'unknown-stopped-application')
+    const old = current, oldState = object(old.State), oldEnv = environment(object(old.Config).Env)
+    requireEvidence(old.Image === source.image && oldEnv.GAME_BUILD_ID === source.build && oldState.Running === false
+      && oldState.OOMKilled === false && oldState.ExitCode === 0, 'retained-source-not-cleanly-stopped')
+  } else requireEvidence(current === null, 'unknown-bootstrap-application')
+  const caddyId = compose(['ps', '-a', '-q', 'caddy']), currentCaddy = caddyId ? inspect(caddyId) : null
+  requireEvidence(currentCaddy ? currentCaddy.Image === caddy.image && object(currentCaddy.State).OOMKilled === false : request.installation.kind === 'bootstrap', 'caddy-native-image-changed')
+  const probeName = `oa-formal-status-${request.operationId}-${randomUUID().slice(0, 8)}`
+  let proof: Record<string, unknown>
+  try {
+    proof = object(JSON.parse(compose(['run', '--rm', '--name', probeName, '--label', `org.open-agricola.backend-operation=${request.operationId}`,
+      '--label', 'org.open-agricola.backend-phase=status-query', '--no-deps', '--pull', 'never', 'app', 'node', '--import', 'tsx', '--input-type=module', '-e', BACKEND_CHECKPOINT_QUERY, request.sourceSha], 60_000)))
+  } finally {
+    const cleanupDeadline = performance.now() + 30_000
+    const cleanup = (args: string[]) => {
+      const remaining = Math.floor(cleanupDeadline - performance.now())
+      requireEvidence(remaining > 0, 'status-query-cleanup-deadline-expired')
+      return execute('docker', args, root, process.env, remaining)
+    }
+    const ids = cleanup(['ps', '-a', '-q', '--filter', `name=^/${probeName}$`]).split('\n').filter(Boolean)
+    requireEvidence(ids.length <= 1, 'ambiguous-status-query-container')
+    for (const id of ids) {
+      requireEvidence(/^[a-f0-9]{12,64}$/.test(id), 'invalid-status-query-container')
+      const values: unknown = JSON.parse(cleanup(['inspect', id]))
+      requireEvidence(Array.isArray(values) && values.length === 1, 'invalid-status-query-inspection')
+      const container = object(values[0]), labels = object(object(container.Config).Labels)
+      requireEvidence(container.Id === id && container.Image === image && labels['org.open-agricola.backend-operation'] === request.operationId
+        && labels['org.open-agricola.backend-phase'] === 'status-query', 'foreign-status-query-container')
+      cleanup(['rm', '-f', '-v', id])
+    }
+  }
+  const barrier = object(proof.barrier), report = object(JSON.parse(String(barrier.report_json)))
+  requireEvidence(barrier.status === 'validated' && typeof barrier.updated_at === 'number' && barrier.updated_at >= progress.liveStartedAt
+    && barrier.updated_at <= Date.now() + 60_000 && proof.bad === 0 && proof.foreign === 0
+    && typeof proof.active === 'number' && (nativeTarget || proof.active === 0), 'live-checkpoint-or-writers-invalid')
+  requireEvidence(Object.keys(report).sort().join(',') === [...validationKeys].sort().join(',')
+    && backendEvidenceHash(JSON.stringify(Object.fromEntries(validationKeys.map(key => [key, report[key]])))) === progress.validationSha256, 'live-validation-report-changed')
+  const published = installed.image === image && installed.caddyImage === caddy.image
+  requireEvidence(installed.image === null || published, 'installed-selector-changed')
+  requireEvidence(installed.caddyImage === null || installed.caddyImage === caddy.image, 'installed-caddy-selector-changed')
+  const markers = existsSync(join(root, 'data/deployed-build-id')) && readFileSync(join(root, 'data/deployed-build-id'), 'utf8').trim() === request.sourceSha
+    && existsSync(join(root, 'data/deployed-image.json')) && backendEvidenceHash(readFileSync(join(root, 'data/deployed-image.json'))) === progress.imageSha256
+  const caddyRunning = currentCaddy !== null && object(currentCaddy.State).Running === true
+  const accepted = nativeTarget && published && markers && caddyRunning
+  const result = { request, progress, image, caddyImage: caddy.image, installed, compose, inspect, nativeTarget, caddyRunning, accepted, deadline,
+    status: { ...operationSummary(request, progress), state: accepted ? 'accepted' as const : 'resumable' as const, nextAction: accepted ? 'none' as const : 'resume' as const } }
+  if (accepted && progress.phase === 'accepted') return result
+  let storage: Record<string, unknown>
+  if (request.installation.kind === 'bootstrap') {
+    const bytes = privateBackendEvidence(join(request.stage, 'empty-storage.json'))
+    requireEvidence(progress.sourceSha256 === null && backendEvidenceHash(bytes) === progress.storageSha256, 'empty-storage-proof-changed')
+    const empty = object(JSON.parse(bytes.toString('utf8')))
+    requireEvidence(empty.targetBuildId === request.sourceSha && empty.database === 'empty' && empty.objects === 'empty', 'empty-storage-proof-invalid')
+    storage = Object.fromEntries(validationKeys.map(key => [key, key === 'replaySchemaVersions' ? [] : 0]))
+  } else {
+    const sourceBytes = privateBackendEvidence(join(request.stage, 'source.json'))
+    requireEvidence(backendEvidenceHash(sourceBytes) === progress.sourceSha256, 'retained-source-evidence-changed')
+    const source = object(JSON.parse(sourceBytes.toString('utf8'))), capture = object(services.capture), captureEnv = object(capture.environment)
+    requireEvidence(capture.image === source.image && capture.pull_policy === 'never' && !capture.build, 'retained-source-image-changed')
+    for (const key of ['DATABASE_URL', 'DATABASE_SCHEMA', 'S3_ENDPOINT', 'S3_BUCKET', 'S3_PREFIX', 'S3_REGION', 'S3_FORCE_PATH_STYLE', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']) {
+      requireEvidence((targetEnv[key] ?? '') === (captureEnv[key] ?? ''), 'retained-data-target-changed')
+    }
+    const stem = `pre-${request.sourceSha.slice(0, 12)}-${request.operationId}`, bytes = privateBackendEvidence(join(root, 'backups', `${stem}.manifest.json`))
+    requireEvidence(backendEvidenceHash(bytes) === progress.storageSha256, 'sealed-backup-changed')
+    storage = object(JSON.parse(bytes.toString('utf8')))
+    requireEvidence(storage.formatVersion === 2 && storage.environment === 'stable' && storage.backupStem === stem
+      && storage.sourceBuildId === source.build && storage.targetBuildId === request.sourceSha && typeof storage.validatedAt === 'string'
+      && Date.parse(storage.validatedAt) <= progress.liveStartedAt, 'sealed-backup-binding-changed')
+    for (const [file, digest, size] of [[`${stem}.tgz`, storage.archiveSha256, storage.archiveSizeBytes], [`env-${stem}`, storage.configurationSha256, storage.configurationSizeBytes]]) {
+      requireEvidence(typeof file === 'string' && typeof digest === 'string' && /^[a-f0-9]{64}$/.test(digest) && typeof size === 'number', 'sealed-backup-file-invalid')
+      const filePath = join(root, 'backups', file), info = lstatSync(filePath)
+      requireEvidence(info.isFile() && !info.isSymbolicLink() && info.uid === process.getuid?.() && info.nlink === 1 && !(info.mode & 0o077)
+        && info.size === size && run('sha256sum', [filePath], 120_000).split(/\s/)[0] === digest, 'sealed-backup-file-changed')
+    }
+  }
+  requireEvidence(Object.keys(report).sort().join(',') === [...validationKeys].sort().join(',')
+    && validationKeys.every(key => JSON.stringify(report[key]) === JSON.stringify(storage[key])), 'live-validation-report-changed')
+  return result
+}
+
+export function backendImageOperationStatus(path: string, expected: Target): BackendOperationStatus {
+  const { request } = readBackendImageEvidence(path, expected)
+  let progress: BackendProgress | undefined
+  try {
+    progress = readBackendProgress(request)
+    return observeBackendOperation(path, expected, 120_000).status
+  } catch (error) {
+    return { ...operationSummary(request, progress), state: error instanceof BackendEvidenceMismatch ? error.message === 'validator-still-present' ? 'running' : 'blocked' : 'unknown',
+      nextAction: error instanceof BackendEvidenceMismatch && error.message === 'validator-still-present' ? 'wait' : 'inspect',
+      reason: error instanceof BackendEvidenceMismatch ? error.message : 'native-evidence-unavailable-or-invalid' }
+  }
+}
+
+export function resumeBackendImage(path: string, expected: Target, authorization: string): BackendOperationStatus {
+  const { request } = readBackendImageEvidence(path, expected), workMs = validateBackendResumeAuthorization(authorization, request)
+  requireEvidence(process.env.BACKEND_CONTINUATION_OPERATION === request.operationId, 'continuation-requires-operation-lock')
+  const observed = observeBackendOperation(path, expected, workMs), { progress, image, caddyImage, installed, compose, inspect } = observed
+  let accepted = observed.accepted
+  try {
+    if (!observed.accepted) {
+      if (!observed.nativeTarget || !observed.caddyRunning) compose(['up', '-d', '--remove-orphans', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '120', 'app', 'caddy'], 150_000)
+      const current = inspect(compose(['ps', '-q', 'app'])), env = environment(object(current.Config).Env), state = object(current.State)
+      requireEvidence(current.Image === image && state.Running === true && state.OOMKilled === false && object(state.Health).Status === 'healthy'
+        && env.GAME_BUILD_ID === request.sourceSha && env.RELEASE_CHANNEL === 'stable', 'started-target-identity-changed')
+      const caddy = inspect(compose(['ps', '-q', 'caddy']))
+      requireEvidence(caddy.Image === caddyImage && object(caddy.State).Running === true && object(caddy.State).OOMKilled === false, 'started-caddy-identity-changed')
+      requireEvidence(performance.now() < observed.deadline, 'continuation-deadline-expired-before-acceptance')
+      writeFileSync(join(request.directory, 'data/deployed-build-id'), request.sourceSha + '\n', { mode: 0o600, flush: true })
+      writeFileSync(join(request.directory, 'data/deployed-image.json'), privateBackendEvidence(join(request.stage, 'image.json')), { mode: 0o600, flush: true })
+      installed.write(image, caddyImage)
+      accepted = true
+    }
+    writeBackendProgress(request, { ...progress, phase: 'accepted', updatedAt: Math.max(progress.liveStartedAt, Date.now()) })
+    const archive = join(request.stage, 'image.tar')
+    if (existsSync(archive)) unlinkSync(archive)
+    return { ...operationSummary(request, { ...progress, phase: 'accepted' }), state: 'accepted', nextAction: 'none' }
+  } catch (error) {
+    if (!accepted) {
+      const cleanupDeadline = performance.now() + BACKEND_IMAGE_CLEANUP_MS
+      const cleanup = (args: string[]) => {
+        const remaining = Math.floor(cleanupDeadline - performance.now())
+        requireEvidence(remaining > 0, 'continuation-cleanup-deadline-expired')
+        return execute('docker', args, request.directory, process.env, remaining)
+      }
+      try {
+        const failures: unknown[] = [], project = object(JSON.parse(privateBackendEvidence(join(request.stage, 'maintenance.compose.json')).toString('utf8'))).name
+        for (const service of request.installation.kind === 'bootstrap' ? ['app', 'caddy'] : ['app']) {
+          let ids: string[]
+          try { ids = cleanup(['compose', '-f', join(request.stage, 'maintenance.compose.json'), 'ps', '-a', '-q', service]).split('\n').filter(Boolean) }
+          catch (inspectionError) { failures.push(inspectionError); continue }
+          for (const id of ids) {
+            try {
+              requireEvidence(/^[a-f0-9]{12,64}$/.test(id), 'invalid-unaccepted-target')
+              const values: unknown = JSON.parse(cleanup(['inspect', id]))
+              requireEvidence(Array.isArray(values) && values.length === 1, 'ambiguous-unaccepted-target')
+              const container = object(values[0]), config = object(container.Config), labels = object(config.Labels)
+              requireEvidence(container.Id === id && container.Image === (service === 'app' ? image : caddyImage)
+                && labels['com.docker.compose.project'] === project && labels['com.docker.compose.service'] === service
+                && (service !== 'app' || environment(config.Env).GAME_BUILD_ID === request.sourceSha
+                  && labels['org.open-agricola.backend-operation'] === request.operationId), 'unaccepted-target-identity-changed')
+              cleanup(['stop', '--time', '90', id])
+              const after: unknown = JSON.parse(cleanup(['inspect', id]))
+              requireEvidence(Array.isArray(after) && after.length === 1 && object(after[0]).Id === id && object(object(after[0]).State).Running === false, 'unaccepted-target-did-not-stop')
+            } catch (targetError) { failures.push(targetError) }
+          }
+        }
+        if (failures.length) throw new AggregateError([error, ...failures], 'Could not confirm every unaccepted continuation target stopped', { cause: error })
+      } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Backend continuation failed and target drain could not be confirmed', { cause: cleanupError }) }
+    }
+    throw error
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const [mode, path, directory, sourceSha, producerSha] = process.argv.slice(2)
+    const [mode, path, directory, sourceSha, producerSha, authorization] = process.argv.slice(2)
     if (!path || !directory || !sourceSha || !producerSha) throw new Error('Usage: backend-image-maintenance.ts maintain <request> <directory> <source> <producer>')
     const expected = { directory, sourceSha, producerSha }
     if (mode === 'maintain') {
@@ -315,6 +566,29 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       const result = spawnSync('flock', ['-w', String(BACKEND_IMAGE_QUEUE_WAIT_MS / 1000), join(directory, 'backups/.maintenance.lock'), process.execPath, fileURLToPath(import.meta.url), '_locked', path, directory, sourceSha, producerSha],
         { stdio: 'inherit', timeout: BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS - 60_000, env: { ...process.env, BACKEND_MAINTENANCE_OPERATION: request.operationId } })
       if (result.error || result.status !== 0) throw new Error('Fixed image maintenance failed; inspect the private operation evidence before retrying')
+    } else if (mode === 'status' || mode === 'resume') {
+      const { request } = readBackendImageEvidence(path, expected)
+      if (mode === 'resume' && !authorization) throw new Error('Backend resume requires fresh continuation authorization')
+      const lockPath = join(directory, 'backups/.maintenance.lock')
+      if (!existsSync(lockPath)) {
+        if (mode === 'resume') throw new Error('Backend operation lock is missing; continuation is refused')
+        console.log(JSON.stringify({ ...operationSummary(request), reason: 'operation-lock-missing' }))
+        process.exit(0)
+      }
+      const result = spawnSync('flock', ['-n', '-E', '75', lockPath, process.execPath, fileURLToPath(import.meta.url),
+        mode === 'status' ? '_status' : '_resume', path, directory, sourceSha, producerSha, ...(authorization ? [authorization] : [])],
+      { stdio: 'inherit', timeout: BACKEND_RESUME_WORK_MS + BACKEND_IMAGE_CLEANUP_MS + 30_000, env: { ...process.env, BACKEND_CONTINUATION_OPERATION: request.operationId } })
+      if (result.status === 75) {
+        let progress: BackendProgress | undefined
+        try { progress = readBackendProgress(request) } catch { /* The first journal is written only after storage is sealed. */ }
+        console.log(JSON.stringify({ ...operationSummary(request, progress), state: 'running', nextAction: 'wait' }))
+      }
+      else if (result.error || result.status !== 0) throw new Error('Backend observation or continuation failed; inspect private operation evidence')
+    } else if (mode === '_status') {
+      console.log(JSON.stringify(backendImageOperationStatus(path, expected)))
+    } else if (mode === '_resume' && authorization) {
+      try { console.log(JSON.stringify(resumeBackendImage(path, expected, authorization))) }
+      catch (error) { throw new Error(error instanceof BackendEvidenceMismatch ? error.message : 'Backend continuation evidence or execution failed; inspect private evidence', { cause: error }) }
     } else if (mode === '_locked') {
       startBackendImageOperation(path, { kind: 'maintenance', target: expected, operationId: process.env.BACKEND_MAINTENANCE_OPERATION ?? '' })
       maintainBackendImage(path, expected)
