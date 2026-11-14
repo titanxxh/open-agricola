@@ -153,10 +153,13 @@ export function checkOwnerLocalVerification({ cwd, repository, repositoryId, can
   let statuses: unknown
   try { statuses = read(`${prefix}/commits/${candidateSha}/statuses?per_page=100`, '[]') } catch { return null }
   if (!Array.isArray(statuses)) throw new Error('Invalid native owner-local statuses')
-  const status = statuses.map(object).filter(status => status.context === OWNER_LOCAL_CONTEXT).sort((a, b) => integer(b.id) - integer(a.id))[0]
-  if (!status) return null
+  const candidates = statuses.map(object).filter(status => status.context === OWNER_LOCAL_CONTEXT)
+  if (!candidates.length) return null
   const authority = ownerLocalRepository(read(prefix), repository)
-  if (authority.repositoryId !== repositoryId || integer(object(status.creator).id) !== authority.ownerId || status.state !== 'success') throw new Error('The latest owner-local status was not approved by the native repository owner')
+  if (authority.repositoryId !== repositoryId) throw new Error('Owner-local native repository identity differs')
+  const status = candidates.filter(status => status.creator !== null && typeof status.creator === 'object'
+    && 'id' in status.creator && status.creator.id === authority.ownerId).sort((a, b) => integer(b.id) - integer(a.id))[0]
+  if (!status || status.state !== 'success') return null
   const url = text(status.target_url), marker = /^owner-local sha256:([a-f0-9]{64})$/.exec(text(status.description))
   const expectedPrefix = `https://github.com/${repository}/releases/download/`
   if (!marker || !url.startsWith(expectedPrefix)) throw new Error('Owner-local status must bind its exact native release asset digest')

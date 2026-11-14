@@ -63,6 +63,8 @@ The receipt records every actual `runCandidateTask` command, its exit code and l
 
 The publisher checks the authenticated owner's native user ID, prepares an exact-candidate draft, uploads only `owner-local-verification.json`, and creates the independent `owner-local-verification` commit status. Its description binds the receipt SHA-256; its target is the same repository's formal Release asset. The publisher reads back status creator, Release author, asset uploader and uploaded bytes before publishing. Retry with the same command and receipt to resume this tool's matching draft. The ordinary release path continues to reject drafts.
 
+Only the native owner's statuses select local proof; another actor's matching context cannot select or withdraw it. The owner's latest pending, failure or error status withdraws the local authorization without reviving an older success. Verification then uses the ordinary native GitHub evidence path. A malformed latest owner-success proof still blocks rather than silently falling back.
+
 Pages, backend delivery and private image production independently read this published proof through the common candidate gate. They recheck native identities, the unchanged tag, raw tree, both configurations, commands, times and receipt digest. They never accept arbitrary receipt URLs, another user's status, partial task results or invented Actions IDs. GitHub still performs the real private image and Pages builds. Image provenance, private registry checks, owner transport and runtime guards remain required. The separate Bug Report deployment-feedback command currently rejects owner-local proof; that optional command is not part of release or backend delivery.
 
 ## Publish a fixed prerelease candidate
