@@ -26,6 +26,17 @@ describe('container image receipts', () => {
       url: 'https://github.com/titanxxh/open-agricola/releases/download/v0.12.9/owner-local-verification.json' } }
     expect(parseContainerImageReceipt(receipt)).toEqual(receipt)
     expect(() => parseContainerImageReceipt({ ...receipt, purpose: 'candidate', channel: 'prerelease' })).toThrow()
+    expect(() => parseContainerImageReceipt({ ...receipt, verification: { ...receipt.verification,
+      url: 'https://github.com/v1.2.3/fixture/releases/download/v0.12.9-beta.1/owner-local-verification.json' } })).toThrow()
+  })
+  it('retains distinct prerelease owner-local image authority and rejects either channel impersonation', () => {
+    const receipt = { ...policyReceipt(), purpose: 'candidate', channel: 'prerelease', verification: { kind: 'owner-local-prerelease',
+      configuration: 'd'.repeat(64), producerConfiguration: 'e'.repeat(64), receiptSha256: 'f'.repeat(64),
+      statusId: 10, releaseId: 11, assetId: 12, ownerId: 7,
+      url: 'https://github.com/titanxxh/open-agricola/releases/download/v0.12.9-beta.1/owner-local-verification.json' } }
+    expect(parseContainerImageReceipt(receipt)).toEqual(receipt)
+    expect(() => parseContainerImageReceipt({ ...receipt, purpose: 'formal-candidate', channel: 'stable' })).toThrow()
+    expect(() => parseContainerImageReceipt({ ...receipt, verification: { ...receipt.verification, kind: 'owner-local' } })).toThrow()
   })
   it('accepts an exact trusted-policy image without granting candidate deployment authority', () => {
     expect(parseContainerImageReceipt(policyReceipt())).toEqual(policyReceipt())
