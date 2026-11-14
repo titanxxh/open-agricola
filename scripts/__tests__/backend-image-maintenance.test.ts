@@ -27,7 +27,7 @@ function fixture(failure = '', bootstrap = false) {
   const originalEnv = `# owner configuration\nACCOUNT_REGISTRATION_POLICY=invite_only\nPUBLIC_API_BASE=https://api.example.test\nPRIVATE_SENTINEL='keep exactly this value'\n${bootstrap ? '' : `BACKEND_IMAGE=${sourceImage}\nCADDY_IMAGE=${caddyImage}\n`}`
   writeFileSync(join(value.directory, '.env'), originalEnv)
   const data = { DATABASE_URL: 'postgres://private-fixture/formal', S3_ENDPOINT: 'http://objects:9000', S3_BUCKET: 'formal', S3_PREFIX: '', S3_REGION: 'fixture', S3_FORCE_PATH_STYLE: 'true', S3_ACCESS_KEY_ID: 'private-fixture-key', S3_SECRET_ACCESS_KEY: 'private-fixture-secret' }
-  const state = { failure, bootstrap: bootstrap || failure === 'missing-app', caddyStarted: !bootstrap, projectVolume: false, proofRemoved: false, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
+  const state = { failure, bootstrap: bootstrap || failure === 'missing-app', caddyStarted: !bootstrap, projectVolume: false, proofRemoved: false, livePresent: false, liveRemoved: false, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
   const statePath = join(value.root, 'maintenance.json'), callsPath = join(value.root, 'maintenance-calls.jsonl')
   writeFileSync(statePath, JSON.stringify(state))
   const prefix = `#!${process.execPath}
@@ -44,16 +44,17 @@ else if(a[0]==='checkout'){s.head=s.failure==='checkout'?'f'.repeat(40):a[2];sav
 if(a[0]==='image'&&a.at(-1).startsWith('caddy@sha256:')){log('docker');out([{Id:s.caddyImage,Os:'linux',Architecture:s.failure==='caddy-architecture'?'arm64':'amd64',RepoDigests:s.failure==='caddy-digest'?[]:[(s.failure==='caddy-canonical'?'docker.io/library/caddy':s.failure==='caddy-foreign'?'evil.example/library/caddy':'caddy')+'@sha256:'+('d'.repeat(64))]}]);process.exit(0)}
 if(a[0]==='create'&&a.includes('check-empty')){log('docker');const community=${JSON.stringify(join(value.directory, 'data/community'))},info=fs.existsSync(community)?fs.lstatSync(community):null;fs.appendFileSync(${JSON.stringify(join(value.root, 'community-before-run.jsonl'))},JSON.stringify({exists:!!info,directory:info?.isDirectory(),uid:info?.uid,mode:info?info.mode&0o777:null})+'\\n');fs.writeFileSync(${JSON.stringify(join(value.root, 'empty-proof-create.json'))},JSON.stringify(a));console.log('4'.repeat(64));process.exit(0)}
 if(a[0]==='rm'&&a.includes('4'.repeat(64))){log('docker');s.proofRemoved=true;save();process.exit(0)}
+if(a[0]==='rm'&&a.includes('5'.repeat(64))){log('docker');if(s.failure==='live-remove')process.exit(46);s.livePresent=false;s.liveRemoved=true;save();process.exit(0)}
 if(['context','info','image','create','cp','rm'].includes(a[0])){const r=cp.spawnSync(${JSON.stringify(join(value.bin, 'docker-intake'))},a,{stdio:'inherit'});process.exit(r.status??1)}
 log('docker');const oldId=${JSON.stringify(oldId)},caddyId=${JSON.stringify(caddyId)},newId=${JSON.stringify(newId)},data=${JSON.stringify(data)};
 if(a[0]==='inspect'){
- const id=a[1],isNew=id===newId;out([{Id:id,Image:id===caddyId?(s.failure==='caddy-up-identity'&&s.caddyStarted?'sha256:'+'e'.repeat(64):s.caddyImage):isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
+ const id=a[1],isNew=id===newId||id==='5'.repeat(64);out([{Id:id,Image:id===caddyId?(s.failure==='caddy-up-identity'&&s.caddyStarted?'sha256:'+'e'.repeat(64):s.caddyImage):isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
  State:{Running:id===caddyId?s.caddyStarted:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0},
- Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':'formal','com.docker.compose.service':id===caddyId?'caddy':'app'}}}]);
+ Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':'formal','com.docker.compose.service':id===caddyId?'caddy':'app',...(id==='5'.repeat(64)?{'org.open-agricola.backend-operation':s.failure==='live-foreign'?'foreign':${JSON.stringify(value.request.operationId)},'org.open-agricola.backend-phase':'live-validation'}:{})}}}]);
 }else if(a[0]==='stop'){if(s.failure==='up-app-stop'&&a.at(-1)===newId)process.exit(47);if(a.at(-1)===newId)s.started=false;else if(a.at(-1)===caddyId)s.caddyStarted=false;else s.running=false;save();}
 else if(a[0]==='start'&&a.includes('4'.repeat(64))){if(['nonempty','unsupported-empty'].includes(s.failure))process.exit(45);out({formatVersion:1,targetBuildId:${JSON.stringify(value.request.sourceSha)},database:'empty',objects:'empty'});}
 else if(a[0]==='start'){s.running=true;save();}
-else if(a[0]==='ps'){}
+else if(a[0]==='ps'){if(a.includes('--filter')&&s.livePresent)console.log('5'.repeat(64));}
 else if(a[0]==='volume'){if(s.failure==='retained-volume'||s.projectVolume)console.log('formal_app-data');}
 else if(a[0]==='compose'){
  log('compose-owner',[process.env.APP_UID??'<unset>',process.env.APP_GID??'<unset>']);
@@ -72,7 +73,7 @@ else if(a[0]==='compose'){
   }else if(a.includes('ledger-export'))fs.writeFileSync(path.join(${JSON.stringify(value.directory)},'backups/replay-removals.latest.json'),'{"version":1,"batches":[]}');
   else if(a.includes('validate'))out({formatVersion:2,validatedAt:new Date().toISOString(),sourceBuildId:s.sourceBuild,targetBuildId:s.failure==='report-target'?s.sourceBuild:${JSON.stringify(value.request.sourceSha)}});
   else if(a.includes('check-empty')){if(['nonempty','unsupported-empty'].includes(s.failure))process.exit(45);out({formatVersion:1,targetBuildId:${JSON.stringify(value.request.sourceSha)},database:'empty',objects:'empty'});}
-  else if(a.includes('check-live')){if(s.failure==='live')process.exit(44);}
+  else if(a.includes('check-live')){s.livePresent=true;save();if(['live','live-foreign','live-remove'].includes(s.failure))process.exit(44);if(s.failure==='live-delay')Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,2000);s.livePresent=false;save();}
   else if(!a.includes('cleanup-scratch'))throw Error('Unexpected compose run: '+a.join(' '));
  }else throw Error('Unexpected compose: '+a.join(' '));
 }else throw Error('Unexpected docker: '+a.join(' '));
@@ -202,6 +203,43 @@ it.each(['drain', 'live', 'up', 'up-identity', 'backup-stopped', 'source-changed
   expect(result.status).not.toBe(0)
   expect(value.calls().some(call => call.args[0] === 'start')).toBe(false)
   expect(value.current().started).toBe(false)
+})
+
+it('gives the named live validator the bounded remaining work budget rather than two minutes', () => {
+  const value = fixture(), observed = join(value.root, 'live-timeout.json'), preload = join(value.root, 'live-timeout.mjs')
+  writeFileSync(preload, `import fs from 'node:fs';import cp from 'node:child_process';import{syncBuiltinESMExports}from'node:module';
+const exec=cp.execFileSync;cp.execFileSync=(command,args,options)=>{if(command==='docker'&&args?.includes('check-live'))fs.writeFileSync(${JSON.stringify(observed)},JSON.stringify({timeout:options.timeout,args}));return exec(command,args,options)};syncBuiltinESMExports();`)
+  const result = value.invoke(value.request.sourceSha, { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` })
+  expect(result.status, result.stderr).toBe(0)
+  const live: { timeout: number; args: string[] } = JSON.parse(readFileSync(observed, 'utf8'))
+  expect(live.timeout).toBeGreaterThan(120_000)
+  expect(live.timeout).toBeLessThanOrEqual(30 * 60_000)
+  expect(live.args[live.args.indexOf('--name') + 1]).toBe(`oa-formal-live-${value.request.operationId}`)
+  expect(live.args).toContain(`org.open-agricola.backend-operation=${value.request.operationId}`)
+  expect(live.args).toContain('org.open-agricola.backend-phase=live-validation')
+  const deadline = Number(live.args.find(arg => arg.startsWith('BACKUP_DEADLINE_EPOCH_MS='))?.split('=')[1])
+  expect(deadline).toBeGreaterThan(Date.now())
+  expect(deadline).toBeLessThanOrEqual(Date.now() + 30 * 60_000)
+})
+
+it('removes only its native owned live-validation container after an actual command timeout', () => {
+  const value = fixture('live-delay'), preload = join(value.root, 'live-timeout.mjs')
+  writeFileSync(preload, `import cp from 'node:child_process';import{syncBuiltinESMExports}from'node:module';
+const exec=cp.execFileSync;cp.execFileSync=(command,args,options)=>exec(command,args,command==='docker'&&args?.includes('check-live')?{...options,timeout:250}:options);syncBuiltinESMExports();`)
+  const result = value.invoke(value.request.sourceSha, { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` })
+  expect(result.status).not.toBe(0)
+  expect(value.current()).toMatchObject({ livePresent: false, liveRemoved: true, running: false, started: false })
+  expect(value.calls().filter(call => call.args[0] === 'rm' && call.args.includes('-f')).map(call => call.args)).toContainEqual(['rm', '-f', '-v', '5'.repeat(64)])
+  expect(value.calls().some(call => call.args[0] === 'start' || call.args.includes('up'))).toBe(false)
+})
+
+it.each(['live-foreign', 'live-remove'])('fails closed when %s prevents exact live-validator cleanup', failure => {
+  const value = fixture(failure), result = value.invoke()
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Live target validation failed and its owned container cleanup could not be confirmed')
+  expect(value.current()).toMatchObject({ livePresent: true, liveRemoved: false, running: false, started: false })
+  if (failure === 'live-foreign') expect(value.calls().some(call => call.args[0] === 'rm' && call.args.includes('5'.repeat(64)))).toBe(false)
+  expect(value.calls().some(call => call.args[0] === 'start' || call.args.includes('up'))).toBe(false)
 })
 
 function nativeCompose(directory: string, explicitEnvFile = false) {

@@ -227,7 +227,31 @@ export function maintainBackendImage(path: string, expected: Target): void {
     }
     installed.write('', bootstrap ? '' : undefined)
     restartOld = false
-    compose(['run', '--rm', '--no-deps', '--pull', 'never', 'app', 'node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', 'check-live', request.sourceSha, '--applications-stopped'], 120_000)
+    const liveName = `oa-formal-live-${request.operationId}`
+    const liveBudget = Math.min(30 * 60_000, Math.floor(deadline - performance.now()))
+    if (liveBudget <= 0) throw new Error('Formal backend maintenance has no remaining target-validation budget')
+    const removeLive = (): void => {
+      const ids = execute('docker', ['ps', '-a', '-q', '--filter', `name=^/${liveName}$`], root).split('\n').filter(Boolean)
+      for (const id of ids) {
+        if (!/^[a-f0-9]{12,64}$/.test(id)) throw new Error('Live-validation cleanup returned an invalid native container identity')
+        const values: unknown = JSON.parse(execute('docker', ['inspect', id], root))
+        if (!Array.isArray(values) || values.length !== 1) throw new Error('Live-validation cleanup requires one native container')
+        const container = object(values[0]), labels = object(object(container.Config).Labels)
+        if (container.Id !== id || container.Image !== image || labels['org.open-agricola.backend-operation'] !== request.operationId
+          || labels['org.open-agricola.backend-phase'] !== 'live-validation') throw new Error('Refusing to remove another live-validation container')
+        execute('docker', ['rm', '-f', '-v', id], root)
+      }
+    }
+    try {
+      compose(['run', '--rm', '--name', liveName, '--label', `org.open-agricola.backend-operation=${request.operationId}`,
+        '--label', 'org.open-agricola.backend-phase=live-validation', '--no-deps', '--pull', 'never',
+        '-e', `BACKUP_DEADLINE_EPOCH_MS=${Date.now() + liveBudget}`, 'app', 'node', '--import', 'tsx',
+        'scripts/storage-archive-cli.ts', 'check-live', request.sourceSha, '--applications-stopped'], liveBudget)
+    } catch (error) {
+      try { removeLive() }
+      catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Live target validation failed and its owned container cleanup could not be confirmed', { cause: cleanupError }) }
+      throw error
+    }
     drainTarget = () => {
       const failures: unknown[] = []
       for (const service of bootstrap ? ['app', 'caddy'] : ['app']) {
