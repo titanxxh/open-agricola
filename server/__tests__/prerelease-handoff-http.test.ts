@@ -405,7 +405,7 @@ it('treats a contradictory formal error envelope as unavailable authority', asyn
 })
 
 it.each(['unrelated_source_revoked', 'beta_qualification_changed'])(
-  'pauses an unconfirmed %s epoch race without declaring this callback expired', async reason => {
+  'applies only matching %s invalidation to an in-flight callback', async reason => {
   const pending = await begin(), service = getPrereleaseSessions()
   if (!service) throw new Error('Missing prerelease consumer')
   const before = await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()
@@ -417,12 +417,20 @@ it.each(['unrelated_source_revoked', 'beta_qualification_changed'])(
     return Response.json({ ok: true, state: identity() })
   }
   const response = await exchange(pending)
-  expect(response.status).toBe(503)
-  expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
-  expect(response.headers.getSetCookie()).toEqual([])
-  expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
-  expect(await getDb().prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
-  expect(await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()).toEqual(before)
+  if (reason === 'unrelated_source_revoked') {
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ ok: true, user: { id: 'handoff-user' } })
+    expect(response.headers.getSetCookie().some(cookie => cookie.startsWith('__Host-oa-pre-session='))).toBe(true)
+    expect(await getDb().prepare('SELECT user_id FROM prerelease_sessions').all()).toEqual([{ user_id: 'handoff-user' }])
+    expect(await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()).toEqual([])
+  } else {
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+    expect(response.headers.getSetCookie()).toEqual([])
+    expect(await getDb().prepare('SELECT id FROM users').all()).toEqual([])
+    expect(await getDb().prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
+    expect(await getDb().prepare('SELECT * FROM prerelease_browser_handoffs').all()).toEqual(before)
+  }
 })
 
 it('rejects malformed callback fields before calling the authority', async () => {
