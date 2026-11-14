@@ -10,6 +10,7 @@ import { PRERELEASE_BUILD_PROTOCOL_PREFIX, PRERELEASE_GENERATION_PROTOCOL_PREFIX
 import { PrereleaseSessions } from '../../prerelease-sessions'
 import { getAccountDeletionRoomIds } from '../../auth'
 import { GameContextStore } from '../../game/game-context-store'
+import { RoomDirectory } from '../../game/room-directory'
 import { listMyActiveRooms } from '../../lobby-my-rooms'
 import { createTestDatabase } from '../../__tests__/_helpers/postgres'
 import { startFormalSoloBackend } from '../../__tests__/_helpers/formal-solo-network'
@@ -126,6 +127,10 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
     const hostWaiting = await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting')
     expect(hostWaiting).toMatchObject({ roomId, isHost: true, canStart: false, members: [{ name: 'Farmer 0', teamIndex: 0, seatCount: 2 }] })
     expect(JSON.stringify(hostWaiting)).not.toContain('userId')
+    expect(await new RoomDirectory(db).lobby(50, userIds[1])).toMatchObject([{
+      id: roomId, playerCount: 2, maxPlayers: 4, status: 'waiting',
+      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' },
+    }])
     peers[1]!.socket.send(JSON.stringify({ type: 'joinRoom', roomId }))
     await peers[1]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting' && event.canStart === false)
     expect(await getAccountDeletionRoomIds(userIds[1]!, db)).toEqual([roomId])
