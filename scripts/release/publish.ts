@@ -25,7 +25,6 @@ function releaseOptions(input: string[]): { version: string; channel: 'stable' |
   }
   const channel = values.get('--channel') ?? 'stable'
   if (channel !== 'stable' && channel !== 'prerelease') throw new Error('Release channel must be stable or prerelease')
-  if (channel !== 'stable' && values.has('--local-verification')) throw new Error('Owner-local verification is available only for formal releases')
   if (!(channel === 'stable' ? /^v\d+\.\d+\.\d+$/ : /^v\d+\.\d+\.\d+-beta\.[1-9]\d*$/).test(version)) {
     throw new Error('Release version must match its channel: stable vX.Y.Z or prerelease vX.Y.Z-beta.N with N >= 1')
   }
@@ -54,7 +53,7 @@ export async function publishRelease(cwd: string, input: string[]): Promise<void
   const { version, channel, repository, ref, pollMs, timeoutMs, localVerification } = releaseOptions(input)
   const sha = candidateSha(cwd, repository, ref)
   console.error(`Fixed release candidate: ${sha}. Retry with --ref ${sha} to keep this candidate.`)
-  if (localVerification) { publishOwnerLocalRelease(cwd, { version, repository, sha, path: resolve(localVerification) }); return }
+  if (localVerification) { publishOwnerLocalRelease(cwd, { version, repository, sha, channel, path: resolve(localVerification) }); return }
   existingRelease(repository, version, sha, channel)
   if (channel === 'prerelease') fixPrereleaseCandidate(cwd, repository, sha)
   const check = () => channel === 'prerelease' ? checkPrereleaseVerification(cwd, repository, sha) : checkCandidateVerification(cwd, repository, sha)

@@ -31,7 +31,7 @@
 
 正式 request/check 首先确认所选仓库受保护 main 上的最终 PR 快照，核对原生数字身份、明确的 main ref 与原始 Git 可达性。独立固定的受保护 main producer P 为候选 C 编排，配置哈希绑定两棵树且只标识兼容执行。该新增实现策略及原生治理信任边界见 [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md)。
 
-`scripts/ci/candidate-verification.ts` 绑定实际干净检出、工作流提交和验证配置。check 命令读取 GitHub run、job 和 step 元数据，每个必需任务都必须有兼容的成功证据。跨 run 和重跑按任务自身的执行时间排序；重跑其他任务不会推进未重跑 job 的时间。新 manifest 要求但未执行的任务持续阻断旧成功，直到 run 完成。执行时间缺失时，已完成 run 的可信 `updated_at` 可约束未通过证据的最晚时间，允许后续正常执行替代它。时间无界或执行区间重叠时不能复用。本地成功 JSON 和普通范围 CI 不能充当完整候选验证。
+`scripts/ci/candidate-verification.ts` 绑定实际干净检出、工作流提交和验证配置。check 命令读取 GitHub run、job 和 step 元数据，每个必需任务都必须有兼容的成功证据。跨 run 和重跑按任务自身的执行时间排序；重跑其他任务不会推进未重跑 job 的时间。新 manifest 要求但未执行的任务持续阻断旧成功，直到 run 完成。执行时间缺失时，已完成 run 的可信 `updated_at` 可约束未通过证据的最晚时间，允许后续正常执行替代它。时间无界或执行区间重叠时不能复用。未经 owner 授权的本地成功 JSON 和普通范围 CI 不能充当完整候选验证。
 
 `candidate-rehearsal.yml` 通过普通 PR/workflow-call 运行当前实现及相同十项隔离任务。完成后输出所选任务和检出提交，但其原生工作流身份不能授权部署。正式 `candidate-verification.yml` 只在 main 派发；P 在特权 setup 前准入 C，所有控制、setup、收尾代码均来自 P。原生回执绑定仓库、通道、C、双方配置及 P。
 
@@ -39,7 +39,9 @@
 预发布由 `prerelease-candidate-verification.yml` 和 `scripts/ci/prerelease-verification.ts` 中独立的可信 main producer 编排。固定 ref 与集成清单绑定选定候选及独立功能来源；同一完整任务目录执行候选，不取得正式写入凭据。回执通道和测试运行环境分别控制：普通回归使用正式环境，pre 专用夹具显式选择 pre，生产构建运行正常 typed hosted builder 并写入 pre 元数据。回执绑定仓库 ID、通道、候选 SHA、候选和策略配置，以及可从受保护 main 到达的兼容 producer。其他候选不能覆盖本候选结果，缺失或不兼容任务均阻断发布。正式候选准入保持原要求；prerelease 日常 push/PR 使用同一 routine plan。测试入口为 `candidate-verification-prerelease.test.ts`、`candidate-verification.test.ts`、`release-publish.test.ts` 和 `candidate-verification-pages.test.ts`。
 
 
-完整 catalog 的候选安装钩子、浏览器下载、服务准备、构建和测试使用独立 UID 及专用 Docker29.9.3 rootless daemon。可信 runner 独占原始源码、policy 依赖、命令文件、日志与回执；policy CLI 使用 Node 原生 TypeScript，不执行候选可写目录中的工具。root 所有的 `candidate-user-environment.sh` 在 PAM 之后为 bootstrap 命令及该 UID 的用户管理器重设 HOME、XDG 和 Docker 私有路径，保留通知 socket，并排除全局环境生成器。候选没有宿主 sudo 或 rootful Docker 权限。root 所有的 smoke 实测身份、客户端 no-new-privileges、受保护文件、bind 写入身份及双向 host 网络。Docker 容器由 daemon 的 rootless UID 映射隔离，客户端 no-new-privileges 不会经 Docker API 传播给容器。清理先停止用户管理器及全部后代 cgroup，再转交候选目录，核对源码字节并以不跟随链接的方式收集诊断。候选输出先写私有日志，显示前转义。普通 PR 完整 catalog 使用相同执行器，提供合入前证据；缺少隔离能力直接失败。历史 stable 回执仅限可信 `LEGACY_STABLE_CUTOFF` 的祖先边界，候选删除 marker 不能选择 legacy。该候选一旦有新的 main producer 尝试，包括未完成或配置不兼容的尝试，就不能退回历史成功。prerelease 回执始终要求隔离准备、运行时证明与完整清理成功。测试：`candidate-verification-isolation.test.ts`、`candidate-verification-cli.test.ts` 和 `candidate-verification.test.ts`。
+`scripts/release/owner-local.ts` 只发布已有的完整本机回执，不执行候选命令。`scripts/ci/owner-local-verification.ts` 绑定原生 owner status/Release/asset 身份、原始源码树、双方配置和全部 canonical 命令。stable 保留 format 1；pre 必须使用 format 2，并绑定独立收集的隔离 Docker 执行证据摘要，镜像与接收端 proof 解析继续传递该摘要。publisher 不提供默认执行器。测试：`release-owner-local.test.ts`、`container-images.test.ts`、`prerelease-operations.test.ts`。
+
+原生完整 catalog 的候选安装钩子、浏览器下载、服务准备、构建和测试使用独立 UID 及专用 Docker29.9.3 rootless daemon。可信 runner 独占原始源码、policy 依赖、命令文件、日志与回执；policy CLI 使用 Node 原生 TypeScript，不执行候选可写目录中的工具。root 所有的 `candidate-user-environment.sh` 在 PAM 之后为 bootstrap 命令及该 UID 的用户管理器重设 HOME、XDG 和 Docker 私有路径，保留通知 socket，并排除全局环境生成器。候选没有宿主 sudo 或 rootful Docker 权限。root 所有的 smoke 实测身份、客户端 no-new-privileges、受保护文件、bind 写入身份及双向 host 网络。Docker 容器由 daemon 的 rootless UID 映射隔离，客户端 no-new-privileges 不会经 Docker API 传播给容器。清理先停止用户管理器及全部后代 cgroup，再转交候选目录，核对源码字节并以不跟随链接的方式收集诊断。候选输出先写私有日志，显示前转义。普通 PR 完整 catalog 使用相同执行器，提供合入前证据；缺少隔离能力直接失败。历史 stable 回执仅限可信 `LEGACY_STABLE_CUTOFF` 的祖先边界，候选删除 marker 不能选择 legacy。该候选一旦有新的 main producer 尝试，包括未完成或配置不兼容的尝试，就不能退回历史成功。prerelease 回执始终要求隔离准备、运行时证明与完整清理成功。测试：`candidate-verification-isolation.test.ts`、`candidate-verification-cli.test.ts` 和 `candidate-verification.test.ts`。
 
 ## 日常范围验证
 
