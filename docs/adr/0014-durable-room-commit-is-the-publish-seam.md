@@ -49,3 +49,7 @@ The connection layer sent `StateUpdateEnvelope` first and saved the Room about a
 - Per-player Replay chains: there is one authoritative Frame; perspectives filter on read.
 - A Redis queue with separate commit workers: the Room state machine already retries and reconciles durably.
 - Shipping historical Viewers inside the overwritten Pages build: old Replays would lose their Viewer.
+
+## Prerelease environment override
+
+Before creating a pre Room, its frozen Viewer Build must declare the bridge protocol and Replay schema. Authentication stays in the top-level parent; the credentialless allow-scripts Viewer receives no cookie or remote capability. Parent/Viewer share the existing absolute authorization deadline. Expiry, idle parent loss and resume clear channels, pending work, displayed Frames and temporary images; persistent archives are unaffected.
