@@ -69,7 +69,7 @@ const fetchManifest = (): Promise<Response> => {
   const sha256: string | undefined = import.meta.env.VITE_CARDS_MANIFEST_SHA256
   if (!sha256) return resourceFetch(`${normalised}cards-manifest.json`, { cache: 'no-cache' })
   if (!/^[a-f0-9]{64}$/.test(sha256)) return Promise.reject(new Error('Invalid cards manifest fingerprint'))
-  return fetchVerifiedResource(`${normalised}cards-manifest.${sha256}.json`, sha256)
+  return fetchVerifiedResource(`${normalised}cards-manifest.${sha256}.json`, sha256, resourceFetch)
 }
 
 let manifestPromise: Promise<Record<string, CardMeta>> | null = null

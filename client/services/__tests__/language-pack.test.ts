@@ -13,6 +13,25 @@ beforeEach(() => vi.resetModules())
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
 describe('independent language packages', () => {
+  it('loads verified bootstrap language before a prerelease session exists', async () => {
+    vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease')
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(manifest))
+      .mockResolvedValueOnce(new Response(raw))
+    vi.stubGlobal('fetch', fetchMock)
+    const { loadLanguageManifest, loadLanguagePack } = await import('../language-pack')
+
+    const languages = await loadLanguageManifest()
+    await loadLanguagePack(languages.defaultLocale)
+
+    const { t } = await import('../../../shared/i18n')
+    expect(t('fr', 'ui.title')).toBe('Ferme')
+    expect(fetchMock.mock.calls).toEqual([
+      ['/i18n/manifest.json', { cache: 'no-cache' }],
+      [`/i18n/${manifest.languages[0].file}`, { cache: 'force-cache' }],
+    ])
+  })
+
   it('loads a manifest-defined locale without loading English and coalesces concurrent requests', async () => {
     const fetch = vi.fn(async (url: string) => url.endsWith('manifest.json')
       ? new Response(JSON.stringify(manifest)) : new Response(raw))
