@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { stableConfiguration } from '../ci/candidate-verification'
 import { candidateRepository, finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
@@ -11,6 +11,8 @@ const repository = 'titanxxh/open-agricola'
 const requestPath = '.github/workflows/pages-release-request.yml'
 const legacyPath = '.github/workflows/deploy-pages.yml'
 const brokerPath = '.github/workflows/deploy-pages-broker.yml'
+// These release-tool cases drive git and CLI subprocesses; several take ~5 s locally, so low-core CI needs a file-local test budget.
+vi.setConfig({ testTimeout: 30_000 })
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
@@ -464,7 +466,7 @@ describe.each(['workflow_run', 'workflow_dispatch'] as const)('Pages deployment 
     expect(value.git('rev-parse', 'main')).toBe(later)
     expect(value.git('rev-parse', 'v1.0.0')).toBe(later)
     expect(value.git('rev-parse', 'HEAD')).toBe(value.policySha)
-  }, 10_000)
+  })
 
   it.each(['install failure', 'install changed source', 'build failure', 'artifact mismatch', 'changed source', 'changed policy', 'no new artifact'])('does not upload or deploy after %s', (failure) => {
     const value = fixture(eventName)
