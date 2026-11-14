@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkCandidateVerification, parseGitHubJsonLines, repositoryName } from './candidate-verification.ts'
 import { fullSha } from './verification-tasks.ts'
+import { assertPagesBackendReady } from './pages-backend.ts'
 
 const REQUEST_WORKFLOW = '.github/workflows/pages-release-request.yml'
 const BROKER_WORKFLOW = '.github/workflows/deploy-pages-broker.yml'
@@ -119,7 +120,7 @@ function assertArtifact(directory: string, sha: string): void {
   }
 }
 
-export function buildVerifiedPages(cwd: string, repository: string): void {
+export async function buildVerifiedPages(cwd: string, repository: string, readinessOnly = false): Promise<void> {
   repositoryName(repository)
   const policy = trustedPolicy(cwd, repository)
   const sha = candidateSha(policy.event, repository)
@@ -133,7 +134,9 @@ export function buildVerifiedPages(cwd: string, repository: string): void {
     const reasons = verification.tasks.filter(task => task.status !== 'passed').map(task => `${task.id}: ${task.reason}`)
     throw new Error(`Pages deployment blocked for ${sha}: ${reasons.join('; ')}`)
   }
+  await assertPagesBackendReady({ candidateSha: sha, apiBase: process.env.VITE_API_BASE, appOrigin: process.env.PUBLIC_APP_ORIGIN })
   assertSourceCheckout(cwd, policy.sha)
+  if (readinessOnly) return
   const candidate = mkdtempSync(join(process.env.RUNNER_TEMP ?? tmpdir(), 'pages-candidate-'))
   try {
     git(cwd, ['worktree', 'add', '--detach', candidate, sha])
@@ -155,17 +158,16 @@ export function buildVerifiedPages(cwd: string, repository: string): void {
   }
 }
 
-export function pagesDeploymentCli(cwd: string, input: string[]): void {
-  if (input.length !== 3 || input[0] !== 'build' || input[1] !== '--repository') {
-    throw new Error('Usage: pages-deployment.ts build --repository <owner/name>')
+export async function pagesDeploymentCli(cwd: string, input: string[]): Promise<void> {
+  if (input.length !== 3 || !['build', 'ready'].includes(input[0]) || input[1] !== '--repository') {
+    throw new Error('Usage: pages-deployment.ts build|ready --repository <owner/name>')
   }
-  buildVerifiedPages(cwd, input[2])
+  await buildVerifiedPages(cwd, input[2], input[0] === 'ready')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { pagesDeploymentCli(process.cwd(), process.argv.slice(2)) }
-  catch (error) {
+  pagesDeploymentCli(process.cwd(), process.argv.slice(2)).catch(error => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1
-  }
+  })
 }

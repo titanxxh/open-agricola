@@ -39,6 +39,8 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
   const temporary = join(root, 'temporary')
   for (const directory of [join(cwd, '.github/workflows'), join(cwd, 'scripts'), bin, temporary]) mkdirSync(directory, { recursive: true })
   cpSync(join(repoRoot, 'scripts/ci'), join(cwd, 'scripts/ci'), { recursive: true })
+  mkdirSync(join(cwd, 'shared/contract'), { recursive: true })
+  cpSync(join(repoRoot, 'shared/contract/browser-auth.ts'), join(cwd, 'shared/contract/browser-auth.ts'))
   cpSync(join(repoRoot, '.github/workflows/candidate-verification.yml'), join(cwd, '.github/workflows/candidate-verification.yml'))
   cpSync(join(repoRoot, 'scripts/__tests__/fixtures/pages-v0.11.5.yml'), join(cwd, legacyPath))
   writeFileSync(join(cwd, 'scripts/ci/pages-deployment.ts'), "throw new Error('The candidate gate must never execute')\n")
@@ -98,6 +100,23 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
   const eventFile = join(root, 'event.json')
   const githubFile = join(root, 'github.json')
   const log = join(root, 'commands.jsonl')
+  const backendFile = join(root, 'backend.json')
+  const backend = {
+    health: { ok: true },
+    policy: { version: 2, buildId: sha, appOrigin: 'https://app.example', apiOrigin: 'https://api.example' },
+  }
+  writeFileSync(backendFile, JSON.stringify(backend))
+  const preload = join(root, 'backend-fetch.mjs')
+  writeFileSync(preload, `import fs from 'node:fs'; import path from 'node:path';
+globalThis.fetch = async (url, options) => {
+  const target = new URL(url);
+  fs.appendFileSync(process.env.COMMAND_LOG, JSON.stringify(['backend-get', target.href, options.method, options.redirect, options.credentials]) + '\\n');
+  if (target.origin !== 'https://api.example') throw Error('Unexpected backend origin');
+  const value = JSON.parse(fs.readFileSync(process.env.PAGES_TEST_BACKEND, 'utf8'));
+  const policy = {...value.policy};
+  if (process.env.PAGES_TEST_BACKEND_CHANGED && fs.existsSync(path.join(process.cwd(), 'dist-pages/index.html'))) policy.buildId = 'f'.repeat(40);
+  return new Response(JSON.stringify(target.pathname === '/api/health' ? value.health : policy), {status: 200, headers: {'content-type': 'application/json'}});
+};\n`)
   const save = () => {
     writeFileSync(eventFile, JSON.stringify(event))
     writeFileSync(githubFile, JSON.stringify(responses))
@@ -157,12 +176,14 @@ if (args[0] === 'deploy') fs.copyFileSync(process.env.PAGES_TEST_UPLOAD, process
     GITHUB_WORKFLOW_REF: `${repository}/${brokerPath}@refs/heads/main`, GITHUB_REF: 'refs/heads/main',
     GITHUB_EVENT_NAME: eventName, GITHUB_EVENT_PATH: eventFile, GITHUB_REPOSITORY: repository,
     RUNNER_TEMP: temporary, GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: '',
-    PAGES_TEST_UPLOAD: join(root, 'upload.json'), PAGES_TEST_DEPLOYMENT: join(root, 'deployment.json') }
+    PAGES_TEST_UPLOAD: join(root, 'upload.json'), PAGES_TEST_DEPLOYMENT: join(root, 'deployment.json'),
+    VITE_API_BASE: 'https://api.example', PUBLIC_APP_ORIGIN: 'https://app.example', PAGES_TEST_BACKEND: backendFile,
+    NODE_OPTIONS: [process.env.NODE_OPTIONS, '--import', preload].filter(Boolean).join(' ') }
   const run = (...args: string[]) => spawnSync(process.execPath, [join(cwd, 'scripts/ci/pages-deployment.ts'), ...args], { cwd, env, encoding: 'utf8' })
   const build = () => run('build', '--repository', repository)
   const commands = () => existsSync(log) ? readFileSync(log, 'utf8') : ''
   return { cwd, root, sha, policySha, configuration, env, git, commit, run, build, commands, event,
-    requestRun, requestWorkflow, candidateRun, jobs, environment, policies, responses, save }
+    requestRun, requestWorkflow, candidateRun, jobs, environment, policies, responses, save, backend, backendFile }
 }
 
 function runWorkflow(value: ReturnType<typeof fixture>) {
@@ -183,7 +204,7 @@ function runWorkflow(value: ReturnType<typeof fixture>) {
   const expand = (input: string): string => input.replace(/\$\{\{ (.*?) \}\}/g, (_, key: string) => {
     if (key === 'github.sha') return value.policySha
     if (key === 'github.token') return 'fixture-read-token'
-    if (key.startsWith('vars.')) return ''
+    if (key.startsWith('vars.')) return value.env[key.slice('vars.'.length)] ?? ''
     throw new Error(`Unsupported Pages workflow expression ${key}`)
   })
   for (const job of jobs) {
@@ -219,6 +240,33 @@ function runWorkflow(value: ReturnType<typeof fixture>) {
 }
 
 describe('Pages trusted broker public CLI', () => {
+  it.each(['old build', 'unhealthy', 'wrong application', 'wrong API', 'wrong browser protocol'])('blocks an %s backend before build or upload', failure => {
+    const value = fixture()
+    if (failure === 'old build') value.backend.policy.buildId = 'f'.repeat(40)
+    else if (failure === 'unhealthy') value.backend.health.ok = false
+    else if (failure === 'wrong application') value.backend.policy.appOrigin = 'https://other.example'
+    else if (failure === 'wrong API') value.backend.policy.apiOrigin = 'https://other.example'
+    else value.backend.policy.version = 1
+    writeFileSync(value.backendFile, JSON.stringify(value.backend))
+    const result = runWorkflow(value)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Pages is waiting for healthy backend')
+    expect(value.commands()).not.toContain('["pnpm"')
+    expect(existsSync(value.env.PAGES_TEST_UPLOAD ?? '')).toBe(false)
+    expect(existsSync(value.env.PAGES_TEST_DEPLOYMENT ?? '')).toBe(false)
+  })
+
+  it('rechecks live backend after the build and refuses changed versions before actual deployment', () => {
+    const value = fixture()
+    value.env.PAGES_TEST_BACKEND_CHANGED = '1'
+    const result = runWorkflow(value)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Pages is waiting for healthy backend')
+    expect(existsSync(value.env.PAGES_TEST_UPLOAD ?? '')).toBe(true)
+    expect(existsSync(value.env.PAGES_TEST_DEPLOYMENT ?? '')).toBe(false)
+    expect(value.commands()).not.toContain('workflow","disable')
+  })
+
   it('rejects an unmerged producer before candidate install, build, upload or deployment', () => {
     const value = fixture()
     value.responses[`repos/${repository}/commits/${value.sha}/pulls?per_page=100`] = []
@@ -416,7 +464,7 @@ describe.each(['workflow_run', 'workflow_dispatch'] as const)('Pages deployment 
     expect(value.git('rev-parse', 'main')).toBe(later)
     expect(value.git('rev-parse', 'v1.0.0')).toBe(later)
     expect(value.git('rev-parse', 'HEAD')).toBe(value.policySha)
-  })
+  }, 10_000)
 
   it.each(['install failure', 'install changed source', 'build failure', 'artifact mismatch', 'changed source', 'changed policy', 'no new artifact'])('does not upload or deploy after %s', (failure) => {
     const value = fixture(eventName)
