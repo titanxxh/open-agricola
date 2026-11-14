@@ -2,12 +2,16 @@ import { request, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { RoomDirectory } from './game/room-directory'
 
 /** Call only after application admission; the owner repeats admission and Room authorization. */
-export async function forwardRoomRequest(req: IncomingMessage, res: ServerResponse, directory: RoomDirectory,
+export async function forwardRoomRequest(req: IncomingMessage, res: ServerResponse, directory: Pick<RoomDirectory, 'currentRoute' | 'instances'>,
   instanceId: string, roomId: string): Promise<boolean> {
+  const disconnected = () => req.aborted || res.destroyed || res.writableEnded
+  if (disconnected()) return true
   const route = await directory.currentRoute(roomId)
+  if (disconnected()) return true
   if (!route || route.owner.instanceId === instanceId) return false
   if (req.headers['x-oa-room-forwarded']) throw new Error('Room owner changed during forwarding')
   const owner = (await directory.instances()).find(instance => instance.instance_id === route.owner.instanceId)
+  if (disconnected()) return true
   if (!owner) throw new Error('Room owner is unavailable')
   const target = new URL(owner.internal_url)
   await new Promise<void>((resolve, reject) => {
