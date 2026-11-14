@@ -77,8 +77,8 @@ describe('D141_SeedSeller session', () => {
     expect(resp.ok).toBe(true)
 
     const after = session.getState().state
-    // Owner should not get bonus grain — scope is 'player' only
-    expect(after.players[0]!.resources.grain).toBe(0)
+    // Keep the one grain already received when the card was played.
+    expect(after.players[0]!.resources.grain).toBe(1)
   })
 })
 
