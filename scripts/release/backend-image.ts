@@ -112,13 +112,20 @@ function backendOperationCommand(cwd: string, input: string[]): void {
   const stage = join(directory, 'backups', `.backend-image-${operationId}`), path = join(stage, 'request.json')
   const controller = join(stage, 'policy/scripts/release/backend-image-maintenance.ts')
   const ssh = (args: string[], input?: string, timeout = 150_000) => execute('ssh', [host, args.map(quote).join(' ')], input, timeout)
+  const parseStatus = (output: string, expectedBinding?: string) => {
+    const value: unknown = JSON.parse(output)
+    if (!value || typeof value !== 'object' || !('kind' in value) || value.kind !== 'backend-image-operation'
+      || !('operationId' in value) || value.operationId !== operationId || !('sourceSha' in value) || value.sourceSha !== sourceSha
+      || !('producerSha' in value) || value.producerSha !== producerSha || !('bindingSha256' in value)
+      || typeof value.bindingSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.bindingSha256)
+      || expectedBinding !== undefined && value.bindingSha256 !== expectedBinding
+      || !('state' in value) || value.state !== 'running' && value.state !== 'resumable' && value.state !== 'accepted' && value.state !== 'blocked' && value.state !== 'unknown') {
+      throw new Error('Backend returned another operation or invalid status')
+    }
+    return { state: value.state, bindingSha256: value.bindingSha256 }
+  }
   const output = ssh(['node', controller, 'status', path, directory, sourceSha, producerSha])
-  const value: unknown = JSON.parse(output)
-  if (!value || typeof value !== 'object' || !('kind' in value) || value.kind !== 'backend-image-operation'
-    || !('operationId' in value) || value.operationId !== operationId || !('sourceSha' in value) || value.sourceSha !== sourceSha
-    || !('producerSha' in value) || value.producerSha !== producerSha || !('bindingSha256' in value)
-    || typeof value.bindingSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.bindingSha256)
-    || !('state' in value) || !['running', 'resumable', 'accepted', 'blocked', 'unknown'].includes(String(value.state))) throw new Error('Backend returned another operation or invalid status')
+  const value = parseStatus(output)
   if (mode === 'status') { process.stdout.write(output + '\n'); return }
   if (value.state !== 'resumable' && value.state !== 'accepted') throw new Error(`Backend operation is ${String(value.state)}; inspect its status before continuing`)
   if (backendCandidate(cwd, [sourceSha]) !== sourceSha) throw new Error('Backend continuation candidate authority changed')
@@ -126,7 +133,10 @@ function backendOperationCommand(cwd: string, input: string[]): void {
   const authorization = { format: 1, nonce, operationId, bindingSha256: value.bindingSha256, authorizedAt: now, expiresAt: now + BACKEND_RESUME_WORK_MS, workMs: BACKEND_RESUME_WORK_MS }
   const store = 'require("node:fs").writeFileSync(process.argv[1],require("node:fs").readFileSync(0),{flag:"wx",mode:0o600,flush:true})'
   ssh(['node', '-e', store, authorizationPath], JSON.stringify(authorization) + '\n', 30_000)
-  process.stdout.write(ssh(['node', controller, 'resume', path, directory, sourceSha, producerSha, authorizationPath], undefined, BACKEND_RESUME_WORK_MS + BACKEND_IMAGE_CLEANUP_MS + 60_000) + '\n')
+  const result = ssh(['node', controller, 'resume', path, directory, sourceSha, producerSha, authorizationPath], undefined, BACKEND_RESUME_WORK_MS + BACKEND_IMAGE_CLEANUP_MS + 60_000)
+  const final = parseStatus(result, value.bindingSha256)
+  if (final.state !== 'accepted') throw new Error(`Backend continuation is ${final.state}; acceptance was not confirmed`)
+  process.stdout.write(result + '\n')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

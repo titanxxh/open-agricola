@@ -28,7 +28,7 @@ type BrowserProof = {
   mobileWidth?: { content: number; viewport: number };
 }
 export type LiveSmokeReport = {
-  format: 1; expectedBuild: string; startedAt: string; passed: boolean; browsers: BrowserProof[];
+  format: 1; expectedBuild: string; appOrigin: string; apiOrigin: string; startedAt: string; passed: boolean; browsers: BrowserProof[];
   gamesCreated: 0; gameplayCommands: 0; failure?: { stage: string; category: string }; completedAt?: string;
 }
 const object = (value: unknown): Record<string, unknown> => {
@@ -126,7 +126,8 @@ export async function runLiveReleaseSmoke(config: LiveSmokeConfig, options: { pr
   const retained = inventory(config), account = credentials(config.credentialsFile)
   const expectedArtifact = build(JSON.parse(readFileSync(join(config.artifactDirectory, 'frontend-build.json'), 'utf8')), config.expectedBuild)
   const headers = { Origin: new URL(config.appUrl).origin, [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION) }
-  const report: LiveSmokeReport = { format: 1, expectedBuild: config.expectedBuild, startedAt: new Date().toISOString(), passed: false, browsers: [], gamesCreated: 0, gameplayCommands: 0 }
+  const report: LiveSmokeReport = { format: 1, expectedBuild: config.expectedBuild, appOrigin: new URL(config.appUrl).origin,
+    apiOrigin: new URL(config.apiUrl).origin, startedAt: new Date().toISOString(), passed: false, browsers: [], gamesCreated: 0, gameplayCommands: 0 }
   const observers: ReleasePageDiagnostics[] = []
   const recordFailure = createFailureRecorder(config.outputDirectory, () => observers.map(observer => liveDiagnosticMetadata(observer.snapshot())))
   let stage = 'build-metadata'
