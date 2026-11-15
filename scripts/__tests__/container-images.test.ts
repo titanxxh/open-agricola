@@ -4,9 +4,9 @@ import { checkPrereleaseVerification, prereleaseConfiguration } from '../ci/prer
 import { prepareContainerImageArchive } from '../release/container-images-owner'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseContainerImageReceipt, containerImageVerification, verifyContainerImageBuild, CONTAINER_IMAGE_WORKFLOW, containerImageArtifactName } from '../release/container-images'
@@ -46,8 +46,8 @@ describe('container image receipts', () => {
 
 const roots: string[] = []
 afterEach(() => { vi.unstubAllEnvs(); for (const path of roots.splice(0)) rmSync(path, { force: true, recursive: true }) })
-function githubFixture() {
-  const cwd = resolve(import.meta.dirname, '../..'), root = mkdtempSync(join(tmpdir(), 'oa-image-github-'))
+function githubFixture(cwd = resolve(import.meta.dirname, '../..')) {
+  const root = mkdtempSync(join(tmpdir(), 'oa-image-github-'))
   roots.push(root); const bin = join(root, 'bin'); mkdirSync(bin)
   const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim()
   const api: Record<string, unknown> = {
@@ -309,7 +309,24 @@ it('rejects an incomplete or duplicated candidate task set', () => {
 
 
 function stableImageFixture() {
-  const value = githubFixture(), prefix = 'repos/titanxxh/open-agricola'
+  const source = resolve(import.meta.dirname, '../..'), cwd = mkdtempSync(join(tmpdir(), 'oa-stable-image-source-'))
+  roots.push(cwd)
+  const configurationPaths = [
+    '.github/workflows/candidate-verification.yml', '.github/workflows/prerelease-candidate-verification.yml',
+    '.github/workflows/candidate-rehearsal.yml', 'scripts/ci', 'scripts/release/requirements.json',
+    'package.json', 'pnpm-lock.yaml', 'vitest.config.ts', 'playwright.config.ts', 'vite.config.ts',
+    ...readdirSync(join(source, 'scripts')).filter(name => /^(?:verification[^/]*\.ts|verify[^/]*\.(?:ts|sh)|test-project-globs\.ts)$/.test(name)).map(name => `scripts/${name}`),
+    ...readdirSync(source).filter(name => /^tsconfig[^/]*\.json$/.test(name)),
+  ]
+  for (const path of configurationPaths) {
+    const target = join(cwd, path); mkdirSync(dirname(target), { recursive: true })
+    cpSync(join(source, path), target, { recursive: true })
+  }
+  const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  git('init', '-b', 'main'); git('config', 'user.name', 'Image fixture'); git('config', 'user.email', 'fixture@example.invalid')
+  git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**'); git('commit', '-m', 'self-contained verification source')
+  expect(git('rev-parse', '--is-shallow-repository')).toBe('false')
+  const value = githubFixture(cwd), prefix = 'repos/titanxxh/open-agricola'
   Object.assign(value.api, finalSnapshotMetadata(value.sha, value.sha, { id: 123, full_name: 'titanxxh/open-agricola' }))
   const configuration = stableConfiguration(value.cwd, value.sha, value.sha)
   const step = (name: string) => ({ name, status: 'completed', conclusion: 'success' })
