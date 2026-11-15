@@ -257,7 +257,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       FRONTEND_PORT: String(frontendPort), APP_BASE_PORT: String(appPort), OBSERVABILITY_ENABLED: 'false' }), { mode: 0o600 })
     const launchEnv: NodeJS.ProcessEnv = { ...process.env, LOCAL_ENV_FILE: envFile }
     delete launchEnv.REPLAY_VIEWER_BUILD_ID
+    // Created after setup succeeds; the post-setup close path (not `acquired`) must stop it.
+    let guardSamples: ReturnType<typeof setInterval> | undefined
     const close = () => releaseAll([
+      () => clearInterval(guardSamples),
       async () => { await gateway?.close() },
       async () => { if (existsSync(owned)) await command('bash', ['./restart-local.sh', '--kill-only'], launchEnv, join(directory, 'stop.log')) },
       async () => {
@@ -348,8 +351,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       renameSync(`${path}.tmp`, path)
     }
     writeGuard(observedAt)
-    const guardSamples = setInterval(() => writeGuard(Date.now()), 15_000)
-    acquired.register(() => clearInterval(guardSamples))
+    guardSamples = setInterval(() => writeGuard(Date.now()), 15_000)
     writeFileSync(stateFile, JSON.stringify({ format: 1, targetId, channel: 'prerelease', mode: options.ownerVerification ? 'maintenance' : 'open', buildId,
       generation: generationId, acceptance: options.ownerVerification ? null : { healthyCycle, formalBuildId: buildId } }))
     gateway = createPrereleaseGateway({ stateFile, targetId, origin: preOrigin, upstream: `http://127.0.0.1:${upstreamPort}`,
