@@ -14,6 +14,7 @@ import { RoomDirectory } from '../../game/room-directory'
 import { listMyActiveRooms } from '../../lobby-my-rooms'
 import { createTestDatabase } from '../../__tests__/_helpers/postgres'
 import { startFormalSoloBackend } from '../../__tests__/_helpers/formal-solo-network'
+import { parseTeamRoomMembers } from '../../../shared/contract/team-room'
 
 class Peer {
   readonly events: ServerEvent[] = []
@@ -83,7 +84,7 @@ async function teamNetwork(count = 2) {
       await once(peer.socket, 'open')
       return peer
     }
-    const create = async (configuration: import('../../../shared/contract/team').TeamConfiguration) => {
+    const create = async (configuration?: import('../../../shared/contract/team').TeamConfiguration, maxPlayers = 4) => {
       const allocationId = randomUUID()
       const locate = await new Promise<{ status: number; body: string }>((resolve, reject) => {
         const req = request(`${backend!.baseUrl}/api/rooms/locate`, { method: 'POST',
@@ -96,7 +97,7 @@ async function teamNetwork(count = 2) {
         req.on('error', reject); req.end(JSON.stringify({ allocationId }))
       })
       expect(locate.status, locate.body).toBe(200)
-      return peers[0]!.mutate({ type: 'createRoom', maxPlayers: 4, enableCommunityDeck: false, customCardIds: [], teamConfig: configuration }, allocationId)
+      return peers[0]!.mutate({ type: 'createRoom', maxPlayers, enableCommunityDeck: false, customCardIds: [], teamConfig: configuration }, allocationId)
     }
     const close = async () => {
       service.close()
@@ -138,6 +139,11 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
     expect(await new GameContextStore(db).resolve(roomId, userIds[1])).toMatchObject({ ok: true, lifecycle: 'active', phase: 'waiting', playerIndex: null })
     expect(await listMyActiveRooms(db, userIds[1]!)).toMatchObject([{ id: roomId, player_index: null, teamWaiting: { selfMemberId: expect.any(String) } }])
     const beforeStart = await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)
+    const multihandMembers = parseTeamRoomMembers(beforeStart?.team_members_json)
+    if (!multihandMembers?.[0] || !multihandMembers[1]) throw new Error('Missing Multihand membership')
+    expect(await peers[0]!.mutate({ type: 'setTeam', teamIndex: 1, swapMemberId: multihandMembers[1].memberId }, undefined, roomId))
+      .toMatchObject({ ok: false, code: 'team_change_failed' })
+    expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(beforeStart)
     expect((await peers[1]!.mutate({ type: 'startTeamGame' }, undefined, roomId)).ok).toBe(false)
     expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(beforeStart)
     expect((await peers[0]!.mutate({ type: 'startTeamGame' }, undefined, roomId)).ok).toBe(true)
@@ -153,7 +159,7 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
     }
     expect((await peers[0]!.mutate({ type: 'proposeGameEnd', intent: 'rematch' }, undefined, roomId)).ok).toBe(true)
     const proposed = await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'gameEndProposal' }> => event.type === 'gameEndProposal' && event.proposal !== null)
-    if (!proposed.proposal) throw new Error('Missing end proposal')
+    if (!proposed.proposal || proposed.proposal.intent !== 'rematch') throw new Error('Missing rematch proposal')
     const rematch = await peers[1]!.mutate({ type: 'respondGameEnd', proposalId: proposed.proposal.id, agree: true }, undefined, roomId)
     expect(rematch).toMatchObject({ ok: true, roomId: proposed.proposal.nextRoomId })
     const nextRoom = await db.prepare('SELECT status FROM rooms WHERE id=?').get(proposed.proposal.nextRoomId)
@@ -167,6 +173,141 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
     for (const playerIndex of [0, 2]) await peers[1]!.wait((event): event is Extract<ServerEvent, { type: 'playerDisconnected' }> =>
       event.type === 'playerDisconnected' && event.playerIndex === playerIndex)
     expect(await db.prepare('SELECT state_json FROM rooms WHERE id=?').get(proposed.proposal.nextRoomId)).toEqual(retained)
+  } finally { await fixture.close() }
+}, 60_000)
+
+it('permits empty-slot pairing and rejects over-capacity single-member moves after full occupancy', async () => {
+  const fixture = await teamNetwork(4)
+  const { db, peers } = fixture
+  try {
+    const created = await fixture.create({ mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'shared' })
+    if (!created.roomId) throw new Error('Missing Team room')
+    const roomId = created.roomId
+    for (const peer of peers.slice(1, 3)) {
+      peer.socket.send(JSON.stringify({ type: 'joinRoom', roomId }))
+      await peer.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting')
+    }
+    const partial = await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting' && event.members.length === 3)
+    const adjusted = partial.members.find(value => value.name === 'Farmer 1')
+    if (!adjusted) throw new Error('Missing adjusted member')
+    expect(await peers[1]!.mutate({ type: 'setTeam', memberId: partial.selfMemberId, teamIndex: 1 }, undefined, roomId))
+      .toMatchObject({ ok: false, code: 'team_change_failed' })
+    expect(await peers[1]!.mutate({ type: 'setTeam', teamIndex: 1 }, undefined, roomId)).toMatchObject({ ok: true })
+    await peers[1]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting'
+      && event.members.some(member => member.memberId === adjusted.memberId && member.teamIndex === 1))
+    expect(await peers[1]!.mutate({ type: 'setTeam', teamIndex: 0 }, undefined, roomId)).toMatchObject({ ok: true })
+    expect(await peers[0]!.mutate({ type: 'setTeam', memberId: adjusted.memberId, teamIndex: 1 }, undefined, roomId)).toMatchObject({ ok: true })
+    peers[3]!.socket.send(JSON.stringify({ type: 'joinRoom', roomId }))
+    const full = await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting' && event.canStart)
+    expect(full.members.map(member => [member.name, member.teamIndex])).toEqual([
+      ['Farmer 0', 0], ['Farmer 1', 1], ['Farmer 2', 1], ['Farmer 3', 0],
+    ])
+    const before = await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)
+    for (const member of full.members) {
+      expect(await peers[0]!.mutate({ type: 'setTeam', memberId: member.memberId, teamIndex: 1 - member.teamIndex }, undefined, roomId))
+        .toMatchObject({ ok: false, code: 'team_change_failed' })
+    }
+    expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(before)
+  } finally { await fixture.close() }
+}, 60_000)
+
+it.each(['shared', 'private'] as const)('atomically reassigns a full %s roster to the host-selected member', async teammateVisibility => {
+  const fixture = await teamNetwork(4)
+  const { db, peers } = fixture
+  try {
+    const created = await fixture.create({ mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility })
+    if (!created.roomId) throw new Error('Missing Team room')
+    const roomId = created.roomId
+    for (const peer of peers.slice(1)) {
+      peer.socket.send(JSON.stringify({ type: 'joinRoom', roomId }))
+      await peer.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting')
+    }
+    const full = await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> => event.type === 'teamRoomWaiting' && event.canStart)
+    const member = full.members.find(value => value.name === 'Farmer 1')
+    const target = full.members.find(value => value.name === 'Farmer 2')
+    if (!member || !target) throw new Error('Missing swap members')
+    const before = await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)
+    if (!before) throw new Error('Missing stored room')
+    const original = parseTeamRoomMembers(before.team_members_json)
+    if (!original) throw new Error('Missing stored members')
+    const command = { type: 'setTeam', memberId: member.memberId, teamIndex: target.teamIndex,
+      swapMemberId: target.memberId } satisfies Extract<ClientCommand, { type: 'setTeam' }>
+    for (const invalid of [
+      { ...command, memberId: randomUUID() },
+      { ...command, swapMemberId: randomUUID() },
+      { ...command, swapMemberId: member.memberId },
+      { ...command, teamIndex: member.teamIndex },
+      { ...command, teamIndex: -1 },
+      { ...command, teamIndex: 2 },
+      { ...command, teamIndex: 0.5 },
+      { ...command, swapMemberId: full.selfMemberId, teamIndex: member.teamIndex },
+      { type: 'setTeam', memberId: member.memberId, teamIndex: target.teamIndex } satisfies ClientCommand,
+    ]) {
+      expect(await peers[0]!.mutate(invalid, undefined, roomId)).toMatchObject({ ok: false, code: 'team_change_failed' })
+      expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(before)
+    }
+    for (const invalid of [command, { ...command, memberId: full.selfMemberId }]) {
+      expect(await peers[1]!.mutate(invalid, undefined, roomId)).toMatchObject({ ok: false, code: 'team_change_failed' })
+      expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(before)
+    }
+    // @ts-expect-error Exercise the untrusted WebSocket optional-field boundary.
+    expect(await peers[0]!.mutate({ ...command, swapMemberId: null }, undefined, roomId)).toMatchObject({ ok: false, code: 'team_change_failed' })
+    // @ts-expect-error Exercise the untrusted WebSocket optional-field boundary.
+    expect(await peers[0]!.mutate({ ...command, swapMemberId: 1 }, undefined, roomId)).toMatchObject({ ok: false, code: 'team_change_failed' })
+    expect(await peers[0]!.mutate({ ...command, swapMemberId: '' }, undefined, roomId)).toMatchObject({ ok: false, code: 'team_change_failed' })
+    await db.exec(`CREATE TABLE team_meta_writes (count integer NOT NULL);
+      INSERT INTO team_meta_writes VALUES (0);
+      CREATE FUNCTION count_team_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+        UPDATE team_meta_writes SET count=count+1; RETURN NEW; END $$;
+      CREATE TRIGGER count_team_change AFTER UPDATE ON rooms FOR EACH ROW
+        WHEN (OLD.team_members_json IS DISTINCT FROM NEW.team_members_json) EXECUTE FUNCTION count_team_change()`)
+    expect(await peers[0]!.mutate(command, undefined, roomId)).toMatchObject({ ok: true })
+    const expected = original.map(value => value.memberId === member.memberId ? { ...value, teamIndex: target.teamIndex }
+      : value.memberId === target.memberId ? { ...value, teamIndex: member.teamIndex } : value)
+    expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual({
+      state_json: before.state_json, team_members_json: expected,
+    })
+    expect(await db.prepare('SELECT count FROM team_meta_writes').get()).toEqual({ count: 1 })
+    const swapped = await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)
+    await db.exec(`CREATE FUNCTION reject_team_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+      RAISE EXCEPTION 'test Team metadata storage unavailable'; END $$;
+      CREATE TRIGGER reject_team_change BEFORE UPDATE ON rooms FOR EACH ROW
+        WHEN (OLD.team_members_json IS DISTINCT FROM NEW.team_members_json) EXECUTE FUNCTION reject_team_change()`)
+    expect(await peers[0]!.mutate({ ...command, teamIndex: member.teamIndex }, undefined, roomId)).toMatchObject({ ok: false, code: 'team_change_failed' })
+    expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(swapped)
+    expect(await db.prepare('SELECT count FROM team_meta_writes').get()).toEqual({ count: 1 })
+    await db.exec('DROP TRIGGER reject_team_change ON rooms; DROP FUNCTION reject_team_change()')
+    expect(await peers[0]!.mutate({ type: 'setTeam', memberId: member.memberId, teamIndex: target.teamIndex }, undefined, roomId)).toMatchObject({ ok: true })
+    expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(swapped)
+    for (const peer of peers) await peer.wait((event): event is Extract<ServerEvent, { type: 'teamRoomWaiting' }> =>
+      event.type === 'teamRoomWaiting' && event.members.some(value => value.memberId === member.memberId && value.teamIndex === target.teamIndex)
+      && event.members.some(value => value.memberId === target.memberId && value.teamIndex === member.teamIndex))
+    expect(await db.prepare('SELECT * FROM room_players WHERE room_id=?').all(roomId)).toEqual([])
+    expect(peers.flatMap(peer => peer.events).some(event => event.type === 'gameStarted')).toBe(false)
+    expect((await peers[0]!.mutate({ type: 'startTeamGame' }, undefined, roomId)).ok).toBe(true)
+    for (const [index, peer] of peers.entries()) {
+      const joined = await peer.wait((event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined' && event.status === 'playing')
+      const state = await peer.wait((event): event is Extract<ServerEvent, { type: 'stateUpdate' }> => event.type === 'stateUpdate')
+      const ownMember = expected.find(value => value.userId === fixture.userIds[index])
+      if (!ownMember) throw new Error('Missing member ownership')
+      expect(joined.controlledPlayerIndexes).toHaveLength(ownMember.seatCount)
+      expect(joined.controlledPlayerIndexes?.every(seat => state.payload.state.team?.playerTeams[seat] === ownMember.teamIndex)).toBe(true)
+      expect(state.payload.state.players).toHaveLength(4)
+      for (const seat of joined.controlledPlayerIndexes ?? []) expect(state.payload.state.players[seat]?.name).toBe(ownMember.name)
+      const visible = state.payload.state.players.flatMap((player, seat) =>
+        (teammateVisibility === 'shared' ? state.payload.state.team?.playerTeams[seat] === ownMember.teamIndex
+          : joined.controlledPlayerIndexes?.includes(seat)) ? [player.id] : [])
+      expect(joined.visiblePlayerIds).toEqual(visible)
+      for (const player of state.payload.state.players) {
+        expect(player.occupationHand).toHaveLength(7)
+        expect(player.occupationHand.every(cardId => visible.includes(player.id) ? cardId !== '?' : cardId === '?')).toBe(true)
+      }
+      expect(await db.prepare('SELECT player_index FROM room_players WHERE room_id=? AND user_id=? ORDER BY player_index').all(roomId, ownMember.userId))
+        .toEqual(joined.controlledPlayerIndexes?.map(player_index => ({ player_index })))
+    }
+    const playing = await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)
+    expect(await peers[0]!.mutate(command, undefined, roomId)).toMatchObject({ ok: false, error: 'Team assignments are unavailable' })
+    expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(playing)
   } finally { await fixture.close() }
 }, 60_000)
 
@@ -203,7 +344,8 @@ it.each(['shared', 'private'] as const)('publishes %s Team hands without grantin
         else expect(player.occupationHand.every(id => id === '?')).toBe(true)
       }
     }
-    const actor = states[0]!.payload.state.currentPlayerIndex
+    const interaction = states[0]!.payload.interaction
+    const actor = interaction.stateId === 'wait' ? interaction.playerIndex : states[0]!.payload.state.currentPlayerIndex
     const teammate = joins.findIndex(joined => joined.playerIndex !== actor && joined.playerIndex % 2 === actor % 2)
     expect(teammate).toBeGreaterThanOrEqual(0)
     expect(states[teammate]!.payload.interaction.allowedCommands).toEqual([])
@@ -212,5 +354,37 @@ it.each(['shared', 'private'] as const)('publishes %s Team hands without grantin
     expect(await peers[teammate]!.mutate({ type: 'action', spaceId: 'grain-seeds' }, undefined, roomId)).toMatchObject({ ok: false, error: 'seat mismatch: you cannot act on another player' })
     expect(await db.prepare('SELECT state_json FROM rooms WHERE id=?').get(roomId)).toEqual(before)
     expect(await db.prepare('SELECT * FROM game_replays WHERE room_id=?').get(roomId)).toEqual(replay)
+  } finally { await fixture.close() }
+}, 60_000)
+
+
+it('keeps ordinary two-player reserved-seat start and resume valid while the owner is offline', async () => {
+  const fixture = await teamNetwork()
+  const { db, peers, userIds } = fixture
+  try {
+    const created = await fixture.create(undefined, 2)
+    if (!created.roomId) throw new Error('Missing ordinary room')
+    const roomId = created.roomId
+    peers[1]!.socket.send(JSON.stringify({ type: 'joinRoom', roomId }))
+    const waiting = await peers[1]!.wait((event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined' && event.status === 'waiting')
+    expect(waiting.colorConfirmationPlayerIndex).toBe(waiting.playerIndex)
+    const owners = await db.prepare('SELECT player_index,user_id FROM room_players WHERE room_id=? ORDER BY player_index').all(roomId)
+    expect(await peers[0]!.mutate({ type: 'setTeam', teamIndex: 1, swapMemberId: 'not-a-Team-member' }, undefined, roomId))
+      .toMatchObject({ ok: false, error: 'Team assignments are unavailable' })
+    await peers[0]!.close()
+    await peers[1]!.wait((event): event is Extract<ServerEvent, { type: 'playerDisconnected' }> => event.type === 'playerDisconnected')
+    expect((await peers[1]!.mutate({ type: 'confirmPlayerColor' }, undefined, roomId)).ok).toBe(true)
+    await peers[1]!.wait((event): event is Extract<ServerEvent, { type: 'gameStarted' }> => event.type === 'gameStarted')
+    const resumed = await fixture.reconnect(0)
+    resumed.socket.send(JSON.stringify({ type: 'joinRoom', roomId, intent: 'resume' }))
+    const joined = await resumed.wait((event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined' && event.status === 'playing')
+    expect(joined.controlledPlayerIndexes).toEqual([joined.playerIndex])
+    const state = await resumed.wait((event): event is Extract<ServerEvent, { type: 'stateUpdate' }> => event.type === 'stateUpdate')
+    expect(state.payload.state.players).toHaveLength(2)
+    expect(await db.prepare('SELECT player_index,user_id FROM room_players WHERE room_id=? ORDER BY player_index').all(roomId)).toEqual(owners)
+    expect(await db.prepare('SELECT player_index FROM room_players WHERE room_id=? AND user_id=?').get(roomId, userIds[0])).toEqual({ player_index: joined.playerIndex })
+    const beforeCommand = await db.prepare('SELECT state_json FROM rooms WHERE id=?').get(roomId)
+    expect(await resumed.mutate({ type: 'confirmPlayerColor' }, undefined, roomId)).toMatchObject({ ok: false, error: 'Colors are locked after the game starts' })
+    expect(await db.prepare('SELECT state_json FROM rooms WHERE id=?').get(roomId)).toEqual(beforeCommand)
   } finally { await fixture.close() }
 }, 60_000)
