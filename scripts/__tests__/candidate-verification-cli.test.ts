@@ -2,14 +2,22 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { historicalStableSnapshot, LEGACY_STABLE_CUTOFF, stableConfiguration } from '../ci/candidate-verification'
 import { verificationConfiguration } from '../ci/verification-tasks'
 import { candidateRepository, finalSnapshotMetadata } from './_helpers/candidate-provenance'
+import { createLegacyStableOrigin, legacyStableHistory } from './_helpers/legacy-stable-history'
 
 const repoRoot = resolve(__dirname, '../..')
 const cli = join(repoRoot, 'scripts/ci/candidate-verification.ts')
 const temporary: string[] = []
+let historyRoot = '', historyOrigin = ''
+beforeAll(() => {
+  historyRoot = mkdtempSync(join(tmpdir(), 'candidate-public-history-'))
+  historyOrigin = createLegacyStableOrigin(join(historyRoot, 'origin.git'))
+  expect(legacyStableHistory.cutoff).toBe(LEGACY_STABLE_CUTOFF)
+})
+afterAll(() => { if (historyRoot) rmSync(historyRoot, { recursive: true, force: true }) })
 afterEach(() => { for (const cwd of temporary.splice(0)) rmSync(cwd, { recursive: true, force: true }) })
 
 function fixture(forgedProducer = false, legacy = false) {
@@ -34,11 +42,11 @@ function fixture(forgedProducer = false, legacy = false) {
   git('init', '-b', 'main')
   git('config', 'user.name', 'Candidate Test')
   git('config', 'user.email', 'candidate@example.test')
-  git('config', `url.file://${repoRoot}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
+  git('config', `url.file://${historyOrigin}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
   git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**')
   git('commit', '-m', 'candidate fixture')
   if (legacy) {
-    git('fetch', '--no-tags', repoRoot, LEGACY_STABLE_CUTOFF)
+    git('fetch', '--no-tags', '--depth=4', historyOrigin, LEGACY_STABLE_CUTOFF)
     git('checkout', '-B', 'main', LEGACY_STABLE_CUTOFF)
     writeFileSync(join(cwd, '.git/info/exclude'), 'bin/\ncommands.jsonl\ngithub-responses.json\ngithub-mutations.jsonl\n')
   }
@@ -127,16 +135,11 @@ it('keeps a withdrawn local authorization blocked when no native GitHub tasks pa
 })
 
 describe('historical stable Git ancestry', () => {
-  const older = execFileSync('git', ['rev-parse', `${LEGACY_STABLE_CUTOFF}~3`], { cwd: repoRoot, encoding: 'utf8' }).trim()
-  const newer = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()
+  const { older, newer } = legacyStableHistory
   function shallow(...commits: string[]) {
     const root = mkdtempSync(join(tmpdir(), 'candidate-history-'))
     temporary.push(root)
-    const origin = join(root, 'origin.git'), cwd = join(root, 'checkout')
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repoRoot, encoding: 'utf8' }).trim()
-    execFileSync('git', ['init', '--bare', origin], { stdio: 'ignore' })
-    writeFileSync(join(origin, 'objects/info/alternates'), join(common, 'objects') + '\n')
-    execFileSync('git', ['--git-dir', origin, 'update-ref', 'refs/heads/main', newer])
+    const origin = historyOrigin, cwd = join(root, 'checkout')
     execFileSync('git', ['init', '-b', 'main', cwd], { stdio: 'ignore' })
     const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
     git('config', `url.file://${origin}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
@@ -228,10 +231,7 @@ describe('candidate verification public CLI', () => {
     replaceMetadata(value, { [`${prefix}/git/ref/heads/main`]: { ref: 'refs/heads/main', object: { type: 'commit', sha: main } } })
     const root = mkdtempSync(join(tmpdir(), 'candidate-shallow-check-')); temporary.push(root)
     const origin = join(root, 'origin.git'), checkout = join(root, 'checkout')
-    execFileSync('git', ['init', '--bare', origin], { stdio: 'ignore' })
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repoRoot, encoding: 'utf8' }).trim()
-    writeFileSync(join(origin, 'objects/info/alternates'), join(value.cwd, '.git/objects') + '\n' + join(common, 'objects') + '\n')
-    execFileSync('git', ['--git-dir', origin, 'update-ref', 'refs/heads/main', main])
+    execFileSync('git', ['clone', '--bare', '--no-hardlinks', value.cwd, origin], { stdio: 'ignore' })
     execFileSync('git', ['clone', '--quiet', '--branch', 'main', '--depth=1', '--no-checkout', `file://${origin}`, checkout])
     execFileSync('git', ['config', `url.file://${origin}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git'], { cwd: checkout })
     expect(execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: checkout, encoding: 'utf8' }).trim()).toBe('true')
