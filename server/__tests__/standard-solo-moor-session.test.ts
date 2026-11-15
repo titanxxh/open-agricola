@@ -175,6 +175,28 @@ describe('standard solo Moor supply', () => {
     expect(session[command]().ok).toBe(true)
   })
 
+  it('cancels anytime stable construction after opening disclosure and preserves the revealed card', () => {
+    let session = createOpeningSession({ seed: 7,
+      options: { playerCount: 1, enableFarmersOfTheMoor: true, deckIds: ['A'] },
+      expected: { phase: 'playing', roundPhase: 'work', interaction: { stateId: 'idle' } },
+    })
+    evidence.track(session)
+    session.state.players[0]!.occupationPlayed = ['C094_StableCleaner']
+    Object.assign(session.state.players[0]!.resources, { wood: 1, food: 1 })
+    const before = undoRuleSnapshot(session.getState())
+    const started = session.takeAnytimeAction(0, 'C94-stable-cleaner-anytime')
+    expect(started.ok, started.error).toBe(true)
+    expect(started.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+    session = restore(session)
+    const undone = session.undoStep()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undoRuleSnapshot(undone)).toBe(before)
+    expect(undone.interaction.stateId).toBe('idle')
+    session = restore(session)
+    assertRejectedUnchanged(session, () => session.undoStep())
+    assertRejectedUnchanged(session, () => session.undoAction())
+  })
+
   it.each(['undoStep', 'undoAction'] as const)('%s restores an action after replacing the current card without restoring the old card', command => {
     let session = work()
     confirmNext(session, session.takeAction(0, 'grain-seeds'))

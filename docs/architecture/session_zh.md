@@ -72,7 +72,7 @@ type SessionResponse = {
 
 ## 轮转、额外回合与供应人物
 
-撤回历史区分行动起点的边界与行动中途或玩家交接时的边界。同时标记 `actionStart` 和 `undoBoundary` 的条目已包含揭示的信息，允许撤回到该条目，并重新设置 `pendingUndoBoundary` 以保护更早的历史。行动起点之后的边界仍阻止撤回整个行动。此规则沿用现有存档标记，也适用于保留的游标。测试：`server/__tests__/{pending-undo-boundary,standard-solo-moor-session}.test.ts`。
+撤回历史区分揭示信息之后捕获的快照与行动中途或玩家交接时的边界。带有 `undoBoundary` 且标记 `actionStart` 或 `postObservation` 的条目已包含揭示的信息，允许逐步撤回到该条目，并重新设置 `pendingUndoBoundary` 以保护更早的历史。随时操作在消费待处理的揭示边界时记录 `postObservation`，不新开 Turn，也不改变整次行动的起点快照。后续边界仍阻止撤回更早的整次行动。可选标记随私有游标保存恢复；缺少标记的保留条目沿用原有的保守边界行为。测试：`server/__tests__/{pending-undo-boundary,standard-solo-moor-session}.test.ts`。
 
 标准单人对局只有一名实际参与者。新局资源初始化给该玩家零食物；共同基础行动定义接纳一人并沿用两人基础行动盘，Forest 每轮补充两木。发牌、规则查询和结算仍读取真实人数一。普通行动沿用现有确认与撤销边界，最后一次放人也在确认后才进入回家或收获。测试：`server/__tests__/standard-solo-core-session.test.ts`。
 

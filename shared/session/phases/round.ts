@@ -559,7 +559,7 @@ export const takeAnytimeAction = (
     return core.emitResponse(false, 'no active engine')
   }
 
-  core.appendHistory(entry.replacesTurn === true)
+  core.appendAnytimeHistory(entry.replacesTurn === true)
   if (entry.replacesTurn) {
     const owner = core.state.players[playerIndex]
     if (!owner) return core.emitResponse(false, 'invalid player')
