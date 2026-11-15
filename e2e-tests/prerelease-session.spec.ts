@@ -24,7 +24,7 @@ import { createServer, request as httpRequest, type ClientRequest, type Incoming
 import { once } from 'node:events'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync, renameSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Duplex } from 'node:stream'
@@ -339,8 +339,17 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       writeFileSync(join(directory, 'verification.json'), JSON.stringify({ targetId, buildId, generation: generationId, healthyCycle,
         tokenHash: createHash('sha256').update(ownerToken).digest('hex'), expiresAt }), { mode: 0o600 })
     }
-    writeFileSync(join(directory, 'storage-guard.json'), JSON.stringify({ format: 1, targetId, fingerprint: 'f'.repeat(64),
-      status: 'healthy', healthyCycle, observedAt, validUntil: observedAt + 120_000, operationsAllowed: true }))
+    // Like the owner guard, publish a fresh healthy sample every 15 seconds within one
+    // healthy cycle; a single 120-second sample would close long tests mid-flow.
+    const writeGuard = (at: number) => {
+      const path = join(directory, 'storage-guard.json')
+      writeFileSync(`${path}.tmp`, JSON.stringify({ format: 1, targetId, fingerprint: 'f'.repeat(64),
+        status: 'healthy', healthyCycle, observedAt: at, validUntil: at + 120_000, operationsAllowed: true }))
+      renameSync(`${path}.tmp`, path)
+    }
+    writeGuard(observedAt)
+    const guardSamples = setInterval(() => writeGuard(Date.now()), 15_000)
+    acquired.register(() => clearInterval(guardSamples))
     writeFileSync(stateFile, JSON.stringify({ format: 1, targetId, channel: 'prerelease', mode: options.ownerVerification ? 'maintenance' : 'open', buildId,
       generation: generationId, acceptance: options.ownerVerification ? null : { healthyCycle, formalBuildId: buildId } }))
     gateway = createPrereleaseGateway({ stateFile, targetId, origin: preOrigin, upstream: `http://127.0.0.1:${upstreamPort}`,
@@ -788,7 +797,7 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
           : await confirm.count() === 1 ? { button: confirm, name: 'Confirm switch' } : undefined
         if (!control) throw new Error(`Unexpected sandbox opening interaction: ${JSON.stringify(before.summary)}`)
         await expect(control.button).toBeEnabled()
-        await control.button.click()
+        await control.button.click({ timeout: 5000 })
         await expect.poll(async () => (await snapshot()).fingerprint).not.toBe(before.fingerprint)
         await observe('opening-after', control.name)
       }
