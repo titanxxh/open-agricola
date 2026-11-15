@@ -228,7 +228,7 @@ const callAndRespond = async (
   const executor = sessionExecutors.get((await getSessionKey(req)))
   const resp = executor
     ? await executor.execute(method, args, () => assertSandboxRequestAccess(req))
-    : session.withCtx(() => fn(session))
+    : session.withCtx(() => { assertSandboxRequestAccess(req); return fn(session) })
   if (method === 'loadState' && resp.ok) gameInstanceIds.delete(session)
   const viewerId = resolveViewerPlayerId(req, session)
   return { resp, result: respondWith(resp, session, viewerId), viewerId }

@@ -188,7 +188,7 @@ Viewer HTML 复验 CSP，不可变脚本仅允许 'self'。公开 Replay 允许�
 - 真实 Room 中的 `customCardIds` 只接受已批准、已上线的卡，并使用其审核过的快照。正式单人保留全部显式选择，卡源不可用或来源变化时拒绝创建并返回配置调整；其他 Room 对作者自己未上线的卡给出指引，过滤其他无法加载的 ID。未审核的代码只在工坊沙盒中运行，从不进入多人 `GameSession`。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。
-- `workshop-public-cards.ts` 只读提供上线目录、固定输入与图片、30 秒状态，排除草稿和编译产物。`prerelease-public-{cards,sandbox}.ts` 校验 hash/元数据、按候选编译，以单调租约约束执行和下发；失败不续期，旧成功不覆盖拒绝。pre 注册失败拒绝整组，其他会话警告；其他工坊路由关闭。见 `prerelease-public-sandbox.test.ts`。
+- `workshop-public-cards.ts` 只读提供目录、固定输入、图片及 30 秒状态。`prerelease-public-{cards,sandbox}.ts` 校验并编译；scope 经中央租约重绑原 ref，退休 lease 不复活。失败不续期、旧成功不覆拒绝；新局刷新，HTTP执行与下发前检查Beta。pre 错误拒绝整组，其他警告；其他工坊路由关闭。见 `prerelease-public-sandbox.test.ts`。
 - 工坊草稿错误暴露 `shared/contract/workshop.ts` 中的类型化 `code`；在线编辑守卫以 HTTP 409 返回 `live_edit_blocked`。
 
 测试：`server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submissions}.test.ts`、`server/workshop-pr/__tests__/`。
