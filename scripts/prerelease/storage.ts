@@ -65,7 +65,8 @@ export async function operatePrereleaseStorage(target: PrereleaseTarget, operati
       catch (error) { if (error && typeof error === 'object' && '$metadata' in error && error.$metadata && typeof error.$metadata === 'object' && 'httpStatusCode' in error.$metadata && error.$metadata.httpStatusCode === 403) scratchDenied = true; else throw error }
       if (!scratchDenied) throw new Error('Application object credentials can access validation scratch')
     }
-    if (operation === 'identities') return readRetainedIdentityManifest(db)
+    // Await inside try: returning the promise would run finally and close the pool before the read.
+    if (operation === 'identities') return await readRetainedIdentityManifest(db)
     const keys: Array<{ key: string; bytes: number }> = []
     let token: string | undefined
     do {
