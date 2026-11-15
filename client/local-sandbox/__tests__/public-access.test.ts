@@ -2,6 +2,7 @@
 // @vitest-environment-options {"url":"https://pre.agricola.test/open-agricola/"}
 import { createHash } from 'node:crypto'
 import { afterEach, expect, it, vi } from 'vitest'
+import { FakeWorker } from './fake-worker'
 import { canonicalJson } from '../../../shared/contract/authoritative-command'
 import type { WorkshopPublicCardInput } from '../../../shared/contract/workshop-public-cards'
 
@@ -60,7 +61,7 @@ it('does not accept an older positive source response after a known disable', as
 })
 
 it('terminates an idle actual-core worker at source denial and checks a restore before spawning a replacement', async () => {
-  const fixture = await setup(), { LocalGameTransport } = await import('../local-transport'), { FakeWorker } = await import('./fake-worker')
+  const fixture = await setup(), { LocalGameTransport } = await import('../local-transport')
   let worker: InstanceType<typeof FakeWorker> | undefined
   const factory = vi.fn(() => { worker = new FakeWorker(); return worker })
   const config = { cards: [], playerCount: 2, seed: 42, publicInputs: fixture.inputs }, persisted: import('../protocol').PersistedLocalGame[] = []
@@ -90,7 +91,7 @@ it('rejects arbitrary source and a different build or generation before the work
 })
 
 it('drops a pending worker response after source denial instead of publishing or persisting it', async () => {
-  const fixture = await setup(), { LocalGameTransport } = await import('../local-transport'), { FakeWorker } = await import('./fake-worker')
+  const fixture = await setup(), { LocalGameTransport } = await import('../local-transport')
   class DelayedWorker extends FakeWorker {
     held?: import('../protocol').LocalSandboxRequest
     override postMessage(request: import('../protocol').LocalSandboxRequest) { if (request.kind === 'call') this.held = request; else super.postMessage(request) }
@@ -111,7 +112,7 @@ it('drops a pending worker response after source denial instead of publishing or
 })
 
 it('does not recreate a timed-out worker from a compiled package after the fixed source is disabled', async () => {
-  const fixture = await setup(), { LocalGameTransport } = await import('../local-transport'), { FakeWorker } = await import('./fake-worker')
+  const fixture = await setup(), { LocalGameTransport } = await import('../local-transport')
   const factory = vi.fn(() => new FakeWorker(request => request.kind === 'call'))
   const transport = new LocalGameTransport({ cards: [], playerCount: 2, seed: 42, publicInputs: fixture.inputs }, { workerFactory: factory, timeoutMs: 10 })
   cleanups.push(() => transport.destroy()); await transport.start()
@@ -123,7 +124,7 @@ it('does not recreate a timed-out worker from a compiled package after the fixed
 })
 
 it('checks a fresh allowNew before resetting an existing game without revoking its allowExisting lease', async () => {
-  const fixture = await setup(), { LocalGameTransport } = await import('../local-transport'), { FakeWorker } = await import('./fake-worker')
+  const fixture = await setup(), { LocalGameTransport } = await import('../local-transport')
   const transport = new LocalGameTransport({ cards: [], playerCount: 2, seed: 42, publicInputs: fixture.inputs }, { workerFactory: () => new FakeWorker() })
   cleanups.push(() => transport.destroy())
   const initial = await transport.start()
