@@ -699,9 +699,33 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
     await environment.source.prepare("UPDATE workshop_card_versions SET card_json=jsonb_set(card_json::jsonb,'{modifiers}',?::jsonb)::text WHERE id=?")
       .run(JSON.stringify([modifier]), fixtureCard.versionId)
     const page = await environment.enter(environment.context), workers: string[] = []
+    let serverSnapshot: unknown
+    const object = (value: unknown): Record<string, unknown> => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected a sandbox state object')
+      return value
+    }
+    const readSaved = () => page.evaluate(async () => {
+      if (!(await indexedDB.databases()).some(database => database.name === 'open-agricola-local-sandbox')) return []
+      return new Promise<unknown[]>((resolve, reject) => {
+        const opening = indexedDB.open('open-agricola-local-sandbox', 1)
+        opening.onerror = () => reject(opening.error)
+        opening.onsuccess = () => {
+          const db = opening.result, tx = db.transaction('games', 'readonly'), request = tx.objectStore('games').getAll()
+          let saved: unknown[] = []
+          request.onsuccess = () => { saved = request.result }
+          request.onerror = () => reject(request.error)
+          tx.oncomplete = () => { db.close(); resolve(saved) }
+          tx.onabort = () => { db.close(); reject(tx.error) }
+        }
+      })
+    })
     page.on('console', message => { if (message.type() === 'error') diagnostics.push({ console: message.text() }) })
     page.on('response', response => {
-      if (new URL(response.url()).pathname.includes('/public-sandbox/')) void response.text().then(body => diagnostics.push({ url: response.url(), status: response.status(), body }))
+      const path = new URL(response.url()).pathname
+      if (path.includes('/public-sandbox/')) void response.text().then(body => diagnostics.push({ url: response.url(), status: response.status(), body }))
+      if (['/api/game/state', '/api/game/choice', '/api/game/confirm-player-switch', '/api/game/dev/play-card'].includes(path)) {
+        void response.json().then((body: unknown) => { serverSnapshot = body }).catch(error => diagnostics.push({ path, error: String(error) }))
+      }
     })
     page.on('worker', worker => workers.push(worker.url()))
     await page.goto(`${environment.preOrigin}/open-agricola/?page=workshop`)
@@ -719,12 +743,76 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
       await expect.poll(() => page.getByRole('img', { name: fixtureCard.name, exact: true }).evaluate((element: HTMLImageElement) => element.naturalWidth)).toBe(1)
       const frame = page.frameLocator('iframe.sandbox-embed-frame')
       await expect(frame.locator('.action-board').first()).toBeVisible({ timeout: 30_000 })
+      if (mode === 'browser') await expect.poll(readSaved).toHaveLength(1)
+      else await expect.poll(() => serverSnapshot).toBeDefined()
+      const snapshot = async () => {
+        const raw = object(mode === 'browser' ? (await readSaved())[0] : serverSnapshot)
+        const serialized = mode === 'browser' ? object(raw.serializedState) : raw
+        const state = object(serialized.state)
+        const frames: unknown = mode === 'browser' ? object(object(serialized.sessionCursor).engineStack).frames : []
+        if (!Array.isArray(frames)) throw new Error('Expected the saved sandbox engine frames')
+        const interaction = mode === 'server' ? object(raw.interaction) : undefined
+        return { fingerprint: JSON.stringify(serialized), idle: mode === 'browser' ? frames.length === 0 : interaction?.stateId === 'idle',
+          summary: { phase: state.phase, round: state.round, roundPhase: state.roundPhase, interaction,
+            frameCount: mode === 'browser' ? frames.length : null,
+            frames: frames.map(value => { const frame = object(value); return { kind: object(frame.source).kind, reason: frame.reason,
+              pending: object(frame.engineSnapshot).pendingData } }),
+          } }
+      }
+      const observe = async (stage: string, control?: string) => {
+        const value = await snapshot()
+        diagnostics.push({ mode, stage, control, ...value.summary, ui: await frame.locator('.interaction-bar').innerText() })
+        return value
+      }
+      const skip = frame.locator('.interaction-bar button[data-choice-value="__skip__"]:not([role="radio"])')
+      const confirm = frame.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+      const synchronizeOpening = async () => {
+        try {
+          await expect.poll(async () => {
+            const value = await snapshot(), bodies = await frame.locator('.interaction-bar__body').count()
+            if (value.idle) return bodies === 0 && value.summary.phase === 'playing' && value.summary.round === 1 && value.summary.roundPhase === 'work'
+            const preparation = value.summary.phase === 'playing' && value.summary.round === 1 && value.summary.roundPhase === 'preparation'
+            return preparation && bodies === 1 && (await skip.count() === 1 && await skip.isEnabled() || await confirm.count() === 1 && await confirm.isEnabled())
+          }, { message: 'Sandbox saved state and UI must agree on idle or an enabled opening skip/switch' }).toBe(true)
+        } catch (error) {
+          await observe('opening-state-ui-not-synchronized')
+          throw error
+        }
+      }
+      for (let opening = 0; opening < 8; opening++) {
+        await synchronizeOpening()
+        const before = await observe('opening-before')
+        if (before.idle) break
+        expect(before.summary).toMatchObject({ phase: 'playing', round: 1, roundPhase: 'preparation' })
+        const control = await skip.count() === 1 ? { button: skip, name: '__skip__' }
+          : await confirm.count() === 1 ? { button: confirm, name: 'Confirm switch' } : undefined
+        if (!control) throw new Error(`Unexpected sandbox opening interaction: ${JSON.stringify(before.summary)}`)
+        await expect(control.button).toBeEnabled()
+        await control.button.click()
+        await expect.poll(async () => (await snapshot()).fingerprint).not.toBe(before.fingerprint)
+        await observe('opening-after', control.name)
+      }
+      await synchronizeOpening()
+      const ready = await observe('before-play-card')
+      expect(ready.idle, JSON.stringify(ready.summary)).toBe(true)
+      expect(ready.summary).toMatchObject({ phase: 'playing', round: 1, roundPhase: 'work' })
+      await expect(frame.locator('.interaction-bar__body')).toHaveCount(0)
       await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 2"]').first()).toBeVisible()
       await frame.locator('.dev-field', { hasText: 'Card ID' }).getByRole('textbox').fill(fixtureCard.ruleId)
       const played = mode === 'server' ? page.waitForResponse(response => new URL(response.url()).pathname === '/api/game/dev/play-card' && response.request().method() === 'POST') : undefined
-      await frame.getByRole('button', { name: 'Play Card', exact: true }).click()
-      if (played) expect((await (await played).json()).state.players[0].activeModifiers).toContainEqual(modifier)
-      await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible()
+      try {
+        await frame.getByRole('button', { name: 'Play Card', exact: true }).click()
+        if (played) {
+          const response = await played, body = await response.json()
+          diagnostics.push({ mode, stage: 'play-card-response', status: response.status(), ok: body.ok, error: body.error, interaction: body.interaction })
+          expect(response.status(), JSON.stringify(body)).toBe(200)
+          expect(body.ok, body.error).toBe(true)
+          expect(body.state.players[0].activeModifiers).toContainEqual(modifier)
+        }
+        await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible()
+      } finally {
+        try { await observe('after-play-card-last-committed-state') } catch (error) { diagnostics.push({ mode, stage: 'after-play-card-observation-failed', error: String(error) }) }
+      }
       if (mode === 'server') {
         serverWorkerCount = workers.length
         await page.getByRole('button', { name: 'Close Sandbox', exact: true }).click()
