@@ -622,6 +622,23 @@ it('rejects whole-host cleanup requests before creating state or running tools',
 })
 
 
+it('reports the remote failure and keeps the owner SSH transport tolerant of short stalls', () => {
+  const value = fixture()
+  writeFileSync(join(value.bin, 'ssh'), `#!/bin/sh
+printf '%s\\n' "$*" >> '${value.temporary}/ssh-calls'
+cat >/dev/null
+printf 'Prerelease docker compose failed; the gateway remains in its recorded mode\\n' >&2
+exit 1
+`, { mode: 0o700 })
+  const result = value.invoke('initialize', '--expected-current', 'empty', '--generation', 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', '--ssh', 'fixture-owner')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Remote prerelease operation failed (exit 1): Prerelease docker compose failed; the gateway remains in its recorded mode')
+  const call = readFileSync(join(value.temporary, 'ssh-calls'), 'utf8')
+  expect(call).toContain('ServerAliveInterval=15')
+  expect(call).toContain('ServerAliveCountMax=8')
+  expect(existsSync(join(value.root, 'control'))).toBe(false)
+})
+
 it.each(['CI', 'GITHUB_ACTIONS'])('refuses owner initialization in %s before state, Docker, SSH or GitHub effects', flag => {
   const value = fixture()
   value.env[flag] = 'true'
