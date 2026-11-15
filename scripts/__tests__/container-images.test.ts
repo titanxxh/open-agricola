@@ -98,7 +98,11 @@ it.each(['run', 'attempt', 'producer', 'repository', 'artifact source', 'artifac
   const value = buildArtifactFixture()
   if (failure === 'run') value.run.conclusion = 'failure'
   if (failure === 'attempt') value.run.run_attempt = 1
-  if (failure === 'producer') value.run.head_sha = execFileSync('git', ['rev-parse', 'HEAD~1'], { cwd: value.cwd, encoding: 'utf8' }).trim()
+  if (failure === 'producer') {
+    value.run.head_sha = execFileSync('git', ['-c', 'user.name=Image fixture', '-c', 'user.email=fixture@example.invalid',
+      'commit-tree', `${value.sha}^{tree}`, '-p', value.sha], { cwd: value.cwd, input: 'Unmerged image producer\n', encoding: 'utf8' }).trim()
+    expect(value.run.head_sha).not.toBe(value.sha)
+  }
   if (failure === 'repository') value.run.head_repository.id = 999
   if (failure === 'artifact source') value.artifact.workflow_run.id = 999
   if (failure === 'artifact digest') value.artifact.digest = `sha256:${'f'.repeat(64)}`
@@ -259,7 +263,7 @@ it('rejects an incomplete or duplicated candidate task set', () => {
 })
 
 
-it('requires complete stable verification before authorizing a formal candidate image', () => {
+function stableImageFixture() {
   const value = githubFixture(), prefix = 'repos/titanxxh/open-agricola'
   Object.assign(value.api, finalSnapshotMetadata(value.sha, value.sha, { id: 123, full_name: 'titanxxh/open-agricola' }))
   const configuration = stableConfiguration(value.cwd, value.sha, value.sha)
@@ -278,7 +282,11 @@ it('requires complete stable verification before authorizing a formal candidate 
   value.api[`${prefix}/actions/runs/61/jobs?filter=all&per_page=100`] = [manifest, ...jobs]
   for (const job of jobs) value.api[`${prefix}/actions/jobs/${job.id}`] = job
   value.save()
-  expect(checkCandidateVerification(value.cwd, 'titanxxh/open-agricola', value.sha).status).toBe('passed')
+  return { value, configuration, jobs }
+}
+
+it('requires complete stable verification before authorizing a formal candidate image', () => {
+  const { value, configuration } = stableImageFixture()
   const verified = containerImageVerification({ cwd: value.cwd, purpose: 'formal-candidate', sourceSha: value.sha, producerSha: value.sha })
   expect(verified).toEqual({ kind: 'stable', configuration, producerConfiguration: verificationConfiguration(value.cwd, value.sha),
     tasks: FULL_TASK_IDS.map((id, index) => ({ id, runId: 61, jobId: index + 2000, runAttempt: 2 })).sort((a, b) => a.id.localeCompare(b.id)) })
@@ -287,6 +295,11 @@ it('requires complete stable verification before authorizing a formal candidate 
   expect(parseContainerImageReceipt(receipt).purpose).toBe('formal-candidate')
   expect(() => parseContainerImageReceipt({ ...receipt, purpose: 'trusted-policy' })).toThrow()
   expect(() => parseContainerImageReceipt({ ...receipt, channel: 'prerelease' })).toThrow()
+})
+
+it('rejects a failed current task after stable verification previously passed', () => {
+  const { value, jobs } = stableImageFixture()
+  expect(checkCandidateVerification(value.cwd, 'titanxxh/open-agricola', value.sha).status).toBe('passed')
   jobs[0].conclusion = 'failure'; value.save()
   expect(() => containerImageVerification({ cwd: value.cwd, purpose: 'formal-candidate', sourceSha: value.sha, producerSha: value.sha })).toThrow(/Complete/)
 })
