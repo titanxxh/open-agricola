@@ -5,6 +5,7 @@ import { createPublicIngress } from '../server/ingress'
 import { RoomDirectory } from '../server/game/room-directory'
 import { initializeDatabase, getDb } from '../server/db'
 import { installShutdownHandlers } from '../server/shutdown'
+import { typescriptLoaderArgs } from './typescript-loader'
 
 const count = Number(process.env.APP_INSTANCES ?? 1)
 const port = Number(process.env.BACKEND_PORT ?? 5175)
@@ -31,7 +32,7 @@ installShutdownHandlers(shutdown)
 async function start(index: number): Promise<void> {
   const childPort = privatePort + index
   const internalUrl = `http://127.0.0.1:${childPort}`
-  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
+  const child = spawn(process.execPath, [...typescriptLoaderArgs(), 'server/index.ts'], {
     // Private children receive one normalized client IP from this ingress.
     env: { ...process.env, REPLAY_TRUST_PROXY: 'true', INSTANCE_SLOT: String(index), BACKEND_HOST: '127.0.0.1', BACKEND_PORT: String(childPort), INSTANCE_INTERNAL_URL: internalUrl },
     stdio: 'inherit',

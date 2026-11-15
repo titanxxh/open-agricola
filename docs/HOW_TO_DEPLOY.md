@@ -285,12 +285,12 @@ Prepare an owner-owned mode-0600 JSON file outside the candidate directory. `scr
 - `limits`: `sourceDatabaseBytes`, `validationDatabaseBytes`, `bucketBytes`, `multipartBytes`, `localBytes`, `offsiteBytes`, `hostFreeBytes`, `hostFreeInodes`, `offsiteFreeBytes`, `offsiteFreeInodes`, `operationReserveBytes`. Usage values are stop thresholds; free values are floors. The reserve is measured additional local/offsite space for the largest admitted operation. Include seven retained daily backups, validation scratch and failed-transfer peaks. Install the same positive `bucketBytes` as the native RustFS whole-bucket quota and verify actual rejection. Quota covers completed logical objects; multipart parts remain separately measured.
 - `intervalMs`, `probeTimeoutMs`, `leaseMs`: measured observation timing. `intervalMs + probeTimeoutMs` must be less than `leaseMs`, which cannot exceed 120 seconds. `watch` also requires systemd's actual positive safe-integer `WATCHDOG_USEC`; missing or malformed values fail before locking or collecting. `intervalMs + probeTimeoutMs + 10000` must be strictly less than that watchdog deadline in milliseconds. The 10-second margin includes the bounded 3-second notification and local processing/I/O headroom. With the template's 90-second watchdog, 15/30/90-second timing is accepted and 80/30/120 is rejected. `once` and emergency `trip` do not require watchdog information. A complete sample must finish within its probe deadline; native stop timing must also fit the supervisor budget.
 
-The unit allows 64 tasks because systemd counts Node loader and compiler threads as tasks. Include uncached CLI startup when measuring any adjustment; a 32-task limit can fail before the first observation.
+The unit loads `scripts/typescript-runtime.mjs` from the trusted checkout and starts its locked child with the same preload; update the checkout before installing a unit that names it. The unit allows 64 tasks because systemd counts Node loader and compiler threads as tasks. Include uncached CLI startup when measuring any adjustment; a 32-task limit can fail before the first observation.
 
 Run the one-shot probe before enabling the service:
 
 ```bash
-node --import tsx scripts/prerelease/storage-guard-cli.ts once "$pre_config" "$pre_storage_config"
+node --import ./scripts/typescript-runtime.mjs scripts/prerelease/storage-guard-cli.ts once "$pre_config" "$pre_storage_config"
 sudo systemctl daemon-reload
 sudo systemctl enable --now open-agricola-prerelease-storage-guard.service
 ./deploy-prerelease.sh budget-check --config "$pre_config" --expected-current "$pre_current"
@@ -379,7 +379,7 @@ Both cases start with the common steps below.
 
 ### 1.1 Common Setup
 
-On the formal host, install Node.js 24.15+ (excluding Node 25), Docker Compose, Git and user systemd/cgroup v2. Production Compose runs two independent application processes inside the app container on one host, sharing PostgreSQL 18 and RustFS through the public HTTP/WS routing process. It fixes `APP_INSTANCES=2`, including when `.env` contains the local-development value `1`. No external service account is required. Local development still defaults to one application process; use `./restart-local.sh --instances 2` to exercise the same two-process routing locally.
+On the formal host, install Node.js 24.15+ (excluding Node 25), Docker Compose, Git and user systemd/cgroup v2. Production Compose runs two independent application processes inside the app container on one host, sharing PostgreSQL 18 and RustFS through the public HTTP/WS routing process. It fixes `APP_INSTANCES=2`, including when `.env` contains the local-development value `1`. No external service account is required. Local development still defaults to one application process; use `./restart-local.sh --instances 2` to exercise the same two-process routing locally. Images run TypeScript with Node's native type stripping: `scripts/typescript-runtime.mjs` only resolves extensionless relative imports, and the routing process passes the same preload to application processes and custom-session workers. Development keeps tsx. Removing tsx's in-memory transforms and source maps keeps the application processes small enough to share the host with the prerelease channel. tsx remains a production dependency for one-off operator commands and backup scripts that may run against an older image.
 
 Earlier SQLite single-instance performance reports are historical baselines only. Keep existing admission limits; those measurements do not certify PostgreSQL, two-instance capacity, or high availability. This delivery verifies normal behavior and restarts, without fault injection or recovery-time acceptance.
 

@@ -42,4 +42,4 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=6 \
     CMD node -e "fetch('http://127.0.0.1:5175/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 USER node
 ENTRYPOINT []
-CMD ["node", "--import", "tsx", "scripts/container-entry.ts"]
+CMD ["node", "--import", "./scripts/typescript-runtime.mjs", "scripts/container-entry.ts"]

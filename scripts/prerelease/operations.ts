@@ -15,6 +15,7 @@ import { parseImageImportRequest, runImageImport } from './image-import'
 import { assertExpectedContainerImage, verifyContainerImageBuild } from '../release/container-images.ts'
 import { prepareContainerImageArchive } from '../release/container-images-owner.ts'
 import { runBoundedImageImport } from './image-import-limits'
+import { typescriptLoaderArgs } from '../typescript-loader'
 
 export function prerequisitePlan(configFile: string) {
   const raw: unknown = JSON.parse(readFileSync(configFile, 'utf8'))
@@ -131,7 +132,7 @@ export async function operations(args: string[]): Promise<void> {
 function sendEnvelope(target: ReturnType<typeof parsePrereleaseTarget>, envelope: Record<string, unknown>, ssh?: string): string {
   if (!ssh) return locked(target, envelope)
   if (!/^[a-zA-Z0-9][a-zA-Z0-9@_.-]*$/.test(ssh)) throw new Error('Invalid owner SSH host')
-  const remote = `cd ${shell(target.policyDirectory)} && exec node --import tsx scripts/prerelease/operations.ts receive`
+  const remote = `cd ${shell(target.policyDirectory)} && exec node --import ./scripts/typescript-runtime.mjs scripts/prerelease/operations.ts receive`
   const result = spawnSync('ssh', ['-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=2', ssh, remote],
     { input: JSON.stringify(envelope), encoding: 'utf8', timeout: 60 * 60_000, stdio: ['pipe', 'pipe', 'pipe'] })
   if (result.status !== 0 || result.error) throw new Error('Remote prerelease operation failed; read the scoped maintenance or image-import record')
@@ -177,7 +178,7 @@ function locked(target: ReturnType<typeof parsePrereleaseTarget>, envelope: Reco
   mkdirSync(controlDirectory(target), { recursive: true, mode: 0o700 })
   const request = object(envelope.request)
   const result = request.action === 'import-image' ? runBoundedImageImport(target, parseImageImportRequest(request).operationId, JSON.stringify(envelope))
-    : spawnSync('setsid', ['--wait', 'flock', '-w', '60', join(controlDirectory(target), '.operation.lock'), process.execPath, '--import', 'tsx',
+    : spawnSync('setsid', ['--wait', 'flock', '-w', '60', join(controlDirectory(target), '.operation.lock'), process.execPath, ...typescriptLoaderArgs(),
     join(target.policyDirectory, 'scripts/prerelease/operations.ts'), '_locked'], { cwd: target.policyDirectory,
     env: { ...process.env, PRERELEASE_LOCK_SCOPE: targetFingerprint(target) }, encoding: 'utf8', input: JSON.stringify(envelope), timeout: 60 * 60_000 })
   if (result.status !== 0 || result.error) throw new Error(result.stderr?.trim() || result.error?.message || 'Scoped prerelease operation failed')

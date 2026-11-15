@@ -287,12 +287,12 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 - `limits` 包含 `sourceDatabaseBytes`、`validationDatabaseBytes`、`bucketBytes`、`multipartBytes`、`localBytes`、`offsiteBytes`、`hostFreeBytes`、`hostFreeInodes`、`offsiteFreeBytes`、`offsiteFreeInodes`、`operationReserveBytes`。用量值为停止阈值，free 值为保留余量。reserve 是允许的最大一次操作所需新增本地及离站空间。取数包括七份每日备份、validation scratch 和失败传输峰值。将相同正数 `bucketBytes` 安装为 RustFS 整桶原生 quota，并验证实际拒写。quota 覆盖已完成对象逻辑大小；multipart 分片另行测量。
 - `intervalMs`、`probeTimeoutMs`、`leaseMs` 记录已验证的采样时限。`intervalMs + probeTimeoutMs` 须小于 `leaseMs`，后者最多 120 秒。`watch` 还要求 systemd 提供实际的正安全整数 `WATCHDOG_USEC`；缺失或格式非法时，在加锁和采集前失败。`intervalMs + probeTimeoutMs + 10000` 必须严格小于换算为毫秒的 watchdog 时限。10 秒余量包含最长 3 秒的通知及本地处理/I/O 开销。模板 watchdog 为 90 秒时，15/30/90 秒的配置可接受，80/30/120 秒会被拒绝。单次 `once` 和紧急 `trip` 不要求 watchdog 信息。完整采样必须在探测 deadline 内结束；原生停止耗时也须容纳于监督器预算。
 
-unit 允许 64 个 task，因为 systemd 也将 Node loader 和编译器线程计入 task。调整额度时须测量无缓存的 CLI 启动；32 个 task 的上限可能在首次采样前就导致失败。
+unit 从可信 checkout 加载 `scripts/typescript-runtime.mjs`，加锁子进程沿用同一预加载；安装引用它的 unit 之前先更新 checkout。unit 允许 64 个 task，因为 systemd 也将 Node loader 和编译器线程计入 task。调整额度时须测量无缓存的 CLI 启动；32 个 task 的上限可能在首次采样前就导致失败。
 
 启用 service 前先运行单次探测：
 
 ```bash
-node --import tsx scripts/prerelease/storage-guard-cli.ts once "$pre_config" "$pre_storage_config"
+node --import ./scripts/typescript-runtime.mjs scripts/prerelease/storage-guard-cli.ts once "$pre_config" "$pre_storage_config"
 sudo systemctl daemon-reload
 sudo systemctl enable --now open-agricola-prerelease-storage-guard.service
 ./deploy-prerelease.sh budget-check --config "$pre_config" --expected-current "$pre_current"
@@ -380,7 +380,7 @@ ssh ubuntu@ten-kr \
 
 ### 1. 基础步骤（两种情况通用）
 
-正式主机准备 Node.js 24.15+（不支持 Node 25）、Docker Compose、Git 和用户级 systemd/cgroup v2。生产 Compose 在同一台机器的 app 容器内启动两个独立应用进程，通过公开 HTTP/WS 路由进程接入，共享 PostgreSQL 18 和 RustFS。生产配置固定 `APP_INSTANCES=2`，即使 `.env` 中保留本地开发的 `1` 也会启动两个。无需申请外部服务。本地开发仍默认一个应用进程，使用 `./restart-local.sh --instances 2` 即可在本机验证相同的双进程路由。
+正式主机准备 Node.js 24.15+（不支持 Node 25）、Docker Compose、Git 和用户级 systemd/cgroup v2。生产 Compose 在同一台机器的 app 容器内启动两个独立应用进程，通过公开 HTTP/WS 路由进程接入，共享 PostgreSQL 18 和 RustFS。生产配置固定 `APP_INSTANCES=2`，即使 `.env` 中保留本地开发的 `1` 也会启动两个。无需申请外部服务。本地开发仍默认一个应用进程，使用 `./restart-local.sh --instances 2` 即可在本机验证相同的双进程路由。镜像用 Node 原生类型剥离运行 TypeScript：`scripts/typescript-runtime.mjs` 只把无扩展名的相对导入解析到 `.ts` 文件，路由进程把同一预加载传给应用进程和自定义 Session worker。开发环境仍用 tsx。去掉 tsx 的内存转译结果和 source map 后，应用进程才能与预发布通道共用主机。tsx 仍是生产依赖，供一次性运维命令和可能面对旧镜像的备份脚本使用。
 
 旧 SQLite 单实例的性能报告仅是历史基线；继续保留应用的既有容量上限，不把这些数字当作 PostgreSQL、双实例或高可用认证。本次只验正常功能和重启，不做故障注入或恢复计时。
 

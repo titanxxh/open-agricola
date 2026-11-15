@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { parsePrereleaseTarget, targetFingerprint } from './config'
 import { readStorageGuardConfig, nativeStorageGuard, assertStorageGuardWatchdog } from './storage-guard-native'
 import { runStorageGuardCycle } from './storage-guard'
+import { typescriptLoaderArgs } from '../typescript-loader'
 
 export async function storageGuard(args: string[]) {
   const [action, targetFile, guardFile] = args
@@ -17,7 +18,7 @@ export async function storageGuard(args: string[]) {
     try {
       mkdirSync(join(target.directory, 'control'), { recursive: true, mode: 0o700 })
       const result = spawnSync('flock', ['-n', join(target.directory, 'control/.storage-guard.lock'), process.execPath,
-        '--import', 'tsx', fileURLToPath(import.meta.url), `_${action}`, resolve(targetFile), resolve(guardFile)],
+        ...typescriptLoaderArgs(), fileURLToPath(import.meta.url), `_${action}`, resolve(targetFile), resolve(guardFile)],
       { env: { ...process.env, PRERELEASE_GUARD_LOCK: fingerprint }, stdio: 'inherit' })
       if (result.error || result.status !== 0) throw new Error('Storage guard failed or another guard owns the target')
     } catch (error) {

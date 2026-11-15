@@ -2,6 +2,7 @@ import { assertNativeImageIntake, imageIntakeProperties } from '../image-intake.
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { targetFingerprint, type PrereleaseTarget } from './config'
+import { typescriptLoaderArgs } from '../typescript-loader'
 
 function unitName(target: PrereleaseTarget, operationId: string): string {
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(operationId)) throw new Error('Invalid image intake operation')
@@ -21,6 +22,6 @@ export function runBoundedImageImport(target: PrereleaseTarget, operationId: str
     ...imageIntakeProperties(budget),
     `--setenv=PRERELEASE_LOCK_SCOPE=${targetFingerprint(target)}`, ...environment,
     '--', 'setsid', '--wait', 'flock', '-w', '60', join(target.directory, 'control/.operation.lock'),
-    process.execPath, '--import', 'tsx', join(target.policyDirectory, 'scripts/prerelease/operations.ts'), '_locked'],
+    process.execPath, ...typescriptLoaderArgs(), join(target.policyDirectory, 'scripts/prerelease/operations.ts'), '_locked'],
   { cwd: target.policyDirectory, input: envelope, encoding: 'utf8', timeout: 21 * 60_000 })
 }
