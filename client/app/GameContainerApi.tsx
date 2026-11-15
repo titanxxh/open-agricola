@@ -1572,7 +1572,7 @@ export const GameContainerApi = () => {
               )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
               {wsStatus.phase === 'team-waiting'
-                ? <TeamWaitingRoom value={wsStatus} onChooseTeam={(teamIndex, memberId) => wsTransport?.sendRoomCommand('setTeam', { teamIndex, memberId })}
+                ? <TeamWaitingRoom value={wsStatus} onChooseTeam={(teamIndex, memberId, swapMemberId) => wsTransport?.sendRoomCommand('setTeam', { teamIndex, memberId, swapMemberId })}
                     onStart={() => wsTransport?.sendRoomCommand('startTeamGame')} disabled={persistencePaused} error={roomTeamError} />
                 : <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex ?? undefined} onColorChange={changePlayerColor} colorError={roomColorError}
                   colorConfirmationPlayerIndex={wsStatus.colorConfirmationPlayerIndex} onConfirmColor={() => wsTransport?.sendRoomCommand('confirmPlayerColor')} disabled={persistencePaused} />}
