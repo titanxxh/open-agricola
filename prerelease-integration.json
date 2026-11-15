@@ -8,6 +8,39 @@
       "dependsOn": [],
       "sourceSha": "087e71b429fb2316972ab57db65369f8d928a619",
       "integratedSha": "d261410651afbc01639a9203eadc680f76558ad8"
+    },
+    {
+      "id": "pre-lifecycle",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5"
+    },
+    {
+      "id": "private-replay",
+      "dependsOn": [
+        "pre-identity",
+        "pre-lifecycle"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5"
+    },
+    {
+      "id": "public-sandbox",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5"
+    },
+    {
+      "id": "team-cooperation",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5"
     }
   ]
 }
