@@ -6,6 +6,28 @@ import type { TeamConfiguration, TeamState } from '../../shared/contract/team'
 import type { GameSeed } from '../../shared/contract/types'
 import { createSeededRng, shuffleWithRng } from '../../shared/utils/rng'
 
+type TeamReassignment = { kind: 'move'; memberId: string; teamIndex: number }
+  | { kind: 'swap'; memberId: string; teamIndex: number; swapMemberId: string }
+
+export function planTeamReassignment(team: TeamState, members: readonly TeamRoomMember[], operation: TeamReassignment): TeamRoomMember[] | undefined {
+  const { seatsPerTeam, mode } = team.configuration
+  const teamCount = team.playerTeams.length / seatsPerTeam
+  const member = members.find(value => value.memberId === operation.memberId)
+  if (!member || !Number.isInteger(operation.teamIndex) || operation.teamIndex < 0 || operation.teamIndex >= teamCount) return
+  const swap = operation.kind === 'swap' ? members.find(value => value.memberId === operation.swapMemberId) : undefined
+  if (operation.kind === 'swap' && (mode !== 'team' || !swap || swap.memberId === member.memberId
+    || swap.teamIndex !== operation.teamIndex || swap.teamIndex === member.teamIndex)) return
+  const next = members.map(value => value.memberId === member.memberId ? { ...value, teamIndex: operation.teamIndex }
+    : value.memberId === swap?.memberId ? { ...value, teamIndex: member.teamIndex } : value)
+  if (new Set(next.map(value => value.userId)).size !== next.length
+    || new Set(next.map(value => value.memberId)).size !== next.length
+    || next.some(value => !Number.isInteger(value.teamIndex) || value.teamIndex < 0 || value.teamIndex >= teamCount
+      || value.seatCount !== (mode === 'multihand' ? seatsPerTeam : 1))
+    || Array.from({ length: teamCount }, (_, index) => next.filter(value => value.teamIndex === index)
+      .reduce((sum, value) => sum + value.seatCount, 0)).some(count => count > seatsPerTeam)) return
+  return next
+}
+
 export function planTeamSeating(team: TeamState, members: readonly TeamRoomMember[], seed: GameSeed) {
   const { seatsPerTeam, mode } = team.configuration
   const teamCount = team.playerTeams.length / seatsPerTeam

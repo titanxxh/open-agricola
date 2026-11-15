@@ -6,7 +6,7 @@ import { TeamConfigurationSummary } from './TeamSetupFields'
 
 export function TeamWaitingRoom({ value, onChooseTeam, onStart, disabled, error }: {
   value: TeamWaitingRoomState
-  onChooseTeam: (teamIndex: number, memberId?: string) => void
+  onChooseTeam: (teamIndex: number, memberId?: string, swapMemberId?: string) => void
   onStart: () => void
   disabled?: boolean
   error?: RoomTeamErrorCode | null
@@ -19,10 +19,23 @@ export function TeamWaitingRoom({ value, onChooseTeam, onStart, disabled, error 
     .filter(member => member.teamIndex === teamIndex && member.memberId !== excluding)
     .reduce((sum, member) => sum + member.seatCount, 0)
   const teamName = (teamIndex: number) => t('team.name', { number: teamIndex + 1 })
-  const options = (member: TeamWaitingRoomState['members'][number]) => teams.map(teamIndex => {
+  const options = (member: TeamWaitingRoomState['members'][number]) => teams.flatMap(teamIndex => {
     const full = occupied(teamIndex, member.memberId) + member.seatCount > value.teamConfig.seatsPerTeam
-    return <option key={teamIndex} value={teamIndex} disabled={full}>{teamName(teamIndex)}{full ? ` (${t('team.full')})` : ''}</option>
+    return [<option key={teamIndex} value={teamIndex} disabled={full}>{teamName(teamIndex)}{full ? ` (${t('team.full')})` : ''}</option>,
+      ...(value.isHost && value.teamConfig.mode === 'team' && teamIndex !== member.teamIndex
+        ? value.members.filter(target => target.teamIndex === teamIndex).map(target =>
+          <option key={`swap:${target.memberId}`} value={`swap:${target.memberId}`}>
+            {t('team.swapWith', { player: target.name, team: teamName(teamIndex) })}
+          </option>) : [])]
   })
+  const choose = (choice: string, memberId?: string) => {
+    const target = value.members.find(member => `swap:${member.memberId}` === choice)
+    if (target && value.isHost) onChooseTeam(target.teamIndex, memberId, target.memberId)
+    else {
+      const teamIndex = teams.find(index => String(index) === choice)
+      if (teamIndex !== undefined) onChooseTeam(teamIndex, memberId)
+    }
+  }
   return <section className="team-waiting-room" aria-label={t('team.waitingTitle')}>
     <TeamConfigurationSummary maxPlayers={value.maxPlayers} value={value.teamConfig} />
     <p className="ws-waiting-count" role="status">{t('team.seatsFilled', {
@@ -39,7 +52,7 @@ export function TeamWaitingRoom({ value, onChooseTeam, onStart, disabled, error 
           {value.isHost && value.teamConfig.mode === 'team' && member.memberId !== value.selfMemberId && <label className="team-member-move" htmlFor={`${id}-${member.memberId}`}>
             {t('team.moveMember', { player: member.name })}
             <select id={`${id}-${member.memberId}`} value={member.teamIndex} disabled={disabled}
-              onChange={event => onChooseTeam(Number(event.target.value), member.memberId)}>{options(member)}</select>
+              onChange={event => choose(event.target.value, member.memberId)}>{options(member)}</select>
           </label>}
         </li>)}</ul>
       </section>)}
@@ -47,7 +60,7 @@ export function TeamWaitingRoom({ value, onChooseTeam, onStart, disabled, error 
     {self && value.teamConfig.mode === 'team' && <label className="team-self-select" htmlFor={`${id}-self`}>
       {t('team.chooseTeam')}
       <select id={`${id}-self`} value={self.teamIndex} disabled={disabled}
-        onChange={event => onChooseTeam(Number(event.target.value))}>{options(self)}</select>
+        onChange={event => choose(event.target.value)}>{options(self)}</select>
     </label>}
     {error && <p className="form-error" role="alert">{t(error === 'team_change_failed' ? 'team.changeFailed' : 'team.startFailed')}</p>}
     {value.isHost ? <>
