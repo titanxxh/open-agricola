@@ -41,18 +41,30 @@ export function parsePublicSandboxReferences(value: unknown): PublicCardReferenc
 
 export class PublicSandboxScope {
   readonly snapshots: WorkshopPublicCardSnapshot[]
-  private readonly leases: PublicCardExecutionLease<WorkshopPublicCardSnapshot | PublicCardReference>[]
-  constructor(snapshots: WorkshopPublicCardSnapshot[], leases: PublicCardExecutionLease<WorkshopPublicCardSnapshot | PublicCardReference>[]) {
-    this.snapshots = snapshots; this.leases = leases
+  private leases: PublicCardExecutionLease<PublicCardReference>[]
+  private readonly currentLease?: (ref: PublicCardReference) => Promise<PublicCardExecutionLease<PublicCardReference>>
+  constructor(snapshots: WorkshopPublicCardSnapshot[], leases: PublicCardExecutionLease<PublicCardReference>[],
+    currentLease?: (ref: PublicCardReference) => Promise<PublicCardExecutionLease<PublicCardReference>>) {
+    this.snapshots = snapshots; this.leases = leases; this.currentLease = currentLease
+  }
+  private async recover(): Promise<void> {
+    const currentLease = this.currentLease
+    if (currentLease) this.leases = await Promise.all(this.leases.map(lease => lease.authorized()
+      ? lease : currentLease(lease.snapshot).catch(() => lease)))
   }
   assert(): void {
     if (this.leases.some(lease => !lease.authorized())) throw new PublicSandboxPaused('Public card execution paused')
   }
   async check(): Promise<void> {
+    if (this.leases.some(lease => !lease.authorized())) await this.recover()
     await Promise.all(this.leases.filter(lease => lease.remainingMs() <= 15_000).map(lease => lease.refresh().catch(() => {})))
     this.assert()
   }
-  async checkNew(): Promise<void> { await Promise.all(this.leases.map(lease => lease.refresh())); this.leases.forEach(lease => lease.assertNew()) }
+  async checkNew(): Promise<void> {
+    if (this.leases.some(lease => !lease.authorized())) await this.recover()
+    await Promise.all(this.leases.map(lease => lease.refresh()))
+    this.leases.forEach(lease => lease.assertNew())
+  }
   remainingMs(): number { return Math.min(30_000, ...this.leases.map(lease => lease.remainingMs())) }
 }
 
@@ -60,12 +72,12 @@ export class PublicSandboxScope {
 export class PrereleasePublicSandbox {
   readonly source: FormalPublicCards
   readonly runtime: Pick<PrereleaseRuntime, 'buildId' | 'generationId'>
-  private readonly leases = new Map<string, PublicCardExecutionLease<WorkshopPublicCardSnapshot | PublicCardReference>>()
-  private readonly loading = new Map<string, Promise<PublicCardExecutionLease<WorkshopPublicCardSnapshot | PublicCardReference>>>()
+  private readonly leases = new Map<string, PublicCardExecutionLease<PublicCardReference>>()
+  private readonly loading = new Map<string, Promise<PublicCardExecutionLease<PublicCardReference>>>()
   constructor(source: FormalPublicCards, runtime: Pick<PrereleaseRuntime, 'buildId' | 'generationId'>) {
     this.source = source; this.runtime = runtime
   }
-  private async lease(ref: PublicCardReference, force: boolean): Promise<PublicCardExecutionLease<WorkshopPublicCardSnapshot | PublicCardReference>> {
+  private async lease(ref: PublicCardReference, force: boolean): Promise<PublicCardExecutionLease<PublicCardReference>> {
     let lease = this.leases.get(ref.sha256)
     if (!lease) {
       let pending = this.loading.get(ref.sha256)
@@ -92,20 +104,20 @@ export class PrereleasePublicSandbox {
     return lease
   }
   async create(cardIds: string[]): Promise<PublicSandboxScope> {
-    const snapshots: WorkshopPublicCardSnapshot[] = [], leases: PublicCardExecutionLease<WorkshopPublicCardSnapshot | PublicCardReference>[] = []
+    const snapshots: WorkshopPublicCardSnapshot[] = [], leases: PublicCardExecutionLease<PublicCardReference>[] = []
     for (const id of parsePublicSandboxIds(cardIds)) {
       const fixed = await this.source.snapshot(id), lease = await this.lease(publicCardReference(fixed.snapshot), true)
       lease.assertNew()
       snapshots.push(fixed.snapshot); leases.push(lease)
     }
-    const scope = new PublicSandboxScope(snapshots, leases)
+    const scope = new PublicSandboxScope(snapshots, leases, ref => this.lease(ref, true))
     scope.assert()
     return scope
   }
   async inspect(refs: PublicCardReference[], newGame = false): Promise<PublicSandboxScope> {
-    const leases: PublicCardExecutionLease<WorkshopPublicCardSnapshot | PublicCardReference>[] = []
+    const leases: PublicCardExecutionLease<PublicCardReference>[] = []
     for (const ref of refs) leases.push(await this.lease(ref, true))
-    const scope = new PublicSandboxScope([], leases)
+    const scope = new PublicSandboxScope([], leases, ref => this.lease(ref, true))
     if (newGame) {
       try { leases.forEach(lease => lease.assertNew()) }
       catch { throw new PublicSandboxNewUnavailable('Public card unavailable for new execution') }
