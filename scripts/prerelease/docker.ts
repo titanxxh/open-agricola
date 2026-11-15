@@ -106,20 +106,37 @@ export function stopWriters(target: PrereleaseTarget, record: RuntimeRecord): vo
   if (status.Running !== false || status.OOMKilled !== false || status.ExitCode !== 0 && !(unacceptedStartup && !drainedSource && before.Running === false)) throw new Error('Application did not drain cleanly; keep maintenance and inspect accepted commits')
 }
 
+/**
+ * Candidate-side startup identity check, run inside the app container. The live server identity
+ * comes from its public entry; node:http keeps the Host header that fetch would replace. Frontend
+ * metadata is read from the image because prerelease admission gates every served resource.
+ */
+export function startupCheckScript(expected: { buildId: string; generation: string; origin: string }, port = 5175): string {
+  return `
+    import { request } from "node:http";
+    import { readFileSync } from "node:fs";
+    const expected=${JSON.stringify(expected)};
+    const read=path=>new Promise((resolve,reject)=>{
+      const req=request({host:"127.0.0.1",port:${port},path,headers:{host:new URL(expected.origin).host,"x-forwarded-proto":"https"}},res=>{
+        let body="";res.setEncoding("utf8");res.on("data",chunk=>{body+=chunk});
+        res.on("end",()=>{if(res.statusCode!==200)return reject(Error("Prerelease startup check failed"));try{resolve(JSON.parse(body))}catch(error){reject(error)}});
+      });
+      req.setTimeout(10000,()=>req.destroy(Error("Prerelease startup check timed out")));req.on("error",reject);req.end();
+    });
+    const [health,location]=await Promise.all(["/api/health","/api/app-location"].map(read));
+    if(!process.env.FRONTEND_ROOT)throw Error("Prerelease identity mismatch");
+    const build=JSON.parse(readFileSync(process.env.FRONTEND_ROOT+"/frontend-build.json","utf8"));
+    if(health.ok!==true||location.buildId!==expected.buildId||build.gameBuildId!==expected.buildId||build.releaseChannel!=="prerelease"||build.deploymentTarget!=="prerelease-hosted"||process.env.PRERELEASE_DATA_GENERATION!==expected.generation)throw Error("Prerelease identity mismatch");
+    process.stdout.write(JSON.stringify({buildId:build.gameBuildId,channel:build.releaseChannel,generation:expected.generation}));`
+}
+
 export function verifyRunning(target: PrereleaseTarget, record: RuntimeRecord): void {
   if (!record.installed) throw new Error('No installed prerelease build')
   const container = compose(target, ['ps', '-a', '-q', 'app'])
   if (!/^[a-f0-9]+$/.test(container) || command('docker', ['inspect', '--format', '{{.Image}}', container]) !== record.installed.image
     || command('docker', ['inspect', '--format', '{{index .Config.Labels "com.docker.compose.project"}}', container]) !== target.project) throw new Error('Live candidate image/project differs from the runtime record')
-  const expected = JSON.stringify({ buildId: record.installed.buildId, generation: record.generation, origin: target.origin })
-  const result = parsed(compose(target, ['exec', '-T', 'app', 'node', '--input-type=module', '-e', `
-    const expected=${expected};
-    const [health,location,build]=await Promise.all(["/api/health","/api/app-location","/open-agricola/frontend-build.json"].map(async path=>{
-      const response=await fetch("http://127.0.0.1:5175"+path,{headers:{host:new URL(expected.origin).host,"x-forwarded-proto":"https"}});
-      if(!response.ok)throw Error("Prerelease startup check failed");return response.json();
-    }));
-    if(health.ok!==true||location.buildId!==expected.buildId||build.gameBuildId!==expected.buildId||build.releaseChannel!=="prerelease"||build.deploymentTarget!=="prerelease-hosted"||process.env.PRERELEASE_DATA_GENERATION!==expected.generation)throw Error("Prerelease identity mismatch");
-    process.stdout.write(JSON.stringify({buildId:build.gameBuildId,channel:build.releaseChannel,generation:expected.generation}));`]))
+  const result = parsed(compose(target, ['exec', '-T', 'app', 'node', '--input-type=module', '-e',
+    startupCheckScript({ buildId: record.installed.buildId, generation: record.generation, origin: target.origin })]))
   if (result.buildId !== record.installed.buildId || result.channel !== 'prerelease' || result.generation !== record.generation) throw new Error('Installed prerelease identity did not verify')
 }
 
