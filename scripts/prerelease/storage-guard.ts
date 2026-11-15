@@ -15,6 +15,13 @@ export type StorageGuardNative = { observe: (mode?: 'admission' | 'diagnostic') 
 // An unwritable control directory must not let a later successful probe erase the incident.
 const unpersistedLatches = new Map<string, string>()
 
+// Native probes report fixed messages; anything else may carry private details and is not recorded.
+const probeErrorCategory = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : ''
+  return /^(?:Storage guard [a-z-]{1,40} failed|Storage probe deadline exceeded|Invalid storage observation|Guard [A-Za-z /-]{1,80}|Pre role [A-Za-z /-]{1,80})$/.test(message)
+    ? message : 'unclassified-probe-error'
+}
+
 /** The guard alone owns this record; ordinary owner operations only read it. */
 export async function runStorageGuardCycle(target: PrereleaseTarget, policy: StorageGuardPolicy, native: StorageGuardNative, forceTripReason?: 'supervisor-stop') {
   const path = join(target.directory, 'control/storage-guard.json'), fingerprint = targetFingerprint(target)
@@ -27,6 +34,8 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
   const previousHealthyCycle = readStorageGuard(path, target.targetId, fingerprint)?.healthyCycle
   let observation: StorageObservation | null = null
   let observationCompletedAt: number | null = null
+  let previousValidUntil: number | null = null
+  let probeError: string | null = null
   if (!reason && existsSync(path)) {
     try {
       const previous: unknown = JSON.parse(readFileSync(path, 'utf8'))
@@ -37,6 +46,7 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
           ? previous.reason : 'previous-latch-or-invalid-state'
       }
       else if (!('validUntil' in previous) || typeof previous.validUntil !== 'number' || previous.validUntil <= observationStartedAt) reason = 'expired-observation'
+      else previousValidUntil = previous.validUntil
     } catch { reason = 'invalid-state' }
   }
   const wasLatched = reason !== null
@@ -54,7 +64,13 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
       reason = usageKeys.find(key => observation !== null && observation[key] >= policy.limits[key])
         ?? freeKeys.find(key => observation !== null && observation[key] <= policy.limits[key]) ?? null
       if (Date.now() - observationStartedAt >= policy.leaseMs) reason = 'observation-deadline'
-    } catch { reason = 'observation-failed' }
+    } catch (error) { reason = 'observation-failed'; probeError = probeErrorCategory(error) }
+  }
+  // Inside the previous healthy lease a failed probe neither renews nor latches: the lease still
+  // expires on schedule, closing admission, and the next cycle retries. An expired lease latches.
+  if (reason === 'observation-failed' && previousValidUntil !== null && previousValidUntil > Date.now()) {
+    return { format: 1, targetId: target.targetId, fingerprint, status: 'retrying', healthyCycle: previousHealthyCycle ?? null, reason, probeError,
+      observationStartedAt, validUntil: previousValidUntil, operationsAllowed: false, persistenceFailures }
   }
   if (!reason && observation && observationCompletedAt !== null) {
     const operationsAllowed = observation.hostFreeBytes - policy.limits.hostFreeBytes >= policy.limits.operationReserveBytes
@@ -68,7 +84,7 @@ export async function runStorageGuardCycle(target: PrereleaseTarget, policy: Sto
   }
   reason ??= 'observation-missing'
   unpersistedLatches.set(fingerprint, reason)
-  const state = { format: 1, targetId: target.targetId, fingerprint, status: 'latched', healthyCycle: null, reason, observedAt: observationStartedAt,
+  const state = { format: 1, targetId: target.targetId, fingerprint, status: 'latched', healthyCycle: null, reason, probeError, observedAt: observationStartedAt,
     validUntil: observationStartedAt, operationsAllowed: false, observation, persistenceFailures }
   if (persist(state, 'latch')) unpersistedLatches.delete(fingerprint)
   const failures = await native.stop().catch(() => ['stop-failed'])

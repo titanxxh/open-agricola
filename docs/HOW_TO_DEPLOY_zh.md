@@ -298,7 +298,7 @@ sudo systemctl enable --now open-agricola-prerelease-storage-guard.service
 ./deploy-prerelease.sh budget-check --config "$pre_config" --expected-current "$pre_current"
 ```
 
-`control/storage-guard.json` 与 `gate.json` 分开。网关及写入命令要求新鲜 healthy 记录；缺失、过期或 latched 均关闭准入，包括私有验证和已有 WebSocket。操作余量不足时拒绝新任务，健康 app 继续运行。探测失败、用量超限或 free 低于阈值时，先尝试写入永久 latch，再停止。latch 或回执写盘失败不会跳过独立停止动作；结果分别报告写盘失败与停止失败。进程内 latch 保持到能够持久化，探测恢复也不能清除。保护器不等待 `.operation.lock`：终止精确登记的 owner 命令 session，给予所属 app 容器 20 秒 drain，停止 scoped 工具，仍在运行的所属容器执行 kill。随后对三个 pre role 验证 `NOLOGIN` 及会话清空，对两个所属对象账号禁用并读回状态。一个边界失败不会阻止其他停止动作，后续循环分别重试。锁存后的循环先重试停止，再通过 owner 凭据刷新诊断观察；pre LOGIN 和 key 已禁用时仍可采样，新的诊断不会清除 latch。正式 app、共享 PostgreSQL/RustFS、正式 role 和 bucket 不属于停止选择器。
+`control/storage-guard.json` 与 `gate.json` 分开。网关及写入命令要求新鲜 healthy 记录；缺失、过期或 latched 均关闭准入，包括私有验证和已有 WebSocket。操作余量不足时拒绝新任务，健康 app 继续运行。用量超限或 free 低于阈值时，先尝试写入永久 latch，再停止。探测失败时，若上一健康租约已过期则同样锁存；租约内既不续租也不锁存，租约到期即关闭准入，下一轮重试。重试与锁存记录只写固定的探测错误类别。latch 或回执写盘失败不会跳过独立停止动作；结果分别报告写盘失败与停止失败。进程内 latch 保持到能够持久化，探测恢复也不能清除。保护器不等待 `.operation.lock`：终止精确登记的 owner 命令 session，给予所属 app 容器 20 秒 drain，停止 scoped 工具，仍在运行的所属容器执行 kill。随后对三个 pre role 验证 `NOLOGIN` 及会话清空，对两个所属对象账号禁用并读回状态。一个边界失败不会阻止其他停止动作，后续循环分别重试。锁存后的循环先重试停止，再通过 owner 凭据刷新诊断观察；pre LOGIN 和 key 已禁用时仍可采样，新的诊断不会清除 latch。正式 app、共享 PostgreSQL/RustFS、正式 role 和 bucket 不属于停止选择器。
 
 Healthy 记录以探测完成时间作为 `observedAt` 并续期 lease，另保留 `observationStartedAt` 标明采样区间；原生探测 deadline 仍从采集开始计时。cycle 保留探测开始时验证的 UUID，开始时旧 lease 已过期仍会锁存。
 
