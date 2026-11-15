@@ -14,7 +14,7 @@ const response = (hash: string, now: number, allowed: boolean) => Response.json(
 })
 
 function fixture() {
-  let now = 1_000
+  let now = 1_000, monotonic = 1_000
   const allowed = new Set<string>(), requests: string[] = []
   let read = async (hash: string) => response(hash, now, allowed.has(hash))
   const source = new FormalPublicCards('https://formal.example.test', async url => {
@@ -22,9 +22,10 @@ function fixture() {
     if (!hash) throw new Error('Missing fixed input hash')
     requests.push(hash)
     return read(hash)
-  }, { now: () => now, monotonic: () => now })
+  }, { now: () => now, monotonic: () => monotonic })
   return { service: new PrereleasePublicSandbox(source, { buildId: 'a'.repeat(40), generationId: 'lease-cache-fixture' }),
-    allowed, requests, now: () => now, advance: (milliseconds: number) => { now += milliseconds },
+    allowed, requests, now: () => now, advance: (milliseconds: number) => { now += milliseconds; monotonic += milliseconds },
+    advanceWall: (milliseconds: number) => { now += milliseconds }, advanceMonotonic: (milliseconds: number) => { monotonic += milliseconds },
     read: (reader: typeof read) => { read = reader } }
 }
 
@@ -76,24 +77,100 @@ it('keeps 256 live inputs bounded and preserves an unexpired scope during collec
   expect(scope.remainingMs()).toBe(19_999)
 })
 
-it('permanently retires collected scopes without allowing their checks to fetch or revive them', async () => {
+it('recovers a collected scope only after its central fixed reference has a fresh positive status', async () => {
   const f = fixture(), ref = reference(0)
   f.allowed.add(ref.sha256)
-  const retired = await f.service.inspect([ref])
+  const expired = await f.service.inspect([ref])
   f.advance(30_001)
   const next = reference(1); f.allowed.add(next.sha256)
   await f.service.inspect([next])
+  expect(() => expired.assert()).toThrow('Public card execution paused')
+  expect(expired.remainingMs()).toBe(0)
   const replacement = await f.service.inspect([ref])
+  expect(() => expired.assert()).toThrow('Public card execution paused')
   const requests = f.requests.length
-  await expect(retired.check()).rejects.toThrow('Public card execution paused')
-  await expect(retired.checkNew()).rejects.toThrow('Public card execution paused')
-  expect(f.requests).toHaveLength(requests)
-  expect(retired.remainingMs()).toBe(0)
-  expect(() => retired.assert()).toThrow('Public card execution paused')
+  await expired.check()
+  expect(f.requests.slice(requests)).toEqual([ref.sha256])
+  expect(expired.remainingMs()).toBe(30_000)
+  expect(() => expired.assert()).not.toThrow()
   expect(() => replacement.assert()).not.toThrow()
 })
 
-it('pins an expired lease until its pending refresh settles, then reclaims it without reviving its scope', async () => {
+it('does not recover an expired fixed scope from a network failure or a continued denial', async () => {
+  const f = fixture(), ref = reference(0)
+  f.allowed.add(ref.sha256)
+  const scope = await f.service.inspect([ref])
+  f.advance(30_001)
+  const next = reference(1); f.allowed.add(next.sha256)
+  await f.service.inspect([next])
+  f.read(async () => { throw new Error('offline') })
+  await expect(scope.check()).rejects.toThrow('Public card execution paused')
+  expect(scope.remainingMs()).toBe(0)
+  f.read(async hash => response(hash, f.now(), false))
+  await expect(scope.check()).rejects.toThrow('Public card execution paused')
+  expect(() => scope.assert()).toThrow('Public card execution paused')
+  f.read(async hash => response(hash, f.now(), true))
+  await scope.check()
+  expect(scope.remainingMs()).toBe(30_000)
+  expect(f.requests.every(hash => hash === ref.sha256 || hash === next.sha256)).toBe(true)
+})
+
+it('restores existing execution after admin re-enable without changing the fixed reference', async () => {
+  const f = fixture(), ref = reference(0)
+  f.allowed.add(ref.sha256)
+  const scope = await f.service.inspect([ref])
+  f.allowed.delete(ref.sha256)
+  await expect(f.service.inspect([ref])).rejects.toThrow('Public card execution paused')
+  expect(() => scope.assert()).toThrow('Public card execution paused')
+  f.allowed.add(ref.sha256)
+  await f.service.inspect([ref])
+  expect(() => scope.assert()).toThrow('Public card execution paused')
+  const requests = f.requests.length
+  await scope.check()
+  expect(f.requests.slice(requests)).toEqual([ref.sha256])
+  expect(() => scope.assert()).not.toThrow()
+})
+
+it('still requires strict new-game freshness after rebinding to a current central lease', async () => {
+  const f = fixture(), ref = reference(0)
+  f.allowed.add(ref.sha256)
+  const scope = await f.service.inspect([ref])
+  f.advance(30_001)
+  const next = reference(1); f.allowed.add(next.sha256)
+  await f.service.inspect([next])
+  await f.service.inspect([ref])
+  const requests = f.requests.length
+  f.read(async () => { throw new Error('offline') })
+  await expect(scope.checkNew()).rejects.toThrow('offline')
+  expect(f.requests.slice(requests)).toEqual([ref.sha256, ref.sha256])
+})
+
+it('requires a fresh positive for new execution even while its current scope remains authorized', async () => {
+  const f = fixture(), ref = reference(0)
+  f.allowed.add(ref.sha256)
+  const scope = await f.service.inspect([ref])
+  f.read(async () => { throw new Error('offline') })
+  await expect(scope.checkNew()).rejects.toThrow('offline')
+  expect(() => scope.assert()).not.toThrow()
+  expect(scope.remainingMs()).toBe(30_000)
+})
+
+it.each(['wall', 'monotonic'] as const)('does not extend a restored scope past its %s deadline', async clock => {
+  const f = fixture(), ref = reference(0)
+  f.allowed.add(ref.sha256)
+  const scope = await f.service.inspect([ref])
+  f.advance(30_001)
+  const next = reference(1); f.allowed.add(next.sha256)
+  await f.service.inspect([next])
+  await scope.check()
+  expect(scope.remainingMs()).toBe(30_000)
+  if (clock === 'wall') f.advanceWall(30_000)
+  else { f.advanceWall(-60_000); f.advanceMonotonic(30_000) }
+  expect(scope.remainingMs()).toBe(0)
+  expect(() => scope.assert()).toThrow('Public card execution paused')
+})
+
+it('pins an expired lease until its pending refresh settles, then reclaims it without bypassing live capacity', async () => {
   const f = fixture(), first = reference(0)
   f.allowed.add(first.sha256)
   const scope = await f.service.inspect([first])

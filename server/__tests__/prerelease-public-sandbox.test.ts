@@ -1,5 +1,5 @@
 import { createServer, request, type IncomingMessage, type ServerResponse } from 'node:http'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { createTestDatabase } from './_helpers/postgres'
 import { testStorageEnvironment } from './_helpers/objects'
@@ -13,6 +13,7 @@ import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract
 import { publicCardReference } from '../../shared/contract/public-card-input'
 import type { WorkshopPublicCardSnapshot } from '../../shared/contract/workshop-public-cards'
 import type { PublicSandboxInputs, PublicSandboxWorkerLease } from '../../shared/contract/public-sandbox'
+import type { PrereleaseIdentityEvent } from '../../shared/contract/prerelease-identity'
 import { LocalSandboxCore } from '../../client/local-sandbox/worker-core'
 
 const sourceDb = await createTestDatabase(), preDb = await createTestDatabase()
@@ -20,7 +21,9 @@ const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUU
 vi.mock('../db.ts', () => ({ getDb: () => preDb }))
 vi.mock('../storage/runtime.ts', () => ({ getResources: () => resources }))
 const nativeFetch = fetch, buildId = 'a'.repeat(40), generationId = randomUUID(), sourceCalls: Array<{ path: string; headers: Headers }> = []
-let sourceOrigin = '', preOrigin = '', token = '', serial = 20000
+let sourceOrigin = '', preOrigin = '', token = '', serial = 20000, betaAccess = true
+let beforeStatus: ((target: URL) => Promise<void>) | undefined
+const identityEvents: PrereleaseIdentityEvent[] = []
 let sourceServer: ReturnType<typeof createServer>, preServer: ReturnType<typeof createServer>
 const runtime = { buildId, generationId, appOrigin: 'https://pre.example.test', formalAppOrigin: 'https://formal.example.test', formalApiBase: 'https://formal.example.test', targetId: 'prerelease-main' }
 const sourceCode = (id: string, name: string) => `const CARD_ID='${id}'; const CARD_DEF=MinorImprovement({id:CARD_ID,name:${JSON.stringify(name)},desc:['Gain 2 food.'],cost:{},vp:0}); const CARD_IMPL={effect:{id:CARD_ID,onBuy:()=>gainLeaf(CARD_ID,{food:2})}}`
@@ -44,11 +47,11 @@ async function published(name: string, code?: string) {
   const version = await publish(sourceDb, { cardId: card.id, authorId: 'author', baseRevision: card.revision })
   return { card, version, id }
 }
-async function api(path: string, body?: unknown) {
+async function api(path: string, body?: unknown, headers: Record<string, string> = {}) {
   const response = await new Promise<Response>((resolve, reject) => {
     const outgoing = request(`${preOrigin}${path}`, { method: body === undefined ? 'GET' : 'POST', headers: {
       Host: new URL(runtime.appOrigin).host, Origin: runtime.appOrigin, Cookie: `__Host-oa-pre-session=${token}`,
-      [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION), 'x-oa-pre-build': buildId, 'x-oa-pre-generation': generationId, 'Content-Type': 'application/json',
+      [BROWSER_AUTH_HEADER]: String(BROWSER_AUTH_VERSION), 'x-oa-pre-build': buildId, 'x-oa-pre-generation': generationId, 'Content-Type': 'application/json', ...headers,
     } }, incoming => {
       const chunks: Buffer[] = []; incoming.on('data', chunk => chunks.push(Buffer.from(chunk)))
       incoming.on('end', () => resolve(new Response(Buffer.concat(chunks), { status: incoming.statusCode, headers: { 'Cache-Control': String(incoming.headers['cache-control'] ?? '') } })))
@@ -57,6 +60,17 @@ async function api(path: string, body?: unknown) {
     outgoing.on('error', reject); outgoing.end(body === undefined ? undefined : JSON.stringify(body))
   })
   return { status: response.status, body: await response.json(), headers: response.headers }
+}
+async function authorize() {
+  const identity = getPrereleaseSessions(); if (!identity) throw new Error('Missing prerelease sessions')
+  const begin = await identity.beginHandoff(), params = new URLSearchParams(new URL(begin.formalUrl).hash.slice(1))
+  const state = params.get('state'), challenge = params.get('browserChallenge'); if (!state || !challenge) throw new Error('Missing handoff')
+  token = (await identity.exchangeHandoff(begin.cookie, { protocolVersion: 1, code: 'c'.repeat(43), state, browserChallenge: challenge, returnTo: `${runtime.formalAppOrigin}/` })).token
+}
+function signal() {
+  let finish = () => {}
+  const promise = new Promise<void>(resolve => { finish = resolve })
+  return { promise, finish: () => finish() }
 }
 beforeAll(async () => {
   await sourceDb.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES('author','author','Author','hash',1)").run()
@@ -67,14 +81,19 @@ beforeAll(async () => {
     PUBLIC_APP_ORIGIN: runtime.appOrigin, PUBLIC_API_BASE: runtime.appOrigin, FORMAL_APP_ORIGIN: runtime.formalAppOrigin,
     FORMAL_API_BASE: runtime.formalApiBase, PRERELEASE_DATA_GENERATION: generationId, PRERELEASE_TARGET_ID: runtime.targetId,
     PRERELEASE_IDENTITY_SERVICE_KEY: 'fixture-key-at-least-32-bytes-in-length' })) vi.stubEnv(key, value)
-  vi.stubGlobal('fetch', async () => Response.json({ ok: true, state: { protocolVersion: 1, channel: 'prerelease', targetOrigin: runtime.appOrigin, generationId,
+  vi.stubGlobal('fetch', async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname
+    if (path.endsWith('/events')) return Response.json({ ok: true, protocolVersion: 1, events: identityEvents })
+    if (path.endsWith('/acknowledgements')) {
+      const event = identityEvents.shift(); if (!event) throw new Error('Missing identity event')
+      return Response.json({ ok: true, receipt: { eventId: event.id, outcome: 'rechecked', completedAt: Date.now() } })
+    }
+    return Response.json({ ok: true, state: { protocolVersion: 1, channel: 'prerelease', targetOrigin: runtime.appOrigin, generationId,
     grantId: 'g'.repeat(43), account: { kind: 'active', subject: { id: 'author', username: 'author', displayName: 'Author' } },
-    source: { kind: 'active', expiresAt: Date.now() + 86_400_000 }, grant: { kind: 'active', expiresAt: Date.now() + 86_400_000 }, betaAccess: true, confirmedAt: Date.now(), validUntil: Date.now() + 30_000 } }))
-  const identity = getPrereleaseSessions(); if (!identity) throw new Error('Missing prerelease sessions')
-  const begin = await identity.beginHandoff(), params = new URLSearchParams(new URL(begin.formalUrl).hash.slice(1))
-  const state = params.get('state'), challenge = params.get('browserChallenge'); if (!state || !challenge) throw new Error('Missing handoff')
-  token = (await identity.exchangeHandoff(begin.cookie, { protocolVersion: 1, code: 'c'.repeat(43), state, browserChallenge: challenge, returnTo: `${runtime.formalAppOrigin}/` })).token
-  const client = new FormalPublicCards(runtime.formalApiBase, async (url, init) => { const target = new URL(String(url)); sourceCalls.push({ path: target.pathname, headers: new Headers(init?.headers) }); return nativeFetch(sourceOrigin + target.pathname + target.search, init) })
+    source: { kind: 'active', expiresAt: Date.now() + 86_400_000 }, grant: { kind: 'active', expiresAt: Date.now() + 86_400_000 }, betaAccess, confirmedAt: Date.now(), validUntil: Date.now() + 30_000 } })
+  })
+  await authorize()
+  const client = new FormalPublicCards(runtime.formalApiBase, async (url, init) => { const target = new URL(String(url)); sourceCalls.push({ path: target.pathname, headers: new Headers(init?.headers) }); if (target.pathname.endsWith('/status')) await beforeStatus?.(target); return nativeFetch(sourceOrigin + target.pathname + target.search, init) })
   configurePrereleasePublicSandbox(new PrereleasePublicSandbox(client, runtime))
   const { handlePrereleaseRoute, requirePrereleaseRequest } = await import('../prerelease-routes')
   const { handlePrereleasePublicSandbox } = await import('../prerelease-public-sandbox')
@@ -171,6 +190,64 @@ it('uses the candidate built-in implementation while retaining the public identi
   await sourceDb.prepare('UPDATE workshop_public_versions SET disabled_at=1 WHERE card_id=?').run(input.card.id)
   expect((await api('/api/workshop/public-sandbox/v1/status', { inputs: snapshots.map(publicCardReference) })).status).toBe(400)
   expect((await api('/api/game/state')).status).toBe(503)
+})
+
+it.each(['logout', 'beta', 'expiry'])('does not apply a built-in command when %s invalidates identity during fixed-source recovery', async reason => {
+  const input = await published(`PublicRecovery${reason}`), ruleId = 'A008_FoodBasket'
+  const version = await sourceDb.prepare('SELECT card_json FROM workshop_card_versions WHERE id=?').get<{ card_json: string }>(input.version.versionId)
+  if (!version) throw new Error('Missing approved fixture version')
+  const raw: unknown = JSON.parse(version.card_json)
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid fixture version')
+  await sourceDb.prepare('UPDATE workshop_card_versions SET card_json=? WHERE id=?')
+    .run(JSON.stringify({ ...raw, id: ruleId, _code: sourceCode(ruleId, 'Public recovery') }), input.version.versionId)
+  const fixed = await api('/api/workshop/public-sandbox/v1/inputs', { cardIds: [input.card.id] })
+  const snapshots: WorkshopPublicCardSnapshot[] = fixed.body.snapshots, refs = snapshots.map(publicCardReference)
+  const created = await api('/api/game/new-sandbox', { seed: 42, playerCount: 2, customCardIds: [input.card.id] })
+  expect(created.status).toBe(200)
+  expect(created.body.customCardsLoaded).toBe(0)
+  expect(created.body.state.players[0].resources.wood).toBe(0)
+  await sourceDb.prepare('UPDATE workshop_public_versions SET disabled_at=1 WHERE card_id=?').run(input.card.id)
+  expect((await api('/api/workshop/public-sandbox/v1/status', { inputs: refs })).status).toBe(400)
+  await sourceDb.prepare('UPDATE workshop_public_versions SET disabled_at=NULL WHERE card_id=?').run(input.card.id)
+  const reached = signal(), release = signal()
+  beforeStatus = async target => {
+    expect(target.searchParams.get('sha256')).toBe(refs[0]?.sha256)
+    reached.finish(); await release.promise
+  }
+  const command = api('/api/game/dev/set-resources', { playerIndex: 0, resources: { wood: 9 } })
+  const identity = getPrereleaseSessions(); if (!identity) throw new Error('Missing prerelease sessions')
+  try {
+    await reached.promise
+    if (reason === 'beta') {
+      betaAccess = false
+      identityEvents.push({ id: randomUUID(), userId: 'author', kind: 'beta_changed', grantId: null, createdAt: Date.now() })
+      await identity.processEvents()
+    } else if (reason === 'expiry') {
+      const expired = await preDb.prepare('UPDATE prerelease_sessions SET expires_at=? WHERE token_hash=?').run(Date.now() - 1, createHash('sha256').update(token).digest('base64url'))
+      expect(expired.changes).toBe(1)
+      expect(await identity.resolve(token)).toBeNull()
+    } else await identity.revoke(token)
+    expect(identity.cachedAuthorized(token, runtime)).toBe(false)
+  } finally { beforeStatus = undefined; release.finish() }
+  const rejected = await command
+  if (reason === 'beta') {
+    betaAccess = true
+    identityEvents.push({ id: randomUUID(), userId: 'author', kind: 'beta_changed', grantId: null, createdAt: Date.now() })
+    await identity.processEvents()
+  } else {
+    expect((await api('/api/game/state')).status).toBe(403)
+    await authorize()
+  }
+  expect(rejected.status).toBe(403)
+  expect(rejected.body.code).toBe('prerelease_access_expired')
+  const restored = await api('/api/game/state')
+  expect(restored.status).toBe(200)
+  expect(restored.body.state).toEqual(created.body.state)
+  expect(restored.body.state.players[0].resources.wood).toBe(0)
+  const wrongGeneration = await api('/api/game/dev/set-resources', { playerIndex: 0, resources: { wood: 9 } }, { 'x-oa-pre-generation': randomUUID() })
+  expect(wrongGeneration.status).toBe(426)
+  expect(wrongGeneration.body.code).toBe('prerelease_runtime_changed')
+  expect((await api('/api/game/state')).body.state).toEqual(created.body.state)
 })
 
 it('rejects private version/source injection and every Workshop write even for the projected author', async () => {
