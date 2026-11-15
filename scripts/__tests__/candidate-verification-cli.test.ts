@@ -211,6 +211,11 @@ describe('candidate verification public CLI', () => {
     writeFileSync(join(value.cwd, 'scripts/ci/new-policy.json'), '{"version":2}')
     value.git('add', '--', 'scripts/ci/new-policy.json', ':(exclude)docs/superpowers/**'); value.git('commit', '-m', 'next main producer')
     const main = value.git('rev-parse', 'HEAD')
+    const originRoot = mkdtempSync(join(tmpdir(), 'candidate-producer-origin-')); temporary.push(originRoot)
+    const origin = join(originRoot, 'origin.git')
+    execFileSync('git', ['clone', '--bare', '--no-hardlinks', value.cwd, origin], { stdio: 'ignore' })
+    value.git('config', '--unset-all', `url.file://${historyOrigin}.insteadOf`)
+    value.git('config', `url.file://${origin}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
     replaceMetadata(value, {
       [`${prefix}/git/ref/heads/main`]: { ref: 'refs/heads/main', object: { type: 'commit', sha: main } },
       [`${prefix}/actions/workflows/100/runs?event=workflow_dispatch&per_page=100`]: { workflow_runs: [evidence.run,
