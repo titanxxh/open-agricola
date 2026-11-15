@@ -3,7 +3,7 @@ import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 import { checkPrereleaseVerification, prereleaseConfiguration } from '../ci/prerelease-verification'
 import { prepareContainerImageArchive } from '../release/container-images-owner'
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -55,15 +55,60 @@ function githubFixture() {
     'repos/titanxxh/open-agricola/git/ref/heads/main': { ref: 'refs/heads/main', object: { type: 'commit', sha } },
     'repos/titanxxh/open-agricola/rules/branches/main?per_page=100': ['pull_request', 'non_fast_forward', 'deletion', 'required_linear_history'].map(type => ({ type })),
   }
-  const file = join(root, 'api.json'), save = () => writeFileSync(file, JSON.stringify(api)); save()
-  writeFileSync(join(bin, 'gh'), `#!${process.execPath}
-const fs=require('node:fs');const api=JSON.parse(fs.readFileSync(${JSON.stringify(file)},'utf8'));const args=process.argv.slice(2),value=api[args[1]];
-if(value===undefined)process.exit(1);if(value.binary){process.stdout.write(fs.readFileSync(value.binary));process.exit(0)}if(args.includes('--paginate'))for(const row of value)console.log(JSON.stringify(row));else console.log(JSON.stringify(value));
-`)
+  const shellQuote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'"
+  const save = () => {
+    const responses = Object.entries(api).flatMap(([endpoint, value], index) => {
+      if (value === undefined) return []
+      if (value === null) return [`${shellQuote(endpoint)}) exit 1 ;;`]
+      if (typeof value === 'object' && 'binary' in value && value.binary) {
+        if (typeof value.binary !== 'string') throw new Error('Invalid fixture binary path')
+        return [`${shellQuote(endpoint)}) exec /bin/cat -- ${shellQuote(value.binary)} ;;`]
+      }
+      const normal = join(root, `response-${index}.json`), page = join(root, `response-${index}.jsonl`)
+      writeFileSync(normal, JSON.stringify(value) + '\n')
+      const rows = Array.isArray(value) ? value : typeof value === 'string' ? Array.from(value) : null
+      if (rows) writeFileSync(page, rows.map(row => JSON.stringify(row) + '\n').join(''))
+      return [`${shellQuote(endpoint)}) if [ "$paginated" = 1 ]; then ${rows ? `exec /bin/cat -- ${shellQuote(page)}` : 'exit 1'}; else exec /bin/cat -- ${shellQuote(normal)}; fi ;;`]
+    })
+    writeFileSync(join(bin, 'gh'), `#!/bin/sh
+paginated=0
+for arg do
+  if [ "$arg" = --paginate ]; then paginated=1; fi
+done
+case "\${2-}" in
+${responses.join('\n')}
+*) exit 1 ;;
+esac
+`, { mode: 0o700 })
+  }
+  save()
   chmodSync(join(bin, 'gh'), 0o700);vi.stubEnv('PATH', bin + ':' + process.env.PATH)
   vi.stubEnv('CI', '');vi.stubEnv('GITHUB_ACTIONS', '')
   return { cwd, root, bin, sha, api, save }
 }
+it('preserves JSON, paginated and live binary fixture bytes without evaluating shell input', () => {
+  const value = githubFixture(), endpoint = "fixture/'$(touch SHELL_EVALUATED)*"
+  const binary = join(value.root, "artifact 'quoted' $(touch BINARY_EVALUATED).zip")
+  value.api[endpoint] = { message: 'public' }
+  value.api['fixture/rows'] = [{ id: 1 }, { id: 2 }]
+  value.api['fixture/empty'] = []
+  value.api['fixture/binary'] = { binary }
+  writeFileSync(binary, Buffer.from([0, 255, 13, 10])); value.save()
+  const gh = (...args: string[]) => execFileSync(join(value.bin, 'gh'), ['api', ...args], { cwd: value.root })
+  expect(gh(endpoint).toString()).toBe('{"message":"public"}\n')
+  expect(gh('fixture/rows').toString()).toBe('[{"id":1},{"id":2}]\n')
+  expect(gh('fixture/rows', '--paginate', '--jq', '.[] | @json').toString()).toBe('{"id":1}\n{"id":2}\n')
+  expect(gh('fixture/empty', '--paginate').toString()).toBe('')
+  expect(gh('fixture/binary')).toEqual(Buffer.from([0, 255, 13, 10]))
+  writeFileSync(binary, Buffer.from([1, 2, 3]))
+  expect(gh('fixture/binary')).toEqual(Buffer.from([1, 2, 3]))
+  value.api[endpoint] = { message: 'changed' }; value.save()
+  expect(gh(endpoint).toString()).toBe('{"message":"changed"}\n')
+  expect(spawnSync(join(value.bin, 'gh'), ['api', 'missing-endpoint'], { cwd: value.root }).status).toBe(1)
+  expect(existsSync(join(value.root, 'SHELL_EVALUATED'))).toBe(false)
+  expect(existsSync(join(value.root, 'BINARY_EVALUATED'))).toBe(false)
+})
+
 it('derives policy identity from protected main without requiring full stable release evidence', () => {
   const value = githubFixture()
   expect(containerImageVerification({ cwd: value.cwd, purpose: 'trusted-policy', sourceSha: value.sha, producerSha: value.sha }))
