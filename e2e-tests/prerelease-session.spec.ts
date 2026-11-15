@@ -749,7 +749,7 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
         const raw = object(mode === 'browser' ? (await readSaved())[0] : serverSnapshot)
         const serialized = mode === 'browser' ? object(raw.serializedState) : raw
         const state = object(serialized.state)
-        const frames: unknown = mode === 'browser' ? object(object(serialized.sessionCursor).engineStack).frames : []
+        const frames: unknown = mode === 'browser' ? object(object(serialized.sessionCursor).engineStackCursor).frames : []
         if (!Array.isArray(frames)) throw new Error('Expected the saved sandbox engine frames')
         const interaction = mode === 'server' ? object(raw.interaction) : undefined
         return { fingerprint: JSON.stringify(serialized), idle: mode === 'browser' ? frames.length === 0 : interaction?.stateId === 'idle',
