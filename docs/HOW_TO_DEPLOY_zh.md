@@ -205,7 +205,7 @@ node --import tsx scripts/prerelease/authority.ts close --config "$pre_config" -
 ./deploy-prerelease.sh deploy --config "$pre_config" --expected-current "$pre_current" --sha "$pre_sha" --generation "$pre_generation" --operation-id "$pre_op" --authority-receipt close.json
 ```
 
-deploy 独立检查固定 SHA、同通道的完整原生 workflow 或 owner-local 回执，在修改准入或数据前，解析已验证导入的候选与 trusted-policy 镜像，核对前端元数据及 OCI revision/channel，固定候选不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份，最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
+deploy 独立检查固定 SHA、同通道的完整原生 workflow 或 owner-local 回执，在修改准入或数据前，解析已验证导入的候选与 trusted-policy 镜像，核对前端元数据及 OCI revision/channel，固定候选不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份：以目标 Host 经候选公开入口读取 health 与 `/api/app-location`，前端元数据从镜像的 `FRONTEND_ROOT` 读取，因为准入门禁覆盖所有下发资源。最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
 
 候选必须提供真实 SQL view `prerelease_retained_identity_refs(user_id,source_grant_id)`，覆盖全部外部主体，包括仅存于房间/历史中的引用，并实现 `scripts/prerelease/identity-audit.ts apply <packet.json>`。adapter 删除/匿名化已删除主体，将每个保留活跃引用映射到返回的当前代次 `associationId`，不恢复会话或登录权。该持久化/清理实现由 #1663/#1667 负责；main 没有空 stub，缺 view/adapter 阻断开放。owner 读取真实行，拒绝遗漏、null 或无来源绑定，按二进制/C 顺序对 ASCII pair 去重排序并哈希共享 canonical JSON。正式 associate 校验旧来源，创建无 source、已撤销的关联，确保恢复后仍接收未来删除。
 
