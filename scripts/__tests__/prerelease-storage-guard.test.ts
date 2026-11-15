@@ -69,6 +69,47 @@ it('closes admission on a probe failure without needing the deployment lock', as
   expect(calls).toEqual(['stopped'])
 })
 
+it('retries a failed probe inside the previous healthy lease without renewing, stopping or latching', async () => {
+  const { runStorageGuardCycle } = await import('../prerelease/storage-guard')
+  const value = fixture(), calls: string[] = []
+  value.save(value.healthy)
+  const observation = { sourceDatabaseBytes: 2, validationDatabaseBytes: 2, bucketBytes: 2, multipartBytes: 2,
+    localBytes: 2, offsiteBytes: 2, hostFreeBytes: 100, hostFreeInodes: 100, offsiteFreeBytes: 100, offsiteFreeInodes: 100 }
+  const limits = { ...observation, sourceDatabaseBytes: 10, validationDatabaseBytes: 10, bucketBytes: 10, multipartBytes: 10,
+    localBytes: 10, offsiteBytes: 10, hostFreeBytes: 1, hostFreeInodes: 1, offsiteFreeBytes: 1, offsiteFreeInodes: 1, operationReserveBytes: 1 }
+  const before = readFileSync(join(value.control, 'storage-guard.json'), 'utf8')
+  const failed = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, {
+    observe: async () => { throw new Error('Storage guard ssh failed') }, stop: async () => { calls.push('stop'); return [] },
+  })
+  expect(failed).toMatchObject({ status: 'retrying', reason: 'observation-failed', probeError: 'Storage guard ssh failed',
+    healthyCycle: value.healthy.healthyCycle, validUntil: value.healthy.validUntil, operationsAllowed: false })
+  expect(readFileSync(join(value.control, 'storage-guard.json'), 'utf8')).toBe(before)
+  expect(calls).toEqual([])
+  const recovered = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, { observe: async () => observation, stop: async () => { calls.push('stop'); return [] } })
+  expect(recovered).toMatchObject({ status: 'healthy', healthyCycle: value.healthy.healthyCycle })
+  expect(calls).toEqual([])
+})
+
+it('latches a failed probe once the previous lease has expired and records only a fixed error category', async () => {
+  const { runStorageGuardCycle } = await import('../prerelease/storage-guard')
+  const value = fixture(), calls: string[] = []
+  value.save({ ...value.healthy, validUntil: Date.now() + 50 })
+  const limits = { sourceDatabaseBytes: 10, validationDatabaseBytes: 10, bucketBytes: 10, multipartBytes: 10,
+    localBytes: 10, offsiteBytes: 10, hostFreeBytes: 1, hostFreeInodes: 1, offsiteFreeBytes: 1, offsiteFreeInodes: 1, operationReserveBytes: 1 }
+  const expired = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, {
+    observe: async () => { await new Promise(done => setTimeout(done, 100)); throw new Error('Storage probe deadline exceeded') },
+    stop: async () => { calls.push('stop'); return [] },
+  })
+  expect(expired).toMatchObject({ status: 'latched', reason: 'observation-failed', probeError: 'Storage probe deadline exceeded' })
+  expect(calls).toEqual(['stop'])
+  const fresh = fixture()
+  const unclassified = await runStorageGuardCycle(fresh.target, { limits, leaseMs: 60_000 }, {
+    observe: async () => { throw new Error('postgres://owner:private-secret@host failed') }, stop: async () => [],
+  })
+  expect(unclassified).toMatchObject({ status: 'latched', reason: 'observation-failed', probeError: 'unclassified-probe-error' })
+  expect(JSON.stringify(unclassified)).not.toContain('private-secret')
+})
+
 it('rejects unmeasured limits and owner credentials inside candidate paths before native calls', async () => {
   const { parseStorageGuardConfig } = await import('../prerelease/storage-guard-native')
   const value = fixture()
@@ -81,7 +122,8 @@ it('rejects unmeasured limits and owner credentials inside candidate paths befor
 it.each(['probe-failure', 'healthy-write', 'forced-trip'])('stops independently when control persistence fails during %s and never heals the in-process latch', async fault => {
   const { runStorageGuardCycle } = await import('../prerelease/storage-guard')
   const value = fixture(), calls: string[] = []
-  value.save(value.healthy)
+  // A probe failure latches only once the prior lease has expired, so let it lapse during the failed probe.
+  value.save(fault === 'probe-failure' ? { ...value.healthy, validUntil: Date.now() + 50 } : value.healthy)
   const observation = { sourceDatabaseBytes: 2, validationDatabaseBytes: 2, bucketBytes: 2, multipartBytes: 2,
     localBytes: 2, offsiteBytes: 2, hostFreeBytes: 100, hostFreeInodes: 100, offsiteFreeBytes: 100, offsiteFreeInodes: 100 }
   const limits = { ...observation, sourceDatabaseBytes: 10, validationDatabaseBytes: 10, bucketBytes: 10, multipartBytes: 10,
@@ -89,7 +131,10 @@ it.each(['probe-failure', 'healthy-write', 'forced-trip'])('stops independently 
   chmodSync(value.control, 0o500)
   try {
     const result = await runStorageGuardCycle(value.target, { limits, leaseMs: 60_000 }, {
-      observe: async () => { if (fault === 'probe-failure') throw new Error('probe unavailable'); return observation },
+      observe: async () => {
+        if (fault === 'probe-failure') { await new Promise(done => setTimeout(done, 100)); throw new Error('probe unavailable') }
+        return observation
+      },
       stop: async () => { calls.push('stop'); return ['postgres-roles'] },
     }, fault === 'forced-trip' ? 'supervisor-stop' : undefined)
     expect(calls).toEqual(['stop'])
