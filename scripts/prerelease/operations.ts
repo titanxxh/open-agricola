@@ -129,13 +129,20 @@ export async function operations(args: string[]): Promise<void> {
   process.stdout.write(sendEnvelope(target, envelope, ssh))
 }
 
+// Tolerate about two minutes of silence on owner links before SSH gives up.
+const SSH_OPTIONS = ['-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8']
+
 function sendEnvelope(target: ReturnType<typeof parsePrereleaseTarget>, envelope: Record<string, unknown>, ssh?: string): string {
   if (!ssh) return locked(target, envelope)
   if (!/^[a-zA-Z0-9][a-zA-Z0-9@_.-]*$/.test(ssh)) throw new Error('Invalid owner SSH host')
   const remote = `cd ${shell(target.policyDirectory)} && exec node --import ./scripts/typescript-runtime.mjs scripts/prerelease/operations.ts receive`
-  const result = spawnSync('ssh', ['-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=2', ssh, remote],
+  const result = spawnSync('ssh', [...SSH_OPTIONS, ssh, remote],
     { input: JSON.stringify(envelope), encoding: 'utf8', timeout: 60 * 60_000, stdio: ['pipe', 'pipe', 'pipe'] })
-  if (result.status !== 0 || result.error) throw new Error('Remote prerelease operation failed; read the scoped maintenance or image-import record')
+  if (result.status !== 0 || result.error) {
+    // The receiver reports bounded operation errors; show them instead of a generic transport failure.
+    const remote = (result.stderr ?? '').trim().slice(-4000) || result.error?.message || 'no remote output'
+    throw new Error(`Remote prerelease operation failed (${result.signal ? `signal ${result.signal}` : `exit ${result.status}`}): ${remote}; read the scoped maintenance or image-import record`)
+  }
   return result.stdout
 }
 
@@ -164,7 +171,7 @@ async function ownerImport(target: ReturnType<typeof parsePrereleaseTarget>, val
     const path = join(controlDirectory(target), `image-import-${operationId}.tar`)
     if (staged.archivePath !== path || staged.imageId !== receipt.imageId) throw new Error('Remote image staging identity differs')
     if (ssh) {
-      const result = spawnSync('scp', ['-p', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=2', '--', prepared.archivePath, `${ssh}:${path}`],
+      const result = spawnSync('scp', ['-p', ...SSH_OPTIONS, '--', prepared.archivePath, `${ssh}:${path}`],
         { timeout: 30 * 60_000, stdio: ['ignore', 'ignore', 'pipe'] })
       if (result.status !== 0 || result.error) throw new Error('Image archive transfer failed; retry the original image operation')
     } else { copyFileSync(prepared.archivePath, path); chmodSync(path, 0o600) }
