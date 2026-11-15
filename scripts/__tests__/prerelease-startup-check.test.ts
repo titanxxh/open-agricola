@@ -19,14 +19,14 @@ afterEach(async () => {
 
 /** Mirrors the candidate public entry: production rejects every non-health path on another Host,
  * and prerelease admission requires a session for served frontend resources. */
-async function candidateEntry(served: { buildId: string } = { buildId }) {
+async function candidateEntry(location: Record<string, unknown> = { mode: 'canonical', appUrl: `${origin}/open-agricola/`, buildId }) {
   const seen: Array<{ path: string; host: string | undefined; proto: string | string[] | undefined }> = []
   const server = createServer((req, res) => {
     seen.push({ path: req.url ?? '', host: req.headers.host, proto: req.headers['x-forwarded-proto'] })
     const send = (status: number, body: unknown) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)) }
     if (req.url !== '/api/health' && req.headers.host !== new URL(origin).host) return send(403, { ok: false, message: 'Invalid public host' })
     if (req.url === '/api/health') return send(200, { ok: true })
-    if (req.url === '/api/app-location') return send(200, { buildId: served.buildId })
+    if (req.url === '/api/app-location') return send(200, location)
     if (req.url === '/open-agricola/frontend-build.json') return send(401, { ok: false, code: 'prerelease_auth_required' })
     send(404, {})
   })
@@ -68,7 +68,16 @@ describe('prerelease startup identity check', () => {
   })
 
   it('fails when the live server build differs from the installed build', async () => {
-    const entry = await candidateEntry({ buildId: 'b'.repeat(40) })
+    const entry = await candidateEntry({ mode: 'canonical', appUrl: `${origin}/open-agricola/`, buildId: 'b'.repeat(40) })
+
+    const result = await runCheck(entry.port)
+
+    expect(result.code).not.toBe(0)
+    expect(result.stderr).toContain('Prerelease identity mismatch')
+  })
+
+  it('fails when the entry does not serve a canonical hosted identity', async () => {
+    const entry = await candidateEntry({ mode: 'disabled' })
 
     const result = await runCheck(entry.port)
 
