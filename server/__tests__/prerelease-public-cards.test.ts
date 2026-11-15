@@ -57,3 +57,19 @@ it('keeps the original absolute deadline through failures and rejects a late pos
   now = 31_000
   expect(independent.authorized()).toBe(false)
 })
+
+it('never refreshes or revives an explicitly retired raw lease', async () => {
+  let now = 1000, reads = 0
+  const client = new FormalPublicCards('https://formal.example.test', async () => {
+    reads++
+    return Response.json({ ok: true, snapshot, status: status(now) })
+  }, { now: () => now, monotonic: () => now })
+  const raw = await client.create('public-card')
+  now += 30_001
+  expect(raw.retireIfExpired()).toBe(true)
+  const before = reads
+  await expect(raw.refresh()).rejects.toThrow('Public card execution paused')
+  expect(reads).toBe(before)
+  expect(raw.remainingMs()).toBe(0)
+  expect(() => raw.assert()).toThrow('Public card execution paused')
+})
