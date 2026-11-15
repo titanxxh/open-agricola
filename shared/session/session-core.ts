@@ -325,7 +325,11 @@ export type HistoryEntry = {
   actionStart: boolean
   /** At action start, the boundary protects older history, not this post-observation snapshot. */
   undoBoundary?: boolean
+  postObservation?: true
 }
+
+const isRestorableUndoBoundary = (entry: HistoryEntry): boolean =>
+  entry.undoBoundary === true && (entry.actionStart || entry.postObservation === true)
 
 export type SessionCommandCheckpoint = {
   state: GameState
@@ -648,6 +652,9 @@ export class GameCore {
 
   /** @internal phase access — append history entry (Round/Harvest/Draft mixins). */
   appendHistory(actionStart = false, undoBoundary = false): void { this.pushHistory(actionStart, undoBoundary) }
+  appendAnytimeHistory(replacesTurn: boolean): void {
+    this.pushHistory(replacesTurn, false, this.state.pendingUndoBoundary === true)
+  }
   /** @internal phase access — drop all history entries. */
   clearHistory(): void { this.history = [] }
 
@@ -2600,7 +2607,7 @@ export class GameCore {
       || kind === 'selection'
   }
 
-  private pushHistory(actionStart = false, undoBoundary = false) {
+  private pushHistory(actionStart = false, undoBoundary = false, postObservation = false) {
     // Cards can flag a one-shot undo boundary on state via `state.pendingUndoBoundary`
     // (e.g. immediately after rolling random). Merge it with the explicit parameter,
     // then clear the flag so it fires exactly once.
@@ -2619,6 +2626,7 @@ export class GameCore {
       turnOwnerPlayerIndex: this.turnOwnerPlayerIndex,
       actionStart,
       undoBoundary: effectiveBoundary,
+      ...(postObservation ? { postObservation: true as const } : {}),
     }
     this.history.push(entry)
     if (actionStart) {
@@ -2632,7 +2640,7 @@ export class GameCore {
 
   private restoreHistory(entry: HistoryEntry) {
     this.state = preservePlayerDisplayNames(this.state, restoreSessionState(entry.state, id => this.registry.get(id)))
-    if (entry.actionStart && entry.undoBoundary) this.state.pendingUndoBoundary = true
+    if (isRestorableUndoBoundary(entry)) this.state.pendingUndoBoundary = true
     this.reconcileRoomAnimals()
     // Task 10/11: the previous GameCore pending field was deleted from
     // `GameState`. S2 Task 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
@@ -2673,7 +2681,7 @@ export class GameCore {
     if (this.state.pendingUndoBoundary === true) return false
     if (this.isFailedAuthoritativeCommand(normalizedCommand('undoStep', null, {}))) return false
     const entry = this.history[this.history.length - 1]
-    return !!entry && (entry.undoBoundary !== true || entry.actionStart)
+    return !!entry && (entry.undoBoundary !== true || isRestorableUndoBoundary(entry))
   }
 
   private canUndoActionNow(): boolean {
@@ -5636,7 +5644,7 @@ export class GameCore {
       return this.respond(false, 'cannot undo past boundary')
     }
     const latest = this.history[this.history.length - 1]
-    if (latest?.undoBoundary && !latest.actionStart) {
+    if (latest?.undoBoundary && !isRestorableUndoBoundary(latest)) {
       return this.respond(false, 'cannot undo past boundary')
     }
     const entry = this.history[this.history.length - 1]
