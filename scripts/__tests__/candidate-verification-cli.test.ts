@@ -178,11 +178,27 @@ describe('candidate verification public CLI', () => {
   })
   it.each([{ legacy: true, exit: 0, status: 'passed' }, { legacy: false, exit: 1, status: 'blocked' }])('uses the trusted historical stable cutoff (legacy=$legacy)', ({ legacy, exit, status }) => {
     const value = fixture(false, legacy)
+    if (!legacy) {
+      const root = mkdtempSync(join(tmpdir(), 'candidate-current-and-history-')); temporary.push(root)
+      const origin = join(root, 'origin.git')
+      execFileSync('git', ['clone', '--bare', '--no-hardlinks', value.cwd, origin], { stdio: 'ignore' })
+      execFileSync('git', ['--git-dir', origin, 'fetch', '--no-tags', '--update-shallow', `file://${historyOrigin}`,
+        `${LEGACY_STABLE_CUTOFF}:refs/heads/fixed-legacy-history`], { stdio: 'ignore' })
+      value.git('config', '--unset-all', `url.file://${historyOrigin}.insteadOf`)
+      value.git('config', `url.file://${origin}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
+      value.git('fetch', '--no-tags', '--update-shallow', `file://${origin}`, LEGACY_STABLE_CUTOFF)
+      expect(readFileSync(join(origin, 'shallow'), 'utf8')).toBe(legacyStableHistory.older + '\n')
+      expect(readFileSync(join(value.cwd, '.git/shallow'), 'utf8')).toBe(legacyStableHistory.older + '\n')
+      const ancestry = spawnSync('git', ['merge-base', '--is-ancestor', value.sha, LEGACY_STABLE_CUTOFF], { cwd: value.cwd, encoding: 'utf8' })
+      expect(ancestry.status, ancestry.stderr).toBe(1)
+      expect(ancestry.stderr).toBe('')
+    }
     const evidence = githubFixture(value, '', candidateRepository, value.sha, true)
     for (const job of evidence.jobs) job.steps = job.steps.filter(step => !['Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].includes(step.name))
     replaceMetadata(value, { [`${prefix}/actions/runs/1/jobs?filter=all&per_page=100`]: { jobs: evidence.jobs } })
     const result = value.run('check', '--sha', value.sha, '--repository', 'titanxxh/open-agricola')
     expect(result.status, result.stderr).toBe(exit)
+    expect(result.stdout, result.stderr).not.toBe('')
     expect(JSON.parse(result.stdout)).toMatchObject({ status, sha: value.sha })
     if (legacy) expect(JSON.parse(result.stdout).configuration).toBe(evidence.configuration)
     else expect(JSON.parse(result.stdout).configuration).not.toBe(evidence.configuration)
