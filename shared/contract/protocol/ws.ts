@@ -91,7 +91,7 @@ type ClientCommandBody =
   | { type: 'setPlayerColor'; color: PlayerState['color'] }
   | { type: 'confirmPlayerColor' }
   | { type: 'startTeamGame' }
-  | { type: 'setTeam'; memberId?: string; teamIndex: number }
+  | { type: 'setTeam'; memberId?: string; teamIndex: number; swapMemberId?: string }
   | { type: 'dissolveRoom' }
   | { type: 'proposeGameEnd'; intent: 'end' | 'rematch' }
   | { type: 'respondGameEnd'; proposalId: string; agree: boolean }

@@ -1,4 +1,4 @@
-import { admitTeamMember, planTeamSeating, publishTeamWaitingRoom } from '../game/team-room'
+import { admitTeamMember, planTeamReassignment, planTeamSeating, publishTeamWaitingRoom } from '../game/team-room'
 import { closePrereleaseSocket, isPrerelease, prereleaseCommandAllowed } from '../prerelease-access'
 import { addRoomSpectator, isRoomSpectator, removeRoomSpectator } from '../game/room-spectators'
 import { isPublicSpectatableRoom } from '../game/room'
@@ -1073,19 +1073,27 @@ async function handleSetTeam(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   if (!room || !team || room.status !== 'waiting' || !self || room.waitingTeamConnections?.get(self.memberId) !== ctx.ws) {
     sendCommandError(ctx, 'Team assignments are unavailable', msg.requestId, 'team_change_failed'); return
   }
-  const member = room.teamMembers?.find(value => value.memberId === (msg.memberId ?? self.memberId))
-  const teamCount = room.maxPlayers / team.configuration.seatsPerTeam
-  if (!member || (member.memberId !== self.memberId && room.createdBy !== userId)
-    || !Number.isInteger(msg.teamIndex) || msg.teamIndex < 0 || msg.teamIndex >= teamCount
-    || (room.teamMembers ?? []).filter(value => value.memberId !== member.memberId && value.teamIndex === msg.teamIndex)
-      .reduce((sum, value) => sum + value.seatCount, member.seatCount) > team.configuration.seatsPerTeam) {
+  const memberId = msg.memberId ?? self.memberId
+  if ((msg.memberId !== undefined && (typeof msg.memberId !== 'string' || !msg.memberId))
+    || (msg.swapMemberId !== undefined && (typeof msg.swapMemberId !== 'string' || !msg.swapMemberId || room.createdBy !== userId))
+    || (memberId !== self.memberId && room.createdBy !== userId)) {
     sendCommandError(ctx, 'Invalid Team assignment', msg.requestId, 'team_change_failed'); return
   }
+  const next = planTeamReassignment(team, room.teamMembers ?? [], msg.swapMemberId === undefined
+    ? { kind: 'move', memberId, teamIndex: msg.teamIndex }
+    : { kind: 'swap', memberId, teamIndex: msg.teamIndex, swapMemberId: msg.swapMemberId })
+  if (!next) { sendCommandError(ctx, 'Invalid Team assignment', msg.requestId, 'team_change_failed'); return }
   const previous = room.teamMembers
-  room.teamMembers = (previous ?? []).map(value => value.memberId === member.memberId ? { ...value, teamIndex: msg.teamIndex } : value)
-  try { await ctx.checkpoint.recordMeta(room) }
-  catch (error) { room.teamMembers = previous; throw error }
-  if (ctx.activeCommand) ctx.activeCommand.outcome = { ok: true, roomId: room.id, roomVersion: room.version }
+  room.teamMembers = next
+  try {
+    await ctx.checkpoint.recordMeta(room, ctx.activeCommand ? { receipt: {
+      request: ctx.activeCommand.request, outcome: { ok: true, roomId: room.id, roomVersion: room.version },
+    } } : undefined)
+  } catch (error) {
+    room.teamMembers = previous
+    if (error instanceof ExecutionRevokedError || error instanceof RoomOwnershipError || error instanceof CommandError) throw error
+    sendCommandError(ctx, 'Could not change teams', msg.requestId, 'team_change_failed'); return
+  }
   await publishTeamWaitingRoom({ room, broadcaster: ctx.broadcaster })
 }
 
