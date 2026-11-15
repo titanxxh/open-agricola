@@ -1,13 +1,13 @@
 {
   "format": 1,
   "repository": "titanxxh/open-agricola",
-  "baselineMainSha": "4c9948485f6799bf156036ee193a9f047b03a30e",
+  "baselineMainSha": "4f0e4696c487274424b9e0434c7dc1b6d0e64180",
   "features": [
     {
       "id": "pre-identity",
       "dependsOn": [],
       "sourceSha": "087e71b429fb2316972ab57db65369f8d928a619",
-      "integratedSha": "d261410651afbc01639a9203eadc680f76558ad8"
+      "integratedSha": "e470f08f44df7288295e51711c061f6c2cb86099"
     },
     {
       "id": "pre-lifecycle",
@@ -15,7 +15,7 @@
         "pre-identity"
       ],
       "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
-      "integratedSha": "348266c73cce2a30713efc8b3ec9c1186c2b8320"
+      "integratedSha": "9bf13d40cb02423358ba07efad30bab26839a7d0"
     },
     {
       "id": "private-replay",
@@ -24,7 +24,7 @@
         "pre-lifecycle"
       ],
       "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
-      "integratedSha": "348266c73cce2a30713efc8b3ec9c1186c2b8320"
+      "integratedSha": "9bf13d40cb02423358ba07efad30bab26839a7d0"
     },
     {
       "id": "public-sandbox",
@@ -32,7 +32,7 @@
         "pre-identity"
       ],
       "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
-      "integratedSha": "348266c73cce2a30713efc8b3ec9c1186c2b8320"
+      "integratedSha": "9bf13d40cb02423358ba07efad30bab26839a7d0"
     },
     {
       "id": "team-cooperation",
@@ -40,7 +40,7 @@
         "pre-identity"
       ],
       "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
-      "integratedSha": "348266c73cce2a30713efc8b3ec9c1186c2b8320"
+      "integratedSha": "9bf13d40cb02423358ba07efad30bab26839a7d0"
     }
   ]
 }
