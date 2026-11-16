@@ -35,3 +35,11 @@ The Game Replay Archive must replay completed games exactly forever, while suppo
 - An unbounded delta chain: seek cost and damage scope grow with game length.
 - One chain per perspective: duplicates the same state and drifts at Step boundaries.
 - Rewriting history on deploy or migrating schemas in the newest Viewer: alters forensic data and adds rollback risk.
+
+## Prerelease retention, 2026-11-14
+
+The independent prerelease environment limits completed results and Replay archives to 30 days from their earliest durable ending. Reads stop at that deadline even before collection; restoring a backup never restarts the period. The formal channel retains its existing policy. See `server/game/prerelease-archive-retention.ts`.
+
+## Prerelease environment override
+
+Prerelease keeps this storage codec and never reruns rules. A new immutable Viewer manifest explicitly declares the parent bridge protocol and supported Replay schemas. Old Viewer hashes remain unchanged; pre rejects unsupported Builds instead of choosing the newest Viewer.

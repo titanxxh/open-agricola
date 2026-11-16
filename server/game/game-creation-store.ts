@@ -3,6 +3,7 @@ import type { PostgresDatabase } from '../database/postgres'
 import { parseGameCreationRecord } from './creation-configuration'
 import { CommandError } from './command-store'
 import type { CommandOutcome } from '../../shared/contract/protocol/commands'
+import { prereleaseArchiveExpired } from './prerelease-archive-retention'
 
 export class GameCreationError extends CommandError {
   readonly adjustment?: CommandOutcome['creationAdjustment']
@@ -18,11 +19,13 @@ const rejected = (code: SoloCreationErrorCode, message: string): SourceResult =>
 /** Private creation metadata; authorization never depends on Replay availability. */
 export class GameCreationStore {
   private readonly db: Pick<PostgresDatabase, 'prepare' | 'transaction'>
-  constructor(db: Pick<PostgresDatabase, 'prepare' | 'transaction'>) { this.db = db }
+  private readonly now: () => number
+  constructor(db: Pick<PostgresDatabase, 'prepare' | 'transaction'>, now: () => number = Date.now) { this.db = db; this.now = now }
 
   async completedSource(roomId: string, userId?: string): Promise<SourceResult> {
     if (!userId) return rejected('login_required', 'Login required')
     return this.db.transaction(async (): Promise<SourceResult> => {
+      if (await prereleaseArchiveExpired(this.db, roomId, this.now)) return rejected('source_removed', 'This game context expired')
       const context = await this.db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id=? FOR SHARE').get<{ lifecycle: string }>(roomId)
       if (context?.lifecycle === 'removed') return rejected('source_removed', 'This game context was removed')
       if (context?.lifecycle !== 'completed') return rejected('source_not_completed', 'The source game has not completed durably')
@@ -33,6 +36,7 @@ export class GameCreationStore {
       const stored = await this.db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?').get<{ configuration_json: string }>(roomId)
       const record = stored ? parseGameCreationRecord(stored.configuration_json) : null
       if (!record) return rejected('creation_configuration_unavailable', 'The original creation configuration is unavailable')
+      if (await prereleaseArchiveExpired(this.db, roomId, this.now)) return rejected('source_removed', 'This game context expired')
       return { ok: true, record }
     })()
   }
