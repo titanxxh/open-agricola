@@ -8,6 +8,34 @@ export const SUITE_CASES = {
   sandbox: ['public-sandbox'], viewer: ['viewer-firefox', 'viewer-webkit'], continuity: ['continuity'], deletion: ['formal-account-deletion'], readback: ['public-readback'],
 }
 
+/** Engines each suite must pass on; acceptance requires every case of every suite except `readback` on each of them. */
+export const SUITE_ENGINES = {
+  handoff: ['chromium', 'firefox', 'webkit'], boundary: ['chromium', 'firefox', 'webkit'], multihand: ['chromium'], team: ['chromium'],
+  sandbox: ['chromium'], viewer: ['firefox', 'webkit'], continuity: ['chromium'], deletion: ['chromium'], readback: ['chromium'],
+}
+
+/** Case labels one engine runs for a suite, in execution order. The Viewer suite runs one engine-named case. */
+export const caseLabels = (suite, engine) => suite === 'viewer' ? [`viewer-${engine}`] : SUITE_CASES[suite]
+
+/** Validates `--case a,b` against the suite before any remote work; null keeps every case. */
+export function parseCaseSelection(suite, value) {
+  if (value === undefined) return null
+  const requested = value.split(',').map(name => name.trim()).filter(Boolean)
+  if (!SUITE_CASES[suite]) throw new Error(`Unknown suite ${suite}`)
+  if (!requested.length) throw new Error('--case needs at least one case label')
+  const unknown = requested.filter(name => !SUITE_CASES[suite].includes(name))
+  if (unknown.length) throw new Error(`Unknown ${suite} case ${unknown.join(', ')}; expected one of ${SUITE_CASES[suite].join(', ')}`)
+  return requested
+}
+
+/** Indexes and labels of the plan cases one engine runs under a selection. */
+export const selectCases = (suite, engine, requested) => caseLabels(suite, engine)
+  .map((label, index) => ({ label, index })).filter(({ label }) => !requested || requested.includes(label))
+
+/** Every (case, engine) pair acceptance needs a passing newest result for. */
+export const REQUIRED_CASES = Object.entries(SUITE_ENGINES).filter(([suite]) => suite !== 'readback')
+  .flatMap(([suite, engines]) => engines.flatMap(engine => caseLabels(suite, engine).map(label => ({ case: label, engine }))))
+
 const within = (ms, fence = 31_000) => ms !== null && ms !== undefined && ms <= fence
 const NOTICE = 'Your login or Beta access is no longer valid. Return to production to sign in and enter again.'
 const byLabel = (accounts, label) => { const account = accounts.find(a => a.label === label); assert.ok(account, `Account ${label} is not configured`); return account }

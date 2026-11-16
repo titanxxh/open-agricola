@@ -51,6 +51,8 @@ docker exec "$PG" psql -X -qAt -U "$AD" -d '${ctx.target.database.name}' -c "BEG
 
 async function runSuite(ctx, options) {
   const suite = options.suite, stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  // Reject an unknown case before minting tokens or touching the target.
+  const requested = suites.parseCaseSelection(suite, options.case)
   const runDirectory = options.run ? privateDirectory(options.run, 'Run directory') : join(ctx.outputRoot, `run-${stamp}`)
   mkdirSync(runDirectory, { recursive: true, mode: 0o700 })
   const { status, bindings } = prepare(ctx, runDirectory)
@@ -58,28 +60,34 @@ async function runSuite(ctx, options) {
   const kit = createKit({ origins: ctx.origins, formalBuild: ctx.config.formalBuild, bindings, accounts, ownerCookie: ctx.config.ownerCookie })
   const list = value => value.split(',').map(v => v.trim()).filter(Boolean)
   const plan = {
-    handoff: { engines: ['chromium', 'firefox', 'webkit'], cases: [suites.handoffCase] },
-    boundary: { engines: ['chromium', 'firefox', 'webkit'], cases: [suites.visitorCase, suites.ordinaryCase, suites.betaBoundaryCase, suites.revocationCase] },
-    multihand: { engines: ['chromium'], cases: [(k, b, a) => suites.multihandCase(k, b, a, options.guest ?? 'B', runDirectory)] },
-    team: { engines: ['chromium'], cases: [(k, b, a) => suites.teamGameCase(k, b, a, list(options.players ?? 'A,B,C,D'), runDirectory)] },
-    sandbox: { engines: ['chromium'], cases: [(k, b, a) => suites.sandboxCase(k, b, a, runDirectory)] },
-    viewer: { engines: ['firefox', 'webkit'], cases: [(k, b, a) => suites.viewerCase(k, b, a, options.room, runDirectory)] },
-    continuity: { engines: ['chromium'], cases: [(k, b, a) => suites.continuityCase(k, b, a, options.room)] },
-    deletion: { engines: ['chromium'], cases: [(k, b, a) => suites.deletionCase(k, b, a, list(options.labels ?? ''))] },
-    readback: { engines: ['chromium'], cases: [suites.readbackCase] },
+    handoff: { cases: [suites.handoffCase] },
+    boundary: { cases: [suites.visitorCase, suites.ordinaryCase, suites.betaBoundaryCase, suites.revocationCase] },
+    multihand: { cases: [(k, b, a) => suites.multihandCase(k, b, a, options.guest ?? 'B', runDirectory)] },
+    team: { cases: [(k, b, a) => suites.teamGameCase(k, b, a, list(options.players ?? 'A,B,C,D'), runDirectory)] },
+    sandbox: { cases: [(k, b, a) => suites.sandboxCase(k, b, a, runDirectory)] },
+    viewer: { cases: [(k, b, a) => suites.viewerCase(k, b, a, options.room, runDirectory)] },
+    continuity: { cases: [(k, b, a) => suites.continuityCase(k, b, a, options.room)] },
+    deletion: { cases: [(k, b, a) => suites.deletionCase(k, b, a, list(options.labels ?? ''))] },
+    readback: { cases: [suites.readbackCase] },
   }[suite]
   if (!plan) throw new Error(`Unknown suite ${suite}`)
+  plan.engines = suites.SUITE_ENGINES[suite]
   if (['viewer', 'continuity'].includes(suite) && !/^[a-f0-9-]{36}$/.test(options.room ?? '')) throw new Error('--room <archived room id> is required')
   if (suite === 'readback' ? status.mode !== 'open' : status.mode !== 'maintenance') throw new Error(`Suite ${suite} needs the target in ${suite === 'readback' ? 'open' : 'maintenance'} mode`)
   const summary = []
-  for (const engineName of options.engine ? list(options.engine) : plan.engines) {
-    const engine = engines[engineName]; if (!engine) throw new Error(`Unknown engine ${engineName}`)
+  const selectedEngines = options.engine ? list(options.engine) : plan.engines
+  for (const engineName of selectedEngines) if (!engines[engineName]) throw new Error(`Unknown engine ${engineName}`)
+  if (!selectedEngines.some(engineName => suites.selectCases(suite, engineName, requested).length)) throw new Error(`No selected ${suite} case runs on ${selectedEngines.join(', ')}`)
+  for (const engineName of selectedEngines) {
+    const engine = engines[engineName], selected = suites.selectCases(suite, engineName, requested)
+    if (!selected.length) continue
+    // `cases` names what this run executed; a later single-case rerun replaces only those cases in the bundle.
     const report = { format: 1, suite, engine: engineName, candidate: bindings.candidateSha, generation: bindings.generation, operationId: bindings.operationId,
-      healthyCycle: bindings.healthyCycle, mode: bindings.mode, startedAt: new Date().toISOString(), results: [] }
+      healthyCycle: bindings.healthyCycle, mode: bindings.mode, startedAt: new Date().toISOString(), cases: selected.map(({ label }) => label), results: [] }
     if (bindings.mode === 'maintenance') await kit.publicIsClosed()
     // A fresh browser per case: WebKit keeps stale engine state after the blocked-frame embedding probes.
-    for (const [index, run] of plan.cases.entries()) {
-      const label = suite === 'viewer' ? `viewer-${engineName}` : suites.SUITE_CASES[suite][index]
+    for (const { label, index } of selected) {
+      const run = suite === 'viewer' ? plan.cases[0] : plan.cases[index]
       const browser = await engine.launch({ headless: true }); report.version = browser.version()
       try { report.results.push(await run(kit, browser, accounts)) }
       catch (error) { report.results.push({ case: label, passed: false, error: String(error.message).slice(0, 400) }) }
@@ -87,7 +95,7 @@ async function runSuite(ctx, options) {
     }
     if (bindings.mode === 'maintenance') report.publicStill503 = await kit.publicStillClosed(report)
     report.boundedEvaluations = [...kit.hung]
-    report.passed = report.results.length === plan.cases.length && report.results.every(v => v.passed) && (bindings.mode !== 'maintenance' || report.publicStill503)
+    report.passed = report.results.length === selected.length && report.results.every(v => v.passed) && (bindings.mode !== 'maintenance' || report.publicStill503)
     report.completedAt = new Date().toISOString()
     const text = JSON.stringify(report, null, 2) + '\n'; assertNoAccountValues(accounts, text, `${suite} result`)
     writePrivate(join(runDirectory, `result-${suite}-${engineName}-${Date.now()}.json`), text)
@@ -149,4 +157,4 @@ const ctx = loadAcceptanceConfig(options.config)
 if (command === 'run') await runSuite(ctx, options)
 else if (command === 'bundle') await bundle(ctx, options)
 else if (command === 'acceptance') acceptance(ctx, options)
-else throw new Error('Use run --suite <name> | bundle --runs <dirs> --output <dir> | acceptance --index <file> --formal-browser <file> --output <file>')
+else throw new Error('Use run --suite <name> [--engine <e,...>] [--case <label,...>] | bundle --runs <dirs> --output <dir> | acceptance --index <file> --formal-browser <file> --output <file>')

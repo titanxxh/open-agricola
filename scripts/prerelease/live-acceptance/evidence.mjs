@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { chmodSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { assertNoAccountValues } from './context.mjs'
+import { REQUIRED_CASES } from './suites.mjs'
 
 export const REQUIRED_EVIDENCE = ['identity', 'beta-access', 'http-ws', 'public-cards', 'viewer', 'retained-data', 'deletion-audit', 'capacity', 'formal-unaffected', 'browser-boundary', 'formal-browser-policy']
 const sha256 = path => createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -15,7 +16,10 @@ export const SOURCES = {
   'deletion-audit': ['formal-account-deletion'], 'browser-boundary': ['beta-boundary'],
 }
 
-/** Reads every result file in the run directories; the newest result per (case, engine) wins. */
+/**
+ * Reads every result file in the run directories; the newest result per (case, engine) wins. A single-case rerun
+ * therefore replaces only its own cases. Files are read in `--runs` order, then by name (`result-<suite>-<engine>-<ms>`).
+ */
 export function collectResults(directories) {
   const latest = new Map()
   for (const directory of directories) for (const name of readdirSync(directory).filter(file => /^result-.+\.json$/.test(file)).sort()) {
@@ -33,8 +37,12 @@ export function bundleEvidence({ results, output, common, accounts, extra = {} }
   const index = {}
   for (const item of REQUIRED_EVIDENCE.filter(name => name !== 'formal-browser-policy')) {
     const rows = results.filter(row => (SOURCES[item] ?? []).includes(row.result.case))
+    // Every required (case, engine) pair needs its own newest result; a case that never ran blocks the item.
+    const missing = REQUIRED_CASES.filter(pair => (SOURCES[item] ?? []).includes(pair.case)
+      && !rows.some(row => row.result.case === pair.case && row.engine === pair.engine))
     const body = { format: 1, item, ...common,
-      passed: rows.length > 0 ? rows.every(row => row.result.passed === true) : (extra[item] ? extra[item].passed !== false : false),
+      passed: missing.length === 0 && (rows.length > 0 ? rows.every(row => row.result.passed === true) : (extra[item] ? extra[item].passed !== false : false)),
+      ...(missing.length ? { missing } : {}),
       results: rows.map(row => ({ engine: row.engine, version: row.run.version, case: row.result.case, passed: row.result.passed, result: row.result, source: { path: row.path, sha256: sha256(row.path) } })),
       ...(extra[item] ? { owner: extra[item] } : {}) }
     const text = JSON.stringify(body, null, 1)
