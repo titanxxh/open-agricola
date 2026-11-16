@@ -277,7 +277,7 @@ export async function verifyEmailToken(rawToken: string): Promise<EmailVerificat
   }
 }
 
-function publicAppBase(): URL {
+export function publicAppBase(): URL {
   const configured = process.env.PUBLIC_APP_ORIGIN?.trim()
   if (!configured && process.env.NODE_ENV === 'production') {
     throw new Error('PUBLIC_APP_ORIGIN is required in production')

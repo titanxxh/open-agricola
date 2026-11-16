@@ -1,10 +1,10 @@
 import { request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { PostgresDatabase } from '../database/postgres'
-import { extractToken, getSessionByToken, isAdmin } from '../auth'
+import { extractToken, getSessionByToken, isAdmin, publicAppBase } from '../auth'
 import { serializeOperationsCookie } from '../auth-cookies'
 import { httpAdmission, requestSessionToken } from '../request-auth'
-import { corsHeaders, getRequestOrigin, normalizeOrigin } from '../http-origin'
+import { corsHeaders, getRequestOrigin } from '../http-origin'
 import { operationsMetrics } from './metrics'
 
 const digest = (token: string) => createHash('sha256').update(token).digest('hex')
@@ -17,9 +17,11 @@ const json = (res: ServerResponse, status: number, body: unknown) => {
  * operations page, which starts a fresh handoff. Dashboard data requests keep their machine-readable rejection.
  */
 function reenterOperations(req: IncomingMessage, res: ServerResponse): boolean {
-  const app = normalizeOrigin(process.env.PUBLIC_APP_ORIGIN)
-  if (!app || !['GET', 'HEAD'].includes(req.method ?? '') || req.headers['sec-fetch-dest'] !== 'document' || req.headers['sec-fetch-mode'] !== 'navigate') return false
-  res.writeHead(303, { Location: `${app}/?page=operations`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
+  if (!['GET', 'HEAD'].includes(req.method ?? '') || req.headers['sec-fetch-dest'] !== 'document' || req.headers['sec-fetch-mode'] !== 'navigate') return false
+  // Keep the configured frontend path: hosted and self-hosted frontends can live below the origin root.
+  const page = publicAppBase()
+  page.searchParams.set('page', 'operations')
+  res.writeHead(303, { Location: page.href, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
   res.end()
   return true
 }
