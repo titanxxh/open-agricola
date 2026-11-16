@@ -32,12 +32,14 @@ export const validateReplay = (
       throw new Error(`replay step metadata invalid at ${header.room_id} step ${row.step_no}`)
     }
     try {
+      // Each frame is read once and replaced by its successor, so the delta may
+      // update it in place instead of cloning the whole frame for every step.
       previousFrame = decodeReplayFrame(previousFrame, {
         payloadKind: row.payload_kind,
         payloadGzip: row.payload_gzip,
         checkpointStepNo: row.checkpoint_step_no,
         frameHash: row.frame_hash,
-      })
+      }, { inPlace: true })
     } catch {
       throw new Error(`replay segment integrity failed at ${header.room_id} step ${row.step_no}`)
     }

@@ -26,6 +26,9 @@ describe('Replay delta own JSON properties', () => {
     const restored = applyReplayDelta(empty, adds)
     expect(canonicalJson(restored)).toBe(canonicalJson(added))
     expect(Object.getPrototypeOf(restored)).toBe(Object.prototype)
+    const restoredInPlace = applyReplayDelta(json('{}'), json(JSON.stringify(adds)) as ReplayDeltaOperation[], { inPlace: true })
+    expect(canonicalJson(restoredInPlace)).toBe(canonicalJson(added))
+    expect(Object.getPrototypeOf(restoredInPlace)).toBe(Object.prototype)
     expect(Object.getOwnPropertyDescriptor(restored, '__proto__'))
       .toMatchObject({ value: { food: 1 }, enumerable: true })
 

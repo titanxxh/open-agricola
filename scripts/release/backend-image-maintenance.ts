@@ -255,7 +255,7 @@ export function maintainBackendImage(path: string, expected: Target): void {
     try {
       compose(['run', '--rm', '--name', liveName, '--label', `org.open-agricola.backend-operation=${request.operationId}`,
         '--label', 'org.open-agricola.backend-phase=live-validation', '--no-deps', '--pull', 'never',
-        '-e', `BACKUP_DEADLINE_EPOCH_MS=${Date.now() + liveBudget}`, 'app', 'node', '--import', 'tsx',
+        '-e', `BACKUP_DEADLINE_EPOCH_MS=${Date.now() + liveBudget}`, '-e', 'STORAGE_VALIDATION_CONCURRENCY=auto', 'app', 'node', '--import', 'tsx',
         'scripts/storage-archive-cli.ts', 'check-live', request.sourceSha, '--applications-stopped'], liveBudget)
     } catch (error) {
       try { removeLive() }

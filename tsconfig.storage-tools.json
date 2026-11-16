@@ -12,6 +12,7 @@
     "scripts/local-backend.ts",
     "scripts/storage-archive.ts",
     "scripts/storage-archive-cli.ts",
+    "scripts/replay-validation-worker.ts",
     "scripts/container-entry.ts",
     "scripts/update-whats-new.ts",
     "scripts/bench/room-performance.ts",

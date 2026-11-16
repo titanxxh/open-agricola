@@ -1127,6 +1127,8 @@ bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
 
 验证使用隔离 PostgreSQL 数据库和 S3 prefix。报告记录源/目标构建以及归档、配置的 hash 和长度；先发布数据和配置，最后发布 manifest。仅完整且验证成功的组合会进入异机暂存，远端校验 hash 后才提交 manifest。半成品不占保留份额，也不替换上次验证成功的报告。默认验证账号需要 `CREATEDB`；托管服务可提供单独的空 `VALIDATION_DATABASE_URL`，工具会独占该验证目标并在使用后恢复为空。旧 SQLite 的写入/容量数字不能用于这些能力的声明。
 
+回放步骤解码占校验时间的绝大部分，默认单线程执行，因此在线备份最多与玩家争用一个 CPU。应用停止时，正式环境的发布前备份校验和 `check-live` 设置 `STORAGE_VALIDATION_CONCURRENCY=auto`，用全部可用 CPU 并行解码回放；也可以设为不超过 64 的正整数，指定 worker 数。任一设置得到的报告完全相同。
+
 每日备份与部署共用 `backups/.maintenance.lock`。保留策略仍是本地 daily 7 份、pre 5 份，异机 daily 30 份、pre 10 份，所有普通归档及其配置快照最多 30 天。保留 `deploy/offsite-retention.sh` 的异机独立 cron，删除 ledger 不受归档清理影响。配置 `OFFSITE_BACKUP_TARGET` 和 `OFFSITE_BACKUP_REMOTE_DIR` 后安装仓库 `deploy/open-agricola-backup.cron` 与 logrotate 配置；无异机时仍可执行本机手动备份。
 
 cron 模板按宿主机的 `Asia/Shanghai` 时区调度：每日 04:00 备份，05:30 执行异机独立保留清理。安装前在两台主机分别运行 `timedatectl show -p Timezone --value` 核对。Ubuntu cron 不使用 `CRON_TZ` 选择单个任务的调度时区；其他宿主机时区需要相应调整表达式。

@@ -395,6 +395,7 @@ it('delivers an imported immutable image with source capture, target restore val
   expect(index(' export ')).toBeLessThan(index(' validate '))
   expect(index(' validate ')).toBeLessThan(index('check-live'))
   expect(index('check-live')).toBeLessThan(index(' up '))
+  expect(commands.find(command => command.includes('check-live'))).toContain('-e STORAGE_VALIDATION_CONCURRENCY=auto')
   expect(calls.find(call => call.kind === 'docker' && call.args.includes('up'))?.args).toContain('--remove-orphans')
   expect(commands.find(command => command.includes(' export '))).toContain(' capture ')
   expect(commands.find(command => command.includes(' validate '))).toContain(' app ')

@@ -265,6 +265,8 @@ it('captures online from the running immutable image without stopping or restart
   expect(result.calls.some(call => call.includes('export-online /backup/'))).toBe(true)
   expect(result.calls.some(call => call.includes('--label org.open-agricola.backup.run=fixture-run'))).toBe(true)
   expect(result.calls.some(call => call.includes('app timeout --signal=TERM'))).toBe(true)
+  // Validation shares the host with players and stays single-threaded.
+  expect(result.calls.some(call => call.includes('STORAGE_VALIDATION_CONCURRENCY'))).toBe(false)
   expect(result.report).toMatchObject({ environment: 'stable', retentionDays: 30, sourceBuildId: sourceBuild, targetBuildId: sourceBuild,
     archiveSizeBytes: result.archive!.length, archiveSha256: createHash('sha256').update(result.archive!).digest('hex'),
     configurationSizeBytes: result.configuration!.length, configurationSha256: createHash('sha256').update(result.configuration!).digest('hex') })
@@ -290,6 +292,7 @@ it('leaves the maintenance stop owned by the deployment caller', () => {
   expect(result.calls.some(call => /(?:stop|start) app$/.test(call))).toBe(false)
   expect(result.calls.some(call => call.includes('export-online'))).toBe(false)
   expect(result.calls.some(call => call.includes(' --applications-stopped'))).toBe(true)
+  expect(result.calls.find(call => call.includes('validate /backup/'))).toContain('-e STORAGE_VALIDATION_CONCURRENCY=auto')
 })
 
 it('refuses a linked host report without changing an inert owner fixture', () => {
