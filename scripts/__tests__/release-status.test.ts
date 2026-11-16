@@ -26,7 +26,7 @@ else if(a[1].includes('/actions/runs/'))out({id:42,run_attempt:2,status:s.image,
 else{console.error('Fixture native unavailable PRIVATE_TOKEN_SENTINEL');process.exit(1)}
 `, { mode: 0o700 })
   writeFileSync(join(bin, 'git'), `#!${process.execPath}\n${common}if(a.includes('rev-parse'))console.log(${JSON.stringify(producer)});else if(!a.includes('status'))process.exit(91);\n`, { mode: 0o700 })
-  writeFileSync(join(bin, 'ssh'), `#!${process.execPath}\n${common}if(!a[1].includes("'status'")||a[1].includes("'resume'"))process.exit(92);out({kind:'backend-image-operation',operationId:${JSON.stringify(operationId)},sourceSha:${JSON.stringify(sha)},producerSha:${JSON.stringify(producer)},bindingSha256:'d'.repeat(64),state:s.backend,phase:s.backend==='accepted'?'accepted':'validating',nextAction:s.backend==='accepted'?'none':'wait',validatorExitCode:null});\n`, { mode: 0o700 })
+  writeFileSync(join(bin, 'ssh'), `#!${process.execPath}\n${common}if(!a.at(-1).includes("'status'")||a.at(-1).includes("'resume'"))process.exit(92);out({kind:'backend-image-operation',operationId:${JSON.stringify(operationId)},sourceSha:${JSON.stringify(sha)},producerSha:${JSON.stringify(producer)},bindingSha256:'d'.repeat(64),state:s.backend,phase:s.backend==='accepted'?'accepted':'validating',nextAction:s.backend==='accepted'?'none':'wait',validatorExitCode:null});\n`, { mode: 0o700 })
   const server = createServer((req, res) => {
     if (state.public === 'redirect') { res.writeHead(302, { Location: 'https://never-follow.invalid/' }).end(); return }
     if (state.public === 'missing') { res.writeHead(404).end(); return }
@@ -69,7 +69,7 @@ it('queries real read-only provider boundaries and separates saved acceptance fr
     pages: { state: 'verified', evidence: 'live' }, acceptance: { state: 'verified', evidence: 'saved', reason: 'saved-acceptance-passed-not-live', observedAt: '2026-01-01T00:01:00.000Z' },
   } })
   expect(result.stdout + result.stderr).not.toContain('PRIVATE_TOKEN_SENTINEL')
-  expect(value.events().some(event => event.tool === 'ssh' && event.args[1]?.includes("'status'"))).toBe(true)
+  expect(value.events().some(event => event.tool === 'ssh' && event.args.at(-1)?.includes("'status'"))).toBe(true)
   expect(value.events().every(event => !event.args.includes('--method'))).toBe(true)
 })
 
