@@ -78,10 +78,11 @@ async function runSuite(ctx, options) {
       healthyCycle: bindings.healthyCycle, mode: bindings.mode, startedAt: new Date().toISOString(), results: [] }
     if (bindings.mode === 'maintenance') await kit.publicIsClosed()
     // A fresh browser per case: WebKit keeps stale engine state after the blocked-frame embedding probes.
-    for (const run of plan.cases) {
+    for (const [index, run] of plan.cases.entries()) {
+      const label = suite === 'viewer' ? `viewer-${engineName}` : suites.SUITE_CASES[suite][index]
       const browser = await engine.launch({ headless: true }); report.version = browser.version()
       try { report.results.push(await run(kit, browser, accounts)) }
-      catch (error) { report.results.push({ case: run.name || suite, passed: false, error: String(error.message).slice(0, 400) }) }
+      catch (error) { report.results.push({ case: label, passed: false, error: String(error.message).slice(0, 400) }) }
       finally { await browser.close().catch(() => {}) }
     }
     if (bindings.mode === 'maintenance') report.publicStill503 = await kit.publicStillClosed(report)

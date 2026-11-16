@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { bounded, socketCut } from '../prerelease/live-acceptance/browser.mjs'
 import { assertNoAccountValues, loadAccounts, privatePath, scrub } from '../prerelease/live-acceptance/context.mjs'
-import { REQUIRED_EVIDENCE, acceptanceRecord, bundleEvidence, collectResults } from '../prerelease/live-acceptance/evidence.mjs'
+import { REQUIRED_EVIDENCE, SOURCES, acceptanceRecord, bundleEvidence, collectResults } from '../prerelease/live-acceptance/evidence.mjs'
+import { SUITE_CASES } from '../prerelease/live-acceptance/suites.mjs'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -81,4 +82,10 @@ describe('acceptance evidence', () => {
     const run = runDirectory(root, 'run', { 'result-handoff-chromium-1.json': { engine: 'chromium', results: [{ case: 'handoff', passed: true, note: 'pre_a_name' }] } })
     expect(() => bundleEvidence({ results: collectResults([run]), output, common: {}, accounts })).toThrow(/would leak/)
   })
+})
+
+it('records every suite case under a label the evidence mapping reads, so a retried pass replaces the failure', () => {
+  const referenced = new Set(Object.values(SOURCES).flat())
+  const labels = Object.entries(SUITE_CASES).filter(([suite]) => suite !== 'readback').flatMap(([, cases]) => cases)
+  expect(labels.filter(label => !referenced.has(label))).toEqual([])
 })

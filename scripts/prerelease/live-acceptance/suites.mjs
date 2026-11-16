@@ -2,6 +2,12 @@
 import assert from 'node:assert/strict'
 import { bounded, sleep, poll, pollTrue } from './browser.mjs'
 
+/** Stable case labels per suite: failures are recorded under the same label as a pass, so the newest result wins. */
+export const SUITE_CASES = {
+  handoff: ['handoff'], boundary: ['visitor', 'ordinary', 'beta-boundary', 'revocation'], multihand: ['multihand-cooperation-viewer'], team: ['team-game'],
+  sandbox: ['public-sandbox'], viewer: ['viewer-firefox', 'viewer-webkit'], continuity: ['continuity'], deletion: ['formal-account-deletion'], readback: ['public-readback'],
+}
+
 const within = (ms, fence = 31_000) => ms !== null && ms !== undefined && ms <= fence
 const NOTICE = 'Your login or Beta access is no longer valid. Return to production to sign in and enter again.'
 const byLabel = (accounts, label) => { const account = accounts.find(a => a.label === label); assert.ok(account, `Account ${label} is not configured`); return account }
