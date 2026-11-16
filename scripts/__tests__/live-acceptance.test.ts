@@ -125,6 +125,21 @@ describe('acceptance evidence', () => {
     expect(index['deletion-audit'].passed).toBe(false)
     expect(index['browser-boundary'].passed).toBe(true)
   })
+  it('blocks passed cases whose own maintenance run could not prove the public origin stayed closed', () => {
+    const leaky = (root: string) => runDirectory(root, 'run-2', { 'result-boundary-webkit-2.json': { engine: 'webkit', version: '2', mode: 'maintenance', publicStill503: false,
+      cases: ['beta-boundary', 'revocation'], results: [{ case: 'beta-boundary', passed: true }, { case: 'revocation', passed: true }] } })
+    const root = privateRoot()
+    const index = bundle(root, [fullRun(root, 'run-1'), leaky(root)])
+    expect(index['browser-boundary'].passed).toBe(false)
+    expect(index['beta-access'].passed).toBe(false)
+    expect(JSON.parse(readFileSync(index['browser-boundary'].path, 'utf8')).results.find((row: { engine: string }) => row.engine === 'webkit').publicClosed).toBe(false)
+    // A closed-origin rerun restores only its own case; the other case from the leaky run still blocks.
+    const later = privateRoot()
+    const rerunIndex = bundle(later, [fullRun(later, 'run-1'), leaky(later), runDirectory(later, 'run-3', { 'result-boundary-webkit-3.json': { engine: 'webkit', version: '3',
+      mode: 'maintenance', publicStill503: true, cases: ['beta-boundary'], results: [{ case: 'beta-boundary', passed: true }] } })])
+    expect(rerunIndex['browser-boundary'].passed).toBe(true)
+    expect(rerunIndex['beta-access'].passed).toBe(false)
+  })
   it('refuses to bundle a result that would leak an account value', () => {
     const root = privateRoot(), output = join(root, 'evidence'); mkdirSync(output, { mode: 0o700 })
     const run = runDirectory(root, 'run', { 'result-handoff-chromium-1.json': { engine: 'chromium', results: [{ case: 'handoff', passed: true, note: 'pre_a_name' }] } })
