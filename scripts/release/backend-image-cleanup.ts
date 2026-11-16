@@ -74,7 +74,8 @@ const buildValue = (value: unknown): string => {
   return sha.test(valueText) ? valueText : 'unknown'
 }
 function inspectImages(docker: Docker): Image[] {
-  const ids = [...new Set(docker(['image', 'ls', '-q', '--no-trunc']).split(/\s+/).filter(Boolean))]
+  // --all: the containerd image store hides untagged images, including every imported formal candidate, from the default listing.
+  const ids = [...new Set(docker(['image', 'ls', '-a', '-q', '--no-trunc']).split(/\s+/).filter(Boolean))]
   for (const id of ids) checked(id, native)
   if (!ids.length) return []
   return docker(['image', 'inspect', '--format', imageFormat, ...ids]).split('\n').map(line => {
