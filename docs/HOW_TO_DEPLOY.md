@@ -228,6 +228,17 @@ For #1668 browser acceptance while the public gateway remains in maintenance, ru
 node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verification_token_file" "$private_owner_profile"
 ```
 
+For repeatable acceptance, `scripts/prerelease/live-acceptance/cli.mjs` runs the same checks in real Chromium, Firefox and WebKit. Its owner-private config (mode 0600) names `targetConfig`, `ssh`, the installed `candidate` and its image `candidateReceipt`, `formalBuild`, accounts files labelled A–C (A Beta, B a second Beta seat, C ordinary) and optional D–E, the formal `ownerCookie`, the host `guardConfig` path and a private `outputRoot`. Each `run` refreshes status, mints the private ingress token in maintenance, and reads the healthy cycle and the live app instance:
+
+```bash
+cli=scripts/prerelease/live-acceptance/cli.mjs
+node --import tsx $cli run --config "$acceptance_config" --suite handoff      # also: boundary, multihand --guest B, team --players A,B,C,D,
+node --import tsx $cli bundle --config "$acceptance_config" --runs "$run_dirs" --output "$evidence_dir"   #   sandbox, viewer/continuity --room, deletion --labels D,E, readback
+node --import tsx $cli acceptance --config "$acceptance_config" --index "$evidence_dir/index.json" --formal-browser "$formal_browser_json" --output "$acceptance_json"
+```
+
+Results carry account labels, statuses and timings only, and bundling refuses any identifier, username or password. Browser runs use a fresh browser per case and never measure credentials with request interception enabled: intercepted credentialless frames are reported with cookies they never send. Disposable accounts end with the `deletion` suite and a full identity audit. Copy the evidence files to the same paths on the host before `open`.
+
 During an active private verification window, anonymous GETs may also load only hash-addressed Viewer programs, including the entry HTML's display query. The gateway strips that query before forwarding; no Cookie, authorization or client-binding headers receive this exception. These programs contain no archive data and grant no data access. An otherwise admitted program navigation also loses cookies and client bindings before forwarding, including on browsers without credentialless support. Target/build/generation, storage health and the formal policy lease still apply, and a missing or expired window keeps maintenance closed.
 
 Fresh TCP connections await HTTP headers under Node's unchanged header/request timeouts; they have no forwarding authority yet. HTTP and WebSocket handlers classify and authorize requests before forwarding. Permission sweeps revoke classified connections, not header-pending ones; global shutdown still closes both.
