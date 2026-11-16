@@ -32,7 +32,10 @@ type BugReport = {
   lastErrorCode: string | null
 }
 
-/** Publishes how far the trigger reaches in from the right edge so the section shortcuts can stop short of it. */
+/**
+ * Publishes how far the trigger reaches in from the right edge so the section shortcuts can stop short of it.
+ * Its size changes with the label; its right offset changes with the viewport breakpoints.
+ */
 const publishTriggerExtent = (trigger: HTMLElement | null) => {
   const app = trigger?.closest<HTMLElement>('.app')
   if (!trigger || !app) return
@@ -41,8 +44,10 @@ const publishTriggerExtent = (trigger: HTMLElement | null) => {
   publish()
   const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publish)
   observer?.observe(trigger)
+  window.addEventListener('resize', publish)
   return () => {
     observer?.disconnect()
+    window.removeEventListener('resize', publish)
     app.style.removeProperty('--bug-report-trigger-extent')
   }
 }

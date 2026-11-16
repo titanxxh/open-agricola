@@ -196,9 +196,10 @@ describe('BugReportBar', () => {
       isConnectionStatusRequest(String(input))
         ? response({ ok: true, enabled: true, connected: false })
         : response({ ok: true, report: null })))
+    let reach = 130
     const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
       .mockImplementation(function (this: HTMLElement) {
-        const left = this.classList.contains('bug-report-trigger') ? window.innerWidth - 130 : 0
+        const left = this.classList.contains('bug-report-trigger') ? window.innerWidth - reach : 0
         return DOMRect.fromRect({ x: left, y: 0, width: 114, height: 42 })
       })
     try {
@@ -210,6 +211,11 @@ describe('BugReportBar', () => {
 
       const trigger = await screen.findByRole('button', { name: 'Report a bug' })
       expect(app.style.getPropertyValue('--bug-report-trigger-extent')).toBe('130px')
+      // A breakpoint can move the trigger without resizing it.
+      reach = 178
+      window.dispatchEvent(new Event('resize'))
+      expect(app.style.getPropertyValue('--bug-report-trigger-extent')).toBe('178px')
+      reach = 130
       await user.click(trigger)
       expect(app.style.getPropertyValue('--bug-report-trigger-extent')).toBe('')
       await user.click(screen.getByRole('button', { name: 'Close' }))
