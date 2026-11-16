@@ -188,6 +188,7 @@ const cardImpl = {
       actionId: 'fence',
       sourceCard: CARD_ID,
       actionContext: {
+        targetFarmPolicy: 'own',
         fencePolicy: {
           allowedSegmentTypes: ['fence'],
           segmentBounds: { total: { min: 1, max: 4 } },

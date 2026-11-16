@@ -13,6 +13,7 @@ import type { RoomSummary } from '../../shared/contract/protocol/ws.ts'
 import type { RoomAccess } from '../../shared/contract/room-access'
 import { canAccessRoom } from './room-access'
 import type { GameCreationRecord, SoloHandMode } from '../../shared/contract/game-creation'
+import type { TeamRoomMember } from '../../shared/contract/team-room'
 
 import type { GameEndProposal } from '../../shared/contract/protocol/game-termination'
 import {
@@ -33,6 +34,8 @@ export type RoomSeatOwner = {
 }
 
 export type Room = {
+  teamMembers?: TeamRoomMember[]
+  waitingTeamConnections?: Map<string, WebSocket>
   access?: RoomAccess
 
   endProposal?: GameEndProposal | null
@@ -200,21 +203,24 @@ const roomSeatOwners = (
 }
 
 export const roomOccupiedSeatCount = (
-  room: Pick<Room, 'id' | 'players' | 'seatOwners'>,
-): number => isDevRoom(room.id)
+  room: Pick<Room, 'id' | 'players' | 'seatOwners'> & Partial<Pick<Room, 'status' | 'teamMembers'>>,
+): number => room.status === 'waiting' && room.teamMembers
+  ? room.teamMembers.reduce((sum, member) => sum + member.seatCount, 0)
+  : isDevRoom(room.id)
   ? room.players.length
   : new Set([
       ...room.players.map((player) => player.playerIndex),
       ...roomSeatOwners(room).map((owner) => owner.playerIndex),
     ]).size
 
-export const roomConnections = (room: Pick<Room, 'players'>): WebSocket[] =>
-  [...new Set(room.players.map(player => player.ws))]
+export const roomConnections = (room: Pick<Room, 'players'> & Partial<Pick<Room, 'waitingTeamConnections'>>): WebSocket[] =>
+  [...new Set([...room.players.map(player => player.ws), ...(room.waitingTeamConnections?.values() ?? [])])]
 
-export const roomConnectedPlayerCount = (room: Pick<Room, 'players'>): number =>
+export const roomConnectedPlayerCount = (room: Pick<Room, 'players'> & Partial<Pick<Room, 'waitingTeamConnections'>>): number =>
   roomConnections(room).filter(ws => ws.readyState === ws.OPEN).length
 
 export const toRoomMeta = (room: Room): RoomMeta => ({
+  ...(room.teamMembers ? { teamMembers: room.teamMembers } : {}),
   endProposal: room.endProposal ?? null,
   awaitingRematchPlayers: room.awaitingRematchPlayers === true,
   ...(room.executionStamp ? { executionStamp: room.executionStamp } : {}),
@@ -314,11 +320,14 @@ export const resolveJoinRequestPlayerIndex = (
 }
 
 export const removePlayerFromRoom = (
-  room: Pick<Room, 'id' | 'players'>,
+  room: Pick<Room, 'id' | 'players'> & Partial<Pick<Room, 'waitingTeamConnections'>>,
   ws: WebSocket,
 ): 'not-present' | 'empty' | 'remaining' => {
   const before = roomConnections(room).length
   room.players = room.players.filter((p) => p.ws !== ws)
+  for (const [memberId, connection] of room.waitingTeamConnections ?? []) {
+    if (connection === ws) room.waitingTeamConnections?.delete(memberId)
+  }
   const after = roomConnections(room).length
   if (after === before) return 'not-present'
   return after === 0 ? 'empty' : 'remaining'
@@ -327,7 +336,7 @@ export const removePlayerFromRoom = (
 type RoomLikeForSummary = Pick<
   Room,
   'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy' | 'hotseat' | 'access' | 'status'
->
+> & Partial<Pick<Room, 'teamMembers' | 'waitingTeamConnections' | 'session'>>
 
 export function summarizeRoomsForLobby(
   source: Iterable<RoomLikeForSummary>,
@@ -343,6 +352,7 @@ export function summarizeRoomsForLobby(
     if (roomConnections(r).length === 0 && !isFixedDev(r.id)) continue
     const playerCount = roomOccupiedSeatCount(r)
     list.push({
+      ...(r.session?.state.team ? { teamConfig: r.session.state.team.configuration } : {}),
       id: r.id,
       playerCount,
       maxPlayers: r.maxPlayers,
@@ -411,6 +421,7 @@ export const snapshotToRoom = (
   return {
     id: snapshot.id,
     ...(snapshot.creationConfiguration ? { creationConfiguration: snapshot.creationConfiguration } : {}),
+    ...(snapshot.meta.teamMembers ? { teamMembers: snapshot.meta.teamMembers, waitingTeamConnections: new Map() } : {}),
     endProposal: snapshot.meta.endProposal ?? null,
     awaitingRematchPlayers: snapshot.meta.awaitingRematchPlayers === true,
     inputWindow: snapshot.meta.inputWindow ?? nextInputWindow(null, session.state, 'initial'),

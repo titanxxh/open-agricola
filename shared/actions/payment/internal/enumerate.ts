@@ -769,7 +769,7 @@ const buildUnitCostOptions = (
     .sort((left, right) => tradeSignature(left).localeCompare(tradeSignature(right)))
   for (const trade of prices) {
     if (!costBoundsSatisfied(unitFee, trade.minCost, trade.maxCost) || (trade.max ?? 1) <= 0) continue
-    const resources = mergePaymentResources(trade.unitPrice ?? {}, {})
+    const resources = mergePaymentResources(trade.unitPrice ?? {}, cost.unitPriceIncrease ?? {})
     for (const token of ['stable', 'fence'] as const) {
       const amount = unitFee[token] ?? 0
       if (amount > 0) resources[token] = (resources[token] ?? 0) + amount

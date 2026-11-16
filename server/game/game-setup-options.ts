@@ -1,6 +1,7 @@
 import type { InitialStateOptions } from '../../shared/session/state-constants.ts'
 import type { SoloCreationConfiguration, SoloHandMode } from '../../shared/contract/game-creation'
 import { isMoorBalanceRulesEnabled } from '../../shared/contract/game-variants'
+import { parseTeamConfiguration, type TeamConfiguration } from '../../shared/contract/team'
 
 export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
@@ -11,6 +12,7 @@ export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: numb
  * payload maps onto `InitialStateOptions`.
  */
 export type GameSetupRequest = {
+  teamConfig?: TeamConfiguration
   playerCount: number
   soloHandMode?: SoloHandMode
   enableCommunityDeck: boolean
@@ -48,12 +50,18 @@ export const asSetupPayload = (parsed: unknown): Record<string, unknown> =>
  * `maxPlayers` is the room wording, `playerCount` the hotseat one; accept both
  * so the lobby can post either without a second mapping table.
  */
+type GameSetupPermissions = { allowTeamRooms?: boolean }
+
 export const parseGameSetupRequest = (
   raw: Record<string, unknown>,
   draft: DraftSetupOptions | null,
+  permissions: GameSetupPermissions = {},
 ): GameSetupRequest => {
-  assertSupportedGameConfiguration(raw)
+  assertSupportedGameConfiguration(raw, permissions)
+  const teamConfig = parseTeamConfiguration(raw.teamConfig, clampPlayerCount(raw.maxPlayers ?? raw.playerCount))
+  if (teamConfig && raw.hotseat === true) throw new Error('Team games do not support hotseat')
   return {
+    ...(teamConfig ? { teamConfig } : {}),
     playerCount: clampPlayerCount(raw.maxPlayers ?? raw.playerCount),
     ...(clampPlayerCount(raw.maxPlayers ?? raw.playerCount) === 1
       ? { soloHandMode: raw.soloHandMode === 'choose-7' ? 'choose-7' : 'random' } : {}),
@@ -72,6 +80,7 @@ export const parseGameSetupRequest = (
 
 export const buildInitialStateOptions = (request: GameSetupRequest): InitialStateOptions => ({
   playerCount: request.playerCount,
+  ...(request.teamConfig ? { teamConfig: request.teamConfig } : {}),
   ...(request.soloHandMode ? { soloHandMode: request.soloHandMode } : {}),
   enableCommunityDeck: request.enableCommunityDeck,
   enableParentCards: request.enableParentCards,
@@ -108,8 +117,9 @@ export const resolveCustomCardDbIds = (
 }
 
 /** Removed game modes must fail at ingress rather than becoming ordinary games. */
-export const assertSupportedGameConfiguration = (raw: object): void => {
-  if (['teamConfig', 'team', 'multihand', 'cooperationRules'].some(key => Object.hasOwn(raw, key))) {
+export const assertSupportedGameConfiguration = (raw: object, permissions: GameSetupPermissions = {}): void => {
+  if (['team', 'multihand', 'cooperationRules'].some(key => Object.hasOwn(raw, key))
+    || Object.hasOwn(raw, 'teamConfig') && !permissions.allowTeamRooms) {
     throw new Error('Unsupported game configuration')
   }
 }

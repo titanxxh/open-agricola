@@ -122,6 +122,7 @@ export const planResolveChoiceSubmission = (
     case 'selection':
     case 'resource-quantity-select':
     case 'resource-batch-exchange-select':
+    case 'marketplace-select':
     case 'card-draft':
     case 'solo-hand-selection':
     case 'engine-blocked':
@@ -138,6 +139,7 @@ export type CommitSelectionKind =
   | 'selection'
   | 'resource-quantity-select'
   | 'resource-batch-exchange-select'
+  | 'marketplace-select'
 
 export type CommitSelectionSubmissionPlan =
   | Failure
@@ -148,6 +150,7 @@ export type CommitSelectionSubmissionPlan =
       isGenericSelection: boolean
       isResourceQuantity: boolean
       isResourceBatchExchange: boolean
+      isMarketplace: boolean
     }
 
 export const effectiveCommitSelectionKind = (
@@ -182,7 +185,8 @@ export const planCommitSelectionSubmission = (input: {
     effectiveKind !== 'farm-select' &&
     effectiveKind !== 'selection' &&
     effectiveKind !== 'resource-quantity-select' &&
-    effectiveKind !== 'resource-batch-exchange-select'
+    effectiveKind !== 'resource-batch-exchange-select' &&
+    effectiveKind !== 'marketplace-select'
   ) {
     return { ok: false, error: 'no pending selection/resource choice for this player' }
   }
@@ -199,6 +203,7 @@ export const planCommitSelectionSubmission = (input: {
     isGenericSelection,
     isResourceQuantity: effectiveKind === 'resource-quantity-select',
     isResourceBatchExchange: effectiveKind === 'resource-batch-exchange-select',
+    isMarketplace: effectiveKind === 'marketplace-select',
   }
 }
 
