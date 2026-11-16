@@ -12,11 +12,27 @@ export function bounded(promise, ms, label, fallback, hung) {
   return Promise.race([promise.finally(() => clearTimeout(timer)), new Promise(done => { timer = setTimeout(() => { hung?.push(label); done(fallback) }, ms) })])
 }
 
-/** Sockets live at t0 (opened at or before it and still open then) and when the last of them closed. */
-export function socketCut(rows, t0) {
-  const live = rows.filter(v => v.openedAt !== null && v.openedAt <= t0 && v.documentEndedAt === undefined && (v.closedAt === null || v.closedAt >= t0))
-  const closed = live.length > 0 && live.every(v => v.closedAt !== null)
-  return { connectedAtStart: live.length, closedAfterMs: closed ? Math.max(...live.map(v => v.closedAt - t0)) : null }
+/**
+ * Held sockets the page itself saw open just before an action, and when the last of them closed. Both times come
+ * from the page clock; a watched socket missing from the rows means its document was replaced, not that it closed.
+ */
+export function snapshotCut(rows, snapshot) {
+  const watched = snapshot.ids.map(id => rows[id])
+  const documentLost = watched.some(row => row === undefined)
+  const closed = watched.length > 0 && !documentLost && watched.every(row => row.closedAt !== null)
+  return { connectedAtStart: watched.length, closedAfterMs: closed ? Math.max(...watched.map(row => row.closedAt - snapshot.pageNow)) : null,
+    codes: watched.map(row => row?.code ?? null), ...(documentLost ? { documentLost: true } : {}) }
+}
+
+/**
+ * Retries once only when no HTTP response arrived (timeout or connection failure) and records why. A received
+ * status is never retried, so an assertion still sees the first answer the server gave.
+ */
+export async function retryWithoutResponse(request, label, retries) {
+  try { return await request() } catch (error) {
+    retries.push(`${label}: ${String(error?.message ?? error).split('\n')[0].slice(0, 120)}`)
+    return request()
+  }
 }
 
 export async function poll(read, expected, timeout = 30_000, label = 'poll') {
@@ -38,7 +54,7 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
   const goodProtocols = ['oa.browser.v2', `oa.pre.build.${binding.build}`, `oa.pre.generation.${binding.generation}`]
   const formalHeaders = { Origin: formalApp, 'x-oa-browser-protocol': '2' }
   const labels = new Map(accounts.map(a => [a.id, a.label]))
-  const hung = []
+  const hung = [], retries = []
   const label = id => id == null ? null : labels.get(id) ?? 'other'
   const cookie = readFileSync(ownerCookie, 'utf8').trim()
   if (!/^__Host-oa-session=[A-Za-z0-9._~-]+$/.test(cookie)) throw new Error('Invalid formal owner cookie file')
@@ -105,7 +121,7 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
   async function boundaryContext(browser) {
     const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 900 } })
     const blocked = await readOnlyGuard(context)
-    if (bindings.verificationTokenFile) await configureOwnerVerification(context, pre, bindings.verificationTokenFile)
+    if (bindings.verificationTokenFile) await configureOwnerVerification(context, pre, bindings.verificationTokenFile, error => retries.push(`owner verification: ${String(error?.message ?? error).split('\n')[0].slice(0, 120)}`))
     return { context, blocked }
   }
   /** Game context without interception (#1756): foreign main-frame navigations are recorded instead of blocked. */
@@ -116,7 +132,7 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
     context.on('page', page => page.on('framenavigated', frame => {
       try { const origin = new URL(frame.url()).origin; if (frame === page.mainFrame() && /^https?:/.test(origin) && ![formalApp, pre].includes(origin)) foreign.push(origin) } catch {}
     }))
-    if (bindings.verificationTokenFile) await configureOwnerVerification(context, pre, bindings.verificationTokenFile)
+    if (bindings.verificationTokenFile) await configureOwnerVerification(context, pre, bindings.verificationTokenFile, error => retries.push(`owner verification: ${String(error?.message ?? error).split('\n')[0].slice(0, 120)}`))
     return { context, foreign }
   }
   async function login(page, actor, armCleanup) {
@@ -139,7 +155,12 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
   async function handoff(page) {
     const exchanged = page.waitForResponse(r => r.url() === pre + '/api/prerelease/session' && r.request().method() === 'POST', { timeout: 60_000 })
     await page.goto(pre + '/open-agricola/auth/start', { waitUntil: 'domcontentloaded', timeout: 30_000 })
-    const exchange = await exchanged; assert.equal(exchange.status(), 200)
+    const exchange = await exchanged.catch(error => {
+      // Name the hop that stalled without copying a query string that may carry a grant.
+      const at = new URL(page.url()), host = at.host === preHost ? 'pre' : at.origin === formalApp ? 'formal-app' : at.protocol === 'about:' ? 'about' : 'other'
+      throw new Error(`session exchange not observed; page at ${host}${at.pathname}: ${String(error.message).split('\n')[0]}`)
+    })
+    assert.equal(exchange.status(), 200)
     await page.locator('.prerelease-banner').waitFor({ state: 'visible', timeout: 30_000 })
     return exchange.status()
   }
@@ -179,19 +200,25 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
   }
   function holdSocket(page) {
     return bounded(page.evaluate(({ url, protocols }) => new Promise(done => {
-      window.__oaHeld ??= []; const row = { openedAt: null, closedAt: null, code: null }; window.__oaHeld.push(row)
-      const ws = new window.__oaNativeWebSocket(url, protocols)
+      window.__oaHeld ??= []; window.__oaHeldSockets ??= []; const row = { openedAt: null, closedAt: null, code: null }; window.__oaHeld.push(row)
+      const ws = new window.__oaNativeWebSocket(url, protocols); window.__oaHeldSockets.push(ws)
       ws.onopen = () => { row.openedAt = Date.now(); done(true) }
       ws.onclose = event => { row.closedAt = Date.now(); row.code = event.code; done(row.openedAt !== null) }
       setTimeout(() => done(row.openedAt !== null), 10_000)
     }), { url: wsUrl, protocols: goodProtocols }), 30_000, 'hold socket', false, hung)
   }
-  /** Waits (up to waitMs after t0) for every held socket live at t0 to close, then reports the real cut. */
-  async function heldCut(page, t0, waitMs = 35_000) {
+  /** Take immediately before the action: the held sockets the page reports OPEN, with the page clock. */
+  async function liveSockets(page) {
+    const snapshot = await bounded(page.evaluate(() => ({ pageNow: Date.now(), ids: (window.__oaHeldSockets ?? []).flatMap((ws, id) => ws.readyState === 1 ? [id] : []) })),
+      15_000, 'live sockets', { pageNow: null, ids: [] }, hung)
+    return { ...snapshot, takenAt: Date.now() }
+  }
+  /** Waits (up to waitMs after the snapshot) for every socket in it to close, then reports the cut on the page clock. */
+  async function heldCut(page, snapshot, waitMs = 35_000) {
     for (;;) {
       const rows = await bounded(page.evaluate(() => window.__oaHeld ?? []), 15_000, 'held rows', [], hung)
-      const cut = socketCut(rows, t0)
-      if (cut.closedAfterMs !== null || Date.now() - t0 >= waitMs) return { ...cut, codes: rows.filter(v => v.openedAt !== null && v.openedAt <= t0).map(v => v.code) }
+      const cut = snapshotCut(rows, snapshot)
+      if (cut.closedAfterMs !== null || cut.documentLost || Date.now() - snapshot.takenAt >= waitMs) return cut
       await sleep(250)
     }
   }
@@ -209,7 +236,7 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
     }
   }
   const formalPost = async (context, path) => (await context.request.post(formalApi + path, { headers: formalHeaders, timeout: 15_000 })).status()
-  const formalMe = async context => (await context.request.get(formalApi + '/api/auth/me', { headers: formalHeaders, timeout: 15_000 })).status()
+  const formalMe = async context => (await retryWithoutResponse(() => context.request.get(formalApi + '/api/auth/me', { headers: formalHeaders, timeout: 15_000 }), 'formal me', retries)).status()
   /** Records game socket frames; a reload replaces the document, whose sockets Playwright may never report closed. */
   function observeGameSocket(page) {
     const states = [], joins = [], sockets = []
@@ -234,6 +261,9 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
     for (const page of agreeing) await (await openGameEndControls(page)).getByRole('button', { name: 'Agree', exact: true }).click()
     await proposer.getByRole('heading', { name: 'Ended by agreement', exact: true }).waitFor({ state: 'visible' })
   }
-  return { origins, binding, wsUrl, goodProtocols, hung, label, publicIsClosed, publicStillClosed, betaAccess, boundaryContext, gameContext, login, handoff, enterPre,
-    probePage, preFetch, wsProbe, holdSocket, heldCut, preCookieDigest, untilDenied, formalPost, formalMe, observeGameSocket, openGameEndControls, endByAgreement }
+  const kit = { origins, binding, wsUrl, goodProtocols, hung, retries, label, publicIsClosed, publicStillClosed, betaAccess, boundaryContext, gameContext, login, handoff, enterPre,
+    probePage, preFetch, wsProbe, holdSocket, liveSockets, heldCut, preCookieDigest, untilDenied, formalPost, formalMe, observeGameSocket, openGameEndControls, endByAgreement,
+    /** The case result the CLI keeps, with its phase, if the case throws before returning it. */
+    partial: null, track: result => (kit.partial = result) }
+  return kit
 }

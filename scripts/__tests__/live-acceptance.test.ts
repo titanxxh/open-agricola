@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, w
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { bounded, socketCut } from '../prerelease/live-acceptance/browser.mjs'
+import { bounded, retryWithoutResponse, snapshotCut } from '../prerelease/live-acceptance/browser.mjs'
 import { assertNoAccountValues, loadAccounts, privatePath, scrub } from '../prerelease/live-acceptance/context.mjs'
 import { REQUIRED_EVIDENCE, SOURCES, acceptanceRecord, bundleEvidence, collectResults } from '../prerelease/live-acceptance/evidence.mjs'
 import { REQUIRED_CASES, SUITE_CASES, parseCaseSelection, selectCases } from '../prerelease/live-acceptance/suites.mjs'
@@ -13,14 +13,33 @@ function privateRoot() { const root = mkdtempSync(join(tmpdir(), 'oa-live-accept
 const accounts = [{ id: 'user-a-identifier', username: 'pre_a_name', password: 'pre-a-password-value', label: 'A' }]
 
 describe('revocation socket cut', () => {
-  const t0 = 10_000
-  it('counts sockets live at t0, including one opened at t0, and reports when the last closed', () => {
-    expect(socketCut([{ openedAt: 9_000, closedAt: 10_400 }, { openedAt: 10_000, closedAt: 10_900 }, { openedAt: 5_000, closedAt: 9_500 }], t0))
-      .toEqual({ connectedAtStart: 2, closedAfterMs: 900 })
+  const snapshot = { pageNow: 10_000, takenAt: 0, ids: [1, 2] }
+  it('watches only the sockets the page saw open before the action and times them on the page clock', () => {
+    const rows = [{ openedAt: 5_000, closedAt: 9_500, code: 1008 }, { openedAt: 9_000, closedAt: 10_400, code: 1008 }, { openedAt: 9_990, closedAt: 10_900, code: 1008 }]
+    expect(snapshotCut(rows, snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: 900, codes: [1008, 1008] })
   })
-  it('stays open while any live socket remains and ignores sockets of a replaced document', () => {
-    expect(socketCut([{ openedAt: 9_000, closedAt: null }, { openedAt: 9_500, closedAt: 10_200 }], t0)).toEqual({ connectedAtStart: 2, closedAfterMs: null })
-    expect(socketCut([{ openedAt: 3_000, closedAt: null, documentEndedAt: 8_000 }, { openedAt: 9_500, closedAt: 10_300 }], t0)).toEqual({ connectedAtStart: 1, closedAfterMs: 300 })
+  it('stays open while any watched socket remains and reports a replaced document instead of a close', () => {
+    expect(snapshotCut([{}, { closedAt: null, code: null }, { closedAt: 10_200, code: 1008 }], snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: null, codes: [null, 1008] })
+    expect(snapshotCut([{ closedAt: 9_000, code: 1000 }], snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: null, codes: [null, null], documentLost: true })
+    expect(snapshotCut([], { pageNow: null, ids: [] })).toEqual({ connectedAtStart: 0, closedAfterMs: null, codes: [] })
+  })
+})
+
+describe('setup request retry', () => {
+  it('retries once only when no response arrived and records why', async () => {
+    const retries: string[] = []
+    let calls = 0
+    expect(await retryWithoutResponse(async () => { if (++calls === 1) throw new Error('Timeout 15000ms exceeded.\nCall log'); return 200 }, 'formal me', retries)).toBe(200)
+    expect(retries).toEqual(['formal me: Timeout 15000ms exceeded.'])
+    await expect(retryWithoutResponse(async () => { throw new Error('socket hang up') }, 'formal me', retries)).rejects.toThrow('socket hang up')
+    expect(retries).toHaveLength(2)
+  })
+  it('keeps the first received status, even a failing one', async () => {
+    const retries: string[] = []
+    let calls = 0
+    expect(await retryWithoutResponse(async () => { calls++; return 401 }, 'formal me', retries)).toBe(401)
+    expect(calls).toBe(1)
+    expect(retries).toEqual([])
   })
 })
 

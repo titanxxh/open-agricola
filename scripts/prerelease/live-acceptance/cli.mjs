@@ -88,13 +88,15 @@ async function runSuite(ctx, options) {
     // A fresh browser per case: WebKit keeps stale engine state after the blocked-frame embedding probes.
     for (const { label, index } of selected) {
       const run = suite === 'viewer' ? plan.cases[0] : plan.cases[index]
-      const browser = await engine.launch({ headless: true }); report.version = browser.version()
+      // Firefox renders the JSON probe page in its JSON viewer; a plain text document keeps evaluations stable.
+      const browser = await engine.launch({ headless: true, ...(engineName === 'firefox' ? { firefoxUserPrefs: { 'devtools.jsonview.enabled': false } } : {}) }); report.version = browser.version()
+      kit.partial = null
       try { report.results.push(await run(kit, browser, accounts)) }
-      catch (error) { report.results.push({ case: label, passed: false, error: String(error.message).slice(0, 400) }) }
+      catch (error) { report.results.push({ ...(kit.partial ?? {}), case: label, passed: false, error: String(error.message).slice(0, 400) }) }
       finally { await browser.close().catch(() => {}) }
     }
     if (bindings.mode === 'maintenance') report.publicStill503 = await kit.publicStillClosed(report)
-    report.boundedEvaluations = [...kit.hung]
+    report.boundedEvaluations = [...kit.hung]; report.networkRetries = [...kit.retries]
     report.passed = report.results.length === selected.length && report.results.every(v => v.passed) && (bindings.mode !== 'maintenance' || report.publicStill503)
     report.completedAt = new Date().toISOString()
     const text = JSON.stringify(report, null, 2) + '\n'; assertNoAccountValues(accounts, text, `${suite} result`)
