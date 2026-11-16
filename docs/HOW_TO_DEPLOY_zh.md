@@ -246,7 +246,7 @@ node --import tsx $cli bundle --config "$acceptance_config" --runs "$run_dirs" -
 node --import tsx $cli acceptance --config "$acceptance_config" --index "$evidence_dir/index.json" --formal-browser "$formal_browser_json" --output "$acceptance_json"
 ```
 
-结果只含账号标签、状态码与耗时；打包时出现任何标识、用户名或密码都会被拒绝。浏览器用例每个 case 使用新浏览器，且不在开启请求拦截时测量凭据：被拦截的 credentialless frame 会被报告带有实际并未发送的 Cookie。一次性账号以 `deletion` 套件和完整身份审计收尾。`open` 之前把证据文件复制到主机的相同路径。
+`run --case <label>[,<label>]` 只重跑某个套件中指定的 case，例如 `--suite boundary --engine webkit --case revocation`；未知标签在任何远程步骤之前即报错。`bundle` 按 case 与浏览器保留最新结果，重跑只替换它自己的 case。只有当某项证据依赖的每个 case 在其套件要求的每个浏览器上都有通过的最新结果时，该项才通过；从未运行或最新结果失败的 case 都会阻断。结果只含账号标签、状态码与耗时；打包时出现任何标识、用户名或密码都会被拒绝。浏览器用例每个 case 使用新浏览器，且不在开启请求拦截时测量凭据：被拦截的 credentialless frame 会被报告带有实际并未发送的 Cookie。一次性账号以 `deletion` 套件和完整身份审计收尾。`open` 之前把证据文件复制到主机的相同路径。
 
 pre 可以使用 `https://pre.titanxxh.com`，保留正式 Pages/API 地址；必须与两者使用不同 hostname，换端口不能代替主机隔离。仅维护页的 bootstrap 可以早于正式升级。服务候选代码，包括私有 owner 验收，要求运行中的正式浏览器认证策略为 version 2。先部署匹配的正式前后端保护并完成旧会话迁移。owner 生命周期 CLI 只接受新的 `__Host-oa-session` Cookie 文件并发送浏览器协议头；迁移后重新登录取得 owner Cookie。
 
