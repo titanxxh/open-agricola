@@ -1,5 +1,6 @@
+import { endPrereleaseSession, getPrereleaseAccess, isPrereleaseClient, subscribePrereleaseAccess } from '../services/prerelease-runtime'
 import { browserApiFetch } from '../services/browser-api'
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useSyncExternalStore, type ReactNode } from 'react'
 import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from '../app/game-container-helpers'
 
@@ -56,7 +57,7 @@ type AuthContextValue = AuthState & {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 const devAuthShortcutsEnabled = (): boolean =>
-  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1'
+  !isPrereleaseClient() && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1')
 
 function devShortcutUserFromLocation(): AuthUser | null {
   const params = new URLSearchParams(window.location.search)
@@ -107,8 +108,13 @@ function currentReturnTo(): string | undefined {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, loading: true })
+  const prereleaseAccess = useSyncExternalStore(subscribePrereleaseAccess, getPrereleaseAccess)
+  const authState: AuthState = isPrereleaseClient()
+    ? { user: prereleaseAccess.kind === 'active' ? prereleaseAccess.session.user : null, loading: prereleaseAccess.kind === 'checking' }
+    : state
 
   const refreshSessionFn = useCallback(async () => {
+    if (isPrereleaseClient()) return
     try {
       const resp = await browserApiFetch(`${API_BASE}/api/auth/me`, {
         credentials: 'include',
@@ -126,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check existing session on mount
   useEffect(() => {
+    if (isPrereleaseClient()) return
     const devUser = devShortcutUserFromLocation()
     if (devUser) {
       setState({ user: devUser, loading: false })
@@ -191,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshSessionFn])
 
   const logoutFn = useCallback(async () => {
+    endPrereleaseSession()
     await browserApiFetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
@@ -199,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logoutAllFn = useCallback(async () => {
+    endPrereleaseSession()
     await browserApiFetch(`${API_BASE}/api/auth/logout-all`, {
       method: 'POST',
       credentials: 'include',
@@ -235,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      ...state,
+      ...authState,
       login: loginFn,
       registerWithPassword: registerWithPasswordFn,
       resendVerification: resendVerificationFn,

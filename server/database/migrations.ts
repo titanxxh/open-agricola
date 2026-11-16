@@ -28,8 +28,10 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('044-historical-feedback-subjects.sql')
     migrations.push('045-feedback-summary-and-deletion.sql')
     migrations.push('046-browser-auth-policy.sql')
-    for (const [index, filename] of migrations.entries()) {
-      const version = index + 1
+    migrations.push('047-prerelease-sessions.sql')
+    migrations.push('050-prerelease-handoff-receipts.sql')
+    for (const filename of migrations) {
+      const version = filename === 'schema.sql' ? 1 : Number.parseInt(filename.slice(0, 3), 10)
       if (await db.prepare('SELECT version FROM postgres_schema_migrations WHERE version = ?').get(version)) continue
       await db.exec(readFileSync(join(import.meta.dirname, filename), 'utf8'))
       await db.prepare('INSERT INTO postgres_schema_migrations (version) VALUES (?)').run(version)
