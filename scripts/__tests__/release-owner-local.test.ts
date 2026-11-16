@@ -170,6 +170,7 @@ else if (Object.hasOwn(state.provenance, endpoint)) {
 `)
   chmodSync(join(bin, 'gh'), 0o700)
   const env: NodeJS.ProcessEnv = { ...process.env, PATH: [bin, join(repositoryRoot, 'node_modules/.bin'), process.env.PATH].join(delimiter),
+    NODE_COMPILE_CACHE: join(bin, 'node-compile-cache'),
     CI: '', GITHUB_ACTIONS: '', GITHUB_SHA: '', GITHUB_OUTPUT: '', OWNER_LOCAL_TEST_ROOT: root }
   const run = (local = true, trusted = true) => spawnSync(process.execPath, ['--import', tsxLoader, join(trusted ? policy : root, 'scripts/release/publish.ts'), version, '--channel', channel, '--ref', sha,
     ...(local ? ['--local-verification', receiptPath] : []), '--poll-seconds', '0.01', '--timeout-seconds', '0.05'], { cwd: root, env, encoding: 'utf8', timeout: 30_000 })

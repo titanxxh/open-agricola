@@ -39,7 +39,7 @@
 
 服务器沙盒保留固定的 `player=p1` 路由。浏览器沙盒省略 `player`，沿用拥有本地配置的登录账号；只有启用开发认证快捷方式的构建中，显式携带 `player=p1&devMode=1` 的工坊父页面才会向子页面传递 `player=p1`。准入检查要求子页面参数与父页面的身份模式一致，不接受任意玩家覆盖。
 
-`application-bootstrap.ts` 在语言、Auth 和连接初始化前要求主应用位于顶层窗口；被嵌入时只显示独立打开根地址的链接。`browser-api.ts` 给正式 API 加当前协议版本，收到 reload-required 后停止后续请求并显示现有刷新界面。WS 使用匹配子协议；公开素材、无凭据 Viewer 与第三方模型请求保持各自运输方式。测试：`application-bootstrap.test.ts`、`browser-api.test.ts`、`hosted-password-login.spec.ts`。
+`application-bootstrap.ts` 在语言/Auth/连接初始化前要求顶层窗口；嵌入页只显示独立打开根地址的链接。`browser-protocol.ts` 在 session 准入前，让 API 与 prerelease runtime bootstrap 共用协议 header 和刷新状态。HTTP 426/`reload_required` 停止后续请求并显示刷新界面；503 保持可重试。WS 使用匹配协议；素材、无凭据 Viewer 和模型请求保持各自运输方式。测试：`application-bootstrap.test.ts`、`browser-api.test.ts`、`App.prerelease-reload.test.tsx`。
 
 - 生产启动保留前端 origin。GitHub Pages 提供 `https://open-agricola.titanxxh.com/`，HTTP 与 WS 使用单独配置的 API origin。两个 HTTPS 子域同站，账号会话继续使用仅属于 API host 的 HttpOnly Cookie。本地偏好和草稿不会自动跨源迁移。见 ADR 0035。
 - `build:pages-frontend` 生成根路径生产构建，显式配置 API/WS origin 并写入构建元数据；可选的 `build:hosted-frontend` 保留同源自托管。`hosted-password-login.spec.ts` 在两个 HTTPS 同站子域提供实际 Pages 构建，验证严格 WebKit 与 Chromium 下的登录、浏览器重开和 routed Room 恢复。引擎测试不能替代实体 Safari 验收。
@@ -102,11 +102,13 @@
 
 ### 预发布入口
 
-`app/PrereleaseEntry.tsx` 是大厅及设置页头图标行里的 Beta 徽标，读取账号 Beta 资格和实时权威入口响应。只以 `noopener noreferrer` 新标签打开已配置的 HTTPS hosted 入口，缺少配置时明确不可用。窗口重新聚焦会复核，并丢弃晚于拒绝结果返回的旧响应。
+`PrereleaseBoundary` 守住 Context/私有资料，`AuthContext` 订阅同一已验证身份，不再独立复取。已发布语言 pin 和横幅在重新加载时仍展示环境/构建及正式返回入口；受限页保留站内导航，不提供账号管理。HTTP/WS/worker 绑定标签的构建/代次和绝对期限；替换 Cookie 不能恢复旧标签。复核串行执行，单调 lease 包含请求耗时。退出在网络完成前终止准入。已确认的认证/访问/交接/运行时代次拒绝要求新文档；迟到回复不能恢复它。暂停允许复核。回调先清除 fragment；重试只在内存保留同一绑定兑换。
 
-`PrereleaseHandoffPage` 与 `services/prerelease.ts` 负责 `?page=prerelease-handoff`。页面读取并清除浏览器绑定的 fragment，核对当前配置的目标和正式站根，通过已认证的正式权威只签发一次短期 code。code 仅以 fragment 交给固定 pre 回调；页面不保存登录凭据或 verifier，也不采用调用者提供的回调 URL。出错只返回正式站根。测试见 `PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx` 和 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例。
+`app/PrereleaseEntry.tsx` 是大厅/设置页头图标行的 Beta 徽标，使用 Beta 资格和实时权威状态。只以 `noopener noreferrer` 打开配置的 HTTPS 入口；缺少配置则不可用。窗口聚焦复核丢弃早于拒绝的响应。
 
-浏览器只校验时间戳格式与目标。code 过期由正式权威按自身时钟在兑换时裁决，浏览器时钟偏差不参与授权。独立时钟与错误响应的反例通过 `services/__tests__/prerelease.test.ts` 中的公开 helper 验证。
+`PrereleaseHandoffPage` 和 `services/prerelease.ts` 清除绑定 fragment，校验配置的目标/正式根，只请求一个短期 code。仅固定回调接收 fragment；不持久化凭据/verifier，不跟随调用者回调，错误返回正式根。浏览器仅验证时间戳格式/目标；兑换过期由正式权威时钟裁决。
+
+覆盖：`PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx`、`services/__tests__/prerelease.test.ts`（时钟偏差/错误响应）及 HTTPS `hosted-password-login.spec.ts`。
 
 ### 卡牌百科
 
@@ -144,7 +146,6 @@ GameContextRouter
 - Bug Report 诊断由 `services/bug-report-diagnostics.ts` 识别浏览器和设备，并在标签页存储中保留当前 Room 最近一小时最多五次 WebSocket 关闭记录。`WsGameTransport` 只记录当前连接的关闭，排除主动销毁。创建、编辑草稿及最终确认作者时附带最新的有界诊断快照；刷新后仍可读取，不包含原始 User-Agent。测试见 `bug-report-diagnostics.test.ts` 和 `bug-report.spec.ts`。
 - Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。
 - 大厅和对局菜单的 `InboxButton` 读取鉴权持久反馈。模态框保留 Room interaction，只将打开的消息标记已读；焦点及消息变化刷新已加载页范围和未读状态。切换账号重新挂载，credentialless Replay Viewer 不挂载。结论保留修订历史及待补充信息的条目、账号指引。上线消息展示不可改写的首次核验，单独投影后续核验及相关报告。`BugReportFeedbackSettings`、`BugReportFixSettings` 登记结论、显式重复及完整合入修复，展示上线进度但不接受部署证明。共用解析器 `services/bug-report-feedback.ts`；测试：`bug-report-feedback.test.ts` 和 `bug-report-{feedback,fix-links,release-feedback}.spec.ts`。
-
 
 ## Beta 资格与客户端传输
 

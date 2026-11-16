@@ -1,3 +1,4 @@
+import { assertPrereleaseAccess, getPrereleaseAccess, isPrereleaseClient, subscribePrereleaseAccess } from '../services/prerelease-runtime'
 /**
  * LocalGameTransport — `GameTransport` implementation backed by the
  * local-sandbox engine worker. The whole game (engine + custom card code)
@@ -68,6 +69,7 @@ export class LocalGameTransport implements GameTransport {
   private destroyed = false
   private inflight = false
 
+  private readonly unsubscribePrerelease: () => void
   private readonly config: LocalGameConfig
   private readonly opts: LocalTransportOptions
 
@@ -75,10 +77,14 @@ export class LocalGameTransport implements GameTransport {
     this.config = config
     this.opts = opts
     this.viewer = opts.viewer ?? { visiblePlayerIds: [], mode: 'viewer' }
+    this.unsubscribePrerelease = subscribePrereleaseAccess(() => {
+      if (isPrereleaseClient() && getPrereleaseAccess().kind !== 'active') this.destroy()
+    })
   }
 
   /** Spawn the worker and start a fresh game. */
   async start(): Promise<GameSyncPayload> {
+    assertPrereleaseAccess()
     await this.spawn()
     const response = await this.request({ kind: 'init', config: this.config, viewer: this.viewer })
     return this.accept(response)
@@ -86,6 +92,7 @@ export class LocalGameTransport implements GameTransport {
 
   /** Spawn the worker and resume a persisted game (IndexedDB resume, T4). */
   async startFromPersisted(persisted: PersistedLocalGame): Promise<GameSyncPayload> {
+    assertPrereleaseAccess()
     await this.spawn()
     const response = await this.request({ kind: 'restore', persisted, viewer: this.viewer })
     return this.accept(response)
@@ -159,6 +166,7 @@ export class LocalGameTransport implements GameTransport {
 
   destroy(): void {
     this.destroyed = true
+    this.unsubscribePrerelease()
     this.rejectAllPending(new Error('transport destroyed'))
     this.listeners.clear()
     this.worker?.terminate()
@@ -182,6 +190,7 @@ export class LocalGameTransport implements GameTransport {
   }
 
   private accept(response: LocalSandboxResponse & { ok: true }): GameSyncPayload {
+    assertPrereleaseAccess()
     if (!('payload' in response)) {
       throw new Error('local sandbox returned no payload')
     }
@@ -246,6 +255,7 @@ export class LocalGameTransport implements GameTransport {
       | Omit<Extract<LocalSandboxRequest, { kind: 'restore' }>, 'id'>
       | Omit<Extract<LocalSandboxRequest, { kind: 'call' }>, 'id'>,
   ): Promise<LocalSandboxResponse & { ok: true }> {
+    try { assertPrereleaseAccess() } catch (error) { return Promise.reject(error) }
     if (this.destroyed) return Promise.reject(new Error('transport destroyed'))
     if (this.recovering) return Promise.reject(new Error('local sandbox is recovering'))
     const worker = this.worker
