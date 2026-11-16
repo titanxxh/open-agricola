@@ -226,6 +226,17 @@ node --import tsx scripts/prerelease/authority.ts activate --config "$pre_config
 node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verification_token_file" "$private_owner_profile"
 ```
 
+可重复的验收用 `scripts/prerelease/live-acceptance/cli.mjs`，在真实的 Chromium、Firefox、WebKit 中执行同一组检查。它的 owner 私有配置（mode 0600）给出 `targetConfig`、`ssh`、已安装的 `candidate` 及其镜像 `candidateReceipt`、`formalBuild`、标为 A–C 的账号文件（A 为 Beta，B 为第二个 Beta 座位，C 为普通账号）与可选的 D–E、正式站 `ownerCookie`、主机上的 `guardConfig` 路径和私有 `outputRoot`。每次 `run` 都刷新 status，在维护模式下签发私有入口 token，并读取健康周期与当前 app 实例：
+
+```bash
+cli=scripts/prerelease/live-acceptance/cli.mjs
+node --import tsx $cli run --config "$acceptance_config" --suite handoff      # 另有 boundary、multihand --guest B、team --players A,B,C,D、
+node --import tsx $cli bundle --config "$acceptance_config" --runs "$run_dirs" --output "$evidence_dir"   #   sandbox、viewer/continuity --room、deletion --labels D,E、readback
+node --import tsx $cli acceptance --config "$acceptance_config" --index "$evidence_dir/index.json" --formal-browser "$formal_browser_json" --output "$acceptance_json"
+```
+
+结果只含账号标签、状态码与耗时；打包时出现任何标识、用户名或密码都会被拒绝。浏览器用例每个 case 使用新浏览器，且不在开启请求拦截时测量凭据：被拦截的 credentialless frame 会被报告带有实际并未发送的 Cookie。一次性账号以 `deletion` 套件和完整身份审计收尾。`open` 之前把证据文件复制到主机的相同路径。
+
 pre 可以使用 `https://pre.titanxxh.com`，保留正式 Pages/API 地址；必须与两者使用不同 hostname，换端口不能代替主机隔离。仅维护页的 bootstrap 可以早于正式升级。服务候选代码，包括私有 owner 验收，要求运行中的正式浏览器认证策略为 version 2。先部署匹配的正式前后端保护并完成旧会话迁移。owner 生命周期 CLI 只接受新的 `__Host-oa-session` Cookie 文件并发送浏览器协议头；迁移后重新登录取得 owner Cookie。
 
 网关只接受声明的 `__Host-oa-pre-session`、`__Host-oa-pre-handoff` 候选 Cookie，要求 Secure、HttpOnly、Path=/、SameSite=Lax 且没有 Domain。它移除其他候选 Cookie、Clear-Site-Data、入站 Authorization 和未声明的身份头；owner 验收 Cookie 不传给候选。HTTP 拒绝其他 Origin 及没有精确 pre Origin 的不安全方法；WS 要求精确 pre Origin 和 `/ws`。候选身份和房间权限仍由 app 负责。迁移、捕获和存储策略工具只取得数据凭据，不取得 target identity service key。同父域仍共享部分浏览器容量限制，不能承诺独立站点级的 Cookie 可用性隔离。
