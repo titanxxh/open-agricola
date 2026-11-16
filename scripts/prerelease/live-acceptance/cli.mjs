@@ -84,6 +84,8 @@ async function runSuite(ctx, options) {
     // `cases` names what this run executed; a later single-case rerun replaces only those cases in the bundle.
     const report = { format: 1, suite, engine: engineName, candidate: bindings.candidateSha, generation: bindings.generation, operationId: bindings.operationId,
       healthyCycle: bindings.healthyCycle, mode: bindings.mode, startedAt: new Date().toISOString(), cases: selected.map(({ label }) => label), results: [] }
+    // The kit spans every engine of the run; each report keeps only what happened in its own engine.
+    const hungFrom = kit.hung.length, retriesFrom = kit.retries.length
     if (bindings.mode === 'maintenance') await kit.publicIsClosed()
     // A fresh browser per case: WebKit keeps stale engine state after the blocked-frame embedding probes.
     for (const { label, index } of selected) {
@@ -96,7 +98,7 @@ async function runSuite(ctx, options) {
       finally { await browser.close().catch(() => {}) }
     }
     if (bindings.mode === 'maintenance') report.publicStill503 = await kit.publicStillClosed(report)
-    report.boundedEvaluations = [...kit.hung]; report.networkRetries = [...kit.retries]
+    report.boundedEvaluations = kit.hung.slice(hungFrom); report.networkRetries = kit.retries.slice(retriesFrom)
     report.passed = report.results.length === selected.length && report.results.every(v => v.passed) && (bindings.mode !== 'maintenance' || report.publicStill503)
     report.completedAt = new Date().toISOString()
     const text = JSON.stringify(report, null, 2) + '\n'; assertNoAccountValues(accounts, text, `${suite} result`)
