@@ -1274,7 +1274,7 @@ The accounts exporter uses a dedicated PostgreSQL login with read-only transacti
 
 The room panel places online waiting, playing, hotseat and development counts on the left axis. The right axis shows retained offline rooms and the sum of waiting, playing, hotseat and retained rooms. That total excludes development, completed and expired rooms. Neither axis stacks its series.
 
-Administrator authentication remains in the game application's `/ops/` gateway. Independent monitoring deployment does not make this gateway available while the game application is stopped.
+Administrator authentication remains in the game application's `/ops/` gateway. Enter it from the site's operations page (`?page=operations`); a browser that opens a dashboard bookmark or used handoff without a current operations session is sent back there. Independent monitoring deployment does not make this gateway available while the game application is stopped.
 
 No monitoring service publishes a production host port. Their private dependency network is a trusted server boundary; do not add a Caddy route directly to them. Only `/ops/` through the application gateway is public. The services run without a Docker socket; Node Exporter mounts the host root read only and uses host PID visibility for host observations. Configure `OBSERVABILITY_UID/GID` when the deployment account differs from 1000 and ensure `data/observability/{prometheus,grafana}` and the token file are readable/writable by that account. The application still runs as `APP_UID/GID`.
 

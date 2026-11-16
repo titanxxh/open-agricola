@@ -4,13 +4,24 @@ import type { PostgresDatabase } from '../database/postgres'
 import { extractToken, getSessionByToken, isAdmin } from '../auth'
 import { serializeOperationsCookie } from '../auth-cookies'
 import { httpAdmission, requestSessionToken } from '../request-auth'
-import { corsHeaders, getRequestOrigin } from '../http-origin'
+import { corsHeaders, getRequestOrigin, normalizeOrigin } from '../http-origin'
 import { operationsMetrics } from './metrics'
 
 const digest = (token: string) => createHash('sha256').update(token).digest('hex')
 const json = (res: ServerResponse, status: number, body: unknown) => {
   res.writeHead(status, { ...corsHeaders(), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
   res.end(JSON.stringify(body))
+}
+/**
+ * A browser opening a dashboard bookmark or a used handoff without a current operations session goes back to the site's
+ * operations page, which starts a fresh handoff. Dashboard data requests keep their machine-readable rejection.
+ */
+function reenterOperations(req: IncomingMessage, res: ServerResponse): boolean {
+  const app = normalizeOrigin(process.env.PUBLIC_APP_ORIGIN)
+  if (!app || !['GET', 'HEAD'].includes(req.method ?? '') || req.headers['sec-fetch-dest'] !== 'document' || req.headers['sec-fetch-mode'] !== 'navigate') return false
+  res.writeHead(303, { Location: `${app}/?page=operations`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
+  res.end()
+  return true
 }
 export function metricsAuthorized(req: IncomingMessage): boolean {
   const expected = process.env.OBSERVABILITY_METRICS_TOKEN ?? ''
@@ -47,14 +58,14 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
       const row = await db.prepare('DELETE FROM observability_tickets WHERE ticket_hash=? AND expires_at>? RETURNING session_token')
         .get<{ session_token: string }>(digest(ticket), Date.now())
       const user = row && await userFor(row.session_token)
-      if (!user || !isAdmin(user.username)) { json(res, 401, { ok: false, code: 'invalid_handoff' }); return true }
+      if (!user || !isAdmin(user.username)) { if (!reenterOperations(req, res)) json(res, 401, { ok: false, code: 'invalid_handoff' }); return true }
       res.writeHead(303, { Location: `${prefix}/ops/d/open-agricola/operations`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
         'Set-Cookie': serializeOperationsCookie(row!.session_token) })
       res.end(); return true
     }
     const sessionToken = requestSessionToken(req, path.startsWith('/ops/'))
     const user = await userFor(sessionToken)
-    if (!user) { json(res, 401, { ok: false, code: 'login_required' }); return true }
+    if (!user) { if (!path.startsWith('/ops/') || !reenterOperations(req, res)) json(res, 401, { ok: false, code: 'login_required' }); return true }
     if (path === '/api/observability/telemetry') {
       if (req.method !== 'POST') { json(res, 405, { ok: false }); return true }
       const now = Date.now()
