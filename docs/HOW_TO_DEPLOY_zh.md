@@ -183,6 +183,8 @@ owner 可在安排扩容期间明确暂缓完整负载验收。部署证据须�
 
 首次安装前 current 使用 `empty`。传输或 load 中断后，`control/` 私有 journal 保留原操作和 image ID；重试必须复用，不能用同源码的重构建镜像替换。trusted-policy 的 `stable` 仅标识工具，不能授权正式或预发布 app 部署。候选部署仍需独立完整 prerelease 验证。policy 变化后，消费前须具备对应导入工具镜像和候选 producer 绑定。
 
+每个 owner 操作都会带上 owner checkout 的 HEAD；主机发现策略 SHA 与自身 owner-tools 的 HEAD 不同就拒绝该操作（`Owner envelope is expired or bound to a different policy/target`）。在线备份同样需要已导入的、对应该 HEAD 的 trusted-policy 镜像。涉及策略变更的维护窗口按以下顺序进行：先把主机 owner-tools 目录切到新的 main SHA（不停任何服务），再从同一 SHA 的 owner checkout 执行 `maintain`，然后导入该 SHA 的 trusted-policy 镜像和由它构建的候选镜像，最后 `deploy`。第一步与第三步要在同一个窗口内完成：新 trusted-policy 镜像导入之前，下一次定时备份会失败。运行中的 gateway 与 storage guard 沿用启动时加载的内容：gateway 挂载 `scripts/prerelease/gateway.ts`、`browser-policy.ts`、`storage-guard-state.ts` 和 `shared/contract/browser-auth.ts`，guard 运行 `scripts/prerelease/storage-guard-cli.ts` 及其导入的模块。新 SHA 改动其中任何一项时，需在窗口内重启对应服务。
+
 正式生命周期 API 尚未部署时，先记录一个 UUID，再启动维护网关。先准备两个私有凭据文件和固定语言包；`plan` 即使带 `--ssh` 也验证本机路径，因此要在持有这些文件的宿主执行。固定实际运行采用的限额。owner 可明确批准在完整容量验收前使用保守临时限额；交付证据须记录该决定和待补测量，初装后仍执行同一限额：
 
 ```bash
