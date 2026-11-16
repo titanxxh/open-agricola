@@ -97,17 +97,16 @@ describe('section navigation targets', () => {
     }).map(item => item.id)).toEqual(['farm', 'major-supply'])
   })
 
-  it('uses the existing section names in both languages', () => {
+  it('uses dedicated short labels in both languages', () => {
     const items = sectionNavItems({
       handPlayerId: 'p1', viewedFarm: true, publicFarms: true, seasons: true, moor: true, majorSupply: true,
     })
     expect(items.map(item => item.labelKey)).toEqual([
-      'ui.handCards', 'ui.farmTitle', 'ui.publicFarms', 'ui.seasons.board', 'moor.specialActions.title', 'ui.majorImprovements',
+      'ui.sectionNav.hand', 'ui.sectionNav.farm', 'ui.sectionNav.publicFarms',
+      'ui.sectionNav.seasons', 'ui.sectionNav.moor', 'ui.sectionNav.majorSupply',
     ])
-    for (const item of items) {
-      expect(t('en', item.labelKey)).not.toBe(item.labelKey)
-      expect(t('zh', item.labelKey)).not.toBe(item.labelKey)
-    }
+    expect(items.map(item => t('en', item.labelKey))).toEqual(['Hand', 'Farm', 'Others', 'Seasons', 'Special', 'Majors'])
+    expect(items.map(item => t('zh', item.labelKey))).toEqual(['手牌', '农场', '他人', '四季', '特殊', '改良'])
     expect(items.find(item => item.id === 'hand')?.selector).toBe('[data-section-target="hand"][data-hand-anchor="p1"]')
   })
 
@@ -142,21 +141,21 @@ describe('SectionNav', () => {
     focused.setAttribute('data-interaction-focused', 'true')
     expect(document.activeElement).toBe(document.body)
 
-    await user.click(screen.getByRole('button', { name: 'Hand Cards' }))
+    await user.click(screen.getByRole('button', { name: 'Hand' }))
 
     const ownHand = document.querySelector('[data-hand-anchor="p1"]')!
     expect(window.scrollBy).toHaveBeenCalledExactlyOnceWith({ top: 900 - 48 - 12, behavior: 'smooth' })
     expect(ownHand).not.toHaveAttribute('data-interaction-focused')
     expect(ownHand).not.toHaveFocus()
     expect(focused).toHaveAttribute('data-interaction-focused', 'true')
-    expect(screen.getByRole('button', { name: 'Hand Cards' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Hand' })).toHaveFocus()
     expect(screen.getByRole('navigation', { name: sectionNavName('en', items) })).toBeVisible()
   })
 
   it('leaves a section that is already between the header and the action bar where it is', async () => {
     const user = userEvent.setup()
     renderNav(itemsFor())
-    await user.click(screen.getByRole('button', { name: 'Player Farm' }))
+    await user.click(screen.getByRole('button', { name: 'Farm' }))
     expect(window.scrollBy).not.toHaveBeenCalled()
   })
 
@@ -170,9 +169,9 @@ describe('SectionNav', () => {
     render(<SectionNav locale="en" items={sectionNavItems({
       handPlayerId: 'p1', viewedFarm: false, publicFarms: false, seasons: true, moor: false, majorSupply: false,
     })} />)
-    await user.click(screen.getByRole('button', { name: 'Seasons Board' }))
+    await user.click(screen.getByRole('button', { name: 'Seasons' }))
     expect(window.scrollBy).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: 'Special Actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Special' })).not.toBeInTheDocument()
     expect(document.querySelector('[data-hand-anchor="p2"]')).not.toHaveAttribute('data-interaction-focused')
   })
 
@@ -193,8 +192,8 @@ describe('SectionNav', () => {
     renderNav(sectionNavItems({
       handPlayerId: null, viewedFarm: true, publicFarms: false, seasons: false, moor: false, majorSupply: true,
     }))
-    const farm = screen.getByRole('button', { name: 'Player Farm' })
-    const majors = screen.getByRole('button', { name: 'Major Improvements', exact: true })
+    const farm = screen.getByRole('button', { name: 'Farm' })
+    const majors = screen.getByRole('button', { name: 'Majors', exact: true })
     expect(document.activeElement).toBe(document.body)
     farm.focus()
     fireEvent.keyDown(farm, { key: 'ArrowRight' })
@@ -236,7 +235,7 @@ describe('SectionNav', () => {
     renderNav(sectionNavItems({
       handPlayerId: null, viewedFarm: true, publicFarms: false, seasons: false, moor: false, majorSupply: false,
     }))
-    fireEvent.click(screen.getByRole('button', { name: 'Player Farm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Farm' }))
     expect(window.scrollBy).toHaveBeenCalledWith({ top: 600 - 48 - 12, behavior: 'smooth' })
   })
 

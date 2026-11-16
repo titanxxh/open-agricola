@@ -30,7 +30,7 @@ for (const width of [1920, 390]) {
     const nav = page.locator('.section-nav')
     await expect(nav).toBeVisible()
     await expect(nav.getByRole('button')).toHaveText([
-      'Hand Cards', 'Player Farm', 'Public farms', 'Seasons Board', 'Special Actions', 'Major Improvements',
+      'Hand', 'Farm', 'Others', 'Seasons', 'Special', 'Majors',
     ])
     const focusedBefore = await page.locator('[data-interaction-focused]').evaluateAll(nodes =>
       nodes.map(node => node.getAttribute('data-interaction-focus')))
@@ -39,12 +39,12 @@ for (const width of [1920, 390]) {
     await expect(page.locator('.desktop-public-farms [data-hand-anchor]')).toHaveCount(0)
 
     for (const [name, selector] of [
-      ['Hand Cards', '[data-section-target="hand"] h3'],
-      ['Player Farm', '[data-section-target="farm"]'],
-      ['Seasons Board', '[data-section-target="seasons"]'],
-      ['Special Actions', '[data-section-target="moor"]'],
-      ['Major Improvements', '[data-section-target="major-supply"] h2'],
-      ['Public farms', '[data-section-target="public-farms"] > h2'],
+      ['Hand', '[data-section-target="hand"] h3'],
+      ['Farm', '[data-section-target="farm"]'],
+      ['Seasons', '[data-section-target="seasons"]'],
+      ['Special', '[data-section-target="moor"]'],
+      ['Majors', '[data-section-target="major-supply"] h2'],
+      ['Others', '[data-section-target="public-farms"] > h2'],
     ]) {
       await nav.getByRole('button', { name, exact: true }).click()
       await expect.poll(() => page.locator(selector).evaluate(node => {
@@ -58,8 +58,8 @@ for (const width of [1920, 390]) {
     expect(await page.locator('[data-interaction-focused]').evaluateAll(nodes =>
       nodes.map(node => node.getAttribute('data-interaction-focus')))).toEqual(focusedBefore)
 
-    const first = nav.getByRole('button', { name: 'Hand Cards', exact: true })
-    const last = nav.getByRole('button', { name: 'Major Improvements', exact: true })
+    const first = nav.getByRole('button', { name: 'Hand', exact: true })
+    const last = nav.getByRole('button', { name: 'Majors', exact: true })
     await first.evaluate(node => node.focus({ preventScroll: true }))
     const scrollY = await page.evaluate(() => window.scrollY)
     await first.press('End')
@@ -91,11 +91,11 @@ test('solo shortcuts omit public farms and disabled expansion boards', async ({ 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
-  await expect(page.locator('.section-nav').getByRole('button')).toHaveText(['Hand Cards', 'Player Farm', 'Major Improvements'])
+  await expect(page.locator('.section-nav').getByRole('button')).toHaveText(['Hand', 'Farm', 'Majors'])
   await expect(page.locator('[data-section-target="seasons"], [data-section-target="moor"]')).toHaveCount(0)
 })
 
-test('narrow shortcuts wrap beside the report trigger and the major supply shares the hand columns', async ({ browser, request }, testInfo) => {
+test('narrow Chinese shortcuts fit one row beside the report trigger and the major supply shares the hand columns', async ({ browser, request }, testInfo) => {
   test.setTimeout(90_000)
   const context = await browser.newContext({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true })
   try {
@@ -109,7 +109,7 @@ test('narrow shortcuts wrap beside the report trigger and the major supply share
     await expect(page).toHaveURL(/\?room=[^&]+/)
     await finishHotseatOpening(page)
     const nav = page.locator('.section-nav')
-    await expect(nav.getByRole('button')).toHaveText(['手牌', '玩家农场', '公开农场', '四季版图', '特殊行动', '主要改良'])
+    await expect(nav.getByRole('button')).toHaveText(['手牌', '农场', '他人', '四季', '特殊', '改良'])
     await expect(page.getByRole('button', { name: '报告问题', exact: true })).toBeVisible()
     const dock = await nav.evaluate(node => {
       const bounds = node.getBoundingClientRect()
@@ -123,10 +123,10 @@ test('narrow shortcuts wrap beside the report trigger and the major supply share
       }
     })
     expect(dock.gap).toBeGreaterThanOrEqual(8)
-    expect(dock).toMatchObject({ rows: 2, contained: true })
+    expect(dock).toMatchObject({ rows: 1, contained: true })
     await page.screenshot({ path: testInfo.outputPath('section-shortcuts-360-zh.png') })
 
-    await nav.getByRole('button', { name: '主要改良', exact: true }).click()
+    await nav.getByRole('button', { name: '改良', exact: true }).click()
     const toggle = page.locator('.major-supply-toggle')
     if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
     const majors = page.locator('.major-row > .major-card-wrapper')
