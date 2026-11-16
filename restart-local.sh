@@ -38,6 +38,14 @@ fi
 SHARED_DATA_DIR="${SHARED_DATA_DIR:-$MAIN_REPO_DIR/data}"
 REPLAY_VIEWER_ROOT="${REPLAY_VIEWER_ROOT:-$SHARED_DATA_DIR/replay-viewers}"
 
+# Only the prerelease app supervisor receives its restricted identity key.
+# Catalog/build/upload/migration helper processes do not need that authority.
+BACKEND_IDENTITY_ENV=()
+if [ "${RELEASE_CHANNEL:-stable}" = "prerelease" ]; then
+  BACKEND_IDENTITY_ENV=("PRERELEASE_IDENTITY_SERVICE_KEY=${PRERELEASE_IDENTITY_SERVICE_KEY:?Missing prerelease identity key}")
+  unset PRERELEASE_IDENTITY_SERVICE_KEY
+fi
+
 # Linked worktrees may share the main checkout's installed dependencies.
 # Materialize missing top-level entries as symlinks so Node/Vite can resolve
 # bare imports relative to source files even when the worktree lives outside
@@ -577,7 +585,7 @@ REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
     REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" \
     "$PNPM_BIN" run build:replay-viewer | tail -n 1
 )}"
-GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
+export GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 env REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" REPLAY_VIEWER_BUILD_ID="$REPLAY_VIEWER_BUILD_ID" "$PNPM_BIN" exec tsx scripts/upload-replay-viewer.ts
 
 RESET_CONFIRMED=0
@@ -630,6 +638,30 @@ if [ "$TAILSCALE_ENABLED" -eq 1 ]; then
 else
   PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$BIND_IP:$BACKEND_PORT}"
 fi
+FRONTEND_API_BASE="http://$BIND_IP:$BACKEND_PORT"
+FRONTEND_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws"
+FRONTEND_API_ENV=()
+# Isolated prerelease rehearsals retain explicit HTTPS origins.
+if [ "${RELEASE_CHANNEL:-stable}" = "prerelease" ]; then
+  : "${PUBLIC_APP_ORIGIN:?Explicit HTTPS prerelease app origin is required}"
+  : "${PUBLIC_API_BASE:?Explicit HTTPS prerelease API origin is required}"
+  : "${CORS_ORIGIN:?Explicit HTTPS prerelease browser origin is required}"
+  FRONTEND_API_BASE="$(node --input-type=module - "$PUBLIC_APP_ORIGIN" "$PUBLIC_API_BASE" "$CORS_ORIGIN" <<'JS'
+const [app, api, cors] = process.argv.slice(2).map(value => new URL(value));
+if ([app, api, cors].some(url => url.protocol !== 'https:' || url.username || url.password || url.search || url.hash)
+  || app.origin !== api.origin || app.origin !== cors.origin || api.pathname !== '/' || cors.pathname !== '/') {
+  throw Error('Prerelease local rehearsal requires one explicit HTTPS app/API/browser origin');
+}
+process.stdout.write(api.origin);
+JS
+)"
+  FRONTEND_WS_BASE="${FRONTEND_API_BASE/https:/wss:}/ws"
+  FRONTEND_API_ENV=("VITE_API_BASE=$FRONTEND_API_BASE")
+else
+  PUBLIC_APP_ORIGIN="http://$BIND_IP:${FRONTEND_PORT:-5173}"
+  CORS_ORIGIN="$PUBLIC_APP_ORIGIN"
+fi
+
 echo "Stopping existing processes..."
 if [ -n "$OWNED_PROCESSES_FILE" ]; then
   stop_owned_processes
@@ -648,23 +680,23 @@ fi
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   echo "Building frontend preview bundle..."
   env \
-    VITE_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
-    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
+    VITE_API_BASE="$FRONTEND_API_BASE" \
+    VITE_WS_BASE="$FRONTEND_WS_BASE" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$PNPM_BIN" run build
 fi
 
 echo "Starting backend (port $BACKEND_PORT on $BIND_IP, dev2/dev3/dev4/dev5/dev6 recorded in PostgreSQL/S3)..."
-start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
+start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env "${BACKEND_IDENTITY_ENV[@]}" \
   NODE_ENV=development \
   APP_INSTANCES="$APP_INSTANCES" \
   BACKEND_PORT="$BACKEND_PORT" \
   ALLOW_ANONYMOUS_WS="${ALLOW_ANONYMOUS_WS:-true}" \
   ENABLE_AUTH_TEST_HELPERS=1 \
   BACKEND_HOST="$BIND_IP" \
-  CORS_ORIGIN="http://$BIND_IP:$FRONTEND_PORT" \
+  CORS_ORIGIN="$CORS_ORIGIN" \
   PUBLIC_API_BASE="$PUBLIC_API_BASE" \
-  PUBLIC_APP_ORIGIN="http://$BIND_IP:$FRONTEND_PORT" \
+  PUBLIC_APP_ORIGIN="$PUBLIC_APP_ORIGIN" \
   DEV_ENABLE_PARENT_CARDS="$([ "$PARENTS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_PARENTS="$([ "$PARENTS_ENABLED" -eq 1 ] && [ "$DRAFT_ENABLED" -eq 0 ] && echo false || echo true)" \
   DEV_ENABLE_THROUGH_THE_SEASONS="$([ "$SEASONS_ENABLED" -eq 1 ] && echo true || echo false)" \
@@ -687,16 +719,16 @@ fi
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   echo "Starting frontend preview (port $FRONTEND_PORT on $BIND_IP)..."
   start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
-    VITE_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
-    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
+    VITE_API_BASE="$FRONTEND_API_BASE" \
+    VITE_WS_BASE="$FRONTEND_WS_BASE" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$FRONTEND_BIN" preview --host "$BIND_IP" --port "$FRONTEND_PORT" --strictPort
 else
   echo "Starting frontend (port $FRONTEND_PORT on $BIND_IP)..."
-  start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
+  start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env "${FRONTEND_API_ENV[@]}" \
     NODE_ENV=development \
     BACKEND_HOST="$BIND_IP" \
-    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
+    VITE_WS_BASE="$FRONTEND_WS_BASE" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$FRONTEND_BIN" --host "$BIND_IP" --port "$FRONTEND_PORT" --strictPort
 fi

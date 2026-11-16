@@ -62,3 +62,7 @@ With one game per `roomId` (ADR 0009), public Replays (ADR 0010) and delta archi
 - Per-seat archives: duplicate public state.
 - Returning 404 after expiry or removal: confuses known and unknown IDs.
 - Snapping a mismatched Anchor to the nearest Step: shows the wrong scene.
+
+## Prerelease environment override
+
+[ADR 0042](0042-experimental-feature-availability.md) supersedes the public-read exemption for prerelease data. Every Context, result, Replay, segment, anchor, Evidence and associated data resource first requires a current prerelease session and Beta qualification, then its existing finer permission. Public static Viewer code carries no archive authority; credentialless delivery is a separate prerelease Viewer feature.

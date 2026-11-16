@@ -106,7 +106,10 @@ export async function createFormalSoloRecording(db: PostgresDatabase) {
 }
 
 /** A real backend process with one private PG schema and one private S3 prefix. */
-export async function startFormalSoloBackend(db: PostgresDatabase) {
+export async function startFormalSoloBackend(db: PostgresDatabase, accessEnvironment: Partial<Pick<NodeJS.ProcessEnv,
+  'NODE_ENV' | 'RELEASE_CHANNEL' | 'ALLOW_ANONYMOUS_WS' | 'GAME_BUILD_ID' | 'OBSERVABILITY_METRICS_TOKEN'
+  | 'PUBLIC_APP_ORIGIN' | 'PUBLIC_API_BASE' | 'FORMAL_APP_ORIGIN' | 'FORMAL_API_BASE'
+  | 'PRERELEASE_DATA_GENERATION' | 'PRERELEASE_TARGET_ID' | 'PRERELEASE_IDENTITY_SERVICE_KEY'>> = {}) {
   const schema = await db.prepare('SELECT current_schema() AS name').get<{ name: string }>()
   if (!schema?.name.startsWith('test_')) throw new Error('Formal acceptance requires a private test schema')
   const recording = await createFormalSoloRecording(db)
@@ -129,6 +132,7 @@ export async function startFormalSoloBackend(db: PostgresDatabase) {
         INSTANCE_INTERNAL_URL: baseUrl, PUBLIC_APP_ORIGIN: BROWSER_TEST_ORIGIN, PUBLIC_API_BASE: baseUrl.replace('http:', 'https:'),
         REPLAY_VIEWER_BUILD_ID: buildId, GAME_BUILD_ID: 'standard-solo-network-acceptance',
         ALLOW_ANONYMOUS_WS: 'false', DISABLE_RATE_LIMIT: '1', WORKSHOP_PR_ENABLED: 'false', BUG_REPORTS_ENABLED: 'false',
+        ...accessEnvironment,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })

@@ -38,6 +38,24 @@ async function lockMigration(db: PostgresDatabase): Promise<void> {
   await db.prepare('SELECT pg_advisory_xact_lock(962, hashtext(?))').get(row.schema)
 }
 
+/**
+ * Prerelease databases created before 2026-11-20 recorded their own migrations as versions 47, 48 and 50, which
+ * main later assigned to Web Push and Classic Card Edition. Such a database has the prerelease identity table
+ * but neither main migration; its versions move to 9047, 9048 and 9050 so the main migrations still run.
+ */
+async function movePrereleaseMigrationVersions(db: PostgresDatabase): Promise<void> {
+  const row = await db.prepare(`
+    SELECT to_regclass('prerelease_external_identities') IS NOT NULL AS prerelease,
+      to_regclass('web_push_bindings') IS NOT NULL AS web_push,
+      EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'rooms' AND column_name = 'card_edition') AS card_edition,
+      EXISTS (SELECT 1 FROM postgres_schema_migrations WHERE version = 9047) AS moved,
+      EXISTS (SELECT 1 FROM postgres_schema_migrations WHERE version = 47) AS legacy
+  `).get<{ prerelease: boolean; web_push: boolean; card_edition: boolean; moved: boolean; legacy: boolean }>()
+  if (!row?.prerelease || row.moved || !row.legacy) return
+  if (row.web_push || row.card_edition) throw new Error('Prerelease migration versions 47-50 are ambiguous; restore the database from its backup')
+  await db.exec('UPDATE postgres_schema_migrations SET version = version + 9000 WHERE version IN (47, 48, 50)')
+}
+
 /** Serialize schema changes before any application instance starts accepting requests. */
 export async function migratePostgres(db: PostgresDatabase): Promise<void> {
   await db.transaction(async () => {
@@ -66,8 +84,12 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('046-browser-auth-policy.sql')
     migrations.push('047-web-push.sql')
     migrations.push('048-classic-card-edition.sql')
-    for (const [index, filename] of migrations.entries()) {
-      const version = index + 1
+    // Prerelease-only migrations use 9000 + their original number so main can keep numbering 047 onward.
+    await movePrereleaseMigrationVersions(db)
+    migrations.push('9047-prerelease-sessions.sql')
+    migrations.push('9050-prerelease-handoff-receipts.sql')
+    for (const filename of migrations) {
+      const version = filename === 'schema.sql' ? 1 : Number.parseInt(filename.slice(0, filename.indexOf('-')), 10)
       if (await db.prepare('SELECT version FROM postgres_schema_migrations WHERE version = ?').get(version)) continue
       await db.exec(readFileSync(join(import.meta.dirname, filename), 'utf8'))
       await db.prepare('INSERT INTO postgres_schema_migrations (version) VALUES (?)').run(version)

@@ -1,3 +1,5 @@
+import { browserApiFetch } from '../services/browser-api'
+import { isPrereleaseClient } from '../services/prerelease-runtime'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CompletedGameContextDescriptor, TerminatedGameContextDescriptor } from '../../shared/contract/protocol/game-context'
 import type {
@@ -143,7 +145,8 @@ export function ReplayShell({
     if (!replay) return
     const controller = new AbortController()
     const verify = async () => {
-      const replayResponse = await fetch(
+      const read = isPrereleaseClient() ? browserApiFetch : fetch
+      const replayResponse = await read(
         `${API_BASE}/api/v1/replays/${encodeURIComponent(context.roomId)}/manifest`,
         { credentials: 'omit', signal: controller.signal },
       )
@@ -166,7 +169,7 @@ export function ReplayShell({
           throw new Error('invalid_replay_anchor')
         }
         const anchorStep = Number(rawAnchorStep)
-        const anchorResponse = await fetch(
+        const anchorResponse = await read(
           `${API_BASE}/api/v1/replays/${encodeURIComponent(context.roomId)}/anchors/${anchorStep}?frame=${frameHash}`,
           { credentials: 'omit', signal: controller.signal },
         )
