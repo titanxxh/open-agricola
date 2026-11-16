@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, readFile, readdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, expect, it, vi } from 'vitest'
 import { createTestDatabase, databaseMaintenance, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 import { testStorageEnvironment } from '../../server/__tests__/_helpers/objects'
 import { createWorkSession } from '../../server/__tests__/_helpers/session-fixtures'
@@ -19,10 +19,59 @@ import { snapshotToRoom, type Room } from '../../server/game/room'
 import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config'
 import { extractPairedPrereleaseBackup, fileHash, readPairedPrereleaseBackup } from '../prerelease/backup'
 import { exportStorageArchive, restoreStorageArchive } from '../storage-archive'
+import { expirePrereleaseReplay } from '../../server/game/replay-removal'
+import { GameContextStore } from '../../server/game/game-context-store'
+import { PRERELEASE_ARCHIVE_RETENTION_MS } from '../../server/game/prerelease-archive-retention'
 
 vi.setConfig({ testTimeout: 120000, hookTimeout: 180000 })
 const cleanups = releaseQueue()
 afterAll(async () => { vi.restoreAllMocks(); await cleanups.release() })
+afterEach(() => vi.unstubAllEnvs())
+
+it('applies newer prerelease expiry facts to an actual older PostgreSQL and object archive', async () => {
+  vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+  const root = await mkdtemp(join(tmpdir(), 'agricola-pre-expiry-archive-'))
+  cleanups.register(() => rm(root, { recursive: true, force: true }))
+  const db = await createTestDatabase()
+  cleanups.register(() => db.close())
+  const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
+  cleanups.register(() => releaseAll([() => objects.clearPrefix(), () => objects.close()]))
+  const resources = new ResourceStore(db, objects)
+  const sentinel = Buffer.from('another retained resource must remain unchanged')
+  await resources.stage('card-art/retained-sentinel.png', sentinel, 'image/png')
+  await db.prepare(`INSERT INTO game_contexts(room_id,lifecycle,replay_status,created_at,updated_at)
+    VALUES ('expiry-backup-room','completed','legacy_no_replay',1,1)`).run()
+  await db.prepare(`INSERT INTO game_results(room_id,started_at,finished_at,rounds_played,player_count,
+    enable_community_deck,enable_parent_cards,enable_through_the_seasons,enable_farmers_of_the_moor,enable_snake_opening)
+    VALUES ('expiry-backup-room',1,1000,14,2,0,0,0,0,0)`).run()
+  await db.prepare(`INSERT INTO game_result_players(room_id,player_index,game_player_id,display_name,score)
+    VALUES ('expiry-backup-room',0,'p1','Private archived name',42)`).run()
+  const archiveRoot = join(root, 'archive'), controller = new AbortController()
+  const archive = await exportStorageArchive({ connectionString: getTestDatabaseUrl(), db, objects, root: archiveRoot,
+    sourceBuildId: 'a'.repeat(40), mode: 'maintenance', signal: controller.signal })
+  const originalDump = fileHash(join(archiveRoot, 'database.dump'))
+  expect(await db.prepare('SELECT display_name,score FROM game_result_players').all()).toEqual([{ display_name: 'Private archived name', score: 42 }])
+  expect(await expirePrereleaseReplay(db, { roomId: 'expiry-backup-room', resources,
+    now: () => 1000 + PRERELEASE_ARCHIVE_RETENTION_MS })).toBe(true)
+  const currentFacts = await resources.ledger.read()
+  const ledger = await objects.get('erasure/ledger.json')
+  const admin = databaseMaintenance(), name = `expiry_${randomUUID().replaceAll('-', '')}`
+  cleanups.register(() => admin.close())
+  await admin.exec(`CREATE DATABASE "${name}"`)
+  const url = new URL(getTestDatabaseUrl()); url.pathname = `/${name}`
+  const restored = new PostgresDatabase({ connectionString: url.toString(), schema: archive.schema })
+  const restoredObjects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
+  cleanups.register(() => releaseAll([() => restoredObjects.clearPrefix(), () => restoredObjects.close(),
+    () => restored.close(), () => admin.exec(`DROP DATABASE IF EXISTS "${name}"`)]))
+  await restoreStorageArchive(url.toString(), restored, restoredObjects, archiveRoot, currentFacts)
+  expect(await restored.prepare('SELECT room_id FROM game_results').all()).toEqual([])
+  expect(await restored.prepare('SELECT display_name FROM game_result_players').all()).toEqual([])
+  expect(await new GameContextStore(restored).resolve('expiry-backup-room')).toMatchObject({ lifecycle: 'removed' })
+  expect((await restoredObjects.get('card-art/retained-sentinel.png'))?.body).toEqual(sentinel)
+  expect((await objects.get('card-art/retained-sentinel.png'))?.body).toEqual(sentinel)
+  expect((await objects.get('erasure/ledger.json'))?.body).toEqual(ledger?.body)
+  expect(fileHash(join(archiveRoot, 'database.dump'))).toBe(originalDump)
+})
 
 it('restores one two-player recovery point while real game commands, uploads and collection continue', async () => {
   const root = await mkdtemp(join(tmpdir(), 'agricola-online-archive-'))

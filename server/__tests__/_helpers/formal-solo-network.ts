@@ -91,7 +91,8 @@ export async function createFormalSoloRecording(db: PostgresDatabase) {
   const resources = new ResourceStore(db, objects)
   const replay = new ReplayResources(resources)
   const html = Buffer.from('<main>Standard solo network acceptance</main>')
-  const manifest = Buffer.from(JSON.stringify({ entrypoint: 'index.html', files: { 'index.html': objectHash(html) } }))
+  const manifest = Buffer.from(JSON.stringify({ entrypoint: 'index.html', files: { 'index.html': objectHash(html) },
+    bridge: { protocolVersion: 1, replaySchemaVersions: [1] } }))
   const buildId = objectHash(manifest)
   try {
     await resources.stage(`replay-viewers/${buildId}/index.html`, html, 'text/html')
