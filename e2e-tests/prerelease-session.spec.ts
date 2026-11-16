@@ -99,6 +99,15 @@ function observeGameSocket(page: Page) {
   return { states, joins, latest: () => states.at(-1) }
 }
 
+// Each fixture owns one private temporary directory (logs, certificates, app data). A passing test removes it;
+// a failed test keeps it so the retained launcher and app logs remain available for diagnosis.
+const fixtureDirectories: string[] = []
+test.afterEach(async ({ playwright: _playwright }, testInfo) => {
+  const directories = fixtureDirectories.splice(0)
+  if (testInfo.status !== testInfo.expectedStatus) return
+  for (const directory of directories) rmSync(directory, { recursive: true, force: true })
+})
+
 /** Actual pre application and sessions; the formal fixture uses the real authority protocol. */
 async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPublicSandbox = false,
   options: { browserName?: PlaywrightWorkerOptions['browserName']; ownerVerification?: boolean } = {}) {
@@ -107,6 +116,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
   let closeAfterSetup: (() => Promise<void>) | undefined
   try {
     const directory = mkdtempSync(join(tmpdir(), 'oa-pre-session-')), schema = `test_${randomUUID().replaceAll('-', '')}`
+    fixtureDirectories.push(directory)
     acquired.register(() => { for (const name of ['pre.env', 'key.pem', 'owner-token']) rmSync(join(directory, name), { force: true }) })
     const generationId = randomUUID(), targetId = 'prerelease-main', serviceKey = randomUUID() + randomUUID()
     const backendPort = await port(), frontendPort = await port(), appPort = await port(), gatewayPort = await port()
