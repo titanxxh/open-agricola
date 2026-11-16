@@ -22,18 +22,31 @@ export function storageValidationConcurrency(value: string | undefined): number 
   return count
 }
 
-const validateInWorker = (worker: Worker, header: ReplayHeaderRow, rows: ReplayStepRow[]): Promise<ReplayValidationCounts> =>
-  new Promise((resolve, reject) => {
-    const settle = (callback: () => void) => {
-      worker.off('message', onMessage); worker.off('error', onError); worker.off('exit', onExit)
-      callback()
-    }
-    const onMessage = (result: ReplayValidationResult) => settle(() => result.ok ? resolve(result.counts) : reject(new Error(result.error)))
-    const onError = (error: Error) => settle(() => reject(new Error(`replay validation worker failed: ${error.message}`)))
-    const onExit = (code: number) => settle(() => reject(new Error(`replay validation worker exited: ${code}`)))
-    worker.on('message', onMessage); worker.on('error', onError); worker.on('exit', onExit)
-    worker.postMessage({ header, rows })
+type ValidationLane = { validate: (header: ReplayHeaderRow, rows: ReplayStepRow[]) => Promise<ReplayValidationCounts> }
+
+/**
+ * Listens for the worker's whole life: a crash or failed bootstrap while the
+ * caller is still loading steps must reject the lane, not reach Node as an
+ * unhandled 'error' event that ends the process.
+ */
+const workerLane = (worker: Worker): ValidationLane => {
+  let failure: Error | null = null
+  let job: { resolve: (counts: ReplayValidationCounts) => void; reject: (error: Error) => void } | null = null
+  const fail = (error: Error) => { failure ??= error; job?.reject(failure); job = null }
+  worker.on('error', error => fail(new Error(`replay validation worker failed: ${error.message}`)))
+  worker.on('exit', code => fail(new Error(`replay validation worker exited: ${code}`)))
+  worker.on('message', (result: ReplayValidationResult) => {
+    const current = job; job = null
+    if (!current) return
+    if (result.ok) current.resolve(result.counts)
+    else current.reject(new Error(result.error))
   })
+  return { validate: (header, rows) => new Promise((resolve, reject) => {
+    if (failure) { reject(failure); return }
+    job = { resolve, reject }
+    worker.postMessage({ header, rows })
+  }) }
+}
 
 /**
  * Decodes and hash-checks every Replay Step. Replays are independent, so with
@@ -44,6 +57,8 @@ export async function validateReplays(
   headers: readonly ReplayHeaderRow[],
   loadSteps: (header: ReplayHeaderRow) => Promise<ReplayStepRow[]>,
   concurrency = 1,
+  /** Replaceable only so tests can start a failing worker. */
+  workerEntry = WORKER_ENTRY,
 ): Promise<ReplayValidationCounts> {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1 || concurrency > MAX_STORAGE_VALIDATION_CONCURRENCY) {
     throw new Error('Invalid storage validation concurrency')
@@ -55,11 +70,11 @@ export async function validateReplays(
     return total
   }
   const queue = [...headers].sort((a, b) => b.latest_step_no - a.latest_step_no || a.room_id.localeCompare(b.room_id))
-  const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => new Worker(WORKER_ENTRY))
+  const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => new Worker(workerEntry))
   try {
-    const lanes = await Promise.allSettled(workers.map(async worker => {
+    const lanes = await Promise.allSettled(workers.map(workerLane).map(async lane => {
       try {
-        for (let header = queue.shift(); header; header = queue.shift()) add(await validateInWorker(worker, header, await loadSteps(header)))
+        for (let header = queue.shift(); header; header = queue.shift()) add(await lane.validate(header, await loadSteps(header)))
       } catch (error) {
         queue.length = 0 // Stop the other lanes after their current replay.
         throw error

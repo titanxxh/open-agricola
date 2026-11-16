@@ -1,5 +1,7 @@
-import { availableParallelism } from 'node:os'
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { availableParallelism, tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, describe, expect, it } from 'vitest'
 import { encodeReplayFrame, type JsonValue } from '../../server/game/replay-codec'
 import type { ReplayHeaderRow, ReplayStepRow } from '../replay-integrity'
 import { MAX_STORAGE_VALIDATION_CONCURRENCY, storageValidationConcurrency, validateReplays } from '../replay-validation-pool'
@@ -26,6 +28,14 @@ const library = (lengths: number[]) => {
     headers: [...replays.values()].map(entry => entry.header),
     load: async (header: ReplayHeaderRow) => { loads.push(header.room_id); return replays.get(header.room_id)!.rows },
   }
+}
+
+const workerRoot = mkdtempSync(join(tmpdir(), 'oa-replay-worker-'))
+afterAll(() => rmSync(workerRoot, { recursive: true, force: true }))
+const failingWorker = (source: string) => {
+  const path = join(workerRoot, `worker-${Math.random().toString(36).slice(2)}.mjs`)
+  writeFileSync(path, source + '\n')
+  return path
 }
 
 describe('validateReplays', () => {
@@ -58,6 +68,19 @@ describe('validateReplays', () => {
       return failing.load(header)
     }
     await expect(validateReplays(failing.headers, load, 2)).rejects.toThrow('step query failed')
+  })
+
+  it('rejects a worker that fails while this thread is still loading steps, without an unhandled error', async () => {
+    const replays = library([4, 20, 6, 9])
+    const slowLoad = async (header: ReplayHeaderRow) => { await new Promise(done => setTimeout(done, 300)); return replays.load(header) }
+    await expect(validateReplays(replays.headers, slowLoad, 2, failingWorker('throw new Error("boot failed")')))
+      .rejects.toThrow('replay validation worker failed: boot failed')
+  })
+
+  it('rejects a worker that exits during a replay', async () => {
+    const replays = library([4, 20, 6, 9])
+    await expect(validateReplays(replays.headers, replays.load, 2, failingWorker('(await import("node:worker_threads")).parentPort.on("message", () => process.exit(3))')))
+      .rejects.toThrow('replay validation worker exited: 3')
   })
 
   it('rejects an invalid worker count before loading anything', async () => {
