@@ -132,7 +132,10 @@ export async function handlePrereleaseRoute(req: IncomingMessage, res: ServerRes
 export async function requirePrereleaseRequest(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   if (!isPrerelease() || prereleaseBootstrapRequest(req)) return true
   const path = new URL(req.url ?? '/', 'http://localhost').pathname
-  const imagePath = path.startsWith('/card-art/') || path === '/api/community/wechat-qr' || path === '/api/community/feishu-qr'
+  // Top-level frontend images (e.g. the donation badge and favicon) carry no game data, but an <img>
+  // cannot send client-binding headers; they follow the same session-bound image rule as card art.
+  const frontendImage = /^\/open-agricola\/[A-Za-z0-9][A-Za-z0-9._-]*\.(?:png|svg|webp|jpe?g|gif|ico)$/.test(path)
+  const imagePath = path.startsWith('/card-art/') || frontendImage || path === '/api/community/wechat-qr' || path === '/api/community/feishu-qr'
   const resourceImage = imagePath && req.method === 'GET' && req.headers['sec-fetch-site'] === 'same-origin'
     && req.headers['sec-fetch-dest'] === 'image' && !prereleaseRequestBinding(req)
   const service = getPrereleaseSessions()
