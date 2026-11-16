@@ -203,7 +203,7 @@ type InteractionState =
 | kind | Payload shape |
 |---|---|
 | `choice` | `{ options: ActionChoiceOption[], multiSelect?: { valuePrefix, minSelections, maxSelections } }` |
-| `farm-select` | `{ farm: { farmType: 'plow'\|'sow'\|'fence'\|'room'\|'stable', selectable*..., maxSelections? }, options? }` |
+| `farm-select` | `{ farmOwnerPlayerId?: string, farm: { farmType: 'plow'\|'sow'\|'fence'\|'room'\|'stable', selectable*..., maxSelections? }, options? }` |
 | `selection` | `{ selection: { selectionType: 'farm-position'\|'occupation-hand', ... } }` |
 | `animal-reorg` | `{ zones: InteractionAnimalReorgZone[] }` |
 | `feed` | `{ remaining; foodUsed; feedQueue? }` |
@@ -274,3 +274,7 @@ Pre-local sessions carry only opaque host-only cookies. Retrying a handoff requi
 Command scopes and durable receipts remain independent of capability declarations. A refresh-required error settles any outstanding durable receipt before transport stops retries; it does not revoke authentication or re-execute an acknowledged command. Tests: `experimental-feature-transport.test.ts`, `gameTransport-reconnect.test.ts`, and the CORS case in `auth-routes.test.ts`. Deployment overlap follows [HOW_TO_DEPLOY](../HOW_TO_DEPLOY.md#supported-browser-and-backend-overlap).
 
 The private Replay bridge (`protocol/replay-bridge.ts`) accepts only manifest, checkpoint Segment, exact Anchor, room-owned image and single-Evidence reads. Context binds an ephemeral nonce, environment/target, app SHA, data generation, room, Viewer hash, schema and mode; it carries no login or remote capability. Requests have bounded concurrency/bytes and monotonic IDs; cancellation and close retire pending work. `replay-viewer-build.ts` parses immutable manifests and their explicit bridge/schema declaration. Old public Builds remain valid but cannot serve pre. Tests: `replay-bridge.test.ts`, `publish-replay-viewer.test.ts`.
+
+Prerelease `team.ts` owns Team/Multihand configuration, seat-to-team assignments and four scoring summaries. `team-room.ts` separates account waiting members from rule seats. `teamRoomWaiting` carries no account IDs; host start fixes seat ownership. Waiting `setTeam` moves into available capacity; only the host may explicitly exchange two Team members with `swapMemberId`. Both assignments and the command receipt persist atomically, with unchanged capacity and account ownership. Multihand keeps automatic whole-team admission. Shared visibility never changes controlled command seats. Tests: `team-network.test.ts`, `TeamWaitingRoom.test.tsx`.
+
+`marketplace.ts` defines bounded goods transfers and the `marketplace-select` structured request. Each good identifies one giver/receiver and one same-good tax. It uses the existing `commitSelection` channel; receive events keep payer and recipient distinct.

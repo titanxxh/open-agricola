@@ -1,4 +1,5 @@
 import { isPrereleaseClient } from '../services/prerelease-runtime'
+import { ArchivedTeamResults } from '../components/board/ArchivedTeamResults'
 import { browserApiFetch } from '../services/browser-api'
 import { checkServerAvailability, isServerUnavailableStatus, onServerRecovered, useServerAvailability } from '../services/server-availability'
 import { MaintenancePage } from './MaintenancePage'
@@ -244,7 +245,7 @@ function CompletedContext({
       <h1>{t('platform.gameContext.completedTitle')}</h1>
       <p>{t('solo.scoreHint')}: <strong>{formatScore(player?.score ?? 0)}</strong></p>
       {rematch}
-    </section> : null}<ReplayShell context={context} /></div>
+    </section> : null}{context.result.team ? <ArchivedTeamResults result={context.result} locale={locale} /> : null}<ReplayShell context={context} /></div>
   }
   return statusPage(
     t('platform.backToLobbyPlain'),
@@ -253,13 +254,13 @@ function CompletedContext({
     t('platform.gameContext.legacyNoReplay'),
     <div>
       <h2 className="ws-status-title">{t('platform.gameContext.players')}</h2>
-      <ul>
+      {context.result.team ? <ArchivedTeamResults result={context.result} locale={locale} /> : <ul>
         {context.result.players.map((player) => (
           <li key={player.playerIndex}>
             {getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)}: {t('platform.gameContext.score', { score: player.score })}
           </li>
         ))}
-      </ul>
+      </ul>}
       {rematch}
     </div>,
   )

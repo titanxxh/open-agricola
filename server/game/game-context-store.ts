@@ -1,3 +1,4 @@
+import type { TeamResultArchive } from '../../shared/contract/team'
 import { spectatorRoute } from './room-spectators'
 import { prereleaseArchiveReadState } from './prerelease-archive-retention'
 import type { PostgresDatabase as Database } from '../database/postgres'
@@ -45,6 +46,9 @@ type ResultRow = {
   enable_snake_opening: number
   card_edition: 'classic' | null
   classic_deck_ids: unknown
+  team_mode: TeamResultArchive['mode'] | null
+  team_scoring: TeamResultArchive['scoring'] | null
+  team_scores: TeamResultArchive['scores'] | null
 }
 
 type ResultPlayerRow = {
@@ -52,6 +56,7 @@ type ResultPlayerRow = {
   display_name: string
   name_is_default: number
   score: number
+  team_index: number | null
 }
 
 type ReplayRow = {
@@ -302,6 +307,12 @@ export class GameContextStore {
         ORDER BY room_players.player_index LIMIT 1
       `).get(userId, roomId)) as ActiveRow | undefined
       if (!active) {
+        const waiting = await this.db.prepare(`SELECT version FROM rooms WHERE id=? AND status='waiting'
+          AND EXISTS(SELECT 1 FROM jsonb_array_elements(team_members_json) member WHERE member->>'userId'=?)`)
+          .get<{ version: number }>(roomId, userId)
+        if (waiting) return { ok: true, roomId, lifecycle: 'active', phase: 'waiting', playerIndex: null,
+          roomVersion: waiting.version, stepNo: 0,
+          ...(context.expires_at === null ? {} : { expiresAt: context.expires_at }) }
         if (intent === 'join' && await spectatorRoute(this.db, roomId)) {
           const snapshot = await this.db.prepare(`SELECT r.version, g.latest_step_no FROM rooms r
             LEFT JOIN game_replays g ON g.room_id=r.id WHERE r.id=?`)
@@ -332,7 +343,7 @@ export class GameContextStore {
       SELECT started_at, finished_at, rounds_played, player_count,
              enable_community_deck, enable_parent_cards,
              enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
-             enable_snake_opening, card_edition, classic_deck_ids
+             enable_snake_opening, card_edition, classic_deck_ids, team_mode, team_scoring, team_scores
       FROM game_results
       WHERE room_id = ?
     `).get(roomId)) as ResultRow | undefined
@@ -345,7 +356,7 @@ export class GameContextStore {
       }
     }
     const players = (await this.db.prepare(`
-      SELECT player_index, display_name, score, name_is_default
+      SELECT player_index, display_name, score, name_is_default, team_index
       FROM game_result_players
       WHERE room_id = ?
       ORDER BY player_index
@@ -374,11 +385,15 @@ export class GameContextStore {
             ? result.classic_deck_ids.filter((deck): deck is string => typeof deck === 'string')
             : [],
         } : {}),
+        ...(result.team_mode !== null && result.team_scoring !== null && result.team_scores !== null ? {
+          team: { mode: result.team_mode, scoring: result.team_scoring, scores: result.team_scores },
+        } : {}),
         players: players.map((player) => ({
           playerIndex: player.player_index,
           displayName: player.display_name,
           ...(player.name_is_default === 1 ? { nameIsDefault: true } : {}),
           score: player.score,
+          ...(player.team_index !== null ? { teamIndex: player.team_index } : {}),
         })),
       },
     }
