@@ -33,8 +33,22 @@ describe('browser API requests', () => {
     await expect(browserApiFetch('/api/auth/me')).resolves.toBe(response)
     expect(changed).toHaveBeenCalledOnce()
     expect(getBrowserReloadRequired()).toBe(true)
+    await expect(response.json()).resolves.toEqual({ ok: false, code: 'reload_required' })
     await expect(browserApiFetch('/api/prerelease/handoffs', { method: 'POST' })).rejects.toThrow('reload_required')
     expect(fetchMock).toHaveBeenCalledOnce()
     unsubscribe()
+  })
+
+  it.each([
+    { status: 426, body: '{"ok":false,"code":"prerelease_runtime_changed"}' },
+    { status: 426, body: 'not json' },
+    { status: 503, body: '{"ok":false,"code":"reload_required"}' },
+  ])('keeps a non-protocol rejection retryable for $status/$body', async ({ status, body }) => {
+    const { browserApiFetch, getBrowserReloadRequired } = await import('../browser-api')
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(body, { status })))
+    const response = await browserApiFetch('/api/auth/me')
+    expect(getBrowserReloadRequired()).toBe(false)
+    await expect(response.text()).resolves.toBe(body)
+    await expect(browserApiFetch('/api/auth/me')).resolves.toHaveProperty('status', status)
   })
 })
