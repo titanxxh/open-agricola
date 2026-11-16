@@ -159,9 +159,9 @@ POST   /api/v1/issue-submission-connection/github/complete
 POST   /api/v1/github-app/webhook
 ```
 
-Public Replay APIs return versioned JSON, never PostgreSQL encoding. A Segment expands at most one checkpoint chain with every Frame Hash verified; an Anchor must match `stepNo + frameHash` exactly. Public reads have per-IP quotas and size caps; authenticated evidence and report endpoints are rate-limited per account.
+Public Replay APIs return versioned JSON, never PostgreSQL encoding. A Segment expands at most one checkpoint chain with every Frame Hash verified; an Anchor must match `stepNo + frameHash` exactly. Public reads have IP quotas/size caps; Evidence/reports have account quotas.
 
-Viewer entry HTML revalidates its response policy; content-addressed assets remain immutable. Its CSP explicitly allows the `PUBLIC_API_BASE` origin (the request origin in local development) for public reads from the opaque sandbox, while scripts remain restricted to `'self'`. Coverage: `replay-routes.test.ts` and `replay-viewer-csp.spec.ts`.
+Viewer HTML revalidates CSP; immutable scripts stay 'self'. Public Replay allows the configured API origin. Pre bridge builds allow blob images. `replay-routes.test.ts` and `replay-viewer-csp.spec.ts` cover both policies.
 
 ## Workshop backend
 
@@ -194,7 +194,7 @@ Bug Report delivery follows [ADR 0012](../adr/0012-github-issue-submission-ident
 - `github-issue-client` fixes repository/installation IDs. Retry reconciliation requires configured-App provenance, attempt-time bounds and a unique terminal marker. Encrypted App user tokens and public-identity consent serve self-authored delivery; Hosted Issue Identity uses installation tokens. Invalid connections never switch authors.
 - `bug-report/feedback-service.ts` owns assessments, inboxes, root fix summaries and deployment operations. Notification subjects isolate imports from native evidence; deletion anonymizes their public IDs through the same App. Writes lock 1673001, sorted users, then subjects. Durable intents fence historical recipients/fix versions/scope; account/root dedup preserves messages/read state. Owner-only native/owner-local proof keeps its type, separate from HTTP. `github-fix-verifier.ts` reads merged proof; raw ancestry supports late links. Current fix availability follows the latest deployment, including rollbacks; first verification remains historical. Tests: `bug-report-{feedback,feedback-routes,fix-links,release-feedback,historical-feedback,historical-deletion}.test.ts`.
 - Account deletion persists `deletion_pending`, signs out sessions and edits known Issue bodies through the installation adapter, retrying until GitHub confirms the site user ID is gone.
-- Maintainer evidence reads require a reason, are audited permanently, are rate-limited and reapply the current participant tombstone projection.
+- Maintainer evidence reads require a reason, are audited permanently, are rate-limited and reapply the current participant tombstone projection. Participant Evidence reads need no Issue secrets.
 - Erasure ([ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)): `server/game/replay-removal.ts` appends each batch to the independent `erasure/ledger.json` in private S3 with ETag CAS before deleting payloads; startup and restore apply it idempotently, a malformed ledger blocks restoration, and resource reads and uploads consult its permanent hash deny rules. Logs never contain tokens, Frame payloads, symptom text or raw GitHub responses.
 
 ## Deployment, rollback and observability
