@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import { join } from 'node:path'
 import { assertScopedPaths, loadPrereleaseEnvironment, type PrereleaseTarget, targetFingerprint } from './config'
 import { atomicJson, controlDirectory, readRuntime, recordPath, writeRuntime, type RuntimeRecord } from './runtime'
-import { archiveTool, assertCapacity, backupEnvironment, backupRoot, importedImage, trustedArchiveImage, candidateTool, command, compose, policyTool, stopWriters, verifyPermissions, verifyRunning } from './docker'
+import { archiveTool, assertCapacity, backupEnvironment, backupRoot, importedImage, trustedArchiveImage, candidateTool, command, compose, policyTool, stopWriters, toolEnvironment, verifyPermissions, verifyRunning } from './docker'
 import { canonicalJson } from '../../shared/contract/authoritative-command'
 import { prepareRestoreStaging, readPairedPrereleaseBackup, removeRestoreStaging } from './backup'
 import { compareIdentityRefs } from './identity-manifest'
@@ -82,9 +82,9 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
   if (record.mode === 'closed' && !['status', 'retention', 'reinitialize', 'finish-close'].includes(request.action)) throw new Error('Retired targets require fresh resources and a new generation')
   if (request.action === 'status') return record
   if (request.action === 'retention') {
-    command('node', [join(target.policyDirectory, 'scripts/backup-files.mjs'), 'prune', backupRoot(target), '7', '1000000'], { env: {
+    command('node', [join(target.policyDirectory, 'scripts/backup-files.mjs'), 'prune', backupRoot(target), '7', '1000000'], { env: toolEnvironment({
       BACKUP_RETENTION_DAYS: '7', BACKUP_ENVIRONMENT: target.targetId, BACKUP_TARGET_FINGERPRINT: targetFingerprint(target),
-    } })
+    }) })
     command('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', target.offsite.host, 'bash', '-s', '--', target.offsite.directory, '7'],
       { input: readFileSync(join(target.policyDirectory, 'deploy/offsite-retention.sh')), timeout: 60_000 })
     return { targetId: target.targetId, retentionDays: 7, mode: record.mode }
