@@ -125,6 +125,7 @@ export const isComplexCost = (
     'protectedFee' in cost ||
     'unitFee' in cost ||
     'roomMaterial' in cost ||
+    'unitPriceIncrease' in cost ||
     'unitPriceAlternatives' in cost ||
     'nb' in cost
   )

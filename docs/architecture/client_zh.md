@@ -150,8 +150,13 @@ GameContextRouter
 - Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。
 - 大厅和对局菜单的 `InboxButton` 读取鉴权持久反馈。模态框保留 Room interaction，只将打开的消息标记已读；焦点及消息变化刷新已加载页范围和未读状态。切换账号重新挂载，credentialless Replay Viewer 不挂载。结论保留修订历史及待补充信息的条目、账号指引。上线消息展示不可改写的首次核验，单独投影后续核验及相关报告。`BugReportFeedbackSettings`、`BugReportFixSettings` 登记结论、显式重复及完整合入修复，展示上线进度但不接受部署证明。共用解析器 `services/bug-report-feedback.ts`；测试：`bug-report-feedback.test.ts` 和 `bug-report-{feedback,fix-links,release-feedback}.spec.ts`。
 
+
 ## Beta 资格与客户端传输
 
 `AuthContext` 消费服务端账号状态 `betaAccess` 和 `isAdmin`，密码登录或重置密码后重读 `/api/auth/me`。设置页展示当前资格及管理员 `BetaAccessSettings` 授予控件。账号搜索包含未验证邮箱的账号，排除待删除账号。撤销后预发布访问在 30 秒内停止，已保存的对局及其他状态继续保留。测试：`BetaAccessSettings.test.tsx`、`SettingsPage.test.tsx`、`beta-access-admin.spec.ts`。
 
 `WsGameTransport` 在每个新 socket 声明能力，`HttpGameTransport` 发送请求 header。要求刷新时沿用可读 reload 界面，并在停止重试前结算未完成的持久 receipt。认证和 journal 的命令身份保持独立。见[客户端能力](contract.md#client-capabilities)。
+
+pre Team 持久建房，`TeamWaitingRoom` 在开局前列出成员。Multihand 跟随自有应答者，不随农场浏览；`ScoringPad`/`ArchivedTeamResults` 展示权威分数。测试：`team-network.test.ts`、`prerelease-session.spec.ts`。
+
+- 合作建造以响应者手牌（`FarmBoard.handPlayer`）展示 `farmOwnerPlayerId` 的农场；命令与费用属于 builder，palisade 限自家权限。测试见 `player-palisades.test.ts` 与预发布合作 E2E。

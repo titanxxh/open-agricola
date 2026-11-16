@@ -8,6 +8,7 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C087_Mason'
 const FREE_SINGLE_ROOM_CONTEXT = {
+  targetFarmPolicy: 'own',
   maxRooms: 1,
   exactCost: { max: 1 },
   trueAction: false,
