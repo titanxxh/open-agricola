@@ -217,7 +217,7 @@ export async function revocationCase(kit, browser, accounts) {
     phase('grant'); r.betaRestore = { admin: await kit.betaAccess('grant', A) }
     await enter(one, 'one-after-grant'); r.betaRestore.sameIdentity = true; phase('done')
     r.passed = r.currentLogout.formal === 200 && within(r.currentLogout.derived.deniedAfterMs) && r.currentLogout.otherAfter33s.status === 200
-      && r.currentLogout.otherSocketAfter33s.connectedAtStart > 0 && r.currentLogout.otherSocketAfter33s.closedAfterMs === null
+      && r.currentLogout.otherSocketAfter33s.stillOpen === true
       && r.logoutAll.formal === 200 && within(a.deniedAfterMs) && within(b.deniedAfterMs)
       && within(r.betaRevoke.http.deniedAfterMs) && r.betaRevoke.reentry.preSession !== 200 && r.betaRevoke.reentry.handoffStatus !== 200 && r.betaRestore.sameIdentity
       && [r.currentLogout.derivedSockets, ...r.logoutAll.sockets, r.betaRevoke.sockets].every(s => s.connectedAtStart > 0 && within(s.closedAfterMs))
