@@ -144,8 +144,13 @@ GameContextRouter
 - The Issue Submission Connection is separate from `AuthContext`: the report footer owns the initial connection, Settings shows status and disconnect only, and an invalid connection never switches to Hosted Issue Identity.
 - `InboxButton` in the Lobby and game menu reads authenticated persistent feedback. Its modal preserves Room interaction and marks only the opened message read. Focus/message changes refresh the loaded page range and unread state; account changes remount it and credentialless Replay Viewers never mount it. Assessments retain revision history and needs-info item/account guidance. Release messages show immutable first verification, separately projected later verification and related reports. `BugReportFeedbackSettings` and `BugReportFixSettings` record assessments, explicit duplicates and complete merged fixes, displaying release progress without accepting deployment proof. Shared parser: `services/bug-report-feedback.ts`; tests: `bug-report-feedback.test.ts` and `bug-report-{feedback,fix-links,release-feedback}.spec.ts`.
 
+
 ## Beta access and client transport
 
 `AuthContext` consumes server account facts `betaAccess` and `isAdmin`, and refreshes `/api/auth/me` after password login or password reset. Settings shows current qualification and the administrator `BetaAccessSettings` grant controls. Its account search includes email-unverified accounts and excludes accounts pending deletion. Revocation stops prerelease access within 30 seconds while retaining saved games and other state. Tests: `BetaAccessSettings.test.tsx`, `SettingsPage.test.tsx`, `beta-access-admin.spec.ts`.
 
 `WsGameTransport` declares capabilities on each new socket; `HttpGameTransport` sends the request header. A refresh-required error retains the readable reload UI and waits for outstanding durable receipts before stopping retries. Authentication and journal command identities remain separate. See [client capabilities](contract.md#client-capabilities).
+
+Pre Team creation is durable; `TeamWaitingRoom` lists members before start. Multihand follows owned responders, not farm browsing; `ScoringPad`/`ArchivedTeamResults` show authoritative scores. Tests: `team-network.test.ts`, `prerelease-session.spec.ts`.
+
+- Partner builds show the `farmOwnerPlayerId` farm with the responder's hand (`FarmBoard.handPlayer`); commands and costs stay the builder's, palisades owner-scoped.

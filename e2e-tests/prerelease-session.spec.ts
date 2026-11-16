@@ -9,12 +9,21 @@ import { seedPrivateReplay } from './_helpers/prerelease-replay'
 // @covers client/app/PageRouter.tsx
 // @covers server/prerelease-routes.ts
 // @covers server/prerelease-sessions.ts
+// @covers client/components/interaction/MarketplacePanel.tsx
+// @covers server/game/room.ts
+// @covers server/game/room-committer.ts
+// @covers client/app/MultihandSeatControls.tsx
+// @covers client/app/TeamWaitingRoom.tsx
+// @covers client/app/LobbyPage.tsx
+// @covers client/app/GameContainerApi.tsx
+// @covers shared/actions/effects/internal/select-target-farm.ts
 import { expect, type BrowserContext, type Page, type PlaywrightWorkerArgs, type PlaywrightWorkerOptions } from '@playwright/test'
 import { execFileSync, spawn } from 'node:child_process'
 import { createServer as tlsServer } from 'node:https'
 import { createServer, request as httpRequest, type ClientRequest, type IncomingMessage } from 'node:http'
 import { once } from 'node:events'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import { mkdtempSync, readFileSync, writeFileSync, renameSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -31,6 +40,16 @@ import { createPrereleaseGateway, OWNER_VERIFICATION_COOKIE } from '../scripts/p
 import { configureOwnerVerification } from '../scripts/prerelease/owner-browser'
 import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { test } from './server-fixtures'
+import type { ServerEvent } from '../shared/contract/protocol/ws'
+import { PostgresDatabase } from '../server/database/postgres'
+import { RoomDirectory } from '../server/game/room-directory'
+import { PostgresRoomPersistence } from '../server/game/persistence/postgres-adapter'
+import { ExecutionAccess } from '../server/game/execution-access'
+import { serializeSessionSnapshot } from '../shared/session/serialization'
+import type { GameSession } from '../server/game/authoritative-session'
+import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
+import { canonicalJson, frameHash } from '../server/game/replay-codec'
+import { REPLAY_SCHEMA_VERSION } from '../server/game/room-committer'
 
 const buildId = 'a'.repeat(40)
 const reservedPorts = new Set<number>()
@@ -69,6 +88,17 @@ function observeRoomSocket(page: Page) {
   return { created, joined }
 }
 
+function observeGameSocket(page: Page) {
+  const states: Array<Extract<ServerEvent, { type: 'stateUpdate' }>> = []
+  const joins: Array<Extract<ServerEvent, { type: 'roomJoined' }>> = []
+  page.on('websocket', socket => socket.on('framereceived', frame => {
+    const event: ServerEvent = JSON.parse(String(frame.payload))
+    if (event.type === 'stateUpdate') states.push(event)
+    if (event.type === 'roomJoined') joins.push(event)
+  }))
+  return { states, joins, latest: () => states.at(-1) }
+}
+
 /** Actual pre application and sessions; the formal fixture uses the real authority protocol. */
 async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPublicSandbox = false,
   options: { browserName?: PlaywrightWorkerOptions['browserName']; ownerVerification?: boolean } = {}) {
@@ -89,11 +119,14 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
     acquired.register(() => admin.close())
     await admin.exec(`CREATE SCHEMA "${schema}"`)
     acquired.register(() => admin.exec(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`))
+    const additionalUsers: string[] = []
     const source = getDb(), username = `pre_${randomUUID().slice(0, 8)}`
     const user = await createLocalUserForTests(username, 'pre-session-password-926')
     const cleanSourceUser = async () => {
-      await source.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id)
-      await source.prepare('DELETE FROM users WHERE id=?').run(user.id)
+      for (const id of [user.id, ...additionalUsers]) {
+        await source.prepare('DELETE FROM sessions WHERE user_id=?').run(id)
+        await source.prepare('DELETE FROM users WHERE id=?').run(id)
+      }
     }
     acquired.register(cleanSourceUser)
     await source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
@@ -133,6 +166,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
     const track = (socket: Duplex) => { if (sockets.has(socket)) return; sockets.add(socket); socket.once('close', () => sockets.delete(socket)); socket.on('error', () => socket.destroy()) }
     const trackRequest = (request: ClientRequest) => { requests.add(request); request.once('close', () => requests.delete(request)); request.once('socket', track); return request }
     let formalOrigin = '', preOrigin = '', authority = createPrereleaseAuthorityHandler({ db: source, getSourceToken: async req => requestSessionToken(req) })
+    let beforeNextExchange: (() => Promise<void>) | undefined
     const proxy = tlsServer({ key: readFileSync(join(directory, 'key.pem')), cert: readFileSync(join(directory, 'cert.pem')) }, (req, res) => {
       const host = new URL(`https://${req.headers.host}`).hostname
       if (host === 'localhost') {
@@ -156,7 +190,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
           .then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
       }
       if ((req.url ?? '').startsWith('/api/prerelease/')) {
-        void authority(req, res).then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
+        const before = req.url === '/api/prerelease/exchange' ? beforeNextExchange : undefined
+        if (before) beforeNextExchange = undefined
+        void Promise.resolve().then(() => before?.()).then(() => authority(req, res))
+          .then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
       }
       if (req.url === '/api/auth/browser-policy') {
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
@@ -321,27 +358,51 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       formal: { appOrigin: formalOrigin, apiOrigin: formalOrigin }, ca: readFileSync(join(directory, 'cert.pem')) })
     await new Promise<void>(resolve => gateway!.server.listen(gatewayPort, '127.0.0.1', resolve))
     await gateway.refreshBrowserPolicy()
-    const enter = async (context: BrowserContext) => {
+    const enter = async (context: BrowserContext, principal = user, expected?: 'paused') => {
       const page = await context.newPage()
-      await page.goto(`${preOrigin}/open-agricola/auth/start`)
-      await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toBeVisible()
-      const fragment = new URL(page.url()).hash
-      const input = Object.fromEntries(new URLSearchParams(fragment.slice(1)))
-      const issued = await page.evaluate(async ({ formal, input, header, version }) => {
-        const response = await fetch(`${formal}/api/prerelease/handoffs`, { method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json', [header]: String(version) },
-          body: JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin: input.targetOrigin, browserChallenge: input.browserChallenge, returnTo: input.returnTo }) })
-        if (!response.ok) throw new Error('Formal authority refused browser handoff')
-        return response.json()
-      }, { formal: formalOrigin, input, header: BROWSER_AUTH_HEADER, version: BROWSER_AUTH_VERSION })
-      const callback = new URL(issued.callbackUrl)
-      callback.hash = new URLSearchParams({ protocolVersion: '1', code: issued.code, state: input.state!, browserChallenge: input.browserChallenge!, returnTo: issued.returnTo }).toString()
-      await page.goto(callback.href)
-      await expect(page.locator('.prerelease-banner')).toContainText('Prerelease aaaaaaaaaaaa')
-      await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toHaveCount(0)
-      await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible()
-      await expect(page.locator('.lobby-user-pill')).toHaveText(user.displayName)
-      return page
+      const responses: Array<Promise<{ at: number; path: string; status: number; code?: string }>> = []
+      page.on('response', response => {
+        const path = new URL(response.url()).pathname
+        if (!['/api/prerelease/session', '/api/auth/me'].includes(path)) return
+        const at = Date.now()
+        responses.push(response.json().then((body: unknown) => ({ at, path, status: response.status(),
+          ...(body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' ? { code: body.code } : {}),
+        }), () => ({ at, path, status: response.status() })))
+      })
+      try {
+        await page.goto(`${preOrigin}/open-agricola/auth/start`)
+        await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toBeVisible()
+        const fragment = new URL(page.url()).hash
+        const input = Object.fromEntries(new URLSearchParams(fragment.slice(1)))
+        const issued = await page.evaluate(async ({ formal, input, header, version }) => {
+          const response = await fetch(`${formal}/api/prerelease/handoffs`, { method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json', [header]: String(version) },
+            body: JSON.stringify({ protocolVersion: 1, channel: 'prerelease', targetOrigin: input.targetOrigin, browserChallenge: input.browserChallenge, returnTo: input.returnTo }) })
+          if (!response.ok) throw new Error('Formal authority refused browser handoff')
+          return response.json()
+        }, { formal: formalOrigin, input, header: BROWSER_AUTH_HEADER, version: BROWSER_AUTH_VERSION })
+        const callback = new URL(issued.callbackUrl)
+        callback.hash = new URLSearchParams({ protocolVersion: '1', code: issued.code, state: input.state!, browserChallenge: input.browserChallenge!, returnTo: issued.returnTo }).toString()
+        const initialResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/prerelease/session' && response.request().method() === 'POST')
+        await page.goto(callback.href)
+        await expect(page.locator('.prerelease-banner')).toContainText('Prerelease aaaaaaaaaaaa')
+        await expect(page.getByRole('heading', { name: 'Formal identity fixture' })).toHaveCount(0)
+        const response = await initialResponse
+        if (expected === 'paused') expect(response.status()).toBe(503)
+        if (response.status() === 503) {
+          expect(await response.json()).toEqual({ ok: false, code: 'prerelease_access_paused' })
+          await expect(page.locator('.prerelease-access-screen')).toContainText('Access is paused')
+          await page.getByRole('button', { name: 'Retry', exact: true }).click()
+        }
+        await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible()
+        await expect(page.locator('.lobby-user-pill')).toHaveText(principal.displayName)
+        return page
+      } finally {
+        const events = await source.prepare('SELECT kind,created_at,acknowledged_at FROM prerelease_identity_events WHERE target_origin=? AND user_id=? ORDER BY created_at,id').all(preOrigin, principal.id)
+        const path = test.info().outputPath(`prerelease-entry-observations-${randomUUID()}.json`)
+        writeFileSync(path, JSON.stringify({ responses: await Promise.all(responses), events }, null, 2), { mode: 0o600 })
+        await test.info().attach('prerelease-entry-observations', { path, contentType: 'application/json' })
+      }
     }
     const browser = await playwright[options.browserName ?? 'chromium'].launch()
     const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
@@ -362,10 +423,58 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
       expect(result).toMatchObject({ ok: true, user: { id: user.id, username: user.username, displayName: user.displayName } })
     }
     const assertFormalSession = async () => { expect(await validateSession(sourceToken)).toMatchObject({ id: user.id, username: user.username }) }
-    return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
+    const createParticipant = async () => {
+      const participant = await createLocalUserForTests(`team_${randomUUID().slice(0, 8)}`, 'team-session-password-926')
+      additionalUsers.push(participant.id)
+      await source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(participant.id, Date.now())
+      const token = await createSession(participant.id)
+      if (!token) throw new Error('Could not create the participant formal session')
+      const other = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
+      await other.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+      await other.addCookies([{ name: formalCookieName, value: token, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
+      return { context: other, user: participant }
+    }
+    // A prepared native snapshot is restored before this owner has loaded the room. No browser command can mutate its setup.
+    const prepareRetainedRoom = async (session: GameSession, seatUserIds: string[]) => {
+      const db = new PostgresDatabase({ connectionString: databaseUrl, schema })
+      try {
+        const state = session.state, team = state.team
+        if (!team || state.players.length !== seatUserIds.length) throw new Error('Expected explicit Team seat ownership')
+        const viewer = await db.prepare('SELECT build_id FROM replay_viewer_builds ORDER BY created_at DESC LIMIT 1').get<{ build_id: string }>()
+        if (!viewer) throw new Error('The actual prerelease app has not installed its immutable viewer')
+        const roomId = randomUUID(), directory = new RoomDirectory(db)
+        const { owner } = await directory.claim(roomId)
+        const executionStamp = await new ExecutionAccess(db).capture([], seatUserIds)
+        const teamMembers = [...new Set(seatUserIds)].map(userId => {
+          const playerIndex = seatUserIds.indexOf(userId), player = state.players[playerIndex], teamIndex = team.playerTeams[playerIndex]
+          if (!player || teamIndex === undefined) throw new Error('Missing native Team member')
+          return { memberId: randomUUID(), userId, name: player.name, teamIndex,
+            seatCount: seatUserIds.filter(id => id === userId).length }
+        })
+        const serialized = session.withCtx(() => serializeSessionSnapshot(state, session)), createdAt = Date.now()
+        expect(await new PostgresRoomPersistence(db, directory).commitReplay({
+          roomId, serialized, meta: {
+            createdBy: seatUserIds[0] ?? null, startedAt: createdAt, status: 'playing', maxPlayers: state.players.length,
+            customCardDbIds: [], replayRecording: true, replayViewerBuildId: viewer.build_id, replayGameBuildId: buildId,
+            teamMembers, players: seatUserIds.map((userId, playerIndex) => ({ userId, playerIndex })), owner, executionStamp,
+          }, header: { schemaVersion: REPLAY_SCHEMA_VERSION, viewerBuildId: viewer.build_id,
+            gameBuildId: buildId, missingPrefix: false, customCardsJson: '[]' },
+          step: { stepNo: 0, roomVersion: 0, checkpointStepNo: 0, playerIndex: null, commandType: 'initial',
+            intentJson: '{}', payloadKind: 'checkpoint', payloadGzip: gzipSync(canonicalJson(serialized.frame)),
+            frameHash: frameHash(serialized.frame), createdAt },
+        })).toEqual({ kind: 'committed' })
+        return roomId
+      } finally { await db.close() }
+    }
+    const retainedRoom = async (roomId: string) => admin.prepare(`SELECT status,state_json,team_members_json FROM "${schema}".rooms WHERE id=?`).get(roomId)
+    const waitForIdentityEvents = () => expect.poll(async () => (await source.prepare('SELECT count(*)::int AS pending FROM prerelease_identity_events WHERE target_origin=? AND user_id=? AND acknowledged_at IS NULL')
+      .get<{ pending: number }>(preOrigin, user.id))?.pending).toBe(0)
+    return { context, browser, close, enter, createParticipant, retainedRoom, prepareRetainedRoom, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
       upstreamReads, verificationBinding: { targetId, buildId, generation: generationId, healthyCycle, expiresAt, mode: options.ownerVerification ? 'maintenance' : 'open' },
       seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }),
-      publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value } }
+      publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value },
+      waitForIdentityEvents,
+      beforeNextExchange: (callback: () => Promise<void>) => { beforeNextExchange = callback } }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
     catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Prerelease fixture setup and cleanup failed', { cause: cleanupError }) }
@@ -776,4 +885,343 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
     await testInfo.attach('public-sandbox-responses', { body: JSON.stringify(diagnostics, null, 2), contentType: 'application/json' })
     await releaseAll([() => environment.context.close(), () => environment.browser.close(), () => environment.close()])
   }
+})
+
+test('real prerelease Multihand binds two seats per principal and survives browser reentry without losing the game', async ({ playwright }) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright)
+  let other: Awaited<ReturnType<typeof environment.createParticipant>> | undefined
+  let failure: { error: unknown } | undefined
+  try {
+    const host = await environment.enter(environment.context)
+    other = await environment.createParticipant()
+    const guest = await environment.enter(other.context, other.user)
+    const hostWire = observeGameSocket(host), guestWire = observeGameSocket(guest)
+    await host.getByRole('button', { name: 'Multihand game', exact: true }).click()
+    const cooperation = host.getByRole('checkbox', { name: 'Official cooperation rules', exact: true })
+    await expect(cooperation).not.toBeChecked()
+    await cooperation.check()
+    await host.getByRole('button', { name: 'Create Game', exact: true }).click()
+    await expect(host.locator('.team-waiting-room')).toBeVisible()
+    await expect(host.getByRole('button', { name: 'Start game', exact: true })).toBeDisabled()
+    const roomUrl = host.url(), roomId = new URL(roomUrl).searchParams.get('room')
+    expect(roomId).toMatch(/^[a-f0-9-]{36}$/)
+    await guest.goto(roomUrl)
+    await expect(guest.locator('.team-waiting-room')).toContainText('4/4 seats filled')
+    await expect(host.getByRole('button', { name: 'Start game', exact: true })).toBeEnabled()
+    expect(hostWire.latest()).toBeUndefined()
+    expect(guestWire.latest()).toBeUndefined()
+    await host.getByRole('button', { name: 'Start game', exact: true }).click()
+    await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await expect.poll(() => guestWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([1, 3])
+    await expect.poll(() => hostWire.latest()?.payload.state.team?.playerTeams).toEqual([0, 1, 0, 1])
+    expect(hostWire.latest()?.payload.state.team?.configuration.cooperationRules).toBe(true)
+    const pages = [host, guest]
+    const wires = [hostWire, guestWire]
+    for (let opening = 0; opening < 8; opening++) {
+      const current = hostWire.latest()!
+      if (current.payload.interaction.stateId === 'idle') break
+      if (current.payload.interaction.stateId !== 'wait') throw new Error('Expected a pending opening interaction')
+      expect(current.payload.state).toMatchObject({ phase: 'playing', round: 1, roundPhase: 'preparation' })
+      const actor = current.payload.interaction.playerIndex, side = actor % 2
+      const page = pages[side]!, wire = wires[side]!
+      await expect.poll(() => wire.latest()?.version).toBe(current.version)
+      const interaction = wire.latest()!.payload.interaction
+      if (interaction.stateId !== 'wait') throw new Error('Expected an owned opening interaction')
+      const request = interaction.request
+      const control = request.kind === 'choice' && request.options.some(option => option.value === '__skip__' && !option.disabled)
+        ? page.locator('.interaction-bar [data-choice-value="__skip__"]')
+        : request.kind === 'confirm-player-switch'
+          ? page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+          : undefined
+      if (!control) throw new Error(`Unexpected opening interaction: ${request.kind}`)
+      await expect(control).toBeEnabled()
+      await control.click()
+      await expect.poll(() => wire.latest()?.version ?? -1).toBeGreaterThan(current.version)
+      await expect.poll(() => hostWire.latest()?.version).toBe(wire.latest()!.version)
+    }
+    await expect.poll(() => hostWire.latest()?.payload.interaction.stateId).toBe('idle')
+    expect(hostWire.latest()?.payload.state.actionSpaces.flatMap(space => space.takenBy)).toEqual([])
+    const acted = new Set<number>()
+    for (let step = 0; step < 4; step++) {
+      const state = hostWire.latest()!
+      const actor = state.payload.interaction.stateId === 'wait'
+        ? state.payload.interaction.playerIndex : state.payload.state.currentPlayerIndex
+      const side = actor % 2, page = pages[side]!, wire = wires[side]!
+      await expect(page.locator(`.multihand-operation[data-operation-player-id="p${actor + 1}"]`).first()).toBeVisible()
+      const before = wire.latest()!.version
+      const action = page.locator(['forest', 'clay-pit', 'reed-bank', 'grain-seeds']
+        .map(id => `[data-action-id="${id}"] button:enabled`).join(', ')).first()
+      await expect(action).toBeVisible()
+      await action.click()
+      await expect.poll(() => wire.latest()!.version).toBeGreaterThan(before)
+      acted.add(actor)
+      const confirm = page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+      const pending = wire.latest()!.payload.interaction
+      if (pending.stateId === 'wait' && (pending.request.kind === 'confirm-next-player' || pending.request.kind === 'confirm-player-switch')) {
+        await expect(confirm).toBeVisible()
+        const previous = wire.latest()!.version
+        await confirm.click()
+        await expect.poll(() => wire.latest()!.version).toBeGreaterThan(previous)
+      }
+      await expect.poll(() => hostWire.latest()?.version).toBe(wire.latest()!.version)
+    }
+    expect([...acted].sort()).toEqual([0, 1, 2, 3])
+    const persisted = await environment.retainedRoom(roomId!)
+    await host.reload()
+    await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await expect(host.locator('.multihand-seat-controls')).toBeVisible()
+    await expect(host.getByRole('button', { name: 'View your hand', exact: true })).toBeVisible()
+    await host.getByRole('button', { name: 'View your hand', exact: true }).click()
+    await expect(host.locator('.multihand-hand-dialog select option')).toHaveCount(2)
+    await host.locator('.multihand-hand-dialog').getByRole('button', { name: 'Close', exact: true }).click()
+    await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
+    await expect(host.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
+    expect(await environment.retainedRoom(roomId!)).toEqual(persisted)
+    await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
+    environment.beforeNextExchange(async () => {
+      await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
+      await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
+      await environment.waitForIdentityEvents()
+    })
+    const returned = await environment.enter(environment.context, environment.user, 'paused')
+    const returnedWire = observeGameSocket(returned)
+    await returned.goto(roomUrl)
+    await expect.poll(() => returnedWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await expect(returned.locator('.multihand-seat-controls')).toBeVisible()
+  } catch (error) { failure = { error } }
+  try {
+    await releaseAll([
+      async () => { await other?.context.close() },
+      () => environment.context.close(), () => environment.browser.close(), () => environment.close(),
+    ])
+  } catch (error) {
+    if (failure) throw new AggregateError([failure.error, error], 'Team browser test and cleanup failed', { cause: error })
+    throw error
+  }
+  if (failure) throw failure.error
+})
+
+
+test('real retained cooperative Marketplace charges the giver once and resumes after reloading the pending switch', async ({ playwright }) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright)
+  let other: Awaited<ReturnType<typeof environment.createParticipant>> | undefined
+  let failure: { error: unknown } | undefined
+  try {
+    const host = await environment.enter(environment.context)
+    other = await environment.createParticipant()
+    const guest = await environment.enter(other.context, other.user)
+    const hostWire = observeGameSocket(host), guestWire = observeGameSocket(guest)
+    const guestUser = other.user
+    const session = createWorkSession({ options: { playerCount: 4,
+      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', cooperationRules: true },
+    }, configure: state => {
+      for (const [index, player] of state.players.entries()) player.name = index % 2 === 0 ? environment.user.displayName : guestUser.displayName
+    } })
+    let roomId: string
+    try { roomId = await environment.prepareRetainedRoom(session, [environment.user.id, other.user.id, environment.user.id, other.user.id]) }
+    finally { session.dispose() }
+    const roomUrl = `${environment.preOrigin}/open-agricola/?room=${roomId}`
+    await host.goto(roomUrl)
+    await guest.goto(roomUrl)
+    await expect.poll(() => hostWire.latest()?.payload.state.players.map(player => player.resources.food)).toEqual([2, 3, 3, 3])
+    await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await host.locator('[data-action-id="marketplace"] button').click()
+    const food = host.locator('[data-marketplace-resource="food"]')
+    await expect(food).toBeVisible()
+    await food.locator('select').first().selectOption('take')
+    await food.locator('select').nth(1).selectOption('p3')
+    await food.locator('input').fill('1')
+    await expect(food.locator('output')).toHaveText(`${environment.user.displayName} pays 1 Food and 1 Food tax`)
+    await host.getByRole('button', { name: 'Confirm transfers', exact: true }).click()
+    await expect.poll(() => hostWire.latest()?.payload.state.players.map(player => player.resources.food)).toEqual([3, 3, 1, 3])
+    await expect.poll(() => hostWire.latest()?.payload.state.log.filter(entry => entry.key === 'log.marketplaceTransfer').length).toBe(1)
+    expect(hostWire.latest()?.payload.scores?.map(score => score.total)).toEqual([-14, -14, -14, -14])
+    expect(hostWire.latest()?.payload.teamScores?.map(score => score.total)).toEqual([-28, -28])
+    await expect.poll(() => hostWire.latest()?.payload.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player', nextPlayerIndex: 1 } })
+    const persisted = await environment.retainedRoom(roomId)
+    await host.reload()
+    const confirm = host.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+    await expect(confirm).toBeVisible()
+    expect(await environment.retainedRoom(roomId)).toEqual(persisted)
+    expect(hostWire.latest()?.payload.state.players.map(player => player.resources.food)).toEqual([3, 3, 1, 3])
+    expect(hostWire.latest()?.payload.state.log.filter(entry => entry.key === 'log.marketplaceTransfer')).toHaveLength(1)
+    await confirm.click()
+    await expect.poll(() => guestWire.latest()?.payload.state.currentPlayerIndex).toBe(1)
+    const version = guestWire.latest()!.version
+    await guest.locator('[data-action-id="day-laborer"] button').click()
+    await expect.poll(() => guestWire.latest()?.version).toBeGreaterThan(version)
+    await expect.poll(() => guestWire.latest()?.payload.state.players.map(player => player.resources.food)).toEqual([3, 5, 1, 3])
+    expect(guestWire.latest()?.payload.state.log.filter(entry => entry.key === 'log.marketplaceTransfer')).toHaveLength(1)
+  } catch (error) { failure = { error } }
+  try {
+    await releaseAll([
+      async () => { await other?.context.close() },
+      () => environment.context.close(), () => environment.browser.close(), () => environment.close(),
+    ])
+  } catch (error) {
+    if (failure) throw new AggregateError([failure.error, error], 'Marketplace browser test and cleanup failed', { cause: error })
+    throw error
+  }
+  if (failure) throw failure.error
+})
+
+
+test('real cooperative builds keep the builder, target farm and Stablehand continuation through revoked access and reentry', async ({ playwright }) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright)
+  let other: Awaited<ReturnType<typeof environment.createParticipant>> | undefined
+  let failure: { error: unknown } | undefined
+  try {
+    let host = await environment.enter(environment.context)
+    other = await environment.createParticipant()
+    const guestUser = other.user, guest = await environment.enter(other.context, guestUser)
+    let hostWire = observeGameSocket(host)
+    const guestWire = observeGameSocket(guest)
+    const session = createWorkSession({ seed: 1666, options: { playerCount: 4,
+      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', cooperationRules: true },
+    }, configure: state => {
+      state.round = 14
+      for (const [index, player] of state.players.entries()) {
+        player.name = index % 2 === 0 ? environment.user.displayName : guestUser.displayName
+        player.workers.push({ id: `${player.id}-family-third`, isActive: true, isNewborn: false })
+      }
+      const builder = state.players[0]
+      if (!builder) throw new Error('Missing build actor')
+      Object.assign(builder.resources, { wood: 20, reed: 3 })
+      builder.occupationPlayed = ['D089_Stablehand']
+    } })
+    let roomId: string
+    try { roomId = await environment.prepareRetainedRoom(session, [environment.user.id, guestUser.id, environment.user.id, guestUser.id]) }
+    finally { session.dispose() }
+    const roomUrl = `${environment.preOrigin}/open-agricola/?room=${roomId}`
+    await host.goto(roomUrl); await guest.goto(roomUrl)
+    await expect.poll(() => hostWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
+    await expect.poll(() => guestWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([1, 3])
+    const latest = () => {
+      const event = hostWire.latest()
+      if (!event) throw new Error('Missing confirmed room state')
+      return event.payload
+    }
+    const command = async (wire: ReturnType<typeof observeGameSocket>, action: () => Promise<unknown>) => {
+      // The acting page must first see the host's confirmed state; otherwise a late earlier broadcast satisfies the wait below.
+      await expect.poll(() => wire.latest()?.version).toBe(hostWire.latest()?.version)
+      const version = wire.latest()?.version ?? -1
+      await action()
+      await expect.poll(() => wire.latest()?.version ?? -1).toBeGreaterThan(version)
+      await expect.poll(() => hostWire.latest()?.version).toBe(wire.latest()?.version)
+    }
+    const confirmSwitch = async (page: Page, wire: ReturnType<typeof observeGameSocket>, next: number) => {
+      await command(wire, () => page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true }).click())
+      await expect.poll(() => latest().state.currentPlayerIndex).toBe(next)
+    }
+    const take = async (page: Page, wire: ReturnType<typeof observeGameSocket>, spaceId: string) =>
+      command(wire, () => page.locator(`[data-action-id="${spaceId}"] button`).click())
+    const chooseTarget = async (playerId: string) => {
+      await host.locator(`.interaction-bar [data-choice-value="target-farm:${playerId}"]`).click()
+      await command(hostWire, () => host.getByRole('button', { name: 'Build on this farm', exact: true }).click())
+    }
+    const chooseBuild = async (kind: 'construct' | 'stables') => {
+      const interaction = latest().interaction
+      if (interaction.stateId !== 'wait' || interaction.request.kind !== 'choice') throw new Error(`Expected ${kind} branch`)
+      const option = interaction.request.options.find(option => option.labelKey === `actions.${kind}.name`)
+      if (!option) throw new Error(`Missing ${kind} option`)
+      await command(hostWire, () => host.locator(`.interaction-bar [data-choice-value="${option.value}"]`).click())
+    }
+    const place = async (playerId: string, tile: string) => {
+      await expect(host.locator(`.hand-cards[data-hand-anchor="p1"]`).first()).toBeVisible()
+      await host.locator(`[data-farm-tile-player="${playerId}"][data-farm-tile-key="${tile}"]`).click()
+      await command(hostWire, () => host.locator('.interaction-bar [data-choice-value="confirm"]').click())
+    }
+    const otherSeats = async (actions: [string, string, string]) => {
+      for (const [index, spaceId] of actions.entries()) {
+        const actor = index + 1, page = actor % 2 === 0 ? host : guest, wire = actor % 2 === 0 ? hostWire : guestWire
+        await expect.poll(() => latest().state.currentPlayerIndex).toBe(actor)
+        await take(page, wire, spaceId)
+        await confirmSwitch(page, wire, actor === 3 ? 0 : actor + 1)
+      }
+    }
+    await take(host, hostWire, 'marketplace')
+    const food = host.locator('[data-marketplace-resource="food"]')
+    await food.locator('select').first().selectOption('take')
+    await food.locator('input').fill('1')
+    await command(hostWire, () => host.getByRole('button', { name: 'Confirm transfers', exact: true }).click())
+    expect(latest().state.players.map(player => player.resources.food)).toEqual([3, 3, 1, 3])
+    await confirmSwitch(host, hostWire, 1)
+    await otherSeats(['day-laborer', 'grain-seeds', 'forest'])
+    await take(host, hostWire, 'farm-expansion')
+    await chooseTarget('p3')
+    await chooseBuild('construct')
+    await expect.poll(() => latest().interaction).toMatchObject({ stateId: 'wait', playerIndex: 0,
+      request: { kind: 'farm-select', farmOwnerPlayerId: 'p3', farm: { farmType: 'room' } } })
+    await place('p3', '1-1')
+    expect(latest().state.players[0]?.resources).toMatchObject({ wood: 14, reed: 0 })
+    expect(latest().state.players[0]?.rooms).toBe(2)
+    expect(latest().state.players[2]?.rooms).toBe(3)
+    await chooseBuild('stables')
+    await place('p3', '0-2')
+    expect(latest().state.players[0]?.resources.wood).toBe(11)
+    expect(latest().state.players[0]?.stableTiles).toEqual([])
+    expect(latest().state.players[2]?.stableTiles).toEqual([{ row: 0, col: 2 }])
+    await confirmSwitch(host, hostWire, 1)
+    await otherSeats(['clay-pit', 'reed-bank', 'copse'])
+    await take(host, hostWire, 'fencing')
+    await chooseTarget('p3')
+    for (const edge of ['H-0-3', 'H-1-3', 'V-0-3', 'V-0-4']) {
+      await host.locator(`[data-fence-player="p3"][data-fence-edge="${edge}"] .farm-fence-hit`).click()
+    }
+    await expect(host.getByTestId('fence-selection-cost')).toHaveText('Cost: 6 wood')
+    await command(hostWire, () => host.locator('.interaction-bar [data-choice-value="confirm"]').click())
+    expect(latest().state.players[0]?.resources.wood).toBe(5)
+    expect(latest().state.players[2]?.pastures).toHaveLength(1)
+    for (let step = 0; step < 4; step++) {
+      const interaction = latest().interaction
+      if (interaction.stateId !== 'wait' || (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger')) throw new Error('Expected Stablehand continuation')
+      if (interaction.request.options.some(option => option.value === 'target-farm:p1')) break
+      const option = interaction.request.options.find(option => option.value === 'D089_Stablehand')
+        ?? interaction.request.options.find(option => option.value !== '__skip__' && !option.disabled)
+      if (!option) throw new Error('Missing Stablehand continuation choice')
+      await command(hostWire, () => host.locator(`.interaction-bar [data-choice-value="${option.value}"]`).click())
+    }
+    await expect(host.locator('.interaction-bar [data-choice-value="target-farm:p1"]')).toBeVisible()
+    const persisted = await environment.retainedRoom(roomId)
+    await host.reload()
+    await expect(host.locator('.interaction-bar [data-choice-value="target-farm:p1"]')).toBeVisible()
+    expect(await environment.retainedRoom(roomId)).toEqual(persisted)
+    await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
+    await expect(host.getByText('Your login or Beta access is no longer valid. Return to production to sign in and enter again.')).toBeVisible({ timeout: 35_000 })
+    expect(await environment.retainedRoom(roomId)).toEqual(persisted)
+    await environment.source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(environment.user.id, Date.now())
+    await environment.waitForIdentityEvents()
+    await host.close()
+    host = await environment.enter(environment.context)
+    hostWire = observeGameSocket(host)
+    await host.goto(roomUrl)
+    await expect(host.locator('.interaction-bar [data-choice-value="target-farm:p1"]')).toBeVisible()
+    await chooseTarget('p1')
+    await place('p1', '0-4')
+    expect(latest().state.players[0]?.resources.wood).toBe(5)
+    expect(latest().state.players[0]?.stableTiles).toEqual([{ row: 0, col: 4 }])
+    expect(latest().state.players[2]?.stableTiles).toEqual([{ row: 0, col: 2 }])
+    expect(latest().state.players[2]?.pastures[0]?.tiles).toEqual([{ row: 0, col: 3 }])
+    expect(latest().state.log.filter(entry => entry.key === 'log.marketplaceTransfer')).toHaveLength(1)
+    expect(latest().state.log).toContainEqual(expect.objectContaining({ key: 'log.partnerRoomsBuiltWood', playerId: 'p1', playerRefs: { owner: 'p3' } }))
+    expect(latest().state.log).toContainEqual(expect.objectContaining({ key: 'log.partnerStablesBuilt', playerId: 'p1', playerRefs: { owner: 'p3' } }))
+    expect(latest().scores?.find(score => score.playerId === 'p1')?.categories.find(category => category.key === 'empty')?.total).toBe(-12)
+    expect(latest().scores?.find(score => score.playerId === 'p3')?.categories.find(category => category.key === 'empty')?.total).toBe(-10)
+    await confirmSwitch(host, hostWire, 1)
+    await take(guest, guestWire, 'vegetable-seeds')
+    expect(latest().state.players[1]?.resources.vegetable).toBe(1)
+  } catch (error) { failure = { error } }
+  try {
+    await releaseAll([
+      async () => { await other?.context.close() },
+      () => environment.context.close(), () => environment.browser.close(), () => environment.close(),
+    ])
+  } catch (error) {
+    if (failure) throw new AggregateError([failure.error, error], 'Cooperation browser test and cleanup failed', { cause: error })
+    throw error
+  }
+  if (failure) throw failure.error
 })

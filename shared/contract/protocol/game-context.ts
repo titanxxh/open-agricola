@@ -1,3 +1,4 @@
+import type { TeamResultArchive } from '../team'
 import type { GameTermination } from './game-termination'
 
 export type GameContextLifecycle = 'active' | 'completed' | 'terminated' | 'expired' | 'removed'
@@ -41,11 +42,13 @@ export type CompletedGameContextDescriptor = {
     /** Present only for a classic game (ADR 0049); absent means revised. */
     cardEdition?: 'classic'
     classicDeckIds?: string[]
+    team?: TeamResultArchive
     players: Array<{
       playerIndex: number
       displayName: string
       nameIsDefault?: boolean
       score: number
+      teamIndex?: number
     }>
   }
   replay?: {

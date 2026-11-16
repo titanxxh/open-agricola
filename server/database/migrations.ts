@@ -93,6 +93,7 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     // Prerelease-only migrations use 9000 + their original number so main can keep numbering 047 onward.
     await movePrereleaseMigrationVersions(db)
     migrations.push('9047-prerelease-sessions.sql')
+    migrations.push('9048-team-room-members.sql')
     migrations.push('9050-prerelease-handoff-receipts.sql')
     for (const filename of migrations) {
       const name = typeof filename === 'string' ? filename : filename.name
