@@ -59,7 +59,9 @@ export function createOperationsHandler({ db, collect }: { db: PostgresDatabase;
         .get<{ session_token: string }>(digest(ticket), Date.now())
       const user = row && await userFor(row.session_token)
       if (!user || !isAdmin(user.username)) { if (!reenterOperations(req, res)) json(res, 401, { ok: false, code: 'invalid_handoff' }); return true }
-      res.writeHead(303, { Location: `${prefix}/ops/d/open-agricola/operations`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
+      // The ticket lives only in this request URL, never in a Referer. strict-origin keeps the opener's origin on the
+      // redirected navigation, which is how the gateway admits a launch from the site's operations page.
+      res.writeHead(303, { Location: `${prefix}/ops/d/open-agricola/operations`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'strict-origin',
         'Set-Cookie': serializeOperationsCookie(row!.session_token) })
       res.end(); return true
     }

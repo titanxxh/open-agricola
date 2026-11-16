@@ -78,6 +78,19 @@ it('uses a one-time handoff, strips site credentials and checks current privileg
   vi.stubEnv('ADMIN_USERS', 'ops-admin')
 })
 
+it('keeps the app origin as Referer through the handoff redirect so an in-app launch reaches the dashboard', async () => {
+  const bootstrap = await fetch(base + '/api/admin/observability/session', { method: 'POST', headers: { Authorization: 'Bearer ops-admin-token' } })
+  // The site's operations page opens the handoff in a new tab: a same-site navigation whose Referer is the app page.
+  const start = await navigate(base + (await bootstrap.json()).path, { 'Sec-Fetch-Site': 'same-site', Referer: `${base}/?page=operations` })
+  expect(start.status).toBe(303)
+  expect(start.headers.get('referrer-policy')).toBe('strict-origin')
+  const cookie = start.headers.get('set-cookie')!.split(';')[0]!
+  const followed = { 'Sec-Fetch-Site': 'same-site', Cookie: cookie }
+  // strict-origin keeps the app origin on the redirected navigation; no-referrer dropped it and the gateway refused it.
+  expect((await navigate(base + start.headers.get('location')!, { ...followed, Referer: `${base}/` })).status).toBe(200)
+  expect((await navigate(base + start.headers.get('location')!, followed)).status).toBe(403)
+})
+
 it('returns a browser without a current operations session to the site operations page', async () => {
   const opened = { 'Sec-Fetch-Site': 'none' }
   const missing = await navigate(base + '/ops/d/open-agricola/operations', opened)
