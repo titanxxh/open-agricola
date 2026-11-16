@@ -853,8 +853,11 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
     await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible({ timeout: 30_000 })
     await expect(frame.locator('.action-board').first()).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('sandbox-restored.png'), fullPage: true })
+    // An unconfirmed source keeps the last confirmed lease (at most 30 s) before pausing; the client checks every second
+    // and a status request may take its full 5 s timeout, so a fresh lease right before the change can exceed 30 s.
+    const sourceLeasePause = 40_000
     await environment.source.prepare('UPDATE workshop_public_versions SET disabled_at=? WHERE card_id=?').run(Date.now(), fixtureCard.cardId)
-    await expect(frame.getByText('This playtest is paused. Check access and card availability before continuing.', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(frame.getByText('This playtest is paused. Check access and card availability before continuing.', { exact: true })).toBeVisible({ timeout: sourceLeasePause })
     await expect(frame.locator('.action-board')).toHaveCount(0)
     const resume = async () => {
       const confirmed = page.waitForEvent('dialog').then(dialog => dialog.accept())
@@ -866,7 +869,7 @@ test('prerelease public sandbox renders fixed art and executes dynamic effects i
     await environment.source.prepare('UPDATE workshop_public_versions SET disabled_at=NULL WHERE card_id=?').run(fixtureCard.cardId)
     await resume()
     environment.setPublicSourceOnline(false)
-    await expect(frame.getByText('This playtest is paused. Check access and card availability before continuing.', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(frame.getByText('This playtest is paused. Check access and card availability before continuing.', { exact: true })).toBeVisible({ timeout: sourceLeasePause })
     await expect(frame.locator('.action-board')).toHaveCount(0)
     environment.setPublicSourceOnline(true)
     await resume()
@@ -1100,6 +1103,8 @@ test('real cooperative builds keep the builder, target farm and Stablehand conti
       return event.payload
     }
     const command = async (wire: ReturnType<typeof observeGameSocket>, action: () => Promise<unknown>) => {
+      // The acting page must first see the host's confirmed state; otherwise a late earlier broadcast satisfies the wait below.
+      await expect.poll(() => wire.latest()?.version).toBe(hostWire.latest()?.version)
       const version = wire.latest()?.version ?? -1
       await action()
       await expect.poll(() => wire.latest()?.version ?? -1).toBeGreaterThan(version)
