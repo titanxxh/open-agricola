@@ -120,20 +120,23 @@ it('keeps import records when Docker cannot confirm that their image is gone', (
   expect(readdirSync(join(value.root, 'control', 'retired-images'))).toEqual([])
 })
 
-it('refuses to remove images during a pending operation or an image import, and ignores foreign records', () => {
+it('frees space beside a staged import archive, refuses a pending operation and ignores foreign records', () => {
   const value = fixture(); seed(value)
   value.cache('candidate', sha('f'), sha('e'), image('6'), 'f'.repeat(64))
   expect(parse(value.invoke('image-cleanup-plan')).foreign).toEqual([`image-candidate-${sha('f')}-${sha('e')}.json`])
-  writeFileSync(join(value.root, 'control', 'image-import-22222222-2222-4222-8222-222222222222.tar'), '')
-  const importing = value.invoke('image-cleanup')
-  expect(importing.status).not.toBe(0)
-  expect(importing.stderr).toContain('image import is in progress')
-  rmSync(join(value.root, 'control', 'image-import-22222222-2222-4222-8222-222222222222.tar'))
+  // A failed import keeps its uploaded archive; cleanup must still free the space that import needs.
+  const staged = 'image-import-22222222-2222-4222-8222-222222222222.tar'
+  writeFileSync(join(value.root, 'control', staged), 'archive')
+  const freed = parse(value.invoke('image-cleanup'))
+  expect(short(freed.removed)).toEqual([['3'], ['4']])
+  expect(freed.stagedImports).toEqual([staged])
+  expect(readFileSync(join(value.root, 'control', staged), 'utf8')).toBe('archive')
   value.record({ mode: 'maintenance', operation: { id: '33333333-3333-4333-8333-333333333333', kind: 'deploy', stage: 'acceptance', buildId: sha('b'), image: image('3'),
     sourceBuildId: sha('a'), sourceImage: image('1'), backupStem: null, generation: '11111111-1111-4111-8111-111111111111' } })
+  const callsBefore = value.calls()
   const pending = value.invoke('image-cleanup')
   expect(pending.status).not.toBe(0)
   expect(pending.stderr).toContain('pending prerelease operation')
-  expect(value.images()).toHaveLength(6)
-  expect(value.calls()).not.toContain('image rm')
+  expect(value.images().sort()).toEqual([image('1'), image('2'), image('5'), image('6')])
+  expect(value.calls().slice(callsBefore.length)).not.toContain('image rm')
 })

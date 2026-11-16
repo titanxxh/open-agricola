@@ -190,7 +190,7 @@ owner 可在安排扩容期间明确暂缓完整负载验收。部署证据须�
 ./deploy-prerelease.sh image-cleanup --config "$pre_config" --ssh "$pre_host" --expected-current "$pre_current"
 ```
 
-两者都在操作锁内运行，只考虑本 target 的已验证导入记录 `control/image-<purpose>-<source>-<policy>.json`。保留当前 policy 的 trusted-policy 镜像、已安装候选、挂起操作涉及的全部镜像，以及任何容器（含已停止容器）引用的镜像。执行时若有挂起操作或未完成的导入则拒绝；在锁内重新规划，不带强制删除镜像，只把已删除镜像的记录移到 `control/retired-images/`。其他 target 的记录只报告、不改动；正式镜像从不在候选之列。之后需要已删除镜像的操作会失败即关闭，直到重新导入该镜像。
+两者都在操作锁内运行，只考虑本 target 的已验证导入记录 `control/image-<purpose>-<source>-<policy>.json`。保留当前 policy 的 trusted-policy 镜像、已安装候选、挂起操作涉及的全部镜像，以及任何容器（含已停止容器）引用的镜像。执行时若有挂起操作则拒绝；在锁内重新规划，不带强制删除镜像，只把已删除镜像的记录移到 `control/retired-images/`。镜像加载持有同一把锁，因此导入失败留下的归档不会阻挡清理；它会列在 `stagedImports` 中，留给重试使用。其他 target 的记录只报告、不改动；正式镜像从不在候选之列。之后需要已删除镜像的操作会失败即关闭，直到重新导入该镜像。
 
 每个 owner 操作都会带上 owner checkout 的 HEAD；主机发现策略 SHA 与自身 owner-tools 的 HEAD 不同就拒绝该操作（`Owner envelope is expired or bound to a different policy/target`）。在线备份同样需要已导入的、对应该 HEAD 的 trusted-policy 镜像。涉及策略变更的维护窗口按以下顺序进行：先把主机 owner-tools 目录切到新的 main SHA（不停任何服务），再从同一 SHA 的 owner checkout 执行 `maintain`，然后导入该 SHA 的 trusted-policy 镜像和由它构建的候选镜像，最后 `deploy`。第一步与第三步要在同一个窗口内完成：新 trusted-policy 镜像导入之前，下一次定时备份会失败。运行中的 gateway 与 storage guard 沿用启动时加载的内容：gateway 挂载 `scripts/prerelease/gateway.ts`、`browser-policy.ts`、`storage-guard-state.ts` 和 `shared/contract/browser-auth.ts`，guard 运行 `scripts/prerelease/storage-guard-cli.ts` 及其导入的模块。新 SHA 改动其中任何一项时，需在窗口内重启对应服务。
 
