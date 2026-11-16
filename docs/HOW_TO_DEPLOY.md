@@ -857,6 +857,8 @@ Live target validation uses the remaining monotonic maintenance budget, capped a
 
 Only a source that was running at entry, drained cleanly by this operation and retained its exact identity can restart after a pre-migration backup failure. OOM, unclean drain and failures after live migration begins keep maintenance active. The `data_imports` barrier and container health gate remain. The private operation directory retains import/source evidence and resolved Compose, which contains environment credentials and must remain private.
 
+Owner SSH uses a two-minute keepalive. If the session still ends during maintenance, the backend keeps working and `deploy-backend.sh` follows its status every 30 seconds instead of failing: it reports success only after native acceptance, runs one continuation when the operation becomes `resumable`, and stops with the exact status command on `blocked`/`unknown` or when the backend stays unreachable past the owner deadline.
+
 From the same clean exact producer checkout, inspect an interrupted operation before continuing it:
 
 ```bash
