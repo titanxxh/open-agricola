@@ -36,7 +36,7 @@ const parsed = (text: string): Record<string, unknown> => object(JSON.parse(text
 export function assertCapacity(target: PrereleaseTarget, phase: 'import' | 'tool' | 'inspect-image' | 'app' | 'idle'): void {
   assertStorageAdmission(target, targetFingerprint(target), phase === 'idle' ? 'idle' : 'operation')
   command('bash', ['-euo', 'pipefail', '-c', 'source "$1"; backup_reap_tools', 'prerelease-reap', join(target.policyDirectory, 'scripts/backup-process.sh')],
-    { env: { BACKUP_ENVIRONMENT: target.targetId, BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + 30_000) } })
+    { env: toolEnvironment({ BACKUP_ENVIRONMENT: target.targetId, BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + 30_000) }) })
   if (command('docker', ['ps', '-q', '--filter', `label=org.open-agricola.backup.environment=${target.targetId}`])) {
     throw new Error(`Prerelease ${phase} requires other tools to be stopped`)
   }
@@ -140,14 +140,20 @@ export function verifyRunning(target: PrereleaseTarget, record: RuntimeRecord): 
   if (result.buildId !== record.installed.buildId || result.channel !== 'prerelease' || result.generation !== record.generation) throw new Error('Installed prerelease identity did not verify')
 }
 
+/** Owner tools pass a minimal environment, but child programs still need an exported PATH:
+ * uutils `timeout` (Ubuntu 26.04) cannot find its command without one, unlike GNU's /bin:/usr/bin fallback. */
+export function toolEnvironment(values: Readonly<Record<string, string>>): NodeJS.ProcessEnv {
+  return { PATH: process.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', ...values }
+}
+
 export function backupEnvironment(target: PrereleaseTarget, record: RuntimeRecord): NodeJS.ProcessEnv {
-  return { BACKUP_ENVIRONMENT: target.targetId, BACKUP_WORKING_DIRECTORY: target.directory, BACKUP_POLICY_ROOT: target.policyDirectory,
+  return toolEnvironment({ BACKUP_ENVIRONMENT: target.targetId, BACKUP_WORKING_DIRECTORY: target.directory, BACKUP_POLICY_ROOT: target.policyDirectory,
     BACKUP_TARGET_CONFIG: JSON.stringify(target), BACKUP_TARGET_BUILD_ID: record.operation?.buildId ?? record.buildId ?? '',
     BACKUP_COMPOSE_FILE: composePath(target), BACKUP_COMPOSE_PROJECT: target.project, BACKUP_TOOL_SERVICE: 'tools', BACKUP_CAPTURE_SERVICE: 'capture',
     BACKUP_TOOL_MEMORY_MIB: String(target.budgets.tools.memoryMiB), BACKUP_TOOL_CPUS: String(target.budgets.tools.cpus), BACKUP_TOOL_PIDS: String(target.budgets.tools.pids),
     BACKUP_RETENTION_DAYS: '7', BACKUP_DAILY_COUNT: '7', BACKUP_PRE_COUNT: '1000000', SOURCE_BUILD_ID: record.buildId ?? '',
     BACKUP_DATA_GENERATION: record.generation, BACKUP_TARGET_FINGERPRINT: targetFingerprint(target),
-    BACKUP_SOURCE_IMAGE: record.installed?.image ?? '', OFFSITE_BACKUP_TARGET: target.offsite.host, OFFSITE_BACKUP_REMOTE_DIR: target.offsite.directory }
+    BACKUP_SOURCE_IMAGE: record.installed?.image ?? '', OFFSITE_BACKUP_TARGET: target.offsite.host, OFFSITE_BACKUP_REMOTE_DIR: target.offsite.directory })
 }
 
 function cleanupOwnedTools(target: PrereleaseTarget, runId: string): void {
