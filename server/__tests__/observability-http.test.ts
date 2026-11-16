@@ -65,7 +65,10 @@ it('uses a one-time handoff, strips site credentials and checks current privileg
   const start = await navigate(base + path)
   expect(start.status).toBe(303)
   const cookie = start.headers.get('set-cookie')!.split(';')[0]!
-  expect((await navigate(base + path)).status).toBe(401)
+  const reused = await navigate(base + path)
+  expect(reused.status).toBe(303)
+  expect(reused.headers.get('location')).toBe(`${base}/?page=operations`)
+  expect(reused.headers.get('set-cookie')).toBeNull()
   const query = await fetch(base + '/ops/api/ds/query', { method: 'POST', headers: { Cookie: cookie, 'X-WEBAUTH-USER': 'forged', Origin: base }, body: '{}' })
   expect(query.status).toBe(200)
   expect(await query.json()).toEqual({ user: 'ops-admin' })
@@ -73,6 +76,28 @@ it('uses a one-time handoff, strips site credentials and checks current privileg
   vi.stubEnv('ADMIN_USERS', '')
   expect((await fetch(base + '/ops/api/ds/query', { method: 'POST', headers: { Cookie: cookie, Origin: base }, body: '{}' })).status).toBe(403)
   vi.stubEnv('ADMIN_USERS', 'ops-admin')
+})
+
+it('returns a browser without a current operations session to the site operations page', async () => {
+  const opened = { 'Sec-Fetch-Site': 'none' }
+  const missing = await navigate(base + '/ops/d/open-agricola/operations', opened)
+  expect(missing.status).toBe(303)
+  expect(missing.headers.get('location')).toBe(`${base}/?page=operations`)
+  expect(missing.headers.get('set-cookie')).toBeNull()
+  await db.prepare('INSERT INTO sessions(token,user_id,created_at,expires_at,auth_policy_version) VALUES(?,?,?,?,2)')
+    .run('ops-admin-ending-token', 'ops-admin', Date.now(), Date.now() + 60_000)
+  const bootstrap = await fetch(base + '/api/admin/observability/session', { method: 'POST', headers: { Authorization: 'Bearer ops-admin-ending-token' } })
+  const start = await navigate(base + (await bootstrap.json()).path)
+  const cookie = start.headers.get('set-cookie')!.split(';')[0]!
+  expect((await navigate(base + '/ops/d/open-agricola/operations', { ...opened, Cookie: cookie })).status).toBe(200)
+  await db.prepare('DELETE FROM sessions WHERE token=?').run('ops-admin-ending-token')
+  const ended = await navigate(base + '/ops/d/open-agricola/operations', { ...opened, Cookie: cookie })
+  expect(ended.status).toBe(303)
+  expect(ended.headers.get('location')).toBe(`${base}/?page=operations`)
+  // Dashboard data requests keep the machine-readable rejection.
+  const data = await fetch(base + '/ops/api/search', { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty' } })
+  expect(data.status).toBe(401)
+  expect(await data.json()).toEqual({ ok: false, code: 'login_required' })
 })
 
 it('requires the current site administrator for every dashboard and data route', async () => {

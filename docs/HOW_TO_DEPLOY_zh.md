@@ -1243,7 +1243,7 @@ Grafana 关闭预装插件自动更新（`plugins.preinstall_auto_update=false`�
 
 房间面板左轴显示在线等待、进行中、同屏和开发房间，右轴显示离线保留房间和总房间。总房间为等待、进行中、同屏和离线保留之和，不含开发、已完成或已过期房间。两轴都不堆叠。
 
-管理员鉴权仍由游戏应用的 `/ops/` 网关处理。监控独立发布不保证游戏停服期间该网关可用。
+管理员鉴权仍由游戏应用的 `/ops/` 网关处理。从站内运维页面（`?page=operations`）进入；浏览器直接打开看板书签或已用过的交接链接、而运维会话已失效时，会被送回该页面。监控独立发布不保证游戏停服期间该网关可用。
 
 所有监控服务都不发布生产主机端口。私有 dependency network 是可信服务器边界，不能另加 Caddy 直连监控服务；公网仅通过应用网关访问 `/ops/`。不挂 Docker socket；Node Exporter 只读挂载 host root，并使用 host PID 可见性。部署账号不是 1000 时设置 `OBSERVABILITY_UID/GID`，确保该账号可读写 `data/observability/{prometheus,grafana}` 并读取 token 文件；应用继续使用 `APP_UID/GID`。
 
