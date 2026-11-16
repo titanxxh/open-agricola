@@ -60,11 +60,16 @@ export function planImageCleanup(target: PrereleaseTarget, record: RuntimeRecord
   return plan
 }
 
-/** Replans under the operation lock, removes images without force and retires only the records whose image is gone. */
+const stagedImports = (control: string) => readdirSync(control).filter(file => /^image-(?:import|snapshot)-.+\.tar$/.test(file)).sort()
+
+/**
+ * Replans under the operation lock, removes images without force and retires only the records whose image is gone.
+ * Image loads run under the same lock, so a staged archive left by a failed import does not block cleanup: freeing
+ * space is how that import can succeed. Staged archives and images without a verified record are never touched.
+ */
 export function executeImageCleanup(target: PrereleaseTarget, record: RuntimeRecord) {
   const control = controlDirectory(target)
   if (record.operation) throw new Error('Finish the pending prerelease operation before removing images')
-  if (readdirSync(control).some(file => /^image-(import|snapshot)-.+\.tar$/.test(file))) throw new Error('An image import is in progress; finish or retry it before removing images')
   const plan = planImageCleanup(target, record)
   const retired = join(control, 'retired-images')
   mkdirSync(retired, { recursive: true, mode: 0o700 })
@@ -80,5 +85,5 @@ export function executeImageCleanup(target: PrereleaseTarget, record: RuntimeRec
     renameSync(join(control, entry.file), join(retired, entry.file))
     removed.push(entry)
   }
-  return { mode: 'execute', policySha: plan.policySha, keep: plan.keep, removed, retained, foreign: plan.foreign }
+  return { mode: 'execute', policySha: plan.policySha, keep: plan.keep, removed, retained, foreign: plan.foreign, stagedImports: stagedImports(control) }
 }
