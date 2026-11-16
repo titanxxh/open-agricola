@@ -1,8 +1,12 @@
 import { PublicSandboxAccess, pausePublicSandbox, PUBLIC_SANDBOX_PAUSED_EVENT } from '../local-sandbox/public-access'
 import { isPrereleaseClient } from '../services/prerelease-runtime'
+import type { MarketplaceTransfer } from '../../shared/contract/marketplace'
+import { TeamWaitingRoom } from './TeamWaitingRoom'
+import { nextMultihandPlayerId, pendingMultihandInputs, type MultihandInput } from './multihand-seat'
+import { MultihandSeatControls } from './MultihandSeatControls'
 import { PublicOpeningProgress } from './PublicOpeningProgress'
 import { GameEndControls } from './GameEndControls'
-import type { RoomColorErrorCode } from '../../shared/contract/protocol/ws'
+import type { RoomColorErrorCode, RoomTeamErrorCode } from '../../shared/contract/protocol/ws'
 import { WaitingRoomPlayers } from './WaitingRoomPlayers'
 import { buildRoomSearch, roomIdFromQuery } from '../utils/game-room-url'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
@@ -169,6 +173,7 @@ const useTransportSetup = (
 
   const initRef = useRef(false)
   const [recoveryNotice, setRecoveryNotice] = useState(false)
+  const [roomTeamError, setRoomTeamError] = useState<RoomTeamErrorCode | null>(null)
   const [roomColorError, setRoomColorError] = useState<RoomColorErrorCode | null>(null)
   const [connectedPlayerIndexes, setConnectedPlayerIndexes] = useState<number[] | null>(null)
   const playerIndexRef = useRef(0)
@@ -252,7 +257,7 @@ const useTransportSetup = (
     let hotseat = false
     let receivedRoom = false
     let snapshotRoomId: string | undefined
-    let waiting: Extract<WsStatus, { phase: 'waiting' }> | undefined
+    let waiting: Extract<WsStatus, { phase: 'waiting' | 'team-waiting' }> | undefined
     let disposed = false
     const ready = () => {
       if (disposed) return
@@ -292,6 +297,11 @@ const useTransportSetup = (
         setWsStatus({ phase: 'joining', roomId: msg.roomId })
       } else if (msg.type === 'spectatingEnded') {
         ready()
+      } else if (msg.type === 'teamRoomWaiting') {
+        receivedRoom = true; hotseat = false
+        setRoomInUrl(msg.roomId); setRoomTeamError(null)
+        waiting = { ...msg, phase: 'team-waiting' }
+        setWsReady(false); setWsStatus(waiting)
       } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined') {
         receivedRoom = true
         setRoomInUrl(msg.roomId)
@@ -327,6 +337,8 @@ const useTransportSetup = (
         snapshotRoomId = msg.roomId
         setRoomInUrl(msg.roomId)
         if (ws.connected) ready()
+      } else if (msg.type === 'error' && (msg.code === 'team_change_failed' || msg.code === 'team_start_failed')) {
+        setRoomTeamError(msg.code)
       } else if (msg.type === 'error' && (msg.code === 'color_unavailable' || msg.code === 'color_locked' || msg.code === 'invalid_color' || msg.code === 'color_save_failed' || msg.code === 'color_confirmation_unavailable' || msg.code === 'color_confirmation_failed')) {
         setRoomColorError(msg.code)
       } else if (msg.type === 'error' && !ws.connected) {
@@ -384,7 +396,7 @@ const useTransportSetup = (
     : isWsMode && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = isLocalMode ? localReady : (!isWsMode || wsReady)
   return {
-    connectedPlayerIndexes, transport, wsStatus, lastReadyStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
+    connectedPlayerIndexes, transport, wsStatus, lastReadyStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, roomTeamError, changePlayerColor: (color: PlayerState['color']) => {
     setRoomColorError(null)
     try { wsTransport?.sendRoomCommand('setPlayerColor', { color }) } catch { setRoomColorError('color_save_failed') }
   } }
@@ -423,7 +435,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     if (access) void access.start().catch(pausePublicSandbox)
     return () => { access?.stop(); window.removeEventListener(PUBLIC_SANDBOX_PAUSED_EVENT, pause) }
   }, [isWsMode, isLocalMode, user?.id])
-  const { connectedPlayerIndexes, transport, wsStatus, lastReadyStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor } = useTransportSetup(
+  const { connectedPlayerIndexes, transport, wsStatus, lastReadyStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, roomTeamError, changePlayerColor } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
     isWsMode,
@@ -431,7 +443,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     isLocalMode,
     user?.id ?? 'anon',
   )
-  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, waitingSeatIndexes, applySnapshot } =
+  const { state, interaction, scores, teamScores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, waitingSeatIndexes, applySnapshot } =
     useGameSync()
   const roomHistory = useRoomHistory(transport, state, historyWindow)
   const privateEventNotificationBatchSeqRef = useRef(0)
@@ -533,8 +545,22 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const isHotseat = viewerStatus?.hotseat === true
   const participantViewer = viewerStatus?.viewer.kind === 'participant' ? viewerStatus.viewer : null
   const controlledPlayerIndexes = participantViewer?.controlledPlayerIndexes ?? (participantViewer ? [participantViewer.playerIndex] : [])
-  const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
-  const activePlayer = interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
+  const isMultihand = !isHotseat && state?.team?.configuration.mode === 'multihand'
+  const multihandRoomId = wsStatus.phase === 'ready' ? wsStatus.roomId : null
+  const [preferredMultihandInput, setPreferredMultihandInput] = useState<(MultihandInput & { roomId: string }) | null>(null)
+  const pendingMultihand = isMultihand && state ? pendingMultihandInputs(state, controlledPlayerIndexes) : []
+  const multihandPlayerId = isMultihand && state ? nextMultihandPlayerId(state, interaction, controlledPlayerIndexes,
+    preferredMultihandInput?.roomId === multihandRoomId ? preferredMultihandInput : null) : null
+  const localPlayerId = isMultihand ? multihandPlayerId ?? wsAssignedPlayerId : lockedViewPlayerId ?? wsAssignedPlayerId
+  const multihandAudienceKey = multihandPlayerId && wsStatus.phase === 'ready' ? `${wsStatus.roomId}:${multihandPlayerId}` : null
+  const [lastMultihandAudienceKey, setLastMultihandAudienceKey] = useState<string | null>(null)
+  if (lastMultihandAudienceKey !== multihandAudienceKey) {
+    setLastMultihandAudienceKey(multihandAudienceKey)
+    if (multihandPlayerId) setViewPlayerId(multihandPlayerId)
+  }
+  const activePlayer = isMultihand && multihandPlayerId && (state?.phase === 'draft' || state?.phase === 'parent-selection')
+    ? state.players.find(player => player.id === multihandPlayerId) ?? currentPlayer
+    : interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
       ? state?.players[interaction.playerIndex] ?? currentPlayer
       : currentPlayer
   // One-device HTTP play follows the Interaction Player, including reactions.
@@ -544,10 +570,13 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
   // Browsing a public farm never changes the interaction or confirmed seat.
   // HTTP sandbox follows the responder rather than a browsing preference.
-  const displayPlayer = isWs
+  const targetFarmOwnerId = interaction.stateId === 'wait' && interaction.request.kind === 'farm-select'
+    ? interaction.request.farmOwnerPlayerId : undefined
+  const targetFarmOwner = state?.players.find(player => player.id === targetFarmOwnerId)
+  const displayPlayer = targetFarmOwner ?? (isWs
     ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
-    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
-  const isPublicFarmView = isHotseat && displayPlayer?.id !== activePlayer?.id
+    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null))
+  const isPublicFarmView = isHotseat && !targetFarmOwner && displayPlayer?.id !== activePlayer?.id
   const hotseatRoomId = isHotseat && viewerStatus ? viewerStatus.roomId : null
   const hotseatAudienceId = isHotseat && state
     ? state.phase === 'draft' && state.draft
@@ -577,7 +606,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     ? !persistencePaused && !!activePlayer && hotseatSeatConfirmed === hotseatAudienceKey && !isPublicFarmView
     : isWs
       ? !persistencePaused && (!isWs || wsStatus.phase === 'ready') && !!(activePlayer && selfPlayer && displayPlayer &&
-           activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
+           activePlayer.id === selfPlayer.id && (displayPlayer.id === selfPlayer.id || displayPlayer.id === targetFarmOwner?.id))
       : !!(activePlayer && displayPlayer))
   const hasGameView = !!(state && currentPlayer && displayPlayer)
   // While the server is unavailable the last board stays under an overlay as the transport keeps reconnecting; opening
@@ -674,8 +703,8 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const farmSelectionDraft = useFarmSelectionDraftPresentation({
     interactionPresentationPlan,
     locale,
-    // Budgets and geometry belong to the responder, even while inspecting another farm.
-    displayPlayer: (isHotseat ? activePlayer : displayPlayer),
+    // Placement uses the bound farm; the server supplies the builder payment budget.
+    displayPlayer: targetFarmOwner ?? (isHotseat ? activePlayer : displayPlayer),
     players: state?.players,
   })
   const farmInteraction = farmSelectionDraft.farmInteraction
@@ -1535,6 +1564,8 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       ? t(locale, 'platform.serverMaintenance.game')
       : wsStatus.phase === 'reconnecting'
       ? t(locale, 'platform.roomReconnecting')
+      : wsStatus.phase === 'team-waiting'
+      ? t(locale, 'team.waitingTitle')
       : wsStatus.phase === 'waiting'
       ? colorConfirmingPlayer
         ? t(locale, 'platform.waitingForColorConfirmation', { player: getPlayerDisplayName(locale, colorConfirmingPlayer.name, colorConfirmingPlayer.playerIndex) })
@@ -1561,7 +1592,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
             : `Error: ${wsStatus.message}`
         : ''
 
-    const inviteUrl = wsStatus.phase === 'waiting'
+    const inviteUrl = wsStatus.phase === 'waiting' || wsStatus.phase === 'team-waiting'
       ? `${window.location.origin}${window.location.pathname}${buildRoomSearch(wsStatus.roomId)}`
       : null
 
@@ -1586,7 +1617,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
 
     return (
       <div className="ws-status-screen">
-        <div className="ws-status-card">
+        <div className={`ws-status-card${wsStatus.phase === 'team-waiting' ? ' ws-status-card--team' : ''}`}>
           {!isEmbedded && <div className="site-header-links"><SiteCommunityLinks /></div>}
           {!isEmbedded ? (
             <BrandMark
@@ -1606,7 +1637,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
             </div>
           ) : null}
 
-          {(wsStatus.phase === 'waiting') && inviteUrl && (
+          {(wsStatus.phase === 'waiting' || wsStatus.phase === 'team-waiting') && inviteUrl && (
             <div className="ws-invite-panel">
               <div className="ws-invite-label">{t(locale, 'platform.inviteLabel')}</div>
               <div className="ws-invite-url-row">
@@ -1631,9 +1662,12 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
                 </div>
               )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
-              {<WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex ?? undefined} onColorChange={changePlayerColor} colorError={roomColorError}
+              {wsStatus.phase === 'team-waiting'
+                ? <TeamWaitingRoom value={wsStatus} onChooseTeam={(teamIndex, memberId, swapMemberId) => wsTransport?.sendRoomCommand('setTeam', { teamIndex, memberId, swapMemberId })}
+                    onStart={() => wsTransport?.sendRoomCommand('startTeamGame')} disabled={persistencePaused} error={roomTeamError} />
+                : <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex ?? undefined} onColorChange={changePlayerColor} colorError={roomColorError}
                   colorConfirmationPlayerIndex={wsStatus.colorConfirmationPlayerIndex} onConfirmColor={() => wsTransport?.sendRoomCommand('confirmPlayerColor')} disabled={persistencePaused} />}
-              {wsStatus.phase === 'waiting' && <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
+              {(wsStatus.phase === 'waiting' || wsStatus.isHost) && <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
                 {t(locale, 'platform.dissolveRoom')}
               </button>}
             </div>
@@ -1738,6 +1772,11 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     </>
   )
   const gameHeader = renderGameHeader(true)
+  const multihandControls = isMultihand && state && selfPlayer && multihandRoomId
+    ? <MultihandSeatControls state={state} locale={locale} controlledPlayerIndexes={controlledPlayerIndexes}
+        pending={pendingMultihand} operatingPlayerId={selfPlayer.id}
+        onChoose={input => setPreferredMultihandInput({ ...input, roomId: multihandRoomId })} />
+    : null
   const hotseatHandoff = (playerId: string) => (
     <div className={`app app--handoff${isEmbedded ? ' app--embedded' : ''}`}>
       {renderGameHeader(false)}
@@ -1773,6 +1812,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
+        {multihandControls}
         {notificationStack}
         {bugReportBar}
         {waiting?.canSubmit ? (
@@ -1809,6 +1849,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
+        {multihandControls}
         {notificationStack}
         {bugReportBar}
         <DraftOverlay
@@ -1839,6 +1880,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
+        {multihandControls}
         {notificationStack}
         {bugReportBar}
         <ParentSelectionOverlay
@@ -1865,6 +1907,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const farmBoardView = {
     ...farmBoardProjection,
     ...farmSelectionDraft.farmBoardDraft,
+    handPlayer: targetFarmOwner ? selfPlayer ?? activePlayer ?? undefined : undefined,
     ...(isPublicFarmView ? {
       plowSelectableSet: new Set<string>(),
       pendingPlowTile: null,
@@ -1955,6 +1998,17 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
           },
         }
       : null
+  const interactionBarMarketplaceSelect = interactionPresentationPlan.kind === 'marketplace-select'
+    ? {
+        request: interactionPresentationPlan.request,
+        actorName: interaction.stateId === 'wait' ? playerNames[state.players[interaction.playerIndex]?.id ?? ''] ?? '' : '',
+        isConfirmDisabled: (transfers: MarketplaceTransfer[]) => !isInteractive || isInteractionSubmitDraftRejected({ value: 'confirm', marketplaceTransfers: transfers }),
+        onConfirm: (transfers: MarketplaceTransfer[]) => {
+          if (!isInteractive) return
+          runInteractionSubmitCommand(buildInteractionSubmitCommand(interaction, { value: 'confirm', marketplaceTransfers: transfers }))
+        },
+      }
+    : null
   const interactionBarResourceBatchExchangeSelect =
     interactionPresentationPlan.kind === 'resource-batch-exchange-select'
       ? {
@@ -2006,6 +2060,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       nextPlayerConfirmDisabled: currentConfirmRejected,
       playerSwitchConfirmDisabled: currentConfirmRejected,
       heating: heatingPending,
+      marketplaceSelect: interactionBarMarketplaceSelect,
       resourceQuantitySelect: interactionBarResourceQuantitySelect,
       resourceBatchExchangeSelect: interactionBarResourceBatchExchangeSelect,
       suppressChoiceOptions: suppressPendingChoiceOptions,
@@ -2036,7 +2091,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
         sow: isSelectingSow,
       },
       fence: {
-        canBuildPalisades: !!activePlayer && playerCanBuildPalisades(activePlayer),
+        canBuildPalisades: !!activePlayer && playerCanBuildPalisades(activePlayer, targetFarmOwner ?? activePlayer),
         placementMode: farmSelectionDraft.interactionBarDraft.fencePlacementMode,
         setPlacementMode: farmSelectionDraft.controls.setFencePlacementMode,
         borrowedSources: farmSelectionDraft.borrowedFenceSources,
@@ -2167,7 +2222,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const sectionItems = sectionNavItems({
     handPlayerId: ownHandSectionAvailable({
       selfPlayerId: selfPlayer?.id ?? null,
-      displayPlayerId: displayPlayer.id,
+      displayPlayerId: farmBoardView.handPlayer?.id ?? displayPlayer.id,
       visiblePlayerIds: farmBoardView.visiblePlayerIds,
       devMode: farmBoardView.devMode,
     }),
@@ -2240,7 +2295,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
           }}
         />
       </div>
-      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring}
+      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} teamScores={teamScores} teamConfiguration={state.team?.configuration} players={state.players} onClose={closeScoring}
         showDraftHistory={state.gameOver && (state.players.length > 1 || !!state.soloHandSelection?.kept)}
         startingHandSelection={state.players.length === 1 ? state.soloHandSelection : undefined}
         completionActions={state.gameOver && state.players.length === 1 && isWs && wsTransport?.roomId
@@ -2263,6 +2318,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
 
       <div ref={headerRef}>
         {gameHeader}
+        {multihandControls}
       </div>
 
       {isDesktopTable && !nearbyMajorSupply ? majorImprovementsPresentation : null}
