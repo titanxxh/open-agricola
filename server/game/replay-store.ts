@@ -1,4 +1,5 @@
 import type { PostgresDatabase as Database } from '../database/postgres'
+import { prereleaseArchiveExpired } from './prerelease-archive-retention'
 import type { CustomCardDef } from '../../shared/contract/protocol/game.ts'
 import type { GameContextLifecycle } from '../../shared/contract/protocol/game-context.ts'
 import type {
@@ -189,6 +190,7 @@ export class ReplayStore {
   }
 
   private async header(roomId: string): Promise<Awaited<AvailableHeader | ReplayUnavailableError>> {
+    if (await prereleaseArchiveExpired(this.db, roomId)) return replayError('context_expired', 'Replay has expired', 'expired')
     const row = (await this.db.prepare(`
       SELECT context.lifecycle,
              context.replay_status,
@@ -245,6 +247,11 @@ export class ReplayStore {
         'completed',
       )
     }
+  }
+
+  async archiveUnavailable(roomId: string): Promise<ReplayUnavailableError | null> {
+    const header = await this.header(roomId)
+    return 'ok' in header ? header : null
   }
 
   private async segmentDescriptors(roomId: string): Promise<Awaited<ReplaySegmentDescriptor[]>> {

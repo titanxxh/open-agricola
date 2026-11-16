@@ -1,3 +1,4 @@
+import { isPrereleaseClient } from '../services/prerelease-runtime'
 import { browserApiFetch } from '../services/browser-api'
 import { checkServerAvailability, isServerUnavailableStatus, onServerRecovered, useServerAvailability } from '../services/server-availability'
 import { MaintenancePage } from './MaintenancePage'
@@ -126,7 +127,7 @@ function ReportedEvidenceContext({
           return
         }
         if (body.ok) {
-          await verifyReplayViewerBuild(body.viewerBuildId, controller.signal)
+          await verifyReplayViewerBuild(body.viewerBuildId, controller.signal, body.schemaVersion)
         }
         setResolution({ key: evidenceKey, evidence: body })
       })
@@ -152,7 +153,7 @@ function ReportedEvidenceContext({
   }, [evidence])
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== iframeRef.current?.contentWindow) return
+      if (isPrereleaseClient() || event.source !== iframeRef.current?.contentWindow) return
       const message = event.data as Partial<ReportedEvidenceViewerReadyMessage>
       if (message.type !== 'open-agricola-reported-evidence-ready') return
       const currentEvidence = evidenceRef.current
@@ -208,6 +209,7 @@ function ReportedEvidenceContext({
         </dl>
       </header>
       <ReplayFrame
+        source={evidence}
         key={`${roomId}:${evidence.viewerBuildId}:${locale}`}
         roomId={roomId}
         viewerBuildId={evidence.viewerBuildId}
