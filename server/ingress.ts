@@ -23,7 +23,8 @@ const nodePath = /^\/nodes\/([A-Za-z0-9-]+)\/ws(?:\?(.*))?$/
 
 /** One public origin. Routing cookies convey affinity only, never authentication. */
 export function createPublicIngress(directory: RoomDirectory, secureCookies: boolean, trustProxy = process.env.REPLAY_TRUST_PROXY === 'true' || process.env.REPLAY_TRUST_PROXY === '1', observationDb?: PostgresDatabase) {
-  const handleFrontend = createFrontendHosting()
+  const prerelease = process.env.RELEASE_CHANNEL === 'prerelease'
+  const handleFrontend = prerelease ? undefined : createFrontendHosting()
   const collect = createCollector(directory.db, 'ingress', undefined, undefined, undefined, observationDb)
   let next = 0
   const sockets = new Set<Duplex>()
@@ -40,7 +41,7 @@ export function createPublicIngress(directory: RoomDirectory, secureCookies: boo
       if (process.env.NODE_ENV === 'production' && !isApiHost(req) && req.url !== '/api/health' && !req.url?.startsWith('/internal/metrics')) {
         jsonError(res, 403, 'Invalid public host'); return
       }
-      if (await handleFrontend(req, res)) return
+      if (handleFrontend && await handleFrontend(req, res)) return
       const path = new URL(req.url ?? '/', 'http://localhost').pathname
       if (path.startsWith('/internal/metrics')) {
         if (!metricsAuthorized(req)) { res.writeHead(401); res.end(); return }
@@ -65,7 +66,7 @@ export function createPublicIngress(directory: RoomDirectory, secureCookies: boo
         req.url = '/internal/metrics'
       } else if (path.startsWith('/internal/metrics/')) { res.writeHead(404); res.end(); return }
       const dissolve = /^\/api\/rooms\/([A-Za-z0-9-]+)\/dissolve$/.exec(req.url ?? '')
-      if (req.method === 'POST' && dissolve && await directory.db.prepare('SELECT 1 FROM rooms WHERE id=?').get(dissolve[1])) {
+      if (!prerelease && req.method === 'POST' && dissolve && await directory.db.prepare('SELECT 1 FROM rooms WHERE id=?').get(dissolve[1])) {
         const owner = await directory.currentRoute(dissolve[1]!)
         const instanceId = owner?.owner.instanceId ?? await directory.availableInstanceId()
         if (instanceId) selected = instances.find(instance => instance.instance_id === instanceId)
