@@ -9,6 +9,7 @@ import { canonicalJson } from '../../shared/contract/authoritative-command'
 import { prepareRestoreStaging, readPairedPrereleaseBackup, removeRestoreStaging } from './backup'
 import { compareIdentityRefs } from './identity-manifest'
 import { readFormalBrowserDeployment, verifyFormalBrowserAcceptance } from './browser-policy'
+import { executeImageCleanup, planImageCleanup } from './image-cleanup'
 
 export type OperationRequest = { action: string; expectedCurrent: string; buildId?: string; generation?: string; nextGeneration?: string;
   acceptLoss?: string; operationId?: string; acceptanceFile?: string; authorityFile?: string; retirementFile?: string; backupStem?: string; sourceTarget?: PrereleaseTarget;
@@ -97,6 +98,9 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     compose(target, ['up', '-d', '--no-build', 'gateway'])
     return record
   }
+  // Removing unused imported images only frees space, so it does not need storage admission.
+  if (request.action === 'image-cleanup-plan') return { mode: 'plan', ...planImageCleanup(target, record) }
+  if (request.action === 'image-cleanup') return executeImageCleanup(target, record)
   if (!['maintain', 'reverify', 'finish-close', 'budget-check'].includes(request.action)) assertStorageAdmission(target, targetFingerprint(target), 'operation')
   if (request.action === 'maintain') {
     authorityReceipt(target, record, request.authorityFile, 'close')
