@@ -14,6 +14,8 @@ import {
 import { handleBugReportRoute } from '../bug-report-routes.ts'
 import { encodeReplayFrame } from '../game/replay-codec.ts'
 import { resetRateLimitsForTests } from '../rate-limit.ts'
+import type { QueryResultRow } from 'pg'
+import { PRERELEASE_ARCHIVE_RETENTION_MS } from '../game/prerelease-archive-retention'
 
 const FRAME_HASH = 'a'.repeat(64)
 const USER: AuthUser = { id: 'u1', username: 'u1', displayName: 'User 1' }
@@ -1109,6 +1111,43 @@ describe('bug report routes', () => {
       SELECT COUNT(*) AS count FROM bug_report_evidence_audit
       WHERE maintainer_user_id = ?
     `).get(USER.id)) as { count: number }).count).toBe(30)
+  })
+
+  it('closes completed pre Evidence at the fixed deadline, including an in-flight read', async () => {
+    const created = await invoke('POST', '/api/v1/game-contexts/active-room/bug-reports', { phenomenon: 'Archive Evidence' })
+    const submissionId = (json(created).report as { submissionId: string }).submissionId
+    await invoke('PATCH', `/api/v1/bug-reports/${submissionId}`, { authorIdentity: 'hosted', confirmHosted: true })
+    await invoke('POST', `/api/v1/bug-reports/${submissionId}/submit`, {})
+    const encoded = encodeReplayFrame({ frame: { players: [{ id: 'p1', name: 'Evidence private name', minorHand: ['A'], occupationHand: [], cardStates: {}, stats: {} }],
+      log: [], scores: [], events: [], publicEventArchive: [], roundActionOrder: [], futureMeeples: [], ordinaryCardDecks: { occupation: [], minor: [] },
+      ordinaryCardDrawChoices: {}, engineStack: { frames: [] } }, previousFrame: null, stepNo: 5, previousCheckpointStepNo: 5 })
+    await db.prepare('UPDATE game_replay_steps SET payload_gzip=?,frame_hash=? WHERE room_id=?').run(encoded.payloadGzip, encoded.frameHash, 'active-room')
+    await db.prepare('UPDATE bug_reports SET frame_hash=? WHERE submission_id=?').run(encoded.frameHash, submissionId)
+    const endedAt = Date.now()
+    await db.prepare("UPDATE game_contexts SET lifecycle='completed',phase=NULL WHERE room_id='active-room'").run()
+    await db.prepare("UPDATE game_replays SET completed_at=? WHERE room_id='active-room'").run(endedAt)
+    vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
+    let now = endedAt + PRERELEASE_ARCHIVE_RETENTION_MS - 1
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const inspect = () => invoke('POST', `/api/v1/bug-reports/${submissionId}/evidence/inspect`, { perspective: 'open', reason: 'Archive retention proof' }, USER, {}, true)
+    expect((await inspect()).statusCode).toBe(200)
+    now++
+    expect((await inspect()).statusCode).toBe(410)
+    now--
+    const prepare = db.prepare.bind(db)
+    vi.spyOn(db, 'prepare').mockImplementation(sql => {
+      const statement = prepare(sql)
+      if (sql.includes('SELECT player_index, user_id') && sql.includes('game_context_participants')) {
+        const all = statement.all
+        statement.all = async <Row extends QueryResultRow = QueryResultRow>(...values: unknown[]): Promise<Row[]> => {
+          const rows = await all<Row>(...values); now++; return rows
+        }
+      }
+      return statement
+    })
+    const late = await inspect()
+    expect(late.statusCode).toBe(410)
+    expect(late.body).not.toContain('Evidence private name')
   })
 
   it('expires evidence only while the game context remains active', async () => {
