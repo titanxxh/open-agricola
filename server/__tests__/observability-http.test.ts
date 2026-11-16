@@ -107,6 +107,11 @@ it('returns a browser without a current operations session to the site operation
   const ended = await navigate(base + '/ops/d/open-agricola/operations', { ...opened, Cookie: cookie })
   expect(ended.status).toBe(303)
   expect(ended.headers.get('location')).toBe(`${base}/?page=operations`)
+  vi.stubEnv('PUBLIC_APP_ORIGIN', `${base}/open-agricola`)
+  try {
+    const hosted = await navigate(base + '/ops/d/open-agricola/operations', opened)
+    expect(hosted.headers.get('location')).toBe(`${base}/open-agricola/?page=operations`)
+  } finally { vi.stubEnv('PUBLIC_APP_ORIGIN', base) }
   // Dashboard data requests keep the machine-readable rejection.
   const data = await fetch(base + '/ops/api/search', { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty' } })
   expect(data.status).toBe(401)
