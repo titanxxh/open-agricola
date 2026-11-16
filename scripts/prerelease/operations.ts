@@ -54,7 +54,7 @@ function verifyReceipt(value: unknown, buildId: string | undefined): void {
 
 function parseRequest(value: unknown): OperationRequest {
   const input = object(value)
-  const actions = ['initialize', 'status', 'maintain', 'backup', 'budget-check', 'retention', 'deploy', 'reset', 'reinitialize', 'finish-close', 'open', 'identities', 'apply-identities', 'restore', 'activate-recovery', 'verify-access', 'verify-formal-browser', 'reverify']
+  const actions = ['initialize', 'status', 'maintain', 'backup', 'budget-check', 'retention', 'image-cleanup-plan', 'image-cleanup', 'deploy', 'reset', 'reinitialize', 'finish-close', 'open', 'identities', 'apply-identities', 'restore', 'activate-recovery', 'verify-access', 'verify-formal-browser', 'reverify']
   if (typeof input.action !== 'string' || !actions.includes(input.action) || typeof input.expectedCurrent !== 'string'
     || !/^(empty|[a-f0-9]{40})$/.test(input.expectedCurrent)) throw new Error('Explicit operation and expected-current SHA are required')
   const optional = (key: string): string | undefined => {
@@ -93,7 +93,7 @@ export async function operations(args: string[]): Promise<void> {
     if (!imageImport && request.action !== 'retention') loadPrereleaseEnvironment(target)
     if ('buildId' in request && (request.action === 'deploy' || request.action === 'open' || request.action === 'restore')) verifyReceipt(input.receipt, request.buildId)
     if (args[0] === 'receive') { process.stdout.write(locked(target, input)); return }
-    const cleanup = ['status', 'initialize', 'retention', 'maintain', 'reverify', 'finish-close', 'budget-check'].includes(request.action) ? () => {} : registerStorageOperation(target)
+    const cleanup = ['status', 'initialize', 'retention', 'maintain', 'reverify', 'finish-close', 'budget-check', 'image-cleanup-plan', 'image-cleanup'].includes(request.action) ? () => {} : registerStorageOperation(target)
     try { process.stdout.write(JSON.stringify('transfer' in request ? runImageImport(target, request) : await runPrereleaseOperation(target, request)) + '\n') }
     finally { cleanup() }
     return
