@@ -875,6 +875,8 @@ receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可�
 
 只有停机前正在运行、此次干净停止且身份未变化的旧容器，才会在 live migration 前的备份失败后恢复。OOM、未干净排空或开始 live migration 后的失败保持维护，不把旧程序接到可能已变化的 schema。`data_imports` 屏障和容器健康检查继续生效。私有操作目录保存导入、source 身份和 resolved Compose；后者含环境凭据，勿公开。
 
+owner SSH 使用约两分钟的 keepalive。若会话仍在维护中断开，后端继续执行，`deploy-backend.sh` 不再直接失败，而是每 30 秒跟进一次 status：只有原生 accepted 后才报告成功；操作变为 `resumable` 时执行一次续跑；遇到 `blocked`/`unknown`，或后端超过 owner 截止时间仍不可达时，停止并给出对应的 status 命令。
+
 从同一 clean exact producer checkout 查询中断操作，再决定续跑：
 
 ```bash

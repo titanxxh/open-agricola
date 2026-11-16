@@ -12,6 +12,12 @@ import { prepareContainerImageArchive } from './container-images-owner.ts'
 import { BACKEND_RESUME_WORK_MS } from './backend-image-progress.ts'
 
 const quote = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
+// Tolerate about two minutes of silence on owner links before SSH gives up.
+const SSH_OPTIONS = ['-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8']
+const sleep = (ms: number) => new Promise(done => setTimeout(done, ms))
+/** SSH exits 255 for its own failures (lost or refused connection); an owner-side timeout kills the client. */
+const connectionLost = (error: unknown): boolean => !!error && typeof error === 'object'
+  && (('status' in error && error.status === 255) || ('signal' in error && error.signal === 'SIGTERM'))
 function execute(command: string, args: string[], input?: string, timeout = 30_000): string {
   return execFileSync(command, args, { input, encoding: 'utf8', timeout, maxBuffer: 4 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
 }
@@ -54,7 +60,7 @@ export async function backendImageDeployment(cwd: string, input: string[]): Prom
   const exported = await prepareContainerImageArchive({ receipt, authFile: resolve(selected.get('--auth-file') ?? ''), directory: local, maxBytes: budget.import.maxArchiveMiB * 1024 * 1024 })
   const stage = join(directory, 'backups', `.backend-image-${operationId}`)
   process.stderr.write(`Backend operation: ${operationId}\nOwner image evidence: ${local}\nStatus: ./deploy-backend.sh status ${host} ${sourceSha} ${directory} --operation-id ${operationId}\n`)
-  const ssh = (args: string[], script?: string, timeout = 30_000): string => execute('ssh', [host, args.map(quote).join(' ')], script, timeout)
+  const ssh = (args: string[], script?: string, timeout = 30_000): string => execute('ssh', [...SSH_OPTIONS, host, args.map(quote).join(' ')], script, timeout)
   const prepare = `set -euo pipefail
 umask 077
 export GIT_NO_REPLACE_OBJECTS=1
@@ -78,13 +84,13 @@ printf '%s\\n' "$4"
   const authorize = (): void => {
     request.expiresAt = Date.now() + 300_000
     writeFileSync(requestPath, JSON.stringify(request) + '\n', { mode: 0o600, flush: true })
-    execute('scp', ['-p', '--', requestPath, `${host}:${remoteRequest}`])
+    execute('scp', [...SSH_OPTIONS, '-p', '--', requestPath, `${host}:${remoteRequest}`])
   }
   authorize()
   const receiver = join(stage, 'policy/scripts/release/backend-image-receiver.ts')
   const target = [remoteRequest, directory, sourceSha, producerSha]
   ssh(['node', receiver, 'preflight', ...target], undefined, 120_000)
-  try { execute('scp', ['-p', '--', exported.archivePath, `${host}:${stage}/image.tar`], undefined, 20 * 60_000) }
+  try { execute('scp', [...SSH_OPTIONS, '-p', '--', exported.archivePath, `${host}:${stage}/image.tar`], undefined, 20 * 60_000) }
   catch (error) {
     try { ssh(['node', receiver, 'discard-transfer', ...target], undefined, 120_000) }
     catch (cleanupError) { throw new AggregateError([error], `Formal image archive transfer failed and partial cleanup could not be confirmed; inspect ${stage}`, { cause: cleanupError }) }
@@ -96,22 +102,29 @@ printf '%s\\n' "$4"
   authorize()
   const env = ['env']
   if (process.env.ACCOUNT_REGISTRATION_POLICY) env.push(`ACCOUNT_REGISTRATION_POLICY=${process.env.ACCOUNT_REGISTRATION_POLICY}`)
-  const result = ssh([...env, 'node', join(stage, 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', ...target], undefined, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS)
+  let result: string
+  try { result = ssh([...env, 'node', join(stage, 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', ...target], undefined, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS) }
+  catch (error) {
+    // The backend keeps running without this session; follow its journal instead of reporting a failure.
+    if (!connectionLost(error)) throw error
+    process.stderr.write(`Owner SSH session ended during maintenance; following backend operation ${operationId}\n`)
+    result = await followBackendOperation(cwd, { host, sourceSha, directory, operationId })
+  }
   process.stdout.write(result + `\nOwner image evidence: ${local}\n`)
 }
 
-function backendOperationCommand(cwd: string, input: string[]): void {
-  const [mode, selectedHost, selectedSha, directory, flag, operationId] = input
-  if (input.length !== 6 || !['status', 'resume'].includes(mode) || flag !== '--operation-id'
-    || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(operationId ?? '')) throw new Error('Usage: deploy-backend.sh status|resume <host> <full-sha> <remote-dir> --operation-id <UUID>')
-  const host = selectedHost.includes('@') ? selectedHost : `ubuntu@${selectedHost}`, sourceSha = fullSha(selectedSha)
-  if (!/^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+$/.test(host)
+type OperationTarget = { host: string; sourceSha: string; directory: string; operationId: string }
+
+function operationContext(cwd: string, target: OperationTarget) {
+  const { host, sourceSha, directory, operationId } = target
+  if (!/^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+$/.test(host) || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(operationId)
     || !/^\/[A-Za-z0-9_./-]+$/.test(directory) || resolve(directory) !== directory || directory === '/') throw new Error('Invalid backend operation target')
   const producerSha = fullSha(execute('git', ['-C', cwd, 'rev-parse', 'HEAD']))
   if (execute('git', ['-C', cwd, 'status', '--porcelain', '--untracked-files=no'])) throw new Error('Run backend operation commands from the clean exact producer checkout')
   const stage = join(directory, 'backups', `.backend-image-${operationId}`), path = join(stage, 'request.json')
   const controller = join(stage, 'policy/scripts/release/backend-image-maintenance.ts')
-  const ssh = (args: string[], input?: string, timeout = 150_000) => execute('ssh', [host, args.map(quote).join(' ')], input, timeout)
+  const ssh = (args: string[], input?: string, timeout = 150_000) => execute('ssh', [...SSH_OPTIONS, host, args.map(quote).join(' ')], input, timeout)
+  const statusCommand = `./deploy-backend.sh status ${host} ${sourceSha} ${directory} --operation-id ${operationId}`
   const parseStatus = (output: string, expectedBinding?: string) => {
     const value: unknown = JSON.parse(output)
     if (!value || typeof value !== 'object' || !('kind' in value) || value.kind !== 'backend-image-operation'
@@ -124,19 +137,53 @@ function backendOperationCommand(cwd: string, input: string[]): void {
     }
     return { state: value.state, bindingSha256: value.bindingSha256 }
   }
-  const output = ssh(['node', controller, 'status', path, directory, sourceSha, producerSha])
-  const value = parseStatus(output)
-  if (mode === 'status') { process.stdout.write(output + '\n'); return }
-  if (value.state !== 'resumable' && value.state !== 'accepted') throw new Error(`Backend operation is ${String(value.state)}; inspect its status before continuing`)
-  if (backendCandidate(cwd, [sourceSha]) !== sourceSha) throw new Error('Backend continuation candidate authority changed')
-  const nonce = randomUUID(), now = Date.now(), authorizationPath = join(stage, `resume-${nonce}.json`)
-  const authorization = { format: 1, nonce, operationId, bindingSha256: value.bindingSha256, authorizedAt: now, expiresAt: now + BACKEND_RESUME_WORK_MS, workMs: BACKEND_RESUME_WORK_MS }
-  const store = 'require("node:fs").writeFileSync(process.argv[1],require("node:fs").readFileSync(0),{flag:"wx",mode:0o600,flush:true})'
-  ssh(['node', '-e', store, authorizationPath], JSON.stringify(authorization) + '\n', 30_000)
-  const result = ssh(['node', controller, 'resume', path, directory, sourceSha, producerSha, authorizationPath], undefined, BACKEND_RESUME_WORK_MS + BACKEND_IMAGE_CLEANUP_MS + 60_000)
-  const final = parseStatus(result, value.bindingSha256)
-  if (final.state !== 'accepted') throw new Error(`Backend continuation is ${final.state}; acceptance was not confirmed`)
-  process.stdout.write(result + '\n')
+  const readStatus = () => {
+    const output = ssh(['node', controller, 'status', path, directory, sourceSha, producerSha])
+    return { output, ...parseStatus(output) }
+  }
+  const resume = (bindingSha256: string): string => {
+    if (backendCandidate(cwd, [sourceSha]) !== sourceSha) throw new Error('Backend continuation candidate authority changed')
+    const nonce = randomUUID(), now = Date.now(), authorizationPath = join(stage, `resume-${nonce}.json`)
+    const authorization = { format: 1, nonce, operationId, bindingSha256, authorizedAt: now, expiresAt: now + BACKEND_RESUME_WORK_MS, workMs: BACKEND_RESUME_WORK_MS }
+    const store = 'require("node:fs").writeFileSync(process.argv[1],require("node:fs").readFileSync(0),{flag:"wx",mode:0o600,flush:true})'
+    ssh(['node', '-e', store, authorizationPath], JSON.stringify(authorization) + '\n', 30_000)
+    const result = ssh(['node', controller, 'resume', path, directory, sourceSha, producerSha, authorizationPath], undefined, BACKEND_RESUME_WORK_MS + BACKEND_IMAGE_CLEANUP_MS + 60_000)
+    const final = parseStatus(result, bindingSha256)
+    if (final.state !== 'accepted') throw new Error(`Backend continuation is ${final.state}; acceptance was not confirmed`)
+    return result
+  }
+  return { readStatus, resume, statusCommand }
+}
+
+function backendOperationCommand(cwd: string, input: string[]): void {
+  const [mode, selectedHost, selectedSha, directory, flag, operationId] = input
+  if (input.length !== 6 || !['status', 'resume'].includes(mode) || flag !== '--operation-id'
+    || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(operationId ?? '')) throw new Error('Usage: deploy-backend.sh status|resume <host> <full-sha> <remote-dir> --operation-id <UUID>')
+  const host = selectedHost.includes('@') ? selectedHost : `ubuntu@${selectedHost}`
+  const operation = operationContext(cwd, { host, sourceSha: fullSha(selectedSha), directory, operationId })
+  const status = operation.readStatus()
+  if (mode === 'status') { process.stdout.write(status.output + '\n'); return }
+  if (status.state !== 'resumable' && status.state !== 'accepted') throw new Error(`Backend operation is ${String(status.state)}; inspect its status before continuing`)
+  process.stdout.write(operation.resume(status.bindingSha256) + '\n')
+}
+
+/**
+ * After the owner SSH session ends mid-maintenance, polls the backend journal until it accepts, continues a resumable
+ * operation once the link returns, and stops on blocked/unknown or when the backend stays unreachable past the deadline.
+ */
+export async function followBackendOperation(cwd: string, target: OperationTarget,
+  options: { pollMs?: number; deadlineMs?: number } = {}): Promise<string> {
+  const pollMs = options.pollMs ?? 30_000, deadline = Date.now() + (options.deadlineMs ?? BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS)
+  const operation = operationContext(cwd, target)
+  for (;;) {
+    let status: ReturnType<typeof operation.readStatus> | undefined
+    try { status = operation.readStatus() } catch (error) { if (!connectionLost(error)) throw error }
+    if (status?.state === 'accepted') return status.output
+    if (status?.state === 'resumable') return operation.resume(status.bindingSha256)
+    if (status && status.state !== 'running') throw new Error(`Backend operation is ${status.state}; inspect it with ${operation.statusCommand}`)
+    if (Date.now() >= deadline) throw new Error(`Backend operation is ${status ? 'still running' : 'unreachable'} after the owner deadline; inspect it with ${operation.statusCommand}`)
+    await sleep(pollMs)
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
