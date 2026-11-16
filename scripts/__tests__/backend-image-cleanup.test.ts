@@ -31,7 +31,8 @@ function fixture() {
   let beforeCall: ((args: string[]) => void) | undefined
   const docker = (args: string[]): string => {
     calls.push(args); beforeCall?.(args)
-    if (args[0] === 'image' && args[1] === 'ls') return images.map(image => image.id).join('\n')
+    // Like Docker 29 with the containerd image store, the default listing hides untagged images; --all lists them.
+    if (args[0] === 'image' && args[1] === 'ls') return images.filter(image => args.includes('-a') || image.tags.length > 0).map(image => image.id).join('\n')
     if (args[0] === 'image' && args[1] === 'inspect') return images.filter(image => args.includes(image.id)).map(image => JSON.stringify(image)).join('\n')
     if (args[0] === 'ps') return containers.map(container => container.id).join('\n')
     if (args[0] === 'container' && args[1] === 'inspect') return containers.map(container => JSON.stringify(container)).join('\n')
@@ -145,6 +146,14 @@ it('keeps unknown refs, prerelease images, malformed builds, and future dates', 
   value.add({ ...image(7), created: new Date(now + day).toISOString() })
   value.add({ ...image(8), digests: [`ghcr.io/unknown/repository@${imageId(8)}`] })
   expect(value.plan().images.filter(image => image.action === 'remove').map(image => image.id)).toEqual([imageId(2)])
+})
+
+it('inventories untagged imported images that the containerd store hides from the default listing', () => {
+  const value = fixture()
+  value.add({ ...image(4), project: '', service: '' })
+  value.stage(4, 1, 31)
+  expect(value.plan().images.find(image => image.id === imageId(4))?.action).toBe('remove')
+  expect(value.calls).toContainEqual(['image', 'ls', '-a', '-q', '--no-trunc'])
 })
 
 it('uses historical formal receipts for ownership without retaining expired audit images or trusted-policy caches', () => {
