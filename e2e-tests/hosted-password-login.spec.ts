@@ -772,10 +772,11 @@ for (const engine of ['chromium', 'webkit', 'firefox'] satisfies Engine[]) {
         document.cookie = `${name}=injected-parent; Domain=agricola.test; Path=/; Secure; SameSite=Lax`
         document.cookie = `${name}=pre-only; Path=/; Secure; SameSite=Lax`
       }, { token: otherToken, name: SESSION_COOKIE })
+      // WebKit commits document.cookie writes to the network cookie store asynchronously; wait for the last write.
+      await expect.poll(async () => (await environment.context.cookies(environment.preOrigin)).find(cookie => cookie.name === SESSION_COOKIE)?.value).toBe('pre-only')
       const formalCookies = await environment.context.cookies(environment.apiOrigin)
       expect(formalCookies.filter(cookie => cookie.name === SESSION_COOKIE).map(cookie => cookie.domain)).toEqual(['api.agricola.test'])
       expect(formalCookies.some(cookie => cookie.name === 'oa_session' && cookie.domain === '.agricola.test')).toBe(true)
-      expect((await environment.context.cookies(environment.preOrigin)).find(cookie => cookie.name === SESSION_COOKIE)?.value).toBe('pre-only')
       const identity = await page.evaluate(async ({ api, header, version }) => {
         const response = await fetch(`${api}/api/auth/me`, { credentials: 'include', headers: { [header]: version } })
         return { status: response.status, body: await response.json() }
