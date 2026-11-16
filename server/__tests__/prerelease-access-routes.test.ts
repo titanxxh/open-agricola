@@ -178,6 +178,19 @@ it('permits same-origin image loads with the pre cookie and still rejects siblin
   expect(dataReads).toBe(1)
 })
 
+it('serves top-level frontend images to same-origin image loads with the pre cookie only', async () => {
+  const image = { cookie: '__Host-oa-pre-session=pre-only', 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'image' }
+  for (const path of ['/open-agricola/afdian.png', '/open-agricola/vite.svg']) {
+    expect((await fetch(origin + path, { headers: image })).status).toBe(200)
+    expect((await fetch(origin + path, { headers: { ...image, 'sec-fetch-site': 'same-site' } })).status).toBe(401)
+    expect((await fetch(origin + path, { headers: { ...image, cookie: '__Host-oa-session=formal' } })).status).toBe(401)
+    expect((await fetch(origin + path, { headers: { ...image, 'sec-fetch-dest': 'empty' } })).status).toBe(426)
+  }
+  for (const path of ['/open-agricola/nested/afdian.png', '/open-agricola/cards-manifest.json', '/open-agricola/afdian.png.json']) {
+    expect((await fetch(origin + path, { headers: image })).status).toBe(426)
+  }
+})
+
 it('preserves only canonical product locators through the browser handoff', async () => {
   const preserved = await fetch(origin + '/open-agricola/auth/start?returnPath=' + encodeURIComponent('/open-agricola/?room=retained&step=3&frame=abc'), { redirect: 'manual' })
   expect(preserved.status).toBe(302)
