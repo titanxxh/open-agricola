@@ -6,11 +6,13 @@ import { assertOwnerPath, parsePrereleaseTarget } from './config'
 import { ownerMachine } from '../release/candidate'
 
 /** This grants only private ingress. The candidate still applies real identity/Beta admission. */
-export async function configureOwnerVerification(context: BrowserContext, origin: string, tokenFile: string): Promise<void> {
+export async function configureOwnerVerification(context: BrowserContext, origin: string, tokenFile: string, onRetry?: (error: unknown) => void): Promise<void> {
   if (new URL(origin).origin !== origin || !origin.startsWith('https://') || statSync(tokenFile).mode & 0o077) throw new Error('Private HTTPS owner verification configuration required')
   const token = readFileSync(tokenFile, 'utf8').trim()
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error('Invalid private owner ingress token')
-  const response = await context.request.post(`${origin}/__prerelease_verify`, { headers: { Origin: origin }, data: { token }, timeout: 15000 })
+  const send = () => context.request.post(`${origin}/__prerelease_verify`, { headers: { Origin: origin }, data: { token }, timeout: 15000 })
+  // One retry only when no response arrived; a received rejection stays final.
+  const response = await send().catch((error: unknown) => { onRetry?.(error); return send() })
   if (response.status() !== 204) throw new Error('Private owner verification ingress was rejected')
 }
 

@@ -105,7 +105,7 @@ export async function ordinaryCase(kit, browser, accounts) {
 }
 
 export async function betaBoundaryCase(kit, browser, accounts) {
-  const r = { case: 'beta-boundary' }; const { context, blocked } = await kit.boundaryContext(browser); const side = {}
+  const r = kit.track({ case: 'beta-boundary' }); r.phase = 'context'; const { context, blocked } = await kit.boundaryContext(browser); const side = {}
   const { pre, formalApp, formalApi } = kit.origins
   try {
     const page = await context.newPage(); page.setDefaultTimeout(20_000)
@@ -175,34 +175,47 @@ export async function betaBoundaryCase(kit, browser, accounts) {
 
 /** Two formal logins of the same Beta account each derive their own pre session and held socket. */
 export async function revocationCase(kit, browser, accounts) {
-  const A = byLabel(accounts, 'A'), r = { case: 'revocation' }
+  const A = byLabel(accounts, 'A'), r = kit.track({ case: 'revocation', phases: [] }), started = Date.now()
+  // Each phase records when it began, so a failure names the step that stalled.
+  const phase = name => { r.phase = name; r.phases.push([name, Date.now() - started]) }
+  const snapshot = async (probe, name) => {
+    const live = await kit.liveSockets(probe)
+    assert.ok(live.ids.length > 0, `${name}: no held socket was open before the action`)
+    return live
+  }
+  phase('contexts')
   const one = await kit.boundaryContext(browser), two = await kit.boundaryContext(browser)
   const enter = async (side, name) => {
+    phase(`${name}:formal`)
     side.page ??= await side.context.newPage(); side.page.setDefaultTimeout(20_000)
     if (!side.formal || await kit.formalMe(side.context) !== 200) { await kit.login(side.page, A, () => { side.logged = true }); side.formal = true }
-    await kit.handoff(side.page); await sleep(2000)
-    side.probe ??= await kit.probePage(side.context)
+    phase(`${name}:handoff`); await kit.handoff(side.page); await sleep(2000)
+    phase(`${name}:probe`); side.probe ??= await kit.probePage(side.context)
     assert.equal((await kit.preFetch(side.probe, '/api/auth/me')).user, 'A', name)
-    assert.equal(await kit.holdSocket(side.probe), true, `${name} socket`)
+    phase(`${name}:socket`); assert.equal(await kit.holdSocket(side.probe), true, `${name} socket`)
   }
   try {
     await enter(one, 'one'); await enter(two, 'two')
+    phase('logout'); let live = await snapshot(one.probe, 'one'); const liveTwo = await snapshot(two.probe, 'two')
     let t0 = Date.now(); r.currentLogout = { formal: await kit.formalPost(one.context, '/api/auth/logout') }; one.formal = false
-    r.currentLogout.derived = await kit.untilDenied(one.probe, t0); r.currentLogout.derivedSockets = await kit.heldCut(one.probe, t0)
+    r.currentLogout.derived = await kit.untilDenied(one.probe, t0); r.currentLogout.derivedSockets = await kit.heldCut(one.probe, live)
     while (Date.now() - t0 < 33_000) await sleep(500)
-    r.currentLogout.otherAfter33s = await kit.preFetch(two.probe, '/api/auth/me'); r.currentLogout.otherSocketAfter33s = await kit.heldCut(two.probe, t0, 0)
+    r.currentLogout.otherAfter33s = await kit.preFetch(two.probe, '/api/auth/me'); r.currentLogout.otherSocketAfter33s = await kit.heldCut(two.probe, liveTwo, 0)
     await enter(one, 'one-again')
+    phase('logout-all'); live = await snapshot(one.probe, 'one-again'); const liveBoth = await snapshot(two.probe, 'two')
     t0 = Date.now(); r.logoutAll = { formal: await kit.formalPost(two.context, '/api/auth/logout-all') }; one.formal = false; two.formal = false
     const [a, b] = await Promise.all([kit.untilDenied(one.probe, t0), kit.untilDenied(two.probe, t0)])
-    r.logoutAll.loginOne = a; r.logoutAll.loginTwo = b; r.logoutAll.sockets = [await kit.heldCut(one.probe, t0), await kit.heldCut(two.probe, t0)]
+    r.logoutAll.loginOne = a; r.logoutAll.loginTwo = b; r.logoutAll.sockets = [await kit.heldCut(one.probe, live), await kit.heldCut(two.probe, liveBoth)]
     await enter(one, 'one-before-revoke')
+    phase('revoke'); live = await snapshot(one.probe, 'one-before-revoke')
     t0 = Date.now(); r.betaRevoke = { admin: await kit.betaAccess('revoke', A) }
-    r.betaRevoke.http = await kit.untilDenied(one.probe, t0); r.betaRevoke.sockets = await kit.heldCut(one.probe, t0)
+    r.betaRevoke.http = await kit.untilDenied(one.probe, t0); r.betaRevoke.sockets = await kit.heldCut(one.probe, live)
+    phase('reentry')
     const refused = one.page.waitForResponse(x => x.url() === kit.origins.formalApi + '/api/prerelease/handoffs', { timeout: 20_000 }).then(x => x.status(), () => null)
     await one.page.goto(kit.origins.pre + '/open-agricola/auth/start', { waitUntil: 'domcontentloaded' }); await sleep(6000)
     r.betaRevoke.reentry = { handoffStatus: await refused, preSession: (await kit.preFetch(one.probe, '/api/auth/me')).status }
-    r.betaRestore = { admin: await kit.betaAccess('grant', A) }
-    await enter(one, 'one-after-grant'); r.betaRestore.sameIdentity = true
+    phase('grant'); r.betaRestore = { admin: await kit.betaAccess('grant', A) }
+    await enter(one, 'one-after-grant'); r.betaRestore.sameIdentity = true; phase('done')
     r.passed = r.currentLogout.formal === 200 && within(r.currentLogout.derived.deniedAfterMs) && r.currentLogout.otherAfter33s.status === 200
       && r.currentLogout.otherSocketAfter33s.connectedAtStart > 0 && r.currentLogout.otherSocketAfter33s.closedAfterMs === null
       && r.logoutAll.formal === 200 && within(a.deniedAfterMs) && within(b.deniedAfterMs)
