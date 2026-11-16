@@ -51,6 +51,51 @@ describe('replay codec', () => {
     expect(applyReplayDelta(before, delta)).toEqual(after)
   })
 
+  it('applies a handed-over delta in place with the same result as the copying default', () => {
+    const before = (): JsonValue => ({ players: [{ id: 'p1', food: 1 }, { id: 'p2', food: 2 }], round: 1, obsolete: true })
+    const after: JsonValue = { players: [{ id: 'p1', food: 2 }], round: 2, added: { value: 1 } }
+    const operations = () => JSON.parse(JSON.stringify(createReplayDelta(before(), after))) as ReturnType<typeof createReplayDelta>
+
+    const original = before()
+    const copied = applyReplayDelta(original, operations())
+    expect(copied).toEqual(after)
+    expect(original).toEqual(before())
+
+    const owned = before()
+    const handedOver = operations()
+    const updated = applyReplayDelta(owned, handedOver, { inPlace: true })
+    expect(updated).toBe(owned)
+    expect(updated).toEqual(after)
+    const addition = handedOver.find(operation => operation.path === '/added') as { value: JsonValue }
+    expect((updated as Record<string, JsonValue>).added).toBe(addition.value)
+
+    const root = { replaced: true }
+    expect(applyReplayDelta(before(), [{ op: 'replace', path: '', value: root }], { inPlace: true })).toBe(root)
+  })
+
+  it('decodes a chain in place to the same hash-verified frames as the copying default', () => {
+    const stable = Array.from({ length: 40 }, (_, index) => ({ index, text: `unchanged ${index}` }))
+    const frames: JsonValue[] = [0, 1, 2, 3].map(value => ({ stable, history: Array.from({ length: value }, (_, index) => ({ index })), value }))
+    let previous: JsonValue | null = null
+    let checkpoint = 0
+    const encoded = frames.map((frame, stepNo) => {
+      const result = encodeReplayFrame({ frame, previousFrame: previous, stepNo, previousCheckpointStepNo: checkpoint })
+      previous = frame; checkpoint = result.checkpointStepNo
+      return result
+    })
+    expect(encoded.map(frame => frame.payloadKind)).toEqual(['checkpoint', 'delta', 'delta', 'delta'])
+    let copied: JsonValue | null = null
+    let inPlace: JsonValue | null = null
+    for (const [index, frame] of encoded.entries()) {
+      const retained: JsonValue | null = copied
+      copied = decodeReplayFrame(copied, frame)
+      if (retained !== null) expect(retained).toEqual(frames[index - 1])
+      inPlace = decodeReplayFrame(inPlace, frame, { inPlace: true })
+      expect(inPlace).toEqual(frames[index])
+      expect(copied).toEqual(frames[index])
+    }
+  })
+
   it('uses Step 0 and every sixteenth step as checkpoints', () => {
     const stable = 'x'.repeat(500)
     const step0 = encodeReplayFrame({

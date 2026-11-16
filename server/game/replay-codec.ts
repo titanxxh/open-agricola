@@ -131,16 +131,27 @@ const arrayIndex = (raw: string, length: number, allowEnd: boolean): number => {
   return index
 }
 
+export type ReplayDeltaApplication = {
+  /**
+   * The caller hands over both `frame` and the operation values: they are
+   * mutated or adopted instead of copied. Only for single-pass sequential
+   * readers that discard the previous frame, such as storage validation.
+   */
+  inPlace?: boolean
+}
+
 export const applyReplayDelta = (
   frame: JsonValue,
   operations: readonly ReplayDeltaOperation[],
+  { inPlace = false }: ReplayDeltaApplication = {},
 ): JsonValue => {
-  let result = structuredClone(frame)
+  const own = <T extends JsonValue>(value: T): T => inPlace ? value : structuredClone(value)
+  let result = own(frame)
   for (const operation of operations) {
     const parts = pointerParts(operation.path)
     if (parts.length === 0) {
       if (operation.op === 'remove') throw new Error('cannot remove replay frame root')
-      result = structuredClone(operation.value)
+      result = own(operation.value)
       continue
     }
     let parent: JsonValue = result
@@ -156,9 +167,9 @@ export const applyReplayDelta = (
     const key = parts.at(-1)!
     if (Array.isArray(parent)) {
       const index = arrayIndex(key, parent.length, operation.op === 'add')
-      if (operation.op === 'add') parent.splice(index, 0, structuredClone(operation.value))
+      if (operation.op === 'add') parent.splice(index, 0, own(operation.value))
       else if (operation.op === 'remove') parent.splice(index, 1)
-      else parent[index] = structuredClone(operation.value)
+      else parent[index] = own(operation.value)
     } else if (isObject(parent)) {
       if (operation.op === 'remove') {
         if (!Object.hasOwn(parent, key)) throw new Error('JSON pointer does not exist')
@@ -168,7 +179,7 @@ export const applyReplayDelta = (
           throw new Error('JSON pointer does not exist')
         }
         Object.defineProperty(parent, key, {
-          value: structuredClone(operation.value), enumerable: true, configurable: true, writable: true,
+          value: own(operation.value), enumerable: true, configurable: true, writable: true,
         })
       }
     } else {
@@ -218,6 +229,7 @@ const isReplayDelta = (value: unknown): value is ReplayDeltaOperation[] =>
 export const decodeReplayFrame = (
   previousFrame: JsonValue | null,
   encoded: EncodedReplayFrame,
+  application: ReplayDeltaApplication = {},
 ): JsonValue => {
   let parsed: unknown
   try {
@@ -231,7 +243,7 @@ export const decodeReplayFrame = (
   } else {
     if (previousFrame === null || !isReplayDelta(parsed)) throw new Error('invalid replay payload')
     try {
-      frame = applyReplayDelta(previousFrame, parsed)
+      frame = applyReplayDelta(previousFrame, parsed, application)
     } catch {
       throw new Error('invalid replay payload')
     }

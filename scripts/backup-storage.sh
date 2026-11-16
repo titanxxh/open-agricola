@@ -7,6 +7,10 @@ source "$POLICY_ROOT/scripts/backup-process.sh"
 MODE=online
 if [[ "${2:-}" == --already-stopped ]]; then MODE=maintenance
 elif [[ -n "${2:-}" ]]; then echo 'Unknown backup mode' >&2; exit 1; fi
+# Online validation shares the host with players and stays single-threaded;
+# a stopped stable deployment may use every CPU for restore validation.
+if [[ "$MODE" == maintenance && "${BACKUP_ENVIRONMENT:-stable}" == stable ]]; then export STORAGE_VALIDATION_CONCURRENCY=auto
+else unset STORAGE_VALIDATION_CONCURRENCY; fi
 backup_job_begin "$MODE" "$@"
 export APP_UID="$(id -u)" APP_GID="$(id -g)"
 umask 077

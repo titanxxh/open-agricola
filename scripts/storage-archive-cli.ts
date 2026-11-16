@@ -8,12 +8,14 @@ import { ResourceStore } from '../server/storage/resource-store'
 import { migratePostgres } from '../server/database/migrations'
 import { applyReplayRemovalLedger } from '../server/game/replay-removal'
 import { validateStorage } from './storage-validation'
+import { storageValidationConcurrency } from './replay-validation-pool'
 import { assertEmptyStorage, decodeLedger, exportStorageArchive, mergeLedger, restoreStorageArchive, type StorageArchive } from './storage-archive'
 import { cleanupBackupScratch, withBackupScratch } from './backup-scratch'
 
 /** Target-build validation never connects an application to historical data. */
 export async function validateArchiveInIsolation(root: string, env: NodeJS.ProcessEnv = process.env, signal?: AbortSignal) {
   if (!env.DATABASE_URL) throw new Error('DATABASE_URL is required')
+  const concurrency = storageValidationConcurrency(env.STORAGE_VALIDATION_CONCURRENCY)
   const manifest = JSON.parse(await readFile(join(root, 'archive.json'), 'utf8')) as StorageArchive
   const sourceObjects = S3ObjectStore.fromEnv(env, env.S3_PREFIX ?? '', signal)
   try {
@@ -21,7 +23,7 @@ export async function validateArchiveInIsolation(root: string, env: NodeJS.Proce
       schema: manifest.schema, deadlineEpochMs: Number(env.BACKUP_DEADLINE_EPOCH_MS || Date.now() + 30 * 60 * 1000),
       signal: signal ?? new AbortController().signal }, async target => {
       const ledger = await new ErasureLedger(sourceObjects).read()
-      const { validation } = await restoreStorageArchive(target.connectionString, target.db, target.objects, root, ledger, target.signal)
+      const { validation } = await restoreStorageArchive(target.connectionString, target.db, target.objects, root, ledger, target.signal, { concurrency })
       return { formatVersion: 2, sourceBuildId: manifest.sourceBuildId, targetBuildId: env.GAME_BUILD_ID ?? 'development',
         createdAt: manifest.createdAt, validatedAt: new Date().toISOString(), database: manifest.database, ...validation }
     })
@@ -33,6 +35,7 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
   if (!path || !['export-online', 'export', 'validate', 'restore', 'check-empty', 'check-live', 'ledger-export', 'ledger-merge', 'cleanup-scratch'].includes(command)) {
     throw new Error('Usage: storage-archive-cli.ts export-online|validate <directory> | cleanup-scratch <record-directory> | export|restore <directory> --applications-stopped | check-empty|check-live <build-id> --applications-stopped | ledger-export|ledger-merge <ledger.json>')
   }
+  const validationConcurrency = storageValidationConcurrency(env.STORAGE_VALIDATION_CONCURRENCY)
   const controller = new AbortController()
   const deadline = env.BACKUP_DEADLINE_EPOCH_MS === undefined ? undefined : Number(env.BACKUP_DEADLINE_EPOCH_MS)
   if (deadline !== undefined && (!Number.isSafeInteger(deadline) || deadline <= Date.now() || deadline - Date.now() > 30 * 60 * 1000)) throw new Error('Invalid or expired backup deadline')
@@ -84,7 +87,7 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       try {
         const resources = new ResourceStore(db, objects)
         await applyReplayRemovalLedger(db, { resources })
-        const validation = await validateStorage(db, resources)
+        const validation = await validateStorage(db, resources, { concurrency: validationConcurrency })
         await db.prepare("UPDATE data_imports SET status='validated',report_json=?,updated_at=? WHERE source_hash=?").run(JSON.stringify(validation), Date.now(), barrier)
         console.log(JSON.stringify(validation, null, 2)); return
       } catch (error) {
@@ -101,7 +104,8 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       // is empty. Ordinary archives intentionally cannot supply this input.
       if (!env.CURRENT_ERASURE_LEDGER) throw new Error('CURRENT_ERASURE_LEDGER must point to the latest independent ledger copy')
       const ledger = decodeLedger(await readFile(env.CURRENT_ERASURE_LEDGER, 'utf8'))
-      console.log(JSON.stringify(await restoreStorageArchive(env.DATABASE_URL, db, objects, resolve(path), ledger, controller.signal), null, 2))
+      console.log(JSON.stringify(await restoreStorageArchive(env.DATABASE_URL, db, objects, resolve(path), ledger, controller.signal,
+        { concurrency: validationConcurrency }), null, 2))
     }
   } finally {
     if (timer) clearTimeout(timer)

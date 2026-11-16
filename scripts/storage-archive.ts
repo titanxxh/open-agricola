@@ -10,7 +10,7 @@ import { ResourceStore } from '../server/storage/resource-store'
 import { ErasureLedger, type ErasureBatch } from '../server/storage/erasure-ledger'
 import { objectHash, S3ObjectStore } from '../server/storage/s3-store'
 import { applyReplayRemovalLedger, validateBatch } from '../server/game/replay-removal'
-import { validateStorage } from './storage-validation'
+import { validateStorage, type StorageValidationOptions } from './storage-validation'
 import { migratePostgres } from '../server/database/migrations'
 import { withResourceCapture, type CapturedResource } from '../server/storage/backup-coordination'
 
@@ -165,7 +165,7 @@ export async function assertEmptyStorage(db: PostgresDatabase, objects: S3Object
 }
 
 /** Restore into an EMPTY database. Caller supplies current, independent erasure facts. */
-export async function restoreStorageArchive(connectionString: string, db: PostgresDatabase, objects: S3ObjectStore, root: string, currentErasureFacts: ErasureBatch[], signal?: AbortSignal) {
+export async function restoreStorageArchive(connectionString: string, db: PostgresDatabase, objects: S3ObjectStore, root: string, currentErasureFacts: ErasureBatch[], signal?: AbortSignal, validation: StorageValidationOptions = {}) {
   signal?.throwIfAborted()
   const manifest = JSON.parse(await readFile(join(root, 'archive.json'), 'utf8')) as StorageArchive
   if (manifest.version !== 1 || !/^[a-z_][a-z0-9_]*$/.test(manifest.schema) || !Array.isArray(manifest.objects)) throw new Error('Invalid storage archive manifest')
@@ -213,9 +213,9 @@ export async function restoreStorageArchive(connectionString: string, db: Postgr
     await record('importing')
     const resources = new ResourceStore(db, objects)
     await applyReplayRemovalLedger(db, { resources })
-    const validation = await validateStorage(db, resources)
-    await record('validated', validation)
-    return { manifest, validation }
+    const report = await validateStorage(db, resources, validation)
+    await record('validated', report)
+    return { manifest, validation: report }
   } catch (error) {
     // Native restore is transactional. If it failed before schema creation,
     // initialize the empty target only to leave a permanent startup barrier.

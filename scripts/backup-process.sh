@@ -108,6 +108,7 @@ backup_container() {
   local environment=(-e "SOURCE_BUILD_ID=${SOURCE_BUILD_ID:-}")
   seconds="$(backup_seconds_left)" || return
   if [[ -n "${BACKUP_DEADLINE_EPOCH_MS:-}" ]]; then environment+=(-e "BACKUP_DEADLINE_EPOCH_MS=$BACKUP_DEADLINE_EPOCH_MS"); fi
+  if [[ -n "${STORAGE_VALIDATION_CONCURRENCY:-}" ]]; then environment+=(-e "STORAGE_VALIDATION_CONCURRENCY=$STORAGE_VALIDATION_CONCURRENCY"); fi
   BACKUP_SEQUENCE=$((BACKUP_SEQUENCE + 1))
   name="agricola-backup-$BACKUP_ENVIRONMENT-$BACKUP_JOB_ID-$$-$BACKUP_SEQUENCE"
   service="${BACKUP_TOOL_SERVICE:-app}"
