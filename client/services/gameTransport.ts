@@ -1,6 +1,6 @@
+import { assertPrereleaseAccess, getPrereleaseAccess, isPrereleaseClient, observePrereleaseFailure, prereleaseStorageKey, prereleaseWebSocketProtocols, subscribePrereleaseAccess } from './prerelease-runtime'
 import { browserApiFetch } from './browser-api'
 import { randomUuid } from '../utils/uuid'
-import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { recordBugReportDisconnect } from './bug-report-diagnostics'
 import { markRequest, responseReceived, snapshotReceived, observeBrowser } from './observability'
@@ -293,6 +293,7 @@ const terminalCode = (code?: string): boolean => !!code && [
   'context_expired', 'context_removed', 'command_scope_expired',
   'player_slot_required',
   'client_refresh_required',
+  'prerelease_auth_required', 'prerelease_access_paused', 'prerelease_access_expired', 'prerelease_runtime_changed',
 ].includes(code)
 
 export class WsGameTransport implements GameTransport {
@@ -335,16 +336,24 @@ export class WsGameTransport implements GameTransport {
   private retryTimer?: ReturnType<typeof setTimeout>
   private retryAttempt = 0
   private allocationId = commandUuid()
+  private readonly unsubscribePrerelease: () => void
   private generation = 0
   private status: RoomConnectionStatus = { phase: 'connecting' }
 
   constructor(wsUrl: string = WS_BASE, roomId?: string, playerIndex?: number, options: RoomConnectionOptions = {}) {
     this.options = options
     this.wsUrl = wsUrl
-    this.journal = new RoomCommandJournal(options.journalKey ?? `agricola.pending-commands:${wsUrl}`, roomId ?? '')
+    this.journal = new RoomCommandJournal(prereleaseStorageKey(options.journalKey ?? `agricola.pending-commands:${wsUrl}`), roomId ?? '')
     this.roomId = this.journal.roomId
     this.seatHint = playerIndex ?? this.journal.playerIndex
     this.roomViewer = { kind: 'participant', playerIndex: this.seatHint ?? 0 }
+    this.unsubscribePrerelease = subscribePrereleaseAccess(() => {
+      const access = getPrereleaseAccess()
+      if (isPrereleaseClient() && (access.kind === 'blocked' || access.kind === 'ended')) {
+        this.stop(access.code, access.code)
+        this.ws?.close()
+      }
+    })
   }
 
   get connected() { return this._connected && !this.recovering && !this.stopped }
@@ -369,7 +378,7 @@ export class WsGameTransport implements GameTransport {
     this.ws = null
     previous?.close()
     await new Promise<void>((resolve, reject) => {
-      const socket = new WebSocket(url, BROWSER_WS_PROTOCOL)
+      const socket = new WebSocket(url, prereleaseWebSocketProtocols())
       this.ws = socket
       const scope = this.readScope()
       let authenticated = false
@@ -383,6 +392,7 @@ export class WsGameTransport implements GameTransport {
       socket.onclose = (event) => {
         clearTimeout(timer)
         if (this.ws !== socket) return
+        if (event) observePrereleaseFailure(event.reason)
         if (event) recordBugReportDisconnect(this.roomId, event)
         this._connected = false
         const error = new Error('WebSocket disconnected')
@@ -397,6 +407,7 @@ export class WsGameTransport implements GameTransport {
         if (this.ws !== socket || this.stopped) return
         let msg: ServerEvent
         try { msg = JSON.parse(event.data as string) as ServerEvent } catch { return }
+        if (msg.type === 'error') observePrereleaseFailure(msg.code)
         if (msg.type === 'commandScope') {
           clearTimeout(timer)
           authenticated = true
@@ -695,7 +706,7 @@ export class WsGameTransport implements GameTransport {
     this.eventWaiters.forEach(waiter => waiter.reject(error))
     this.setStatus({ phase: 'stopped', message, code })
   }
-  private scopeKey(): string { return `agricola.command-scope:${this.wsUrl}` }
+  private scopeKey(): string { return prereleaseStorageKey(`agricola.command-scope:${this.wsUrl}`) }
   private readScope(): CommandScope | undefined {
     const pending = [...this.journal.commands.values()][0]?.commandContext
     if (pending) return { scopeId: pending.scopeId, expiresAt: 0 } // Expired identities must be rejected, never silently replaced.
@@ -728,6 +739,7 @@ export class WsGameTransport implements GameTransport {
     this.rejectReads(error)
   }
   private sendRaw(command: ClientCommand): void {
+    assertPrereleaseAccess()
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) throw new Error('WebSocket not connected')
     if (command.requestId) markRequest(command.requestId)
     this.ws.send(JSON.stringify(command))
@@ -930,6 +942,7 @@ export class WsGameTransport implements GameTransport {
   }
 
   destroy() {
+    this.unsubscribePrerelease()
     this.stop('Transport destroyed')
     this.generation++
     this.listeners.clear()
