@@ -113,6 +113,32 @@ afterEach(() => {
 
 describe('GameContextStore', () => {
 
+  it('returns archived team results and memberships through the public completed-context endpoint', async () => {
+    const db = await createDb()
+    try {
+      await insertCompleted(db, 'team-context', 'legacy_no_replay')
+      const scores = [
+        { teamIndex: 0, playerIds: ['p1', 'p3'], scoring: 'sum', total: 72, rank: 1, buildingResources: 0, categories: [], factors: [] },
+        { teamIndex: 1, playerIds: ['p2', 'p4'], scoring: 'sum', total: 60, rank: 2, buildingResources: 0, categories: [], factors: [] },
+      ]
+      await db.prepare("UPDATE game_results SET player_count=4, team_mode='multihand', team_scoring='sum', team_scores=?::jsonb WHERE room_id=?")
+        .run(JSON.stringify(scores), 'team-context')
+      await db.prepare('UPDATE game_result_players SET team_index=player_index WHERE room_id=?').run('team-context')
+      await db.prepare("INSERT INTO game_result_players(room_id,player_index,game_player_id,user_id,display_name,score,team_index) VALUES('team-context',2,'p3','u1','Alice',30,0),('team-context',3,'p4','u2','Bob',25,1)").run()
+
+      const response = await requestRoute(new GameContextStore(db), '/api/v1/game-contexts/team-context')
+
+      expect(response.status).toBe(200)
+      expect(JSON.parse(response.body)).toMatchObject({ lifecycle: 'completed', result: {
+        team: { mode: 'multihand', scoring: 'sum', scores },
+        players: [{ playerIndex: 0, teamIndex: 0 }, { playerIndex: 1, teamIndex: 1 },
+          { playerIndex: 2, teamIndex: 0 }, { playerIndex: 3, teamIndex: 1 }],
+      } })
+      expect(response.body).not.toContain('userId')
+      expect(response.body).not.toContain('user_id')
+    } finally { await db.close() }
+  })
+
   it('includes the selected Moor balance rule in the public completed result', async () => {
     const db = await createDb()
     try {

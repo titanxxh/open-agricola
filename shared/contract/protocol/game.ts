@@ -89,6 +89,7 @@ export type RedactedPrivatePromptInteraction =
 export type ClientInteractionState = InteractionState | RedactedPrivatePromptInteraction
 
 export type GameSyncPayload = {
+  teamScores?: import('../team').TeamScoreSummary[]
   state: SerializedGameState
   historyWindow?: HistoryWindow
   interaction: ClientInteractionState

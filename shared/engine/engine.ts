@@ -232,6 +232,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         }
         action.beforePhaseResolved = data.beforePhaseResolved === true
         action.bodyStarted = data.bodyStarted === true
+        action.farmTargetSelection = data.farmTargetSelection === true
         action.selectedBranchChoice = typeof data.selectedBranchChoice === 'string' ? data.selectedBranchChoice : undefined
         action.continuationParentHostNodeId = typeof data.continuationParentHostNodeId === 'string'
           ? data.continuationParentHostNodeId
