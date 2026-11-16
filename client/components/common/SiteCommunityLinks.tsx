@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { API_BASE } from '../../config'
 import { useLocale } from '../../contexts/LocaleContext'
@@ -56,7 +56,8 @@ function CommunityGroupDialog({ platform, onClose }: { platform: CommunityPlatfo
   )
 }
 
-export function SiteCommunityLinks() {
+/** `children` are page-specific icons appended to the shared row. */
+export function SiteCommunityLinks({ children }: { children?: ReactNode }) {
   const { t } = useLocale()
   const [open, setOpen] = useState<CommunityPlatform | null>(null)
   const communities: Array<{ platform: CommunityPlatform; label: string }> = [
@@ -74,6 +75,7 @@ export function SiteCommunityLinks() {
         </svg> : <img src={feishuIcon} alt="" aria-hidden="true" />}
       </button>)}
       <WhatsNewButton />
+      {children}
       {open && <CommunityGroupDialog platform={open} onClose={() => setOpen(null)} />}
     </div>
   )

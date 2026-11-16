@@ -32,6 +32,21 @@ type BugReport = {
   lastErrorCode: string | null
 }
 
+/** Publishes how far the trigger reaches in from the right edge so the section shortcuts can stop short of it. */
+const publishTriggerExtent = (trigger: HTMLElement | null) => {
+  const app = trigger?.closest<HTMLElement>('.app')
+  if (!trigger || !app) return
+  const publish = () => app.style.setProperty('--bug-report-trigger-extent',
+    `${Math.max(0, Math.ceil(window.innerWidth - trigger.getBoundingClientRect().left))}px`)
+  publish()
+  const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publish)
+  observer?.observe(trigger)
+  return () => {
+    observer?.disconnect()
+    app.style.removeProperty('--bug-report-trigger-extent')
+  }
+}
+
 type Connection = {
   enabled: boolean
   connected: boolean
@@ -238,7 +253,7 @@ export function BugReportBar({
   if (!roomId) return null
   if (authenticationRequired) {
     return (
-      <a className="bug-report-trigger" href={loginHref()}>
+      <a ref={publishTriggerExtent} className="bug-report-trigger" href={loginHref()}>
         {t('platform.loginBtn')}
       </a>
     )
@@ -468,6 +483,7 @@ export function BugReportBar({
     <>
       {!open ? (
         <button
+          ref={publishTriggerExtent}
           type="button"
           className="bug-report-trigger"
           onClick={() => setOpen(true)}

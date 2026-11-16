@@ -121,10 +121,12 @@ afterEach(() => {
 })
 
 describe('LobbyPage main navigation', () => {
-  it('offers prerelease to a qualified account in a separate tab', async () => {
+  it('offers prerelease to a qualified account in a separate tab from the header icons', async () => {
     accountQualification.betaAccess = true
     render(<LobbyPage />)
-    expect(await screen.findByRole('link', { name: 'Enter prerelease' })).toHaveAttribute('target', '_blank')
+    const entry = await screen.findByRole('link', { name: 'Enter prerelease' })
+    expect(entry).toHaveAttribute('target', '_blank')
+    expect(entry.closest('.site-community-links')?.closest('.lobby-header')).not.toBeNull()
   })
 
   const encyclopediaLink = () => within(screen.getByRole('navigation', { name: 'Main navigation' }))

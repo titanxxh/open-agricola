@@ -190,6 +190,34 @@ describe('BugReportBar', () => {
     )
   })
 
+  it('publishes how far the trigger reaches in from the right edge while it is shown', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) =>
+      isConnectionStatusRequest(String(input))
+        ? response({ ok: true, enabled: true, connected: false })
+        : response({ ok: true, report: null })))
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const left = this.classList.contains('bug-report-trigger') ? window.innerWidth - 130 : 0
+        return DOMRect.fromRect({ x: left, y: 0, width: 114, height: 42 })
+      })
+    try {
+      window.localStorage.setItem('open-agricola-locale-v2', 'en')
+      const { container } = render(
+        <LocaleProvider><div className="app"><BugReportBar roomId="room-1" /></div></LocaleProvider>,
+      )
+      const app = container.querySelector<HTMLElement>('.app')!
+
+      const trigger = await screen.findByRole('button', { name: 'Report a bug' })
+      expect(app.style.getPropertyValue('--bug-report-trigger-extent')).toBe('130px')
+      await user.click(trigger)
+      expect(app.style.getPropertyValue('--bug-report-trigger-extent')).toBe('')
+      await user.click(screen.getByRole('button', { name: 'Close' }))
+      await screen.findByRole('button', { name: 'Report a bug' })
+      expect(app.style.getPropertyValue('--bug-report-trigger-extent')).toBe('130px')
+    } finally { bounds.mockRestore() }
+  })
+
   it('offers anchor-preserving sign in when a replay participant is logged out', async () => {
     window.history.replaceState(
       null,

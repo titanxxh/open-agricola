@@ -2,7 +2,8 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { createInitialState } from '../shared/session/state-bootstrap'
-import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
+import { authenticateSolo } from './helpers/standard-solo-acceptance'
 
 async function prepareTable(request: APIRequestContext, playerCount = 2, expansions = true) {
   expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {
@@ -64,7 +65,13 @@ for (const width of [1920, 390]) {
     await first.press('End')
     await expect(last).toBeFocused()
     expect(await page.evaluate(() => window.scrollY)).toBe(scrollY)
-    if (width === 390) expect(await nav.evaluate(node => node.scrollLeft)).toBeGreaterThan(0)
+    expect(await nav.evaluate(node => {
+      const dock = node.getBoundingClientRect()
+      return node.scrollWidth <= node.clientWidth && Array.from(node.querySelectorAll('button')).every(button => {
+        const bounds = button.getBoundingClientRect()
+        return bounds.left >= dock.left && bounds.right <= dock.right
+      })
+    }), 'every shortcut must be fully visible without scrolling the dock').toBe(true)
     await last.press('Home')
     await expect(first).toBeFocused()
 
@@ -86,4 +93,53 @@ test('solo shortcuts omit public farms and disabled expansion boards', async ({ 
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   await expect(page.locator('.section-nav').getByRole('button')).toHaveText(['Hand Cards', 'Player Farm', 'Major Improvements'])
   await expect(page.locator('[data-section-target="seasons"], [data-section-target="moor"]')).toHaveCount(0)
+})
+
+test('narrow shortcuts wrap beside the report trigger and the major supply shares the hand columns', async ({ browser, request }, testInfo) => {
+  test.setTimeout(90_000)
+  const context = await browser.newContext({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true })
+  try {
+    await authenticateSolo(context, request, `section_nav_${Date.now().toString(36)}`)
+    await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+    // Reports are disabled in the test environment; only the trigger's presence matters for this layout.
+    await context.route('**/api/v1/issue-submission-connection**', route =>
+      route.fulfill({ json: { ok: true, enabled: true, connected: false } }))
+    const page = await context.newPage()
+    await page.goto(`${FRONTEND_URL}/?transport=ws&hotseat=1&maxPlayers=2&enableThroughTheSeasons=true&enableFarmersOfTheMoor=true&allowIncompleteFarmersOfTheMoorMinorDeal=true`)
+    await expect(page).toHaveURL(/\?room=[^&]+/)
+    await finishHotseatOpening(page)
+    const nav = page.locator('.section-nav')
+    await expect(nav.getByRole('button')).toHaveText(['手牌', '玩家农场', '公开农场', '四季版图', '特殊行动', '主要改良'])
+    await expect(page.getByRole('button', { name: '报告问题', exact: true })).toBeVisible()
+    const dock = await nav.evaluate(node => {
+      const bounds = node.getBoundingClientRect()
+      const trigger = document.querySelector('.bug-report-trigger')!.getBoundingClientRect()
+      const buttons = Array.from(node.querySelectorAll('button'), button => button.getBoundingClientRect())
+      return {
+        gap: trigger.left - bounds.right,
+        rows: new Set(buttons.map(button => Math.round(button.top))).size,
+        contained: node.scrollWidth <= node.clientWidth
+          && buttons.every(button => button.left >= bounds.left && button.right <= bounds.right),
+      }
+    })
+    expect(dock.gap).toBeGreaterThanOrEqual(8)
+    expect(dock).toMatchObject({ rows: 2, contained: true })
+    await page.screenshot({ path: testInfo.outputPath('section-shortcuts-360-zh.png') })
+
+    await nav.getByRole('button', { name: '主要改良', exact: true }).click()
+    const toggle = page.locator('.major-supply-toggle')
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+    const majors = page.locator('.major-row > .major-card-wrapper')
+    await expect(majors.nth(3)).toBeVisible()
+    const layout = await page.locator('.major-row').evaluate(row => {
+      const cards = Array.from(row.children, card => card.getBoundingClientRect())
+      return {
+        firstRow: cards.filter(card => Math.round(card.top) === Math.round(cards[0]!.top)).length,
+        overflow: row.scrollWidth - row.clientWidth,
+        pageOverflow: document.documentElement.scrollWidth - innerWidth,
+      }
+    })
+    expect(layout).toEqual({ firstRow: 3, overflow: 0, pageOverflow: 0 })
+    await page.locator('.major-improvements').screenshot({ path: testInfo.outputPath('major-supply-360-zh.png') })
+  } finally { await context.close() }
 })

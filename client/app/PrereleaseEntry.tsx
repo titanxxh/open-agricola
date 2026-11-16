@@ -3,9 +3,11 @@ import type { PrereleaseEntry as Entry } from '../../shared/contract/prerelease-
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { readPrereleaseEntry } from '../services/prerelease'
+import './PrereleaseEntry.css'
 
 type EntryState = { kind: 'hidden' } | Entry
 
+/** Beta badge for the site icon row; pass it as a child of `SiteCommunityLinks`. */
 export function PrereleaseEntry() {
   const { user, apiFetch } = useAuth()
   const { t } = useLocale()
@@ -31,10 +33,11 @@ export function PrereleaseEntry() {
     return () => { request++; window.removeEventListener('focus', refresh) }
   }, [eligible, user?.id, apiFetch])
   if (!eligible || entry.kind === 'hidden') return null
-  return <div className="prerelease-entry">
-    {entry.kind === 'available'
-      ? <a className="btn-secondary" href={entry.startUrl} target="_blank" rel="noopener noreferrer">{t('prerelease.entry')}</a>
-      : <button type="button" className="btn-secondary" disabled>{t('prerelease.entry')}</button>}
-    <p className="settings-hint" role="status">{t(entry.kind === 'available' ? 'prerelease.entryHint' : 'prerelease.unavailable')}</p>
-  </div>
+  const badge = <span className="prerelease-entry__badge" aria-hidden="true">{t('beta.badge')}</span>
+  // The title doubles as the accessible description, so the hint stays available without taking header space.
+  return entry.kind === 'available'
+    ? <a className="github-repo-link prerelease-entry" href={entry.startUrl} target="_blank" rel="noopener noreferrer"
+      aria-label={t('prerelease.entry')} title={t('prerelease.entryHint')}>{badge}</a>
+    : <button type="button" className="github-repo-link prerelease-entry" disabled
+      aria-label={t('prerelease.entry')} title={t('prerelease.unavailable')}>{badge}</button>
 }

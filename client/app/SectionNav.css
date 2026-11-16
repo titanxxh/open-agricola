@@ -4,22 +4,23 @@
   left: max(8px, env(safe-area-inset-left, 0px));
   bottom: calc(max(var(--interaction-bar-height, 72px), var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) + 8px);
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: row wrap;
   gap: 6px;
   width: max-content;
-  max-width: calc(100vw - 156px - env(safe-area-inset-left, 0px));
+  /* Wrap rather than scroll on narrow screens, and stop short of the bug-report trigger, which publishes its extent. */
+  max-width: calc(100vw - max(8px, env(safe-area-inset-left, 0px)) - var(--bug-report-trigger-extent, 0px) - 8px);
   margin: 0;
   padding: 4px;
   overflow-x: auto;
   overflow-y: hidden;
   border: 1px solid rgba(168, 135, 82, 0.9);
-  border-radius: 999px;
+  border-radius: 22px;
   background: rgba(255, 250, 240, 0.96);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
 }
 
 .section-nav__jump {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-height: 32px;
   padding: 4px 12px;
   border: 1px solid #d9cfb7;
@@ -30,7 +31,7 @@
   font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
-  white-space: nowrap;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -47,14 +48,18 @@
 @media (max-width: 1100px) {
   .section-nav {
     left: max(6px, env(safe-area-inset-left, 0px));
+    max-width: calc(100vw - max(6px, env(safe-area-inset-left, 0px)) - var(--bug-report-trigger-extent, 0px) - 8px);
     gap: 4px;
     padding: 3px;
+    border-radius: 21px;
   }
 
   .section-nav__jump {
+    max-width: calc(50% - 2px);
     min-height: 36px;
-    padding: 6px 10px;
-    font-size: 14px;
+    padding: 6px clamp(6px, 2vw, 10px);
+    font-size: clamp(12px, 3.4vw, 14px);
+    text-wrap: balance;
   }
 }
 

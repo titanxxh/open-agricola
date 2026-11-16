@@ -216,7 +216,7 @@ export function LobbyPage() {
             {t('ui.encyclopedia.title')}
           </a>
         </nav>
-        <SiteCommunityLinks />
+        <SiteCommunityLinks><PrereleaseEntry /></SiteCommunityLinks>
         <div className="lobby-header__right">
           <LocaleSwitcher />
           <InboxButton />
@@ -285,8 +285,6 @@ export function LobbyPage() {
           </>
         )}
       </header>
-
-      <PrereleaseEntry />
 
       {soloSetup || roomCreation.adjustment ? <SoloSetupDialog
         locale={locale} creating={roomCreation.creating}

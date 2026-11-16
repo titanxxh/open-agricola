@@ -132,7 +132,9 @@ describe('SettingsPage', () => {
     prereleaseConfigured = true
     apiFetchMock.mockResolvedValue(Response.json({ ok: true, identities: [] }))
     render(<SettingsPage />)
-    expect(await screen.findByRole('link', { name: '进入预发布' })).toHaveAttribute('target', '_blank')
+    const entry = await screen.findByRole('link', { name: '进入预发布' })
+    expect(entry).toHaveAttribute('target', '_blank')
+    expect(entry.closest('.site-header-links')).not.toBeNull()
   })
 
   it('shows current account qualification and removes it after revocation', async () => {
