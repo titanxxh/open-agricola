@@ -14,14 +14,15 @@ export function bounded(promise, ms, label, fallback, hung) {
 
 /**
  * Held sockets the page itself saw open just before an action, and when the last of them closed. Both times come
- * from the page clock; a watched socket missing from the rows means its document was replaced, not that it closed.
+ * from the page clock. A watched socket missing from the rows (replaced document or hung evaluation) is unobserved:
+ * it proves neither a close nor survival.
  */
 export function snapshotCut(rows, snapshot) {
   const watched = snapshot.ids.map(id => rows[id])
-  const documentLost = watched.some(row => row === undefined)
-  const closed = watched.length > 0 && !documentLost && watched.every(row => row.closedAt !== null)
-  return { connectedAtStart: watched.length, closedAfterMs: closed ? Math.max(...watched.map(row => row.closedAt - snapshot.pageNow)) : null,
-    codes: watched.map(row => row?.code ?? null), ...(documentLost ? { documentLost: true } : {}) }
+  const unobserved = watched.some(row => row === undefined)
+  const seen = watched.length > 0 && !unobserved
+  return { connectedAtStart: watched.length, closedAfterMs: seen && watched.every(row => row.closedAt !== null) ? Math.max(...watched.map(row => row.closedAt - snapshot.pageNow)) : null,
+    stillOpen: seen && watched.every(row => row.closedAt === null), codes: watched.map(row => row?.code ?? null), ...(unobserved ? { unobserved: true } : {}) }
 }
 
 /**
@@ -218,7 +219,7 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
     for (;;) {
       const rows = await bounded(page.evaluate(() => window.__oaHeld ?? []), 15_000, 'held rows', [], hung)
       const cut = snapshotCut(rows, snapshot)
-      if (cut.closedAfterMs !== null || cut.documentLost || Date.now() - snapshot.takenAt >= waitMs) return cut
+      if (cut.closedAfterMs !== null || cut.unobserved || Date.now() - snapshot.takenAt >= waitMs) return cut
       await sleep(250)
     }
   }

@@ -16,12 +16,16 @@ describe('revocation socket cut', () => {
   const snapshot = { pageNow: 10_000, takenAt: 0, ids: [1, 2] }
   it('watches only the sockets the page saw open before the action and times them on the page clock', () => {
     const rows = [{ openedAt: 5_000, closedAt: 9_500, code: 1008 }, { openedAt: 9_000, closedAt: 10_400, code: 1008 }, { openedAt: 9_990, closedAt: 10_900, code: 1008 }]
-    expect(snapshotCut(rows, snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: 900, codes: [1008, 1008] })
+    expect(snapshotCut(rows, snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: 900, stillOpen: false, codes: [1008, 1008] })
   })
-  it('stays open while any watched socket remains and reports a replaced document instead of a close', () => {
-    expect(snapshotCut([{}, { closedAt: null, code: null }, { closedAt: 10_200, code: 1008 }], snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: null, codes: [null, 1008] })
-    expect(snapshotCut([{ closedAt: 9_000, code: 1000 }], snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: null, codes: [null, null], documentLost: true })
-    expect(snapshotCut([], { pageNow: null, ids: [] })).toEqual({ connectedAtStart: 0, closedAfterMs: null, codes: [] })
+  it('reports survival only when every watched socket was observed open', () => {
+    expect(snapshotCut([{}, { closedAt: null, code: null }, { closedAt: null, code: null }], snapshot)).toMatchObject({ closedAfterMs: null, stillOpen: true })
+    expect(snapshotCut([{}, { closedAt: null, code: null }, { closedAt: 10_200, code: 1008 }], snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: null, stillOpen: false, codes: [null, 1008] })
+  })
+  it('treats unreadable rows as unobserved, proving neither a close nor survival', () => {
+    expect(snapshotCut([], snapshot)).toEqual({ connectedAtStart: 2, closedAfterMs: null, stillOpen: false, codes: [null, null], unobserved: true })
+    expect(snapshotCut([{ closedAt: 9_000, code: 1000 }, { closedAt: null, code: null }], snapshot)).toMatchObject({ closedAfterMs: null, stillOpen: false, unobserved: true })
+    expect(snapshotCut([], { pageNow: null, ids: [] })).toEqual({ connectedAtStart: 0, closedAfterMs: null, stillOpen: false, codes: [] })
   })
 })
 
