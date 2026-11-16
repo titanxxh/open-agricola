@@ -30,6 +30,7 @@ export const interactionRequestChoices = (request: InteractionRequest): ActionCh
     case 'engine-blocked':
     case 'resource-quantity-select':
     case 'resource-batch-exchange-select':
+    case 'marketplace-select':
       // Structured submissions carry their own payload validation.
       return []
     default: {
