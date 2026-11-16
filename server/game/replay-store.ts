@@ -1,3 +1,4 @@
+import type { TeamResultArchive } from '../../shared/contract/team'
 import type { PostgresDatabase as Database } from '../database/postgres'
 import { prereleaseArchiveExpired } from './prerelease-archive-retention'
 import type { CustomCardDef } from '../../shared/contract/protocol/game.ts'
@@ -34,6 +35,7 @@ type ReplayParticipantRow = {
   player_index: number
   display_name: string
   name_is_default: number
+  team_index: number | null
 }
 
 type ReplaySegmentRow = {
@@ -272,11 +274,11 @@ export class ReplayStore {
 
   private async participants(roomId: string): Promise<Awaited<ReplayParticipantRow[]>> {
     return (await this.db.prepare(`
-      SELECT player_index, display_name, name_is_default
+      SELECT player_index, display_name, name_is_default, team_index
       FROM game_result_players
       WHERE room_id = ?
       UNION ALL
-      SELECT player_index, display_name, name_is_default
+      SELECT player_index, display_name, name_is_default, NULL AS team_index
       FROM game_termination_players
       WHERE room_id = ?
       ORDER BY player_index
@@ -295,6 +297,9 @@ export class ReplayStore {
       )
     }
     const participants = (await this.participants(roomId))
+    const team = await this.db.prepare('SELECT team_mode, team_scoring, team_scores FROM game_results WHERE room_id = ?').get<{
+      team_mode: TeamResultArchive['mode'] | null; team_scoring: TeamResultArchive['scoring'] | null; team_scores: TeamResultArchive['scores'] | null
+    }>(roomId)
     let steps: ReplayStepSummary[]
     try {
       steps = ((await this.db.prepare(`
@@ -363,7 +368,11 @@ export class ReplayStore {
         playerIndex: participant.player_index,
         displayName: participant.display_name,
         ...(participant.name_is_default === 1 ? { nameIsDefault: true } : {}),
+        ...(participant.team_index !== null ? { teamIndex: participant.team_index } : {}),
       })),
+      ...(team?.team_mode && team.team_scoring && team.team_scores ? {
+        team: { mode: team.team_mode, scoring: team.team_scoring, scores: team.team_scores },
+      } : {}),
       segments,
       steps,
       corruptRanges,

@@ -1,3 +1,4 @@
+import type { TeamResultArchive, TeamScoreSummary } from '../team'
 import type { SerializedGameState } from '../../session/serialization'
 import type { PlayerScoreSummary } from '../../domain'
 import type { CustomCardDef } from './game'
@@ -15,6 +16,7 @@ export type ReplayParticipant = {
   playerIndex: number
   displayName: string
   nameIsDefault?: boolean
+  teamIndex?: number
 }
 
 export type ReplaySegmentDescriptor = {
@@ -36,6 +38,7 @@ export type ReplayStepSummary = {
 
 export type ReplayGameState = SerializedGameState & {
   scores?: PlayerScoreSummary[]
+  teamScores?: TeamScoreSummary[]
 }
 
 export type ReplayManifest = {
@@ -50,6 +53,7 @@ export type ReplayManifest = {
   lastStepNo: number
   missingPrefix: boolean
   participants: ReplayParticipant[]
+  team?: TeamResultArchive
   segments: ReplaySegmentDescriptor[]
   steps: ReplayStepSummary[]
   corruptRanges: Array<{

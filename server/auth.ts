@@ -789,7 +789,9 @@ export async function getAccountDeletionRoomIds(userId: string, db = getDb()): P
     SELECT id FROM rooms WHERE created_by = ?
     UNION
     SELECT room_id AS id FROM room_players WHERE user_id = ?
-  `).all(userId, userId)) as Array<{ id: string }>).map(row => row.id)
+    UNION
+    SELECT id FROM rooms WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(team_members_json) member WHERE member->>'userId'=?)
+  `).all(userId, userId, userId)) as Array<{ id: string }>).map(row => row.id)
 }
 
 export async function getSessionByToken(token: string, options: {

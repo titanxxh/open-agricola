@@ -1,0 +1,10 @@
+.team-scoring-content { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.team-score { min-width: 0; padding: 1rem; border: 1px solid currentColor; border-radius: .5rem; }
+.team-score-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; }
+.team-score p { margin: .5rem 0; }
+.team-score summary { cursor: pointer; padding: .5rem 0; }
+.team-score-table-scroll { overflow-x: auto; }
+.team-score-table { border-collapse: collapse; width: 100%; }
+.team-score-table th, .team-score-table td { padding: .4rem .6rem; text-align: right; white-space: nowrap; }
+.team-score-table th:first-child { text-align: left; }
+.team-score-table [data-team-counted="true"] { background: #e4d399; color: #30270e; font-weight: bold; box-shadow: inset 0 -2px #8e6b18; }
