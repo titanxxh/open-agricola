@@ -3,6 +3,9 @@ import { execFileSync } from 'node:child_process'
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
+import { PostgresDatabase } from '../server/database/postgres'
+import { BACKEND_URL, browserRequestHeaders } from './fixtures'
+import { authenticateSolo } from './helpers/standard-solo-acceptance'
 
 function communityDirectory() {
   if (!process.env.SHARED_DATA_DIR || !process.env.DATABASE_SCHEMA?.startsWith('test_')) {
@@ -147,6 +150,37 @@ test.describe('shared headers on touch devices', () => {
           await expect(dialog).toBeVisible()
           await expectWithin(page, dialog)
           await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+        })
+      }
+    }
+  })
+
+  test('keeps the Beta badge and language selector inside the lobby and settings headers', async ({ context, page, request }, testInfo) => {
+    publish(testInfo, 1)
+    await authenticateSolo(context, request, `beta_header_${Date.now().toString(36)}`)
+    await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+    const me = await (await context.request.get(`${BACKEND_URL}/api/auth/me`, { headers: browserRequestHeaders() })).json() as { user: { id: string } }
+    const db = new PostgresDatabase({ connectionString: process.env.DATABASE_URL, schema: process.env.DATABASE_SCHEMA })
+    try {
+      await db.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(me.user.id, Date.now())
+    } finally { await db.close() }
+    for (const width of [320, 360]) {
+      await page.setViewportSize({ width, height: 780 })
+      for (const [url, header] of [['/?bg=none', '.lobby-header'], ['/?page=settings&bg=none', '.settings-page > header']] as const) {
+        await test.step(`${header} at ${width}px`, async () => {
+          await page.goto(url)
+          const beta = page.locator(header).getByLabel('进入预发布', { exact: true })
+          await expect(beta).toBeVisible()
+          await expect(page.locator(header).locator('.whats-new-button')).toBeVisible()
+          await expectHorizontallyWithin(page, beta)
+          if (header !== '.lobby-header') {
+            const locale = page.locator(header).getByRole('button', { name: '界面语言: 简体中文', exact: true })
+            await expectHorizontallyWithin(page, locale)
+            const [box, own] = await Promise.all([page.locator(header).boundingBox(), locale.boundingBox()])
+            expect(own!.x + own!.width).toBeLessThanOrEqual(box!.x + box!.width)
+          }
+          expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0)
+          await page.locator(header).screenshot({ path: testInfo.outputPath(`beta-header-${width}-${header.includes('lobby') ? 'lobby' : 'settings'}.png`) })
         })
       }
     }

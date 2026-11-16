@@ -111,6 +111,13 @@
   .settings-nav-left {
     flex-wrap: wrap;
   }
+
+  /* Header icons plus the Beta badge can outgrow a phone; let the language selector take its own line. */
+  .settings-page .site-header-links {
+    flex-wrap: wrap;
+    flex-shrink: 1;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 640px) {
