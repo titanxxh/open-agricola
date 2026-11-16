@@ -106,8 +106,7 @@ ClientCommand
 - Replay archives use bounded authoritative state deltas ([ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)).
 - A write failure freezes the same Frame and Intent, blocks the Room and retries with backoff; clients wait and never read uncommitted state. The same idempotency key with a different hash blocks permanently and alerts.
 - Each instance defaults to 30 online ordinary Rooms. `APP_ROOM_CAPACITY` (1–30) and `CUSTOM_SESSION_WORKER_CAPACITY` (0–15, default 15) can lower limits; invalid values stop startup. `RoomDirectory` atomically checks OPEN connections and 30-second reservations on creation and first resume, including cached Rooms. Activation keeps its reservation until positive presence consumes it. Offline saves retain ownership without using online quota. Worker limits include retained Workshop executors, restored Rooms and HTTP sandboxes. Full Rooms may reconnect seats or replace themselves one-for-one with `newGame`. See `room-directory.test.ts`, `session-capacity.test.ts` and `ws-server.test.ts`.
-- Game Context links resolve by lifecycle ([ADR 0013](../adr/0013-lifecycle-routed-game-context-access.md)): completed, expired and removed contexts and public Replay need no login; active descriptors, recovery, Bug Report, evidence and maintainer forensics enforce seat or administrator authorization. Errors use `{ ok:false, code, lifecycle?, message }`.
-- Completed Replay is public and retained until erasure ([ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)).
+- Formal Context/completed Replay stays public (ADRs 0010/0013); recovery/Evidence keep seat/admin access. Pre gates reads and final bytes on Beta admission. Private JSON/images use no-store, without ETag/Range; global replay-assets stay blocked. `prereleaseArchiveReadState` checks lifecycle/TTL. `ReplayResources.assetAvailable` rechecks references, catalog and erasure after asynchronous fences. Evidence rechecks the exact submitted Anchor/seat after decode. Tests: `prerelease-replay-routes.test.ts`.
 - Bug Reports ([ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)) keep PostgreSQL drafts, stable `submissionId`, attempts, atomic claims, and GitHub App/test adapters.
 
 Tests: `server/game/__tests__/{room-committer,room-committer-private-cursor,replay-delta-shared-history}.test.ts`, `server/__tests__/{bug-report-routes,bug-report-store}.test.ts`, `e2e-tests/{replay-viewer,bug-report}.spec.ts`.
@@ -173,9 +172,9 @@ POST   /api/v1/issue-submission-connection/github/complete
 POST   /api/v1/github-app/webhook
 ```
 
-Public Replay APIs return versioned JSON, never PostgreSQL encoding. A Segment expands at most one checkpoint chain with every Frame Hash verified; an Anchor must match `stepNo + frameHash` exactly. Public reads have per-IP quotas and size caps; authenticated evidence and report endpoints are rate-limited per account.
+Public Replay APIs return versioned JSON, never PostgreSQL encoding. A Segment expands at most one checkpoint chain with every Frame Hash verified; an Anchor must match `stepNo + frameHash` exactly. Public reads have IP quotas/size caps; Evidence/reports have account quotas.
 
-Viewer entry HTML revalidates its response policy; content-addressed assets remain immutable. Its CSP explicitly allows the `PUBLIC_API_BASE` origin (the request origin in local development) for public reads from the opaque sandbox, while scripts remain restricted to `'self'`. Coverage: `replay-routes.test.ts` and `replay-viewer-csp.spec.ts`.
+Viewer HTML revalidates CSP; immutable scripts stay 'self'. Public Replay allows the configured API origin. Pre bridge builds allow blob images. `replay-routes.test.ts` and `replay-viewer-csp.spec.ts` cover both policies.
 
 ## Workshop backend
 
@@ -186,7 +185,7 @@ Viewer entry HTML revalidates its response policy; content-addressed assets rema
 - Approved `main` merges become read-only `merged` after exact-head reconciliation; other bases become stale/offline. `live` only affects gallery display; `markBuiltInMergedCards` makes merged cards built-in at release.
 - Games load only deployed cards (ADR 0052): creation rejects any `customCardIds`, and the sandbox accepts only the author's own cards. Rooms recorded with Workshop cards still restore through the executor.
 - Author unpublish permits existing games; administrator takedown ends affected Rooms without scoring or Replay.
-- `workshop-public-cards.ts` owns the catalog of live approved versions, fixed source and image inputs and 30-second status. Catalog pages exclude drafts and compiler output. Reads never write sandbox state; consumers compile and suspend on expiry. [Platform design](../PLATFORM_DESIGN.md#d3-sandbox-isolation-and-fault-tolerance) defines lifecycle policy.
+- `workshop-public-cards.ts` serves catalog/inputs/images with 30s status. `prerelease-public-{cards,sandbox}.ts` validates/compiles fixed inputs. Scopes rebind refs centrally; retired leases stay retired. Failure cannot renew expiry or undo denial; new games refresh. HTTP gates execution/publication. Pre registration rejects errors; others warn; other Workshop APIs stay closed. [Policy](../PLATFORM_DESIGN.md#d3-sandbox-isolation-and-fault-tolerance); `prerelease-public-sandbox.test.ts`.
 - `workshop_submissions` freezes operation/version before GitHub writes. The repository-scoped App uses expected-head CAS, reconciles uncertain PR creation and pauses generated-file conflicts. See the [GitHub App runbook](../operations/github-oauth-app-setup.md).
 - Draft errors use `shared/contract/workshop.ts`; live edits return HTTP 409 `live_edit_blocked`.
 
@@ -197,7 +196,7 @@ Tests: `server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submis
 - `server/db.ts` owns PostgreSQL through `pg`: transactions retain one connection across awaits, nesting uses savepoints, and startup migrations take an advisory lock. There is no runtime database fallback.
 - `scripts/import-sqlite.ts` imports a stopped schema-33 SQLite database through exact comparisons and blocks on damaged recorded games, and `data_imports` keeps a failed import behind a startup barrier; `scripts/validate-backup.ts` validates a PostgreSQL / S3 restore.
 - `schema.sql` and migrations define product tables. Replay uses `checkpointStepNo`; evidence, quotas and webhooks have no parallel storage.
-- Games completed before recording are `legacy_no_replay`: they keep their result summary but have no Replay header or Frames.
+- `game/prerelease-archive-{retention,cleanup}.ts` owns pre expiry, safe erasure and GC. See `HOW_TO_DEPLOY.md` for retained-data policy.
 
 ## GitHub delivery, security and deletion
 
@@ -208,7 +207,7 @@ Bug Report delivery follows [ADR 0012](../adr/0012-github-issue-submission-ident
 - `github-issue-client` fixes repository/installation IDs. Retry reconciliation requires configured-App provenance, attempt-time bounds and a unique terminal marker. Encrypted App user tokens and public-identity consent serve self-authored delivery; Hosted Issue Identity uses installation tokens. Invalid connections never switch authors.
 - `bug-report/feedback-service.ts` owns assessments, inboxes, root fix summaries and deployment operations. Notification subjects isolate imports from native evidence; deletion anonymizes their public IDs through the same App. Writes lock 1673001, sorted users, then subjects. Durable intents fence historical recipients/fix versions/scope; account/root dedup preserves messages/read state. Owner-only native/owner-local proof keeps its type, separate from HTTP. `github-fix-verifier.ts` reads merged proof; raw ancestry supports late links. Current fix availability follows the latest deployment, including rollbacks; first verification remains historical. Tests: `bug-report-{feedback,feedback-routes,fix-links,release-feedback,historical-feedback,historical-deletion}.test.ts`.
 - Account deletion persists `deletion_pending`, signs out sessions and edits known Issue bodies through the installation adapter, retrying until GitHub confirms the site user ID is gone.
-- Maintainer evidence reads require a reason, are audited permanently, are rate-limited and reapply the current participant tombstone projection.
+- Maintainer evidence reads require a reason, are audited permanently, are rate-limited and reapply the current participant tombstone projection. Participant Evidence reads need no Issue secrets.
 - Erasure ([ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)): `server/game/replay-removal.ts` appends each batch to the independent `erasure/ledger.json` in private S3 with ETag CAS before deleting payloads; startup and restore apply it idempotently, a malformed ledger blocks restoration, and resource reads and uploads consult its permanent hash deny rules. Logs never contain tokens, Frame payloads, symptom text or raw GitHub responses.
 
 ## Deployment, rollback and observability

@@ -1,15 +1,20 @@
+// @covers client/app/replay-bridge.ts
+// @covers replay-viewer/src/bridge-transport.ts
+// @covers scripts/prerelease/gateway.ts
+// @covers scripts/prerelease/owner-browser.ts
+import { seedPrivateReplay } from './_helpers/prerelease-replay'
 // @covers client/app/PrereleaseBoundary.tsx
 // @covers client/services/prerelease-runtime.ts
 // @covers client/contexts/AuthContext.tsx
 // @covers client/app/PageRouter.tsx
 // @covers server/prerelease-routes.ts
 // @covers server/prerelease-sessions.ts
-import { expect, type BrowserContext, type Page, type PlaywrightWorkerArgs } from '@playwright/test'
+import { expect, type BrowserContext, type Page, type PlaywrightWorkerArgs, type PlaywrightWorkerOptions } from '@playwright/test'
 import { execFileSync, spawn } from 'node:child_process'
 import { createServer as tlsServer } from 'node:https'
 import { createServer, request as httpRequest, type ClientRequest, type IncomingMessage } from 'node:http'
 import { once } from 'node:events'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdtempSync, readFileSync, writeFileSync, renameSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -22,7 +27,8 @@ import { getDb } from '../server/db'
 import { releaseAll, releaseQueue } from '../server/__tests__/_helpers/release-all'
 import { databaseMaintenance, getTestDatabaseUrl } from '../server/__tests__/_helpers/postgres'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../shared/contract/browser-auth'
-import { createPrereleaseGateway } from '../scripts/prerelease/gateway'
+import { createPrereleaseGateway, OWNER_VERIFICATION_COOKIE } from '../scripts/prerelease/gateway'
+import { configureOwnerVerification } from '../scripts/prerelease/owner-browser'
 import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { test } from './server-fixtures'
 
@@ -64,13 +70,14 @@ function observeRoomSocket(page: Page) {
 }
 
 /** Actual pre application and sessions; the formal fixture uses the real authority protocol. */
-async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
+async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPublicSandbox = false,
+  options: { browserName?: PlaywrightWorkerOptions['browserName']; ownerVerification?: boolean } = {}) {
   expect(process.env.DATABASE_SCHEMA).toMatch(/^test_[a-f0-9]{32}$/)
   const acquired = releaseQueue()
   let closeAfterSetup: (() => Promise<void>) | undefined
   try {
     const directory = mkdtempSync(join(tmpdir(), 'oa-pre-session-')), schema = `test_${randomUUID().replaceAll('-', '')}`
-    acquired.register(() => { rmSync(join(directory, 'pre.env'), { force: true }); rmSync(join(directory, 'key.pem'), { force: true }) })
+    acquired.register(() => { for (const name of ['pre.env', 'key.pem', 'owner-token']) rmSync(join(directory, name), { force: true }) })
     const generationId = randomUUID(), targetId = 'prerelease-main', serviceKey = randomUUID() + randomUUID()
     const backendPort = await port(), frontendPort = await port(), appPort = await port(), gatewayPort = await port()
     let gateway: ReturnType<typeof createPrereleaseGateway> | undefined = undefined
@@ -92,9 +99,37 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     await source.prepare('INSERT INTO beta_access(user_id,granted_at) VALUES(?,?)').run(user.id, Date.now())
     const sourceToken = await createSession(user.id)
     if (!sourceToken) throw new Error('Could not create the formal fixture session')
+    let publicFixture: { cardId: string; versionId: string; ruleId: string; name: string } | undefined
+    let publicSourceOnline = true
+    const publicRequests: Array<{ path: string; cookie: string | undefined; authorization: string | undefined; origin: string | undefined }> = []
+    const cleanPublicFixture = async () => {
+      if (!publicFixture) return
+      await source.prepare('DELETE FROM object_references WHERE owner_id=? OR owner_id=?').run(publicFixture.cardId, publicFixture.versionId)
+      await source.prepare('DELETE FROM workshop_cards WHERE id=?').run(publicFixture.cardId)
+      const { getResources } = await import('../server/storage/runtime')
+      await getResources().removeUnreferenced([`card-art/${publicFixture.ruleId}.png`])
+    }
+    if (withPublicSandbox) {
+      const { prepareWorkshopDraft } = await import('../server/workshop-draft-validation')
+      const { createCard, approveCurrentDraft, publish } = await import('../server/workshop-drafts')
+      const { getResources } = await import('../server/storage/runtime')
+      const ruleId = `CUSTOM_PublicBrowser_${randomUUID().replaceAll('-', '')}`, name = 'Published browser fixture'
+      const effectCode = `const CARD_ID='${ruleId}';const CARD_DEF=MinorImprovement({id:CARD_ID,name:'${name}',desc:['Gain 2 food.'],cost:{},vp:0});const CARD_IMPL={effect:{id:CARD_ID,onBuy:()=>gainLeaf(CARD_ID,{food:2})}}`
+      const prepared = await prepareWorkshopDraft({ cardId: ruleId, cardType: 'minor', name, description: 'Gain two food', effectCode,
+        cardJson: { id: ruleId, name, deck: 'CUSTOM', number: 0, card_type: 'minor', implemented: true, desc: ['Gain 2 food.'], cost: {}, vp: 0 }, artUrl: `/card-art/${ruleId}.png` })
+      if (!prepared.ok) throw new Error(prepared.error)
+      await getResources().stage(`card-art/${ruleId}.png`, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jErkAAAAASUVORK5CYII=', 'base64'), 'image/png')
+      const card = await createCard(source, { authorId: user.id, draft: prepared.draft })
+      const version = await approveCurrentDraft(source, { cardId: card.id, authorId: user.id })
+      await publish(source, { cardId: card.id, authorId: user.id, baseRevision: card.revision })
+      publicFixture = { cardId: card.id, versionId: version.versionId, ruleId, name }
+      acquired.register(cleanPublicFixture)
+    }
     const envKeys = ['NODE_ENV', 'PUBLIC_APP_ORIGIN', 'PUBLIC_API_BASE', 'CORS_ORIGIN', 'PRERELEASE_APP_ORIGIN', 'PRERELEASE_IDENTITY_SERVICE_KEY', 'PRERELEASE_ENTRY_ENABLED', 'GAME_BUILD_ID']
     const previous = Object.fromEntries(envKeys.map(key => [key, process.env[key]]))
     const sockets = new Set<Duplex>(), requests = new Set<ClientRequest>()
+    const upstreamReads: Array<{ path: string; method: string; cookieNames: string[]; authorization: boolean; status: number; contentType: string; bytes: number; sha256: string }> = []
+    let observer: ReturnType<typeof createServer> | undefined
     const track = (socket: Duplex) => { if (sockets.has(socket)) return; sockets.add(socket); socket.once('close', () => sockets.delete(socket)); socket.on('error', () => socket.destroy()) }
     const trackRequest = (request: ClientRequest) => { requests.add(request); request.once('close', () => requests.delete(request)); request.once('socket', track); return request }
     let formalOrigin = '', preOrigin = '', authority = createPrereleaseAuthorityHandler({ db: source, getSourceToken: async req => requestSessionToken(req) })
@@ -106,6 +141,19 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
         }))
         upstream.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
         req.once('aborted', () => upstream.destroy()); res.once('close', () => { if (!res.writableEnded) upstream.destroy() }); req.pipe(upstream); return
+      }
+      if ((req.url ?? '').startsWith('/api/workshop/public-cards/')) {
+        publicRequests.push({ path: req.url ?? '', cookie: req.headers.cookie, authorization: req.headers.authorization, origin: req.headers.origin })
+        if (!publicSourceOnline) { res.writeHead(503).end(); return }
+        if (req.url === '/api/workshop/public-cards/v1/cards' && publicFixture) {
+          // The catalog transport follows the separately delivered formal v1 contract.
+          // Immutable snapshots/status below use the native PG/S3 source handler.
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+          res.end(JSON.stringify({ ok: true, protocolVersion: 1, cards: [{ source: { kind: 'workshop-public', authority: 'titanxxh/open-agricola', workshopCardId: publicFixture.cardId, versionId: publicFixture.versionId },
+            cardId: publicFixture.ruleId, name: publicFixture.name, cardType: 'minor' }], nextCursor: null })); return
+        }
+        void import('../server/workshop-public-cards').then(({ handleWorkshopPublicCards }) => handleWorkshopPublicCards(req, res, source))
+          .then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
       }
       if ((req.url ?? '').startsWith('/api/prerelease/')) {
         void authority(req, res).then(handled => { if (!handled) res.writeHead(404).end() }).catch(() => res.writeHead(500).end()); return
@@ -181,7 +229,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       async () => {
         for (const request of requests) request.destroy()
         for (const socket of sockets) socket.destroy()
-        await new Promise<void>(done => proxy.close(() => done()))
+        await Promise.all([proxy, ...(observer ? [observer] : [])].map(server => new Promise<void>(done => {
+          if (!server.listening) { done(); return }
+          server.close(() => done())
+        })))
       },
       async () => { try { await admin.exec(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`) } finally { await admin.close() } },
       async () => {
@@ -199,11 +250,12 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       },
       async () => {
         await eraseGeneration()
+        await cleanPublicFixture()
         await cleanSourceUser()
       },
       () => {
         for (const key of envKeys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key] }
-        rmSync(root, { recursive: true, force: true }); rmSync(envFile, { force: true }); rmSync(join(directory, 'key.pem'), { force: true })
+        rmSync(root, { recursive: true, force: true }); rmSync(envFile, { force: true }); rmSync(join(directory, 'key.pem'), { force: true }); rmSync(join(directory, 'owner-token'), { force: true })
       },
     ])
     closeAfterSetup = close
@@ -211,6 +263,48 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     writeFileSync(join(root, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: buildId, basePath: '/open-agricola/', releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }) + '\n')
     await command('bash', ['./restart-local.sh'], launchEnv, join(directory, 'launcher.log'))
     const healthyCycle = randomUUID(), observedAt = Date.now(), stateFile = join(directory, 'gate.json')
+    let upstreamPort = backendPort
+    if (options.ownerVerification) {
+      observer = createServer((req, res) => {
+        const path = req.url ?? '/', capture = /^\/(?:replay-viewers\/|api\/v1\/(?:replays\/|game-contexts\/))/.test(path)
+          ? { path, method: req.method ?? '', cookieNames: (req.headers.cookie ?? '').split(';').map(value => value.trim().split('=')[0]).filter(Boolean),
+            authorization: req.headers.authorization !== undefined, status: 0, contentType: '', bytes: 0, sha256: '' } : undefined
+        if (capture) upstreamReads.push(capture)
+        const outgoing = trackRequest(httpRequest({ hostname: '127.0.0.1', port: backendPort, path, method: req.method, headers: req.headers }, response => {
+          if (capture) { capture.status = response.statusCode ?? 0; capture.contentType = String(response.headers['content-type'] ?? '') }
+          const digest = createHash('sha256')
+          response.on('data', (chunk: Buffer) => { if (capture) { capture.bytes += chunk.length; digest.update(chunk) } })
+          response.on('end', () => { if (capture) capture.sha256 = digest.digest('hex') })
+          res.writeHead(response.statusCode ?? 502, response.headers); response.pipe(res)
+        }))
+        outgoing.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
+        req.once('aborted', () => outgoing.destroy()); res.once('close', () => { if (!res.writableEnded) outgoing.destroy() }); req.pipe(outgoing)
+      })
+      observer.on('connection', track)
+      observer.on('upgrade', (req, socket, head) => {
+        track(socket)
+        const outgoing = trackRequest(httpRequest({ hostname: '127.0.0.1', port: backendPort, path: req.url, headers: req.headers }))
+        outgoing.on('upgrade', (response, transport, upstreamHead) => {
+          track(transport)
+          socket.write(`HTTP/${response.httpVersion} ${response.statusCode ?? 502} ${response.statusMessage ?? ''}\r\n${response.rawHeaders.reduce((text, value, index, values) => index % 2 ? text : `${text}${value}: ${values[index + 1]}\r\n`, '')}\r\n`)
+          if (head.length) transport.write(head)
+          if (upstreamHead.length) socket.write(upstreamHead)
+          socket.once('close', () => transport.destroy()); transport.once('close', () => socket.destroy()); socket.pipe(transport).pipe(socket)
+        })
+        outgoing.on('response', response => { response.destroy(); socket.destroy() })
+        outgoing.on('error', () => socket.destroy()); socket.once('close', () => outgoing.destroy()); outgoing.end()
+      })
+      await new Promise<void>(done => observer!.listen(0, '127.0.0.1', done))
+      const address = observer.address(); if (!address || typeof address === 'string') throw new Error('Missing native upstream observer port')
+      upstreamPort = address.port
+    }
+    const ownerToken = options.ownerVerification ? randomBytes(32).toString('base64url') : undefined
+    const tokenFile = join(directory, 'owner-token'), expiresAt = Date.now() + 600_000
+    if (ownerToken) {
+      writeFileSync(tokenFile, ownerToken, { mode: 0o600 })
+      writeFileSync(join(directory, 'verification.json'), JSON.stringify({ targetId, buildId, generation: generationId, healthyCycle,
+        tokenHash: createHash('sha256').update(ownerToken).digest('hex'), expiresAt }), { mode: 0o600 })
+    }
     // Like the owner guard, publish a fresh healthy sample every 15 seconds within one
     // healthy cycle; a single 120-second sample would close long tests mid-flow.
     const writeGuard = (at: number) => {
@@ -221,9 +315,9 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
     }
     writeGuard(observedAt)
     guard.samples = setInterval(() => writeGuard(Date.now()), 15_000)
-    writeFileSync(stateFile, JSON.stringify({ format: 1, targetId, channel: 'prerelease', mode: 'open', buildId,
-      generation: generationId, acceptance: { healthyCycle, formalBuildId: buildId } }))
-    gateway = createPrereleaseGateway({ stateFile, targetId, origin: preOrigin, upstream: `http://127.0.0.1:${backendPort}`,
+    writeFileSync(stateFile, JSON.stringify({ format: 1, targetId, channel: 'prerelease', mode: options.ownerVerification ? 'maintenance' : 'open', buildId,
+      generation: generationId, acceptance: options.ownerVerification ? null : { healthyCycle, formalBuildId: buildId } }))
+    gateway = createPrereleaseGateway({ stateFile, targetId, origin: preOrigin, upstream: `http://127.0.0.1:${upstreamPort}`,
       formal: { appOrigin: formalOrigin, apiOrigin: formalOrigin }, ca: readFileSync(join(directory, 'cert.pem')) })
     await new Promise<void>(resolve => gateway!.server.listen(gatewayPort, '127.0.0.1', resolve))
     await gateway.refreshBrowserPolicy()
@@ -249,11 +343,15 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       await expect(page.locator('.lobby-user-pill')).toHaveText(user.displayName)
       return page
     }
-    const browser = await playwright.chromium.launch()
+    const browser = await playwright[options.browserName ?? 'chromium'].launch()
     const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
-    await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    await context.addInitScript(() => { if (window.top === window) localStorage.setItem('open-agricola-locale-v2', 'en') })
     const formalCookieName = authCookieNames().session
     await context.addCookies([{ name: formalCookieName, value: sourceToken, url: formalOrigin, httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }])
+    if (options.ownerVerification) {
+      try { await configureOwnerVerification(context, preOrigin, tokenFile) }
+      catch (error) { await releaseAll([() => context.close(), () => browser.close()]); throw error }
+    }
     const assertPrincipal = async (page: Page) => {
       const result: unknown = await page.evaluate(async ({ build, generation, header, version }) => {
         const response = await fetch('/api/auth/me', { credentials: 'include', headers: {
@@ -264,7 +362,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright']) {
       expect(result).toMatchObject({ ok: true, user: { id: user.id, username: user.username, displayName: user.displayName } })
     }
     const assertFormalSession = async () => { expect(await validateSession(sourceToken)).toMatchObject({ id: user.id, username: user.username }) }
-    return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source }
+    return { context, browser, close, enter, assertPrincipal, assertFormalSession, formalOrigin, formalCookieName, preOrigin, user, source, generationId,
+      upstreamReads, verificationBinding: { targetId, buildId, generation: generationId, healthyCycle, expiresAt, mode: options.ownerVerification ? 'maintenance' : 'open' },
+      seedReplay: (evidence = false) => seedPrivateReplay({ databaseUrl, schema, prefix, dependencies, userId: user.id, evidence }),
+      publicFixture, publicRequests, setPublicSourceOnline: (value: boolean) => { publicSourceOnline = value } }
   } catch (error) {
     try { if (closeAfterSetup) await closeAfterSetup(); else await acquired.release() }
     catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Prerelease fixture setup and cleanup failed', { cause: cleanupError }) }
@@ -342,4 +443,337 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
     throw error
   }
   if (failure) throw failure.error
+})
+
+
+test('private replay uses an authenticated parent bridge and clears idle display on source revocation', async ({ playwright, browserName }, testInfo) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright, false, { browserName, ownerVerification: true })
+  const ordinary = await environment.browser.newContext({ ignoreHTTPSErrors: true })
+  const probes: Array<{ path: string; status: number }> = []
+  const iframeRequests: Array<Promise<{ url: string; cookieNames: string[]; authorization: boolean }>> = []
+  let viewerUrl: string | null = null
+  try {
+    expect(environment.verificationBinding.mode).toBe('maintenance')
+    expect((await environment.context.cookies(environment.preOrigin)).find(cookie => cookie.name === OWNER_VERIFICATION_COOKIE))
+      .toMatchObject({ httpOnly: true, secure: true, sameSite: 'Lax', path: '/' })
+    const page = await environment.enter(environment.context)
+    const replay = await environment.seedReplay()
+    for (const path of ['/', '/api/auth/me', `/api/v1/replays/${replay.roomId}/manifest`,
+      `/api/v1/replays/${replay.roomId}/assets/${replay.assetHash}`, `/replay-assets/${replay.assetHash}`]) {
+      const response = await ordinary.request.get(environment.preOrigin + path)
+      probes.push({ path, status: response.status() })
+      expect(response.status(), path).toBe(503)
+    }
+    const debug: unknown[] = []
+    page.on('console', message => { if(message.type() === 'error') debug.push({kind:'console',text:message.text()}) })
+    page.on('pageerror', error => debug.push({kind:'pageerror',text:error.message}))
+    page.on('response', response => { if(response.url().includes('/replay-viewers/')) debug.push({kind:'response',url:response.url(),status:response.status()}) })
+    page.on('request', request => {
+      if (request.frame() !== page.mainFrame()) iframeRequests.push(request.allHeaders().then(headers => ({ url: request.url(),
+        cookieNames: (headers.cookie ?? '').split(';').map(value => value.trim().split('=')[0]).filter(Boolean),
+        authorization: headers.authorization !== undefined })))
+    })
+    await page.addInitScript(() => {
+      const revoked: string[] = []
+      Object.defineProperty(window,'__revokedReplayBlobs',{value:revoked})
+      const original = URL.revokeObjectURL
+      URL.revokeObjectURL = url => { revoked.push(url); original(url) }
+    })
+    await page.goto(`${environment.preOrigin}/open-agricola/?room=${replay.roomId}&perspective=p1`)
+    const frame = page.frameLocator('iframe')
+    try { await expect(frame.locator('.replay-app')).toBeVisible() } catch(error) {
+      debug.push(await page.locator('iframe').getAttribute('src').catch(()=>null))
+      for(const child of page.frames()) debug.push({url:child.url(),text:await child.locator('body').innerText().catch(()=>'(unavailable)')})
+      writeFileSync(testInfo.outputPath('replay-bridge-debug.json'),JSON.stringify(debug,null,2))
+      throw error
+    }
+    await expect(page.locator('iframe')).toHaveAttribute('sandbox','allow-scripts')
+    await expect(page.locator('iframe')).toHaveAttribute('credentialless','')
+    viewerUrl = await page.locator('iframe').getAttribute('src')
+    expect(viewerUrl).toMatch(/\/replay-viewers\/[a-f0-9]{64}\/index\.html\?/)
+    expect(new URL(viewerUrl!, environment.preOrigin).searchParams.get('room')).toBe(replay.roomId)
+    await expect(frame.locator('[data-card-anchor="CUSTOM_PRIVATE_REPLAY"]')).toBeVisible()
+    await expect.poll(async () => frame.locator('[data-card-anchor="CUSTOM_PRIVATE_REPLAY"] .card-icon').first().evaluate(element => getComputedStyle(element).backgroundImage)).toContain('blob:')
+    const browserRequests = await Promise.all(iframeRequests)
+    expect(browserRequests.filter(request => /\/api\/v1\/|\/replay-assets\//.test(request.url))).toEqual([])
+    if (await page.evaluate(() => 'credentialless' in HTMLIFrameElement.prototype)) {
+      expect(browserRequests.some(request => request.cookieNames.includes('__Host-oa-pre-session') || request.cookieNames.includes(OWNER_VERIFICATION_COOKIE))).toBe(false)
+    }
+    await expect.poll(() => environment.upstreamReads.some(read => /\/replay-viewers\/.+\/index\.html$/.test(read.path) && read.status === 200 && read.bytes > 0)).toBe(true)
+    await expect.poll(() => environment.upstreamReads.some(read => /\/replay-viewers\/.+\.js$/.test(read.path) && read.status === 200 && read.bytes > 0)).toBe(true)
+    const programs = environment.upstreamReads.filter(read => read.path.startsWith('/replay-viewers/'))
+    expect(programs.every(read => read.cookieNames.length === 0 && !read.authorization && !read.path.includes('?'))).toBe(true)
+    expect(environment.upstreamReads.some(read => read.path.startsWith(`/api/v1/replays/${replay.roomId}/`) && read.status === 200 && read.cookieNames.includes('__Host-oa-pre-session'))).toBe(true)
+    await page.screenshot({ path: testInfo.outputPath('owner-maintenance-replay.png'), fullPage: true })
+    await frame.locator('.replay-transport button').nth(2).click()
+    await expect(frame.locator('.replay-transport output')).toContainText('1 / 1')
+    await frame.locator('.replay-header select').selectOption('open')
+    const direct = await page.evaluate(async ({room,hash}) => {
+      const response = await fetch(`/api/v1/replays/${room}/assets/${hash}`,{headers:{range:'bytes=0-1','if-none-match':'*'}})
+      return {status:response.status,cache:response.headers.get('cache-control')}
+    },{room:replay.roomId,hash:replay.assetHash})
+    expect(direct).toEqual({status:426,cache:'no-store'})
+    await page.evaluate(() => {
+      const original = MessagePort.prototype.postMessage
+      MessagePort.prototype.postMessage = function(data: unknown, options?: Transferable[] | StructuredSerializeOptions) {
+        if (data && typeof data === 'object' && 'type' in data && data.type === 'lease') return
+        Reflect.apply(original,this,options === undefined ? [data] : [data,options])
+      }
+    })
+    await expect(frame.locator('.replay-app')).toHaveCount(0,{timeout:5_000})
+    await expect.poll(() => frame.locator('html').evaluate(() => '__revokedReplayBlobs' in window && Array.isArray(window.__revokedReplayBlobs) ? window.__revokedReplayBlobs.length : 0)).toBeGreaterThan(0)
+    await page.reload()
+    await expect(frame.locator('.replay-app')).toBeVisible()
+    const evidence = await environment.seedReplay(true)
+    const evidenceReply = page.waitForResponse(response => new URL(response.url()).pathname === `/api/v1/game-contexts/${evidence.roomId}/evidence/0`)
+    await page.goto(`${environment.preOrigin}/open-agricola/?room=${evidence.roomId}&step=0&frame=${evidence.firstHash}`)
+    const evidenceHttp = await evidenceReply
+    expect(await evidenceHttp.json()).toMatchObject({ok:true,kind:'reportedEvidence',perspective:'p1'})
+    expect(evidenceHttp.status()).toBe(200)
+    await expect(frame.locator('.replay-app--board')).toBeVisible()
+    await expect(frame.locator('[data-hand-anchor="p1"] [data-card-anchor="CUSTOM_PRIVATE_REPLAY"]')).toBeVisible()
+    await expect(frame.locator('[data-hand-anchor="p2"]')).toHaveCount(0)
+    await expect(frame.locator('.replay-header select')).toHaveCount(0)
+    expect((await Promise.all(iframeRequests)).filter(request => /\/api\/v1\/|\/replay-assets\//.test(request.url))).toEqual([])
+    await page.screenshot({ path: testInfo.outputPath('owner-maintenance-evidence.png'), fullPage: true })
+    await environment.source.prepare('DELETE FROM beta_access WHERE user_id=?').run(environment.user.id)
+    await expect(page.locator('iframe')).toHaveCount(0,{timeout:35_000})
+    await expect(page.locator('.prerelease-access-screen')).toBeVisible()
+  } finally {
+    const path = testInfo.outputPath('owner-maintenance-replay-http.json')
+    writeFileSync(path, JSON.stringify({ browserName, verification: environment.verificationBinding, viewerUrl, ordinary: probes,
+      browserRequests: await Promise.all(iframeRequests), upstreamReads: environment.upstreamReads }, null, 2), { mode: 0o600 })
+    await testInfo.attach('owner-maintenance-replay-http', { path, contentType: 'application/json' })
+    await releaseAll([() => ordinary.close(),()=>environment.context.close(),()=>environment.browser.close(),()=>environment.close()])
+  }
+})
+
+for (const mode of ['server', 'browser']) test(`prerelease public sandbox rejects malformed registration metadata in ${mode} mode`, async ({ playwright }) => {
+  test.setTimeout(180_000)
+  const environment = await fixture(playwright, true)
+  try {
+    const card = environment.publicFixture
+    if (!card) throw new Error('Missing published fixture')
+    await environment.source.prepare("UPDATE workshop_card_versions SET card_json=jsonb_set(card_json::jsonb,'{modifiers}','{\"type\":\"bonus\"}'::jsonb)::text WHERE id=?").run(card.versionId)
+    const page = await environment.enter(environment.context), dialogs: string[] = []
+    page.on('dialog', dialog => { dialogs.push(dialog.message()); void dialog.accept() })
+    await page.goto(`${environment.preOrigin}/open-agricola/?page=workshop`)
+    await page.getByLabel(card.name, { exact: true }).check()
+    await page.getByRole('combobox', { name: 'Run game' }).selectOption(mode)
+    const started = mode === 'server' ? page.waitForResponse(response => new URL(response.url()).pathname === '/api/game/new-sandbox' && response.request().method() === 'POST') : undefined
+    await page.getByRole('button', { name: 'Start Sandbox', exact: true }).click()
+    if (started) {
+      expect((await started).status()).toBe(400)
+      await expect(page.getByRole('alert')).toContainText('modifiers')
+    } else {
+      await expect.poll(() => dialogs.join('\n'), { timeout: 5000 }).toContain('modifiers')
+      await expect(page.frameLocator('iframe.sandbox-embed-frame').locator('.action-board')).toHaveCount(0)
+    }
+  } finally { await releaseAll([() => environment.context.close(), () => environment.browser.close(), () => environment.close()]) }
+})
+
+test('prerelease public sandbox displays the HTTP compiler refusal', async ({ playwright }) => {
+  test.setTimeout(180_000)
+  const environment = await fixture(playwright, true)
+  try {
+    const card = environment.publicFixture
+    if (!card) throw new Error('Missing published fixture')
+    await environment.source.prepare("UPDATE workshop_card_versions SET card_json=jsonb_set(card_json::jsonb,'{_code}',to_jsonb(?::text))::text WHERE id=?")
+      .run(`const CARD_ID='${card.ruleId}';const CARD_IMPL={effect:{id:CARD_ID,unsupportedCapability:()=>1}}`, card.versionId)
+    const page = await environment.enter(environment.context)
+    await page.goto(`${environment.preOrigin}/open-agricola/?page=workshop`)
+    await page.getByLabel(card.name, { exact: true }).check()
+    await page.getByRole('button', { name: 'Start Sandbox', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('unsupported')
+    await expect(page.locator('iframe.sandbox-embed-frame')).toHaveCount(0)
+  } finally { await releaseAll([() => environment.context.close(), () => environment.browser.close(), () => environment.close()]) }
+})
+
+test('prerelease public sandbox renders fixed art and executes dynamic effects in both modes, then stops idle execution on disable', async ({ playwright }, testInfo) => {
+  test.setTimeout(300_000)
+  const environment = await fixture(playwright, true)
+  const diagnostics: unknown[] = []
+  try {
+    const fixtureCard = environment.publicFixture
+    if (!fixtureCard) throw new Error('Missing published fixture')
+    const modifier = { type: 'bonus', cardId: fixtureCard.ruleId, appliesTo: ['construct'], discount: { wood: 1 } }
+    await environment.source.prepare("UPDATE workshop_card_versions SET card_json=jsonb_set(card_json::jsonb,'{modifiers}',?::jsonb)::text WHERE id=?")
+      .run(JSON.stringify([modifier]), fixtureCard.versionId)
+    const page = await environment.enter(environment.context), workers: string[] = []
+    let serverSnapshot: unknown
+    const object = (value: unknown): Record<string, unknown> => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected a sandbox state object')
+      return value
+    }
+    const readSaved = () => page.evaluate(async () => {
+      if (!(await indexedDB.databases()).some(database => database.name === 'open-agricola-local-sandbox')) return []
+      return new Promise<unknown[]>((resolve, reject) => {
+        const opening = indexedDB.open('open-agricola-local-sandbox', 1)
+        opening.onerror = () => reject(opening.error)
+        opening.onsuccess = () => {
+          const db = opening.result, tx = db.transaction('games', 'readonly'), request = tx.objectStore('games').getAll()
+          let saved: unknown[] = []
+          request.onsuccess = () => { saved = request.result }
+          request.onerror = () => reject(request.error)
+          tx.oncomplete = () => { db.close(); resolve(saved) }
+          tx.onabort = () => { db.close(); reject(tx.error) }
+        }
+      })
+    })
+    page.on('console', message => { if (message.type() === 'error') diagnostics.push({ console: message.text() }) })
+    page.on('response', response => {
+      const path = new URL(response.url()).pathname
+      if (path.includes('/public-sandbox/')) void response.text().then(body => diagnostics.push({ url: response.url(), status: response.status(), body }))
+      if (['/api/game/state', '/api/game/choice', '/api/game/confirm-player-switch', '/api/game/dev/play-card'].includes(path)) {
+        void response.json().then((body: unknown) => { serverSnapshot = body }).catch(error => diagnostics.push({ path, error: String(error) }))
+      }
+    })
+    page.on('worker', worker => workers.push(worker.url()))
+    await page.goto(`${environment.preOrigin}/open-agricola/?page=workshop`)
+    await expect(page.getByRole('heading', { name: 'Public card sandbox' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Design|Generate|Publish/i })).toHaveCount(0)
+    await page.getByLabel(fixtureCard.name, { exact: true }).check()
+    const modes = ['server', 'browser']
+    let serverWorkerCount = 0
+    for (const mode of modes) {
+      await page.getByRole('combobox', { name: 'Run game' }).selectOption(mode)
+      const started = mode === 'server' ? page.waitForResponse(response => new URL(response.url()).pathname === '/api/game/new-sandbox' && response.request().method() === 'POST') : undefined
+      await page.getByRole('button', { name: 'Start Sandbox', exact: true }).click()
+      if (started) { const response = await started; expect(response.status(), await response.text()).toBe(200) }
+      await expect(page.getByRole('img', { name: fixtureCard.name, exact: true })).toBeVisible()
+      await expect.poll(() => page.getByRole('img', { name: fixtureCard.name, exact: true }).evaluate((element: HTMLImageElement) => element.naturalWidth)).toBe(1)
+      const frame = page.frameLocator('iframe.sandbox-embed-frame')
+      await expect(frame.locator('.action-board').first()).toBeVisible({ timeout: 30_000 })
+      if (mode === 'browser') await expect.poll(readSaved).toHaveLength(1)
+      else await expect.poll(() => serverSnapshot).toBeDefined()
+      const snapshot = async () => {
+        const raw = object(mode === 'browser' ? (await readSaved())[0] : serverSnapshot)
+        const serialized = mode === 'browser' ? object(raw.serializedState) : raw
+        const state = object(serialized.state)
+        const frames: unknown = mode === 'browser' ? object(object(serialized.sessionCursor).engineStackCursor).frames : []
+        if (!Array.isArray(frames)) throw new Error('Expected the saved sandbox engine frames')
+        const interaction = mode === 'server' ? object(raw.interaction) : undefined
+        return { fingerprint: JSON.stringify(serialized), idle: mode === 'browser' ? frames.length === 0 : interaction?.stateId === 'idle',
+          summary: { phase: state.phase, round: state.round, roundPhase: state.roundPhase, interaction,
+            frameCount: mode === 'browser' ? frames.length : null,
+            frames: frames.map(value => { const frame = object(value); return { kind: object(frame.source).kind, reason: frame.reason,
+              pending: object(frame.engineSnapshot).pendingData } }),
+          } }
+      }
+      const observe = async (stage: string, control?: string) => {
+        const value = await snapshot()
+        diagnostics.push({ mode, stage, control, ...value.summary, ui: await frame.locator('.interaction-bar').innerText() })
+        return value
+      }
+      const skip = frame.locator('.interaction-bar button[data-choice-value="__skip__"]:not([role="radio"])')
+      const confirm = frame.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+      const synchronizeOpening = async () => {
+        try {
+          await expect.poll(async () => {
+            const value = await snapshot(), bodies = await frame.locator('.interaction-bar__body').count()
+            if (value.idle) return bodies === 0 && value.summary.phase === 'playing' && value.summary.round === 1 && value.summary.roundPhase === 'work'
+            const preparation = value.summary.phase === 'playing' && value.summary.round === 1 && value.summary.roundPhase === 'preparation'
+            return preparation && bodies === 1 && (await skip.count() === 1 && await skip.isEnabled() || await confirm.count() === 1 && await confirm.isEnabled())
+          }, { message: 'Sandbox saved state and UI must agree on idle or an enabled opening skip/switch' }).toBe(true)
+        } catch (error) {
+          await observe('opening-state-ui-not-synchronized')
+          throw error
+        }
+      }
+      for (let opening = 0; opening < 8; opening++) {
+        await synchronizeOpening()
+        const before = await observe('opening-before')
+        if (before.idle) break
+        expect(before.summary).toMatchObject({ phase: 'playing', round: 1, roundPhase: 'preparation' })
+        const control = await skip.count() === 1 ? { button: skip, name: '__skip__' }
+          : await confirm.count() === 1 ? { button: confirm, name: 'Confirm switch' } : undefined
+        if (!control) throw new Error(`Unexpected sandbox opening interaction: ${JSON.stringify(before.summary)}`)
+        // The interaction bar is fixed inside the iframe, so scrolling its own document cannot reveal it.
+        await page.locator('iframe.sandbox-embed-frame').evaluate(node => node.scrollIntoView({ block: 'end' }))
+        await expect(control.button).toBeEnabled()
+        await control.button.click({ timeout: 5000 })
+        await expect.poll(async () => (await snapshot()).fingerprint).not.toBe(before.fingerprint)
+        await observe('opening-after', control.name)
+      }
+      await synchronizeOpening()
+      const ready = await observe('before-play-card')
+      expect(ready.idle, JSON.stringify(ready.summary)).toBe(true)
+      expect(ready.summary).toMatchObject({ phase: 'playing', round: 1, roundPhase: 'work' })
+      await expect(frame.locator('.interaction-bar__body')).toHaveCount(0)
+      await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 2"]').first()).toBeVisible()
+      await frame.locator('.dev-field', { hasText: 'Card ID' }).getByRole('textbox').fill(fixtureCard.ruleId)
+      const played = mode === 'server' ? page.waitForResponse(response => new URL(response.url()).pathname === '/api/game/dev/play-card' && response.request().method() === 'POST') : undefined
+      try {
+        await frame.getByRole('button', { name: 'Play Card', exact: true }).click()
+        if (played) {
+          const response = await played, body = await response.json()
+          diagnostics.push({ mode, stage: 'play-card-response', status: response.status(), ok: body.ok, error: body.error, interaction: body.interaction })
+          expect(response.status(), JSON.stringify(body)).toBe(200)
+          expect(body.ok, body.error).toBe(true)
+          expect(body.state.players[0].activeModifiers).toContainEqual(modifier)
+        }
+        await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible()
+      } finally {
+        try { await observe('after-play-card-last-committed-state') } catch (error) { diagnostics.push({ mode, stage: 'after-play-card-observation-failed', error: String(error) }) }
+      }
+      if (mode === 'server') {
+        serverWorkerCount = workers.length
+        await page.getByRole('button', { name: 'Close Sandbox', exact: true }).click()
+      }
+    }
+    expect(workers.length).toBeGreaterThan(serverWorkerCount)
+    const frame = page.frameLocator('iframe.sandbox-embed-frame')
+    const frameUrl = await page.locator('iframe.sandbox-embed-frame').getAttribute('src')
+    expect(frameUrl).toContain('localSandbox=1')
+    await expect.poll(() => page.evaluate(() => new Promise<unknown[]>((resolve, reject) => {
+      const opening = indexedDB.open('open-agricola-local-sandbox', 1)
+      opening.onerror = () => reject(opening.error)
+      opening.onsuccess = () => {
+        const db = opening.result, tx = db.transaction('games', 'readonly'), request = tx.objectStore('games').getAll()
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+        tx.oncomplete = () => db.close()
+      }
+    }))).toEqual(expect.arrayContaining([expect.objectContaining({ serializedState: expect.objectContaining({ state: expect.objectContaining({
+      players: expect.arrayContaining([expect.objectContaining({ id: 'p1', resources: expect.objectContaining({ food: 4 }), activeModifiers: expect.arrayContaining([modifier]) })]),
+    }) }) })]))
+    await environment.source.prepare('UPDATE workshop_cards SET live=0 WHERE id=?').run(fixtureCard.cardId)
+    const resumed = page.waitForEvent('dialog').then(dialog => dialog.accept())
+    const navigated = page.waitForEvent('framenavigated', candidate => new URL(candidate.url()).pathname === '/open-agricola/workshop-game.html')
+    await page.locator('iframe.sandbox-embed-frame').evaluate((element: HTMLIFrameElement) => element.contentWindow?.location.reload())
+    await navigated; await resumed
+    await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.action-board').first()).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('sandbox-restored.png'), fullPage: true })
+    // An unconfirmed source keeps the last confirmed lease (at most 30 s) before pausing; the client checks every second
+    // and a status request may take its full 5 s timeout, so a fresh lease right before the change can exceed 30 s.
+    const sourceLeasePause = 40_000
+    await environment.source.prepare('UPDATE workshop_public_versions SET disabled_at=? WHERE card_id=?').run(Date.now(), fixtureCard.cardId)
+    await expect(frame.getByText('This playtest is paused. Check access and card availability before continuing.', { exact: true })).toBeVisible({ timeout: sourceLeasePause })
+    await expect(frame.locator('.action-board')).toHaveCount(0)
+    const resume = async () => {
+      const confirmed = page.waitForEvent('dialog').then(dialog => dialog.accept())
+      const navigation = page.waitForEvent('framenavigated', candidate => new URL(candidate.url()).pathname === '/open-agricola/workshop-game.html')
+      await frame.getByRole('button', { name: 'Retry', exact: true }).click()
+      await navigation; await confirmed
+      await expect(frame.locator('[data-player-resource-anchor="p1"] [aria-label="Food: 4"]').first()).toBeVisible({ timeout: 30_000 })
+    }
+    await environment.source.prepare('UPDATE workshop_public_versions SET disabled_at=NULL WHERE card_id=?').run(fixtureCard.cardId)
+    await resume()
+    environment.setPublicSourceOnline(false)
+    await expect(frame.getByText('This playtest is paused. Check access and card availability before continuing.', { exact: true })).toBeVisible({ timeout: sourceLeasePause })
+    await expect(frame.locator('.action-board')).toHaveCount(0)
+    environment.setPublicSourceOnline(true)
+    await resume()
+    await environment.assertPrincipal(page)
+    for (const request of environment.publicRequests) {
+      expect(request.cookie).toBeUndefined(); expect(request.authorization).toBeUndefined(); expect(request.origin).toBeUndefined()
+      expect(request.path).toMatch(/^\/api\/workshop\/public-cards\/v1\/cards(?:$|\/)/)
+    }
+  } finally {
+    writeFileSync(testInfo.outputPath('public-sandbox-responses.json'), JSON.stringify(diagnostics, null, 2))
+    await testInfo.attach('public-sandbox-responses', { body: JSON.stringify(diagnostics, null, 2), contentType: 'application/json' })
+    await releaseAll([() => environment.context.close(), () => environment.browser.close(), () => environment.close()])
+  }
 })

@@ -1,4 +1,5 @@
 import { spectatorRoute } from './room-spectators'
+import { prereleaseArchiveReadState } from './prerelease-archive-retention'
 import type { PostgresDatabase as Database } from '../database/postgres'
 import { isDevRoom } from './room.ts'
 import { RoomRetentionStore } from './room-retention-store'
@@ -66,13 +67,23 @@ const removedReason = (
 ): RemovedGameContextDescriptor['reason'] =>
   value === 'moderation' || value === 'legal' ? value : 'removed'
 
+const archiveReadUnavailable = (roomId: string, state: Awaited<ReturnType<typeof prereleaseArchiveReadState>>): GameContextResponse | null => {
+  if (state?.lifecycle === 'removed') return { ok:true, roomId, lifecycle:'removed', reason:removedReason(state.removalReason) }
+  if (state?.expired || state?.lifecycle === 'expired') return { ok:true, roomId, lifecycle:'expired' }
+  return null
+}
+
 export class GameContextStore {
   private readonly db: StoreDatabase
 
   async readCreationConfiguration(roomId: string, userId?: string): Promise<SoloCreationConfigurationResponse> {
-    const source = await new GameCreationStore(this.db).completedSource(roomId, userId)
+    const source = await new GameCreationStore(this.db, this.now).completedSource(roomId, userId)
     if (!source.ok) return source
     const resolved = await resolveSoloWorkshopCards(this.db, source.record.configuration)
+    const current = await prereleaseArchiveReadState(this.db, roomId, this.now)
+    if (process.env.RELEASE_CHANNEL === 'prerelease' && (!current || current.lifecycle !== 'completed' || current.expired)) {
+      return { ok: false, code: 'source_removed', message: 'This game context is unavailable' }
+    }
     return { ok: true, configuration: source.record.configuration, issues: resolved.issues }
   }
   private readonly now: () => number
@@ -212,6 +223,18 @@ export class GameContextStore {
   }
 
   async resolve(roomId: string, userId?: string, intent: 'join' | 'resume' = 'resume'): Promise<Awaited<GameContextResponse>> {
+    const initial = archiveReadUnavailable(roomId, await prereleaseArchiveReadState(this.db, roomId, this.now))
+    if (initial) return initial
+    const response = await this.resolveAvailable(roomId, userId, intent)
+    if (process.env.RELEASE_CHANNEL !== 'prerelease') return response
+    const current = await prereleaseArchiveReadState(this.db, roomId, this.now)
+    if (!current) return { ok:false, code:'unknown_context', message:'Game context not found' }
+    const unavailable = archiveReadUnavailable(roomId, current)
+    if (unavailable) return unavailable
+    return response.ok && response.lifecycle !== current.lifecycle ? this.resolve(roomId, userId, intent) : response
+  }
+
+  private async resolveAvailable(roomId: string, userId?: string, intent: 'join' | 'resume' = 'resume'): Promise<Awaited<GameContextResponse>> {
     const context = (await this.currentContext(roomId))
     if (!context) {
       return {
