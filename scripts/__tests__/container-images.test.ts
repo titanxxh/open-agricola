@@ -3,10 +3,10 @@ import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 import { checkPrereleaseVerification, prereleaseConfiguration } from '../ci/prerelease-verification'
 import { prepareContainerImageArchive } from '../release/container-images-owner'
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseContainerImageReceipt, containerImageVerification, verifyContainerImageBuild, CONTAINER_IMAGE_WORKFLOW, containerImageArtifactName } from '../release/container-images'
@@ -46,8 +46,8 @@ describe('container image receipts', () => {
 
 const roots: string[] = []
 afterEach(() => { vi.unstubAllEnvs(); for (const path of roots.splice(0)) rmSync(path, { force: true, recursive: true }) })
-function githubFixture() {
-  const cwd = resolve(import.meta.dirname, '../..'), root = mkdtempSync(join(tmpdir(), 'oa-image-github-'))
+function githubFixture(cwd = resolve(import.meta.dirname, '../..')) {
+  const root = mkdtempSync(join(tmpdir(), 'oa-image-github-'))
   roots.push(root); const bin = join(root, 'bin'); mkdirSync(bin)
   const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim()
   const api: Record<string, unknown> = {
@@ -55,15 +55,60 @@ function githubFixture() {
     'repos/titanxxh/open-agricola/git/ref/heads/main': { ref: 'refs/heads/main', object: { type: 'commit', sha } },
     'repos/titanxxh/open-agricola/rules/branches/main?per_page=100': ['pull_request', 'non_fast_forward', 'deletion', 'required_linear_history'].map(type => ({ type })),
   }
-  const file = join(root, 'api.json'), save = () => writeFileSync(file, JSON.stringify(api)); save()
-  writeFileSync(join(bin, 'gh'), `#!${process.execPath}
-const fs=require('node:fs');const api=JSON.parse(fs.readFileSync(${JSON.stringify(file)},'utf8'));const args=process.argv.slice(2),value=api[args[1]];
-if(value===undefined)process.exit(1);if(value.binary){process.stdout.write(fs.readFileSync(value.binary));process.exit(0)}if(args.includes('--paginate'))for(const row of value)console.log(JSON.stringify(row));else console.log(JSON.stringify(value));
-`)
+  const shellQuote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'"
+  const save = () => {
+    const responses = Object.entries(api).flatMap(([endpoint, value], index) => {
+      if (value === undefined) return []
+      if (value === null) return [`${shellQuote(endpoint)}) exit 1 ;;`]
+      if (typeof value === 'object' && 'binary' in value && value.binary) {
+        if (typeof value.binary !== 'string') throw new Error('Invalid fixture binary path')
+        return [`${shellQuote(endpoint)}) exec /bin/cat -- ${shellQuote(value.binary)} ;;`]
+      }
+      const normal = join(root, `response-${index}.json`), page = join(root, `response-${index}.jsonl`)
+      writeFileSync(normal, JSON.stringify(value) + '\n')
+      const rows = Array.isArray(value) ? value : typeof value === 'string' ? Array.from(value) : null
+      if (rows) writeFileSync(page, rows.map(row => JSON.stringify(row) + '\n').join(''))
+      return [`${shellQuote(endpoint)}) if [ "$paginated" = 1 ]; then ${rows ? `exec /bin/cat -- ${shellQuote(page)}` : 'exit 1'}; else exec /bin/cat -- ${shellQuote(normal)}; fi ;;`]
+    })
+    writeFileSync(join(bin, 'gh'), `#!/bin/sh
+paginated=0
+for arg do
+  if [ "$arg" = --paginate ]; then paginated=1; fi
+done
+case "\${2-}" in
+${responses.join('\n')}
+*) exit 1 ;;
+esac
+`, { mode: 0o700 })
+  }
+  save()
   chmodSync(join(bin, 'gh'), 0o700);vi.stubEnv('PATH', bin + ':' + process.env.PATH)
   vi.stubEnv('CI', '');vi.stubEnv('GITHUB_ACTIONS', '')
   return { cwd, root, bin, sha, api, save }
 }
+it('preserves JSON, paginated and live binary fixture bytes without evaluating shell input', () => {
+  const value = githubFixture(), endpoint = "fixture/'$(touch SHELL_EVALUATED)*"
+  const binary = join(value.root, "artifact 'quoted' $(touch BINARY_EVALUATED).zip")
+  value.api[endpoint] = { message: 'public' }
+  value.api['fixture/rows'] = [{ id: 1 }, { id: 2 }]
+  value.api['fixture/empty'] = []
+  value.api['fixture/binary'] = { binary }
+  writeFileSync(binary, Buffer.from([0, 255, 13, 10])); value.save()
+  const gh = (...args: string[]) => execFileSync(join(value.bin, 'gh'), ['api', ...args], { cwd: value.root })
+  expect(gh(endpoint).toString()).toBe('{"message":"public"}\n')
+  expect(gh('fixture/rows').toString()).toBe('[{"id":1},{"id":2}]\n')
+  expect(gh('fixture/rows', '--paginate', '--jq', '.[] | @json').toString()).toBe('{"id":1}\n{"id":2}\n')
+  expect(gh('fixture/empty', '--paginate').toString()).toBe('')
+  expect(gh('fixture/binary')).toEqual(Buffer.from([0, 255, 13, 10]))
+  writeFileSync(binary, Buffer.from([1, 2, 3]))
+  expect(gh('fixture/binary')).toEqual(Buffer.from([1, 2, 3]))
+  value.api[endpoint] = { message: 'changed' }; value.save()
+  expect(gh(endpoint).toString()).toBe('{"message":"changed"}\n')
+  expect(spawnSync(join(value.bin, 'gh'), ['api', 'missing-endpoint'], { cwd: value.root }).status).toBe(1)
+  expect(existsSync(join(value.root, 'SHELL_EVALUATED'))).toBe(false)
+  expect(existsSync(join(value.root, 'BINARY_EVALUATED'))).toBe(false)
+})
+
 it('derives policy identity from protected main without requiring full stable release evidence', () => {
   const value = githubFixture()
   expect(containerImageVerification({ cwd: value.cwd, purpose: 'trusted-policy', sourceSha: value.sha, producerSha: value.sha }))
@@ -98,7 +143,11 @@ it.each(['run', 'attempt', 'producer', 'repository', 'artifact source', 'artifac
   const value = buildArtifactFixture()
   if (failure === 'run') value.run.conclusion = 'failure'
   if (failure === 'attempt') value.run.run_attempt = 1
-  if (failure === 'producer') value.run.head_sha = execFileSync('git', ['rev-parse', 'HEAD~1'], { cwd: value.cwd, encoding: 'utf8' }).trim()
+  if (failure === 'producer') {
+    value.run.head_sha = execFileSync('git', ['-c', 'user.name=Image fixture', '-c', 'user.email=fixture@example.invalid',
+      'commit-tree', `${value.sha}^{tree}`, '-p', value.sha], { cwd: value.cwd, input: 'Unmerged image producer\n', encoding: 'utf8' }).trim()
+    expect(value.run.head_sha).not.toBe(value.sha)
+  }
   if (failure === 'repository') value.run.head_repository.id = 999
   if (failure === 'artifact source') value.artifact.workflow_run.id = 999
   if (failure === 'artifact digest') value.artifact.digest = `sha256:${'f'.repeat(64)}`
@@ -259,8 +308,25 @@ it('rejects an incomplete or duplicated candidate task set', () => {
 })
 
 
-it('requires complete stable verification before authorizing a formal candidate image', () => {
-  const value = githubFixture(), prefix = 'repos/titanxxh/open-agricola'
+function stableImageFixture() {
+  const source = resolve(import.meta.dirname, '../..'), cwd = mkdtempSync(join(tmpdir(), 'oa-stable-image-source-'))
+  roots.push(cwd)
+  const configurationPaths = [
+    '.github/workflows/candidate-verification.yml', '.github/workflows/prerelease-candidate-verification.yml',
+    '.github/workflows/candidate-rehearsal.yml', 'scripts/ci', 'scripts/release/requirements.json',
+    'package.json', 'pnpm-lock.yaml', 'vitest.config.ts', 'playwright.config.ts', 'vite.config.ts',
+    ...readdirSync(join(source, 'scripts')).filter(name => /^(?:verification[^/]*\.ts|verify[^/]*\.(?:ts|sh)|test-project-globs\.ts)$/.test(name)).map(name => `scripts/${name}`),
+    ...readdirSync(source).filter(name => /^tsconfig[^/]*\.json$/.test(name)),
+  ]
+  for (const path of configurationPaths) {
+    const target = join(cwd, path); mkdirSync(dirname(target), { recursive: true })
+    cpSync(join(source, path), target, { recursive: true })
+  }
+  const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  git('init', '-b', 'main'); git('config', 'user.name', 'Image fixture'); git('config', 'user.email', 'fixture@example.invalid')
+  git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**'); git('commit', '-m', 'self-contained verification source')
+  expect(git('rev-parse', '--is-shallow-repository')).toBe('false')
+  const value = githubFixture(cwd), prefix = 'repos/titanxxh/open-agricola'
   Object.assign(value.api, finalSnapshotMetadata(value.sha, value.sha, { id: 123, full_name: 'titanxxh/open-agricola' }))
   const configuration = stableConfiguration(value.cwd, value.sha, value.sha)
   const step = (name: string) => ({ name, status: 'completed', conclusion: 'success' })
@@ -278,7 +344,11 @@ it('requires complete stable verification before authorizing a formal candidate 
   value.api[`${prefix}/actions/runs/61/jobs?filter=all&per_page=100`] = [manifest, ...jobs]
   for (const job of jobs) value.api[`${prefix}/actions/jobs/${job.id}`] = job
   value.save()
-  expect(checkCandidateVerification(value.cwd, 'titanxxh/open-agricola', value.sha).status).toBe('passed')
+  return { value, configuration, jobs }
+}
+
+it('requires complete stable verification before authorizing a formal candidate image', () => {
+  const { value, configuration } = stableImageFixture()
   const verified = containerImageVerification({ cwd: value.cwd, purpose: 'formal-candidate', sourceSha: value.sha, producerSha: value.sha })
   expect(verified).toEqual({ kind: 'stable', configuration, producerConfiguration: verificationConfiguration(value.cwd, value.sha),
     tasks: FULL_TASK_IDS.map((id, index) => ({ id, runId: 61, jobId: index + 2000, runAttempt: 2 })).sort((a, b) => a.id.localeCompare(b.id)) })
@@ -287,6 +357,11 @@ it('requires complete stable verification before authorizing a formal candidate 
   expect(parseContainerImageReceipt(receipt).purpose).toBe('formal-candidate')
   expect(() => parseContainerImageReceipt({ ...receipt, purpose: 'trusted-policy' })).toThrow()
   expect(() => parseContainerImageReceipt({ ...receipt, channel: 'prerelease' })).toThrow()
+})
+
+it('rejects a failed current task after stable verification previously passed', () => {
+  const { value, jobs } = stableImageFixture()
+  expect(checkCandidateVerification(value.cwd, 'titanxxh/open-agricola', value.sha).status).toBe('passed')
   jobs[0].conclusion = 'failure'; value.save()
   expect(() => containerImageVerification({ cwd: value.cwd, purpose: 'formal-candidate', sourceSha: value.sha, producerSha: value.sha })).toThrow(/Complete/)
 })
