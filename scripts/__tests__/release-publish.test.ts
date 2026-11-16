@@ -182,7 +182,7 @@ fs.appendFileSync(path.join(process.env.RELEASE_TEST_ROOT, 'events.jsonl'), JSON
 `)
   chmodSync(join(bin, 'ssh'), 0o755)
   writeFileSync(join(bin, 'sudo'), `#!${process.execPath}\nrequire('node:fs').appendFileSync(${JSON.stringify(join(root, 'events.jsonl'))},JSON.stringify({kind:'sudo',args:process.argv.slice(2)})+'\\n');process.exit(99)\n`, { mode: 0o700 })
-  const events = (): { kind: string; args?: string[]; endpoint?: string; body?: unknown; evidence?: string }[] => existsSync(join(root, 'events.jsonl'))
+  const events = (): { kind: string; options?: string[]; args?: string[]; endpoint?: string; body?: unknown; evidence?: string }[] => existsSync(join(root, 'events.jsonl'))
     ? readFileSync(join(root, 'events.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
   const publishVersion = (version: string, ...args: string[]) => spawnSync('pnpm', ['--silent', 'release', version, '--poll-seconds', '0.01', '--timeout-seconds', '0.1', ...args], {
     cwd: root, env, encoding: 'utf8', timeout: 30_000,
@@ -251,7 +251,7 @@ if(a[0]==='archive')a.unshift('-C',${JSON.stringify(value.root)});}
 const result=cp.spawnSync(${JSON.stringify(realGit)},a,{stdio:'inherit'});process.exit(result.status??1);
 `, { mode: 0o700 })
   writeFileSync(join(value.bin, 'ssh'), `#!${process.execPath}
-const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2),input=fs.readFileSync(0);fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'ssh',args:a,body:{stdinBytes:input.length}})+'\\n');
+const fs=require('node:fs'),cp=require('node:child_process'),a=process.argv.slice(2),options=[],input=fs.readFileSync(0);while(a[0]==='-o')options.push(...a.splice(0,2));fs.appendFileSync(${JSON.stringify(join(value.root, 'events.jsonl'))},JSON.stringify({kind:'ssh',options,args:a,body:{stdinBytes:input.length}})+'\\n');
 const command=a[1].replaceAll(${JSON.stringify(targetDirectory)},${JSON.stringify(remote)});
 if(a[1].includes("'bash' '-s'")){const r=cp.spawnSync('bash',['-c',command],{input,encoding:'utf8'});process.stdout.write(r.stdout.replaceAll(${JSON.stringify(remote)},${JSON.stringify(targetDirectory)}));process.stderr.write(r.stderr);process.exit(r.status??1)}
 if(a[1].includes('backend-image-receiver.ts')){
@@ -570,6 +570,7 @@ describe('direct backend deployment entry', () => {
     expect(ssh[1]?.args?.[1]).toContain("'preflight'")
     expect(ssh[2]?.args?.[1]).toContain("'receive'")
     expect(ssh[3]?.args?.[1]).toContain('backend-image-maintenance.ts')
+    expect(ssh[3]?.options).toEqual(expect.arrayContaining(['ServerAliveInterval=15', 'ServerAliveCountMax=8']))
     expect(copies.map(event => event.args?.at(-2)?.split('/').at(-1))).toEqual(['request.json', 'image.tar', 'request.json', 'request.json'])
     expect(copies.every(event => event.args?.includes('-p'))).toBe(true)
     const nativeChecks = events.filter(event => event.endpoint === 'actions/runs/80/attempts/1')
