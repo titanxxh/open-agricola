@@ -72,6 +72,20 @@
   }
   .game-layout .hand-row > * { width: 100%; max-width: none; }
   .game-layout .hand-row .player-card { max-width: none; }
+  /* The major supply wraps into the same columns as the hand instead of a row of full-size cards. */
+  .game-layout .major-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+    scroll-snap-type: none;
+    padding-bottom: 0;
+  }
+  .game-layout .major-row > * { width: 100%; min-width: 0; max-width: none; }
+  .game-layout .major-row .player-card { max-width: none; }
+  .game-layout .major-card-wrapper { padding-right: 8px; padding-bottom: 10px; }
+  .game-layout .major-stack .player-card.major-stack-card-covered { transform: translate(6px, 8px); }
+  .game-layout .major-stack-count { top: -4px; right: 0; }
   .game-layout .parent-cards-row { display: flex; flex-wrap: wrap; gap: 8px; }
   .game-layout .parent-card-tile { width: calc((100% - 8px) / 2); max-width: 188px; }
   .game-layout .special-actions-panel__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -85,13 +99,17 @@
 
   @media (min-width: 640px) {
     .game-layout .played-row { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-    .game-layout .hand-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .game-layout .hand-row,
+    .game-layout .major-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   }
 
   @media (max-height: 500px) {
     .game-layout .hand-row .player-card {
       max-width: min(100%, calc((100dvh - var(--interaction-bar-height, 0px) - var(--section-nav-height, 0px) - 72px) * 188 / 299));
       justify-self: center;
+    }
+    .game-layout .major-row .major-stack {
+      max-width: min(100%, calc((100dvh - var(--interaction-bar-height, 0px) - var(--section-nav-height, 0px) - 72px) * 188 / 299));
     }
   }
 }

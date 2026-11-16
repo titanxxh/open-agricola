@@ -72,7 +72,7 @@
 - `exchange-overlay-presentation.tsx` 与 `exchange-draft-presentation.ts` 承载普通兑换、喂养和供暖共用的交换中心。供暖复用配方行、顺序数量控件和重置路径，并展示燃料支付行与生病预览；`InteractionBar` 只保留确认入口。弹层根据底部操作栏的实测高度留出空间，过长的配方列表在面板内滚动，让确认按钮和随时响应入口均可操作。覆盖见 `heating-exchange.spec.ts`、`listener-lifecycle-room.spec.ts`、`issue-893-rules.spec.ts`。
 
 - `interaction-focus.ts` 将本机 Interaction Player 的权威请求映射到显示目标。职业选择在接机确认后定位私有手牌，支付等后续步骤保留行动聚焦，完成后返回行动区。Session 交互适配器仅向响应者发布不透明的等待步骤 `requestKey`，候选刷新及 cursor 恢复均保留其身份，玩家手动浏览不会再次触发滚动。共享目标锚点与返回快捷入口覆盖手牌、供应区和农场选择。
-- `SectionNav` 仅滚动到已经渲染的分区锚点，不改变 Farm View Player、私有信息可见性或 Interaction Focus。其实测高度为页面底部留白，并与固定操作栏一起计入农场缩放及交互滚动的可用视口。覆盖见 `section-navigation.spec.ts` 和 section-nav 组件测试。
+- `SectionNav` 仅滚动到已经渲染的分区锚点，不改变 Farm View Player、私有信息可见性或 Interaction Focus。其实测高度为页面底部留白，并与固定操作栏一起计入农场缩放及交互滚动的可用视口。窄屏时按钮换行而非横向滚动，并让出报告问题按钮自行发布的占位宽度。覆盖见 `section-navigation.spec.ts` 和 section-nav 组件测试。
 - 农场选择、空间目标选择、动物整理及本机选中的 Moor 地形操作使用农场目标。格盘根据有效视口和固定控件调整尺寸，也支持扩展农场。围栏控件扩大命中范围，并以收窄端点区分相邻边。同一步的重复快照保留草稿，只移除撤回的合法目标。`fence-selection-quote.ts` 显示权威选择费用，在快照、请求或草稿改变后丢弃旧回复；费用查询不决定是否允许提交。验收见 `farm-interaction-focus.spec.ts` 及聚焦、农场草稿和费用组件测试。
 
 - `board/ActionSpaceDescription.tsx` 根据权威 `baseDescriptionPreview` 渲染行动格图标，费用和数量始终取自该规则树。详细悬停说明与交互选项使用 `interaction/ActionDescription.tsx`。棋盘保留图形表达，不再另行维护规则表；组件和浏览器覆盖见 `ActionBoard.test.tsx` 与 `action-space-icons.spec.ts`。
@@ -95,7 +95,7 @@
 
 ### 预发布入口
 
-`app/PrereleaseEntry.tsx` 在大厅及设置读取账号 Beta 资格和实时权威入口响应。只以 `noopener noreferrer` 新标签打开已配置的 HTTPS hosted 入口，缺少配置时明确不可用。窗口重新聚焦会复核，并丢弃晚于拒绝结果返回的旧响应。
+`app/PrereleaseEntry.tsx` 是大厅及设置页头图标行里的 Beta 徽标，读取账号 Beta 资格和实时权威入口响应。只以 `noopener noreferrer` 新标签打开已配置的 HTTPS hosted 入口，缺少配置时明确不可用。窗口重新聚焦会复核，并丢弃晚于拒绝结果返回的旧响应。
 
 `PrereleaseHandoffPage` 与 `services/prerelease.ts` 负责 `?page=prerelease-handoff`。页面读取并清除浏览器绑定的 fragment，核对当前配置的目标和正式站根，通过已认证的正式权威只签发一次短期 code。code 仅以 fragment 交给固定 pre 回调；页面不保存登录凭据或 verifier，也不采用调用者提供的回调 URL。出错只返回正式站根。测试见 `PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx` 和 `hosted-password-login.spec.ts` 的 HTTPS 预发布用例。
 

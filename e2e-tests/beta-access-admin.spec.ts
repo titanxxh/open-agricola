@@ -84,8 +84,9 @@ test('administrator manages Beta qualification with bilingual revocation while m
 
     await member.reload()
     await expectStableLobby(member)
-    await expect(member.getByRole('button', { name: 'Enter prerelease', exact: true })).toBeDisabled()
-    await expect(member.locator('.prerelease-entry')).toContainText('Prerelease is not available yet.')
+    const memberEntry = member.locator('.lobby-header .site-community-links').getByRole('button', { name: 'Enter prerelease', exact: true })
+    await expect(memberEntry).toBeDisabled()
+    await expect(memberEntry).toHaveAccessibleDescription(/^Prerelease is not available yet\./)
     expect(await (await ordinary.request.get(`${app.apiUrl}/api/auth/me`, { headers: browserRequestHeaders(app.apiUrl) })).json()).toMatchObject({ user: { betaAccess: true } })
 
     await row.getByRole('button', { name: 'Revoke', exact: true }).click()

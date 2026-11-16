@@ -1,0 +1,35 @@
+.github-repo-link.prerelease-entry {
+  width: auto;
+  min-width: 34px;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.prerelease-entry__badge {
+  padding: 2px 6px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.github-repo-link.prerelease-entry:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.github-repo-link.prerelease-entry:disabled:hover {
+  background: transparent;
+}
+
+@media (pointer: coarse) {
+  .github-repo-link.prerelease-entry {
+    min-width: 44px;
+  }
+}

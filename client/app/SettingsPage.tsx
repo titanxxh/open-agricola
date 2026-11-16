@@ -304,7 +304,7 @@ export function SettingsPage() {
           <h1>{t('platform.settingsTitle')}</h1>
         </div>
         <div className="site-header-links">
-          <SiteCommunityLinks />
+          <SiteCommunityLinks><PrereleaseEntry /></SiteCommunityLinks>
           <LocaleSwitcher />
         </div>
       </header>
@@ -317,7 +317,6 @@ export function SettingsPage() {
         {user?.betaAccess || user?.isAdmin ? <p className="settings-readonly beta-access-status">
           {t('beta.accessLabel')}: <span className="settings-readonly-chip">{t('beta.accessEnabled')}</span>{' '}
         </p> : null}
-        <PrereleaseEntry />
         <form onSubmit={handleSaveName} className="settings-form">
           <div className="form-field">
             <label htmlFor="displayName">{t('platform.displayNameLabel')}</label>
