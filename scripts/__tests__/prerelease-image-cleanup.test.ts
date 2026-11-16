@@ -43,7 +43,8 @@ case "$1 $2" in
   'inspect --format') shift 3; for c in "$@"; do grep "^$c " "$C" | cut -d' ' -f2; done;;
   'image rm') if cut -d' ' -f2 "$C" | grep -qx "$3"; then echo "conflict: image is being used by a container" >&2; exit 1; fi
     grep -qx "$3" "$I" || { echo "No such image: $3" >&2; exit 1; }; grep -vx "$3" "$I" > "$I.next"; mv "$I.next" "$I";;
-  'image inspect') grep -qx "$3" "$I" || exit 1; printf '[{}]';;
+  'image inspect') [ ! -f '${temporary}/daemon-down' ] || { echo "Cannot connect to the Docker daemon" >&2; exit 1; }
+    grep -qx "$5" "$I" || { echo "Error response from daemon: No such image: $5" >&2; exit 1; }; printf '%s\\n' "$5";;
   *) echo "unexpected docker $*" >&2; exit 64;;
 esac
 `, { mode: 0o700 })
@@ -105,6 +106,18 @@ it('keeps a cache record when Docker refuses to remove its image', () => {
   expect(short(result.keep)).toContainEqual(['3', 'container'])
   expect(value.images()).toContain(image('3'))
   expect(existsSync(join(value.root, 'control', `image-candidate-${sha('b')}-${sha('e')}.json`))).toBe(true)
+})
+
+it('keeps import records when Docker cannot confirm that their image is gone', () => {
+  const value = fixture(); seed(value)
+  writeFileSync(join(value.temporary, 'daemon-down'), '')
+  const result = parse(value.invoke('image-cleanup'))
+  expect(result.removed).toEqual([])
+  expect(short(result.retained)).toEqual([['3'], ['4']])
+  expect(result.retained.every((entry: { error: string }) => entry.error.includes('could not confirm'))).toBe(true)
+  expect(value.images()).toHaveLength(5)
+  expect(readdirSync(join(value.root, 'control')).filter(name => name.startsWith('image-'))).toHaveLength(5)
+  expect(readdirSync(join(value.root, 'control', 'retired-images'))).toEqual([])
 })
 
 it('refuses to remove images during a pending operation or an image import, and ignores foreign records', () => {

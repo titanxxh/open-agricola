@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { targetFingerprint, type PrereleaseTarget } from './config'
@@ -11,9 +12,16 @@ const nativeId = (value: unknown): string | null => typeof value === 'string' &&
 export type ImageCleanupEntry = { file: string; purpose: string; sourceSha: string; producerSha: string; nativeImageId: string; reasons: string[] }
 export type ImageCleanupPlan = { policySha: string; keep: ImageCleanupEntry[]; remove: ImageCleanupEntry[]; foreign: string[] }
 
-function exists(imageId: string): boolean {
-  try { command('docker', ['image', 'inspect', imageId]); return true } catch { return false }
+/** Only Docker's own "no such image" answer proves absence; any other failure leaves the state unknown. */
+function imageState(imageId: string): 'present' | 'missing' {
+  const env: NodeJS.ProcessEnv = {}
+  for (const key of ['PATH', 'HOME', 'USER', 'LANG', 'DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_CONFIG']) if (process.env[key]) env[key] = process.env[key]
+  const result = spawnSync('docker', ['image', 'inspect', '--format', '{{.Id}}', imageId], { env, encoding: 'utf8', timeout: 30_000 })
+  if (result.status === 0 && result.stdout.trim() === imageId) return 'present'
+  if (result.status !== 0 && /no such (?:image|object)/i.test(result.stderr ?? '')) return 'missing'
+  throw new Error('Docker could not confirm whether the image is present; its import record is kept')
 }
+const failureText = (failure: unknown) => String(failure instanceof Error ? failure.message : failure).slice(0, 300)
 
 /**
  * Plans removal of images imported for this target that nothing can still use. It keeps the current policy's tooling,
@@ -63,10 +71,12 @@ export function executeImageCleanup(target: PrereleaseTarget, record: RuntimeRec
   const removed: ImageCleanupEntry[] = [], retained: Array<ImageCleanupEntry & { error: string }> = []
   for (const entry of plan.remove) {
     let error = ''
-    if (exists(entry.nativeImageId)) {
-      try { command('docker', ['image', 'rm', entry.nativeImageId]) } catch (failure) { error = String(failure instanceof Error ? failure.message : failure).slice(0, 300) }
-    }
-    if (exists(entry.nativeImageId)) { retained.push({ ...entry, error: error || 'Docker retained the image' }); continue }
+    try {
+      if (imageState(entry.nativeImageId) === 'present') {
+        try { command('docker', ['image', 'rm', entry.nativeImageId]) } catch (failure) { error = failureText(failure) }
+      }
+      if (imageState(entry.nativeImageId) === 'present') { retained.push({ ...entry, error: error || 'Docker retained the image' }); continue }
+    } catch (failure) { retained.push({ ...entry, error: failureText(failure) }); continue }
     renameSync(join(control, entry.file), join(retired, entry.file))
     removed.push(entry)
   }
