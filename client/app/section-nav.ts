@@ -37,15 +37,15 @@ export function sectionNavItems(availability: SectionNavAvailability): SectionNa
   if (availability.handPlayerId) {
     items.push({
       id: 'hand',
-      labelKey: 'ui.handCards',
+      labelKey: 'ui.sectionNav.hand',
       selector: `[data-section-target="hand"][data-hand-anchor="${CSS.escape(availability.handPlayerId)}"]`,
     })
   }
-  if (availability.viewedFarm) items.push({ id: 'farm', labelKey: 'ui.farmTitle', selector: '[data-section-target="farm"]' })
-  if (availability.publicFarms) items.push({ id: 'public-farms', labelKey: 'ui.publicFarms', selector: '[data-section-target="public-farms"]' })
-  if (availability.seasons) items.push({ id: 'seasons', labelKey: 'ui.seasons.board', selector: '[data-section-target="seasons"]' })
-  if (availability.moor) items.push({ id: 'moor', labelKey: 'moor.specialActions.title', selector: '[data-section-target="moor"]' })
-  if (availability.majorSupply) items.push({ id: 'major-supply', labelKey: 'ui.majorImprovements', selector: '[data-section-target="major-supply"]' })
+  if (availability.viewedFarm) items.push({ id: 'farm', labelKey: 'ui.sectionNav.farm', selector: '[data-section-target="farm"]' })
+  if (availability.publicFarms) items.push({ id: 'public-farms', labelKey: 'ui.sectionNav.publicFarms', selector: '[data-section-target="public-farms"]' })
+  if (availability.seasons) items.push({ id: 'seasons', labelKey: 'ui.sectionNav.seasons', selector: '[data-section-target="seasons"]' })
+  if (availability.moor) items.push({ id: 'moor', labelKey: 'ui.sectionNav.moor', selector: '[data-section-target="moor"]' })
+  if (availability.majorSupply) items.push({ id: 'major-supply', labelKey: 'ui.sectionNav.majorSupply', selector: '[data-section-target="major-supply"]' })
   return items
 }
 
