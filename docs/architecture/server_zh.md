@@ -164,7 +164,7 @@ POST   /api/v1/github-app/webhook
 
 公开 Replay API 返回版本化 JSON，从不暴露 PostgreSQL 编码。一个 Segment 最多展开一条 checkpoint 链，并校验每个 Frame Hash；Anchor 必须精确匹配 `stepNo + frameHash`。公开读取有按 IP 的配额与大小上限；需认证的证据与报告端点按账号限流。
 
-Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓存。其 CSP 显式允许 `PUBLIC_API_BASE` 的来源（本地开发使用请求来源），供不透明来源的沙箱读取公开资源，脚本仍限于 `'self'`。覆盖：`replay-routes.test.ts` 与 `replay-viewer-csp.spec.ts`。
+Viewer HTML 复验 CSP，不可变脚本仅允许 'self'。公开 Replay 允许已配置的 API 来源；pre 桥接 Build 允许 blob 图片。`replay-routes.test.ts` 与 `replay-viewer-csp.spec.ts` 覆盖这两种策略。
 
 ## 工坊后端
 
@@ -186,7 +186,7 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 - `server/db.ts` 通过 `pg` 持有异步 PostgreSQL 连接：transaction 跨 await 保持同一连接，嵌套 transaction 使用 savepoint，原生迁移在启动前于 advisory lock 下执行。运行时没有 SQLite 或 JSON 回退。
 - `data_imports` 让失败的恢复停在启动屏障之后；`scripts/validate-backup.ts` 校验 PostgreSQL / S3 的恢复。
 - `schema.sql` 与有序迁移定义产品表。回放片段由 `checkpointStepNo` 表示；证据 payload、配额和 webhook 投递不另建并行存储表。
-- 录制上线前完成的对局为 `legacy_no_replay`：保留结果摘要，但没有 Replay header 或 Frame。
+- `game/prerelease-archive-{retention,cleanup}.ts` 负责 pre 到期、可靠删除与资源回收。保留数据政策见 `HOW_TO_DEPLOY.md`。
 
 ## GitHub 投递、安全与删除
 
@@ -197,7 +197,7 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 - `github-issue-client` 在服务端固定仓库和安装 ID；对账只接受由指定 App 在尝试之后创建且以唯一 marker 结尾的 Issue，浏览器只轮询站内状态。本人投递使用加密 App 用户 token（AES-256-GCM、`keyId`）并确认公开身份；Hosted Issue Identity 使用安装 token。连接失效不切换作者。
 - `bug-report/feedback-service.ts` 统一管理结论、站内信、根修复摘要和上线操作。通知对象将历史导入与原生取证权限分开，删除时仍由同一 App 匿名化公开站点 ID。写入按 1673001、排序账号、排序对象加锁；持久历史意图校验接收人/修复版本及范围，账号/根修复去重保留消息和已读状态。HTTP 检查 Origin；生产证明只经 owner 入口并保留原生/owner-local 类型，完整祖先集合支持晚到关联。当前修复可用性以最新部署为准，包含回滚；首次核验仍保留历史事实。测试：`bug-report-{feedback,feedback-routes,fix-links,release-feedback,historical-feedback,historical-deletion}.test.ts`。
 - 删号时持久化 `deletion_pending`、登出所有会话，并通过安装 adapter 编辑已知 Issue 正文，持续重试直到 GitHub 确认站点用户 ID 已消失。
-- 维护者读取证据需要填写理由，永久审计、限流，并重新应用当前参与者的 tombstone 投影。
+- 维护者读取证据需要填写理由，永久审计、限流，并重新应用当前参与者的 tombstone 投影。 参与者 Evidence 只读接口不依赖 Issue 凭据，解码后重查座位、已提交 Anchor、生命周期和期限。
 - 删除（[ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)）：`server/game/replay-removal.ts` 在删除 payload 前，用 ETag CAS 把每个批次追加到私有 S3 中独立的 `erasure/ledger.json`；启动与恢复会幂等应用它，格式错误的 ledger 会阻断恢复，资源读取与上传会查询其永久哈希拒绝规则。日志从不包含 token、Frame payload、现象文字或原始 GitHub 响应。
 
 ## 部署、回滚与观测

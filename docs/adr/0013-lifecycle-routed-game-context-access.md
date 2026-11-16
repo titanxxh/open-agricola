@@ -65,4 +65,6 @@ With one game per `roomId` (ADR 0009), public Replays (ADR 0010) and delta archi
 
 ## Prerelease environment override
 
-[ADR 0042](0042-experimental-feature-availability.md) supersedes the public-read exemption for prerelease data. Every Context, result, Replay, segment, anchor, Evidence and associated data resource first requires a current prerelease session and Beta qualification, then its existing finer permission. Public static Viewer code carries no archive authority; credentialless delivery is a separate prerelease Viewer feature.
+[ADR 0042](0042-experimental-feature-availability.md) supersedes the public-read exemption for prerelease data. Every Context, result, Replay, segment, anchor, Evidence and associated data resource first requires a current prerelease session and Beta qualification, then its existing finer permission. Public static Viewer code carries no archive authority; credentialless delivery uses the dedicated parent bridge.
+
+The implemented pre bridge binds the current iframe Window, nonce, dedicated MessagePort, environment/target, generation, room, Build, schema and archive/exact-Evidence mode. Auth precedes cache/Range decisions. No-store room-scoped images retain their reference, integrity and erasure barriers; global anonymous images stay blocked.
