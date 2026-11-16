@@ -9,6 +9,7 @@ import { approveCurrentDraft, createCard, enterReview, publish, type WorkshopDra
 import { httpAdmission } from '../request-auth'
 import { authCookieNames } from '../auth-cookies'
 import { createSession } from '../auth'
+import { FormalPublicCards } from '../prerelease-public-cards'
 
 const db = await createTestDatabase()
 const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
@@ -194,6 +195,37 @@ it('exports only a live approved version and verifies the actual image bytes in 
   expect(body.snapshot.sha256).toMatch(/^[a-f0-9]{64}$/)
   expect(JSON.stringify(body)).not.toContain('compiled')
   expect(JSON.stringify(body)).not.toContain('private generation')
+})
+
+it('consumes the actual formal public source and pauses its fixed input after a durable administrator takedown', async () => {
+  const { card, versionId } = await publicCard('CandidateConsumer')
+  const requests: Array<{ method: string; path: string; authorization: string | null; cookie: string | null }> = []
+  const client = new FormalPublicCards('https://formal.example.test', async (target, init) => {
+    const url = new URL(String(target))
+    const headers = new Headers(init?.headers)
+    requests.push({ method: init?.method ?? 'GET', path: url.pathname, authorization: headers.get('authorization'), cookie: headers.get('cookie') })
+    return fetch(`${origin}${url.pathname}${url.search}`, init)
+  })
+  const lease = await client.create(card.id)
+  expect(lease.snapshot.input.source.versionId).toBe(versionId)
+  expect(lease.snapshot.input.art?.base64).toBe('cHVibGljIGltYWdlIGJ5dGVz')
+  expect(lease.authorized()).toBe(true)
+  const { unpublish, adminTakedownCard } = await import('../workshop-drafts')
+  await unpublish(db, { cardId: card.id, authorId: 'author', baseRevision: card.revision })
+  await expect(client.create(card.id)).rejects.toThrow()
+  await lease.refresh()
+  expect(lease.authorized()).toBe(true)
+  await adminTakedownCard(db, card.id)
+  await lease.refresh()
+  expect(lease.authorized()).toBe(false)
+  expect(() => lease.assert()).toThrow('Public card execution paused')
+  expect(requests.every(request => request.method === 'GET' && request.authorization === null && request.cookie === null)).toBe(true)
+  expect(requests.map(request => request.path)).toEqual([
+    `/api/workshop/public-cards/v1/cards/${card.id}`,
+    `/api/workshop/public-cards/v1/cards/${card.id}`,
+    `/api/workshop/public-cards/v1/cards/${card.id}/versions/${versionId}/status`,
+    `/api/workshop/public-cards/v1/cards/${card.id}/versions/${versionId}/status`,
+  ])
 })
 
 it('keeps an existing public input after author unpublish while refusing new creation and private versions', async () => {
