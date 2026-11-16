@@ -8,7 +8,7 @@ export const REQUIRED_EVIDENCE = ['identity', 'beta-access', 'http-ws', 'public-
 const sha256 = path => createHash('sha256').update(readFileSync(path)).digest('hex')
 
 /** Which suite results support each item; formal-browser-policy comes from the target's own verifier. */
-const SOURCES = {
+export const SOURCES = {
   identity: ['handoff'], 'beta-access': ['revocation', 'multihand-cooperation-viewer', 'formal-account-deletion'],
   'http-ws': ['visitor', 'ordinary', 'beta-boundary', 'team-game'], 'public-cards': ['public-sandbox'],
   viewer: ['multihand-cooperation-viewer', 'viewer-firefox', 'viewer-webkit', 'continuity'], 'retained-data': ['continuity'],
