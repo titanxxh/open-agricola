@@ -200,7 +200,10 @@ export async function verifyStorageArchive(root: string): Promise<StorageArchive
   await verifiedDump(root, manifest)
   const seen = new Set<string>()
   for (const item of manifest.objects) {
-    if (!/^[a-f0-9]{64}$/.test(item.sha256) || seen.has(item.sha256)) continue
+    // The same identity rules as restore: a malformed entry rejects the copy instead of being skipped.
+    if (!/^[a-f0-9]{64}$/.test(item.sha256) || !Number.isSafeInteger(item.size) || item.size < 0
+      || typeof item.key !== 'string' || !/^(card-art|replay-assets|replay-viewers)\//.test(item.key)) throw new Error('Invalid object archive identity')
+    if (seen.has(item.sha256)) continue
     seen.add(item.sha256)
     const actual = await digest(join(root, 'objects', item.sha256)).catch(() => null)
     if (!actual || actual.sha256 !== item.sha256 || actual.size !== item.size) throw new Error(`Object archive integrity failure: ${item.key}`)
