@@ -1,5 +1,5 @@
 // Owner-only live prerelease acceptance CLI. Run from the trusted owner checkout:
-//   node --import tsx scripts/prerelease/live-acceptance/cli.mjs <run|bundle|acceptance> --config <private.json> ...
+//   node --import tsx scripts/prerelease/live-acceptance/cli.mjs <run|bundle|acceptance|window> --config <private.json> ...
 import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -8,6 +8,7 @@ import { assertNoAccountValues, loadAcceptanceConfig, privateDirectory, privateJ
 import { createKit } from './browser.mjs'
 import * as suites from './suites.mjs'
 import { acceptanceRecord, bundleEvidence, collectResults } from './evidence.mjs'
+import { runWindow, WindowStop } from './window.mjs'
 
 const root = resolve(import.meta.dirname, '../../..')
 const engines = { chromium, firefox, webkit }
@@ -161,4 +162,16 @@ const ctx = loadAcceptanceConfig(options.config)
 if (command === 'run') await runSuite(ctx, options)
 else if (command === 'bundle') await bundle(ctx, options)
 else if (command === 'acceptance') acceptance(ctx, options)
-else throw new Error('Use run --suite <name> [--engine <e,...>] [--case <label,...>] | bundle --runs <dirs> --output <dir> | acceptance --index <file> --formal-browser <file> --output <file>')
+else if (command === 'window') {
+  // The whole reverify window after an accepted formal deploy; stops at the first failure with the next commands.
+  if (!options.window) throw new Error('window needs --window <private window config>')
+  try {
+    const state = await runWindow({ configPath: options.config, windowPath: options.window, resume: options.resume === 'true', confirmStep: options['confirm-step'] ?? null })
+    process.stdout.write(JSON.stringify({ window: state.windowId, completed: true }) + '\n')
+  } catch (error) {
+    if (!(error instanceof WindowStop)) throw error
+    process.stderr.write(`Window stopped: ${error.message}\n${error.next.map(command => `  next: ${command}\n`).join('')}`)
+    process.exitCode = 1
+  }
+}
+else throw new Error('Use run --suite <name> [--engine <e,...>] [--case <label,...>] | bundle --runs <dirs> --output <dir> | acceptance --index <file> --formal-browser <file> --output <file> | window --window <file> [--resume true] [--confirm-step accounts|deletion]')
