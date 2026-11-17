@@ -625,9 +625,12 @@ export const getAnimalScoreAdjustment = (
   return adjustment
 }
 
-export const getHarvestBreedOrderPriority = (
+type HarvestOrderPriorityHook = 'computeHarvestBreedOrderPriority' | 'computeHarvestFeedingOrderPriority'
+
+const getHarvestOrderPriority = (
   state: GameState,
   player: PlayerState,
+  hook: HarvestOrderPriorityHook,
 ): number => {
   const allCards = [
     ...(player.improvements ?? []),
@@ -636,8 +639,7 @@ export const getHarvestBreedOrderPriority = (
   ]
   let priority = 0
   for (const cardId of allCards) {
-    const effect = getCardEffect(cardId)
-    const handler = effect?.computeHarvestBreedOrderPriority
+    const handler = getCardEffect(cardId)?.[hook]
     if (!handler) continue
     try {
       const next = handler(state, player)
@@ -645,7 +647,7 @@ export const getHarvestBreedOrderPriority = (
       priority = Math.max(priority, Math.floor(next))
     } catch (err) {
       if (isCustomCard(cardId)) {
-        console.warn(`[card-effects] custom card ${cardId} computeHarvestBreedOrderPriority threw, skipping:`, err)
+        console.warn(`[card-effects] custom card ${cardId} ${hook} threw, skipping:`, err)
         continue
       }
       throw err
@@ -654,37 +656,15 @@ export const getHarvestBreedOrderPriority = (
   return priority
 }
 
+export const getHarvestBreedOrderPriority = (
+  state: GameState,
+  player: PlayerState,
+): number => getHarvestOrderPriority(state, player, 'computeHarvestBreedOrderPriority')
+
 export const getHarvestFeedingOrderPriority = (
   state: GameState,
   player: PlayerState,
-): number => {
-  const allCards = [
-    ...(player.improvements ?? []),
-    ...(player.minorPlayed ?? []),
-    ...(player.occupationPlayed ?? []),
-  ]
-  let priority = 0
-  for (const cardId of allCards) {
-    const effect = getCardEffect(cardId)
-    const handler = effect?.computeHarvestFeedingOrderPriority
-    if (!handler) continue
-    try {
-      const next = handler(state, player)
-      if (typeof next !== 'number' || Number.isNaN(next)) continue
-      priority = Math.max(priority, Math.floor(next))
-    } catch (err) {
-      if (isCustomCard(cardId)) {
-        console.warn(
-          `[card-effects] custom card ${cardId} computeHarvestFeedingOrderPriority threw, skipping:`,
-          err,
-        )
-        continue
-      }
-      throw err
-    }
-  }
-  return priority
-}
+): number => getHarvestOrderPriority(state, player, 'computeHarvestFeedingOrderPriority')
 
 export const consumeAnimalPaymentFromCardEffects = (
   state: GameState | undefined,

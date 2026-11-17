@@ -53,6 +53,8 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - 带实现的大改良源码经两条生成路径进入后端：`scripts/generate-register-all.ts` 把它加入 `ALL_CARD_IMPLS`；`major/runtime.generated.ts` 提供 `majorCardSources`，`shared/cards/major/index.ts` 把其中的 `impl.effect` 合并进大改良 Card Definition。
 - 服务端与沙盒只注册自定义卡的运行时部分；主客户端只注册展示 metadata，从不导入自定义运行时注册表。
 
+- 旧版卡牌源码放在 `classic/{deck}/`；牌组前缀在原牌组前加 `C`，卡牌 ID 使用三位卡号。运行时生成器自动发现所有直属 `classic/*` 目录；这些源码暂不进入普通发牌目录，由独立的接入变更启用。
+
 ## `cardStates` 中的局部状态
 
 - 持续计数、一次性标记和局部状态放在 `player.cardStates[cardId]`，不放 `PlayerState` 顶层。卡牌打出前就需要的历史使用显式的手牌区 listener（[Hook 系统](hooks_zh.md#hook-系统)），不用全局统计。

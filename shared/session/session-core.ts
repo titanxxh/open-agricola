@@ -3298,11 +3298,12 @@ export class GameCore {
 
   private executeFeedingLogic(): SessionResponse {
     const feedQueue = this.getHarvestPlayerIndices()
-      .map((index) => ({
+      .map((index, order) => ({
         index,
+        order,
         priority: getHarvestFeedingOrderPriority(this.state, this.state.players[index]!),
       }))
-      .sort((left, right) => left.priority - right.priority)
+      .sort((left, right) => left.priority - right.priority || left.order - right.order)
       .map(({ index }) => ({ index }))
     return this.continueHarvestFeedingQueue(feedQueue)
   }
