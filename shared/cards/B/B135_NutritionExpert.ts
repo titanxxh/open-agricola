@@ -1,33 +1,43 @@
 import { defineOccupationCard } from '../card-source'
-import { payGainActionFlow } from '../helpers/pay-gain-node'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { animalKeysForState } from '../../contract/animals'
+import type { ActionFlow } from '../../contract/types'
 
 const CARD_ID = 'B135_NutritionExpert'
 
 const cardImpl = {
   effect: {
-  id: CARD_ID,
-  onRoundStart: (state, player) => {
+    id: CARD_ID,
+    onRoundStart: (state, player) => {
 
-    const animalTypes = animalKeysForState(state)
-    const availableAnimals = animalTypes.filter((a) => (player.resources[a] ?? 0) >= 1)
-    const hasGrain = (player.resources.grain ?? 0) >= 1
-    const hasVeg = (player.resources.vegetable ?? 0) >= 1
+      const animalTypes = animalKeysForState(state)
+      const availableAnimals = animalTypes.filter((a) => (player.resources[a] ?? 0) >= 1)
+      const hasGrain = (player.resources.grain ?? 0) >= 1
+      const hasVeg = (player.resources.vegetable ?? 0) >= 1
 
-    if (availableAnimals.length === 0 || !hasGrain || !hasVeg) return
+      if (availableAnimals.length === 0 || !hasGrain || !hasVeg) return
 
-    const children = availableAnimals.map((animal) =>
-      payGainActionFlow({
-        cardId: CARD_ID,
-        cost: { [animal]: 1, grain: 1, vegetable: 1 },
-        gain: { food: 5, score: 2 },
-      }),
-    )
+      const children = availableAnimals.map<ActionFlow>((animal) => ({
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf', actionId: 'exchange', sourceCard: CARD_ID,
+            actionContext: {
+              directTrade: {
+                from: { [animal]: 1, grain: 1, vegetable: 1 },
+                to: { food: 5 },
+                sourceId: CARD_ID,
+              },
+            },
+          },
+          bonusVpLeaf(CARD_ID, 2),
+        ],
+      }))
 
-    return { type: 'xor', optional: true, children }
+      return { type: 'xor', optional: true, children }
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
