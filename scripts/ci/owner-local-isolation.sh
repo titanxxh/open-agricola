@@ -4,8 +4,11 @@
 # rootless Docker per run, one source copy per task sharing one test-service data directory, and a bounded
 # cgroup teardown before the trusted collector reads anything. Candidate code never runs in this shell.
 #   start   <policy-dir> <run-dir> <owner-uid> <public-assets-dir> <task>...   create the identity, copies, user manager and daemon
-#   stop    <owner-uid> <task>...                          kill the subtree, delete the identity, hand copies over
-#   cleanup <owner-uid>                                    remove the candidate home and runtime configuration
+#   stop    <run-dir> <owner-uid> <task>...                kill the subtree, delete the identity, hand copies over
+#   cleanup <run-dir> <owner-uid>                          remove the candidate home and runtime configuration
+# stop and cleanup act only on isolation that start created for the same run directory: start records the run in a
+# root-only ownership marker before it creates anything and tags the account with it, so a refused start never tears
+# down a pre-existing UID 61000 account or another run's candidate.
 set -Eeuo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 fail() { printf 'Owner-local isolation %s failed: %s\n' "${action:-?}" "$1" >&2; exit 1; }
@@ -19,6 +22,20 @@ unmount_candidate_mounts() {
     [[ -n $mount ]] && umount --no-canonicalize "$mount"
   done < <(awk -v home="$home/" 'index($2, home) == 1 { print $2 }' /proc/self/mounts | sort -r)
   ! awk -v home="$home/" 'index($2, home) == 1 { found = 1 } END { exit !found }' /proc/self/mounts || fail 'candidate mounts remain'
+}
+marker=/run/oa-owner-local-owner
+account_tag() { printf 'oa-owner-local %s' "$(printf '%s' "$1" | sha256sum | cut -c1-16)"; }
+# Fails unless this run created the current isolation; prints whether the tagged candidate account still exists.
+require_ownership() {
+  [[ -f $marker && ! -L $marker && $(stat -c '%u %a' "$marker") == '0 600' && $(cat "$marker") == "$1" ]] || fail 'this run did not create the candidate isolation; nothing was changed'
+  local entry
+  entry="$(getent passwd "$uid" || true)"
+  if [[ -n $entry ]]; then
+    [[ $(cut -d: -f1 <<< "$entry") == oa-candidate && $(cut -d: -f5 <<< "$entry") == "$(account_tag "$1")" ]] || fail 'UID 61000 belongs to an account this run did not create; nothing was changed'
+    echo present
+  else
+    echo absent
+  fi
 }
 task_name() { [[ $1 =~ ^[a-z0-9-]+$ ]] || fail "invalid task $1"; }
 owner_uid() { [[ $1 =~ ^[1-9][0-9]*$ && $1 != "$uid" && ${SUDO_UID:-} == "$1" ]] || fail 'owner uid must be the invoking sudo user'; }
@@ -34,12 +51,13 @@ if [[ $action == start ]]; then
   # would redirect the root mkdir and mount, so the candidate tree must not contain it at all.
   [[ ! -e $run/source/data && ! -L $run/source/data ]] || fail 'the candidate tree contains data; refusing to mount over it'
   ! getent passwd oa-candidate >/dev/null && ! getent passwd "$uid" >/dev/null && ! getent group "$uid" >/dev/null || fail 'a candidate identity already exists; run stop and cleanup first'
-  [[ ! -e $home && ! -e $runtime ]] || fail 'a previous candidate home or runtime remains; run cleanup first'
+  [[ ! -e $home && ! -e $runtime && ! -e $marker ]] || fail 'a previous candidate home, runtime or ownership marker remains; run stop and cleanup with its run directory first'
   [[ -x /usr/bin/rootlesskit && -x /usr/bin/dockerd-rootless-setuptool.sh && -x /usr/bin/newuidmap && -x /opt/oa-owner-local/node/bin/node ]] || fail 'owner machine is not provisioned (scripts/ci/owner-local-provision.sh)'
   docker_version="$(docker version --format '{{.Server.Version}}')"
+  (umask 077; printf '%s' "$run" > "$marker")
   install -d -m 755 "$runtime" "$runtime/environment-generators"
   groupadd --gid "$uid" oa-candidate
-  useradd --uid "$uid" --gid "$uid" -K UID_MAX="$uid" --create-home --shell /bin/bash oa-candidate
+  useradd --uid "$uid" --gid "$uid" -K UID_MAX="$uid" --comment "$(account_tag "$run")" --create-home --shell /bin/bash oa-candidate
   setfacl --remove-all --remove-default "$home"; chmod 700 "$home"
   grep -q '^oa-candidate:' /etc/subuid && grep -q '^oa-candidate:' /etc/subgid || fail 'no subordinate ids were allocated'
   # One private copy per task; every copy's ignored data/ is the same directory, so `local-services --test`
@@ -83,9 +101,10 @@ if [[ $action == start ]]; then
   chmod 644 "$runtime/context.json"
   printf 'Candidate identity, %d task copies and rootless Docker %s ready\n' "$#" "$docker_version"
 elif [[ $action == stop ]]; then
-  (( $# >= 1 )) || fail 'usage: stop <owner-uid> <task>...'
-  owner_uid "$1"; shift
+  (( $# >= 2 )) || fail 'usage: stop <run-dir> <owner-uid> <task>...'
+  run="$(realpath -m "$1")"; owner_uid "$2"; shift 2
   for task in "$@"; do task_name "$task"; done
+  account="$(require_ownership "$run")"
   cgroup=/sys/fs/cgroup/user.slice/user-$uid.slice
   wait_empty() {
     local until=$(( SECONDS + 15 ))
@@ -96,8 +115,10 @@ elif [[ $action == stop ]]; then
     done
   }
   # Stop the user manager first so user units cannot restart descendants, then every payload unit.
-  loginctl disable-linger oa-candidate 2>/dev/null || true
-  systemctl stop user@$uid.service || true
+  if [[ $account == present ]]; then
+    loginctl disable-linger oa-candidate 2>/dev/null || true
+    systemctl stop user@$uid.service || true
+  fi
   [[ -d $cgroup ]] && printf '1\n' > "$cgroup/cgroup.kill"
   systemctl stop user-$uid.slice || true
   wait_empty || { cat "$cgroup/cgroup.events" >&2; fail 'candidate descendants remain after bounded teardown'; }
@@ -105,20 +126,22 @@ elif [[ $action == stop ]]; then
   # (a copy could have been moved and replaced by a symlink to a host mount point).
   unmount_candidate_mounts
   # Refuse collection if any account can restart the subtree; only then may the trusted collector read it.
-  userdel oa-candidate
+  [[ $account == absent ]] || userdel oa-candidate
   ! getent passwd "$uid" >/dev/null || fail 'candidate account remains'
-  chown --from="$uid" --no-dereference "$SUDO_UID:0" "$home"
+  [[ -d $home ]] && chown --from="$uid" --no-dereference "$SUDO_UID:0" "$home"
   [[ -d $work ]] && chown -R --from="$uid" --no-dereference "$SUDO_UID:0" "$work"
   printf 'Candidate cgroup empty, identity deleted; private collection ownership transferred\n'
 elif [[ $action == cleanup ]]; then
-  (( $# == 1 )) || fail 'usage: cleanup <owner-uid>'
-  owner_uid "$1"
-  ! getent passwd "$uid" >/dev/null || fail 'stop the candidate before cleanup'
+  (( $# == 2 )) || fail 'usage: cleanup <run-dir> <owner-uid>'
+  run="$(realpath -m "$1")"; owner_uid "$2"
+  account="$(require_ownership "$run")"
+  [[ $account == absent ]] || fail 'stop the candidate before cleanup'
   unmount_candidate_mounts
   rm -rf --one-file-system "$home" "$runtime" "$dropin"
   rm -rf /run/systemd/system.control/user-$uid.slice.d
   systemctl daemon-reload
   sed -i '/^oa-candidate:/d' /etc/subuid /etc/subgid
+  rm -f "$marker"
   printf 'Candidate home and runtime removed\n'
 else
   fail 'usage: start|stop|cleanup'

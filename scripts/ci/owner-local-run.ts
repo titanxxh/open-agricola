@@ -6,7 +6,7 @@
 // Run it from the trusted protected-main checkout; its HEAD is the producer. Candidate code never runs as the owner.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { createServer } from 'node:net'
 import { homedir } from 'node:os'
@@ -187,7 +187,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
   }
   // An interrupted owner still tears the candidate down; a started identity is never left running.
   const interrupted = (signal: NodeJS.Signals) => {
-    for (const step of [['stop', String(inputs.ownerUid), ...tasks], ['cleanup', String(inputs.ownerUid)]]) {
+    for (const step of [['stop', output, String(inputs.ownerUid), ...tasks], ['cleanup', output, String(inputs.ownerUid)]]) {
       try { runner.isolation(step, join(output, `isolation-${step[0]}-${signal.toLowerCase()}.log`)) } catch { /* reported in its log */ }
     }
     process.exit(130)
@@ -223,7 +223,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     process.off('SIGINT', interrupted); process.off('SIGTERM', interrupted)
     const stop = join(output, 'isolation-stop.log'), cleanup = join(output, 'isolation-cleanup.log')
     try {
-      runner.isolation(['stop', String(inputs.ownerUid), ...tasks], stop)
+      runner.isolation(['stop', output, String(inputs.ownerUid), ...tasks], stop)
     } catch (error) { failed.push(error instanceof Error ? error.message : String(error)) }
     try {
       for (const task of tasks) {
@@ -231,7 +231,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
         try { mkdirSync(join(output, 'diagnostics', task), { recursive: true, mode: 0o700 }); runner.collectDiagnostics(execution(task).work, join(output, 'diagnostics', task)) } catch { /* diagnostics are best effort */ }
       }
     } finally {
-      runner.isolation(['cleanup', String(inputs.ownerUid)], cleanup)
+      runner.isolation(['cleanup', output, String(inputs.ownerUid)], cleanup)
     }
     teardown = { stop: existsSync(stop) ? fileSha256(stop) : '', cleanup: fileSha256(cleanup) }
   }
@@ -327,7 +327,7 @@ export async function main(args: string[]): Promise<number> {
   if (spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: policyRoot }).status !== 0) git(['fetch', '--no-tags', '--quiet', 'origin', sha])
   assertPrivateHome(homedir())
   assertNoReservedCandidatePaths(git(['ls-tree', '--name-only', sha, '--', 'data']))
-  if (existsSync(output)) throw new Error('Choose a new private output directory for each run')
+  if (existsSync(output) || realpathSync(dirname(output)) !== dirname(output)) throw new Error('Choose a new private output directory for each run, under a path without symlinks')
   // One candidate identity exists per machine, so runs never overlap.
   const lock = '/tmp/oa-owner-local-verification.lock'
   try { writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 }) }
