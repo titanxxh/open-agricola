@@ -1,8 +1,10 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { weightedAssignment } from '../ci/verification-tasks'
+import { canonicalOwnerLocalCommands } from '../ci/owner-local-verification'
+import { browserSpecWeightsAt, verificationConfiguration, weightedAssignment } from '../ci/verification-tasks'
 import { testPortRange } from '../test-ports'
 import { hostedFrontendMismatch, laneArguments, laneCount, splitFileArgs, writeHostedFrontendMarker } from '../verify-lanes'
 
@@ -87,5 +89,48 @@ describe('test port ranges', () => {
     expect(testPortRange({})).toEqual([20000, 32767])
     expect(testPortRange({ TEST_PORT_RANGE: '24000-25999' })).toEqual([24000, 25999])
     for (const bad of ['19000-20000', '30000-33000', '24000-24010', 'x']) expect(() => testPortRange({ TEST_PORT_RANGE: bad })).toThrow(/TEST_PORT_RANGE/)
+  })
+})
+
+describe('history-preserving catalog changes', () => {
+  // A minimal repository whose commits differ only in the files that matter here.
+  function repository() {
+    const root = mkdtempSync(join(tmpdir(), 'oa-catalog-history-')); roots.push(root)
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
+    git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't')
+    mkdirSync(join(root, '.github/workflows'), { recursive: true }); mkdirSync(join(root, 'scripts/ci'), { recursive: true }); mkdirSync(join(root, 'e2e-tests'))
+    for (const file of ['.github/workflows/candidate-verification.yml', 'scripts/ci/verification-tasks.ts', 'scripts/ci/candidate-verification.ts', 'pnpm-lock.yaml']) writeFileSync(join(root, file), file)
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { 'check:architecture': 'pnpm run lint' } }))
+    for (const name of ['a', 'b', 'c', 'd', 'e']) writeFileSync(join(root, 'e2e-tests', `${name}.spec.ts`), '// spec\n')
+    writeFileSync(join(root, 'scripts/verify-parallel.mjs'), 'one\n')
+    git('add', '.'); git('commit', '-qm', 'legacy catalog')
+    const legacy = git('rev-parse', 'HEAD')
+    writeFileSync(join(root, 'scripts/verify-parallel.mjs'), 'two\n')
+    git('commit', '-qam', 'runner edit before weights')
+    const legacyEdited = git('rev-parse', 'HEAD')
+    writeFileSync(join(root, 'scripts/ci/browser-spec-weights.json'), JSON.stringify({ format: 1, files: { 'e2e-tests/a.spec.ts': 40, 'e2e-tests/b.spec.ts': 30 } }))
+    git('add', '.'); git('commit', '-qm', 'weighted catalog')
+    const weighted = git('rev-parse', 'HEAD')
+    writeFileSync(join(root, 'scripts/verify-parallel.mjs'), 'three\n')
+    git('commit', '-qam', 'runner edit after weights')
+    return { root, legacy, legacyEdited, weighted, weightedEdited: git('rev-parse', 'HEAD') }
+  }
+
+  it('keeps earlier hashes: the lane runner counts only in trees that carry the weight table', () => {
+    const value = repository()
+    expect(verificationConfiguration(value.root, value.legacyEdited)).toBe(verificationConfiguration(value.root, value.legacy))
+    expect(verificationConfiguration(value.root, value.weightedEdited)).not.toBe(verificationConfiguration(value.root, value.weighted))
+  })
+
+  it('reproduces each producer catalog: index-modulo verify before the weight table, weighted lanes after it', () => {
+    const value = repository()
+    expect(browserSpecWeightsAt(value.root, value.legacy)).toBeNull()
+    expect(canonicalOwnerLocalCommands(value.root, value.weighted, 'prerelease', value.legacy)['chromium-1'])
+      .toEqual([{ command: 'pnpm', args: ['verify', 'e2e-tests/a.spec.ts', 'e2e-tests/e.spec.ts'] }])
+    const weighted = canonicalOwnerLocalCommands(value.root, value.weighted, 'prerelease', value.weighted)
+    // a(40), then c/d/e at the median 40 by path, then b(30) into the lightest task.
+    expect(weighted['chromium-1']).toEqual([{ command: 'pnpm', args: ['verify:parallel', 'e2e-tests/a.spec.ts', 'e2e-tests/b.spec.ts'] }])
+    expect(['chromium-1', 'chromium-2', 'chromium-3', 'chromium-4'].flatMap(id => weighted[id as 'chromium-1'].flatMap(command => command.args.slice(1))).sort())
+      .toEqual(['a', 'b', 'c', 'd', 'e'].map(name => `e2e-tests/${name}.spec.ts`))
   })
 })

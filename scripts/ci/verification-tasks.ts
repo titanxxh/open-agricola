@@ -63,9 +63,26 @@ function chromiumSuite(cwd: string): string[] {
   return found.sort()
 }
 
+export const BROWSER_SPEC_WEIGHTS = 'scripts/ci/browser-spec-weights.json'
+export type BrowserSpecWeights = Record<string, number>
+
 /** Measured seconds per browser spec file; part of the verification configuration (scripts/ci/). */
-export function browserSpecWeights(): Record<string, number> {
-  const value: unknown = JSON.parse(readFileSync(join(import.meta.dirname, 'browser-spec-weights.json'), 'utf8'))
+export function browserSpecWeights(): BrowserSpecWeights {
+  return parseBrowserSpecWeights(readFileSync(join(import.meta.dirname, 'browser-spec-weights.json'), 'utf8'))
+}
+
+/**
+ * The weight table of the catalog at `sha`, or null for a catalog from before weighted assignment, whose chromium
+ * tasks were index-modulo `pnpm verify` selections. Reproducing an earlier producer's plan must use its own table.
+ */
+export function browserSpecWeightsAt(cwd: string, sha: string): BrowserSpecWeights | null {
+  fullSha(sha)
+  const listed = execFileSync('git', ['ls-tree', '--name-only', sha, '--', BROWSER_SPEC_WEIGHTS], { cwd, encoding: 'utf8' }).trim()
+  return listed ? parseBrowserSpecWeights(execFileSync('git', ['show', `${sha}:${BROWSER_SPEC_WEIGHTS}`], { cwd, encoding: 'utf8' })) : null
+}
+
+export function parseBrowserSpecWeights(text: string): BrowserSpecWeights {
+  const value: unknown = JSON.parse(text)
   const files = typeof value === 'object' && value !== null && 'files' in value ? value.files : null
   if (typeof files !== 'object' || files === null || Array.isArray(files)
     || !Object.values(files).every(weight => typeof weight === 'number' && Number.isFinite(weight) && weight >= 0)) throw new Error('Invalid browser spec weight table')
@@ -93,13 +110,19 @@ export function weightedAssignment(files: readonly string[], groups: number, wei
 }
 
 // Each task runs its files through `verify:parallel`, which splits them further into lanes when the machine sets
-// VERIFY_PARALLEL_LANES (default one lane: an in-place `pnpm verify`).
-function chromiumCommands(cwd: string, shard: number): VerificationCommand[] {
-  const selected = weightedAssignment(chromiumSuite(cwd), 4, browserSpecWeights())[shard]
+// VERIFY_PARALLEL_LANES (default one lane: an in-place `pnpm verify`). Without a weight table (a catalog from before
+// weighted assignment) the tasks keep that catalog's index-modulo `pnpm verify` selections.
+function chromiumCommands(cwd: string, shard: number, weights: BrowserSpecWeights | null): VerificationCommand[] {
+  if (!weights) {
+    const legacy = chromiumSuite(cwd).filter((_, index) => index % 4 === shard)
+    return legacy.length ? [{ command: 'pnpm', args: ['verify', ...legacy] }] : []
+  }
+  const selected = weightedAssignment(chromiumSuite(cwd), 4, weights)[shard]
   return selected.length ? [{ command: 'pnpm', args: ['verify:parallel', ...selected] }] : []
 }
 
-export function taskCommands(cwd: string, input: string): VerificationCommand[] {
+/** `weights` defaults to this catalog's table; pass an earlier producer's table (or null) to reproduce its plan. */
+export function taskCommands(cwd: string, input: string, weights: BrowserSpecWeights | null = browserSpecWeights()): VerificationCommand[] {
   const task = verificationTask(input)
   switch (task.id) {
     case 'quality': return [...architectureCommands(cwd), { command: 'pnpm', args: ['run', 'lint:i18n'] }]
@@ -110,10 +133,10 @@ export function taskCommands(cwd: string, input: string): VerificationCommand[] 
       { command: 'pnpm', args: ['run', 'build:replay-viewer'] },
       { command: 'pnpm', args: ['run', 'check:bundle-size'] },
     ]
-    case 'chromium-1': return chromiumCommands(cwd, 0)
-    case 'chromium-2': return chromiumCommands(cwd, 1)
-    case 'chromium-3': return chromiumCommands(cwd, 2)
-    case 'chromium-4': return chromiumCommands(cwd, 3)
+    case 'chromium-1': return chromiumCommands(cwd, 0, weights)
+    case 'chromium-2': return chromiumCommands(cwd, 1, weights)
+    case 'chromium-3': return chromiumCommands(cwd, 2, weights)
+    case 'chromium-4': return chromiumCommands(cwd, 3, weights)
     case 'browser-sandbox': return [{ command: 'pnpm', args: ['run', 'verify:e2e:browser-sandbox'] }]
     case 'webkit': return [{ command: 'pnpm', args: ['run', 'verify:e2e:webkit'] }]
   }
@@ -128,7 +151,7 @@ const configurationPath = (file: string): boolean =>
   (file === '.github/workflows/candidate-verification.yml' || file === '.github/workflows/prerelease-candidate-verification.yml' || file === '.github/workflows/candidate-rehearsal.yml')
   || file.startsWith('scripts/ci/')
   || /^scripts\/verification[^/]*\.ts$/.test(file)
-  || /^scripts\/verify[^/]*\.(?:ts|sh|mjs)$/.test(file)
+  || /^scripts\/verify[^/]*\.(?:ts|sh)$/.test(file)
   || file === 'scripts/test-project-globs.ts'
   || file === 'scripts/release/requirements.json'
   || ['package.json', 'pnpm-lock.yaml', 'vitest.config.ts', 'playwright.config.ts', 'vite.config.ts'].includes(file)
@@ -137,7 +160,12 @@ const configurationPath = (file: string): boolean =>
 export function verificationConfiguration(cwd: string, sha: string): string {
   fullSha(sha)
   const git = (args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' })
-  const files = git(['ls-tree', '-r', '--name-only', sha]).trim().split('\n').filter(configurationPath).sort()
+  const tree = git(['ls-tree', '-r', '--name-only', sha]).trim().split('\n')
+  // Recomputing an earlier commit's hash must reproduce the value its verification bound. Inputs added later are
+  // therefore keyed to a file that only newer catalogs contain: verify-parallel.mjs runs the chromium tasks only
+  // since the weight table exists, so it counts only in trees that have that table.
+  const weighted = tree.includes(BROWSER_SPEC_WEIGHTS)
+  const files = tree.filter(file => configurationPath(file) || weighted && file === 'scripts/verify-parallel.mjs').sort()
   for (const required of ['.github/workflows/candidate-verification.yml', 'scripts/ci/verification-tasks.ts', 'scripts/ci/candidate-verification.ts', 'package.json', 'pnpm-lock.yaml']) {
     if (!files.includes(required)) throw new Error(`Candidate lacks complete verification configuration: ${required}`)
   }
