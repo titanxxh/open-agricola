@@ -1,4 +1,5 @@
 import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-feeding-requirement'
+import { pendingHarvestSkips } from '../cards/helpers/harvest-skip'
 import { harvestRounds } from '../contract/state-constants'
 import type { GameState, PlayerState } from '../contract/types'
 import { computeHeatingRequirement } from '../moor/heating'
@@ -13,6 +14,9 @@ export type HarvestRequirements = {
 export const getHarvestRequirements = (state: GameState, player: PlayerState): HarvestRequirements | null => {
   const round = harvestRounds.find(candidate => candidate >= state.round)
   if (state.gameOver || round === undefined) return null
+  if (pendingHarvestSkips(state, player).some(skip => skip.round === round)) {
+    return { round, food: 0, fuel: state.enableFarmersOfTheMoor ? 0 : null }
+  }
 
   const projectedPlayer = round > state.round
     ? { ...player, workers: player.workers.map(worker => ({ ...worker, isNewborn: false })) }

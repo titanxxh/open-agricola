@@ -2,9 +2,35 @@ import { describe, expect, it } from 'vitest'
 import { setActiveWorkerCount, setNewbornCount } from '../../../shared/domain/player'
 import { rehydrateState, serializeSessionSnapshot } from '../../../shared/session/serialization'
 import { captureStateWithHistory } from '../../../shared/session/history-streams'
+import { activatePendingHarvestSkips, scheduleNextHarvestSkip } from '../../../shared/cards/helpers/harvest-skip'
 import { createWorkSession } from '../../__tests__/_helpers/session-fixtures'
 
 describe('harvest requirement projection', () => {
+  it.each(['pending', 'active', 'expired'] as const)('accounts for a %s harvest skip without affecting other players', phase => {
+    const session = createWorkSession({ seed: 5415, options: {
+      enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    }, configure(state) {
+      state.round = 4
+      scheduleNextHarvestSkip(state.players[0]!, 'C108_Layabout')
+    } })
+    try {
+      if (phase !== 'pending') {
+        session.state.roundPhase = 'harvest'
+        activatePendingHarvestSkips(session.state)
+      }
+      if (phase === 'expired') session.state.round = 7
+      const players = session.buildSyncPayload(session.getState(), []).state.players
+      expect(players[0]).toMatchObject({ harvestRequirements: {
+        round: phase === 'expired' ? 7 : 4,
+        food: phase === 'expired' ? 4 : 0,
+        fuel: phase === 'expired' ? 2 : 0,
+      } })
+      expect(players[1]).toMatchObject({ harvestRequirements: {
+        round: phase === 'expired' ? 7 : 4, food: 4, fuel: 2,
+      } })
+    } finally { session.dispose() }
+  })
+
   it.each([
     { round: 3, food: 6 },
     { round: 4, food: 5 },

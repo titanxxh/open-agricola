@@ -47,7 +47,7 @@ undoStep() / undoAction()
 
 ## 统一的 SessionResponse
 
-`harvest-requirements.ts` 复用结算使用的喂养、供暖查询，投影下次收获的食物需求及可选燃料需求。投影沿用当前家庭、房屋和已打出卡牌；若收获在后续回合，现有新生儿按成人计算，季节仅在独立副本上推进。序列化向所有视角提供这个只读展示字段，恢复时移除。它不预测未来行动，也不推进引擎。测试：`server/game/__tests__/harvest-requirements.test.ts`。
+`harvest-requirements.ts` 复用结算使用的喂养、供暖查询，投影下次收获的食物需求及可选燃料需求。待生效或正在生效的跳过收获标记对应零需求。投影沿用当前家庭、房屋和已打出卡牌；若收获在后续回合，现有新生儿按成人计算，季节仅在独立副本上推进。序列化向所有视角提供这个只读展示字段，恢复时移除。它不预测未来行动，也不推进引擎。测试：`server/game/__tests__/harvest-requirements.test.ts`。
 
 ```ts
 type SessionResponse = {
