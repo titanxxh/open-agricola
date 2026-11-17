@@ -32,6 +32,7 @@ shared/domain/
 - 已用 / 未用格只从 `farmyard-usage-core.ts` 读取，包含扩展、地形、封锁格与派生的牧场格；`farmyard-usage.ts` 与 `farm.ts` 只是兼容 facade。卡牌从不手动数格子。房间、地形、田地、马厩与牧场格始终计为已用；`farmyardSpaceStates` 中的条目只有带 `blocksPlacement` 时才计入。
 - 农场计分消费者将规范使用查询与 `getFarmyardTilePositions()` 的真实几何结合。卡牌实现门禁拒绝在计分中局部重建占用集合，反例夹具保留旧实现；`server/__tests__/farmyard-scoring-cards-session.test.ts` 验证计分、扩展格邻接和恢复。
 - 牧场持久化身份、格子与动物安置。`getPastureSize()`、`getPastureStableCount()` 与 `getFencedStableCount()` 派生其余信息；`getPastureViews()` 返回独立视图；序列化的 `size` / `stables` 只用于展示，加载时剥离。
+- 围栏校验只裁定本次选择新围出或改变形状的区域。此前已围合且格子不变的区域保持原身份：牧场仍是牧场；已围但不是牧场的格子（卡牌围住的地形，或之后放在其中的田）不再做占用检查，不计入新区域或新牧场的限制，校验也不会把它升级为牧场，升级由围住它的卡牌完成。
 - 农场与行动格来源使用 source / type metadata：`FenceSegment.type/source`、`WorkerRef.synthetic`、`ActionSpace.blockedBy`、supply token helper、跨人数的行动格类别 helper、预留标记与附件。基础行动定义按 2–6 人过滤；5/6 人专属格单独建模。
 - Farmers of the Moor 地形（[ADR 0007](../adr/0007-farmers-of-the-moor-variant-runtime.md)）是 `farmTerrain.kind` 的公开顶层，被覆盖的地形在 `covered`。`planTerrainOperation()` 无写入地验证整份有序选择；坐标、重复项、层、占用或相邻限制中任一非法项都会在选择状态变化前拒绝整批。selection leaf 与特殊行动都通过 `farm-operations.ts` 提交准备好的操作。`farm.terrainChanged` 记录可见层和覆盖层的前后变化及新生成的田；未来地形 token 复用 `futureMeeples` 条目。围起地形的相邻计算是纯 helper；一次性的相邻规则使用 `adjacencyPolicy` / `allowedTiles` / `fencePolicy`。只支持可见层与单层覆盖。整批拒绝、层身份、嵌套收据、恢复与撤销见 `server/__tests__/terrain-operation-session.test.ts`。
 - Farmyard Extension 扩展共享几何；所有农场读取方都使用动态形状。

@@ -1066,8 +1066,16 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const previousPastureKeys = new Set(
     normalized.pastures.map((pasture) => regionKey(pasture.tiles)),
   )
+  // A region that was already fenced and keeps the same tiles is not built by this
+  // selection. It keeps what it was: a pasture stays one, and an enclosure that was
+  // not a pasture (a card fenced terrain into it) is neither judged again nor promoted.
+  const previouslyFencedKeys = new Set(
+    computeFencedRegions(existingEdges, normalized)
+      .filter((region) => region.fenced)
+      .map((region) => regionKey(region.tiles)),
+  )
   const changedRegions = fencedRegions.filter((region) =>
-    !previousPastureKeys.has(regionKey(region.tiles)),
+    !previouslyFencedKeys.has(regionKey(region.tiles)),
   )
   const allowedRegionKeys = options.allowedNewRegionTiles
     ? new Set(options.allowedNewRegionTiles.map(localPositionKey))
@@ -1113,7 +1121,6 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  const changedRegionKeys = new Set(changedRegions.map((region) => regionKey(region.tiles)))
   const roomSet = new Set(normalized.roomTiles.map(localPositionKey))
   const fieldSet = new Set(
     normalized.fields.map((field) =>
@@ -1121,19 +1128,13 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     ),
   )
   const terrainSet = new Set((normalized.farmTerrain ?? []).map(localPositionKey))
-  const occupiedRegion = fencedRegions.find((region) =>
+  const occupiedRegion = changedRegions.find((region) =>
     region.tiles.some(
       (tile) => {
         const key = localPositionKey(tile)
         return roomSet.has(key) ||
           fieldSet.has(key) ||
-          (
-            terrainSet.has(key) &&
-            !(
-              options.allowTerrainInNewRegions &&
-              changedRegionKeys.has(regionKey(region.tiles))
-            )
-          )
+          (terrainSet.has(key) && !options.allowTerrainInNewRegions)
       },
     ),
   )
@@ -1168,11 +1169,14 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  const pastureRegions = options.suppressTerrainRegions
-    ? fencedRegions.filter((region) =>
-      !region.tiles.some((tile) => terrainSet.has(localPositionKey(tile))),
+  const pastureRegions = fencedRegions.filter((region) => {
+    const key = regionKey(region.tiles)
+    if (previouslyFencedKeys.has(key)) return previousPastureKeys.has(key)
+    return !(
+      options.suppressTerrainRegions &&
+      region.tiles.some((tile) => terrainSet.has(localPositionKey(tile)))
     )
-    : fencedRegions
+  })
   const pastures: Pasture[] = pastureRegions.map((region, index) => ({
     id: `pasture-${index + 1}`,
     tiles: region.tiles,
