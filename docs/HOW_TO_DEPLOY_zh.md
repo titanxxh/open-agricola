@@ -283,6 +283,32 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 
 使用新的操作 UUID。reverify 关闭公网、撤销私有 owner 入口，保留已安装 app 并创建 acceptance 操作；重试使用同一 UUID。重新执行私有浏览器验收、上述原生身份 audit/activate，绑定新操作生成 acceptance 文件后 open。该过程不重装 pre、不重置对局。计划回滚到没有新认证保护的正式版本时，必须先关闭 pre ingress 与正式 handoff，再回滚；不能以三十秒能力确认窗口容忍不安全回滚。
 
+正式部署被接受后，在 HEAD 等于主机 owner-tools SHA 的 checkout 中，用一条 owner 命令完成整个窗口：
+
+```bash
+node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$acceptance_config" --window "$window_config" [--resume true] [--confirm-step accounts|deletion]
+```
+
+私有 window 配置写明：窗口 ID、pre 数据代次、正式站前后两个 SHA、上一窗口的 run（用于读取已归档的 team 对局）、本窗口的 run 与状态目录、owner 与主机上绝对路径相同的交换目录，以及可选的 owner notes。命令先确认正式 API、Pages 和健康检查都已切到新 SHA，然后依次完成以下步骤：
+- close 加 reverify；
+- 创建一次性账号 D/E 并授予 Beta；
+- 审计链；
+- 各验收套件；
+- 删除 D/E，执行删除后的审计链，并核对数据行为零；
+- 根据以上事实生成 owner notes，打包证据，证明正式站浏览器策略，把证据复制到主机并核对哈希；
+- 最终审计链在 audit-complete 与 activate 之间写入 acceptance，之后三十秒内 open；
+- readback、收回 Beta、全部登出、归档回执。
+
+在正式容器内运行的辅助脚本位于 `scripts/prerelease/owner-accounts/`。
+
+每一步都记录在 `state.json`，并有对应日志。遇到第一个失败即停止，并打印下一步命令（例如单个 case 的重跑命令），不会自动重试。`--resume true` 的行为：
+- 重新检查前置条件；
+- 沿用同一个 reverify 操作 ID，但重新做 close；
+- 审计链整条重跑；
+- suite 只有在已有通过证据时才标记为完成。
+
+创建账号和删除账号不可重入：中断后只能加 `--confirm-step` 继续，命令会先核对正式站账号。open 前若正式站浏览器证明已超过 25 分钟，会重新生成。
+
 每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，从固定可信 main 策略 SHA 在外部构建并导入。工具回执、不可变 image ID、revision 和 channel 均与 `control/` 中的目标缓存核对；缺缓存时拒绝，不构建也不停 app。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
 
 候选验证和迁移只取得所选归档、账本或身份 packet 的只读挂载，不能写宿主备份根目录或 owner 私有的 report/seal 目录。候选 scratch 记录保存在独立私有 run 目录，可信清理仍核对原期限及数据库/对象归属。原生 PostgreSQL 连接文件和恢复列表写入归档输入之外的私有临时目录。宿主独占创建 report，拒绝链接或非私有父目录。
