@@ -181,11 +181,20 @@ function mergeNotes(generated, owner) {
   return merged
 }
 
+/**
+ * Requires a complete zero-row snapshot for deleted D/E on formal and pre. Formal deletion may finish in the
+ * background (HTTP 202), so a nonzero snapshot fails the collecting step and a resume collects it again.
+ */
+export function assertNoResidualRows(rows) {
+  const missing = ['D', 'E'].filter(label => !rows[label] || !rows[label].formal || !rows[label].pre)
+  if (missing.length) throw new WindowStop(`Deletion row counts for ${missing.join(', ')} are missing; collect them again with --resume true`)
+  const left = Object.entries(rows).flatMap(([label, scopes]) => Object.entries(scopes).flatMap(([scope, counts]) => Object.entries(counts)
+    .filter(([, count]) => count !== 0).map(([table, count]) => `${label} ${scope}.${table}=${count}`)))
+  if (left.length) throw new WindowStop(`Deleted accounts still have rows (${left.join(', ')}); wait for deletion to finish or repair it, then --resume true`)
+}
+
 export function ownerNotes({ candidate, formalFrom, formalTo, rows, receipts, diagnostics }, owner = {}) {
-  for (const label of ['D', 'E']) if (!rows[label]) throw new Error(`Deletion rows for ${label} are missing`)
-  for (const [label, scopes] of Object.entries(rows)) for (const [scope, counts] of Object.entries(scopes)) for (const [table, count] of Object.entries(counts)) {
-    if (count !== 0) throw new WindowStop(`Deleted account ${label} still has ${count} ${scope} ${table} rows; investigate before bundling`)
-  }
+  assertNoResidualRows(rows)
   for (const name of ['close', 'associations', 'identity-verified', 'audit', 'activate']) if (!receipts[name]?.sha256) throw new Error(`Deletion audit receipt ${name} is missing`)
   return mergeNotes({
     'retained-data': { reverify: { installed: candidate, formalFrom, formalTo, note: 'The formal build changed; pre was reverified in place without reinstalling or resetting data.' } },
@@ -374,7 +383,10 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
         const [label, refs, players, users] = line.split(',')
         rows[label] = { formal: formal[label], pre: { retained_identity_refs: Number(refs), room_players: Number(players), users: Number(users) } }
       }
-      return { rows: writeAndReturn(local('deletion-rows.json'), rows) }
+      // Keep the snapshot for inspection, but only a zero snapshot completes the step.
+      const path = writeAndReturn(local('deletion-rows.json'), rows)
+      assertNoResidualRows(rows)
+      return { rows: path }
     },
     async 'owner-notes'() {
       const ctx = getCtx(), owner = win.ownerNotes ? privateJson(win.ownerNotes, 'Owner notes') : {}

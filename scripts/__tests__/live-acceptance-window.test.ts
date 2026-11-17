@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { REQUIRED_EVIDENCE } from '../prerelease/live-acceptance/evidence.mjs'
 import {
-  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertWithin, markStep, markThrough, newState, nextStep, openBinding, ownerNotes,
+  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertNoResidualRows, assertWithin, markStep, markThrough, newState, nextStep, openBinding, ownerNotes,
   parseWindowConfig, previousTeamRoom, rerunCommands, resetSteps, resumeDecision, reverifyOps, runDiagnostics, runWindow, staleSteps, suiteGaps, teamAccounts,
 } from '../prerelease/live-acceptance/window.mjs'
 
@@ -137,7 +137,7 @@ describe('accounts and owner notes', () => {
   })
   it('refuses to bundle while a deleted account still has rows or a receipt is missing', () => {
     const left = { ...zeroRows, pre: { ...zeroRows.pre, room_players: 1 } }
-    expect(() => ownerNotes({ candidate: sha('c'), formalFrom: sha('a'), formalTo: sha('b'), rows: { D: zeroRows, E: left }, receipts, diagnostics: [] })).toThrow(/E still has 1 pre room_players/)
+    expect(() => ownerNotes({ candidate: sha('c'), formalFrom: sha('a'), formalTo: sha('b'), rows: { D: zeroRows, E: left }, receipts, diagnostics: [] })).toThrow(/still have rows \(E pre\.room_players=1\)/)
     expect(() => ownerNotes({ candidate: sha('c'), formalFrom: sha('a'), formalTo: sha('b'), rows: { D: zeroRows, E: zeroRows }, receipts: {}, diagnostics: [] })).toThrow(/receipt close/)
   })
 })
@@ -337,5 +337,72 @@ describe('final open', () => {
     const window = finalWindow(() => openStatus(), { acceptanceFile: { operationId: reverifyOp, buildId: candidate, generation }, finalFailed: true })
     await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/already open under a different acceptance/)
     expect(window.calls.some(call => call.includes('authority.ts'))).toBe(false)
+  })
+})
+
+describe('deletion rows', () => {
+  // A window whose next step is deletion-rows; bundle (after owner-notes) fails so a successful collection stops there.
+  function deletionWindow(counts: () => { formal: Record<string, Record<string, number>>; pre: string }) {
+    const root = privateRoot(), secrets = privateDir(root, 'secrets'), exchange = privateDir(root, 'exchange')
+    const accounts = (labels: string[]) => ({ accounts: labels.map(label => ({ id: `id-${label}`, username: `user-${label}`, password: `password-${label}` })) })
+    const target = writePrivate(join(secrets, 'target.json'), { targetId: 'pre-main', origin: 'https://pre.example.test', directory: '/srv/pre', policyDirectory: '/srv/policy',
+      database: { name: 'pre' }, formal: { appOrigin: 'https://app.example.test', apiOrigin: 'https://api.example.test', project: 'formal' } })
+    writeFileSync(join(secrets, 'cookie'), '__Host-oa-session=abc\n', { mode: 0o600 })
+    const candidate = sha('c'), generation = '44444444-4444-4444-8444-444444444444'
+    const configPath = writePrivate(join(secrets, 'acceptance.json'), { format: 1, targetConfig: target, ssh: 'owner@host', candidate, formalBuild: sha('b'),
+      candidateReceipt: writePrivate(join(secrets, 'receipt.json'), { purpose: 'candidate', channel: 'prerelease', sourceSha: candidate, producerSha: sha('d') }),
+      accounts: writePrivate(join(secrets, 'accounts.json'), accounts(['A', 'B', 'C'])), teamAccounts: writePrivate(join(secrets, 'team.json'), accounts(['D', 'E'])),
+      ownerCookie: join(secrets, 'cookie'), guardConfig: '/srv/guard.json', outputRoot: privateDir(root, 'output') })
+    for (const name of ['close', 'associations', 'identity-verified', 'audit', 'activate']) writePrivate(join(exchange, `deletion-${name}.json`), { name })
+    const value = { format: 1, windowId: 'c6', generation, formalFrom: sha('a'), formalBuild: sha('b'), previousRun: privateDir(root, 'previous'), run: privateDir(root, 'run'),
+      windowDirectory: privateDir(root, 'window'), exchangeDirectory: exchange }
+    let state = { ...newState('c6', Date.now()), ops: { reverify: '66666666-6666-4666-8666-666666666666' } }
+    for (const step of WINDOW_STEPS.slice(0, WINDOW_STEPS.indexOf('deletion-rows'))) state = markStep(markStep(state, step, 'started', Date.now()), step, 'done', Date.now())
+    writePrivate(join(value.windowDirectory, 'state.json'), state)
+    const calls: string[] = []
+    const io = {
+      setLog: () => {},
+      fetch: async (url: string) => ({ status: 200, json: async () => (url.endsWith('/frontend-build.json') ? { gameBuildId: sha('b') } : url.endsWith('/browser-policy') ? { buildId: sha('b') } : { ok: true }) }),
+      run(command: string, args: string[], { input = '' }: { input?: string } = {}) {
+        calls.push([command === process.execPath ? 'node' : command, ...args].join(' '))
+        const ok = (stdout = '') => ({ status: 0, stdout, stderr: '', error: null })
+        if (command === 'git') return ok(args[0] === 'rev-parse' ? 'head\n' : '')
+        if (command === 'ssh' && args.at(-1) === '-s') return ok(input.includes('psql') ? counts().pre : '55555555-5555-4555-8555-555555555555\n')
+        if (command === 'ssh' && args.at(-1)!.includes('rev-parse HEAD')) return ok('head\n')
+        if (command === 'ssh' && args.at(-1)!.includes('typescript-runtime.mjs')) return ok(JSON.stringify(counts().formal) + '\n')
+        if (command === './deploy-prerelease.sh' && args[0] === 'status') return ok(JSON.stringify({ installed: { buildId: candidate }, generation }) + '\n')
+        if (command === process.execPath && args.includes('bundle')) return { status: 1, stdout: '', stderr: 'bundle stopped by the test', error: null }
+        return ok()
+      },
+    }
+    return { configPath, windowPath: writePrivate(join(root, 'window.json'), value), value, calls, io, exchange }
+  }
+  const formalZero = { D: { users: 0, beta_access: 0, sessions: 0 }, E: { users: 0, beta_access: 0, sessions: 0 } }
+
+  it('fails the collection on residual rows and collects again on resume once deletion has finished', async () => {
+    let pending = true
+    const window = deletionWindow(() => pending
+      ? { formal: { ...formalZero, E: { users: 1, beta_access: 0, sessions: 2 } }, pre: 'D,0,0,0\nE,0,0,0\n' }
+      : { formal: formalZero, pre: 'D,0,0,0\nE,0,0,0\n' })
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io }))
+      .rejects.toThrow(/still have rows \(E formal\.users=1, E formal\.sessions=2\)/)
+    const stateFile = join(window.value.windowDirectory, 'state.json')
+    expect(JSON.parse(readFileSync(stateFile, 'utf8')).steps['deletion-rows'].status).toBe('failed')
+    expect(JSON.parse(readFileSync(join(window.exchange, 'deletion-rows.json'), 'utf8')).E.formal.users).toBe(1)
+
+    pending = false
+    const collections = () => window.calls.filter(call => call.includes('typescript-runtime.mjs')).length
+    const before = collections()
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/bundle failed/)
+    expect(collections()).toBe(before + 1)
+    const steps = JSON.parse(readFileSync(stateFile, 'utf8')).steps
+    expect([steps['deletion-rows'].status, steps['owner-notes'].status, steps.bundle.status]).toEqual(['done', 'done', 'failed'])
+    expect(JSON.parse(readFileSync(join(window.exchange, 'owner-notes.json'), 'utf8'))['deletion-audit'].remainingRows.E.formal).toEqual({ users: 0, beta_access: 0, sessions: 0 })
+  })
+
+  it('treats a missing formal or pre count as incomplete, not as zero', () => {
+    expect(() => assertNoResidualRows({ D: zeroRows })).toThrow(/for E are missing/)
+    expect(() => assertNoResidualRows({ D: zeroRows, E: { pre: zeroRows.pre } })).toThrow(/for E are missing/)
+    expect(() => assertNoResidualRows({ D: zeroRows, E: zeroRows })).not.toThrow()
   })
 })
