@@ -612,6 +612,7 @@ describe('fast rebind window', () => {
     writePrivate(window.windowPath, { ...window.value, acknowledgeBoundaryDiff: digest })
     await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/bundle failed/)
     expect(JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8')).rebind).toMatchObject({ path: 'fast', boundary: { files: ['server/auth.ts'], acknowledged: true } })
+    expect(window.calls.find(call => call.includes(' bundle '))).toContain(`--acknowledge-boundary-diff ${digest}`)
     const full = fastWindow({ patch: 'PATCH', windowExtra: { rebind: 'full' } })
     await expect(runWindow({ configPath: full.configPath, windowPath: full.windowPath, io: full.io })).rejects.toThrow(/teamAccounts file for D\/E/)
     expect(JSON.parse(readFileSync(join(full.value.windowDirectory, 'state.json'), 'utf8')).rebind).toMatchObject({ path: 'full',

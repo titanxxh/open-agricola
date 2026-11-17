@@ -553,7 +553,8 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
     },
     async bundle() {
       const output = local('evidence'); mkdirSync(output, { recursive: true, mode: 0o700 }); chmodSync(output, 0o700)
-      const carry = state().rebind?.path === 'fast' ? ['--carry', win.fullAcceptance] : []
+      const carry = state().rebind?.path === 'fast'
+        ? ['--carry', win.fullAcceptance, ...(win.acknowledgeBoundaryDiff ? ['--acknowledge-boundary-diff', win.acknowledgeBoundaryDiff] : [])] : []
       must(tools().cli(['bundle', '--config', env.configPath, '--runs', env.runDirectory, '--output', output, '--extra', local('owner-notes.json'), ...carry]), 'bundle')
       return { index: join(output, 'index.json') }
     },

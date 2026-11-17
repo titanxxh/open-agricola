@@ -105,3 +105,13 @@ export function rebindDecision({ request = 'auto', full, status, boundary, ackno
     ...(boundary ? { boundary: { ...boundary, acknowledged: boundary.files.length > 0 && boundary.diffSha256 === acknowledged } } : {}) }
   return record
 }
+
+/**
+ * The same eligibility, rechecked wherever evidence is carried (`bundle --carry`), so a manual bundle cannot reuse a
+ * full acceptance the window would have refused. `status` is the target status the run recorded.
+ */
+export function assertCarryEligible({ full, status, formalBuild, git, acknowledged = null, now = Date.now() }) {
+  const decision = rebindDecision({ full, status, boundary: boundaryDiff(git, full.formalBuild, formalBuild), acknowledged, now })
+  if (decision.path !== 'fast') throw new Error(`Evidence may be carried only on an eligible fast rebind: ${decision.reasons.join('; ')}`)
+  return decision
+}

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { REQUIRED_EVIDENCE } from '../prerelease/live-acceptance/evidence.mjs'
 import { fixtureGeneration as generation, fullAcceptanceFixture } from './_helpers/full-acceptance-fixture'
 import { POLICY_STEPS, WINDOW_STEPS } from '../prerelease/live-acceptance/window.mjs'
-import { CARRIED_CASES, FAST_SKIPPED_STEPS, FULL_ACCEPTANCE_MAX_AGE_MS, IDENTITY_BOUNDARY_PATHS, boundaryDiff, loadFullAcceptance, rebindDecision } from '../prerelease/live-acceptance/rebind.mjs'
+import { CARRIED_CASES, FAST_SKIPPED_STEPS, assertCarryEligible, FULL_ACCEPTANCE_MAX_AGE_MS, IDENTITY_BOUNDARY_PATHS, boundaryDiff, loadFullAcceptance, rebindDecision } from '../prerelease/live-acceptance/rebind.mjs'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -79,5 +79,19 @@ describe('rebind decision', () => {
   it('accepts only the exact acknowledged boundary diff', () => {
     expect(rebindDecision({ full, status, boundary: changed, acknowledged: 'd'.repeat(64), now })).toMatchObject({ path: 'fast', boundary: { acknowledged: true } })
     expect(rebindDecision({ full, status, boundary: changed, acknowledged: 'e'.repeat(64), now }).path).toBe('full')
+  })
+})
+
+describe('carry eligibility', () => {
+  const status = { installed: { buildId: sha('c'), image: 'sha256:image' }, generation }
+  const git = (patch: string) => (args: string[]) => args.includes('--name-only') ? (patch ? 'server/auth.ts\n' : '') : patch
+  it('rechecks the window rules wherever evidence is carried', () => {
+    const full = loadFullAcceptance(fullAcceptanceFixture(privateRoot(), { acceptedAt: 1_000_000 }))
+    expect(assertCarryEligible({ full, status, formalBuild: sha('b'), git: git(''), now: 2_000_000 }).path).toBe('fast')
+    expect(() => assertCarryEligible({ full, status, formalBuild: sha('b'), git: git(''), now: 1_000_000 + FULL_ACCEPTANCE_MAX_AGE_MS + 1 })).toThrow(/older than seven days/)
+    expect(() => assertCarryEligible({ full, status: { ...status, installed: { ...status.installed, image: 'sha256:other' } }, formalBuild: sha('b'), git: git(''), now: 2_000_000 }))
+      .toThrow(/installed image differs/)
+    expect(() => assertCarryEligible({ full, status, formalBuild: sha('b'), git: git('PATCH'), now: 2_000_000 })).toThrow(/boundary files changed: server\/auth.ts/)
+    expect(assertCarryEligible({ full, status, formalBuild: sha('b'), git: git('PATCH'), acknowledged: hash('PATCH'), now: 2_000_000 }).boundary.acknowledged).toBe(true)
   })
 })
