@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import { playMoorAuditMinor } from './_helpers/moor-rules-audit'
 import { playerBoard } from '../../shared/domain'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -165,6 +166,30 @@ const specialCardFor = (session: GameSession, actionId: string) =>
     card.actions.includes(actionId as never),
   )!
 
+const pastureKeys = (resp: { state: GameState }) =>
+  resp.state.players[0]!.pastures
+    .map((pasture) => (pasture.tiles ?? []).map((tile) => `${tile.row}-${tile.col}`).join('+'))
+    .sort()
+
+const reserveTiles = (resp: { state: GameState }) =>
+  resp.state.players[0]!.cardStates.M038_NatureReserve?.extraData?.natureReserveTiles
+
+const scoreQuantity = (resp: ReturnType<GameSession['takeAction']>, key: string) =>
+  resp.scores?.[0]?.categories.find((category) => category.key === key)?.quantity
+
+const withForestReserve = (player: PlayerState) => {
+  addPasture00(player)
+  player.farmTerrain = [{ row: 0, col: 1, kind: 'forest' }]
+}
+
+// The space east of the reserve: its west fence is the reserve's east fence.
+const pastureEastOfReserveEdges = ['H-0-2', 'H-1-2', 'V-0-3']
+
+// resetToPlayerTurn hands the turn back but leaves placed workers on their spaces.
+const returnWorkersHome = (session: GameSession) => {
+  for (const space of session.state.actionSpaces) space.takenBy = []
+}
+
 const resetToPlayerTurn = (session: GameSession) => {
   resetMoorSpecialActionCards(session.state)
   session.state.currentPlayerIndex = 0
@@ -296,5 +321,122 @@ describe('M038/M039/M043 one-shot adjacency overrides', () => {
     expect(resp.state.players[0]!.pastures.some((pasture) =>
       pasture.tiles.some((tile) => tile.row === 0 && tile.col === 1),
     )).toBe(false)
+  })
+
+  it('M038 leaves ordinary fencing available while the forest still stands in its reserve', () => {
+    const session = setup('M038_NatureReserve', withForestReserve)
+
+    let resp = commitFence(session, playMinor(session, 'M038_NatureReserve'), adjacentTerrainEdges)
+    expect(resp.ok, resp.error).toBe(true)
+    expect(pastureKeys(resp)).toEqual(['0-0'])
+    expect(reserveTiles(resp)).toEqual([{ row: 0, col: 1 }])
+    confirmNextPlayer(session)
+    resetToPlayerTurn(session)
+
+    resp = session.takeAction(0, 'fencing')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+    resp = session.commitSelectionChoice(0, { edges: pastureEastOfReserveEdges })
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(7)
+    expect(pastureKeys(resp)).toEqual(['0-0', '0-2'])
+    expect(resp.state.players[0]!.farmTerrain).toEqual([{ row: 0, col: 1, kind: 'forest' }])
+    expect(reserveTiles(resp)).toEqual([{ row: 0, col: 1 }])
+    expect(resp.state.log[0]).toMatchObject({
+      key: 'log.actionDetail',
+      playerId: resp.state.players[0]!.id,
+      params: { action: 'actions.fencing.name', detailParts: { costs: { wood: 3 }, effects: { fencing: 3 } } },
+    })
+    expect(scoreQuantity(resp, 'pastures')).toBe(2)
+    confirmNextPlayer(session)
+    resetToPlayerTurn(session)
+    returnWorkersHome(session)
+
+    resp = session.takeSpecialAction(0, specialCardFor(session, 'fell-trees').id, 'fell-trees', {
+      tile: { row: 0, col: 1 },
+    })
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.farmTerrain).toEqual([])
+    expect(pastureKeys(resp)).toEqual(['0-0', '0-1', '0-2'])
+    expect(reserveTiles(resp)).toEqual([])
+    expect(scoreQuantity(resp, 'pastures')).toBe(3)
+  })
+
+  it('M038 does not let later ordinary fencing enclose another forest', () => {
+    const session = setup('M038_NatureReserve', (player) => {
+      withForestReserve(player)
+      player.farmTerrain = [...player.farmTerrain!, { row: 0, col: 2, kind: 'forest' }]
+    })
+    let resp = commitFence(session, playMinor(session, 'M038_NatureReserve'), adjacentTerrainEdges)
+    expect(resp.ok, resp.error).toBe(true)
+    confirmNextPlayer(session)
+    resetToPlayerTurn(session)
+    resp = session.takeAction(0, 'fencing')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+
+    assertRejectedUnchanged(session, () =>
+      session.commitSelectionChoice(0, { edges: pastureEastOfReserveEdges }))
+
+    resp = session.commitSelectionChoice(0, { edges: edgesForTile(1, 2) })
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(6)
+    expect(pastureKeys(resp)).toEqual(['0-0', '1-2'])
+    expect(resp.state.players[0]!.farmTerrain).toEqual([
+      { row: 0, col: 1, kind: 'forest' },
+      { row: 0, col: 2, kind: 'forest' },
+    ])
+  })
+
+  it('M038 leaves ordinary fencing available after Slash and Burn puts a field inside its reserve', () => {
+    const session = setup('M038_NatureReserve', withForestReserve)
+    let resp = commitFence(session, playMinor(session, 'M038_NatureReserve'), adjacentTerrainEdges)
+    expect(resp.ok, resp.error).toBe(true)
+    confirmNextPlayer(session)
+    resetToPlayerTurn(session)
+    resp = session.takeSpecialAction(0, specialCardFor(session, 'slash-and-burn').id, 'slash-and-burn', {
+      tile: { row: 0, col: 1 },
+    })
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.fields).toEqual([{ row: 0, col: 1, stacks: [] }])
+    expect(resp.state.players[0]!.farmTerrain).toEqual([])
+    expect(pastureKeys(resp)).toEqual(['0-0'])
+    expect(reserveTiles(resp)).toEqual([])
+    confirmNextPlayer(session)
+    resetToPlayerTurn(session)
+
+    resp = session.takeAction(0, 'fencing')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+    resp = session.commitSelectionChoice(0, { edges: pastureEastOfReserveEdges })
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(7)
+    expect(pastureKeys(resp)).toEqual(['0-0', '0-2'])
+    expect(resp.state.players[0]!.fields).toEqual([{ row: 0, col: 1, stacks: [] }])
+    expect(scoreQuantity(resp, 'fields')).toBe(1)
+    expect(scoreQuantity(resp, 'pastures')).toBe(2)
+  })
+
+  it('M039 fences its special pasture when an M038 reserve is already fenced', () => {
+    const session = setup('M038_NatureReserve', (player) => {
+      withForestReserve(player)
+      player.minorHand = ['M038_NatureReserve', 'M039_SpecialPasture']
+    })
+    let resp = commitFence(session, playMinor(session, 'M038_NatureReserve'), adjacentTerrainEdges)
+    expect(resp.ok, resp.error).toBe(true)
+    confirmNextPlayer(session)
+    resetToPlayerTurn(session)
+    returnWorkersHome(session)
+
+    resp = playMinor(session, 'M039_SpecialPasture')
+    expect(resp.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+    resp = commitFence(session, resp, edgesForTile(2, 4))
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(8)
+    expect(pastureKeys(resp)).toEqual(['0-0', '2-4'])
+    expect(resp.state.players[0]!.farmTerrain).toEqual([{ row: 0, col: 1, kind: 'forest' }])
   })
 })

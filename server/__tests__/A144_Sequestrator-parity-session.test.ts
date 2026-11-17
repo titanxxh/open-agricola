@@ -95,6 +95,9 @@ describe('A144 Sequestrator parity', () => {
     actor.fenceSegments = TWO_PASTURES.map((edge) => ({
       edge, type: 'fence' as const, source: { kind: 'own' as const, ownerPlayerId: actor.id },
     }))
+    actor.pastures = [{ row: 0, col: 2 }, { row: 1, col: 2 }].map((tile, index) => ({
+      id: `pasture-${index + 1}`, tiles: [tile], animalType: null, animalCount: 0,
+    }))
     session.loadState(state)
     const pending = session.takeAction(1, 'fencing')
     expect(pending.interaction).toMatchObject({

@@ -46,6 +46,7 @@
 | 教牧信函也为当前拥有的升级 Church 加 1 分，已移除的 Village Church 不再计入。 | `M063_PastoralLetter` |
 | 维护者选择参考实现的卡牌计分值 0，即使官方规则示例牌图为 1；见 [#1448](https://github.com/titanxxh/open-agricola/issues/1448)。 | `M090_WinterStorehouse` |
 | 行政管理使用逻辑大设施身份，包括女巫舞池这类双重身份设施。 | `M074_Administration` |
+| 后续牧场可以只与尚未成为牧场的自然保护区围栏相连，不对该围区强制“新牧场须与既有牧场相邻”；出版方无相关裁定。 | `M038_NatureReserve` |
 | 实时预估在最终结算前已考虑可用的最优工坊兑换。 | `E124_MayorCandidate` |
 
 ## 3. 基础设施待办

@@ -984,3 +984,85 @@ describe('validateFenceSelection — generic fence policy', () => {
     }
   })
 })
+
+describe('validateFenceSelection — enclosures that existed before the selection', () => {
+  const pastureTiles = (pastures: PlayerFarmState['pastures']) =>
+    pastures.map((pasture) => pasture.tiles.map((tile) => `${tile.row}-${tile.col}`).join('+')).sort()
+
+  // Pasture at (0,0); (0,1) is already fenced on all sides but is not a pasture.
+  const playerWithEnclosure = (content: 'forest' | 'field'): PlayerFarmState => {
+    const player = createPlayer()
+    player.fenceSegments = [...edgesForTile(0, 0), 'H-0-1', 'H-1-1', 'V-0-2'].map((edge) => ({
+      edge,
+      type: 'fence',
+      source: { kind: 'own', ownerPlayerId: player.id },
+    }))
+    player.pastures = [{
+      id: 'pasture-1',
+      tiles: [{ row: 0, col: 0 }],
+      animalType: null,
+      animalCount: 0,
+    }]
+    if (content === 'forest') player.farmTerrain = [{ row: 0, col: 1, kind: 'forest' }]
+    else player.fields = [{ row: 0, col: 1, stacks: [] }]
+    return player
+  }
+  const newPastureEdges = ['H-0-2', 'H-1-2', 'V-0-3']
+
+  it.each(['forest', 'field'] as const)('fences a new pasture beside an existing enclosure that holds a %s', (content) => {
+    const result = validateFenceSelection(playerWithEnclosure(content), newPastureEdges)
+
+    expect(result.ok, result.ok ? undefined : result.error.code).toBe(true)
+    if (!result.ok) return
+    expect(result.payableWoodCost).toBe(3)
+    expect(pastureTiles(result.player.pastures)).toEqual(['0-0', '0-2'])
+    expect(pastureTiles(result.newPastures)).toEqual(['0-2'])
+  })
+
+  it('keeps the animals of an existing pasture when a new pasture is fenced beside the enclosure', () => {
+    const player = playerWithEnclosure('forest')
+    player.resources.sheep = 2
+    player.pastures[0]!.animalType = 'sheep'
+    player.pastures[0]!.animalCount = 2
+
+    const result = validateFenceSelection(player, newPastureEdges)
+
+    expect(result.ok, result.ok ? undefined : result.error.code).toBe(true)
+    if (!result.ok) return
+    expect(result.player.pastures.find((pasture) =>
+      pasture.tiles.some((tile) => tile.row === 0 && tile.col === 0))).toMatchObject({ animalType: 'sheep', animalCount: 2 })
+    expect(result.player.resources.sheep).toBe(2)
+  })
+
+  it('still rejects a new enclosure around a forest, a field or a room', () => {
+    const aroundForest = playerWithEnclosure('forest')
+    aroundForest.farmTerrain = [...aroundForest.farmTerrain!, { row: 0, col: 2, kind: 'forest' }]
+    const aroundField = playerWithEnclosure('forest')
+    aroundField.fields = [{ row: 0, col: 2, stacks: [] }]
+
+    for (const result of [
+      validateFenceSelection(aroundForest, newPastureEdges),
+      validateFenceSelection(aroundField, newPastureEdges),
+      validateFenceSelection(playerWithEnclosure('forest'), ['H-2-0', 'V-1-0', 'V-1-1']),
+    ]) {
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.error.code).toBe('ENCLOSED_TILE_OCCUPIED')
+    }
+  })
+
+  it('does not count an existing enclosure against new-region or new-pasture bounds', () => {
+    const result = validateFenceSelection(playerWithEnclosure('forest'), edgesForTile(2, 4), [], 0, 0, {
+      allowedSegmentTypes: ['fence'],
+      segmentBounds: { total: { min: 4, max: 4 } },
+      connectionPolicy: 'allowDisconnected',
+      allowedNewRegionTiles: [{ row: 2, col: 4 }],
+      newRegionBounds: { count: { min: 1, max: 1 }, totalSize: { min: 1, max: 1 } },
+      newPastureBounds: { count: { min: 1, max: 1 }, totalSize: { min: 1, max: 1 } },
+      costPolicy: { fence: { wood: 0 } },
+    })
+
+    expect(result.ok, result.ok ? undefined : result.error.code).toBe(true)
+    if (!result.ok) return
+    expect(pastureTiles(result.player.pastures)).toEqual(['0-0', '2-4'])
+  })
+})

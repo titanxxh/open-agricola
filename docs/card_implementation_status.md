@@ -46,6 +46,7 @@ Unless the product direction changes, the following are not bugs. Cards without 
 | Pastoral Letter also gives an owned upgraded Church +1. Removed Village Church cards no longer contribute. | `M063_PastoralLetter` |
 | The maintainer selected the reference's printed scoring value of 0 despite the official rulebook sample showing 1; see [#1448](https://github.com/titanxxh/open-agricola/issues/1448). | `M090_WinterStorehouse` |
 | Administration uses logical major-improvement identity, including dual-type improvements such as Witches' Dance Floor. | `M074_Administration` |
+| A later pasture may connect only to the fences of a Nature Reserve space that is not yet a pasture; the rule that a new pasture adjoins an existing pasture is not enforced against that enclosure. No publisher ruling covers the case. | `M038_NatureReserve` |
 | Live estimates account for available optimal craft conversions before final settlement. | `E124_MayorCandidate` |
 
 ## 3. Infrastructure backlog
