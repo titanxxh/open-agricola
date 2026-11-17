@@ -1,6 +1,7 @@
+import { spawnSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { backendImageDeployment, followBackendOperation } from '../release/backend-image'
 
@@ -112,4 +113,12 @@ it.each(['blocked', 'unknown'])('stops following when the backend reports %s and
 it('gives up with the status command when the backend stays unreachable past the deadline', async () => {
   const value = followFixture(Array.from({ length: 50 }, () => ({ exit: 255 })))
   await expect(followBackendOperation(value.root, value.target, { pollMs: 1, deadlineMs: 30 })).rejects.toThrow(/unreachable.*deploy-backend\.sh status/s)
+})
+
+it('starts the deploy-backend.sh entry on plain Node without a TypeScript resolver', () => {
+  // deploy-backend.sh runs `node scripts/release/backend-image.ts`; storage tools load only in child processes.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'NODE_OPTIONS'))
+  const result = spawnSync(process.execPath, ['scripts/release/backend-image.ts', 'status'], { cwd: resolve(import.meta.dirname, '../..'), env, encoding: 'utf8', timeout: 30_000 })
+  expect(result.stderr).not.toContain('ERR_MODULE_NOT_FOUND')
+  expect(result.stderr).toContain('Usage: deploy-backend.sh status|resume')
 })
