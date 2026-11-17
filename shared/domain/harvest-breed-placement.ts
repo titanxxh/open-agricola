@@ -9,7 +9,12 @@ export const syncHarvestBreedPlacement = (state: GameState | undefined, player: 
     if (minimum === undefined) continue
     const count = player.resources[animal] ?? 0
     if (count === 0) delete placement.minimums[animal]
-    else placement.minimums[animal] = Math.max(1, minimum + count - (placement.animalCounts[animal] ?? 0))
+    else {
+      // Payments can exhaust parents, but later gains must remain separate from
+      // the entire unsettled litter, not just one newborn.
+      const newborns = state?.harvestBreedSummary?.[player.id]?.resources[animal] ?? 1
+      placement.minimums[animal] = Math.max(newborns, minimum + count - (placement.animalCounts[animal] ?? 0))
+    }
     placement.animalCounts[animal] = count
   }
   return placement
