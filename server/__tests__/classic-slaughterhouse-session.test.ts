@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { OLD_I97_Slaughterhouse } from '../../shared/cards/classic/I/OLD_I97_Slaughterhouse'
+import { CI097_Slaughterhouse } from '../../shared/cards/classic/CI/CI097_Slaughterhouse'
 import type { CustomCardData } from '../../shared/cards/session-card-context'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { markAllWorkersUsed } from '../../shared/domain/player'
@@ -9,12 +9,12 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { createWorkSession } from './_helpers/session-fixtures'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 
-const CARD_ID = OLD_I97_Slaughterhouse.meta.id
-const customCards: CustomCardData[] = [{ cardType: 'minor', cardJson: OLD_I97_Slaughterhouse.meta }]
+const CARD_ID = CI097_Slaughterhouse.meta.id
+const customCards: CustomCardData[] = [{ cardType: 'minor', cardJson: CI097_Slaughterhouse.meta }]
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 
-function harvestSession(configure?: (state: GameState) => void, playerCount = 2) {
+function harvestSession(configure?: (state: GameState) => void, playerCount = 4) {
   const session = createWorkSession({
     options: { playerCount },
     customCards,
@@ -76,13 +76,13 @@ function finishFeeding(session: GameSession, initial: SessionResponse) {
 function moorHorseSession(cookingPlayer: 0 | 1) {
   const session = createWorkSession({
     seed: 42,
-    options: { enableFarmersOfTheMoor: true },
+    options: { playerCount: 4, enableFarmersOfTheMoor: true },
     customCards,
     configure(state) {
       state.round = 4
       state.players.forEach((player, index) => {
         player.startPlayer = index === 0
-        Object.assign(player.resources, { food: 3, grain: 1, fuel: 2 })
+        Object.assign(player.resources, { food: index < 2 ? 3 : 4, grain: 1, fuel: 2 })
         markAllWorkersUsed(state, player)
       })
       state.players[0]!.minorPlayed = [CARD_ID]
@@ -114,7 +114,13 @@ function confirmHeating(session: GameSession, response: SessionResponse, playerI
   expect(response.interaction).toMatchObject({
     stateId: 'wait', playerIndex, request: { kind: 'heating', required: 2 },
   })
-  return session.resolveChoice(playerIndex, 'confirm', { fuelUsed: 2, selections: [] })
+  let next = session.resolveChoice(playerIndex, 'confirm', { fuelUsed: 2, selections: [] })
+  for (let step = 0; step < 2 && next.interaction.stateId === 'wait' && next.interaction.playerIndex >= 2; step++) {
+    const other = next.interaction.playerIndex
+    expect(next.interaction.request).toMatchObject({ kind: 'heating', required: 2 })
+    next = session.resolveChoice(other, 'confirm', { fuelUsed: 2, selections: [] })
+  }
+  return next
 }
 
 describe('classic I97 Slaughterhouse', () => {
@@ -243,13 +249,13 @@ describe('classic I97 Slaughterhouse', () => {
     expect(finished.ok, finished.error).toBe(true)
     expect(finished.interaction.stateId).toBe('idle')
     expect(finished.state.round).toBe(5)
-    expect(finished.state.players.map((player) => player.resources.begging)).toEqual([0, 0])
+    expect(finished.state.players.map((player) => player.resources.begging)).toEqual([0, 0, 0, 0])
     expect(
       finished.state.log
         .filter((entry) => entry.key === 'log.harvestFeedDetail')
         .map((entry) => entry.params?.player)
         .toReversed(),
-    ).toEqual([session.state.players[1]!.name, session.state.players[0]!.name])
+    ).toEqual([1, 2, 3, 0].map(index => session.state.players[index]!.name))
     expect(finished.state.log).toContainEqual(expect.objectContaining({
       key: 'log.harvestFeedDetail',
       params: expect.objectContaining({
@@ -276,7 +282,7 @@ describe('classic I97 Slaughterhouse', () => {
     expect(finished.ok, finished.error).toBe(true)
     expect(finished.interaction.stateId).toBe('idle')
     expect(finished.state.round).toBe(5)
-    expect(finished.state.players.map((player) => player.resources.food)).toEqual([0, 0])
+    expect(finished.state.players.map((player) => player.resources.food)).toEqual([0, 0, 0, 0])
   })
 
   it.each([
@@ -301,8 +307,10 @@ describe('classic I97 Slaughterhouse', () => {
     })
     let response = nextFeeding(session, session.performRoundEnd())
     if (cookingPlayer === 0) {
-      expectFeed(response, 1)
-      response = nextFeeding(session, session.resolveChoice(1, 'confirm', { selections: [] }))
+      for (const index of [1, 2, 3]) {
+        expectFeed(response, index)
+        response = nextFeeding(session, session.resolveChoice(index, 'confirm', { selections: [] }))
+      }
     }
     const request = expectFeed(response, cookingPlayer)
     const recipe = request.exchangeCatalog?.find(

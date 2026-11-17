@@ -5,6 +5,39 @@ import path from 'node:path'
 import { buildRegisterAll } from '../generate-register-all'
 
 describe('generate-register-all Card Source', () => {
+  it('discovers classic deck directories without adding them to the ordinary deal catalog', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'classic-register-all-'))
+    const cardsRoot = path.join(tmp, 'shared', 'cards')
+    try {
+      for (const deck of ['CE', 'CI', 'CWM', 'CC']) {
+        const dir = path.join(cardsRoot, 'classic', deck)
+        fs.mkdirSync(dir, { recursive: true })
+        const id = `${deck}001_Source`
+        fs.writeFileSync(path.join(dir, `${id}.ts`),
+          `export const ${id} = defineMinorCard({
+            meta: { id: '${id}', name: 'Source', deck: '${deck}', number: 1, desc: [], cost: {} },
+            impl: { effect: { id: '${id}' } },
+          })\n`)
+        // Test files and non-directories must not become runtime card sources.
+        fs.writeFileSync(path.join(dir, `${deck}.test.ts`),
+          `export const IgnoredTest = defineMinorCard({ impl: {} })`)
+      }
+      fs.writeFileSync(path.join(cardsRoot, 'classic', 'README.md'), 'Classic cards')
+      const result = buildRegisterAll({ repoRoot: tmp })
+      for (const deck of ['CE', 'CI', 'CWM', 'CC']) {
+        const id = `${deck}001_Source`
+        expect(result.registerAll).toContain(`import { ${id} } from './classic/${deck}/${id}'`)
+        expect(result.registerAll).toContain(`'${id}': ${id}.impl`)
+        expect(result.catalogGenerated).not.toContain(id)
+      }
+      expect(result.implCount).toBe(4)
+      expect(result.catalogDefinitionCount).toBe(0)
+      expect(result.registerAll).not.toContain('IgnoredTest')
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
   it('includes only Card Source impl exports in ALL_CARD_IMPLS', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'card-source-register-all-'))
     const cardsRoot = path.join(tmp, 'shared', 'cards')
