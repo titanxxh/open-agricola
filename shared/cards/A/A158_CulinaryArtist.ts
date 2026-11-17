@@ -1,7 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
-import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
@@ -25,29 +24,14 @@ const listener: CardListenerRegistration = {
       flow: {
         type: 'xor',
         optional: true,
-        children: [
-          {
-            type: 'seq',
-            children: [
-              payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
-              gainLeaf(CARD_ID, { food: 4 }),
-            ],
+        children: ([['grain', 4], ['sheep', 5], ['vegetable', 7]] as const).map(([resource, food]) => ({
+          type: 'leaf',
+          actionId: 'exchange',
+          sourceCard: CARD_ID,
+          actionContext: {
+            directTrade: { from: { [resource]: 1 }, to: { food }, sourceId: CARD_ID },
           },
-          {
-            type: 'seq',
-            children: [
-              payLeaf({ cardId: CARD_ID, cost: { sheep: 1 } }),
-              gainLeaf(CARD_ID, { food: 5 }),
-            ],
-          },
-          {
-            type: 'seq',
-            children: [
-              payLeaf({ cardId: CARD_ID, cost: { vegetable: 1 } }),
-              gainLeaf(CARD_ID, { food: 7 }),
-            ],
-          },
-        ],
+        })),
       },
       sourceCard: CARD_ID,
     }
