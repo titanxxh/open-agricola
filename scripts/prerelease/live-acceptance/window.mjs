@@ -6,7 +6,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { caseLabels, SUITE_ENGINES } from './suites.mjs'
-import { collectResults } from './evidence.mjs'
+import { acceptanceRecord, collectResults } from './evidence.mjs'
 import { loadAcceptanceConfig, privateDirectory, privateJson } from './context.mjs'
 import { logoutAll, setBeta } from './formal-admin.mjs'
 
@@ -113,6 +113,18 @@ export function resumeDecision(step, entry, { gaps = null, confirmed = false } =
     : { action: 'stop', reason: 'The deletion suite is not re-entrant; check the D/E rows, then rerun with --confirm-step deletion only if the accounts still exist' }
   if (gaps) return { action: 'stop', reason: `Suite ${step} still lacks passing results; rerun the listed cases, then --resume` }
   return { action: 'run' }
+}
+
+/**
+ * Whether pre is open, and under this window's acceptance. After a lost `open` response the host may already be
+ * open; it counts as ours only when its acceptance hash, build, generation and formal build all match this window.
+ */
+export function openBinding(status, { candidate, generation, formalBuild, reverifyOperationId, acceptance }) {
+  if (status?.mode !== 'open') return 'closed'
+  const ours = !!acceptance && status.acceptance?.sha256 === acceptance.sha256 && acceptance.operationId === reverifyOperationId
+    && acceptance.buildId === candidate && acceptance.generation === generation && status.installed?.buildId === candidate
+    && status.generation === generation && status.acceptance?.formalBuildId === formalBuild
+  return ours ? 'ours' : 'other'
 }
 
 export function assertWithin(label, elapsedMs, limitMs) {
@@ -235,14 +247,20 @@ function hostTools(io, ctx) {
 
 // ---- Steps --------------------------------------------------------------------------------------------------------
 
+function storageCycle(t, ctx) {
+  const cycle = t.script(`python3 -c "import json;print(json.load(open('${ctx.target.directory}/control/storage-guard.json'))['healthyCycle'])"`, 'storage guard')
+  if (!uuid.test(cycle)) throw new WindowStop('The prerelease storage guard is not healthy')
+  return cycle
+}
+
 async function liveFormalBuild(io, origins) {
   const read = async url => { const response = await io.fetch(url, { signal: AbortSignal.timeout(15_000) }); return { status: response.status, body: await response.json().catch(() => ({})) } }
   const pages = await read(origins.formalApp + '/frontend-build.json'), policy = await read(origins.formalApi + '/api/auth/browser-policy'), health = await read(origins.formalApi + '/api/health')
   return { pages: pages.body.gameBuildId ?? null, policy: policy.body.buildId ?? null, healthy: health.status === 200 && health.body.ok === true }
 }
 
-/** Three-file audit chain on the installed candidate; `beforeActivate` runs between audit-complete and activate. */
-async function auditChain(io, tools, win, tag, beforeActivate = async () => {}) {
+/** Audit chain on the installed candidate. Nothing runs between audit-complete and activate (<30 s apart). */
+async function auditChain(io, tools, win, tag) {
   const X = win.exchangeDirectory, file = name => join(X, `${tag}-${name}.json`)
   const ops = { close: randomUUID(), associate: randomUUID(), audit: randomUUID(), activate: randomUUID() }
   writePrivateJson(file('ops'), ops)
@@ -255,7 +273,6 @@ async function auditChain(io, tools, win, tag, beforeActivate = async () => {}) 
   tools.fromHost(applied.path, file('identity-verified'))
   tools.authority('audit-complete', win.generation, ops.audit, ['--verification', file('identity-verified'), '--output', file('audit')])
   const audited = Date.now()
-  await beforeActivate()
   assertWithin('audit-complete → activate', Date.now() - audited, LIMITS.auditToActivateMs)
   tools.authority('activate', win.generation, ops.activate, ['--audit', file('audit'), '--output', file('activate')])
   const activatedAt = Date.now()
@@ -293,8 +310,7 @@ function makeSteps({ io, win, env, getCtx, reload, setOps, state }) {
       if (head !== hostHead) throw new WindowStop(`Owner checkout ${head.slice(0, 12)} differs from host owner-tools ${hostHead.slice(0, 12)}; run from a checkout at the host policy SHA`)
       const status = t.deploy('status')
       if (status.installed?.buildId !== getCtx().config.candidate || status.generation !== win.generation) throw new WindowStop('The installed pre candidate or generation differs from the window config')
-      const healthyCycle = t.script(`python3 -c "import json;print(json.load(open('${getCtx().target.directory}/control/storage-guard.json'))['healthyCycle'])"`, 'storage guard')
-      if (!uuid.test(healthyCycle)) throw new WindowStop('The prerelease storage guard is not healthy')
+      storageCycle(t, getCtx())
       mkdirSync(X, { recursive: true, mode: 0o700 }); chmodSync(X, 0o700); privateDirectory(X, 'Exchange directory')
       t.ssh(`mkdir -p -m 700 '${X}' && chmod 700 '${X}'`, undefined, 'host exchange directory')
       return { status: writeAndReturn(local('pre-status.json'), status) }
@@ -371,16 +387,26 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
       return {}
     },
     async 'final-open'() {
-      const t = tools(), ctx = getCtx()
-      const chain = await auditChain(io, t, win, 'final', async () => {
-        must(t.cli(['acceptance', '--config', env.configPath, '--index', local('evidence/index.json'), '--formal-browser', local('formal-browser.json'), '--output', local('acceptance.json')]), 'acceptance')
-        t.toHost([local('acceptance.json')], X)
-      })
+      const t = tools(), ctx = getCtx(), accepted = local('acceptance.json'), reverifyOperationId = state().ops.reverify
+      const live = t.deploy('status')
+      // A lost `open` response must not replay the chain: closing an open target would leave pre closed.
+      const previous = existsSync(accepted) ? { ...JSON.parse(readFileSync(accepted, 'utf8')), sha256: hashFile(accepted) } : null
+      const binding = openBinding(live, { candidate: ctx.config.candidate, generation: win.generation, formalBuild: win.formalBuild, reverifyOperationId, acceptance: previous })
+      if (binding === 'ours') return { acceptance: accepted, open: writeAndReturn(local('open.json'), live) }
+      if (binding === 'other') throw new WindowStop('Pre is already open under a different acceptance or build; inspect it before continuing this window')
+      if (live.mode !== 'maintenance' || live.operation?.id !== reverifyOperationId || live.operation?.stage !== 'acceptance') throw new WindowStop("Pre is not in this window's acceptance maintenance")
+      // All slow work precedes the chain. `open` rechecks the storage cycle and a 30 min acceptance age; the chain's
+      // apply-identities keeps the installed build, generation and operation, so the record stays valid through it.
+      const index = privateJson(local('evidence/index.json'), 'Evidence index'), formalBrowser = privateJson(local('formal-browser.json'), 'Formal browser proof')
+      if (!Object.values(index).every(entry => entry.passed)) throw new WindowStop('Every evidence item must pass before writing acceptance')
+      writePrivateJson(accepted, acceptanceRecord({ targetId: ctx.target.targetId, status: live, healthyCycle: storageCycle(t, ctx), index, formalBrowser }))
+      t.toHost([accepted], X)
+      const chain = await auditChain(io, t, win, 'final')
       assertWithin('activate → open', Date.now() - chain.activatedAt, LIMITS.activateToOpenMs)
       const opened = t.deploy('open', ['--sha', ctx.config.candidate, '--authority-receipt', chain.files.activate, '--audit', chain.files.audit,
-        '--verification', chain.files['identity-verified'], '--acceptance', local('acceptance.json')])
+        '--verification', chain.files['identity-verified'], '--acceptance', accepted])
       if (opened.mode !== 'open') throw new WindowStop('Open did not report an open target')
-      return { ...chain.files, acceptance: local('acceptance.json'), open: writeAndReturn(local('open.json'), opened) }
+      return { ...chain.files, acceptance: accepted, open: writeAndReturn(local('open.json'), opened) }
     },
     readback: async () => runSuite(tools(), env, SUITE_RUNS.find(entry => entry.step === 'readback')),
     async cleanup() {

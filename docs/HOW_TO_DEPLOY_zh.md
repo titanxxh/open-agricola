@@ -296,7 +296,7 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 - 各验收套件；
 - 删除 D/E，执行删除后的审计链，并核对数据行为零；
 - 根据以上事实生成 owner notes，打包证据，证明正式站浏览器策略，把证据复制到主机并核对哈希；
-- 最终审计链在 audit-complete 与 activate 之间写入 acceptance，之后三十秒内 open；
+- 在最终审计链开始前写好并复制 acceptance，audit-complete 与 activate 之间不做任何事；activate 后三十秒内 open；
 - readback、收回 Beta、全部登出、归档回执。
 
 在正式容器内运行的辅助脚本位于 `scripts/prerelease/owner-accounts/`。
@@ -307,7 +307,7 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 - 审计链整条重跑；
 - suite 只有在已有通过证据时才标记为完成。
 
-创建账号和删除账号不可重入：中断后只能加 `--confirm-step` 继续，命令会先核对正式站账号。open 前若正式站浏览器证明已超过 25 分钟，会重新生成。
+创建账号和删除账号不可重入：中断后只能加 `--confirm-step` 继续，命令会先核对正式站账号。open 前若正式站浏览器证明已超过 25 分钟，会重新生成。如果响应丢失时主机其实已经按本窗口的 acceptance 完成 open，`--resume` 直接记录 open，不重放审计链；如果主机已 open 但绑定的是其他 acceptance，则停止。
 
 每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，从固定可信 main 策略 SHA 在外部构建并导入。工具回执、不可变 image ID、revision 和 channel 均与 `control/` 中的目标缓存核对；缺缓存时拒绝，不构建也不停 app。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
 

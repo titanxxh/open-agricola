@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { REQUIRED_EVIDENCE } from '../prerelease/live-acceptance/evidence.mjs'
 import {
-  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertWithin, markStep, newState, nextStep, ownerNotes,
+  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertWithin, markStep, newState, nextStep, openBinding, ownerNotes,
   parseWindowConfig, previousTeamRoom, rerunCommands, resetSteps, resumeDecision, reverifyOps, runDiagnostics, runWindow, staleSteps, suiteGaps, teamAccounts,
 } from '../prerelease/live-acceptance/window.mjs'
 
@@ -216,5 +218,100 @@ describe('window run with an injected runner', () => {
     await expect(runWindow({ configPath, windowPath, resume: true, io: resumed.io })).rejects.toThrow(/--confirm-step accounts/)
     expect(resumed.calls.some(call => call.includes('reverify'))).toBe(false)
     expect(resumed.calls.some(call => call.startsWith('./deploy-prerelease.sh status'))).toBe(true)
+  })
+})
+
+describe('final open', () => {
+  const candidate = sha('c'), generation = '44444444-4444-4444-8444-444444444444', reverifyOp = '66666666-6666-4666-8666-666666666666'
+  const acceptance = { operationId: reverifyOp, buildId: candidate, generation, sha256: 'f'.repeat(64) }
+  const openStatus = (extra = {}) => ({ mode: 'open', generation, installed: { buildId: candidate }, acceptance: { sha256: 'f'.repeat(64), formalBuildId: sha('b') }, ...extra })
+  const binding = { candidate, generation, formalBuild: sha('b'), reverifyOperationId: reverifyOp, acceptance }
+
+  it('treats an open target as ours only when its acceptance, build, generation and formal build all match', () => {
+    expect(openBinding({ mode: 'maintenance' }, binding)).toBe('closed')
+    expect(openBinding(openStatus(), binding)).toBe('ours')
+    expect(openBinding(openStatus({ acceptance: { sha256: 'e'.repeat(64), formalBuildId: sha('b') } }), binding)).toBe('other')
+    expect(openBinding(openStatus(), { ...binding, acceptance: { ...acceptance, operationId: '77777777-7777-4777-8777-777777777777' } })).toBe('other')
+    expect(openBinding(openStatus({ acceptance: { sha256: 'f'.repeat(64), formalBuildId: sha('a') } }), binding)).toBe('other')
+    expect(openBinding(openStatus(), { ...binding, acceptance: null })).toBe('other')
+  })
+
+  // Prepares a window whose steps before final-open are done; readback (the next step) fails so each run stops there.
+  function finalWindow(statusFor: () => Record<string, unknown>, { acceptanceFile = null as Record<string, unknown> | null, finalFailed = false } = {}) {
+    const root = privateRoot(), secrets = privateDir(root, 'secrets'), exchange = privateDir(root, 'exchange'), evidence = privateDir(exchange, 'evidence')
+    const accounts = (labels: string[]) => ({ accounts: labels.map(label => ({ id: `id-${label}`, username: `user-${label}`, password: `password-${label}` })) })
+    const target = writePrivate(join(secrets, 'target.json'), { targetId: 'pre-main', origin: 'https://pre.example.test', directory: '/srv/pre', policyDirectory: '/srv/policy',
+      database: { name: 'pre' }, formal: { appOrigin: 'https://app.example.test', apiOrigin: 'https://api.example.test', project: 'formal' } })
+    writeFileSync(join(secrets, 'cookie'), '__Host-oa-session=abc\n', { mode: 0o600 })
+    const configPath = writePrivate(join(secrets, 'acceptance.json'), { format: 1, targetConfig: target, ssh: 'owner@host', candidate, formalBuild: sha('b'),
+      candidateReceipt: writePrivate(join(secrets, 'receipt.json'), { purpose: 'candidate', channel: 'prerelease', sourceSha: candidate, producerSha: sha('d') }),
+      accounts: writePrivate(join(secrets, 'accounts.json'), accounts(['A', 'B', 'C'])), teamAccounts: writePrivate(join(secrets, 'team.json'), accounts(['D', 'E'])),
+      ownerCookie: join(secrets, 'cookie'), guardConfig: '/srv/guard.json', outputRoot: privateDir(root, 'output') })
+    const index = Object.fromEntries(REQUIRED_EVIDENCE.filter(item => item !== 'formal-browser-policy').map(item => [item, { path: `/x/${item}.json`, sha256: 'b'.repeat(64), passed: true }]))
+    writePrivate(join(evidence, 'index.json'), index)
+    writePrivate(join(exchange, 'formal-browser.json'), { path: '/srv/pre/control/formal-browser.json', sha256: 'c'.repeat(64) })
+    if (acceptanceFile) writePrivate(join(exchange, 'acceptance.json'), acceptanceFile)
+    const value = { format: 1, windowId: 'c6', generation, formalFrom: sha('a'), formalBuild: sha('b'), previousRun: privateDir(root, 'previous'), run: privateDir(root, 'run'),
+      windowDirectory: privateDir(root, 'window'), exchangeDirectory: exchange }
+    let state = { ...newState('c6', Date.now()), ops: { reverify: reverifyOp } }
+    for (const step of WINDOW_STEPS.slice(0, WINDOW_STEPS.indexOf('final-open'))) state = markStep(markStep(state, step, 'started', Date.now()), step, 'done', Date.now())
+    if (finalFailed) state = markStep(markStep(state, 'final-open', 'started', Date.now()), 'final-open', 'failed', Date.now(), { error: 'ssh dropped' })
+    writePrivate(join(value.windowDirectory, 'state.json'), state)
+    const calls: string[] = []
+    const io = {
+      setLog: () => {},
+      fetch: async (url: string) => ({ status: 200, json: async () => (url.endsWith('/frontend-build.json') ? { gameBuildId: sha('b') } : url.endsWith('/browser-policy') ? { buildId: sha('b') } : { ok: true }) }),
+      run(command: string, args: string[]) {
+        calls.push([command === process.execPath ? 'node' : command, ...args].join(' '))
+        const ok = (value: unknown = '') => ({ status: 0, stdout: typeof value === 'string' ? value : JSON.stringify(value) + '\n', stderr: '', error: null })
+        if (command === 'git') return ok(args[0] === 'rev-parse' ? 'head\n' : '')
+        if (command === 'ssh' && args.at(-1) === '-s') return ok('55555555-5555-4555-8555-555555555555\n')
+        if (command === 'ssh' && args.at(-1)!.includes('rev-parse HEAD')) return ok('head\n')
+        if (command === './deploy-prerelease.sh') {
+          if (args[0] === 'status') return ok(statusFor())
+          if (args[0] === 'identities') return ok({ path: '/srv/pre/control/identities.json', identityCount: 3 })
+          if (args[0] === 'apply-identities') return ok({ path: '/srv/pre/control/identity-verified.json' })
+          if (args[0] === 'open') return ok({ mode: 'open' })
+        }
+        if (command === process.execPath && args.includes('run')) return { status: 1, stdout: '', stderr: 'readback failed', error: null }
+        return ok()
+      },
+    }
+    return { configPath, windowPath: writePrivate(join(root, 'window.json'), value), value, calls, io, exchange }
+  }
+  const maintenance = () => ({ mode: 'maintenance', fingerprint: 'fp', generation, installed: { buildId: candidate, image: 'sha256:image' },
+    operation: { id: reverifyOp, kind: 'reverify', stage: 'acceptance' } })
+
+  it('writes and copies acceptance before the final chain, with no work between audit-complete and activate', async () => {
+    const window = finalWindow(maintenance)
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/Suite readback did not pass/)
+    const at = (text: string) => window.calls.findIndex(call => call.includes(text))
+    const audited = at('authority.ts audit-complete'), activated = at('authority.ts activate')
+    expect(audited).toBeGreaterThan(-1)
+    expect(activated).toBe(audited + 1)
+    expect(window.calls.some(call => call.includes('cli.mjs acceptance'))).toBe(false)
+    expect(at(join(window.exchange, 'acceptance.json'))).toBeLessThan(at('authority.ts close'))
+    expect(window.calls.findIndex(call => call.startsWith('./deploy-prerelease.sh open'))).toBeGreaterThan(activated)
+    const written = JSON.parse(readFileSync(join(window.exchange, 'acceptance.json'), 'utf8'))
+    expect(written).toMatchObject({ channel: 'prerelease', targetId: 'pre-main', operationId: reverifyOp, buildId: candidate, generation, healthyCycle: '55555555-5555-4555-8555-555555555555' })
+    expect(JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8')).steps['final-open'].status).toBe('done')
+  })
+
+  it('records an open the host already committed under this window instead of replaying the chain', async () => {
+    const window = finalWindow(() => ({}), { acceptanceFile: { operationId: reverifyOp, buildId: candidate, generation }, finalFailed: true })
+    const local = createHash('sha256').update(readFileSync(join(window.exchange, 'acceptance.json'))).digest('hex')
+    window.io.run = ((run) => (command: string, args: string[]) => (command === './deploy-prerelease.sh' && args[0] === 'status'
+      ? (window.calls.push(`./deploy-prerelease.sh status`), { status: 0, stdout: JSON.stringify(openStatus({ acceptance: { sha256: local, formalBuildId: sha('b') } })) + '\n', stderr: '', error: null })
+      : run(command, args)))(window.io.run)
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/Suite readback did not pass/)
+    expect(window.calls.some(call => call.includes('authority.ts'))).toBe(false)
+    expect(window.calls.some(call => call.startsWith('./deploy-prerelease.sh open'))).toBe(false)
+    expect(JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8')).steps['final-open'].status).toBe('done')
+  })
+
+  it('stops when pre is already open under another acceptance', async () => {
+    const window = finalWindow(() => openStatus(), { acceptanceFile: { operationId: reverifyOp, buildId: candidate, generation }, finalFailed: true })
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/already open under a different acceptance/)
+    expect(window.calls.some(call => call.includes('authority.ts'))).toBe(false)
   })
 })
