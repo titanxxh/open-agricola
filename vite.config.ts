@@ -6,24 +6,29 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { browserCardTestsPlugin } from './scripts/vite-browser-card-tests.ts'
 import { loadBrowserDataDefines } from './scripts/browser-data.ts'
 import {
+  isViteDevServerCli,
   loadPublicAssetConfig,
   publicAssetUrls,
 } from './scripts/public-assets.ts'
 
 const publicAssets = await loadPublicAssetConfig({
   allowLocal: !process.argv.includes('build') && !process.env.CI,
+  devServer: isViteDevServerCli(),
   validateRemote: process.env.VITEST !== 'true',
 })
 const browserDataDefines = process.argv.includes('build') && process.env.VITEST !== 'true'
   ? loadBrowserDataDefines(import.meta.dirname)
   : {}
 
-const servePublicAssets = (assetRoot: string) => {
+const servePublicAssets = (assetRoot: string, missingIsNotFound: boolean) => {
   const contentTypes: Record<string, string> = {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.png': 'image/png',
     '.webp': 'image/webp',
+    '.woff2': 'font/woff2',
+    '.woff': 'font/woff',
+    '.ttf': 'font/ttf',
   }
   return {
     name: 'serve-public-assets',
@@ -38,7 +43,8 @@ const servePublicAssets = (assetRoot: string) => {
             || !fs.existsSync(filePath)
             || !fs.statSync(filePath).isFile()
           ) {
-            next()
+            // A pinned checkout is the whole asset site: answer like it does instead of the app's HTML fallback.
+            if (missingIsNotFound) { res.statusCode = 404; res.end() } else next()
             return
           }
           res.setHeader('Content-Type', contentTypes[path.extname(filePath)] || 'application/octet-stream')
@@ -55,7 +61,7 @@ const plugins: PluginOption[] = [
   publicAssetUrls(publicAssets, [process.env.VITE_BASE_PATH ?? '/', '/']),
 ]
 if (publicAssets.localDir) {
-  plugins.push(servePublicAssets(publicAssets.localDir))
+  plugins.push(servePublicAssets(publicAssets.localDir, publicAssets.pinned === true))
 }
 
 export default defineConfig({

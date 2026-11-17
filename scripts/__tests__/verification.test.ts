@@ -165,6 +165,7 @@ describe('verification modes and evidence', () => {
   it.each([
     ['PUBLIC_ASSET_LOCAL_DIR', '/local/assets'],
     ['PUBLIC_ASSET_VALIDATION_DIR', '/local/assets'],
+    ['E2E_PUBLIC_ASSET_DIR', '/local/assets'],
     ['RELEASE_SMOKE_PROXY', 'http://127.0.0.1:8080'],
     ['E2E_EXTENDED', '1'],
     ['LIBGL_ALWAYS_SOFTWARE', '0'],

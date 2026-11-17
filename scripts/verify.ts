@@ -37,7 +37,7 @@ export function sourceFingerprint(cwd: string, options: { excludeFiles?: readonl
   const hash = createHash('sha256')
   hash.update(JSON.stringify({ node: process.version, platform: process.platform, arch: process.arch,
     environment: ['NODE_ENV', 'NODE_OPTIONS', 'CI', 'TZ', 'VITE_SANDBOX_EXECUTOR', 'APP_INSTANCES', 'E2E_EXTENDED',
-      'PUBLIC_ASSET_LOCAL_DIR', 'PUBLIC_ASSET_VALIDATION_DIR', 'RELEASE_SMOKE_PROXY',
+      'PUBLIC_ASSET_LOCAL_DIR', 'PUBLIC_ASSET_VALIDATION_DIR', 'E2E_PUBLIC_ASSET_DIR', 'RELEASE_SMOKE_PROXY',
       'LIBGL_ALWAYS_SOFTWARE', 'WEBKIT_SKIA_ENABLE_CPU_RENDERING', '__EGL_VENDOR_LIBRARY_FILENAMES']
       .map(key => [key, process.env[key] ?? null]),
   }))

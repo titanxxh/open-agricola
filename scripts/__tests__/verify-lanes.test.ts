@@ -78,6 +78,8 @@ describe('hosted frontend reuse', () => {
     expect(hostedFrontendMismatch(root, 'b'.repeat(40), 'f'.repeat(64), env)).toBe('parent build is for another commit')
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, VITE_SANDBOX_EXECUTOR: 'browser' })).toBe('parent build environment differs')
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, PUBLIC_ASSET_VALIDATION_DIR: '/assets' })).toBe('parent build environment differs')
+    // The local asset checkout steers the development server each lane starts; a lane only reuses a parent of the same choice.
+    expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, E2E_PUBLIC_ASSET_DIR: '/assets' })).toBe('parent build environment differs')
     // Ignored dotenv files feed the Vite build; a lane's own (absent) files must match the parent's.
     const lane = checkout([])
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), env, viteDotenv(lane))).toBeNull()

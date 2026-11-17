@@ -19,10 +19,28 @@ export type PublicAssetConfig = {
   version: string
   requiredFiles: string[]
   localDir?: string
+  /** The local directory is a verified checkout of `version`: a missing file is a 404, as on the asset site. */
+  pinned?: boolean
 }
 
 export const publicAssetBaseUrl = (): string =>
   'https://titanxxh.github.io/open-agricola-assets/'
+
+/**
+ * True only for the Vite CLI running the development server. Builds, previews, Vitest and scripts that call
+ * Vite's JavaScript API (which can build without `build` in argv) are never the development server.
+ */
+export const isViteDevServerCli = (
+  argv: readonly string[] = process.argv,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean =>
+  env.VITEST !== 'true'
+  && /(?:^|[\\/])vite(?:\.js)?$/.test(argv[1] ?? '')
+  && !argv.slice(2).some(arg => arg === 'build' || arg === 'preview' || arg === 'optimize')
+
+/** The asset base URL the development server uses in this environment; browser tests compare against it. */
+export const devServerPublicAssetBaseUrl = (env: NodeJS.ProcessEnv = process.env): string =>
+  env.PUBLIC_ASSET_LOCAL_DIR || env.E2E_PUBLIC_ASSET_DIR ? LOCAL_PUBLIC_ASSET_BASE_URL : publicAssetBaseUrl()
 
 const parseFileList = (value: unknown, label: string): string[] => {
   if (!Array.isArray(value) || value.some(file => typeof file !== 'string')) {
@@ -87,17 +105,39 @@ const fetchText = async (url: URL, fetcher: Fetcher, init?: RequestInit): Promis
   return response.text()
 }
 
+/** A clean asset-repository checkout at exactly `version` that tracks and contains every required file. */
+const assertPinnedCheckout = async (directory: string, version: string, requiredFiles: string[]): Promise<void> => {
+  const git = (...args: string[]): string => execFileSync('git', ['-C', directory, ...args], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim()
+  if (git('rev-parse', 'HEAD') !== version) {
+    throw new Error(`Public asset checkout version does not match ${version}`)
+  }
+  if (git('status', '--porcelain', '--untracked-files=all', '--', 'assets')) {
+    throw new Error('Public asset checkout assets must be clean')
+  }
+  const available = new Set(git('ls-tree', '-r', '--name-only', 'HEAD', '--', 'assets').split('\n'))
+  for (const file of requiredFiles) {
+    if (!available.has(file) || !(await stat(path.join(directory, file))).isFile()) {
+      throw new Error(`Public asset checkout is missing required file: ${file}`)
+    }
+  }
+}
+
 export const loadPublicAssetConfig = async ({
   rootDir = process.cwd(),
   env = process.env,
   fetcher = fetch,
   allowLocal = !env.CI,
+  devServer = false,
   validateRemote = true,
 }: {
   rootDir?: string
   env?: NodeJS.ProcessEnv
   fetcher?: Fetcher
   allowLocal?: boolean
+  /** Only the main site's development server honours `E2E_PUBLIC_ASSET_DIR`; every build ignores it. */
+  devServer?: boolean
   validateRemote?: boolean
 } = {}): Promise<PublicAssetConfig> => {
   const version = (await readFile(path.join(rootDir, 'public-assets.ref'), 'utf8')).trim()
@@ -129,27 +169,20 @@ export const loadPublicAssetConfig = async ({
     return { baseUrl: LOCAL_PUBLIC_ASSET_BASE_URL, version, requiredFiles, localDir }
   }
 
+  // Browser verification from one address must not depend on the asset site's request limits. The development
+  // server then serves the pinned checkout itself, also under CI; nothing is fetched and nothing falls back.
+  if (devServer && env.E2E_PUBLIC_ASSET_DIR) {
+    const localDir = path.resolve(rootDir, env.E2E_PUBLIC_ASSET_DIR)
+    await assertPinnedCheckout(localDir, version, requiredFiles)
+    return { baseUrl: LOCAL_PUBLIC_ASSET_BASE_URL, version, requiredFiles, localDir, pinned: true }
+  }
+
   if (!validateRemote) {
     return { baseUrl: publicAssetBaseUrl(), version, requiredFiles }
   }
 
   if (env.PUBLIC_ASSET_VALIDATION_DIR) {
-    const directory = path.resolve(rootDir, env.PUBLIC_ASSET_VALIDATION_DIR)
-    const git = (...args: string[]): string => execFileSync('git', ['-C', directory, ...args], {
-      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-    }).trim()
-    if (git('rev-parse', 'HEAD') !== version) {
-      throw new Error(`Public asset checkout version does not match ${version}`)
-    }
-    if (git('status', '--porcelain', '--untracked-files=all', '--', 'assets')) {
-      throw new Error('Public asset checkout assets must be clean')
-    }
-    const available = new Set(git('ls-tree', '-r', '--name-only', 'HEAD', '--', 'assets').split('\n'))
-    for (const file of requiredFiles) {
-      if (!available.has(file) || !(await stat(path.join(directory, file))).isFile()) {
-        throw new Error(`Public asset checkout is missing required file: ${file}`)
-      }
-    }
+    await assertPinnedCheckout(path.resolve(rootDir, env.PUBLIC_ASSET_VALIDATION_DIR), version, requiredFiles)
     return { baseUrl: publicAssetBaseUrl(), version, requiredFiles }
   }
 

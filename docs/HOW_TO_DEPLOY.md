@@ -793,6 +793,17 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 The checkout HEAD must match `public-assets.ref`, its `assets/` tree must be clean, and every required file must be tracked and present. This also works for `pnpm verify` and Replay Viewer builds. Build URLs still use the pinned Pages source. This checks local asset contents; it does not verify the live Pages deployment. Without this explicit setting, builds retain the remote metadata check.
 
+The asset site limits requests per address, so several browser tasks run from one machine receive HTTP 429 for card art. For browser verification, serve the same pinned checkout from the development server:
+
+```bash
+E2E_PUBLIC_ASSET_DIR=/absolute/path/open-agricola-assets PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify <spec>
+```
+
+- Only the main site's Vite development server honours `E2E_PUBLIC_ASSET_DIR`, also under `CI`. It applies the pinned clean-checkout check above, then serves every image and font from `/__public-assets__/` and answers 404 for an unknown path. It makes no remote request and never falls back.
+- Hosted, Pages and Replay Viewer builds, previews and Vitest ignore the variable. They keep the Pages URLs and their own validation; add `PUBLIC_ASSET_VALIDATION_DIR` to keep those builds off the network as well.
+- An immutable Viewer still loads its art and fonts from Pages at run time.
+- The setting is part of the verification fingerprint. It does not verify the live Pages deployment; a build without `PUBLIC_ASSET_VALIDATION_DIR` still does.
+
 To update public assets, first publish `open-agricola-assets` to its Pages site and wait for its workflow to verify every live file against that commit. Then update `public-assets.ref` to the deployed `asset-version.txt`, synchronize `public-assets.required.json`, and follow the main repository's normal release flow. Asset commits that change only documentation also change the deployment marker. Older Viewer Builds retain their code, while public art/fonts follow the current asset site.
 
 ---
@@ -1089,6 +1100,7 @@ Changing the target does not transfer existing GitHub Issues or rewrite stored r
 | `VITE_WS_BASE` | Derived from the API base | WebSocket URL |
 | `PUBLIC_ASSET_LOCAL_DIR` | — | Local development only: a complete asset-repository checkout; remote mixing and fallback are disabled |
 | `PUBLIC_ASSET_VALIDATION_DIR` | — | Validate a clean asset checkout at `public-assets.ref` instead of fetching Pages metadata; build URLs retain the Pages source |
+| `E2E_PUBLIC_ASSET_DIR` | — | Browser verification only: the development server serves a clean asset checkout at `public-assets.ref`, also under `CI`; every build ignores it |
 
 ---
 
