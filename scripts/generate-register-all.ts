@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { parseCardFile, type CardMeta } from './build-cards-manifest'
 
 const CATALOG_DECKS = ['A', 'B', 'C', 'D', 'E', 'M', 'community'] as const
-const RUNTIME_DECKS = [...CATALOG_DECKS, 'classic/E', '__stubs__'] as const
+const RUNTIME_DECKS = [...CATALOG_DECKS, '__stubs__'] as const
 const MAJOR_DECK = 'major'
 
 export type RegisterAllBuildResult = {
@@ -153,7 +153,14 @@ export function buildRegisterAll(options: BuildOptions = {}): RegisterAllBuildRe
   const repoRoot = options.repoRoot ?? process.cwd()
   const cardsRoot = path.resolve(repoRoot, 'shared', 'cards')
   const catalogSources = collectSources(cardsRoot, CATALOG_DECKS)
-  const runtimeSources = collectSources(cardsRoot, RUNTIME_DECKS)
+  const classicRoot = path.join(cardsRoot, 'classic')
+  const classicDecks = fs.existsSync(classicRoot)
+    ? fs.readdirSync(classicRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `classic/${entry.name}`)
+      .sort()
+    : []
+  const runtimeSources = collectSources(cardsRoot, [...RUNTIME_DECKS, ...classicDecks])
   const majorSources = collectMajorSources(cardsRoot)
   const implSources = [...runtimeSources, ...majorSources].filter((source) => source.hasImpl)
   const catalogMetas = parseSourceMetas(catalogSources)

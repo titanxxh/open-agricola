@@ -538,6 +538,7 @@ import { C177_MountainHiker } from './C/C177_MountainHiker'
 import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C179_BovinePioneer } from './C/C179_BovinePioneer'
 import { C180_Trapper } from './C/C180_Trapper'
+import { CE203_Shepherd } from './classic/CE/CE203_Shepherd'
 import { CUSTOM_FixtureHarvester } from './community/CUSTOM_FixtureHarvester'
 import { D001_ZigzagHarrow } from './D/D001_ZigzagHarrow'
 import { D002_DwellingPlan } from './D/D002_DwellingPlan'
@@ -996,7 +997,6 @@ import { M128_Workbench } from './M/M128_Workbench'
 import { M129_PlowhorseMarket } from './M/M129_PlowhorseMarket'
 import { M130_Nosebag } from './M/M130_Nosebag'
 import { M131_CattleStall } from './M/M131_CattleStall'
-import { OLD_E203_Shepherd } from './classic/E/OLD_E203_Shepherd'
 import { STUB_BeforeBakeGainClay } from './__stubs__/STUB_BeforeBakeGainClay'
 import { Major_ClayOven } from './major/clay-oven'
 import { Major_StoneOven } from './major/stone-oven'
@@ -1554,6 +1554,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C178_OnSiteReverend': C178_OnSiteReverend.impl,
   'C179_BovinePioneer': C179_BovinePioneer.impl,
   'C180_Trapper': C180_Trapper.impl,
+  'CE203_Shepherd': CE203_Shepherd.impl,
   'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester.impl,
   'D001_ZigzagHarrow': D001_ZigzagHarrow.impl,
   'D002_DwellingPlan': D002_DwellingPlan.impl,
@@ -2012,7 +2013,6 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M129_PlowhorseMarket': M129_PlowhorseMarket.impl,
   'M130_Nosebag': M130_Nosebag.impl,
   'M131_CattleStall': M131_CattleStall.impl,
-  'OLD_E203_Shepherd': OLD_E203_Shepherd.impl,
   'STUB_BeforeBakeGainClay': STUB_BeforeBakeGainClay.impl,
   'Major_ClayOven': Major_ClayOven.impl,
   'Major_StoneOven': Major_StoneOven.impl,

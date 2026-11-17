@@ -51,6 +51,8 @@ Tests: `shared/cards/__tests__/card-source-representatives.test.ts`, `scripts/ch
 - An implementation-bearing major source enters the backend through two generated paths: `scripts/generate-register-all.ts` adds it to `ALL_CARD_IMPLS`, and `major/runtime.generated.ts` supplies `majorCardSources`, whose `impl.effect` `shared/cards/major/index.ts` merges into the major Card Definitions.
 - The server and sandbox register only custom runtime parts; the main client registers only display metadata and never imports the custom runtime registry.
 
+- Classic sources live under `classic/{deck}/`. Their deck prefixes prepend `C` to the original deck, and card IDs use three-digit numbers. The runtime generator discovers every direct `classic/*` directory; these sources remain outside the ordinary deal catalog until a separate integration enables them.
+
 ## Local state in `cardStates`
 
 - Persistent counters, one-time flags and local state live in `player.cardStates[cardId]`, never top-level `PlayerState`. History a card needs before it is played uses an explicit hand-zone listener ([Hook system](hooks.md#hook-system)), not a global statistic.
