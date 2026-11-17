@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FULL_TASK_IDS, type FullTaskId, type VerificationCommand } from '../ci/verification-tasks'
-import { TASK_ORDER, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
+import { TASK_ORDER, assertNoReservedCandidatePaths, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -24,7 +24,7 @@ function inputs(channel: 'stable' | 'prerelease'): Inputs {
   return { channel, sha, producerSha: producer, output, jobs: 4, repository: 'titanxxh/open-agricola', repositoryId: 123, tree: 'e'.repeat(40),
     configuration: 'a'.repeat(64), producerConfiguration: 'b'.repeat(64), commands, ownerUid: 1000,
     node: { path: '/opt/oa-owner-local/node/bin/node', version: 'v24.19.0', sha256: 'f'.repeat(64) }, dockerVersion: '29.6.2',
-    policyFiles: { 'scripts/ci/owner-local-run.ts': '1'.repeat(64) }, servicePorts: { postgres: 41001, objects: 41002 }, retries: 1, testWorkers: 6, publicAssets: assets, profile: false, browserJobs: 2 }
+    policyFiles: { 'scripts/ci/owner-local-run.ts': '1'.repeat(64) }, servicePorts: { postgres: 41001, objects: 41002 }, retries: 1, testWorkers: 6, publicAssets: assets, profile: false, browserJobs: 2, ownerHome: '/home/owner' }
 }
 
 /** Records every call; each candidate command writes its log and exits with the configured code. */
@@ -92,6 +92,18 @@ describe('owner-local task environment and scheduling', () => {
   })
 })
 
+describe('owner-local preconditions', () => {
+  it('requires an owner home closed to other users and a candidate tree without the reserved data path', () => {
+    const stat = (mode: number) => () => ({ isDirectory: () => true, mode: 0o40000 | mode }) as unknown as ReturnType<typeof import('node:fs').statSync>
+    expect(() => assertPrivateHome('/home/owner', stat(0o750))).not.toThrow()
+    expect(() => assertPrivateHome('/home/owner', stat(0o700))).not.toThrow()
+    expect(() => assertPrivateHome('/home/owner', stat(0o755))).toThrow(/chmod o-rwx/)
+    expect(() => assertPrivateHome('/home/owner', stat(0o751))).toThrow(/must not be accessible/)
+    expect(() => assertNoReservedCandidatePaths('')).not.toThrow()
+    expect(() => assertNoReservedCandidatePaths('data\n')).toThrow(/reserves/)
+  })
+})
+
 describe('isolated owner-local run', () => {
   it.each(['stable', 'prerelease'] as const)('writes a complete %s receipt bound to its logs and evidence after teardown', async channel => {
     const value = inputs(channel), fake = fakeRunner(value)
@@ -107,7 +119,7 @@ describe('isolated owner-local run', () => {
     expect(fake.calls.some(call => call.startsWith('candidate services ') && call.includes('scripts/local-services.mjs --test'))).toBe(true)
     // Every candidate command, preparation included, uses the run's own service ports.
     const candidateCalls = fake.calls.filter(call => call.startsWith('candidate '))
-    expect(candidateCalls.every(call => call.includes('"LOCAL_POSTGRES_PORT":"41001","LOCAL_S3_PORT":"41002","TMPDIR":"/home/oa-candidate/tmp","PUBLIC_ASSET_VALIDATION_DIR":"/home/oa-candidate/public-assets","VITEST_MAX_WORKERS":"6"') && call.includes(' PrivateTmp=yes'))).toBe(true)
+    expect(candidateCalls.every(call => call.includes('"LOCAL_POSTGRES_PORT":"41001","LOCAL_S3_PORT":"41002","TMPDIR":"/home/oa-candidate/tmp","PUBLIC_ASSET_VALIDATION_DIR":"/home/oa-candidate/public-assets","VITEST_MAX_WORKERS":"6"') && call.includes(' PrivateTmp=yes,InaccessiblePaths=/home/owner'))).toBe(true)
     // The browser wave starts only after every CPU-bound task finished.
     const taskStarts = candidateCalls.filter(call => call.startsWith('candidate task-')).map(call => call.split(' ')[1].replace(/^task-|-\d+$/g, ''))
     expect(taskStarts.slice(0, taskStarts.findIndex(task => task.startsWith('chromium')))).toEqual(['fast', 'fast'])
