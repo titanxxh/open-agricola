@@ -40,6 +40,7 @@ function fixture(prerelease = false) {
   cpSync(join(repository, '.github/workflows/candidate-verification.yml'), join(root, '.github/workflows/candidate-verification.yml'))
   cpSync(join(repository, 'deploy-backend.sh'), join(root, 'deploy-backend.sh'))
   cpSync(join(repository, 'scripts/image-intake.ts'), join(root, 'scripts/image-intake.ts'))
+  cpSync(join(repository, 'scripts/typescript-loader.ts'), join(root, 'scripts/typescript-loader.ts'))
   for (const name of ['backup-storage.sh', 'backup-process.sh', 'backup-files.mjs']) cpSync(join(repository, 'scripts', name), join(root, 'scripts', name))
   const packageValue: unknown = JSON.parse(readFileSync(join(repository, 'package.json'), 'utf8'))
   if (typeof packageValue !== 'object' || !packageValue || !('scripts' in packageValue)
