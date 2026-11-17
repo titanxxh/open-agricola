@@ -2,7 +2,7 @@
 // on the owner machine, inside the same isolation model as GitHub (a disposable candidate UID with its own rootless
 // Docker, NoNewPrivileges units, no owner credentials, HOME, release state or rootful Docker socket), and records the
 // owner-local receipt that `pnpm release ... --local-verification` publishes.
-//   pnpm exec tsx scripts/ci/owner-local-run.ts --channel stable|prerelease --sha <candidate> --output <new private dir> [--jobs <n>] [--browser-jobs <n>] [--retries <0-3>] [--test-workers <n>] [--profile]
+//   pnpm exec tsx scripts/ci/owner-local-run.ts --channel stable|prerelease --sha <candidate> --output <new private dir> [--jobs <n>] [--browser-jobs <n>] [--lanes <1-8>] [--retries <0-3>] [--test-workers <n>] [--profile]
 // Run it from the trusted protected-main checkout; its HEAD is the producer. Candidate code never runs as the owner.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -39,10 +39,24 @@ const COMMAND_TIMEOUT_MS = 60 * 60_000
 // candidate migrates test schemas concurrently and serves E2E assets locally (#1779).
 export const DEFAULT_TEST_WORKERS = 10
 export const DEFAULT_BROWSER_JOBS = 2
+// Browser lanes per chromium task; with two browser tasks at once this keeps four lanes on the public asset host.
+export const DEFAULT_LANES = 2
 const policyRoot = resolve(import.meta.dirname, '../..')
 const sha256 = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex')
 const fileSha256 = (path: string) => sha256(readFileSync(path))
 const iso = (time: number) => new Date(time).toISOString()
+
+// Every browser task gets its own slice of the 20000–32767 test port range, so lanes of concurrent tasks never race
+// for the same port between allocation and bind.
+export const BROWSER_PORT_SLICES: Partial<Record<FullTaskId, string>> = Object.fromEntries(
+  (['chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'webkit', 'browser-sandbox'] as const).map((task, index) => [task, `${20000 + 2000 * index}-${21999 + 2000 * index}`]))
+
+/** Environment a browser task needs to share the machine with the other browser tasks of the same run. */
+export function browserEnvironment(task: FullTaskId, lanes: number): Record<string, string> {
+  const range = BROWSER_PORT_SLICES[task]
+  if (!range) return {}
+  return { TEST_PORT_RANGE: range, ...(task.startsWith('chromium-') ? { VERIFY_PARALLEL_LANES: String(lanes) } : {}) }
+}
 
 /** The environment GitHub tasks receive besides the isolation defaults; only the pre production build is pre. */
 export function taskEnvironment(channel: LocalChannel, sha: string, task: FullTaskId, command: VerificationCommand): Record<string, string> {
@@ -139,6 +153,8 @@ export type Inputs = {
   profile: boolean
   /** The owner's home directory, hidden from candidate commands. */
   ownerHome: string
+  /** `VERIFY_PARALLEL_LANES` for each chromium task: independent app instances and browsers inside one task. */
+  lanes: number
   /**
    * Browser tasks running at once. Every test downloads card art from the public asset host, which rate-limits one
    * owner IP (HTTP 429) once about four browser tasks run together; two were measured to pass.
@@ -177,7 +193,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     for (const [index, command] of inputs.commands[task].entries()) {
       const phase = attempt ? `task-${task}-r${attempt}-${index}` : `task-${task}-${index}`
       const executable = command.command === 'pnpm' ? pnpm : command.command === 'node' ? inputs.node.path : command.command
-      const exitCode = await runner.candidate(execution(task), executable, command.args, phase, { ...services, ...taskEnvironment(channel, sha, task, command) }, properties, inputs.profile)
+      const exitCode = await runner.candidate(execution(task), executable, command.args, phase, { ...services, ...browserEnvironment(task, inputs.lanes), ...taskEnvironment(channel, sha, task, command) }, properties, inputs.profile)
       commands.push({ ...command, exitCode, logSha256: fileSha256(join(logs, `${phase}.log`)) })
       if (exitCode !== 0) { failure = `${task}: ${command.command} ${command.args.join(' ')} exited ${exitCode}`; break }
     }
@@ -243,7 +259,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     candidate: { sha, tree: inputs.tree, configuration: inputs.configuration },
     producer: { sha: inputs.producerSha, configuration: inputs.producerConfiguration, files: inputs.policyFiles },
     sandbox: { identity: 'oa-candidate', uid: UID, rootlessDocker: inputs.dockerVersion, noNewPrivileges: true, supplementaryGroups: [],
-      limits: { MemoryMax: '64G', TasksMax: 16384, CPUWeight: 50 }, unitProperties: properties, tmpdir: CANDIDATE_TMPDIR, waves: TASK_WAVES, testWorkers: inputs.testWorkers, browserJobs: inputs.browserJobs,
+      limits: { MemoryMax: '64G', TasksMax: 16384, CPUWeight: 50 }, unitProperties: properties, tmpdir: CANDIDATE_TMPDIR, waves: TASK_WAVES, testWorkers: inputs.testWorkers, browserJobs: inputs.browserJobs, lanes: inputs.lanes, browserPortSlices: BROWSER_PORT_SLICES,
       publicAssets: { version: git(['rev-parse', 'HEAD'], inputs.publicAssets), validationDirectory: CANDIDATE_PUBLIC_ASSETS },
       servicePorts: inputs.servicePorts, isolationStartSha256: fileSha256(join(output, 'isolation-start.log')) },
     prerequisites: { node: inputs.node, packageManager: 'corepack', preparation },
@@ -322,6 +338,8 @@ export async function main(args: string[]): Promise<number> {
   const testWorkers = Number(option(args, '--test-workers', String(DEFAULT_TEST_WORKERS)))
   if (!Number.isSafeInteger(testWorkers) || testWorkers < 0 || testWorkers > 64) throw new Error('--test-workers must be 0–64 (0 keeps the Vitest default)')
   const browserJobs = Number(option(args, '--browser-jobs', String(DEFAULT_BROWSER_JOBS)))
+  const lanes = Number(option(args, '--lanes', String(DEFAULT_LANES)))
+  if (!Number.isSafeInteger(lanes) || lanes < 1 || lanes > 8) throw new Error('--lanes must be 1–8')
   if (git(['status', '--porcelain', '--untracked-files=no'])) throw new Error('The trusted policy checkout has tracked edits')
   const producerSha = git(['rev-parse', 'HEAD'])
   if (spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: policyRoot }).status !== 0) git(['fetch', '--no-tags', '--quiet', 'origin', sha])
@@ -352,7 +370,7 @@ export async function main(args: string[]): Promise<number> {
     producerConfiguration: verificationConfiguration(policyRoot, producerSha), commands: canonicalOwnerLocalCommands(policyRoot, sha, channel),
     ownerUid, node, dockerVersion: execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).trim(), policyFiles,
     servicePorts: { postgres: await freePort(), objects: await freePort() }, retries, testWorkers: testWorkers || null, publicAssets, profile: args.includes('--profile'), browserJobs,
-    ownerHome: homedir() }
+    ownerHome: homedir(), lanes }
   const result = await runIsolated(inputs, nativeRunner)
   if ('failed' in result) { console.error(`Owner-local verification failed:\n- ${result.failed.join('\n- ')}\nLogs: ${join(output, 'logs')}`); return 1 }
   // The publisher applies the same checks; failing here keeps an unusable receipt from being published.
