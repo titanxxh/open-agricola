@@ -53,9 +53,12 @@ export function laneArguments(args: readonly string[], selectedFiles: readonly s
   return weightedAssignment(selectedFiles, lanes, weights).filter(group => group.length).map(group => [...split.options, ...group])
 }
 
+// E2E_* variables that steer only test selection or service setup, never the frontend bundle.
+const NON_BUILD_E2E = new Set(['E2E_DEPENDENCIES_READY', 'E2E_EXTENDED'])
+
 /** Build inputs beyond the source fingerprint that change the hosted frontend. */
 export function hostedFrontendEnvironment(env: NodeJS.ProcessEnv): Record<string, string | null> {
-  const keys = Object.keys(env).filter(key => /^(?:VITE_|PUBLIC_ASSET_|E2E_)/.test(key))
+  const keys = Object.keys(env).filter(key => /^(?:VITE_|PUBLIC_ASSET_|E2E_)/.test(key) && !NON_BUILD_E2E.has(key))
   for (const key of ['GAME_BUILD_ID', 'RELEASE_CHANNEL', 'NODE_ENV', 'NODE_OPTIONS', 'CI']) keys.push(key)
   return Object.fromEntries([...new Set(keys)].sort().map(key => [key, env[key] ?? null]))
 }
