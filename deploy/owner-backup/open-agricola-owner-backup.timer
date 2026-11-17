@@ -1,0 +1,10 @@
+# Runs after the host's 04:00 daily backup; a missed run (machine off) starts at boot.
+[Unit]
+Description=Daily Open Agricola Owner-local Backup
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 Asia/Shanghai
+Persistent=true
+
+[Install]
+WantedBy=timers.target

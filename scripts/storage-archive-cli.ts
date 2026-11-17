@@ -25,15 +25,18 @@ export async function validateArchiveInIsolation(root: string, env: NodeJS.Proce
       const ledger = await new ErasureLedger(sourceObjects).read()
       const { validation } = await restoreStorageArchive(target.connectionString, target.db, target.objects, root, ledger, target.signal, { concurrency })
       return { formatVersion: 2, sourceBuildId: manifest.sourceBuildId, targetBuildId: env.GAME_BUILD_ID ?? 'development',
-        createdAt: manifest.createdAt, validatedAt: new Date().toISOString(), database: manifest.database, ...validation }
+        createdAt: manifest.createdAt, validatedAt: new Date().toISOString(),
+        database: { sha256: manifest.database.sha256, size: manifest.database.size, ...(manifest.database.format ? { format: manifest.database.format } : {}) }, ...validation }
     })
   } finally { sourceObjects.close() }
 }
 
 export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const [command, path, flag] = args
+  // An uncompressed directory dump keeps per-table files byte-stable for rsync copies.
+  const databaseFormat = args.includes('--directory-database') ? 'directory' as const : 'custom' as const
   if (!path || !['export-online', 'export', 'validate', 'restore', 'check-empty', 'check-live', 'ledger-export', 'ledger-merge', 'cleanup-scratch'].includes(command)) {
-    throw new Error('Usage: storage-archive-cli.ts export-online|validate <directory> | cleanup-scratch <record-directory> | export|restore <directory> --applications-stopped | check-empty|check-live <build-id> --applications-stopped | ledger-export|ledger-merge <ledger.json>')
+    throw new Error('Usage: storage-archive-cli.ts export-online|validate <directory> [--directory-database] | cleanup-scratch <record-directory> | export|restore <directory> --applications-stopped [--directory-database] | check-empty|check-live <build-id> --applications-stopped | ledger-export|ledger-merge <ledger.json>')
   }
   const validationConcurrency = storageValidationConcurrency(env.STORAGE_VALIDATION_CONCURRENCY)
   const controller = new AbortController()
@@ -68,7 +71,7 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
     db = new PostgresDatabase({ connectionString: env.DATABASE_URL, schema: env.DATABASE_SCHEMA })
     if (command === 'export-online') {
       if (deadline === undefined) throw new Error('Online backup requires a deadline')
-      await exportStorageArchive({ connectionString: env.DATABASE_URL, db, objects, root: resolve(path),
+      await exportStorageArchive({ connectionString: env.DATABASE_URL, db, objects, root: resolve(path), databaseFormat,
         sourceBuildId: env.SOURCE_BUILD_ID || env.GAME_BUILD_ID || '', mode: 'online', deadlineEpochMs: deadline, signal: controller.signal })
       return
     }
@@ -96,7 +99,7 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       }
     }
     if (command === 'export') {
-      await exportStorageArchive({ connectionString: env.DATABASE_URL, db, objects, root: resolve(path),
+      await exportStorageArchive({ connectionString: env.DATABASE_URL, db, objects, root: resolve(path), databaseFormat,
         sourceBuildId: env.SOURCE_BUILD_ID || env.GAME_BUILD_ID || '', mode: 'maintenance',
         signal: controller.signal, ...(deadline === undefined ? {} : { deadlineEpochMs: deadline }) })
     } else {

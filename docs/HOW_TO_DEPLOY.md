@@ -1115,6 +1115,22 @@ The cron templates use the host's `Asia/Shanghai` timezone: daily backup at 04:0
 
 Offsite ledger synchronization reads the remote copy, merges it into the current S3 CAS ledger, and exports the union. Old backups or local copies cannot erase newer deletion facts. Use `ledger-only` immediately after a removal.
 
+#### Owner-local backup
+
+The owner machine keeps its own copies under `~/oa-backup/<UTC capture time>/` (ADR 0045). The host's daily backup, its validation and offsite sync are unchanged.
+
+```bash
+node --import tsx scripts/owner-backup.ts run --host ubuntu@<formal-host>   # pull, validate, prune
+node --import tsx scripts/owner-backup.ts validate --snapshot ~/oa-backup/<stamp>
+node --import tsx scripts/owner-backup.ts prune
+```
+
+`run` asks the host's `scripts/owner-sync-capture.sh capture` for one online, snapshot-consistent capture under the maintenance lock. The capture uses the running image, a directory-format uncompressed dump, the objects and the current deletion ledger, and contains no configuration. The owner machine pulls it with rsync, using the previous copy as basis, verifies every digest and then has the host release it. The host keeps at most one owner capture; the next capture supersedes a stale one and daily pruning removes one older than 30 days. A lock held by the daily backup is retried three times, ten minutes apart.
+
+Validation restores the copy into throwaway PostgreSQL and RustFS containers on an internal Docker network, merges the copied ledger and runs `storage-archive-cli.ts validate` in the image the host was running, with every CPU. That image must already be on the owner machine, as it is after a formal delivery. The report is written to `validation.json`. Copies older than 30 days are deleted, the newest included. A copy restores through the procedure below, with its `capture/` directory as the archive.
+
+The capture needs a running image and host checkout that include `owner-sync-capture.sh`; with an older image the dump stays custom-format, which validates but transfers in full. Install the daily timer from `deploy/owner-backup/` as its header describes; it runs at 04:30 Asia/Shanghai and catches up after the machine was off.
+
 #### Restore or switch to external services
 
 Stop every application. Prepare the target image, archive and matching report, latest independent ledger, retained encryption keys, an empty target database, and a separate target object namespace. Verify the tar SHA-256/length against the report before extracting into a private directory. Restore also verifies the inner database and object hashes/lengths. Configure the destination connection group while preserving the accepted `BACKEND_IMAGE` from this deployment's `.env`, then run. A backup configuration belongs to its source build and must not replace this selector. Missing or blank bindings require a verified fixed-image delivery before these commands:
