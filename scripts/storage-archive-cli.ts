@@ -90,7 +90,8 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       try {
         const resources = new ResourceStore(db, objects)
         await applyReplayRemovalLedger(db, { resources })
-        const validation = await validateStorage(db, resources, { concurrency: validationConcurrency })
+        // --counted: an Owner-local Validation already decoded these exact bytes with this target image.
+        const validation = await validateStorage(db, resources, { concurrency: validationConcurrency, replaySteps: args.includes('--counted') ? 'count' : 'decode' })
         await db.prepare("UPDATE data_imports SET status='validated',report_json=?,updated_at=? WHERE source_hash=?").run(JSON.stringify(validation), Date.now(), barrier)
         console.log(JSON.stringify(validation, null, 2)); return
       } catch (error) {

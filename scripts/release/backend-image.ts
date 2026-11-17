@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fullSha } from '../ci/verification-tasks.ts'
@@ -10,6 +10,8 @@ import { BACKEND_IMAGE_CLEANUP_MS, BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS, BACKEN
 import { assertExpectedContainerImage, verifyContainerImageBuild } from './container-images.ts'
 import { prepareContainerImageArchive } from './container-images-owner.ts'
 import { BACKEND_RESUME_WORK_MS } from './backend-image-progress.ts'
+import { typescriptLoaderArgs } from '../typescript-loader.ts'
+import { pullSnapshot } from '../owner-backup.ts'
 
 const quote = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 // Tolerate about two minutes of silence on owner links before SSH gives up.
@@ -21,14 +23,31 @@ const connectionLost = (error: unknown): boolean => !!error && typeof error === 
 function execute(command: string, args: string[], input?: string, timeout = 30_000): string {
   return execFileSync(command, args, { input, encoding: 'utf8', timeout, maxBuffer: 4 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
 }
+/** execute() without blocking the event loop; failures carry the same status/signal fields. */
+function executeAsync(command: string, args: string[], timeout: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = '', stderr = ''
+    child.stdout.on('data', chunk => { stdout += chunk }); child.stderr.on('data', chunk => { stderr += chunk })
+    const timer = setTimeout(() => child.kill('SIGTERM'), timeout)
+    child.once('error', error => { clearTimeout(timer); reject(error) })
+    child.once('close', (status, signal) => {
+      clearTimeout(timer)
+      if (status === 0) resolve(stdout.trim())
+      else reject(Object.assign(new Error(`${command} failed`), { status, signal, stderr }))
+    })
+  })
+}
 
-export async function backendImageDeployment(cwd: string, input: string[]): Promise<void> {
-  if (input[0] === 'status' || input[0] === 'resume') {
-    backendOperationCommand(cwd, input)
+export async function backendImageDeployment(cwd: string, arguments_: string[]): Promise<void> {
+  if (arguments_[0] === 'status' || arguments_[0] === 'resume') {
+    backendOperationCommand(cwd, arguments_)
     return
   }
+  // ADR 0045: by default the owner machine validates the cutover when both images support it.
+  const fullMaintenance = arguments_.includes('--full-maintenance'), input = arguments_.filter(value => value !== '--full-maintenance')
   const split = input.findIndex(value => value.startsWith('--')), positional = split < 0 ? input : input.slice(0, split)
-  if (positional.length > 3) throw new Error('Usage: deploy-backend.sh [host] [ref] [remote-dir] --build-run N --build-attempt N --artifact-id N --auth-file FILE --import-budget FILE')
+  if (positional.length > 3) throw new Error('Usage: deploy-backend.sh [host] [ref] [remote-dir] --build-run N --build-attempt N --artifact-id N --auth-file FILE --import-budget FILE [--full-maintenance]')
   const sourceSha = backendCandidate(cwd, [positional[1] ?? 'main'])
   const flags = split < 0 ? [] : input.slice(split), selected = new Map<string, string>()
   const required = ['--build-run', '--build-attempt', '--artifact-id', '--auth-file', '--import-budget']
@@ -99,16 +118,35 @@ printf '%s\\n' "$4"
   authorize()
   ssh(['node', receiver, 'receive', remoteRequest], undefined, BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS)
   if (backendCandidate(cwd, [sourceSha]) !== sourceSha || JSON.stringify(verifyContainerImageBuild(build)) !== JSON.stringify(receipt)) throw new Error('Formal image authority changed during transport')
+  const ownerValidation = !fullMaintenance && installation.kind !== 'bootstrap'
+  if (ownerValidation) {
+    // A fresh basis keeps the cutover delta to the last few minutes of writes; it is optional.
+    try { process.stderr.write(`Owner-local Backup refreshed: ${await pullSnapshot({ host, remoteDir: directory, root: join(homedir(), 'oa-backup') }, 1)}\n`) }
+    catch (error) { process.stderr.write(`Owner-local Backup warm-up skipped: ${error instanceof Error ? error.message : String(error)}\n`) }
+  }
   authorize()
-  const env = ['env']
+  const env = ['env', `BACKEND_VALIDATION=${ownerValidation ? 'owner' : 'host'}`]
   if (process.env.ACCOUNT_REGISTRATION_POLICY) env.push(`ACCOUNT_REGISTRATION_POLICY=${process.env.ACCOUNT_REGISTRATION_POLICY}`)
+  const finished = join(local, 'maintenance-finished')
+  const owner = ownerValidation ? new Promise<string>(done => {
+    const child = spawn(process.execPath, [...typescriptLoaderArgs(), resolve(import.meta.dirname, 'owner-cutover.ts'), host, directory, stage, sourceSha, exported.transfer.receipt.imageId, operationId, finished],
+      { stdio: ['ignore', 'pipe', 'inherit'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.once('close', status => done(status === 0 ? output.trim() : `{"outcome":"error","status":${status}}`))
+  }) : Promise.resolve('{"outcome":"host"}')
   let result: string
-  try { result = ssh([...env, 'node', join(stage, 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', ...target], undefined, BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS) }
-  catch (error) {
-    // The backend keeps running without this session; follow its journal instead of reporting a failure.
-    if (!connectionLost(error)) throw error
-    process.stderr.write(`Owner SSH session ended during maintenance; following backend operation ${operationId}\n`)
-    result = await followBackendOperation(cwd, { host, sourceSha, directory, operationId })
+  try {
+    try { result = await executeAsync('ssh', [...SSH_OPTIONS, host, [...env, 'node', join(stage, 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', ...target].map(quote).join(' ')], BACKEND_IMAGE_MAINTENANCE_OWNER_TIMEOUT_MS) }
+    catch (error) {
+      // The backend keeps running without this session; follow its journal instead of reporting a failure.
+      if (!connectionLost(error)) throw error
+      process.stderr.write(`Owner SSH session ended during maintenance; following backend operation ${operationId}\n`)
+      result = await followBackendOperation(cwd, { host, sourceSha, directory, operationId })
+    }
+  } finally {
+    writeFileSync(finished, '', { mode: 0o600 })
+    process.stderr.write(`Owner-local Validation: ${await owner}\n`)
   }
   process.stdout.write(result + `\nOwner image evidence: ${local}\n`)
 }

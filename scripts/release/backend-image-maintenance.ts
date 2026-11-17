@@ -73,6 +73,12 @@ function installedImageBinding(root: string) {
   } }
 }
 type Target = Pick<BackendImageRequest, 'directory' | 'sourceSha' | 'producerSha'>
+/** How long a stopped cutover waits for the owner's report before restarting the unchanged source. */
+export const OWNER_REPORT_WAIT_MS = 15 * 60_000
+function ownerReportWaitMs(): number {
+  const value = Number(process.env.BACKEND_OWNER_WAIT_MS ?? OWNER_REPORT_WAIT_MS)
+  return Number.isSafeInteger(value) && value >= 1000 && value <= OWNER_REPORT_WAIT_MS ? value : OWNER_REPORT_WAIT_MS
+}
 function validateTarget(request: BackendImageRequest, expected: Target): BackendImageRequest {
   if (request.directory !== expected.directory || request.sourceSha !== fullSha(expected.sourceSha)
     || request.producerSha !== fullSha(expected.producerSha)) throw new Error('Formal image request differs from the owner maintenance target')
@@ -91,12 +97,34 @@ export function maintainBackendImage(path: string, expected: Target): void {
   const docker = (args: string[], timeout?: number): string => run('docker', args, root, process.env, timeout)
   const unpin = pinBackendDocker(request.stage, docker)
   let restartOld = false
+  let ownerNonce: string | null = null
   let drainTarget: (() => void) | undefined
   let source: { id: string; image: string; build: string; running: boolean } | undefined
   const inspect = (id: string): Record<string, unknown> => {
     const values: unknown = JSON.parse(docker(['inspect', id]))
     if (!Array.isArray(values) || values.length !== 1) throw new Error('Expected exactly one native application container')
     return object(values[0])
+  }
+  /** Storage features an image declares; an image without the module, or a failed probe, declares none. */
+  const capabilities = (imageId: string): string[] => {
+    try {
+      const output = docker(['run', '--rm', '--pull', 'never', '--network', 'none', '--user', `${process.getuid?.()}:${process.getgid?.()}`, '--entrypoint', 'node', imageId,
+        '--import', 'tsx', '--input-type=module', '-e', "const m = await import('./scripts/storage-capabilities.ts').catch(() => null); console.log(JSON.stringify(m?.STORAGE_CAPABILITIES ?? []))"], 60_000)
+      const value: unknown = JSON.parse(output.split('\n').at(-1) ?? '[]')
+      return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+    } catch { return [] }
+  }
+  /** Owner-local Validation needs the owner's request and both images' support; otherwise the host validates. */
+  const selectCutoverValidation = (sourceImage: string, targetImage: string): string | null => {
+    let reason = 'host validation requested'
+    let nonce: string | null = null
+    if (process.env.BACKEND_VALIDATION === 'owner') {
+      if (!capabilities(sourceImage).includes('directory-database')) reason = 'source image cannot export a directory dump'
+      else if (!capabilities(targetImage).includes('counted-live-check')) reason = 'target image cannot run a counted live check'
+      else { nonce = randomUUID(); reason = 'both images support Owner-local Validation' }
+    }
+    writeFileSync(join(request.stage, 'validation-mode.json'), JSON.stringify({ format: 1, mode: nonce ? 'owner' : 'host', reason }) + '\n', { flag: 'wx', mode: 0o600, flush: true })
+    return nonce
   }
   try {
     const image = verifyReceivedBackendImage(path, expected, 'maintenance', docker), installed = installedImageBinding(root)
@@ -176,6 +204,8 @@ export function maintainBackendImage(path: string, expected: Target): void {
     const compose = (args: string[], timeout?: number): string => run('docker', ['compose', '-f', composePath, ...args], root, env, timeout)
     if (source) {
       writeFileSync(join(request.stage, 'source.json'), JSON.stringify({ ...source, previousRef }) + '\n', { flag: 'wx', mode: 0o600, flush: true })
+      // ADR 0045: decided before the stop, so probing costs no downtime.
+      ownerNonce = selectCutoverValidation(source.image, image)
       if (source.running) {
         docker(['stop', '--time', '90', source.id], 100_000)
         const stopped = inspect(source.id), state = object(stopped.State)
@@ -186,12 +216,15 @@ export function maintainBackendImage(path: string, expected: Target): void {
       const backupEnv = Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith('BACKUP_')))
       run('bash', [join(policy, 'scripts/backup-storage.sh'), stem, '--already-stopped'], root,
         { ...backupEnv, BACKUP_ENVIRONMENT: 'stable', BACKUP_POLICY_ROOT: policy, BACKUP_WORKING_DIRECTORY: root, BACKUP_COMPOSE_FILE: composePath,
-          BACKUP_CAPTURE_SERVICE: 'capture', BACKUP_TOOL_SERVICE: 'app', SOURCE_BUILD_ID: source.build, MAINTENANCE_LOCK_HELD: '1' }, 31 * 60_000)
+          BACKUP_CAPTURE_SERVICE: 'capture', BACKUP_TOOL_SERVICE: 'app', SOURCE_BUILD_ID: source.build, MAINTENANCE_LOCK_HELD: '1',
+          ...(ownerNonce ? { BACKUP_OWNER_VALIDATION: ownerNonce, BACKUP_OWNER_REQUEST: join(request.stage, 'owner-request.json'), BACKUP_OWNER_REPORT: join(request.stage, 'owner-report.json'),
+            BACKUP_TARGET_BUILD_ID: request.sourceSha, BACKUP_TARGET_IMAGE: request.transfer.receipt.imageId, BACKUP_OWNER_WAIT_MS: String(ownerReportWaitMs()) } : {}) }, 31 * 60_000)
       const manifest = object(JSON.parse(readFileSync(join(root, 'backups', `${stem}.manifest.json`), 'utf8')))
       if (manifest.formatVersion !== 2 || manifest.environment !== 'stable' || manifest.backupStem !== stem
         || manifest.sourceBuildId !== source.build || manifest.targetBuildId !== request.sourceSha
         || typeof manifest.validatedAt !== 'string' || !Number.isFinite(Date.parse(manifest.validatedAt))) throw new Error('Sealed backup does not bind the retained source and fixed formal target')
     } else {
+      writeFileSync(join(request.stage, 'validation-mode.json'), JSON.stringify({ format: 1, mode: 'host', reason: 'explicit empty installation' }) + '\n', { flag: 'wx', mode: 0o600, flush: true })
       const network = object(object(targetConfig.networks).dependencies)
       if (network.external !== true || typeof network.name !== 'string' || !network.name) throw new Error('Empty-storage proof requires the configured external dependency network')
       const names = ['DATABASE_URL', 'DATABASE_SCHEMA', 'S3_ENDPOINT', 'S3_BUCKET', 'S3_PREFIX', 'S3_REGION', 'S3_FORCE_PATH_STYLE', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']
@@ -252,15 +285,22 @@ export function maintainBackendImage(path: string, expected: Target): void {
         execute('docker', ['rm', '-f', '-v', id], root)
       }
     }
+    let live = ''
     try {
-      compose(['run', '--rm', '--name', liveName, '--label', `org.open-agricola.backend-operation=${request.operationId}`,
+      live = compose(['run', '--rm', '--name', liveName, '--label', `org.open-agricola.backend-operation=${request.operationId}`,
         '--label', 'org.open-agricola.backend-phase=live-validation', '--no-deps', '--pull', 'never',
         '-e', `BACKUP_DEADLINE_EPOCH_MS=${Date.now() + liveBudget}`, '-e', 'STORAGE_VALIDATION_CONCURRENCY=auto', 'app', 'node', '--import', 'tsx',
-        'scripts/storage-archive-cli.ts', 'check-live', request.sourceSha, '--applications-stopped'], liveBudget)
+        'scripts/storage-archive-cli.ts', 'check-live', request.sourceSha, '--applications-stopped', ...(ownerNonce ? ['--counted'] : [])], liveBudget)
     } catch (error) {
       try { removeLive() }
       catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Live target validation failed and its owned container cleanup could not be confirmed', { cause: cleanupError }) }
       throw error
+    }
+    if (ownerNonce) {
+      // The counted check decodes no frames; the migrated live data must match what the owner decoded.
+      let report: Record<string, unknown> = {}
+      try { report = object(JSON.parse(live.slice(live.indexOf('{')))) } catch { /* compared below */ }
+      if (validationKeys.some(key => JSON.stringify(report[key]) !== JSON.stringify(sealedStorage[key]))) throw new Error('Counted live validation differs from the Owner-local Validation; maintenance remains active')
     }
     progress = { ...progress, phase: 'starting', updatedAt: Math.max(progress.liveStartedAt, Date.now()), validatorExitCode: 0 }
     writeBackendProgress(request, progress)
@@ -316,6 +356,26 @@ export function maintainBackendImage(path: string, expected: Target): void {
     }
     throw error
   } finally { unpin() }
+}
+
+/**
+ * Restarts the identical, cleanly stopped source after a maintenance process
+ * died before migration (for example while waiting for an Owner-local
+ * Validation). Refused once migration began: no restart of an old image after
+ * the live schema may have changed (ADR 0040).
+ */
+export function restoreBackendSource(path: string, expected: Target): { restored: string } {
+  const { request } = readBackendImageEvidence(path, expected), root = request.directory
+  if (existsSync(join(request.stage, 'maintenance-progress.json'))) throw new Error('Live migration began for this operation; restoring the source is refused')
+  const source = object(JSON.parse(privateBackendEvidence(join(request.stage, 'source.json')).toString('utf8')))
+  if (typeof source.id !== 'string' || !/^[a-f0-9]{12,64}$/.test(source.id) || typeof source.image !== 'string' || typeof source.build !== 'string') throw new Error('Invalid retained source evidence')
+  if (installedImageBinding(root).image !== source.image) throw new Error('Installed image selector no longer names the retained source')
+  const values: unknown = JSON.parse(execute('docker', ['inspect', source.id], root))
+  if (!Array.isArray(values) || values.length !== 1) throw new Error('Expected exactly one retained source container')
+  const current = object(values[0]), state = object(current.State), env = environment(object(current.Config).Env)
+  if (current.Image !== source.image || env.GAME_BUILD_ID !== source.build || state.Running !== false || state.OOMKilled !== false || state.ExitCode !== 0) throw new Error('Source identity or clean stop changed; restoring it is refused')
+  execute('docker', ['start', source.id], root)
+  return { restored: source.id }
 }
 
 export type BackendOperationStatus = {
@@ -588,6 +648,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         }
       }
       else if (result.error || result.status !== 0) throw new Error('Backend observation or continuation failed; inspect private operation evidence')
+    } else if (mode === 'restore-source') {
+      const result = spawnSync('flock', ['-n', '-E', '75', join(directory, 'backups/.maintenance.lock'), process.execPath, fileURLToPath(import.meta.url), '_restore-source', path, directory, sourceSha, producerSha],
+        { stdio: 'inherit', timeout: 120_000 })
+      if (result.status === 75) throw new Error('The maintenance lock is busy; the operation is still running')
+      if (result.error || result.status !== 0) throw new Error('Source restore was refused; inspect private operation evidence')
+    } else if (mode === '_restore-source') {
+      console.log(JSON.stringify(restoreBackendSource(path, expected)))
     } else if (mode === '_status') {
       console.log(JSON.stringify(backendImageOperationStatus(path, expected)))
     } else if (mode === '_resume' && authorization) {
