@@ -272,7 +272,7 @@ helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的�
 ./deploy-prerelease.sh open --config "$pre_config" --expected-current "$pre_sha" --sha "$pre_sha" --authority-receipt activate.json --audit audit.json --verification "$native_verification" --acceptance acceptance.json
 ```
 
-open 重扫 native view，核对 completion/activation 绑定、证据哈希及运行身份，仅原子开放该已验收候选；health 不会自动开放。正式入口 flag 仍由 owner 独立激活，也不能绕过代次准入和维护态。
+open 重扫 native view，核对 completion/activation 绑定、证据哈希及运行身份，仅原子开放该已验收候选；health 不会自动开放。正式入口 flag 仍由 owner 独立激活，也不能绕过代次准入和维护态。最终审计链之前，可以运行 `./deploy-prerelease.sh verify-open --config "$pre_config" --sha "$pre_sha" --output <新的私有文件>`，在本机完成 GitHub 候选回执校验，不连接主机。之后 `open --verified-receipt <文件>` 只在本机复核一次就使用这份回执，因此 activate 到 open 的 30 秒时限内只剩下发往主机的请求。该文件必须为 owner 私有，绑定候选、策略 SHA 和 target，并且生成不超过十分钟。主机只检查回执的结构，不检查生成时间。不带这个参数时，open 仍按原方式校验。
 
 可信网关每十秒读取固定的正式策略接口，确认期限不超过请求开始后三十秒。能力缺失、不兼容或过期时，关闭候选 HTTP/WS 及已有连接。开放状态还绑定已验收的正式 build；正式发布 SHA 改变后，pre 关闭直至重新验收。无需重建、迁移或替换 pre 数据代次，先取得新 authority close 回执再执行：
 
@@ -296,7 +296,7 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 - 各验收套件；
 - 删除 D/E，执行删除后的审计链，并核对数据行为零；
 - 根据以上事实生成 owner notes，打包证据，证明正式站浏览器策略，把证据复制到主机并核对哈希；
-- 在最终审计链开始前写好并复制 acceptance，audit-complete 与 activate 之间不做任何事；activate 后三十秒内 open；
+- 在最终审计链开始前写好并复制 acceptance，并完成 `verify-open`；audit-complete 与 activate 之间不做任何事；activate 后三十秒内执行 `open --verified-receipt`；
 - readback、收回 Beta、全部登出、归档回执。
 
 在正式容器内运行的辅助脚本位于 `scripts/prerelease/owner-accounts/`。

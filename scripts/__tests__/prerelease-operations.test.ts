@@ -849,3 +849,27 @@ it.each(['stable proof', 'missing isolation digest', 'partial tasks', 'invented 
   expect(value.calls()).toBe('')
   expect(existsSync(join(value.root, 'control/gate.json'))).toBe(false)
 })
+
+it('opens from a verify-open receipt without GitHub and refuses a stale one or another action before host work', () => {
+  const value = fixture(), candidate = 'c'.repeat(40)
+  writeFileSync(join(value.bin, 'gh'), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> '${value.temporary}/calls'\nexit 1\n`, { mode: 0o700 })
+  const policy = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const receipt = { status: 'passed', channel: 'prerelease', repository: 'titanxxh/open-agricola', sha: candidate, configuration: 'a'.repeat(64), producerConfiguration: 'b'.repeat(64),
+    tasks: FULL_TASK_IDS.map((id, index) => ({ id, status: 'passed', runId: 7, jobId: index + 1 })) }
+  const verified = (name: string, verifiedAt: number) => {
+    const path = join(value.temporary, name)
+    writeFileSync(path, JSON.stringify({ format: 1, action: 'open', buildId: candidate, policySha: policy, fingerprint: targetFingerprint(parsePrereleaseTarget(value.config)), verifiedAt, receipt }), { mode: 0o600 })
+    return path
+  }
+  const stale = value.invoke('open', '--expected-current', candidate, '--sha', candidate, '--verified-receipt', verified('stale.json', Date.now() - 11 * 60_000))
+  expect(stale.status).not.toBe(0)
+  expect(stale.stderr).toContain('Verified open receipt is stale')
+  const fresh = value.invoke('open', '--expected-current', candidate, '--sha', candidate, '--verified-receipt', verified('fresh.json', Date.now()))
+  expect(fresh.status).not.toBe(0)
+  // The envelope carried the pre-verified receipt through the host's own receipt check to the runtime lease check.
+  expect(fresh.stderr).toContain('expected-current lease changed')
+  const other = value.invoke('status', '--expected-current', candidate, '--verified-receipt', verified('other.json', Date.now()))
+  expect(other.stderr).toContain('--verified-receipt applies only to open')
+  expect(value.invoke('verify-open', '--sha', candidate).stderr).toContain('verify-open requires --sha')
+  expect(value.calls()).not.toContain('gh ')
+})

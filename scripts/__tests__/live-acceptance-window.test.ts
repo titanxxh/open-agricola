@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { REQUIRED_EVIDENCE } from '../prerelease/live-acceptance/evidence.mjs'
 import {
-  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertNoResidualRows, assertWithin, markStep, markThrough, newState, nextStep, openBinding, ownerNotes,
+  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertNoResidualRows, assertWithin, markStep, markThrough, newState, nextStep, openBinding, ownerNotes, verifiedOpenFresh,
   parseWindowConfig, previousTeamRoom, rerunCommands, resetSteps, resumeDecision, reverifyOps, runDiagnostics, runWindow, staleSteps, suiteGaps, teamAccounts,
 } from '../prerelease/live-acceptance/window.mjs'
 
@@ -61,6 +61,15 @@ describe('window plan', () => {
     expect(resetSteps(state, ['formal-browser']).steps['formal-browser']).toBeUndefined()
     state = markStep(markStep(state, 'final-open', 'started', 2_000), 'final-open', 'done', 3_000)
     expect(staleSteps(state, 1_000 + 60 * 60_000)).toEqual([])
+  })
+
+  it('reuses a verify-open file only while at least five of its ten minutes remain', () => {
+    const path = join(privateRoot(), 'verified-open.json')
+    expect(verifiedOpenFresh(path, 0)).toBe(false)
+    writePrivate(path, { verifiedAt: 1_000 })
+    expect(verifiedOpenFresh(path, 1_000 + 4 * 60_000)).toBe(true)
+    expect(verifiedOpenFresh(path, 1_000 + 5 * 60_000)).toBe(false)
+    expect(verifiedOpenFresh(path, 999)).toBe(false)
   })
 
   it('stops before a lifecycle limit instead of sending a request the authority would refuse', () => {
@@ -299,7 +308,14 @@ describe('final open', () => {
     expect(activated).toBe(audited + 1)
     expect(window.calls.some(call => call.includes('cli.mjs acceptance'))).toBe(false)
     expect(at(join(window.exchange, 'acceptance.json'))).toBeLessThan(at('authority.ts close'))
-    expect(window.calls.findIndex(call => call.startsWith('./deploy-prerelease.sh open'))).toBeGreaterThan(activated)
+    const opened = window.calls.findIndex(call => call.startsWith('./deploy-prerelease.sh open'))
+    expect(opened).toBeGreaterThan(activated)
+    // GitHub verification ran before the chain; activate → open holds only the evidence copy and the open itself.
+    expect(at('./deploy-prerelease.sh verify-open')).toBeGreaterThan(-1)
+    expect(at('./deploy-prerelease.sh verify-open')).toBeLessThan(at('authority.ts close'))
+    expect(window.calls.slice(activated + 1, opened).every(call => call.startsWith('scp '))).toBe(true)
+    expect(window.calls[opened]).toContain(`--verified-receipt ${join(window.value.windowDirectory, 'verified-open.json')}`)
+    expect(window.calls.some(call => call.startsWith('gh '))).toBe(false)
     const written = JSON.parse(readFileSync(join(window.exchange, 'acceptance.json'), 'utf8'))
     expect(written).toMatchObject({ channel: 'prerelease', targetId: 'pre-main', operationId: reverifyOp, buildId: candidate, generation, healthyCycle: '55555555-5555-4555-8555-555555555555' })
     expect(JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8')).steps['final-open'].status).toBe('done')
