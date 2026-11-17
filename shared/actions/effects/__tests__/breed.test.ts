@@ -11,7 +11,7 @@ import { withActiveRegistry } from '../../../cards/active-registry'
 import { CardRegistry } from '../../../cards/registry'
 import { E084_DollysMother_impl } from '../../../cards/E/E084_DollysMother'
 import { M033_NightPasture_impl } from '../../../cards/M/M033_NightPasture'
-import { OLD_E203_Shepherd } from '../../../cards/classic/E/OLD_E203_Shepherd'
+import { CE203_Shepherd } from '../../../cards/classic/CE/CE203_Shepherd'
 
 const NIGHT_PASTURE = 'M033_NightPasture'
 
@@ -394,10 +394,10 @@ describe('breed core helper', () => {
 })
 
 describe('classic E203 Shepherd through the public breeding boundary', () => {
-  const cardId = OLD_E203_Shepherd.meta.id
+  const cardId = CE203_Shepherd.meta.id
   const withShepherd = <T>(run: () => T): T => {
     const registry = createOfficialCardRegistry()
-    registry.loadImpl(cardId, OLD_E203_Shepherd.impl)
+    registry.loadImpl(cardId, CE203_Shepherd.impl)
     return withActiveRegistry(registry, run)
   }
   const setup = (sheep: number, played = true) => {
