@@ -15,6 +15,15 @@ const customCards: CustomCardData[] = [{ cardType: 'minor', cardJson: CI097_Slau
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 
+function settlePlayerSwitches(session: GameSession, initial: SessionResponse) {
+  let response = initial
+  while (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-player-switch') {
+    expect(response.ok, response.error).toBe(true)
+    response = confirmPlayerSwitch(session)
+  }
+  return response
+}
+
 function harvestSession(configure?: (state: GameState) => void, playerCount = 4) {
   const session = createWorkSession({
     options: { playerCount },
@@ -153,10 +162,7 @@ describe('classic I97 Slaughterhouse', () => {
       },
     })
     sessions.push(session)
-    let response = session.takeAction(2, 'traveling-players')
-    while (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-player-switch') {
-      response = confirmPlayerSwitch(session)
-    }
+    let response = settlePlayerSwitches(session, session.takeAction(2, 'traveling-players'))
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: cookIndex, request: { kind: 'choice' } })
     if (response.interaction.stateId !== 'wait') throw new Error('Expected Culinary Artist choice')
@@ -164,10 +170,7 @@ describe('classic I97 Slaughterhouse', () => {
       descriptionEffects(option.descriptionPreview).some(effect =>
         (effect.kind === 'payment' || effect.kind === 'resourceExchange') && effect.resourcesPaid?.[resource] === 1))
     expect(choice).toBeDefined()
-    response = session.resolveChoice(cookIndex, choice!.value)
-    while (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-player-switch') {
-      response = confirmPlayerSwitch(session)
-    }
+    response = settlePlayerSwitches(session, session.resolveChoice(cookIndex, choice!.value))
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[cookIndex]!.resources).toMatchObject({ [resource]: 0, food })
     expect(response.state.players[0]!.resources.food).toBe(cookIndex === 0 ? food : reward)
@@ -177,6 +180,52 @@ describe('classic I97 Slaughterhouse', () => {
       exchangeSource: artist, paid: { [resource]: 1 }, gained: { food },
     }))
     expect(JSON.stringify(response.state.log)).toContain(artist)
+    expect(response.scores?.[0]?.categories.find(category => category.key === 'cards')?.entries)
+      .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 2 }))
+  })
+
+  it.each([
+    { cookIndex: 1, accept: true, reward: 1 },
+    { cookIndex: 0, accept: true, reward: 0 },
+    { cookIndex: 1, accept: false, reward: 0 },
+  ])('handles Nutrition Expert for player $cookIndex, accepted: $accept', ({ cookIndex, accept, reward }) => {
+    const nutrition = 'B135_NutritionExpert'
+    const session = createWorkSession({
+      options: { playerCount: 4 },
+      customCards,
+      configure(state) {
+        state.round = 3
+        state.players.forEach(player => {
+          Object.assign(player.resources, { food: 0, grain: 0, vegetable: 0, sheep: 0 })
+          markAllWorkersUsed(state, player)
+        })
+        state.players[0]!.minorPlayed = [CARD_ID]
+        const cook = state.players[cookIndex]!
+        cook.occupationPlayed = [nutrition]
+        Object.assign(cook.resources, { grain: 1, vegetable: 1, sheep: 1 })
+        const room = cook.roomTiles[0]!
+        cook.houseAnimals = { [`${room.row}-${room.col}`]: 'sheep' }
+      },
+    })
+    sessions.push(session)
+    let response = settlePlayerSwitches(session, session.performRoundEnd())
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: cookIndex, request: { kind: 'choice' } })
+    if (response.interaction.stateId !== 'wait') throw new Error('Expected Nutrition Expert choice')
+    const choice = response.interaction.request.options?.find(option => !option.disabled &&
+      (accept ? option.value !== '__skip__' : option.value === '__skip__'))
+    expect(choice).toBeDefined()
+    response = settlePlayerSwitches(session, session.resolveChoice(cookIndex, choice!.value))
+    expect(response.ok, response.error).toBe(true)
+    const cook = response.state.players[cookIndex]!
+    expect(cook.resources).toMatchObject({ food: accept ? 5 : 0, grain: accept ? 0 : 1, vegetable: accept ? 0 : 1, sheep: accept ? 0 : 1 })
+    expect(cook.cardStates[nutrition]?.counters?.bonusVp ?? 0).toBe(accept ? 2 : 0)
+    expect(response.state.players[0]!.resources.food).toBe(cookIndex === 0 && accept ? 5 : reward)
+    expect(response.state.round).toBe(4)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.events.filter(event => event.type === 'resource.exchanged' && event.exchangeSource === nutrition))
+      .toHaveLength(accept ? 1 : 0)
+    if (accept) expect(JSON.stringify(response.state.log)).toContain(nutrition)
     expect(response.scores?.[0]?.categories.find(category => category.key === 'cards')?.entries)
       .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 2 }))
   })
