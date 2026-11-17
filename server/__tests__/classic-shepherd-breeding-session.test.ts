@@ -79,6 +79,19 @@ function houseSheep(session: GameSession, count: number, playerIndex = 0): Sessi
   return housed
 }
 
+function exchangeFor(session: GameSession, cardId: string, resource: 'stone' | 'sheep', count: number) {
+  let response = session.takeAnytimeAction(0, 'exchange')
+  expect(response.ok, response.error).toBe(true)
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Expected exchange choices')
+  const option = response.interaction.request.options.find(candidate => candidate.sourceCard === cardId
+    && candidate.effectPreview?.kind === 'resourceExchange'
+    && (candidate.effectPreview.resourcesGained?.[resource] ?? 0) > 0)
+  expect(option).toBeDefined()
+  response = session.resolveChoice(0, `bulk:${option!.value.split(':')[1]}=${count}`)
+  expect(response.ok, response.error).toBe(true)
+  return response
+}
+
 describe('classic Shepherd breeding at the authoritative boundary', () => {
   it('retains one of two newborns and grants exactly one Fodder Planter sowing', () => {
     const session = setup()
@@ -115,17 +128,7 @@ describe('classic Shepherd breeding at the authoritative boundary', () => {
   it('counts only housed newborns after Sheep Walker exchanges all four parents', () => {
     const session = setup(state => { state.players[0]!.occupationPlayed.push('B104_SheepWalker') })
     advanceToHousing(session)
-    let response = session.takeAnytimeAction(0, 'exchange')
-    expect(response.ok, response.error).toBe(true)
-    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Expected exchange choices')
-    const option = response.interaction.request.options.find(candidate =>
-      candidate.sourceCard === 'B104_SheepWalker'
-      && candidate.effectPreview?.kind === 'resourceExchange'
-      && (candidate.effectPreview.resourcesGained?.stone ?? 0) > 0,
-    )!
-    expect(option).toBeDefined()
-    response = session.resolveChoice(0, `bulk:${option.value.split(':')[1]}=4`)
-    expect(response.ok, response.error).toBe(true)
+    let response = exchangeFor(session, 'B104_SheepWalker', 'stone', 4)
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, stone: 4 })
     response = houseSheep(session, 1)
     const owner = response.state.players[0]!
@@ -136,6 +139,46 @@ describe('classic Shepherd breeding at the authoritative boundary', () => {
     const sow = response.interaction.request.options.find(candidate => candidate.value !== '__skip__')!
     response = session.resolveChoice(0, sow.value)
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { farm: { farmType: 'sow', maxSelections: 1 } } })
+  })
+
+  it.each([false, true])('separates bought sheep after all parents are exchanged, restored: %s', restoreAfterPayment => {
+    let session = setup(state => {
+      state.players[0]!.occupationPlayed.push('B104_SheepWalker')
+      state.players[0]!.minorPlayed = ['M081_PeatBoat']
+    }, true)
+    const pending = advanceToHousing(session)
+    expect(pending.state.players[0]!.resources.sheep).toBe(6)
+    const birth = structuredClone(pending.state.events.find(event => event.type === 'farm.animalBred')!)
+    let response = exchangeFor(session, 'B104_SheepWalker', 'stone', 4)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, stone: 4 })
+    if (restoreAfterPayment) session = restore(session)
+    const fuel = session.state.players[0]!.resources.fuel
+    response = exchangeFor(session, 'M081_PeatBoat', 'sheep', 1)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 3, fuel: fuel - 2 })
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.exchanged', exchangeSource: 'M081_PeatBoat', paid: { fuel: 2 }, gained: { sheep: 1 },
+    }))
+    response = houseSheep(session, 2)
+    const owner = response.state.players[0]!
+    expect(response.state.harvestBreedSummary?.[owner.id]).toEqual({ resources: { sheep: 1 }, animalTypes: 1, animalCount: 1 })
+    expect(response.state.events.filter(event => event.type === 'farm.animalBred'))
+      .toEqual([{ ...birth, animals: { sheep: 1 } }])
+    expect(response.interaction).toMatchObject({ stateId: 'wait', promptKey: 'ui.interactionFodderPlanterSow' })
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Expected Fodder Planter choice')
+    const sow = response.interaction.request.options.find(option => option.value !== '__skip__')!
+    response = session.resolveChoice(0, sow.value)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { farm: { farmType: 'sow', maxSelections: 1 } } })
+    response = session.commitSelectionChoice(0, { crops: [
+      { row: 0, col: 1, crop: 'grain' }, { row: 0, col: 2, crop: 'grain' },
+    ] })
+    expect(response.ok).toBe(false)
+    expect(response.state.players[0]!.resources.grain).toBe(2)
+    response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'grain' }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, grain: 1 })
+    expect(response.state.players[0]!.fields.map(field => field.stacks)).toEqual([[{ kind: 'grain', remaining: 3 }], []])
+    expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.sow', playerId: owner.id }))
+    expect(response.scores![0]!.categories.find(category => category.key === 'sheeps')).toMatchObject({ quantity: 2 })
   })
 
   it.each([{ kept: 2, newborns: 0 }, { kept: 4, newborns: 2 }])('retains $newborns newborns when $kept sheep are housed', ({ kept, newborns }) => {
