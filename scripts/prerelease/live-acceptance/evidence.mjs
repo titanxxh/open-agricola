@@ -4,6 +4,7 @@ import { chmodSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { assertNoAccountValues } from './context.mjs'
 import { REQUIRED_CASES } from './suites.mjs'
+import { CARRIED_CASES } from './rebind.mjs'
 
 export const REQUIRED_EVIDENCE = ['identity', 'beta-access', 'http-ws', 'public-cards', 'viewer', 'retained-data', 'deletion-audit', 'capacity', 'formal-unaffected', 'browser-boundary', 'formal-browser-policy']
 const sha256 = path => createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -45,13 +46,16 @@ export function bundleEvidence({ results, output, common, accounts, extra = {}, 
     // Every required (case, engine) pair needs its own newest result; a case that never ran blocks the item.
     const missing = REQUIRED_CASES.filter(pair => (SOURCES[item] ?? []).includes(pair.case)
       && !rows.some(row => row.result.case === pair.case && row.engine === pair.engine))
-    // Fast rebind: cases this window did not run come from the passing item of the last full acceptance. Fresh rows
-    // for the cases that did run still count, and the original body travels inside the new file with its hash.
-    const carried = carry && missing.length ? carry.evidence[item] : null
-    if (carry && missing.length && !carried) throw new Error(`The full acceptance has no ${item} evidence to carry`)
+    // Fast rebind: only cases of the suites it skips may come from the passing item of the last full acceptance. A
+    // missing handoff or boundary result still blocks. Fresh rows for the cases that ran count as usual, and the
+    // original body travels inside the new file with its hash.
+    const carriedCases = carry ? missing.filter(pair => CARRIED_CASES.includes(pair.case)) : []
+    const unmeasured = missing.filter(pair => !carriedCases.includes(pair))
+    const carried = carriedCases.length ? carry.evidence[item] : null
+    if (carriedCases.length && !carried) throw new Error(`The full acceptance has no ${item} evidence to carry`)
     const body = { format: 1, item, ...common,
-      passed: (missing.length === 0 || carried?.body.passed === true) && (rows.length > 0 ? rows.every(counts) : (carried ? true : extra[item] ? extra[item].passed !== false : false)),
-      ...(missing.length ? (carried ? { carriedCases: missing } : { missing }) : {}),
+      passed: unmeasured.length === 0 && (!carried || carried.body.passed === true) && (rows.length > 0 ? rows.every(counts) : (carried ? true : extra[item] ? extra[item].passed !== false : false)),
+      ...(unmeasured.length ? { missing: unmeasured } : {}), ...(carriedCases.length ? { carriedCases } : {}),
       results: rows.map(row => ({ engine: row.engine, version: row.run.version, case: row.result.case, passed: row.result.passed, publicClosed: publicClosed(row), result: row.result, source: { path: row.path, sha256: sha256(row.path) } })),
       ...(carried ? { carriedFrom: { acceptanceSha256: carry.sha256, acceptedAt: carry.acceptedAt, formalBuild: carry.formalBuild, evidence: { path: carried.path, sha256: carried.sha256 } }, carried: carried.body } : {}),
       ...(extra[item] ? { owner: extra[item] } : {}) }

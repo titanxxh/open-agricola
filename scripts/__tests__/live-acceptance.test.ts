@@ -208,6 +208,15 @@ describe('acceptance evidence', () => {
       expect(httpWs.results.map((row: { case: string }) => row.case)).toContain('visitor')
       expect(body(index, 'beta-access').carriedCases.map((pair: { case: string }) => pair.case).sort()).toEqual(['formal-account-deletion', 'multihand-cooperation-viewer'])
     })
+    it('never carries handoff or boundary cases: without fresh results those items block', () => {
+      const root = privateRoot(), carry = loadFullAcceptance(fullAcceptanceFixture(root)), empty = runDirectory(root, 'empty', {})
+      const index = carryBundle(root, empty, carry)
+      expect(Object.entries(index).filter(([, entry]) => !entry.passed).map(([item]) => item).sort()).toEqual(['beta-access', 'browser-boundary', 'http-ws', 'identity'])
+      expect(body(index, 'identity')).toMatchObject({ passed: false, missing: SUITE_ENGINES.handoff.map(engine => ({ case: 'handoff', engine })) })
+      expect(body(index, 'identity').carriedFrom).toBeUndefined()
+      expect(body(index, 'http-ws').missing.map((pair: { case: string }) => pair.case)).not.toContain('team-game')
+      expect(body(index, 'viewer').passed).toBe(true)
+    })
     it('still fails on a fresh failure, a failed carried item or another candidate', () => {
       const root = privateRoot(), carry = loadFullAcceptance(fullAcceptanceFixture(root))
       expect(carryBundle(root, fastRun(root, { failed: ['revocation:webkit'] }), carry)['beta-access'].passed).toBe(false)

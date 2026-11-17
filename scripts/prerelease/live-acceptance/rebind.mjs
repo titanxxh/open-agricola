@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { privateJson } from './context.mjs'
+import { SUITE_CASES } from './suites.mjs'
 
 /**
  * Formal-side files that define the identity boundary pre relies on: handoff issue/exchange, sessions and logout,
@@ -33,6 +34,8 @@ export const IDENTITY_BOUNDARY_PATHS = [
 
 /** Steps the fast path marks done without running; their evidence comes from the last full acceptance. */
 export const FAST_SKIPPED_STEPS = ['suite-multihand', 'suite-team', 'suite-sandbox', 'suite-viewer', 'suite-continuity', 'deletion', 'chain-deletion', 'deletion-rows']
+/** The only cases a fast rebind may carry: those of the suites it skips. Handoff and boundary are always measured fresh. */
+export const CARRIED_CASES = FAST_SKIPPED_STEPS.map(step => step.replace(/^suite-/, '')).filter(suite => SUITE_CASES[suite]).flatMap(suite => SUITE_CASES[suite])
 export const FULL_ACCEPTANCE_MAX_AGE_MS = 7 * 24 * 60 * 60_000
 
 const sha = /^[a-f0-9]{40}$/, digest = /^[a-f0-9]{64}$/

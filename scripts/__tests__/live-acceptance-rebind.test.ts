@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { REQUIRED_EVIDENCE } from '../prerelease/live-acceptance/evidence.mjs'
 import { fixtureGeneration as generation, fullAcceptanceFixture } from './_helpers/full-acceptance-fixture'
-import { FULL_ACCEPTANCE_MAX_AGE_MS, IDENTITY_BOUNDARY_PATHS, boundaryDiff, loadFullAcceptance, rebindDecision } from '../prerelease/live-acceptance/rebind.mjs'
+import { POLICY_STEPS, WINDOW_STEPS } from '../prerelease/live-acceptance/window.mjs'
+import { CARRIED_CASES, FAST_SKIPPED_STEPS, FULL_ACCEPTANCE_MAX_AGE_MS, IDENTITY_BOUNDARY_PATHS, boundaryDiff, loadFullAcceptance, rebindDecision } from '../prerelease/live-acceptance/rebind.mjs'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -27,6 +28,12 @@ describe('identity boundary', () => {
     expect(calls[1]).toContain('--full-index')
     expect(() => boundaryDiff(git, 'abc', sha('b'))).toThrow(/full formal SHAs/)
   })
+})
+
+it('skips only suite and deletion steps, never the policy phase, and carries only their cases', () => {
+  expect(FAST_SKIPPED_STEPS.every(step => WINDOW_STEPS.includes(step))).toBe(true)
+  expect(FAST_SKIPPED_STEPS.filter(step => POLICY_STEPS.includes(step) || ['preconditions', 'reverify', 'accounts', 'suite-handoff', 'suite-boundary'].includes(step))).toEqual([])
+  expect([...CARRIED_CASES].sort()).toEqual(['continuity', 'formal-account-deletion', 'multihand-cooperation-viewer', 'public-sandbox', 'team-game', 'viewer-firefox', 'viewer-webkit'])
 })
 
 describe('full acceptance', () => {
