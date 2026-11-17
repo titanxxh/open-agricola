@@ -6,6 +6,27 @@ import en from '../../../output/i18n/locales/en.json'
 import zh from '../../../output/i18n/locales/zh.json'
 import { catalogCardDefinitions } from '../../cards/catalog.generated'
 
+type Named = { name?: string }
+
+const cardNameCollisions = (english: Map<string, string>, sections: Array<Record<string, Named>>) => {
+  const owners = new Map<string, Set<string>>()
+  for (const faces of sections) {
+    for (const [id, face] of Object.entries(faces)) {
+      if (!face.name) continue
+      const classic = /^C[A-Z]+\d{3}_/.test(id)
+      const englishName = english.get(id)
+      // Deferred classic imports have no verified English face to compare yet.
+      if (classic && !englishName) continue
+      const key = `${classic ? 'classic' : 'revised'}:${face.name}`
+      const names = owners.get(key) ?? new Set<string>()
+      names.add((englishName ?? id).toLowerCase())
+      owners.set(key, names)
+    }
+  }
+  return [...owners].filter(([, names]) => names.size > 1)
+    .map(([name, names]) => `${name}: ${[...names].join(' / ')}`)
+}
+
 describe('zh platform translations', () => {
   it('places every A-E and Moor card in its translation section and translates its face', () => {
     type Face = { name?: string; description?: string; rules?: string; prerequisite?: string }
@@ -37,25 +58,24 @@ describe('zh platform translations', () => {
     expect(missing).toEqual([])
   })
 
-  it('gives cards with different English names different Chinese names', () => {
-    type Named = { name?: string }
+  it('gives verified cards with different English names different Chinese names within each edition', () => {
     const english = new Map<string, string>(catalogCardDefinitions.map((card) => [card.id, card.name]))
-    for (const [id, face] of Object.entries(en.improvements as Record<string, Named>)) {
-      if (face.name) english.set(id, face.name)
-    }
-    const owners = new Map<string, Set<string>>()
-    for (const faces of [zh.minorImprovements, zh.occupations, zh.improvements] as Array<Record<string, Named>>) {
+    for (const faces of [en.minorImprovements, en.occupations, en.improvements] as Array<Record<string, Named>>) {
       for (const [id, face] of Object.entries(faces)) {
-        if (!face.name) continue
-        const names = owners.get(face.name) ?? new Set<string>()
-        names.add((english.get(id) ?? id).toLowerCase())
-        owners.set(face.name, names)
+        if (face.name) english.set(id, face.name)
       }
     }
-    const collisions = [...owners]
-      .filter(([, names]) => names.size > 1)
-      .map(([name, names]) => `${name}: ${[...names].join(' / ')}`)
-    expect(collisions).toEqual([])
+    expect(cardNameCollisions(english, [zh.minorImprovements, zh.occupations, zh.improvements])).toEqual([])
+  })
+
+  it('allows cross-edition names and deferred imports while still rejecting known collisions', () => {
+    const english = new Map([['B104_SheepWalker', 'Sheep Walker'], ['CE203_Shepherd', 'Shepherd']])
+    const faces = { B104_SheepWalker: { name: '牧羊人' }, CE203_Shepherd: { name: '牧羊人' }, CNL064_Sheepherder: { name: '牧羊人' } }
+    expect(cardNameCollisions(english, [faces])).toEqual([])
+    english.set('CNL064_Sheepherder', 'Sheepherder')
+    expect(cardNameCollisions(english, [faces])).toEqual(['classic:牧羊人: shepherd / sheepherder'])
+    expect(cardNameCollisions(english, [{ B104_SheepWalker: { name: '牧羊人' }, B999_Untranslated: { name: '牧羊人' } }]))
+      .toEqual(['revised:牧羊人: sheep walker / b999_untranslated'])
   })
 
   it('labels player action cards with the name on the card face', () => {
