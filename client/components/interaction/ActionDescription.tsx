@@ -237,6 +237,7 @@ export const renderEffectPreview = (
           locale={locale}
           resources={effectPreview.resourcesGained ?? {}}
           bonusVp={effectPreview.bonusVp ?? 0}
+          showZeroBonusVp={effectPreview.bonusVp === 0}
           hideZero
         />
       </span>

@@ -14,6 +14,7 @@ import type {
 import { parsePositionKey } from '../../shared/domain/farm'
 import type { PendingChoice } from '../types/ui'
 import { buildFenceCommitPayload, buildStableCommitPayload } from './farm-commit-ui'
+import { isAnytimeExchangeRequest } from './anytime-exchange-ui'
 import {
   buildPendingMoorSpecialActionChoiceMaps,
   type FarmCommitType,
@@ -374,7 +375,7 @@ export const buildInteractionPresentationPlan = (
       suppressChoiceOptions: true,
     }
   }
-  if (pendingChoice.promptKey === 'ui.interactionExchangeChoice') {
+  if (isAnytimeExchangeRequest(interaction.request)) {
     return { kind: 'exchange-center', pendingChoice }
   }
   return {

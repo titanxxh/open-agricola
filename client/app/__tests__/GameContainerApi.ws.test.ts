@@ -28,7 +28,6 @@ import {
   parsePendingMoorSpecialActionChoice,
   playerIdFromWsStatus,
   splitBoardActionSpaces,
-  shouldShowPendingChoiceInInteractionBar,
   shouldShowDevPanel,
   shouldSuppressPendingChoiceOptionsInInteractionBar,
 } from '../game-container-helpers'
@@ -232,12 +231,6 @@ describe('GameContainerApi WS player identity', () => {
     expect(farmCommitErrorMessageKey('stable', 'LIMIT_REACHED')).toBe('ui.stableErrorLimit')
     expect(farmCommitErrorMessageKey('plow', 'FENCED')).toBe('ui.plowErrorFenced')
     expect(farmCommitErrorMessageKey('sow', 'NO_SELECTION')).toBe('ui.sowErrorNoSelection')
-  })
-
-  it('routes anytime exchange choices to the exchange overlay instead of the bottom interaction bar', () => {
-    expect(shouldShowPendingChoiceInInteractionBar(null)).toBe(false)
-    expect(shouldShowPendingChoiceInInteractionBar({ promptKey: 'ui.interactionChooseOne' })).toBe(true)
-    expect(shouldShowPendingChoiceInInteractionBar({ promptKey: 'ui.interactionExchangeChoice' })).toBe(false)
   })
 
   it('uses authoritative Moor special action availability', () => {

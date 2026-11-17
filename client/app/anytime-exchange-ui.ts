@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionChoiceOption, InteractionRequest, PlayerState, Resource } from '../../shared/contract/types'
 import type { CardExchange } from '../../shared/contract/cards'
 import type { CardMeta } from '../services/card-meta'
 
@@ -29,6 +29,15 @@ const parseTradeChoice = (option: ActionChoiceOption): ParsedTradeChoice | undef
   if (!Number.isFinite(maxTimes) || maxTimes <= 0) return undefined
   return { option, tradeIndex, maxTimes }
 }
+
+export const isAnytimeExchangeRequest = (request: InteractionRequest): boolean =>
+  request.kind === 'choice' &&
+  request.structuredChoicePrefixes?.includes('bulk:') === true &&
+  request.options.some(option => option.value === 'cancel') &&
+  request.options.every(option => option.value === 'cancel' || (
+    parseTradeChoice(option) !== undefined &&
+    !!option.sourceCard && option.effectPreview?.kind === 'resourceExchange'
+  ))
 
 const resourceValue = (resources: Record<string, number | undefined> | undefined, key: string) =>
   resources?.[key] ?? 0

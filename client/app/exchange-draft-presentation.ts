@@ -184,22 +184,25 @@ export const useExchangeDraftPresentation = ({
     setBakeExchangeCounts(nextCounts)
   }, [bakeExchangeOptionIds])
 
-  const isAnytimeExchange = pendingChoice?.promptKey === 'ui.interactionExchangeChoice'
+  const anytimePendingChoice = interactionPresentationPlan.kind === 'exchange-center'
+    ? interactionPresentationPlan.pendingChoice
+    : null
+  const isAnytimeExchange = anytimePendingChoice !== null
   const anytimeExchangePlayer =
-    isAnytimeExchange && pendingChoice && state
-      ? state.players[pendingChoice.playerIndex] ?? null
+    anytimePendingChoice && state
+      ? state.players[anytimePendingChoice.playerIndex] ?? null
       : null
   const anytimeExchangeOptions = useMemo(
     () =>
-      isAnytimeExchange && pendingChoice && anytimeExchangePlayer
+      anytimePendingChoice && anytimeExchangePlayer
         ? buildAnytimeExchangeOptions(
             anytimeExchangePlayer,
-            pendingChoice.options,
+            anytimePendingChoice.options,
             cardLabel,
             getCardMeta,
           )
         : [],
-    [anytimeExchangePlayer, cardLabel, getCardMeta, isAnytimeExchange, pendingChoice],
+    [anytimeExchangePlayer, cardLabel, getCardMeta, anytimePendingChoice],
   )
   const anytimeExchangeOptionIds = useMemo(
     () => anytimeExchangeOptions.map((option) => option.id),

@@ -11,6 +11,7 @@ type Props = {
   resources: PaymentResourceMap
   mode?: ResourceLineMode
   bonusVp?: number
+  showZeroBonusVp?: boolean
   hideZero?: boolean
   emptyLabel?: string
   className?: string
@@ -45,6 +46,7 @@ export const ResourceLine = ({
   resources,
   mode = 'inventory',
   bonusVp = 0,
+  showZeroBonusVp = false,
   hideZero = true,
   emptyLabel,
   className,
@@ -54,7 +56,7 @@ export const ResourceLine = ({
     .map((key) => ({ key, amount: resources[key] ?? 0 }))
     .filter(({ amount }) => !hideZero || amount > 0)
     .filter(({ amount }) => amount > 0)
-  if (bonusVp > 0) {
+  if (bonusVp > 0 || (showZeroBonusVp && bonusVp === 0)) {
     items.push({ key: 'bonusVp', amount: bonusVp })
   }
   if (items.length === 0) {
