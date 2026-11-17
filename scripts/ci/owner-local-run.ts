@@ -6,9 +6,10 @@
 // Run it from the trusted protected-main checkout; its HEAD is the producer. Candidate code never runs as the owner.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { createServer } from 'node:net'
+import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { candidateCommand, collectCandidateDiagnostics, verifyCandidateSources, type CandidateExecution } from './candidate-isolation.ts'
 import { assertCandidateCheckout } from './candidate-verification.ts'
@@ -28,7 +29,8 @@ const NODE = '/opt/oa-owner-local/node/bin/node'
 export const TASK_WAVES: FullTaskId[][] = [['fast'], ['chromium-1', 'chromium-4', 'chromium-3', 'chromium-2', 'slow', 'webkit', 'browser-sandbox', 'quality', 'build']]
 export const TASK_ORDER: FullTaskId[] = TASK_WAVES.flat()
 // A private /tmp hides the owner's own temporary files; TMPDIR keeps tmpdir() paths visible to the rootless daemon.
-const CANDIDATE_PROPERTIES = ['PrivateTmp=yes']
+// The owner's home is also hidden from candidate commands; `assertPrivateHome` covers the candidate's daemon too.
+const candidateProperties = (ownerHome: string) => ['PrivateTmp=yes', `InaccessiblePaths=${ownerHome}`]
 const CANDIDATE_TMPDIR = '/home/oa-candidate/tmp'
 const CANDIDATE_PUBLIC_ASSETS = '/home/oa-candidate/public-assets'
 const COMMAND_TIMEOUT_MS = 60 * 60_000
@@ -135,6 +137,8 @@ export type Inputs = {
   publicAssets: string
   /** Records per-chunk output timelines for timing analysis; a profiling run never writes a receipt. */
   profile: boolean
+  /** The owner's home directory, hidden from candidate commands. */
+  ownerHome: string
   /**
    * Browser tasks running at once. Every test downloads card art from the public asset host, which rate-limits one
    * owner IP (HTTP 429) once about four browser tasks run together; two were measured to pass.
@@ -159,8 +163,9 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
   // when every browser task restarts the app from one owner IP.
   const services = { LOCAL_POSTGRES_PORT: String(inputs.servicePorts.postgres), LOCAL_S3_PORT: String(inputs.servicePorts.objects), TMPDIR: CANDIDATE_TMPDIR,
     PUBLIC_ASSET_VALIDATION_DIR: CANDIDATE_PUBLIC_ASSETS, ...(inputs.testWorkers ? { VITEST_MAX_WORKERS: String(inputs.testWorkers) } : {}) }
+  const properties = candidateProperties(inputs.ownerHome)
   const prepare = async (task: string, command: string, args: string[], phase: string) => {
-    const exitCode = await runner.candidate(execution(task), command, args, phase, services, CANDIDATE_PROPERTIES)
+    const exitCode = await runner.candidate(execution(task), command, args, phase, services, properties)
     preparation.push({ phase, exitCode, logSha256: fileSha256(join(logs, `${phase}.log`)) })
     if (exitCode !== 0) throw new Error(`Candidate ${phase} failed (exit ${exitCode})`)
   }
@@ -172,7 +177,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     for (const [index, command] of inputs.commands[task].entries()) {
       const phase = attempt ? `task-${task}-r${attempt}-${index}` : `task-${task}-${index}`
       const executable = command.command === 'pnpm' ? pnpm : command.command === 'node' ? inputs.node.path : command.command
-      const exitCode = await runner.candidate(execution(task), executable, command.args, phase, { ...services, ...taskEnvironment(channel, sha, task, command) }, CANDIDATE_PROPERTIES, inputs.profile)
+      const exitCode = await runner.candidate(execution(task), executable, command.args, phase, { ...services, ...taskEnvironment(channel, sha, task, command) }, properties, inputs.profile)
       commands.push({ ...command, exitCode, logSha256: fileSha256(join(logs, `${phase}.log`)) })
       if (exitCode !== 0) { failure = `${task}: ${command.command} ${command.args.join(' ')} exited ${exitCode}`; break }
     }
@@ -238,7 +243,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     candidate: { sha, tree: inputs.tree, configuration: inputs.configuration },
     producer: { sha: inputs.producerSha, configuration: inputs.producerConfiguration, files: inputs.policyFiles },
     sandbox: { identity: 'oa-candidate', uid: UID, rootlessDocker: inputs.dockerVersion, noNewPrivileges: true, supplementaryGroups: [],
-      limits: { MemoryMax: '64G', TasksMax: 16384, CPUWeight: 50 }, unitProperties: CANDIDATE_PROPERTIES, tmpdir: CANDIDATE_TMPDIR, waves: TASK_WAVES, testWorkers: inputs.testWorkers, browserJobs: inputs.browserJobs,
+      limits: { MemoryMax: '64G', TasksMax: 16384, CPUWeight: 50 }, unitProperties: properties, tmpdir: CANDIDATE_TMPDIR, waves: TASK_WAVES, testWorkers: inputs.testWorkers, browserJobs: inputs.browserJobs,
       publicAssets: { version: git(['rev-parse', 'HEAD'], inputs.publicAssets), validationDirectory: CANDIDATE_PUBLIC_ASSETS },
       servicePorts: inputs.servicePorts, isolationStartSha256: fileSha256(join(output, 'isolation-start.log')) },
     prerequisites: { node: inputs.node, packageManager: 'corepack', preparation },
@@ -265,6 +270,20 @@ function option(args: string[], name: string, fallback?: string): string {
   if (value === undefined || value.startsWith('--')) throw new Error(`Missing ${name}`)
   return value
 }
+/**
+ * The candidate UID and its rootless daemon run on the owner's machine; the owner's home must not be readable or
+ * traversable by other users, as GitHub runner setup makes the runner home private.
+ */
+export function assertPrivateHome(home: string, stat = statSync): void {
+  const info = stat(home)
+  if (!info.isDirectory() || (info.mode & 0o007) !== 0) throw new Error(`The owner home ${home} must not be accessible to other users; run chmod o-rwx ${home}`)
+}
+
+/** Paths a candidate tree must not contain: the recorder mounts shared test data there as root. */
+export function assertNoReservedCandidatePaths(entries: string): void {
+  if (entries.trim()) throw new Error('The candidate tree contains data/, which the recorder reserves for shared test services')
+}
+
 /** A loopback port free right now; the kernel's ephemeral range stays clear of the 20000–32767 test ports. */
 function freePort(): Promise<number> {
   return new Promise((done, reject) => {
@@ -306,6 +325,8 @@ export async function main(args: string[]): Promise<number> {
   if (git(['status', '--porcelain', '--untracked-files=no'])) throw new Error('The trusted policy checkout has tracked edits')
   const producerSha = git(['rev-parse', 'HEAD'])
   if (spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: policyRoot }).status !== 0) git(['fetch', '--no-tags', '--quiet', 'origin', sha])
+  assertPrivateHome(homedir())
+  assertNoReservedCandidatePaths(git(['ls-tree', '--name-only', sha, '--', 'data']))
   if (existsSync(output)) throw new Error('Choose a new private output directory for each run')
   // One candidate identity exists per machine, so runs never overlap.
   const lock = '/tmp/oa-owner-local-verification.lock'
@@ -330,7 +351,8 @@ export async function main(args: string[]): Promise<number> {
     tree: git(['rev-parse', `${sha}^{tree}`]), configuration: verificationConfiguration(policyRoot, sha),
     producerConfiguration: verificationConfiguration(policyRoot, producerSha), commands: canonicalOwnerLocalCommands(policyRoot, sha, channel),
     ownerUid, node, dockerVersion: execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).trim(), policyFiles,
-    servicePorts: { postgres: await freePort(), objects: await freePort() }, retries, testWorkers: testWorkers || null, publicAssets, profile: args.includes('--profile'), browserJobs }
+    servicePorts: { postgres: await freePort(), objects: await freePort() }, retries, testWorkers: testWorkers || null, publicAssets, profile: args.includes('--profile'), browserJobs,
+    ownerHome: homedir() }
   const result = await runIsolated(inputs, nativeRunner)
   if ('failed' in result) { console.error(`Owner-local verification failed:\n- ${result.failed.join('\n- ')}\nLogs: ${join(output, 'logs')}`); return 1 }
   // The publisher applies the same checks; failing here keeps an unusable receipt from being published.

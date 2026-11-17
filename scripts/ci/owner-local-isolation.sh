@@ -13,6 +13,13 @@ action="${1:-}"; shift || true
 [[ $EUID == 0 ]] || fail 'requires root through sudo'
 uid=61000 home=/home/oa-candidate runtime=/run/oa-ci-isolation dropin=/run/systemd/system/user@61000.service.d
 work="$home/work" shared="$home/shared-data"
+unmount_candidate_mounts() {
+  local mount
+  while read -r mount; do
+    [[ -n $mount ]] && umount --no-canonicalize "$mount"
+  done < <(awk -v home="$home/" 'index($2, home) == 1 { print $2 }' /proc/self/mounts | sort -r)
+  ! awk -v home="$home/" 'index($2, home) == 1 { found = 1 } END { exit !found }' /proc/self/mounts || fail 'candidate mounts remain'
+}
 task_name() { [[ $1 =~ ^[a-z0-9-]+$ ]] || fail "invalid task $1"; }
 owner_uid() { [[ $1 =~ ^[1-9][0-9]*$ && $1 != "$uid" && ${SUDO_UID:-} == "$1" ]] || fail 'owner uid must be the invoking sudo user'; }
 
@@ -23,6 +30,9 @@ if [[ $action == start ]]; then
   for task in "$@"; do task_name "$task"; done
   [[ $(stat -c '%u %a' "$run") == "$SUDO_UID 700" && $(stat -c '%u %a' "$run/logs") == "$SUDO_UID 700" ]] || fail 'run and log directories must be owner-private'
   [[ -d $run/source/.git && $(stat -c %u "$run/source") == "$SUDO_UID" ]] || fail 'trusted source checkout is missing'
+  # data/ becomes a root-made bind mount in every copy; a candidate path there (a tracked symlink in particular)
+  # would redirect the root mkdir and mount, so the candidate tree must not contain it at all.
+  [[ ! -e $run/source/data && ! -L $run/source/data ]] || fail 'the candidate tree contains data; refusing to mount over it'
   ! getent passwd oa-candidate >/dev/null && ! getent passwd "$uid" >/dev/null && ! getent group "$uid" >/dev/null || fail 'a candidate identity already exists; run stop and cleanup first'
   [[ ! -e $home && ! -e $runtime ]] || fail 'a previous candidate home or runtime remains; run cleanup first'
   [[ -x /usr/bin/rootlesskit && -x /usr/bin/dockerd-rootless-setuptool.sh && -x /usr/bin/newuidmap && -x /opt/oa-owner-local/node/bin/node ]] || fail 'owner machine is not provisioned (scripts/ci/owner-local-provision.sh)'
@@ -41,8 +51,11 @@ if [[ $action == start ]]; then
   cp -a "$assets" "$home/public-assets"
   for task in "$@"; do
     cp -a "$run/source" "$work/$task"
-    install -d -m 700 "$work/$task/data"
-    mount --bind "$shared" "$work/$task/data"
+    target="$work/$task/data"
+    [[ ! -e $target && ! -L $target ]] || fail "copy for $task contains data"
+    mkdir -m 700 "$target"
+    [[ ! -L $target && $(realpath -e "$target") == "$target" ]] || fail "unexpected data path for $task"
+    mount --bind "$shared" "$target"
   done
   chown -R --no-dereference "$uid:$uid" "$home"
   install -m 644 "$policy/scripts/ci/candidate-isolation-smoke.ts" "$runtime/smoke.mts"
@@ -88,7 +101,9 @@ elif [[ $action == stop ]]; then
   [[ -d $cgroup ]] && printf '1\n' > "$cgroup/cgroup.kill"
   systemctl stop user-$uid.slice || true
   wait_empty || { cat "$cgroup/cgroup.events" >&2; fail 'candidate descendants remain after bounded teardown'; }
-  for task in "$@"; do mountpoint -q "$work/$task/data" && umount "$work/$task/data"; done
+  # No candidate process remains, so the mount table holds the real mount points; never resolve candidate paths
+  # (a copy could have been moved and replaced by a symlink to a host mount point).
+  unmount_candidate_mounts
   # Refuse collection if any account can restart the subtree; only then may the trusted collector read it.
   userdel oa-candidate
   ! getent passwd "$uid" >/dev/null || fail 'candidate account remains'
@@ -99,7 +114,7 @@ elif [[ $action == cleanup ]]; then
   (( $# == 1 )) || fail 'usage: cleanup <owner-uid>'
   owner_uid "$1"
   ! getent passwd "$uid" >/dev/null || fail 'stop the candidate before cleanup'
-  for mount in $(awk -v home="$home/" 'index($2, home) == 1 { print $2 }' /proc/self/mounts); do umount "$mount"; done
+  unmount_candidate_mounts
   rm -rf --one-file-system "$home" "$runtime" "$dropin"
   rm -rf /run/systemd/system.control/user-$uid.slice.d
   systemctl daemon-reload
