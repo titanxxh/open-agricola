@@ -1135,6 +1135,22 @@ cron 模板按宿主机的 `Asia/Shanghai` 时区调度：每日 04:00 备份，
 
 异机 ledger 同步先读远端副本，合并到当前 S3 的 CAS ledger，再导出其并集。旧普通备份、旧本地副本都不能抹掉较新的删除事实。立即删除后的异机同步仍使用 `ledger-only`。
 
+#### 本机备份
+
+owner 本机在 `~/oa-backup/<UTC 捕获时间>/` 下保留自己的副本（ADR 0045）。主机的每日备份、主机上的验证和异机同步保持不变。
+
+```bash
+node --import tsx scripts/owner-backup.ts run --host ubuntu@<formal-host>   # 拉取、验证、清理
+node --import tsx scripts/owner-backup.ts validate --snapshot ~/oa-backup/<stamp>
+node --import tsx scripts/owner-backup.ts prune
+```
+
+`run` 请主机的 `scripts/owner-sync-capture.sh capture` 在维护锁下做一次在线、快照一致的捕获。捕获使用运行中的镜像，包含目录格式的未压缩 dump、对象和当前删除记录，不含任何配置。本机以上一份副本为基准用 rsync 拉取，逐项校验摘要后通知主机释放。主机最多保留一份 owner 捕获：下一次捕获会替换遗留的那份，每日清理会删除超过 30 天的。遇到每日备份持锁时，每隔十分钟重试，共三次。
+
+验证在内部 Docker 网络上的临时 PostgreSQL 与 RustFS 容器中还原副本，合并拉回的删除记录，再用主机当时运行的镜像执行 `storage-archive-cli.ts validate`，使用全部 CPU。该镜像必须已在本机上，正式交付后即满足。报告写入 `validation.json`。超过 30 天的副本一律删除，包括最新的一份。副本可按下面的流程恢复，以其 `capture/` 目录作为归档。
+
+捕获要求运行中的镜像与主机检出都包含 `owner-sync-capture.sh`；镜像较旧时 dump 仍为 custom 格式，可以验证，但每次全量传输。按 `deploy/owner-backup/` 文件头的说明安装每日定时器：北京时间 04:30 运行，机器关机错过时开机补跑。
+
 #### 恢复或切换外部服务
 
 停止全部应用。准备目标版本镜像、原始归档、配对 manifest、最新独立 ledger、保留的加密密钥，以及一个空目标数据库和隔离的目标对象 namespace。先核对 tar 的 SHA-256/长度与 manifest，然后解包到私有目录；恢复工具还会核对内层数据库和每个对象的 hash/长度。配置目标连接组时保留本部署 `.env` 中已验收的 `BACKEND_IMAGE`，随后运行。备份配置属于源版本，不得覆盖此绑定；缺失或为空时，须先完成固定镜像交付才能使用这些命令：

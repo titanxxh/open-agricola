@@ -2,7 +2,7 @@ import { spawn, execFile } from 'node:child_process'
 import { dockerBindUser } from './ci/docker-bind-user'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { mkdir, readFile, writeFile, stat, mkdtemp, rm, chmod } from 'node:fs/promises'
+import { mkdir, readFile, readdir, writeFile, stat, lstat, mkdtemp, rm, chmod } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { PostgresDatabase } from '../server/database/postgres'
@@ -14,11 +14,54 @@ import { validateStorage, type StorageValidationOptions } from './storage-valida
 import { migratePostgres } from '../server/database/migrations'
 import { withResourceCapture, type CapturedResource } from '../server/storage/backup-coordination'
 
-const POSTGRES_IMAGE = 'postgres:18-bookworm@sha256:3725f4e2499eef5134592b3b4ab79a543ed7f8e533b05b5b637af926630f6650'
+export const POSTGRES_IMAGE = 'postgres:18-bookworm@sha256:3725f4e2499eef5134592b3b4ab79a543ed7f8e533b05b5b637af926630f6650'
 type ArchivedObject = { key: string; sha256: string; size: number; contentType: string }
+type DumpFile = { name: string; sha256: string; size: number }
+/**
+ * Version 1 holds one compressed custom-format dump. Version 2 holds an
+ * uncompressed directory-format dump whose per-table files stay byte-stable
+ * between captures, so an rsync copy transfers only what changed.
+ */
 export type StorageArchive = {
-  version: 1; sourceBuildId: string; createdAt: string; schema: string
-  database: { sha256: string; size: number }; objects: ArchivedObject[]
+  version: 1 | 2; sourceBuildId: string; createdAt: string; schema: string
+  database: { sha256: string; size: number; format?: 'directory'; files?: DumpFile[] }; objects: ArchivedObject[]
+}
+export type DatabaseDumpFormat = 'custom' | 'directory'
+const DUMP_FILE = /^(?:toc\.dat|[0-9]+\.dat)$/
+
+/** One digest over the sorted file list binds a directory dump as a whole. */
+export function directoryDumpDigest(files: readonly DumpFile[]): { sha256: string; size: number } {
+  const sorted = [...files].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+  const hash = createHash('sha256')
+  for (const file of sorted) hash.update(`${file.name}\t${file.sha256}\t${file.size}\n`)
+  return { sha256: hash.digest('hex'), size: sorted.reduce((total, file) => total + file.size, 0) }
+}
+
+/** Lists a directory dump as regular files only; anything else is refused. */
+async function directoryDumpFiles(path: string): Promise<DumpFile[]> {
+  const files: DumpFile[] = []
+  for (const name of (await readdir(path)).sort()) {
+    const info = await lstat(join(path, name))
+    if (!info.isFile() || !DUMP_FILE.test(name)) throw new Error('Database archive integrity failure')
+    files.push({ name, ...await digest(join(path, name)) })
+  }
+  return files
+}
+
+/** Checks the dump named by the manifest and returns the path pg_restore reads inside /archive. */
+async function verifiedDump(root: string, manifest: StorageArchive): Promise<string> {
+  if (manifest.version === 1) {
+    const actual = await digest(join(root, 'database.dump'))
+    if (actual.sha256 !== manifest.database.sha256 || actual.size !== manifest.database.size) throw new Error('Database archive integrity failure')
+    return '/archive/database.dump'
+  }
+  const expected = manifest.database.files
+  if (manifest.database.format !== 'directory' || !Array.isArray(expected)) throw new Error('Invalid storage archive manifest')
+  const actual = await directoryDumpFiles(join(root, 'database'))
+  const summary = directoryDumpDigest(actual)
+  if (JSON.stringify(actual) !== JSON.stringify([...expected].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    || summary.sha256 !== manifest.database.sha256 || summary.size !== manifest.database.size) throw new Error('Database archive integrity failure')
+  return '/archive/database'
 }
 
 async function digest(path: string): Promise<{ sha256: string; size: number }> {
@@ -94,6 +137,7 @@ async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, 
 
 type ArchiveExport = {
   connectionString: string; db: PostgresDatabase; objects: S3ObjectStore; root: string; sourceBuildId: string; signal: AbortSignal
+  databaseFormat?: DatabaseDumpFormat
 } & ({ mode: 'maintenance'; deadlineEpochMs?: number } | { mode: 'online'; deadlineEpochMs: number })
 
 /** A fixed recovery point includes native database bytes and immutable private resources. */
@@ -106,11 +150,17 @@ export async function exportStorageArchive(request: ArchiveExport): Promise<Stor
     const signal = view.kind === 'online' ? view.signal : request.signal
     signal.throwIfAborted()
     await mkdir(join(root, 'objects'), { recursive: true, mode: 0o700 })
-    const dump = join(root, 'database.dump')
-    const args = ['--format=custom', '--no-owner', '--no-acl', `--schema=${schema}`, '--file=/archive/database.dump']
+    const directory = request.databaseFormat === 'directory'
+    const dump = join(root, directory ? 'database' : 'database.dump')
+    const args = directory
+      ? ['--format=directory', '--compress=0', '--no-owner', '--no-acl', `--schema=${schema}`, '--file=/archive/database']
+      : ['--format=custom', '--no-owner', '--no-acl', `--schema=${schema}`, '--file=/archive/database.dump']
     if (view.kind === 'online') args.push(`--snapshot=${view.snapshotId}`)
     await pgTool('pg_dump', connectionString, root, args, signal, request.deadlineEpochMs)
-    await chmod(dump, 0o600)
+    if (directory) {
+      await chmod(dump, 0o700)
+      for (const name of await readdir(dump)) await chmod(join(dump, name), 0o600)
+    } else await chmod(dump, 0o600)
     const catalog = view.kind === 'online' ? view.resources : await db.prepare(
       "SELECT object_key, content_hash AS sha256, size_bytes, content_type, state FROM stored_objects WHERE NOT blocked AND state IN ('ready','staging') ORDER BY object_key").all<CapturedResource>()
     const archived: ArchivedObject[] = []
@@ -126,9 +176,10 @@ export async function exportStorageArchive(request: ArchiveExport): Promise<Stor
       archived.push({ key: item.object_key, sha256: item.sha256, size: item.size_bytes, contentType: item.content_type })
     }
     signal.throwIfAborted()
-    const database = await digest(dump)
+    const files = directory ? await directoryDumpFiles(dump) : null
+    const database = files ? { ...directoryDumpDigest(files), format: 'directory' as const, files } : await digest(dump)
     signal.throwIfAborted()
-    const manifest: StorageArchive = { version: 1, sourceBuildId, createdAt: new Date().toISOString(), schema, database, objects: archived }
+    const manifest: StorageArchive = { version: files ? 2 : 1, sourceBuildId, createdAt: new Date().toISOString(), schema, database, objects: archived }
     await writeFile(join(root, 'archive.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 })
     signal.throwIfAborted()
     return manifest
@@ -137,6 +188,24 @@ export async function exportStorageArchive(request: ArchiveExport): Promise<Stor
     deadlineEpochMs: request.deadlineEpochMs, signal: request.signal }, (view, signal) => capture({ kind: 'online', ...view, signal }))
   if (await db.prepare("SELECT 1 FROM app_instances WHERE status!='stopped' AND lease_until>(extract(epoch FROM clock_timestamp())*1000)::bigint LIMIT 1").get()) throw new Error('Stop all applications before exporting storage')
   return capture({ kind: 'maintenance' })
+}
+
+/**
+ * Read-only integrity check of a copied archive directory: the manifest's dump
+ * and every listed object must be present with their recorded digests.
+ */
+export async function verifyStorageArchive(root: string): Promise<StorageArchive> {
+  const manifest = JSON.parse(await readFile(join(root, 'archive.json'), 'utf8')) as StorageArchive
+  if (![1, 2].includes(manifest.version) || !Array.isArray(manifest.objects)) throw new Error('Invalid storage archive manifest')
+  await verifiedDump(root, manifest)
+  const seen = new Set<string>()
+  for (const item of manifest.objects) {
+    if (!/^[a-f0-9]{64}$/.test(item.sha256) || seen.has(item.sha256)) continue
+    seen.add(item.sha256)
+    const actual = await digest(join(root, 'objects', item.sha256)).catch(() => null)
+    if (!actual || actual.sha256 !== item.sha256 || actual.size !== item.size) throw new Error(`Object archive integrity failure: ${item.key}`)
+  }
+  return manifest
 }
 
 export function decodeLedger(raw: string): ErasureBatch[] {
@@ -168,10 +237,9 @@ export async function assertEmptyStorage(db: PostgresDatabase, objects: S3Object
 export async function restoreStorageArchive(connectionString: string, db: PostgresDatabase, objects: S3ObjectStore, root: string, currentErasureFacts: ErasureBatch[], signal?: AbortSignal, validation: StorageValidationOptions = {}) {
   signal?.throwIfAborted()
   const manifest = JSON.parse(await readFile(join(root, 'archive.json'), 'utf8')) as StorageArchive
-  if (manifest.version !== 1 || !/^[a-z_][a-z0-9_]*$/.test(manifest.schema) || !Array.isArray(manifest.objects)) throw new Error('Invalid storage archive manifest')
+  if (![1, 2].includes(manifest.version) || !/^[a-z_][a-z0-9_]*$/.test(manifest.schema) || !Array.isArray(manifest.objects)) throw new Error('Invalid storage archive manifest')
   if (await db.prepare("SELECT 1 FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') LIMIT 1").get()) throw new Error('Restore requires an empty target database')
-  const actual = await digest(join(root, 'database.dump'))
-  if (actual.sha256 !== manifest.database.sha256 || actual.size !== manifest.database.size) throw new Error('Database archive integrity failure')
+  const dumpPath = await verifiedDump(root, manifest)
   const barrier = `restore:${manifest.database.sha256}`
   // The target stays detached from ingress until validation succeeds. The
   // durable barrier also prevents accidental startup after a failed restore.
@@ -198,11 +266,11 @@ export async function restoreStorageArchive(connectionString: string, db: Postgr
     // pg_dump --schema omits extension definitions; citext lives in public for
     // every application schema. Use the PostgreSQL client's native restore.
     await db.exec('CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public')
-    const listing = await pgTool('pg_restore', connectionString, root, ['--list', '/archive/database.dump'], signal)
+    const listing = await pgTool('pg_restore', connectionString, root, ['--list', dumpPath], signal)
     // public already exists and owns citext in a fresh target database. Omit
     // only its schema-creation entry, keeping every application object.
     await writeFile(restoreList, listing.split('\n').filter(line => !/^\d+; \d+ \d+ SCHEMA - public /.test(line)).join('\n'), { mode: 0o600 })
-    await pgTool('pg_restore', connectionString, root, ['--use-list=/archive-restore.list', '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl', '/archive/database.dump'], signal, undefined, restoreList)
+    await pgTool('pg_restore', connectionString, root, ['--use-list=/archive-restore.list', '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl', dumpPath], signal, undefined, restoreList)
     await migratePostgres(db)
     // Restored routing leases belong to source processes. Detach them without
     // changing Room recovery, permanent identities or ownership fencing epochs.

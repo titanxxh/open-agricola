@@ -9,7 +9,7 @@ import { vi, afterEach, beforeEach, expect, it } from 'vitest'
 vi.setConfig({ testTimeout: 120000, hookTimeout: 180000 })
 import { importFixture } from './_helpers/import-fixture'
 import { importSqlite } from '../sqlite-import/import'
-import { exportStorageArchive, restoreStorageArchive } from '../storage-archive'
+import { directoryDumpDigest, exportStorageArchive, restoreStorageArchive } from '../storage-archive'
 import { validateArchiveInIsolation } from '../storage-archive-cli'
 import { databaseMaintenance, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 import { releaseAll, releaseQueue } from '../../server/__tests__/_helpers/release-all'
@@ -82,6 +82,46 @@ it('round-trips native PostgreSQL recovery bytes and private S3 objects, then ap
   await writeFile(join(archive, 'archive.json'), JSON.stringify(index))
   await expect(restoreStorageArchive(incomplete.url, incomplete.db, incomplete.objects, archive, [])).rejects.toThrow(/resource|viewer/i)
   await expect(assertStorageReady(incomplete.db)).rejects.toThrow('has not passed validation')
+}, 120000)
+
+it('round-trips an uncompressed directory dump and refuses a changed or extra dump file', async () => {
+  const fixture = await importFixture(); cleanups.register(() => fixture.close())
+  await importSqlite(fixture.paths, fixture.db, fixture.resources)
+  const archive = join(fixture.root, 'directory-archive')
+  const manifest = await exportStorageArchive({ connectionString: getTestDatabaseUrl(), db: fixture.db, objects: fixture.resources.objects, root: archive,
+    sourceBuildId: 'test-build', mode: 'maintenance', databaseFormat: 'directory', signal: new AbortController().signal })
+  expect(manifest).toMatchObject({ version: 2, database: { format: 'directory' } })
+  expect((await readdir(archive)).sort()).toEqual(['archive.json', 'database', 'objects'])
+  const files = (await readdir(join(archive, 'database'))).sort()
+  expect(files).toContain('toc.dat')
+  expect(manifest.database.files!.map(file => file.name)).toEqual(files)
+  expect(directoryDumpDigest(manifest.database.files!)).toEqual({ sha256: manifest.database.sha256, size: manifest.database.size })
+  const admin = databaseMaintenance()
+  cleanups.register(() => admin.close())
+  const makeTarget = async () => {
+    const name = `backup_${randomUUID().replaceAll('-', '')}`
+    await admin.exec(`CREATE DATABASE "${name}"`)
+    const url = new URL(getTestDatabaseUrl()); url.pathname = `/${name}`
+    const db = new PostgresDatabase({ connectionString: url.toString(), schema: manifest.schema })
+    const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
+    cleanups.register(() => releaseAll([() => objects.clearPrefix(), () => objects.close(), () => db.close(), () => dropDatabase(name)]))
+    return { db, objects, url: url.toString() }
+  }
+  const target = await makeTarget()
+  expect((await restoreStorageArchive(target.url, target.db, target.objects, archive, [], undefined, { concurrency: 2 })).validation)
+    .toMatchObject({ roomCount: 1, replayCount: 1, replayStepCount: 4, retainedObjectCount: 3 })
+  const steps = 'SELECT payload_gzip, frame_hash FROM game_replay_steps ORDER BY step_no'
+  expect(await target.db.prepare(steps).all()).toEqual(await fixture.db.prepare(steps).all())
+  // The data file of one table changes: its digest no longer matches the manifest.
+  const data = files.find(name => name !== 'toc.dat')!
+  const original = await readFile(join(archive, 'database', data))
+  await writeFile(join(archive, 'database', data), Buffer.concat([original, Buffer.from('\n')]))
+  const changed = await makeTarget()
+  await expect(restoreStorageArchive(changed.url, changed.db, changed.objects, archive, [])).rejects.toThrow('Database archive integrity failure')
+  await writeFile(join(archive, 'database', data), original)
+  await writeFile(join(archive, 'database', '9999.dat'), 'extra')
+  const extra = await makeTarget()
+  await expect(restoreStorageArchive(extra.url, extra.db, extra.objects, archive, [])).rejects.toThrow('Database archive integrity failure')
 }, 120000)
 
 it('expires restored runtime routes so a new generation can immediately recover the same room', async () => {
