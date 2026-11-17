@@ -119,17 +119,22 @@ export function candidateEnvironment(execution: CandidateExecution, environment:
   }
 }
 
+/** `sudo` arguments that run one candidate command as its own transient unit inside the candidate slice. */
+export function candidateCommand(execution: CandidateExecution, command: string, args: string[], phase: string, environment: Record<string, string> = {}, properties: string[] = []): string[] {
+  if (!/^[a-z0-9-]+$/.test(phase) || properties.some(property => !/^[A-Za-z]+=[A-Za-z0-9/._-]*$/.test(property))) throw new Error('Invalid candidate execution phase')
+  const env = candidateEnvironment(execution, environment)
+  return ['-n', '/usr/bin/systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+    `--unit=oa-candidate-${phase}`, `--slice=user-${execution.uid}.slice`, `--uid=${execution.uid}`, `--gid=${execution.gid}`,
+    '--property=NoNewPrivileges=yes', '--property=SupplementaryGroups=', '--property=KillMode=control-group', ...properties.map(property => `--property=${property}`),
+    `--working-directory=${execution.work}`, '/usr/bin/env', '-i', ...Object.entries(env).map(([key, value]) => `${key}=${value}`), command, ...args]
+}
+
 export function executeCandidate(execution: CandidateExecution, command: string, args: string[], phase: string, environment: Record<string, string> = {}): number {
-  if (!/^[a-z0-9-]+$/.test(phase)) throw new Error('Invalid candidate execution phase')
+  const argv = candidateCommand(execution, command, args, phase, environment)
   const log = join(execution.privateDirectory, `${phase}.log`)
   const fd = openSync(log, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
   try {
-    const env = candidateEnvironment(execution, environment)
-    const result = spawnSync('/usr/bin/sudo', ['-n', '/usr/bin/systemd-run', '--quiet', '--wait', '--pipe', '--collect',
-      `--unit=oa-candidate-${phase}`, `--slice=user-${execution.uid}.slice`, `--uid=${execution.uid}`, `--gid=${execution.gid}`,
-      '--property=NoNewPrivileges=yes', '--property=SupplementaryGroups=', '--property=KillMode=control-group',
-      `--working-directory=${execution.work}`, '/usr/bin/env', '-i', ...Object.entries(env).map(([key, value]) => `${key}=${value}`), command, ...args,
-    ], { stdio: ['ignore', fd, fd] })
+    const result = spawnSync('/usr/bin/sudo', argv, { stdio: ['ignore', fd, fd] })
     if (result.error) throw result.error
     return result.status ?? 1
   } finally { closeSync(fd); printVerificationOutput(displayCandidateLog(log)) }

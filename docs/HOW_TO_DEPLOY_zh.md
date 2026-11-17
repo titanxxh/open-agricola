@@ -55,11 +55,21 @@ fork 仓库可传入 `--repository owner/name`，并在该仓库配置候选验�
 
 ### 授权完整本机候选验证
 
-正式版本明确采用本机验收时，仓库原生 User owner 可提交同一完整十任务候选计划的回执：
+正式版本与 pre 版本默认在 owner 本机验证固定候选（ADR 0046），GitHub 候选 workflow 作为回退。仓库原生 User owner 提交同一完整十任务候选计划的回执：
 
 ```bash
-pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/verification.json
+sudo bash scripts/ci/owner-local-provision.sh <node-install-dir>      # 每台 owner 机器执行一次
+pnpm exec tsx scripts/ci/owner-local-run.ts --channel stable --sha <final-main-sha> --output /owner/runs/<新目录>
+pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/runs/<新目录>/verification.json
 ```
+
+`scripts/ci/owner-local-run.ts` 是 recorder，须在受信任的 protected-main checkout 中运行，其干净的 HEAD 即 producer。
+- **一次性准备**：安装与已装引擎同版本的 rootless Docker 组件、用户命名空间工具，并在 `/opt/oa-owner-local` 放置 root 所有的可信 Node 工具链副本和可信 Playwright 浏览器缓存；不会升级 Docker。Playwright 升级后需重新执行。
+- **隔离**：每次运行新建一次性 UID 61000 `oa-candidate` 及其独立 rootless Docker，与 GitHub runner 隔离方式一致。候选命令以 NoNewPrivileges unit 运行，使用私有 `/tmp`，取不到 owner 凭据、HOME、发布状态或 rootful Docker socket。候选 slice 上限为 64 GiB 内存、16384 个任务、CPU 权重 50。
+- **共享输入**：每个任务一份浅克隆源码副本，各副本共享同一个被忽略的 `data/` 目录，因此 `local-services --test` 只使用一套凭据，端口为本次运行选定的回环端口。候选还会得到可信浏览器缓存的副本，以及其 `public-assets.ref` 对应的干净公共资源 checkout（`PUBLIC_ASSET_VALIDATION_DIR`），构建时离线校验资源清单。
+- **流程**：先执行隔离 smoke、依赖安装、浏览器安装和一次服务启动。随后 `fast` 单独运行；其余九个任务按耗时从长到短运行，浏览器任务同时最多 `--browser-jobs` 个（默认 2，因为公共资源主机会对同一 owner IP 限流）。`--test-workers` 设置 `VITEST_MAX_WORKERS`（默认 10；0 表示沿用 Vitest 默认值）。失败的任务在各波次结束后单独重试，次数为 `--retries`（默认 1），与 GitHub 重跑失败任务的做法一致。之后停止整个 cgroup、删除身份、用受信任 checkout 核对每份副本，并删除候选 home。
+- **产出**：只有完全成功时才写出 `verification.json`（stable format 1）或 `pre-verification.json`（pre format 2），以及 `execution-evidence.json`。证据绑定 sandbox、工具链、准备阶段日志、每一次尝试、记录的命令、源码完整性、资源限制与 teardown 日志。日志每行带有距该命令开始的秒数。recorder 会按 publisher 的规则复核回执。`--profile` 额外记录输出时间线用于耗时分析，不写回执。
+- **约束**：同一台机器同时只能有一次运行，由 `/tmp/oa-owner-local-verification.lock` 串行化；中断时仍会 teardown。输出目录须保持私有，其中还有日志和诊断。
 
 回执记录每条实际 `runCandidateTask` 命令、退出码与日志 SHA-256，以及执行时间、Node、平台、架构、受测提交、原始源码树和候选/producer 验证配置。完整十任务及其 canonical 命令必须全部通过。日常 affected 检查或单独 `release:rehearse` 不满足此路径。rebase 后仅当完整原始树和验证配置与受测源码相同时，publisher 才能重绑 `candidateSha`；保留 `testedSha`，不把本机命令记为 GitHub job。
 
@@ -109,7 +119,7 @@ pre start 先建立 host-only HttpOnly verifier/state Cookie，再前往正式�
 
 各 SHA 均为完整提交身份。清单提交位于功能提交之后，`integratedSha` 指向实际集成功能提交。独立功能保留来源，以便只晋升选定功能。依赖必须指向清单中已有功能且不能成环；候选须继承 main 基线且无 merge commit。
 
-owner 同步 main 时以 `rebase.updateRefs=false` 准备并审阅 rebase 结果，再更新清单基线与集成提交。同步前须取得该精确 head 由 `pull_request` 或 `push` 事件产生的成功 `verify`。即使通过，GitHub 也不会用 `workflow_dispatch` 的检查满足原生 required-status 规则，见 [GitHub 必需检查事件说明](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated)。按当前 workflow 触发条件，从同步分支向当前 main 建立 draft 对比 PR，明确标注仅作同步审阅，等待检查通过。不要将此 PR 合入 main。然后执行：
+owner 同步 main 时以 `rebase.updateRefs=false` 准备并审阅 rebase 结果，再更新清单基线与集成提交。owner 在同步前用 recorder 在本机验证该精确 head，并适用 owner 的 ruleset bypass，因此无需等待 GitHub 检查。未做本机验证时，同步前须取得该精确 head 由 `pull_request` 或 `push` 事件产生的成功 `verify`。即使通过，GitHub 也不会用 `workflow_dispatch` 的检查满足原生 required-status 规则，见 [GitHub 必需检查事件说明](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated)。按当前 workflow 触发条件，从同步分支向当前 main 建立 draft 对比 PR，明确标注仅作同步审阅，等待检查通过。不要将此 PR 合入 main。然后执行：
 
 ```bash
 pnpm exec tsx scripts/ci/prerelease-verification.ts sync --repository titanxxh/open-agricola --sha <new-pre-sha> --expected-old <old-pre-sha> --main-sha <current-main-sha>
@@ -129,12 +139,12 @@ owner 明确采用完整本机候选验收时，先完成原生集成并固定�
 
 ```bash
 pnpm exec tsx scripts/ci/prerelease-verification.ts select --repository titanxxh/open-agricola --sha "$pre_sha"
-# 先使用已批准的隔离 harness 执行完整 canonical 计划。
+pnpm exec tsx scripts/ci/owner-local-run.ts --channel prerelease --sha "$pre_sha" --output "$private_owner_directory"
 pnpm release vX.Y.Z-beta.N --channel prerelease --ref "$pre_sha" \
   --local-verification "$private_owner_directory/pre-verification.json"
 ```
 
-这是仅处理数据的发布接口，不是候选执行器：它不安装候选依赖，也不运行候选命令；不提供默认本机 recorder。输入回执必须覆盖全部十项 canonical pre 任务、真实成功退出码及保留日志的 SHA256，失败或不完整结果不能放行。选择与发布重验当前 pre SHA、不可变引用、原生保护、manifest 来源和干净的 protected-main producer。普通回归沿用 stable 运行期默认值，生产 hosted build 使用 prerelease；源码变化或 producer 配置不兼容时重新验收。不得用旧的不隔离 runner 生成此回执。
+这是仅处理数据的发布接口，不是候选执行器：它不安装候选依赖，也不运行候选命令。回执由 `scripts/ci/owner-local-run.ts --channel prerelease --sha "$pre_sha"` 产生（见[授权完整本机候选验证](#authorize-complete-owner-local-verification)）。输入回执必须覆盖全部十项 canonical pre 任务、真实成功退出码及保留日志的 SHA256，失败或不完整结果不能放行。选择与发布重验当前 pre SHA、不可变引用、原生保护、manifest 来源和干净的 protected-main producer。普通回归沿用 stable 运行期默认值，生产 hosted build 使用 prerelease；源码变化或 producer 配置不兼容时重新验收。不得用旧的不隔离 runner 生成此回执。
 
 pre owner-local 必须使用 format 2 回执及 `execution: { kind: "docker-isolated", evidenceSha256: "<64 lowercase hex>" }`。owner 在候选之外收集的证据绑定实际 sandbox、前置服务源码闭包、命令、源码完整性、资源限制及 teardown，原始证据与日志一并不可变保留。已撤回的 format-1 pre 回执拒绝；stable format 1 不变。pre proof 的 `executionEvidenceSha256` 随镜像与接收端复核传递，并使用独立的原生 owner `owner-local-prerelease-verification` status；固定 beta Release 必须为 `prerelease=true`、`latest=false`。stable 与 pre 证明不能互相授权。公共 pre checker 重验固定源码、完整计划、双方配置、producer 祖先关系、原生 owner、tag 和绑定摘要的 asset ID/实际字节。完整同树 rebase 保留实际受测 SHA；源码树或 producer 配置不兼容时重新执行。owner、接收端 deploy/open/restore 和 candidate 镜像生产保留真实 typed 本机证明，不虚构 Actions ID。本机授权缺失或撤销时仍可用原生 workflow 回退；owner 最新 success 的证明无效时阻断。原生 PR/ref 规则、同步 lease、真实私有镜像生产/import 和目标验收仍为独立门禁；候选内工具不能自授权，必须先把 producer 正当交付到 protected main。
 
