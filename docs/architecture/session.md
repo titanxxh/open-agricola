@@ -122,6 +122,8 @@ Tests: `server/__tests__/{person-placement-order-session,move-farmer-before-plac
 
 ## Player Feeding Settlement
 
+Heating previews use `computeHeatingRequirement()` with `discountTiming: 'upcoming-harvest'`; settlement keeps its existing default. A card's pure `computeHarvestHeatingRoomDiscount` query shares its field-phase calculation. The captured discount and `heatingRoomDiscountRound` preserve that harvest's value after animals change; legacy feeding/breeding snapshots retain their stored discount. This native query is outside the Workshop hook allowlist. Coverage: `server/__tests__/harvest-heating-discount-session.test.ts`.
+
 `shared/actions/helpers/harvest-feeding-requirement.ts` owns the feeding requirement: adults require three food with one actual participant and two otherwise; newborns require one. Existing card modifiers apply to that base before the result is offered or settled. Tests: `shared/actions/helpers/__tests__/harvest-feeding-requirement.test.ts` and `server/__tests__/standard-solo-core-session.test.ts`.
 
 `handleFeedResolved()` resolves the offered and live recipe catalogs and validates the complete batch before replacing its pending frame with an ordinary Exchange flow. Its private `harvestSettlementResume` stores remaining demand, prepaid food, conversion costs and the player queue. Every batch reaction and required animal reorganization completes before remaining food payment, begging and heating. Snapshot recovery and undo restore that continuation with the engine cursor, so completed exchange and prepaid food never replay.

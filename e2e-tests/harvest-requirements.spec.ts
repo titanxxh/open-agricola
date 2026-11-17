@@ -3,6 +3,7 @@
 import { expect, test } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { setActiveWorkerCount, setNewbornCount } from '../shared/domain/player'
+import { writeCardExtraData } from '../shared/cards/helpers/card-state'
 import { serializeState } from '../shared/session/serialization'
 import { joinRoomClients, roomDriver } from './room-command-driver'
 
@@ -20,6 +21,8 @@ for (const locale of ['en', 'zh'] as const) {
         state.round = 3
         setActiveWorkerCount(state.players[0]!, 3)
         setNewbornCount(state.players[0]!, 1)
+        state.players[0]!.minorPlayed = ['M086_SpinningMill']
+        writeCardExtraData(state.players[0]!, 'M086_SpinningMill', 'heatingRoomDiscount', 2)
         state.players[1]!.houseType = 'clay'
       } })
       const initial = fixture.withCtx(() => serializeState(fixture.state, {}))

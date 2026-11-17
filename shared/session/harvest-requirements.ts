@@ -32,6 +32,7 @@ export const getHarvestRequirements = (state: GameState, player: PlayerState): H
   return {
     round,
     food: computeHarvestFeedingRequirement(projectedState, projectedPlayer),
-    fuel: state.enableFarmersOfTheMoor ? computeHeatingRequirement(projectedState, projectedPlayer) : null,
+    fuel: state.enableFarmersOfTheMoor
+      ? computeHeatingRequirement(projectedState, projectedPlayer, { discountTiming: 'upcoming-harvest' }) : null,
   }
 }

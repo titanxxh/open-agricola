@@ -1,6 +1,7 @@
 import type { GameState, PlayerState, Worker } from '../contract/types'
 import type { CardDefinition } from '../contract/cards'
 import { getPlayedCardDefinitions } from '../cards/helpers/card-type'
+import { getCardEffect } from '../cards/card-effects'
 import { availableWorkers, workersAtHome, smallestAvailableWorker } from '../domain/player'
 import { findActionSpaceById } from '../domain/space'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
@@ -20,6 +21,7 @@ export type HeatingPaymentResult = {
 
 type HeatingRequirementContext = {
   woodToFuel?: number
+  discountTiming?: 'settled' | 'upcoming-harvest'
 }
 
 const workerNumber = (worker: Worker): number => Number(worker.id)
@@ -40,14 +42,32 @@ const sickSet = (player: PlayerState): Set<string> =>
 const cardStateHeatingRoomDiscount = (player: PlayerState, cardId: string): number =>
   wholeNumber(player.cardStates?.[cardId]?.extraData?.heatingRoomDiscount)
 
-const hasHeatingMetadata = (player: PlayerState, card: CardDefinition): boolean =>
+const hasHeatingMetadata = (player: PlayerState, card: CardDefinition, context: HeatingRequirementContext): boolean =>
   card.heatingRoomDiscount !== undefined ||
   card.heatingFuelCap !== undefined ||
   card.heatingWoodToFuelDiscount !== undefined ||
-  cardStateHeatingRoomDiscount(player, card.id) !== 0
+  cardStateHeatingRoomDiscount(player, card.id) !== 0 ||
+  (context.discountTiming === 'upcoming-harvest' && getCardEffect(card.id)?.computeHarvestHeatingRoomDiscount !== undefined)
 
-const playedHeatingCards = (player: PlayerState): CardDefinition[] =>
-  getPlayedCardDefinitions(player).filter((card) => hasHeatingMetadata(player, card))
+const playedHeatingCards = (player: PlayerState, context: HeatingRequirementContext): CardDefinition[] =>
+  getPlayedCardDefinitions(player).filter((card) => hasHeatingMetadata(player, card, context))
+
+const harvestHeatingRoomDiscount = (
+  state: GameState,
+  player: PlayerState,
+  cardId: string,
+  context: HeatingRequirementContext,
+): number => {
+  if (context.discountTiming !== 'upcoming-harvest') return cardStateHeatingRoomDiscount(player, cardId)
+  const query = getCardEffect(cardId)?.computeHarvestHeatingRoomDiscount
+  const capturedRound = player.cardStates?.[cardId]?.extraData?.heatingRoomDiscountRound
+  const legacySettlement = capturedRound === undefined &&
+    (state.roundPhase === 'feeding' || state.roundPhase === 'breeding')
+  if (!query || capturedRound === state.round || legacySettlement) {
+    return cardStateHeatingRoomDiscount(player, cardId)
+  }
+  return wholeNumber(query(state, player))
+}
 
 export const computeHeatingRequirementBeforeSeason = (
   state: GameState,
@@ -57,14 +77,14 @@ export const computeHeatingRequirementBeforeSeason = (
   if (state.enableFarmersOfTheMoor !== true) return 0
   const rooms = player.roomTiles?.length ?? player.rooms ?? 0
   const houseDiscount = player.houseType === 'stone' ? 2 : player.houseType === 'clay' ? 1 : 0
-  const heatingCards = playedHeatingCards(player)
+  const heatingCards = playedHeatingCards(player, context)
   const cardDiscount = heatingCards.reduce((sum, card) => {
     const woodDiscount = wholeNonNegative(context.woodToFuel) > 0
       ? wholeNonNegative(card.heatingWoodToFuelDiscount)
       : 0
     return sum
       + wholeNumber(card.heatingRoomDiscount)
-      + cardStateHeatingRoomDiscount(player, card.id)
+      + harvestHeatingRoomDiscount(state, player, card.id, context)
       + woodDiscount
   }, 0)
   const caps = heatingCards
