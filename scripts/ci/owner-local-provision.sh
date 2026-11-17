@@ -35,7 +35,8 @@ if [[ ! -d $target ]]; then
 fi
 ln -sfn "$target" /opt/oa-owner-local/node
 # The pnpm shim resolves the candidate's packageManager pin through Corepack, as on GitHub runners.
-/opt/oa-owner-local/node/bin/corepack enable --install-directory /opt/oa-owner-local/node/bin
+# Corepack's shim starts with `#!/usr/bin/env node`, which the reset PATH would not find on nvm/asdf machines.
+/opt/oa-owner-local/node/bin/node /opt/oa-owner-local/node/bin/corepack enable --install-directory /opt/oa-owner-local/node/bin
 
 # Browser system libraries come from the trusted checkout's Playwright, as in the CI prerequisite step.
 [[ -f $policy/node_modules/playwright/cli.js ]] || { echo 'Install trusted dependencies in the policy checkout first' >&2; exit 1; }
