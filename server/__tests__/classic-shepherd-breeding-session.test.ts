@@ -5,7 +5,7 @@ import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/s
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 
-const SHEPHERD = 'OLD_E203_Shepherd'
+const SHEPHERD = 'CE203_Shepherd'
 const FODDER_PLANTER = 'D115_FodderPlanter'
 const NIGHT_PASTURE = 'M033_NightPasture'
 const sessions: GameSession[] = []

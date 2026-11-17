@@ -1,14 +1,14 @@
 import { defineOccupationCard } from '../../card-source'
 
-const CARD_ID = 'OLD_E203_Shepherd'
+const CARD_ID = 'CE203_Shepherd'
 
-export const OLD_E203_Shepherd = defineOccupationCard({
+export const CE203_Shepherd = defineOccupationCard({
   meta: {
     id: CARD_ID,
     name: 'Shepherd',
-    deck: 'E',
+    deck: 'CE',
     number: 203,
-    desc: ['During each breeding phase, if you have at least 4 sheep, your sheep produce 2 offspring instead of 1.'],
+    desc: ['During each breeding phase, if you have at least 4 <sheep>, your <sheep> produce 2 offspring instead of 1.'],
     players: '4+',
   },
   impl: {
