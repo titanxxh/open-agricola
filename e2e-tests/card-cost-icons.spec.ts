@@ -1,6 +1,7 @@
 // @covers client/components/board/
 import { expect, test } from '@playwright/test'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const costs = [
   ['A009_YoungAnimalMarket', [['sheep', 1]]],
@@ -14,7 +15,7 @@ const costs = [
 
 for (const locale of ['en', 'zh'] as const) {
   for (const width of [1280, 390]) {
-    test(`${locale} printed animal and fuel costs at ${width}px`, async ({ page, request }) => {
+    test(`${locale} printed animal and fuel costs at ${width}px`, matrixVariant(locale === 'en' && width === 1280), async ({ page, request }) => {
       await page.setViewportSize({ width, height: 844 })
       await page.addInitScript(value => localStorage.setItem('open-agricola-locale-v2', value), locale)
       expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {

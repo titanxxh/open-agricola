@@ -4,6 +4,7 @@ import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures
 import { serializeState } from '../shared/session/serialization'
 import type { SessionResponse } from '../server/game/authoritative-session'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 async function prepare(page: Page, request: APIRequestContext, kind: 'sow' | 'animals') {
   expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
@@ -83,7 +84,7 @@ async function confirm(page: Page): Promise<SessionResponse> {
 }
 
 for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }, { width: 1440, height: 900 }]) {
-  test(`mixed farm and Card Field targets share the draft above controls at ${viewport.width}x${viewport.height}`, async ({ page, request }) => {
+  test(`mixed farm and Card Field targets share the draft above controls at ${viewport.width}x${viewport.height}`, matrixVariant(viewport.width === 1440), async ({ page, request }) => {
     await page.setViewportSize(viewport)
     await prepare(page, request, 'sow')
     const beforeOrder = await order(page)
@@ -119,7 +120,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }
     expect(await order(page)).toEqual(beforeOrder)
   })
 
-  test(`farm and card animal controls share each zone at ${viewport.width}x${viewport.height}`, async ({ page, request }) => {
+  test(`farm and card animal controls share each zone at ${viewport.width}x${viewport.height}`, matrixVariant(viewport.width === 1440), async ({ page, request }) => {
     await page.setViewportSize(viewport)
     await prepare(page, request, 'animals')
     const beforeOrder = await order(page)

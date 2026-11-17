@@ -10,6 +10,7 @@ import { BACKEND_URL } from './fixtures'
 import { joinRoomClients, roomDriver } from './room-command-driver'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
+import { matrixVariant } from './helpers/extended'
 
 const communities = [
   { platform: 'wechat', label: 'WeChat player group', title: 'Join the WeChat player group', image: 'WeChat player group QR code', flag: '--wechat-qr', filename: 'wechat-qr', endpoint: '/api/community/wechat-qr' },
@@ -25,7 +26,7 @@ function communityDirectory() {
 
 for (const community of communities) {
   for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
-    test.describe(`${community.platform} ${viewport.width}px`, () => {
+    test.describe(`${community.platform} ${viewport.width}px`, matrixVariant(viewport.width === 1280), () => {
       test.use({ viewport, hasTouch: viewport.width < 500, isMobile: viewport.width < 500 })
       test('opens beside GitHub and refreshes its own image without restarting', async ({ page, request }, testInfo) => {
         const directory = communityDirectory()

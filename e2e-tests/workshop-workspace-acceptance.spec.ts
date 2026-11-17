@@ -15,6 +15,7 @@ import { approveCurrentDraft, publish } from '../server/workshop-drafts.ts'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { test } from './server-fixtures'
 import { createLocalUserForTests, createSession } from '../server/auth'
+import { matrixVariant } from './helpers/extended'
 
 type Locale = 'en'
 type Viewport = 'desktop' | 'mobile'
@@ -1624,7 +1625,7 @@ const scenarios: Array<{
 test.describe('AI card workspace acceptance matrix', () => {
   for (const scenario of scenarios) {
     for (const variant of variants) {
-      test(`${scenario.title} [${variant.locale}/${variant.viewport}]`, async ({
+      test(`${scenario.title} [${variant.locale}/${variant.viewport}]`, matrixVariant(variant.viewport === 'desktop'), async ({
         page,
         request,
       }) => {

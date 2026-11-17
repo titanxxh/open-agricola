@@ -5,6 +5,8 @@ export default defineConfig({
   timeout: 120_000,
   retries: 0,
   workers: 1,
+  // Repeated viewport, locale and device variants (e2e-tests/helpers/extended.ts) run only on request.
+  ...(process.env.E2E_EXTENDED === '1' ? {} : { grepInvert: /@extended/ }),
   snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}-{platform}{ext}',
   use: {
     headless: true,

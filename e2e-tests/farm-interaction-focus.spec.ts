@@ -5,6 +5,7 @@ import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures
 import { serializeState } from '../shared/session/serialization'
 import type { GameState, SessionResponse } from '../shared/contract/types'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 async function prepare(page: Page, request: APIRequestContext, configure?: (state: GameState) => void, moor = false) {
   const options = { playerCount: 2, enableFarmersOfTheMoor: moor, allowIncompleteFarmersOfTheMoorMinorDeal: moor }
@@ -123,7 +124,7 @@ test('farm redevelopment fences eight edges with exactly eight wood', async ({ p
 })
 
 for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }, { width: 1440, height: 900 }]) {
-  test(`fence touch targets remain distinct and above the operation bar at ${viewport.width}x${viewport.height}`, async ({ browser, request }) => {
+  test(`fence touch targets remain distinct and above the operation bar at ${viewport.width}x${viewport.height}`, matrixVariant(viewport.width === 375), async ({ browser, request }) => {
     const context = await browser.newContext({ viewport, hasTouch: true })
     const page = await context.newPage()
     try {

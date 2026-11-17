@@ -2,6 +2,7 @@
 import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const CARD_ID = 'E148_Lazybones'
 
@@ -9,7 +10,7 @@ for (const scenario of [
   { locale: 'en', width: 1440, confirm: 'Confirm (2/2)', grain: 'Grain Seeds', farmland: 'Farmland' },
   { locale: 'en', width: 390, confirm: 'Confirm (2/2)', grain: 'Grain Seeds', farmland: 'Farmland' },
 ] as const) {
-  test(`Lazybones shows four selectable tiles at ${scenario.width}px in ${scenario.locale}`, async ({ page, request }) => {
+  test(`Lazybones shows four selectable tiles at ${scenario.width}px in ${scenario.locale}`, matrixVariant(scenario.width === 1440), async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
     await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
     const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),

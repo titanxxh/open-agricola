@@ -6,6 +6,7 @@ import { expect, type Route } from '@playwright/test'
 import { test } from './server-fixtures'
 import { FRONTEND_URL } from './fixtures'
 import { createLocalUserForTests, createSession } from '../server/auth'
+import { matrixVariant } from './helpers/extended'
 
 const modelUrl = 'https://api.deepseek.com/v1/chat/completions'
 const referenceCommit = 'e'.repeat(40)
@@ -39,7 +40,7 @@ async function respond(route: Route, delta: Record<string, unknown>, tools = fal
   ].map(frame => `data: ${JSON.stringify(frame)}\n\n`).join('') + 'data: [DONE]\n\n' })
 }
 
-for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) test(`editor candidate recovery and explicit adoption (en, ${width}px)`, async ({ page, browser }, testInfo) => {
+for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) test(`editor candidate recovery and explicit adoption (en, ${width}px)`, matrixVariant(width === 1920), async ({ page, browser }, testInfo) => {
   test.setTimeout(120_000)
   await page.setViewportSize({ width, height })
   await page.addInitScript(() => { if (window === top) localStorage.setItem('open-agricola-locale-v2', 'en') })

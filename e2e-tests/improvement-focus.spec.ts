@@ -5,6 +5,7 @@ import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'
 import { GameSession } from '../server/game/authoritative-session'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const openGame = async (page: Page, request: APIRequestContext, configure?: (state: GameState) => void) => {
   const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
@@ -36,7 +37,7 @@ const openGame = async (page: Page, request: APIRequestContext, configure?: (sta
 }
 
 for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 }]) {
-  test(`mixed improvement selection keeps one supply beside the minor hand at ${viewport.width}px`, async ({ page, request }) => {
+  test(`mixed improvement selection keeps one supply beside the minor hand at ${viewport.width}px`, matrixVariant(viewport.width === 1440), async ({ page, request }) => {
     await page.setViewportSize(viewport)
     await openGame(page, request)
     await page.locator('[data-action-id="major-improvement"] button').first().click()
@@ -67,7 +68,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 
     await expect(page.locator('[data-interaction-focus="actions"]')).toHaveAttribute('data-interaction-focused', 'true')
   })
 
-  test(`only legal majors open and focus the supply at ${viewport.width}px`, async ({ page, request }) => {
+  test(`only legal majors open and focus the supply at ${viewport.width}px`, matrixVariant(viewport.width === 1440), async ({ page, request }) => {
     await page.setViewportSize(viewport)
     await openGame(page, request, state => { state.players[0]!.minorHand = ['__test_placeholder__'] })
     await page.locator('[data-action-id="major-improvement"] button').first().click()
@@ -81,7 +82,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 
     await expect(page.locator('.played-cards [data-card-anchor="Major_Fireplace1"]')).toBeVisible()
   })
 
-  test(`a minor-only request has no major purchase entry at ${viewport.width}px`, async ({ page, request }) => {
+  test(`a minor-only request has no major purchase entry at ${viewport.width}px`, matrixVariant(viewport.width === 1440), async ({ page, request }) => {
     await page.setViewportSize(viewport)
     await openGame(page, request)
     await page.locator('[data-action-id="meeting-place"] button').first().click()
@@ -95,7 +96,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 
   })
 
   for (const count of [2, 3]) {
-    test(`an improvement offer shows ${count === 3 ? 'a summary' : 'details'} for ${count} cards at ${viewport.width}px`, async ({ page, request }) => {
+    test(`an improvement offer shows ${count === 3 ? 'a summary' : 'details'} for ${count} cards at ${viewport.width}px`, matrixVariant(viewport.width === 1440), async ({ page, request }) => {
       await page.setViewportSize(viewport)
       const cards = ['A053_Claypipe', 'A076_Cob', 'B065_GrainDepot'].slice(0, count)
       await openGame(page, request, state => {

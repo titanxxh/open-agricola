@@ -2,6 +2,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { LOCAL_PUBLIC_ASSET_BASE_URL, publicAssetBaseUrl } from '../scripts/public-assets'
 import { FRONTEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const sandboxSettings = {
   player_count: 2,
@@ -33,7 +34,7 @@ async function expectFullyWithinViewport(locator: Locator, viewportWidth: number
 }
 
 for (const width of [320, 375, 390]) {
-  test(`workshop browse controls fit within a ${width}px viewport`, async ({ page }) => {
+  test(`workshop browse controls fit within a ${width}px viewport`, matrixVariant(width === 320), async ({ page }) => {
     await mockPlatformApis(page)
     await page.setViewportSize({ width, height: 844 })
     await page.goto('/?page=workshop')
@@ -54,7 +55,7 @@ for (const width of [320, 375, 390]) {
 }
 
 for (const width of [320, 375, 390]) {
-  test(`account binding controls fit within a ${width}px viewport`, async ({ page }) => {
+  test(`account binding controls fit within a ${width}px viewport`, matrixVariant(width === 320), async ({ page }) => {
     await mockPlatformApis(page)
     await page.setViewportSize({ width, height: 844 })
     await page.goto('/?page=settings')

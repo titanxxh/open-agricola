@@ -2,10 +2,11 @@
 import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 375 }]) {
   for (const count of [2, 3]) {
-    test(`occupation offer uses ${count === 3 ? 'a summary' : 'the shared payment'} for ${count} cards in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
+    test(`occupation offer uses ${count === 3 ? 'a summary' : 'the shared payment'} for ${count} cards in ${scenario.locale} at ${scenario.width}px`, matrixVariant(scenario.width === 1440), async ({ page, request }) => {
       await page.setViewportSize({ width: scenario.width, height: 900 })
       await page.addInitScript(locale => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
       const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 1373, playerCount: 2, customCardIds: [] } })

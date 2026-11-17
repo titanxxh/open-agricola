@@ -3,6 +3,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { FRONTEND_URL } from './fixtures'
 import { authenticateSolo, recordSoloEvidence, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
 import { checkpoint, restartIsolatedBackend } from './helpers/standard-solo-process'
+import { matrixVariant } from './helpers/extended'
 
 const clearHotseatCover = async (page: Page) => {
   await page.locator('.game-layout, .hotseat-handoff').first().waitFor()
@@ -11,7 +12,7 @@ const clearHotseatCover = async (page: Page) => {
 }
 
 for (const width of [1280, 375]) for (const mode of ['multiplayer', 'hotseat', 'solo'] as const) {
-  test(`Moor balance creation, synchronization and refresh: ${mode} at ${width}px`, async ({ browser, request }, testInfo) => {
+  test(`Moor balance creation, synchronization and refresh: ${mode} at ${width}px`, matrixVariant(width === 1280), async ({ browser, request }, testInfo) => {
     test.setTimeout(90_000)
     const contexts: BrowserContext[] = []
     const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width === 375 })

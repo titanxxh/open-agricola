@@ -5,6 +5,7 @@ import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'
 import { GameSession } from '../server/game/authoritative-session'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 test.use({ hasTouch: true, viewport: { width: 375, height: 667 } })
 
@@ -195,7 +196,7 @@ test.describe('iPad without container units or CSS length division', () => {
   })
 
   for (const portrait of [{ width: 744, height: 1133 }, { width: 768, height: 1024 }]) {
-    test(`cards fit their slots through rotation at ${portrait.width}px`, async ({ page, request }) => {
+    test(`cards fit their slots through rotation at ${portrait.width}px`, matrixVariant(portrait.width === 744), async ({ page, request }) => {
       await page.setViewportSize(portrait)
       await openGame(page, request, state => {
         state.players[0]!.occupationHand = ['A116_WoodCutter', 'A124_Knapper', 'A126_MasterWorkman']

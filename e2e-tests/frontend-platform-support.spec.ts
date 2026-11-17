@@ -1,6 +1,7 @@
 // @covers client/styles/pages/
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { matrixVariant } from './helpers/extended'
 
 const platformStyleFiles = [
   'client/App.css',
@@ -261,7 +262,7 @@ test('platform navigation stays operable at a 200% effective desktop viewport', 
 })
 
 for (const width of [320, 375, 390, 768, 1280]) {
-  test(`platform pages fit a ${width}px viewport`, async ({ page }) => {
+  test(`platform pages fit a ${width}px viewport`, matrixVariant(width === 320), async ({ page }) => {
     await mockPlatformApis(page)
     await page.setViewportSize({ width, height: 900 })
 

@@ -2,6 +2,7 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 test.use({ hasTouch: true })
 
@@ -24,7 +25,7 @@ async function prepareExpansions(request: APIRequestContext) {
 }
 
 for (const width of [320, 390, 768, 1920]) {
-  test(`expansion boards and completed parents stay readable at ${width}px`, async ({ page, request }) => {
+  test(`expansion boards and completed parents stay readable at ${width}px`, matrixVariant(width === 320), async ({ page, request }) => {
     await prepareExpansions(request)
     await page.setViewportSize({ width, height: 900 })
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))

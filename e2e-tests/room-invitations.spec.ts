@@ -5,6 +5,7 @@ import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { MyActiveRoom } from '../shared/contract/lobby'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
+import { matrixVariant } from './helpers/extended'
 
 const cookieValue = (response: APIResponse, name: string): string => {
   const header = response.headersArray().find(entry => entry.name.toLowerCase() === 'set-cookie' && entry.value.startsWith(`${name}=`))
@@ -55,7 +56,7 @@ async function directJoin(page: Page, wsPath: string, roomId: string) {
 }
 
 for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: 'mobile', width: 390, height: 844 }]) {
-  test(`invited rooms search player names, enforce admission and show resumable game details (${viewport.name})`, async ({ browser }, testInfo) => {
+  test(`invited rooms search player names, enforce admission and show resumable game details (${viewport.name})`, matrixVariant(viewport.name === 'desktop'), async ({ browser }, testInfo) => {
     const contexts: BrowserContext[] = []
     try {
       const device = { viewport: { width: viewport.width, height: viewport.height },

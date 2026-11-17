@@ -2,6 +2,7 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 async function prepareTable(request: APIRequestContext) {
   expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {
@@ -36,7 +37,7 @@ async function prepareTable(request: APIRequestContext) {
 }
 
 for (const width of [2239, 1920, 1440]) {
-  test(`desktop table keeps readable cards and a full-width private hand at ${width}px`, async ({ page, request }) => {
+  test(`desktop table keeps readable cards and a full-width private hand at ${width}px`, matrixVariant(width === 1920), async ({ page, request }) => {
     await prepareTable(request)
     await page.setViewportSize({ width, height: 1271 })
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))

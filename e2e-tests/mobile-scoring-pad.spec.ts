@@ -2,6 +2,7 @@
 import { expect, test } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 test.use({ hasTouch: true })
 
@@ -14,7 +15,7 @@ for (const viewport of [
   { width: 440, height: 796 },
   { width: 1920, height: 1080 },
 ]) {
-  test(`four-player scoring keeps every name and score column on screen at ${viewport.width}px`, async ({ page, request }) => {
+  test(`four-player scoring keeps every name and score column on screen at ${viewport.width}px`, matrixVariant(viewport.width === 393), async ({ page, request }) => {
     expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {
       seed: 1001, playerCount: 4, customCardIds: [],
     })).ok).toBe(true)

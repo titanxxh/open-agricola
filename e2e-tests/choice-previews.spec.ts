@@ -6,6 +6,7 @@ import type { ActionChoiceOption } from '../shared/contract/types'
 import { serializeState } from '../shared/session/serialization'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 test('Rod Collection previews points for wood beyond the four printed exceptions', async ({ page, request }) => {
   const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 38052, playerCount: 2, customCardIds: [] } })
@@ -65,7 +66,7 @@ test('Cubbyhole payment choices show the shared reed cost', async ({ page, reque
 
 for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 390 }] as const) {
   for (const target of ['farm', 'card'] as const) {
-    test(`whole-field ${target} choices click farm and Card Fields in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
+    test(`whole-field ${target} choices click farm and Card Fields in ${scenario.locale} at ${scenario.width}px`, matrixVariant(scenario.width === 1440), async ({ page, request }) => {
       await page.setViewportSize({ width: scenario.width, height: 1000 })
       await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
       const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 1073, playerCount: 2, customCardIds: [] } })
@@ -120,7 +121,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
 }
 
 for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 390 }] as const) {
-  test(`Peat Sled displays four distinct executable schedules in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
+  test(`Peat Sled displays four distinct executable schedules in ${scenario.locale} at ${scenario.width}px`, matrixVariant(scenario.width === 1440), async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
     await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
     const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 1079, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })

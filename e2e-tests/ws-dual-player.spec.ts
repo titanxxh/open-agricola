@@ -14,6 +14,7 @@ import { browserRequestHeaders, BACKEND_URL, saveScreenshot, saveState, FRONTEND
 import { finishWsOpening, observeWsOpening } from './helpers/ws-opening'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeSessionSnapshot } from '../shared/session/serialization'
+import { matrixVariant } from './helpers/extended'
 
 test.use({ viewport: { width: 1920, height: 1080 }, trace: 'retain-on-failure' })
 
@@ -58,7 +59,7 @@ const authenticate = async (
 
 test.describe('WS dual-player sync', () => {
   for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
-    test(`header follows the interaction player through a cross-player reaction at ${viewport.width}px`, async ({ browser, request }, testInfo) => {
+    test(`header follows the interaction player through a cross-player reaction at ${viewport.width}px`, matrixVariant(viewport.width === 1920), async ({ browser, request }, testInfo) => {
       const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
       const session = createWorkSession({ configure(state) {
         Object.assign(state.players[0]!, { name: 'xxh', nameIsDefault: false, color: 'yellow' })
@@ -159,7 +160,7 @@ test.describe('WS dual-player sync', () => {
     page.locator('.action-card-holder.taken', { hasText: text })
 
   for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
-    test(`own hands remain readable during another player's turn at ${viewport.width}px`, async ({ browser, request }, testInfo) => {
+    test(`own hands remain readable during another player's turn at ${viewport.width}px`, matrixVariant(viewport.width === 1920), async ({ browser, request }, testInfo) => {
       const mobile = viewport.width < 900
       const ctx1 = await browser.newContext({ viewport, hasTouch: mobile })
       const ctx2 = await browser.newContext({ viewport, hasTouch: mobile })

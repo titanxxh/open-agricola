@@ -166,6 +166,7 @@ describe('verification modes and evidence', () => {
     ['PUBLIC_ASSET_LOCAL_DIR', '/local/assets'],
     ['PUBLIC_ASSET_VALIDATION_DIR', '/local/assets'],
     ['RELEASE_SMOKE_PROXY', 'http://127.0.0.1:8080'],
+    ['E2E_EXTENDED', '1'],
     ['LIBGL_ALWAYS_SOFTWARE', '0'],
     ['WEBKIT_SKIA_ENABLE_CPU_RENDERING', '0'],
     ['__EGL_VENDOR_LIBRARY_FILENAMES', '/custom/egl-vendor.json'],

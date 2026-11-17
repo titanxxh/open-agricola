@@ -10,6 +10,7 @@ import {
 import { createHash } from 'node:crypto'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import en from '../output/i18n/locales/en.json' with { type: 'json' }
+import { matrixVariant } from './helpers/extended'
 
 const cookieValue = (response: APIResponse, name: string): string => {
   const header = response.headersArray().find(({ name: headerName, value }) =>
@@ -291,7 +292,7 @@ test('completed replay submits one hosted bug report with the current anchor', a
 for (const locale of ['en'] as const) {
   const copy = en.platform.bugReport
   for (const width of [320, 1280]) {
-    test(`GitHub connection is a visible keyboard-operable button (${locale}, ${width}px)`, async ({
+    test(`GitHub connection is a visible keyboard-operable button (${locale}, ${width}px)`, matrixVariant(width === 1280), async ({
       page,
       request,
     }, testInfo) => {

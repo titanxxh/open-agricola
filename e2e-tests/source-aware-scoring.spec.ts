@@ -3,10 +3,11 @@ import { expect, test, type Page } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import { joinRoomClients, publicRoomState, roomDriver, roomSnapshot } from './room-command-driver'
+import { matrixVariant } from './helpers/extended'
 
 const CARD = 'M027_GardenPath'
 
-for (const width of [1920, 375]) test(`independent scoring markers follow their holder at ${width}px`, async ({ browser, request }, testInfo) => {
+for (const width of [1920, 375]) test(`independent scoring markers follow their holder at ${width}px`, matrixVariant(width === 1920), async ({ browser, request }, testInfo) => {
   const pages: [Page, Page] = [
     await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width === 375 }),
     await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width === 375 }),

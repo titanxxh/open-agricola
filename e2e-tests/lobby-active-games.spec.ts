@@ -2,6 +2,7 @@
 // @covers client/app/use-turn-tab-title.ts
 import { expect, test } from '@playwright/test'
 import type { MyActiveRoom } from '../shared/contract/lobby'
+import { matrixVariant } from './helpers/extended'
 
 test.use({ timezoneId: 'Asia/Singapore' })
 
@@ -71,7 +72,7 @@ test('lobby turn titles cycle, follow motion preferences and stop for hotseat or
 
 for (const width of [320, 390, 1280]) {
   for (const locale of ['en', 'zh']) {
-    test(`active games show six colored players and update turns at ${width}px in ${locale}`, async ({ page }, testInfo) => {
+    test(`active games show six colored players and update turns at ${width}px in ${locale}`, matrixVariant(width === 1280 && locale === 'en'), async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
       await page.clock.install()
       await page.addInitScript(locale => localStorage.setItem('open-agricola-locale-v2', locale), locale)
