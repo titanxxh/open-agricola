@@ -31,6 +31,7 @@ import { canTakeVisibleMoorSpecialAction, isMoorSpecialActionCardUsableByPlayer 
 import type { MoorSpecialActionId } from '../moor/types'
 import type { FarmersOfTheMoorState, MoorSoloSupplyView } from '../moor/types'
 import { getPlayerPanelSupplySummary, type PlayerPanelSupplySummary } from '../domain/player-panel-summary'
+import { getHarvestRequirements, type HarvestRequirements } from './harvest-requirements'
 import { filterSerializedStateForPlayer, filterSerializedCancellationsForPlayer } from '../projections/serialized-state'
 export { filterSerializedStateForPlayer } from '../projections/serialized-state'
 
@@ -50,6 +51,7 @@ export type SerializedPlayerState = Omit<PlayerState, 'pastures'> & {
   moorSpecialActionAvailability: Record<string, Partial<Record<MoorSpecialActionId, boolean>> & { cardUsable: boolean }>
   lockedFarmTileKeys: string[]
   playerPanelSummary: PlayerPanelSupplySummary
+  harvestRequirements: HarvestRequirements | null
   specialStables: BuiltSpecialStable[]
   roomAnimalZones: InteractionAnimalReorgZone[]
   stableAnimalZones: InteractionAnimalReorgZone[]
@@ -205,6 +207,7 @@ const serializePlayerDisplayFields = (
     cardStatePresentation: { ...collectCardStatePresentation(player), ...projectParentCardState(player) },
     lockedFarmTileKeys,
     playerPanelSummary,
+    harvestRequirements: getHarvestRequirements(state, player),
     specialStables,
     roomAnimalZones: zones.filter(zone => zone.zoneType === 'house').map(serializeAnimalZone),
     stableAnimalZones: zones.filter(zone => zone.zoneType === 'stable').map(serializeAnimalZone),
@@ -327,6 +330,7 @@ export const rehydrateState = (
       moorSpecialActionAvailability: _moorSpecialActionAvailability,
       lockedFarmTileKeys: _lockedFarmTileKeys,
       playerPanelSummary: _playerPanelSummary,
+      harvestRequirements: _harvestRequirements,
       specialStables: _specialStables,
       roomAnimalZones: _roomAnimalZones,
       stableAnimalZones: _stableAnimalZones,

@@ -2,6 +2,7 @@ import { t, type Locale } from '../../../shared/i18n'
 import type { ClientGameState } from '../../services/rehydrate'
 import { formatScore } from '../../utils/format-score'
 import type { PlayerScoreSummary } from '../../../shared/domain'
+import { HarvestRequirements } from './HarvestRequirements'
 
 const resources = ['wood', 'clay', 'reed', 'stone', 'grain', 'vegetable', 'food', 'sheep', 'boar', 'cattle', 'begging', 'fuel', 'horse'] as const
 
@@ -34,6 +35,7 @@ export function DesktopPlayerOverview({ locale, players, playerNames, scores, vi
             ))}
             <span title={t(locale, 'ui.family')}><span className="res-icon res-icon-child" aria-hidden="true" /><span>{player.playerPanelSummary.family.used}/{player.playerPanelSummary.family.limit}</span></span>
           </div>
+          <HarvestRequirements locale={locale} requirements={player.harvestRequirements} />
         </section>
       ))}
     </div>

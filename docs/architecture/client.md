@@ -12,6 +12,8 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 
 ## Client bundles
 
+Harvest needs use server `harvestRequirements`. UI: `harvest-requirements.spec.ts`.
+
 | Bundle | Entry | Paths | Constraint |
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | Uses WebSocket. From `shared/*`, imports only `contract`, `domain` and `i18n`; card display uses manifest-backed `card-meta` plus `custom-card-metadata`. |
