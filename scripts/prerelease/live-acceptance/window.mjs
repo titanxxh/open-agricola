@@ -66,6 +66,13 @@ export function markStep(state, step, status, now, extra = {}) {
 
 export const nextStep = state => WINDOW_STEPS.find(step => state.steps[step]?.status !== 'done') ?? null
 
+/** Marks every unfinished step up to and including `step` done, e.g. after finding the target already opened by it. */
+export function markThrough(state, step, now, note) {
+  let next = state
+  for (const name of WINDOW_STEPS.slice(0, WINDOW_STEPS.indexOf(step) + 1)) if (next.steps[name]?.status !== 'done') next = markStep(next, name, 'done', now, { note })
+  return next
+}
+
 /** The formal browser proof must be ≤30 min old at `open`; an old proof and the evidence copy that embeds it are redone. */
 export function staleSteps(state, now) {
   const proof = state.steps['formal-browser']
@@ -247,6 +254,14 @@ function hostTools(io, ctx) {
 
 // ---- Steps --------------------------------------------------------------------------------------------------------
 
+/** Reads the live target and decides whether an `open` it reports belongs to this window's acceptance file. */
+function liveOpen(t, ctx, win, reverifyOperationId, acceptancePath) {
+  const live = t.deploy('status')
+  const previous = existsSync(acceptancePath) ? { ...JSON.parse(readFileSync(acceptancePath, 'utf8')), sha256: hashFile(acceptancePath) } : null
+  return { live, binding: openBinding(live, { candidate: ctx.config.candidate, generation: win.generation, formalBuild: win.formalBuild, reverifyOperationId, acceptance: previous }) }
+}
+const OPEN_ELSEWHERE = 'Pre is already open under a different acceptance or build; inspect it before continuing this window'
+
 function storageCycle(t, ctx) {
   const cycle = t.script(`python3 -c "import json;print(json.load(open('${ctx.target.directory}/control/storage-guard.json'))['healthyCycle'])"`, 'storage guard')
   if (!uuid.test(cycle)) throw new WindowStop('The prerelease storage guard is not healthy')
@@ -388,12 +403,10 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
     },
     async 'final-open'() {
       const t = tools(), ctx = getCtx(), accepted = local('acceptance.json'), reverifyOperationId = state().ops.reverify
-      const live = t.deploy('status')
       // A lost `open` response must not replay the chain: closing an open target would leave pre closed.
-      const previous = existsSync(accepted) ? { ...JSON.parse(readFileSync(accepted, 'utf8')), sha256: hashFile(accepted) } : null
-      const binding = openBinding(live, { candidate: ctx.config.candidate, generation: win.generation, formalBuild: win.formalBuild, reverifyOperationId, acceptance: previous })
+      const { live, binding } = liveOpen(t, ctx, win, reverifyOperationId, accepted)
       if (binding === 'ours') return { acceptance: accepted, open: writeAndReturn(local('open.json'), live) }
-      if (binding === 'other') throw new WindowStop('Pre is already open under a different acceptance or build; inspect it before continuing this window')
+      if (binding === 'other') throw new WindowStop(OPEN_ELSEWHERE)
       if (live.mode !== 'maintenance' || live.operation?.id !== reverifyOperationId || live.operation?.stage !== 'acceptance') throw new WindowStop("Pre is not in this window's acceptance maintenance")
       // All slow work precedes the chain. `open` rechecks the storage cycle and a 30 min acceptance age; the chain's
       // apply-identities keeps the installed build, generation and operation, so the record stays valid through it.
@@ -440,9 +453,22 @@ export async function runWindow({ configPath, windowPath, resume = false, confir
   if (state && state.windowId !== win.windowId) throw new WindowStop('state.json belongs to another window')
   state ??= newState(win.windowId, now())
   const save = () => writePrivateJson(statePath, state)
+  let ctx = loadAcceptanceConfig(configPath), room = null
+  // An `open` that committed after its response was lost is reconciled before anything is invalidated or rerun:
+  // proofs and evidence can only be redone in maintenance, so refreshing them first would fail forever.
+  const finalOpen = state.steps['final-open']
+  if (resume && finalOpen && finalOpen.status !== 'done') {
+    const accepted = join(win.exchangeDirectory, 'acceptance.json')
+    const { live, binding } = liveOpen(hostTools(io, ctx), ctx, win, state.ops.reverify, accepted)
+    if (binding === 'other') throw new WindowStop(OPEN_ELSEWHERE)
+    if (binding === 'ours') {
+      const open = writeAndReturn(join(win.exchangeDirectory, 'open.json'), live)
+      state = markThrough(state, 'final-open', now(), 'pre was already open under this window\'s acceptance')
+      state = { ...state, steps: { ...state.steps, 'final-open': { ...state.steps['final-open'], outputs: { open: { path: open, sha256: hashFile(open) } } } } }; save()
+    }
+  }
   // Preconditions are rechecked on every resume: formal or pre may have changed since the last attempt.
   state = resetSteps(state, [...(nextStep(state) ? ['preconditions'] : []), ...staleSteps(state, now())]); save()
-  let ctx = loadAcceptanceConfig(configPath), room = null
   const env = { configPath: resolve(configPath), runDirectory: resolve(win.run), room: () => (room ??= previousTeamRoom(win.previousRun)) }
   const steps = makeSteps({ io, win, env, getCtx: () => ctx, reload: () => { ctx = loadAcceptanceConfig(configPath) }, state: () => state,
     setOps: ops => { state = { ...state, ops: { ...state.ops, ...ops } }; save() } })
