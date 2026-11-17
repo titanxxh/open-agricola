@@ -134,6 +134,7 @@ export type CardEffectField = CardEffectHook
   | 'computeResourceCommitments'
   | 'computeExtraRoomCapacity'
   | 'computeHarvestBreedOrderPriority'
+  | 'computeHarvestHeatingRoomDiscount'
   | 'enforceReorganizeOnLastHarvest'
   | 'computeBreedThreshold' | 'computeBreedableAnimalCount' | 'computeAnimalScoreAdjustment'
   | 'onComputeAnimalZones' | 'onComputeSharedAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
@@ -289,6 +290,7 @@ export type CardEffect = {
   getRuleContributions?: (player: Readonly<PlayerState>) => CardRuleContributions | void
   getStatePresentation?: (player: Readonly<PlayerState>) => CardStatePresentation | void
   computeHarvestBreedOrderPriority?: (state: GameState, player: PlayerState) => number | void
+  computeHarvestHeatingRoomDiscount?: (state: GameState, player: PlayerState) => number
   computePastureCapacityModifiers?: (
     player: PlayerState,
     state: GameState,

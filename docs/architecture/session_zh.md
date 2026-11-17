@@ -124,6 +124,8 @@ type SessionResponse = {
 
 ## 逐玩家喂养结算
 
+供暖预估使用 `computeHeatingRequirement()` 的 `discountTiming: 'upcoming-harvest'` 模式，结算沿用既有默认模式。卡牌的纯查询 `computeHarvestHeatingRoomDiscount` 与田地阶段共用计算。已记录的折扣和 `heatingRoomDiscountRound` 保留该次收获的结果，之后动物数量变化不影响它；旧喂养、繁殖阶段存档沿用已存折扣。此原生查询不在工坊 hook 准入清单内。测试：`server/__tests__/harvest-heating-discount-session.test.ts`。
+
 `shared/actions/helpers/harvest-feeding-requirement.ts` 统一计算喂养需求：实际参与者为一人时成人每人三食，其他人数每人两食；新生儿每人一食。现有卡牌 modifier 在此基数上叠加，然后才提供报价或结算。测试：`shared/actions/helpers/__tests__/harvest-feeding-requirement.test.ts`、`server/__tests__/standard-solo-core-session.test.ts`。
 
 `handleFeedResolved()` 解析已提供目录与实时配方，完整校验批次后，把原等待帧替换为普通 Exchange flow。私有 `harvestSettlementResume` 保存剩余需求、已付食物、转换成本和玩家队列。完整批次反应与必需的动物整理结束后，才支付剩余食物、补乞讨和供暖。快照恢复与撤销同时恢复续行和引擎游标，不重做已完成兑换或重复扣除已付食物。

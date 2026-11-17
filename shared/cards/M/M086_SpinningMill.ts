@@ -2,15 +2,20 @@ import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import { getAssignedAnimalsByType } from '../../domain/animals'
 import { writeCardExtraData } from '../helpers/card-state'
+import type { GameState, PlayerState } from '../../contract/types'
 
 const CARD_ID = 'M086_SpinningMill'
+
+const computeHarvestHeatingRoomDiscount = (state: GameState, player: PlayerState): number =>
+  Math.floor(getAssignedAnimalsByType(player, state).sheep / 2)
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    computeHarvestHeatingRoomDiscount,
     onHarvestFieldPhase: (state, player) => {
-      const sheep = getAssignedAnimalsByType(player, state).sheep
-      writeCardExtraData(player, CARD_ID, 'heatingRoomDiscount', Math.floor(sheep / 2))
+      writeCardExtraData(player, CARD_ID, 'heatingRoomDiscount', computeHarvestHeatingRoomDiscount(state, player))
+      writeCardExtraData(player, CARD_ID, 'heatingRoomDiscountRound', state.round)
     },
   },
   reaches: [] as readonly string[],
