@@ -12,7 +12,8 @@ function assert(value: unknown, message: string): asserts value { if (!value) th
 assert(process.getuid?.() === 61000 && process.getgid?.() === 61000 && process.getgroups?.().every(group => group === 61000), 'Candidate identity or groups are unsafe')
 assert(/^NoNewPrivs:\s+1$/m.test(readFileSync('/proc/self/status', 'utf8')), 'Candidate payload needs NoNewPrivileges')
 assert(spawnSync('/usr/bin/sudo', ['-n', '/usr/bin/true'], { stdio: 'ignore' }).status !== 0, 'Candidate has host sudo')
-for (const path of ['/run/oa-ci-isolation/protected-marker', JSON.parse(readFileSync('/run/oa-ci-isolation/context.json', 'utf8')).privateDirectory + '/inert-marker']) {
+const context = JSON.parse(readFileSync('/run/oa-ci-isolation/context.json', 'utf8'))
+for (const path of ['/run/oa-ci-isolation/protected-marker', context.privateDirectory + '/inert-marker']) {
   let denied = false
   try { writeFileSync(path, 'candidate inert bytes', { flag: 'a' }) } catch { denied = true }
   assert(denied, 'Candidate can write trusted files')
@@ -24,7 +25,9 @@ await new Promise<void>((done, reject) => {
 })
 const security: unknown = JSON.parse(execFileSync('docker', ['info', '--format', '{{json .SecurityOptions}}'], { encoding: 'utf8' }))
 assert(Array.isArray(security) && security.includes('name=rootless'), 'Docker is not rootless')
-assert(execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).trim() === '29.9.3', 'Unexpected rootless Docker version')
+// GitHub runners install the pinned 29.9.3; an owner machine pins the rootless extras to its installed engine.
+const expectedDocker = context.kind === 'owner-local' ? context.dockerVersion : '29.9.3'
+assert(execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).trim() === expectedDocker, 'Unexpected rootless Docker version')
 const directory = mkdtempSync('/home/oa-candidate/bind-'); chmodSync(directory, 0o700)
 await run('docker', ['run', '--mount', 'type=volume,target=/var/lib/postgresql,volume-nocopy', '--rm', '--user', '0:0', '--mount', `type=bind,source=${directory},target=/marker`, image, 'bash', '-c', 'printf "native bind bytes\\n" > /marker/result'])
 assert(readFileSync(join(directory, 'result'), 'utf8') === 'native bind bytes\n', 'Rootless bind UID mapping failed')
