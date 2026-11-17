@@ -178,14 +178,16 @@ export function pruneSnapshots(root: string, now = Date.now()): string[] {
   return removed
 }
 
-function parseOptions(args: string[]): Options & { snapshot?: string } {
+function parseOptions(args: string[]): Options & { snapshot?: string; attempts: number } {
   const value = (flag: string) => { const index = args.indexOf(flag); return index >= 0 ? args[index + 1] : undefined }
   const host = value('--host') ?? process.env.OWNER_BACKUP_HOST ?? ''
   const remoteDir = value('--remote-dir') ?? process.env.OWNER_BACKUP_REMOTE_DIR ?? '/home/ubuntu/open-agricola'
   const root = resolve(value('--root') ?? process.env.OWNER_BACKUP_ROOT ?? join(homedir(), 'oa-backup'))
   if (host && !/^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+$/.test(host)) throw new Error('Invalid owner backup host')
   if (!/^\/[A-Za-z0-9_./-]+$/.test(remoteDir) || remoteDir.includes('..')) throw new Error('Invalid remote deployment directory')
-  return { host, remoteDir, root, snapshot: value('--snapshot') }
+  const attempts = Number(value('--attempts') ?? 3)
+  if (!Number.isSafeInteger(attempts) || attempts < 1 || attempts > 3) throw new Error('Invalid capture attempt count')
+  return { host, remoteDir, root, snapshot: value('--snapshot'), attempts }
 }
 
 export async function ownerBackup(args: string[]): Promise<void> {
@@ -199,7 +201,7 @@ export async function ownerBackup(args: string[]): Promise<void> {
   if (command !== 'pull' && command !== 'run') throw new Error('Usage: owner-backup.ts run|pull|validate|prune|reap [--host user@host] [--remote-dir D] [--root R] [--snapshot S]')
   if (!options.host) throw new Error('--host or OWNER_BACKUP_HOST is required')
   try {
-    const snapshot = await pullSnapshot(options)
+    const snapshot = await pullSnapshot(options, options.attempts)
     process.stdout.write(JSON.stringify({ snapshot }) + '\n')
     if (command === 'run') process.stdout.write(JSON.stringify(validateSnapshot(snapshot)) + '\n')
   } finally {

@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdtempSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fullSha } from '../ci/verification-tasks.ts'
@@ -10,8 +10,8 @@ import { BACKEND_IMAGE_CLEANUP_MS, BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS, BACKEN
 import { assertExpectedContainerImage, verifyContainerImageBuild } from './container-images.ts'
 import { prepareContainerImageArchive } from './container-images-owner.ts'
 import { BACKEND_RESUME_WORK_MS } from './backend-image-progress.ts'
+// Storage tools load through a TypeScript resolver in child processes: this entry runs on plain Node.
 import { typescriptLoaderArgs } from '../typescript-loader.ts'
-import { pullSnapshot } from '../owner-backup.ts'
 
 const quote = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 // Tolerate about two minutes of silence on owner links before SSH gives up.
@@ -120,9 +120,11 @@ printf '%s\\n' "$4"
   if (backendCandidate(cwd, [sourceSha]) !== sourceSha || JSON.stringify(verifyContainerImageBuild(build)) !== JSON.stringify(receipt)) throw new Error('Formal image authority changed during transport')
   const ownerValidation = !fullMaintenance && installation.kind !== 'bootstrap'
   if (ownerValidation) {
-    // A fresh basis keeps the cutover delta to the last few minutes of writes; it is optional.
-    try { process.stderr.write(`Owner-local Backup refreshed: ${await pullSnapshot({ host, remoteDir: directory, root: join(homedir(), 'oa-backup') }, 1)}\n`) }
-    catch (error) { process.stderr.write(`Owner-local Backup warm-up skipped: ${error instanceof Error ? error.message : String(error)}\n`) }
+    // A fresh basis keeps the cutover delta to the last few minutes of writes; it is optional. The pull
+    // uses the same root and retention as the daily job (OWNER_BACKUP_ROOT, 30-day pruning).
+    const warm = await new Promise<number | null>(done => spawn(process.execPath, [...typescriptLoaderArgs(), resolve(import.meta.dirname, '../owner-backup.ts'), 'pull', '--host', host, '--remote-dir', directory, '--attempts', '1'],
+      { stdio: ['ignore', 'ignore', 'inherit'] }).once('close', done).once('error', () => done(null)))
+    process.stderr.write(warm === 0 ? 'Owner-local Backup refreshed before the cutover\n' : 'Owner-local Backup warm-up skipped; the cutover pulls in full\n')
   }
   authorize()
   const env = ['env', `BACKEND_VALIDATION=${ownerValidation ? 'owner' : 'host'}`]
