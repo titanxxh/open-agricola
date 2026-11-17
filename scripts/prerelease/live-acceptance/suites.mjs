@@ -14,6 +14,12 @@ export const SUITE_ENGINES = {
   sandbox: ['chromium'], viewer: ['firefox', 'webkit'], continuity: ['chromium'], deletion: ['chromium'], readback: ['chromium'],
 }
 
+/**
+ * Suites whose engines may run at once, each with its own A–C. The Viewer suite stays sequential: both engines open the
+ * archived team room as its participant A and revoke A's Beta; every other suite runs on one engine.
+ */
+export const PARALLEL_SUITES = ['handoff', 'boundary']
+
 /** Case labels one engine runs for a suite, in execution order. The Viewer suite runs one engine-named case. */
 export const caseLabels = (suite, engine) => suite === 'viewer' ? [`viewer-${engine}`] : SUITE_CASES[suite]
 

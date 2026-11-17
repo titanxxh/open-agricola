@@ -237,7 +237,7 @@ node --import tsx scripts/prerelease/authority.ts activate --config "$pre_config
 node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verification_token_file" "$private_owner_profile"
 ```
 
-可重复的验收用 `scripts/prerelease/live-acceptance/cli.mjs`，在真实的 Chromium、Firefox、WebKit 中执行同一组检查。它的 owner 私有配置（mode 0600）给出 `targetConfig`、`ssh`、已安装的 `candidate` 及其镜像 `candidateReceipt`、`formalBuild`、标为 A–C 的账号文件（A 为 Beta，B 为第二个 Beta 座位，C 为普通账号）与可选的 D–E、正式站 `ownerCookie`、主机上的 `guardConfig` 路径和私有 `outputRoot`。每次 `run` 都刷新 status，在维护模式下签发私有入口 token，并读取健康周期与当前 app 实例：
+可重复的验收用 `scripts/prerelease/live-acceptance/cli.mjs`，在真实的 Chromium、Firefox、WebKit 中执行同一组检查。它的 owner 私有配置（mode 0600）给出 `targetConfig`、`ssh`、已安装的 `candidate` 及其镜像 `candidateReceipt`、`formalBuild`、标为 A–C 的账号文件（A 为 Beta，B 为第二个 Beta 座位，C 为普通账号）与可选的 D–E、可选的 `engineAccounts`（为 `firefox` 和 `webkit` 各指定一份独立的 A–C 账号文件）、正式站 `ownerCookie`、主机上的 `guardConfig` 路径和私有 `outputRoot`。每次 `run` 都刷新 status，在维护模式下签发私有入口 token，并读取健康周期与当前 app 实例：
 
 ```bash
 cli=scripts/prerelease/live-acceptance/cli.mjs
@@ -246,7 +246,7 @@ node --import tsx $cli bundle --config "$acceptance_config" --runs "$run_dirs" -
 node --import tsx $cli acceptance --config "$acceptance_config" --index "$evidence_dir/index.json" --formal-browser "$formal_browser_json" --output "$acceptance_json"
 ```
 
-`run --case <label>[,<label>]` 只重跑某个套件中指定的 case，例如 `--suite boundary --engine webkit --case revocation`；未知标签在任何远程步骤之前即报错。`bundle` 按 case 与浏览器保留最新结果，重跑只替换它自己的 case。只有当某项证据依赖的每个 case 在其套件要求的每个浏览器上都有通过的最新结果时，该项才通过；从未运行或最新结果失败的 case 都会阻断。维护模式的运行还须在结束时证明公共入口仍为关闭；否则该次运行的所有 case 都不计入，直到入口关闭状态下的重跑替换它们。失败的 case 保留局部结果及其到达的阶段。socket 断开只观察探针页在动作前一刻报告为打开的 socket，并按页面时钟计时。未收到任何响应的准备类请求会重试一次并记入 `networkRetries`；已收到的状态码从不重试。结果只含账号标签、状态码与耗时；打包时出现任何标识、用户名或密码都会被拒绝。浏览器用例每个 case 使用新浏览器，且不在开启请求拦截时测量凭据：被拦截的 credentialless frame 会被报告带有实际并未发送的 Cookie。一次性账号以 `deletion` 套件和完整身份审计收尾。`open` 之前把证据文件复制到主机的相同路径。
+配置了 `engineAccounts` 时，`handoff` 和 `boundary` 的三个浏览器同时运行，各用自己的 kit 和 A–C：revocation 会登出 A 的全部会话并收回 A 的 Beta。单浏览器重跑使用该浏览器自己的账号。未配置时各浏览器依次使用共享账号，Viewer 套件始终依次运行。`run --case <label>[,<label>]` 只重跑某个套件中指定的 case，例如 `--suite boundary --engine webkit --case revocation`；未知标签在任何远程步骤之前即报错。`bundle` 按 case 与浏览器保留最新结果，重跑只替换它自己的 case。只有当某项证据依赖的每个 case 在其套件要求的每个浏览器上都有通过的最新结果时，该项才通过；从未运行或最新结果失败的 case 都会阻断。维护模式的运行还须在结束时证明公共入口仍为关闭；否则该次运行的所有 case 都不计入，直到入口关闭状态下的重跑替换它们。失败的 case 保留局部结果及其到达的阶段。socket 断开只观察探针页在动作前一刻报告为打开的 socket，并按页面时钟计时。未收到任何响应的准备类请求会重试一次并记入 `networkRetries`；已收到的状态码从不重试。结果只含账号标签、状态码与耗时；打包时出现任何标识、用户名或密码都会被拒绝。浏览器用例每个 case 使用新浏览器，且不在开启请求拦截时测量凭据：被拦截的 credentialless frame 会被报告带有实际并未发送的 Cookie。一次性账号以 `deletion` 套件和完整身份审计收尾。`open` 之前把证据文件复制到主机的相同路径。
 
 pre 可以使用 `https://pre.titanxxh.com`，保留正式 Pages/API 地址；必须与两者使用不同 hostname，换端口不能代替主机隔离。仅维护页的 bootstrap 可以早于正式升级。服务候选代码，包括私有 owner 验收，要求运行中的正式浏览器认证策略为 version 2。先部署匹配的正式前后端保护并完成旧会话迁移。owner 生命周期 CLI 只接受新的 `__Host-oa-session` Cookie 文件并发送浏览器协议头；迁移后重新登录取得 owner Cookie。
 
@@ -315,6 +315,13 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 - suite 只有在已有通过证据时才标记为完成。
 
 创建账号和删除账号不可重入：中断后只能加 `--confirm-step` 继续，命令会先核对正式站账号。open 前若正式站浏览器证明已超过 25 分钟，会重新生成。如果响应丢失时主机其实已经按本窗口的 acceptance 完成 open，`--resume` 会在刷新任何证明或证据之前直接记录 open，不重放审计链；如果主机已 open 但绑定的是其他 acceptance，则停止。
+
+**快速重新绑定（fast rebind）。** 前置检查只决定一次路径，连同原因记入 `state.json`、`rebind.json` 和 `browser-boundary` 的 owner notes；resume 时若会得出不同路径则停止。window 配置的可选字段：
+- `fullAcceptance`：上一次完整窗口归档的 `receipts/acceptance.json`，证据在 `receipts/evidence/`；
+- `acknowledgeBoundaryDiff`；
+- `rebind: "full"`。
+
+快速路径要求该验收不超过七天，且对应已安装的候选、镜像和代次。从其正式构建到新正式构建的身份边界 diff（`live-acceptance/rebind.mjs` 中的 `IDENTITY_BOUNDARY_PATHS`）必须为空，或等于 owner 确认的 SHA-256；diff 非空时窗口停止并打印哈希和审阅命令，直到 owner 确认或选择完整流程。快速路径跳过 D/E、multihand、team、sandbox、Viewer、continuity、deletion 和删除审计链，为每个浏览器的 A、B 授予 Beta，仍执行两条审计链、handoff、boundary、正式站浏览器证明和 readback。`bundle --carry` 把被跳过 case 的通过项写入新证据文件并标注 `carriedFrom`（acceptance 与证据哈希）；已运行的 case 仍以新结果为准，`open` 照常校验新文件。`previousRun` 保持为上一次完整窗口的 run。
 
 每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，从固定可信 main 策略 SHA 在外部构建并导入。工具回执、不可变 image ID、revision 和 channel 均与 `control/` 中的目标缓存核对；缺缓存时拒绝，不构建也不停 app。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
 

@@ -3,9 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { bounded, retryWithoutResponse, snapshotCut } from '../prerelease/live-acceptance/browser.mjs'
-import { assertNoAccountValues, loadAccounts, privatePath, scrub } from '../prerelease/live-acceptance/context.mjs'
+import { assertNoAccountValues, loadAcceptanceConfig, loadAccounts, privatePath, runsInParallel, scrub } from '../prerelease/live-acceptance/context.mjs'
 import { REQUIRED_EVIDENCE, SOURCES, acceptanceRecord, bundleEvidence, collectResults } from '../prerelease/live-acceptance/evidence.mjs'
-import { REQUIRED_CASES, SUITE_CASES, parseCaseSelection, selectCases } from '../prerelease/live-acceptance/suites.mjs'
+import { loadFullAcceptance } from '../prerelease/live-acceptance/rebind.mjs'
+import { PARALLEL_SUITES, REQUIRED_CASES, SUITE_CASES, SUITE_ENGINES, parseCaseSelection, selectCases } from '../prerelease/live-acceptance/suites.mjs'
+import { fixtureGeneration, fullAcceptanceFixture } from './_helpers/full-acceptance-fixture'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -68,6 +70,26 @@ describe('private inputs', () => {
     writeFileSync(file, JSON.stringify({ accounts: [{ id: 'a', username: 'u', password: 'p' }] }), { mode: 0o600 })
     expect(loadAccounts(file, ['A']).map(a => a.label)).toEqual(['A'])
     expect(() => loadAccounts(file, ['A', 'B'])).toThrow(/exactly 2/)
+  })
+  it('gives each configured engine its own A–C and runs a suite in parallel only when every engine has them', () => {
+    const root = privateRoot(), file = (name: string, value: unknown) => { const path = join(root, name); writeFileSync(path, JSON.stringify(value), { mode: 0o600 }); return path }
+    const set = (prefix: string) => ({ accounts: ['A', 'B', 'C'].map(label => ({ id: `${prefix}-${label}`, username: `${prefix}_${label}`, password: `${prefix}-password-${label}` })) })
+    const target = file('target.json', { origin: 'https://pre.example.test', formal: { appOrigin: 'https://app.example.test', apiOrigin: 'https://api.example.test' } })
+    const config = (extra: Record<string, unknown>) => file(`config-${Object.keys(extra).join('-') || 'base'}-${Math.random()}.json`, { format: 1, targetConfig: target, ssh: 'owner@host',
+      candidate: 'c'.repeat(40), formalBuild: 'b'.repeat(40), candidateReceipt: file('receipt.json', { purpose: 'candidate', channel: 'prerelease', sourceSha: 'c'.repeat(40), producerSha: 'd'.repeat(40) }),
+      accounts: file('chromium.json', set('chromium')), ownerCookie: file('cookie', '__Host-oa-session=abc'), guardConfig: '/srv/guard.json', outputRoot: root, ...extra })
+    mkdirSync(root, { recursive: true })
+    const legacy = loadAcceptanceConfig(config({}))
+    expect(Object.keys(legacy.engineAccounts)).toEqual(['chromium'])
+    expect(runsInParallel(legacy, SUITE_ENGINES.boundary)).toBe(false)
+    const ctx = loadAcceptanceConfig(config({ engineAccounts: { firefox: file('firefox.json', set('firefox')), webkit: file('webkit.json', set('webkit')) } }))
+    expect(ctx.engineAccounts.webkit.map((account: { label: string }) => account.label)).toEqual(['A', 'B', 'C'])
+    expect(ctx.allAccounts).toHaveLength(9)
+    expect(runsInParallel(ctx, SUITE_ENGINES.boundary)).toBe(true)
+    expect(runsInParallel(ctx, ['webkit'])).toBe(false)
+    expect(PARALLEL_SUITES).toEqual(['handoff', 'boundary'])
+    expect(() => loadAcceptanceConfig(config({ engineAccounts: { chromium: file('other.json', set('other')) } }))).toThrow(/chromium uses accounts/)
+    expect(() => loadAcceptanceConfig(config({ engineAccounts: { firefox: file('dup.json', set('chromium')) } }))).toThrow(/distinct accounts/)
   })
   it('scrubs account values and URL secrets, and refuses evidence that still carries them', () => {
     expect(scrub(accounts, 'login pre_a_name with pre-a-password-value at /x?code=abc&state=def')).toBe('login <A> with <A> at /x?code=<redacted>&state=<redacted>')
@@ -162,6 +184,39 @@ describe('acceptance evidence', () => {
       mode: 'maintenance', publicStill503: true, cases: ['beta-boundary'], results: [{ case: 'beta-boundary', passed: true }] } })])
     expect(rerunIndex['browser-boundary'].passed).toBe(true)
     expect(rerunIndex['beta-access'].passed).toBe(false)
+  })
+  describe('fast rebind carry', () => {
+    // A fast window runs handoff and boundary only; every other case comes from the last full acceptance.
+    const fastRun = (root: string, { failed = [] as string[] } = {}) => fullRun(root, 'fast-run', { failed,
+      skip: REQUIRED_CASES.filter(pair => !['handoff', 'visitor', 'ordinary', 'beta-boundary', 'revocation'].includes(pair.case)).map(pair => `${pair.case}:${pair.engine}`) })
+    const carryBundle = (root: string, run: string, carry: ReturnType<typeof loadFullAcceptance>, common = { candidate: 'c'.repeat(40), generation: fixtureGeneration }) => {
+      const output = join(root, 'evidence'); mkdirSync(output, { mode: 0o700 })
+      return bundleEvidence({ results: collectResults([run]), output, common, accounts, extra: { capacity: { passed: true }, 'formal-unaffected': { passed: true } }, carry })
+    }
+    const body = (index: Record<string, { path: string }>, item: string) => JSON.parse(readFileSync(index[item].path, 'utf8'))
+
+    it('measures handoff and boundary items fresh and carries the rest with their source hash', () => {
+      const root = privateRoot(), carry = loadFullAcceptance(fullAcceptanceFixture(root)), index = carryBundle(root, fastRun(root), carry)
+      expect(Object.entries(index).filter(([, entry]) => !entry.passed)).toEqual([])
+      expect(body(index, 'identity').carriedFrom).toBeUndefined()
+      expect(body(index, 'browser-boundary').carriedFrom).toBeUndefined()
+      const viewer = body(index, 'viewer'), httpWs = body(index, 'http-ws')
+      expect(viewer).toMatchObject({ results: [], carriedFrom: { acceptanceSha256: carry.sha256, formalBuild: 'a'.repeat(40), evidence: { path: carry.evidence.viewer.path, sha256: carry.evidence.viewer.sha256 } },
+        carried: carry.evidence.viewer.body })
+      // Mixed items keep their fresh rows and carry only the cases this window skipped.
+      expect(httpWs.carriedCases).toEqual([{ case: 'team-game', engine: 'chromium' }])
+      expect(httpWs.results.map((row: { case: string }) => row.case)).toContain('visitor')
+      expect(body(index, 'beta-access').carriedCases.map((pair: { case: string }) => pair.case).sort()).toEqual(['formal-account-deletion', 'multihand-cooperation-viewer'])
+    })
+    it('still fails on a fresh failure, a failed carried item or another candidate', () => {
+      const root = privateRoot(), carry = loadFullAcceptance(fullAcceptanceFixture(root))
+      expect(carryBundle(root, fastRun(root, { failed: ['revocation:webkit'] }), carry)['beta-access'].passed).toBe(false)
+      const other = privateRoot()
+      expect(() => carryBundle(other, fastRun(other), carry, { candidate: 'd'.repeat(40), generation: fixtureGeneration })).toThrow(/another candidate or generation/)
+      const failed = privateRoot(), stale = loadFullAcceptance(fullAcceptanceFixture(failed))
+      stale.evidence.viewer = { ...stale.evidence.viewer, body: { ...stale.evidence.viewer.body, passed: false } }
+      expect(carryBundle(failed, fastRun(failed), stale).viewer.passed).toBe(false)
+    })
   })
   it('refuses to bundle a result that would leak an account value', () => {
     const root = privateRoot(), output = join(root, 'evidence'); mkdirSync(output, { mode: 0o700 })

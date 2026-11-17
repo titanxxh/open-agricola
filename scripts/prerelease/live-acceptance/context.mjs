@@ -34,9 +34,13 @@ export function loadAccounts(path, labels) {
   })
 }
 
+/** Engines that may run concurrently; each then needs its own A–C accounts so a revocation cannot reach another. */
+export const PARALLEL_ENGINES = ['chromium', 'firefox', 'webkit']
+
 /**
  * Private config: { format: 1, targetConfig, ssh, candidate, candidateReceipt, formalBuild, accounts, teamAccounts?,
- *   ownerCookie, guardConfig, outputRoot }. `guardConfig` is the storage guard config path on the host.
+ *   engineAccounts?: { firefox?, webkit? }, ownerCookie, guardConfig, outputRoot }. `guardConfig` is the storage guard
+ *   config path on the host. `accounts` (A–C) serve chromium and every engine without its own `engineAccounts` file.
  */
 export function loadAcceptanceConfig(path) {
   const config = privateJson(path, 'Acceptance config')
@@ -54,13 +58,32 @@ export function loadAcceptanceConfig(path) {
   }
   const accounts = loadAccounts(config.accounts, ['A', 'B', 'C'])
   const team = config.teamAccounts ? loadAccounts(config.teamAccounts, ['D', 'E']) : []
+  const engineAccounts = { chromium: accounts }
+  if (config.engineAccounts !== undefined) {
+    if (!config.engineAccounts || typeof config.engineAccounts !== 'object' || Array.isArray(config.engineAccounts)) throw new Error('engineAccounts must map engines to account files')
+    for (const [engine, file] of Object.entries(config.engineAccounts)) {
+      if (!PARALLEL_ENGINES.includes(engine) || engine === 'chromium') throw new Error(`engineAccounts names an unsupported engine ${engine}; chromium uses accounts`)
+      if (privatePath(file, `${engine} accounts`) === privatePath(config.accounts, 'Acceptance accounts')) throw new Error(`${engine} accounts must differ from the chromium accounts`)
+      engineAccounts[engine] = loadAccounts(file, ['A', 'B', 'C'])
+    }
+    const ids = Object.values(engineAccounts).flat().map(account => account.id)
+    if (new Set(ids).size !== ids.length) throw new Error('Each engine needs distinct accounts')
+  }
   privatePath(config.ownerCookie, 'Formal owner cookie')
   return {
-    path: resolve(path), config, target, producer: receipt.producerSha, accounts, team,
+    path: resolve(path), config, target, producer: receipt.producerSha, accounts, team, engineAccounts,
+    /** Every configured account, for leak checks and full logout. */
+    allAccounts: [...Object.values(engineAccounts).flat(), ...team],
     origins: { pre: new URL(target.origin).origin, formalApp: new URL(target.formal.appOrigin).origin, formalApi: new URL(target.formal.apiOrigin).origin },
     outputRoot: privateDirectory(config.outputRoot, 'Acceptance output root'),
   }
 }
+
+/**
+ * Engines of one suite run concurrently only when each has its own accounts: revocation logs every session of its A
+ * out and revokes A's Beta, so a shared A would break the other engines' cases.
+ */
+export const runsInParallel = (ctx, engines) => engines.length > 1 && engines.every(engine => ctx.engineAccounts[engine])
 
 /** Replaces every account value in free text, plus single-use URL secrets. */
 export function scrub(accounts, text) {
