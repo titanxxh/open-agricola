@@ -9,6 +9,7 @@ import { caseLabels, SUITE_ENGINES } from './suites.mjs'
 import { acceptanceRecord, collectResults } from './evidence.mjs'
 import { loadAcceptanceConfig, privateDirectory, privateJson } from './context.mjs'
 import { logoutAll, setBeta } from './formal-admin.mjs'
+import { FAST_SKIPPED_STEPS, IDENTITY_BOUNDARY_PATHS, boundaryDiff, loadFullAcceptance, rebindDecision } from './rebind.mjs'
 
 const root = resolve(import.meta.dirname, '../../..')
 const CLI = 'scripts/prerelease/live-acceptance/cli.mjs'
@@ -42,7 +43,11 @@ export class WindowStop extends Error {
 const sha = /^[a-f0-9]{40}$/, uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 const hashFile = path => createHash('sha256').update(readFileSync(path)).digest('hex')
 
-/** { format: 1, windowId, generation, formalFrom, formalBuild, previousRun, run, windowDirectory, exchangeDirectory, ownerNotes? } */
+/**
+ * { format: 1, windowId, generation, formalFrom, formalBuild, previousRun, run, windowDirectory, exchangeDirectory, ownerNotes?,
+ *   policy?, fullAcceptance?, acknowledgeBoundaryDiff?, rebind? }. `fullAcceptance` names the last full acceptance file (its
+ *   evidence archived beside it) that a fast rebind carries from; `rebind: 'full'` forces the full suites.
+ */
 export function parseWindowConfig(value) {
   if (value?.format !== 1) throw new Error('Window config format 1 is required')
   if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(value.windowId ?? '')) throw new Error('Window id must be a short lowercase label')
@@ -53,6 +58,9 @@ export function parseWindowConfig(value) {
   for (const key of ['previousRun', 'run', 'windowDirectory']) if (typeof value[key] !== 'string' || !value[key]) throw new Error(`Window config needs ${key}`)
   if (value.ownerNotes !== undefined && (typeof value.ownerNotes !== 'string' || !value.ownerNotes)) throw new Error('ownerNotes must be a path')
   if (value.policy !== undefined) parsePolicy(value.policy)
+  if (value.fullAcceptance !== undefined && (typeof value.fullAcceptance !== 'string' || !value.fullAcceptance)) throw new Error('fullAcceptance must be a path')
+  if (value.acknowledgeBoundaryDiff !== undefined && !/^[a-f0-9]{64}$/.test(value.acknowledgeBoundaryDiff)) throw new Error('acknowledgeBoundaryDiff must be the SHA-256 of the identity-boundary diff')
+  if (value.rebind !== undefined && !['auto', 'full'].includes(value.rebind)) throw new Error("rebind must be 'auto' or 'full'")
   return value
 }
 
@@ -145,10 +153,12 @@ export function rerunCommands({ configPath, runDirectory, room }, suiteStep, gap
  * What --resume does with an unfinished step. Suites finish from evidence; account creation and deletion are not
  * re-entrant, so after an interruption they continue only with --confirm-step <step>, which first checks the target.
  */
-export function resumeDecision(step, entry, { gaps = null, confirmed = false } = {}) {
+export function resumeDecision(step, entry, { gaps = null, confirmed = false, fast = false } = {}) {
   if (!entry) return { action: 'run' }
   if (entry.status === 'done') return { action: 'skip' }
   if (gaps && gaps.length === 0) return { action: 'complete', reason: 'every required case has a passing newest result' }
+  // On the fast path the accounts step creates nothing; granting Beta again is harmless.
+  if (step === 'accounts' && fast) return { action: 'run' }
   if (step === 'accounts') return confirmed ? { action: 'check-accounts' }
     : { action: 'stop', reason: 'Account creation may already have committed; rerun with --confirm-step accounts to check the formal accounts and continue' }
   if (step === 'deletion') return confirmed ? { action: 'run' }
@@ -239,13 +249,20 @@ export function assertNoResidualRows(rows) {
   if (left.length) throw new WindowStop(`Deleted accounts still have rows (${left.join(', ')}); wait for deletion to finish or repair it, then --resume true`)
 }
 
-export function ownerNotes({ candidate, formalFrom, formalTo, rows, receipts, diagnostics }, owner = {}) {
-  assertNoResidualRows(rows)
-  for (const name of ['close', 'associations', 'identity-verified', 'audit', 'activate']) if (!receipts[name]?.sha256) throw new Error(`Deletion audit receipt ${name} is missing`)
+/**
+ * Generated owner notes. A full window proves D/E deletion here; a fast rebind deleted nobody, so its deletion-audit
+ * item is carried and only the path decision (with any acknowledged boundary diff) is added to the boundary item.
+ */
+export function ownerNotes({ candidate, formalFrom, formalTo, rows = null, receipts = null, diagnostics, rebind = null }, owner = {}) {
+  const fast = rebind?.path === 'fast'
+  if (!fast) {
+    assertNoResidualRows(rows)
+    for (const name of ['close', 'associations', 'identity-verified', 'audit', 'activate']) if (!receipts?.[name]?.sha256) throw new Error(`Deletion audit receipt ${name} is missing`)
+  }
   return mergeNotes({
     'retained-data': { reverify: { installed: candidate, formalFrom, formalTo, note: 'The formal build changed; pre was reverified in place without reinstalling or resetting data.' } },
-    'deletion-audit': { accounts: ['D', 'E'], remainingRows: rows, receipts },
-    'browser-boundary': { diagnostics },
+    ...(fast ? {} : { 'deletion-audit': { accounts: ['D', 'E'], remainingRows: rows, receipts } }),
+    'browser-boundary': { diagnostics, ...(rebind ? { rebind } : {}) },
   }, owner)
 }
 
@@ -361,7 +378,27 @@ function runSuite(tools, env, entry) {
   return {}
 }
 
-function makeSteps({ io, win, env, getCtx, reload, setOps, state }) {
+/**
+ * Decides fast or full once per window from the last full acceptance and the identity-boundary diff of the formal
+ * builds. The formal SHAs are fetched into the owner checkout when missing.
+ */
+function decideRebind(io, win, status, now) {
+  let full = null
+  if (win.fullAcceptance) {
+    try { full = loadFullAcceptance(win.fullAcceptance) }
+    catch (error) { throw new WindowStop(`The named full acceptance is unusable (${error.message}); fix fullAcceptance or remove it to run the full suites`) }
+  }
+  const git = args => must(io.run('git', args), `git ${args[0]}`)
+  let boundary = null
+  if (full) {
+    const missing = [full.formalBuild, win.formalBuild].filter(sha => io.run('git', ['cat-file', '-e', `${sha}^{commit}`], { quiet: true }).status !== 0)
+    if (missing.length) git(['fetch', '--no-tags', 'origin', ...missing])
+    boundary = boundaryDiff(git, full.formalBuild, win.formalBuild)
+  }
+  return rebindDecision({ request: win.rebind ?? 'auto', full, status, boundary, acknowledged: win.acknowledgeBoundaryDiff ?? null, now })
+}
+
+function makeSteps({ io, win, env, getCtx, reload, setOps, state, setRebind, now = Date.now }) {
   const X = win.exchangeDirectory
   const tools = () => hostTools(io, getCtx())
   const local = name => join(X, name)
@@ -422,7 +459,6 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
       if (ctx.config.formalBuild !== win.formalBuild) {
         const raw = privateJson(env.configPath, 'Acceptance config'); writePrivateJson(env.configPath, { ...raw, formalBuild: win.formalBuild }); reload()
       }
-      if (!getCtx().config.teamAccounts) throw new WindowStop('The acceptance config must name a teamAccounts file for D/E')
       const t = tools()
       const head = must(io.run('git', ['rev-parse', 'HEAD']), 'git rev-parse').trim()
       if (must(io.run('git', ['status', '--porcelain', '--untracked-files=no']), 'git status').trim()) throw new WindowStop('The owner checkout has tracked local edits')
@@ -433,7 +469,18 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
       storageCycle(t, getCtx())
       mkdirSync(X, { recursive: true, mode: 0o700 }); chmodSync(X, 0o700); privateDirectory(X, 'Exchange directory')
       t.ssh(`mkdir -p -m 700 '${X}' && chmod 700 '${X}'`, undefined, 'host exchange directory')
-      return { status: writeAndReturn(local('pre-status.json'), status) }
+      // The path is fixed by the first decision; a resume that would decide differently stops instead of mixing paths.
+      const rebind = decideRebind(io, win, status, now())
+      // A boundary change is the owner's call: stop before fixing a path so they can acknowledge it or choose full.
+      if (rebind.path === 'full' && win.rebind !== 'full' && rebind.boundary?.files.length && !rebind.boundary.acknowledged && rebind.reasons.length === 1) {
+        throw new WindowStop(`Identity-boundary files changed since the last full acceptance (${rebind.boundary.files.join(', ')}). Review the diff, then set acknowledgeBoundaryDiff to ${rebind.boundary.diffSha256} for the fast path or rebind to "full", and rerun with --resume true`,
+          [`git diff ${rebind.boundary.from} ${rebind.boundary.to} -- ${IDENTITY_BOUNDARY_PATHS.map(path => `'${path}'`).join(' ')}`])
+      }
+      const earlier = state().rebind
+      if (earlier && earlier.path !== rebind.path) throw new WindowStop(`This window started on the ${earlier.path} path but would now take the ${rebind.path} path (${rebind.reasons.join('; ') || 'nothing forces full'}); start a new window`)
+      if (!earlier) setRebind(rebind)
+      if (rebind.path === 'full' && !getCtx().config.teamAccounts) throw new WindowStop('The acceptance config must name a teamAccounts file for D/E')
+      return { status: writeAndReturn(local('pre-status.json'), status), rebind: writeAndReturn(local('rebind.json'), earlier ?? rebind) }
     },
     async reverify() {
       const t = tools(), ops = reverifyOps(state()); setOps({ reverify: ops.reverify })
@@ -447,6 +494,16 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
     },
     async accounts({ decision }) {
       const t = tools(), ctx = getCtx(), requestPath = join(win.windowDirectory, 'accounts-request.json')
+      // A and B of every engine need Beta for this window; the fast path creates no disposable accounts.
+      const grantEngines = async () => {
+        const rows = {}
+        for (const [engine, accounts] of Object.entries(getCtx().engineAccounts)) {
+          rows[engine] = await setBeta({ origins: getCtx().origins, ownerCookieFile: getCtx().config.ownerCookie, fetchImpl: io.fetch }, 'grant', accounts, ['A', 'B'])
+          if (!rows[engine].beta.A || !rows[engine].beta.B) throw new WindowStop(`Beta was not granted to ${engine} A and B`)
+        }
+        return rows
+      }
+      if (state().rebind?.path === 'fast') return { beta: writeAndReturn(join(win.windowDirectory, 'beta-granted.json'), { engines: await grantEngines() }) }
       let request, created = null
       if (decision.action === 'check-accounts') {
         request = privateJson(requestPath, 'Saved account request')
@@ -460,7 +517,7 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
       writePrivateJson(ctx.config.teamAccounts, teamAccounts(request, created)); reload()
       const beta = await setBeta({ origins: getCtx().origins, ownerCookieFile: getCtx().config.ownerCookie, fetchImpl: io.fetch }, 'grant', [...getCtx().accounts, ...getCtx().team], ['A', 'B', 'D', 'E'])
       if (!['A', 'B', 'D', 'E'].every(label => beta.beta[label])) throw new WindowStop('Beta was not granted to every acceptance account')
-      return { beta: writeAndReturn(join(win.windowDirectory, 'beta-granted.json'), beta) }
+      return { beta: writeAndReturn(join(win.windowDirectory, 'beta-granted.json'), { ...beta, engines: await grantEngines() }) }
     },
     'chain-initial': async () => (await auditChain(io, tools(), win, 'initial')).files,
     deletion: async () => runSuite(tools(), env, SUITE_RUNS.find(entry => entry.step === 'deletion')),
@@ -485,17 +542,18 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
       return { rows: path }
     },
     async 'owner-notes'() {
-      const ctx = getCtx(), owner = win.ownerNotes ? privateJson(win.ownerNotes, 'Owner notes') : {}
-      const receipts = Object.fromEntries(['close', 'associations', 'identity-verified', 'audit', 'activate'].map(name => {
+      const ctx = getCtx(), owner = win.ownerNotes ? privateJson(win.ownerNotes, 'Owner notes') : {}, rebind = state().rebind ?? null, fast = rebind?.path === 'fast'
+      const receipts = fast ? null : Object.fromEntries(['close', 'associations', 'identity-verified', 'audit', 'activate'].map(name => {
         const path = local(`deletion-${name}.json`); return [name, { path, sha256: hashFile(path) }]
       }))
-      const notes = ownerNotes({ candidate: ctx.config.candidate, formalFrom: win.formalFrom, formalTo: win.formalBuild, rows: JSON.parse(readFileSync(local('deletion-rows.json'), 'utf8')),
-        receipts, diagnostics: runDiagnostics(env.runDirectory) }, owner)
+      const notes = ownerNotes({ candidate: ctx.config.candidate, formalFrom: win.formalFrom, formalTo: win.formalBuild, rows: fast ? null : JSON.parse(readFileSync(local('deletion-rows.json'), 'utf8')),
+        receipts, diagnostics: runDiagnostics(env.runDirectory), rebind }, owner)
       return { notes: writeAndReturn(local('owner-notes.json'), notes) }
     },
     async bundle() {
       const output = local('evidence'); mkdirSync(output, { recursive: true, mode: 0o700 }); chmodSync(output, 0o700)
-      must(tools().cli(['bundle', '--config', env.configPath, '--runs', env.runDirectory, '--output', output, '--extra', local('owner-notes.json')]), 'bundle')
+      const carry = state().rebind?.path === 'fast' ? ['--carry', win.fullAcceptance] : []
+      must(tools().cli(['bundle', '--config', env.configPath, '--runs', env.runDirectory, '--output', output, '--extra', local('owner-notes.json'), ...carry]), 'bundle')
       return { index: join(output, 'index.json') }
     },
     async 'formal-browser'() {
@@ -537,10 +595,12 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
     },
     readback: async () => runSuite(tools(), env, SUITE_RUNS.find(entry => entry.step === 'readback')),
     async cleanup() {
-      const ctx = getCtx(), origins = ctx.origins
-      const beta = await setBeta({ origins, ownerCookieFile: ctx.config.ownerCookie, fetchImpl: io.fetch }, 'revoke', ctx.accounts, ['A', 'B'])
-      if (beta.beta.A || beta.beta.B) throw new WindowStop('Beta was not revoked from A and B')
-      const sessions = await logoutAll({ origins, fetchImpl: io.fetch }, ctx.accounts)
+      const ctx = getCtx(), origins = ctx.origins, beta = {}, sessions = {}
+      for (const [engine, accounts] of Object.entries(ctx.engineAccounts)) {
+        beta[engine] = await setBeta({ origins, ownerCookieFile: ctx.config.ownerCookie, fetchImpl: io.fetch }, 'revoke', accounts, ['A', 'B'])
+        if (beta[engine].beta.A || beta[engine].beta.B) throw new WindowStop(`Beta was not revoked from ${engine} A and B`)
+        sessions[engine] = await logoutAll({ origins, fetchImpl: io.fetch }, accounts)
+      }
       return { cleanup: writeAndReturn(join(win.windowDirectory, 'cleanup.json'), { beta, sessions }) }
     },
     async archive() {
@@ -584,13 +644,15 @@ export async function runWindow({ configPath, windowPath, resume = false, confir
   // Preconditions are rechecked on every resume: formal or pre may have changed since the last attempt.
   state = resetSteps(state, [...(nextStep(state) ? ['preconditions'] : []), ...staleSteps(state, now())]); save()
   const env = { configPath: resolve(configPath), runDirectory: resolve(win.run), room: () => (room ??= previousTeamRoom(win.previousRun)) }
-  const steps = makeSteps({ io, win, env, getCtx: () => ctx, reload: () => { ctx = loadAcceptanceConfig(configPath) }, state: () => state,
-    setOps: ops => { state = { ...state, ops: { ...state.ops, ...ops } }; save() } })
+  const steps = makeSteps({ io, win, env, getCtx: () => ctx, reload: () => { ctx = loadAcceptanceConfig(configPath) }, state: () => state, now,
+    setOps: ops => { state = { ...state, ops: { ...state.ops, ...ops } }; save() }, setRebind: rebind => { state = { ...state, rebind }; save() } })
   for (const step of WINDOW_STEPS) {
     const entry = state.steps[step]
     if (entry?.status === 'done') continue
+    const fast = state.rebind?.path === 'fast'
+    if (fast && FAST_SKIPPED_STEPS.includes(step)) { state = markStep(state, step, 'done', now(), { note: 'skipped: fast rebind carries this evidence from the last full acceptance' }); save(); continue }
     const suite = SUITE_RUNS.find(candidate => candidate.step === step)
-    const decision = resumeDecision(step, entry, { gaps: entry && suite ? suiteGaps(collectResults([env.runDirectory]), suite.suite) : null, confirmed: confirmStep === step })
+    const decision = resumeDecision(step, entry, { gaps: entry && suite ? suiteGaps(collectResults([env.runDirectory]), suite.suite) : null, confirmed: confirmStep === step, fast })
     if (decision.action === 'stop') {
       const gaps = suite ? suiteGaps(collectResults([env.runDirectory]), suite.suite) : []
       throw new WindowStop(decision.reason, suite && step !== 'deletion' ? rerunCommands({ ...env, room: suite.room ? env.room() : null }, step, gaps) : [])

@@ -31,22 +31,29 @@ export function collectResults(directories) {
 
 /**
  * Writes one summary per item into `output` and returns { item: { path, sha256 } }. `extra` carries owner-collected
- * inputs (capacity snapshot, formal checks, deletion counts, notes) keyed by item.
+ * inputs (capacity snapshot, formal checks, deletion counts, notes) keyed by item. `carry` is a loaded full
+ * acceptance (rebind.mjs) whose passing items stand in for cases a fast rebind did not run.
  */
-export function bundleEvidence({ results, output, common, accounts, extra = {} }) {
+export function bundleEvidence({ results, output, common, accounts, extra = {}, carry = null }) {
   const index = {}
   // A case result counts only when its own maintenance run also proved the public origin stayed closed.
   const publicClosed = row => row.run.mode !== 'maintenance' || row.run.publicStill503 === true
   const counts = row => row.result.passed === true && publicClosed(row)
+  if (carry && (carry.buildId !== common.candidate || carry.generation !== common.generation)) throw new Error('Carried evidence belongs to another candidate or generation')
   for (const item of REQUIRED_EVIDENCE.filter(name => name !== 'formal-browser-policy')) {
     const rows = results.filter(row => (SOURCES[item] ?? []).includes(row.result.case))
     // Every required (case, engine) pair needs its own newest result; a case that never ran blocks the item.
     const missing = REQUIRED_CASES.filter(pair => (SOURCES[item] ?? []).includes(pair.case)
       && !rows.some(row => row.result.case === pair.case && row.engine === pair.engine))
+    // Fast rebind: cases this window did not run come from the passing item of the last full acceptance. Fresh rows
+    // for the cases that did run still count, and the original body travels inside the new file with its hash.
+    const carried = carry && missing.length ? carry.evidence[item] : null
+    if (carry && missing.length && !carried) throw new Error(`The full acceptance has no ${item} evidence to carry`)
     const body = { format: 1, item, ...common,
-      passed: missing.length === 0 && (rows.length > 0 ? rows.every(counts) : (extra[item] ? extra[item].passed !== false : false)),
-      ...(missing.length ? { missing } : {}),
+      passed: (missing.length === 0 || carried?.body.passed === true) && (rows.length > 0 ? rows.every(counts) : (carried ? true : extra[item] ? extra[item].passed !== false : false)),
+      ...(missing.length ? (carried ? { carriedCases: missing } : { missing }) : {}),
       results: rows.map(row => ({ engine: row.engine, version: row.run.version, case: row.result.case, passed: row.result.passed, publicClosed: publicClosed(row), result: row.result, source: { path: row.path, sha256: sha256(row.path) } })),
+      ...(carried ? { carriedFrom: { acceptanceSha256: carry.sha256, acceptedAt: carry.acceptedAt, formalBuild: carry.formalBuild, evidence: { path: carried.path, sha256: carried.sha256 } }, carried: carried.body } : {}),
       ...(extra[item] ? { owner: extra[item] } : {}) }
     const text = JSON.stringify(body, null, 1)
     assertNoAccountValues(accounts, text, item)

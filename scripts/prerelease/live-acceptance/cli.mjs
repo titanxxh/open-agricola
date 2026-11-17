@@ -4,11 +4,12 @@ import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { chromium, firefox, webkit } from 'playwright'
-import { assertNoAccountValues, loadAcceptanceConfig, privateDirectory, privateJson } from './context.mjs'
+import { assertNoAccountValues, loadAcceptanceConfig, privateDirectory, privateJson, runsInParallel } from './context.mjs'
 import { createKit } from './browser.mjs'
 import * as suites from './suites.mjs'
 import { acceptanceRecord, bundleEvidence, collectResults } from './evidence.mjs'
 import { runWindow, WindowStop } from './window.mjs'
+import { loadFullAcceptance } from './rebind.mjs'
 
 const root = resolve(import.meta.dirname, '../../..')
 const engines = { chromium, firefox, webkit }
@@ -57,8 +58,6 @@ async function runSuite(ctx, options) {
   const runDirectory = options.run ? privateDirectory(options.run, 'Run directory') : join(ctx.outputRoot, `run-${stamp}`)
   mkdirSync(runDirectory, { recursive: true, mode: 0o700 })
   const { status, bindings } = prepare(ctx, runDirectory)
-  const accounts = [...ctx.accounts, ...ctx.team]
-  const kit = createKit({ origins: ctx.origins, formalBuild: ctx.config.formalBuild, bindings, accounts, ownerCookie: ctx.config.ownerCookie })
   const list = value => value.split(',').map(v => v.trim()).filter(Boolean)
   const plan = {
     handoff: { cases: [suites.handoffCase] },
@@ -75,39 +74,52 @@ async function runSuite(ctx, options) {
   plan.engines = suites.SUITE_ENGINES[suite]
   if (['viewer', 'continuity'].includes(suite) && !/^[a-f0-9-]{36}$/.test(options.room ?? '')) throw new Error('--room <archived room id> is required')
   if (suite === 'readback' ? status.mode !== 'open' : status.mode !== 'maintenance') throw new Error(`Suite ${suite} needs the target in ${suite === 'readback' ? 'open' : 'maintenance'} mode`)
-  const summary = []
   const selectedEngines = options.engine ? list(options.engine) : plan.engines
   for (const engineName of selectedEngines) if (!engines[engineName]) throw new Error(`Unknown engine ${engineName}`)
   if (!selectedEngines.some(engineName => suites.selectCases(suite, engineName, requested).length)) throw new Error(`No selected ${suite} case runs on ${selectedEngines.join(', ')}`)
-  for (const engineName of selectedEngines) {
-    const engine = engines[engineName], selected = suites.selectCases(suite, engineName, requested)
-    if (!selected.length) continue
-    // `cases` names what this run executed; a later single-case rerun replaces only those cases in the bundle.
-    const report = { format: 1, suite, engine: engineName, candidate: bindings.candidateSha, generation: bindings.generation, operationId: bindings.operationId,
-      healthyCycle: bindings.healthyCycle, mode: bindings.mode, startedAt: new Date().toISOString(), cases: selected.map(({ label }) => label), results: [] }
-    // The kit spans every engine of the run; each report keeps only what happened in its own engine.
-    const hungFrom = kit.hung.length, retriesFrom = kit.retries.length
-    if (bindings.mode === 'maintenance') await kit.publicIsClosed()
-    // A fresh browser per case: WebKit keeps stale engine state after the blocked-frame embedding probes.
-    for (const { label, index } of selected) {
-      const run = suite === 'viewer' ? plan.cases[0] : plan.cases[index]
-      // Firefox renders the JSON probe page in its JSON viewer; a plain text document keeps evaluations stable.
-      const browser = await engine.launch({ headless: true, ...(engineName === 'firefox' ? { firefoxUserPrefs: { 'devtools.jsonview.enabled': false } } : {}) }); report.version = browser.version()
-      kit.partial = null
-      try { report.results.push(await run(kit, browser, accounts)) }
-      catch (error) { report.results.push({ ...(kit.partial ?? {}), case: label, passed: false, error: String(error.message).slice(0, 400) }) }
-      finally { await browser.close().catch(() => {}) }
-    }
-    if (bindings.mode === 'maintenance') report.publicStill503 = await kit.publicStillClosed(report)
-    report.boundedEvaluations = kit.hung.slice(hungFrom); report.networkRetries = kit.retries.slice(retriesFrom)
-    report.passed = report.results.length === selected.length && report.results.every(v => v.passed) && (bindings.mode !== 'maintenance' || report.publicStill503)
-    report.completedAt = new Date().toISOString()
-    const text = JSON.stringify(report, null, 2) + '\n'; assertNoAccountValues(accounts, text, `${suite} result`)
-    writePrivate(join(runDirectory, `result-${suite}-${engineName}-${Date.now()}.json`), text)
-    summary.push({ engine: engineName, passed: report.passed, cases: report.results.map(v => [v.case, v.passed]) })
+  const kitFor = accounts => createKit({ origins: ctx.origins, formalBuild: ctx.config.formalBuild, bindings, accounts, ownerCookie: ctx.config.ownerCookie })
+  // A parallel suite gives each engine its own kit and A–C, also for a single-engine rerun. Otherwise one kit spans
+  // the engines in order with the shared accounts, as before.
+  const ownAccounts = suites.PARALLEL_SUITES.includes(suite) && selectedEngines.every(engineName => ctx.engineAccounts[engineName])
+  const parallel = ownAccounts && runsInParallel(ctx, selectedEngines)
+  const shared = ownAccounts ? null : [...ctx.accounts, ...ctx.team], sharedKit = shared && kitFor(shared)
+  const runEngine = engineName => runOnEngine({ ctx, suite, plan, requested, bindings, runDirectory, engineName,
+    kit: sharedKit ?? kitFor(ctx.engineAccounts[engineName]), accounts: shared ?? ctx.engineAccounts[engineName] })
+  const summary = []
+  if (parallel) summary.push(...await Promise.all(selectedEngines.map(runEngine)))
+  else for (const engineName of selectedEngines) summary.push(await runEngine(engineName))
+  const ran = summary.filter(Boolean)
+  process.stdout.write(JSON.stringify({ suite, run: runDirectory, parallel, summary: ran }) + '\n')
+  if (!ran.every(v => v.passed)) process.exitCode = 1
+}
+
+/** Runs one engine's selected cases with a fresh browser per case and writes its result file; null when none apply. */
+async function runOnEngine({ ctx, suite, plan, requested, bindings, runDirectory, engineName, kit, accounts }) {
+  const engine = engines[engineName], selected = suites.selectCases(suite, engineName, requested)
+  if (!selected.length) return null
+  // `cases` names what this run executed; a later single-case rerun replaces only those cases in the bundle.
+  const report = { format: 1, suite, engine: engineName, candidate: bindings.candidateSha, generation: bindings.generation, operationId: bindings.operationId,
+    healthyCycle: bindings.healthyCycle, mode: bindings.mode, startedAt: new Date().toISOString(), cases: selected.map(({ label }) => label), results: [] }
+  // A shared kit spans every engine of the run; each report keeps only what happened in its own engine.
+  const hungFrom = kit.hung.length, retriesFrom = kit.retries.length
+  if (bindings.mode === 'maintenance') await kit.publicIsClosed()
+  // A fresh browser per case: WebKit keeps stale engine state after the blocked-frame embedding probes.
+  for (const { label, index } of selected) {
+    const run = suite === 'viewer' ? plan.cases[0] : plan.cases[index]
+    // Firefox renders the JSON probe page in its JSON viewer; a plain text document keeps evaluations stable.
+    const browser = await engine.launch({ headless: true, ...(engineName === 'firefox' ? { firefoxUserPrefs: { 'devtools.jsonview.enabled': false } } : {}) }); report.version = browser.version()
+    kit.partial = null
+    try { report.results.push(await run(kit, browser, accounts)) }
+    catch (error) { report.results.push({ ...(kit.partial ?? {}), case: label, passed: false, error: String(error.message).slice(0, 400) }) }
+    finally { await browser.close().catch(() => {}) }
   }
-  process.stdout.write(JSON.stringify({ suite, run: runDirectory, summary }) + '\n')
-  if (!summary.every(v => v.passed)) process.exitCode = 1
+  if (bindings.mode === 'maintenance') report.publicStill503 = await kit.publicStillClosed(report)
+  report.boundedEvaluations = kit.hung.slice(hungFrom); report.networkRetries = kit.retries.slice(retriesFrom)
+  report.passed = report.results.length === selected.length && report.results.every(v => v.passed) && (bindings.mode !== 'maintenance' || report.publicStill503)
+  report.completedAt = new Date().toISOString()
+  const text = JSON.stringify(report, null, 2) + '\n'; assertNoAccountValues(ctx.allAccounts, text, `${suite} result`)
+  writePrivate(join(runDirectory, `result-${suite}-${engineName}-${Date.now()}.json`), text)
+  return { engine: engineName, passed: report.passed, cases: report.results.map(v => [v.case, v.passed]) }
 }
 
 function capacitySnapshot(ctx) {
@@ -135,14 +147,16 @@ async function formalChecks(ctx) {
 }
 
 async function bundle(ctx, options) {
-  const output = privateDirectory(options.output, 'Evidence output directory'), accounts = [...ctx.accounts, ...ctx.team]
+  const output = privateDirectory(options.output, 'Evidence output directory'), accounts = ctx.allAccounts
   const runs = options.runs.split(',').map(path => privateDirectory(path, 'Run directory'))
   const status = privateJson(join(runs.at(-1), 'status.json'), 'Run status'), bindings = privateJson(join(runs.at(-1), 'bindings.json'), 'Run bindings')
   const owner = options.extra ? privateJson(options.extra, 'Owner evidence notes') : {}
   const extra = { ...owner, capacity: { ...owner.capacity, snapshot: capacitySnapshot(ctx) }, 'formal-unaffected': { ...owner['formal-unaffected'], ...(await formalChecks(ctx)) } }
   const common = { candidate: ctx.config.candidate, generation: status.generation, operationId: status.operation?.id ?? null, healthyCycle: bindings.healthyCycle, formalBuild: ctx.config.formalBuild,
     ownerToolsPolicy: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim() }
-  const index = bundleEvidence({ results: collectResults(runs), output, common, accounts, extra })
+  // Fast rebind: --carry names the last full acceptance whose passing items cover the cases this window skipped.
+  const carry = options.carry ? loadFullAcceptance(options.carry) : null
+  const index = bundleEvidence({ results: collectResults(runs), output, common, accounts, extra, carry })
   writePrivate(join(output, 'index.json'), index)
   process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(index).map(([item, entry]) => [item, entry.passed]))) + '\n')
   if (!Object.values(index).every(entry => entry.passed)) process.exitCode = 1
@@ -174,4 +188,4 @@ else if (command === 'window') {
     process.exitCode = 1
   }
 }
-else throw new Error('Use run --suite <name> [--engine <e,...>] [--case <label,...>] | bundle --runs <dirs> --output <dir> | acceptance --index <file> --formal-browser <file> --output <file> | window --window <file> [--resume true] [--confirm-step accounts|deletion]')
+else throw new Error('Use run --suite <name> [--engine <e,...>] [--case <label,...>] | bundle --runs <dirs> --output <dir> [--carry <full acceptance>] | acceptance --index <file> --formal-browser <file> --output <file> | window --window <file> [--resume true] [--confirm-step accounts|deletion]')

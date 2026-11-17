@@ -8,6 +8,7 @@ import {
   DISPOSABLE_AUTHORIZATION, LIMITS, POLICY_STEPS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertNoResidualRows, assertWithin, markStep, markThrough, newState, nextStep, openBinding, ownerNotes, verifiedOpenFresh,
   importClosure, parseWindowConfig, previousTeamRoom, rerunCommands, resetSteps, resumeDecision, reverifyOps, runDiagnostics, runWindow, staleSteps, suiteGaps, teamAccounts,
 } from '../prerelease/live-acceptance/window.mjs'
+import { fullAcceptanceFixture } from './_helpers/full-acceptance-fixture'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -523,5 +524,105 @@ describe('policy phase', () => {
     const closure = importClosure(resolve(import.meta.dirname, '../..'), 'scripts/prerelease/storage-guard-cli.ts')
     expect(closure).toEqual(expect.arrayContaining(['scripts/prerelease/storage-guard-cli.ts', 'scripts/prerelease/storage-guard.ts', 'scripts/prerelease/config.ts']))
     expect(closure.every(file => file.startsWith('scripts/') || file.startsWith('shared/'))).toBe(true)
+  })
+})
+
+describe('fast rebind window', () => {
+  const candidate = sha('c'), generation = '44444444-4444-4444-8444-444444444444'
+  // A fake host and formal API: suites "pass" by writing their own result files, and bundling stops the window.
+  function fastWindow({ patch = '', windowExtra = {} as Record<string, unknown>, team = false } = {}) {
+    const root = privateRoot(), secrets = privateDir(root, 'secrets')
+    const set = (prefix: string, labels = ['A', 'B', 'C']) => ({ accounts: labels.map(label => ({ id: `${prefix}-id-${label}`, username: `${prefix}-user-${label}`, password: `${prefix}-password-${label}` })) })
+    const target = writePrivate(join(secrets, 'target.json'), { targetId: 'pre-main', origin: 'https://pre.example.test', directory: '/srv/pre', policyDirectory: '/srv/policy',
+      database: { name: 'pre' }, formal: { appOrigin: 'https://app.example.test', apiOrigin: 'https://api.example.test', project: 'formal' } })
+    writeFileSync(join(secrets, 'cookie'), '__Host-oa-session=abc\n', { mode: 0o600 })
+    const configPath = writePrivate(join(secrets, 'acceptance.json'), { format: 1, targetConfig: target, ssh: 'owner@host', candidate, formalBuild: sha('b'),
+      candidateReceipt: writePrivate(join(secrets, 'receipt.json'), { purpose: 'candidate', channel: 'prerelease', sourceSha: candidate, producerSha: sha('d') }),
+      accounts: writePrivate(join(secrets, 'chromium.json'), set('chromium')),
+      engineAccounts: { firefox: writePrivate(join(secrets, 'firefox.json'), set('firefox')), webkit: writePrivate(join(secrets, 'webkit.json'), set('webkit')) },
+      ...(team ? { teamAccounts: writePrivate(join(secrets, 'team.json'), set('team', ['D', 'E'])) } : {}),
+      ownerCookie: join(secrets, 'cookie'), guardConfig: '/srv/guard.json', outputRoot: privateDir(root, 'output') })
+    const fullAcceptance = fullAcceptanceFixture(privateDir(root, 'c5'), { candidate, generation })
+    const value = { format: 1, windowId: 'c6', generation, formalFrom: sha('a'), formalBuild: sha('b'), previousRun: privateDir(root, 'previous'), run: privateDir(root, 'run'),
+      windowDirectory: privateDir(root, 'window'), exchangeDirectory: join(root, 'exchange'), fullAcceptance, ...windowExtra }
+    const windowPath = writePrivate(join(root, 'window.json'), value)
+    const calls: string[] = [], beta: string[] = []
+    const ids = ['chromium', 'firefox', 'webkit'].flatMap(prefix => ['A', 'B', 'C'].map(label => `${prefix}-id-${label}`))
+    const io = {
+      setLog: () => {},
+      async fetch(url: string, init: { method?: string; body?: string } = {}) {
+        if (url.endsWith('/api/admin/beta-access')) {
+          if (init.method === 'PUT') beta.push(JSON.parse(init.body!).userId)
+          return { status: 200, json: async () => ({}), text: async () => JSON.stringify(ids.filter(id => /-[AB]$/.test(id))) }
+        }
+        return { status: 200, json: async () => (url.endsWith('/frontend-build.json') ? { gameBuildId: sha('b') } : url.endsWith('/browser-policy') ? { buildId: sha('b') } : { ok: true }) }
+      },
+      run(command: string, args: string[]) {
+        const line = [command === process.execPath ? 'node' : command, ...args].join(' ')
+        calls.push(line)
+        const ok = (out: unknown = '') => ({ status: 0, stdout: typeof out === 'string' ? out : JSON.stringify(out) + '\n', stderr: '', error: null })
+        if (command === 'git') return ok(args[0] === 'rev-parse' ? 'head\n' : args[0] === 'diff' ? (args.includes('--name-only') ? (patch ? 'server/auth.ts\n' : '') : patch) : '')
+        if (command === 'ssh' && args.at(-1) === '-s') return ok('55555555-5555-4555-8555-555555555555\n')
+        if (command === 'ssh' && args.at(-1)!.includes('rev-parse HEAD')) return ok('head\n')
+        if (command === './deploy-prerelease.sh') {
+          if (args[0] === 'status') return ok({ mode: 'maintenance', generation, installed: { buildId: candidate, image: 'sha256:image' } })
+          if (args[0] === 'reverify') return ok({ mode: 'maintenance', operation: { kind: 'reverify', id: args[args.indexOf('--operation-id') + 1] } })
+          if (args[0] === 'identities') return ok({ path: '/srv/pre/control/identities.json' })
+          if (args[0] === 'apply-identities') return ok({ path: '/srv/pre/control/identity-verified.json' })
+        }
+        if (command === process.execPath && args.includes('run')) {
+          const suite = args[args.indexOf('--suite') + 1]
+          for (const engine of ['chromium', 'firefox', 'webkit']) writePrivate(join(value.run, `result-${suite}-${engine}-1.json`), { suite, engine, mode: 'maintenance', publicStill503: true,
+            results: ({ handoff: ['handoff'], boundary: ['visitor', 'ordinary', 'beta-boundary', 'revocation'] } as Record<string, string[]>)[suite].map(name => ({ case: name, passed: true })) })
+          return ok()
+        }
+        if (command === process.execPath && args.includes('bundle')) return { status: 1, stdout: '', stderr: 'stop here', error: null }
+        return ok()
+      },
+    }
+    return { configPath, windowPath, value, calls, beta, io, fullAcceptance }
+  }
+  const statuses = (windowDirectory: string) => Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(windowDirectory, 'state.json'), 'utf8')).steps)
+    .map(([step, entry]) => [step, (entry as { status: string; note?: string }).note?.startsWith('skipped') ? 'skipped' : (entry as { status: string }).status]))
+
+  it('runs only handoff and boundary, creates no accounts, and bundles with the carried full acceptance', async () => {
+    const window = fastWindow()
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, io: window.io })).rejects.toThrow(/bundle failed/)
+    const state = JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8'))
+    expect(state.rebind).toMatchObject({ path: 'fast', reasons: [], boundary: { from: sha('a'), to: sha('b'), files: [] } })
+    // Policy steps are no-ops without `policy` and are never skipped by the fast path.
+    expect(statuses(window.value.windowDirectory)).toEqual({ 'policy-host': 'done', preconditions: 'done', 'policy-maintain': 'done', 'policy-import': 'done', reverify: 'done', accounts: 'done', 'chain-initial': 'done', 'suite-handoff': 'done', 'suite-boundary': 'done',
+      'suite-multihand': 'skipped', 'suite-team': 'skipped', 'suite-sandbox': 'skipped', 'suite-viewer': 'skipped', 'suite-continuity': 'skipped',
+      deletion: 'skipped', 'chain-deletion': 'skipped', 'deletion-rows': 'skipped', 'owner-notes': 'done', bundle: 'failed' })
+    expect(window.calls.filter(call => call.includes(' run ')).map(call => call.split('--suite ')[1].split(' ')[0])).toEqual(['handoff', 'boundary'])
+    expect(window.calls.some(call => call.includes('typescript-runtime.mjs'))).toBe(false)
+    expect(window.beta.sort()).toEqual(['chromium-id-A', 'chromium-id-B', 'firefox-id-A', 'firefox-id-B', 'webkit-id-A', 'webkit-id-B'])
+    expect(window.calls.find(call => call.includes(' bundle '))).toContain(`--carry ${window.fullAcceptance}`)
+    const notes = JSON.parse(readFileSync(join(window.value.exchangeDirectory, 'owner-notes.json'), 'utf8'))
+    expect(notes['deletion-audit']).toBeUndefined()
+    expect(notes['browser-boundary'].rebind).toMatchObject({ path: 'fast', fullAcceptance: { path: window.fullAcceptance } })
+  })
+  it('stops for the owner on a boundary change, then follows the acknowledgment or an explicit full choice', async () => {
+    const window = fastWindow({ patch: 'PATCH' }), digest = createHash('sha256').update('PATCH').digest('hex')
+    const stop = await runWindow({ configPath: window.configPath, windowPath: window.windowPath, io: window.io }).catch(error => error)
+    expect(stop).toBeInstanceOf(WindowStop)
+    expect(stop.message).toContain(`acknowledgeBoundaryDiff to ${digest}`)
+    expect(stop.next[0]).toMatch(new RegExp(`^git diff ${sha('a')} ${sha('b')} -- 'client/app/PrereleaseHandoffPage.tsx'`))
+    expect(JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8')).rebind).toBeUndefined()
+    writePrivate(window.windowPath, { ...window.value, acknowledgeBoundaryDiff: digest })
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/bundle failed/)
+    expect(JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8')).rebind).toMatchObject({ path: 'fast', boundary: { files: ['server/auth.ts'], acknowledged: true } })
+    const full = fastWindow({ patch: 'PATCH', windowExtra: { rebind: 'full' } })
+    await expect(runWindow({ configPath: full.configPath, windowPath: full.windowPath, io: full.io })).rejects.toThrow(/teamAccounts file for D\/E/)
+    expect(JSON.parse(readFileSync(join(full.value.windowDirectory, 'state.json'), 'utf8')).rebind).toMatchObject({ path: 'full',
+      reasons: ['owner requested a full acceptance', 'identity-boundary files changed: server/auth.ts'] })
+  })
+  it('never switches path on resume', async () => {
+    const window = fastWindow({ team: true })
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, io: window.io })).rejects.toThrow(/bundle failed/)
+    writePrivate(window.windowPath, { ...window.value, rebind: 'full' })
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/started on the fast path/)
+    expect(() => parseWindowConfig({ ...window.value, rebind: 'fast' })).toThrow(/'auto' or 'full'/)
+    expect(() => parseWindowConfig({ ...window.value, acknowledgeBoundaryDiff: 'abc' })).toThrow(/SHA-256/)
   })
 })
