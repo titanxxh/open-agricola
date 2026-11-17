@@ -9,6 +9,7 @@ import { caseLabels, SUITE_ENGINES } from './suites.mjs'
 import { acceptanceRecord, collectResults } from './evidence.mjs'
 import { loadAcceptanceConfig, privateDirectory, privateJson } from './context.mjs'
 import { logoutAll, setBeta } from './formal-admin.mjs'
+import { loginBudget } from './login-budget.mjs'
 import { FAST_SKIPPED_STEPS, IDENTITY_BOUNDARY_PATHS, boundaryDiff, loadFullAcceptance, rebindDecision } from './rebind.mjs'
 
 const root = resolve(import.meta.dirname, '../../..')
@@ -599,7 +600,7 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
       for (const [engine, accounts] of Object.entries(ctx.engineAccounts)) {
         beta[engine] = await setBeta({ origins, ownerCookieFile: ctx.config.ownerCookie, fetchImpl: io.fetch }, 'revoke', accounts, ['A', 'B'])
         if (beta[engine].beta.A || beta[engine].beta.B) throw new WindowStop(`Beta was not revoked from ${engine} A and B`)
-        sessions[engine] = await logoutAll({ origins, fetchImpl: io.fetch }, accounts)
+        sessions[engine] = await logoutAll({ origins, fetchImpl: io.fetch, budget: loginBudget(env.runDirectory) }, accounts)
       }
       return { cleanup: writeAndReturn(join(win.windowDirectory, 'cleanup.json'), { beta, sessions }) }
     },

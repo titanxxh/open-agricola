@@ -48,7 +48,7 @@ export async function poll(read, expected, timeout = 30_000, label = 'poll') {
 export const pollTrue = (read, timeout = 30_000, label = 'condition') => poll(async () => !!(await read()), true, timeout, label)
 
 /** One kit per run: origins, bindings and accounts come from the private acceptance config and prepared bindings. */
-export function createKit({ origins, formalBuild, bindings, accounts, ownerCookie }) {
+export function createKit({ origins, formalBuild, bindings, accounts, ownerCookie, loginBudget = null }) {
   const { pre, formalApp, formalApi } = origins
   const preHost = new URL(pre).host, binding = { build: bindings.candidateSha, generation: bindings.generation }
   const wsUrl = `wss://${preHost}/nodes/${bindings.instanceId}/ws`
@@ -144,12 +144,18 @@ export function createKit({ origins, formalBuild, bindings, accounts, ownerCooki
     }, formalApi)
     assert.equal(live.frontend.gameBuildId, formalBuild); assert.equal(live.policy.buildId, formalBuild); assert.equal(live.policy.version, 2)
     await page.locator('#username').fill(actor.username); await page.locator('#password').fill(actor.password)
-    const request = page.waitForResponse(r => r.url() === formalApi + '/api/auth/login' && r.request().method() === 'POST', { timeout: 20_000 }).then(response => ({ response }), error => ({ error }))
-    armCleanup()
-    try { await page.locator('form:has(#password) button[type=submit]').click() } catch (error) { await request; throw error }
-    const observed = await request
-    if (observed.error) throw observed.error
-    assert.equal(observed.response.status(), 200)
+    // Every login takes a slot of the window's shared budget; a 429 waits out the server window and submits again.
+    for (let attempt = 1; ; attempt++) {
+      await loginBudget?.take()
+      const request = page.waitForResponse(r => r.url() === formalApi + '/api/auth/login' && r.request().method() === 'POST', { timeout: 20_000 }).then(response => ({ response }), error => ({ error }))
+      armCleanup()
+      try { await page.locator('form:has(#password) button[type=submit]').click() } catch (error) { await request; throw error }
+      const observed = await request
+      if (observed.error) throw observed.error
+      if (observed.response.status() === 429 && loginBudget && attempt < 3) { retries.push('formal login: 429, waited for the authentication window'); await loginBudget.rejected(); continue }
+      assert.equal(observed.response.status(), 200)
+      break
+    }
     await page.locator('#password').waitFor({ state: 'detached' })
   }
   /** The banner renders on the handoff page before the session exchange; wait for the exchange itself. */

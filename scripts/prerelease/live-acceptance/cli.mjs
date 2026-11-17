@@ -10,6 +10,7 @@ import * as suites from './suites.mjs'
 import { acceptanceRecord, bundleEvidence, collectResults } from './evidence.mjs'
 import { runWindow, WindowStop } from './window.mjs'
 import { loadFullAcceptance } from './rebind.mjs'
+import { loginBudget } from './login-budget.mjs'
 
 const root = resolve(import.meta.dirname, '../../..')
 const engines = { chromium, firefox, webkit }
@@ -77,7 +78,9 @@ async function runSuite(ctx, options) {
   const selectedEngines = options.engine ? list(options.engine) : plan.engines
   for (const engineName of selectedEngines) if (!engines[engineName]) throw new Error(`Unknown engine ${engineName}`)
   if (!selectedEngines.some(engineName => suites.selectCases(suite, engineName, requested).length)) throw new Error(`No selected ${suite} case runs on ${selectedEngines.join(', ')}`)
-  const kitFor = accounts => createKit({ origins: ctx.origins, formalBuild: ctx.config.formalBuild, bindings, accounts, ownerCookie: ctx.config.ownerCookie })
+  // One login ledger per run directory paces every formal login of the window, across engines and CLI processes.
+  const budget = loginBudget(runDirectory)
+  const kitFor = accounts => createKit({ origins: ctx.origins, formalBuild: ctx.config.formalBuild, bindings, accounts, ownerCookie: ctx.config.ownerCookie, loginBudget: budget })
   // A parallel suite gives each engine its own kit and A–C, also for a single-engine rerun. Otherwise one kit spans
   // the engines in order with the shared accounts, as before.
   const ownAccounts = suites.PARALLEL_SUITES.includes(suite) && selectedEngines.every(engineName => ctx.engineAccounts[engineName])

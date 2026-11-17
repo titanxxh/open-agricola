@@ -26,11 +26,20 @@ export async function setBeta({ origins, ownerCookieFile, fetchImpl = fetch }, a
   return { changes, beta: Object.fromEntries(accounts.map(account => [account.label, text.includes(`"${account.id}"`)])) }
 }
 
-/** Logs each account out of every formal session and proves its session is gone. */
-export async function logoutAll({ origins, fetchImpl = fetch }, accounts) {
+/**
+ * Logs each account out of every formal session and proves its session is gone. Logins take slots from the window's
+ * login budget (login-budget.mjs); a 429 waits out the server window and logs in again once.
+ */
+export async function logoutAll({ origins, fetchImpl = fetch, budget = null }, accounts) {
   const headers = protocolHeaders(origins), rows = []
+  const signIn = async (account, retry = true) => {
+    await budget?.take()
+    const response = await fetchImpl(origins.formalApi + '/api/auth/login', { method: 'POST', headers, body: JSON.stringify({ username: account.username, password: account.password }), signal: AbortSignal.timeout(20_000) })
+    if (response.status === 429 && budget && retry) { await budget.rejected(); return signIn(account, false) }
+    return response
+  }
   for (const account of accounts) {
-    const login = await fetchImpl(origins.formalApi + '/api/auth/login', { method: 'POST', headers, body: JSON.stringify({ username: account.username, password: account.password }), signal: AbortSignal.timeout(20_000) })
+    const login = await signIn(account)
     const cookie = (login.headers.getSetCookie?.() ?? []).map(value => value.split(';')[0]).filter(value => value.startsWith('__Host-oa-session=')).join('; ')
     const out = cookie ? await fetchImpl(origins.formalApi + '/api/auth/logout-all', { method: 'POST', headers: { ...headers, Cookie: cookie }, signal: AbortSignal.timeout(20_000) }) : null
     const after = cookie ? await fetchImpl(origins.formalApi + '/api/auth/me', { headers: { ...headers, Cookie: cookie }, signal: AbortSignal.timeout(20_000) }) : null
