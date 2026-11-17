@@ -32,6 +32,8 @@ import type { FarmBoardProjectionCardFieldTarget } from '../../app/farm-board-pr
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { tileVariant } from './farm-tile-variants'
 import { FarmGroundSprite } from './FarmGroundSprite'
+import { HarvestRequirements } from './HarvestRequirements'
+import type { ClientGameState } from '../../services/rehydrate'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
 import { wouldExceedZoneOccupancyLimit } from '../../app/hooks/use-animal-reorg-flow'
@@ -401,6 +403,7 @@ export type FarmBoardView = {
   visiblePlayerIds: readonly string[]
   activePlayerId?: string
   playerPanelSummary: PlayerPanelSupplySummary
+  harvestRequirements?: ClientGameState['players'][number]['harvestRequirements']
   devMode: boolean
   currentStartPlayerId: string
   nextStartPlayerId: string
@@ -845,6 +848,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     visiblePlayerIds,
     activePlayerId,
     playerPanelSummary,
+    harvestRequirements,
     currentStartPlayerId,
     nextStartPlayerId,
     farmCells,
@@ -1229,6 +1233,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
             </span>
           </>) : null}
         </div>
+        <HarvestRequirements locale={locale} requirements={harvestRequirements} />
       </div>
       <div className="player-tabs-container">
         <div className="player-tabs">

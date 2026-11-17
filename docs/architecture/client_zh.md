@@ -14,6 +14,8 @@
 
 ## 客户端 bundle
 
+收获需求由服务端 `harvestRequirements` 提供。界面测试：`harvest-requirements.spec.ts`。
+
 | Bundle | 入口 | 路径 | 约束 |
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 使用 WebSocket。从 `shared/*` 只导入 `contract`、`domain` 与 `i18n`；卡牌展示使用以 manifest 为后端的 `card-meta` 加 `custom-card-metadata`。 |

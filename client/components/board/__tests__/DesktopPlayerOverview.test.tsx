@@ -11,6 +11,7 @@ const player = (id: string, color: 'red' | 'blue'): ClientGameState['players'][n
   color,
   resources: { wood: 3, food: 2 },
   playerPanelSummary: { family: { used: 2, limit: 5 } },
+  harvestRequirements: { round: 4, food: 4, fuel: 2 },
 } as ClientGameState['players'][number])
 
 const players = [player('p1', 'red'), player('p2', 'blue')]
@@ -18,6 +19,16 @@ const playerNames = { p1: 'Ada', p2: 'Bea' }
 const scores = [{ playerId: 'p1', total: 4 }, { playerId: 'p2', total: 7 }]
 
 describe('DesktopPlayerOverview current turn', () => {
+  it('shows the next harvest food and heating requirements for each player', () => {
+    render(<DesktopPlayerOverview
+      locale="en" players={players} playerNames={playerNames} scores={scores}
+      viewedPlayerId="p1" currentPlayerId="p2" onViewPlayer={() => {}}
+    />)
+    expect(screen.getAllByText('Next harvest · Round 4')).toHaveLength(2)
+    expect(screen.getAllByLabelText('Feeding requires 4 food')).toHaveLength(2)
+    expect(screen.getAllByLabelText('Heating requires 2 fuel')).toHaveLength(2)
+  })
+
   it('marks the turn player separately from the farm being viewed', () => {
     const { container } = render(<DesktopPlayerOverview
       locale="en" players={players} playerNames={playerNames} scores={scores}

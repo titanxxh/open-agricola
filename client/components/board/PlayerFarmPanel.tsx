@@ -11,7 +11,7 @@ export interface PlayerFarmPanelProps {
   viewedPlayerId: string
   view: Omit<
     FarmBoardView,
-    'players' | 'currentPlayer' | 'displayPlayer' | 'infirmaryWorkerCount' | 'playerPanelSummary'
+    'players' | 'currentPlayer' | 'displayPlayer' | 'infirmaryWorkerCount' | 'playerPanelSummary' | 'harvestRequirements'
   >
   actions: FarmBoardActions
   inlineCardStats?: boolean
@@ -51,6 +51,7 @@ export function PlayerFarmPanel({
           displayPlayer,
           infirmaryWorkerCount,
           playerPanelSummary: displayPlayer.playerPanelSummary,
+          harvestRequirements: displayPlayer.harvestRequirements,
         }}
         actions={actions}
         inlineCardStats={inlineCardStats}

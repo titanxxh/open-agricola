@@ -45,6 +45,8 @@ Tests: `server/__tests__/fence-selection-quote-session.test.ts`, `server/connect
 
 ## Unified SessionResponse
 
+`harvest-requirements.ts` projects the next harvest's food and optional fuel demand through settlement's feeding and heating queries. It keeps current family, house and played-card facts, ages existing newborns when the harvest falls in a later round, and advances only a detached season value. Serialization publishes this read-only display field for every viewer and strips it on recovery. It neither predicts future actions nor advances the engine. Coverage: `server/game/__tests__/harvest-requirements.test.ts`.
+
 ```ts
 type SessionResponse = {
   ok: boolean
