@@ -9,7 +9,7 @@ import { createKit } from './browser.mjs'
 import * as suites from './suites.mjs'
 import { acceptanceRecord, bundleEvidence, collectResults } from './evidence.mjs'
 import { runWindow, WindowStop } from './window.mjs'
-import { loadFullAcceptance } from './rebind.mjs'
+import { assertCarryEligible, loadFullAcceptance } from './rebind.mjs'
 import { loginBudget } from './login-budget.mjs'
 
 const root = resolve(import.meta.dirname, '../../..')
@@ -157,8 +157,11 @@ async function bundle(ctx, options) {
   const extra = { ...owner, capacity: { ...owner.capacity, snapshot: capacitySnapshot(ctx) }, 'formal-unaffected': { ...owner['formal-unaffected'], ...(await formalChecks(ctx)) } }
   const common = { candidate: ctx.config.candidate, generation: status.generation, operationId: status.operation?.id ?? null, healthyCycle: bindings.healthyCycle, formalBuild: ctx.config.formalBuild,
     ownerToolsPolicy: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim() }
-  // Fast rebind: --carry names the last full acceptance whose passing items cover the cases this window skipped.
+  // Fast rebind: --carry names the last full acceptance whose passing items cover the cases this window skipped. The
+  // window's eligibility (age, candidate, image, generation, boundary diff or its acknowledgment) is rechecked here.
   const carry = options.carry ? loadFullAcceptance(options.carry) : null
+  if (carry) assertCarryEligible({ full: carry, status, formalBuild: ctx.config.formalBuild, acknowledged: options['acknowledge-boundary-diff'] ?? null,
+    git: args => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }) })
   const index = bundleEvidence({ results: collectResults(runs), output, common, accounts, extra, carry })
   writePrivate(join(output, 'index.json'), index)
   process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(index).map(([item, entry]) => [item, entry.passed]))) + '\n')
@@ -191,4 +194,4 @@ else if (command === 'window') {
     process.exitCode = 1
   }
 }
-else throw new Error('Use run --suite <name> [--engine <e,...>] [--case <label,...>] | bundle --runs <dirs> --output <dir> [--carry <full acceptance>] | acceptance --index <file> --formal-browser <file> --output <file> | window --window <file> [--resume true] [--confirm-step accounts|deletion]')
+else throw new Error('Use run --suite <name> [--engine <e,...>] [--case <label,...>] | bundle --runs <dirs> --output <dir> [--carry <full acceptance> [--acknowledge-boundary-diff <sha256>]] | acceptance --index <file> --formal-browser <file> --output <file> | window --window <file> [--resume true] [--confirm-step accounts|deletion]')
