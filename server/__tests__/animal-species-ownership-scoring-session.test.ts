@@ -234,8 +234,9 @@ describe('animal species and ownership scoring', () => {
       clay: 1, grain: 1, food: 20, fuel: 20, horse: 0 })
     expect(response.state.players[0]!.houseAnimals).toEqual({})
     expect(bonus(response, NUTRITION)).toBe(2)
-    expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'resource.paid', sourceCardId: NUTRITION,
-      resources: { horse: 1, grain: 1, vegetable: 1 } }))
+    expect(response.state.events.filter(event => event.type === 'resource.exchanged' && event.exchangeSource === NUTRITION))
+      .toEqual([expect.objectContaining({ actorPlayerId: response.state.players[0]!.id,
+        paid: { horse: 1, grain: 1, vegetable: 1 }, gained: { food: 5 } })])
     expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.cardTriggered',
       params: expect.objectContaining({ cardId: NUTRITION }) }))
   })
@@ -303,7 +304,13 @@ describe('animal species and ownership scoring', () => {
     const horse = getChoiceOptions(choices).find(option => option.effectPreview?.kind === 'resourceExchange'
       && option.effectPreview.resourcesPaid?.horse === 1)
     expect(horse?.effectPreview).toMatchObject({ resourcesPaid: { horse: 1, grain: 1, vegetable: 1 },
-      resourcesGained: { food: 5 }, bonusVp: 2 })
+      resourcesGained: { food: 5 } })
+    // The visible sequence includes the complete exchange and the following bonus.
+    expect(horse?.descriptionPreview).toMatchObject({ kind: 'group', operator: 'sequence', parts: [
+      { kind: 'action', effectPreview: { kind: 'resourceExchange',
+        resourcesPaid: { horse: 1, grain: 1, vegetable: 1 }, resourcesGained: { food: 5 } } },
+      { kind: 'action', effectPreview: { kind: 'resourceExchange', bonusVp: 2 } },
+    ] })
     if (choices.interaction.stateId !== 'wait') throw new Error('Expected animal recipe choice')
     const result = passPreparationExchanges(session, session.resolveChoice(choices.interaction.playerIndex, horse!.value))
     expect(result.ok, result.error).toBe(true)
