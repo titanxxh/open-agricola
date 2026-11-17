@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { REQUIRED_EVIDENCE } from '../prerelease/live-acceptance/evidence.mjs'
 import {
-  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertWithin, markStep, newState, nextStep, openBinding, ownerNotes,
+  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertWithin, markStep, markThrough, newState, nextStep, openBinding, ownerNotes,
   parseWindowConfig, previousTeamRoom, rerunCommands, resetSteps, resumeDecision, reverifyOps, runDiagnostics, runWindow, staleSteps, suiteGaps, teamAccounts,
 } from '../prerelease/live-acceptance/window.mjs'
 
@@ -35,6 +35,13 @@ describe('window plan', () => {
     state = markStep(state, 'reverify', 'started', 6)
     expect(state.steps.reverify).toEqual({ status: 'started', attempts: 2, startedAt: 6 })
     expect(() => markStep(state, 'nope', 'started', 7)).toThrow(/Unknown window step/)
+  })
+
+  it('marks every unfinished step through a given step done without touching later ones', () => {
+    const state = markThrough(markStep(newState('c6', 0), 'formal-browser', 'started', 1), 'final-open', 2, 'already open')
+    expect(WINDOW_STEPS.slice(0, WINDOW_STEPS.indexOf('final-open') + 1).every(step => state.steps[step]?.status === 'done')).toBe(true)
+    expect(state.steps['final-open']).toMatchObject({ status: 'done', note: 'already open', finishedAt: 2 })
+    expect(state.steps.readback).toBeUndefined()
   })
 
   it('keeps one reverify operation id across attempts and mints a fresh close each time', () => {
@@ -237,7 +244,7 @@ describe('final open', () => {
   })
 
   // Prepares a window whose steps before final-open are done; readback (the next step) fails so each run stops there.
-  function finalWindow(statusFor: () => Record<string, unknown>, { acceptanceFile = null as Record<string, unknown> | null, finalFailed = false } = {}) {
+  function finalWindow(statusFor: () => Record<string, unknown>, { acceptanceFile = null as Record<string, unknown> | null, finalFailed = false, proofAgeMs = 0 } = {}) {
     const root = privateRoot(), secrets = privateDir(root, 'secrets'), exchange = privateDir(root, 'exchange'), evidence = privateDir(exchange, 'evidence')
     const accounts = (labels: string[]) => ({ accounts: labels.map(label => ({ id: `id-${label}`, username: `user-${label}`, password: `password-${label}` })) })
     const target = writePrivate(join(secrets, 'target.json'), { targetId: 'pre-main', origin: 'https://pre.example.test', directory: '/srv/pre', policyDirectory: '/srv/policy',
@@ -255,6 +262,7 @@ describe('final open', () => {
       windowDirectory: privateDir(root, 'window'), exchangeDirectory: exchange }
     let state = { ...newState('c6', Date.now()), ops: { reverify: reverifyOp } }
     for (const step of WINDOW_STEPS.slice(0, WINDOW_STEPS.indexOf('final-open'))) state = markStep(markStep(state, step, 'started', Date.now()), step, 'done', Date.now())
+    if (proofAgeMs) state = { ...state, steps: { ...state.steps, 'formal-browser': { ...state.steps['formal-browser'], finishedAt: Date.now() - proofAgeMs } } }
     if (finalFailed) state = markStep(markStep(state, 'final-open', 'started', Date.now()), 'final-open', 'failed', Date.now(), { error: 'ssh dropped' })
     writePrivate(join(value.windowDirectory, 'state.json'), state)
     const calls: string[] = []
@@ -307,6 +315,22 @@ describe('final open', () => {
     expect(window.calls.some(call => call.includes('authority.ts'))).toBe(false)
     expect(window.calls.some(call => call.startsWith('./deploy-prerelease.sh open'))).toBe(false)
     expect(JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8')).steps['final-open'].status).toBe('done')
+  })
+
+  it('reconciles an already-committed open before a stale formal proof would be refreshed', async () => {
+    const window = finalWindow(() => ({}), { acceptanceFile: { operationId: reverifyOp, buildId: candidate, generation }, finalFailed: true, proofAgeMs: 26 * 60_000 })
+    const local = createHash('sha256').update(readFileSync(join(window.exchange, 'acceptance.json'))).digest('hex')
+    const run = window.io.run
+    window.io.run = (command: string, args: string[]) => (command === './deploy-prerelease.sh' && args[0] === 'status'
+      ? (window.calls.push('./deploy-prerelease.sh status'), { status: 0, stdout: JSON.stringify(openStatus({ acceptance: { sha256: local, formalBuildId: sha('b') } })) + '\n', stderr: '', error: null })
+      : run(command, args))
+    await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, resume: true, io: window.io })).rejects.toThrow(/Suite readback did not pass/)
+    expect(window.calls.some(call => call.includes('verify-formal-browser'))).toBe(false)
+    expect(window.calls.some(call => call.includes('authority.ts'))).toBe(false)
+    expect(window.calls.some(call => call.startsWith('./deploy-prerelease.sh open'))).toBe(false)
+    expect(window.calls.some(call => call.includes('--suite readback'))).toBe(true)
+    const steps = JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8')).steps
+    expect([steps['formal-browser'].status, steps['copy-evidence'].status, steps['final-open'].status]).toEqual(['done', 'done', 'done'])
   })
 
   it('stops when pre is already open under another acceptance', async () => {
