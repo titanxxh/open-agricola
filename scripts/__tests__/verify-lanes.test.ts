@@ -70,7 +70,8 @@ describe('hosted frontend reuse', () => {
   it('reuses only a parent build of the same commit, sources and build environment', () => {
     const env = { VITE_SANDBOX_EXECUTOR: 'server', RELEASE_CHANNEL: 'stable', PATH: '/bin' }
     const root = parent(env)
-    expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, PATH: '/usr/bin', BACKEND_PORT: '20001' })).toBeNull()
+    // Lanes add service and selection variables that never change the bundle.
+    expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, PATH: '/usr/bin', BACKEND_PORT: '20001', E2E_DEPENDENCIES_READY: '1', E2E_EXTENDED: '1' })).toBeNull()
     expect(hostedFrontendMismatch(root, head, 'e'.repeat(64), env)).toBe('parent build sources differ')
     expect(hostedFrontendMismatch(root, 'b'.repeat(40), 'f'.repeat(64), env)).toBe('parent build is for another commit')
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, VITE_SANDBOX_EXECUTOR: 'browser' })).toBe('parent build environment differs')
