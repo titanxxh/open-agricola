@@ -63,9 +63,40 @@ function chromiumSuite(cwd: string): string[] {
   return found.sort()
 }
 
+/** Measured seconds per browser spec file; part of the verification configuration (scripts/ci/). */
+export function browserSpecWeights(): Record<string, number> {
+  const value: unknown = JSON.parse(readFileSync(join(import.meta.dirname, 'browser-spec-weights.json'), 'utf8'))
+  const files = typeof value === 'object' && value !== null && 'files' in value ? value.files : null
+  if (typeof files !== 'object' || files === null || Array.isArray(files)
+    || !Object.values(files).every(weight => typeof weight === 'number' && Number.isFinite(weight) && weight >= 0)) throw new Error('Invalid browser spec weight table')
+  return Object.fromEntries(Object.entries(files).map(([file, weight]) => [file, Number(weight)]))
+}
+
+/**
+ * Deterministic longest-first packing of files into `groups` by weight: each file goes to the lightest group so far
+ * (lowest index on ties), heavier files first, ties by path. Files missing from the table weigh the table's median,
+ * so new specs need no scheduling metadata. Every file lands in exactly one group; each group's files are sorted.
+ */
+export function weightedAssignment(files: readonly string[], groups: number, weights: Record<string, number>): string[][] {
+  if (!Number.isSafeInteger(groups) || groups < 1) throw new Error('Weighted assignment needs at least one group')
+  const known = Object.values(weights).sort((a, b) => a - b)
+  const median = known.length ? known[Math.floor(known.length / 2)] : 1
+  const items = [...new Set(files)].map(file => ({ file, weight: weights[file] ?? median }))
+    .sort((a, b) => b.weight - a.weight || (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))
+  const bins = Array.from({ length: groups }, () => ({ files: [] as string[], total: 0 }))
+  for (const item of items) {
+    const lightest = bins.reduce((best, bin) => bin.total < best.total ? bin : best)
+    lightest.files.push(item.file)
+    lightest.total += item.weight
+  }
+  return bins.map(bin => bin.files.sort())
+}
+
+// Each task runs its files through `verify:parallel`, which splits them further into lanes when the machine sets
+// VERIFY_PARALLEL_LANES (default one lane: an in-place `pnpm verify`).
 function chromiumCommands(cwd: string, shard: number): VerificationCommand[] {
-  const selected = chromiumSuite(cwd).filter((_, index) => index % 4 === shard)
-  return selected.length ? [{ command: 'pnpm', args: ['verify', ...selected] }] : []
+  const selected = weightedAssignment(chromiumSuite(cwd), 4, browserSpecWeights())[shard]
+  return selected.length ? [{ command: 'pnpm', args: ['verify:parallel', ...selected] }] : []
 }
 
 export function taskCommands(cwd: string, input: string): VerificationCommand[] {
@@ -97,7 +128,7 @@ const configurationPath = (file: string): boolean =>
   (file === '.github/workflows/candidate-verification.yml' || file === '.github/workflows/prerelease-candidate-verification.yml' || file === '.github/workflows/candidate-rehearsal.yml')
   || file.startsWith('scripts/ci/')
   || /^scripts\/verification[^/]*\.ts$/.test(file)
-  || /^scripts\/verify[^/]*\.(?:ts|sh)$/.test(file)
+  || /^scripts\/verify[^/]*\.(?:ts|sh|mjs)$/.test(file)
   || file === 'scripts/test-project-globs.ts'
   || file === 'scripts/release/requirements.json'
   || ['package.json', 'pnpm-lock.yaml', 'vitest.config.ts', 'playwright.config.ts', 'vite.config.ts'].includes(file)

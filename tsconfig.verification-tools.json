@@ -11,6 +11,8 @@
   "include": [
     "scripts/ci/**/*.ts",
     "scripts/verify.ts",
+    "scripts/verify-lanes.ts",
+    "scripts/__tests__/verify-lanes.test.ts",
     "scripts/verification-*.ts",
     "scripts/release/**/*.ts",
     "scripts/prerelease/**/*.ts",

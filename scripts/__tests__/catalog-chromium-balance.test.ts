@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { FULL_TASK_IDS, taskCommands } from '../ci/verification-tasks'
+import { FULL_TASK_IDS, browserSpecWeights, taskCommands } from '../ci/verification-tasks'
 
 const temporary: string[] = []
 afterEach(() => temporary.splice(0).forEach(cwd => rmSync(cwd, { recursive: true, force: true })))
@@ -29,13 +29,19 @@ function plannedSpecs(cwd: string, id: string): string[] {
 }
 
 describe('complete catalog chromium tasks', () => {
-  it('assigns every Chromium spec exactly once with balanced counts and repeatable membership', () => {
+  it('assigns every Chromium spec exactly once with balanced measured time and repeatable membership', () => {
     const suite = chromiumSuite(root)
     const first = chromiumTasks.map(id => plannedSpecs(root, id))
     expect(chromiumTasks.map(id => plannedSpecs(root, id))).toEqual(first)
     expect(first.flat().sort()).toEqual(suite)
-    const counts = first.map(files => files.length)
-    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1)
+    expect(chromiumTasks.every(id => taskCommands(root, id)[0].args[0] === 'verify:parallel')).toBe(true)
+    // Longest-first packing keeps the spread below the heaviest single spec file.
+    const weights = browserSpecWeights(), values = Object.values(weights).sort((a, b) => a - b)
+    const median = values[Math.floor(values.length / 2)]
+    const totals = first.map(files => files.reduce((sum, file) => sum + (weights[file] ?? median), 0))
+    expect(Math.max(...totals) - Math.min(...totals)).toBeLessThanOrEqual(Math.max(...values))
+    // The table measures the current suite; a stale table would silently unbalance the tasks.
+    expect(suite.filter(file => weights[file] === undefined)).toEqual([])
     expect(FULL_TASK_IDS).toEqual([
       'quality', 'fast', 'slow', 'build',
       'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit',
@@ -44,16 +50,16 @@ describe('complete catalog chromium tasks', () => {
     expect(taskCommands(root, 'webkit')).toEqual([{ command: 'pnpm', args: ['run', 'verify:e2e:webkit'] }])
   })
 
-  it('discovers and assigns new files without separate scheduling metadata', () => {
+  it('discovers and assigns new files without separate scheduling metadata (they weigh the median)', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'chromium-counts-'))
     temporary.push(cwd)
     mkdirSync(join(cwd, 'e2e-tests'), { recursive: true })
     for (const name of ['e', 'c', 'a', 'd', 'b']) writeFileSync(join(cwd, 'e2e-tests', `${name}.spec.ts`), '// spec\n')
     expect(chromiumTasks.map(id => taskCommands(cwd, id))).toEqual([
-      [{ command: 'pnpm', args: ['verify', 'e2e-tests/a.spec.ts', 'e2e-tests/e.spec.ts'] }],
-      [{ command: 'pnpm', args: ['verify', 'e2e-tests/b.spec.ts'] }],
-      [{ command: 'pnpm', args: ['verify', 'e2e-tests/c.spec.ts'] }],
-      [{ command: 'pnpm', args: ['verify', 'e2e-tests/d.spec.ts'] }],
+      [{ command: 'pnpm', args: ['verify:parallel', 'e2e-tests/a.spec.ts', 'e2e-tests/e.spec.ts'] }],
+      [{ command: 'pnpm', args: ['verify:parallel', 'e2e-tests/b.spec.ts'] }],
+      [{ command: 'pnpm', args: ['verify:parallel', 'e2e-tests/c.spec.ts'] }],
+      [{ command: 'pnpm', args: ['verify:parallel', 'e2e-tests/d.spec.ts'] }],
     ])
     writeFileSync(join(cwd, 'e2e-tests/f.spec.ts'), '// new spec\n')
     expect(chromiumTasks.map(id => plannedSpecs(cwd, id))).toEqual([

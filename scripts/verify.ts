@@ -92,8 +92,10 @@ export function verificationPlan(cwd: string, input: string[]): Plan {
     ] }
   }
   // Preserve the existing pnpm verify [Playwright args] contract, including no arguments.
+  // A verify:parallel lane reuses its parent's build of the same sources (scripts/verify-lanes.ts checks the match).
+  const hosted = process.env.VERIFY_HOSTED_FRONTEND_SOURCE ? ['exec', 'tsx', 'scripts/verify-lanes.ts', 'hosted-frontend'] : ['run', 'build:hosted-frontend']
   return { mode: 'e2e', requirementsPath: parsed.path, steps: [
-    { name: 'hosted-frontend', command: 'pnpm', args: ['run', 'build:hosted-frontend'] },
+    { name: 'hosted-frontend', command: 'pnpm', args: hosted },
     { name: 'browser-tests', command: 'bash', args: ['scripts/verify.sh', ...args] },
   ] }
 }
