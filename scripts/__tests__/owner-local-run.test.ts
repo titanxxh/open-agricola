@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FULL_TASK_IDS, type FullTaskId, type VerificationCommand } from '../ci/verification-tasks'
-import { TASK_ORDER, assertNoReservedCandidatePaths, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
+import { BROWSER_PORT_SLICES, TASK_ORDER, assertNoReservedCandidatePaths, browserEnvironment, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -24,7 +24,7 @@ function inputs(channel: 'stable' | 'prerelease'): Inputs {
   return { channel, sha, producerSha: producer, output, jobs: 4, repository: 'titanxxh/open-agricola', repositoryId: 123, tree: 'e'.repeat(40),
     configuration: 'a'.repeat(64), producerConfiguration: 'b'.repeat(64), commands, ownerUid: 1000,
     node: { path: '/opt/oa-owner-local/node/bin/node', version: 'v24.19.0', sha256: 'f'.repeat(64) }, dockerVersion: '29.6.2',
-    policyFiles: { 'scripts/ci/owner-local-run.ts': '1'.repeat(64) }, servicePorts: { postgres: 41001, objects: 41002 }, retries: 1, testWorkers: 6, publicAssets: assets, profile: false, browserJobs: 2, ownerHome: '/home/owner' }
+    policyFiles: { 'scripts/ci/owner-local-run.ts': '1'.repeat(64) }, servicePorts: { postgres: 41001, objects: 41002 }, retries: 1, testWorkers: 6, publicAssets: assets, profile: false, browserJobs: 2, ownerHome: '/home/owner', lanes: 3 }
 }
 
 /** Records every call; each candidate command writes its log and exits with the configured code. */
@@ -89,6 +89,18 @@ describe('owner-local task environment and scheduling', () => {
     await Promise.all([1, 2, 3].map(item => limited(async () => { order.push(item); await new Promise(done => setTimeout(done, 1)) })))
     expect(order).toEqual([1, 2, 3])
     expect(() => semaphore(0)).toThrow(/positive integer/)
+  })
+})
+
+describe('owner-local browser task environment', () => {
+  it('gives every browser task a disjoint port slice and lanes only to chromium tasks', () => {
+    const slices = Object.values(BROWSER_PORT_SLICES).map(range => range!.split('-').map(Number))
+    expect(slices).toHaveLength(6)
+    for (const [first, last] of slices) { expect(first).toBeGreaterThanOrEqual(20000); expect(last).toBeLessThanOrEqual(32767); expect(last - first).toBeGreaterThanOrEqual(63) }
+    for (const [index, [, last]] of slices.entries()) if (index + 1 < slices.length) expect(last).toBeLessThan(slices[index + 1][0])
+    expect(browserEnvironment('chromium-2', 4)).toEqual({ TEST_PORT_RANGE: '22000-23999', VERIFY_PARALLEL_LANES: '4' })
+    expect(browserEnvironment('webkit', 4)).toEqual({ TEST_PORT_RANGE: '28000-29999' })
+    expect(browserEnvironment('fast', 4)).toEqual({})
   })
 })
 
