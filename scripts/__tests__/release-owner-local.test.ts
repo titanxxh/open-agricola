@@ -4,7 +4,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { canonicalOwnerLocalCommands, type OwnerLocalReceipt } from '../ci/owner-local-verification'
+import { canonicalOwnerLocalCommands, rebindPrereleaseOwnerLocalReceipt, type OwnerLocalReceipt } from '../ci/owner-local-verification'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
@@ -387,6 +387,24 @@ it('carries the authenticated native pre asset proof into candidate image qualif
   expect(JSON.parse(image.stdout)).toMatchObject({ kind: 'owner-local-prerelease', ownerId: 7, assetId: 12, executionEvidenceSha256: 'e'.repeat(64),
     url: 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9-beta.1/owner-local-verification.json' })
   expect(JSON.parse(image.stdout).tasks).toBeUndefined()
+})
+
+describe('owner-local prerelease receipt continuity', () => {
+  it('rebinds an ancestor producer receipt after main changes its configuration only when continuity is requested', () => {
+    const value = fixture(false, 'prerelease')
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: value.root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+    git('checkout', '-q', '-b', 'newer-main', value.mainSha)
+    writeFileSync(join(value.root, 'tsconfig.storage-tools.json'), '{}')
+    git('add', 'tsconfig.storage-tools.json'); git('commit', '-q', '-m', 'main changes verification configuration')
+    const main = git('rev-parse', 'HEAD')
+    const selection = { repository: 'titanxxh/open-agricola', repositoryId: 123, candidateSha: value.sha, producerSha: main }
+    expect(() => rebindPrereleaseOwnerLocalReceipt(value.root, value.receipt, selection)).toThrow(/verification configuration differs/)
+    expect(rebindPrereleaseOwnerLocalReceipt(value.root, value.receipt, { ...selection, continuity: true }).producerSha).toBe(value.mainSha)
+    git('checkout', '-q', '-b', 'unrelated', value.mainSha)
+    git('commit', '-q', '--allow-empty', '-m', 'unrelated producer')
+    const unrelated = { ...value.receipt, producerSha: git('rev-parse', 'HEAD') }
+    expect(() => rebindPrereleaseOwnerLocalReceipt(value.root, unrelated, { ...selection, continuity: true })).toThrow(/not compatible protected main/)
+  })
 })
 
 describe('owner-local prerelease admission remains source bound', () => {

@@ -28,7 +28,8 @@ export type PrereleaseOwnerLocalReceipt = Omit<OwnerLocalReceipt, 'kind' | 'form
 }
 type LocalReceipt = OwnerLocalReceipt | PrereleaseOwnerLocalReceipt
 export type OwnerLocalGitHubReader = (endpoint: string, collection?: string) => unknown
-export type OwnerLocalSelection = { repository: string; repositoryId: number; candidateSha: string; producerSha: string }
+/** `continuity` (prerelease only) accepts a receipt whose ancestor producer configuration differs from the selected producer. */
+export type OwnerLocalSelection = { repository: string; repositoryId: number; candidateSha: string; producerSha: string; continuity?: boolean }
 
 const object = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid owner-local evidence object')
@@ -135,7 +136,8 @@ function rebindReceipt(cwd: string, value: unknown, selected: OwnerLocalSelectio
     || receipt.tree !== rawTree(cwd, selected.candidateSha, selected.repository)
     || receipt.configuration !== verificationConfiguration(cwd, receipt.testedSha)
     || receipt.configuration !== verificationConfiguration(cwd, selected.candidateSha)
-    || receipt.producerConfiguration !== verificationConfiguration(cwd, selected.producerSha)) throw new Error('Owner-local source tree or verification configuration differs')
+    || !(selected.continuity === true && receipt.kind === PRERELEASE_OWNER_LOCAL_CONTEXT)
+      && receipt.producerConfiguration !== verificationConfiguration(cwd, selected.producerSha)) throw new Error('Owner-local source tree or verification configuration differs')
   const commands = canonicalOwnerLocalCommands(cwd, receipt.testedSha, channel)
   for (const task of receipt.tasks) {
     if (JSON.stringify(task.commands.map(({ command, args }) => ({ command, args }))) !== JSON.stringify(commands[task.id])) throw new Error(`Owner-local ${task.id} commands differ from the complete candidate plan`)
@@ -200,7 +202,7 @@ function tagSha(read: OwnerLocalGitHubReader, prefix: string, tag: string): stri
 type LocalVerificationInput = OwnerLocalSelection & {
   cwd: string; read: OwnerLocalGitHubReader; download: (endpoint: string) => Buffer; draftReleaseId?: number
 }
-function checkLocalVerification({ cwd, repository, repositoryId, candidateSha, producerSha, read, download, draftReleaseId }: LocalVerificationInput, channel: 'stable' | 'prerelease'): LocalProof | null {
+function checkLocalVerification({ cwd, repository, repositoryId, candidateSha, producerSha, continuity, read, download, draftReleaseId }: LocalVerificationInput, channel: 'stable' | 'prerelease'): LocalProof | null {
   const prefix = `repos/${repository}`
   let statuses: unknown
   try { statuses = read(`${prefix}/commits/${candidateSha}/statuses?per_page=100`, '[]') } catch { return null }
@@ -230,7 +232,7 @@ function checkLocalVerification({ cwd, repository, repositoryId, candidateSha, p
   let uploaded: unknown
   try { uploaded = JSON.parse(bytes.toString('utf8')) }
   catch (cause) { throw new Error('Owner-local receipt asset is not valid JSON', { cause }) }
-  const receipt = rebindReceipt(cwd, uploaded, { repository, repositoryId, candidateSha, producerSha }, channel)
+  const receipt = rebindReceipt(cwd, uploaded, { repository, repositoryId, candidateSha, producerSha, continuity }, channel)
   if (receipt.candidateSha !== candidateSha || object(uploaded).candidateSha !== candidateSha
     || time(status.created_at) + 1000 < time(receipt.completedAt) || time(asset.created_at) + 1000 < time(receipt.completedAt)
     || time(status.created_at) < time(asset.created_at) || time(release.created_at) > time(asset.created_at)

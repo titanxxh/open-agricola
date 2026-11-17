@@ -192,7 +192,7 @@ owner 可在安排扩容期间明确暂缓完整负载验收。部署证据须�
 
 两者都在操作锁内运行，只考虑本 target 的已验证导入记录 `control/image-<purpose>-<source>-<policy>.json`。保留当前 policy 的 trusted-policy 镜像、已安装候选、挂起操作涉及的全部镜像，以及任何容器（含已停止容器）引用的镜像。执行时若有挂起操作则拒绝；在锁内重新规划，不带强制删除镜像，只把已删除镜像的记录移到 `control/retired-images/`。镜像加载持有同一把锁，因此导入失败留下的归档不会阻挡清理；它会列在 `stagedImports` 中，留给重试使用。其他 target 的记录只报告、不改动；正式镜像从不在候选之列。之后需要已删除镜像的操作会失败即关闭，直到重新导入该镜像。
 
-每个 owner 操作都会带上 owner checkout 的 HEAD；主机发现策略 SHA 与自身 owner-tools 的 HEAD 不同就拒绝该操作（`Owner envelope is expired or bound to a different policy/target`）。在线备份同样需要已导入的、对应该 HEAD 的 trusted-policy 镜像。涉及策略变更的维护窗口按以下顺序进行：先把主机 owner-tools 目录切到新的 main SHA（不停任何服务），再从同一 SHA 的 owner checkout 执行 `maintain`，然后导入该 SHA 的 trusted-policy 镜像和由它构建的候选镜像，最后 `deploy`。第一步与第三步要在同一个窗口内完成：新 trusted-policy 镜像导入之前，下一次定时备份会失败。运行中的 gateway 与 storage guard 沿用启动时加载的内容：gateway 挂载 `scripts/prerelease/gateway.ts`、`browser-policy.ts`、`storage-guard-state.ts` 和 `shared/contract/browser-auth.ts`，guard 运行 `scripts/prerelease/storage-guard-cli.ts` 及其导入的模块。新 SHA 改动其中任何一项时，需在窗口内重启对应服务。
+每个 owner 操作都会带上 owner checkout 的 HEAD；主机发现策略 SHA 与自身 owner-tools 的 HEAD 不同就拒绝该操作（`Owner envelope is expired or bound to a different policy/target`）。在线备份同样需要已导入的、对应该 HEAD 的 trusted-policy 镜像。涉及策略变更的维护窗口按以下顺序进行：先把主机 owner-tools 目录切到新的 main SHA（不停任何服务），再从同一 SHA 的 owner checkout 执行 `maintain`，然后导入该 SHA 的 trusted-policy 镜像和由它构建的候选镜像，最后 `deploy`。第一步与第三步要在同一个窗口内完成：新 trusted-policy 镜像导入之前，下一次定时备份会失败。运行中的 gateway 与 storage guard 沿用启动时加载的内容：gateway 挂载 `scripts/prerelease/gateway.ts`、`browser-policy.ts`、`storage-guard-state.ts` 和 `shared/contract/browser-auth.ts`，guard 运行 `scripts/prerelease/storage-guard-cli.ts` 及其导入的模块。新 SHA 改动其中任何一项时，需在窗口内重启对应服务。已安装候选不变时，跳过候选导入和 `deploy`：导入 trusted-policy 镜像后执行 `reverify` 并重新开放。此时 `open` 通过已安装候选回执沿用（见下文）接受该候选此前的完整验证。脚本化的 `window` 通过 `policy` 配置块执行这一顺序。
 
 正式生命周期 API 尚未部署时，先记录一个 UUID，再启动维护网关。先准备两个私有凭据文件和固定语言包；`plan` 即使带 `--ssh` 也验证本机路径，因此要在持有这些文件的宿主执行。固定实际运行采用的限额。owner 可明确批准在完整容量验收前使用保守临时限额；交付证据须记录该决定和待补测量，初装后仍执行同一限额：
 
@@ -281,9 +281,9 @@ open 重扫 native view，核对 completion/activation 绑定、证据哈希及�
 ./deploy-prerelease.sh verify-formal-browser --config "$pre_config" --expected-current "$pre_sha"
 ```
 
-使用新的操作 UUID。reverify 关闭公网、撤销私有 owner 入口，保留已安装 app 并创建 acceptance 操作；重试使用同一 UUID。重新执行私有浏览器验收、上述原生身份 audit/activate，绑定新操作生成 acceptance 文件后 open。该过程不重装 pre、不重置对局。计划回滚到没有新认证保护的正式版本时，必须先关闭 pre ingress 与正式 handoff，再回滚；不能以三十秒能力确认窗口容忍不安全回滚。
+使用新的操作 UUID。reverify 关闭公网、撤销私有 owner 入口，保留已安装 app 并创建 acceptance 操作；重试使用同一 UUID。重新执行私有浏览器验收、上述原生身份 audit/activate，绑定新操作生成 acceptance 文件后 open。该过程不重装 pre、不重置对局。已安装构建的 `open` 与 `verify-open` 接受已安装候选回执沿用（ADR 0046）：main 改动验证配置后，仍可接受 protected main 可达的较早 producer 产出的完整证据，回执用 `continuity` 标明这一差异。deploy、restore 和镜像构建始终要求当前 producer 配置，主机拒绝把沿用回执用于这些操作；`--strict-producer true` 让 `open` 也要求当前配置。计划回滚到没有新认证保护的正式版本时，必须先关闭 pre ingress 与正式 handoff，再回滚；不能以三十秒能力确认窗口容忍不安全回滚。
 
-正式部署被接受后，在 HEAD 等于主机 owner-tools SHA 的 checkout 中，用一条 owner 命令完成整个窗口：
+正式部署被接受后，在 HEAD 等于主机 owner-tools SHA 的 checkout 中（配置带 `policy` 块时为新策略 SHA），用一条 owner 命令完成整个窗口：
 
 ```bash
 node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$acceptance_config" --window "$window_config" [--resume true] [--confirm-step accounts|deletion]
@@ -300,6 +300,13 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 - readback、收回 Beta、全部登出、归档回执。
 
 在正式容器内运行的辅助脚本位于 `scripts/prerelease/owner-accounts/`。
+
+可选的 `policy` 配置块包含 `from`、`to`、`to` 的 trusted-policy 镜像构建 `image.run`/`attempt`/`artifact`，以及私有 GHCR 读取凭据 `authFile`。有这个块时，窗口会多出策略阶段：
+- 在前置检查之前把主机 owner-tools 从 `from` 切到 `to`；`i18n.ref` 有变化时重建主机语言包；
+- 执行 close 和 `maintain`（会停掉 app），再用同一个保留的操作 ID 导入 trusted-policy 镜像；之后由审计链中的 `apply-identities` 重新启动 app；
+- 依赖或 storage guard 代码有变化时，切换后停下并给出需要在主机上执行的命令；执行后把 `dependenciesInstalled` 或 `guardRestarted` 设为 true，再 resume。
+
+策略 SHA 一确定就构建 trusted-policy 镜像，此时 pre 仍在开放。
 
 每一步都记录在 `state.json`，并有对应日志。遇到第一个失败即停止，并打印下一步命令（例如单个 case 的重跑命令），不会自动重试。`--resume true` 的行为：
 - 重新检查前置条件；
