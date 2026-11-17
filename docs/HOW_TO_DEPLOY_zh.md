@@ -835,6 +835,17 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 素材仓 HEAD 必须等于 `public-assets.ref`，`assets/` 必须干净，全部必需文件必须已纳入该提交且实际存在。该设置同样适用于 `pnpm verify` 和 Replay Viewer 构建。构建 URL 仍使用固定版本的 Pages 来源。这证明本地素材内容有效，不代表线上 Pages 已验证；未显式设置时仍检查远端元数据。
 
+图片站按来源地址限流，同一台机器并行运行多个浏览器任务时，卡图请求会收到 HTTP 429。浏览器验收可让开发服务器直接提供同一个固定版本的 checkout：
+
+```bash
+E2E_PUBLIC_ASSET_DIR=/absolute/path/open-agricola-assets PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify <spec>
+```
+
+- 只有主站的 Vite 开发服务器接受 `E2E_PUBLIC_ASSET_DIR`，设置了 `CI` 时同样生效。它先做上述固定版本干净 checkout 校验，再从 `/__public-assets__/` 提供全部图片和字体，未知路径返回 404；不发远端请求，也不回退。
+- hosted、Pages、Replay Viewer 构建，以及 preview 和 Vitest 都忽略该变量，继续使用 Pages URL 和各自的校验；要让这些构建也不联网，同时设置 `PUBLIC_ASSET_VALIDATION_DIR`。
+- 不可变 Viewer 运行时仍从 Pages 加载卡图和字体。
+- 该设置计入验证指纹。它不验证线上 Pages 部署；未设置 `PUBLIC_ASSET_VALIDATION_DIR` 的构建仍会验证。
+
 更新公共资源时先把 `open-agricola-assets` 发布到图片仓 Pages，等待其 workflow 将所有线上文件与该 commit 逐一校验，再把主仓 `public-assets.ref` 更新为线上 `asset-version.txt`，同步 `public-assets.required.json`，随后走主仓正常 Release。只修改文档的图片仓 commit 也会改变部署版本标记。旧 Viewer Build 保留代码，公共卡图和字体跟随图片站当前文件。
 
 ---
@@ -1135,6 +1146,7 @@ Game Bug Reports 交付到公开的 `titanxxh/open-agricola` 仓库。将独立 
 | `VITE_WS_BASE` | 从 API_BASE 推导 | WebSocket 地址 |
 | `PUBLIC_ASSET_LOCAL_DIR` | — | 仅本地开发：完整图片仓 checkout；设置后禁止远端混用或回退 |
 | `PUBLIC_ASSET_VALIDATION_DIR` | — | 直接校验 `public-assets.ref` 对应的干净素材仓，替代 Pages 元数据请求；构建 URL 仍使用 Pages 来源 |
+| `E2E_PUBLIC_ASSET_DIR` | — | 仅浏览器验收：开发服务器提供 `public-assets.ref` 对应的干净素材仓，`CI` 下同样生效；所有构建忽略它 |
 
 ---
 

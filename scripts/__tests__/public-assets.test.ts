@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   LOCAL_PUBLIC_ASSET_BASE_URL,
+  devServerPublicAssetBaseUrl,
+  isViteDevServerCli,
   loadPublicAssetConfig,
   publicAssetBaseUrl,
   rewriteCssPublicAssetUrls,
@@ -235,6 +237,94 @@ describe('public asset contract', () => {
       env: { PUBLIC_ASSET_LOCAL_DIR: localDir },
       fetcher,
     })).rejects.toThrow(`missing required file: ${REQUIRED_FILES[1]}`)
+  })
+
+  it('serves the pinned checkout from the development server, also under CI, without contacting Pages', async () => {
+    const { rootDir, directory, version } = await createAssetCheckout()
+    const fetcher = vi.fn(() => Promise.reject(new Error('unexpected fetch')))
+    await expect(loadPublicAssetConfig({
+      rootDir, env: { CI: 'true', E2E_PUBLIC_ASSET_DIR: directory }, fetcher, devServer: true,
+    })).resolves.toEqual({
+      baseUrl: LOCAL_PUBLIC_ASSET_BASE_URL, version, requiredFiles: REQUIRED_FILES, localDir: directory, pinned: true,
+    })
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('ignores the browser-verification checkout in every build, even an unusable one', async () => {
+    const rootDir = await createContract()
+    const env = { CI: 'true', E2E_PUBLIC_ASSET_DIR: path.join(rootDir, 'absent') }
+    const fetcher = inventoryFetcher()
+    await expect(loadPublicAssetConfig({ rootDir, env, fetcher, allowLocal: false }))
+      .resolves.toEqual({ baseUrl: publicAssetBaseUrl(), version: VERSION, requiredFiles: REQUIRED_FILES })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+
+    const checkout = await createAssetCheckout()
+    const offline = vi.fn(() => Promise.reject(new Error('unexpected fetch')))
+    await expect(loadPublicAssetConfig({
+      rootDir: checkout.rootDir, fetcher: offline, allowLocal: false,
+      env: { CI: 'true', E2E_PUBLIC_ASSET_DIR: path.join(rootDir, 'absent'), PUBLIC_ASSET_VALIDATION_DIR: checkout.directory },
+    })).resolves.toEqual({ baseUrl: publicAssetBaseUrl(), version: checkout.version, requiredFiles: REQUIRED_FILES })
+    await expect(loadPublicAssetConfig({ rootDir, env, fetcher: offline, validateRemote: false }))
+      .resolves.toEqual({ baseUrl: publicAssetBaseUrl(), version: VERSION, requiredFiles: REQUIRED_FILES })
+    expect(offline).not.toHaveBeenCalled()
+  })
+
+  it('rejects a browser-verification checkout that is not the pinned clean tree', async () => {
+    const load = (rootDir: string, directory: string) => loadPublicAssetConfig({
+      rootDir, env: { CI: 'true', E2E_PUBLIC_ASSET_DIR: directory }, devServer: true,
+      fetcher: () => Promise.reject(new Error('unexpected fetch')),
+    })
+    const other = await createAssetCheckout()
+    await writeFile(path.join(other.rootDir, 'public-assets.ref'), `${VERSION}\n`)
+    await expect(load(other.rootDir, other.directory)).rejects.toThrow('checkout version does not match')
+
+    for (const mode of ['modified', 'missing', 'untracked'] as const) {
+      const { rootDir, directory } = await createAssetCheckout()
+      if (mode === 'missing') await rm(path.join(directory, 'assets/a.png'))
+      else await writeFile(path.join(directory, mode === 'modified' ? 'assets/a.png' : 'assets/new.png'), 'changed')
+      await expect(load(rootDir, directory)).rejects.toThrow('checkout assets must be clean')
+    }
+
+    const partial = await createAssetCheckout(['assets/a.png'])
+    await expect(load(partial.rootDir, partial.directory)).rejects.toThrow('checkout is missing required file: assets/b.webp')
+
+    const plain = await createContract()
+    await mkdir(path.join(plain, 'plain', 'assets'), { recursive: true })
+    await Promise.all(REQUIRED_FILES.map(file => writeFile(path.join(plain, 'plain', file), file)))
+    await expect(load(plain, path.join(plain, 'plain'))).rejects.toThrow()
+  })
+
+  it('keeps the local development override ahead of the browser-verification checkout and refused under CI', async () => {
+    const { rootDir, directory } = await createAssetCheckout()
+    await expect(loadPublicAssetConfig({
+      rootDir, env: { CI: 'true', PUBLIC_ASSET_LOCAL_DIR: directory, E2E_PUBLIC_ASSET_DIR: directory }, devServer: true,
+    })).rejects.toThrow('only supported by the local development server')
+    await expect(loadPublicAssetConfig({
+      rootDir, env: { PUBLIC_ASSET_LOCAL_DIR: directory, E2E_PUBLIC_ASSET_DIR: directory }, devServer: true,
+    })).resolves.toEqual({ baseUrl: LOCAL_PUBLIC_ASSET_BASE_URL, version: expect.any(String), requiredFiles: REQUIRED_FILES, localDir: directory })
+  })
+
+  it.each([
+    [['node', '/repo/node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '20001', '--strictPort'], {}, true],
+    [['node', '/repo/node_modules/.bin/vite'], { CI: 'true' }, true],
+    [['node', 'C:\\repo\\node_modules\\vite\\bin\\vite.js', 'dev'], {}, true],
+    [['node', '/repo/node_modules/vite/bin/vite.js', 'build', '--outDir', 'dist'], {}, false],
+    [['node', '/repo/node_modules/vite/bin/vite.js', 'preview', '--port', '20001'], {}, false],
+    [['node', '/repo/node_modules/vite/bin/vite.js', 'build', '--config', 'replay-viewer/vite.config.ts'], {}, false],
+    [['node', '/repo/node_modules/vitest/vitest.mjs', 'run'], { VITEST: 'true' }, false],
+    [['node', '/repo/node_modules/vite/bin/vite.js'], { VITEST: 'true' }, false],
+    // A script calling Vite's JavaScript API builds without `build` in argv.
+    [['node', '/repo/scripts/check-browser-boundaries.ts'], {}, false],
+    [['node'], {}, false],
+  ] as const)('recognises only the Vite CLI development server: %j %j', (argv, env, expected) => {
+    expect(isViteDevServerCli(argv, env)).toBe(expected)
+  })
+
+  it('names the base URL the development server uses in each environment', () => {
+    expect(devServerPublicAssetBaseUrl({})).toBe(publicAssetBaseUrl())
+    expect(devServerPublicAssetBaseUrl({ PUBLIC_ASSET_VALIDATION_DIR: '/assets' })).toBe(publicAssetBaseUrl())
+    expect(devServerPublicAssetBaseUrl({ E2E_PUBLIC_ASSET_DIR: '/assets' })).toBe(LOCAL_PUBLIC_ASSET_BASE_URL)
+    expect(devServerPublicAssetBaseUrl({ PUBLIC_ASSET_LOCAL_DIR: '/assets' })).toBe(LOCAL_PUBLIC_ASSET_BASE_URL)
   })
 
   it('rewrites CSS asset URLs through the pinned source', () => {

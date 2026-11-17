@@ -1,6 +1,6 @@
 // @covers client/styles/pages/
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { LOCAL_PUBLIC_ASSET_BASE_URL, publicAssetBaseUrl } from '../scripts/public-assets'
+import { devServerPublicAssetBaseUrl, LOCAL_PUBLIC_ASSET_BASE_URL, publicAssetBaseUrl } from '../scripts/public-assets'
 import { FRONTEND_URL } from './fixtures'
 import { matrixVariant } from './helpers/extended'
 
@@ -88,7 +88,7 @@ test('button-styled links stay undecorated across interaction states', async ({ 
 
 test('the first seasonal background request uses the runtime asset path', async ({ page }) => {
   await mockPlatformApis(page)
-  const baseUrl = process.env.PUBLIC_ASSET_LOCAL_DIR ? LOCAL_PUBLIC_ASSET_BASE_URL : publicAssetBaseUrl()
+  const baseUrl = devServerPublicAssetBaseUrl()
   const assetUrl = `${baseUrl}assets/website-bg/summer-1.webp`
   const seasonalRequests: string[] = []
   page.on('request', (request) => {
@@ -106,6 +106,26 @@ test('the first seasonal background request uses the runtime asset path', async 
     'href',
     assetUrl,
   )
+})
+
+test('a pinned asset checkout answers for the asset site without any request leaving the development server', async ({ page }) => {
+  test.skip(!process.env.E2E_PUBLIC_ASSET_DIR, 'Runs only when E2E_PUBLIC_ASSET_DIR serves the pinned checkout')
+  await mockPlatformApis(page)
+  const remote: string[] = []
+  page.on('request', (request) => {
+    if (request.url().startsWith(publicAssetBaseUrl())) remote.push(request.url())
+  })
+  const background = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/summer-1.webp'))
+  await page.goto('/?bg=summer-1')
+  expect((await background).status()).toBe(200)
+
+  const asset = (file: string) => new URL(`${LOCAL_PUBLIC_ASSET_BASE_URL}assets/${file}`, FRONTEND_URL).href
+  const present = await page.request.get(asset('website-bg/summer-1.webp'))
+  expect(present.status()).toBe(200)
+  expect(present.headers()['content-type']).toBe('image/webp')
+  // The asset site answers 404 for an unknown path; the checkout must not fall back to the application HTML.
+  expect((await page.request.get(asset('website-bg/absent.webp'))).status()).toBe(404)
+  expect(remote).toEqual([])
 })
 
 test('lobby omits the duplicate horizon when the seasonal background is disabled', async ({ page }) => {
