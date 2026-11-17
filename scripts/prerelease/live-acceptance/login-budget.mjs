@@ -24,18 +24,25 @@ export function loginBudget(directory, { now = Date.now, sleep = defaultSleep, l
     const temporary = `${ledger}.${process.pid}.tmp`
     writeFileSync(temporary, JSON.stringify({ format: 1, ...value }) + '\n', { mode: 0o600 }); renameSync(temporary, ledger)
   }
-  /** Exclusive-create lock holding its acquisition time; a lock older than `lockStaleMs` belongs to a dead process. */
+  /**
+   * Exclusive-create lock holding its acquisition time; a lock older than `lockStaleMs` belongs to a dead process.
+   * A lock without a valid time lost its writer between create and write, so it ages from when this caller first saw
+   * it invalid; a failed write removes the lock it just created.
+   */
   async function locked(work) {
+    let invalidSince = null
     for (;;) {
       try {
         const fd = openSync(lock, 'wx', 0o600)
-        try { writeSync(fd, String(now())) } finally { closeSync(fd) }
+        try { writeSync(fd, String(now())) } catch (error) { rmSync(lock, { force: true }); throw error } finally { closeSync(fd) }
         break
       } catch (error) {
         if (error?.code !== 'EEXIST') throw error
-        let heldSince = 0
-        try { heldSince = Number(readFileSync(lock, 'utf8')) } catch { continue }
-        if (heldSince && now() - heldSince > limit.lockStaleMs) { rmSync(lock, { force: true }); continue }
+        let held
+        try { held = Number(readFileSync(lock, 'utf8').trim()) } catch { continue }
+        const valid = Number.isSafeInteger(held) && held > 0
+        invalidSince = valid ? null : invalidSince ?? now()
+        if (now() - (valid ? held : invalidSince) > limit.lockStaleMs) { rmSync(lock, { force: true }); invalidSince = null; continue }
         await sleep(limit.lockPollMs)
       }
     }

@@ -51,6 +51,14 @@ describe('formal login budget', () => {
     expect(await loginBudget(root, held).take()).toBe(0)
     expect(time.state.slept).toEqual([LOGIN_LIMIT.lockPollMs])
   })
+  it('breaks an empty lock left between create and write once it has stayed empty past the stale age', async () => {
+    const root = privateRoot(), time = clock(), start = time.state.at
+    writeFileSync(join(root, 'login-ledger.lock'), '', { mode: 0o600 })
+    expect(await loginBudget(root, time).take()).toBe(0)
+    expect(time.state.at - start).toBeGreaterThan(LOGIN_LIMIT.lockStaleMs)
+    expect(time.state.at - start).toBeLessThanOrEqual(LOGIN_LIMIT.lockStaleMs + 2 * LOGIN_LIMIT.lockPollMs)
+    expect(JSON.parse(readFileSync(join(root, 'login-ledger.json'), 'utf8')).logins).toEqual([time.state.at])
+  })
   it('paces logout-all logins and logs in again once after a 429', async () => {
     const root = privateRoot(), time = clock(), budget = loginBudget(root, time), statuses = [429, 200]
     const origins = { formalApp: 'https://app.example.test', formalApi: 'https://api.example.test' }
