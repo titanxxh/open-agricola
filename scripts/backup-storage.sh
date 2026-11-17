@@ -12,6 +12,15 @@ elif [[ -n "${2:-}" ]]; then echo 'Unknown backup mode' >&2; exit 1; fi
 if [[ "$MODE" == maintenance && "${BACKUP_ENVIRONMENT:-stable}" == stable ]]; then export STORAGE_VALIDATION_CONCURRENCY=auto
 else unset STORAGE_VALIDATION_CONCURRENCY; fi
 backup_job_begin "$MODE" "$@"
+# A stopped stable cutover may hand restore validation to the owner machine
+# (ADR 0045): the host exports a directory dump, publishes an owner request and
+# seals only after a report bound to this capture and candidate arrives.
+OWNER=0
+if [[ -n "${BACKUP_OWNER_VALIDATION:-}" ]]; then
+  [[ "$MODE" == maintenance && "${BACKUP_ENVIRONMENT:-stable}" == stable && "$BACKUP_OWNER_VALIDATION" =~ ^[a-f0-9-]{36}$
+    && "${BACKUP_OWNER_REQUEST:-}" == /* && "${BACKUP_OWNER_REPORT:-}" == /* && "${BACKUP_OWNER_WAIT_MS:-900000}" =~ ^[0-9]+$ ]] || { echo 'Invalid owner validation request' >&2; exit 1; }
+  OWNER=1
+fi
 export APP_UID="$(id -u)" APP_GID="$(id -g)"
 umask 077
 STEM="${1:?Usage: backup-storage.sh <daily-|pre-|manual-name> [--already-stopped]}"
@@ -53,15 +62,29 @@ backup_container ledger-export /backup/replay-removals.latest.json
 if [[ "$MODE" == online ]]; then
   backup_container export-online "/backup/.pending-$BACKUP_JOB_ID/capture"
 else
-  backup_container export "/backup/.pending-$BACKUP_JOB_ID/capture" --applications-stopped
+  backup_container export "/backup/.pending-$BACKUP_JOB_ID/capture" --applications-stopped $([[ "$OWNER" == 1 ]] && printf -- --directory-database)
 fi
 ENV_FILES=(.env data/dependencies.compose.env)
 [[ ! -f data/local-services.env ]] || ENV_FILES+=(data/local-services.env)
 backup_command tar -czf "$BACKUP_PENDING/env" "${ENV_FILES[@]}"
-backup_command tar -C "$BACKUP_PENDING/capture" -czf "$PWD/$BACKUP_PENDING/archive.tgz" .
-backup_container ledger-export /backup/replay-removals.latest.json
-backup_container validate "/backup/.pending-$BACKUP_JOB_ID/capture" \
-  | backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" write-report "$BACKUP_PENDING/report.json"
+if [[ "$OWNER" == 1 ]]; then
+  backup_container ledger-export /backup/replay-removals.latest.json
+  owner_deadline="$(( $(date +%s%N) / 1000000 + ${BACKUP_OWNER_WAIT_MS:-900000} ))"
+  backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" owner-request "$BACKUP_PENDING" "$PWD/backups/replay-removals.latest.json" "$owner_deadline"
+  # The owner pulls the capture while the host packages it; fast compression keeps downtime short.
+  backup_command tar -C "$BACKUP_PENDING/capture" -I 'gzip -1' -cf "$PWD/$BACKUP_PENDING/archive.tgz" .
+  until [[ -e "$BACKUP_OWNER_REPORT" ]]; do
+    (( $(date +%s%N) / 1000000 < owner_deadline )) || { echo 'Owner validation report did not arrive in time' >&2; exit 1; }
+    backup_seconds_left >/dev/null || exit 124
+    sleep 2
+  done
+  backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" accept-owner-report "$BACKUP_PENDING"
+else
+  backup_command tar -C "$BACKUP_PENDING/capture" -czf "$PWD/$BACKUP_PENDING/archive.tgz" .
+  backup_container ledger-export /backup/replay-removals.latest.json
+  backup_container validate "/backup/.pending-$BACKUP_JOB_ID/capture" \
+    | backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" write-report "$BACKUP_PENDING/report.json"
+fi
 backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" seal "$BACKUP_PENDING" "$STEM"
 chmod 600 "$BACKUP_PENDING/archive.tgz" "$BACKUP_PENDING/env" "$BACKUP_PENDING/manifest.json" backups/replay-removals.latest.json
 mv "$BACKUP_PENDING/archive.tgz" "backups/$STEM.tgz"

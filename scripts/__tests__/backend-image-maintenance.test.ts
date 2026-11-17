@@ -68,6 +68,10 @@ if(a[0]==='inspect'){
  const id=a[1],isNew=id===newId||id==='5'.repeat(64);if(id===oldId&&s.sourceRemoved)process.exit(48);out([{Id:id,Image:id===caddyId?(s.failure==='caddy-up-identity'&&s.caddyStarted?'sha256:'+'e'.repeat(64):s.caddyImage):isNew?${JSON.stringify(value.imageId)}:s.sourceImage,
  State:{Running:id===caddyId?s.caddyStarted:isNew?s.started:s.running,OOMKilled:s.failure==='oom',ExitCode:s.failure==='drain'?137:0,Health:{Status:s.failure==='unhealthy'?'unhealthy':'healthy'}},
  Config:{Env:Object.entries({...data,GAME_BUILD_ID:isNew?(s.failure==='up-identity'?'wrong':${JSON.stringify(value.request.sourceSha)}):s.sourceBuild,RELEASE_CHANNEL:'stable'}).map(([k,v])=>k+'='+v),Labels:{'com.docker.compose.project':(s.foreignCaddy&&id===caddyId&&s.caddyStarted)||(s.foreignApp&&isNew)?'foreign':'formal','com.docker.compose.service':id===caddyId?'caddy':'app',...(isNew?{'org.open-agricola.backend-operation':s.foreignOperation?'another-operation':${JSON.stringify(value.request.operationId)}}:{}),...(id==='5'.repeat(64)?{'org.open-agricola.backend-operation':s.failure==='live-foreign'?'foreign':${JSON.stringify(value.request.operationId)},'org.open-agricola.backend-phase':'live-validation'}:{})}}}]);
+}else if(a[0]==='run'&&a.includes('--entrypoint')){
+ const probed=a[a.indexOf('--entrypoint')+2],source=probed===s.sourceImage;
+ if(s.failure==='owner-probe-error')process.exit(51);
+ out(source&&s.failure==='owner-source-old'?[]:!source&&s.failure==='owner-target-old'?['directory-database']:['directory-database','counted-live-check']);
 }else if(a[0]==='stop'){if(s.failure==='up-app-stop'&&a.at(-1)===newId)process.exit(47);if(a.at(-1)===newId)s.started=false;else if(a.at(-1)===caddyId)s.caddyStarted=false;else s.running=false;save();}
 else if(a[0]==='start'&&a.includes('4'.repeat(64))){if(['nonempty','unsupported-empty'].includes(s.failure))process.exit(45);out({formatVersion:1,targetBuildId:${JSON.stringify(value.request.sourceSha)},database:'empty',objects:'empty'});}
 else if(a[0]==='start'){s.running=true;save();}
@@ -86,12 +90,14 @@ else if(a[0]==='compose'){
   if(a.includes('export')){
    if(['backup','backup-stopped','source-changed'].includes(s.failure)){if(s.failure==='source-changed'){s.sourceImage='sha256:'+'a'.repeat(64);save();}process.exit(43);}
    const destination=a.find(x=>x.startsWith('/backup/.pending-')&&x.endsWith('/capture')),directory=path.join(${JSON.stringify(value.directory)},'backups',destination.slice('/backup/'.length));fs.mkdirSync(directory,{recursive:true});
-   fs.writeFileSync(path.join(directory,'database.dump'),'real fixture database bytes');fs.writeFileSync(path.join(directory,'archive.json'),JSON.stringify({version:1,sourceBuildId:s.sourceBuild,createdAt:new Date().toISOString(),schema:'public',objects:[]}));
+   if(a.includes('--directory-database')){fs.mkdirSync(path.join(directory,'database'));fs.writeFileSync(path.join(directory,'database','toc.dat'),'fixture toc');fs.writeFileSync(path.join(directory,'archive.json'),JSON.stringify({version:2,sourceBuildId:s.sourceBuild,createdAt:new Date().toISOString(),schema:'public',database:{format:'directory',sha256:'d'.repeat(64),size:11,files:[{name:'toc.dat',sha256:'d'.repeat(64),size:11}]},objects:[]}));}
+   else{fs.writeFileSync(path.join(directory,'database.dump'),'real fixture database bytes');fs.writeFileSync(path.join(directory,'archive.json'),JSON.stringify({version:1,sourceBuildId:s.sourceBuild,createdAt:new Date().toISOString(),schema:'public',objects:[]}));}
   }else if(a.includes('ledger-export'))fs.writeFileSync(path.join(${JSON.stringify(value.directory)},'backups/replay-removals.latest.json'),'{"version":1,"batches":[]}');
   else if(a.includes('validate'))out({formatVersion:2,validatedAt:new Date().toISOString(),sourceBuildId:s.sourceBuild,targetBuildId:s.failure==='report-target'?s.sourceBuild:${JSON.stringify(value.request.sourceSha)},roomCount:0,replayCount:0,replayHeadCount:0,replayStepCount:0,replaySegmentCount:0,retainedObjectCount:0,replaySchemaVersions:[]});
   else if(a.includes('check-empty')){if(['nonempty','unsupported-empty'].includes(s.failure))process.exit(45);out({formatVersion:1,targetBuildId:${JSON.stringify(value.request.sourceSha)},database:'empty',objects:'empty'});}
   else if(a.includes('--input-type=module')){if(s.proofUnavailable)process.exit(50);out({barrier:{status:s.proofStatus??'validated',updated_at:s.checkpointAt??Date.now(),report_json:JSON.stringify({roomCount:0,replayCount:0,replayHeadCount:0,replayStepCount:s.badReport?1:0,replaySegmentCount:0,retainedObjectCount:0,replaySchemaVersions:[]})},bad:s.badImports??0,active:s.active??(s.started?1:0),foreign:s.foreign??0});}
-  else if(a.includes('check-live')){s.livePresent=true;s.checkpointAt=Date.now();save();if(['live','live-foreign','live-remove'].includes(s.failure))process.exit(44);if(s.failure==='live-delay')Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,2000);s.livePresent=false;save();}
+  else if(a.includes('check-live')){s.livePresent=true;s.checkpointAt=Date.now();if(a.includes('--counted'))s.counted=true;save();if(['live','live-foreign','live-remove'].includes(s.failure))process.exit(44);if(s.failure==='live-delay')Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,2000);s.livePresent=false;save();
+   if(a.includes('--counted'))out({roomCount:0,replayCount:0,replayHeadCount:0,replayStepCount:s.failure==='owner-live-counts'?1:0,replaySegmentCount:0,retainedObjectCount:0,replaySchemaVersions:[]});}
   else if(!a.includes('cleanup-scratch'))throw Error('Unexpected compose run: '+a.join(' '));
  }else throw Error('Unexpected compose: '+a.join(' '));
 }else throw Error('Unexpected docker: '+a.join(' '));
@@ -99,6 +105,22 @@ else if(a[0]==='compose'){
   const invoke = (expectedSha = value.request.sourceSha, extraEnv: NodeJS.ProcessEnv = {}) => spawnSync(process.execPath,
     [join(policy, 'scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, expectedSha, value.request.producerSha],
     { env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }), encoding: 'utf8', timeout: 30_000 })
+  /** Runs maintenance concurrently with a simulated owner machine that answers the published owner request. */
+  const invokeWithOwner = (answer: ((request: Record<string, unknown>) => Record<string, unknown>) | null, extraEnv: NodeJS.ProcessEnv = {}) => new Promise<{ status: number | null; stdout: string; stderr: string; request?: Record<string, unknown> }>(done => {
+    const child = spawn(process.execPath, [join(policy, 'scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, value.request.sourceSha, value.request.producerSha],
+      { env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, BACKEND_VALIDATION: 'owner', ...extraEnv }) })
+    let stdout = '', stderr = '', request: Record<string, unknown> | undefined
+    child.stdout.on('data', chunk => { stdout += chunk }); child.stderr.on('data', chunk => { stderr += chunk })
+    const watcher = setInterval(() => {
+      const path = join(value.stage, 'owner-request.json')
+      if (request || !existsSync(path)) return
+      request = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      if (!answer) return
+      writeFileSync(join(value.stage, 'owner-report.json.partial'), JSON.stringify(answer(request)), { mode: 0o600 })
+      renameSync(join(value.stage, 'owner-report.json.partial'), join(value.stage, 'owner-report.json'))
+    }, 50)
+    child.once('close', status => { clearInterval(watcher); done({ status, stdout, stderr, request }) })
+  })
   const calls = (): { kind: string; args: string[] }[] => existsSync(callsPath) ? readFileSync(callsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
   const operation = (mode: string, authorization?: string, extraEnv: NodeJS.ProcessEnv = {}) => spawnSync(process.execPath,
     [join(policy, 'scripts/release/backend-image-maintenance.ts'), mode, value.requestPath, value.directory, value.request.sourceSha, value.request.producerSha, ...(authorization ? [authorization] : [])],
@@ -109,7 +131,7 @@ else if(a[0]==='compose'){
     return path
   }
   const mutate = (changes: Record<string, unknown>) => writeFileSync(statePath, JSON.stringify({ ...JSON.parse(readFileSync(statePath, 'utf8')), ...changes }))
-  return { ...value, operation, authorize, mutate, sourceBuild, sourceImage, caddyImage, caddyDigest, oldId, originalEnv, invoke, calls,
+  return { ...value, operation, authorize, mutate, sourceBuild, sourceImage, caddyImage, caddyDigest, oldId, originalEnv, invoke, invokeWithOwner, calls,
     current: () => JSON.parse(readFileSync(statePath, 'utf8')),
     compose: () => JSON.parse(readFileSync(join(value.root, 'observed-compose.json'), 'utf8')) }
 }
@@ -777,3 +799,100 @@ cp.execFileSync=(command,args,options)=>{if(command==='docker')fs.appendFileSync
   expect(value.calls().some(call => call.args[0] === 'stop' || call.args.includes('check-live') || call.args.includes('up'))).toBe(false)
   expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv)
 })
+
+// ADR 0045: the owner machine validates the stopped cutover; the host seals only a bound report.
+const ownerReport = (changes: Record<string, unknown> = {}) => (request: Record<string, unknown>) => ({
+  formatVersion: 2, validator: 'owner-local', nonce: request.nonce, sourceBuildId: request.sourceBuildId, targetBuildId: request.targetBuildId,
+  image: request.targetImage, createdAt: request.createdAt, database: request.database, validatedAt: new Date().toISOString(),
+  roomCount: 0, replayCount: 0, replayHeadCount: 0, replayStepCount: 0, replaySegmentCount: 0, retainedObjectCount: 0, replaySchemaVersions: [], ...changes,
+})
+const commandsOf = (value: ReturnType<typeof fixture>) => value.calls().map(call => call.args.join(' '))
+const sourceRestarted = (value: ReturnType<typeof fixture>) => value.calls().some(call => call.kind === 'docker' && call.args[0] === 'start' && call.args.includes(value.oldId))
+
+it('hands cutover validation to the owner machine when both images support it, then checks live data by counts', async () => {
+  const value = fixture()
+  const result = await value.invokeWithOwner(ownerReport())
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(readFileSync(join(value.stage, 'validation-mode.json'), 'utf8'))).toMatchObject({ mode: 'owner', reason: 'both images support Owner-local Validation' })
+  expect(result.request).toMatchObject({ sourceBuildId: value.sourceBuild, targetBuildId: value.request.sourceSha, targetImage: value.request.transfer.receipt.imageId })
+  expect(String(result.request?.capture)).toMatch(/\/backups\/\.pending-[^/]+\/capture$/)
+  const commands = commandsOf(value)
+  expect(commands.some(command => command.includes(' export ') && command.includes('--directory-database'))).toBe(true)
+  expect(commands.some(command => command.includes(' validate /backup/'))).toBe(false)
+  expect(commands.find(command => command.includes('check-live'))).toContain('--counted')
+  const manifest = JSON.parse(readFileSync(join(value.directory, 'backups', `pre-${value.request.sourceSha.slice(0, 12)}-${value.request.operationId}.manifest.json`), 'utf8'))
+  expect(manifest).toMatchObject({ formatVersion: 2, validator: 'owner-local', targetBuildId: value.request.sourceSha, sourceBuildId: value.sourceBuild })
+  expect(value.current()).toMatchObject({ started: true, counted: true })
+  expect(sourceRestarted(value)).toBe(false)
+  const status = value.operation('status')
+  expect(JSON.parse(status.stdout)).toMatchObject({ state: 'accepted', phase: 'accepted' })
+}, 30_000)
+
+it.each([
+  ['a failed owner validation', ownerReport({ ok: false, error: 'replay segment integrity failed' }), {}],
+  ['a report bound to another dump', ownerReport({ database: { sha256: 'e'.repeat(64), size: 11 } }), {}],
+  ['a report bound to another image', ownerReport({ image: `sha256:${'e'.repeat(64)}` }), {}],
+  ['a missing report', null, { BACKEND_OWNER_WAIT_MS: '1500' }],
+] as const)('restarts the unchanged source before migration after %s', async (_name, answer, env) => {
+  const value = fixture()
+  const result = await value.invokeWithOwner(answer, env)
+  expect(result.status).not.toBe(0)
+  expect(sourceRestarted(value)).toBe(true)
+  expect(commandsOf(value).some(command => command.includes('check-live'))).toBe(false)
+  expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv)
+  expect(existsSync(join(value.directory, 'backups', `pre-${value.request.sourceSha.slice(0, 12)}-${value.request.operationId}.manifest.json`))).toBe(false)
+}, 30_000)
+
+it('keeps maintenance after migration when counted live data differs from the owner report', async () => {
+  const value = fixture('owner-live-counts')
+  const result = await value.invokeWithOwner(ownerReport())
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('Counted live validation differs from the Owner-local Validation')
+  expect(sourceRestarted(value)).toBe(false)
+  expect(value.current()).toMatchObject({ started: false })
+}, 30_000)
+
+it.each([
+  ['owner-source-old', 'source image cannot export a directory dump'],
+  ['owner-target-old', 'target image cannot run a counted live check'],
+  ['owner-probe-error', 'source image cannot export a directory dump'],
+])('falls back to host validation when %s', async (failure, reason) => {
+  const value = fixture(failure)
+  const result = await value.invokeWithOwner(ownerReport())
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(readFileSync(join(value.stage, 'validation-mode.json'), 'utf8'))).toEqual({ format: 1, mode: 'host', reason })
+  expect(result.request).toBeUndefined()
+  const commands = commandsOf(value)
+  expect(commands.some(command => command.includes(' validate /backup/'))).toBe(true)
+  expect(commands.find(command => command.includes('check-live'))).not.toContain('--counted')
+}, 30_000)
+
+it('does not probe images or wait for the owner unless the owner asked for it', () => {
+  const value = fixture(), result = value.invoke()
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(readFileSync(join(value.stage, 'validation-mode.json'), 'utf8'))).toEqual({ format: 1, mode: 'host', reason: 'host validation requested' })
+  expect(value.calls().some(call => call.kind === 'docker' && call.args[0] === 'run')).toBe(false)
+})
+
+it('restores the stopped source only before migration when maintenance died waiting for the owner', async () => {
+  const value = fixture()
+  const child = spawn(process.execPath, [join(value.stage, 'policy/scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, value.request.sourceSha, value.request.producerSha],
+    { detached: true, stdio: 'ignore', env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, BACKEND_VALIDATION: 'owner' }) })
+  const closed = new Promise(done => child.once('close', done))
+  for (let waited = 0; !existsSync(join(value.stage, 'owner-request.json')); waited += 50) {
+    if (waited > 20_000) throw new Error('owner request was not published')
+    await new Promise(done => setTimeout(done, 50))
+  }
+  process.kill(-child.pid!, 'SIGKILL'); await closed
+  expect(value.current()).toMatchObject({ running: false })
+  const restored = value.operation('restore-source')
+  expect(restored.status, restored.stderr).toBe(0)
+  expect(JSON.parse(restored.stdout)).toEqual({ restored: value.oldId })
+  expect(value.current()).toMatchObject({ running: true })
+
+  const migrated = fixture(), accepted = migrated.invoke()
+  expect(accepted.status, accepted.stderr).toBe(0)
+  const refused = migrated.operation('restore-source')
+  expect(refused.status).not.toBe(0)
+  expect(refused.stderr).toContain('Source restore was refused')
+}, 30_000)

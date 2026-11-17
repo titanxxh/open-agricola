@@ -12,10 +12,35 @@ import { validateReplays } from './replay-validation-pool'
 export type StorageValidationOptions = {
   /** Worker threads decoding Replay Steps; 1 keeps validation on the calling thread. */
   concurrency?: number
+  /**
+   * `decode` hash-checks every frame. `count` checks each replay's step chain
+   * structure and counts it without decoding; it is only for live data whose
+   * identical bytes an Owner-local Validation already decoded.
+   */
+  replaySteps?: 'decode' | 'count'
+}
+
+type ReplayShape = { steps: number; segments: number; first: number | null; last: number | null; first_kind: string | null }
+
+/** The structural checks of validateReplay, from SQL aggregates instead of decoded frames. */
+async function countReplays(db: PostgresDatabase, headers: readonly ReplayHeaderRow[]) {
+  let stepCount = 0, segmentCount = 0
+  for (const header of headers) {
+    const shape = await db.prepare(`SELECT count(*)::int AS steps, (count(*) FILTER (WHERE payload_kind = 'checkpoint'))::int AS segments,
+      min(step_no) AS first, max(step_no) AS last, (array_agg(payload_kind ORDER BY step_no))[1] AS first_kind
+      FROM game_replay_steps WHERE room_id = ?`).get<ReplayShape>(header.room_id)
+    if (!shape || shape.steps === 0) throw new Error(`replay has no steps: ${header.room_id}`)
+    if (shape.first_kind !== 'checkpoint') throw new Error(`invalid replay segment at ${header.room_id} step ${shape.first}`)
+    if (header.lifecycle !== 'expired' && shape.last! - shape.first! + 1 !== shape.steps) throw new Error(`replay step gap at ${header.room_id}`)
+    if (header.lifecycle !== 'expired' && header.missing_prefix !== 1 && shape.first !== 0) throw new Error(`replay does not start at step 0: ${header.room_id}`)
+    if (shape.last !== header.latest_step_no) throw new Error(`replay head step mismatch: ${header.room_id}`)
+    stepCount += shape.steps; segmentCount += shape.segments
+  }
+  return { stepCount, segmentCount }
 }
 
 /** Read-only target-build verification. It never reconstructs active state from Replay. */
-export async function validateStorage(db: PostgresDatabase, resources: ResourceStore, { concurrency = 1 }: StorageValidationOptions = {}) {
+export async function validateStorage(db: PostgresDatabase, resources: ResourceStore, { concurrency = 1, replaySteps = 'decode' }: StorageValidationOptions = {}) {
   const replayResources = new ReplayResources(resources)
   const persistence = new PostgresRoomPersistence(db)
   const committer = new RoomCommitter({ persistence, resources: replayResources, viewerBuildId: '', gameBuildId: '', viewerBuildExists: async id => !!await replayResources.viewer(id) })
@@ -52,7 +77,7 @@ export async function validateStorage(db: PostgresDatabase, resources: ResourceS
     }
   }
   // Step decoding dominates validation time; metadata checks above stay serial.
-  const { stepCount: replayStepCount, segmentCount: replaySegmentCount } = await validateReplays(headers,
+  const { stepCount: replayStepCount, segmentCount: replaySegmentCount } = replaySteps === 'count' ? await countReplays(db, headers) : await validateReplays(headers,
     header => db.prepare('SELECT * FROM game_replay_steps WHERE room_id = ? ORDER BY step_no').all<ReplayStepRow>(header.room_id), concurrency)
   // Validate every retained private object, including Viewer files that are not
   // the HTML entrypoint and Workshop generation candidates not yet adopted.

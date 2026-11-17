@@ -10,6 +10,8 @@ vi.setConfig({ testTimeout: 120000, hookTimeout: 180000 })
 import { importFixture } from './_helpers/import-fixture'
 import { importSqlite } from '../sqlite-import/import'
 import { directoryDumpDigest, exportStorageArchive, restoreStorageArchive } from '../storage-archive'
+import { validateStorage } from '../storage-validation'
+import { ResourceStore } from '../../server/storage/resource-store'
 import { validateArchiveInIsolation } from '../storage-archive-cli'
 import { databaseMaintenance, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 import { releaseAll, releaseQueue } from '../../server/__tests__/_helpers/release-all'
@@ -112,6 +114,11 @@ it('round-trips an uncompressed directory dump and refuses a changed or extra du
     .toMatchObject({ roomCount: 1, replayCount: 1, replayStepCount: 4, retainedObjectCount: 3 })
   const steps = 'SELECT payload_gzip, frame_hash FROM game_replay_steps ORDER BY step_no'
   expect(await target.db.prepare(steps).all()).toEqual(await fixture.db.prepare(steps).all())
+  // The counted live check reports exactly what full decoding reports, and still refuses a broken step chain.
+  const resources = new ResourceStore(target.db, target.objects)
+  expect(await validateStorage(target.db, resources, { replaySteps: 'count' })).toEqual(await validateStorage(target.db, resources))
+  await target.db.exec('DELETE FROM game_replay_steps WHERE step_no = 2')
+  await expect(validateStorage(target.db, resources, { replaySteps: 'count' })).rejects.toThrow('replay step gap')
   // The data file of one table changes: its digest no longer matches the manifest.
   const data = files.find(name => name !== 'toc.dat')!
   const original = await readFile(join(archive, 'database', data))

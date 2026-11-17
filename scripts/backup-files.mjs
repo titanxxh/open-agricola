@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { constants, createReadStream } from 'node:fs'
-import { readdir, readFile, writeFile, stat, rm, lstat, open, realpath } from 'node:fs/promises'
+import { readdir, readFile, writeFile, stat, rm, lstat, open, realpath, rename } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
 const stemPattern = /^(daily|pre|manual)-[a-zA-Z0-9._-]+$/
@@ -70,6 +70,40 @@ async function main([command, root, first, second]) {
     const output = await open(root, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
     try { for await (const bytes of process.stdin) await output.write(bytes) }
     finally { await output.close() }
+    return
+  }
+  if (command === 'owner-request') {
+    // Tells the owner machine what to pull and what its report must bind; published atomically.
+    const capture = JSON.parse(await readFile(join(root, 'capture', 'archive.json'), 'utf8')), path = process.env.BACKUP_OWNER_REQUEST ?? ''
+    if (capture.version !== 2 || capture.database?.format !== 'directory') throw new Error('Owner validation requires a directory-format capture')
+    const request = { format: 1, nonce: process.env.BACKUP_OWNER_VALIDATION, capture: resolve(root, 'capture'), ledger: resolve(first ?? ''),
+      sourceBuildId: process.env.SOURCE_BUILD_ID, targetBuildId: process.env.BACKUP_TARGET_BUILD_ID, targetImage: process.env.BACKUP_TARGET_IMAGE,
+      createdAt: capture.createdAt, database: { sha256: capture.database.sha256, size: capture.database.size }, reportDeadlineEpochMs: Number(second) }
+    if (!Number.isSafeInteger(request.reportDeadlineEpochMs)) throw new Error('Invalid owner report deadline')
+    await writeFile(`${path}.partial`, JSON.stringify(request, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+    await rename(`${path}.partial`, path)
+    return
+  }
+  if (command === 'accept-owner-report') {
+    // An Owner-local Validation stands in for the host restore only when it is
+    // bound to this capture, this source and this exact candidate image.
+    const path = process.env.BACKUP_OWNER_REPORT ?? '', info = await lstat(path)
+    if (!info.isFile() || info.uid !== process.getuid() || info.mode & 0o077 || info.size > 64 * 1024) throw new Error('Owner validation report must be an owner-private regular file')
+    const report = JSON.parse(await readFile(path, 'utf8'))
+    if (report.ok === false) throw new Error(`Owner validation failed: ${String(report.error ?? 'unknown').slice(0, 300)}`)
+    const capture = JSON.parse(await readFile(join(root, 'capture', 'archive.json'), 'utf8'))
+    const count = value => Number.isSafeInteger(value) && value >= 0
+    if (report.formatVersion !== 2 || report.validator !== 'owner-local' || report.nonce !== process.env.BACKUP_OWNER_VALIDATION
+      || !/^[a-f0-9-]{36}$/.test(report.nonce ?? '') || report.sourceBuildId !== process.env.SOURCE_BUILD_ID
+      || !/^[a-f0-9]{40}$/.test(process.env.BACKUP_TARGET_BUILD_ID ?? '') || report.targetBuildId !== process.env.BACKUP_TARGET_BUILD_ID
+      || !/^sha256:[a-f0-9]{64}$/.test(process.env.BACKUP_TARGET_IMAGE ?? '') || report.image !== process.env.BACKUP_TARGET_IMAGE
+      || report.createdAt !== capture.createdAt || report.database?.sha256 !== capture.database?.sha256 || report.database?.size !== capture.database?.size
+      || !Number.isFinite(Date.parse(report.validatedAt)) || !Array.isArray(report.replaySchemaVersions)
+      || !['roomCount', 'replayCount', 'replayHeadCount', 'replayStepCount', 'replaySegmentCount', 'retainedObjectCount'].every(key => count(report[key]))) {
+      throw new Error('Owner validation report does not bind this capture, source and candidate image')
+    }
+    const output = await open(join(root, 'report.json'), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+    try { await output.write(JSON.stringify(report, null, 2) + '\n') } finally { await output.close() }
     return
   }
   if (command === 'seal') {

@@ -50,13 +50,13 @@ export function rsyncArguments({ host, source, destination, linkDest, zstd }: { 
     ...(linkDest ? [`--link-dest=${linkDest}`] : []), '-e', `ssh ${SSH_OPTIONS.join(' ')}`, `${host}:${source}`, destination]
 }
 
-const privateDirectory = (path: string): string => {
+export const privateDirectory = (path: string): string => {
   mkdirSync(path, { recursive: true, mode: 0o700 })
   const info = lstatSync(path)
   if (!info.isDirectory() || info.uid !== process.getuid?.() || info.mode & 0o077) throw new Error(`Owner backup directory must be private: ${path}`)
   return path
 }
-const snapshots = (root: string): string[] => readdirSync(root).filter(name => SNAPSHOT.test(name)).sort()
+export const snapshots = (root: string): string[] => readdirSync(root).filter(name => SNAPSHOT.test(name)).sort()
 const VALIDATION_LABEL = 'org.open-agricola.owner-validation'
 export type ValidationResource = { id: string; owner: number; deadline: number }
 /** Throwaway validation services outlive a killed tool; a later run or the unit's stop hook removes them. */
@@ -81,14 +81,14 @@ const run = (command: string, args: string[], timeout = 30 * 60_000): string =>
 
 type Options = { host: string; remoteDir: string; root: string }
 
-export async function pullSnapshot({ host, remoteDir, root }: Options): Promise<string> {
+export async function pullSnapshot({ host, remoteDir, root }: Options, attempts = 3): Promise<string> {
   privateDirectory(root)
   const ssh = (command: string) => run('ssh', [...SSH_OPTIONS, host, `cd ${remoteDir} && bash scripts/owner-sync-capture.sh ${command}`], 35 * 60_000)
   // The daily host backup shares the maintenance lock; wait it out a few times.
   let capture: OwnerCapture | undefined
   for (let attempt = 1; !capture; attempt++) {
     try { capture = parseCaptureLine(ssh('capture')) } catch (error) {
-      if (attempt >= 3) throw error
+      if (attempt >= attempts) throw error
       process.stderr.write(`Owner capture attempt ${attempt} failed; retrying in 10 minutes\n`)
       execFileSync('sleep', ['600'])
     }
@@ -114,28 +114,28 @@ export async function pullSnapshot({ host, remoteDir, root }: Options): Promise<
   }
 }
 
-/** Isolated restore + full storage validation in the image the host was running, on throwaway local services. */
-export function validateSnapshot(snapshot: string): Record<string, unknown> {
-  const source = JSON.parse(readFileSync(join(snapshot, 'source.json'), 'utf8')) as SnapshotSource
-  if (existsSync(join(snapshot, 'validation.json'))) throw new Error('Snapshot is already validated')
-  try { run('docker', ['image', 'inspect', '--format', '{{.Id}}', source.image]) } catch {
-    throw new Error(`Validation image ${source.image} is not on this machine; formal delivery keeps it locally`)
+/**
+ * Isolated restore + full storage validation of an archive directory in `image`, on throwaway PostgreSQL and
+ * RustFS containers attached to an internal Docker network. Returns the image's validation report.
+ */
+export function validateCapture({ capture, ledger, image, buildId, workParent }: { capture: string; ledger: string; image: string; buildId: string; workParent: string }): Record<string, unknown> {
+  try { run('docker', ['image', 'inspect', '--format', '{{.Id}}', image]) } catch {
+    throw new Error(`Validation image ${image} is not on this machine; formal delivery keeps it locally`)
   }
   reapValidations()
   const id = randomBytes(6).toString('hex'), network = `oa-owner-validate-${id}`, postgres = `${network}-postgres`, objects = `${network}-objects`
   const labels = ['--label', VALIDATION_LABEL, '--label', `${VALIDATION_LABEL}.owner=${process.pid}`, '--label', `${VALIDATION_LABEL}.deadline=${Date.now() + 40 * 60_000}`]
-  const work = mkdtempSync(join(snapshot, '.validate-')), scratch = privateDirectory(join(work, 'scratch'))
+  const work = mkdtempSync(join(workParent, '.validate-')), scratch = privateDirectory(join(work, 'scratch'))
   const password = randomBytes(24).toString('hex'), key = randomBytes(16).toString('hex'), secret = randomBytes(32).toString('hex')
   const environment = join(work, 'tool.env')
   writeFileSync(join(work, 'postgres.env'), `POSTGRES_USER=agricola\nPOSTGRES_PASSWORD=${password}\nPOSTGRES_DB=agricola\n`, { mode: 0o600 })
   writeFileSync(join(work, 'objects.env'), `RUSTFS_ACCESS_KEY=${key}\nRUSTFS_SECRET_KEY=${secret}\nRUSTFS_CONSOLE_ENABLE=false\nRUSTFS_OBS_LOGGER_LEVEL=error\n`, { mode: 0o600 })
   writeFileSync(environment, [`DATABASE_URL=postgresql://agricola:${password}@${postgres}:5432/agricola`, `S3_ENDPOINT=http://${objects}:9000`,
     'S3_BUCKET=agricola', 'S3_PREFIX=', 'S3_REGION=us-east-1', `S3_ACCESS_KEY_ID=${key}`, `S3_SECRET_ACCESS_KEY=${secret}`, 'S3_FORCE_PATH_STYLE=true',
-    `GAME_BUILD_ID=${source.sourceBuildId}`, 'NODE_ENV=production', 'STORAGE_VALIDATION_CONCURRENCY=auto', 'BACKUP_SCRATCH_DIRECTORY=/scratch', ''].join('\n'), { mode: 0o600 })
+    `GAME_BUILD_ID=${buildId}`, 'NODE_ENV=production', 'STORAGE_VALIDATION_CONCURRENCY=auto', 'BACKUP_SCRATCH_DIRECTORY=/scratch', ''].join('\n'), { mode: 0o600 })
   const tool = (args: string[], timeout = 30 * 60_000) => run('docker', ['run', '--rm', '--network', network, '--user', `${process.getuid?.()}:${process.getgid?.()}`,
     '--env-file', environment, '-e', `BACKUP_DEADLINE_EPOCH_MS=${Date.now() + 29 * 60_000}`,
-    '-v', `${join(snapshot, 'capture')}:/backup/capture:ro`, '-v', `${join(snapshot, 'ledger.json')}:/backup/ledger.json:ro`, '-v', `${scratch}:/scratch`,
-    source.image, ...args], timeout)
+    '-v', `${capture}:/backup/capture:ro`, '-v', `${ledger}:/backup/ledger.json:ro`, '-v', `${scratch}:/scratch`, image, ...args], timeout)
   try {
     run('docker', ['network', 'create', '--internal', ...labels, network])
     run('docker', ['run', '-d', '--rm', ...labels, '--name', postgres, '--network', network, '--env-file', join(work, 'postgres.env'), '--tmpfs', '/var/lib/postgresql:rw,size=16g', '--shm-size=1g', POSTGRES_IMAGE])
@@ -151,14 +151,22 @@ export function validateSnapshot(snapshot: string): Record<string, unknown> {
     }
     tool(['node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', 'ledger-merge', '/backup/ledger.json'])
     const output = tool(['node', '--import', 'tsx', 'scripts/storage-archive-cli.ts', 'validate', '/backup/capture'])
-    const report = { ...JSON.parse(output.slice(output.indexOf('{'))) as Record<string, unknown>, validator: 'owner-local', image: source.image }
-    writeFileSync(join(snapshot, 'validation.json'), JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
-    return report
+    return JSON.parse(output.slice(output.indexOf('{'))) as Record<string, unknown>
   } finally {
     for (const name of [postgres, objects]) try { run('docker', ['rm', '-f', '-v', name]) } catch { /* not started */ }
     try { run('docker', ['network', 'rm', network]) } catch { /* not created */ }
     rmSync(work, { recursive: true, force: true })
   }
+}
+
+/** Validates a pulled snapshot in the image the host was running and records the report beside it. */
+export function validateSnapshot(snapshot: string): Record<string, unknown> {
+  const source = JSON.parse(readFileSync(join(snapshot, 'source.json'), 'utf8')) as SnapshotSource
+  if (existsSync(join(snapshot, 'validation.json'))) throw new Error('Snapshot is already validated')
+  const report = { ...validateCapture({ capture: join(snapshot, 'capture'), ledger: join(snapshot, 'ledger.json'), image: source.image, buildId: source.sourceBuildId, workParent: snapshot }),
+    validator: 'owner-local', image: source.image }
+  writeFileSync(join(snapshot, 'validation.json'), JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
+  return report
 }
 
 export function pruneSnapshots(root: string, now = Date.now()): string[] {
