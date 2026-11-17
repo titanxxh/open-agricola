@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { allocateTestPort } from './test-ports.ts'
+import { HOSTED_FRONTEND_SOURCE, laneArguments, laneCount, MAX_LANES } from './verify-lanes.ts'
 import { caseKey, readBrowserRunRequest, readBrowserRunResult, requirementsArgument } from './verification-requirements.ts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,18 +24,30 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
 })
 
 function options(input) {
-  let shards = 4
+  let explicit
   const args = []
   for (let index = 0; index < input.length; index++) {
     const argument = input[index]
-    if (argument === '--shards') shards = Number(input[++index])
-    else if (argument.startsWith('--shards=')) shards = Number(argument.slice(9))
+    if (argument === '--shards') explicit = Number(input[++index])
+    else if (argument.startsWith('--shards=')) explicit = Number(argument.slice(9))
     else if (argument === '--shard' || argument.startsWith('--shard=')) throw new Error('The runner owns --shard; use --shards=N')
     else if (argument !== '--') args.push(argument)
   }
-  if (!Number.isInteger(shards) || shards < 1 || shards > 8) throw new Error('--shards must be an integer from 1 to 8')
+  // Without --shards the lane count comes from VERIFY_PARALLEL_LANES; one lane runs `pnpm verify` in place.
+  const shards = laneCount(explicit)
   if (['focus', 'prepush', 'status'].includes(args[0])) throw new Error('verify:parallel only accepts browser verification arguments')
-  return { shards, args }
+  return { shards, args, explicit: explicit !== undefined }
+}
+
+/** One lane needs no worktree: the plain isolated `pnpm verify`, as candidate tasks ran before lanes existed. */
+async function inPlace(args) {
+  console.log(`[parallel] one lane: pnpm verify ${args.join(' ')}`)
+  const child = spawn('pnpm', ['verify', ...args], { cwd: root, env: process.env, stdio: 'inherit' })
+  const exitCode = await new Promise(resolve => {
+    child.once('error', () => resolve(1))
+    child.once('close', (code, signal) => resolve(signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : code ?? 1))
+  })
+  process.exitCode = exitCode
 }
 
 async function waitForGroup(pid) {
@@ -131,10 +144,12 @@ function evidence(lane, expectedHead, destination) {
 
 async function main() {
   if (process.argv.includes('--help')) {
-    console.log('Usage: pnpm verify:parallel [--shards=N] [Playwright files/options]\nRuns committed HEAD in 1–8 independent worktrees, one browser worker each.\nLogs and child evidence: output/verification/parallel-runs/<run>.\nFailures retain every owned worktree. This does not create a root E2E verification record.')
+    console.log(`Usage: pnpm verify:parallel [--shards=N] [Playwright files/options]\nRuns committed HEAD in 1–${MAX_LANES} independent worktrees, one browser worker each; without --shards, VERIFY_PARALLEL_LANES lanes (default 1: pnpm verify in place).`)
+    console.log('\nLogs and child evidence: output/verification/parallel-runs/<run>.\nFailures retain every owned worktree. This does not create a root E2E verification record.')
     return
   }
-  const { shards, args } = options(process.argv.slice(2))
+  const { shards, args, explicit } = options(process.argv.slice(2))
+  if (shards === 1 && !explicit) return inPlace(args)
   if (process.platform === 'win32') throw new Error('Parallel verification requires POSIX process groups')
   if (git('status', '--porcelain', '--untracked-files=all')) throw new Error('Commit all source changes before parallel verification; each shard checks out committed HEAD')
   const head = git('rev-parse', 'HEAD')
@@ -165,8 +180,18 @@ async function main() {
     update()
     const preparation = await command(process.execPath, ['scripts/local-services.mjs', '--test'], root, env, join(output, 'dependencies.log'), 'dependencies')
     if (preparation.exitCode !== 0) throw new Error('Shared test dependency preparation failed; see dependencies.log')
+    // Exact spec files are packed into lanes by measured weight; other selections keep Playwright's --shard split.
+    const selectedFiles = [...new Set([...expected.values()].map(identity => identity.file))].sort()
+    const laneArgs = laneArguments(args, selectedFiles, shards, root)
+    summary.laneArguments = laneArgs
+    // Build the hosted frontend once; each lane copies it when its sources and build environment match.
+    const built = await command('pnpm', ['run', 'build:hosted-frontend'], root, env, join(output, 'hosted-frontend.log'), 'build')
+    if (built.exitCode !== 0) throw new Error('Hosted frontend build failed; see hosted-frontend.log')
+    const marked = await command('pnpm', ['exec', 'tsx', 'scripts/verify-lanes.ts', 'write-marker'], root, env, join(output, 'hosted-frontend.log'), 'build')
+    if (marked.exitCode !== 0) throw new Error('Hosted frontend build marker failed; see hosted-frontend.log')
+    env[HOSTED_FRONTEND_SOURCE] = root
     const taken = new Set()
-    for (let index = 1; index <= shards; index++) {
+    for (let index = 1; index <= laneArgs.length; index++) {
       if (interrupted) throw new Error(`Interrupted by ${interrupted}`)
       const backend = await allocateTestPort({ taken }); taken.add(backend)
       const frontend = await allocateTestPort({ taken }); taken.add(frontend)
@@ -184,7 +209,7 @@ async function main() {
         const installation = await command('pnpm', ['install', '--offline', '--frozen-lockfile'], lane.worktree, env, join(destination, 'install.log'), lane.index)
         if (installation.exitCode !== 0) throw new Error('Offline frozen installation failed')
         lane.status = 'running'; update()
-        const result = await command('pnpm', ['verify', ...args, `--shard=${lane.index}/${shards}`, '--workers=1'], lane.worktree,
+        const result = await command('pnpm', ['verify', ...laneArgs[lane.index - 1], '--workers=1'], lane.worktree,
           { ...env, E2E_DEPENDENCIES_READY: '1', BACKEND_PORT: String(lane.ports.backend), FRONTEND_PORT: String(lane.ports.frontend), APP_BASE_PORT: String(lane.ports.application) },
           join(destination, 'verify.log'), lane.index)
         lane.exitCode = result.exitCode
