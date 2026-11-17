@@ -58,10 +58,15 @@ function verifyReceipt(value: unknown, buildId: string | undefined): void {
   }
 }
 
-/** Receipts carried over from an earlier producer configuration may only reopen the installed candidate. */
-export function admitReceipt(value: unknown, buildId: string | undefined, action: string): void {
+/**
+ * Receipts carried over from an earlier producer configuration may only reopen the installed candidate, and never
+ * when the owner asked for the current producer (`--strict-producer true`), even from a cached `verify-open` file.
+ */
+export function admitReceipt(value: unknown, buildId: string | undefined, action: string, { strict = false } = {}): void {
   verifyReceipt(value, buildId)
-  if (object(value).continuity !== undefined && action !== 'open') throw new Error('Installed receipt continuity only reopens the installed candidate; deploy and restore need current producer verification')
+  if (object(value).continuity === undefined) return
+  if (action !== 'open') throw new Error('Installed receipt continuity only reopens the installed candidate; deploy and restore need current producer verification')
+  if (strict) throw new Error('--strict-producer true refuses a receipt carried from an earlier producer configuration')
 }
 
 /**
@@ -175,7 +180,7 @@ export async function operations(args: string[]): Promise<void> {
     const verified = values.get('--verified-receipt')
     if (verified) receipt = readVerifiedOpenReceipt(verified, { buildId: request.buildId, policySha: policySha(policyRoot), fingerprint: targetFingerprint(target) })
     else receipt = checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, request.buildId, { continuity: continuity && request.action === 'open' })
-    admitReceipt(receipt, request.buildId, request.action)
+    admitReceipt(receipt, request.buildId, request.action, { strict: !continuity })
   }
   const envelope = { format: 1, policySha: policySha(policyRoot), expiresAt: Date.now() + 5 * 60_000, fingerprint: targetFingerprint(target), target, request, receipt }
   process.stdout.write(sendEnvelope(target, envelope, ssh))
