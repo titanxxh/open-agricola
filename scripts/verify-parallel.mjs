@@ -39,15 +39,25 @@ function options(input) {
   return { shards, args, explicit: explicit !== undefined }
 }
 
-/** One lane needs no worktree: the plain isolated `pnpm verify`, as candidate tasks ran before lanes existed. */
+/**
+ * One lane needs no worktree: the plain isolated `pnpm verify`, as candidate tasks ran before lanes existed. Its own
+ * process group is registered like a lane's, so a cancelled runner stops it, waits for its cleanup and reports the
+ * interruption instead of the child's status.
+ */
 async function inPlace(args) {
+  if (interrupted) throw new Error(`Interrupted by ${interrupted}`)
   console.log(`[parallel] one lane: pnpm verify ${args.join(' ')}`)
-  const child = spawn('pnpm', ['verify', ...args], { cwd: root, env: process.env, stdio: 'inherit' })
+  const child = spawn('pnpm', ['verify', ...args], { cwd: root, env: process.env, stdio: 'inherit', detached: true })
+  if (child.pid) active.set(child.pid, child)
   const exitCode = await new Promise(resolve => {
     child.once('error', () => resolve(1))
     child.once('close', (code, signal) => resolve(signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : code ?? 1))
   })
-  process.exitCode = exitCode
+  if (child.pid) {
+    await waitForGroup(child.pid)
+    active.delete(child.pid)
+  }
+  process.exitCode = interrupted === 'SIGINT' ? 130 : interrupted === 'SIGTERM' ? 143 : exitCode
 }
 
 async function waitForGroup(pid) {
