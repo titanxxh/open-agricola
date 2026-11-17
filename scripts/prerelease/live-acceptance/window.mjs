@@ -3,7 +3,7 @@
 // run next and never retries by itself. Progress lives in <windowDirectory>/state.json with one log per step.
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { caseLabels, SUITE_ENGINES } from './suites.mjs'
 import { acceptanceRecord, collectResults } from './evidence.mjs'
@@ -132,6 +132,17 @@ export function openBinding(status, { candidate, generation, formalBuild, reveri
     && acceptance.buildId === candidate && acceptance.generation === generation && status.installed?.buildId === candidate
     && status.generation === generation && status.acceptance?.formalBuildId === formalBuild
   return ours ? 'ours' : 'other'
+}
+
+/**
+ * A `verify-open` file is usable for ten minutes; reuse it only while at least five remain, so the chain and `open`
+ * that follow it always finish inside its limit. Anything older, unreadable or missing is verified again.
+ */
+export function verifiedOpenFresh(path, now = Date.now()) {
+  try {
+    const value = JSON.parse(readFileSync(path, 'utf8'))
+    return typeof value.verifiedAt === 'number' && value.verifiedAt <= now && now - value.verifiedAt < 5 * 60_000
+  } catch { return false }
 }
 
 export function assertWithin(label, elapsedMs, limitMs) {
@@ -426,10 +437,16 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
       if (!Object.values(index).every(entry => entry.passed)) throw new WindowStop('Every evidence item must pass before writing acceptance')
       writePrivateJson(accepted, acceptanceRecord({ targetId: ctx.target.targetId, status: live, healthyCycle: storageCycle(t, ctx), index, formalBrowser }))
       t.toHost([accepted], X)
+      // GitHub receipt verification for `open` also runs now, so activate → open holds only a local check and SSH.
+      const verified = join(win.windowDirectory, 'verified-open.json')
+      if (!verifiedOpenFresh(verified)) {
+        rmSync(verified, { force: true })
+        must(io.run('./deploy-prerelease.sh', ['verify-open', '--config', ctx.config.targetConfig, '--sha', ctx.config.candidate, '--output', verified], { timeoutMs: 5 * 60_000 }), 'verify-open')
+      }
       const chain = await auditChain(io, t, win, 'final')
       assertWithin('activate → open', Date.now() - chain.activatedAt, LIMITS.activateToOpenMs)
       const opened = t.deploy('open', ['--sha', ctx.config.candidate, '--authority-receipt', chain.files.activate, '--audit', chain.files.audit,
-        '--verification', chain.files['identity-verified'], '--acceptance', accepted])
+        '--verification', chain.files['identity-verified'], '--acceptance', accepted, '--verified-receipt', verified])
       if (opened.mode !== 'open') throw new WindowStop('Open did not report an open target')
       return { ...chain.files, acceptance: accepted, open: writeAndReturn(local('open.json'), opened) }
     },

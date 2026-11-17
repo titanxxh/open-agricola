@@ -1,5 +1,5 @@
 import { registerStorageOperation } from './storage-operation'
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, closeSync, constants, copyFileSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -52,6 +52,33 @@ function verifyReceipt(value: unknown, buildId: string | undefined): void {
     }))) throw new Error('A complete same-channel fixed-candidate verification receipt is required')
 }
 
+/**
+ * `verify-open` runs the slow GitHub receipt verification before the 30 s activation lease, so `open` can then send
+ * its envelope with only a local recheck. The host checks the receipt's structure, not its age; ten minutes bounds
+ * how long a verified file stays usable on the owner machine.
+ */
+export const VERIFIED_OPEN_MAX_AGE_MS = 10 * 60_000
+type VerifiedOpenBinding = { buildId: string; policySha: string; fingerprint: string }
+
+export function verifyOpen(binding: VerifiedOpenBinding, output: string, check: (sha: string) => unknown = sha => checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, sha), now = Date.now()) {
+  const receipt = check(binding.buildId)
+  verifyReceipt(receipt, binding.buildId)
+  const value = { format: 1, action: 'open', ...binding, verifiedAt: now, receipt }
+  const fd = openSync(output, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+  try { writeSync(fd, JSON.stringify(value) + '\n') } finally { closeSync(fd) }
+  return { output, verifiedAt: now }
+}
+
+export function readVerifiedOpenReceipt(path: string, binding: VerifiedOpenBinding, now = Date.now()): unknown {
+  const info = lstatSync(path)
+  if (!info.isFile() || info.nlink !== 1 || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0) throw new Error('Verified open receipt must be an owner-private regular file')
+  const value = object(JSON.parse(readFileSync(path, 'utf8')))
+  if (value.format !== 1 || value.action !== 'open' || value.buildId !== binding.buildId || value.policySha !== binding.policySha || value.fingerprint !== binding.fingerprint
+    || typeof value.verifiedAt !== 'number' || value.verifiedAt > now || now - value.verifiedAt > VERIFIED_OPEN_MAX_AGE_MS) throw new Error('Verified open receipt is stale or bound to another candidate, policy or target')
+  verifyReceipt(value.receipt, binding.buildId)
+  return value.receipt
+}
+
 function parseRequest(value: unknown): OperationRequest {
   const input = object(value)
   const actions = ['initialize', 'status', 'maintain', 'backup', 'budget-check', 'retention', 'image-cleanup-plan', 'image-cleanup', 'deploy', 'reset', 'reinitialize', 'finish-close', 'open', 'identities', 'apply-identities', 'restore', 'activate-recovery', 'verify-access', 'verify-formal-browser', 'reverify']
@@ -99,7 +126,7 @@ export async function operations(args: string[]): Promise<void> {
     return
   }
   const values = new Map<string, string>()
-  const flags = ['--config', '--expected-current', '--sha', '--generation', '--accept-loss', '--operation-id', '--acceptance', '--authority-receipt', '--retirement-receipt', '--ssh', '--associations', '--audit', '--verification', '--source-config', '--expected-source-current', '--backup', '--backup-generation', '--purpose', '--build-run', '--build-attempt', '--artifact-id', '--auth-file']
+  const flags = ['--config', '--expected-current', '--sha', '--generation', '--accept-loss', '--operation-id', '--acceptance', '--authority-receipt', '--retirement-receipt', '--ssh', '--associations', '--audit', '--verification', '--source-config', '--expected-source-current', '--backup', '--backup-generation', '--purpose', '--build-run', '--build-attempt', '--artifact-id', '--auth-file', '--output', '--verified-receipt']
   for (let index = 1; index < args.length; index += 2) {
     if (!flags.includes(args[index]) || !args[index + 1] || values.has(args[index])) throw new Error('Unknown, duplicate or incomplete owner option')
     values.set(args[index], args[index + 1])
@@ -112,6 +139,12 @@ export async function operations(args: string[]): Promise<void> {
   }
   ownerMachine()
   if (args[0] === 'import-image') return ownerImport(target, values)
+  if (args[0] === 'verify-open') {
+    const sha = values.get('--sha'), output = values.get('--output')
+    if (!sha || !/^[a-f0-9]{40}$/.test(sha) || !output) throw new Error('verify-open requires --sha <full candidate SHA> and --output <new private file>')
+    process.stdout.write(JSON.stringify(verifyOpen({ buildId: sha, policySha: policySha(policyRoot), fingerprint: targetFingerprint(target) }, resolve(output))) + '\n'); return
+  }
+  if (values.has('--verified-receipt') && args[0] !== 'open') throw new Error('--verified-receipt applies only to open')
   const request = parseRequest({ action: args[0], expectedCurrent: values.get('--expected-current'), buildId: values.get('--sha'), generation: values.get('--generation'),
     acceptLoss: values.get('--accept-loss'), operationId: values.get('--operation-id'), acceptanceFile: values.get('--acceptance'), authorityFile: values.get('--authority-receipt'), retirementFile: values.get('--retirement-receipt'),
     associationsFile: values.get('--associations'), auditFile: values.get('--audit'), verificationFile: values.get('--verification'), backupStem: values.get('--backup'),
@@ -122,8 +155,12 @@ export async function operations(args: string[]): Promise<void> {
   let receipt: unknown = null
   if (request.action === 'deploy' || request.action === 'open' || request.action === 'restore') {
     if (!request.buildId || !/^[a-f0-9]{40}$/.test(request.buildId)) throw new Error('A fixed full candidate SHA is required')
-    receipt = checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, request.buildId)
-    verifyReceipt(receipt, request.buildId)
+    const verified = values.get('--verified-receipt')
+    if (verified) receipt = readVerifiedOpenReceipt(verified, { buildId: request.buildId, policySha: policySha(policyRoot), fingerprint: targetFingerprint(target) })
+    else {
+      receipt = checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, request.buildId)
+      verifyReceipt(receipt, request.buildId)
+    }
   }
   const envelope = { format: 1, policySha: policySha(policyRoot), expiresAt: Date.now() + 5 * 60_000, fingerprint: targetFingerprint(target), target, request, receipt }
   process.stdout.write(sendEnvelope(target, envelope, ssh))
