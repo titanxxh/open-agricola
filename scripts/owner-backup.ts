@@ -57,6 +57,25 @@ const privateDirectory = (path: string): string => {
   return path
 }
 const snapshots = (root: string): string[] => readdirSync(root).filter(name => SNAPSHOT.test(name)).sort()
+const VALIDATION_LABEL = 'org.open-agricola.owner-validation'
+export type ValidationResource = { id: string; owner: number; deadline: number }
+/** Throwaway validation services outlive a killed tool; a later run or the unit's stop hook removes them. */
+export function abandonedValidations(resources: readonly ValidationResource[], now: number, alive: (pid: number) => boolean): string[] {
+  return resources.filter(item => !Number.isSafeInteger(item.owner) || item.owner <= 0 || !alive(item.owner) || !(item.deadline > now)).map(item => item.id)
+}
+const processAlive = (pid: number): boolean => { try { process.kill(pid, 0); return true } catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM' } }
+export function reapValidations(now = Date.now()): string[] {
+  const removed: string[] = []
+  for (const kind of ['container', 'network'] as const) {
+    const listing = run('docker', [kind, 'ls', ...(kind === 'container' ? ['-a'] : []), '--filter', `label=${VALIDATION_LABEL}`, '--format',
+      `{{.ID}} {{.Label "${VALIDATION_LABEL}.owner"}} {{.Label "${VALIDATION_LABEL}.deadline"}}`]).trim()
+    const resources = listing ? listing.split('\n').map(line => { const [id, owner, deadline] = line.split(' '); return { id: id!, owner: Number(owner), deadline: Number(deadline) } }) : []
+    for (const id of abandonedValidations(resources, now, processAlive)) {
+      try { run('docker', kind === 'container' ? ['rm', '-f', '-v', id] : ['network', 'rm', id]); removed.push(`${kind}:${id}`) } catch { /* already gone */ }
+    }
+  }
+  return removed
+}
 const run = (command: string, args: string[], timeout = 30 * 60_000): string =>
   execFileSync(command, args, { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'] })
 
@@ -102,7 +121,9 @@ export function validateSnapshot(snapshot: string): Record<string, unknown> {
   try { run('docker', ['image', 'inspect', '--format', '{{.Id}}', source.image]) } catch {
     throw new Error(`Validation image ${source.image} is not on this machine; formal delivery keeps it locally`)
   }
+  reapValidations()
   const id = randomBytes(6).toString('hex'), network = `oa-owner-validate-${id}`, postgres = `${network}-postgres`, objects = `${network}-objects`
+  const labels = ['--label', VALIDATION_LABEL, '--label', `${VALIDATION_LABEL}.owner=${process.pid}`, '--label', `${VALIDATION_LABEL}.deadline=${Date.now() + 40 * 60_000}`]
   const work = mkdtempSync(join(snapshot, '.validate-')), scratch = privateDirectory(join(work, 'scratch'))
   const password = randomBytes(24).toString('hex'), key = randomBytes(16).toString('hex'), secret = randomBytes(32).toString('hex')
   const environment = join(work, 'tool.env')
@@ -116,9 +137,9 @@ export function validateSnapshot(snapshot: string): Record<string, unknown> {
     '-v', `${join(snapshot, 'capture')}:/backup/capture:ro`, '-v', `${join(snapshot, 'ledger.json')}:/backup/ledger.json:ro`, '-v', `${scratch}:/scratch`,
     source.image, ...args], timeout)
   try {
-    run('docker', ['network', 'create', '--internal', network])
-    run('docker', ['run', '-d', '--name', postgres, '--network', network, '--env-file', join(work, 'postgres.env'), '--tmpfs', '/var/lib/postgresql:rw,size=16g', '--shm-size=1g', POSTGRES_IMAGE])
-    run('docker', ['run', '-d', '--name', objects, '--network', network, '--env-file', join(work, 'objects.env'), '--tmpfs', '/data:rw,uid=10001,gid=10001,mode=0700,size=8g', OBJECTS_IMAGE, '/data'])
+    run('docker', ['network', 'create', '--internal', ...labels, network])
+    run('docker', ['run', '-d', '--rm', ...labels, '--name', postgres, '--network', network, '--env-file', join(work, 'postgres.env'), '--tmpfs', '/var/lib/postgresql:rw,size=16g', '--shm-size=1g', POSTGRES_IMAGE])
+    run('docker', ['run', '-d', '--rm', ...labels, '--name', objects, '--network', network, '--env-file', join(work, 'objects.env'), '--tmpfs', '/data:rw,uid=10001,gid=10001,mode=0700,size=8g', OBJECTS_IMAGE, '/data'])
     for (let attempt = 0; ; attempt++) {
       try { run('docker', ['exec', postgres, 'pg_isready', '-U', 'agricola', '-d', 'agricola']); break } catch { if (attempt > 60) throw new Error('Validation database did not start') }
       execFileSync('sleep', ['1'])
@@ -162,11 +183,12 @@ function parseOptions(args: string[]): Options & { snapshot?: string } {
 export async function ownerBackup(args: string[]): Promise<void> {
   const [command] = args, options = parseOptions(args.slice(1))
   if (command === 'prune') { process.stdout.write(JSON.stringify({ removed: pruneSnapshots(privateDirectory(options.root)) }) + '\n'); return }
+  if (command === 'reap') { process.stdout.write(JSON.stringify({ removed: reapValidations() }) + '\n'); return }
   if (command === 'validate') {
     const snapshot = options.snapshot ? resolve(options.snapshot) : join(options.root, snapshots(privateDirectory(options.root)).at(-1) ?? '')
     process.stdout.write(JSON.stringify(validateSnapshot(snapshot)) + '\n'); return
   }
-  if (command !== 'pull' && command !== 'run') throw new Error('Usage: owner-backup.ts run|pull|validate|prune [--host user@host] [--remote-dir D] [--root R] [--snapshot S]')
+  if (command !== 'pull' && command !== 'run') throw new Error('Usage: owner-backup.ts run|pull|validate|prune|reap [--host user@host] [--remote-dir D] [--root R] [--snapshot S]')
   if (!options.host) throw new Error('--host or OWNER_BACKUP_HOST is required')
   try {
     const snapshot = await pullSnapshot(options)

@@ -3,7 +3,9 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { expiredSnapshots, parseCaptureLine, pruneSnapshots, rsyncArguments, snapshotName, snapshotTime } from '../owner-backup'
+import { createHash } from 'node:crypto'
+import { abandonedValidations, expiredSnapshots, parseCaptureLine, pruneSnapshots, rsyncArguments, snapshotName, snapshotTime } from '../owner-backup'
+import { verifyStorageArchive } from '../storage-archive'
 
 const sourceBuild = 'a'.repeat(40), image = `sha256:${'b'.repeat(64)}`, container = 'c'.repeat(64)
 const roots: string[] = []
@@ -40,6 +42,35 @@ describe('owner backup naming and retention', () => {
     expect(args).toEqual(expect.arrayContaining(['-a', '--chmod=Du=rwx,Dgo=,Fu=rw,Fgo=', '--compress', '--compress-choice=zstd', '--link-dest=/home/o/oa-backup/20261117T043012Z/capture']))
     expect(args.slice(-2)).toEqual(['ubuntu@host:/srv/backups/.capture-owner-1/capture/', '/home/o/oa-backup/.incoming-1/capture/'])
     expect(rsyncArguments({ host: 'ubuntu@host', source: 's', destination: 'd', linkDest: null, zstd: false }).some(arg => arg.startsWith('--link-dest') || arg.startsWith('--compress-choice'))).toBe(false)
+  })
+})
+
+describe('owner backup safety', () => {
+  it('reaps validation services whose tool process is gone or whose deadline passed, and keeps a live run', () => {
+    const now = 1_000_000, alive = (pid: number) => pid === 42
+    expect(abandonedValidations([
+      { id: 'live', owner: 42, deadline: now + 1 }, { id: 'dead-owner', owner: 7, deadline: now + 1 },
+      { id: 'expired', owner: 42, deadline: now }, { id: 'unlabelled', owner: NaN, deadline: NaN },
+    ], now, alive)).toEqual(['dead-owner', 'expired', 'unlabelled'])
+  })
+
+  it('rejects a copied archive whose object entry is malformed instead of skipping it', async () => {
+    const root = temporary('oa-owner-verify-')
+    const dump = Buffer.from('dump bytes'), body = Buffer.from('viewer')
+    writeFileSync(join(root, 'database.dump'), dump)
+    mkdirSync(join(root, 'objects'))
+    const sha = createHash('sha256').update(body).digest('hex')
+    writeFileSync(join(root, 'objects', sha), body)
+    const manifest = (objects: unknown[]) => writeFileSync(join(root, 'archive.json'), JSON.stringify({ version: 1, sourceBuildId: sourceBuild, createdAt: '2026-11-17T00:00:00Z', schema: 'public',
+      database: { sha256: createHash('sha256').update(dump).digest('hex'), size: dump.length }, objects }))
+    manifest([{ key: 'replay-viewers/x/index.html', sha256: sha, size: body.length, contentType: 'text/html' }])
+    expect((await verifyStorageArchive(root)).objects).toHaveLength(1)
+    for (const bad of [{ sha256: sha.slice(0, 10) }, { key: '../escape' }, { size: -1 }]) {
+      manifest([{ key: 'replay-viewers/x/index.html', sha256: sha, size: body.length, contentType: 'text/html', ...bad }])
+      await expect(verifyStorageArchive(root)).rejects.toThrow('Invalid object archive identity')
+    }
+    manifest([{ key: 'replay-viewers/x/index.html', sha256: sha, size: body.length + 1, contentType: 'text/html' }])
+    await expect(verifyStorageArchive(root)).rejects.toThrow('Object archive integrity failure')
   })
 })
 

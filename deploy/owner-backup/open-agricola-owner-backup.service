@@ -14,5 +14,8 @@ Type=oneshot
 EnvironmentFile=%h/.config/open-agricola/owner-backup.env
 # A login shell provides the owner's Node.js 24 and Docker on PATH.
 ExecStart=/bin/bash -lc 'cd "$OWNER_BACKUP_CHECKOUT" && exec node --import tsx scripts/owner-backup.ts run'
-TimeoutStartSec=100min
+# Also after a timeout or kill: remove validation services whose tool process is gone.
+ExecStopPost=/bin/bash -lc 'cd "$OWNER_BACKUP_CHECKOUT" && exec node --import tsx scripts/owner-backup.ts reap'
+# Covers three capture attempts, a first full pull and validation; normal runs take minutes.
+TimeoutStartSec=4h
 Nice=10
