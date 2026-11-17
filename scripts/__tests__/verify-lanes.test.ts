@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { canonicalOwnerLocalCommands } from '../ci/owner-local-verification'
 import { browserSpecWeightsAt, verificationConfiguration, weightedAssignment } from '../ci/verification-tasks'
 import { testPortRange } from '../test-ports'
-import { hostedFrontendMismatch, laneArguments, laneCount, splitFileArgs, writeHostedFrontendMarker } from '../verify-lanes'
+import { hostedFrontendMismatch, laneArguments, laneCount, splitFileArgs, viteDotenv, writeHostedFrontendMarker } from '../verify-lanes'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -78,6 +78,16 @@ describe('hosted frontend reuse', () => {
     expect(hostedFrontendMismatch(root, 'b'.repeat(40), 'f'.repeat(64), env)).toBe('parent build is for another commit')
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, VITE_SANDBOX_EXECUTOR: 'browser' })).toBe('parent build environment differs')
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, PUBLIC_ASSET_VALIDATION_DIR: '/assets' })).toBe('parent build environment differs')
+    // Ignored dotenv files feed the Vite build; a lane's own (absent) files must match the parent's.
+    const lane = checkout([])
+    expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), env, viteDotenv(lane))).toBeNull()
+    writeFileSync(join(lane, '.env.production.local'), 'VITE_ENABLE_DEV_AUTH_SHORTCUTS=1\n')
+    expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), env, viteDotenv(lane))).toBe('parent build dotenv files differ')
+    const dotenvParent = checkout([])
+    mkdirSync(join(dotenvParent, 'dist')); writeFileSync(join(dotenvParent, 'dist/frontend-build.json'), '{}\n')
+    writeFileSync(join(dotenvParent, '.env'), 'VITE_ENABLE_DEV_AUTH_SHORTCUTS=1\n')
+    writeHostedFrontendMarker(dotenvParent, head, 'f'.repeat(64), env)
+    expect(hostedFrontendMismatch(dotenvParent, head, 'f'.repeat(64), env, viteDotenv(checkout([])))).toBe('parent build dotenv files differ')
     rmSync(join(root, 'dist'), { recursive: true })
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), env)).toBe('no parent build')
     expect(hostedFrontendMismatch(checkout([]), head, 'f'.repeat(64), env)).toBe('no parent build')

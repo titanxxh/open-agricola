@@ -5,6 +5,7 @@
 // Only node built-ins and verification-tasks.ts are imported statically, so verify-parallel.mjs can load this module
 // under plain Node; the source fingerprint comes from verify.ts, loaded only on the tsx command paths.
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -63,10 +64,22 @@ export function hostedFrontendEnvironment(env: NodeJS.ProcessEnv): Record<string
   return Object.fromEntries([...new Set(keys)].sort().map(key => [key, env[key] ?? null]))
 }
 
-type Marker = { schemaVersion: 1; head: string; fingerprint: string; environment: Record<string, string | null> }
+// Vite reads these from the project root for the production build; they are ignored by Git, so the source fingerprint
+// misses them and fresh lane worktrees never contain them.
+export const VITE_DOTENV_FILES = ['.env', '.env.local', '.env.production', '.env.production.local'] as const
+
+/** SHA-256 of each dotenv file Vite would load for a production build, null when absent. */
+export function viteDotenv(root: string): Record<string, string | null> {
+  return Object.fromEntries(VITE_DOTENV_FILES.map(file => {
+    const path = join(root, file)
+    return [file, existsSync(path) ? createHash('sha256').update(readFileSync(path)).digest('hex') : null]
+  }))
+}
+
+type Marker = { schemaVersion: 1; head: string; fingerprint: string; environment: Record<string, string | null>; dotenv: Record<string, string | null> }
 
 export function writeHostedFrontendMarker(root: string, head: string, fingerprint: string, env: NodeJS.ProcessEnv = process.env): string {
-  const marker: Marker = { schemaVersion: 1, head, fingerprint, environment: hostedFrontendEnvironment(env) }
+  const marker: Marker = { schemaVersion: 1, head, fingerprint, environment: hostedFrontendEnvironment(env), dotenv: viteDotenv(root) }
   const path = join(root, MARKER)
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, JSON.stringify(marker, null, 2) + '\n')
@@ -74,7 +87,7 @@ export function writeHostedFrontendMarker(root: string, head: string, fingerprin
 }
 
 /** Why a lane must build its own frontend, or null when the parent's build matches it exactly. */
-export function hostedFrontendMismatch(source: string, head: string, fingerprint: string, env: NodeJS.ProcessEnv = process.env): string | null {
+export function hostedFrontendMismatch(source: string, head: string, fingerprint: string, env: NodeJS.ProcessEnv = process.env, dotenv: Record<string, string | null> = viteDotenv(source)): string | null {
   const path = join(source, MARKER)
   if (!existsSync(path) || !existsSync(join(source, 'dist', 'frontend-build.json'))) return 'no parent build'
   let marker: Partial<Marker>
@@ -82,6 +95,7 @@ export function hostedFrontendMismatch(source: string, head: string, fingerprint
   if (marker.schemaVersion !== 1 || marker.head !== head) return 'parent build is for another commit'
   if (marker.fingerprint !== fingerprint) return 'parent build sources differ'
   if (JSON.stringify(marker.environment) !== JSON.stringify(hostedFrontendEnvironment(env))) return 'parent build environment differs'
+  if (JSON.stringify(marker.dotenv) !== JSON.stringify(dotenv)) return 'parent build dotenv files differ'
   return null
 }
 
@@ -97,7 +111,7 @@ const fingerprintOf = async (cwd: string): Promise<string> => (await import('./v
 /** The `pnpm verify` hosted-frontend step of a lane: reuse the parent's matching build, else build as usual. */
 export async function hostedFrontendStep(cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<number> {
   const source = env[HOSTED_FRONTEND_SOURCE]
-  const mismatch = source ? hostedFrontendMismatch(resolve(source), headOf(cwd), await fingerprintOf(cwd), env) : 'no parent build'
+  const mismatch = source ? hostedFrontendMismatch(resolve(source), headOf(cwd), await fingerprintOf(cwd), env, viteDotenv(cwd)) : 'no parent build'
   if (mismatch) {
     console.log(`[verify] building the hosted frontend (${mismatch})`)
     return run('pnpm', ['run', 'build:hosted-frontend'], cwd)
