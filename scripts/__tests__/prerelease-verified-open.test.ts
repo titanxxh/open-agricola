@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { RELEASE_REPOSITORY } from '../release/candidate'
-import { VERIFIED_OPEN_MAX_AGE_MS, readVerifiedOpenReceipt, verifyOpen } from '../prerelease/operations'
+import { VERIFIED_OPEN_MAX_AGE_MS, admitReceipt, readVerifiedOpenReceipt, verifyOpen } from '../prerelease/operations'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -61,5 +61,30 @@ describe('open --verified-receipt', () => {
     const shared = written()
     chmodSync(shared, 0o644)
     expect(() => readVerifiedOpenReceipt(shared, binding, 10_000)).toThrow(/owner-private regular file/)
+  })
+})
+
+describe('installed receipt continuity', () => {
+  const carried = (continuity: Record<string, unknown> = { mainSha: 'f'.repeat(40), policyConfiguration: '9'.repeat(64) }) => receipt({ continuity })
+
+  it('lets verify-open and open carry an earlier producer configuration for the installed candidate', () => {
+    const output = join(root(), 'verified-open.json')
+    verifyOpen(binding, output, () => carried(), 10_000)
+    expect(readVerifiedOpenReceipt(output, binding, 10_000)).toEqual(carried())
+    expect(() => admitReceipt(carried(), sha, 'open')).not.toThrow()
+  })
+
+  it.each(['deploy', 'restore'])('refuses a carried receipt for %s', action => {
+    expect(() => admitReceipt(carried(), sha, action)).toThrow(/only reopens the installed candidate/)
+    expect(() => admitReceipt(receipt(), sha, action)).not.toThrow()
+  })
+
+  it.each([
+    ['an unchanged configuration', { mainSha: 'f'.repeat(40), policyConfiguration: 'b'.repeat(64) }],
+    ['a short main SHA', { mainSha: 'f'.repeat(39), policyConfiguration: '9'.repeat(64) }],
+    ['an extra field', { mainSha: 'f'.repeat(40), policyConfiguration: '9'.repeat(64), producerSha: 'f'.repeat(40) }],
+  ])('rejects continuity with %s', (_, continuity) => {
+    expect(() => admitReceipt(carried(continuity), sha, 'open')).toThrow(/Invalid installed receipt continuity/)
+    expect(() => verifyOpen(binding, join(root(), 'verified-open.json'), () => carried(continuity))).toThrow(/Invalid installed receipt continuity/)
   })
 })

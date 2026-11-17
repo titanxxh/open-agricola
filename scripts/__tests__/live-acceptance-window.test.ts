@@ -5,8 +5,8 @@ import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { REQUIRED_EVIDENCE } from '../prerelease/live-acceptance/evidence.mjs'
 import {
-  DISPOSABLE_AUTHORIZATION, LIMITS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertNoResidualRows, assertWithin, markStep, markThrough, newState, nextStep, openBinding, ownerNotes, verifiedOpenFresh,
-  parseWindowConfig, previousTeamRoom, rerunCommands, resetSteps, resumeDecision, reverifyOps, runDiagnostics, runWindow, staleSteps, suiteGaps, teamAccounts,
+  DISPOSABLE_AUTHORIZATION, LIMITS, POLICY_STEPS, SUITE_STEPS, WINDOW_STEPS, WindowStop, accountRequest, assertNoResidualRows, assertWithin, markStep, markThrough, newState, nextStep, openBinding, ownerNotes, verifiedOpenFresh,
+  importClosure, parseWindowConfig, previousTeamRoom, rerunCommands, resetSteps, resumeDecision, reverifyOps, runDiagnostics, runWindow, staleSteps, suiteGaps, teamAccounts,
 } from '../prerelease/live-acceptance/window.mjs'
 
 const roots: string[] = []
@@ -22,14 +22,16 @@ const row = (testCase: string, engine: string, passed: boolean, run: Record<stri
 
 describe('window plan', () => {
   it('follows the C5 order and stops at the first unfinished step', () => {
-    expect(WINDOW_STEPS.slice(0, 4)).toEqual(['preconditions', 'reverify', 'accounts', 'chain-initial'])
+    expect(WINDOW_STEPS.slice(0, 7)).toEqual(['policy-host', 'preconditions', 'policy-maintain', 'policy-import', 'reverify', 'accounts', 'chain-initial'])
     expect(SUITE_STEPS.map(step => step.suite)).toEqual(['handoff', 'boundary', 'multihand', 'team', 'sandbox', 'viewer', 'continuity'])
-    expect(WINDOW_STEPS.slice(4, 4 + SUITE_STEPS.length)).toEqual(SUITE_STEPS.map(step => step.step))
-    expect(WINDOW_STEPS.slice(4 + SUITE_STEPS.length)).toEqual(['deletion', 'chain-deletion', 'deletion-rows', 'owner-notes', 'bundle', 'formal-browser', 'copy-evidence', 'final-open', 'readback', 'cleanup', 'archive'])
-    let state = newState('c6', 1)
+    expect(WINDOW_STEPS.slice(7, 7 + SUITE_STEPS.length)).toEqual(SUITE_STEPS.map(step => step.step))
+    expect(WINDOW_STEPS.slice(7 + SUITE_STEPS.length)).toEqual(['deletion', 'chain-deletion', 'deletion-rows', 'owner-notes', 'bundle', 'formal-browser', 'copy-evidence', 'final-open', 'readback', 'cleanup', 'archive'])
+    let state = markStep(markStep(newState('c6', 1), 'policy-host', 'started', 1), 'policy-host', 'done', 1)
     expect(nextStep(state)).toBe('preconditions')
     state = markStep(markStep(state, 'preconditions', 'started', 2), 'preconditions', 'done', 3, { outputs: {} })
     expect(state.steps.preconditions).toMatchObject({ status: 'done', attempts: 1, startedAt: 2, finishedAt: 3 })
+    expect(nextStep(state)).toBe('policy-maintain')
+    for (const step of ['policy-maintain', 'policy-import']) state = markStep(markStep(state, step, 'started', 3), step, 'done', 3)
     expect(nextStep(state)).toBe('reverify')
     state = markStep(markStep(state, 'reverify', 'started', 4), 'reverify', 'failed', 5, { error: 'ssh dropped' })
     state = markStep(state, 'reverify', 'started', 6)
@@ -221,7 +223,8 @@ describe('window run with an injected runner', () => {
     await expect(runWindow({ configPath, windowPath, io: host.io })).rejects.toThrow(/create helper failed/)
     const state = JSON.parse(readFileSync(join(value.windowDirectory, 'state.json'), 'utf8'))
     expect(Object.fromEntries(Object.entries(state.steps).map(([step, entry]) => [step, (entry as { status: string }).status])))
-      .toEqual({ preconditions: 'done', reverify: 'done', accounts: 'failed' })
+      .toEqual({ 'policy-host': 'done', preconditions: 'done', 'policy-maintain': 'done', 'policy-import': 'done', reverify: 'done', accounts: 'failed' })
+    expect(host.calls.some(call => call.includes('maintain') || call.includes('import-image') || call.includes('checkout'))).toBe(false)
     expect(JSON.parse(readFileSync(configPath, 'utf8')).formalBuild).toBe(sha('b'))
     const reverify = host.calls.filter(call => call.startsWith('./deploy-prerelease.sh reverify'))
     expect(reverify).toHaveLength(1)
@@ -420,5 +423,105 @@ describe('deletion rows', () => {
     expect(() => assertNoResidualRows({ D: zeroRows })).toThrow(/for E are missing/)
     expect(() => assertNoResidualRows({ D: zeroRows, E: { pre: zeroRows.pre } })).toThrow(/for E are missing/)
     expect(() => assertNoResidualRows({ D: zeroRows, E: zeroRows })).not.toThrow()
+  })
+})
+
+describe('policy phase', () => {
+  const from = sha('1'), to = sha('2'), candidate = sha('c'), generation = '44444444-4444-4444-8444-444444444444', cycle = '55555555-5555-4555-8555-555555555555'
+  function files(root: string, policy: Record<string, unknown> = {}) {
+    const secrets = privateDir(root, 'secrets')
+    const accounts = (labels: string[]) => ({ accounts: labels.map(label => ({ id: `id-${label}`, username: `user-${label}`, password: `password-${label}` })) })
+    const target = writePrivate(join(secrets, 'target.json'), { origin: 'https://pre.example.test', directory: '/srv/pre', policyDirectory: '/srv/policy', database: { name: 'pre' },
+      formal: { appOrigin: 'https://app.example.test', apiOrigin: 'https://api.example.test', project: 'formal' } })
+    writeFileSync(join(secrets, 'cookie'), '__Host-oa-session=abc\n', { mode: 0o600 })
+    const configPath = writePrivate(join(secrets, 'acceptance.json'), { format: 1, targetConfig: target, ssh: 'owner@host', candidate,
+      candidateReceipt: writePrivate(join(secrets, 'receipt.json'), { purpose: 'candidate', channel: 'prerelease', sourceSha: candidate, producerSha: from }), formalBuild: sha('a'),
+      accounts: writePrivate(join(secrets, 'accounts.json'), accounts(['A', 'B', 'C'])), teamAccounts: writePrivate(join(secrets, 'team.json'), accounts(['D', 'E'])),
+      ownerCookie: join(secrets, 'cookie'), guardConfig: '/srv/guard.json', outputRoot: privateDir(root, 'output') })
+    const value = { format: 1, windowId: 'c7', generation, formalFrom: sha('a'), formalBuild: sha('b'), previousRun: privateDir(root, 'previous'), run: privateDir(root, 'run'),
+      windowDirectory: privateDir(root, 'window'), exchangeDirectory: join(root, 'exchange'), policy: { from, to, image: { run: 41, attempt: 1, artifact: 42 }, authFile: '/owner/pull.json', ...policy } }
+    return { configPath, windowPath: writePrivate(join(root, 'window.json'), value), value }
+  }
+  // A fake owner checkout at `to` and a host that starts at `from`; the formal account helper fails so runs stop at accounts.
+  function host({ changed = ['i18n.ref'], failImports = 0, hostAt = from } = {}) {
+    const calls: string[] = []
+    let hostHead = hostAt, imports = 0
+    const ok = (stdout = '') => ({ status: 0, stdout, stderr: '', error: null })
+    const io = {
+      setLog: () => {},
+      fetch: async (url: string) => ({ status: 200, json: async () => (url.endsWith('/frontend-build.json') ? { gameBuildId: sha('b') }
+        : url.endsWith('/browser-policy') ? { buildId: sha('b') } : { ok: true }) }),
+      run(command: string, args: string[], { input = '' }: { input?: string } = {}) {
+        const line = [command.endsWith('node') || command === process.execPath ? 'node' : command, ...args].join(' ')
+        calls.push(input.includes('checkout -q --detach') ? 'host checkout' : input.includes('build:i18n') ? 'host build:i18n' : line)
+        if (command === 'git') return ok(args[0] === 'rev-parse' ? `${to}\n` : args[0] === 'diff' ? changed.join('\n') + '\n' : '')
+        if (command === 'ssh' && args.at(-1) === '-s') {
+          if (input.includes('checkout -q --detach')) { hostHead = to; return ok(`${to}\n`) }
+          return ok(input.includes('build:i18n') ? 'built\n' : `${cycle}\n`)
+        }
+        if (command === 'ssh' && args.at(-1)!.includes('rev-parse HEAD')) return ok(`${hostHead}\n`)
+        if (command === 'ssh' && args.at(-1)!.includes('typescript-runtime.mjs')) return { status: 1, stdout: '', stderr: 'helper exited', error: null }
+        if (command === './deploy-prerelease.sh') {
+          if (args[0] === 'status') return ok(JSON.stringify({ installed: { buildId: candidate }, generation }) + '\n')
+          if (args[0] === 'maintain') return ok(JSON.stringify({ mode: 'maintenance' }) + '\n')
+          if (args[0] === 'import-image') return ++imports <= failImports ? { status: 1, stdout: '', stderr: 'transfer dropped', error: null } : ok(JSON.stringify({ imageId: 'sha256:policy' }) + '\n')
+          if (args[0] === 'reverify') return ok(JSON.stringify({ mode: 'maintenance', operation: { kind: 'reverify', id: args[args.indexOf('--operation-id') + 1] } }) + '\n')
+        }
+        return ok()
+      },
+    }
+    return { io, calls }
+  }
+  const stepStatus = (value: { windowDirectory: string }) => Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(value.windowDirectory, 'state.json'), 'utf8')).steps)
+    .map(([step, entry]) => [step, (entry as { status: string }).status]))
+
+  it('moves host owner-tools, rebuilds pinned language packs, then maintains and imports the trusted-policy image before reverify', async () => {
+    const root = privateRoot(), { configPath, windowPath, value } = files(root), fake = host()
+    await expect(runWindow({ configPath, windowPath, io: fake.io })).rejects.toThrow(/create helper failed/)
+    expect(stepStatus(value)).toMatchObject(Object.fromEntries([...POLICY_STEPS, 'preconditions', 'reverify'].map(step => [step, 'done'])))
+    const at = (prefix: string) => fake.calls.findIndex(call => call.startsWith(prefix))
+    const order = ['host checkout', 'host build:i18n', './deploy-prerelease.sh status', 'node --import tsx scripts/prerelease/authority.ts close', './deploy-prerelease.sh maintain',
+      './deploy-prerelease.sh import-image', './deploy-prerelease.sh reverify'].map(at)
+    expect(order.every(index => index >= 0)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+    const operation = JSON.parse(readFileSync(join(value.windowDirectory, 'state.json'), 'utf8')).ops.policyImport
+    expect(fake.calls[at('./deploy-prerelease.sh import-image')]).toContain(`--expected-current ${candidate} --purpose trusted-policy --sha ${to} --build-run 41 --build-attempt 1 --artifact-id 42 --auth-file /owner/pull.json --operation-id ${operation}`)
+    expect(fake.calls.some(call => call.includes('--purpose candidate') || call.startsWith('./deploy-prerelease.sh deploy'))).toBe(false)
+  })
+
+  it('retries an interrupted trusted-policy import with the same operation id', async () => {
+    const root = privateRoot(), { configPath, windowPath, value } = files(root), first = host({ changed: [], failImports: 1 })
+    await expect(runWindow({ configPath, windowPath, io: first.io })).rejects.toThrow(/import-image failed/)
+    expect(stepStatus(value)['policy-import']).toBe('failed')
+    expect(first.calls.some(call => call === 'host build:i18n')).toBe(false)
+    const resumed = host({ changed: [], hostAt: to })
+    await expect(runWindow({ configPath, windowPath, resume: true, io: resumed.io })).rejects.toThrow(/create helper failed/)
+    const imports = [...first.calls, ...resumed.calls].filter(call => call.startsWith('./deploy-prerelease.sh import-image'))
+    expect(imports).toHaveLength(2)
+    expect(imports[1]).toBe(imports[0])
+    expect(resumed.calls.some(call => call === 'host checkout')).toBe(false)
+  })
+
+  it.each([
+    ['pnpm-lock.yaml', { dependenciesInstalled: true }, /dependencies changed/],
+    ['scripts/prerelease/storage-guard.ts', { guardRestarted: true }, /storage guard code changed/],
+  ])('stops after the host checkout when %s changed until the owner confirms the host step', async (file, confirmed, message) => {
+    const root = privateRoot(), stopped = files(root), fake = host({ changed: [file] })
+    await expect(runWindow({ configPath: stopped.configPath, windowPath: stopped.windowPath, io: fake.io })).rejects.toThrow(message)
+    expect(fake.calls.some(call => call.startsWith('./deploy-prerelease.sh maintain'))).toBe(false)
+    const again = files(privateRoot(), confirmed)
+    await expect(runWindow({ configPath: again.configPath, windowPath: again.windowPath, io: host({ changed: [file] }).io })).rejects.toThrow(/create helper failed/)
+  })
+
+  it('validates the policy block and follows the storage guard import closure', () => {
+    const root = privateRoot(), { value } = files(root)
+    expect(parseWindowConfig(value)).toBe(value)
+    expect(() => parseWindowConfig({ ...value, policy: { ...value.policy, to: from } })).toThrow(/previous and new host owner-tools SHAs/)
+    expect(() => parseWindowConfig({ ...value, policy: { ...value.policy, image: { run: 41, attempt: 0, artifact: 42 } } })).toThrow(/trusted-policy build/)
+    expect(() => parseWindowConfig({ ...value, policy: { ...value.policy, authFile: 'pull.json' } })).toThrow(/absolute private GHCR/)
+    expect(() => parseWindowConfig({ ...value, policy: { ...value.policy, guardRestarted: 'yes' } })).toThrow(/may only be true/)
+    const closure = importClosure(resolve(import.meta.dirname, '../..'), 'scripts/prerelease/storage-guard-cli.ts')
+    expect(closure).toEqual(expect.arrayContaining(['scripts/prerelease/storage-guard-cli.ts', 'scripts/prerelease/storage-guard.ts', 'scripts/prerelease/config.ts']))
+    expect(closure.every(file => file.startsWith('scripts/') || file.startsWith('shared/'))).toBe(true)
   })
 })

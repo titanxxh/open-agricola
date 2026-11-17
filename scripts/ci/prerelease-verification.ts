@@ -105,14 +105,27 @@ export function fixPrereleaseCandidate(cwd: string, repository: string, sha: str
   admitPrereleaseSnapshot(cwd, repository, sha)
 }
 
+const configurationPair = (candidate: string, producer: string): string => createHash('sha256').update('open-agricola-prerelease-verification-v1\0')
+  .update(candidate).update('\0').update(producer).digest('hex')
+
 export function prereleaseConfiguration(cwd: string, sha: string, producer: string): string {
-  return createHash('sha256').update('open-agricola-prerelease-verification-v1\0')
-    .update(verificationConfiguration(cwd, sha)).update('\0').update(verificationConfiguration(cwd, producer)).digest('hex')
+  return configurationPair(verificationConfiguration(cwd, sha), verificationConfiguration(cwd, producer))
 }
 
-export function checkPrereleaseVerification(cwd: string, repository: string, sha: string) {
+/**
+ * `continuity` reopens an already installed candidate after main changed its verification configuration: complete
+ * evidence from any producer reachable from protected main still counts, and the result names the current main
+ * configuration it differs from. Only `open`/`verify-open` of the installed build request it; deploy, restore and
+ * image production always require the current producer configuration.
+ */
+export type PrereleaseVerificationOptions = { continuity?: boolean }
+
+export function checkPrereleaseVerification(cwd: string, repository: string, sha: string, options: PrereleaseVerificationOptions = {}) {
   const source = admitPrereleaseSnapshot(cwd, repository, sha)
+  const policyConfiguration = verificationConfiguration(cwd, source.main)
+  const continuity = (producerConfiguration: string) => producerConfiguration === policyConfiguration ? {} : { continuity: { mainSha: source.main, policyConfiguration } }
   const ownerLocal = checkPrereleaseOwnerLocalVerification({ cwd, repository, repositoryId: source.repositoryId, candidateSha: sha, producerSha: source.main,
+    continuity: options.continuity === true,
     read: (endpoint, collection) => {
       const relative = endpoint.slice(`repos/${repository}/`.length)
       return collection ? list(repository, relative) : github(repository, endpoint === `repos/${repository}` ? '' : relative)
@@ -120,28 +133,44 @@ export function checkPrereleaseVerification(cwd: string, repository: string, sha
     download: endpoint => execFileSync('gh', ['api', endpoint, '-H', 'Accept: application/octet-stream'], { maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }),
   })
   if (ownerLocal) return { status: 'passed' as const, repository, sha, channel: 'prerelease' as const,
-    configuration: ownerLocal.configuration, producerConfiguration: ownerLocal.producerConfiguration, ownerLocal,
+    configuration: ownerLocal.configuration, producerConfiguration: ownerLocal.producerConfiguration, ownerLocal, ...continuity(ownerLocal.producerConfiguration),
     tasks: FULL_TASK_IDS.map(id => ({ id, status: 'passed' as const, reason: 'Owner-authorized local prerelease verification', runId: null, jobId: null, url: ownerLocal.url })) }
   const workflow = object(github(repository, 'actions/workflows/prerelease-candidate-verification.yml'))
   if (workflow.path !== PRERELEASE_CANDIDATE_WORKFLOW || typeof workflow.id !== 'number') throw new Error('Unexpected prerelease producer workflow')
-  const policyConfiguration = verificationConfiguration(cwd, source.main)
-  const runs = list(repository, `actions/workflows/${workflow.id}/runs?event=workflow_dispatch&per_page=100`, 'workflow_runs')
-  const evidence = []
-  const producerShas: string[] = []
+  const workflowId = workflow.id
+  const runs = list(repository, `actions/workflows/${workflowId}/runs?event=workflow_dispatch&per_page=100`, 'workflow_runs')
+  // Evidence is grouped by producer configuration; newest runs come first, so the newest compatible group wins.
+  const groups = new Map<string, { producerShas: string[]; evidence: { run: unknown; jobs: unknown[] }[] }>([[policyConfiguration, { producerShas: [], evidence: [] }]])
   for (const value of runs) {
     const run = object(value)
     if (run.head_branch !== 'main' || typeof run.display_title !== 'string' || !run.display_title.startsWith(`prerelease / ${sha} / `)) continue
     const producer = fullSha(text(run.head_sha))
     assertRawCommit(cwd, repository, producer)
-    if (!ancestor(cwd, producer, source.main) || verificationConfiguration(cwd, producer) !== policyConfiguration) continue
-    producerShas.push(producer)
+    if (!ancestor(cwd, producer, source.main)) continue
+    const producerConfiguration = verificationConfiguration(cwd, producer)
+    if (producerConfiguration !== policyConfiguration && options.continuity !== true) continue
     if (typeof run.id !== 'number' || !Number.isSafeInteger(run.id) || run.id < 1) throw new Error('Invalid prerelease run identity')
-    const jobs = list(repository, `actions/runs/${run.id}/jobs?filter=all&per_page=100`, 'jobs')
-    evidence.push({ run: value, jobs })
+    const group = groups.get(producerConfiguration) ?? { producerShas: [], evidence: [] }
+    group.producerShas.push(producer)
+    group.evidence.push({ run: value, jobs: list(repository, `actions/runs/${run.id}/jobs?filter=all&per_page=100`, 'jobs') })
+    groups.set(producerConfiguration, group)
   }
-  return { ...evaluateCandidateVerification({ repository, repositoryId: source.repositoryId, sha,
-    configuration: prereleaseConfiguration(cwd, sha, source.main), workflowId: workflow.id, channel: 'prerelease', producerShas, execution: 'uid-rootless-v1',
-  }, evidence), channel: 'prerelease' as const, producerConfiguration: policyConfiguration, ownerLocal: undefined }
+  const candidateConfiguration = verificationConfiguration(cwd, sha)
+  const evaluate = (producerConfiguration: string) => {
+    const group = groups.get(producerConfiguration) ?? { producerShas: [], evidence: [] }
+    return { ...evaluateCandidateVerification({ repository, repositoryId: source.repositoryId, sha,
+      configuration: configurationPair(candidateConfiguration, producerConfiguration), workflowId, channel: 'prerelease',
+      producerShas: group.producerShas, execution: 'uid-rootless-v1',
+    }, group.evidence), channel: 'prerelease' as const, producerConfiguration, ownerLocal: undefined, ...continuity(producerConfiguration) }
+  }
+  const current = evaluate(policyConfiguration)
+  if (current.status === 'passed' || options.continuity !== true) return current
+  for (const producerConfiguration of groups.keys()) {
+    if (producerConfiguration === policyConfiguration) continue
+    const carried = evaluate(producerConfiguration)
+    if (carried.status === 'passed') return carried
+  }
+  return current
 }
 
 export function requestPrereleaseVerification(cwd: string, repository: string, sha: string, tasks: string) {

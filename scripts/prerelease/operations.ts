@@ -50,6 +50,18 @@ function verifyReceipt(value: unknown, buildId: string | undefined): void {
       return row.id === id && row.status === 'passed' && (local ? row.runId === null && row.jobId === null
         : typeof row.runId === 'number' && row.runId > 0 && typeof row.jobId === 'number' && row.jobId > 0)
     }))) throw new Error('A complete same-channel fixed-candidate verification receipt is required')
+  if (receipt.continuity !== undefined) {
+    const continuity = object(receipt.continuity)
+    if (Object.keys(continuity).sort().join(',') !== 'mainSha,policyConfiguration' || typeof continuity.mainSha !== 'string' || !/^[a-f0-9]{40}$/.test(continuity.mainSha)
+      || typeof continuity.policyConfiguration !== 'string' || !/^[a-f0-9]{64}$/.test(continuity.policyConfiguration)
+      || continuity.policyConfiguration === receipt.producerConfiguration) throw new Error('Invalid installed receipt continuity')
+  }
+}
+
+/** Receipts carried over from an earlier producer configuration may only reopen the installed candidate. */
+export function admitReceipt(value: unknown, buildId: string | undefined, action: string): void {
+  verifyReceipt(value, buildId)
+  if (object(value).continuity !== undefined && action !== 'open') throw new Error('Installed receipt continuity only reopens the installed candidate; deploy and restore need current producer verification')
 }
 
 /**
@@ -60,7 +72,7 @@ function verifyReceipt(value: unknown, buildId: string | undefined): void {
 export const VERIFIED_OPEN_MAX_AGE_MS = 10 * 60_000
 type VerifiedOpenBinding = { buildId: string; policySha: string; fingerprint: string }
 
-export function verifyOpen(binding: VerifiedOpenBinding, output: string, check: (sha: string) => unknown = sha => checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, sha), now = Date.now()) {
+export function verifyOpen(binding: VerifiedOpenBinding, output: string, check: (sha: string) => unknown = sha => checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, sha, { continuity: true }), now = Date.now()) {
   const receipt = check(binding.buildId)
   verifyReceipt(receipt, binding.buildId)
   const value = { format: 1, action: 'open', ...binding, verifiedAt: now, receipt }
@@ -118,7 +130,7 @@ export async function operations(args: string[]): Promise<void> {
     if (args[0] === '_locked' && process.env.PRERELEASE_LOCK_SCOPE !== targetFingerprint(target)) throw new Error('Prerelease operation lock is missing')
     assertScopedPaths(target)
     if (!imageImport && request.action !== 'retention') loadPrereleaseEnvironment(target)
-    if ('buildId' in request && (request.action === 'deploy' || request.action === 'open' || request.action === 'restore')) verifyReceipt(input.receipt, request.buildId)
+    if ('buildId' in request && (request.action === 'deploy' || request.action === 'open' || request.action === 'restore')) admitReceipt(input.receipt, request.buildId, request.action)
     if (args[0] === 'receive') { process.stdout.write(locked(target, input)); return }
     const cleanup = ['status', 'initialize', 'retention', 'maintain', 'reverify', 'finish-close', 'budget-check', 'image-cleanup-plan', 'image-cleanup'].includes(request.action) ? () => {} : registerStorageOperation(target)
     try { process.stdout.write(JSON.stringify('transfer' in request ? runImageImport(target, request) : await runPrereleaseOperation(target, request)) + '\n') }
@@ -126,7 +138,7 @@ export async function operations(args: string[]): Promise<void> {
     return
   }
   const values = new Map<string, string>()
-  const flags = ['--config', '--expected-current', '--sha', '--generation', '--accept-loss', '--operation-id', '--acceptance', '--authority-receipt', '--retirement-receipt', '--ssh', '--associations', '--audit', '--verification', '--source-config', '--expected-source-current', '--backup', '--backup-generation', '--purpose', '--build-run', '--build-attempt', '--artifact-id', '--auth-file', '--output', '--verified-receipt']
+  const flags = ['--config', '--expected-current', '--sha', '--generation', '--accept-loss', '--operation-id', '--acceptance', '--authority-receipt', '--retirement-receipt', '--ssh', '--associations', '--audit', '--verification', '--source-config', '--expected-source-current', '--backup', '--backup-generation', '--purpose', '--build-run', '--build-attempt', '--artifact-id', '--auth-file', '--output', '--verified-receipt', '--strict-producer']
   for (let index = 1; index < args.length; index += 2) {
     if (!flags.includes(args[index]) || !args[index + 1] || values.has(args[index])) throw new Error('Unknown, duplicate or incomplete owner option')
     values.set(args[index], args[index + 1])
@@ -139,10 +151,15 @@ export async function operations(args: string[]): Promise<void> {
   }
   ownerMachine()
   if (args[0] === 'import-image') return ownerImport(target, values)
+  // Reopening the installed build accepts complete evidence from an earlier compatible producer unless strict.
+  const strict = values.get('--strict-producer')
+  if (strict !== undefined && (strict !== 'true' || !['open', 'verify-open'].includes(args[0]))) throw new Error('--strict-producer true applies only to open and verify-open')
+  const continuity = strict === undefined
   if (args[0] === 'verify-open') {
     const sha = values.get('--sha'), output = values.get('--output')
     if (!sha || !/^[a-f0-9]{40}$/.test(sha) || !output) throw new Error('verify-open requires --sha <full candidate SHA> and --output <new private file>')
-    process.stdout.write(JSON.stringify(verifyOpen({ buildId: sha, policySha: policySha(policyRoot), fingerprint: targetFingerprint(target) }, resolve(output))) + '\n'); return
+    process.stdout.write(JSON.stringify(verifyOpen({ buildId: sha, policySha: policySha(policyRoot), fingerprint: targetFingerprint(target) }, resolve(output),
+      candidate => checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, candidate, { continuity }))) + '\n'); return
   }
   if (values.has('--verified-receipt') && args[0] !== 'open') throw new Error('--verified-receipt applies only to open')
   const request = parseRequest({ action: args[0], expectedCurrent: values.get('--expected-current'), buildId: values.get('--sha'), generation: values.get('--generation'),
@@ -157,10 +174,8 @@ export async function operations(args: string[]): Promise<void> {
     if (!request.buildId || !/^[a-f0-9]{40}$/.test(request.buildId)) throw new Error('A fixed full candidate SHA is required')
     const verified = values.get('--verified-receipt')
     if (verified) receipt = readVerifiedOpenReceipt(verified, { buildId: request.buildId, policySha: policySha(policyRoot), fingerprint: targetFingerprint(target) })
-    else {
-      receipt = checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, request.buildId)
-      verifyReceipt(receipt, request.buildId)
-    }
+    else receipt = checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, request.buildId, { continuity: continuity && request.action === 'open' })
+    admitReceipt(receipt, request.buildId, request.action)
   }
   const envelope = { format: 1, policySha: policySha(policyRoot), expiresAt: Date.now() + 5 * 60_000, fingerprint: targetFingerprint(target), target, request, receipt }
   process.stdout.write(sendEnvelope(target, envelope, ssh))

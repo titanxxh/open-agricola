@@ -3,7 +3,8 @@ import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeF
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { checkPrereleaseVerification, requestPrereleaseVerification, runPrereleaseCandidateTask, syncPrerelease, validateIntegrationManifest } from '../ci/prerelease-verification'
+import { checkPrereleaseVerification, prereleaseConfiguration, requestPrereleaseVerification, runPrereleaseCandidateTask, syncPrerelease, validateIntegrationManifest } from '../ci/prerelease-verification'
+import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 
 const roots: string[] = []
 afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -114,6 +115,81 @@ describe('fixed prerelease candidates and main orchestration', () => {
   it('refuses a lease conflict without invoking git push', () => {
     const value = fixture()
     expect(() => syncPrerelease(value.cwd, value.repository, value.sha, value.main, value.main)).toThrow(/lease/)
+  })
+})
+
+/** Adds one complete, successful native verification run of `value.sha` produced by `producer`. */
+function passingRun(value: ReturnType<typeof fixture>, producer: string, runId: number) {
+  const repositoryId = 1164782262, configuration = prereleaseConfiguration(value.cwd, value.sha, producer)
+  const step = (name: string) => ({ name, status: 'completed', conclusion: 'success' })
+  const run = { id: runId, workflow_id: 200, path: '.github/workflows/prerelease-candidate-verification.yml', event: 'workflow_dispatch', head_sha: producer, head_branch: 'main',
+    display_title: `prerelease / ${value.sha} / all`, repository: { id: repositoryId, full_name: value.repository }, head_repository: { id: repositoryId, full_name: value.repository },
+    status: 'completed', run_attempt: 1, updated_at: '2026-11-13T01:10:00Z', html_url: `https://github.com/${value.repository}/actions/runs/${runId}` }
+  const jobs = FULL_TASK_IDS.map((id, index) => ({ id: runId * 100 + index, run_id: runId, run_attempt: 1, name: `candidate / ${id} / ${configuration}`, status: 'completed', conclusion: 'success',
+    started_at: '2026-11-13T01:05:00Z', completed_at: '2026-11-13T01:06:00Z', html_url: run.html_url,
+    steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers', 'Prepare candidate isolation', 'Prove native candidate isolation', 'Stop candidate descendants and collect private diagnostics'].map(step) }))
+  const manifest = { ...jobs[0], id: runId * 100 + 99, name: 'candidate-manifest', started_at: '2026-11-13T01:00:00Z', completed_at: '2026-11-13T01:01:00Z',
+    steps: [step('Generate candidate manifest'), step(`Prerelease manifest / ${repositoryId} / prerelease / ${value.sha} / ${configuration} / ${producer} / ${FULL_TASK_IDS.join(',')}`)] }
+  const runs = value.api[`repos/${value.repository}/actions/workflows/200/runs?event=workflow_dispatch&per_page=100`] as unknown[]
+  runs.unshift(run)
+  value.api[`repos/${value.repository}/actions/runs/${runId}/jobs?filter=all&per_page=100`] = [manifest, ...jobs]
+  for (const job of jobs) value.api[`repos/${value.repository}/actions/jobs/${job.id}`] = job
+  value.save()
+  return { jobs, configuration }
+}
+
+/** Advances protected main by one commit; a verification configuration file change makes older producers incompatible. */
+function advanceMain(value: ReturnType<typeof fixture>, file: string) {
+  value.git('checkout', '-q', 'main')
+  writeFileSync(join(value.cwd, file), `{"changed":"${file}"}`)
+  value.git('add', '.'); value.git('commit', '-m', `main changes ${file}`)
+  const main = value.git('rev-parse', 'HEAD')
+  value.git('checkout', '-q', 'prerelease')
+  value.api[`repos/${value.repository}/git/ref/heads/main`] = { ref: 'refs/heads/main', object: { type: 'commit', sha: main } }
+  value.save()
+  return main
+}
+
+describe('installed receipt continuity', () => {
+  it('keeps an installed candidate verified by an ancestor producer whose configuration main has since changed', () => {
+    const value = fixture()
+    passingRun(value, value.main, 60)
+    expect(checkPrereleaseVerification(value.cwd, value.repository, value.sha).status).toBe('passed')
+    const main = advanceMain(value, 'tsconfig.storage-tools.json')
+    const strict = checkPrereleaseVerification(value.cwd, value.repository, value.sha)
+    expect(strict.status).toBe('blocked')
+    expect(strict).not.toHaveProperty('continuity')
+    const carried = checkPrereleaseVerification(value.cwd, value.repository, value.sha, { continuity: true })
+    expect(carried.status).toBe('passed')
+    expect(carried.producerConfiguration).toBe(verificationConfiguration(value.cwd, value.main))
+    expect(carried.continuity).toEqual({ mainSha: main, policyConfiguration: verificationConfiguration(value.cwd, main) })
+    expect(carried.tasks.every(task => task.status === 'passed' && task.runId === 60)).toBe(true)
+  })
+
+  it('prefers current-configuration evidence and reports no continuity when it is complete', () => {
+    const value = fixture()
+    passingRun(value, value.main, 60)
+    const result = checkPrereleaseVerification(value.cwd, value.repository, value.sha, { continuity: true })
+    expect(result.status).toBe('passed')
+    expect(result).not.toHaveProperty('continuity')
+  })
+
+  it('still requires complete successful evidence and an ancestor producer', () => {
+    const value = fixture()
+    const { jobs } = passingRun(value, value.main, 60)
+    advanceMain(value, 'tsconfig.storage-tools.json')
+    jobs[3].conclusion = 'failure'; value.save()
+    expect(checkPrereleaseVerification(value.cwd, value.repository, value.sha, { continuity: true }).status).toBe('blocked')
+
+    const other = fixture()
+    other.git('checkout', '-q', '-b', 'side', other.main)
+    writeFileSync(join(other.cwd, 'package.json'), '{"side":true}')
+    other.git('add', '.'); other.git('commit', '-m', 'unmerged producer')
+    const side = other.git('rev-parse', 'HEAD')
+    other.git('checkout', '-q', 'prerelease')
+    passingRun(other, side, 61)
+    advanceMain(other, 'tsconfig.storage-tools.json')
+    expect(checkPrereleaseVerification(other.cwd, other.repository, other.sha, { continuity: true }).status).toBe('blocked')
   })
 })
 

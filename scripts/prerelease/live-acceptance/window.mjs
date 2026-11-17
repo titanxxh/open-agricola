@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { caseLabels, SUITE_ENGINES } from './suites.mjs'
 import { acceptanceRecord, collectResults } from './evidence.mjs'
 import { loadAcceptanceConfig, privateDirectory, privateJson } from './context.mjs'
@@ -28,7 +28,11 @@ export const SUITE_STEPS = [
   { step: 'suite-continuity', suite: 'continuity', args: [], room: true },
 ]
 const SUITE_RUNS = [...SUITE_STEPS, { step: 'deletion', suite: 'deletion', args: ['--labels', 'D,E'] }, { step: 'readback', suite: 'readback', args: [] }]
-export const WINDOW_STEPS = ['preconditions', 'reverify', 'accounts', 'chain-initial', ...SUITE_STEPS.map(entry => entry.step),
+// The optional policy phase (#1778) moves host owner-tools to the owner's newer main SHA inside the same closure:
+// checkout, maintain (stops the app), import that SHA's trusted-policy image. The installed candidate stays; `open`
+// then reuses its earlier complete verification (installed receipt continuity), so no candidate import or deploy runs.
+export const POLICY_STEPS = ['policy-host', 'policy-maintain', 'policy-import']
+export const WINDOW_STEPS = ['policy-host', 'preconditions', 'policy-maintain', 'policy-import', 'reverify', 'accounts', 'chain-initial', ...SUITE_STEPS.map(entry => entry.step),
   'deletion', 'chain-deletion', 'deletion-rows', 'owner-notes', 'bundle', 'formal-browser', 'copy-evidence', 'final-open', 'readback', 'cleanup', 'archive']
 
 export class WindowStop extends Error {
@@ -48,7 +52,38 @@ export function parseWindowConfig(value) {
   if (!/^\/[A-Za-z0-9._/-]+$/.test(value.exchangeDirectory ?? '') || value.exchangeDirectory.split('/').includes('..')) throw new Error('Exchange directory must be a plain absolute path')
   for (const key of ['previousRun', 'run', 'windowDirectory']) if (typeof value[key] !== 'string' || !value[key]) throw new Error(`Window config needs ${key}`)
   if (value.ownerNotes !== undefined && (typeof value.ownerNotes !== 'string' || !value.ownerNotes)) throw new Error('ownerNotes must be a path')
+  if (value.policy !== undefined) parsePolicy(value.policy)
   return value
+}
+
+/**
+ * { from, to, image: { run, attempt, artifact }, authFile, dependenciesInstalled?, guardRestarted? }: host owner-tools
+ * moves from `from` to `to` (the owner checkout HEAD); the image ids name the successful trusted-policy build of `to`.
+ */
+function parsePolicy(policy) {
+  if (!policy || typeof policy !== 'object' || !sha.test(policy.from ?? '') || !sha.test(policy.to ?? '') || policy.from === policy.to) throw new Error('policy needs the previous and new host owner-tools SHAs')
+  const image = policy.image ?? {}
+  if (!['run', 'attempt', 'artifact'].every(key => Number.isSafeInteger(image[key]) && image[key] > 0)) throw new Error('policy.image needs the trusted-policy build run, attempt and artifact ids')
+  if (typeof policy.authFile !== 'string' || !policy.authFile.startsWith('/')) throw new Error('policy.authFile must be the absolute private GHCR read credential path')
+  for (const key of ['dependenciesInstalled', 'guardRestarted']) if (policy[key] !== undefined && policy[key] !== true) throw new Error(`policy.${key} may only be true`)
+  return policy
+}
+
+/** Relative TypeScript/ESM import closure of one entry file in `directory`; the storage guard runs exactly this code. */
+export function importClosure(directory, entry) {
+  const seen = new Set(), pending = [entry]
+  while (pending.length) {
+    const file = pending.pop()
+    if (seen.has(file)) continue
+    seen.add(file)
+    const text = readFileSync(join(directory, file), 'utf8')
+    for (const match of text.matchAll(/(?:from|import)\s*\(?\s*['"](\.{1,2}\/[^'"]+)['"]/g)) {
+      const base = join(dirname(file), match[1])
+      const resolved = [base, `${base}.ts`, `${base}.mjs`, `${base}/index.ts`].find(path => existsSync(join(directory, path)) && statSync(join(directory, path)).isFile())
+      if (resolved) pending.push(resolved)
+    }
+  }
+  return [...seen].sort()
 }
 
 // ---- State: pure transitions, persisted after every change -------------------------------------------------------
@@ -250,8 +285,8 @@ function hostTools(io, ctx) {
   const script = (body, label) => must(io.run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', host, 'bash', '-s'], { input: body + '\n', timeoutMs: 120_000 }), label).trim()
   const toHost = (paths, directory) => must(io.run('scp', ['-q', '-p', '-r', ...paths, `${host}:${directory}/`], { timeoutMs: 5 * 60_000 }), 'copy to host')
   const fromHost = (path, local) => must(io.run('scp', ['-q', '-p', `${host}:${path}`, local], { timeoutMs: 5 * 60_000 }), 'copy from host')
-  const deploy = (action, extra = []) => lastJson(must(io.run('./deploy-prerelease.sh', [action, '--config', target, '--ssh', host, '--expected-current', ctx.config.candidate, ...extra],
-    { timeoutMs: 10 * 60_000 }), `deploy-prerelease ${action}`))
+  const deploy = (action, extra = [], timeoutMs = 10 * 60_000) => lastJson(must(io.run('./deploy-prerelease.sh', [action, '--config', target, '--ssh', host, '--expected-current', ctx.config.candidate, ...extra],
+    { timeoutMs }), `deploy-prerelease ${action}`))
   const authority = (action, generation, operationId, extra) => must(io.run(process.execPath, ['--import', 'tsx', 'scripts/prerelease/authority.ts', action,
     '--config', target, '--cookie-file', cookie, '--generation', generation, '--operation-id', operationId, ...extra], { timeoutMs: 120_000 }), `authority ${action}`)
   const cli = (args, timeoutMs = 10 * 60_000) => io.run(process.execPath, ['--import', 'tsx', CLI, ...args], { timeoutMs })
@@ -330,7 +365,57 @@ function makeSteps({ io, win, env, getCtx, reload, setOps, state }) {
   const X = win.exchangeDirectory
   const tools = () => hostTools(io, getCtx())
   const local = name => join(X, name)
+  const policy = win.policy
   const steps = {
+    async 'policy-host'() {
+      if (!policy) return {}
+      const ctx = getCtx(), t = tools(), directory = ctx.target.policyDirectory
+      const head = must(io.run('git', ['rev-parse', 'HEAD']), 'git rev-parse').trim()
+      if (head !== policy.to) throw new WindowStop(`Run the policy window from an owner checkout at ${policy.to.slice(0, 12)}, not ${head.slice(0, 12)}`)
+      if (must(io.run('git', ['status', '--porcelain', '--untracked-files=no']), 'git status').trim()) throw new WindowStop('The owner checkout has tracked local edits')
+      const changed = must(io.run('git', ['diff', '--name-only', policy.from, policy.to]), 'git diff').trim().split('\n').filter(Boolean)
+      if (!/^[A-Za-z0-9._/-]+$/.test(directory)) throw new Error('Unexpected host owner-tools path')
+      const moved = t.script(`set -e
+T='${directory}'
+[ -z "$(git -C "$T" status --porcelain --untracked-files=no)" ] || { echo 'host owner-tools has tracked edits' >&2; exit 3; }
+current=$(git -C "$T" rev-parse HEAD)
+if [ "$current" != '${policy.to}' ]; then
+  [ "$current" = '${policy.from}' ] || { echo "host owner-tools is at $current, not the window policy.from" >&2; exit 4; }
+  git -C "$T" fetch -q origin main
+  git -C "$T" checkout -q --detach '${policy.to}'
+fi
+git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
+      if (moved !== policy.to) throw new WindowStop(`Host owner-tools reports ${moved.slice(0, 12)} after checkout`)
+      // `maintain` refuses language packs that differ from the policy pin; the packs are ignored build output.
+      if (changed.includes('i18n.ref')) t.script(`set -e\ncd '${directory}'\npnpm run build:i18n >&2\necho built`, 'host language packs')
+      if ((changed.includes('package.json') || changed.includes('pnpm-lock.yaml')) && !policy.dependenciesInstalled) {
+        throw new WindowStop('Host owner-tools dependencies changed with the policy', [`ssh ${ctx.config.ssh} "cd ${directory} && pnpm install --frozen-lockfile"`, 'then set policy.dependenciesInstalled true in the window config and --resume'])
+      }
+      // The gateway is recreated by `maintain` when its mounted files change; the supervised storage guard is not.
+      const guard = importClosure(root, 'scripts/prerelease/storage-guard-cli.ts')
+      if (changed.some(file => guard.includes(file) || file === 'scripts/typescript-runtime.mjs') && !policy.guardRestarted) {
+        throw new WindowStop('The storage guard code changed with the policy', [`ssh ${ctx.config.ssh} "sudo systemctl restart open-agricola-prerelease-storage-guard.service"`, 'then set policy.guardRestarted true in the window config and --resume'])
+      }
+      return {}
+    },
+    async 'policy-maintain'() {
+      if (!policy) return {}
+      const t = tools(), close = local('policy-close.json')
+      t.authority('close', win.generation, randomUUID(), ['--output', close])
+      t.toHost([close], X)
+      const result = t.deploy('maintain', ['--authority-receipt', close])
+      if (result.mode !== 'maintenance') throw new WindowStop('maintain did not leave pre in maintenance')
+      return { close, maintain: writeAndReturn(local('policy-maintain.json'), result) }
+    },
+    async 'policy-import'() {
+      if (!policy) return {}
+      const operation = state().ops.policyImport ?? randomUUID()
+      setOps({ policyImport: operation })
+      // Retrying keeps the operation id, so an interrupted transfer resumes from its journal.
+      const result = tools().deploy('import-image', ['--purpose', 'trusted-policy', '--sha', policy.to, '--build-run', String(policy.image.run),
+        '--build-attempt', String(policy.image.attempt), '--artifact-id', String(policy.image.artifact), '--auth-file', policy.authFile, '--operation-id', operation], 30 * 60_000)
+      return { import: writeAndReturn(local('policy-import.json'), result) }
+    },
     async preconditions() {
       const ctx = getCtx(), live = await liveFormalBuild(io, ctx.origins)
       if (live.pages !== win.formalBuild || live.policy !== win.formalBuild || !live.healthy) throw new WindowStop(`Formal API, Pages and health must all be on ${win.formalBuild} before reverifying pre`)
