@@ -74,6 +74,20 @@ const tradeOption = (
 })
 
 describe('useExchangeDraftPresentation', () => {
+  it('does not reopen the exchange center for scoring choices using the same prompt', () => {
+    const pendingChoice = {
+      promptKey: 'ui.interactionExchangeChoice', playerIndex: 0, spaceId: '__stage:onBeforeEndGame',
+      options: [{ value: 'C099_GardenDesigner:food:0:score:0', labelKey: 'ui.interactionResourceExchange' }],
+    }
+    const { result } = renderHook(() => useExchangeDraftPresentation({
+      state: { players: [mkPlayer()] }, pendingChoice,
+      interactionPresentationPlan: { kind: 'choice-bar', pendingChoice, suppressChoiceOptions: false },
+      locale: 'en', cardLabel: id => id, getCardMeta: () => undefined,
+    }))
+    expect(result.current.anytime.isActive).toBe(false)
+    expect(result.current.anytime.options).toEqual([])
+  })
+
   it('uses shared counters for heating and updates fuel payment and sickness after wood conversion', () => {
     const player = mkPlayer({ resources: { ...emptyResources, wood: 2, fuel: 1 } })
     const { result } = renderHook(() => useExchangeDraftPresentation({
@@ -152,7 +166,7 @@ describe('useExchangeDraftPresentation', () => {
         : undefined
 
     const { result, rerender } = renderHook(
-      ({ plan, options }) =>
+      ({ plan, options }: { plan: InteractionPresentationPlan; options: ActionChoiceOption[] }) =>
         useExchangeDraftPresentation({
           state,
           pendingChoice: {
@@ -169,7 +183,8 @@ describe('useExchangeDraftPresentation', () => {
       {
         initialProps: {
           plan: {
-            kind: 'exchange-center',
+            kind: 'choice-bar',
+            suppressChoiceOptions: false,
             pendingChoice: {
               promptKey: 'ui.interactionBakeBreadChoice',
               options: [
@@ -188,6 +203,7 @@ describe('useExchangeDraftPresentation', () => {
       },
     )
 
+    expect(result.current.anytime.isActive).toBe(false)
     act(() => result.current.bake.updateCount('Major_Fireplace1', 2))
     expect(result.current.bake.choice).toBe('bulk:Major_Fireplace1=2')
     expect(result.current.bake.summary.food).toBe(4)

@@ -13,11 +13,6 @@ export type { WsStatus } from './ws-status'
 export const playerIdFromWsStatus = (status: WsStatus): string | null =>
   status.phase === 'ready' && status.viewer.kind === 'participant' ? `p${status.viewer.playerIndex + 1}` : null
 
-export const shouldShowPendingChoiceInInteractionBar = (
-  pendingChoice: { promptKey?: string } | null,
-): boolean =>
-  !!pendingChoice && pendingChoice.promptKey !== 'ui.interactionExchangeChoice'
-
 export const devResourceKeysForState = (
   state?: { enableFarmersOfTheMoor?: boolean } | null,
 ): (keyof Resource)[] =>

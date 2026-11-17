@@ -20,14 +20,21 @@ const option = (value: string, labelKey = value): ActionChoiceOption => ({
   labelKey,
 })
 
+const tradeOption = (value: string): ActionChoiceOption => ({
+  ...option(value),
+  sourceCard: '__basic__',
+  effectPreview: { kind: 'resourceExchange', resourcesPaid: { grain: 1 }, resourcesGained: { food: 1 } },
+})
+
 const waitChoice = (
   options: ActionChoiceOption[],
   promptKey = 'ui.interactionChooseOne',
+  structuredChoicePrefixes?: string[],
 ): Extract<InteractionState, { stateId: 'wait' }> => ({
   stateId: 'wait',
   playerIndex: 0,
   promptKey: promptKey as never,
-  request: { kind: 'choice', options },
+  request: { kind: 'choice', options, structuredChoicePrefixes },
   allowedCommands: ['resolveChoice', 'undoStep'],
   anytimeActions: [],
 })
@@ -216,14 +223,38 @@ describe('Interaction Presentation', () => {
     expect(plan.suppressChoiceOptions).toBe(false)
   })
 
-  it('routes exchange choice waits to the exchange center surface', () => {
+  it('routes the ordinary exchange contract independently of its prompt', () => {
     const plan = buildInteractionPresentationPlan(
-      waitChoice([option('trade:1:1'), option('cancel')], 'ui.interactionExchangeChoice'),
+      waitChoice([tradeOption('trade:1:1'), option('cancel')], 'ui.interactionChooseOne', ['bulk:']),
     )
 
     expect(plan.kind).toBe('exchange-center')
     if (plan.kind !== 'exchange-center') return
     expect(plan.pendingChoice.options.map((entry) => entry.value)).toEqual(['trade:1:1', 'cancel'])
+  })
+
+  it('keeps an ordinary exchange with only cancel available dismissible', () => {
+    expect(buildInteractionPresentationPlan(
+      waitChoice([option('cancel')], 'ui.interactionExchangeChoice', ['bulk:']),
+    ).kind).toBe('exchange-center')
+  })
+
+  it.each([
+    ['scoring offers', ['C099_GardenDesigner:food:0:score:0', 'C099_GardenDesigner:food:1:score:1'], undefined],
+    ['card branches', ['flow-10', '__skip__'], undefined],
+    ['baking recipes', ['Major_ClayOven'], ['bulk:']],
+    ['missing batch capability', ['trade:1:1', 'cancel'], undefined],
+    ['missing cancel', ['trade:1:1'], ['bulk:']],
+    ['mixed choices', ['trade:1:1', 'another-choice', 'cancel'], ['bulk:']],
+    ['invalid trade', ['trade:1:NaN', 'cancel'], ['bulk:']],
+  ])('preserves %s as ordinary choices despite the exchange prompt', (_name, values, prefixes) => {
+    const plan = buildInteractionPresentationPlan(waitChoice(
+      values.map(value => value.startsWith('trade:') ? tradeOption(value) : option(value)),
+      'ui.interactionExchangeChoice', prefixes,
+    ))
+    expect(plan.kind).toBe('choice-bar')
+    if (plan.kind !== 'choice-bar') return
+    expect(plan.pendingChoice.options.map(entry => entry.value)).toEqual(values)
   })
 
   it('routes Moor special-action choices to the card hot-zone surface', () => {
