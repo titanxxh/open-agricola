@@ -2,6 +2,7 @@
 // @covers client/contexts/
 import { expect, test } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL, postJson } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const names = {
   en: ['Fell Trees', 'Slash and Burn', 'Cut Peat', 'Horse Market', 'Hiring Fair', 'Black Market', 'Illicit Work'],
@@ -9,7 +10,7 @@ const names = {
 
 for (const locale of ['en'] as const) {
   for (const width of [1920, 390]) {
-    test(`${locale} special action cards stay readable at ${width}px for every player count`, async ({ page, request }) => {
+    test(`${locale} special action cards stay readable at ${width}px for every player count`, matrixVariant(width === 1920), async ({ page, request }) => {
       await page.setViewportSize({ width, height: 1080 })
       await page.addInitScript((value) => localStorage.setItem('open-agricola-locale-v2', value), locale)
       const seenCards = new Set<string>()

@@ -2,9 +2,10 @@
 import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 390 }] as const) {
-  test(`actual anytime plans and player-separated schedules in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
+  test(`actual anytime plans and player-separated schedules in ${scenario.locale} at ${scenario.width}px`, matrixVariant(scenario.width === 1440), async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
     await page.addInitScript(locale => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
     const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { seed: 6117, playerCount: 2, customCardIds: [] } })

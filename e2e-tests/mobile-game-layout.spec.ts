@@ -1,5 +1,6 @@
 // @covers client/styles/pages/
 import { expect, test, type FrameLocator, type Page } from '@playwright/test'
+import { matrixVariant } from './helpers/extended'
 
 const openEnglishPage = async (page: Page, url: string) => {
   await page.addInitScript(() => {
@@ -35,7 +36,7 @@ const expectContinuousGame = async (surface: Page | FrameLocator) => {
 }
 
 for (const width of [375, 768, 900]) {
-  test(`real room keeps the complete game on one page at ${width}px`, async ({ page }) => {
+  test(`real room keeps the complete game on one page at ${width}px`, matrixVariant(width === 375), async ({ page }) => {
     await page.setViewportSize({ width, height: 1024 })
     await openEnglishPage(page, '/?player=p1&transport=ws&room=dev5&devMode=1')
 

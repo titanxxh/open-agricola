@@ -4,6 +4,7 @@ import { createOpeningSession, createWorkSession } from '../server/__tests__/_he
 import { serializeState } from '../shared/session/serialization'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
+import { matrixVariant } from './helpers/extended'
 
 const phases = ['draft', 'parent-selection'] as const
 
@@ -35,7 +36,7 @@ for (const phase of phases) {
   const statusSelector = phase === 'draft' ? '.draft-overlay-status' : '.parent-selection-status'
 
   for (const width of [1280, 375, 320]) {
-    test(`${phase} navigation works before and after submission at ${width}px`, async ({ browser, request }, testInfo) => {
+    test(`${phase} navigation works before and after submission at ${width}px`, matrixVariant(width === 1280), async ({ browser, request }, testInfo) => {
       const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
       const [page, peer] = pages
       const driver = roomDriver(pages)

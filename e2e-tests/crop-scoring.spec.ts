@@ -2,12 +2,13 @@
 import { expect, test } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 for (const device of [
   { name: 'desktop', viewport: { width: 1920, height: 1080 }, locale: 'en' },
   { name: 'mobile', viewport: { width: 393, height: 800 }, locale: 'en' },
 ]) {
-  test.describe(device.name, () => {
+  test.describe(device.name, matrixVariant(device.name === 'desktop'), () => {
     test.use({ viewport: device.viewport, hasTouch: device.name === 'mobile' })
 
     test('scoring includes every crop in supply, farmyard fields and card fields', async ({ page, request }) => {

@@ -7,6 +7,7 @@ import { serializeState } from '../shared/session/serialization'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { confirmNext, getChoiceOptions } from '../server/__tests__/_helpers/session-assertions'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const CARD_ID = 'M027_GardenPath'
 const purchase = (session: GameSession, actor: number, space: 'meeting-place' | 'major-improvement') => {
@@ -28,7 +29,7 @@ const purchase = (session: GameSession, actor: number, space: 'meeting-place' | 
 for (const locale of ['en']) {
   for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
     const mobile = viewport.width === 390
-    test.describe(`Garden Path ${locale} at ${viewport.width}px`, () => {
+    test.describe(`Garden Path ${locale} at ${viewport.width}px`, matrixVariant(viewport.width === 1440), () => {
       test.use({ viewport, hasTouch: mobile })
       test('shows localized rules and moves the public token to its new holder', async ({ page, request }) => {
         const session = createWorkSession({

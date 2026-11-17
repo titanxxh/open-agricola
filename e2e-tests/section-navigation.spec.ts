@@ -4,6 +4,7 @@ import type { GameState } from '../shared/contract/types'
 import { createInitialState } from '../shared/session/state-bootstrap'
 import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
 import { authenticateSolo } from './helpers/standard-solo-acceptance'
+import { matrixVariant } from './helpers/extended'
 
 async function prepareTable(request: APIRequestContext, playerCount = 2, expansions = true) {
   expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {
@@ -21,7 +22,7 @@ async function prepareTable(request: APIRequestContext, playerCount = 2, expansi
 }
 
 for (const width of [1920, 390]) {
-  test(`section shortcuts keep titles and page content clear of fixed controls at ${width}px`, async ({ page, request }, testInfo) => {
+  test(`section shortcuts keep titles and page content clear of fixed controls at ${width}px`, matrixVariant(width === 1920), async ({ page, request }, testInfo) => {
     await prepareTable(request)
     await page.setViewportSize({ width, height: 844 })
     await page.emulateMedia({ reducedMotion: 'reduce' })

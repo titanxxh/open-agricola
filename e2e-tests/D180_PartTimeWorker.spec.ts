@@ -4,9 +4,10 @@ import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures
 import { serializeState } from '../shared/session/serialization'
 import type { SessionResponse } from '../shared/contract/types'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 for (const width of [1440, 390]) {
-  test(`Part-Time Worker offers mixed returns after collecting and survives reload at ${width}px`, async ({ page, request }) => {
+  test(`Part-Time Worker offers mixed returns after collecting and survives reload at ${width}px`, matrixVariant(width === 1440), async ({ page, request }) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),

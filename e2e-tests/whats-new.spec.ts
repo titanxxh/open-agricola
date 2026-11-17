@@ -6,6 +6,7 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 import { PostgresDatabase } from '../server/database/postgres'
 import { BACKEND_URL, browserRequestHeaders } from './fixtures'
 import { authenticateSolo } from './helpers/standard-solo-acceptance'
+import { matrixVariant } from './helpers/extended'
 
 function communityDirectory() {
   if (!process.env.SHARED_DATA_DIR || !process.env.DATABASE_SCHEMA?.startsWith('test_')) {
@@ -51,7 +52,7 @@ async function expectWithin(page: Page, locator: Locator) {
 test.afterEach(() => rmSync(join(communityDirectory(), 'whats-new.json'), { force: true }))
 
 for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
-  test.describe(`${viewport.width}px`, () => {
+  test.describe(`${viewport.width}px`, matrixVariant(viewport.width === 1280), () => {
     test.use({ viewport, hasTouch: viewport.width < 500, isMobile: viewport.width < 500 })
     test('lists the newest five releases and clears the unread dot once read, following host updates', async ({ page }, testInfo) => {
       publish(testInfo, 5)

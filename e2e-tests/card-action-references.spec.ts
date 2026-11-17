@@ -1,6 +1,7 @@
 // @covers client/app/encyclopedia/
 import { expect, test, type Page } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL, getJson, postJson } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const preview = (page: Page) => page.locator('.action-reference-preview')
 const face = (page: Page) => page.locator('.encyclopedia-detail__face')
@@ -11,7 +12,7 @@ async function visit(page: Page, locale: string, card: string) {
 }
 
 for (const locale of ['en', 'zh']) {
-  test(`${locale}: ordinary actions stay plain while space references open above card details`, async ({ page }) => {
+  test(`${locale}: ordinary actions stay plain while space references open above card details`, matrixVariant(locale === 'en'), async ({ page }) => {
     await visit(page, locale, 'A010_WoodenShed')
     await expect(face(page).locator('[data-action-reference]')).toHaveCount(0)
     await visit(page, locale, 'B059_FoodChest')
@@ -34,7 +35,7 @@ for (const locale of ['en', 'zh']) {
     await page.screenshot({ path: `output/action-reference-space-${locale}.png` })
   })
 
-  test(`${locale}: quarry references show both targets without exposing internal identifiers`, async ({ page }) => {
+  test(`${locale}: quarry references show both targets without exposing internal identifiers`, matrixVariant(locale === 'en'), async ({ page }) => {
     await visit(page, locale, 'A023_StoneCompany')
     await face(page).locator('[data-action-reference]').hover()
     await expect(preview(page).locator('[data-reference-target]')).toHaveCount(2)
@@ -43,7 +44,7 @@ for (const locale of ['en', 'zh']) {
     await expect(face(page)).not.toContainText('space:')
   })
 
-  test(`${locale}: Moor special action references show card art and localized effects`, async ({ page }) => {
+  test(`${locale}: Moor special action references show card art and localized effects`, matrixVariant(locale === 'en'), async ({ page }) => {
     await visit(page, locale, 'M083_CoalSeam')
     await face(page).locator('[data-action-reference="moor:hiring-fair"]').hover()
     await expect(preview(page).locator('img').first()).toBeVisible()

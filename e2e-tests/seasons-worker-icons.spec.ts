@@ -4,9 +4,10 @@ import { expect, test } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
-  test(`seasonal placement uses the board worker icon at ${viewport.width}px`, async ({ page, request }) => {
+  test(`seasonal placement uses the board worker icon at ${viewport.width}px`, matrixVariant(viewport.width === 1440), async ({ page, request }) => {
     await page.setViewportSize(viewport)
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),

@@ -4,6 +4,7 @@ import type { SessionResponse } from '../server/game/authoritative-session'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const expectedOrder = ['occupation:A110_Roughcaster', 'minor:E047_SyrupTap', 'occupation:A116_WoodCutter', 'major:Major_Fireplace1']
 
@@ -73,7 +74,7 @@ const assertCardOrder = async (page: Page) => {
 }
 
 for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
-  test(`mixed played cards retain authoritative chronology after reload at ${viewport.width}px`, async ({ page, request }) => {
+  test(`mixed played cards retain authoritative chronology after reload at ${viewport.width}px`, matrixVariant(viewport.width === 1920), async ({ page, request }) => {
     await page.setViewportSize(viewport)
     expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
       data: { seed: 1371, playerCount: 2, customCardIds: [] },

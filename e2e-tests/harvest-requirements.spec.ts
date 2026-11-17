@@ -6,11 +6,12 @@ import { setActiveWorkerCount, setNewbornCount } from '../shared/domain/player'
 import { writeCardExtraData } from '../shared/cards/helpers/card-state'
 import { serializeState } from '../shared/session/serialization'
 import { joinRoomClients, roomDriver } from './room-command-driver'
+import { matrixVariant } from './helpers/extended'
 
 test.describe.configure({ mode: 'serial' })
 
 for (const locale of ['en', 'zh'] as const) {
-  test(`resource panels show synchronized harvest needs on desktop and mobile in ${locale}`, async ({ browser, request }, testInfo) => {
+  test(`resource panels show synchronized harvest needs on desktop and mobile in ${locale}`, matrixVariant(locale === 'en'), async ({ browser, request }, testInfo) => {
     const pages = [await browser.newPage(), await browser.newPage()]
     try {
       await joinRoomClients(pages, request, locale)

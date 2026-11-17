@@ -5,6 +5,7 @@ import { serializeState } from '../shared/session/serialization'
 import { GameSession, type SessionResponse } from '../server/game/authoritative-session'
 import type { GameState } from '../shared/contract/types'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { matrixVariant } from './helpers/extended'
 
 const openOccupationScenario = async (page: Page, request: APIRequestContext, configure?: (state: GameState) => void) => {
   const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
@@ -77,7 +78,7 @@ test('a card-granted occupation hand selection focuses the hand and retains whol
 })
 
 for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }, { width: 1440, height: 900 }]) {
-  test(`occupation focus reveals the hand above fixed controls and returns after completion at ${viewport.width}x${viewport.height}`, async ({ page, request }) => {
+  test(`occupation focus reveals the hand above fixed controls and returns after completion at ${viewport.width}x${viewport.height}`, matrixVariant(viewport.width === 1440), async ({ page, request }) => {
     await page.setViewportSize(viewport)
     await openOccupationScenario(page, request)
     await page.locator('[data-action-id="lessons"] button').first().click()

@@ -6,6 +6,7 @@ import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL, openGameEndControls }
 import type { Locale } from '../shared/i18n'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 import type { StateUpdateEnvelope } from '../shared/contract/protocol/game'
+import { matrixVariant } from './helpers/extended'
 
 test.use({ actionTimeout: 15_000, navigationTimeout: 30_000 })
 
@@ -57,7 +58,7 @@ for (const device of [
     backToLobbyPlain: '返回大厅', bug: '报告问题',
   } },
 ] as const) {
-  test(`live spectating stays public and read-only on ${device.name}`, async ({ browser }, testInfo) => {
+  test(`live spectating stays public and read-only on ${device.name}`, matrixVariant(device.name === 'desktop'), async ({ browser }, testInfo) => {
     const contexts: BrowserContext[] = []
     try {
       for (let index = 0; index < 3; index++) {

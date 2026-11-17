@@ -10,6 +10,7 @@ import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { createLocalUserForTests, createSession } from '../server/auth'
 import { getDb } from '../server/db'
 import { RoomRetentionStore } from '../server/game/room-retention-store'
+import { matrixVariant } from './helpers/extended'
 
 test.beforeEach(async ({ context }) => {
   expect(process.env.DATABASE_SCHEMA).toMatch(/^test_[a-f0-9]{32}$/)
@@ -26,7 +27,7 @@ test.beforeEach(async ({ context }) => {
 })
 
 for (const locale of ['en', 'zh']) for (const width of [1440, 375]) {
-  test(`administrator saves room retention in ${locale} at ${width}px`, async ({ page, context }, testInfo) => {
+  test(`administrator saves room retention in ${locale} at ${width}px`, matrixVariant(locale === 'en' && width === 1440), async ({ page, context }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.addInitScript(language => localStorage.setItem('open-agricola-locale-v2', language), locale)
     await page.goto(`${FRONTEND_URL}/?page=operations&bg=none`)
