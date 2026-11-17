@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { FULL_TASK_IDS, fullSha, taskCommands, verificationConfiguration, verificationTask, type FullTaskId, type VerificationCommand } from './verification-tasks.ts'
+import { browserSpecWeights, browserSpecWeightsAt, FULL_TASK_IDS, fullSha, taskCommands, verificationConfiguration, verificationTask, type FullTaskId, type VerificationCommand } from './verification-tasks.ts'
 
 export const OWNER_LOCAL_CONTEXT = 'owner-local-verification'
 export const PRERELEASE_OWNER_LOCAL_CONTEXT = 'owner-local-prerelease-verification'
@@ -66,14 +66,19 @@ function rawTree(cwd: string, sha: string, repository: string): string {
   return tree
 }
 
-export function canonicalOwnerLocalCommands(cwd: string, sha: string, channel: 'stable' | 'prerelease' = 'stable'): Record<FullTaskId, VerificationCommand[]> {
+/**
+ * The complete plan for `sha`. With `producerSha` the chromium selections follow that producer's catalog (its weight
+ * table, or the earlier index-modulo assignment), so a receipt carried from an earlier producer keeps its own plan.
+ */
+export function canonicalOwnerLocalCommands(cwd: string, sha: string, channel: 'stable' | 'prerelease' = 'stable', producerSha?: string): Record<FullTaskId, VerificationCommand[]> {
+  const weights = producerSha === undefined ? browserSpecWeights() : browserSpecWeightsAt(cwd, producerSha)
   const root = mkdtempSync(join(tmpdir(), 'oa-local-plan-'))
   try {
     const archive = git(cwd, ['archive', fullSha(sha), 'package.json', 'e2e-tests'])
     execFileSync('tar', ['-x', '-C', root], { input: archive, stdio: ['pipe', 'ignore', 'pipe'] })
     const commands = (id: FullTaskId): VerificationCommand[] => [
       ...(verificationTask(id).services ? [{ command: 'node', args: ['scripts/local-services.mjs', '--test'] }] : []),
-      ...taskCommands(root, id).map(command => channel === 'prerelease' && id === 'build' && command.command === 'pnpm'
+      ...taskCommands(root, id, weights).map(command => channel === 'prerelease' && id === 'build' && command.command === 'pnpm'
         && command.args.length === 2 && command.args[0] === 'run' && command.args[1] === 'build' ? { command: 'pnpm', args: ['run', 'build:hosted-frontend'] } : command),
     ]
     return { quality: commands('quality'), fast: commands('fast'), slow: commands('slow'), build: commands('build'),
@@ -138,7 +143,7 @@ function rebindReceipt(cwd: string, value: unknown, selected: OwnerLocalSelectio
     || receipt.configuration !== verificationConfiguration(cwd, selected.candidateSha)
     || !(selected.continuity === true && receipt.kind === PRERELEASE_OWNER_LOCAL_CONTEXT)
       && receipt.producerConfiguration !== verificationConfiguration(cwd, selected.producerSha)) throw new Error('Owner-local source tree or verification configuration differs')
-  const commands = canonicalOwnerLocalCommands(cwd, receipt.testedSha, channel)
+  const commands = canonicalOwnerLocalCommands(cwd, receipt.testedSha, channel, receipt.kind === PRERELEASE_OWNER_LOCAL_CONTEXT ? receipt.producerSha : undefined)
   for (const task of receipt.tasks) {
     if (JSON.stringify(task.commands.map(({ command, args }) => ({ command, args }))) !== JSON.stringify(commands[task.id])) throw new Error(`Owner-local ${task.id} commands differ from the complete candidate plan`)
   }
