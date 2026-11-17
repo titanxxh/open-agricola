@@ -74,6 +74,13 @@ describe('installed receipt continuity', () => {
     expect(() => admitReceipt(carried(), sha, 'open')).not.toThrow()
   })
 
+  it('refuses a carried receipt, including a cached verify-open file, when open is strict', () => {
+    const output = join(root(), 'verified-open.json')
+    verifyOpen(binding, output, () => carried(), 10_000)
+    expect(() => admitReceipt(readVerifiedOpenReceipt(output, binding, 10_000), sha, 'open', { strict: true })).toThrow(/--strict-producer true refuses/)
+    expect(() => admitReceipt(receipt(), sha, 'open', { strict: true })).not.toThrow()
+  })
+
   it.each(['deploy', 'restore'])('refuses a carried receipt for %s', action => {
     expect(() => admitReceipt(carried(), sha, action)).toThrow(/only reopens the installed candidate/)
     expect(() => admitReceipt(receipt(), sha, action)).not.toThrow()
