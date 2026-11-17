@@ -1162,6 +1162,7 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/frontend-browser-scenario-matrix.spec.ts',
       'e2e-tests/garden-path-marker.spec.ts',
       'e2e-tests/grain-distillery-scoring.spec.ts',
+      'e2e-tests/harvest-requirements.spec.ts',
       'e2e-tests/hotseat-public-farms.spec.ts',
       'e2e-tests/issue1201-lover-settlement.spec.ts',
       'e2e-tests/mobile-scoring-pad.spec.ts',
