@@ -4,4 +4,27 @@
 
 your-game.example.com {
     reverse_proxy app:5175
+
+    # While the app is down (maintenance or an outage), answer the browser with a readable 503 instead of a bare 502
+    # (#1816). The Pages frontend calls this API cross-origin with a custom header, so every request is preflighted:
+    # the preflight must succeed (204) for the browser to read the 503 that follows. Replace the origin with the
+    # frontend origin in CORS_ORIGIN. Responses the app itself sends, including its own 503s, pass through unchanged.
+    handle_errors 502 503 504 {
+        @allowed header Origin https://your-frontend.example.com
+        header @allowed Access-Control-Allow-Origin {http.request.header.Origin}
+        header @allowed Access-Control-Allow-Credentials true
+        header Vary Origin
+        header Cache-Control no-store
+        @preflight method OPTIONS
+        handle @preflight {
+            header @allowed Access-Control-Allow-Methods "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+            header @allowed Access-Control-Allow-Headers {http.request.header.Access-Control-Request-Headers}
+            respond 204
+        }
+        handle {
+            header Retry-After 30
+            header Content-Type application/json
+            respond `{"ok":false,"code":"server_unavailable"}` 503
+        }
+    }
 }

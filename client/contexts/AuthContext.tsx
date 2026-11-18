@@ -1,4 +1,5 @@
 import { browserApiFetch } from '../services/browser-api'
+import { checkServerAvailability, isServerUnavailableStatus, onServerRecovered } from '../services/server-availability'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from '../app/game-container-helpers'
@@ -75,6 +76,8 @@ async function authFetch(path: string, body: Record<string, unknown>, retries = 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      // An unavailable server answers with a JSON code (Caddy's `server_unavailable`); the probe switches the app over.
+      if (isServerUnavailableStatus(resp.status)) void checkServerAvailability()
       return await resp.json()
     } catch (err) {
       if (attempt >= retries) throw err
@@ -113,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const resp = await browserApiFetch(`${API_BASE}/api/auth/me`, {
         credentials: 'include',
       })
+      if (resp.status >= 500) throw new Error(`Session check failed (${resp.status})`)
       const data = await resp.json()
       if (data.ok && data.user) {
         setState({ user: data.user, loading: false })
@@ -120,9 +124,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState({ user: null, loading: false })
       }
     } catch {
-      setState({ user: null, loading: false })
+      // A failed check is not a signed-out answer: while the server is unavailable the session stays as it was and the
+      // router shows the maintenance page; the check repeats when the server answers again.
+      const availability = await checkServerAvailability()
+      setState(previous => ({ user: availability === 'unavailable' ? previous.user : null, loading: false }))
     }
   }, [])
+
+  useEffect(() => onServerRecovered(() => { void refreshSessionFn() }), [refreshSessionFn])
 
   // Check existing session on mount
   useEffect(() => {

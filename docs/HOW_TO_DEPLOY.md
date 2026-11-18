@@ -567,6 +567,8 @@ Optional free-domain providers:
 
 Caddy obtains and renews the certificate automatically.
 
+**Maintenance answer (#1816).** While the app is stopped, Caddy otherwise returns a bare 502 without CORS headers, which the Pages frontend cannot read and shows as a network error. Add the `handle_errors 502 503 504` block from `deploy/Caddyfile.example` to the API site, with the frontend origin from `CORS_ORIGIN`. It answers a preflight with 204 (every API request carries a custom header, so a failed preflight would hide the 503) and every other request with 503 `{"ok":false,"code":"server_unavailable"}`, `Retry-After: 30` and CORS for that origin. The app's own responses, including its 503s, pass through. The frontend then shows its maintenance page, or an overlay over a running game, and retries every 15 s. To apply it on a running host, edit `deploy/Caddyfile` and run `docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile`; the app keeps running. The frontend part ships with the next Pages deployment.
+
 ---
 
 ### 1.3 Case B: Existing Domain and HTTPS with Nginx

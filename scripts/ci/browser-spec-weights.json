@@ -1,7 +1,7 @@
 {
  "format": 1,
  "unit": "seconds",
- "source": "single-lane chromium tasks of an owner-local harness profile of 39937991 on the owner machine, all six browser tasks concurrent on 20 cores, 2026-11-18 (#1779), rounded up; pinned-asset-host added from its local runs, 2 seconds rounded up",
+ "source": "single-lane chromium tasks of an owner-local harness profile of 39937991 on the owner machine, all six browser tasks concurrent on 20 cores, 2026-11-18 (#1779), rounded up; pinned-asset-host added from its local runs, 2 seconds rounded up; server-maintenance added from its local run, 7 seconds rounded up",
  "files": {
   "e2e-tests/D180_PartTimeWorker.spec.ts": 4,
   "e2e-tests/E148_Lazybones.spec.ts": 3,
@@ -104,6 +104,7 @@
   "e2e-tests/seasonal-settlement-logs.spec.ts": 64,
   "e2e-tests/seasons-worker-icons.spec.ts": 2,
   "e2e-tests/section-navigation.spec.ts": 1,
+  "e2e-tests/server-maintenance.spec.ts": 7,
   "e2e-tests/setup-navigation.spec.ts": 1,
   "e2e-tests/source-aware-scoring.spec.ts": 2,
   "e2e-tests/special-actions-localization.spec.ts": 9,

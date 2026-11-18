@@ -1,4 +1,5 @@
 import { browserApiFetch } from '../services/browser-api'
+import { checkServerAvailability, isServerUnavailableCode } from '../services/server-availability'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -81,6 +82,7 @@ function OAuthLink({
       void startOAuthOnboarding(href).catch(() => {
         setStarting(false)
         setStartFailed(true)
+        void checkServerAvailability()
       })
     }}>
       <OAuthProviderIcon provider={provider} />
@@ -113,6 +115,11 @@ export function LoginPage() {
   const [inviteCode, setInviteCode] = useState('')
   const [registrationSent, setRegistrationSent] = useState(false)
   const [loginNeedsVerification, setLoginNeedsVerification] = useState(false)
+  // A request the server could not answer. While the server is unavailable the router replaces this form with the
+  // maintenance page, so the misleading network error is shown only when the server itself is reachable.
+  const reportFailure = async () => {
+    if (await checkServerAvailability() !== 'unavailable') setError(t('platform.networkError'))
+  }
 
   useEffect(() => {
     if (mode !== 'register') return
@@ -130,7 +137,9 @@ export function LoginPage() {
       .catch(() => {
         if (!cancelled) {
           setPolicyLoadFailed(true)
-          setError(t('platform.networkError'))
+          void checkServerAvailability().then(availability => {
+            if (!cancelled && availability !== 'unavailable') setError(t('platform.networkError'))
+          })
         }
       })
     return () => { cancelled = true }
@@ -142,7 +151,9 @@ export function LoginPage() {
     setLoading(true)
     try {
       const result = await login(username, password)
-      if (!result.ok) {
+      if (!result.ok && isServerUnavailableCode(result.code)) {
+        await reportFailure()
+      } else if (!result.ok) {
         setError(authErrorMessage(result.code, result.error, t))
         setLoginNeedsVerification(result.code === 'email_not_verified')
       } else {
@@ -150,7 +161,7 @@ export function LoginPage() {
       }
     } catch {
       setLoginNeedsVerification(false)
-      setError(t('platform.networkError'))
+      await reportFailure()
     } finally {
       setLoading(false)
     }
@@ -179,12 +190,13 @@ export function LoginPage() {
         inviteCode: inviteRequired ? trimmedInviteCode : undefined,
       })
       if (!result.ok) {
-        setError(authErrorMessage(result.code, result.error, t))
+        if (isServerUnavailableCode(result.code)) await reportFailure()
+        else setError(authErrorMessage(result.code, result.error, t))
         return
       }
       setRegistrationSent(true)
     } catch {
-      setError(t('platform.networkError'))
+      await reportFailure()
     } finally {
       setLoading(false)
     }
@@ -195,10 +207,11 @@ export function LoginPage() {
     try {
       const result = await resendVerification(email)
       if (!result.ok) {
-        setError(authErrorMessage(result.code, result.error, t))
+        if (isServerUnavailableCode(result.code)) await reportFailure()
+        else setError(authErrorMessage(result.code, result.error, t))
       }
     } catch {
-      setError(t('platform.networkError'))
+      await reportFailure()
     }
   }
 

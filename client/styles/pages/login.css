@@ -246,3 +246,12 @@
     border-radius: 12px;
   }
 }
+
+/* Server maintenance (#1816): the login card's frame with a centred notice and a manual retry. */
+.server-maintenance {
+  text-align: center;
+}
+.server-maintenance__text {
+  color: var(--color-text-secondary);
+  margin: 12px 0;
+}
