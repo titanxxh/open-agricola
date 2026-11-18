@@ -34,6 +34,7 @@ export type PaymentExecuteError =
   | 'cannot-afford'
 
 export type PaymentReceipt = {
+  paymentTransfers?: import('../../contract/types').PaymentTransfer[]
   solution: PaymentSolution
   resourcesPaid: PaymentResourceMap
   bonusUsed?: string

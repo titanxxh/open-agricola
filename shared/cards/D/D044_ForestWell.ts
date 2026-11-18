@@ -30,6 +30,7 @@ const cardImpl = {
 
 export const D044_ForestWell = defineMinorCard({
   meta: {
+    wellIdentity: true,
     id: CARD_ID,
     name: 'Forest Well',
     deck: 'D',

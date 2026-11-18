@@ -47,6 +47,11 @@ const consumePaymentResourceProviders = (
       if (!space?.resources) return false
       space.resources[provider.consume.resource] =
         (space.resources[provider.consume.resource] ?? 0) - amount
+    } else {
+      const backing = provider.consume
+      const owner = state?.players.find(player => player.id === backing.playerId)
+      if (!owner) return false
+      incCounter(owner, backing.cardId, backing.resource, -amount)
     }
   }
   return true

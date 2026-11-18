@@ -55,6 +55,8 @@ export type AnimalZone = {
   capacityCounterKey?: string
   capacityLossOnPayment?: boolean
   requiredEmptyZoneGroupIds?: string[]
+  /** Animals that cannot be moved to another holder by a reorganization. */
+  fixedAnimalCounts?: Partial<Record<AnimalType, number>>
 }
 
 type AnimalType = AnimalKey
@@ -695,7 +697,7 @@ const canPlaceAnimalInWorkZone = (
   zone: AnimalAccommodationWorkZone,
   type: AnimalType,
 ): AnimalAccommodationWorkZone | null => {
-  if (zone.blocked || zone.animalCount >= zone.capacity) return null
+  if (zone.fixedAnimalCounts || zone.blocked || zone.animalCount >= zone.capacity) return null
   if (!areZoneOccupancyLimitsSatisfied(zones.map((entry, index) =>
     index === zoneIndex ? { ...entry, animalCount: zone.animalCount + 1 } : entry,
   ))) return null
@@ -714,9 +716,16 @@ export const canAccommodateAnimalTotals = (
   player: PlayerState,
   targetCounts: Partial<Record<AnimalType, number>>,
 ): boolean => {
-  const animals = targetAnimalList(state, targetCounts)
+  const remaining = { ...targetCounts }
+  const zones = computeAnimalZones(player, state).map(zone => {
+    const counts = zone.fixedAnimalCounts
+    if (!counts) return createAccommodationWorkZone(state, zone)
+    for (const animal of ALL_ANIMAL_KEYS) remaining[animal] = (remaining[animal] ?? 0) - (counts[animal] ?? 0)
+    return { ...zone, animalCounts: { ...createAnimalCounts(state.enableFarmersOfTheMoor === true), ...counts }, animalCount: sumAnimalCounts(counts), animalType: singleAnimalType(counts) }
+  })
+  if (ALL_ANIMAL_KEYS.some(animal => (remaining[animal] ?? 0) < 0)) return false
+  const animals = targetAnimalList(state, remaining)
   if (!animals) return false
-  const zones = computeAnimalZones(player, state).map((zone) => createAccommodationWorkZone(state, zone))
   const animalKeys = animalKeysForState(state)
   const failedStates = new Set<string>()
   const stateKey = (index: number, currentZones: AnimalAccommodationWorkZone[]) =>

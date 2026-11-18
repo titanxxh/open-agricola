@@ -145,3 +145,4 @@ type ActionDefinition = {
 
 测试：`shared/session/__tests__/anytime-policy.test.ts`、`server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session,exchange-batch-session}.test.ts`。
 
+**有限收取与保留债务。** `collect` 接受非负整数资源表 `actionContext.leaveOnSpace`，检查实时资源堆，只收取扣除保留量后的部分；事件和预览均记录实际收取。类型化定时操作 `repay-resource-debt` 从保留事实读取债务，归还现有资源并按声明的短缺资源补足，随后清除债务；来源卡离场后仍可执行。`set-first-player` 通过普通替代流程支持 `computeReplace`，卡牌可只替代起始玩家标记转移，而不替代整个行动格。测试：`server/__tests__/classic-fl-{placement,rounds}-session.test.ts`。

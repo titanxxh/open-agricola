@@ -80,6 +80,10 @@ export function recordRoundPlacement(
   workerId: string,
   relocation = false,
 ): PersonUseReceipt | undefined {
+  if (!relocation) {
+    const worker = player.workers.find(entry => entry.id === workerId)
+    if (worker && !worker.isGuest && !worker.firstWorkPlacement) worker.firstWorkPlacement = { spaceId }
+  }
   const cs = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
   const current = getRoundPlacementDetails(player)
   const placement: RoundPlacementEntry = { spaceId, workerId, ...(relocation ? { relocation: true } : {}) }

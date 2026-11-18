@@ -1,3 +1,4 @@
+import { discardHandCards } from '../helpers/hand-discard'
 import { cardIdentityChoice } from '../../actions/helpers/card-choice'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
@@ -37,7 +38,7 @@ const discardFromHandAction: ActionDefinition = {
     const hand = HANDS.find(({ prefix }) => choice.startsWith(prefix))
     const cardId = hand && choice.slice(hand.prefix.length)
     if (!hand || !cardId || !player[hand.zone].includes(cardId)) return { type: 'fail', errorKey: 'log.actionFail' }
-    player[hand.zone] = player[hand.zone].filter((id) => id !== cardId)
+    if (!discardHandCards(player, hand.kind, [cardId])) return { type: 'fail', errorKey: 'log.actionFail' }
     emitPrivateEvent?.(cardEffectHandChangedEvent(player.id, [cardId], hand.kind, CARD_ID, DISCARD_ACTION_ID))
     return { type: 'ok' }
   },

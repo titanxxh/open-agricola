@@ -93,6 +93,7 @@ export type CardProvidedPaymentResourceCover = {
 
 export type CardProvidedPaymentResourceConsume =
   | { type: 'actionSpace'; spaceId: string; resource: ResourceKey }
+  | { type: 'card'; playerId: string; cardId: string; resource: ResourceKey }
 
 export type CardProvidedPaymentResourceProvider = {
   key: CardProvidedPaymentResourceKey
@@ -239,6 +240,8 @@ export type AppliedCostResourceRemoval = {
 
 export type CostModifier = TradeModifier | BonusModifier | CostResourceRemovalModifier
 
+export type PaymentTransfer = { recipientPlayerId: string; sourceCard: string; resources: Partial<Resource> }
+
 export type ComplexCost = {
   fee?: PaymentResourceMap
   fees?: PaymentResourceMap[]
@@ -259,6 +262,8 @@ export type ComplexCost = {
   paymentBudget?: PaymentResourceMap
   minimumResourcesPaid?: PaymentResourceMap
   protectedFee?: Partial<Resource>
+  /** Protected portions credited to other players when the payment commits. */
+  paymentTransfers?: PaymentTransfer[]
   resourceReserve?: ResourceReserve
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
@@ -311,6 +316,9 @@ export type PaymentSolution = {
 export type PaymentSource = 'reserve' | 'field' | 'card'
 
 export type CropStack = {
+  /** Mixed crops may retain their field's original classification. */
+  fieldIdentity?: 'grain' | 'vegetable' | 'wood' | 'stone'
+  independentHarvest?: true
   kind: 'grain' | 'vegetable' | 'wood' | 'stone'
   remaining: number
 }
@@ -331,6 +339,10 @@ export type Worker = {
   id: string
   isActive: boolean
   isNewborn: boolean
+  /** A temporary guest is not one of the player's family tokens. */
+  isGuest?: true
+  /** First real work placement; excludes newborn placement and relocations. */
+  firstWorkPlacement?: { spaceId: string }
   removedFromSupply?: boolean
   supplyUse?: {
     sourceCard?: string
@@ -401,6 +413,10 @@ export type PlayerState = {
   improvements: string[]
   minorHand: string[]
   minorPlayed: string[]
+  /** Number of unplayed hand cards discarded (passing and playing are excluded). */
+  discardedHandCardCount?: number
+  /** A skipped work phase also suppresses guests and extra-turn offers. */
+  workPhaseSkippedAtRound?: number
   occupationHand: string[]
   occupationPlayed: string[]
   extraOccupationsFromCards: string[]
@@ -1376,6 +1392,8 @@ export type AnytimeAction = {
 }
 
 export type InteractionAnimalReorgZone = {
+  /** Fixed animals are displayed but cannot be reassigned. */
+  fixedAnimalCounts?: Partial<Record<AnimalKey, number>>
   id: string
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   cardId?: string

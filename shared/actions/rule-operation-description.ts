@@ -24,6 +24,11 @@ export const describeRuleOperation = (operation: RuleOperation, context: ActionE
     case 'move-worker-from-space': return {
       ...operation, spaceNameKey: context.state.actionSpaces.find(space => space.id === operation.spaceId)?.nameKey ?? 'actions.special-effect.name',
     }
+    case 'repay-resource-debt': {
+      const debt = positiveFact(context, operation.fact)
+      const amount = Math.min(debt, context.player.resources[operation.resource] ?? 0)
+      return { kind: operation.kind, resource: operation.resource, amount, shortfallResource: operation.shortfallResource, shortfall: debt - amount }
+    }
     case 'card-fact-refund': {
       const paidAmount = positiveFact(context, operation.fact)
       return { kind: operation.kind, resource: operation.resource, paidAmount, divisor: operation.divisor, amount: Math.floor(paidAmount / operation.divisor) }

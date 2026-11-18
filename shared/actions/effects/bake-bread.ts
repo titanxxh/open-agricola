@@ -93,11 +93,15 @@ const parseBulkBakePlan = (
   }
 
   const plan: BakePlanEntry[] = []
+  const usedGroups = new Set<string>()
   let totalGrain = 0
   for (const [cardId, count] of countByCard) {
     const rate = rateMap.get(cardId)
     if (!rate) return null
     if (count > rate.max) return null
+    const group = rate.exclusiveGroup ?? rate.cardId
+    if (usedGroups.has(group)) return null
+    usedGroups.add(group)
     totalGrain += count
     plan.push({ cardId, count })
   }

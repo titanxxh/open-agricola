@@ -395,6 +395,7 @@ const validateAssignments = (
     animalCount: byId.get(zone.id)?.animalCount ?? 0,
     animalCounts: readAnimalCountsForZoneAssignment(byId.get(zone.id)),
   }))
+  if (computed.some(zone => zone.fixedAnimalCounts && keys.some(key => (zone.fixedAnimalCounts?.[key] ?? 0) !== (readAnimalCountsForZoneAssignment(byId.get(zone.id))[key] ?? 0)))) return
   if (!areRequiredEmptyZoneGroupsSatisfied(finalZones)) return
   if (!areZoneOccupancyLimitsSatisfied(finalZones)) return
   return [...byId.values()]

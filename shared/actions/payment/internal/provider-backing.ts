@@ -15,21 +15,24 @@ export const canConsumePaymentResourceProviders = (
   providers: readonly CardProvidedPaymentResourceProvider[] | undefined,
 ): boolean => {
   const providerByKey = new Map((providers ?? []).map((provider) => [provider.key, provider]))
-  // Several provider keys may draw from one action-space pool; add their demand.
-  const demandByPool = new Map<string, { spaceId: string; resource: CardProvidedPaymentResourceProvider['consume']['resource']; amount: number }>()
+  // Aliased provider keys must share the same live backing balance.
+  const demandByPool = new Map<string, { available: number; amount: number }>()
   for (const key of Object.keys(solution.resourcesPaid)) {
     if (!key.includes(':')) continue
     const provider = providerByKey.get(key as CardProvidedPaymentResourceProvider['key'])
     const amount = solution.resourcesPaid[key as CardProvidedPaymentResourceProvider['key']] ?? 0
     if (amount <= 0) continue
-    if (!provider || !state) return false
-    if (amount > Math.max(0, Math.floor(provider.available))) return false
-    const { spaceId, resource } = provider.consume
-    const pool = `${spaceId}\0${resource}`
-    const demand = demandByPool.get(pool) ?? { spaceId, resource, amount: 0 }
+    if (!provider || !state || amount > Math.max(0, Math.floor(provider.available))) return false
+    const backing = provider.consume
+    const pool = backing.type === 'actionSpace'
+      ? JSON.stringify(['actionSpace', backing.spaceId, backing.resource])
+      : JSON.stringify(['card', backing.playerId, backing.cardId, backing.resource])
+    const available = backing.type === 'actionSpace'
+      ? findActionSpaceById(state, backing.spaceId)?.resources?.[backing.resource] ?? 0
+      : state.players.find(player => player.id === backing.playerId)?.cardStates?.[backing.cardId]?.counters?.[backing.resource] ?? 0
+    const demand = demandByPool.get(pool) ?? { available, amount: 0 }
     demand.amount += amount
     demandByPool.set(pool, demand)
   }
-  return [...demandByPool.values()].every(({ spaceId, resource, amount }) =>
-    (findActionSpaceById(state!, spaceId)?.resources?.[resource] ?? 0) >= amount)
+  return [...demandByPool.values()].every(({ available, amount }) => available >= amount)
 }

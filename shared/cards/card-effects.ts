@@ -835,6 +835,7 @@ export const collectExtraTurnContributions = (
   player: PlayerState,
   actionHooks?: ActionHookRegistry,
 ): ExtraTurnContribution[] => {
+  if (player.workPhaseSkippedAtRound !== undefined && player.workPhaseSkippedAtRound === state.round) return []
   const contributions: ExtraTurnContribution[] = []
   for (const cardId of extraTurnCardIds(player)) {
     const effect = getCardEffect(cardId)

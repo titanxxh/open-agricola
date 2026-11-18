@@ -1,3 +1,4 @@
+import { fieldHasCrop } from '../../../domain/field'
 import { installOfficialCardRegistry } from '../../__tests__/card-environment'
 
 installOfficialCardRegistry()
@@ -60,6 +61,35 @@ const createState = (player: PlayerState): GameState => ({
 } as GameState)
 
 describe('logical field boundary', () => {
+  it('keeps existing virtual coordinates and assigns noncolliding classic deck and slot coordinates', () => {
+    expect(deriveVirtualTileCol('B068_Beanfield', 0)).toBe(2068)
+    const coordinates = ['CE001_Field', 'CI001_Field', 'CK001_Field', 'CFL001_Field', 'CFL002_Field'].flatMap(id => [0, 1, 999].map(slot => deriveVirtualTileCol(id, slot)))
+    expect(new Set(coordinates).size).toBe(coordinates.length)
+    expect(() => deriveVirtualTileCol('CFL001_Field', 1000)).toThrow()
+    expect(() => deriveVirtualTileCol('CFL001_Field', -1)).toThrow()
+  })
+
+  it.each(['farmyard', 'card'])('harvests both mixed crops on a %s field while preserving the original field identity', (kind) => {
+    const cardId = 'A001_TestField'
+    makeCardFieldImpl(cardId, { allowedCrops: ['grain', 'vegetable'], capacity: 1 })
+    const player = createPlayer(kind === 'farmyard' ? { fields: [{ row: 0, col: 0, stacks: [] }] } : { minorPlayed: [cardId] })
+    const state = createState(player)
+    const target = { fieldId: kind === 'farmyard' ? 'farmyard:0:0' : `card:${cardId}`, slot: 0 }
+    const mutations = mutateLogicalFields(state, player)
+    expect(mutations.place(target, 'grain', 2).ok).toBe(true)
+    expect(mutations.addCompanion(target, 'vegetable', 1).ok).toBe(true)
+    expect(mutations.addCompanion(target, 'vegetable', 1)).toMatchObject({ ok: false })
+    expect(fieldHasCrop(getLogicalFields(player)[0]!, 'grain')).toBe(true)
+    expect(fieldHasCrop(getLogicalFields(player)[0]!, 'vegetable')).toBe(false)
+    const first = reap(state, player)
+    expect(first.reapSummary).toMatchObject({ resources: { grain: 1, vegetable: 1 }, grainFields: 1, vegetableFields: 0 })
+    expect(getLogicalFields(player)[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1, fieldIdentity: 'grain', independentHarvest: true }])
+    const second = reap(state, player)
+    expect(second.reapSummary.resources).toEqual({ grain: 1 })
+    expect(player.resources).toMatchObject({ grain: 2, vegetable: 1 })
+    expect(getLogicalFields(player)[0]!.stacks).toHaveLength(0)
+  })
+
   it.each([2, 4])('reaps %i crops across layers without adding a logical field or slot', (count) => {
     const cardId = 'D025_WitchesDanceFloor'
     makeCardFieldImpl(cardId, { allowedCrops: ['grain'], capacity: 1 })

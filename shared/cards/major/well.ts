@@ -19,6 +19,7 @@ const buildWellImpl = (cardId: string) => ({
 
 export const Major_Well = defineMajorCard({
   meta: {
+    wellIdentity: true,
   id: 'Major_Well',
   name: 'Well',
   deck: 'major',
@@ -33,6 +34,7 @@ export const Major_Well = defineMajorCard({
 
 export const Major_Well2 = defineMajorCard({
   meta: {
+    wellIdentity: true,
   id: 'Major_Well2',
   name: 'Well',
   deck: 'major',

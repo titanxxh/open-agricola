@@ -125,7 +125,7 @@ export const useAnimalReorgDraftPresentation = ({
       const player = state.players[pendingAnimalReorg.playerIndex]
       if (!player) return prev
       const current = prev.zones.find((zone) => zone.id === zoneId)
-      if (!current) return prev
+      if (!current || current.fixedAnimalCounts) return prev
       const capacity = current.capacity
       const totals = prev.zones.reduce((acc, zone) => {
         addAnimalCounts(acc, zoneAnimalCounts(zone))

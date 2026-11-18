@@ -1,3 +1,5 @@
+import { playerHasCardCapability } from '../helpers/card-type'
+import { discardHandCards } from '../helpers/hand-discard'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -19,7 +21,7 @@ const discardOccupations: ActionDefinition = {
   canBeExecutedByPlayer: (_state, player) => player.occupationPlayed.includes(CARD_ID),
   execute: ({ player, emitPrivateEvent }) => {
     const discarded = player.occupationHand
-    player.occupationHand = []
+    if (discarded.length > 0 && !discardHandCards(player, 'occupation', discarded)) return { type: 'fail', errorKey: 'log.actionFail' }
     if (discarded.length > 0) {
       emitPrivateEvent?.(cardEffectHandChangedEvent(player.id, discarded, 'occupation', CARD_ID, DISCARD_ACTION_ID))
     }
@@ -37,6 +39,7 @@ const loneOccupationListener: CardListenerRegistration = {
   zones: ['hand', 'played'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.actionId === 'occupation' && context.choice === CARD_ID) {
+      if (context.player.occupationHand.length > 1 && playerHasCardCapability(context.player, 'preventsHandDiscard')) return { doable: false }
       const hasOtherOccupation = context.player.occupationPlayed.some((id) => id !== CARD_ID)
       if (hasOtherOccupation || (context.player.extraOccupationsFromCards?.length ?? 0) > 0) {
         return { doable: false }

@@ -127,6 +127,11 @@ const buildPaymentSources = (
         from: { kind: 'actionSpace', spaceId: provider.consume.spaceId },
         resources: { [provider.consume.resource]: amount },
       })
+    } else {
+      sources.push({
+        from: { kind: 'card', playerId: provider.consume.playerId, cardId: provider.consume.cardId },
+        resources: { [provider.consume.resource]: amount },
+      })
     }
   }
 
@@ -236,6 +241,11 @@ const buildSelectedResult = (
   if (receipt.returnedCardId) {
     returnCardToBoard(player, receipt.returnedCardId, state)
   }
+  for (const transfer of receipt.paymentTransfers ?? []) eventSink?.emit<'resource.moved'>({
+    type: 'resource.moved', resources: transfer.resources,
+    from: { kind: 'supply' }, to: { kind: 'player', playerId: transfer.recipientPlayerId },
+    reason: 'cardEffect', sourceCardId: transfer.sourceCard,
+  })
   const resourcesPaid = receipt.resourcesPaid
   if (sourceCard && trackSourceCardPaymentStats) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)

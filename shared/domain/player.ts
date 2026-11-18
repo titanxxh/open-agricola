@@ -38,10 +38,10 @@ export const familySize = (p: PlayerState): number =>
   (p.workers ?? []).filter(w => w.isActive).length
 
 export const getFamilyTokenLimit = (p: PlayerState): number =>
-  (p.workers ?? []).filter(w => !w.removedFromSupply).length
+  (p.workers ?? []).filter(w => !w.removedFromSupply && !w.isGuest).length
 
 export const inactiveWorkersInSupply = (p: PlayerState): Worker[] =>
-  (p.workers ?? []).filter(w => !w.isActive && !w.removedFromSupply && !w.supplyUse)
+  (p.workers ?? []).filter(w => !w.isGuest && !w.isActive && !w.removedFromSupply && !w.supplyUse)
 
 export const hasInactiveWorkerInSupply = (p: PlayerState): boolean =>
   inactiveWorkersInSupply(p).length > 0
@@ -67,6 +67,7 @@ export const workersAtHome = (state: GameState, p: PlayerState): Worker[] => {
 }
 
 export const availableWorkers = (state: GameState, p: PlayerState): Worker[] => {
+  if (p.workPhaseSkippedAtRound !== undefined && p.workPhaseSkippedAtRound === state.round) return []
   const held = getCardHeldWorkerIds(p)
   return (p.workers ?? []).filter((worker) =>
     (worker.isActive || worker.supplyUse?.status === 'temporary') &&

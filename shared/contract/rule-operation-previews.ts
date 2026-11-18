@@ -7,6 +7,7 @@ export type RuleActivatedOperationPreview =
   | { kind: 'supply-worker-placement' }
   | { kind: 'supply-worker-turn' }
   | { kind: 'move-worker-from-space'; spaceId: string; spaceNameKey: string }
+  | { kind: 'repay-resource-debt'; resource: keyof Resource; amount: number; shortfallResource: keyof Resource; shortfall: number }
   | { kind: 'card-fact-refund'; resource: keyof Resource; paidAmount: number; amount: number; divisor: number }
   | { kind: 'take-stored-resources'; resources: Partial<Resource>; takeAll: true }
   | { kind: 'harvest-selected-supply-reward'; crop: 'grain' | 'vegetable'; selectedFields: number; appliedFields: number | null }

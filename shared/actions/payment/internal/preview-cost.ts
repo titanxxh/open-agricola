@@ -68,6 +68,18 @@ export const resolveCardCostWithModifiersDetailed = (
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
   const collectedPaymentResourceProviders: CardProvidedPaymentResourceProvider[] = []
+  const transfers: NonNullable<ComplexCost['paymentTransfers']> = []
+  const withTransfers = (base: PaymentResourceMap | ComplexCost): PaymentResourceMap | ComplexCost => {
+    if (!transfers.length) return base
+    const result: ComplexCost = isComplexCost(base) ? { ...base } : { fee: base }
+    result.paymentTransfers = [...(result.paymentTransfers ?? []), ...transfers]
+    result.protectedFee = { ...result.protectedFee }
+    for (const transfer of transfers) for (const [key, amount] of Object.entries(transfer.resources)) {
+      const resource = key as keyof Resource
+      if (typeof amount === 'number' && amount > 0) result.protectedFee[resource] = (result.protectedFee[resource] ?? 0) + amount
+    }
+    return result
+  }
   const transforms: CandidateTransform<CardCostCandidate>[] = []
   let cost: PaymentResourceMap = isComplexCost(baseCost) ? {} : { ...baseCost }
   let candidates = normalizeCardCostCandidates(baseCost)
@@ -103,6 +115,7 @@ export const resolveCardCostWithModifiersDetailed = (
         })),
       )
     }
+    if (result?.paymentTransfers) transfers.push(...result.paymentTransfers)
     if (result?.bonuses) {
       collectedBonuses.push(...result.bonuses)
     }
@@ -152,7 +165,7 @@ export const resolveCardCostWithModifiersDetailed = (
       ]
     }
     return {
-      cost: complexCost,
+      cost: withTransfers(complexCost),
       candidateMetadataByFeeIndex: buildCandidateMetadataByFeeIndex(candidates),
     }
   }
@@ -163,7 +176,7 @@ export const resolveCardCostWithModifiersDetailed = (
       collectedTrades.length === 0 &&
       collectedPaymentResourceProviders.length === 0
     ) {
-      return { cost: baseCost }
+      return { cost: withTransfers(baseCost) }
     }
     const merged: ComplexCost = { ...baseCost }
     if (collectedTrades.length > 0) {
@@ -178,7 +191,7 @@ export const resolveCardCostWithModifiersDetailed = (
         ...collectedPaymentResourceProviders,
       ]
     }
-    return { cost: merged }
+    return { cost: withTransfers(merged) }
   }
 
   if (
@@ -198,10 +211,10 @@ export const resolveCardCostWithModifiersDetailed = (
     if (collectedPaymentResourceProviders.length > 0) {
       complexCost.paymentResourceProviders = collectedPaymentResourceProviders
     }
-    return { cost: complexCost }
+    return { cost: withTransfers(complexCost) }
   }
 
-  return { cost }
+  return { cost: withTransfers(cost) }
 }
 
 export const resolveCardCostWithModifiers = (
