@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FULL_TASK_IDS, type FullTaskId, type VerificationCommand } from '../ci/verification-tasks'
-import { BROWSER_PORT_SLICES, TASK_ORDER, assertNoReservedCandidatePaths, browserEnvironment, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
+import { BROWSER_PORT_SLICES, TASK_ORDER, budgetPool, taskCost, assertNoReservedCandidatePaths, browserEnvironment, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -24,7 +24,7 @@ function inputs(channel: 'stable' | 'prerelease'): Inputs {
   return { channel, sha, producerSha: producer, output, jobs: 4, repository: 'titanxxh/open-agricola', repositoryId: 123, tree: 'e'.repeat(40),
     configuration: 'a'.repeat(64), producerConfiguration: 'b'.repeat(64), commands, ownerUid: 1000,
     node: { path: '/opt/oa-owner-local/node/bin/node', version: 'v24.19.0', sha256: 'f'.repeat(64) }, dockerVersion: '29.6.2',
-    policyFiles: { 'scripts/ci/owner-local-run.ts': '1'.repeat(64) }, servicePorts: { postgres: 41001, objects: 41002 }, retries: 1, testWorkers: 6, publicAssets: assets, profile: false, browserJobs: 2, ownerHome: '/home/owner', lanes: 3 }
+    policyFiles: { 'scripts/ci/owner-local-run.ts': '1'.repeat(64) }, servicePorts: { postgres: 41001, objects: 41002 }, retries: 1, testWorkers: 6, publicAssets: assets, profile: false, browserJobs: 2, ownerHome: '/home/owner', lanes: 3, cpuBudget: 20 }
 }
 
 /** Records every call; each candidate command writes its log and exits with the configured code. */
@@ -92,6 +92,46 @@ describe('owner-local task environment and scheduling', () => {
   })
 })
 
+describe('owner-local CPU budget scheduling', () => {
+  async function trace(items: string[], budget: number, cost: (item: string) => number | 'exclusive') {
+    const events: string[] = [], running = new Set<string>()
+    let peak = 0
+    await budgetPool(items, budget, cost, async item => {
+      running.add(item); events.push(`+${item}`)
+      const price = cost(item)
+      peak = Math.max(peak, [...running].reduce((sum, name) => sum + (cost(name) === 'exclusive' ? budget : cost(name) as number), 0))
+      if (price === 'exclusive') expect(running.size).toBe(1)
+      await new Promise(done => setTimeout(done, 2))
+      running.delete(item); events.push(`-${item}`)
+    })
+    return { events, peak }
+  }
+
+  it('runs exclusive items alone in order and fills the budget with the rest', async () => {
+    const costs: Record<string, number | 'exclusive'> = { fast: 'exclusive', slow: 'exclusive', a: 8, b: 8, c: 8, d: 2, e: 2 }
+    const { events, peak } = await trace(['fast', 'slow', 'a', 'b', 'c', 'd', 'e'], 20, item => costs[item])
+    expect(events.slice(0, 4)).toEqual(['+fast', '-fast', '+slow', '-slow'])
+    expect(peak).toBeLessThanOrEqual(20)
+    // a and b fill 16, then the small d and e fit before c, which waits for a lane budget.
+    expect(events.slice(4, 8)).toEqual(['+a', '+b', '+d', '+e'])
+  })
+
+  it('still runs an item costlier than the whole budget, alone', async () => {
+    const { events } = await trace(['big', 'small'], 4, item => item === 'big' ? 10 : 1)
+    expect(events).toEqual(['+big', '-big', '+small', '-small'])
+    await expect(budgetPool([1], 0, () => 1, async () => {})).rejects.toThrow(/positive integer/)
+    for (const jobs of [0, -1, Number.NaN, 1.5]) await expect(budgetPool([1], 4, () => 1, async () => {}, jobs)).rejects.toThrow(/job limit/)
+  })
+
+  it('prices the Vitest suites exclusive and browser lanes at two cores each', () => {
+    expect(taskCost('fast', 2)).toBe('exclusive')
+    expect(taskCost('slow', 2)).toBe('exclusive')
+    expect(taskCost('chromium-3', 2)).toBe(4)
+    expect(taskCost('webkit', 2) as number + (taskCost('browser-sandbox', 2) as number) + 4 * (taskCost('chromium-1', 2) as number)).toBe(20)
+    expect(TASK_ORDER.slice(0, 2)).toEqual(['fast', 'slow'])
+  })
+})
+
 describe('owner-local browser task environment', () => {
   it('gives every browser task a disjoint port slice and lanes only to chromium tasks', () => {
     const slices = Object.values(BROWSER_PORT_SLICES).map(range => range!.split('-').map(Number))
@@ -131,10 +171,10 @@ describe('isolated owner-local run', () => {
     expect(fake.calls.some(call => call.startsWith('candidate services ') && call.includes('scripts/local-services.mjs --test'))).toBe(true)
     // Every candidate command, preparation included, uses the run's own service ports.
     const candidateCalls = fake.calls.filter(call => call.startsWith('candidate '))
-    expect(candidateCalls.every(call => call.includes('"LOCAL_POSTGRES_PORT":"41001","LOCAL_S3_PORT":"41002","TMPDIR":"/home/oa-candidate/tmp","PUBLIC_ASSET_VALIDATION_DIR":"/home/oa-candidate/public-assets","VITEST_MAX_WORKERS":"6"') && call.includes(' PrivateTmp=yes,InaccessiblePaths=/home/owner'))).toBe(true)
+    expect(candidateCalls.every(call => call.includes('"LOCAL_POSTGRES_PORT":"41001","LOCAL_S3_PORT":"41002","TMPDIR":"/home/oa-candidate/tmp","PUBLIC_ASSET_VALIDATION_DIR":"/home/oa-candidate/public-assets","E2E_PUBLIC_ASSET_DIR":"/home/oa-candidate/public-assets","VITEST_MAX_WORKERS":"6"') && call.includes(' PrivateTmp=yes,InaccessiblePaths=/home/owner'))).toBe(true)
     // The browser wave starts only after every CPU-bound task finished.
     const taskStarts = candidateCalls.filter(call => call.startsWith('candidate task-')).map(call => call.split(' ')[1].replace(/^task-|-\d+$/g, ''))
-    expect(taskStarts.slice(0, taskStarts.findIndex(task => task.startsWith('chromium')))).toEqual(['fast', 'fast'])
+    expect(taskStarts.slice(0, taskStarts.findIndex(task => task.startsWith('chromium')))).toEqual(['fast', 'fast', 'slow'])
     expect(taskStarts.findIndex(task => task.startsWith('chromium'))).toBeGreaterThan(taskStarts.lastIndexOf('fast'))
     const receipt = JSON.parse(readFileSync(result.receipt, 'utf8'))
     expect(receipt.tasks.map((task: { id: string }) => task.id)).toEqual([...FULL_TASK_IDS])
@@ -180,6 +220,22 @@ describe('isolated owner-local run', () => {
     const value = inputs('prerelease'), fake = fakeRunner(value, { changed: ['webkit'] })
     expect(await runIsolated(value, fake.runner)).toEqual({ failed: ['webkit source: Changed candidate source: x'] })
     expect(existsSync(join(value.output, 'pre-verification.json'))).toBe(false)
+  })
+
+  it('retries a downloading preparation step with its own logs and gives up after three attempts', async () => {
+    const slept: number[] = [], sleep = async (ms: number) => { slept.push(ms) }
+    {
+      const value = inputs('stable'), fake = fakeRunner(value, { exit: { services: 1, 'services-a1': 1 } })
+      const result = await runIsolated(value, fake.runner, Date.now, sleep)
+      if ('failed' in result) throw new Error(result.failed.join('; '))
+      expect(fake.calls.filter(call => /^candidate services(-a\d)? /.test(call)).map(call => call.split(' ')[1])).toEqual(['services', 'services-a1', 'services-a2'])
+      expect(JSON.parse(readFileSync(result.evidence, 'utf8')).prerequisites.preparation.filter((row: { phase: string }) => row.phase.startsWith('services'))
+        .map((row: { phase: string; exitCode: number }) => [row.phase, row.exitCode])).toEqual([['services', 1], ['services-a1', 1], ['services-a2', 0]])
+      const failing = inputs('stable'), down = fakeRunner(failing, { exit: { services: 1, 'services-a1': 1, 'services-a2': 1 } })
+      expect(await runIsolated(failing, down.runner, Date.now, sleep)).toEqual({ failed: ['Candidate services failed (exit 1)'] })
+      expect(down.calls.filter(call => call.startsWith('isolation')).map(call => call.split(' ')[1])).toEqual(['start', 'stop', 'cleanup'])
+      expect(slept).toEqual([5_000, 5_000, 5_000, 5_000])
+    }
   })
 
   it('tears down after a failed preparation or a partly failed start', async () => {
