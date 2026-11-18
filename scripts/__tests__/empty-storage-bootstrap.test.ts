@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, expect, it, vi } from 'vitest'
 import { databaseMaintenance, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 import { testStorageEnvironment } from '../../server/__tests__/_helpers/objects'
 import { releaseAll } from '../../server/__tests__/_helpers/release-all'
@@ -10,15 +10,31 @@ import { archiveCommand } from '../storage-archive-cli'
 
 const cleanups: (() => unknown)[] = []
 afterEach(async () => { await releaseAll(cleanups.splice(0)); vi.restoreAllMocks() })
+// Every test still gets a brand-new database, but they are dropped together once the file ends. DROP DATABASE waits
+// for an immediate checkpoint (wait event IPC:CheckpointDone) that syncs every relation file the rest of the fast suite
+// has dirtied: up to 45 s in a local 20-worker run, longer behind a WAL-triggered checkpoint, so one wait per test
+// overran the 10 s afterEach budget. Concurrent drops on separate connections share the same one or two checkpoints,
+// so the file waits once, under a budget sized for that measured worst case.
+const databases: string[] = []
+const admin = databaseMaintenance()
+afterAll(async () => {
+  const drops = await Promise.allSettled(databases.splice(0).map(async name => {
+    const connection = databaseMaintenance()
+    await releaseAll([() => connection.exec(`DROP DATABASE IF EXISTS "${name}"`), () => connection.close()])
+  }))
+  await admin.close()
+  const failures = drops.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
+  if (failures.length) throw new AggregateError(failures, 'Dropping bootstrap test databases failed')
+}, 300_000)
 async function fixture() {
-  const admin = databaseMaintenance(), name = `bootstrap_${randomUUID().replaceAll('-', '')}`
+  const name = `bootstrap_${randomUUID().replaceAll('-', '')}`
   await admin.exec(`CREATE DATABASE "${name}"`)
+  databases.push(name)
   const url = new URL(getTestDatabaseUrl()); url.pathname = `/${name}`
   const db = new PostgresDatabase({ connectionString: url.toString() }), prefix = `test/${randomUUID()}/`
   const env = { ...testStorageEnvironment(), DATABASE_URL: url.toString(), S3_PREFIX: prefix, GAME_BUILD_ID: 'c'.repeat(40) }
   const objects = S3ObjectStore.fromEnv(env)
-  cleanups.push(() => releaseAll([() => objects.clearPrefix(), () => objects.close(), () => db.close(),
-    () => admin.exec(`DROP DATABASE IF EXISTS "${name}"`), () => admin.close()]))
+  cleanups.push(() => releaseAll([() => objects.clearPrefix(), () => objects.close(), () => db.close()]))
   const output = vi.spyOn(console, 'log').mockImplementation(() => {})
   return { db, objects, env, output, check: () => archiveCommand(['check-empty', env.GAME_BUILD_ID, '--applications-stopped'], env) }
 }
