@@ -837,6 +837,12 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 素材仓 HEAD 必须等于 `public-assets.ref`，`assets/` 必须干净，全部必需文件必须已纳入该提交且实际存在。该设置同样适用于 `pnpm verify` 和 Replay Viewer 构建。构建 URL 仍使用固定版本的 Pages 来源。这证明本地素材内容有效，不代表线上 Pages 已验证；未显式设置时仍检查远端元数据。
 
+正式 Pages 构建还读取同次资产发布的 `asset-digests.json`。它核对固定版本以及 `asset-manifest.json` 中每个路径对应的 SHA-256，再将哈希表打入 `/sw.js`。设置 `PUBLIC_ASSET_VALIDATION_DIR` 时，从干净的素材仓 checkout 计算同样的摘要。开发、自托管、预发布和 Replay Viewer 均不注册此 Worker。
+
+缓存按 URL 和 SHA-256 跨应用版本复用已校验素材。未命中时用不带凭证的 CORS 请求重新验证。哈希不符的字节仍可供页面使用，Worker 跳过写入。常规激活等待受控页面退出，只清理自身缓存的旧条目。
+
+需要暂停缓存时，将 `scripts/vite-public-asset-worker.ts` 的 `PUBLIC_ASSET_CACHE_ENABLED` 设为 `false`，按正常发布门禁发布新的正式 Pages 候选。保持 `/sw.js` 的地址和作用域。浏览器安装并激活替换版本后恢复普通素材请求，已打开的标签页无需刷新。发布使用仍有效的素材 pin；缺少 `/sw.js` 的历史产物无法替换浏览器已有的 Worker。
+
 图片站按来源地址限流，同一台机器并行运行多个浏览器任务时，卡图请求会收到 HTTP 429。浏览器验收可让开发服务器直接提供同一个固定版本的 checkout：
 
 ```bash

@@ -1,11 +1,14 @@
 import { execFileSync } from 'node:child_process'
-import { readFile, stat } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { lstat, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 export const LOCAL_PUBLIC_ASSET_BASE_URL = '/__public-assets__/'
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/
+const SHA256_PATTERN = /^[0-9a-f]{64}$/
 const ASSET_PATH_PATTERN = /^assets\/(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/
+const PUBLISHED_ASSET_EXTENSION = /\.(jpg|png|webp|woff2|woff|ttf|txt)$/
 
 type Fetcher = (input: string | URL, init?: RequestInit) => Promise<Response>
 
@@ -18,6 +21,7 @@ export type PublicAssetConfig = {
   baseUrl: string
   version: string
   requiredFiles: string[]
+  digests?: Readonly<Record<string, string>>
   localDir?: string
   /** The local directory is a verified checkout of `version`: a missing file is a 404, as on the asset site. */
   pinned?: boolean
@@ -84,6 +88,38 @@ const parseManifest = (value: unknown): PublicAssetManifest => {
   }
 }
 
+const parseDigests = (text: string, manifest: PublicAssetManifest): Record<string, string> => {
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch (error) {
+    throw new Error('Invalid public asset digests JSON', { cause: error })
+  }
+  if (
+    !value || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).sort().join(',') !== 'digests,version'
+    || !('version' in value) || typeof value.version !== 'string' || !SHA_PATTERN.test(value.version)
+    || !('digests' in value) || !value.digests || typeof value.digests !== 'object' || Array.isArray(value.digests)
+  ) {
+    throw new Error('Invalid public asset digests')
+  }
+  if (value.version !== manifest.version) {
+    throw new Error(`Public asset digests version does not match ${manifest.version}`)
+  }
+
+  const missing = new Set(manifest.files)
+  const digests: Record<string, string> = {}
+  for (const [file, digest] of Object.entries(value.digests)) {
+    if (!missing.delete(file)) throw new Error(`Public asset digests contain unexpected file: ${file}`)
+    if (typeof digest !== 'string' || !SHA256_PATTERN.test(digest)) {
+      throw new Error(`Invalid public asset SHA-256: ${file}`)
+    }
+    digests[file] = digest
+  }
+  if (missing.size) throw new Error(`Public asset digests are missing file: ${missing.values().next().value}`)
+  return digests
+}
+
 const readJson = async (filePath: string, label: string): Promise<unknown> => {
   try {
     return JSON.parse(await readFile(filePath, 'utf8'))
@@ -106,7 +142,7 @@ const fetchText = async (url: URL, fetcher: Fetcher, init?: RequestInit): Promis
 }
 
 /** A clean asset-repository checkout at exactly `version` that tracks and contains every required file. */
-const assertPinnedCheckout = async (directory: string, version: string, requiredFiles: string[]): Promise<void> => {
+const assertPinnedCheckout = async (directory: string, version: string, requiredFiles: string[]): Promise<string[]> => {
   const git = (...args: string[]): string => execFileSync('git', ['-C', directory, ...args], {
     encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
   }).trim()
@@ -122,6 +158,19 @@ const assertPinnedCheckout = async (directory: string, version: string, required
       throw new Error(`Public asset checkout is missing required file: ${file}`)
     }
   }
+  return [...available]
+}
+
+const hashPinnedAssets = async (directory: string, files: string[]): Promise<Record<string, string>> => {
+  const digests: Record<string, string> = {}
+  for (const file of parseFileList(files.sort(), 'Public asset checkout')) {
+    const asset = path.join(directory, file)
+    if (!PUBLISHED_ASSET_EXTENSION.test(file) || !(await lstat(asset)).isFile()) {
+      throw new Error(`Unsupported public asset checkout file: ${file}`)
+    }
+    digests[file] = createHash('sha256').update(await readFile(asset)).digest('hex')
+  }
+  return digests
 }
 
 export const loadPublicAssetConfig = async ({
@@ -131,6 +180,7 @@ export const loadPublicAssetConfig = async ({
   allowLocal = !env.CI,
   devServer = false,
   validateRemote = true,
+  includeDigests = false,
 }: {
   rootDir?: string
   env?: NodeJS.ProcessEnv
@@ -139,6 +189,8 @@ export const loadPublicAssetConfig = async ({
   /** Only the main site's development server honours `E2E_PUBLIC_ASSET_DIR`; every build ignores it. */
   devServer?: boolean
   validateRemote?: boolean
+  /** Include the hash table required by the formal Pages asset Worker. */
+  includeDigests?: boolean
 } = {}): Promise<PublicAssetConfig> => {
   const version = (await readFile(path.join(rootDir, 'public-assets.ref'), 'utf8')).trim()
   if (!SHA_PATTERN.test(version)) {
@@ -152,6 +204,10 @@ export const loadPublicAssetConfig = async ({
   )
   if (requiredFiles.length === 0) {
     throw new Error('public-assets.required.json must contain at least one path')
+  }
+
+  if (includeDigests && (!validateRemote || devServer || env.PUBLIC_ASSET_LOCAL_DIR)) {
+    throw new Error('Public asset digests require validated Pages assets')
   }
 
   if (env.PUBLIC_ASSET_LOCAL_DIR) {
@@ -182,8 +238,10 @@ export const loadPublicAssetConfig = async ({
   }
 
   if (env.PUBLIC_ASSET_VALIDATION_DIR) {
-    await assertPinnedCheckout(path.resolve(rootDir, env.PUBLIC_ASSET_VALIDATION_DIR), version, requiredFiles)
-    return { baseUrl: publicAssetBaseUrl(), version, requiredFiles }
+    const directory = path.resolve(rootDir, env.PUBLIC_ASSET_VALIDATION_DIR)
+    const files = await assertPinnedCheckout(directory, version, requiredFiles)
+    const config = { baseUrl: publicAssetBaseUrl(), version, requiredFiles }
+    return includeDigests ? { ...config, digests: await hashPinnedAssets(directory, files) } : config
   }
 
   const baseUrl = publicAssetBaseUrl()
@@ -196,9 +254,10 @@ export const loadPublicAssetConfig = async ({
     cache: 'no-store',
     headers: { 'cache-control': 'no-cache' },
   }
-  const [liveVersion, manifestText] = await Promise.all([
+  const [liveVersion, manifestText, digestsText] = await Promise.all([
     fetchText(metadataUrl('asset-version.txt'), fetcher, requestOptions),
     fetchText(metadataUrl('asset-manifest.json'), fetcher, requestOptions),
+    includeDigests ? fetchText(metadataUrl('asset-digests.json'), fetcher, requestOptions) : undefined,
   ])
   if (liveVersion.trim() !== version) {
     throw new Error(`Public asset Pages version does not match ${version}`)
@@ -219,7 +278,8 @@ export const loadPublicAssetConfig = async ({
     throw new Error(`Public asset manifest is missing required file: ${missing}`)
   }
 
-  return { baseUrl, version, requiredFiles }
+  const config = { baseUrl, version, requiredFiles }
+  return digestsText === undefined ? config : { ...config, digests: parseDigests(digestsText, manifest) }
 }
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

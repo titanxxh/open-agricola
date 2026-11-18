@@ -16,6 +16,12 @@ import {
 
 const VERSION = '452535ad419b8ea546ef73d9a410847bfae08e25'
 const REQUIRED_FILES = ['assets/a.png', 'assets/b.webp']
+const DIGESTS = {
+  'assets/a.png': '4206c3d1d0f27d43bf24dbcf501427970fa5cfbc334f59ec824d8b43145f8b5c',
+  'assets/b.webp': 'da3309461a599c1ec12dc26994c0fc5b629df310d367ca12eb3785ef57396108',
+  'assets/license.txt': 'c4695effbc5ca332564175cd0a531e2c474a10737cd1f84f877f742ece96cb80',
+  'assets/z.jpg': '2890b6ce0c7d594d52f0ec4f9d632cd385f3e3785538c794b1fc4138bb98b29d',
+}
 const tempDirs: string[] = []
 
 const createContract = async (files = REQUIRED_FILES): Promise<string> => {
@@ -37,6 +43,11 @@ const inventoryFetcher = (
     ? `${version}\n`
     : JSON.stringify({ version, files })),
 )
+
+const digestFetcher = (digestManifest: unknown) => inventoryFetcher(Object.keys(DIGESTS))
+  .mockResolvedValueOnce(new Response(`${VERSION}\n`))
+  .mockResolvedValueOnce(new Response(JSON.stringify({ version: VERSION, files: Object.keys(DIGESTS) })))
+  .mockResolvedValueOnce(new Response(JSON.stringify(digestManifest)))
 
 const createAssetCheckout = async (files = REQUIRED_FILES) => {
   const rootDir = await createContract()
@@ -97,12 +108,61 @@ describe('public asset contract', () => {
     ).rejects.toThrow('missing required file: assets/b.webp')
   })
 
+  it('loads the pinned SHA-256 table from Pages metadata without fetching asset bytes', async () => {
+    const rootDir = await createContract()
+    const fetcher = digestFetcher({ version: VERSION, digests: DIGESTS })
+    const baseUrl = publicAssetBaseUrl()
+
+    await expect(loadPublicAssetConfig({ rootDir, fetcher, includeDigests: true }))
+      .resolves.toEqual({ baseUrl, version: VERSION, requiredFiles: REQUIRED_FILES, digests: DIGESTS })
+    expect(fetcher.mock.calls.map(([input]) => new URL(input).href)).toEqual(
+      ['asset-version.txt', 'asset-manifest.json', 'asset-digests.json'].map(file => `${baseUrl}${file}?v=${VERSION}`),
+    )
+    expect(fetcher.mock.calls[2]?.[1]).toEqual({ cache: 'no-store', headers: { 'cache-control': 'no-cache' } })
+  })
+
+  it.each([
+    [{ version: '0'.repeat(40), digests: DIGESTS }, 'digests version does not match'],
+    [{ version: VERSION, digests: { ...DIGESTS, 'assets/z.jpg': '0'.repeat(63) } }, 'Invalid public asset SHA-256: assets/z.jpg'],
+    [{ version: VERSION, digests: { ...DIGESTS, 'assets/z.jpg': 'A'.repeat(64) } }, 'Invalid public asset SHA-256: assets/z.jpg'],
+    [{ version: VERSION, digests: { 'assets/a.png': DIGESTS['assets/a.png'], 'assets/b.webp': DIGESTS['assets/b.webp'] } }, 'digests are missing file: assets/license.txt'],
+    [{ version: VERSION, digests: { ...DIGESTS, 'assets/extra.jpg': '0'.repeat(64) } }, 'digests contain unexpected file: assets/extra.jpg'],
+    [{ version: VERSION, digests: [], extra: true }, 'Invalid public asset digests'],
+  ])('rejects a mismatched or malformed digest manifest', async (manifest, message) => {
+    const rootDir = await createContract()
+    await expect(loadPublicAssetConfig({ rootDir, fetcher: digestFetcher(manifest), includeDigests: true }))
+      .rejects.toThrow(message)
+  })
+
+  it('rejects unavailable or non-JSON digest metadata', async () => {
+    const rootDir = await createContract()
+    for (const [response, error] of [
+      [new Response('Not Found', { status: 404 }), 'asset-digests.json'],
+      [new Response('<html>Not a digest manifest</html>'), 'Invalid public asset digests JSON'],
+    ] as const) {
+      const fetcher = inventoryFetcher()
+        .mockResolvedValueOnce(new Response(`${VERSION}\n`))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ version: VERSION, files: REQUIRED_FILES })))
+        .mockResolvedValueOnce(response)
+      await expect(loadPublicAssetConfig({ rootDir, fetcher, includeDigests: true })).rejects.toThrow(error)
+    }
+  })
+
   it('validates a pinned clean local checkout without contacting Pages or changing build URLs', async () => {
     const { rootDir, directory, version } = await createAssetCheckout()
     const fetcher = vi.fn(() => Promise.reject(new Error('unexpected fetch')))
     await expect(loadPublicAssetConfig({
       rootDir, env: { PUBLIC_ASSET_VALIDATION_DIR: directory }, fetcher, allowLocal: false,
     })).resolves.toEqual({ baseUrl: publicAssetBaseUrl(), version, requiredFiles: REQUIRED_FILES })
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('derives the same full digest table offline from the pinned checkout', async () => {
+    const { rootDir, directory, version } = await createAssetCheckout(Object.keys(DIGESTS))
+    const fetcher = vi.fn(() => Promise.reject(new Error('unexpected fetch')))
+    await expect(loadPublicAssetConfig({
+      rootDir, env: { PUBLIC_ASSET_VALIDATION_DIR: directory }, fetcher, allowLocal: false, includeDigests: true,
+    })).resolves.toEqual({ baseUrl: publicAssetBaseUrl(), version, requiredFiles: REQUIRED_FILES, digests: DIGESTS })
     expect(fetcher).not.toHaveBeenCalled()
   })
 

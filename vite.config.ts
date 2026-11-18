@@ -4,6 +4,7 @@ import path from 'path'
 import fs from 'fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { browserCardTestsPlugin } from './scripts/vite-browser-card-tests.ts'
+import { publicAssetWorkerPlugin, PUBLIC_ASSET_CACHE_ENABLED } from './scripts/vite-public-asset-worker.ts'
 import { loadBrowserDataDefines } from './scripts/browser-data.ts'
 import {
   isViteDevServerCli,
@@ -11,10 +12,13 @@ import {
   publicAssetUrls,
 } from './scripts/public-assets.ts'
 
+const pagesWorker = process.env.OPEN_AGRICOLA_FRONTEND_TARGET === 'stable-pages'
+  && process.argv.includes('build') && process.env.VITEST !== 'true'
 const publicAssets = await loadPublicAssetConfig({
   allowLocal: !process.argv.includes('build') && !process.env.CI,
   devServer: isViteDevServerCli(),
   validateRemote: process.env.VITEST !== 'true',
+  includeDigests: pagesWorker && PUBLIC_ASSET_CACHE_ENABLED,
 })
 const browserDataDefines = process.argv.includes('build') && process.env.VITEST !== 'true'
   ? loadBrowserDataDefines(import.meta.dirname)
@@ -63,6 +67,7 @@ const plugins: PluginOption[] = [
 if (publicAssets.localDir) {
   plugins.push(servePublicAssets(publicAssets.localDir, publicAssets.pinned === true))
 }
+if (pagesWorker) plugins.push(publicAssetWorkerPlugin(publicAssets))
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
@@ -114,5 +119,6 @@ export default defineConfig({
     'import.meta.env.VITE_GAME_BUILD_ID': JSON.stringify(process.env.GAME_BUILD_ID ?? 'development'),
     'import.meta.env.VITE_RELEASE_CHANNEL': JSON.stringify(process.env.RELEASE_CHANNEL ?? 'stable'),
     'import.meta.env.VITE_PUBLIC_ASSET_BASE_URL': JSON.stringify(publicAssets.baseUrl),
+    'import.meta.env.VITE_PUBLIC_ASSET_WORKER': JSON.stringify(pagesWorker ? '1' : '0'),
   },
 })

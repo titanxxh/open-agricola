@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { createServer, request as httpRequest, type ClientRequest, type IncomingMessage } from 'node:http'
+import { createServer, request as httpRequest, type ClientRequest, type IncomingMessage, type ServerResponse } from 'node:http'
 import { join, resolve } from 'node:path'
 import type { Duplex } from 'node:stream'
 import { createFrontendHosting } from '../../server/frontend-hosting'
@@ -18,6 +18,30 @@ export async function startHostedReleaseApp({ backendUrl, frontendOrigin, direct
   frontendOrigin: string
   directory?: string
 }): Promise<HostedReleaseApp> {
+  const root = resolve(directory), metadata: unknown = JSON.parse(readFileSync(join(root, 'frontend-build.json'), 'utf8'))
+  if (!metadata || typeof metadata !== 'object' || !('gameBuildId' in metadata)
+    || typeof metadata.gameBuildId !== 'string' || !metadata.gameBuildId) {
+    throw new Error('Build the hosted frontend before starting the release rehearsal')
+  }
+  const { gameBuildId } = metadata
+  let hosting: ReturnType<typeof createFrontendHosting> | undefined
+  const app = await startReleaseAppProxy({
+    backendUrl, frontendOrigin,
+    serveFrontend: (request, response) => hosting?.(request, response) ?? false,
+  })
+  try {
+    const appUrl = `${app.origin}${HOSTED_APP_PATH}`
+    hosting = createFrontendHosting({ FRONTEND_ROOT: root, GAME_BUILD_ID: gameBuildId,
+      PUBLIC_APP_ORIGIN: appUrl, PUBLIC_API_BASE: app.origin })
+    return { appUrl, apiUrl: app.origin, gameBuildId, close: app.close }
+  } catch (error) { await app.close(); throw error }
+}
+
+export async function startReleaseAppProxy({ backendUrl, frontendOrigin, serveFrontend }: {
+  backendUrl: string
+  frontendOrigin: string
+  serveFrontend(request: IncomingMessage, response: ServerResponse): boolean | Promise<boolean>
+}) {
   const backend = new URL(backendUrl), trustedOrigin = new URL(frontendOrigin)
   if (backend.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(backend.hostname)
     || backend.username || backend.password || backend.search || backend.hash || backend.pathname !== '/') {
@@ -27,13 +51,8 @@ export async function startHostedReleaseApp({ backendUrl, frontendOrigin, direct
     || trustedOrigin.search || trustedOrigin.hash || trustedOrigin.pathname !== '/') {
     throw new Error('The trusted frontend must be an HTTP or HTTPS origin')
   }
-  const root = resolve(directory), metadata: unknown = JSON.parse(readFileSync(join(root, 'frontend-build.json'), 'utf8'))
-  if (!metadata || typeof metadata !== 'object' || !('gameBuildId' in metadata)
-    || typeof metadata.gameBuildId !== 'string' || !metadata.gameBuildId) {
-    throw new Error('Build the hosted frontend before starting the release rehearsal')
-  }
-  const gameBuildId = metadata.gameBuildId, sockets = new Set<Duplex>(), requests = new Set<ClientRequest>()
-  let appOrigin = '', hosting: ReturnType<typeof createFrontendHosting> | undefined, closing: Promise<void> | undefined
+  const sockets = new Set<Duplex>(), requests = new Set<ClientRequest>()
+  let appOrigin = '', closing: Promise<void> | undefined
   const track = (socket: Duplex) => {
     if (sockets.has(socket)) return
     sockets.add(socket)
@@ -55,17 +74,26 @@ export async function startHostedReleaseApp({ backendUrl, frontendOrigin, direct
   }
   const server = createServer((request, response) => {
     void (async () => {
-      if (!hosting) { response.writeHead(503); response.end('Hosted frontend is starting'); return }
-      if (await hosting(request, response)) return
+      if (await serveFrontend(request, response)) return
       const path = new URL(request.url ?? '/', appOrigin).pathname
-      if (!/^\/api(?:\/|$)/.test(path)) { response.writeHead(404); response.end('Not found'); return }
+      if (!/^\/(?:api|replay-viewers|replay-assets)(?:\/|$)/.test(path)) {
+        response.writeHead(404); response.end('Not found'); return
+      }
       let cancelled = false
       const upstream = trackRequest(httpRequest(backendTarget(request), {
         method: request.method, headers: forwardedHeaders(request),
       }, result => {
         result.on('aborted', () => response.destroy())
         result.on('error', () => response.destroy())
-        response.writeHead(result.statusCode ?? 502, result.headers); result.pipe(response)
+        const headers = result.headers
+        const csp = headers['content-security-policy']
+        if (path.startsWith('/replay-viewers/') && typeof csp === 'string') {
+          // The sandboxed Viewer fetches from the proxy origin in this fixture.
+          headers['content-security-policy'] = csp.replace(
+            `connect-src 'self' ${backend.origin};`, `connect-src 'self' ${appOrigin};`,
+          )
+        }
+        response.writeHead(result.statusCode ?? 502, headers); result.pipe(response)
       }))
       upstream.on('error', () => {
         if (cancelled || response.destroyed || response.writableEnded) return
@@ -114,8 +142,6 @@ export async function startHostedReleaseApp({ backendUrl, frontendOrigin, direct
     const address = server.address()
     if (!address || typeof address === 'string') throw new Error('Hosted release adapter requires a TCP port')
     appOrigin = `http://127.0.0.1:${address.port}`
-    hosting = createFrontendHosting({ FRONTEND_ROOT: root, GAME_BUILD_ID: gameBuildId,
-      PUBLIC_APP_ORIGIN: `${appOrigin}${HOSTED_APP_PATH}`, PUBLIC_API_BASE: appOrigin })
-    return { appUrl: `${appOrigin}${HOSTED_APP_PATH}`, apiUrl: appOrigin, gameBuildId, close }
+    return { origin: appOrigin, close }
   } catch (error) { await close(); throw error }
 }

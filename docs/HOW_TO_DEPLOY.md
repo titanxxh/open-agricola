@@ -795,6 +795,12 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 The checkout HEAD must match `public-assets.ref`, its `assets/` tree must be clean, and every required file must be tracked and present. This also works for `pnpm verify` and Replay Viewer builds. Build URLs still use the pinned Pages source. This checks local asset contents; it does not verify the live Pages deployment. Without this explicit setting, builds retain the remote metadata check.
 
+The stable Pages build reads `asset-digests.json` from the same asset publication. It requires the pinned version and one SHA-256 for every path in `asset-manifest.json`, then embeds the digests in `/sw.js`. With `PUBLIC_ASSET_VALIDATION_DIR`, it derives the same digests from the clean checkout. Development, self-hosted and prerelease builds and Replay Viewer do not register this Worker.
+
+Cache hits reuse verified assets by URL and SHA-256 across app builds. A miss revalidates through credentialless CORS. The page can use mismatched bytes but the Worker leaves them out of its cache. Normal activation waits for controlled pages to close and removes obsolete entries from its own cache.
+
+To pause this cache, set `PUBLIC_ASSET_CACHE_ENABLED` to `false` in `scripts/vite-public-asset-worker.ts` and publish a new stable Pages candidate through the normal release gates. Keep `/sw.js` at the same URL and scope. The replacement restores ordinary requests when the browser installs and activates it, without reloading open tabs. Keep the published asset pin valid; reverting to an artifact that predates `/sw.js` is not a recovery path for browsers with an installed Worker.
+
 The asset site limits requests per address, so several browser tasks run from one machine receive HTTP 429 for card art. For browser verification, serve the same pinned checkout from the development server:
 
 ```bash
