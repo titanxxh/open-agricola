@@ -51,10 +51,21 @@ const logExemptions = [
     reason: 'The session flushes derived engine entries into its visible log cache.',
   },
   {
+    file: 'shared/actions/effects/reorganize.ts', functionName: 'recordHousedNewborns', kind: 'log-cache-writer-call',
+    reason: 'Settling a birth replaces the rows its rewritten birth fact owns with mapper output.',
+  },
+  {
     file: 'shared/events/log-cache.ts', functionName: 'prependDerivedLogEntries', kind: 'state-log-write',
     reason: 'The cache writer prepends already-derived entries to GameState.log.',
   },
+  {
+    file: 'shared/events/log-cache.ts', functionName: 'replaceDerivedLogEntries', kind: 'state-log-write',
+    reason: "The cache writer replaces one event occurrence's derived rows in place.",
+  },
 ] as const
+
+/** Functions in `shared/events/log-cache.ts` that write derived entries into GameState.log. */
+const LOG_CACHE_WRITERS: ReadonlySet<string> = new Set(['prependDerivedLogEntries', 'replaceDerivedLogEntries'])
 
 type LogExemption = typeof logExemptions[number]
 
@@ -230,7 +241,7 @@ const collectImportedIdentifiers = (
     for (const specifier of namedBindings.elements) {
       const importedName = specifier.propertyName?.text ?? specifier.name.text
       if (importedName === 'LogStore') logStoreClassNames.add(specifier.name.text)
-      if (isLogCacheModule(statement.moduleSpecifier.text) && importedName === 'prependDerivedLogEntries') {
+      if (isLogCacheModule(statement.moduleSpecifier.text) && LOG_CACHE_WRITERS.has(importedName)) {
         logCacheWriterNames.add(specifier.name.text)
       }
     }
@@ -373,7 +384,8 @@ const cacheWriterCallName = (
   if (ts.isIdentifier(current) && logCacheWriterNames.has(current.text)) return current.text
   const receiver = accessReceiver(current)
   const unwrappedReceiver = receiver && unwrapExpression(receiver)
-  if (accessName(current) === 'prependDerivedLogEntries'
+  const name = accessName(current)
+  if (name && LOG_CACHE_WRITERS.has(name)
     && unwrappedReceiver
     && ts.isIdentifier(unwrappedReceiver)
     && logCacheWriterNamespaces.has(unwrappedReceiver.text)) {
@@ -468,7 +480,9 @@ const isAllowedLogCacheWriterCall = (
 ): boolean => {
   const localCallIndex = call.expression.getStart(sourceFile) - block.start
   const logEntriesArg = call.arguments[1]?.getText(sourceFile).trim()
-  if (rel === 'shared/events/append.ts') {
+  // Writers fed directly by the mapper: the entries argument must be the
+  // unmodified result of the block's eventsToLogEntries() assignment.
+  if (rel === 'shared/events/append.ts' || rel === 'shared/actions/effects/reorganize.ts') {
     const mapperAssignment = mapperAssignmentRegex().exec(block.source)
     if (!mapperAssignment?.[1] || mapperAssignment.index >= localCallIndex) return false
     const prefix = block.source.slice(
@@ -630,7 +644,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
             if (sourceName && isLogStoreBindingSource(node.initializer, sourceName)) {
               ;(scopedLogStoreAliases as Set<string>).add(bindingName.text)
             }
-            if (sourceName === 'prependDerivedLogEntries'
+            if (sourceName && LOG_CACHE_WRITERS.has(sourceName)
               && namespace
               && logCacheWriterNamespaces.has(namespace)) {
               ;(scopedLogCacheWriterAliases as Set<string>).add(bindingName.text)
@@ -693,10 +707,12 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       const namespace = ts.isIdentifier(unwrapExpression(node.right))
         ? (unwrapExpression(node.right) as ts.Identifier).text
         : null
-      for (const name of objectLiteralAliasAssignments(node.left, 'prependDerivedLogEntries')) {
-        ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
-        if (namespace && logCacheWriterNamespaces.has(namespace)) {
-          ;(scopedLogCacheWriterAliases as Set<string>).add(name)
+      for (const writer of LOG_CACHE_WRITERS) {
+        for (const name of objectLiteralAliasAssignments(node.left, writer)) {
+          ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
+          if (namespace && logCacheWriterNamespaces.has(namespace)) {
+            ;(scopedLogCacheWriterAliases as Set<string>).add(name)
+          }
         }
       }
       for (const name of objectLiteralAliasAssignments(node.left, 'LogStore')) {

@@ -26,6 +26,17 @@ const createRepoFixture = (): string => {
     '    state.log.unshift(entries[index]!)',
     '  }',
     '}',
+    'export const replaceDerivedLogEntries = (state: any, entries: any[], occurrenceId: string) => {',
+    '  state.log = [...entries, ...state.log.filter((entry: any) => entry.sourceEvent?.occurrenceId !== occurrenceId)]',
+    '}',
+  ].join('\n'))
+  writeFixture(root, 'shared/actions/effects/reorganize.ts', [
+    "import { eventsToLogEntries } from '../../events/log-mapper'",
+    "import { replaceDerivedLogEntries } from '../../events/log-cache'",
+    'const recordHousedNewborns = (state: any, rewritten: any, occurrenceId: string) => {',
+    '  const rows = eventsToLogEntries([rewritten], {})',
+    '  replaceDerivedLogEntries(state, rows, occurrenceId)',
+    '}',
   ].join('\n'))
   writeFixture(root, 'shared/events/append.ts', [
     "import { eventsToLogEntries } from './log-mapper'",
@@ -130,11 +141,29 @@ describe('check-direct-session-log', () => {
     expect(() => findDirectSessionLogViolations(root)).toThrow('source symlink')
   })
 
+  it('rejects a birth settlement that replaces log rows with entries other than mapper output', () => {
+    const root = createRepoFixture()
+    writeFixture(root, 'shared/actions/effects/reorganize.ts', [
+      "import { eventsToLogEntries } from '../../events/log-mapper'",
+      "import { replaceDerivedLogEntries } from '../../events/log-cache'",
+      'const recordHousedNewborns = (state: any, rewritten: any, occurrenceId: string) => {',
+      '  const rows = eventsToLogEntries([rewritten], {})',
+      "  rows.push({ key: 'log.forged' })",
+      '  replaceDerivedLogEntries(state, rows, occurrenceId)',
+      '}',
+    ].join('\n'))
+    expect(findDirectSessionLogViolations(root)).toContainEqual(expect.objectContaining({
+      file: 'shared/actions/effects/reorganize.ts', kind: 'log-cache-writer-call',
+    }))
+  })
+
   it.each([
     ['shared/session/session-core.ts', 'constructor', 'this.engineLog = new LogStore()'],
     ['shared/session/session-core.ts', 'flushEngineLog', 'prependDerivedLogEntries(this.state, toAdd)'],
     ['shared/events/log-cache.ts', 'prependDerivedLogEntries', 'state.log.unshift(entries[index]!)'],
     ['shared/events/append.ts', 'appendImmediateEvents', 'prependDerivedLogEntries(state, entries)'],
+    ['shared/events/log-cache.ts', 'replaceDerivedLogEntries', 'state.log = [...entries, ...state.log.filter((entry: any) => entry.sourceEvent?.occurrenceId !== occurrenceId)]'],
+    ['shared/actions/effects/reorganize.ts', 'recordHousedNewborns', 'replaceDerivedLogEntries(state, rows, occurrenceId)'],
     ['shared/engine/engine.ts', 'flushEventTransaction', 'this.log.append(entries[index]!)'],
     ['shared/engine/engine-proceed.ts', 'appendDerivedLogsForEventOnlyResult', 'int.log.append(entries[index]!)'],
     ['shared/engine/engine-resolve.ts', 'appendDerivedLogsForEventOnlyResult', 'int.log.append(entries[index]!)'],
