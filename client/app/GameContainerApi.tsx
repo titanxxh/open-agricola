@@ -156,6 +156,8 @@ const useTransportSetup = (
   ownerKey: string,
 ) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
+  // The last room answer of a ready connection keeps every viewer guard in force while a lost connection shows its board.
+  const [lastReadyStatus, setLastReadyStatus] = useState<Extract<WsStatus, { phase: 'ready' }> | null>(null)
   const [wsTransport, setWsTransport] = useState<WsGameTransport | null>(null)
   const [wsReady, setWsReady] = useState(false)
   const [localTransport, setLocalTransport] = useState<LocalGameTransport | null>(null)
@@ -243,7 +245,9 @@ const useTransportSetup = (
       if (disposed) return
       if (waiting) { setWsReady(false); setWsStatus(waiting); return }
       setWsReady(true)
-      setWsStatus({ phase: 'ready', roomId: ws.roomId, viewer: ws.viewer, ...(ws.spectatingEndReason ? { spectatingEndReason: ws.spectatingEndReason } : {}), ...(hotseat ? { hotseat: true } : {}) })
+      const readyStatus = { phase: 'ready' as const, roomId: ws.roomId, viewer: ws.viewer, ...(ws.spectatingEndReason ? { spectatingEndReason: ws.spectatingEndReason } : {}), ...(hotseat ? { hotseat: true } : {}) }
+      setLastReadyStatus(readyStatus)
+      setWsStatus(readyStatus)
     }
     setWsTransport(ws)
     const offStatus = ws.onConnectionStatus(status => {
@@ -364,7 +368,7 @@ const useTransportSetup = (
     : isWsMode && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = isLocalMode ? localReady : (!isWsMode || wsReady)
   return {
-    connectedPlayerIndexes, transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
+    connectedPlayerIndexes, transport, wsStatus, lastReadyStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
     setRoomColorError(null)
     try { wsTransport?.sendRoomCommand('setPlayerColor', { color }) } catch { setRoomColorError('color_save_failed') }
   } }
@@ -396,7 +400,7 @@ export const GameContainerApi = () => {
   const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
   const { user } = useAuth()
-  const { connectedPlayerIndexes, transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor } = useTransportSetup(
+  const { connectedPlayerIndexes, transport, wsStatus, lastReadyStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
     isWsMode,
@@ -492,12 +496,19 @@ export const GameContainerApi = () => {
   const setDevPlayerId = useCallback((value: string) => {
     setDevPlayerIdOverride(value)
   }, [])
-  const wsAssignedPlayerId = isWs ? playerIdFromWsStatus(wsStatus) : null
+  // A lost or failed connection asks whether the server itself is unavailable (#1816); meanwhile the last ready room
+  // answer keeps the viewer, hotseat and spectator guards exactly as they were, so a board shown under the maintenance
+  // overlay reveals nothing the ready view would not.
+  const wsConnectionLost = isWs && (wsStatus.phase === 'reconnecting' || (wsStatus.phase === 'error'
+    && (!wsStatus.code || isServerUnavailableCode(wsStatus.code)) && !FINAL_ROOM_MESSAGES.has(wsStatus.message)
+    && !wsStatus.message.startsWith('No room in URL')))
+  const viewerStatus = wsStatus.phase === 'ready' ? wsStatus : wsConnectionLost ? lastReadyStatus : null
+  const wsAssignedPlayerId = isWs && viewerStatus ? playerIdFromWsStatus(viewerStatus) : null
   // One connection holds every seat, as confirmed by the server's room answer.
-  const isSpectator = wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'spectator'
-  const spectatingEndReason = wsStatus.phase === 'ready' ? wsStatus.spectatingEndReason : undefined
-  const isHotseat = wsStatus.phase === 'ready' && wsStatus.hotseat === true
-  const participantViewer = wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'participant' ? wsStatus.viewer : null
+  const isSpectator = viewerStatus?.viewer.kind === 'spectator'
+  const spectatingEndReason = viewerStatus?.spectatingEndReason
+  const isHotseat = viewerStatus?.hotseat === true
+  const participantViewer = viewerStatus?.viewer.kind === 'participant' ? viewerStatus.viewer : null
   const controlledPlayerIndexes = participantViewer?.controlledPlayerIndexes ?? (participantViewer ? [participantViewer.playerIndex] : [])
   const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
   const activePlayer = interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
@@ -514,7 +525,7 @@ export const GameContainerApi = () => {
     ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
     : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
   const isPublicFarmView = isHotseat && displayPlayer?.id !== activePlayer?.id
-  const hotseatRoomId = isHotseat && wsStatus.phase === 'ready' ? wsStatus.roomId : null
+  const hotseatRoomId = isHotseat && viewerStatus ? viewerStatus.roomId : null
   const hotseatAudienceId = isHotseat && state
     ? state.phase === 'draft' && state.draft
       ? nextHotseatDraftSeatId(state.draft)
@@ -546,20 +557,19 @@ export const GameContainerApi = () => {
            activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
       : !!(activePlayer && displayPlayer))
   const hasGameView = !!(state && currentPlayer && displayPlayer)
-  // A lost or failed connection asks whether the server itself is unavailable (#1816). Then the last board stays under an
-  // overlay while the transport keeps reconnecting; opening phases and a game without a board say the same on the status
-  // card. A connection that failed before the room was found has stopped, so the page starts over when the server is back.
+  // While the server is unavailable the last board stays under an overlay as the transport keeps reconnecting; opening
+  // phases, an unconfirmed hotseat handoff and a game without a board say the same on the status card. A connection that
+  // failed before the room was found has stopped, so the page starts over when the server is back.
   const serverAvailability = useServerAvailability()
-  const wsConnectionLost = isWs && (wsStatus.phase === 'reconnecting' || (wsStatus.phase === 'error'
-    && (!wsStatus.code || isServerUnavailableCode(wsStatus.code)) && !FINAL_ROOM_MESSAGES.has(wsStatus.message)
-    && !wsStatus.message.startsWith('No room in URL')))
   useEffect(() => { if (wsConnectionLost) void checkServerAvailability() }, [wsConnectionLost])
   const connectionStopped = wsConnectionLost && wsStatus.phase === 'error'
   useEffect(() => connectionStopped ? onServerRecovered(() => window.location.reload()) : undefined, [connectionStopped])
   const serverMaintenance = wsConnectionLost && serverAvailability === 'unavailable'
   // Opening phases return their own views before the board, so they keep the status card instead of the overlay.
   const openingView = state?.phase === 'solo-hand-selection' || state?.phase === 'draft' || state?.phase === 'parent-selection'
-  const maintenanceOverBoard = serverMaintenance && hasGameView && !openingView
+  // An unconfirmed hotseat seat never shows its board: hotseat snapshots carry every hand.
+  const hotseatHandoffPending = isHotseat && hotseatSeatConfirmed !== hotseatAudienceKey
+  const maintenanceOverBoard = serverMaintenance && hasGameView && !openingView && !hotseatHandoffPending
   const canResetGame = !isSpectator && hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
     (!isHotseat || isInteractive) &&
     (!isWs || isHotseat || selfPlayer?.id === displayPlayer?.id)
