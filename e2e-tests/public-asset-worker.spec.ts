@@ -133,14 +133,23 @@ async function loadAssets(page: Page, origin: string, expectedImage: readonly nu
       try { await image.decode() } catch (error) { throw new Error(`Could not decode ${url}`, { cause: error }) }
       return [image.naturalWidth, image.naturalHeight]
     }
-    const [image, season, loadedFont] = await Promise.all([
+    const [image, season] = await Promise.all([
       decode(imageUrl), decode(seasonUrl), font.load(),
     ])
-    return { image, seasonDecoded: season[0] > 0, fontLoaded: loadedFont.status === 'loaded' }
+    return { image, seasonDecoded: season[0] > 0 }
   }, { imageUrl, seasonUrl }).catch(error => {
     throw new Error(`Asset rendering failed. Browser failures: ${failures.join(', ')}. Origin requests: ${assets.requests.join(', ')}`, { cause: error })
   }).finally(() => page.off('requestfailed', trackFailure))
-  expect(result).toEqual({ image: expectedImage, seasonDecoded: true, fontLoaded: true })
+  expect(result).toEqual({ image: expectedImage, seasonDecoded: true })
+  await expect.poll(() => page.evaluate(() => {
+    const canvas = document.createElement('canvas').getContext('2d')
+    if (!canvas) throw new Error('The browser could not measure rendered text')
+    const sample = 'Agricola 0123 WWW'
+    canvas.font = '36px monospace'
+    const fallbackWidth = canvas.measureText(sample).width
+    canvas.font = '36px Dominican, monospace'
+    return canvas.measureText(sample).width !== fallbackWidth
+  }), { message: 'The Pages stylesheet renders Dominican rather than the fallback' }).toBe(true)
 }
 
 async function cachedPaths(page: Page) {
