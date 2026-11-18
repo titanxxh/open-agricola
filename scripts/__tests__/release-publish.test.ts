@@ -274,7 +274,10 @@ else {const r=cp.spawnSync('bash',['-c',command],{input,env:{...process.env,PATH
     const requested = destination.slice(destination.indexOf(':') + 1)
     return JSON.parse(readFileSync(remote + requested.slice(targetDirectory.length), 'utf8'))
   }
-  return { remote, targetDirectory, request, flags: ['--build-run', '80', '--build-attempt', '1', '--artifact-id', '90', '--auth-file', auth, '--import-budget', budget] }
+  // The fixture has no node_modules, so the arm64 validator build (a TypeScript child, ADR 0047) cannot run here: these
+  // transport and authority cases use host validation, and one case below proves the default stops before any SSH.
+  const imageFlags = ['--build-run', '80', '--build-attempt', '1', '--artifact-id', '90', '--auth-file', auth, '--import-budget', budget]
+  return { remote, targetDirectory, request, flags: [...imageFlags, '--full-maintenance'], ownerValidationFlags: imageFlags }
 }
 
 describe('owner-machine release entry', () => {
@@ -559,6 +562,17 @@ describe('direct backend deployment entry', () => {
     expect(ssh.some(event => event.args?.[1]?.includes("'receive'"))).toBe(true)
     expect(ssh.some(event => event.args?.[1]?.includes("'maintain'"))).toBe(false)
     expect(value.events().filter(event => event.endpoint === 'actions/runs/80/attempts/1')).toHaveLength(2)
+  }, 30_000)
+
+  it('stops an Owner-local Validation delivery before any SSH when the arm64 validator image cannot be obtained', () => {
+    const value = fixture()
+    const image = imageInputs(value, '', '/home/ubuntu/open-agricola')
+    const result = value.deploy('fixture-host', value.sha, image.remote, ...image.ownerValidationFlags)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(`Owner-local Validation needs the arm64 validator image of ${value.sha} (ADR 0047)`)
+    expect(result.stderr).toContain('Nothing was sent to the backend')
+    expect(result.stderr).toContain('--full-maintenance')
+    expect(value.events().filter(event => ['ssh', 'scp', 'maintenance-entry'].includes(event.kind))).toEqual([])
   }, 30_000)
 
   it('transports a fixed formal image and renews native authority before maintenance without forwarding credentials', () => {
