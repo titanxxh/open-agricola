@@ -98,9 +98,15 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm exec playwright install-deps chromium webkit firefox
+      - name: Checkout pinned public assets
+        id: public-assets
+        if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
+        run: bash policy/scripts/ci/checkout-public-assets.sh candidate "$RUNNER_TEMP/public-assets"
       - name: Prepare candidate isolation
         id: isolation
-        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash policy/scripts/ci/setup-candidate-isolation.sh "$PWD/candidate" "$PWD/policy" "$(command -v node)" "$(id -u)"
+        env:
+          PUBLIC_ASSETS: ${{ steps.public-assets.outputs.directory }}
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_TEMP bash policy/scripts/ci/setup-candidate-isolation.sh "$PWD/candidate" "$PWD/policy" "$(command -v node)" "$(id -u)" "$PUBLIC_ASSETS"
       - name: Prove native candidate isolation
         run: node policy/scripts/ci/candidate-isolation.ts smoke
       - name: Install dependencies

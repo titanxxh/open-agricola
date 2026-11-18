@@ -82,7 +82,7 @@ Linux 浏览器验收默认使用 `LIBGL_ALWAYS_SOFTWARE=1` 和 `WEBKIT_SKIA_ENA
 
 这些记录用于核对本机检查范围，不会缓存或跳过检查；不代表被忽略的环境文件、外部服务状态或远端 CI 已验证。每个模式保留最近一次记录，失败不会沿用上次成功。提交或 rebase 后文件内容及运行环境完全相同可保持 current。`status` 缺少 prepush 而返回非零，不表示当前范围的 GitHub 门禁失败，也不要求补跑本机完整检查。
 
-若本机已有 `public-assets.ref` 对应的完整素材仓，可用 `PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prepush` 或同环境下的 `pnpm verify <spec>` 避免构建时联网取素材元数据。入口核对素材仓 HEAD、干净的 `assets/` 和全部必需文件，构建继续生成 Pages URL。该环境设置计入验证指纹；本地素材验证不证明线上 Pages 状态。默认 CI 仍执行远端元数据检查，细节见 `docs/HOW_TO_DEPLOY.md`。同一台机器并行运行多个浏览器任务时，图片站会对卡图请求返回 HTTP 429；此时再加 `E2E_PUBLIC_ASSET_DIR=<同一 checkout>`，仅主站开发服务器改为从该 checkout 提供全部素材（`CI` 下同样生效），构建忽略该变量，不可变 Viewer 运行时仍访问 Pages。它同样计入验证指纹。
+GitHub 浏览器任务（日常浏览器分区与候选的 chromium、sandbox、WebKit 任务）先用 `scripts/ci/checkout-public-assets.sh` 浅抓取固定版本素材仓，并设置 `E2E_PUBLIC_ASSET_DIR` 与 `PUBLIC_ASSET_VALIDATION_DIR`，卡图不再依赖 Pages，见[部署文档](../HOW_TO_DEPLOY.md)。若本机已有 `public-assets.ref` 对应的完整素材仓，可用 `PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prepush` 或同环境下的 `pnpm verify <spec>` 避免构建时联网取素材元数据。入口核对素材仓 HEAD、干净的 `assets/` 和全部必需文件，构建继续生成 Pages URL。该环境设置计入验证指纹；本地素材验证不证明线上 Pages 状态。默认 CI 仍执行远端元数据检查，细节见 `docs/HOW_TO_DEPLOY.md`。同一台机器并行运行多个浏览器任务时，图片站会对卡图请求返回 HTTP 429；此时再加 `E2E_PUBLIC_ASSET_DIR=<同一 checkout>`，仅主站开发服务器改为从该 checkout 提供全部素材（`CI` 下同样生效），构建忽略该变量，不可变 Viewer 运行时仍访问 Pages。它同样计入验证指纹。
 
 ## 发布工具演练与必需浏览器用例
 

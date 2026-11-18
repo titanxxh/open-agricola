@@ -23,6 +23,13 @@ source_directory="$(realpath "$1")"
 policy_directory="$(realpath "$2")"
 node_binary="$(realpath "$3")"
 runner_uid="$4"
+# Optional trusted checkout of the pinned public assets (scripts/ci/checkout-public-assets.sh) for browser tasks.
+public_assets_directory="${5:-}"
+if [[ -n $public_assets_directory ]]; then
+  [[ ! -L $public_assets_directory ]] || isolation_failure 1 "$LINENO"
+  public_assets_directory="$(realpath "$public_assets_directory")"
+  [[ -d $public_assets_directory/.git && $public_assets_directory == "$RUNNER_TEMP"/* ]] || isolation_failure 1 "$LINENO"
+fi
 [[ $node_binary == /opt/hostedtoolcache/node/*/bin/node && $runner_uid =~ ^[0-9]+$ && ${RUNNER_TEMP:-} == /home/runner/work/_temp ]] || isolation_failure 1 "$LINENO"
 # Keep policy, dependencies, canonical Git, and runner command files outside the candidate UID.
 chmod 700 /home/runner "$RUNNER_TEMP"
@@ -59,6 +66,8 @@ grep -q '^oa-candidate:' /etc/subuid
 grep -q '^oa-candidate:' /etc/subgid
 isolation_stage=source-copy
 cp -a "$source_directory" /home/oa-candidate/work
+# A candidate-owned copy: Git refuses to inspect a checkout owned by another user.
+if [[ -n $public_assets_directory ]]; then cp -a "$public_assets_directory" /home/oa-candidate/public-assets; fi
 chown -R --no-dereference 61000:61000 /home/oa-candidate
 install -m 644 "$policy_directory/scripts/ci/candidate-isolation-smoke.ts" /run/oa-ci-isolation/smoke.mts
 printf 'trusted inert marker\n' > /run/oa-ci-isolation/protected-marker
@@ -92,8 +101,8 @@ for isolation_attempt in {1..40}; do
 done
 "${candidate_session[@]}" docker --host unix:///run/user/61000/docker.sock info >/dev/null
 isolation_stage=context
-"$node_binary" --input-type=module - "$node_binary" "$RUNNER_TEMP/candidate-isolation" <<'NODE'
+"$node_binary" --input-type=module - "$node_binary" "$RUNNER_TEMP/candidate-isolation" "${public_assets_directory:+/home/oa-candidate/public-assets}" <<'NODE'
 import {writeFileSync} from 'node:fs';
-const [node, privateDirectory] = process.argv.slice(2);
-writeFileSync('/run/oa-ci-isolation/context.json', JSON.stringify({uid:61000,gid:61000,home:'/home/oa-candidate',work:'/home/oa-candidate/work',socket:'/run/user/61000/docker.sock',node,privateDirectory}), {mode:0o644,flag:'wx'});
+const [node, privateDirectory, publicAssets] = process.argv.slice(2);
+writeFileSync('/run/oa-ci-isolation/context.json', JSON.stringify({uid:61000,gid:61000,home:'/home/oa-candidate',work:'/home/oa-candidate/work',socket:'/run/user/61000/docker.sock',node,privateDirectory,publicAssets:publicAssets || null}), {mode:0o644,flag:'wx'});
 NODE

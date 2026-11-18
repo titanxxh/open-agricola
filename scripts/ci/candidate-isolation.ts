@@ -7,8 +7,11 @@ import { fullSha } from './verification-tasks.ts'
 
 export type CandidateExecution = {
   uid: number; gid: number; work: string; home: string; socket: string; node: string; privateDirectory: string
+  /** Candidate-owned checkout of the pinned public assets, present for browser tasks. */
+  publicAssets?: string | null
 }
 export const ISOLATION_CONTEXT = '/run/oa-ci-isolation/context.json'
+export const CANDIDATE_PUBLIC_ASSETS = '/home/oa-candidate/public-assets'
 
 export function candidateExecution(): CandidateExecution {
   const metadata = lstatSync(ISOLATION_CONTEXT)
@@ -19,11 +22,13 @@ export function candidateExecution(): CandidateExecution {
     || !('work' in value) || value.work !== '/home/oa-candidate/work'
     || !('socket' in value) || value.socket !== '/run/user/61000/docker.sock'
     || !('node' in value) || typeof value.node !== 'string' || !value.node.startsWith('/opt/hostedtoolcache/node/')
-    || !('privateDirectory' in value) || typeof value.privateDirectory !== 'string' || !value.privateDirectory.startsWith('/home/runner/work/_temp/')) {
+    || !('privateDirectory' in value) || typeof value.privateDirectory !== 'string' || !value.privateDirectory.startsWith('/home/runner/work/_temp/')
+    || 'publicAssets' in value && value.publicAssets !== null && value.publicAssets !== CANDIDATE_PUBLIC_ASSETS) {
     throw new Error('Invalid candidate execution context')
   }
   if (process.getuid?.() === value.uid) throw new Error('Candidate cannot act as the trusted scheduler')
-  return { uid: value.uid, gid: value.gid, home: value.home, work: value.work, socket: value.socket, node: value.node, privateDirectory: value.privateDirectory }
+  const publicAssets = 'publicAssets' in value && value.publicAssets === CANDIDATE_PUBLIC_ASSETS ? CANDIDATE_PUBLIC_ASSETS : null
+  return { uid: value.uid, gid: value.gid, home: value.home, work: value.work, socket: value.socket, node: value.node, privateDirectory: value.privateDirectory, publicAssets }
 }
 
 const canonicalGit = (source: string, args: string[]): Buffer => execFileSync('git', [
@@ -115,6 +120,8 @@ export function candidateEnvironment(execution: CandidateExecution, environment:
     XDG_RUNTIME_DIR: '/run/user/61000', DOCKER_HOST: `unix://${execution.socket}`,
     CI: 'true', GITHUB_ACTIONS: 'true', TERM: 'dumb', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
     REPLAY_VIEWER_ROOT: join(execution.home, 'replay-viewers'),
+    // Browser tasks serve the pinned assets from the dev server and validate build metadata offline (no Pages).
+    ...execution.publicAssets ? { E2E_PUBLIC_ASSET_DIR: execution.publicAssets, PUBLIC_ASSET_VALIDATION_DIR: execution.publicAssets } : {},
     ...environment,
   }
 }

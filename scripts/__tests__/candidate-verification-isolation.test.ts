@@ -248,3 +248,37 @@ it('keeps a temporary launcher from overwriting its parent candidate dependency 
   expect(readFileSync(parent, 'utf8')).toBe('inert parent dependency sentinel\n')
   expect(readFileSync(join(launcher, 'data/dependencies.local'), 'utf8')).toBe('OBSERVABILITY_ENABLED=false\n')
 })
+
+it('serves pinned public assets to browser tasks only when the trusted setup copied a checkout', () => {
+  const base = { uid: 61000, gid: 61000, home: '/home/oa-candidate', work: '/home/oa-candidate/work', node: '/opt/hostedtoolcache/node/24/x64/bin/node',
+    socket: '/run/user/61000/docker.sock', privateDirectory: '/home/runner/work/_temp/candidate-isolation' }
+  const browser = candidateEnvironment({ ...base, publicAssets: '/home/oa-candidate/public-assets' })
+  expect(browser.E2E_PUBLIC_ASSET_DIR).toBe('/home/oa-candidate/public-assets')
+  expect(browser.PUBLIC_ASSET_VALIDATION_DIR).toBe('/home/oa-candidate/public-assets')
+  for (const env of [candidateEnvironment(base), candidateEnvironment({ ...base, publicAssets: null })]) {
+    expect(env).not.toHaveProperty('E2E_PUBLIC_ASSET_DIR')
+    expect(env).not.toHaveProperty('PUBLIC_ASSET_VALIDATION_DIR')
+  }
+  // An explicit task environment still wins over the defaults.
+  expect(candidateEnvironment({ ...base, publicAssets: '/home/oa-candidate/public-assets' }, { PUBLIC_ASSET_VALIDATION_DIR: '/elsewhere' }).PUBLIC_ASSET_VALIDATION_DIR).toBe('/elsewhere')
+})
+
+it('checks out public assets only for a full pinned SHA read from the Git object, into a new destination', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oa-public-assets-')), script = resolve(import.meta.dirname, '../ci/checkout-public-assets.sh')
+  try {
+    const repository = join(root, 'repository'), git = (...args: string[]) => execFileSync('git', ['-C', repository, ...args], { stdio: 'ignore' })
+    mkdirSync(repository); git('init', '-q'); writeFileSync(join(repository, 'public-assets.ref'), 'not-a-sha\n')
+    git('add', 'public-assets.ref'); git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-qm', 'pin')
+    // A modified working-tree file cannot change the pin that is read from HEAD.
+    writeFileSync(join(repository, 'public-assets.ref'), `${'a'.repeat(40)}\n`)
+    const invalid = spawnSync('bash', [script, repository, join(root, 'assets')], { encoding: 'utf8' })
+    expect(invalid.status).toBe(1)
+    expect(invalid.stderr).toContain('public-assets.ref must contain one full lowercase SHA')
+    mkdirSync(join(root, 'existing'))
+    writeFileSync(join(repository, 'public-assets.ref'), `${'a'.repeat(40)}\n`)
+    git('add', 'public-assets.ref'); git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-qm', 'valid pin')
+    const existing = spawnSync('bash', [script, repository, join(root, 'existing')], { encoding: 'utf8' })
+    expect(existing.status).toBe(1)
+    expect(existing.stderr).toContain('Public asset destination already exists')
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
