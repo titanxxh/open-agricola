@@ -9,7 +9,7 @@
 // Run it from the trusted protected-main checkout; its clean HEAD is the producer. Candidate code never runs as the owner.
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -88,7 +88,7 @@ function candidateOutput(work: string, name: string, maximum: number): string {
  * identity is gone, the archive passed the producer's structural checks for linux/arm64, and the loaded image carries
  * the fixed source, channel and hosted frontend and loads its native modules.
  */
-export async function buildValidatorImage(inputs: ValidatorInputs, runner: Runner, docker: DockerCommand, sleep = pause): Promise<ValidatorReceipt> {
+export async function buildValidatorImage(inputs: ValidatorInputs, runner: Runner, docker: DockerCommand, sleep = pause, exit: (code: number) => void = code => process.exit(code)): Promise<ValidatorReceipt> {
   const { sha, channel, output } = inputs
   fullSha(sha); fullSha(inputs.producerSha)
   const logs = join(output, 'logs'), maxImageBytes = inputs.maxImageBytes ?? MAX_CONTAINER_IMAGE_BYTES, now = inputs.now ?? Date.now
@@ -110,6 +110,14 @@ export async function buildValidatorImage(inputs: ValidatorInputs, runner: Runne
   }
   let failure: { error: unknown } | undefined, buildPhase = 'image-build'
   const stop = join(output, 'isolation-stop.log'), cleanup = join(output, 'isolation-cleanup.log')
+  // An interrupted owner still tears the candidate down; a started identity is never left running.
+  const interrupted = (signal: NodeJS.Signals = 'SIGTERM') => {
+    for (const teardown of [['stop', output, String(inputs.ownerUid), TASK], ['cleanup', output, String(inputs.ownerUid)]]) {
+      try { runner.isolation(teardown, join(output, `isolation-${teardown[0]}-${signal.toLowerCase()}.log`)) } catch { /* reported in its log */ }
+    }
+    exit(130)
+  }
+  process.once('SIGINT', interrupted); process.once('SIGTERM', interrupted)
   try {
     runner.isolation(['start', policyRoot, output, String(inputs.ownerUid), inputs.publicAssets, TASK], join(output, 'isolation-start.log'))
     await step('docker', ['pull', '--quiet', isolationSmokeImage(policyRoot)], 'smoke-image', NETWORK_ATTEMPTS)
@@ -122,6 +130,7 @@ export async function buildValidatorImage(inputs: ValidatorInputs, runner: Runne
       })
   } catch (error) { failure = { error } }
   finally {
+    process.off('SIGINT', interrupted); process.off('SIGTERM', interrupted)
     try { runner.isolation(['stop', output, String(inputs.ownerUid), TASK], stop) } catch (error) { failure ??= { error } }
     try {
       // Every candidate process is gone and the copy belongs to the owner: the outputs can no longer change.
@@ -182,6 +191,24 @@ export function validatorReceipt(sha: string, { channel = 'stable', stateRoot = 
 const git = (args: string[], cwd = policyRoot) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
 /**
+ * The tracked build context, as the GitHub producer prepares it: archived by trusted Git into the fresh owner-private
+ * run directory, never through a path the candidate tree controls, then placed into the trusted checkout that the
+ * isolation copies to the candidate. A tree that tracks `context.tar` is refused, and the placement never follows or
+ * replaces an existing path.
+ */
+export function prepareValidatorContext(output: string, source: string, sha: string): string {
+  fullSha(sha)
+  if (git(['ls-tree', '--name-only', sha, '--', 'context.tar'], source)) throw new Error('The candidate tree contains context.tar, which the validator build reserves for its build context')
+  const archive = join(output, 'context.tar')
+  git(['archive', '--format=tar', '--output', archive, sha], source)
+  const info = lstatSync(archive)
+  if (!info.isFile() || info.size > 256 * 1024 * 1024) throw new Error('Tracked image context exceeds the bounded producer input')
+  const target = join(source, 'context.tar')
+  copyFileSync(archive, target, constants.COPYFILE_EXCL); chmodSync(target, 0o600)
+  return target
+}
+
+/**
  * The validator image for `sha`: the recorded one while the owner's Docker still holds it, otherwise a fresh isolated
  * build from the trusted protected-main checkout, which takes the owner-local lock for its duration.
  */
@@ -201,14 +228,11 @@ export async function ensureValidatorImage(sha: string, { channel = 'stable', re
     mkdirSync(join(stateRoot, 'runs'), { recursive: true, mode: 0o700 }); chmodSync(stateRoot, 0o700)
     const output = join(stateRoot, 'runs', `${sha}-${channel}-${new Date().toISOString().replace(/[-:.]/g, '')}`)
     for (const directory of [output, join(output, 'logs')]) mkdirSync(directory, { mode: 0o700 })
-    const source = checkoutTrustedSource(output, sha)
-    // The tracked archive is the build context, as the GitHub producer prepares it; the copy carries it to the candidate.
-    git(['archive', '--format=tar', '--output', join(source, 'context.tar'), sha], source)
-    if (lstatSync(join(source, 'context.tar')).size > 256 * 1024 * 1024) throw new Error('Tracked image context exceeds the bounded producer input')
+    prepareValidatorContext(output, checkoutTrustedSource(output, sha), sha)
     const receipt = await buildValidatorImage({ sha, channel, producerSha, output, ownerUid, ownerHome: homedir(),
       publicAssets: trustedPublicAssets(git(['show', `${sha}:public-assets.ref`])), node: OWNER_LOCAL_NODE, stateRoot }, nativeRunner, ownerDocker)
-    // The loaded image is the validator; the uncompressed archive is not kept beside its digest.
-    rmSync(join(output, 'image.tar'), { force: true })
+    // The loaded image is the validator; the uncompressed archives are not kept beside their digests.
+    for (const name of ['image.tar', 'context.tar']) rmSync(join(output, name), { force: true })
     return receipt
   } finally { release() }
 }

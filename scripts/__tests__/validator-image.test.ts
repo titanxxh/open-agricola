@@ -1,13 +1,13 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isolatedImageBuildScript } from '../ci/container-image-build'
 import type { Runner } from '../ci/owner-local-run'
 import { validateContainerImageArchive } from '../release/container-images-archive'
-import { buildValidatorImage, validatorReceipt, validatorReceiptPath, type DockerCommand, type ValidatorInputs } from '../release/validator-image'
+import { buildValidatorImage, prepareValidatorContext, validatorReceipt, validatorReceiptPath, type DockerCommand, type ValidatorInputs } from '../release/validator-image'
 
 const sha = 'a'.repeat(40), producer = 'b'.repeat(40)
 const sha256 = (value: Buffer | string) => createHash('sha256').update(value).digest('hex')
@@ -27,8 +27,8 @@ function archive(root: string, { architecture = 'arm64', revision = sha, channel
   return { bytes: readFileSync(path), imageId: `sha256:${sha256(config)}`, labels: JSON.parse(config).config.Labels as Record<string, string> }
 }
 
-function fixture({ buildFailures = 0, architecture = 'arm64', loadedArchitecture = 'arm64', frontendBuild = sha, hardlink = false, maxImageBytes }: {
-  buildFailures?: number; architecture?: string; loadedArchitecture?: string; frontendBuild?: string; hardlink?: boolean; maxImageBytes?: number } = {}) {
+function fixture({ buildFailures = 0, architecture = 'arm64', loadedArchitecture = 'arm64', frontendBuild = sha, hardlink = false, maxImageBytes, duringBuild }: {
+  buildFailures?: number; architecture?: string; loadedArchitecture?: string; frontendBuild?: string; hardlink?: boolean; maxImageBytes?: number; duringBuild?: () => void } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'oa-validator-image-')); roots.push(root)
   const output = join(root, 'run'), workRoot = join(root, 'work'), stateRoot = join(root, 'state')
   mkdirSync(join(output, 'logs'), { recursive: true }); mkdirSync(join(workRoot, 'validator-image'), { recursive: true })
@@ -40,6 +40,7 @@ function fixture({ buildFailures = 0, architecture = 'arm64', loadedArchitecture
       calls.push(`candidate ${phase} ${command} ${args.join(' ')}`); environments.push(environment)
       writeFileSync(join(execution.privateDirectory, `${phase}.log`), `log ${phase}\n`, { flag: 'wx' })
       if (phase.startsWith('image-build') && !phase.startsWith('image-build-reset')) {
+        duringBuild?.()
         if (failures-- > 0) return 1
         const tar = join(execution.work, 'image.tar')
         writeFileSync(tar, built.bytes)
@@ -48,7 +49,7 @@ function fixture({ buildFailures = 0, architecture = 'arm64', loadedArchitecture
       }
       return 0
     },
-    isolation(args, log) { calls.push(`isolation ${args[0]}`); writeFileSync(log, `isolation ${args[0]}\n`, { flag: 'wx' }) },
+    isolation(args, log) { calls.push(`isolation ${args[0]}${/-sig/.test(log) ? ' ' + log.split('isolation-')[1] : ''}`); writeFileSync(log, `isolation ${args[0]}\n`, { flag: 'wx' }) },
     verifySources() { throw new Error('unused') },
     collectDiagnostics() { throw new Error('unused') },
   }
@@ -129,6 +130,34 @@ describe('owner validator image', () => {
     await expect(buildValidatorImage(value.inputs, value.runner, value.docker, value.sleep)).rejects.toThrow(message)
     expect(value.calls.filter(call => call.startsWith('isolation')).map(call => call.split(' ')[1])).toEqual(['start', 'stop', 'cleanup'])
     expect(existsSync(validatorReceiptPath(sha, 'stable', value.stateRoot))).toBe(false)
+  })
+
+  it('tears the candidate down when the owner interrupts a running build', async () => {
+    const exits: number[] = []
+    const value = fixture({ buildFailures: 2, duringBuild: () => { if (!exits.length) process.emit('SIGTERM', 'SIGTERM') } })
+    await expect(buildValidatorImage(value.inputs, value.runner, value.docker, value.sleep, code => { exits.push(code) })).rejects.toThrow(/image-build failed/)
+    expect(exits).toEqual([130])
+    expect(value.calls.filter(call => call.startsWith('isolation'))).toEqual(['isolation start', 'isolation stop stop-sigterm.log', 'isolation cleanup cleanup-sigterm.log', 'isolation stop', 'isolation cleanup'])
+    expect(process.listenerCount('SIGTERM')).toBe(0)
+  })
+
+  it('archives the build context outside the candidate tree and refuses a tree that tracks context.tar', () => {
+    const root = mkdtempSync(join(tmpdir(), 'oa-validator-context-')); roots.push(root)
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.test', ...args], { cwd, encoding: 'utf8' }).trim()
+    const repository = (name: string, plant: (directory: string) => void) => {
+      const directory = join(root, name); mkdirSync(directory); git(directory, 'init', '-q'); writeFileSync(join(directory, 'Dockerfile'), 'FROM scratch\n'); plant(directory)
+      git(directory, 'add', '-A'); git(directory, 'commit', '-qm', 'c'); return { directory, sha: git(directory, 'rev-parse', 'HEAD') }
+    }
+    const output = (name: string) => { const directory = join(root, `${name}-run`); mkdirSync(directory, { mode: 0o700 }); return directory }
+    const clean = repository('clean', () => {})
+    const placed = prepareValidatorContext(output('clean'), clean.directory, clean.sha)
+    expect(placed).toBe(join(clean.directory, 'context.tar'))
+    expect(execFileSync('tar', ['-tf', placed], { encoding: 'utf8' }).trim().split('\n')).toEqual(['Dockerfile'])
+    // A tracked symlink must never redirect the trusted archive onto an owner file.
+    const victim = join(root, 'owner-file'); writeFileSync(victim, 'owner bytes')
+    const planted = repository('planted', directory => symlinkSync(victim, join(directory, 'context.tar')))
+    expect(() => prepareValidatorContext(output('planted'), planted.directory, planted.sha)).toThrow(/reserves for its build context/)
+    expect(readFileSync(victim, 'utf8')).toBe('owner bytes')
   })
 
   it('accepts an arm64 archive only where the caller names arm64', () => {
