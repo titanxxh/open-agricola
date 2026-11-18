@@ -12,6 +12,7 @@ import { CardRegistry } from '../../../cards/registry'
 import { E084_DollysMother_impl } from '../../../cards/E/E084_DollysMother'
 import { M033_NightPasture_impl } from '../../../cards/M/M033_NightPasture'
 import { CE203_Shepherd } from '../../../cards/classic/CE/CE203_Shepherd'
+import { getTotalAnimalCapacity } from '../../../domain'
 
 const NIGHT_PASTURE = 'M033_NightPasture'
 
@@ -164,8 +165,8 @@ describe('breed core helper', () => {
     expect(breedSummary.resources.boar).toBe(1)
   })
 
-  it('does not exceed capacity — stops when free capacity exhausted', () => {
-    // Default house zone has capacity=1; no pasture, no stable. Only 1 type can breed.
+  it('breeds every eligible type without checking room; reorganization decides what is housed', () => {
+    // Default house zone has capacity=1; no pasture, no stable.
     const player = makePlayer({
       resources: {
         wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
@@ -174,9 +175,37 @@ describe('breed core helper', () => {
       pastures: [],
     } as Partial<PlayerState>)
     const state = makeState(player)
-    const { breedSummary } = breed(state, player, { sourceCard: 'harvest' })
-    expect(breedSummary.animalCount).toBe(1)
-    expect(breedSummary.animalTypes).toBe(1)
+    expect(canBreedAnimals(state, player, { sourceCard: 'harvest' })).toBe(true)
+    const { breedSummary, placementMinimums } = breed(state, player, { sourceCard: 'harvest' })
+    expect(breedSummary).toEqual({ resources: { sheep: 1, boar: 1, cattle: 1 }, animalTypes: 3, animalCount: 3 })
+    expect(placementMinimums).toEqual({ sheep: 3, boar: 3, cattle: 3 })
+    expect(player.resources).toMatchObject({ sheep: 5, boar: 5, cattle: 5 })
+  })
+
+  it('offers breeding with effective parents but no room at all', () => {
+    const player = makePlayer({ occupationPlayed: ['TEST_Parents'], roomTiles: [] })
+    const state = makeState(player)
+    const options = { sourceCard: 'harvest', animalTypes: ['cattle'] as const }
+    withEffects([{ id: 'TEST_Parents', computeBreedableAnimalCount: (_state, _player, _type, count) => count + 2 }], () => {
+      expect(canBreedAnimals(state, player, options)).toBe(true)
+      expect(breed(state, player, options).breedSummary.resources).toEqual({ cattle: 1 })
+    })
+  })
+
+  it('keeps a larger litter from suppressing later types when parents outnumber room (#1799)', () => {
+    // One sheep, one boar and one cattle, plus phantom parents counted for breeding:
+    // effective parents 4/2/2 make 2 + 1 + 1 newborns, more than the capacity of 3.
+    const player = makePlayer({ occupationPlayed: ['TEST_Parents', CE203_Shepherd.meta.id], pastures: [makePasture(1)] })
+    Object.assign(player.resources, { sheep: 1, boar: 1, cattle: 1 })
+    const state = makeState(player)
+    expect(getTotalAnimalCapacity(player, state)).toBe(3)
+    withEffects([
+      { id: 'TEST_Parents', computeBreedableAnimalCount: (_state, _player, type, count) => count + (type === 'sheep' ? 3 : 1) },
+      CE203_Shepherd.impl.effect,
+    ], () => {
+      const { breedSummary } = breed(state, player, { sourceCard: 'harvest' })
+      expect(breedSummary).toEqual({ resources: { sheep: 2, boar: 1, cattle: 1 }, animalTypes: 3, animalCount: 4 })
+    })
   })
 
   it('uses default breeding threshold 2 when no modifier applies', () => {
