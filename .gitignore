@@ -11,6 +11,8 @@ node_modules
 dist
 dist-pages
 dist-ssr
+# Staging output of `vite build --config replay-viewer/vite.config.ts`; publish-replay-viewer.ts removes it
+replay-viewer/.build/
 *.local
 
 # Editor directories and files
