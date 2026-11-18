@@ -1,0 +1,46 @@
+{
+  "format": 1,
+  "repository": "titanxxh/open-agricola",
+  "baselineMainSha": "9bdc09e91512a609c24f763b70c855e3b0d4e259",
+  "features": [
+    {
+      "id": "pre-identity",
+      "dependsOn": [],
+      "sourceSha": "087e71b429fb2316972ab57db65369f8d928a619",
+      "integratedSha": "c2a28f466bd8da7d0dcb73105375b0991f363ef4"
+    },
+    {
+      "id": "pre-lifecycle",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "2eee6c79d87350601a5b143528e2e34f29c53506"
+    },
+    {
+      "id": "private-replay",
+      "dependsOn": [
+        "pre-identity",
+        "pre-lifecycle"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "2eee6c79d87350601a5b143528e2e34f29c53506"
+    },
+    {
+      "id": "public-sandbox",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "2eee6c79d87350601a5b143528e2e34f29c53506"
+    },
+    {
+      "id": "team-cooperation",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "04cba264590cd431c1f7150beed945778176409d"
+    }
+  ]
+}
