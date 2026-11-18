@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { publicAssetBaseUrl } from '../scripts/public-assets'
-import { PINNED_ASSET_HEADER } from './helpers/pinned-asset-host'
+import { PINNED_ASSET_HEADER, PINNED_ASSET_HOST_DECLINED } from './helpers/pinned-asset-host'
 
 // Compiled pages keep their asset-site URLs; this proves Chromium answers them from the pinned checkout, so a stalled
 // or rate-limited remote request cannot hold a page's load event.
 test('Chromium loads asset-site images and cross-origin fonts from the pinned checkout', async ({ page, browserName }) => {
   test.skip(!process.env.E2E_PUBLIC_ASSET_DIR || browserName !== 'chromium', 'Chromium maps the asset site only with E2E_PUBLIC_ASSET_DIR')
+  test.skip(Boolean(process.env[PINNED_ASSET_HOST_DECLINED]), `No asset mapping: ${process.env[PINNED_ASSET_HOST_DECLINED]}`)
   const version = readFileSync('public-assets.ref', 'utf8').trim()
   const image = await page.goto(new URL('assets/revised/background.jpg', publicAssetBaseUrl()).href)
   expect(image?.status()).toBe(200)

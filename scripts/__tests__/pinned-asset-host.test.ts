@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { FullConfig } from '@playwright/test'
-import globalSetup, { PINNED_ASSET_HEADER, PINNED_ASSET_HOST_PORT, PINNED_ASSET_HOST_SPKI, pinnedAssetHostArgs, startPinnedAssetHost } from '../../e2e-tests/helpers/pinned-asset-host'
+import globalSetup, { PINNED_ASSET_HEADER, PINNED_ASSET_HOST_DECLINED, PINNED_ASSET_HOST_PORT, PINNED_ASSET_HOST_SPKI, pinnedAssetHostArgs, startPinnedAssetHost } from '../../e2e-tests/helpers/pinned-asset-host'
 
 const roots: string[] = [], closers: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -60,24 +60,31 @@ describe('pinned asset host', () => {
     expect(pinnedAssetHostArgs({ [PINNED_ASSET_HOST_PORT]: '41234', [PINNED_ASSET_HOST_SPKI]: 'pin=' }))
       .toEqual(['--host-resolver-rules=MAP titanxxh.github.io 127.0.0.1:41234', '--ignore-certificate-errors-spki-list=pin='])
     const { repository } = checkout()
-    const config = (browserName?: string) => ({ projects: [{ use: browserName ? { browserName } : {} }] }) as unknown as FullConfig
-    const previous = { dir: process.env.E2E_PUBLIC_ASSET_DIR, port: process.env[PINNED_ASSET_HOST_PORT], spki: process.env[PINNED_ASSET_HOST_SPKI] }
+    const config = (...browsers: (string | undefined)[]) => ({ projects: browsers.map(browserName => ({ use: browserName ? { browserName } : {} })) }) as unknown as FullConfig
+    const keys = ['E2E_PUBLIC_ASSET_DIR', PINNED_ASSET_HOST_PORT, PINNED_ASSET_HOST_SPKI, PINNED_ASSET_HOST_DECLINED]
+    const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]))
     try {
-      delete process.env.E2E_PUBLIC_ASSET_DIR; delete process.env[PINNED_ASSET_HOST_PORT]; delete process.env[PINNED_ASSET_HOST_SPKI]
-      expect(await globalSetup(config())).toBeUndefined()
+      for (const key of keys) delete process.env[key]
+      expect(await globalSetup(config(undefined))).toBeUndefined()
+      expect(process.env[PINNED_ASSET_HOST_DECLINED]).toBeUndefined()
       process.env.E2E_PUBLIC_ASSET_DIR = repository
-      // WebKit refuses to launch with host mapping; its runs keep the asset site.
-      expect(await globalSetup(config('webkit'))).toBeUndefined()
-      expect(process.env[PINNED_ASSET_HOST_PORT]).toBeUndefined()
-      const close = await globalSetup(config())
+      // Launch arguments are shared and WebKit refuses host mapping: WebKit-only and mixed runs keep the asset site,
+      // and say why so the guard spec skips.
+      for (const browsers of [['webkit'], ['chromium', 'firefox', 'webkit']]) {
+        delete process.env[PINNED_ASSET_HOST_DECLINED]
+        expect(await globalSetup(config(...browsers))).toBeUndefined()
+        expect(process.env[PINNED_ASSET_HOST_PORT]).toBeUndefined()
+        expect(process.env[PINNED_ASSET_HOST_DECLINED]).toMatch(/other than Chromium/)
+      }
+      delete process.env[PINNED_ASSET_HOST_DECLINED]
+      const close = await globalSetup(config(undefined))
       expect(close).toBeTypeOf('function'); closers.push(close!)
       expect(process.env[PINNED_ASSET_HOST_PORT]).toMatch(/^\d+$/)
       expect((await fetchPinned(Number(process.env[PINNED_ASSET_HOST_PORT]), '/open-agricola-assets/assets/revised/fonts/Dominican.woff2')).pin)
         .toBe(process.env[PINNED_ASSET_HOST_SPKI])
+      expect(process.env[PINNED_ASSET_HOST_DECLINED]).toBeUndefined()
     } finally {
-      for (const [key, value] of [['E2E_PUBLIC_ASSET_DIR', previous.dir], [PINNED_ASSET_HOST_PORT, previous.port], [PINNED_ASSET_HOST_SPKI, previous.spki]] as const) {
-        if (value === undefined) delete process.env[key]; else process.env[key] = value
-      }
+      for (const key of keys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key] }
     }
   })
 })
