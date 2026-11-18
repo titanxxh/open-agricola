@@ -2,14 +2,14 @@
 // on the owner machine, inside the same isolation model as GitHub (a disposable candidate UID with its own rootless
 // Docker, NoNewPrivileges units, no owner credentials, HOME, release state or rootful Docker socket), and records the
 // owner-local receipt that `pnpm release ... --local-verification` publishes.
-//   pnpm exec tsx scripts/ci/owner-local-run.ts --channel stable|prerelease --sha <candidate> --output <new private dir> [--jobs <n>] [--browser-jobs <n>] [--lanes <1-8>] [--retries <0-3>] [--test-workers <n>] [--profile]
+//   pnpm exec tsx scripts/ci/owner-local-run.ts --channel stable|prerelease --sha <candidate> --output <new private dir> [--jobs <n>] [--cpu-budget <cores>] [--browser-jobs <n>] [--lanes <1-8>] [--retries <0-3>] [--test-workers <n>] [--profile]
 // Run it from the trusted protected-main checkout; its HEAD is the producer. Candidate code never runs as the owner.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { createServer } from 'node:net'
-import { homedir } from 'node:os'
+import { availableParallelism, homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { candidateCommand, collectCandidateDiagnostics, verifyCandidateSources, type CandidateExecution } from './candidate-isolation.ts'
 import { assertCandidateCheckout } from './candidate-verification.ts'
@@ -24,22 +24,30 @@ export type PhaseRecord = { phase: string; exitCode: number; logSha256: string }
 
 const UID = 61000
 const NODE = '/opt/oa-owner-local/node/bin/node'
-// `fast` runs alone first: its database-heavy files keep their 5 s timeouts only without other CPU-bound work (measured
-// 302 s alone with every core). The browser tasks and the shorter suites follow; within a wave the longest start first.
-export const TASK_WAVES: FullTaskId[][] = [['fast'], ['chromium-1', 'chromium-4', 'chromium-3', 'chromium-2', 'slow', 'webkit', 'browser-sandbox', 'quality', 'build']]
-export const TASK_ORDER: FullTaskId[] = TASK_WAVES.flat()
+// Scheduling is a CPU budget, measured on a 20-core owner machine: with every task at once the run queue reached 3x the
+// cores and 5 s test timeouts failed. The Vitest suites use every core, so each runs alone; a browser lane averages
+// about two cores (58 CPU minutes over ~30 lane minutes); the remaining tasks fit beside the browser lanes.
+export const TASK_ORDER: FullTaskId[] = ['fast', 'slow', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'webkit', 'browser-sandbox', 'quality', 'build']
+export type TaskCost = number | 'exclusive'
+export function taskCost(task: FullTaskId, lanes: number): TaskCost {
+  if (task === 'fast' || task === 'slow') return 'exclusive'
+  if (task.startsWith('chromium-')) return 2 * lanes
+  return task === 'build' ? 3 : 2
+}
 // A private /tmp hides the owner's own temporary files; TMPDIR keeps tmpdir() paths visible to the rootless daemon.
 // The owner's home is also hidden from candidate commands; `assertPrivateHome` covers the candidate's daemon too.
 const candidateProperties = (ownerHome: string) => ['PrivateTmp=yes', `InaccessiblePaths=${ownerHome}`]
 const CANDIDATE_TMPDIR = '/home/oa-candidate/tmp'
 const CANDIDATE_PUBLIC_ASSETS = '/home/oa-candidate/public-assets'
 const COMMAND_TIMEOUT_MS = 60 * 60_000
-// Interim defaults for candidates that still serialize every test schema migration on one advisory lock and load card
-// art from the public host: with every core, `fast` alone timed out in two of three runs. Raise both once the
-// candidate migrates test schemas concurrently and serves E2E assets locally (#1779).
-export const DEFAULT_TEST_WORKERS = 10
-export const DEFAULT_BROWSER_JOBS = 2
-// Browser lanes per chromium task; with two browser tasks at once this keeps four lanes on the public asset host.
+const NETWORK_ATTEMPTS = 3
+export const PREPARATION_RETRY_DELAY_MS = 5_000
+// Candidates migrate test schemas concurrently and serve E2E assets locally (#1779), so `fast` keeps Vitest's own
+// worker count and the CPU budget alone limits the browser tasks. For a candidate from before those changes use
+// `--browser-jobs 2 --test-workers 10`.
+export const DEFAULT_TEST_WORKERS = 0
+export const DEFAULT_BROWSER_JOBS = 6
+// Two lanes per chromium task let all four chromium tasks, webkit and the sandbox share a 20-core budget at once.
 export const DEFAULT_LANES = 2
 const policyRoot = resolve(import.meta.dirname, '../..')
 const sha256 = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex')
@@ -72,6 +80,36 @@ export async function pool<T, R>(items: readonly T[], jobs: number, work: (item:
   const lane = async () => { while (next < items.length) { const index = next++; results[index] = await work(items[index]) } }
   await Promise.all(Array.from({ length: Math.min(jobs, items.length) }, lane))
   return results
+}
+
+/**
+ * Runs `work` for every item in order within a CPU budget: an exclusive item waits until nothing runs and holds the
+ * machine alone; others start as soon as their cost fits, smaller later items filling the remaining budget. An item
+ * costlier than the whole budget still runs, alone.
+ */
+export async function budgetPool<T>(items: readonly T[], budget: number, cost: (item: T) => TaskCost, work: (item: T) => Promise<void>, maxJobs = Infinity): Promise<void> {
+  if (!Number.isSafeInteger(budget) || budget < 1) throw new Error('A CPU budget must be a positive integer')
+  if (maxJobs !== Infinity && (!Number.isSafeInteger(maxJobs) || maxJobs < 1)) throw new Error('A job limit must be a positive integer')
+  const pending = [...items]
+  let used = 0, running = 0, exclusive = false
+  await new Promise<void>((done, reject) => {
+    const pump = () => {
+      if (!pending.length && !running) { done(); return }
+      for (let index = 0; index < pending.length && running < maxJobs && !exclusive;) {
+        const item = pending[index], price = cost(item)
+        if (price === 'exclusive' && running) break
+        if (price !== 'exclusive' && running && used + price > budget) { index++; continue }
+        pending.splice(index, 1); running++
+        if (price === 'exclusive') exclusive = true; else used += price
+        work(item).then(() => {
+          running--
+          if (price === 'exclusive') exclusive = false; else used -= price
+          pump()
+        }, reject)
+      }
+    }
+    pump()
+  })
 }
 
 /** Limits how many of the wrapped calls run at once; waiting calls start in arrival order. */
@@ -155,10 +193,9 @@ export type Inputs = {
   ownerHome: string
   /** `VERIFY_PARALLEL_LANES` for each chromium task: independent app instances and browsers inside one task. */
   lanes: number
-  /**
-   * Browser tasks running at once. Every test downloads card art from the public asset host, which rate-limits one
-   * owner IP (HTTP 429) once about four browser tasks run together; two were measured to pass.
-   */
+  /** Cores the scheduler may fill at once; see `taskCost`. */
+  cpuBudget: number
+  /** Browser tasks running at once. */
   browserJobs: number
 }
 
@@ -166,7 +203,9 @@ export type Inputs = {
  * The isolated run itself. Source copies are verified against the trusted checkout after every candidate process
  * is gone, and a receipt is written only when every canonical command succeeded and every copy is unchanged.
  */
-export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now): Promise<{ receipt: string; evidence: string } | { failed: string[] }> {
+const pause = (ms: number) => new Promise<void>(done => setTimeout(done, ms))
+
+export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now, sleep = pause): Promise<{ receipt: string; evidence: string } | { failed: string[] }> {
   const { channel, sha, output } = inputs
   const logs = join(output, 'logs'), source = join(output, 'source')
   const tasks = TASK_ORDER
@@ -175,15 +214,23 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     socket: `/run/user/${UID}/docker.sock`, node: inputs.node.path, privateDirectory: logs })
   const preparation: PhaseRecord[] = []
   const failed: string[] = []
-  // The validation checkout replaces the per-start metadata fetches that the public asset host rate-limits (HTTP 429)
-  // when every browser task restarts the app from one owner IP.
+  // The pinned asset checkout validates build metadata offline and lets the E2E dev server serve card art locally,
+  // so concurrent browser tasks never hit the public asset host from one owner IP (it rate-limits with HTTP 429).
   const services = { LOCAL_POSTGRES_PORT: String(inputs.servicePorts.postgres), LOCAL_S3_PORT: String(inputs.servicePorts.objects), TMPDIR: CANDIDATE_TMPDIR,
-    PUBLIC_ASSET_VALIDATION_DIR: CANDIDATE_PUBLIC_ASSETS, ...(inputs.testWorkers ? { VITEST_MAX_WORKERS: String(inputs.testWorkers) } : {}) }
+    PUBLIC_ASSET_VALIDATION_DIR: CANDIDATE_PUBLIC_ASSETS, E2E_PUBLIC_ASSET_DIR: CANDIDATE_PUBLIC_ASSETS,
+    ...(inputs.testWorkers ? { VITEST_MAX_WORKERS: String(inputs.testWorkers) } : {}) }
   const properties = candidateProperties(inputs.ownerHome)
-  const prepare = async (task: string, command: string, args: string[], phase: string) => {
-    const exitCode = await runner.candidate(execution(task), command, args, phase, services, properties)
-    preparation.push({ phase, exitCode, logSha256: fileSha256(join(logs, `${phase}.log`)) })
-    if (exitCode !== 0) throw new Error(`Candidate ${phase} failed (exit ${exitCode})`)
+  // Preparation that downloads (packages, browsers, service images from Docker Hub) gets fresh attempts after a
+  // transient network failure; every attempt keeps its own log in the evidence.
+  const prepare = async (task: string, command: string, args: string[], phase: string, attempts = 1) => {
+    for (let attempt = 0; ; attempt++) {
+      const name = attempt ? `${phase}-a${attempt}` : phase
+      const exitCode = await runner.candidate(execution(task), command, args, name, services, properties)
+      preparation.push({ phase: name, exitCode, logSha256: fileSha256(join(logs, `${name}.log`)) })
+      if (exitCode === 0) return
+      if (attempt + 1 >= attempts) throw new Error(`Candidate ${phase} failed (exit ${exitCode})`)
+      await sleep(PREPARATION_RETRY_DELAY_MS)
+    }
   }
   const pnpm = join(dirname(inputs.node.path), 'pnpm')
   const records: TaskRecord[] = [], attempts: (TaskRecord & { attempt: number; passed: boolean })[] = []
@@ -214,18 +261,18 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     // A partly failed start may already have created the identity, so teardown always follows it.
     runner.isolation(['start', policyRoot, output, String(inputs.ownerUid), inputs.publicAssets, ...tasks], join(output, 'isolation-start.log'))
     await prepare(tasks[0], inputs.node.path, ['/run/oa-ci-isolation/smoke.mts'], 'smoke')
-    await prepare(tasks[0], pnpm, ['install', '--frozen-lockfile'], `install-${tasks[0]}`)
+    await prepare(tasks[0], pnpm, ['install', '--frozen-lockfile'], `install-${tasks[0]}`, NETWORK_ATTEMPTS)
     // The first install fills the candidate's pnpm store; the other copies then link from it.
-    await pool(tasks.slice(1), 3, task => prepare(task, pnpm, ['install', '--frozen-lockfile'], `install-${task}`))
-    await prepare(tasks[0], pnpm, ['exec', 'playwright', 'install', 'chromium', 'webkit', 'firefox'], 'browsers')
+    await pool(tasks.slice(1), 3, task => prepare(task, pnpm, ['install', '--frozen-lockfile'], `install-${task}`, NETWORK_ATTEMPTS))
+    await prepare(tasks[0], pnpm, ['exec', 'playwright', 'install', 'chromium', 'webkit', 'firefox'], 'browsers', NETWORK_ATTEMPTS)
     // One start of the shared test services before tasks run concurrently, so no two tasks race to create them.
-    await prepare(tasks[0], inputs.node.path, ['scripts/local-services.mjs', '--test'], 'services')
+    await prepare(tasks[0], inputs.node.path, ['scripts/local-services.mjs', '--test'], 'services', NETWORK_ATTEMPTS)
     const failures = new Map<FullTaskId, string>()
     const browsers = semaphore(inputs.browserJobs)
-    for (const wave of TASK_WAVES) await pool(wave, inputs.jobs, async task => {
+    await budgetPool(tasks, inputs.cpuBudget, task => taskCost(task, inputs.lanes), async task => {
       const { record, failure } = await (verificationTask(task).browser ? browsers(() => runTask(task, 0)) : runTask(task, 0))
       if (failure) failures.set(task, failure); else records.push(record)
-    })
+    }, inputs.jobs)
     for (let attempt = 1; attempt <= inputs.retries && failures.size; attempt++) {
       for (const task of TASK_ORDER.filter(task => failures.has(task))) {
         const { record, failure } = await runTask(task, attempt)
@@ -259,7 +306,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     candidate: { sha, tree: inputs.tree, configuration: inputs.configuration },
     producer: { sha: inputs.producerSha, configuration: inputs.producerConfiguration, files: inputs.policyFiles },
     sandbox: { identity: 'oa-candidate', uid: UID, rootlessDocker: inputs.dockerVersion, noNewPrivileges: true, supplementaryGroups: [],
-      limits: { MemoryMax: '64G', TasksMax: 16384, CPUWeight: 50 }, unitProperties: properties, tmpdir: CANDIDATE_TMPDIR, waves: TASK_WAVES, testWorkers: inputs.testWorkers, browserJobs: inputs.browserJobs, lanes: inputs.lanes, browserPortSlices: BROWSER_PORT_SLICES,
+      limits: { MemoryMax: '64G', TasksMax: 16384, CPUWeight: 50 }, unitProperties: properties, tmpdir: CANDIDATE_TMPDIR, cpuBudget: inputs.cpuBudget, taskCosts: Object.fromEntries(TASK_ORDER.map(task => [task, taskCost(task, inputs.lanes)])), testWorkers: inputs.testWorkers, browserJobs: inputs.browserJobs, lanes: inputs.lanes, browserPortSlices: BROWSER_PORT_SLICES,
       publicAssets: { version: git(['rev-parse', 'HEAD'], inputs.publicAssets), validationDirectory: CANDIDATE_PUBLIC_ASSETS },
       servicePorts: inputs.servicePorts, isolationStartSha256: fileSha256(join(output, 'isolation-start.log')) },
     prerequisites: { node: inputs.node, packageManager: 'corepack', preparation },
@@ -335,11 +382,15 @@ export async function main(args: string[]): Promise<number> {
   if (channel !== 'stable' && channel !== 'prerelease') throw new Error('--channel must be stable or prerelease')
   const sha = fullSha(option(args, '--sha')), output = resolve(option(args, '--output')), jobs = Number(option(args, '--jobs', '10')), retries = Number(option(args, '--retries', '1'))
   if (!Number.isSafeInteger(retries) || retries < 0 || retries > 3) throw new Error('--retries must be 0–3')
+  if (!Number.isSafeInteger(jobs) || jobs < 1 || jobs > 64) throw new Error('--jobs must be 1–64')
   const testWorkers = Number(option(args, '--test-workers', String(DEFAULT_TEST_WORKERS)))
   if (!Number.isSafeInteger(testWorkers) || testWorkers < 0 || testWorkers > 64) throw new Error('--test-workers must be 0–64 (0 keeps the Vitest default)')
   const browserJobs = Number(option(args, '--browser-jobs', String(DEFAULT_BROWSER_JOBS)))
+  if (!Number.isSafeInteger(browserJobs) || browserJobs < 1 || browserJobs > 16) throw new Error('--browser-jobs must be 1–16')
   const lanes = Number(option(args, '--lanes', String(DEFAULT_LANES)))
   if (!Number.isSafeInteger(lanes) || lanes < 1 || lanes > 8) throw new Error('--lanes must be 1–8')
+  const cpuBudget = Number(option(args, '--cpu-budget', String(availableParallelism())))
+  if (!Number.isSafeInteger(cpuBudget) || cpuBudget < 1 || cpuBudget > 512) throw new Error('--cpu-budget must be 1–512')
   if (git(['status', '--porcelain', '--untracked-files=no'])) throw new Error('The trusted policy checkout has tracked edits')
   const producerSha = git(['rev-parse', 'HEAD'])
   if (spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: policyRoot }).status !== 0) git(['fetch', '--no-tags', '--quiet', 'origin', sha])
@@ -370,7 +421,7 @@ export async function main(args: string[]): Promise<number> {
     producerConfiguration: verificationConfiguration(policyRoot, producerSha), commands: canonicalOwnerLocalCommands(policyRoot, sha, channel),
     ownerUid, node, dockerVersion: execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).trim(), policyFiles,
     servicePorts: { postgres: await freePort(), objects: await freePort() }, retries, testWorkers: testWorkers || null, publicAssets, profile: args.includes('--profile'), browserJobs,
-    ownerHome: homedir(), lanes }
+    ownerHome: homedir(), lanes, cpuBudget }
   const result = await runIsolated(inputs, nativeRunner)
   if ('failed' in result) { console.error(`Owner-local verification failed:\n- ${result.failed.join('\n- ')}\nLogs: ${join(output, 'logs')}`); return 1 }
   // The publisher applies the same checks; failing here keeps an unusable receipt from being published.
