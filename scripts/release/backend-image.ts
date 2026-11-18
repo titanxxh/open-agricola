@@ -10,6 +10,7 @@ import { BACKEND_IMAGE_CLEANUP_MS, BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS, BACKEN
 import { assertExpectedContainerImage, verifyContainerImageBuild } from './container-images.ts'
 import { prepareContainerImageArchive } from './container-images-owner.ts'
 import { BACKEND_RESUME_WORK_MS } from './backend-image-progress.ts'
+import { ownerValidatorImage } from './owner-validator.ts'
 // Storage tools load through a TypeScript resolver in child processes: this entry runs on plain Node.
 import { typescriptLoaderArgs } from '../typescript-loader.ts'
 
@@ -75,6 +76,10 @@ export async function backendImageDeployment(cwd: string, arguments_: string[]):
   assertExpectedContainerImage(receipt, { purpose: 'formal-candidate', sourceSha, producerSha })
   if (execute('git', ['-C', cwd, 'rev-parse', 'HEAD']) !== producerSha
     || execute('git', ['-C', cwd, 'status', '--porcelain', '--untracked-files=no'])) throw new Error('Run formal image delivery from the clean, exact image producer checkout')
+  // ADR 0047: the aarch64 owner validates on a same-source arm64 build. It is reused or built here, before the export
+  // and any backend contact, so a missing validator stops the release while the old application still serves.
+  const ownerValidation = !fullMaintenance && installation.kind !== 'bootstrap'
+  const validatorImage = ownerValidation ? await ownerValidatorImage(sourceSha) : null
   const local = mkdtempSync(join(tmpdir(), 'oa-formal-image-')), operationId = randomUUID()
   const exported = await prepareContainerImageArchive({ receipt, authFile: resolve(selected.get('--auth-file') ?? ''), directory: local, maxBytes: budget.import.maxArchiveMiB * 1024 * 1024 })
   const stage = join(directory, 'backups', `.backend-image-${operationId}`)
@@ -118,7 +123,6 @@ printf '%s\\n' "$4"
   authorize()
   ssh(['node', receiver, 'receive', remoteRequest], undefined, BACKEND_IMAGE_INTAKE_OWNER_TIMEOUT_MS)
   if (backendCandidate(cwd, [sourceSha]) !== sourceSha || JSON.stringify(verifyContainerImageBuild(build)) !== JSON.stringify(receipt)) throw new Error('Formal image authority changed during transport')
-  const ownerValidation = !fullMaintenance && installation.kind !== 'bootstrap'
   if (ownerValidation) {
     // A fresh basis keeps the cutover delta to the last few minutes of writes; it is optional. The pull
     // uses the same root and retention as the daily job (OWNER_BACKUP_ROOT, 30-day pruning).
@@ -130,8 +134,8 @@ printf '%s\\n' "$4"
   const env = ['env', `BACKEND_VALIDATION=${ownerValidation ? 'owner' : 'host'}`]
   if (process.env.ACCOUNT_REGISTRATION_POLICY) env.push(`ACCOUNT_REGISTRATION_POLICY=${process.env.ACCOUNT_REGISTRATION_POLICY}`)
   const finished = join(local, 'maintenance-finished')
-  const owner = ownerValidation ? new Promise<string>(done => {
-    const child = spawn(process.execPath, [...typescriptLoaderArgs(), resolve(import.meta.dirname, 'owner-cutover.ts'), host, directory, stage, sourceSha, exported.transfer.receipt.imageId, operationId, finished],
+  const owner = validatorImage ? new Promise<string>(done => {
+    const child = spawn(process.execPath, [...typescriptLoaderArgs(), resolve(import.meta.dirname, 'owner-cutover.ts'), host, directory, stage, sourceSha, exported.transfer.receipt.imageId, validatorImage, operationId, finished],
       { stdio: ['ignore', 'pipe', 'inherit'] })
     let output = ''
     child.stdout.on('data', chunk => { output += chunk })

@@ -1205,8 +1205,12 @@ owner 本机定期从正式环境拉取并保留的备份副本，只含正式�
 _Avoid_: 临时副本、实时复制副本、pre 数据副本
 
 **Owner-local Validation（本机校验）**:
-候选版本在 owner 本机对 Cutover Backup 或日常备份执行的恢复与全量存储校验。它的证据绑定被校验的备份、候选提交和镜像，替代生产主机上的全量存储校验；不能证明绑定之外的数据。
+候选版本在 owner 本机对 Cutover Backup 或日常备份执行的恢复与全量存储校验，运行在该版本的 Validator Image 上。它的证据绑定被校验的备份、候选提交、部署镜像与 Validator Image，替代生产主机上的全量存储校验；不能证明绑定之外的数据。
 _Avoid_: 本机 prepush、Release Candidate Verification、日常验证
+
+**Validator Image（校验镜像）**:
+owner 本机在候选隔离中，用同一固定源码构建的 linux/arm64 镜像，只用于 Owner-local Validation；线上部署的仍是 GitHub 构建的 linux/amd64 镜像（ADR 0047）。
+_Avoid_: 部署镜像、候选镜像、本机镜像
 
 **Newborn（后代）**:
 family growth 当轮新增的工人。当轮不计入可放置工人，要到下一轮才回家可用；喂食阶段只需 1 食物（成人需 2）。

@@ -1,6 +1,7 @@
 // Owner-local Backup: pull an online capture from the formal host into
-// ~/oa-backup/<UTC stamp>/, validate it on this machine with the image the host
-// was running, and keep copies at most 30 days (ADR 0010, ADR 0045).
+// ~/oa-backup/<UTC stamp>/, validate it on this machine with the arm64 validator
+// image of the build the host was running, and keep copies at most 30 days
+// (ADR 0010, ADR 0045, ADR 0047).
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -120,7 +121,7 @@ export async function pullSnapshot({ host, remoteDir, root }: Options, attempts 
  */
 export function validateCapture({ capture, ledger, image, buildId, workParent }: { capture: string; ledger: string; image: string; buildId: string; workParent: string }): Record<string, unknown> {
   try { run('docker', ['image', 'inspect', '--format', '{{.Id}}', image]) } catch {
-    throw new Error(`Validation image ${image} is not on this machine; formal delivery keeps it locally`)
+    throw new Error(`Validation image ${image} is not on this machine; build the validator image with scripts/release/validator-image.ts`)
   }
   reapValidations()
   const id = randomBytes(6).toString('hex'), network = `oa-owner-validate-${id}`, postgres = `${network}-postgres`, objects = `${network}-objects`
@@ -159,12 +160,30 @@ export function validateCapture({ capture, ledger, image, buildId, workParent }:
   }
 }
 
-/** Validates a pulled snapshot in the image the host was running and records the report beside it. */
-export function validateSnapshot(snapshot: string): Record<string, unknown> {
+/** The local arm64 validator image ID for a source build: the recorded one, else a fresh isolated build. */
+export type SnapshotValidator = (sourceBuildId: string) => Promise<string>
+
+export const ownerValidator: SnapshotValidator = async sourceBuildId => {
+  const { ensureValidatorImage, validatorReceipt } = await import('./release/validator-image.ts')
+  return (validatorReceipt(sourceBuildId, { channel: 'stable' }) ?? await ensureValidatorImage(sourceBuildId, { channel: 'stable' })).imageId
+}
+
+/**
+ * Validates a pulled snapshot and records the report beside it. The owner machine is aarch64 and cannot run the host's
+ * linux/amd64 image, so it validates with the same-source arm64 validator image (ADR 0047); `source.image`, the host's
+ * native image ID, stays the recorded binding and is never looked up locally. Without a validator nothing is written.
+ */
+export async function validateSnapshot(snapshot: string, { validator = ownerValidator, validate = validateCapture }: { validator?: SnapshotValidator; validate?: typeof validateCapture } = {}): Promise<Record<string, unknown>> {
   const source = JSON.parse(readFileSync(join(snapshot, 'source.json'), 'utf8')) as SnapshotSource
   if (existsSync(join(snapshot, 'validation.json'))) throw new Error('Snapshot is already validated')
-  const report = { ...validateCapture({ capture: join(snapshot, 'capture'), ledger: join(snapshot, 'ledger.json'), image: source.image, buildId: source.sourceBuildId, workParent: snapshot }),
-    validator: 'owner-local', image: source.image }
+  if (!/^[a-f0-9]{40}$/.test(source.sourceBuildId ?? '')) throw new Error('Snapshot source build is invalid')
+  let validatorImage: string
+  try { validatorImage = await validator(source.sourceBuildId) } catch (error) {
+    throw new Error(`Owner-local Validation of ${snapshot} needs the arm64 validator image of ${source.sourceBuildId}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+  }
+  if (!/^sha256:[a-f0-9]{64}$/.test(validatorImage)) throw new Error('Invalid validator image ID')
+  const report = { ...validate({ capture: join(snapshot, 'capture'), ledger: join(snapshot, 'ledger.json'), image: validatorImage, buildId: source.sourceBuildId, workParent: snapshot }),
+    validator: 'owner-local', image: source.image, validatorImage, validatorPlatform: 'linux/arm64' }
   writeFileSync(join(snapshot, 'validation.json'), JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
   return report
 }
@@ -196,14 +215,14 @@ export async function ownerBackup(args: string[]): Promise<void> {
   if (command === 'reap') { process.stdout.write(JSON.stringify({ removed: reapValidations() }) + '\n'); return }
   if (command === 'validate') {
     const snapshot = options.snapshot ? resolve(options.snapshot) : join(options.root, snapshots(privateDirectory(options.root)).at(-1) ?? '')
-    process.stdout.write(JSON.stringify(validateSnapshot(snapshot)) + '\n'); return
+    process.stdout.write(JSON.stringify(await validateSnapshot(snapshot)) + '\n'); return
   }
   if (command !== 'pull' && command !== 'run') throw new Error('Usage: owner-backup.ts run|pull|validate|prune|reap [--host user@host] [--remote-dir D] [--root R] [--snapshot S]')
   if (!options.host) throw new Error('--host or OWNER_BACKUP_HOST is required')
   try {
     const snapshot = await pullSnapshot(options, options.attempts)
     process.stdout.write(JSON.stringify({ snapshot }) + '\n')
-    if (command === 'run') process.stdout.write(JSON.stringify(validateSnapshot(snapshot)) + '\n')
+    if (command === 'run') process.stdout.write(JSON.stringify(await validateSnapshot(snapshot)) + '\n')
   } finally {
     // Retention runs even after a failed pull, without hiding that failure.
     try { process.stdout.write(JSON.stringify({ removed: pruneSnapshots(privateDirectory(options.root)) }) + '\n') }

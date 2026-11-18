@@ -1,7 +1,8 @@
-// Owner side of a formal cutover (ADR 0045): while the host holds the stopped
-// source, pull the Cutover Backup, validate it with the candidate image on this
-// machine and hand the host a report bound to that capture and image. Runs as its
-// own process beside the maintenance SSH session.
+// Owner side of a formal cutover (ADR 0045, ADR 0047): while the host holds the
+// stopped source, pull the Cutover Backup, validate it on this machine with the
+// candidate's same-source arm64 validator image and hand the host a report bound to
+// that capture, the deployed candidate image and the validator. Runs as its own
+// process beside the maintenance SSH session.
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -17,7 +18,9 @@ export type OwnerRequest = {
   format: 1; nonce: string; capture: string; ledger: string; sourceBuildId: string; targetBuildId: string; targetImage: string
   createdAt: string; database: { sha256: string; size: number }; reportDeadlineEpochMs: number
 }
-export type CutoverTarget = { directory: string; stage: string; sourceSha: string; targetImage: string; operationId: string }
+/** `targetImage` is the deployed linux/amd64 image the host binds; `validatorImage` is the owner's local arm64 build of the same source. */
+export type CutoverTarget = { directory: string; stage: string; sourceSha: string; targetImage: string; validatorImage: string; operationId: string }
+export const VALIDATOR_PLATFORM = 'linux/arm64'
 export type CutoverIo = {
   /** A remote file's text, or null while it does not exist. */
   read: (path: string) => string | null
@@ -25,6 +28,8 @@ export type CutoverIo = {
   pull: (request: OwnerRequest, local: string) => { capture: string; ledger: string }
   verify: (capture: string) => Promise<{ createdAt: string; database: { sha256: string; size: number } }>
   validate: (input: { capture: string; ledger: string; image: string; buildId: string; workParent: string }) => Record<string, unknown>
+  /** The validator image the owner's receipt records for the candidate now, re-inspected in local Docker; null when gone. */
+  validatorImage: () => Promise<string | null>
   upload: (report: Record<string, unknown>) => void
   keep: (local: string, request: OwnerRequest, report: Record<string, unknown>) => void
   sleep: (ms: number) => void
@@ -74,8 +79,10 @@ export async function ownerCutover(target: CutoverTarget, io: CutoverIo, root: s
     if (archive.createdAt !== request.createdAt || archive.database.sha256 !== request.database.sha256 || archive.database.size !== request.database.size) {
       throw new Error('Pulled capture differs from the owner request')
     }
-    const validation = io.validate({ ...pulled, image: request.targetImage, buildId: request.targetBuildId, workParent: local })
-    const report = { ...validation, validator: 'owner-local', image: request.targetImage, nonce: request.nonce }
+    // The receipt must still name this exact local image: a rebuilt or removed validator cannot answer for the cutover.
+    if (await io.validatorImage() !== target.validatorImage) throw new Error('The validator image changed or is gone since the delivery selected it')
+    const validation = io.validate({ ...pulled, image: target.validatorImage, buildId: request.targetBuildId, workParent: local })
+    const report = { ...validation, validator: 'owner-local', image: request.targetImage, validatorImage: target.validatorImage, validatorPlatform: VALIDATOR_PLATFORM, nonce: request.nonce }
     if (io.now() > request.reportDeadlineEpochMs) throw new Error('Owner validation finished after the host deadline')
     io.upload(report)
     io.keep(local, request, report)
@@ -107,6 +114,7 @@ export function ownerCutoverIo(host: string, target: CutoverTarget, root: string
     },
     verify: capture => verifyStorageArchive(capture),
     validate: input => validateCapture(input),
+    validatorImage: async () => (await import('./validator-image.ts')).validatorReceipt(target.sourceSha, { channel: 'stable' })?.imageId ?? null,
     upload: report => {
       const partial = join(target.stage, 'owner-report.json.partial'), path = join(target.stage, 'owner-report.json')
       const script = `umask 077 && cat > ${quote(partial)} && mv ${quote(partial)} ${quote(path)}`
@@ -132,11 +140,13 @@ export function ownerCutoverIo(host: string, target: CutoverTarget, root: string
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const [host, directory, stage, sourceSha, targetImage, operationId, finishedMarker] = process.argv.slice(2)
-    if (!host || !directory || !stage || !sourceSha || !targetImage || !operationId || !finishedMarker) throw new Error('Usage: owner-cutover.ts <host> <directory> <stage> <source-sha> <target-image> <operation-id> <finished-marker>')
+    const [host, directory, stage, sourceSha, targetImage, validatorImage, operationId, finishedMarker] = process.argv.slice(2)
+    if (!host || !directory || !stage || !sourceSha || !targetImage || !/^sha256:[a-f0-9]{64}$/.test(validatorImage ?? '') || !operationId || !finishedMarker) {
+      throw new Error('Usage: owner-cutover.ts <host> <directory> <stage> <source-sha> <target-image> <validator-image> <operation-id> <finished-marker>')
+    }
     const root = resolve(process.env.OWNER_BACKUP_ROOT ?? join(homedir(), 'oa-backup'))
     privateDirectory(root)
-    const target = { directory, stage, sourceSha, targetImage, operationId }
+    const target = { directory, stage, sourceSha, targetImage, validatorImage, operationId }
     const outcome = await ownerCutover(target, ownerCutoverIo(host, target, root, () => existsSync(finishedMarker)), root)
     process.stdout.write(JSON.stringify({ outcome }) + '\n')
   } catch (error) { process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 1 }

@@ -2,12 +2,17 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createHash } from 'node:crypto'
-import { abandonedValidations, expiredSnapshots, parseCaptureLine, pruneSnapshots, rsyncArguments, snapshotName, snapshotTime } from '../owner-backup'
+import { abandonedValidations, expiredSnapshots, ownerValidator, parseCaptureLine, pruneSnapshots, rsyncArguments, snapshotName, snapshotTime, validateSnapshot } from '../owner-backup'
 import { verifyStorageArchive } from '../storage-archive'
 
 const sourceBuild = 'a'.repeat(40), image = `sha256:${'b'.repeat(64)}`, container = 'c'.repeat(64)
+const recorded = vi.hoisted(() => ({ receipt: null as { imageId: string } | null, builds: [] as string[] }))
+vi.mock('../release/validator-image.ts', () => ({
+  validatorReceipt: (sha: string, options: { channel: string }) => { expect(options.channel).toBe('stable'); return recorded.receipt && { ...recorded.receipt, sourceSha: sha } },
+  ensureValidatorImage: async (sha: string, options: { channel: string }) => { expect(options.channel).toBe('stable'); recorded.builds.push(sha); return { imageId: `sha256:${'e'.repeat(64)}` } },
+}))
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 const temporary = (prefix: string) => { const root = mkdtempSync(join(tmpdir(), prefix)); roots.push(root); return root }
@@ -134,5 +139,48 @@ describe('host owner capture', () => {
     const refused = host(['release', '../.env'])
     expect(refused.status).toBe(1)
     expect(existsSync(join(refused.root, '.env'))).toBe(true)
+  })
+})
+
+describe('owner snapshot validation', () => {
+  const validatorImage = `sha256:${'d'.repeat(64)}`
+  const snapshot = () => {
+    const root = temporary('oa-owner-snapshot-'), path = join(root, '20261117T203111Z')
+    mkdirSync(path, { recursive: true })
+    writeFileSync(join(path, 'source.json'), JSON.stringify({ name: '.capture-owner-x', sourceBuildId: sourceBuild, image, host: 'ubuntu@host',
+      capturedAt: '2026-11-17T20:31:11.306Z', pulledAt: '2026-11-17T20:35:32.169Z', archiveVersion: 2 }))
+    return path
+  }
+
+  it('validates with the arm64 validator of the source build and keeps the host image only as the recorded binding', async () => {
+    const path = snapshot(), selected: string[] = [], validated: string[] = []
+    const report = await validateSnapshot(path, {
+      validator: async build => { selected.push(build); return validatorImage },
+      validate: input => { validated.push(input.image); expect(input.buildId).toBe(sourceBuild); return { formatVersion: 2, roomCount: 3 } },
+    })
+    // ADR 0047: the host's native linux/amd64 image ID is never looked up on the aarch64 owner machine.
+    expect(selected).toEqual([sourceBuild])
+    expect(validated).toEqual([validatorImage])
+    expect(report).toMatchObject({ formatVersion: 2, roomCount: 3, validator: 'owner-local', image, validatorImage, validatorPlatform: 'linux/arm64' })
+    expect(JSON.parse(readFileSync(join(path, 'validation.json'), 'utf8'))).toEqual(report)
+  })
+
+  it('reuses the recorded validator of the source build and builds one in isolation only when it is missing', async () => {
+    recorded.receipt = { imageId: `sha256:${'d'.repeat(64)}` }; recorded.builds.splice(0)
+    expect(await ownerValidator(sourceBuild)).toBe(`sha256:${'d'.repeat(64)}`)
+    expect(recorded.builds).toEqual([])
+    recorded.receipt = null
+    expect(await ownerValidator(sourceBuild)).toBe(`sha256:${'e'.repeat(64)}`)
+    expect(recorded.builds).toEqual([sourceBuild])
+  })
+
+  it('records nothing and names the source build when no validator image can be obtained', async () => {
+    const path = snapshot(), validated: string[] = []
+    await expect(validateSnapshot(path, {
+      validator: async () => { throw new Error('Another owner-local verification holds the lock') },
+      validate: input => { validated.push(input.image); return {} },
+    })).rejects.toThrow(`needs the arm64 validator image of ${sourceBuild}: Another owner-local verification holds the lock`)
+    expect(validated).toEqual([])
+    expect(existsSync(join(path, 'validation.json'))).toBe(false)
   })
 })

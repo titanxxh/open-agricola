@@ -1,6 +1,6 @@
 # 45. Owner-local backup and cutover validation
 
-- Status: Accepted
+- Status: Accepted; the image that runs Owner-local Validation is amended by [ADR 0047](0047-owner-validation-on-a-same-source-arm64-image.md)
 - Date: 2026-11-17
 
 ## Context
