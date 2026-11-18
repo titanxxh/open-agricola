@@ -1,0 +1,38 @@
+{
+  "format": 1,
+  "repository": "titanxxh/open-agricola",
+  "baselineMainSha": "1cd1594138c104d6cc0de67b3c04bfc66c2fd6d2",
+  "features": [
+    {
+      "id": "pre-identity",
+      "dependsOn": [],
+      "sourceSha": "087e71b429fb2316972ab57db65369f8d928a619",
+      "integratedSha": "98dfcc9f0101ff2419da92c44f4b453c9d58b176"
+    },
+    {
+      "id": "pre-lifecycle",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "bc2a27b1258a80185bde8c970b17135ba319966b"
+    },
+    {
+      "id": "private-replay",
+      "dependsOn": [
+        "pre-identity",
+        "pre-lifecycle"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "bc2a27b1258a80185bde8c970b17135ba319966b"
+    },
+    {
+      "id": "team-cooperation",
+      "dependsOn": [
+        "pre-identity"
+      ],
+      "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
+      "integratedSha": "8508ec81fb95431c57b49bc7a6c0c7a7614d1e39"
+    }
+  ]
+}
