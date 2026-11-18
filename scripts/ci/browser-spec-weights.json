@@ -89,6 +89,7 @@
   "e2e-tests/platform.spec.ts": 33,
   "e2e-tests/played-card-chronology.spec.ts": 7,
   "e2e-tests/prerelease-owner-verification.spec.ts": 9,
+  "e2e-tests/public-asset-worker.spec.ts": 13,
   "e2e-tests/release-diagnostics.spec.ts": 1,
   "e2e-tests/release-rehearsal.spec.ts": 11,
   "e2e-tests/release-rendering.spec.ts": 1,
