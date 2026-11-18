@@ -6,7 +6,7 @@
 // under plain Node; the source fingerprint comes from verify.ts, loaded only on the tsx command paths.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { browserSpecWeights, weightedAssignment } from './ci/verification-tasks.ts'
@@ -76,10 +76,30 @@ export function viteDotenv(root: string): Record<string, string | null> {
   }))
 }
 
-type Marker = { schemaVersion: 1; head: string; fingerprint: string; environment: Record<string, string | null>; dotenv: Record<string, string | null> }
+/**
+ * SHA-256 over every path, symlink target and file under `dist`. A marker holds the digest of the bundle it describes,
+ * so a later rebuild in that checkout (another environment, a failed build) can never inherit the marker.
+ */
+export function distDigest(root: string): string | null {
+  const dist = join(root, 'dist')
+  if (!existsSync(dist)) return null
+  const hash = createHash('sha256')
+  const walk = (directory: string) => {
+    for (const name of readdirSync(join(dist, directory)).sort()) {
+      const path = join(directory, name), full = join(dist, path), stat = lstatSync(full)
+      if (stat.isDirectory()) { hash.update(`d ${path}\0`); walk(path) }
+      else if (stat.isSymbolicLink()) hash.update(`l ${path}\0${readlinkSync(full)}\0`)
+      else hash.update(`f ${path}\0${stat.size}\0`).update(readFileSync(full))
+    }
+  }
+  walk('')
+  return hash.digest('hex')
+}
+
+type Marker = { schemaVersion: 2; head: string; fingerprint: string; environment: Record<string, string | null>; dotenv: Record<string, string | null>; dist: string | null }
 
 export function writeHostedFrontendMarker(root: string, head: string, fingerprint: string, env: NodeJS.ProcessEnv = process.env): string {
-  const marker: Marker = { schemaVersion: 1, head, fingerprint, environment: hostedFrontendEnvironment(env), dotenv: viteDotenv(root) }
+  const marker: Marker = { schemaVersion: 2, head, fingerprint, environment: hostedFrontendEnvironment(env), dotenv: viteDotenv(root), dist: distDigest(root) }
   const path = join(root, MARKER)
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, JSON.stringify(marker, null, 2) + '\n')
@@ -92,10 +112,12 @@ export function hostedFrontendMismatch(source: string, head: string, fingerprint
   if (!existsSync(path) || !existsSync(join(source, 'dist', 'frontend-build.json'))) return 'no parent build'
   let marker: Partial<Marker>
   try { marker = JSON.parse(readFileSync(path, 'utf8')) as Partial<Marker> } catch { return 'unreadable parent build marker' }
-  if (marker.schemaVersion !== 1 || marker.head !== head) return 'parent build is for another commit'
+  if (marker.schemaVersion !== 2) return 'parent build marker format differs'
+  if (marker.head !== head) return 'parent build is for another commit'
   if (marker.fingerprint !== fingerprint) return 'parent build sources differ'
   if (JSON.stringify(marker.environment) !== JSON.stringify(hostedFrontendEnvironment(env))) return 'parent build environment differs'
   if (JSON.stringify(marker.dotenv) !== JSON.stringify(dotenv)) return 'parent build dotenv files differ'
+  if (marker.dist !== distDigest(source)) return 'parent build output changed after it was marked'
   return null
 }
 
