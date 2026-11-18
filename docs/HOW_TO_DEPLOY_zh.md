@@ -948,6 +948,8 @@ receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可�
 
 默认由 owner 本机校验停机切换（ADR 0045）。停机前，`deploy-backend.sh` 尽力刷新最新一份本机备份，作为 rsync 基准。控制器随后探测源镜像与目标镜像中的 `scripts/storage-capabilities.ts`。源镜像能导出目录格式 dump、目标镜像支持 `check-live --counted` 时，部署前备份以目录格式导出，并在操作目录写出 `owner-request.json`。主机等待期间同时打包归档。本机以该基准拉取捕获，校验摘要后在临时本地服务中还原，用候选镜像做完整校验；候选镜像在交付时已留在本机 Docker 中。随后本机写回 `owner-report.json`。只有报告绑定了请求 nonce、源构建、候选 SHA 与镜像、捕获时间与 dump 摘要时，主机才封存备份。之后执行迁移、应用当前删除事实、运行计数式 live 检查，并要求七项计数与报告一致。
 
+owner 机器是 aarch64，无法在 Docker 中运行部署用的 linux/amd64 镜像，因此本机校验使用同源的 linux/arm64 **校验镜像**（#1817）。在受信任的 protected-main checkout 中运行 `pnpm exec tsx scripts/release/validator-image.ts build --sha <F>`：它持有 owner-local 锁，在本机记录器的候选隔离中构建（一次性 UID 61000、独立 rootless Docker、不带任何凭据），使用 GitHub 镜像构建的同一 BuildKit 脚本，只换平台。拆除隔离后，owner 核对归档并载入本机 Docker，检查 arm64 身份、源码标签、通道、托管前端和原生模块，再把私有回执写到 `~/.local/state/open-agricola/validator-images/<F>-<channel>.json`；`show --sha <F>` 会重新核对。切换和每日本机备份另行接入它。
+
 失败报告、绑定不符或 15 分钟内未收到报告时，备份在迁移前终止，原样重启源。镜像缺少能力、指定 `--full-maintenance` 或空安装时，仍由主机校验；`validation-mode.json` 记录所选方式及原因。主机进程在等待中自身退出时保持停机。从暂存 policy 运行 `backend-image-maintenance.ts restore-source <request> <directory> <F> <P>`，它会获取维护锁，仅当 live 迁移尚未开始、镜像选择器仍指向源、且源保持原有身份并干净停止时，才会重启源。
 
 只有停机前正在运行、此次干净停止且身份未变化的旧容器，才会在 live migration 前的备份失败后恢复。OOM、未干净排空或开始 live migration 后的失败保持维护，不把旧程序接到可能已变化的 schema。`data_imports` 屏障和容器健康检查继续生效。私有操作目录保存导入、source 身份和 resolved Compose；后者含环境凭据，勿公开。

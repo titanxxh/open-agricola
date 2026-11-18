@@ -23,7 +23,8 @@ export type TaskRecord = { id: FullTaskId; startedAt: string; completedAt: strin
 export type PhaseRecord = { phase: string; exitCode: number; logSha256: string }
 
 const UID = 61000
-const NODE = '/opt/oa-owner-local/node/bin/node'
+export const OWNER_LOCAL_NODE = '/opt/oa-owner-local/node/bin/node'
+const NODE = OWNER_LOCAL_NODE
 // Scheduling is a CPU budget, measured on a 20-core owner machine: with every task at once the run queue reached 3x the
 // cores and 5 s test timeouts failed. The Vitest suites use every core, so each runs alone; a browser lane averages
 // about two cores (58 CPU minutes over ~30 lane minutes); the remaining tasks fit beside the browser lanes.
@@ -36,11 +37,11 @@ export function taskCost(task: FullTaskId, lanes: number): TaskCost {
 }
 // A private /tmp hides the owner's own temporary files; TMPDIR keeps tmpdir() paths visible to the rootless daemon.
 // The owner's home is also hidden from candidate commands; `assertPrivateHome` covers the candidate's daemon too.
-const candidateProperties = (ownerHome: string) => ['PrivateTmp=yes', `InaccessiblePaths=${ownerHome}`]
-const CANDIDATE_TMPDIR = '/home/oa-candidate/tmp'
+export const candidateProperties = (ownerHome: string) => ['PrivateTmp=yes', `InaccessiblePaths=${ownerHome}`]
+export const CANDIDATE_TMPDIR = '/home/oa-candidate/tmp'
 const CANDIDATE_PUBLIC_ASSETS = '/home/oa-candidate/public-assets'
 const COMMAND_TIMEOUT_MS = 60 * 60_000
-const NETWORK_ATTEMPTS = 3
+export const NETWORK_ATTEMPTS = 3
 export const PREPARATION_RETRY_DELAY_MS = 5_000
 // Candidates migrate test schemas concurrently and serve E2E assets locally (#1779), so `fast` keeps Vitest's own
 // worker count and the CPU budget alone limits the browser tasks. For a candidate from before those changes use
@@ -370,7 +371,7 @@ function freePort(): Promise<number> {
  * A clean public asset checkout at `version`, cached per SHA under the owner's state directory and fetched shallowly
  * from the public repository; the SHA alone identifies its content.
  */
-function trustedPublicAssets(version: string): string {
+export function trustedPublicAssets(version: string): string {
   fullSha(version)
   const directory = join(process.env.HOME ?? '', '.local/state/open-agricola/owner-local-verification/public-assets', version)
   if (!existsSync(join(directory, '.git'))) {
@@ -384,6 +385,30 @@ function trustedPublicAssets(version: string): string {
   return directory
 }
 const git = (args: string[], cwd = policyRoot) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+
+export const OWNER_LOCAL_LOCK = '/tmp/oa-owner-local-verification.lock'
+/**
+ * One candidate identity exists per machine, so owner-local runs (the recorder, the validator image build) never
+ * overlap. Returns the release; the lock also goes when the process exits.
+ */
+export function acquireOwnerLocalLock(lock = OWNER_LOCAL_LOCK): () => void {
+  try { writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 }) }
+  catch { throw new Error(`Another owner-local verification holds ${lock}; remove it only after confirming no run is active`) }
+  const release = () => { try { if (readFileSync(lock, 'utf8') === String(process.pid)) rmSync(lock) } catch { /* already gone */ } }
+  process.once('exit', release)
+  return release
+}
+
+/** The trusted shallow source checkout of `sha` under `output`, like the GitHub candidate checkout; copies come from it as root. */
+export function checkoutTrustedSource(output: string, sha: string): string {
+  const source = join(output, 'source')
+  git(['init', '--quiet', source], output)
+  git(['fetch', '--quiet', '--no-tags', '--depth', '1', `file://${policyRoot}`, sha], source)
+  git(['checkout', '--quiet', '--detach', 'FETCH_HEAD'], source)
+  git(['remote', 'add', 'origin', `https://github.com/${RELEASE_REPOSITORY}.git`], source)
+  assertCandidateCheckout(source, sha)
+  return source
+}
 
 export async function main(args: string[]): Promise<number> {
   ownerMachine()
@@ -408,19 +433,9 @@ export async function main(args: string[]): Promise<number> {
   assertPrivateHome(homedir())
   assertNoReservedCandidatePaths(git(['ls-tree', '--name-only', sha, '--', 'data']))
   if (existsSync(output) || realpathSync(dirname(output)) !== dirname(output)) throw new Error('Choose a new private output directory for each run, under a path without symlinks')
-  // One candidate identity exists per machine, so runs never overlap.
-  const lock = '/tmp/oa-owner-local-verification.lock'
-  try { writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 }) }
-  catch { throw new Error(`Another owner-local verification holds ${lock}; remove it only after confirming no run is active`) }
-  process.once('exit', () => { try { if (readFileSync(lock, 'utf8') === String(process.pid)) rmSync(lock) } catch { /* already gone */ } })
+  acquireOwnerLocalLock()
   for (const directory of [output, join(output, 'logs'), join(output, 'diagnostics')]) mkdirSync(directory, { mode: 0o700 })
-  // The trusted source is a shallow checkout like the GitHub candidate checkout; copies are made from it as root.
-  const source = join(output, 'source')
-  git(['init', '--quiet', source], output)
-  git(['fetch', '--quiet', '--no-tags', '--depth', '1', `file://${policyRoot}`, sha], source)
-  git(['checkout', '--quiet', '--detach', 'FETCH_HEAD'], source)
-  git(['remote', 'add', 'origin', `https://github.com/${RELEASE_REPOSITORY}.git`], source)
-  assertCandidateCheckout(source, sha)
+  checkoutTrustedSource(output, sha)
   const publicAssets = trustedPublicAssets(git(['show', `${sha}:public-assets.ref`]))
   const metadata = github(RELEASE_REPOSITORY, '') as { id?: unknown }
   if (typeof metadata.id !== 'number') throw new Error('Unreadable native repository identity')
