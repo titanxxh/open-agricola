@@ -76,6 +76,7 @@ Register a cross-card mechanism here only while it is still unimplemented. Remov
 
 | Source | Reason |
 |---|---|
+| `classic/CFL/` (61 cards) | Runtime sources and four-player behavioral coverage are present. Classic sources remain excluded from the ordinary deal pool; enabling a Classic variant is a separate integration. |
 | `C054_MarketStall` | Legacy reference source file of `C054_MarketBooth`. |
 | `C071_SlurrySpreader` | Legacy, misnamed reference source file of `C071_Slurry`. |
 | `D011_LawnFertilzer` | Misspelled reference source file of `D011_LawnFertilizer`. |

@@ -76,6 +76,7 @@
 
 | 来源 | 原因 |
 |---|---|
+| `classic/CFL/`（61 张） | 已有运行时实现和四人局行为覆盖。旧版源码仍不进入普通发牌池，旧农模式的启用属于独立集成。 |
 | `C054_MarketStall` | `C054_MarketBooth` 的参考实现 legacy 源文件。 |
 | `C071_SlurrySpreader` | `C071_Slurry` 的参考实现 legacy/错误命名源文件。 |
 | `D011_LawnFertilzer` | `D011_LawnFertilizer` 的参考实现 typo 源文件。 |
