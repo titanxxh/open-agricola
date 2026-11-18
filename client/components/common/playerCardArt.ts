@@ -17,9 +17,20 @@ export const moorMajorArtPath = (cardId: string): string | undefined => {
   return numbering ? `/assets/moor/major/${numbering}.png` : undefined
 }
 
+/** Classic-edition card IDs: `C` + classic deck + three-digit number, e.g. `CE203_Shepherd`. */
+const CLASSIC_CARD_ID = /^(C[A-Z]+)(\d{3})_/
+
+/** Classic card faces live under `assets/classic/<deck>/`, named after the ID prefix. */
+export const classicCardArtPath = (cardId: string): string | undefined => {
+  const match = CLASSIC_CARD_ID.exec(cardId)
+  return match ? `/assets/classic/${match[1]}/${match[1]}${match[2]}.png` : undefined
+}
+
 /** Public asset path of the art an official card face shows, before `publicAssetUrl`. */
 export const officialCardArtPath = (cardId: string, cardType: CardType): string | undefined => {
   if (cardType === 'major') return moorMajorArtPath(cardId) ?? MAJOR_ICON_SPRITE_PATH
+  const classic = classicCardArtPath(cardId)
+  if (classic) return classic
   const numbering = officialCardDisplayNumber(cardId)
   if (!numbering) return undefined
   if (PLAYER56_PORTRAITS.has(numbering)) return `/assets/player56/${numbering}.png`
