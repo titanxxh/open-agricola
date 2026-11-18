@@ -19,7 +19,7 @@ const cookieValue = (response: APIResponse, name: string) => {
   return cookie.value.split(';')[0]!.slice(name.length + 1)
 }
 
-export async function authenticateSolo(context: BrowserContext, request: APIRequestContext, username: string) {
+export async function authenticateSolo(context: BrowserContext, request: APIRequestContext, username: string, origin = FRONTEND_URL) {
   const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { headers: browserRequestHeaders(), data: {
     providerUserId: `solo-acceptance-${username}`, providerLogin: username, email: `${username}@example.com`, displayName: username,
   } })
@@ -29,7 +29,7 @@ export async function authenticateSolo(context: BrowserContext, request: APIRequ
     data: { username, displayName: username, password: 'solo-acceptance-pass-550', confirmPassword: 'solo-acceptance-pass-550' },
   })
   expect(complete.ok(), await complete.text()).toBe(true)
-  await context.addCookies([{ name: authCookieNames().session, value: cookieValue(complete, authCookieNames().session), url: FRONTEND_URL }])
+  await context.addCookies([{ name: authCookieNames().session, value: cookieValue(complete, authCookieNames().session), url: origin }])
   await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
 }
 

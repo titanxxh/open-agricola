@@ -29,9 +29,11 @@
 
 ## 服务与同步状态
 
-主入口通过准入检查后，并行下载 App、PageRouter 代码和所选语言包，再挂载已翻译的界面。`AuthProvider` 无需等待卡牌元数据。`CardMetadataBoundary` 在同步卡牌查询组件渲染前保护公开百科与已登录应用子树；匿名登录、账号恢复不等待卡牌数据。公开 Game Context 路由仍位于账号初始化之外。覆盖：`application-loading.spec.ts`、`application-bootstrap.test.ts`、`hosted-password-login.spec.ts`。
+主入口并行加载 App、PageRouter 和所选语言。公开 Game Context 路由位于账号初始化之外。`AuthProvider`、登录和账号恢复不等待 `CardMetadataBoundary`；该边界保护公开百科和已登录应用的同步卡牌查询。测试：`application-loading.spec.ts`、`application-bootstrap.test.ts`、`hosted-password-login.spec.ts`。
 
-生产构建以 SHA-256 文件名发布卡牌元数据，共用加载器在公开同步查询结果前校验内容，并复用浏览器缓存中的内容命名卡牌与语言包；缓存的 HTTP 错误或完整性不匹配只允许一次绕过旧缓存的请求。开发环境的可变元数据和语言发现仍重新校验。主应用与后续 Replay 构建通过 `scripts/browser-data.ts` 派生相同的卡牌身份。精简品牌素材由 `scripts/build-brand-assets.mjs` 从保留的原图生成，并使用 Vite 内容文件名。独立素材站的版本更新不依赖应用发版。覆盖：card-meta、language-pack、browser-data 测试及 `BrandMark.test.tsx`。
+`scripts/browser-data.ts` 为主应用与新 Replay 构建提供卡牌身份。加载器在使用前验证以 SHA-256 命名的元数据和语言包。缓存错误或哈希不符时允许一次新请求。开发元数据和语言发现会重新验证。品牌素材使用 Vite 内容文件名。测试：card-meta、language-pack、browser-data 及 `BrandMark.test.tsx`。
+
+正式 Pages 在主窗口注册 `/sw.js`。`client/public-assets/cache.worker.ts` 按 URL 和 SHA-256 缓存清单内的图片和字体。测试：`e2e-tests/public-asset-worker.spec.ts`。 [更新与恢复](../HOW_TO_DEPLOY_zh.md#主站图片资源)
 
 `workshop-game/bootstrap.ts` 只接纳应用 base 下 `workshop-game.html` 的固定 HTTP／浏览器沙盒参数。父窗口必须是同源、顶层且带 `page=workshop` 的主页面；直接打开、嵌套、跨源及意外模式均保持静态。准入后 `initialize.tsx` 只挂载 Locale、Auth 和 `GameContainerApi`；未登录时提供独立打开应用的链接，不渲染账号路由。自托管主 HTML 保留 `frame-ancestors 'none'`，只有独立对局 HTML 允许 `'self'`；Pages 同样执行 JavaScript 准入检查。覆盖：`bootstrap.test.ts`、`workshop-game-entry.spec.ts`、`frontend-hosting.test.ts`。
 

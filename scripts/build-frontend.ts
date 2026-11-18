@@ -30,6 +30,7 @@ const build = spawnSync('pnpm', skipTypecheck
     ...(skipTypecheck ? { NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=4096' } : {}),
     NODE_ENV: 'production',
     GAME_BUILD_ID: gameBuildId,
+    OPEN_AGRICOLA_FRONTEND_TARGET: deployment.deploymentTarget,
     VITE_BASE_PATH: basePath,
     VITE_API_BASE: mode === 'hosted' ? '' : process.env.VITE_API_BASE,
     VITE_WS_BASE: mode === 'hosted' ? '' : process.env.VITE_WS_BASE,
