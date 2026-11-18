@@ -20,6 +20,7 @@ import {
   shouldEnforceReorganizeOnLastHarvest,
 } from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
+import { hasUnsettledNonHarvestNewborns } from '../../domain/harvest-breed-placement'
 
 export type BreedOptions = {
   animalTypes?: ReadonlyArray<BreedAnimalType>
@@ -66,11 +67,15 @@ const breedingLitters = (state: GameState, player: PlayerState, opts: BreedOptio
   return litters
 }
 
+/**
+ * A season or card breeding is available only once the player's previous
+ * litter is housed: each unsettled birth is settled by its own reorganization.
+ */
 export const canBreedAnimals = (
   state: GameState,
   player: PlayerState,
   opts: BreedOptions,
-): boolean => breedingLitters(state, player, opts).length > 0
+): boolean => !hasUnsettledNonHarvestNewborns(state, player) && breedingLitters(state, player, opts).length > 0
 
 /**
  * Core breed helper:

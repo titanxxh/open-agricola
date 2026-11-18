@@ -626,6 +626,23 @@ describe('spring breeding records only housed newborns (#1804)', () => {
     expect(logRows(session, 'log.reorganizeDiscard')).toEqual([{ boar: 1 }])
   })
 
+  it('offers no nested card breeding until the spring litter is housed', () => {
+    const RYE = 'C084_PerennialRye'
+    const RYE_ANYTIME = 'C84-perennial-rye-anytime'
+    const session = breed(player => {
+      player.minorPlayed = [RYE]
+      player.resources.grain = 1
+    })
+    const pending = auditClone(session.getState())
+    expect(pending.interaction.anytimeActions.map((action) => action.id)).not.toContain(RYE_ANYTIME)
+    const rejected = session.takeAnytimeAction(0, RYE_ANYTIME)
+    expect(rejected.ok).toBe(false)
+    expect(auditClone(rejected.state)).toEqual(pending.state)
+    house(session, 3)
+    expect(births(session)).toEqual([{ sheep: 1 }])
+    expect(session.getState().interaction.anytimeActions.map((action) => action.id)).toContain(RYE_ANYTIME)
+  })
+
   it('undo after housing restores the unsettled litter and the cooking ban', () => {
     const session = breed()
     house(session, 2)
