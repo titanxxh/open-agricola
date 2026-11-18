@@ -86,7 +86,9 @@ async function main([command, root, first, second]) {
   }
   if (command === 'accept-owner-report') {
     // An Owner-local Validation stands in for the host restore only when it is
-    // bound to this capture, this source and this exact candidate image.
+    // bound to this capture, this source and this exact candidate image. The
+    // aarch64 owner validates with a same-source arm64 build (ADR 0047), which the
+    // report names; sealing keeps it in the manifest beside the deployed image.
     const path = process.env.BACKUP_OWNER_REPORT ?? '', info = await lstat(path)
     if (!info.isFile() || info.uid !== process.getuid() || info.mode & 0o077 || info.size > 64 * 1024) throw new Error('Owner validation report must be an owner-private regular file')
     const report = JSON.parse(await readFile(path, 'utf8'))
@@ -97,10 +99,11 @@ async function main([command, root, first, second]) {
       || !/^[a-f0-9-]{36}$/.test(report.nonce ?? '') || report.sourceBuildId !== process.env.SOURCE_BUILD_ID
       || !/^[a-f0-9]{40}$/.test(process.env.BACKUP_TARGET_BUILD_ID ?? '') || report.targetBuildId !== process.env.BACKUP_TARGET_BUILD_ID
       || !/^sha256:[a-f0-9]{64}$/.test(process.env.BACKUP_TARGET_IMAGE ?? '') || report.image !== process.env.BACKUP_TARGET_IMAGE
+      || !/^sha256:[a-f0-9]{64}$/.test(report.validatorImage ?? '') || report.validatorPlatform !== 'linux/arm64'
       || report.createdAt !== capture.createdAt || report.database?.sha256 !== capture.database?.sha256 || report.database?.size !== capture.database?.size
       || !Number.isFinite(Date.parse(report.validatedAt)) || !Array.isArray(report.replaySchemaVersions)
       || !['roomCount', 'replayCount', 'replayHeadCount', 'replayStepCount', 'replaySegmentCount', 'retainedObjectCount'].every(key => count(report[key]))) {
-      throw new Error('Owner validation report does not bind this capture, source and candidate image')
+      throw new Error('Owner validation report does not bind this capture, source, candidate image and validator image')
     }
     const output = await open(join(root, 'report.json'), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
     try { await output.write(JSON.stringify(report, null, 2) + '\n') } finally { await output.close() }

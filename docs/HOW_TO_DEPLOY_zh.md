@@ -946,9 +946,9 @@ receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可�
 
 维护锁内再次绑定目录、`F`、`P` 和实际 image。保留精确的旧 container/image/Build，检查固定 fetch/checkout 与数据目标，然后干净停止旧应用。旧 image 负责导出 PostgreSQL/S3，新 image 负责隔离恢复验证；通过后才执行 `check-live`，以 `--no-build --pull never` 启动 app 和原 Caddy image。正式主机没有 `pnpm install`、应用构建、registry 登录或自动依赖升级。共享依赖变更仍须单独维护。
 
-默认由 owner 本机校验停机切换（ADR 0045）。停机前，`deploy-backend.sh` 尽力刷新最新一份本机备份，作为 rsync 基准。控制器随后探测源镜像与目标镜像中的 `scripts/storage-capabilities.ts`。源镜像能导出目录格式 dump、目标镜像支持 `check-live --counted` 时，部署前备份以目录格式导出，并在操作目录写出 `owner-request.json`。主机等待期间同时打包归档。本机以该基准拉取捕获，校验摘要后在临时本地服务中还原，用候选镜像做完整校验；候选镜像在交付时已留在本机 Docker 中。随后本机写回 `owner-report.json`。只有报告绑定了请求 nonce、源构建、候选 SHA 与镜像、捕获时间与 dump 摘要时，主机才封存备份。之后执行迁移、应用当前删除事实、运行计数式 live 检查，并要求七项计数与报告一致。
+默认由 owner 本机校验停机切换（ADR 0045）。停机前，`deploy-backend.sh` 尽力刷新最新一份本机备份，作为 rsync 基准。控制器随后探测源镜像与目标镜像中的 `scripts/storage-capabilities.ts`。源镜像能导出目录格式 dump、目标镜像支持 `check-live --counted` 时，部署前备份以目录格式导出，并在操作目录写出 `owner-request.json`。主机等待期间同时打包归档。本机以该基准拉取捕获，校验摘要后在临时本地服务中还原，用下文候选版本的校验镜像做完整校验。随后本机写回 `owner-report.json`。只有报告绑定了请求 nonce、源构建、候选 SHA 与镜像、校验镜像及其平台、捕获时间与 dump 摘要时，主机才封存备份。之后执行迁移、应用当前删除事实、运行计数式 live 检查，并要求七项计数与报告一致。
 
-owner 机器是 aarch64，无法在 Docker 中运行部署用的 linux/amd64 镜像，因此本机校验使用同源的 linux/arm64 **校验镜像**（#1817）。在受信任的 protected-main checkout 中运行 `pnpm exec tsx scripts/release/validator-image.ts build --sha <F>`：它持有 owner-local 锁，在本机记录器的候选隔离中构建（一次性 UID 61000、独立 rootless Docker、不带任何凭据），使用 GitHub 镜像构建的同一 BuildKit 脚本，只换平台。拆除隔离后，owner 核对归档并载入本机 Docker，检查 arm64 身份、源码标签、通道、托管前端和原生模块，再把私有回执写到 `~/.local/state/open-agricola/validator-images/<F>-<channel>.json`；`show --sha <F>` 会重新核对。切换和每日本机备份另行接入它。
+owner 机器是 aarch64，无法在 Docker 中运行部署用的 linux/amd64 镜像，因此本机校验使用同源的 linux/arm64 **校验镜像**（#1817）。在受信任的 protected-main checkout 中运行 `pnpm exec tsx scripts/release/validator-image.ts build --sha <F>`：它持有 owner-local 锁，在本机记录器的候选隔离中构建（一次性 UID 61000、独立 rootless Docker、不带任何凭据），使用 GitHub 镜像构建的同一 BuildKit 脚本，只换平台。拆除隔离后，owner 核对归档并载入本机 Docker，检查 arm64 身份、源码标签、通道、托管前端和原生模块，再把私有回执写到 `~/.local/state/open-agricola/validator-images/<F>-<channel>.json`；`show --sha <F>` 会重新核对。`deploy-backend.sh` 在导出镜像之前复用或构建它（ADR 0047）；拿不到时，发布在接触后端之前就停止，并提示改用 `--full-maintenance`。
 
 失败报告、绑定不符或 15 分钟内未收到报告时，备份在迁移前终止，原样重启源。镜像缺少能力、指定 `--full-maintenance` 或空安装时，仍由主机校验；`validation-mode.json` 记录所选方式及原因。主机进程在等待中自身退出时保持停机。从暂存 policy 运行 `backend-image-maintenance.ts restore-source <request> <directory> <F> <P>`，它会获取维护锁，仅当 live 迁移尚未开始、镜像选择器仍指向源、且源保持原有身份并干净停止时，才会重启源。
 
@@ -1216,7 +1216,7 @@ node --import tsx scripts/owner-backup.ts prune
 
 `run` 请主机的 `scripts/owner-sync-capture.sh capture` 在维护锁下做一次在线、快照一致的捕获。捕获使用运行中的镜像，包含目录格式的未压缩 dump、对象和当前删除记录，不含任何配置。本机以上一份副本为基准用 rsync 拉取，逐项校验摘要后通知主机释放。主机最多保留一份 owner 捕获：下一次捕获会替换遗留的那份，每日清理会删除超过 30 天的。遇到每日备份持锁时，每隔十分钟重试，共三次。
 
-验证在内部 Docker 网络上的临时 PostgreSQL 与 RustFS 容器中还原副本，合并拉回的删除记录，再用主机当时运行的镜像执行 `storage-archive-cli.ts validate`，使用全部 CPU。该镜像必须已在本机上，正式交付后即满足。报告写入 `validation.json`。超过 30 天的副本一律删除，包括最新的一份。副本可按下面的流程恢复，以其 `capture/` 目录作为归档。
+验证在内部 Docker 网络上的临时 PostgreSQL 与 RustFS 容器中还原副本，合并拉回的删除记录，再用主机当时运行的构建对应的校验镜像执行 `storage-archive-cli.ts validate`，使用全部 CPU；该镜像会被复用或现场构建，拿不到时不写报告。报告写入 `validation.json`。超过 30 天的副本一律删除，包括最新的一份。副本可按下面的流程恢复，以其 `capture/` 目录作为归档。
 
 捕获要求运行中的镜像与主机检出都包含 `owner-sync-capture.sh`；镜像较旧时 dump 仍为 custom 格式，可以验证，但每次全量传输。按 `deploy/owner-backup/` 文件头的说明安装每日定时器：北京时间 04:30 运行，机器关机错过时开机补跑。
 

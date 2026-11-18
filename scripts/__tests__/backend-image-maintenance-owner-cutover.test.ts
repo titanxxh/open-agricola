@@ -13,7 +13,8 @@ afterEach(removeBackendImageMaintenanceRoots)
 // ADR 0045: the owner machine validates the stopped cutover; the host seals only a bound report.
 const ownerReport = (changes: Record<string, unknown> = {}) => (request: Record<string, unknown>) => ({
   formatVersion: 2, validator: 'owner-local', nonce: request.nonce, sourceBuildId: request.sourceBuildId, targetBuildId: request.targetBuildId,
-  image: request.targetImage, createdAt: request.createdAt, database: request.database, validatedAt: new Date().toISOString(),
+  image: request.targetImage, validatorImage: `sha256:${'b'.repeat(64)}`, validatorPlatform: 'linux/arm64',
+  createdAt: request.createdAt, database: request.database, validatedAt: new Date().toISOString(),
   roomCount: 0, replayCount: 0, replayHeadCount: 0, replayStepCount: 0, replaySegmentCount: 0, retainedObjectCount: 0, replaySchemaVersions: [], ...changes,
 })
 const commandsOf = (value: ReturnType<typeof fixture>) => value.calls().map(call => call.args.join(' '))
@@ -31,7 +32,9 @@ it('hands cutover validation to the owner machine when both images support it, t
   expect(commands.some(command => command.includes(' validate /backup/'))).toBe(false)
   expect(commands.find(command => command.includes('check-live'))).toContain('--counted')
   const manifest = JSON.parse(readFileSync(join(value.directory, 'backups', `pre-${value.request.sourceSha.slice(0, 12)}-${value.request.operationId}.manifest.json`), 'utf8'))
-  expect(manifest).toMatchObject({ formatVersion: 2, validator: 'owner-local', targetBuildId: value.request.sourceSha, sourceBuildId: value.sourceBuild })
+  // ADR 0047: the sealed evidence keeps the owner's arm64 validator beside the deployed image it stands in for.
+  expect(manifest).toMatchObject({ formatVersion: 2, validator: 'owner-local', targetBuildId: value.request.sourceSha, sourceBuildId: value.sourceBuild,
+    image: value.request.transfer.receipt.imageId, validatorImage: `sha256:${'b'.repeat(64)}`, validatorPlatform: 'linux/arm64' })
   expect(value.current()).toMatchObject({ started: true, counted: true })
   expect(sourceRestarted(value)).toBe(false)
   const status = value.operation('status')
@@ -42,6 +45,9 @@ it.each([
   ['a failed owner validation', ownerReport({ ok: false, error: 'replay segment integrity failed' }), {}],
   ['a report bound to another dump', ownerReport({ database: { sha256: 'e'.repeat(64), size: 11 } }), {}],
   ['a report bound to another image', ownerReport({ image: `sha256:${'e'.repeat(64)}` }), {}],
+  ['a report without its validator image', ownerReport({ validatorImage: undefined }), {}],
+  ['a report from a malformed validator image', ownerReport({ validatorImage: 'validator' }), {}],
+  ['a report from another validator platform', ownerReport({ validatorPlatform: 'linux/amd64' }), {}],
   ['a missing report', null, { BACKEND_OWNER_WAIT_MS: '1500' }],
 ] as const)('restarts the unchanged source before migration after %s', async (_name, answer, env) => {
   const value = fixture()
