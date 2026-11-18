@@ -844,7 +844,7 @@ E2E_PUBLIC_ASSET_DIR=/absolute/path/open-agricola-assets PUBLIC_ASSET_VALIDATION
 - 只有主站的 Vite 开发服务器接受 `E2E_PUBLIC_ASSET_DIR`，设置了 `CI` 时同样生效。它先做上述固定版本干净 checkout 校验，再从 `/__public-assets__/` 提供全部图片和字体，未知路径返回 404；不发远端请求，也不回退。
 - GitHub 上的浏览器任务同样使用它：日常浏览器分区，以及候选验证的 chromium、sandbox、WebKit 任务，都先运行 `scripts/ci/checkout-public-assets.sh`。该脚本从 Git 对象读取固定 SHA，并在 checkout 之外浅抓取素材仓；候选准备步骤把它复制到候选 home。`build` 任务、Pages 构建和线上发布验收仍使用 Pages。
 - hosted、Pages、Replay Viewer 构建，以及 preview 和 Vitest 都忽略该变量，继续使用 Pages URL 和各自的校验；要让这些构建也不联网，同时设置 `PUBLIC_ASSET_VALIDATION_DIR`。
-- 不可变 Viewer 运行时仍从 Pages 加载卡图和字体。
+- 在 Chromium 浏览器测试中，这些构建产物同样不访问远端：设置该变量后，Playwright 的 global setup（`e2e-tests/helpers/pinned-asset-host.ts`）用一把新生成的密钥，在回环地址的 HTTPS 服务上提供同一份 checkout，Chromium 把素材站域名解析到该服务，并且只信任这把密钥。URL 不变，单个卡住的请求不会再拖住页面的 load 事件。WebKit 带主机映射无法启动，因此 WebKit 运行，以及浏览器测试之外的不可变 Viewer，仍从 Pages 加载卡图和字体。
 - 该设置计入验证指纹。它不验证线上 Pages 部署；未设置 `PUBLIC_ASSET_VALIDATION_DIR` 的构建仍会验证。
 
 更新公共资源时先把 `open-agricola-assets` 发布到图片仓 Pages，等待其 workflow 将所有线上文件与该 commit 逐一校验，再把主仓 `public-assets.ref` 更新为线上 `asset-version.txt`，同步 `public-assets.required.json`，随后走主仓正常 Release。只修改文档的图片仓 commit 也会改变部署版本标记。旧 Viewer Build 保留代码，公共卡图和字体跟随图片站当前文件。
@@ -1147,7 +1147,7 @@ Game Bug Reports 交付到公开的 `titanxxh/open-agricola` 仓库。将独立 
 | `VITE_WS_BASE` | 从 API_BASE 推导 | WebSocket 地址 |
 | `PUBLIC_ASSET_LOCAL_DIR` | — | 仅本地开发：完整图片仓 checkout；设置后禁止远端混用或回退 |
 | `PUBLIC_ASSET_VALIDATION_DIR` | — | 直接校验 `public-assets.ref` 对应的干净素材仓，替代 Pages 元数据请求；构建 URL 仍使用 Pages 来源 |
-| `E2E_PUBLIC_ASSET_DIR` | — | 仅浏览器验收：开发服务器提供 `public-assets.ref` 对应的干净素材仓，`CI` 下同样生效；所有构建忽略它 |
+| `E2E_PUBLIC_ASSET_DIR` | — | 仅浏览器验收：开发服务器提供 `public-assets.ref` 对应的干净素材仓，`CI` 下同样生效，Chromium 测试也把素材站解析到它；所有构建忽略它 |
 
 ---
 

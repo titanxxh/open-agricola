@@ -801,7 +801,7 @@ E2E_PUBLIC_ASSET_DIR=/absolute/path/open-agricola-assets PUBLIC_ASSET_VALIDATION
 
 - Only the main site's Vite development server honours `E2E_PUBLIC_ASSET_DIR`, also under `CI`. It applies the pinned clean-checkout check above, then serves every image and font from `/__public-assets__/` and answers 404 for an unknown path. It makes no remote request and never falls back.
 - Hosted, Pages and Replay Viewer builds, previews and Vitest ignore the variable. They keep the Pages URLs and their own validation; add `PUBLIC_ASSET_VALIDATION_DIR` to keep those builds off the network as well.
-- An immutable Viewer still loads its art and fonts from Pages at run time.
+- In Chromium browser tests these compiled pages still load nothing remote. With the variable set, Playwright's global setup (`e2e-tests/helpers/pinned-asset-host.ts`) serves the same checkout from a loopback HTTPS host under a fresh key, and Chromium resolves the asset host to it and trusts only that key. URLs are unchanged, so one stalled request cannot hold a page's load event. WebKit cannot launch with host mapping, so its runs and an immutable Viewer outside browser tests still load art and fonts from Pages.
 - The setting is part of the verification fingerprint. It does not verify the live Pages deployment; a build without `PUBLIC_ASSET_VALIDATION_DIR` still does.
 - GitHub browser tasks use it too: routine browser partitions and the chromium, sandbox and WebKit candidate tasks first run `scripts/ci/checkout-public-assets.sh`, which reads the pin from the Git object and shallow-fetches it outside the checkout. Candidate setup copies it into the candidate home. The `build` task, Pages builds and live release acceptance still use Pages.
 
@@ -1101,7 +1101,7 @@ Changing the target does not transfer existing GitHub Issues or rewrite stored r
 | `VITE_WS_BASE` | Derived from the API base | WebSocket URL |
 | `PUBLIC_ASSET_LOCAL_DIR` | — | Local development only: a complete asset-repository checkout; remote mixing and fallback are disabled |
 | `PUBLIC_ASSET_VALIDATION_DIR` | — | Validate a clean asset checkout at `public-assets.ref` instead of fetching Pages metadata; build URLs retain the Pages source |
-| `E2E_PUBLIC_ASSET_DIR` | — | Browser verification only: the development server serves a clean asset checkout at `public-assets.ref`, also under `CI`; every build ignores it |
+| `E2E_PUBLIC_ASSET_DIR` | — | Browser verification only: the development server serves a clean asset checkout at `public-assets.ref`, also under `CI`, and Chromium tests resolve the asset site to it; every build ignores it |
 
 ---
 
