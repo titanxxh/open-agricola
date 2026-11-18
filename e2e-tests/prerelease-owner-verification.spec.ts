@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process'
 import { once } from 'node:events'
 import { createPrereleaseGateway, OWNER_VERIFICATION_COOKIE } from '../scripts/prerelease/gateway'
 import { configureOwnerVerification } from '../scripts/prerelease/owner-browser'
+import { ownLaunchOptions } from './helpers/pinned-asset-host'
 
 test.use({ trace: 'retain-on-failure' })
 
@@ -104,7 +105,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: '
   proxy.listen(0, '127.0.0.1'); await once(proxy, 'listening')
   const proxyAddress = proxy.address()
   if (!proxyAddress || typeof proxyAddress === 'string') throw new Error('Expected proxy port')
-  const browser = await playwright[engine].launch({ proxy: { server: `http://127.0.0.1:${proxyAddress.port}` } })
+  const browser = await playwright[engine].launch({ ...ownLaunchOptions(engine), proxy: { server: `http://127.0.0.1:${proxyAddress.port}` } })
   return { browser, origin, formal, tokenFile, root, gateway, capability, seen, programs, viewerPath, close: async () => {
     await browser.close(); await gateway.close()
     for (const socket of sockets) socket.destroy()

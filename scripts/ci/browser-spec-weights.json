@@ -1,7 +1,7 @@
 {
  "format": 1,
  "unit": "seconds",
- "source": "single-lane chromium tasks of an owner-local harness profile of 39937991 on the owner machine, all six browser tasks concurrent on 20 cores, 2026-11-18 (#1779), rounded up",
+ "source": "single-lane chromium tasks of an owner-local harness profile of 39937991 on the owner machine, all six browser tasks concurrent on 20 cores, 2026-11-18 (#1779), rounded up; pinned-asset-host added from its local runs, 2 seconds rounded up",
  "files": {
   "e2e-tests/D180_PartTimeWorker.spec.ts": 4,
   "e2e-tests/E148_Lazybones.spec.ts": 3,
@@ -84,6 +84,7 @@
   "e2e-tests/paper-maker-exchange.spec.ts": 8,
   "e2e-tests/parent-ordinary-draw.spec.ts": 2,
   "e2e-tests/parrot-breeder.spec.ts": 5,
+  "e2e-tests/pinned-asset-host.spec.ts": 2,
   "e2e-tests/platform-shell.spec.ts": 89,
   "e2e-tests/platform.spec.ts": 33,
   "e2e-tests/played-card-chronology.spec.ts": 7,

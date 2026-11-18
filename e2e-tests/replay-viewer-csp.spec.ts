@@ -1,10 +1,12 @@
 // @covers replay-viewer/src/
 import { browserRequestHeaders } from './fixtures'
 import { expect, test } from '@playwright/test'
+import { pinnedAssetHostArgs } from './helpers/pinned-asset-host'
 
 const backend = process.env.BACKEND_URL ?? 'http://localhost:5175'
 
-test.use({ launchOptions: { args: ['--enable-itp', '--cookies-policy=no-third-party'] } })
+// Keeps the Chromium asset mapping (empty in WebKit runs) next to the WebKit privacy flags this spec needs.
+test.use({ launchOptions: { args: [...pinnedAssetHostArgs(), '--enable-itp', '--cookies-policy=no-third-party'] } })
 
 test('sandboxed replay loads public resources and rejects other origins @webkit', async ({ page, request }) => {
   const response = await request.post(`${backend}/api/test/replays/completed`, { headers: browserRequestHeaders() })
