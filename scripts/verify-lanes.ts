@@ -1,12 +1,12 @@
 // Lane planning for `pnpm verify:parallel` (#1779): how many lanes, which spec files each lane runs, and whether a
-// lane may reuse the hosted frontend its parent already built from the same sources instead of rebuilding it.
-//   pnpm exec tsx scripts/verify-lanes.ts hosted-frontend   (the `pnpm verify` hosted-frontend step of a lane)
-//   pnpm exec tsx scripts/verify-lanes.ts write-marker      (the parent, after building once)
+// checkout may reuse a hosted frontend already built from the same sources instead of rebuilding it.
+//   pnpm exec tsx scripts/verify-lanes.ts hosted-frontend   (the hosted-frontend step while VERIFY_HOSTED_FRONTEND_SOURCE is set)
+//   pnpm exec tsx scripts/verify-lanes.ts write-marker      (after building once: a verify:parallel root or a caller's checkout)
 // Only node built-ins and verification-tasks.ts are imported statically, so verify-parallel.mjs can load this module
 // under plain Node; the source fingerprint comes from verify.ts, loaded only on the tsx command paths.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { browserSpecWeights, weightedAssignment } from './ci/verification-tasks.ts'
@@ -108,19 +108,35 @@ function run(command: string, args: string[], cwd: string): number {
 const headOf = (cwd: string) => spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).stdout.trim()
 const fingerprintOf = async (cwd: string): Promise<string> => (await import('./verify.ts')).sourceFingerprint(cwd)
 
-/** The `pnpm verify` hosted-frontend step of a lane: reuse the parent's matching build, else build as usual. */
-export async function hostedFrontendStep(cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<number> {
-  const source = env[HOSTED_FRONTEND_SOURCE]
-  const mismatch = source ? hostedFrontendMismatch(resolve(source), headOf(cwd), await fingerprintOf(cwd), env, viteDotenv(cwd)) : 'no parent build'
-  if (mismatch) {
+/** The `pnpm` arguments of a hosted-frontend step: the reuse check while a source build is named, else a plain build. */
+export function hostedFrontendCommand(env: NodeJS.ProcessEnv = process.env): string[] {
+  return env[HOSTED_FRONTEND_SOURCE] ? ['exec', 'tsx', 'scripts/verify-lanes.ts', 'hosted-frontend'] : ['run', 'build:hosted-frontend']
+}
+
+export type HostedFrontendTools = { run: typeof run; head: typeof headOf; fingerprint: typeof fingerprintOf }
+
+/**
+ * The hosted-frontend step while VERIFY_HOSTED_FRONTEND_SOURCE names a build (a verify:parallel root, or one the
+ * caller prepared): copy it when it matches this checkout exactly, else build as usual. A source whose `dist` is this
+ * checkout's own is already in place and is never removed.
+ */
+export async function hostedFrontendStep(cwd: string, env: NodeJS.ProcessEnv = process.env, tools: HostedFrontendTools = { run, head: headOf, fingerprint: fingerprintOf }): Promise<number> {
+  const source = env[HOSTED_FRONTEND_SOURCE] ? resolve(env[HOSTED_FRONTEND_SOURCE]) : null
+  const mismatch = source ? hostedFrontendMismatch(source, tools.head(cwd), await tools.fingerprint(cwd), env, viteDotenv(cwd)) : 'no parent build'
+  if (!source || mismatch) {
     console.log(`[verify] building the hosted frontend (${mismatch})`)
-    return run('pnpm', ['run', 'build:hosted-frontend'], cwd)
+    return tools.run('pnpm', ['run', 'build:hosted-frontend'], cwd)
   }
   // Generated card, language and encyclopedia files serve the dev server; the production bundle is copied.
-  const prepared = run('pnpm', ['run', 'build:cards-manifest'], cwd)
+  const prepared = tools.run('pnpm', ['run', 'build:cards-manifest'], cwd)
   if (prepared !== 0) return prepared
-  rmSync(join(cwd, 'dist'), { recursive: true, force: true })
-  cpSync(join(resolve(source!), 'dist'), join(cwd, 'dist'), { recursive: true })
+  const target = join(cwd, 'dist')
+  if (existsSync(target) && realpathSync(target) === realpathSync(join(source, 'dist'))) {
+    console.log(`[verify] reused the hosted frontend already built in ${source} for the same sources`)
+    return 0
+  }
+  rmSync(target, { recursive: true, force: true })
+  cpSync(join(source, 'dist'), target, { recursive: true })
   console.log(`[verify] reused the hosted frontend built by ${source} for the same sources`)
   return 0
 }

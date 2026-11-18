@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { canonicalOwnerLocalCommands } from '../ci/owner-local-verification'
 import { browserSpecWeightsAt, verificationConfiguration, weightedAssignment } from '../ci/verification-tasks'
 import { testPortRange } from '../test-ports'
-import { hostedFrontendMismatch, laneArguments, laneCount, splitFileArgs, viteDotenv, writeHostedFrontendMarker } from '../verify-lanes'
+import { HOSTED_FRONTEND_SOURCE, hostedFrontendCommand, hostedFrontendMismatch, hostedFrontendStep, laneArguments, laneCount, splitFileArgs, viteDotenv, writeHostedFrontendMarker } from '../verify-lanes'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -93,6 +93,38 @@ describe('hosted frontend reuse', () => {
     rmSync(join(root, 'dist'), { recursive: true })
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), env)).toBe('no parent build')
     expect(hostedFrontendMismatch(checkout([]), head, 'f'.repeat(64), env)).toBe('no parent build')
+  })
+
+  // Records pnpm commands instead of running them; every checkout here is at `head` with the same sources.
+  const recording = (calls: string[][]) => ({ run: (command: string, args: string[], cwd: string) => { calls.push([cwd, command, ...args]); return 0 },
+    head: () => head, fingerprint: async () => 'f'.repeat(64) })
+
+  it('copies a named build that matches exactly, builds otherwise, and keeps a named build that is the checkout itself', async () => {
+    const env = { VITE_SANDBOX_EXECUTOR: 'server', RELEASE_CHANNEL: 'stable' }
+    const source = parent(env)
+    writeFileSync(join(source, 'dist/index.html'), 'source build\n')
+    const lane = checkout([]); mkdirSync(join(lane, 'dist')); writeFileSync(join(lane, 'dist/stale.js'), 'stale\n')
+    // verify-parallel's root and verify.ts take the reuse step only while a source build is named.
+    expect(hostedFrontendCommand(env)).toEqual(['run', 'build:hosted-frontend'])
+    expect(hostedFrontendCommand({ ...env, [HOSTED_FRONTEND_SOURCE]: source })).toEqual(['exec', 'tsx', 'scripts/verify-lanes.ts', 'hosted-frontend'])
+    const calls: string[][] = []
+    // A match prepares only the generated dev-server inputs and replaces the checkout's bundle with the source's.
+    expect(await hostedFrontendStep(lane, { ...env, [HOSTED_FRONTEND_SOURCE]: source }, recording(calls))).toBe(0)
+    expect(calls).toEqual([[lane, 'pnpm', 'run', 'build:cards-manifest']])
+    expect(readFileSync(join(lane, 'dist/index.html'), 'utf8')).toBe('source build\n')
+    expect(existsSync(join(lane, 'dist/stale.js'))).toBe(false)
+    // The browser-local sandbox bundle differs, and without a named source the step is the plain build.
+    calls.length = 0
+    expect(await hostedFrontendStep(lane, { ...env, VITE_SANDBOX_EXECUTOR: 'browser', [HOSTED_FRONTEND_SOURCE]: source }, recording(calls))).toBe(0)
+    expect(await hostedFrontendStep(lane, env, recording(calls))).toBe(0)
+    expect(calls).toEqual([[lane, 'pnpm', 'run', 'build:hosted-frontend'], [lane, 'pnpm', 'run', 'build:hosted-frontend']])
+    // Naming the checkout itself, directly or through a symlink, never removes the build it would copy.
+    calls.length = 0
+    const alias = join(checkout([]), 'alias'); symlinkSync(source, alias)
+    for (const named of [source, alias]) expect(await hostedFrontendStep(source, { ...env, [HOSTED_FRONTEND_SOURCE]: named }, recording(calls))).toBe(0)
+    expect(calls).toEqual([[source, 'pnpm', 'run', 'build:cards-manifest'], [source, 'pnpm', 'run', 'build:cards-manifest']])
+    expect(readFileSync(join(source, 'dist/index.html'), 'utf8')).toBe('source build\n')
+    expect(hostedFrontendMismatch(source, head, 'f'.repeat(64), env)).toBeNull()
   })
 })
 

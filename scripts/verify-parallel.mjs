@@ -6,7 +6,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { allocateTestPort } from './test-ports.ts'
-import { HOSTED_FRONTEND_SOURCE, laneArguments, laneCount, MAX_LANES } from './verify-lanes.ts'
+import { HOSTED_FRONTEND_SOURCE, hostedFrontendCommand, laneArguments, laneCount, MAX_LANES } from './verify-lanes.ts'
 import { caseKey, readBrowserRunRequest, readBrowserRunResult, requirementsArgument } from './verification-requirements.ts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -194,8 +194,9 @@ async function main() {
     const selectedFiles = [...new Set([...expected.values()].map(identity => identity.file))].sort()
     const laneArgs = laneArguments(args, selectedFiles, shards, root)
     summary.laneArguments = laneArgs
-    // Build the hosted frontend once; each lane copies it when its sources and build environment match.
-    const built = await command('pnpm', ['run', 'build:hosted-frontend'], root, env, join(output, 'hosted-frontend.log'), 'build')
+    // Build the hosted frontend once, or copy the caller's VERIFY_HOSTED_FRONTEND_SOURCE build when it matches exactly;
+    // each lane then copies the root's when its sources and build environment match.
+    const built = await command('pnpm', hostedFrontendCommand(env), root, env, join(output, 'hosted-frontend.log'), 'build')
     if (built.exitCode !== 0) throw new Error('Hosted frontend build failed; see hosted-frontend.log')
     const marked = await command('pnpm', ['exec', 'tsx', 'scripts/verify-lanes.ts', 'write-marker'], root, env, join(output, 'hosted-frontend.log'), 'build')
     if (marked.exitCode !== 0) throw new Error('Hosted frontend build marker failed; see hosted-frontend.log')
