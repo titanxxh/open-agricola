@@ -97,6 +97,9 @@ export default mergeConfig(
             name: 'fast-scripts',
             include: FAST_SCRIPTS_INCLUDE,
             exclude: FAST_EXCLUDE,
+            // Tooling tests spawn real tsx, git and bash processes (each with its own 15-30 s process timeout); under a
+            // full fast run on all cores a spawn alone can exceed Vitest's 5 s default, so the project gets their budget.
+            testTimeout: 30_000,
             setupFiles: ['./tests/setup-language-packs.ts', ],
           },
         },
