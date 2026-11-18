@@ -4,6 +4,7 @@ import { buildAnimalReorgRequest } from '../../domain/animal-reorg'
 import { playerBoard } from '../../domain'
 import { copyHistoryRecordIdentity } from '../../session/history-streams'
 import { eventsToLogEntries } from '../../events/log-mapper'
+import { replaceDerivedLogEntries } from '../../events/log-cache'
 import type { GameEvent } from '../../contract/events'
 import {
   settleHousedNewborns,
@@ -317,13 +318,10 @@ const recordHousedNewborns = (
   })
   const occurrenceId = rewritten?.occurrenceId
   if (!rewritten || !occurrenceId) return
-  const first = state.log.findIndex(entry => entry.sourceEvent?.occurrenceId === occurrenceId)
-  if (first === -1) return
   const playerNames = Object.fromEntries(state.players.map(player => [player.id, player.name]))
   const actionNames = Object.fromEntries(state.actionSpaces.map(space => [space.id, space.nameKey]))
   const rows = eventsToLogEntries([rewritten], { playerNames, actionNames })
-  const kept = state.log.filter(entry => entry.sourceEvent?.occurrenceId !== occurrenceId)
-  state.log = [...kept.slice(0, first), ...rows, ...kept.slice(first)]
+  replaceDerivedLogEntries(state, rows, occurrenceId)
 }
 
 const animalTotals = (state: GameState, player: PlayerState): Partial<Pick<Resource, AnimalKey>> => {
