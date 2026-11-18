@@ -1,4 +1,6 @@
 import { browserApiFetch } from '../services/browser-api'
+import { checkServerAvailability, isServerUnavailableStatus, onServerRecovered, useServerAvailability } from '../services/server-availability'
+import { MaintenancePage } from './MaintenancePage'
 import { isDevRoomId, roomIdFromQuery } from '../utils/game-room-url'
 import {
   useCallback,
@@ -347,6 +349,12 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
     key: string
     response: GameContextResponse
   } | null>(null)
+  // A room or context link opened while the server is unavailable shows the maintenance page instead of an unavailable
+  // context, and resolves again once the server answers (#1816).
+  const serverAvailability = useServerAvailability()
+  useEffect(() => hasContext ? onServerRecovered(() => {
+    setLocation(previous => ({ search: window.location.search, version: previous.version + 1 }))
+  }) : undefined, [hasContext])
 
   useEffect(() => {
     const fragment = new URLSearchParams(window.location.hash.slice(1))
@@ -394,10 +402,14 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
       credentials: 'include',
       signal: controller.signal,
     })
-      .then(async (result) => await result.json() as GameContextResponse)
+      .then(async (result) => {
+        if (isServerUnavailableStatus(result.status)) throw new Error('Game server unavailable')
+        return await result.json() as GameContextResponse
+      })
       .then((response) => setResolution({ key: resolutionKey, response }))
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return
+        void checkServerAvailability()
         setResolution({
           key: resolutionKey,
           response: {
@@ -421,6 +433,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   const response = resolution?.key === resolutionKey
     ? resolution.response
     : null
+  if (serverAvailability === 'unavailable' && !response?.ok) return <MaintenancePage />
   if (!response) {
     return <GameLoadScreen percent={10} label={t('platform.loading')} />
   }

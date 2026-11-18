@@ -632,3 +632,59 @@ describe('consensual game end placement', () => {
     await expectEndControlsInHeaderMenu(user)
   })
 })
+
+describe('hotseat during a server outage (#1816)', () => {
+  // Health and room discovery answer Caddy's 503 while `down`; reconnects then keep failing before any socket opens.
+  const outage = () => {
+    const server = { down: false }
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => {
+      const path = String(url)
+      if (server.down && (path.includes('/api/health') || path.includes('/api/rooms/locate'))) {
+        return new Response(JSON.stringify({ ok: false, code: 'server_unavailable' }), { status: 503 })
+      }
+      return new Response(JSON.stringify(path.includes('/api/rooms/locate') ? { wsPath: '/nodes/local/ws' }
+        : path.includes('/api/health') ? { ok: true } : { user: null }))
+    }))
+    return server
+  }
+  const recover = async (server: { down: boolean }) => {
+    server.down = false
+    const { retryServerNow } = await import('../../services/server-availability')
+    await act(async () => { await retryServerNow() })
+  }
+  const maintenanceText = t('en', 'platform.serverMaintenance.game')
+
+  it('never renders an unconfirmed seat behind the maintenance notice', async () => {
+    const server = outage()
+    const { container } = renderGame()
+    await screen.findByRole('button', { name: "I'm Alice — continue" })
+    try {
+      server.down = true
+      act(() => GameSocket.latest.close())
+      await screen.findByText(maintenanceText, {}, { timeout: 5000 })
+      // The status card replaces the handoff: no farm, no hand and no overlay over a board that holds every hand.
+      expect(container.querySelector('.farm-grid')).not.toBeInTheDocument()
+      expect(container.querySelector('[data-hand-anchor]')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('server-maintenance-overlay')).not.toBeInTheDocument()
+      expect(ruleCommands()).toEqual([])
+    } finally { await recover(server) }
+  })
+
+  it('keeps the confirmed seat under the overlay without revealing another seat', async () => {
+    const server = outage()
+    const user = userEvent.setup()
+    const { container } = renderGame()
+    await confirmAlice(user)
+    expect(container.querySelector('[data-hand-anchor="p1"]')).toBeVisible()
+    try {
+      server.down = true
+      act(() => GameSocket.latest.close())
+      const overlay = await screen.findByTestId('server-maintenance-overlay', {}, { timeout: 5000 })
+      expect(overlay).toHaveTextContent(maintenanceText)
+      expect(container.querySelector('[data-hand-anchor="p1"]')).toBeInTheDocument()
+      expect(container.querySelector('[data-hand-anchor="p2"]')).not.toBeInTheDocument()
+      expect(container.querySelector('.app')).toHaveAttribute('inert')
+      expect(ruleCommands()).toEqual([])
+    } finally { await recover(server) }
+  })
+})

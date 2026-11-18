@@ -82,3 +82,18 @@ test('a game whose room cannot be found while the server is unavailable says so 
   await serverBack(page)
   await expect(page.locator('.game-layout')).toBeVisible({ timeout: 45_000 })
 })
+
+test('a real room link opened during the outage shows the maintenance page and resolves the room when it answers', async ({ page }) => {
+  await englishPage(page)
+  await serverDown(page)
+  // A real (non-development) room link is resolved by the game context router before the session is known.
+  await page.goto(`/?room=${crypto.randomUUID()}`)
+  const maintenance = page.getByTestId('server-maintenance')
+  await expect(maintenance.getByRole('heading', { name: TITLE })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Game temporarily unavailable' })).toHaveCount(0)
+
+  await serverBack(page)
+  await maintenance.getByRole('button', { name: 'Retry now' }).click()
+  await expect(maintenance).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Game not found' })).toBeVisible()
+})
