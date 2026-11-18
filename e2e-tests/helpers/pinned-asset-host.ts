@@ -16,6 +16,8 @@ import { publicAssetBaseUrl } from '../../scripts/public-assets'
 
 export const PINNED_ASSET_HOST_PORT = 'PINNED_ASSET_HOST_PORT'
 export const PINNED_ASSET_HOST_SPKI = 'PINNED_ASSET_HOST_SPKI'
+/** Why a run with E2E_PUBLIC_ASSET_DIR keeps the asset site, so the guard spec skips instead of failing. */
+export const PINNED_ASSET_HOST_DECLINED = 'PINNED_ASSET_HOST_DECLINED'
 /** Marks every answer, so a browser test can tell the pinned host from the asset site itself. */
 export const PINNED_ASSET_HEADER = 'x-open-agricola-pinned-assets'
 
@@ -75,12 +77,17 @@ export async function startPinnedAssetHost(root: string): Promise<{ port: number
 
 /**
  * Playwright global setup: with E2E_PUBLIC_ASSET_DIR in a Chromium run, start the pinned host and export its port and
- * key pin for the configuration's launch arguments. WebKit refuses to launch with host mapping and Firefox ignores
- * it, so other engines keep reaching the asset site.
+ * key pin for the configuration's launch arguments. Launch arguments are shared by every project, and WebKit refuses
+ * to launch with host mapping, so a run that includes another engine (`--browser=webkit` or `all`) keeps the asset
+ * site and says so.
  */
 export default async function globalSetup(config: FullConfig): Promise<(() => Promise<void>) | undefined> {
   const root = process.env.E2E_PUBLIC_ASSET_DIR
-  if (!root || config.projects.some(project => (project.use.browserName ?? 'chromium') !== 'chromium')) return undefined
+  if (!root) return undefined
+  if (config.projects.some(project => (project.use.browserName ?? 'chromium') !== 'chromium')) {
+    process.env[PINNED_ASSET_HOST_DECLINED] = 'the run includes a browser other than Chromium'
+    return undefined
+  }
   const host = await startPinnedAssetHost(root)
   process.env[PINNED_ASSET_HOST_PORT] = String(host.port)
   process.env[PINNED_ASSET_HOST_SPKI] = host.spki
