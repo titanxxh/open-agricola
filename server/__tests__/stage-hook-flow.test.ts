@@ -794,7 +794,8 @@ describe('stage hook flows', () => {
       expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 3, grain: 1 })
       expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(3)
       expect(resp.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
-      expect(resp.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'D167_PureBreeder' && event.resources.sheep === 1)).toHaveLength(1)
+      expect(resp.state.events.filter(event => event.type === 'farm.animalBred' && event.sourceCardId === 'D167_PureBreeder'))
+        .toEqual([expect.objectContaining({ source: 'cardEffect', animals: { sheep: 1 } })])
       expect(resp.state.events.filter(event => event.type === 'harvest.phaseStarted' && event.harvestPhase === 'breeding')).toEqual([])
     } finally { session.dispose() }
   })

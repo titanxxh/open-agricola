@@ -197,7 +197,8 @@ describe('Stage animal gains settle before continuation', () => {
     const completed = drive(restored, 'round', 6)
     expect(completed.state.players[0]!.resources.sheep).toBe(3)
     expect(completed.state.players[0]!.pastures[0]!.animalCount).toBe(3)
-    expect(completed.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === BREEDER && event.resources.sheep === 1)).toHaveLength(1)
+    expect(completed.state.events.filter(event => event.type === 'farm.animalBred' && event.sourceCardId === BREEDER))
+      .toEqual([expect.objectContaining({ source: 'cardEffect', animals: { sheep: 1 } })])
   })
 
   it('settles the card owner independently of the player who finished the round', () => {

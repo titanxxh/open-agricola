@@ -2,7 +2,8 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import { payLeaf } from '../helpers/pay-gain-node'
+import { breedLeaf, canBreedAnimals } from '../../actions/effects/breed'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -21,14 +22,15 @@ const anytimeListener: CardListenerRegistration = {
     if (context.player.resources.grain < 1) return
     if (HARVEST_ROUNDS.includes(context.state.round)) return
 
-    const breedableTypes = ANIMAL_TYPES.filter(type => context.player.resources[type] >= 2)
+    const breedableTypes = ANIMAL_TYPES.filter(type =>
+      canBreedAnimals(context.state, context.player, { sourceCard: CARD_ID, animalTypes: [type] }))
     if (breedableTypes.length === 0) return
 
     const children: ActionFlow[] = breedableTypes.map(type => ({
       type: 'seq' as const,
       children: [
         payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
-        gainLeaf(CARD_ID, { [type]: 1 }),
+        breedLeaf(CARD_ID, [type]),
         { type: 'leaf' as const, actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
       ],
     }))

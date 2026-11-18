@@ -4,6 +4,7 @@ import { createCropPaymentAction } from '../../actions/plans/crop-payment'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 import { getLogicalFields } from '../helpers/card-field'
+import { breedLeaf, canBreedAnimals } from '../../actions/effects/breed'
 
 const CARD_ID = 'A084_Silage'
 const PAY_GRAIN_ACTION_ID = 'card_A084_Silage_pay-grain-any'
@@ -29,7 +30,7 @@ const cardImpl = {
     if (!hasGrain) return
 
     const breedableTypes = BREEDABLE_TYPES.filter(
-      (t) => player.resources[t] >= 2,
+      (t) => canBreedAnimals(state, player, { sourceCard: CARD_ID, animalTypes: [t] }),
     )
     if (breedableTypes.length === 0) return
 
@@ -37,7 +38,7 @@ const cardImpl = {
       type: 'seq' as const,
       children: [
         { type: 'leaf' as const, actionId: PAY_GRAIN_ACTION_ID, sourceCard: CARD_ID },
-        { type: 'leaf' as const, actionId: 'gain', params: { [animalType]: 1 }, sourceCard: CARD_ID },
+        breedLeaf(CARD_ID, [animalType]),
       ],
     }))
 
