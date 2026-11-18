@@ -70,6 +70,7 @@ import { ExchangeOverlayPresentation } from './exchange-overlay-presentation'
 import { useExchangeDraftPresentation } from './exchange-draft-presentation'
 import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
+import { checkServerAvailability, useServerAvailability } from '../services/server-availability'
 import {
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
@@ -542,6 +543,13 @@ export const GameContainerApi = () => {
            activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
       : !!(activePlayer && displayPlayer))
   const hasGameView = !!(state && currentPlayer && displayPlayer)
+  // A lost connection asks whether the server itself is unavailable (#1816). Then the last board stays under an overlay
+  // while the transport keeps reconnecting; without a board the status card says the same.
+  const serverAvailability = useServerAvailability()
+  const wsConnectionLost = isWs && (wsStatus.phase === 'reconnecting' || (wsStatus.phase === 'error'
+    && (wsStatus.message === 'WebSocket connection failed' || wsStatus.message === 'no WebSocket instance')))
+  useEffect(() => { if (wsConnectionLost) void checkServerAvailability() }, [wsConnectionLost])
+  const serverMaintenance = wsConnectionLost && serverAvailability === 'unavailable'
   const canResetGame = !isSpectator && hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
     (!isHotseat || isInteractive) &&
     (!isWs || isHotseat || selfPlayer?.id === displayPlayer?.id)
@@ -1406,7 +1414,7 @@ export const GameContainerApi = () => {
     reader.readAsText(file)
   }, [transport])
 
-  if (isWs && wsStatus.phase !== 'ready') {
+  if (isWs && wsStatus.phase !== 'ready' && !(serverMaintenance && hasGameView)) {
     const wsProgressPhase =
       resolveGameLoadPhase({ wsStatus, hasGameView: false }) ??
       (wsStatus.phase === 'idle' ? 'wsConnecting' : null)
@@ -1429,7 +1437,9 @@ export const GameContainerApi = () => {
     const colorConfirmingPlayer = wsStatus.phase === 'waiting'
       ? wsStatus.players.find(player => player.playerIndex === wsStatus.colorConfirmationPlayerIndex)
       : undefined
-    const statusText = wsStatus.phase === 'reconnecting'
+    const statusText = serverMaintenance
+      ? t(locale, 'platform.serverMaintenance.game')
+      : wsStatus.phase === 'reconnecting'
       ? t(locale, 'platform.roomReconnecting')
       : wsStatus.phase === 'waiting'
       ? colorConfirmingPlayer
@@ -1586,7 +1596,8 @@ export const GameContainerApi = () => {
     </div>
   ) : null
 
-  const gameEndControls = !isSpectator && wsTransport && !state.gameOver ? (
+  // Mounting asks the room for its proposal, which a lost connection cannot send; it mounts again once reconnected.
+  const gameEndControls = !isSpectator && wsTransport && !state.gameOver && !serverMaintenance ? (
     <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert}
       />
   ) : null
@@ -2068,7 +2079,13 @@ export const GameContainerApi = () => {
   })
 
   return withEncyclopedia(
-    <div className={`app${isEmbedded ? ' app--embedded' : ''}${isDesktopTable ? ' app--desktop-table' : ''}`}>
+    <>
+    {serverMaintenance ? (
+      <div className="server-maintenance-overlay" data-testid="server-maintenance-overlay">
+        <div className="server-maintenance-overlay__card" role="alert">{t(locale, 'platform.serverMaintenance.game')}</div>
+      </div>
+    ) : null}
+    <div className={`app${isEmbedded ? ' app--embedded' : ''}${isDesktopTable ? ' app--desktop-table' : ''}`} inert={serverMaintenance}>
       {notificationStack}
       <PublicEventResourceAnimations
         animations={displayPublicEventResourceAnimations}
@@ -2224,5 +2241,6 @@ export const GameContainerApi = () => {
           onReturnToTarget={interactionFocus.hasTarget ? interactionFocus.returnToTarget : undefined} />
       </div>
     </div>
+    </>
   )
 }

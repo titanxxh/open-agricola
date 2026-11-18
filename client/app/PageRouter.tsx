@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LoginPage } from './LoginPage'
+import { MaintenancePage } from './MaintenancePage'
+import { useServerAvailability } from '../services/server-availability'
 import { LobbyPage } from './LobbyPage'
 import { OnboardingPage } from './OnboardingPage'
 import { ResetPasswordPage } from './ResetPasswordPage'
@@ -41,6 +43,7 @@ function getPage(): PlatformPage {
 export function PageRouter() {
   const { user, loading } = useAuth()
   const { t } = useLocale()
+  const availability = useServerAvailability()
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -87,6 +90,10 @@ export function PageRouter() {
       </CardMetadataBoundary>
     )
   }
+
+  // An unavailable server is neither a signed-out session nor a lobby to act in. A signed-in game keeps its board under
+  // an overlay; a game opened while the session is still unknown waits on this page instead of the login form.
+  if (availability === 'unavailable' && (page !== 'game' || !user)) return <MaintenancePage />
 
   if (loading) {
     const { percent, labelKey } = getGameLoadProgress('auth')

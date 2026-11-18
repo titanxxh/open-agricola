@@ -604,6 +604,8 @@ Bug Report GitHub App、Workshop PR 和账号 OAuth 都仍是可选集成；配�
 
 > Caddy 会自动申请和续期 Let's Encrypt 证书，你无需手动管理。
 
+**维护应答（#1816）**：app 停止时，Caddy 默认返回不带 CORS 头的空白 502，Pages 前端读不到它，只能显示为网络错误。在 API 站点里加入 `deploy/Caddyfile.example` 中的 `handle_errors 502 503 504` 块，允许的来源填 `CORS_ORIGIN` 中的前端地址。它对预检返回 204（每个 API 请求都带自定义头，预检失败会遮住随后的 503），对其余请求返回 503 `{"ok":false,"code":"server_unavailable"}`、`Retry-After: 30`，并为该来源带上 CORS 头。app 自己的响应（包括它返回的 503）原样透传。前端据此显示维护页，或在进行中的对局上显示覆盖层，并每 15 秒重试。在运行中的主机上应用时，编辑 `deploy/Caddyfile` 后执行 `docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile`，app 不停机。前端部分随下一次 Pages 发布上线。
+
 ---
 
 ### 情况 B：已有域名 + HTTPS（Nginx + Let's Encrypt）

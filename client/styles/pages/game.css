@@ -6576,3 +6576,25 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
 .future-effects-toggle { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 132px; }
 .future-effect-owner { min-width: 0; max-height: 38px; flex-wrap: nowrap; overflow-x: auto; }
 .future-effect-marker { flex-shrink: 0; }
+
+/* Server maintenance (#1816): blocks the last board while the server is unavailable; the transport keeps reconnecting. */
+.server-maintenance-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 45%);
+}
+.server-maintenance-overlay__card {
+  max-width: 480px;
+  padding: 24px 28px;
+  border-radius: 12px;
+  background: var(--bg-parchment, #fff);
+  box-shadow: var(--shadow-paper, 0 8px 30px #0006);
+  color: var(--color-text);
+  font-size: 16px;
+  text-align: center;
+}
