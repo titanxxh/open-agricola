@@ -54,12 +54,15 @@ function identity(config: Record<string, unknown>, expected: Pick<ExpectedContai
   if (labels['org.opencontainers.image.revision'] !== expected.sourceSha || labels['io.open-agricola.release-channel'] !== channel) throw new Error('Image source or channel differs from the receipt')
 }
 
-export function inspectLoadedContainerImage({ imageId: id, expected }: { imageId: string; expected: ExpectedContainerImage }, runDocker: (args: string[]) => string = docker): string {
+/** Architectures an image archive may carry: the deployed images are amd64; the owner's validator image is arm64 (#1817). */
+export type ImageArchitecture = 'amd64' | 'arm64'
+
+export function inspectLoadedContainerImage({ imageId: id, expected, architecture = 'amd64' }: { imageId: string; expected: ExpectedContainerImage; architecture?: ImageArchitecture }, runDocker: (args: string[]) => string = docker): string {
   imageId(id)
   const inspected: unknown = JSON.parse(runDocker(['image', 'inspect', id]))
   if (!Array.isArray(inspected) || inspected.length !== 1) throw new Error('Expected one loaded image')
   const image = object(inspected[0]), config = object(image.Config)
-  if (image.Id !== id || image.Os !== 'linux' || image.Architecture !== 'amd64') throw new Error('Loaded image ID or platform differs')
+  if (image.Id !== id || image.Os !== 'linux' || image.Architecture !== architecture) throw new Error('Loaded image ID or platform differs')
   identity(config, expected)
   const directory = mkdtempSync(join(tmpdir(), 'oa-image-inspection-')), name = `oa-image-inspection-${randomUUID()}`
   let created = false
@@ -134,7 +137,7 @@ function archiveContents(fd: number, bytes: number) {
   return { entries, sha256: hash.digest('hex') }
 }
 
-function validateArchive(fd: number, bytes: number, receipt: { imageId: string; sourceSha: string; purpose: 'candidate' | 'trusted-policy' }, allowProducerTag: boolean) {
+function validateArchive(fd: number, bytes: number, receipt: { imageId: string; sourceSha: string; purpose: 'candidate' | 'trusted-policy' }, allowProducerTag: boolean, architecture: ImageArchitecture) {
   const { entries, sha256 } = archiveContents(fd, bytes)
   const entry = (name: string): Entry => { const result = entries.get(name); if (!result) throw new Error('Missing image archive member'); return result }
   const json = (name: string): unknown => {
@@ -159,7 +162,7 @@ function validateArchive(fd: number, bytes: number, receipt: { imageId: string; 
     }
   }
   const configPath = string(image.Config), configEntry = entry(configPath), config = object(json(configPath))
-  if (`sha256:${configEntry.sha256}` !== receipt.imageId || config.os !== 'linux' || config.architecture !== 'amd64') throw new Error('Archive config ID or platform differs from receipt')
+  if (`sha256:${configEntry.sha256}` !== receipt.imageId || config.os !== 'linux' || config.architecture !== architecture) throw new Error('Archive config ID or platform differs from receipt')
   identity(object(config.config), receipt)
   const layers = strings(image.Layers), rootfs = object(config.rootfs), diffs = strings(rootfs.diff_ids)
   if (rootfs.type !== 'layers' || layers.length !== diffs.length || new Set(layers).size !== layers.length) throw new Error('Invalid archive layer set')
@@ -187,7 +190,7 @@ function validateArchive(fd: number, bytes: number, receipt: { imageId: string; 
       && annotations['io.containerd.image.name'] === `docker.io/library/${tag}` && annotations['org.opencontainers.image.ref.name'] === receipt.sourceSha)
     if (descriptor.platform !== undefined) {
       const platform = object(descriptor.platform)
-      if (Object.keys(platform).sort().join(',') !== 'architecture,os' || platform.architecture !== 'amd64' || platform.os !== 'linux') throw new Error('Unexpected OCI platform')
+      if (Object.keys(platform).sort().join(',') !== 'architecture,os' || platform.architecture !== architecture || platform.os !== 'linux') throw new Error('Unexpected OCI platform')
     }
     if (Object.keys(descriptor).some(key => !['mediaType', 'digest', 'size', 'annotations', 'platform'].includes(key))
       || !/^sha256:[a-f0-9]{64}$/.test(digest) || Object.keys(annotations).length > 0 && !allowedAnnotations
@@ -209,8 +212,8 @@ function validateArchive(fd: number, bytes: number, receipt: { imageId: string; 
   return { archiveManifestDigest, sha256 }
 }
 
-export function validateContainerImageArchive({ archivePath, imageId: id, sourceSha, channel, maxBytes, allowProducerTag = false }: {
-  archivePath: string; imageId: string; sourceSha: string; channel: 'stable' | 'prerelease'; maxBytes: number; allowProducerTag?: boolean
+export function validateContainerImageArchive({ archivePath, imageId: id, sourceSha, channel, maxBytes, allowProducerTag = false, architecture = 'amd64' }: {
+  archivePath: string; imageId: string; sourceSha: string; channel: 'stable' | 'prerelease'; maxBytes: number; allowProducerTag?: boolean; architecture?: ImageArchitecture
 }): { sha256: string; bytes: number; archiveManifestDigest: string | null } {
   imageId(id)
   if (!/^[a-f0-9]{40}$/.test(sourceSha) || !['stable', 'prerelease'].includes(channel)) throw new Error('Invalid expected image identity')
@@ -218,7 +221,7 @@ export function validateContainerImageArchive({ archivePath, imageId: id, source
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || bytes > maxBytes) throw new Error('Image archive exceeds its byte bound')
   const fd = openSync(archivePath, 'r')
   try {
-    return { ...validateArchive(fd, bytes, { imageId: id, sourceSha, purpose: channel === 'prerelease' ? 'candidate' : 'trusted-policy' }, allowProducerTag), bytes }
+    return { ...validateArchive(fd, bytes, { imageId: id, sourceSha, purpose: channel === 'prerelease' ? 'candidate' : 'trusted-policy' }, allowProducerTag, architecture), bytes }
   } finally { closeSync(fd) }
 }
 
