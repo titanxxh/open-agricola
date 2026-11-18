@@ -50,6 +50,13 @@ export const DEFAULT_BROWSER_JOBS = 6
 // Two lanes per chromium task let all four chromium tasks, webkit and the sandbox share a 20-core budget at once.
 export const DEFAULT_LANES = 2
 const policyRoot = resolve(import.meta.dirname, '../..')
+
+/** The digest-pinned image the trusted isolation smoke runs; the smoke is copied alone into /run and keeps its literal. */
+export function isolationSmokeImage(root = policyRoot): string {
+  const match = /^const image = '([a-z0-9./-]+:[\w.-]+@sha256:[0-9a-f]{64})'$/m.exec(readFileSync(join(root, 'scripts/ci/candidate-isolation-smoke.ts'), 'utf8'))
+  if (!match) throw new Error('The isolation smoke names no digest-pinned image')
+  return match[1]
+}
 const sha256 = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex')
 const fileSha256 = (path: string) => sha256(readFileSync(path))
 const iso = (time: number) => new Date(time).toISOString()
@@ -260,6 +267,10 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
   try {
     // A partly failed start may already have created the identity, so teardown always follows it.
     runner.isolation(['start', policyRoot, output, String(inputs.ownerUid), inputs.publicAssets, ...tasks], join(output, 'isolation-start.log'))
+    // The smoke's first container would pull its image, and the smoke itself cannot rerun (it leaves a named container
+    // for the teardown proof). Pulling the pinned image first gives a registry or network stall the download retries;
+    // the trusted Docker CLI runs it, no candidate code.
+    await prepare(tasks[0], 'docker', ['pull', '--quiet', isolationSmokeImage()], 'smoke-image', NETWORK_ATTEMPTS)
     await prepare(tasks[0], inputs.node.path, ['/run/oa-ci-isolation/smoke.mts'], 'smoke')
     await prepare(tasks[0], pnpm, ['install', '--frozen-lockfile'], `install-${tasks[0]}`, NETWORK_ATTEMPTS)
     // The first install fills the candidate's pnpm store; the other copies then link from it.
