@@ -842,6 +842,7 @@ E2E_PUBLIC_ASSET_DIR=/absolute/path/open-agricola-assets PUBLIC_ASSET_VALIDATION
 ```
 
 - 只有主站的 Vite 开发服务器接受 `E2E_PUBLIC_ASSET_DIR`，设置了 `CI` 时同样生效。它先做上述固定版本干净 checkout 校验，再从 `/__public-assets__/` 提供全部图片和字体，未知路径返回 404；不发远端请求，也不回退。
+- GitHub 上的浏览器任务同样使用它：日常浏览器分区，以及候选验证的 chromium、sandbox、WebKit 任务，都先运行 `scripts/ci/checkout-public-assets.sh`。该脚本从 Git 对象读取固定 SHA，并在 checkout 之外浅抓取素材仓；候选准备步骤把它复制到候选 home。`build` 任务、Pages 构建和线上发布验收仍使用 Pages。
 - hosted、Pages、Replay Viewer 构建，以及 preview 和 Vitest 都忽略该变量，继续使用 Pages URL 和各自的校验；要让这些构建也不联网，同时设置 `PUBLIC_ASSET_VALIDATION_DIR`。
 - 不可变 Viewer 运行时仍从 Pages 加载卡图和字体。
 - 该设置计入验证指纹。它不验证线上 Pages 部署；未设置 `PUBLIC_ASSET_VALIDATION_DIR` 的构建仍会验证。

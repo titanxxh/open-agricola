@@ -145,6 +145,25 @@ describe('canonical architecture verification wiring', () => {
     expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: pnpm exec playwright install --with-deps chromium webkit firefox")
   })
 
+  it('serves pinned public assets to every browser task instead of GitHub Pages', () => {
+    const routine = fs.readFileSync(path.join(repoRoot, '.github/workflows/scoped-verification.yml'), 'utf8')
+    expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: bash scripts/ci/checkout-public-assets.sh . \"$RUNNER_TEMP/public-assets\"")
+    expect(routine).toContain('E2E_PUBLIC_ASSET_DIR: ${{ steps.public-assets.outputs.directory }}')
+    expect(routine).toContain('PUBLIC_ASSET_VALIDATION_DIR: ${{ steps.public-assets.outputs.directory }}')
+    for (const [file, scripts] of [['candidate-verification.yml', 'policy'], ['prerelease-candidate-verification.yml', 'policy'], ['candidate-rehearsal.yml', 'candidate']] as const) {
+      const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', file), 'utf8')
+      const checkout = workflow.indexOf('name: Checkout pinned public assets'), isolation = workflow.indexOf('name: Prepare candidate isolation')
+      expect(checkout, file).toBeGreaterThan(-1)
+      expect(checkout, file).toBeLessThan(isolation)
+      expect(workflow, file).toContain(`if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'\n        run: bash ${scripts}/scripts/ci/checkout-public-assets.sh candidate "$RUNNER_TEMP/public-assets"`)
+      expect(workflow, file).toContain('PUBLIC_ASSETS: ${{ steps.public-assets.outputs.directory }}')
+      expect(workflow, file).toMatch(/setup-candidate-isolation\.sh "\$PWD\/candidate" "\$PWD\/(policy|candidate)" "\$\(command -v node\)" "\$\(id -u\)" "\$PUBLIC_ASSETS"/)
+    }
+    const setup = fs.readFileSync(path.join(repoRoot, 'scripts/ci/setup-candidate-isolation.sh'), 'utf8')
+    expect(setup).toContain('cp -a "$public_assets_directory" /home/oa-candidate/public-assets')
+    expect(setup.indexOf('cp -a "$public_assets_directory"')).toBeLessThan(setup.indexOf('chown -R --no-dereference 61000:61000 /home/oa-candidate'))
+  })
+
   it('verifies public PRs and both integration branches with read-only permissions and preserves manual verification', () => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
 

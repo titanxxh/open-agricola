@@ -57,9 +57,16 @@ jobs:
       - name: Install both browser engines for explicit embedded launches
         if: startsWith(inputs.partition, 'browser-')
         run: pnpm exec playwright install --with-deps chromium webkit firefox
+      - name: Checkout pinned public assets
+        id: public-assets
+        if: startsWith(inputs.partition, 'browser-')
+        run: bash scripts/ci/checkout-public-assets.sh . "$RUNNER_TEMP/public-assets"
       - name: Execute the canonical selected partition
         id: execute
         env:
+          # Browser partitions serve the pinned assets from the dev server and validate build metadata offline.
+          E2E_PUBLIC_ASSET_DIR: ${{ steps.public-assets.outputs.directory }}
+          PUBLIC_ASSET_VALIDATION_DIR: ${{ steps.public-assets.outputs.directory }}
           BASE_REF: ${{ inputs.base_ref }}
           HEAD_REF: ${{ inputs.head_ref }}
           EXPECTED_PLAN_DIGEST: ${{ inputs.plan_digest }}

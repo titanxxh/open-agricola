@@ -803,6 +803,7 @@ E2E_PUBLIC_ASSET_DIR=/absolute/path/open-agricola-assets PUBLIC_ASSET_VALIDATION
 - Hosted, Pages and Replay Viewer builds, previews and Vitest ignore the variable. They keep the Pages URLs and their own validation; add `PUBLIC_ASSET_VALIDATION_DIR` to keep those builds off the network as well.
 - An immutable Viewer still loads its art and fonts from Pages at run time.
 - The setting is part of the verification fingerprint. It does not verify the live Pages deployment; a build without `PUBLIC_ASSET_VALIDATION_DIR` still does.
+- GitHub browser tasks use it too: routine browser partitions and the chromium, sandbox and WebKit candidate tasks first run `scripts/ci/checkout-public-assets.sh`, which reads the pin from the Git object and shallow-fetches it outside the checkout. Candidate setup copies it into the candidate home. The `build` task, Pages builds and live release acceptance still use Pages.
 
 To update public assets, first publish `open-agricola-assets` to its Pages site and wait for its workflow to verify every live file against that commit. Then update `public-assets.ref` to the deployed `asset-version.txt`, synchronize `public-assets.required.json`, and follow the main repository's normal release flow. Asset commits that change only documentation also change the deployment marker. Older Viewer Builds retain their code, while public art/fonts follow the current asset site.
 
