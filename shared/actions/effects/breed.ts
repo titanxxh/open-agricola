@@ -9,7 +9,6 @@ import type {
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { animalKeysForState, type AnimalKey } from '../../contract/animals'
-import { getTotalAnimalCapacity } from '../../domain'
 import {
   computeAnimalZones,
   readAnimalCountsForZoneAssignment,
@@ -52,9 +51,7 @@ export const canBreedAnimals = (
   opts: BreedOptions,
 ): boolean => {
   const types = opts.animalTypes ?? animalKeysForState(state)
-  const freeCapacity = getTotalAnimalCapacity(player, state)
   for (const type of types) {
-    if (freeCapacity <= 0) return false
     const ctx = { sourceCard: opts.sourceCard }
     const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
     if (breedableCount < getBreedThreshold(state, player, type, ctx)) continue
@@ -65,12 +62,13 @@ export const canBreedAnimals = (
 }
 
 /**
- * Core breed helper — replays the legacy `breedAnimals` semantics:
- *   - free capacity = `getTotalAnimalCapacity(player)` (no subtraction of
- *     assigned, matching prior harvest behaviour). Each newborn consumes one
- *     unit of free capacity.
- *   - After parent eligibility, played-card offspring queries adjust the default
- *     one newborn. Resources, placement minimums, summaries and events use that count.
+ * Core breed helper:
+ *   - Every eligible animal type produces its litter: the default one newborn,
+ *     adjusted by played-card offspring queries after parent eligibility.
+ *     Resources, placement minimums, summaries and events use that count.
+ *   - Breeding never checks room. The following animal reorganization decides
+ *     which newborns are housed; the player chooses which animals to keep and
+ *     unhoused newborns are discarded.
  *
  * Consumed by both harvest path (sourceCard='harvest') and breed-shaped cards
  * such as A165 PigBreeder (sourceCard='A165_PigBreeder').
@@ -82,11 +80,9 @@ export const breed = (
   eventSink?: EventSink,
 ): { breedSummary: HarvestBreedSummary; placementMinimums: Partial<Record<AnimalKey, number>> } => {
   const types = opts.animalTypes ?? animalKeysForState(state)
-  let freeCapacity = getTotalAnimalCapacity(player, state)
   const summary: HarvestBreedSummary = { resources: {}, animalTypes: 0, animalCount: 0 }
   const placementMinimums: Partial<Record<AnimalKey, number>> = {}
   for (const type of types) {
-    if (freeCapacity <= 0) break
     const ctx = { sourceCard: opts.sourceCard }
     const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
     const threshold = getBreedThreshold(state, player, type, ctx)
@@ -99,7 +95,6 @@ export const breed = (
     summary.resources[type] = offspring
     summary.animalTypes += 1
     summary.animalCount += offspring
-    freeCapacity -= offspring
   }
   if (summary.animalCount > 0) {
     eventSink?.emit<'farm.animalBred'>({
