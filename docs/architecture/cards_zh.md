@@ -68,6 +68,8 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 
 测试：`server/__tests__/card-state-visibility-session.test.ts`。
 
+`shared/actions/plans/scoring-offer.ts` 从同一组当前候选生成并验证每张卡的计分选择。它复用支付求解器的逐资源成本比较，移除成本更高且得分不更高、或成本相同但得分更低的方案。保留零分放弃项，以及结果相同但身份不同的选项。支付与 Scoring Reserve 分别比较，不同卡牌类型的预留也分别比较。刷新 pending 时使用同一筛选；恢复后不改变已结算的支付和得分。覆盖见 `shared/actions/__tests__/scoring-offer.test.ts`、`server/__tests__/scoring-offer-pruning-session.test.ts`、`e2e-tests/exchange-choice-routing.spec.ts`。
+
 ## `shared/cards/helpers/` 中的 helper
 
 - `pay-gain-node.ts`：先付后得、付后追加行动、退回后获得的模板。

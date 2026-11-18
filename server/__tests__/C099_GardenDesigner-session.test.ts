@@ -149,7 +149,7 @@ describe('C099 Garden Designer scoring choices', () => {
     expect(repeated.state.players[0]!.resources.food).toBe(0)
   })
 
-  it.each([[0, 0], [1, 1], [4, 2], [7, 3], [8, 4]])('allows a chosen investment of %i food for %i VP across two fields', (food, score) => {
+  it.each([[0, 0], [1, 1], [2, 2], [5, 3], [8, 4]])('allows a chosen investment of %i food for %i VP across two fields', (food, score) => {
     const response = finishFinalHarvest(setup({ emptyFields: 2, scoringFood: 8 }), food, score)
     expect(gardenDesignerBonus(response)).toBe(score)
     expect(response.state.players[0]!.resources.food).toBe(8 - food)
@@ -213,8 +213,8 @@ describe('C099 Garden Designer scoring choices', () => {
     const rejected = restored.resolveChoice(0, choiceValue(3, 9))
     expect(rejected.ok).toBe(false)
     expect(rejected.state.players[0]!.resources.food).toBe(8)
-    const response = finishFinalHarvest(restored, 7, 3)
-    expect(response.state.players[0]!.resources.food).toBe(1)
+    const response = finishFinalHarvest(restored, 5, 3)
+    expect(response.state.players[0]!.resources.food).toBe(3)
     expect(gardenDesignerBonus(response)).toBe(3)
   })
 })

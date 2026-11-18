@@ -66,6 +66,8 @@ Tests: `shared/cards/__tests__/card-source-representatives.test.ts`, `scripts/ch
 
 Tests: `server/__tests__/card-state-visibility-session.test.ts`.
 
+`shared/actions/plans/scoring-offer.ts` builds and validates each card's scoring choices from the same current candidates. It reuses the payment solver's per-resource cost comparison to remove offers with no better score at greater cost, or a lower score at equal cost. Zero-score decline choices and equal outcomes with different identities remain available. Payment and Scoring Reserve offers are separate, as are reserves with different card types. Refreshed pending choices use the same filter; already settled payments and scores remain unchanged on recovery. Coverage: `shared/actions/__tests__/scoring-offer.test.ts`, `server/__tests__/scoring-offer-pruning-session.test.ts`, `e2e-tests/exchange-choice-routing.spec.ts`.
+
 ## Helpers under `shared/cards/helpers/`
 
 - `pay-gain-node.ts`: pay-then-gain, pay-then-action and return-then-gain templates.

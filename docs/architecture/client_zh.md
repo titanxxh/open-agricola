@@ -71,9 +71,9 @@
 
 ### 现有视图
 
-- `exchange-overlay-presentation.tsx` 与 `exchange-draft-presentation.ts` 为普通兑换、喂养和供暖共用配方、顺序数量控件和重置，并展示燃料支付和生病预览。配方列表在按 `InteractionBar` 实测高度留出的区域内滚动，保持确认和随时响应可达。覆盖见 `heating-exchange.spec.ts`、`listener-lifecycle-room.spec.ts`、`issue-893-rules.spec.ts`。
+- `exchange-overlay-presentation.tsx` 与 `exchange-draft-presentation.ts` 共用普通兑换、喂养和供暖控件，展示燃料和生病预览。配方滚动区域根据 `InteractionBar` 实测高度保持确认和响应可达。覆盖见 `heating-exchange.spec.ts`、`listener-lifecycle-room.spec.ts`、`issue-893-rules.spec.ts`。
 
-- `interaction-presentation.ts` 依据批量提交能力和完整 trade/cancel 选项分派兑换，包括只剩取消的请求；草稿遵循该计划。其他选择在恢复后保留全部选项，明确声明的零分也须可见。覆盖见 `exchange-choice-routing.spec.ts`。
+- `interaction-presentation.ts` 为批量 trade/cancel 请求选择兑换面板，包括只剩取消的请求。草稿遵循该计划；其他选择和明确声明的零分在恢复后保持可见。覆盖见 `exchange-choice-routing.spec.ts`。
 
 - `interaction-focus.ts` 将本机 Interaction Player 的权威请求映射到显示目标。职业选择在接机确认后定位私有手牌，支付等后续步骤保留行动聚焦，完成后返回行动区。Session 交互适配器仅向响应者发布不透明的等待步骤 `requestKey`，候选刷新及 cursor 恢复均保留其身份，玩家手动浏览不会再次触发滚动。共享目标锚点与返回快捷入口覆盖手牌、供应区和农场选择。
 - `SectionNav` 仅滚动到已经渲染的分区锚点，不改变 Farm View Player、私有信息可见性或 Interaction Focus。其实测高度为页面底部留白，并与固定操作栏一起计入农场缩放及交互滚动的可用视口。窄屏时按钮换行而非横向滚动，并让出报告问题按钮自行发布的占位宽度。覆盖见 `section-navigation.spec.ts` 和 section-nav 组件测试。
