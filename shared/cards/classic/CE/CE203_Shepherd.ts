@@ -8,7 +8,7 @@ export const CE203_Shepherd = defineOccupationCard({
     name: 'Shepherd',
     deck: 'CE',
     number: 203,
-    desc: ['During each breeding phase, if you have at least 4 <sheep>, your <sheep> produce 2 offspring instead of 1.'],
+    desc: ['During each breeding phase, if you have at least 4 <sheep>, your <sheep> produce 2 offspring instead of 1, as long as you have room for them.'],
     players: '4+',
   },
   impl: {
