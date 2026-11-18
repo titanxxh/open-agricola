@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FULL_TASK_IDS, type FullTaskId, type VerificationCommand } from '../ci/verification-tasks'
-import { BROWSER_PORT_SLICES, TASK_ORDER, budgetPool, taskCost, assertNoReservedCandidatePaths, browserEnvironment, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
+import { BROWSER_PORT_SLICES, TASK_ORDER, budgetPool, isolationSmokeImage, taskCost, assertNoReservedCandidatePaths, browserEnvironment, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -167,7 +167,9 @@ describe('isolated owner-local run', () => {
     const stopAt = fake.calls.findIndex(call => call.startsWith('isolation stop'))
     expect(fake.calls.slice(stopAt).filter(call => call.startsWith('verify')).length).toBe(FULL_TASK_IDS.length)
     expect(fake.calls.slice(0, stopAt).some(call => call.startsWith('verify'))).toBe(false)
-    expect(fake.calls.filter(call => call.startsWith('candidate ')).slice(0, 2).map(call => call.split(' ')[1])).toEqual(['smoke', `install-${TASK_ORDER[0]}`])
+    expect(fake.calls.filter(call => call.startsWith('candidate ')).slice(0, 3).map(call => call.split(' ')[1])).toEqual(['smoke-image', 'smoke', `install-${TASK_ORDER[0]}`])
+    // The smoke's pinned image is pulled first by the trusted Docker CLI, so a registry stall can retry.
+    expect(fake.calls.find(call => call.startsWith('candidate smoke-image '))).toContain(` docker pull --quiet ${isolationSmokeImage()} `)
     expect(fake.calls.some(call => call.startsWith('candidate services ') && call.includes('scripts/local-services.mjs --test'))).toBe(true)
     // Every candidate command, preparation included, uses the run's own service ports.
     const candidateCalls = fake.calls.filter(call => call.startsWith('candidate '))
@@ -236,6 +238,18 @@ describe('isolated owner-local run', () => {
       expect(down.calls.filter(call => call.startsWith('isolation')).map(call => call.split(' ')[1])).toEqual(['start', 'stop', 'cleanup'])
       expect(slept).toEqual([5_000, 5_000, 5_000, 5_000])
     }
+  })
+
+  it('retries the smoke image pull but never reruns the smoke itself', async () => {
+    const slept: number[] = [], sleep = async (ms: number) => { slept.push(ms) }
+    const value = inputs('stable'), fake = fakeRunner(value, { exit: { 'smoke-image': 1 } })
+    const result = await runIsolated(value, fake.runner, Date.now, sleep)
+    if ('failed' in result) throw new Error(result.failed.join('; '))
+    expect(fake.calls.filter(call => /^candidate smoke/.test(call)).map(call => call.split(' ')[1])).toEqual(['smoke-image', 'smoke-image-a1', 'smoke'])
+    const once = inputs('stable'), failed = fakeRunner(once, { exit: { smoke: 1 } })
+    expect(await runIsolated(once, failed.runner, Date.now, sleep)).toEqual({ failed: ['Candidate smoke failed (exit 1)'] })
+    expect(failed.calls.filter(call => call.startsWith('candidate smoke ')).length).toBe(1)
+    expect(isolationSmokeImage()).toMatch(/^postgres:[\w.-]+@sha256:[0-9a-f]{64}$/)
   })
 
   it('tears down after a failed preparation or a partly failed start', async () => {
