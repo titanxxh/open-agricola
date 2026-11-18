@@ -1,63 +1,21 @@
 // @covers client/app/
 // @covers client/components/interaction/
+import { readFileSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
-import { serializeSessionSnapshot } from '../shared/session/serialization'
-import { markAllWorkersUsed } from '../shared/domain/player'
+import { serializeSessionSnapshot, type PersistedSessionSnapshot } from '../shared/session/serialization'
 import { emptyResources } from '../shared/contract/state-constants'
 import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
 
 const gardenDesigner = 'C099_GardenDesigner'
 const butchersBlock = 'M101_ButchersBlock'
 
-const scoringSnapshot = () => {
-  const session = createWorkSession({ seed: 5099, configure: state => {
-    state.round = 14
-    for (const space of state.actionSpaces) space.takenBy = []
-    for (const player of state.players) {
-      player.resources = { ...emptyResources, food: 4 }
-      player.minorHand = ['__test_placeholder__']
-      player.occupationHand = ['__test_placeholder__']
-      player.minorPlayed = []
-      player.occupationPlayed = []
-      player.improvements = []
-      player.cardStates = {}
-      player.fields = []
-      player.pastures = []
-      markAllWorkersUsed(state, player)
-      for (const worker of player.workers) {
-        if (worker.isActive) state.actionSpaces[0]!.takenBy.push({ playerId: player.id, workerId: worker.id })
-      }
-    }
-    state.players[0]!.occupationPlayed = [gardenDesigner]
-    state.players[0]!.resources.food = 5
-    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
-  } })
-  try {
-    let response = session.performRoundEnd()
-    for (let step = 0; step < 20; step++) {
-      expect(response.ok, response.error).toBe(true)
-      const interaction = response.interaction
-      if (interaction.stateId !== 'wait') throw new Error('Expected final harvest or scoring choice')
-      if (interaction.sourceCard === gardenDesigner && interaction.request.kind === 'choice') {
-        expect(interaction.request.options.map(option => option.value)).toEqual([
-          `${gardenDesigner}:food:0:score:0`, `${gardenDesigner}:food:1:score:1`,
-        ])
-        return serializeSessionSnapshot(session.state, session)
-      }
-      const { playerIndex, request } = interaction
-      if (request.kind === 'feed') response = session.resolveChoice(playerIndex, 'confirm', { selections: [] })
-      else if (request.kind === 'confirm-next-player' || request.kind === 'confirm-player-switch') {
-        response = session.resolveChoice(playerIndex, 'confirm')
-      } else if (request.options?.some(option => option.value === '__skip__')) {
-        response = session.resolveChoice(playerIndex, '__skip__')
-      } else throw new Error(`Unexpected harvest request: ${request.kind}`)
-    }
-    throw new Error('Did not reach Garden Designer scoring')
-  } finally { session.dispose() }
-}
+const legacyScoring: { pending: PersistedSessionSnapshot } = JSON.parse(
+  gunzipSync(readFileSync(new URL('../server/__tests__/fixtures/legacy-garden-designer.json.gz', import.meta.url))).toString(),
+)
 
-for (const food of [0, 1]) {
+for (const { food, score } of [{ food: 0, score: 0 }, { food: 6, score: 4 }, { food: 9, score: 5 }]) {
   test(`restored Garden Designer choice spends ${food} food and finishes on both clients`, async ({ browser, request }, testInfo) => {
     const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
     const driver = roomDriver(pages)
@@ -66,27 +24,29 @@ for (const food of [0, 1]) {
       await joinRoomClients(pages, request)
       joined = true
       await pages[0].setViewportSize({ width: 390, height: 844 })
-      await driver.command(0, { type: 'loadGame', state: scoringSnapshot() })
+      await driver.command(0, { type: 'loadGame', state: legacyScoring.pending })
       await driver.reload()
       const page = pages[0]
       await expect(page.locator('.exchange-overlay')).toHaveCount(0)
+      await expect(page.locator(`[data-choice-value^="${gardenDesigner}:"]`)).toHaveCount(6)
       const zero = page.locator(`[data-choice-value="${gardenDesigner}:food:0:score:0"]`)
       await expect(zero).toBeVisible()
       await expect(zero).toContainText('Free')
       await expect(zero.getByRole('img', { name: '0 Bonus VP', exact: true })).toBeVisible()
-      const chosen = page.locator(`[data-choice-value="${gardenDesigner}:food:${food}:score:${food}"]`)
+      const chosen = page.locator(`[data-choice-value="${gardenDesigner}:food:${food}:score:${score}"]`)
       await expect(chosen).toBeEnabled()
-      await expect(chosen).toBeInViewport()
+      await chosen.scrollIntoViewIfNeeded()
+      await expect(chosen).toBeInViewport({ ratio: 1 })
       await page.screenshot({ path: testInfo.outputPath(`garden-designer-${food}-choice.png`) })
       await driver.ui(0, () => chosen.click())
       for (const client of pages) {
         const finished = await roomSnapshot(client)
         expect(finished.state.gameOver).toBe(true)
-        expect(finished.state.players[0]!.resources.food).toBe(1 - food)
+        expect(finished.state.players[0]!.resources.food).toBe(10 - food)
         const entries = finished.scores?.[0]?.categories.find(category => category.key === 'cardBonusVp')?.entries ?? []
-        expect(entries.find(entry => entry.type === 'bonus' && entry.cardId === gardenDesigner)?.score ?? 0).toBe(food)
+        expect(entries.find(entry => entry.type === 'bonus' && entry.cardId === gardenDesigner)?.score ?? 0).toBe(score)
         expect(finished.state.log.filter(entry => entry.key === 'log.gameOver')).toHaveLength(1)
-        expect(finished.state.log.filter(entry => entry.key === 'log.cardEffectPay' && entry.params?.cardId === gardenDesigner)).toHaveLength(food)
+        expect(finished.state.log.filter(entry => entry.key === 'log.cardEffectPay' && entry.params?.cardId === gardenDesigner)).toHaveLength(food === 0 ? 0 : 1)
       }
     } finally {
       try { if (joined) await driver.newGame() }

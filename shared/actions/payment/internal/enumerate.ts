@@ -34,6 +34,7 @@ import {
 } from '../../helpers/trades'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
+import { compareResourceCosts } from '../../../domain/resource-cost-comparison'
 import { solutionCache, makeCacheKey } from './cache'
 import { canConsumePaymentResourceProviders } from './provider-backing'
 import {
@@ -267,18 +268,7 @@ const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
   if (hasStatefulBonusChoice(a) || hasStatefulBonusChoice(b)) return false
   if (solutionIdentity(a) !== solutionIdentity(b)) return false
 
-  const keys = new Set([
-    ...Object.keys(a.resourcesPaid),
-    ...Object.keys(b.resourcesPaid),
-  ] as PaymentResourceKey[])
-  let strictlyLess = false
-  for (const key of keys) {
-    const aVal = a.resourcesPaid[key] ?? 0
-    const bVal = b.resourcesPaid[key] ?? 0
-    if (aVal > bVal) return false
-    if (aVal < bVal) strictlyLess = true
-  }
-  return strictlyLess
+  return compareResourceCosts(a.resourcesPaid, b.resourcesPaid) === 'lower'
 }
 
 export const keepOnlyOptimals = (
