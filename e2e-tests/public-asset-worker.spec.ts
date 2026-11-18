@@ -125,16 +125,18 @@ async function loadAssets(page: Page, origin: string, expectedImage: readonly nu
   await expect.poll(() => page.evaluate(() =>
     Array.from(document.fonts).some(font => font.family === 'Dominican'))).toBe(true)
   const result = await page.evaluate(async ({ imageUrl, seasonUrl }) => {
+    const font = Array.from(document.fonts).find(face => face.family === 'Dominican')
+    if (!font) throw new Error('The Pages stylesheet did not define Dominican')
     const decode = async (url: string) => {
       const image = new Image()
       image.src = url
       try { await image.decode() } catch (error) { throw new Error(`Could not decode ${url}`, { cause: error }) }
       return [image.naturalWidth, image.naturalHeight]
     }
-    const [image, season, fonts] = await Promise.all([
-      decode(imageUrl), decode(seasonUrl), document.fonts.load('16px Dominican'),
+    const [image, season, loadedFont] = await Promise.all([
+      decode(imageUrl), decode(seasonUrl), font.load(),
     ])
-    return { image, seasonDecoded: season[0] > 0, fontLoaded: fonts.length > 0 && fonts.every(font => font.status === 'loaded') }
+    return { image, seasonDecoded: season[0] > 0, fontLoaded: loadedFont.status === 'loaded' }
   }, { imageUrl, seasonUrl }).catch(error => {
     throw new Error(`Asset rendering failed. Browser failures: ${failures.join(', ')}. Origin requests: ${assets.requests.join(', ')}`, { cause: error })
   }).finally(() => page.off('requestfailed', trackFailure))
