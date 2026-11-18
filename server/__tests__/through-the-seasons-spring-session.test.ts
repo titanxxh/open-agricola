@@ -166,7 +166,7 @@ describe('Seasons batch 3 spring audit', () => {
     expect(auditBirthResources(session)).toEqual(order.includes('breed') ? [{ sheep: 1 }] : [])
   })
 
-  it.each(['release', 'cook'] as const)('spring newborns can be handled by %s without another breeding or field phase', (mode) => {
+  it.each(['release', 'cook'] as const)('spring newborns cannot be cooked, and handling them by %s triggers no other breeding or field phase', (mode) => {
     let session = auditSpring()
     auditPen(session.state.players[0]!, 4)
     session.state.players[0]!.houseAnimals = Object.fromEntries(session.state.players[0]!.roomTiles.slice(0, session.state.players[0]!.resources.cattle = 1).map(tile => [`${tile.row}-${tile.col}`, 'cattle']));
@@ -178,11 +178,12 @@ describe('Seasons batch 3 spring audit', () => {
     expect(session.takeAction(0, springActionId).ok).toBe(true)
     session = auditRestore(session)
     if (mode === 'cook') {
-      const exchange = session.takeAnytimeAction(0, 'exchange')
-      expect(exchange.ok, exchange.error).toBe(true)
-      const option = exchange.interaction.request.options.find((entry) => JSON.stringify(entry).includes('sheep'))!
-      expect(option).toBeDefined()
-      expect(session.resolveChoice(0, `bulk:${option.value.split(':')[1]}=1`).ok).toBe(true)
+      // Spring breeding is a breeding phase: parents and newborns stay uncooked until housed.
+      const pending = auditClone(session.getState())
+      expect(pending.interaction.anytimeActions.some((action) => action.id === 'exchange')).toBe(false)
+      const rejected = session.takeAnytimeAction(0, 'exchange')
+      expect(rejected.ok).toBe(false)
+      expect(auditClone(rejected.state)).toEqual(pending.state)
     }
     const response = session.getState()
     if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
@@ -191,7 +192,8 @@ describe('Seasons batch 3 spring audit', () => {
         { id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
       ] }).ok).toBe(true)
     }
-    expect(session.state.players[0]!.resources).toEqual({ ...before.players[0]!.resources, food: mode === 'cook' ? 52 : 50 })
+    expect(session.state.players[0]!.resources).toEqual(before.players[0]!.resources)
+    expect(session.state.nonHarvestBreedPlacement?.[session.state.players[0]!.id]).toBeUndefined()
     expect(session.state.players[1]).toEqual(before.players[1])
     expect(session.state.events.filter((event) => event.type === 'farm.animalBred')).toHaveLength(1)
     expect(auditBirthResources(session)).toEqual([{ sheep: 1 }])
@@ -560,5 +562,81 @@ describe('Through the Seasons Spring rules', () => {
     expect(resp.ok).toBe(false)
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.players[0]!.fenceSegments).toHaveLength(0)
+  })
+})
+
+describe('spring breeding records only housed newborns (#1804)', () => {
+  const births = (session: GameSession) => session.state.events
+    .filter((event) => event.type === 'farm.animalBred').map((event) => event.animals)
+  const logRows = (session: GameSession, key: string) => session.state.log
+    .filter((entry) => entry.key === key).map((entry) => entry.params?.resources)
+  const boarStables = (player: PlayerState) => {
+    player.resources.boar = 2
+    player.stableTiles = [{ row: 2, col: 2 }, { row: 2, col: 3 }]
+    player.stableAnimals = { '2-2': { animalType: 'boar', animalCount: 1 }, '2-3': { animalType: 'boar', animalCount: 1 } }
+  }
+  const house = (session: GameSession, sheep: number, boar?: number) => {
+    const response = session.resolveChoice(0, 'confirm', { zones: [
+      { id: 'pen', zoneType: 'pasture', animalType: 'sheep', animalCount: sheep },
+      ...(boar === undefined ? [] : [
+        { id: 'stable:2-2', zoneType: 'stable', animalType: boar > 0 ? 'boar' : null, animalCount: Math.min(boar, 1) },
+        { id: 'stable:2-3', zoneType: 'stable', animalType: boar > 1 ? 'boar' : null, animalCount: Math.max(0, boar - 1) },
+      ]),
+    ] })
+    expect(response.ok, response.error).toBe(true)
+    return response
+  }
+  const breed = (configure?: (player: PlayerState) => void) => {
+    let session = auditSpring()
+    auditPen(session.state.players[0]!, 2)
+    configure?.(session.state.players[0]!)
+    expect(session.takeAction(0, springActionId).ok).toBe(true)
+    session = auditRestore(session)
+    expect(session.getState().interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
+    expect(session.state.nonHarvestBreedPlacement?.[session.state.players[0]!.id]).toBeDefined()
+    return session
+  }
+
+  it('keeps the birth when the lamb is housed', () => {
+    const session = breed()
+    house(session, 3)
+    expect(session.state.players[0]!.resources.sheep).toBe(3)
+    expect(births(session)).toEqual([{ sheep: 1 }])
+    expect(auditBirthResources(session)).toEqual([{ sheep: 1 }])
+    expect(logRows(session, 'log.reorganizeDiscard')).toEqual([])
+    expect(session.state.nonHarvestBreedPlacement?.[session.state.players[0]!.id]).toBeUndefined()
+  })
+
+  it('records no birth when the lamb is released', () => {
+    const session = breed()
+    house(session, 2)
+    expect(session.state.players[0]!.resources.sheep).toBe(2)
+    expect(births(session)).toEqual([{}])
+    expect(auditBirthResources(session)).toEqual([])
+    expect(logRows(session, 'log.reorganizeDiscard')).toEqual([{ sheep: 1 }])
+  })
+
+  it('records only the housed type when two types breed', () => {
+    const session = breed(boarStables)
+    expect(session.state.players[0]!.resources).toMatchObject({ sheep: 3, boar: 3 })
+    expect(births(session)).toEqual([{ sheep: 1, boar: 1 }])
+    house(session, 3, 2)
+    expect(births(session)).toEqual([{ sheep: 1 }])
+    expect(auditBirthResources(session)).toEqual([{ sheep: 1 }])
+    expect(logRows(session, 'log.reorganizeDiscard')).toEqual([{ boar: 1 }])
+  })
+
+  it('undo after housing restores the unsettled litter and the cooking ban', () => {
+    const session = breed()
+    house(session, 2)
+    expect(births(session)).toEqual([{}])
+    const undone = session.undoStep(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
+    expect(session.state.nonHarvestBreedPlacement?.[session.state.players[0]!.id]).toBeDefined()
+    expect(births(session)).toEqual([{ sheep: 1 }])
+    house(session, 3)
+    expect(births(session)).toEqual([{ sheep: 1 }])
+    expect(auditBirthResources(session)).toEqual([{ sheep: 1 }])
   })
 })

@@ -27,6 +27,7 @@ import { BASIC_CONVERSION_SOURCE_ID, getBasicConversionExchanges, WOOD_TO_FUEL_E
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones'
+import { hasUnsettledNonHarvestNewborns } from '../../domain/harvest-breed-placement'
 import { getCardExchanges, getRemainingHarvestExchangeUses, recordHarvestExchangeUses } from '../helpers/exchange-recipes'
 import {
   applyAnimalPayment,
@@ -205,8 +206,12 @@ const resolveBatchExchange = (
 // Trade System (the reference-aligned)
 // ============================================
 
-const isTradeAllowedDuringPhase = (trade: Trade, state?: GameState): boolean =>
-  state?.roundPhase !== 'breeding'
+/**
+ * Animals cannot be turned into food during a harvest breeding phase, nor while
+ * the player's newborns from any other breeding still await housing.
+ */
+const isTradeAllowedDuringPhase = (trade: Trade, state?: GameState, player?: PlayerState): boolean =>
+  (state?.roundPhase !== 'breeding' && !hasUnsettledNonHarvestNewborns(state, player))
   || (trade.to.food ?? 0) <= 0
   || !animalKeysForState(state).some(animal => (trade.from[animal] ?? 0) > 0)
 
@@ -223,7 +228,7 @@ export const canAffordTrade = (
   times: number = 1,
   state?: GameState,
 ): boolean => {
-  if (!isTradeAllowedDuringPhase(trade, state)) return false
+  if (!isTradeAllowedDuringPhase(trade, state, player)) return false
   const fromResources = trade.from
   const resourceKeys = Object.keys(fromResources) as ResourceKey[]
 
@@ -242,7 +247,7 @@ export const canAffordTrade = (
  * @returns Maximum times the trade can be applied
  */
 export const getMaxTradeTimes = (player: PlayerState, trade: Trade, state?: GameState): number => {
-  if (!isTradeAllowedDuringPhase(trade, state)) return 0
+  if (!isTradeAllowedDuringPhase(trade, state, player)) return 0
   const fromResources = trade.from
   const resourceKeys = Object.keys(fromResources) as ResourceKey[]
 
@@ -395,7 +400,7 @@ export const getExchangeCatalog = ({
     const woodConversion = getBasicConversionExchanges(state)[WOOD_TO_FUEL_EXCHANGE_INDEX]
     if (woodConversion) add(exchangeToTrade(woodConversion, BASIC_CONVERSION_SOURCE_ID), WOOD_TO_FUEL_EXCHANGE_INDEX, 'anytime')
   }
-  return entries.filter((entry) => isTradeAllowedDuringPhase(entry.trade, state))
+  return entries.filter((entry) => isTradeAllowedDuringPhase(entry.trade, state, player))
 }
 
 export const getFeedExchangeCatalog = (player: PlayerState, state: GameState, actionHooks?: ActionHookRegistry) =>
@@ -429,9 +434,14 @@ export const getExchangesByTradeIds = (
   return out
 }
 
-const isTradeAllowed = (trade: Trade, state: GameState | undefined, actionContext?: Record<string, unknown>): boolean => {
+const isTradeAllowed = (
+  trade: Trade,
+  state: GameState | undefined,
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): boolean => {
   const interactionKind = actionContext?.anytimeInteractionKind as InteractionRequest['kind'] | undefined
-  return isTradeAllowedDuringPhase(trade, state)
+  return isTradeAllowedDuringPhase(trade, state, player)
     && (!interactionKind || !trade.blockedAnytimeInteractionKinds?.includes(interactionKind))
 }
 
@@ -502,7 +512,7 @@ export const validateExchangeBatch = ({
   const sourceUses = new Map<string, number>()
   const harvestUses = new Map<string, number>()
   for (const { trade, count, harvestRound } of entries) {
-    if (!Number.isSafeInteger(count) || count <= 0 || !isTradeAllowedDuringPhase(trade, state)) return false
+    if (!Number.isSafeInteger(count) || count <= 0 || !isTradeAllowedDuringPhase(trade, state, player)) return false
     const recipeKey = JSON.stringify(trade)
     const used = (recipeUses.get(recipeKey) ?? 0) + count
     if (used > (trade.max ?? Infinity)) return false
@@ -630,7 +640,7 @@ const buildExchangeOptions = (
   const options: ActionChoiceOption[] = []
   for (let i = 0; i < trades.length; i++) {
     const trade = trades[i]
-    if (!isTradeAllowed(trade, state, actionContext) || !canAffordTrade(player, trade, 1, state)) continue
+    if (!isTradeAllowed(trade, state, player, actionContext) || !canAffordTrade(player, trade, 1, state)) continue
     const sourceId = trade.sourceId ?? trade.source
     const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
     const harvestRound = harvestRounds.get(i)
@@ -664,7 +674,7 @@ const resolveExchangeChoice = (
   const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(actionContext)
   const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
   const { trades, harvestRounds } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, actionContext, actionHooks)
-  const allowedTrade = (trade: Trade): boolean => isTradeAllowed(trade, state, actionContext)
+  const allowedTrade = (trade: Trade): boolean => isTradeAllowed(trade, state, player, actionContext)
     && (!tradeIds?.length || tradeIds.includes(trade.sourceId ?? trade.source ?? ''))
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
@@ -732,7 +742,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       return { kind: 'resourceBatchExchange', available, receiveResources: [...BUILDING_RESOURCES], minTotal: 'requireAtLeastOne' in batch && batch.requireAtLeastOne === true ? 1 : 0, maxTotal: batch.maxTotal }
     }
     const direct = readDirectTrade(actionContext)
-    if (direct) return isTradeAllowed(direct, state, actionContext)
+    if (direct) return isTradeAllowed(direct, state, player, actionContext)
       ? { kind: 'resourceExchange', resourcesPaid: direct.from, resourcesGained: direct.to }
       : { kind: 'exchangeCatalog', choices: [] }
     const rawIds = actionContext?.tradeIds
@@ -754,7 +764,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       return BUILDING_RESOURCES.some((resource) => (player.resources[resource] ?? 0) > 0)
     }
     const directTrade = readDirectTrade(ctx?.actionContext)
-    if (directTrade) return isTradeAllowed(directTrade, state, ctx?.actionContext) && canAffordTrade(player, directTrade, 1, state)
+    if (directTrade) return isTradeAllowed(directTrade, state, player, ctx?.actionContext) && canAffordTrade(player, directTrade, 1, state)
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
     const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(ctx?.actionContext)
     return buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, ctx?.actionContext, ctx?.actionHooks)
@@ -789,7 +799,7 @@ export const anytimeExchangeAction: ActionDefinition = {
     }
     const directTrade = readDirectTrade(actionContext)
     if (directTrade) {
-      if (!isTradeAllowed(directTrade, state, actionContext) || !canAffordTrade(player, directTrade, 1, state)) {
+      if (!isTradeAllowed(directTrade, state, player, actionContext) || !canAffordTrade(player, directTrade, 1, state)) {
         return { type: 'fail', errorKey: 'log.actionNoExchange' }
       }
       const animalPaymentPreference = readAnimalPaymentPreference(actionContext)

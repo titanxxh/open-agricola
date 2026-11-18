@@ -603,16 +603,6 @@ const auditOwnMajor = (session: GameSession, id: string) => {
   session.state.players[0]!.improvements.push(id)
   takeMajorImprovementFromSupply(session.state, id)
 }
-const auditCook = (session: GameSession, animal: 'sheep' | 'boar' | 'cattle' | 'horse') => {
-  const response = session.takeAnytimeAction(0, 'exchange')
-  expect(response.ok, response.error).toBe(true)
-  const option = response.interaction.request.options.find((entry) => JSON.stringify(entry).includes(animal))
-  expect(option).toBeDefined()
-  const traded = session.resolveChoice(0, `bulk:${option!.value.split(':')[1]}=1`)
-  expect(traded.ok, traded.error).toBe(true)
-  return traded
-}
-
 describe('Cross expansions batch 4 Seasons and Moor harvest audit', () => {
   it.each(auditSeasons.flatMap((season) => (['wood', 'clay', 'stone'] as const).flatMap((houseType) => [0, 2].map((fuel) => ({ season, houseType, fuel })))))(
     '$season harvest heats a $houseType house with $fuel fuel only when required', ({ season, houseType, fuel }) => {
@@ -674,7 +664,7 @@ describe('Cross expansions batch 4 Seasons and Moor harvest audit', () => {
     for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer === null ? [] : [viewer]).scores).toEqual(final.scores)
   })
 
-  it.each(['house', 'release', 'cook'] as const)('spring private horse breeding can %s the newborn without harvesting the opponent', (mode) => {
+  it.each(['house', 'release', 'cook'] as const)('spring private horse breeding handles a %s attempt for the newborn without harvesting the opponent', (mode) => {
     let session = auditSetup({ season: 'spring', moor: true })
     auditPastures(session.state.players[0]!, [{ col: 0, size: 2, animal: 'horse', count: mode === 'house' ? 2 : 4 }])
     auditPastures(session.state.players[1]!, [{ col: 0, size: 2, animal: 'horse', count: 2 }])
@@ -684,9 +674,20 @@ describe('Cross expansions batch 4 Seasons and Moor harvest audit', () => {
     const before = auditClone(session.state.players)
     expect(session.takeAction(0, 'season-spring-animal-and-fruit').ok).toBe(true)
     session = auditRestore(session)
-    if (mode === 'cook') auditCook(session, 'horse')
+    if (mode === 'cook') {
+      // Spring breeding is a breeding phase: the newborn horse cannot be cooked before housing.
+      const pending = auditClone(session.state)
+      const opened = session.takeAnytimeAction(0, 'exchange')
+      if (opened.ok) {
+        expect(opened.interaction.stateId === 'wait' ? opened.interaction.request.options ?? [] : [])
+          .not.toContainEqual(expect.objectContaining({ effectPreview: expect.objectContaining({ resourcesPaid: expect.objectContaining({ horse: 1 }) }) }))
+        expect(session.resolveChoice(0, 'cancel').ok).toBe(true)
+      } else {
+        expect(auditClone(session.state)).toEqual(pending)
+      }
+    }
     auditAnimals(session, { 'pen-0': mode === 'house' ? 3 : 4 })
-    expect(session.state.players[0]!.resources).toEqual({ ...before[0]!.resources, horse: mode === 'house' ? 3 : 4, food: mode === 'cook' ? 52 : 50 })
+    expect(session.state.players[0]!.resources).toEqual({ ...before[0]!.resources, horse: mode === 'house' ? 3 : 4, food: 50 })
     expect(session.state.players[1]).toEqual(before[1])
     expect(session.state.harvestBreedSummary).toBeUndefined()
     expect(session.state.events.filter((event) => event.type === 'farm.animalBred')).toEqual([expect.objectContaining({ actorPlayerId: 'p1', animals: { horse: 1 } })])

@@ -49,6 +49,26 @@ describe('Pig Breeder due breeding', () => {
     expect(response.state.players[0]!.resources.boar).toBe(5)
     expect(response.state.log.some(entry => entry.key === 'log.animalBredFromSource')).toBe(false)
   })
+  it.each([
+    { housed: 3, births: [{ boar: 1 }] },
+    { housed: 2, births: [] },
+  ])('round twelve records the piglet only when it is housed ($housed boar kept)', ({ housed, births }) => {
+    const session = setup(12, 2)
+    const pending = session.performRoundEnd()
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
+    expect(pending.state.nonHarvestBreedPlacement?.[pending.state.players[0]!.id]).toBeDefined()
+    const done = session.resolveChoice(0, 'confirm', { zones: [
+      { id: 'boar-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: housed },
+    ] })
+    expect(done.ok, done.error).toBe(true)
+    expect(done.state.players[0]!.resources.boar).toBe(housed)
+    expect(done.state.events.filter(event => event.type === 'farm.animalBred' && event.sourceCardId === CARD_ID)
+      .map(event => event.animals)).toEqual([births[0] ?? {}])
+    expect(done.state.log.filter(entry => entry.key === 'log.animalBredFromSource').map(entry => entry.params?.resources))
+      .toEqual(births)
+    expect(done.state.nonHarvestBreedPlacement?.[done.state.players[0]!.id]).toBeUndefined()
+    expect(done.state.round).toBe(13)
+  })
   it('round ten has no extra breeding', () => {
     const response = setup(10, 2).performRoundEnd()
     expect(response.ok, response.error).toBe(true)

@@ -635,6 +635,16 @@ export type HarvestBreedSummary = {
   animalCount: number
 }
 
+/** Unsettled newborns: animals to keep per type and the counts last synchronized. */
+export type BreedPlacement = {
+  minimums: Partial<Record<AnimalKey, number>>
+  animalCounts: Partial<Record<AnimalKey, number>>
+}
+
+export type NonHarvestBreedPlacement = BreedPlacement & {
+  newborns: Partial<Record<AnimalKey, number>>
+}
+
 export type RoundPhase = 'preparation' | 'work' | 'returning-home' | 'harvest' | 'field' | 'feeding' | 'breeding'
 
 export type MajorSupplyStack = {
@@ -707,10 +717,13 @@ export type GameState = {
   workPhaseObtainedResources: Record<string, Partial<Resource>>
   harvestReapSummary?: Record<string, HarvestReapSummary>
   harvestBreedSummary?: Record<string, HarvestBreedSummary>
-  harvestBreedPlacement?: Record<string, {
-    minimums: Partial<Record<AnimalKey, number>>
-    animalCounts: Partial<Record<AnimalKey, number>>
-  }>
+  harvestBreedPlacement?: Record<string, BreedPlacement>
+  /**
+   * Newborns from a breeding outside the harvest (a season action or a card),
+   * by player, until the following animal reorganization settles them. While a
+   * record exists, the player cannot turn animals into food.
+   */
+  nonHarvestBreedPlacement?: Record<string, NonHarvestBreedPlacement>
   /**
    * Number of feeding phases that have completed (incremented once at the
    * start of each breeding phase, after all players have fed).

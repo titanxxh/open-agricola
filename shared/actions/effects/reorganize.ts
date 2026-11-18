@@ -3,7 +3,13 @@ import { areZoneOccupancyLimitsSatisfied } from '../../contract/animal-zone-occu
 import { buildAnimalReorgRequest } from '../../domain/animal-reorg'
 import { playerBoard } from '../../domain'
 import { copyHistoryRecordIdentity } from '../../session/history-streams'
-import { syncHarvestBreedPlacement } from '../../domain/harvest-breed-placement'
+import { eventsToLogEntries } from '../../events/log-mapper'
+import type { GameEvent } from '../../contract/events'
+import {
+  settleHousedNewborns,
+  syncHarvestBreedPlacement,
+  syncNonHarvestBreedPlacement,
+} from '../../domain/harvest-breed-placement'
 import type {
   ActionDefinition,
   ActionExecutionResult,
@@ -292,6 +298,34 @@ const applyReorganizeMutate = (
   if (Object.keys(removed).length > 0) notifyAnimalsRemovedFromCardEffects(state, player, removed)
 }
 
+/**
+ * A birth records only the newborns housed by the reorganization that settles
+ * it. Rewrites the committed birth fact in place (keeping its history identity)
+ * and regenerates the log rows it owns, so live logs, recovery and Replay agree.
+ */
+const recordHousedNewborns = (
+  state: GameState,
+  birthEventId: string | undefined,
+  housed: Partial<Record<AnimalKey, number>>,
+): void => {
+  if (!birthEventId) return
+  let rewritten: GameEvent | undefined
+  state.events = state.events.map(event => {
+    if (event.type !== 'farm.animalBred' || event.id !== birthEventId) return event
+    rewritten = copyHistoryRecordIdentity(event, { ...event, animals: { ...housed } })
+    return rewritten
+  })
+  const occurrenceId = rewritten?.occurrenceId
+  if (!rewritten || !occurrenceId) return
+  const first = state.log.findIndex(entry => entry.sourceEvent?.occurrenceId === occurrenceId)
+  if (first === -1) return
+  const playerNames = Object.fromEntries(state.players.map(player => [player.id, player.name]))
+  const actionNames = Object.fromEntries(state.actionSpaces.map(space => [space.id, space.nameKey]))
+  const rows = eventsToLogEntries([rewritten], { playerNames, actionNames })
+  const kept = state.log.filter(entry => entry.sourceEvent?.occurrenceId !== occurrenceId)
+  state.log = [...kept.slice(0, first), ...rows, ...kept.slice(first)]
+}
+
 const animalTotals = (state: GameState, player: PlayerState): Partial<Pick<Resource, AnimalKey>> => {
   const totals: Partial<Pick<Resource, AnimalKey>> = {}
   for (const type of animalKeysForState(state)) totals[type] = player.resources[type] ?? 0
@@ -434,40 +468,31 @@ export const reorganizeAction: ActionDefinition = {
     }
     const before = animalTotals(ctx.state, ctx.player)
     const placement = syncHarvestBreedPlacement(ctx.state, ctx.player)
+    const nonHarvestPlacement = syncNonHarvestBreedPlacement(ctx.state, ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)
     const after = animalTotals(ctx.state, ctx.player)
     const summary = ctx.state.harvestBreedSummary?.[ctx.player.id]
     if (placement && summary) {
-      const previousResources = summary.resources
-      summary.resources = { ...previousResources }
-      for (const animal of animalKeysForState(ctx.state)) {
-        const newborns = previousResources[animal] ?? 0
-        const minimum = placement.minimums[animal] ?? Infinity
-        // The existing minimum includes every unsettled newborn. Preserve the
-        // required non-newborn animals, then count offspring individually.
-        const nonNewbornMinimum = Math.max(0, minimum - newborns)
-        const retained = Math.min(newborns, Math.max(0, (after[animal] ?? 0) - nonNewbornMinimum))
-        if (retained === 0) {
-          delete summary.resources[animal]
-          delete placement.minimums[animal]
-        } else {
-          summary.resources[animal] = retained
-          placement.minimums[animal] = nonNewbornMinimum + retained
-        }
-      }
+      summary.resources = settleHousedNewborns(placement, summary.resources, after, animalKeysForState(ctx.state))
       const recentEvents = [...ctx.state.events].reverse()
       const breedingPhase = recentEvents.find(event => event.type === 'harvest.phaseStarted'
         && event.harvestPhase === 'breeding' && event.round === ctx.state.round)
       const breedingEventId = breedingPhase && recentEvents.find(event => event.type === 'farm.animalBred'
         && event.source === 'harvest' && event.round === ctx.state.round && event.seq > breedingPhase.seq
         && (event.targetPlayerId ?? event.actorPlayerId) === ctx.player.id)?.id
-      ctx.state.events = ctx.state.events.map(event => event.type === 'farm.animalBred' && event.id === breedingEventId
-        ? copyHistoryRecordIdentity(event, { ...event, animals: { ...summary.resources } }) : event)
-      placement.animalCounts = after
+      recordHousedNewborns(ctx.state, breedingEventId, summary.resources)
       summary.animalTypes = Object.keys(summary.resources).length
       summary.animalCount = sumAnimalCounts(summary.resources)
     }
     if (ctx.actionContext?.harvestBreedPlacementMinimums) delete ctx.state.harvestBreedPlacement?.[ctx.player.id]
+    if (nonHarvestPlacement) {
+      // A season or card breeding records only the newborns this reorganization houses.
+      const housed = settleHousedNewborns(nonHarvestPlacement, nonHarvestPlacement.newborns, after, animalKeysForState(ctx.state))
+      const birthEventId = [...ctx.state.events].reverse().find(event => event.type === 'farm.animalBred'
+        && event.source !== 'harvest' && (event.targetPlayerId ?? event.actorPlayerId) === ctx.player.id)?.id
+      recordHousedNewborns(ctx.state, birthEventId, housed)
+      delete ctx.state.nonHarvestBreedPlacement?.[ctx.player.id]
+    }
     const assigned = positiveAnimals(ctx.state, after)
     if (Object.keys(assigned).length > 0) {
       ctx.eventSink?.emit<'farm.animalMoved'>({

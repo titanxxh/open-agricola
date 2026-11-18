@@ -110,7 +110,9 @@ describe('harvest breeding without a room precheck', () => {
     expect(harvestBirths(housed)).toEqual([expect.objectContaining({
       actorPlayerId: owner.id, animals: { sheep: 1, cattle: 1 },
     })])
-    expect(housed.state.log.some(entry => entry.key === 'log.harvestBreedDetail')).toBe(true)
+    // The live log row is regenerated with the housed newborns, matching the public fact.
+    expect(housed.state.log.filter(entry => entry.key === 'log.harvestBreedDetail').map(entry => entry.params?.resources))
+      .toEqual([{ sheep: 1, cattle: 1 }])
     expect(housed.state.round).toBe(5)
     expect(housed.interaction.stateId).toBe('idle')
   })
