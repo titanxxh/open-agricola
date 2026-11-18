@@ -252,7 +252,8 @@ const CARD_IMPL = { effect: { id: CARD_ID, onEndHarvestFeedingPhase: () => ({ ty
     expect(session.peekEnginePendingEnvelope()?.hostNodeId).toBe(host)
   })
 
-  it.each(['C084_PerennialRye', 'D167_PureBreeder'] as const)('still cooks %s animals outside ordinary breeding', card => {
+  it.each(['C084_PerennialRye', 'D167_PureBreeder'] as const)('forbids cooking %s parents and newborns until they are housed', card => {
+    // These cards breed outside a breeding phase, but newborns still cannot be cooked.
     const session = setup('sheep', 5, false, [], card)
     const pending = card === 'C084_PerennialRye'
       ? ok(session.takeAnytimeAction(0, 'C84-perennial-rye-anytime'))
@@ -261,15 +262,23 @@ const CARD_IMPL = { effect: { id: CARD_ID, onEndHarvestFeedingPhase: () => ({ ty
     expect(pending.state.players[0]!.resources.sheep).toBe(3)
     expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
     if (card === 'C084_PerennialRye') expect(pending.state.players[0]!.resources.grain).toBe(0)
-    const food = pending.state.players[0]!.resources.food
+    expect(pending.state.events).toContainEqual(expect.objectContaining({
+      type: 'farm.animalBred', source: 'cardEffect', sourceCardId: card, animals: { sheep: 1 },
+    }))
+    const blocked = ok(session.takeAnytimeAction(0, 'exchange'))
+    expect(cookingOptions(blocked)).toEqual([])
+    ok(session.resolveChoice(0, 'cancel'))
+    const placed = ok(session.resolveChoice(0, 'confirm', { zones: [{ id: 'parents', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 }] }))
+    if (card === 'D167_PureBreeder') expect(placed.state.round).toBe(6)
+    else expect(placed.state.round).toBe(5)
+    expect(placed.interaction.stateId).toBe('idle')
+    expect(placed.state.events.filter(event => event.type === 'farm.animalBred' && event.sourceCardId === card))
+      .toEqual([expect.objectContaining({ animals: { sheep: 1 } })])
+    const food = placed.state.players[0]!.resources.food
     const opened = ok(session.takeAnytimeAction(0, 'exchange'))
     const recipe = cookingOptions(opened)[0]!
     expect(recipe).toBeDefined()
     const cooked = ok(session.resolveChoice(0, `bulk:${recipe.value.split(':')[1]}=3`))
     expect(cooked.state.players[0]!.resources).toMatchObject({ sheep: 0, food: food + 6 })
-    const placed = ok(session.resolveChoice(0, 'confirm', { zones: [] }))
-    if (card === 'D167_PureBreeder') expect(placed.state.round).toBe(6)
-    else expect(placed.state.round).toBe(5)
-    expect(placed.interaction.stateId).toBe('idle')
   })
 })

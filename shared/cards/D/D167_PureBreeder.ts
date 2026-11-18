@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { canAccommodateAllAnimals } from '../../domain/animal-zones'
+import { breedLeaf, canBreedAnimals } from '../../actions/effects/breed'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -17,13 +18,9 @@ const cardImpl = {
   onAfterRoundEnd: (state, player) => {
     if (harvestRounds.includes(state.round)) return // harvest round — skip
     const children: ActionFlow[] = BREEDABLE
-      .filter((t) => player.resources[t] >= 2 && canAccommodateAllAnimals(state, player, [t]))
-      .map((t) => ({
-        type: 'leaf' as const,
-        actionId: 'gain',
-        params: { [t]: 1 },
-        sourceCard: CARD_ID,
-      }))
+      .filter((t) => canBreedAnimals(state, player, { sourceCard: CARD_ID, animalTypes: [t] })
+        && canAccommodateAllAnimals(state, player, [t]))
+      .map((t) => breedLeaf(CARD_ID, [t]))
     if (children.length === 0) return
     return { type: 'xor', optional: true, children }
   },

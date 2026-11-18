@@ -244,3 +244,42 @@ describe('ae-negative-43-harvest', () => {
   it('C084 N2 exactly one species breeds per nonharvest round and repeat refuses before natural next round reset',()=>{const s=make(RYE,true,state=>{state.round=2;yard(state,2,2);state.players[0]!.resources.grain=2}),r=rye(s,'boar');assert.equal(r.state.players[0]!.resources.sheep,2);assert.equal(r.state.players[0]!.resources.boar,3);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.roundPhase,'work');assert.deepEqual(r.state.players[0]!.pastures.map(p=>[p.animalType,p.animalCount]),[['sheep',2],['boar',3]]);const bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C84-perennial-rye-anytime')),three=nextRound(s,3);const again=rye(s);assert.equal(again.state.players[0]!.resources.grain,0);assert.equal(again.state.players[0]!.resources.sheep,3);assert.equal(again.state.players[0]!.resources.boar,3);save('C084-N2',{r,bad,three,again})})
   it('C084 N3 harvest rounds zero grain and one parent forbid anytime before a legal ordinary action',()=>{for(const mode of['harvest','grain','parent']){const s=make(RYE,true,state=>{state.round=mode==='harvest'?7:2;yard(state,mode==='parent'?1:2);state.players[0]!.resources.grain=mode==='grain'?0:1}),bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C84-perennial-rye-anytime')),legal=ok(s.takeAction(0,'reed-bank'));assert.equal(legal.state.players[0]!.resources.sheep,mode==='parent'?1:2);assert.equal(legal.state.players[0]!.resources.grain,mode==='grain'?0:1);save(`C084-N3-${mode}`,{bad,legal})}})
 })
+
+describe('C084 Perennial Rye breeds through the breed action', () => {
+  const withCards = (session: GameSession, configure: (state: SessionResponse['state']) => void) => {
+    const state = session.getState().state
+    configure(state)
+    session.loadState(state)
+    return session
+  }
+
+  it('produces a birth fact, not an ordinary pig gain, so Boar Spear does not offer to cook the piglet', () => {
+    const session = withCards(setup({ played: true, sheep: 0, boar: 2 }), state => {
+      state.players[0]!.occupationPlayed.push('E053_BoarSpear')
+    })
+    enterActiveInteraction(session)
+    const bred = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(bred.ok, bred.error).toBe(true)
+    expect(bred.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
+    expect(bred.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toEqual([])
+    const housed = resolveAnimalReorganization(session, bred, 0, 3)
+    expect(housed.ok, housed.error).toBe(true)
+    expect(housed.state.players[0]!.resources).toMatchObject({ boar: 3, grain: 0 })
+    expect(housed.state.events.filter(event => event.type === 'farm.animalBred' && event.sourceCardId === CARD_ID)
+      .map(event => event.animals)).toEqual([{ boar: 1 }])
+    expect(housed.state.events.filter(event => event.type === 'resource.exchanged' && event.exchangeSource === 'E053_BoarSpear'))
+      .toEqual([])
+  })
+
+  it('does not count a bred lamb as a sheep gained from other sources for Breed Registry', () => {
+    const session = withCards(setup({ played: true, sheep: 2 }), state => {
+      state.players[0]!.minorPlayed.push('D036_BreedRegistry')
+    })
+    const housed = usePerennialRye(session, 'sheep')
+    expect(housed.ok, housed.error).toBe(true)
+    expect(housed.state.players[0]!.resources.sheep).toBe(3)
+    expect(housed.state.players[0]!.cardStates['D036_BreedRegistry']?.extraData?.boardSheep ?? 0).toBe(0)
+    expect(housed.state.events.filter(event => event.type === 'farm.animalBred' && event.sourceCardId === CARD_ID)
+      .map(event => event.animals)).toEqual([{ sheep: 1 }])
+  })
+})
