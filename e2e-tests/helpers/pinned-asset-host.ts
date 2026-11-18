@@ -33,6 +33,15 @@ export function pinnedAssetHostArgs(env: NodeJS.ProcessEnv = process.env): strin
   return [`--host-resolver-rules=MAP ${new URL(publicAssetBaseUrl()).hostname} 127.0.0.1:${port}`, `--ignore-certificate-errors-spki-list=${spki}`]
 }
 
+/**
+ * Launch options for a browser a spec starts itself. Every launch in a test run inherits the configuration's launch
+ * arguments, and the mapping arguments are Chromium flags WebKit refuses to launch with, so other engines start with
+ * none. A spec that passes its own `args` replaces the inherited ones.
+ */
+export function ownLaunchOptions(engine: 'chromium' | 'firefox' | 'webkit'): { args?: string[] } {
+  return engine === 'chromium' ? {} : { args: [] }
+}
+
 /** Serves the checkout under the asset site's path with its CORS and cache headers; any other path is 404, like Pages. */
 export function pinnedAssetHandler(root: string, version: string) {
   const prefix = new URL(publicAssetBaseUrl()).pathname

@@ -1,13 +1,13 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { request } from 'node:https'
 import type { TLSSocket } from 'node:tls'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { FullConfig } from '@playwright/test'
-import globalSetup, { PINNED_ASSET_HEADER, PINNED_ASSET_HOST_DECLINED, PINNED_ASSET_HOST_PORT, PINNED_ASSET_HOST_SPKI, pinnedAssetHostArgs, startPinnedAssetHost } from '../../e2e-tests/helpers/pinned-asset-host'
+import globalSetup, { PINNED_ASSET_HEADER, PINNED_ASSET_HOST_DECLINED, PINNED_ASSET_HOST_PORT, PINNED_ASSET_HOST_SPKI, ownLaunchOptions, pinnedAssetHostArgs, startPinnedAssetHost } from '../../e2e-tests/helpers/pinned-asset-host'
 
 const roots: string[] = [], closers: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -38,6 +38,21 @@ function fetchPinned(port: number, path: string, method = 'GET'): Promise<Answer
   })
 }
 
+/** Each browser a spec launches itself, with the text of its options argument. */
+function ownLaunches(): { site: string; options: string }[] {
+  const root = join(import.meta.dirname, '../../e2e-tests'), sites: { site: string; options: string }[] = []
+  const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter(file => file.endsWith('.ts'))
+  for (const file of files) {
+    const text = readFileSync(join(root, file), 'utf8')
+    for (const match of text.matchAll(/\.(?:launch|launchPersistentContext)\(/g)) {
+      let depth = 1, end = match.index + match[0].length
+      while (depth && end < text.length) { if (text[end] === '(') depth++; else if (text[end] === ')') depth--; end++ }
+      sites.push({ site: `${file}:${text.slice(0, match.index).split('\n').length}`, options: text.slice(match.index + match[0].length, end - 1) })
+    }
+  }
+  return sites
+}
+
 describe('pinned asset host', () => {
   it('answers the asset site path from the checkout with Pages CORS, under the key Chromium is told to trust', async () => {
     const { repository, version } = checkout()
@@ -52,6 +67,14 @@ describe('pinned asset host', () => {
       expect([path, (await fetchPinned(host.port, path)).status]).toEqual([path, 404])
     }
     expect((await fetchPinned(host.port, '/open-agricola-assets/assets/revised/fonts/Dominican.woff2', 'POST')).status).toBe(405)
+  })
+
+  it('makes every browser a spec launches itself pass its own arguments, since WebKit cannot inherit the mapping', () => {
+    const launches = ownLaunches()
+    expect(launches.length).toBeGreaterThan(0)
+    expect(launches.filter(({ options }) => !/\bargs\b|ownLaunchOptions\(/.test(options)).map(({ site }) => site)).toEqual([])
+    expect(ownLaunchOptions('chromium')).toEqual({})
+    expect(ownLaunchOptions('webkit')).toEqual({ args: [] })
   })
 
   it('maps the asset host for Chromium only when a run exported its port and key pin', async () => {

@@ -2,6 +2,7 @@
 // @covers client/sandbox/
 import { createHash } from 'node:crypto'
 import { test, expect, chromium, webkit, type Page } from '@playwright/test'
+import { ownLaunchOptions } from './helpers/pinned-asset-host'
 import { source, passingTests, choiceSource, choiceTests, handshakeTests, infiniteTests, isolationTests } from './fixtures/browser-card-tests.ts'
 
 async function run(page: Page, source: string, tests: string) {
@@ -35,7 +36,7 @@ async function run(page: Page, source: string, tests: string) {
 for (const engine of ['chromium', 'webkit'] as const) {
   test(`${engine}: browser card tests isolate code and terminate runaway Workers`, async ({ baseURL }, testInfo) => {
     test.setTimeout(180_000)
-    const browser = await (engine === 'chromium' ? chromium : webkit).launch()
+    const browser = await (engine === 'chromium' ? chromium : webkit).launch(ownLaunchOptions(engine))
     try {
       const context = await browser.newContext({ baseURL })
       const page = await context.newPage()

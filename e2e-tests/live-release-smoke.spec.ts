@@ -10,6 +10,7 @@ import { expect, test } from '@playwright/test'
 import { installLiveSmokeGuard } from '../scripts/release/live-smoke-guard'
 import { runLiveReleaseSmoke } from '../scripts/release/live-smoke'
 import { installReleaseLocale, signOutReleaseSession, submitReleaseLogin } from './helpers/release-browser'
+import { ownLaunchOptions } from './helpers/pinned-asset-host'
 import { BROWSER_WS_PROTOCOL } from '../shared/contract/browser-auth'
 
 async function controlServer() {
@@ -64,7 +65,7 @@ async function controlServer() {
 
 for (const engine of ['chromium', 'webkit'] satisfies Array<'chromium' | 'webkit'>) {
   test(`live smoke read guard and locale cover opaque frames in ${engine}`, async ({ playwright }) => {
-    const control = await controlServer(), browser = await playwright[engine].launch()
+    const control = await controlServer(), browser = await playwright[engine].launch(ownLaunchOptions(engine))
     const context = await browser.newContext(), errors: string[] = []
     try {
       await installReleaseLocale(context)
