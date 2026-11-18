@@ -70,7 +70,7 @@ import { ExchangeOverlayPresentation } from './exchange-overlay-presentation'
 import { useExchangeDraftPresentation } from './exchange-draft-presentation'
 import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
-import { checkServerAvailability, useServerAvailability } from '../services/server-availability'
+import { checkServerAvailability, isServerUnavailableCode, onServerRecovered, useServerAvailability } from '../services/server-availability'
 import {
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
@@ -375,6 +375,9 @@ const getIsMobileViewport = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(max-width: 900px)').matches
 
+// Ends the transport reaches on purpose; any other uncoded error is a connection that could not be made.
+const FINAL_ROOM_MESSAGES = new Set(['gameTerminated', 'roomDissolved', 'roomTerminatedCardTakedown', 'spectatingEnded', 'Transport destroyed'])
+
 export const GameContainerApi = () => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
@@ -543,13 +546,20 @@ export const GameContainerApi = () => {
            activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
       : !!(activePlayer && displayPlayer))
   const hasGameView = !!(state && currentPlayer && displayPlayer)
-  // A lost connection asks whether the server itself is unavailable (#1816). Then the last board stays under an overlay
-  // while the transport keeps reconnecting; without a board the status card says the same.
+  // A lost or failed connection asks whether the server itself is unavailable (#1816). Then the last board stays under an
+  // overlay while the transport keeps reconnecting; opening phases and a game without a board say the same on the status
+  // card. A connection that failed before the room was found has stopped, so the page starts over when the server is back.
   const serverAvailability = useServerAvailability()
   const wsConnectionLost = isWs && (wsStatus.phase === 'reconnecting' || (wsStatus.phase === 'error'
-    && (wsStatus.message === 'WebSocket connection failed' || wsStatus.message === 'no WebSocket instance')))
+    && (!wsStatus.code || isServerUnavailableCode(wsStatus.code)) && !FINAL_ROOM_MESSAGES.has(wsStatus.message)
+    && !wsStatus.message.startsWith('No room in URL')))
   useEffect(() => { if (wsConnectionLost) void checkServerAvailability() }, [wsConnectionLost])
+  const connectionStopped = wsConnectionLost && wsStatus.phase === 'error'
+  useEffect(() => connectionStopped ? onServerRecovered(() => window.location.reload()) : undefined, [connectionStopped])
   const serverMaintenance = wsConnectionLost && serverAvailability === 'unavailable'
+  // Opening phases return their own views before the board, so they keep the status card instead of the overlay.
+  const openingView = state?.phase === 'solo-hand-selection' || state?.phase === 'draft' || state?.phase === 'parent-selection'
+  const maintenanceOverBoard = serverMaintenance && hasGameView && !openingView
   const canResetGame = !isSpectator && hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
     (!isHotseat || isInteractive) &&
     (!isWs || isHotseat || selfPlayer?.id === displayPlayer?.id)
@@ -1414,7 +1424,7 @@ export const GameContainerApi = () => {
     reader.readAsText(file)
   }, [transport])
 
-  if (isWs && wsStatus.phase !== 'ready' && !(serverMaintenance && hasGameView)) {
+  if (isWs && wsStatus.phase !== 'ready' && !maintenanceOverBoard) {
     const wsProgressPhase =
       resolveGameLoadPhase({ wsStatus, hasGameView: false }) ??
       (wsStatus.phase === 'idle' ? 'wsConnecting' : null)

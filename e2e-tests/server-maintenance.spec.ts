@@ -4,6 +4,7 @@ import { expect, test, type Page, type WebSocketRoute } from '@playwright/test'
 // While the formal backend is down, Caddy answers every API request with this 503 (deploy/Caddyfile.example, #1816).
 const UNAVAILABLE = { status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, code: 'server_unavailable' }) }
 const TITLE = 'The server is under maintenance or temporarily unavailable'
+const GAME_TEXT = 'The server is under maintenance or temporarily unavailable. The game reconnects automatically when it is back; game progress is not lost.'
 
 async function englishPage(page: Page) {
   await page.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'en') })
@@ -60,8 +61,7 @@ test('a game that loses an unavailable server keeps its board under the maintena
     await socket.server?.close({ code: 1012, reason: 'maintenance test' })
   }
   const overlay = page.getByTestId('server-maintenance-overlay')
-  await expect(overlay.getByRole('alert')).toHaveText(
-    'The server is under maintenance or temporarily unavailable. The game reconnects automatically when it is back; game progress is not lost.')
+  await expect(overlay.getByRole('alert')).toHaveText(GAME_TEXT)
   // The last board stays visible underneath and cannot be operated.
   await expect(layout).toBeVisible()
   expect(await layout.evaluate(element => element.closest('[inert]') !== null)).toBe(true)
@@ -71,4 +71,14 @@ test('a game that loses an unavailable server keeps its board under the maintena
   await expect(overlay).toHaveCount(0, { timeout: 45_000 })
   await expect(layout).toBeVisible()
   expect(sockets.length).toBeGreaterThan(0)
+})
+
+test('a game whose room cannot be found while the server is unavailable says so and starts over when it answers', async ({ page }) => {
+  await englishPage(page)
+  await serverDown(page)
+  await page.goto('/?player=p1&transport=ws&room=dev5&devMode=1')
+  // Room discovery fails before any WebSocket opens; the stopped transport cannot retry, so the page reloads on recovery.
+  await expect(page.locator('.ws-status-text')).toHaveText(GAME_TEXT)
+  await serverBack(page)
+  await expect(page.locator('.game-layout')).toBeVisible({ timeout: 45_000 })
 })
