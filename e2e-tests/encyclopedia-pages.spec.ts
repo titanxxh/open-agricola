@@ -32,14 +32,23 @@ test.afterAll(async () => {
   await site?.close()
 })
 
-/** Nothing answers at the artifact's API origin; a signed-in visitor gets a stubbed account and empty lobby. */
+/**
+ * A signed-out visitor's API origin answers only like a live server for a signed-out browser (healthy, no session) and
+ * fails every other request; a reachable artifact with an unreachable API is a server outage (#1816), which shows the
+ * maintenance page instead. A signed-in visitor gets a stubbed account and empty lobby.
+ */
 async function visit(browser: Browser, layout: Layout, { signedIn = false } = {}) {
   const visitor = await newVisitor(browser, layout)
   await visitor.context.route(`${PAGES_API_ORIGIN}/**`, route => {
-    if (!signedIn) return route.abort('failed')
     const path = new URL(route.request().url()).pathname
+    const headers = { 'access-control-allow-origin': site.origin, 'access-control-allow-credentials': 'true' }
+    if (!signedIn) {
+      if (path === '/api/health') return route.fulfill({ headers, json: { ok: true } })
+      if (path === '/api/auth/me') return route.fulfill({ status: 401, headers, json: { ok: false, code: 'not_authenticated' } })
+      return route.abort('failed')
+    }
     return route.fulfill({
-      headers: { 'access-control-allow-origin': site.origin, 'access-control-allow-credentials': 'true' },
+      headers,
       json: path === '/api/auth/me'
         ? { ok: true, user: { id: 'u1', username: 'reader', displayName: 'Reader' } }
         : { ok: true, rooms: [], games: [] },
