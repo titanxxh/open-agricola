@@ -65,7 +65,8 @@ describe('lane planning', () => {
 describe('hosted frontend reuse', () => {
   function parent(env: NodeJS.ProcessEnv) {
     const root = checkout([])
-    mkdirSync(join(root, 'dist')); writeFileSync(join(root, 'dist/frontend-build.json'), '{}\n')
+    mkdirSync(join(root, 'dist/assets'), { recursive: true }); writeFileSync(join(root, 'dist/frontend-build.json'), '{}\n')
+    writeFileSync(join(root, 'dist/index.html'), 'source build\n'); writeFileSync(join(root, 'dist/assets/index.js'), 'server executor\n')
     writeHostedFrontendMarker(root, head, 'f'.repeat(64), env)
     return root
   }
@@ -102,7 +103,6 @@ describe('hosted frontend reuse', () => {
   it('copies a named build that matches exactly, builds otherwise, and keeps a named build that is the checkout itself', async () => {
     const env = { VITE_SANDBOX_EXECUTOR: 'server', RELEASE_CHANNEL: 'stable' }
     const source = parent(env)
-    writeFileSync(join(source, 'dist/index.html'), 'source build\n')
     const lane = checkout([]); mkdirSync(join(lane, 'dist')); writeFileSync(join(lane, 'dist/stale.js'), 'stale\n')
     // verify-parallel's root and verify.ts take the reuse step only while a source build is named.
     expect(hostedFrontendCommand(env)).toEqual(['run', 'build:hosted-frontend'])
@@ -125,6 +125,12 @@ describe('hosted frontend reuse', () => {
     expect(calls).toEqual([[source, 'pnpm', 'run', 'build:cards-manifest'], [source, 'pnpm', 'run', 'build:cards-manifest']])
     expect(readFileSync(join(source, 'dist/index.html'), 'utf8')).toBe('source build\n')
     expect(hostedFrontendMismatch(source, head, 'f'.repeat(64), env)).toBeNull()
+    // A later rebuild here (say for the browser-local sandbox) leaves the marker describing a bundle that is gone.
+    writeFileSync(join(source, 'dist/assets/index.js'), 'browser executor\n')
+    calls.length = 0
+    expect(hostedFrontendMismatch(source, head, 'f'.repeat(64), env)).toBe('parent build output changed after it was marked')
+    expect(await hostedFrontendStep(source, { ...env, [HOSTED_FRONTEND_SOURCE]: source }, recording(calls))).toBe(0)
+    expect(calls).toEqual([[source, 'pnpm', 'run', 'build:hosted-frontend']])
   })
 })
 
