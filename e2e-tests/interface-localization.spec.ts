@@ -133,7 +133,8 @@ test('spring interaction and breeding log use English season/action names withou
   await expect(page.locator('.seasons-board__token')).toHaveText('Sp')
   await page.locator('.seasons-board__space-button[data-season="spring"]').click()
   await expect(page.locator('.interaction-bar')).toContainText('Triggered by Spring')
-  await page.getByRole('button', { name: 'Breed', exact: true }).click()
+  // The breed option previews its litter (#1810): two sheep produce one lamb.
+  await page.getByRole('button', { name: '1 Sheep Breed', exact: true }).click()
   await expect(page.locator('.action-log')).toContainText('Spring triggered (Breed)')
   await expect(page.locator('.action-log')).not.toContainText(/through-the-seasons:|farm\.animalBred|actor=|seq=|\(breed\)/)
 })
