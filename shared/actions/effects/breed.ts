@@ -45,21 +45,32 @@ const breedingAnimalCount = (
   return Math.max(0, count)
 }
 
+type Litter = { type: BreedAnimalType; offspring: number; placementMinimum: number }
+
+/** The litters breeding would produce now, by type; reads state only. */
+const breedingLitters = (state: GameState, player: PlayerState, opts: BreedOptions): Litter[] => {
+  const litters: Litter[] = []
+  for (const type of opts.animalTypes ?? animalKeysForState(state)) {
+    const ctx = { sourceCard: opts.sourceCard }
+    const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
+    const threshold = getBreedThreshold(state, player, type, ctx)
+    if (breedableCount < threshold) continue
+    const offspring = getBreedOffspringCount(state, player, type, { ...ctx, breedableCount })
+    if (offspring <= 0) continue
+    litters.push({
+      type,
+      offspring,
+      placementMinimum: Math.max(0, threshold - (breedableCount - (player.resources[type] ?? 0))) + offspring,
+    })
+  }
+  return litters
+}
+
 export const canBreedAnimals = (
   state: GameState,
   player: PlayerState,
   opts: BreedOptions,
-): boolean => {
-  const types = opts.animalTypes ?? animalKeysForState(state)
-  for (const type of types) {
-    const ctx = { sourceCard: opts.sourceCard }
-    const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
-    if (breedableCount < getBreedThreshold(state, player, type, ctx)) continue
-    if (getBreedOffspringCount(state, player, type, { ...ctx, breedableCount }) <= 0) continue
-    return true
-  }
-  return false
-}
+): boolean => breedingLitters(state, player, opts).length > 0
 
 /**
  * Core breed helper:
@@ -79,18 +90,10 @@ export const breed = (
   opts: BreedOptions,
   eventSink?: EventSink,
 ): { breedSummary: HarvestBreedSummary; placementMinimums: Partial<Record<AnimalKey, number>> } => {
-  const types = opts.animalTypes ?? animalKeysForState(state)
   const summary: HarvestBreedSummary = { resources: {}, animalTypes: 0, animalCount: 0 }
   const placementMinimums: Partial<Record<AnimalKey, number>> = {}
-  for (const type of types) {
-    const ctx = { sourceCard: opts.sourceCard }
-    const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
-    const threshold = getBreedThreshold(state, player, type, ctx)
-    if (breedableCount < threshold) continue
-    const offspring = getBreedOffspringCount(state, player, type, { ...ctx, breedableCount })
-    if (offspring <= 0) continue
-    placementMinimums[type] =
-      Math.max(0, threshold - (breedableCount - (player.resources[type] ?? 0))) + offspring
+  for (const { type, offspring, placementMinimum } of breedingLitters(state, player, opts)) {
+    placementMinimums[type] = placementMinimum
     player.resources[type] += offspring
     summary.resources[type] = offspring
     summary.animalTypes += 1
@@ -118,6 +121,18 @@ export const breedAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
+  /** Shows the newborns each type would produce, so choices between types stay distinguishable. */
+  previewEffect: ({ state, player, actionContext }) => {
+    const ctx = (actionContext ?? {}) as BreedActionContext
+    const litters = breedingLitters(state, player, {
+      animalTypes: ctx.animalTypes ?? undefined,
+      sourceCard: ctx.sourceCard ?? 'unknown',
+    })
+    return {
+      kind: 'resourceExchange',
+      resourcesGained: Object.fromEntries(litters.map(({ type, offspring }) => [type, offspring])),
+    }
+  },
   execute: ({ state, player, actionContext, eventSink }): ActionExecutionResult => {
     const ctx = (actionContext ?? {}) as BreedActionContext
     const sourceCard = ctx.sourceCard ?? 'unknown'
@@ -125,15 +140,22 @@ export const breedAction: ActionDefinition = {
       animalTypes: ctx.animalTypes ?? undefined,
       sourceCard,
     }, eventSink)
+    const animalCounts = () =>
+      Object.fromEntries(animalKeysForState(state).map((animal) => [animal, player.resources[animal] ?? 0]))
     if (sourceCard === 'harvest') {
       state.harvestBreedSummary ??= {}
       state.harvestBreedSummary[player.id] = breedSummary
       if (breedSummary.animalCount > 0) {
         state.harvestBreedPlacement ??= {}
-        state.harvestBreedPlacement[player.id] = {
-          minimums: { ...placementMinimums },
-          animalCounts: Object.fromEntries(animalKeysForState(state).map((animal) => [animal, player.resources[animal] ?? 0])),
-        }
+        state.harvestBreedPlacement[player.id] = { minimums: { ...placementMinimums }, animalCounts: animalCounts() }
+      }
+    } else if (breedSummary.animalCount > 0) {
+      // Settled by the following animal reorganization, which records only housed newborns.
+      state.nonHarvestBreedPlacement ??= {}
+      state.nonHarvestBreedPlacement[player.id] = {
+        newborns: { ...breedSummary.resources },
+        minimums: { ...placementMinimums },
+        animalCounts: animalCounts(),
       }
     }
     const buildReorgRequest = (): ActionExecutionResult => ({

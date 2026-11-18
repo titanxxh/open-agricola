@@ -1114,7 +1114,8 @@ export const buildLogPresentationPlan = (
       if (event.type === 'farm.animalBred') {
         const resources = positiveResources(event.animals)
         const isHarvest = event.source === 'harvest'
-        if (!isHarvest && Object.keys(resources).length === 0) return []
+        // A birth records only housed newborns; none housed leaves no row.
+        if (Object.keys(resources).length === 0) return []
         return presentationRows(event, [{
           key: isHarvest ? 'log.harvestBreedDetail'
             : event.sourceCardId ? 'log.animalBredFromSource' : 'log.animalBred',

@@ -3352,6 +3352,9 @@ export class GameCore {
     const advanced = context.nextRound > this.state.round
     this.state.round = context.nextRound
     if (advanced) advanceThroughTheSeasons(this.state)
+    // Each breeding is settled by the reorganization that follows it; never let
+    // an unsettled record outlive its round and keep blocking animal cooking.
+    if (advanced) delete this.state.nonHarvestBreedPlacement
     this.state.players.forEach((player) => {
       resetRoundPlacements(player)
       delete player._extraTurnSkipCountsByCard
