@@ -3,7 +3,7 @@ import { parseWebPushClick, WEB_PUSH_CLICK_MESSAGE, type WebPushClick } from '..
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { openInboxNotification } from '../services/inbox-notification'
-import { reconcileWebPushDevice, resolveWebPushClick, webPushEnabledBuild } from '../services/web-push'
+import { drainWebPushUnbinds, resolveWebPushClick, webPushEnabledBuild } from '../services/web-push'
 
 const localRoom = () => {
   const params = new URLSearchParams(window.location.search)
@@ -37,12 +37,11 @@ function EnabledWebPushClickRouter() {
   const accountId = user?.id ?? null
 
   useEffect(() => {
-    if (loading) return
-    const reconcile = () => { void reconcileWebPushDevice(accountId).catch(() => {}) }
-    reconcile()
-    window.addEventListener('online', reconcile)
-    return () => window.removeEventListener('online', reconcile)
-  }, [loading, accountId])
+    const retry = () => { void drainWebPushUnbinds() }
+    retry()
+    window.addEventListener('online', retry)
+    return () => window.removeEventListener('online', retry)
+  }, [])
 
   useEffect(() => {
     if (loading) return
@@ -57,8 +56,13 @@ function EnabledWebPushClickRouter() {
       const click = parseWebPushClick(event.data)
       if (!click) return
       const port = event.ports[0]
+      if (click.kind === 'bug-report-inbox' && 'probe' in event.data && event.data.probe === true) {
+        port.postMessage(true)
+        port.close()
+        return
+      }
       const activeRoom = localRoom()
-      if (click.kind === 'draft' && !activeRoom) { port.postMessage(false); return }
+      if (click.kind === 'draft' && !activeRoom) { port.postMessage(false); port.close(); return }
       void target(click, accountId, 1_500).then(result => {
         if (current.signal.aborted) { port.postMessage(false); return }
         if (click.kind === 'draft') {

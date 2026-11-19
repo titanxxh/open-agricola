@@ -391,6 +391,7 @@ const invalidationTimer = setInterval(() => {
 const sessionCleanupTimer = setInterval(async () => {
   try {
     await cleanExpiredSessions()
+    await pushStore.discardUnavailableDeliveries()
     await directory.cleanup()
     await new CommandStore(getDb()).cleanup()
     await wssCtx?.committer?.cleanupReplayAssets()

@@ -14,6 +14,10 @@ CREATE TABLE web_push_bindings (
 CREATE INDEX idx_web_push_bindings_user ON web_push_bindings(user_id);
 CREATE INDEX idx_web_push_bindings_session ON web_push_bindings(session_token);
 
+CREATE TABLE web_push_retired_devices (
+  device_id UUID PRIMARY KEY
+);
+
 CREATE TABLE web_push_events (
   id UUID PRIMARY KEY,
   kind TEXT NOT NULL CHECK (kind IN ('draft', 'bug-report-inbox')),
