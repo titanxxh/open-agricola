@@ -98,6 +98,7 @@ import {
   type WsStatus,
 } from './game-container-helpers'
 import type { WsErrorCode } from './ws-status'
+import { classicPoolMessage } from './classic-card-setup'
 import {
   collectPrivateEventNotifications,
   type PrivateEventNotification,
@@ -319,9 +320,9 @@ const useTransportSetup = (
         setRoomColorError(msg.code)
       } else if (msg.type === 'error' && !ws.connected) {
         if (roomId && (msg.code === 'context_changed' || msg.code === 'not_participant')) window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
-        if (msg.code !== 'command_pending') setWsStatus({ phase: 'error', message: msg.error, code: msg.code })
+        if (msg.code !== 'command_pending') setWsStatus({ phase: 'error', message: msg.error, code: msg.code, shortfall: msg.shortfall })
       } else if (msg.type === 'error' && !receivedRoom) {
-        setWsStatus({ phase: 'error', message: msg.error, code: msg.code })
+        setWsStatus({ phase: 'error', message: msg.error, code: msg.code, shortfall: msg.shortfall })
       }
     })
     const init = async () => {
@@ -1509,7 +1510,9 @@ export const GameContainerApi = () => {
         ? t(locale, 'platform.waitingForColorConfirmation', { player: getPlayerDisplayName(locale, colorConfirmingPlayer.name, colorConfirmingPlayer.playerIndex) })
         : t(locale, 'platform.waitingForPlayers')
       : wsStatus.phase === 'error'
-        ? wsStatus.message === 'gameTerminated'
+        ? wsStatus.shortfall
+          ? classicPoolMessage((key, params) => t(locale, key, params), wsStatus.shortfall)
+          : wsStatus.message === 'gameTerminated'
           ? t(locale, 'platform.gameEnd.terminated')
           : wsStatus.code === 'invalid_room_access'
           ? t(locale, 'platform.invalidRoomAccess')

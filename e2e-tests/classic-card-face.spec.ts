@@ -62,11 +62,11 @@ async function openClassicHotseatSetup(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Local Hotseat', exact: true }).click()
   await page.getByRole('radio', { name: 'Classic', exact: true }).check()
-  await expect(page.getByRole('group', { name: 'Classic Decks', exact: true })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Classic decks', exact: true })).toBeVisible()
 }
 
 async function selectAllEligibleDecks(page: Page) {
-  const decks = page.getByRole('group', { name: 'Classic Decks', exact: true })
+  const decks = page.getByRole('group', { name: 'Classic decks', exact: true })
   for (const checkbox of await decks.getByRole('checkbox').all()) {
     if (await checkbox.isEnabled()) await checkbox.check()
   }
@@ -80,7 +80,19 @@ test.describe('Classic Edition through the lobby', () => {
     await openClassicHotseatSetup(page)
     await selectAllEligibleDecks(page)
     await expect(page.getByRole('button', { name: 'Start Hotseat Game', exact: true })).toBeDisabled()
-    await expect(page.getByRole('status').filter({ hasText: /cannot fill 2 hands|select a classic deck with eligible cards/i })).toBeVisible()
+    const shortage = page.getByRole('status').filter({ hasText: /cannot fill 2 hands/ })
+    await expect(shortage).toBeVisible()
+    const expected = await shortage.innerText()
+    const eligible = selectableDecks.filter(deck => {
+      const pool = getEligibleClassicCardIds([deck], 2)
+      return pool.occupation.length + pool.minor.length > 0
+    })
+    const query = new URLSearchParams({
+      page: 'game', transport: 'ws', hotseat: '1', maxPlayers: '2', cardEdition: 'classic',
+      classicDeckIds: eligible.join(','),
+    })
+    await page.goto(`/?${query}`)
+    await expect(page.getByText(expected, { exact: true })).toBeVisible()
   })
 
   test('starts a Classic room and renders a complete Classic hand', async ({ page }) => {

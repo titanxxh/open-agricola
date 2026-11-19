@@ -72,7 +72,12 @@ export function useClassicDeckPool(
     decks,
     defaultDeckIds,
     selectedDeckIds,
-    shortfall: compareClassicPool(selectedDeckIds, setup.playerCount, classicCardsNeededPerType(setup), eligible),
+    shortfall: compareClassicPool(
+      selectedDeckIds.length > 0 ? selectedDeckIds : defaultDeckIds,
+      setup.playerCount,
+      classicCardsNeededPerType(setup),
+      eligible,
+    ),
   }
 }
 
@@ -82,7 +87,9 @@ export const classicPoolMessage = (t: Translate, shortfall: ClassicPoolShortfall
 export function classicDeckPoolNotice(t: Translate, pool: ClassicDeckPool): string | null {
   if (pool.status === 'loading') return t('platform.classicPoolLoading')
   if (pool.status === 'unavailable') return t('platform.classicPoolUnavailable')
-  if (pool.selectedDeckIds.length === 0) return t('platform.classicNoDeckSelected')
+  if (pool.selectedDeckIds.length === 0 && pool.decks.some(deck => deck.occupation + deck.minor > 0)) {
+    return t('platform.classicNoDeckSelected')
+  }
   return pool.shortfall && classicPoolMessage(t, pool.shortfall)
 }
 

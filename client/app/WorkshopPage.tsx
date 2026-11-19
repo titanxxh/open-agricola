@@ -1576,7 +1576,7 @@ export function WorkshopPage() {
     })
     if (!response.ok) {
       const result = await readSandboxStartResponse(response, t('platform.sandboxUnknownError'))
-      throw new Error(result.shortfall ? classicPoolMessage(t, result.shortfall) : result.error)
+      throw new Error(result.shortfall ? classicPoolMessage(t, result.shortfall) : result.error ?? t('platform.sandboxUnknownError'))
     }
     await loadSandboxData()
   }
