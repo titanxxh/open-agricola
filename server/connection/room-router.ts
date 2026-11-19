@@ -1868,7 +1868,10 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
         }
         if (result.kind === 'completed') {
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'completed', receipt: result.receipt, requestId: msg.requestId })
-          if (active?.outcome && !active.outcome.ok) sendCommandError(ctx, active.outcome.error ?? 'Command rejected', msg.requestId, active.outcome.code as CommandErrorCode | undefined, undefined)
+          if (active?.outcome && !active.outcome.ok) {
+            sendCommandError(ctx, active.outcome.error ?? 'Command rejected', msg.requestId,
+              active.outcome.code as CommandErrorCode | undefined, undefined, active.outcome.shortfall)
+          }
         } else {
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'pending', identity: { scopeId: request.scopeId, commandId: request.commandId }, requestId: msg.requestId })
         }

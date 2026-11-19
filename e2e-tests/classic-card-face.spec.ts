@@ -106,17 +106,34 @@ test.describe('Classic Edition through the lobby', () => {
 
     const cards = page.locator('.hand-cards .player-card-inner[data-id]')
     await expect(cards).toHaveCount(14)
-    const numbered = await cards.evaluateAll(elements => elements.map(card => ({
-      id: card.getAttribute('data-id'), number: card.querySelector('.card-numbering')?.textContent,
-      title: card.querySelector('.card-title')?.textContent,
-    })))
+    const numbered = await cards.evaluateAll(elements => elements.map(card => {
+      const number = card.querySelector('.card-numbering')
+      if (!number) throw new Error('Expected a number on the card face')
+      const text = document.createRange()
+      text.selectNodeContents(number)
+      return {
+        id: card.getAttribute('data-id'), number: number.textContent,
+        title: card.querySelector('.card-title')?.textContent,
+        numberWidth: number.getBoundingClientRect().width,
+        textWidth: text.getBoundingClientRect().width,
+      }
+    }))
     for (const card of numbered) {
       expect(card.id).toMatch(/^C[A-Z]+\d{3}_/)
       expect(card.number).toBe(card.id?.split('_')[0])
       expect(card.title).toBeTruthy()
+      expect(card.numberWidth).toBeGreaterThanOrEqual(card.textWidth)
     }
     const face = cards.first().locator('.card-icon')
     await face.scrollIntoViewIfNeeded()
-    await expect(face).toHaveCSS('background-image', /\/assets\/classic\/[A-Z]+\/C[A-Z]+\d{3}\.png/)
+    const path = await face.evaluate(async element => {
+      const source = getComputedStyle(element).backgroundImage.slice(5, -2)
+      const image = new Image()
+      image.src = source
+      await image.decode()
+      return source
+    })
+    expect(path).toMatch(/\/assets\/classic\/[A-Z]+\/C[A-Z]+\d{3}\.png/)
+    await cards.first().screenshot({ path: test.info().outputPath('classic-hand-card.png') })
   })
 })
