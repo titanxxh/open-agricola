@@ -157,7 +157,7 @@ test('a verified notification opens draft and inbox in the existing Pages game w
       await context.addCookies([otherCookie])
       const staleAccountTab = await context.newPage()
       await staleAccountTab.goto(`${site.origin}/?page=settings&bg=none`)
-      await expect(staleAccountTab.getByText(`${name}_other`, { exact: true })).toBeVisible()
+      await expect(staleAccountTab.getByRole('textbox', { name: 'Display Name', exact: true })).toHaveValue(`${name}_other`)
       await context.addCookies([cookie])
       await staleAccountTab.bringToFront()
       await expect.poll(() => worker.evaluate(async () =>
