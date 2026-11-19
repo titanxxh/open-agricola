@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState } from '../../contract/types'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C130_OutskirtsDirector'
@@ -60,7 +60,7 @@ const listener: CardListenerRegistration = {
         optional: true,
         children: [
           addResourceFlow,
-          ...(workersAvailable(context.state, context.player) > 0 ? [{
+          ...(peopleLeftToPlace(context.state, context.player, context.actionHooks) > 0 ? [{
             type: 'leaf' as const, actionId: 'place-farmer', optional: true, sourceCard: CARD_ID,
           }] : []),
         ],

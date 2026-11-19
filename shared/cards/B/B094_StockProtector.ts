@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B094_StockProtector'
@@ -25,7 +25,7 @@ const afterListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
-    if (workersAvailable(context.state, context.player) <= 0) return
+    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) return
     return {
       flow: { type: 'leaf', actionId: 'place-farmer', optional: true, promptKey: 'ui.interactionStockProtectorPlace' },
       sourceCard: CARD_ID,

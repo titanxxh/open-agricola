@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import { isCardFlagged } from '../helpers/card-state'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
@@ -17,9 +18,12 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (workersAvailable(context.state, context.player) <= 0) return
+    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) return
     const usedMarket = MARKET_SPACES.includes(context.space?.id ?? '')
-    const allowed = computeAllowedPlacementSpaces(context.state, context.player, { actionHooks: context.actionHooks, sourceCard: CARD_ID })
+    // With no family member left the second person is a Guest, whose own targets the placement checks.
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player, {
+      actionHooks: context.actionHooks, sourceCard: CARD_ID, ignoreWorkerAvailability: workersAvailable(context.state, context.player) === 0,
+    })
     const constraints = usedMarket
       ? allowed.map((placement) => placement.spaceId)
       : allowed

@@ -20,7 +20,10 @@ export type PlacementPerson = {
   enter: (space: ActionSpace) => string | undefined
   /** Runs once the person stands on the space; returns actionContext fields for the space's action. */
   placed?: () => Record<string, unknown> | undefined
-  /** The person, not the card that placed it, takes the space: the use carries no card source, as for a family member. */
+  /**
+   * The person, not the card that placed it, takes the space: the use carries no card
+   * source, as for a family member on an ordinary turn.
+   */
   ownsUse?: true
 }
 
@@ -71,14 +74,16 @@ const supplyPerson: PlacementPersonSource = ({ state, player, actionContext, sou
   }
 }
 
-const guestPerson: PlacementPersonSource = ({ state, player, actionContext }) => {
+const guestPerson: PlacementPersonSource = ({ state, player, actionContext, sourceCard }) => {
   const source = actionContext?.workerSource
   if (!source || typeof source !== 'object' || !('guestId' in source)) return
   const guest = findDispatchableGuest(state, player, source.guestId)
   if (!guest) return
   return {
     needsTarget: true,
-    ownsUse: true,
+    // Dispatched by rotation or by the card that granted it, the Guest takes its own turn.
+    // Sent by another card as that card's extra person, the use is that card's, as a family member's would be.
+    ...(sourceCard === undefined || sourceCard === guest.sourceCardId ? { ownsUse: true as const } : {}),
     allowsSpace: (space) => guestMayEnter(guest.where, space),
     enter: () => guest.id,
     placed: () => {

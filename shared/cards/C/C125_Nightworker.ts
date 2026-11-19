@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import { missingBuildingResourceSpaceIds } from '../../actions/helpers/missing-building-resource-spaces'
 
 const CARD_ID = 'C125_Nightworker'
@@ -28,8 +28,8 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeWork: (state, player): ActionFlow | undefined => {
-    if (workersAvailable(state, player) <= 0) return
+  onBeforeWork: (state, player, ctx): ActionFlow | undefined => {
+    if (peopleLeftToPlace(state, player, ctx?.actionHooks) <= 0) return
     // Building resource types the player has 0 of
     const missingTypes = BUILDING_RESOURCES.filter(
       (r) => (player.resources[r] ?? 0) === 0,

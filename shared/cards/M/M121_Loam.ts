@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { allImprovementCount } from './moor-batch1-helpers'
@@ -17,7 +17,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.moorAction?.actionId !== 'hiring-fair') return
     const player = context.ownerPlayer ?? context.player
-    if (context.state.roundPhase !== 'work' || workersAvailable(context.state, player) !== 1) return
+    if (context.state.roundPhase !== 'work' || peopleLeftToPlace(context.state, player, context.actionHooks) !== 1) return
     return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
   },
 }

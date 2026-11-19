@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C093_InnerDistrictsDirector'
@@ -46,7 +46,7 @@ const listener: CardListenerRegistration = {
 
     const addResourceFlow = addStoneToSpaceFlow(otherSpaceId)
 
-    if (workersAvailable(context.state, context.player) <= 0) {
+    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) {
       return {
         flow: {
           type: 'seq',

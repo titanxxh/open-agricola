@@ -456,6 +456,28 @@ describe('FoM special action listener minors', () => {
     expect(session.withCtx(() => meetsCardPrerequisites(noPrereq.player, M121_Loam, noPrereq.state.round, noPrereq.state))).toBe(false)
   })
 
+  it('M121 counts a pending Guest that a legal space awaits among the people left (#1896)', () => {
+    const { session, player } = setup()
+    player.minorPlayed.push('M121_Loam', 'A001_Shelter')
+    setWorkersAtHome(session.state, player, 1)
+    player.guests = [{ id: 'guest:1', sourceCardId: 'CG062_AnimalFarm', round: session.state.round }]
+    // One family member and the Guest are still to place: not "all but one".
+    let resp = takeSpecial(session, 'hiring-fair')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.clay).toBe(0)
+
+    // A Guest with no legal space is not a person left to place.
+    const stranded = setup()
+    stranded.player.minorPlayed.push('M121_Loam', 'A001_Shelter')
+    setWorkersAtHome(stranded.state, stranded.player, 1)
+    stranded.player.guests = [{
+      id: 'guest:1', sourceCardId: 'CG062_AnimalFarm', round: stranded.state.round, where: { kind: 'spaces', spaceIds: ['__nowhere__'] },
+    }]
+    resp = takeSpecial(stranded.session, 'hiring-fair')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.clay).toBe(1)
+  })
+
   it('M123 initializes player-count counters and stops after the quarry is empty', () => {
     const three = setup(3)
     three.player.minorHand = ['M123_StoneQuarry']

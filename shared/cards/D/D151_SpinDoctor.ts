@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { isSpaceOccupied } from '../../domain/space'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
@@ -16,7 +16,7 @@ const listener: CardListenerRegistration = {
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isTravelingPlayersSpaceId(context.space?.id)) return
-    if (workersAvailable(context.state, context.player) <= 0) return
+    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) return
     const constraints = context.state.actionSpaces
       .filter((space) => space.id !== 'meeting-place' || !isSpaceOccupied(space))
       .map((space) => space.id)

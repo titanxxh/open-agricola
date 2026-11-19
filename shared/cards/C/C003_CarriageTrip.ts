@@ -1,15 +1,18 @@
 import { defineMinorCard } from '../card-source'
 import { workersAvailable } from '../../domain/player'
+import { dispatchableGuests } from '../../domain/guests'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C003_CarriageTrip'
 
 const cardImpl = {
-  prerequisiteCheck: (player, state) => !!state && workersAvailable(state, player) > 0,
+  // A person left to place, a Guest of this round included.
+  prerequisiteCheck: (player, state) => !!state && (workersAvailable(state, player) > 0 || dispatchableGuests(state, player).length > 0),
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => {
-    if (workersAvailable(state, player) <= 0) return
+  onBuy: (state, player, _payment, ctx) => {
+    if (peopleLeftToPlace(state, player, ctx?.actionHooks) <= 0) return
     return {
       type: 'seq' as const,
       optional: true,

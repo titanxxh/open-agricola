@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D103_CanalBoatman'
@@ -15,7 +15,7 @@ const listener: CardListenerRegistration = {
   phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !TRIGGER_SPACE_IDS.has(context.space.id)) return
-    if (workersAvailable(context.state, context.player) <= 0) return
+    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) return
     if (context.player.resources.food < 1) return
 
     return {

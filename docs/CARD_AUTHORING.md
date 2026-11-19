@@ -181,6 +181,12 @@ Tests: `E160_KelpGatherer-session.test.ts` (with `confirmPlayerSwitch`) and `A13
 - **Animals:** `meta.animalHolder: true` with `effect.onComputeAnimalZones` adding a `card:<id>` zone (`B012_Stockyard`).
 - **Crops:** a Card Field (`B068_Beanfield`; [cards](architecture/cards.md#card-fields-and-the-logical-field-seam)).
 
+### 4.13 People left to place and "place another person"
+
+- **People left, last person, all people placed:** read `peopleLeftToPlace()` from `actions/guest-turns.ts`, never `workersAvailable()` alone: a pending Guest is a person left to place (`E131_MarketMaster`, `M057_Taps`).
+- **"Place another person":** gate on `peopleLeftToPlace() > 0` and return a `place-farmer` leaf with the card as `sourceCard`, or `spend-worker` for a person on the card. The placement itself offers a family member or a pending Guest (`C042_RavenousHunger`, `D103_CanalBoatman`). Constraints computed with `computeAllowedPlacementSpaces` pass `ignoreWorkerAvailability` when no family member is left.
+- Test: `guest-mixed-edition-session.test.ts`.
+
 ## 5. Session tests
 
 Every card test covers at least one **positive** scenario, where the effect fires and changes state, and one **negative** scenario, where it must not fire: the card is not in play, another player triggers it, the player declines, or the cost cannot be paid. [CARD_TEST_TEMPLATE](CARD_TEST_TEMPLATE.md) lists what to record and assert.
