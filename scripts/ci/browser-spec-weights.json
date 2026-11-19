@@ -117,6 +117,7 @@
   "e2e-tests/standard-solo-ui.spec.ts": 33,
   "e2e-tests/touch-card-play.spec.ts": 15,
   "e2e-tests/visual-support-regression.spec.ts": 1,
+  "e2e-tests/web-push.spec.ts": 47,
   "e2e-tests/wechat-community.spec.ts": 39,
   "e2e-tests/whats-new.spec.ts": 9,
   "e2e-tests/workshop-app-live.spec.ts": 1,

@@ -123,8 +123,8 @@ describe('Bug Report feedback', () => {
       release.resolve()
       await deletion
     }
-    const inbox = await service.listInbox('reporter')
     expect(await outcome).toEqual({ message: expect.objectContaining({ kind: 'needs_info', id: expect.any(Number) }) })
+    const inbox = await service.listInbox('reporter')
     expect(inbox.messages.map(message => message.kind)).toEqual(['needs_info'])
     expect(await recipient.store.claimDue(['bug-report-inbox'])).toBeNull()
   })
