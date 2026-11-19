@@ -1,7 +1,7 @@
 {
  "format": 1,
  "unit": "seconds",
- "source": "mean of two two-lane chromium measurements on GitHub candidate rehearsal (ubuntu-latest, 4 vCPU, one runner per task, VERIFY_PARALLEL_LANES=2) with the timing reporter of #1935, 2026-11-20: run 44788183554 (main 288740710, previous table) and run 44790870965 (this table's first version); per lane, seconds from a spec's first test start to the next spec's first test start in its Playwright JSON report (the last spec runs to the report's end), averaged per spec and rounded up; public-asset-worker keeps run 44788183554 alone because its beforeAll timed out in run 44790870965; app-shell-worker is a local two-test estimate (one Pages build) until the next measurement; prerelease-session added from its unloaded single-worker local run, 247 seconds rounded up",
+ "source": "mean of two two-lane chromium measurements on GitHub candidate rehearsal (ubuntu-latest, 4 vCPU, one runner per task, VERIFY_PARALLEL_LANES=2) with the timing reporter of #1935, 2026-11-20: run 44788183554 (main 288740710, previous table) and run 44790870965 (this table's first version); per lane, seconds from a spec's first test start to the next spec's first test start in its Playwright JSON report (the last spec runs to the report's end), averaged per spec and rounded up; public-asset-worker keeps run 44788183554 alone because its beforeAll timed out in run 44790870965; app-shell-worker is a local two-test estimate (one Pages build) until the next measurement; prerelease-session from a single-lane prerelease harness profile of 4873a74e (2026-11-19): its lane total less the other files at the measured 1.10 load factor, 155 seconds rounded up",
  "files": {
   "e2e-tests/D180_PartTimeWorker.spec.ts": 7,
   "e2e-tests/E148_Lazybones.spec.ts": 5,
@@ -90,7 +90,7 @@
   "e2e-tests/platform.spec.ts": 54,
   "e2e-tests/played-card-chronology.spec.ts": 5,
   "e2e-tests/prerelease-owner-verification.spec.ts": 3,
-  "e2e-tests/prerelease-session.spec.ts": 247,
+  "e2e-tests/prerelease-session.spec.ts": 155,
   "e2e-tests/public-asset-worker.spec.ts": 89,
   "e2e-tests/release-diagnostics.spec.ts": 1,
   "e2e-tests/release-rehearsal.spec.ts": 17,
