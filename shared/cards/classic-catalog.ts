@@ -5,8 +5,8 @@ type ClassicCardDefinition = (typeof classicCardDefinitions)[number]
 const byId = new Map<string, ClassicCardDefinition>(classicCardDefinitions.map(card => [card.id, card]))
 
 /**
- * Runtime-only classic Card Definitions. The ordinary catalog, deal pool, encyclopedia and client manifest never
- * include them; callers that reach classic cards by exact ID (dev draw / play) read their kind here.
+ * Runtime-only classic Card Definitions. The ordinary catalog, deal pool and encyclopedia never include them (the
+ * client manifest does, for display); callers that reach classic cards by exact ID (dev draw / play) read their kind here.
  */
 export const getClassicCardDefinition = (id: string): ClassicCardDefinition | undefined => byId.get(id)
 

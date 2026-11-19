@@ -2,8 +2,9 @@
 /**
  * Build cards manifest for lazy loading.
  *
- * Scans shared/cards/{A,B,C,D,E,M,major,community}/*.ts plus dev/test stubs in
- * shared/cards/__stubs__/*.ts and extracts meta fields from Card Source files.
+ * Scans shared/cards/{A,B,C,D,E,M,major,community}/*.ts, the classic decks in
+ * shared/cards/classic/<deck>/*.ts, plus dev/test stubs in shared/cards/__stubs__/*.ts
+ * and extracts meta fields from Card Source files.
  *
  * Output: public/cards-manifest.json
  */
@@ -511,12 +512,17 @@ export function buildCardsManifest(cardsRoot: string): CardsManifest {
       }
     }
   }
+  const cardSourcesOnly = { includeLegacyConstructors: false, includeMajorLiterals: false, includeCardSources: true }
   for (const deck of decks) {
-    scanDir(path.join(repoRoot, 'shared', 'cards', deck), {
-      includeLegacyConstructors: false,
-      includeMajorLiterals: false,
-      includeCardSources: true,
-    })
+    scanDir(path.join(repoRoot, 'shared', 'cards', deck), cardSourcesOnly)
+  }
+  // Ported classic cards always ship, so classic faces render wherever a game holds them (ADR 0049).
+  const classicRoot = path.join(repoRoot, 'shared', 'cards', 'classic')
+  const classicDecks = fs.existsSync(classicRoot)
+    ? fs.readdirSync(classicRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
+    : []
+  for (const deck of classicDecks) {
+    scanDir(path.join(classicRoot, deck), cardSourcesOnly)
   }
   for (const deck of decks) {
     scanDir(path.join(cardsRoot, deck))
