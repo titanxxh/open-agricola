@@ -138,28 +138,44 @@ describe('canonical architecture verification wiring', () => {
   it('installs both engines in browser catalog lanes and declared inline browser checks', () => {
     const candidate = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-rehearsal.yml'), 'utf8')
     const routine = fs.readFileSync(path.join(repoRoot, '.github/workflows/scoped-verification.yml'), 'utf8')
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/ci/install-browser-system-packages.sh'), 'utf8')
 
     expect(candidate).toContain("if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'")
-    expect(candidate).toContain('pnpm exec playwright install-deps chromium webkit firefox')
+    expect(candidate).toContain('bash "$GITHUB_WORKSPACE/candidate/scripts/ci/install-browser-system-packages.sh" "$APT_ARCHIVES"')
+    expect(script).toContain('engines=(chromium webkit firefox)')
+    expect(script).toContain('deps=(pnpm exec playwright install-deps "${engines[@]}")')
     expect(candidate).toContain('run: node candidate/scripts/ci/candidate-isolation.ts browsers')
-    expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: pnpm exec playwright install --with-deps chromium webkit firefox")
+    expect(routine).toContain('bash scripts/ci/install-browser-system-packages.sh "$APT_ARCHIVES"\n          pnpm exec playwright install chromium webkit firefox')
   })
 
-  it('installs trusted browser system packages from a restored apt archive and saves it only on a miss', () => {
-    for (const file of ['candidate-verification.yml', 'prerelease-candidate-verification.yml', 'candidate-rehearsal.yml']) {
+  it('installs browser system packages from a restored apt archive and saves it only on a miss', () => {
+    const lanes = [
+      ['candidate-verification.yml', 'trusted browser system packages', 'Install trusted browser prerequisites', 'Prepare candidate isolation'],
+      ['prerelease-candidate-verification.yml', 'trusted browser system packages', 'Install trusted browser prerequisites', 'Prepare candidate isolation'],
+      ['candidate-rehearsal.yml', 'trusted browser system packages', 'Install trusted browser prerequisites', 'Prepare candidate isolation'],
+      ['scoped-verification.yml', 'browser system packages', 'Install both browser engines for explicit embedded launches', 'Checkout pinned public assets'],
+    ] as const
+    for (const [file, packages, installName, next] of lanes) {
       const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', file), 'utf8')
       const at = (name: string) => workflow.indexOf(`name: ${name}\n`)
-      const steps = ['Key trusted browser system packages', 'Restore trusted browser system packages', 'Install trusted browser prerequisites',
-        'Save trusted browser system packages', 'Prepare candidate isolation'].map(at)
+      const steps = [`Key ${packages}`, `Restore ${packages}`, installName, `Save ${packages}`, next].map(at)
       expect(steps.every((index, i) => index > (steps[i - 1] ?? 0)), file).toBe(true)
       expect(workflow.slice(steps[1], steps[2]), file).toContain('uses: actions/cache/restore@v6')
       expect(workflow.slice(steps[3], steps[4]), file).toContain("&& steps.browser-packages.outputs.cache-hit != 'true'\n        uses: actions/cache/save@v6")
       const install = workflow.slice(steps[2], steps[3])
       expect(install, file).toContain('APT_ARCHIVES: ${{ runner.temp }}/browser-system-packages')
-      expect(install.indexOf('Dir::Cache::archives'), file).toBeGreaterThan(-1)
-      expect(install.indexOf('Dir::Cache::archives'), file).toBeLessThan(install.indexOf('pnpm exec playwright install-deps'))
-      expect(install.indexOf('sudo rm -rf /etc/apt/apt.conf.d/90-browser-system-packages'), file).toBeGreaterThan(install.indexOf('pnpm exec playwright install-deps'))
+      expect(install, file).toMatch(/bash \S*scripts\/ci\/install-browser-system-packages\.sh"? "\$APT_ARCHIVES"/)
+      expect(install, file).not.toContain('--with-deps')
     }
+    // The cache directory is configured before Playwright's apt commands and removed on every exit; the
+    // time-limited download-only pass precedes the real install.
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/ci/install-browser-system-packages.sh'), 'utf8')
+    const at = (text: string) => script.indexOf(text)
+    expect(at('trap cleanup EXIT')).toBeGreaterThan(-1)
+    expect(at('Dir::Cache::archives')).toBeLessThan(at('if ! download "$first_limit"'))
+    expect(at('timeout --kill-after=15 "$limit" "${deps[@]}"')).toBeGreaterThan(-1)
+    expect(at('if ! download "$first_limit"')).toBeLessThan(script.lastIndexOf('"${deps[@]}"'))
+    expect(script).toMatch(/cleanup\(\) \{\n {2}sudo rm -rf "\$conf" "\$download_only"/)
   })
 
   it('serves pinned public assets to every browser task instead of GitHub Pages', () => {

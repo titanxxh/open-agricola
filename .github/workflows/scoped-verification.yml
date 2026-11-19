@@ -54,9 +54,36 @@ jobs:
       - run: corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Key browser system packages
+        id: browser-packages-key
+        if: startsWith(inputs.partition, 'browser-')
+        run: |
+          playwright=$(grep -m1 -oE '^  playwright@[0-9][^:(]*' pnpm-lock.yaml | cut -d@ -f2)
+          [ -n "$playwright" ] || { echo 'pnpm-lock.yaml names no playwright version' >&2; exit 1; }
+          prefix="browser-system-packages-v1-$(. /etc/os-release && echo "$ID-$VERSION_ID")-$(uname -m)-"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "key=$prefix$playwright" >> "$GITHUB_OUTPUT"
+      - name: Restore browser system packages
+        id: browser-packages
+        if: startsWith(inputs.partition, 'browser-')
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/browser-system-packages
+          key: ${{ steps.browser-packages-key.outputs.key }}
+          restore-keys: ${{ steps.browser-packages-key.outputs.prefix }}
       - name: Install both browser engines for explicit embedded launches
         if: startsWith(inputs.partition, 'browser-')
-        run: pnpm exec playwright install --with-deps chromium webkit firefox
+        env:
+          APT_ARCHIVES: ${{ runner.temp }}/browser-system-packages
+        run: |
+          bash scripts/ci/install-browser-system-packages.sh "$APT_ARCHIVES"
+          pnpm exec playwright install chromium webkit firefox
+      - name: Save browser system packages
+        if: startsWith(inputs.partition, 'browser-') && steps.browser-packages.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/browser-system-packages
+          key: ${{ steps.browser-packages-key.outputs.key }}
       - name: Checkout pinned public assets
         id: public-assets
         if: startsWith(inputs.partition, 'browser-')
