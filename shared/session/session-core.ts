@@ -1828,23 +1828,20 @@ export class GameCore {
     const animals = animalKeysForState(this.state)
     const before = this.state.players.map(player => animals.map(animal => player.resources[animal] ?? 0))
     const result = run()
-    const acquired = new Set<string>()
     if (frame) {
       const pending = new Set(frame.animalAcquisitions)
       for (const [index, player] of this.state.players.entries()) {
         const previous = before[index]
         if (!previous) continue
-        if (animals.some((animal, offset) => (player.resources[animal] ?? 0) > (previous[offset] ?? 0))) {
-          acquired.add(player.id)
-        }
-        if (acquired.has(player.id) || pending.has(player.id)) {
+        const acquired = animals.some((animal, offset) => (player.resources[animal] ?? 0) > (previous[offset] ?? 0))
+        if (acquired || pending.has(player.id)) {
           if (this.hasPendingAnimals(player)) pending.add(player.id)
           else pending.delete(player.id)
         }
       }
       frame.animalAcquisitions = pending.size > 0 ? [...pending] : undefined
     }
-    return { result, acquired }
+    return result
   }
 
   private takeAnimalAcquisition(frame: EngineFrame, playerId: string): boolean {
@@ -3827,8 +3824,9 @@ export class GameCore {
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
       if (!frameOwnerPlayer || !player) return
+      const animalCountBefore = this.getAnimalCount(player)
       this.syncDynamicActionSpaces()
-      const { result: step, acquired } = this.trackAnimalAcquisitions(frame,
+      const step = this.trackAnimalAcquisitions(frame,
         () => frame.engine.proceed(this.buildEngineExecutionContext(player, space)))
       this.flushEngineLog()
 
@@ -4048,7 +4046,7 @@ export class GameCore {
             if (auto?.disabled === true) return
             const resolvedActionId = this.peekHostPendingActionId()
             const resolvedSourceCard = this.peekPendingSourceCard()
-            const { result, acquired } = this.trackAnimalAcquisitions(frame, () => frame.engine.resolveChoice(
+            const result = this.trackAnimalAcquisitions(frame, () => frame.engine.resolveChoice(
               auto.value,
               this.buildEngineExecutionContext(player, space),
             ))
@@ -4090,7 +4088,7 @@ export class GameCore {
               this.turnOwnerPlayerIndex = null
               return
             }
-            if (acquired.has(player.id) && frame.animalAcquisitions?.includes(player.id) && frame.reason !== 'reorganize' &&
+            if (this.getAnimalCount(player) > animalCountBefore &&
               !(result.type === 'ok' && result.internalChildren?.afterHostListeners?.some((child) => child.actionId === 'reorganize'))) {
               const pIdx = effectivePlayerIndex
               frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
@@ -4144,7 +4142,7 @@ export class GameCore {
       // sub-flow. An `animal-reorg` request (last-harvest enforcement without
       // newborns) is handled in the `step.type === 'choice'` block above.
 
-      if (acquired.has(player.id) && frame.animalAcquisitions?.includes(player.id) && frame.reason !== 'reorganize' &&
+      if (this.getAnimalCount(player) > animalCountBefore &&
         !(step.type === 'ok' && step.result.type === 'ok' &&
           step.result.internalChildren?.afterHostListeners?.some((child) => child.actionId === 'reorganize'))) {
         const pIdx = effectivePlayerIndex
@@ -4423,7 +4421,7 @@ export class GameCore {
       this.pushHistory(false, frame?.undoBoundaryOnResolve === true)
     }
     const engine = this.engine
-    const { result } = this.trackAnimalAcquisitions(frame, () => engine.resolveChoice(
+    const result = this.trackAnimalAcquisitions(frame, () => engine.resolveChoice(
       value,
       this.buildEngineExecutionContext(player, space),
       payload,
