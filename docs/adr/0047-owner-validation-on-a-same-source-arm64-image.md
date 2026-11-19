@@ -1,6 +1,6 @@
 # 47. Owner validation on a same-source arm64 image
 
-- Status: Accepted
+- Status: Accepted (isolated-vm removed by ADR 0052)
 - Date: 2026-11-18
 
 ## Context

@@ -1,6 +1,6 @@
 # 14. Durable Room Commit is the publish seam
 
-- Status: Accepted (process and storage shape updated by ADR 0022)
+- Status: Accepted (process and storage shape updated by ADR 0022; executable Workshop Rooms removed by ADR 0052)
 - Date: 2026-07-27
 
 ## Context

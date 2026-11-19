@@ -1,6 +1,6 @@
 # 10. Completed replays are public shared records with erasure tombstones
 
-- Status: Accepted
+- Status: Accepted (Workshop lines superseded by ADR 0052)
 - Date: 2026-07-26
 
 ## Context

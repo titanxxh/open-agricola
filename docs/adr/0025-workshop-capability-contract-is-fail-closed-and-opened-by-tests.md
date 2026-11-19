@@ -1,6 +1,6 @@
 # 25. Workshop Capability Contract is fail-closed and opened by fixed tests
 
-- Status: Accepted
+- Status: Superseded by [ADR 0052](0052-workshop-code-runs-only-in-the-browser.md)
 - Date: 2026-10-10
 
 ## Context
