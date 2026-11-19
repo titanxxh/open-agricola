@@ -2,18 +2,23 @@
 
 import { parseWebPushClick, WEB_PUSH_CLICK_MESSAGE, type WebPushClick } from '../../shared/contract/web-push'
 
-const acceptsClick = (client: WindowClient, click: WebPushClick, probe = false): Promise<boolean> => new Promise(resolve => {
+type ClickReply = 'handled' | 'exact' | 'generic' | 'none'
+
+const askWindow = (client: WindowClient, click: WebPushClick, probe = false): Promise<ClickReply> => new Promise(resolve => {
   const channel = new MessageChannel()
-  const complete = (handled: boolean) => {
+  const complete = (result: ClickReply) => {
     clearTimeout(timer)
     channel.port1.close()
-    resolve(handled)
+    resolve(result)
   }
-  const timer = setTimeout(() => complete(false), probe ? 650 : 2_000)
-  channel.port1.onmessage = event => complete(event.data === true)
+  const timer = setTimeout(() => complete('none'), 2_000)
+  channel.port1.onmessage = event => {
+    const result: unknown = event.data
+    complete(result === true ? 'handled' : result === 'exact' || result === 'generic' ? result : 'none')
+  }
   try {
     client.postMessage({ ...click, probe, type: WEB_PUSH_CLICK_MESSAGE }, [channel.port2])
-  } catch { complete(false) }
+  } catch { complete('none') }
 })
 
 async function clickNotification(scope: ServiceWorkerGlobalScope, click: WebPushClick): Promise<void> {
@@ -23,14 +28,14 @@ async function clickNotification(scope: ServiceWorkerGlobalScope, click: WebPush
       && url.origin === scope.location.origin && (url.pathname === '/' || url.pathname === '/index.html')
   })
   if (click.kind === 'draft') {
-    const actions = await Promise.all(candidates.map(async client => await acceptsClick(client, click) ? client : null))
+    const actions = await Promise.all(candidates.map(async client => await askWindow(client, click) === 'handled' ? client : null))
     const existing = actions.find(client => client !== null)
     if (existing && await existing.focus().catch(() => null)) return
   } else {
-    const ready = await Promise.all(candidates.map(async client => await acceptsClick(client, click, true) ? client : null))
-    const existing = ready.find(client => client !== null)
-    if (existing && await acceptsClick(existing, click)) {
-      await existing.focus().catch(() => null)
+    const ready = await Promise.all(candidates.map(async client => ({ client, result: await askWindow(client, click, true) })))
+    const existing = ready.find(reply => reply.result === 'exact') ?? ready.find(reply => reply.result === 'generic')
+    if (existing) {
+      if (await askWindow(existing.client, click) === 'handled') await existing.client.focus().catch(() => null)
       return
     }
   }

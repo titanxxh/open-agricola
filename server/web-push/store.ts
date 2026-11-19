@@ -11,6 +11,7 @@ import { RoomHistoryStore } from '../game/persistence/room-history-store'
 
 const HOUR_MS = 60 * 60 * 1_000
 const CLAIM_MS = 30_000
+const DEVICES_PER_LOGIN = 8
 
 type DraftPushEvent = { kind: 'draft'; userId: string; roomId: string; seat: number; opportunityKey: string; stepNo: number; createdAt: number }
 export type WebPushEvent = DraftPushEvent | { kind: 'bug-report-inbox'; userId: string; messageId: number; createdAt: number }
@@ -95,20 +96,35 @@ export class WebPushStore {
     await this.db.transaction(async () => {
       await this.lockDevice(deviceId)
       await this.db.prepare(`
-        WITH retired AS (DELETE FROM web_push_bindings WHERE device_id=? RETURNING device_id)
-        INSERT INTO web_push_retired_devices(device_id) SELECT device_id FROM retired ON CONFLICT DO NOTHING
-      `).run(deviceId)
+        WITH revoked_binding AS (DELETE FROM web_push_bindings WHERE device_id=@deviceId RETURNING device_id),
+          revoked_reservation AS (DELETE FROM web_push_device_reservations WHERE device_id=@deviceId RETURNING device_id)
+        INSERT INTO web_push_retired_devices(device_id,retired_at)
+        SELECT device_id,@now::bigint FROM revoked_binding UNION SELECT device_id,@now::bigint FROM revoked_reservation
+        ON CONFLICT DO NOTHING
+      `).run({ deviceId, now: this.now() })
     })()
   }
 
-  async preferences(sessionToken: string, deviceId: string, endpoint: string | null, expectedUserId?: string) {
+  async preferences(sessionToken: string, deviceId: string, endpoint: string | null, expectedUserId?: string, canReserve = true) {
     return this.db.transaction(async () => {
-      const session = await getSessionByToken(sessionToken, { db: this.db, now: this.now(), lock: 'share' })
+      const session = await getSessionByToken(sessionToken, { db: this.db, now: this.now(), lock: 'update' })
       if (!session || (expectedUserId !== undefined && session.user.id !== expectedUserId)) return null
       await this.lockDevice(deviceId)
       await this.db.prepare(`DELETE FROM web_push_bindings WHERE device_id=?
         AND (session_token<>? OR endpoint IS DISTINCT FROM ?)`).run(deviceId, sessionToken, endpoint)
-      return preference(await this.binding(sessionToken, deviceId))
+      const binding = await this.binding(sessionToken, deviceId)
+      if (canReserve && !await this.isRetired(deviceId)) {
+        // Reserve the capability under an authenticated login before opening the browser permission prompt.
+        const reservation = await this.db.prepare(`
+          INSERT INTO web_push_device_reservations(session_token,device_id)
+          SELECT @sessionToken,@deviceId
+          WHERE EXISTS (SELECT 1 FROM web_push_device_reservations WHERE session_token=@sessionToken AND device_id=@deviceId)
+            OR (SELECT count(*) FROM web_push_device_reservations WHERE session_token=@sessionToken) < @limit
+          ON CONFLICT(device_id) DO UPDATE SET session_token=excluded.session_token
+        `).run({ sessionToken, deviceId, limit: DEVICES_PER_LOGIN })
+        if (!binding && reservation.changes !== 1) return null
+      }
+      return preference(binding)
     })()
   }
 
@@ -120,7 +136,7 @@ export class WebPushStore {
       const session = await getSessionByToken(sessionToken, { db: this.db, now: this.now(), lock: 'share' })
       if (!session || session.user.id !== currentSession.user.id) return null
       await this.lockDevice(options.deviceId)
-      if (await this.db.prepare('SELECT 1 FROM web_push_retired_devices WHERE device_id=?').get(options.deviceId)) return null
+      if (await this.isRetired(options.deviceId)) return null
       const endpoint = options.subscription?.endpoint ?? null
       const keys = options.subscription?.keys
       await this.db.prepare(`DELETE FROM web_push_bindings WHERE device_id=?
@@ -128,6 +144,8 @@ export class WebPushStore {
       const current = await this.binding(sessionToken, options.deviceId)
       if (!current && (!options.enabled || !endpoint || !keys)) return emptyWebPushPreferences()
       if (!current && endpoint && keys) {
+        if (!await this.db.prepare('SELECT 1 FROM web_push_device_reservations WHERE session_token=? AND device_id=?')
+          .get(sessionToken, options.deviceId)) return null
         // A live endpoint may only belong to one browser device binding. An
         // endpoint owned by a different device cannot be moved by a preference write.
         const inserted = await this.db.prepare(`
@@ -155,6 +173,10 @@ export class WebPushStore {
       }
       return preference(updated)
     })()
+  }
+
+  private isRetired(deviceId: string) {
+    return this.db.prepare('SELECT 1 FROM web_push_retired_devices WHERE device_id=?').get(deviceId)
   }
 
   private lockDevice(deviceId: string) {
@@ -217,11 +239,13 @@ export class WebPushStore {
   }
 
   async discardUnavailableDeliveries() {
+    const now = this.now()
+    await this.db.prepare('DELETE FROM web_push_retired_devices WHERE retired_at<?').run(now - HOUR_MS)
     await this.db.prepare(`
       UPDATE web_push_deliveries d SET status='discarded',claim_token=NULL,claim_until=0
       FROM web_push_events e WHERE d.event_id=e.id AND d.status='pending'
         AND (d.binding_id IS NULL OR e.expires_at<=?)
-    `).run(this.now())
+    `).run(now)
   }
 
   async expireBinding(bindingId: string) {

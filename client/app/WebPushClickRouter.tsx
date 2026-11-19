@@ -56,17 +56,15 @@ function EnabledWebPushClickRouter() {
       const click = parseWebPushClick(event.data)
       if (!click) return
       const port = event.ports[0]
-      if (click.kind === 'bug-report-inbox' && 'probe' in event.data && event.data.probe === true) {
-        port.postMessage(true)
-        port.close()
-        return
-      }
+      const probe = click.kind === 'bug-report-inbox' && 'probe' in event.data && event.data.probe === true
       const activeRoom = localRoom()
       if (click.kind === 'draft' && !activeRoom) { port.postMessage(false); port.close(); return }
       void target(click, accountId, 1_500).then(result => {
         if (current.signal.aborted) { port.postMessage(false); return }
         if (click.kind === 'draft') {
           port.postMessage(result.kind === 'draft' && result.roomId === activeRoom && localRoom() === activeRoom)
+        } else if (probe) {
+          port.postMessage(result.kind === 'bug-report-inbox' ? 'exact' : 'generic')
         } else {
           openInboxNotification({ userId: accountId, messageId: result.kind === 'bug-report-inbox' ? result.messageId : null })
           port.postMessage(true)

@@ -15,6 +15,7 @@ export async function createInboxPushLogin(
   const store = new WebPushStore(db, now)
   await db.prepare('INSERT INTO sessions(token,user_id,expires_at,created_at,auth_policy_version) VALUES(?,?,?,?,?)')
     .run(token, userId, now() + 2 * 86_400_000, now(), BROWSER_AUTH_VERSION)
+  await store.preferences(token, deviceId, null)
   await store.bind(token, { deviceId, locale: 'en', kind, enabled: true,
     subscription: { endpoint, keys: { p256dh: 'A'.repeat(87), auth: 'A'.repeat(22) } } })
   return { endpoint, store, token }
