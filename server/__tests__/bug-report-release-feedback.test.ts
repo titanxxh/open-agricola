@@ -7,6 +7,8 @@ import { PostgresDatabase } from '../database/postgres'
 import { BugReportFeedbackService } from '../bug-report/feedback-service'
 import { GitHubFixVerifier } from '../bug-report/github-fix-verifier'
 import type { DeploymentProof } from '../bug-report/deployment-proof'
+import { WebPushDelivery } from '../web-push/delivery'
+import { createInboxPushLogin } from './_helpers/inbox-push'
 
 let db: PostgresDatabase
 let service: BugReportFeedbackService
@@ -127,6 +129,26 @@ describe('verified production fix feedback', () => {
     expect((await service.getReport(1465)).version).toBe(2)
     expect((await service.listInbox('reporter')).messages.filter(entry => entry.kind === 'fix_released')).toHaveLength(1)
   })
+  it('pushes one formal release message despite another deployment and reconciliation', async () => {
+    const now = () => 3000
+    const { store, token } = await createInboxPushLogin(db, now, 'reporter')
+    await service.associateFix('admin', fix)
+    await service.recordVerifiedDeployment('deployment-with-push', proof)
+    await service.recordVerifiedDeployment('second-deployment-with-push', { ...proof, observedAt: 2100 })
+    await service.reconcileVerifiedFixes('recheck-release-with-push')
+    const sent: string[] = []
+    const delivery = new WebPushDelivery(store, async ({ deliveryId }) => {
+      sent.push(deliveryId)
+      return { kind: 'accepted' }
+    }, now)
+    await delivery.deliverDue(['bug-report-inbox'])
+    expect(sent).toHaveLength(1)
+    const { messages } = await service.listInbox('reporter')
+    expect(messages.map(message => message.kind)).toEqual(['fix_released', 'confirmed_bug'])
+    expect(await store.resolveClick(token, sent[0], 'bug-report-inbox'))
+      .toEqual({ kind: 'bug-report-inbox', messageId: messages[0].id })
+  })
+
   it('reconciles late fixes and duplicate links against saved production proof', async () => {
     await service.recordVerifiedDeployment('deployment-before-fix', proof)
     expect((await service.listInbox('reporter')).messages.map(entry => entry.kind)).toEqual(['confirmed_bug'])
