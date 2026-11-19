@@ -78,7 +78,7 @@
   "e2e-tests/moor-completion-window.spec.ts": 14,
   "e2e-tests/moor-granted-lifecycle.spec.ts": 9,
   "e2e-tests/oauth-onboarding.spec.ts": 27,
-  "e2e-tests/offline-encyclopedia.spec.ts": 8,
+  "e2e-tests/offline-encyclopedia.spec.ts": 12,
   "e2e-tests/occupation-preview.spec.ts": 26,
   "e2e-tests/online-interaction-completion.spec.ts": 5,
   "e2e-tests/operations-dashboard.spec.ts": 52,
