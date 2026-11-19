@@ -18,6 +18,22 @@ describe('buildCardsManifest', () => {
     expect(getMinorImprovementCard('M060_SowingMachine')?.vp).toBe(1)
   })
 
+  it('includes every ported classic card under its classic deck, beside the revised cards', () => {
+    const cardsRoot = path.resolve(__dirname, '../../shared/cards')
+    const manifest = buildCardsManifest(cardsRoot)
+    const classicRoot = path.join(cardsRoot, 'classic')
+    const classicSources = fs.readdirSync(classicRoot).flatMap((deck) =>
+      fs.readdirSync(path.join(classicRoot, deck)).map((file) => ({ deck, id: file.replace(/\.ts$/, '') })))
+    expect(classicSources.length).toBeGreaterThan(0)
+    for (const { deck, id } of classicSources) {
+      expect(manifest[id]?.meta.deck, id).toBe(deck)
+      expect(manifest[id]?.module, id).toBe(`shared/cards/classic/${deck}/${id}`)
+    }
+    expect(manifest['CE203_Shepherd']?.meta).toMatchObject({ deck: 'CE', number: 203, type: 'occupation', players: '4+' })
+    expect(manifest['CI097_Slaughterhouse']?.meta).toMatchObject({ deck: 'CI', number: 97, type: 'minor', cost: { stone: 2, clay: 2 }, vp: 2 })
+    expect(manifest['E097_Beneficiary']?.meta).toMatchObject({ deck: 'E', number: 97 })
+  })
+
   it('extracts meta from a single Occupation card', () => {
     const manifest = buildCardsManifest(fixturesRoot)
     expect(manifest['A999_TestCard']).toBeDefined()

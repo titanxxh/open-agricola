@@ -47,7 +47,7 @@
 - `services/oauth-onboarding.ts` 在当前标签页的 `sessionStorage` 保存浏览器 verifier 与回调票据，从浏览器历史移除票据 fragment，并在刷新、可修正的表单校验错误后保留凭证。`LoginPage` 在跳转授权前准备 challenge；HTTP 局域网等缺少 Web Crypto 的环境保留 Cookie 导航路径，并在持久缓存恢复的 `pageshow` 事件中重置导航状态；`OnboardingPage` 在成功或凭证终止错误时清理凭证，并提供重新注册入口。站点会话仍使用 HttpOnly Cookie。浏览器测试分别验证 ITP 下的账号创建与 CHIPS 会话能力；Linux WPE 不能替代实体 iPhone 的会话验收。
 - `gameTransport.ts`（`WsGameTransport`）在服务层持有 WebSocket。它按标签页记录未确认的命令，隔离旧 socket 回调，重连期间暂停输入，查询回执，等待完整的过滤后快照，并只以原身份重试仍然有效的输入。
 - `services/room-creation.ts` 使用新的已认证连接和独立的待确认命令记录创建房间。恢复时沿用原创建身份，收到持久回执和新房快照后才导航；来源重开失败时保留旧结果和完整的配置调整信息。大厅与两处完成入口共用这条链路。
-- `card-meta.ts` 加载构建固定身份的卡牌元数据；标准 `public/cards-manifest.json` 仍保留为生成的工具产物。`rehydrate.ts` rehydrate 快照时不导入 `shared/actions` 或卡牌目录。
+- `card-meta.ts` 加载构建固定身份的卡牌元数据，包含已移植的旧版卡，其卡面显示带 `C` 前缀的编号（[cards](cards_zh.md)）；标准 `public/cards-manifest.json` 仍保留为生成的工具产物。`rehydrate.ts` rehydrate 快照时不导入 `shared/actions` 或卡牌目录。
 - `card-encyclopedia.ts` 在首次使用时加载并校验百科文件的哈希，从不在启动时加载；加载失败时下次调用重试（[cards](cards_zh.md)）。
 - `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。
 - 候场消息提供权威座位颜色与连接状态；`WaitingRoomPlayers` 显示所有座位及空位，断线玩家保留姓名和座位并标为离线。其选色器提供六种颜色，禁用其他玩家已占用的颜色，并等待服务端发布保存后的选择。
@@ -69,7 +69,7 @@
 
 多个目标与人数版本在同一个可滚动浮层中分项展示，并标明名称与适用人数。尚未揭示的轮次行动格仅展示公开的印刷内容，不透露本局揭示顺序。图片缺失时仍展示名称、人数和当前语言规则。无效引用目标由官方内容构建检查拦截，工坊预览向作者报错。
 
-引用目标按英文原文含义确定，独立于译文名称。普通规则动作不会因为与行动格同名而成为行动格引用。BGA 的 `__文字__` 标记表达强调，仅凭该标记不能确定引用目标。官方文字明确记录引用目标；工坊作者可使用同一机制，未标记文字保留现有展示。 `CardDescriptionText` 启用 `ResourceText` 的引用交互，普通资源文字只显示引用名称。`ActionTextReference` 使用原生 popover；位于弹窗中时，浮层也挂在该弹窗内。`GameContainerApi` 与 `ReplayBoard` 提供人数上下文。`scripts/build-action-references.ts` 在目录构建时投影印刷规则并校验官方引用目标；`client/services/action-references.ts` 在首次查看时加载该静态文件。测试见 `e2e-tests/card-action-references.spec.ts`、`client/components/common/__tests__/ActionTextReference.test.tsx` 与 `scripts/__tests__/build-action-references.test.ts`。
+引用目标按英文原文含义确定，独立于译文名称。普通规则动作不会因为与行动格同名而成为行动格引用。BGA 的 `__文字__` 标记表达强调，仅凭该标记不能确定引用目标。官方文字明确记录引用目标；工坊作者可使用同一机制，未标记文字保留现有展示。 `CardDescriptionText` 启用 `ResourceText` 的引用交互，普通资源文字只显示引用名称。`ActionTextReference` 使用原生 popover；位于弹窗中时，浮层也挂在该弹窗内。`GameContainerApi` 与 `ReplayBoard` 提供人数上下文。`scripts/build-action-references.ts` 在目录构建时投影印刷规则并校验官方引用目标；`client/services/action-references.ts` 在首次查看时加载该静态文件。测试见 `card-action-references.spec.ts`、`ActionTextReference.test.tsx` 与 `build-action-references.test.ts`。
 
 ### 现有视图
 
