@@ -9,6 +9,7 @@ import type { MoorSpecialActionId } from '../../moor/types'
 import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 import type { SoloHandMode } from '../game-creation'
 import type { SoloHandSelectionSubmission } from '../solo-hand-selection'
+import type { CardEdition, ClassicAdmissionErrorCode } from '../card-edition'
 
 import type { GameEndProposal } from './game-termination'
 
@@ -69,6 +70,13 @@ type ClientCommandBody =
       allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
       /** When true, enable the Snake Opening game variant. Default false. */
       enableSnakeOpening?: boolean
+      /**
+       * Card Edition (ADR 0049). Absent or `'revised'` deals revised cards; `'classic'` is admitted only while the
+       * classic switch is on and deals only eligible cards of `classicDeckIds`.
+       */
+      cardEdition?: CardEdition
+      /** Chosen Classic Decks (`CE`, `CI`, …); normalized, with the default decks when none is left. Classic only. */
+      classicDeckIds?: string[]
       /** Optional simultaneous card-draft. Absent / 'none' keeps classic hand-deal behaviour. */
       draftMode?: DraftMode
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */
@@ -118,7 +126,7 @@ export type ServerEvent =
   | {
       type: 'error'
       error: string
-      code?: RoomColorErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
+      code?: RoomColorErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | ClassicAdmissionErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }

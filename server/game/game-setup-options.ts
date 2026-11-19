@@ -1,6 +1,7 @@
 import type { InitialStateOptions } from '../../shared/session/state-constants.ts'
 import type { SoloCreationConfiguration, SoloHandMode } from '../../shared/contract/game-creation'
 import { isMoorBalanceRulesEnabled } from '../../shared/contract/game-variants'
+import { parseCardEditionChoice, type CardEditionChoice } from '../../shared/session/card-edition-admission'
 
 export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
@@ -10,7 +11,7 @@ export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: numb
  * Both surfaces offer the same lobby panel, so they must agree on how the raw
  * payload maps onto `InitialStateOptions`.
  */
-export type GameSetupRequest = {
+export type GameSetupRequest = CardEditionChoice & {
   playerCount: number
   soloHandMode?: SoloHandMode
   enableCommunityDeck: boolean
@@ -54,6 +55,7 @@ export const parseGameSetupRequest = (
 ): GameSetupRequest => {
   assertSupportedGameConfiguration(raw)
   return {
+    ...parseCardEditionChoice(raw),
     playerCount: clampPlayerCount(raw.maxPlayers ?? raw.playerCount),
     ...(clampPlayerCount(raw.maxPlayers ?? raw.playerCount) === 1
       ? { soloHandMode: raw.soloHandMode === 'choose-7' ? 'choose-7' : 'random' } : {}),
@@ -72,6 +74,7 @@ export const parseGameSetupRequest = (
 
 export const buildInitialStateOptions = (request: GameSetupRequest): InitialStateOptions => ({
   playerCount: request.playerCount,
+  ...(request.cardEdition === 'classic' ? { cardEdition: 'classic', classicDeckIds: request.classicDeckIds } : {}),
   ...(request.soloHandMode ? { soloHandMode: request.soloHandMode } : {}),
   enableCommunityDeck: request.enableCommunityDeck,
   enableParentCards: request.enableParentCards,
