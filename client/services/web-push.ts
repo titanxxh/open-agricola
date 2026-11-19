@@ -39,7 +39,8 @@ function fetchWebPush(path: string, body: unknown, signal = AbortSignal.timeout(
   })
 }
 
-async function drainUnbinds(): Promise<void> {
+export async function drainWebPushUnbinds(): Promise<void> {
+  if (!webPushEnabledBuild) return
   for (const deviceId of pendingUnbinds()) {
     try {
       const response = await fetchWebPush(WEB_PUSH_UNBIND_PATH, { deviceId })
@@ -56,28 +57,33 @@ export async function findWebPushRegistration(): Promise<ServiceWorkerRegistrati
   return registration?.active?.scriptURL === scriptUrl ? registration : null
 }
 
-export async function reconcileWebPushDevice(userId: string | null): Promise<void> {
+export async function reconcileWebPushDevice(
+  userId: string | null,
+  options: { unsubscribe?: boolean; onlyUserId?: string } = {},
+): Promise<void> {
   if (!webPushEnabledBuild) return
   const binding = currentDevice()
-  if (binding && binding.userId !== userId) {
+  if (binding && binding.userId !== userId && (!options.onlyUserId || binding.userId === options.onlyUserId)) {
     localStorage.setItem(PENDING_UNBIND, JSON.stringify([...new Set([...pendingUnbinds(), binding.deviceId])]))
     localStorage.removeItem(DEVICE)
-    // A browser may still have the old cookie while it is offline. Remove the
-    // local subscription before relying on any server response.
-    const registration = await findWebPushRegistration().catch(() => null)
-    const subscription = await registration?.pushManager.getSubscription().catch(() => null)
-    await subscription?.unsubscribe().catch(() => false)
+    if (options.unsubscribe) {
+      // Explicit sign-out tries local unsubscribe even if there is no network.
+      const registration = await findWebPushRegistration().catch(() => null)
+      const subscription = await registration?.pushManager.getSubscription().catch(() => null)
+      if (!currentDevice()) await subscription?.unsubscribe().catch(() => false)
+    }
   }
-  await drainUnbinds()
+  await drainWebPushUnbinds()
 }
 
-async function deviceFor(userId: string): Promise<LocalBinding> {
-  await reconcileWebPushDevice(userId)
-  const existing = currentDevice()
-  if (existing?.userId === userId) return existing
-  const value = { deviceId: crypto.randomUUID(), userId }
-  localStorage.setItem(DEVICE, JSON.stringify(value))
-  return value
+/** Ignore a session response issued before a different tab changed this browser's device. */
+export function captureWebPushAccountReconciliation(): (userId: string | null) => void {
+  const initial = webPushEnabledBuild ? currentDevice()?.deviceId : undefined
+  return userId => {
+    if (webPushEnabledBuild && currentDevice()?.deviceId === initial) {
+      void reconcileWebPushDevice(userId).catch(() => {})
+    }
+  }
 }
 
 const isPreferences = (value: unknown): value is WebPushPreferences =>
@@ -95,9 +101,20 @@ async function readStatus(response: Response): Promise<WebPushStatus> {
 }
 
 export async function getWebPushStatus(registration: ServiceWorkerRegistration, userId: string): Promise<WebPushStatus> {
-  const binding = await deviceFor(userId)
+  await drainWebPushUnbinds()
+  const current = currentDevice()
+  if (current && current.userId !== userId) throw new Error('Notification account changed')
+  const device = current ?? { deviceId: crypto.randomUUID(), userId }
   const subscription = await registration.pushManager.getSubscription()
-  return readStatus(await fetchWebPush(WEB_PUSH_DEVICE_PATH, { operation: 'status', accountId: userId, deviceId: binding.deviceId, endpoint: subscription?.endpoint ?? null }))
+  const status = await readStatus(await fetchWebPush(WEB_PUSH_DEVICE_PATH, {
+    operation: 'status', accountId: userId, deviceId: device.deviceId, endpoint: subscription?.endpoint ?? null,
+  }))
+  const latest = currentDevice()
+  if (latest?.deviceId === device.deviceId) return status
+  if (current || (latest && latest.userId !== userId)) throw new Error('Notification account changed')
+  if (latest) return getWebPushStatus(registration, userId)
+  if (status.allowed.draft || status.allowed['bug-report-inbox']) localStorage.setItem(DEVICE, JSON.stringify(device))
+  return status
 }
 
 function applicationServerKey(value: string) {

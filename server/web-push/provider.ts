@@ -80,7 +80,7 @@ export function createPushProvider(vapid: Vapid, request = fetch, now = Date.now
         Authorization: authorization.authorization, TTL: String(ttl), Urgency: 'normal', Topic: deliveryId.replaceAll('-', ''),
       },
     })
-    await result.body?.cancel()
+    await result.body?.cancel().catch(() => {})
     if (result.ok) return { kind: 'accepted' }
     if (result.status === 404 || result.status === 410) return { kind: 'expired' }
     if (result.status === 408 || result.status === 429 || result.status >= 500) {

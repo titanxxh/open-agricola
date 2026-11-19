@@ -55,12 +55,15 @@ export async function enqueueWebPush(db: PostgresDatabase, event: WebPushEvent):
   const draft = event.kind === 'draft' ? event : undefined
   const inboxId = event.kind === 'bug-report-inbox' ? event.messageId : null
   const sourceKey = draft ? `${draft.roomId}:${draft.seat}:${draft.stepNo}` : String(inboxId)
+  // Account deletion locks the User before cascading through sessions and bindings.
+  if (!await db.prepare('SELECT id FROM users WHERE id=? FOR KEY SHARE').get(event.userId)) return
   await db.prepare(`
     WITH eligible AS (
       SELECT b.id FROM web_push_bindings b JOIN sessions s ON s.token=b.session_token AND s.user_id=b.user_id
       WHERE b.user_id=@userId AND s.expires_at>@createdAt AND s.auth_policy_version=@authVersion
         AND CASE WHEN @kind='draft' THEN b.draft_enabled ELSE b.inbox_enabled END
         AND NOT EXISTS (SELECT 1 FROM account_deletion_requests a WHERE a.user_id=b.user_id)
+      FOR KEY SHARE OF b
     ), inserted AS (
       INSERT INTO web_push_events(id,kind,source_key,user_id,room_id,seat,opportunity_key,inbox_id,created_at,expires_at)
       SELECT @id,@kind,@sourceKey,@userId,@roomId,@seat,@opportunityKey,@inboxId,@createdAt,@expiresAt
@@ -89,7 +92,13 @@ export class WebPushStore {
 
   /** deviceId is a random browser-local unbind capability. Never return or log it. */
   async unbind(deviceId: string) {
-    await this.db.prepare('DELETE FROM web_push_bindings WHERE device_id=?').run(deviceId)
+    await this.db.transaction(async () => {
+      await this.lockDevice(deviceId)
+      await this.db.prepare(`
+        WITH retired AS (DELETE FROM web_push_bindings WHERE device_id=? RETURNING device_id)
+        INSERT INTO web_push_retired_devices(device_id) SELECT device_id FROM retired ON CONFLICT DO NOTHING
+      `).run(deviceId)
+    })()
   }
 
   async preferences(sessionToken: string, deviceId: string, endpoint: string | null, expectedUserId?: string) {
@@ -105,9 +114,13 @@ export class WebPushStore {
 
   async bind(sessionToken: string, options: DeviceOptions) {
     return this.db.transaction(async () => {
+      const currentSession = await getSessionByToken(sessionToken, { db: this.db, now: this.now() })
+      if (!currentSession || (options.expectedUserId !== undefined && currentSession.user.id !== options.expectedUserId)) return null
+      if (!await this.db.prepare('SELECT id FROM users WHERE id=? FOR KEY SHARE').get(currentSession.user.id)) return null
       const session = await getSessionByToken(sessionToken, { db: this.db, now: this.now(), lock: 'share' })
-      if (!session || (options.expectedUserId !== undefined && session.user.id !== options.expectedUserId)) return null
+      if (!session || session.user.id !== currentSession.user.id) return null
       await this.lockDevice(options.deviceId)
+      if (await this.db.prepare('SELECT 1 FROM web_push_retired_devices WHERE device_id=?').get(options.deviceId)) return null
       const endpoint = options.subscription?.endpoint ?? null
       const keys = options.subscription?.keys
       await this.db.prepare(`DELETE FROM web_push_bindings WHERE device_id=?
@@ -201,6 +214,14 @@ export class WebPushStore {
       WHERE id=? AND claim_token=?
     `).run(typeof result === 'string' ? result : 'pending',
       typeof result === 'string' ? 0 : result.retryAt, claim.deliveryId, claim.claimToken)
+  }
+
+  async discardUnavailableDeliveries() {
+    await this.db.prepare(`
+      UPDATE web_push_deliveries d SET status='discarded',claim_token=NULL,claim_until=0
+      FROM web_push_events e WHERE d.event_id=e.id AND d.status='pending'
+        AND (d.binding_id IS NULL OR e.expires_at<=?)
+    `).run(this.now())
   }
 
   async expireBinding(bindingId: string) {

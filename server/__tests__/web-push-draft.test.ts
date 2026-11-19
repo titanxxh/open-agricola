@@ -197,3 +197,17 @@ it('does not deliver any notification from a rolled back Room transaction', asyn
   expect(sent).toEqual([])
   expect(await persistence.load(room.id)).toBeNull()
 })
+
+it('does not revive a retired device if an old account still has a session', async () => {
+  const deviceId = await subscribe(SESSION[0]!, 'shared-browser')
+  await store.unbind(deviceId)
+  const options = { deviceId, subscription: option('fcm.googleapis.com', 'shared-browser'), locale: 'en',
+    kind: 'draft', enabled: true } as const
+  expect(await store.bind(SESSION[0]!, options)).toBeNull()
+  expect(await store.preferences(SESSION[1]!, deviceId, options.subscription.endpoint)).toEqual({
+    draft: false, 'bug-report-inbox': false,
+  })
+  expect(await store.bind(SESSION[1]!, { ...options, deviceId: randomUUID() })).toEqual({
+    draft: true, 'bug-report-inbox': false,
+  })
+})
