@@ -27,7 +27,7 @@ function WorkshopGame() {
     const { percent, labelKey } = getGameLoadProgress('auth')
     return <GameLoadScreen percent={percent} label={t(labelKey)} />
   }
-  return user ? <GameContainerApi /> : <StandaloneLink />
+  return user ? <GameContainerApi workshopSandbox /> : <StandaloneLink />
 }
 
 export async function initializeWorkshopGame(root: HTMLElement): Promise<void> {

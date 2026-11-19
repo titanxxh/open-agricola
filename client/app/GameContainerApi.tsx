@@ -388,7 +388,7 @@ const getIsMobileViewport = () =>
 // Ends the transport reaches on purpose; any other uncoded error is a connection that could not be made.
 const FINAL_ROOM_MESSAGES = new Set(['gameTerminated', 'roomDissolved', 'roomTerminatedCardTakedown', 'spectatingEnded', 'Transport destroyed'])
 
-export const GameContainerApi = () => {
+export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?: boolean }) => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
   const roomId = roomIdFromQuery(window.location.search)
@@ -903,9 +903,16 @@ export const GameContainerApi = () => {
   }, [interaction, runInteractionSubmitCommand, transport, isInteractive])
   const resetGame = useCallback(() => {
     if (!canResetGame) return
-    const seed = resetSeedInput ? Number(resetSeedInput) : undefined
-    void transport.newGame(Number.isFinite(seed) ? seed : undefined).catch((e) => console.error(e))
-  }, [transport, canResetGame, resetSeedInput])
+    const parsed = resetSeedInput ? Number(resetSeedInput) : undefined
+    const seed = Number.isFinite(parsed) ? parsed : undefined
+    if (workshopSandbox && transport === httpTransportSingleton) {
+      void httpTransportSingleton.resetSandbox(seed).catch(error => {
+        window.alert(error instanceof Error ? error.message : String(error))
+      })
+      return
+    }
+    void transport.newGame(seed).catch((e) => console.error(e))
+  }, [transport, canResetGame, resetSeedInput, workshopSandbox])
 
   const pendingEngineBlocked =
     interactionPresentationPlan.kind === 'engine-blocked'

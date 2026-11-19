@@ -101,6 +101,30 @@ it('declares capability on HTTP snapshots, commands, fence quotes and validation
   } finally { vi.unstubAllGlobals(); vi.resetModules() }
 })
 
+it('resets the active HTTP sandbox by instance without emitting rejected snapshots', async () => {
+  const payload = { ...buildPayload(3), gameInstanceId: 'sandbox-instance' }
+  const request = vi.fn(async (url: string, init?: RequestInit) => {
+    void init
+    return { json: async () => url.endsWith('/reset-sandbox')
+      ? { ok: false, code: 'classic_edition_disabled', error: 'Classic card games are not available' }
+      : payload }
+  })
+  vi.stubGlobal('window', { location: { hostname: 'localhost' } })
+  vi.stubGlobal('fetch', request)
+  try {
+    const { HttpGameTransport } = await import('../gameTransport')
+    const transport = new HttpGameTransport()
+    const onSnapshot = vi.fn()
+    transport.onSnapshot(onSnapshot)
+    await transport.getState()
+    await expect(transport.resetSandbox(93)).rejects.toMatchObject({ code: 'classic_edition_disabled' })
+    const [url, init] = request.mock.calls[1]!
+    expect(url).toMatch(/\/api\/game\/reset-sandbox$/)
+    expect(JSON.parse(String(init?.body))).toEqual({ gameInstanceId: 'sandbox-instance', seed: 93 })
+    expect(onSnapshot).toHaveBeenCalledExactlyOnceWith(payload)
+  } finally { vi.unstubAllGlobals(); vi.resetModules() }
+})
+
 describe('WsGameTransport request correlation', () => {
   beforeEach(() => {
     FakeWebSocket.instances = []
