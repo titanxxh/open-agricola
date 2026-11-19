@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LOCAL_SANDBOX_STATUS, buildLocalGameConfig, parseLocalSandboxStatus, pinnedVersionToLocalCard } from '../workshop-launch.ts'
+import { LOCAL_SANDBOX_STATUS, buildLocalGameConfig, createSandboxStatusReporter, parseLocalSandboxStatus, pinnedVersionToLocalCard, type LocalSandboxStatus } from '../workshop-launch.ts'
 
 const settings = {
   player_count: 3, deck_ids: ['A'], enable_through_the_seasons: false, enable_farmers_of_the_moor: false,
@@ -38,5 +38,26 @@ describe('Workshop browser sandbox launch', () => {
       { type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId: 'l', instanceId: 'a', cardWarnings: [1] },
       { type: LOCAL_SANDBOX_STATUS, kind: 'failed', launchId: 'l', instanceId: 'a' },
     ]) expect(parseLocalSandboxStatus(value)).toBeNull()
+  })
+
+  it('keeps a timeout recovery on every later status of the launch', () => {
+    const posted: LocalSandboxStatus[] = []
+    const status = createSandboxStatusReporter('launch-1', message => posted.push(message))
+    status.snapshot([])
+    status.snapshot(['hook warning'])
+    // Recovery restores an earlier, error-free snapshot before reporting the timeout.
+    status.snapshot([])
+    status.recovered('local sandbox timed out')
+    status.snapshot([])
+    status.setInstance('resumed')
+    status.failed('boom')
+    expect(posted.map(message => message.kind === 'running' ? message.cardWarnings : message.error)).toEqual([
+      [], ['hook warning'], [],
+      ['Card code stopped responding and the sandbox rolled back one step: local sandbox timed out'],
+      ['Card code stopped responding and the sandbox rolled back one step: local sandbox timed out'],
+      'boom',
+    ])
+    expect(posted.every(message => message.launchId === 'launch-1')).toBe(true)
+    expect(posted.at(-1)?.instanceId).toBe('resumed')
   })
 })

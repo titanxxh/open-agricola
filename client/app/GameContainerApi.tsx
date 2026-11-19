@@ -27,7 +27,7 @@ import { assertSupportedSetupQuery, isHotseatSetupQuery, parseDraftParamsFromQue
 import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { HotseatHandoff } from './HotseatHandoff'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
-import { LOCAL_SANDBOX_STATUS, readLocalSandboxConfig, type LocalSandboxStatus } from '../local-sandbox/workshop-launch'
+import { createSandboxStatusReporter, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
@@ -182,22 +182,21 @@ const useTransportSetup = (
     }
     const store = openLocalGameStore(ownerKey)
     const saver = createDebouncedSaver(store)
+    // The Workshop parent accepts statuses of its current launch and binds a pinned
+    // playtest to the game actually running, which a resumed save replaces.
+    const sandboxStatus = createSandboxStatusReporter(config.instanceId ?? '', message => {
+      if (window.parent !== window) window.parent.postMessage(message, window.location.origin)
+    })
     const transport = new LocalGameTransport(config, {
       viewer: { visiblePlayerIds: [], mode: 'debug' },
       onPersist: saver.push,
-      onRecovered: () => { window.alert(t(locale, 'platform.localSandboxTimeout')) },
+      onRecovered: ({ error }) => {
+        sandboxStatus.recovered(error)
+        window.alert(t(locale, 'platform.localSandboxTimeout'))
+      },
     })
     window.addEventListener('pagehide', () => { void saver.flush() })
-    // The Workshop parent accepts statuses of its current launch and binds a pinned
-    // playtest to the game actually running, which a resumed save replaces.
-    const launchId = config.instanceId ?? ''
-    let runningInstanceId = launchId
-    const postStatus = (status: LocalSandboxStatus) => {
-      if (window.parent !== window) window.parent.postMessage(status, window.location.origin)
-    }
-    transport.onSnapshot(payload => postStatus({
-      type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId, instanceId: runningInstanceId, cardWarnings: payload.cardWarnings ?? [],
-    }))
+    transport.onSnapshot(payload => sandboxStatus.snapshot(payload.cardWarnings))
 
     // An explicit restart skips the resume prompt.
     const forceFresh = new URLSearchParams(window.location.search).get('freshSandbox') === '1'
@@ -214,10 +213,10 @@ const useTransportSetup = (
         const persisted = forceFresh ? null : await loadResumable(store)
         if (persisted && window.confirm(t(locale, 'platform.localSandboxResume'))) {
           try {
-            runningInstanceId = persisted.config.instanceId ?? ''
+            sandboxStatus.setInstance(persisted.config.instanceId ?? '')
             await transport.startFromPersisted(persisted)
           } catch {
-            runningInstanceId = config.instanceId ?? ''
+            sandboxStatus.setInstance(config.instanceId ?? '')
             await transport.start()
           }
         } else {
@@ -230,7 +229,7 @@ const useTransportSetup = (
       } catch (err) {
         console.error('[local-sandbox] failed to start:', err)
         const error = err instanceof Error ? err.message : String(err)
-        postStatus({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', launchId, instanceId: runningInstanceId, error })
+        sandboxStatus.failed(error)
         window.alert(error)
       }
     }
