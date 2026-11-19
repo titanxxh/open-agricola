@@ -54,6 +54,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - 服务端与沙盒只注册自定义卡的运行时部分；主客户端只注册展示 metadata，从不导入自定义运行时注册表。
 
 - 旧版卡牌源码放在 `classic/{deck}/`；牌组前缀在原牌组前加 `C`，卡牌 ID 使用三位卡号。运行时生成器自动发现所有直属 `classic/*` 目录，并拒绝标记 `implemented: false` 的旧版源码，因此已移植与已实现的旧版卡是同一批；这些源码暂不进入普通发牌目录，由独立的接入变更启用。其卡牌定义生成到 `classic-catalog.generated.ts`（`classic-catalog.ts`）。按精确 ID 的查询（`getMinorImprovementCard` / `getOccupationCard` 及建立在其上的打出、费用、前置条件、类型、计分、dev 抽牌 / 打出）在 catalog 之后找到它们；修订版枚举（catalog 列表、发牌池、百科）永不包含它们。前端卡牌清单始终包含它们，并保留旧版 `deck`、卡牌类型和 `players`，因此对局中的旧版卡都能显示卡面。`officialCardDisplayNumber` 在印刷编号中保留带 `C` 前缀的牌组，旧版卡面不显示修订版牌组徽标，dev 的“牌组 + 编号”简写（`dev-card-id.ts`）也接受旧版代号。见 [ADR 0049](../adr/0049-classic-card-edition-behind-a-switch.md)；测试：`classic-card-lookups-session.test.ts`、`build-cards-manifest.test.ts`、`card-display-number.test.ts`、`classic-card-face.spec.ts`。
+- 旧版牌组（Classic Deck）在 `classic-catalog.ts` 中查询。`getSelectableClassicDeckIds()` 列出至少有一张已移植卡的牌组；`getDefaultClassicDeckIds()` 返回 CE、CI、CK 中有卡者，三者都没有时返回全部可选牌组。`normalizeClassicDeckIds()` 按沙盒牌组的方式去空格、大写、过滤、去重，为空时回落到默认。`getEligibleClassicCardIds(decks, playerCount)` 返回旧版对局发放和计数的卡：所选牌组中已实现、且 `players` 限制允许该人数的卡。`withClassicCardDefinitions(definitions, run)` 是测试 seam，在 `run` 执行期间用给定定义替换已移植定义，作用于查询、牌组和卡池。测试：`shared/cards/__tests__/classic-decks.test.ts`。
 
 ## `cardStates` 中的局部状态
 
