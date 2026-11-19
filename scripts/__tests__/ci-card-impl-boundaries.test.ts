@@ -71,10 +71,15 @@ describe('canonical architecture verification wiring', () => {
   })
 
   it('uses one automatic PR/main verifier without scheduled full or duplicate preview workflows', () => {
-    const workflows = fs.readdirSync(path.join(repoRoot, '.github/workflows')).filter(file => file.endsWith('.yml'))
+    const workflows = fs.readdirSync(path.join(repoRoot, '.github/workflows')).filter(file => /\.ya?ml$/.test(file))
       .map(file => ({ file, source: fs.readFileSync(path.join(repoRoot, '.github/workflows', file), 'utf8') }))
-    expect(workflows.filter(workflow => /^ {2}(?:pull_request|push):/m.test(workflow.source)).map(workflow => workflow.file).sort())
-      .toEqual(['ci.yml'])
+    const workflowsTriggeredBy = (event: RegExp) => workflows.filter(({ source }) => event.test(source)).map(({ file }) => file).sort()
+    expect(workflowsTriggeredBy(/^ {2}pull_request:/m)).toEqual(['ci.yml'])
+    expect(workflowsTriggeredBy(/^ {2}push:/m)).toEqual(['ci.yml', 'prerelease-runtime.yml'])
+    const runtime = workflows.find(({ file }) => file === 'prerelease-runtime.yml')
+    expect(runtime?.source.match(/^on:\n(?: {2}[^\n]*\n)+/m)?.[0]).toBe(
+      "on:\n  workflow_dispatch:\n  push:\n    branches: [main]\n    paths: ['deploy/prerelease-runtime/**']\n",
+    )
     expect(workflows.some(workflow => /^ {2}schedule:/m.test(workflow.source))).toBe(false)
     expect(workflows.some(workflow => /runs-on:.*self-hosted/.test(workflow.source))).toBe(false)
     for (const retired of ['ci-full.yml', 'e2e.yml', 'verification-plan.yml']) {
