@@ -1,3 +1,4 @@
+import { BASE_SOW_AMOUNT } from '../../domain/sow-amount'
 import { addFarmyardSpaceState, commitFarmOperation } from '../../domain/farm-operations'
 import { defineMinorCard } from '../card-source'
 import { fieldOperationFlow } from '../../actions/plans/field-operation'
@@ -83,7 +84,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onComputeSowableFields: (player) => availableExtraFields(player),
-    onSowExtraField: (player, tile, crop) => {
+    onSowExtraField: (player, tile, crop, amount) => {
       if (crop !== 'grain' && crop !== 'vegetable') return false
       const key = positionKey(tile)
       if (getUsedFarmyardTileKeys(player).has(key)) return false
@@ -95,7 +96,7 @@ const cardImpl = {
         spaceKey: key,
         sourceCardId: CARD_ID,
         kind: 'non-field-crop-space',
-        crop: { kind: crop, remaining: crop === 'grain' ? 3 : 2 },
+        crop: { kind: crop, remaining: amount ?? BASE_SOW_AMOUNT[crop] },
       })
       return true
     },

@@ -123,6 +123,24 @@ describe('Interaction Bar Presentation', () => {
     })
   })
 
+  it('names the prompted card in the trigger subtitle and lets an empty bonus selection confirm', () => {
+    const input = baseInput()
+    input.pending.choice = {
+      promptKey: 'ui.interactionSelection',
+      promptParams: { minSelections: 0, maxSelections: 1, triggerCardId: 'B126_Carpenter' },
+      options: [{ value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' }],
+      playerIndex: 0,
+      spaceId: 'grain-utilization',
+      sourceCard: 'E026_Sundial',
+    }
+
+    const model = buildInteractionBarModel(input)
+    expect(model.choice?.triggerSubtitle).toEqual({
+      key: 'ui.interactionTriggeredByCard', params: { card: 'Carpenter' },
+    })
+    expect(model.choice?.visibleOptions.find((option) => option.option.value === 'confirm')?.disabled).toBe(false)
+  })
+
   it('builds a compact model and action set for rendering', () => {
     const confirmHeating = vi.fn()
     const input = baseInput()

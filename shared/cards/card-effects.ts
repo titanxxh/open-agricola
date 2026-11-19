@@ -28,6 +28,27 @@ export type ExtraSowableField = {
 
 export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]
 
+/** One sown target: a farmyard field, a Card Field slot, or another card's extra crop space. */
+export type SowTarget =
+  | { kind: 'farmyard'; row: number; col: number }
+  | { kind: 'card-field'; row: number; col: number; cardId: string; slot: number }
+  | { kind: 'extra'; row: number; col: number; cardId: string }
+
+export type SowAmountContext = {
+  state: GameState
+  player: PlayerState
+  crop: ExtraSowableCrop
+  target: SowTarget
+  /** Every target of this Sow, e.g. for "exactly 1 field" conditions. */
+  selections: readonly { row: number; col: number; crop: ExtraSowableCrop }[]
+  /** Card that granted this Sow, for modifiers limited to one granted Sow. */
+  sourceCard?: string
+  actionContext?: Record<string, unknown>
+}
+
+/** `optional` deltas are chosen by the player per target before placement; fixed deltas always apply. */
+export type SowAmountModifier = { delta: number; optional?: boolean }
+
 /**
  * Lightweight meeple shape consumed by `getInvalidAnimals`. Our model
  * aggregates animals as `(animalType, animalCount)` per zone; per-meeple
@@ -148,6 +169,7 @@ export type CardEffectField = CardEffectHook
   | 'computeBreedThreshold' | 'computeBreedableAnimalCount' | 'computeBreedOffspringCount'
   | 'computeAnimalScoreAdjustment'
   | 'onComputeAnimalZones' | 'onComputeSharedAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
+  | 'modifySowAmount'
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
   | 'getSpecialStablePositions' | 'applySpecialStable' | 'getBuiltSpecialStables'
@@ -340,8 +362,15 @@ export type CardEffect = {
   ) => Meeple[]
   /** Return extra sowable tiles (e.g. pasture tiles that can be sown). */
   onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
-  /** Handle sowing into an extra field returned by onComputeSowableFields. */
-  onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
+  /** Handle sowing into an extra field returned by onComputeSowableFields.
+   *  `amount` is the final good count from the Sow amount modifiers; absent means the base amount. */
+  onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop, amount?: number) => boolean
+  /**
+   * Adjust how many goods this player's Sow places on one sown target.
+   * Called once per target before anything is placed; `optional` deltas are offered to the player.
+   * See `shared/actions/helpers/sow-amount.ts`.
+   */
+  modifySowAmount?: (context: SowAmountContext) => SowAmountModifier | undefined
   /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
   computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
   /**
@@ -1074,6 +1103,7 @@ export const handleSowExtraField = (
   player: PlayerState,
   tile: FarmTilePosition,
   crop: ExtraSowableCrop,
+  amount?: number,
 ): boolean => {
   const allCards = [
     ...player.improvements,
@@ -1084,7 +1114,7 @@ export const handleSowExtraField = (
     const effect = getCardEffect(cardId)
     if (!effect?.onSowExtraField) continue
     try {
-      if (effect.onSowExtraField(player, tile, crop)) return true
+      if (effect.onSowExtraField(player, tile, crop, amount)) return true
     } catch (err) {
       if (cardId.startsWith('CUSTOM_')) {
         console.warn(`[card-effects] custom card ${cardId} onSowExtraField threw, skipping:`, err)

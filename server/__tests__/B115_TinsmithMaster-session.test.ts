@@ -4,7 +4,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
+import type { FarmTilePosition } from '../../shared/contract/types'
 import '../../shared/cards/B/B115_TinsmithMaster'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
@@ -232,16 +232,13 @@ describe('B115_TinsmithMaster session', () => {
   // --- Sow bonus tests ---
 
   describe('sow bonus crop', () => {
+    // The bonus is asked inside the Sow, before any crop is placed.
     const acceptSelection = (session: GameSession, resp: ReturnType<GameSession['resolveChoice']>) => {
       expect(resp.interaction.stateId).toBe('wait')
-      if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-      const accept = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
-      expect(accept).toBeDefined()
-      resp = session.resolveChoice(0, accept!.value)
-      expect(resp.interaction.stateId).toBe('wait')
-      if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
-      expect(resp.interaction.sourceCard).toBe(CARD_ID)
+      if (resp.interaction.stateId !== 'wait') throw new Error('expected bonus selection')
+      expect(resp.interaction.promptParams).toMatchObject({ minSelections: 0, triggerCardId: CARD_ID })
       expect(resp.interaction.request.selection?.kind).toBe('farm-position')
+      expect(resp.state.events.some((event) => event.type === 'farm.sown')).toBe(false)
       return resp
     }
 
@@ -287,8 +284,10 @@ describe('B115_TinsmithMaster session', () => {
         crops: [{ row: 0, col: 0, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
-      expect(resp.interaction.stateId).toBe('wait')
-      resp = session.resolveChoice(0, '__skip__')
+      resp = acceptSelection(session, resp)
+      expect(resp.state.players[0]!.fields[0]!.stacks).toEqual([])
+      resp = selectPositions(session, [])
+      expect(resp.ok, resp.error).toBe(true)
 
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
       expect(field?.stacks[0]?.remaining ?? 0).toBe(3)
@@ -309,7 +308,7 @@ describe('B115_TinsmithMaster session', () => {
       })
       expect(resp.ok).toBe(true)
 
-      resp = acceptSelection(session, resp)
+      acceptSelection(session, resp)
       resp = selectPositions(session, [{ row: 0, col: 0 }])
       expect(resp.ok).toBe(true)
 
@@ -406,8 +405,9 @@ describe('B115_TinsmithMaster session', () => {
       const player = resp.state.players[0]!
       const f0 = player.fields.find((f) => f.row === 0 && f.col === 0)
       const f1 = player.fields.find((f) => f.row === 0 && f.col === 1)
-      expect(f0?.stacks[0]?.remaining ?? 0).toBe(3)
+      expect(f0?.stacks).toEqual([])
       expect(f1?.stacks[0]?.remaining ?? 0).toBe(3)
+      expect(player.resources.grain).toBe(2)
     })
   })
 })

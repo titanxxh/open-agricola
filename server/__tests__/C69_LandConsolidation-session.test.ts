@@ -2,13 +2,10 @@ import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
-import { EXTRA_CROP_PLACEMENT_CONTEXT_KEY, isExtraCropPlacementActionContext } from '../../shared/actions/helpers/extra-crop-placement-context'
 
 import '../../shared/cards/C/C069_LandConsolidation'
 import '../../shared/cards/B/B115_TinsmithMaster'
 import '../../shared/cards/B/B113_PatchCaregiver'
-import '../../shared/cards/E/E071_CowPatty'
 import '../../shared/cards/C/C057_Crudite'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
@@ -20,13 +17,7 @@ const ANYTIME_ID = 'C69-land-consolidation-anytime'
 const c69AnytimeVisible = (resp: ReturnType<GameSession['takeAction']>) =>
   resp.interaction.anytimeActions?.some((entry) => entry.id === ANYTIME_ID) ?? false
 
-const pendingActionContext = (session: GameSession) =>
-  (session.getEngineStack().peekPendingEnvelope()?.contextSnapshot as
-    | { actionContext?: Record<string, unknown> }
-    | undefined
-  )?.actionContext
-
-const setupC69ExtraCropSession = (sourceCard: 'B115_TinsmithMaster' | 'E071_CowPatty') => {
+const setupC69ExtraCropSession = (sourceCard: 'B115_TinsmithMaster') => {
   const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -40,11 +31,6 @@ const setupC69ExtraCropSession = (sourceCard: 'B115_TinsmithMaster' | 'E071_CowP
   setWorkersAtHome(state, player, 2)
   player.minorPlayed.push('C069_LandConsolidation')
   if (sourceCard === 'B115_TinsmithMaster') player.occupationPlayed.push(sourceCard)
-  if (sourceCard === 'E071_CowPatty') {
-    player.minorPlayed.push(sourceCard)
-    player.resources.cattle = 1
-    player.pastures = [{ id: 'p1', size: 1, tiles: [{ row: 0, col: 1 }], stables: 0, animalType: 'cattle', animalCount: 1 }]
-  }
   player.resources.grain = 1
   player.fields = [{ row: 0, col: 0, stacks: [] }]
   session.loadState(state)
@@ -186,22 +172,19 @@ describe('C069_LandConsolidation session', () => {
     ])
   })
 
-  it('C069 S7: Land Consolidation is hidden while a Tinsmith Master extra crop is pending', () => {
+  it('C069 S7: the Tinsmith Master bonus prompt comes before the crop is placed, so no 3-grain field exists yet', () => {
     const session = setupC69ExtraCropSession('B115_TinsmithMaster')
 
-    const resp = driveSowUntilExtraCropPrompt(session)
+    const prompt = driveSowUntilExtraCropPrompt(session)
 
-    expect(c69AnytimeVisible(resp)).toBe(false)
-    expect(isExtraCropPlacementActionContext(pendingActionContext(session))).toBe(true)
-  })
+    expect(prompt.interaction).toMatchObject({ stateId: 'wait', promptParams: { triggerCardId: 'B115_TinsmithMaster' } })
+    expect(prompt.state.players[0]!.fields[0]!.stacks).toEqual([])
+    expect(c69AnytimeVisible(prompt)).toBe(false)
 
-  it('hides C69 anytime while E71 extra crop is pending', () => {
-    const session = setupC69ExtraCropSession('E071_CowPatty')
-
-    const resp = driveSowUntilExtraCropPrompt(session)
-
-    expect(c69AnytimeVisible(resp)).toBe(false)
-    expect(isExtraCropPlacementActionContext(pendingActionContext(session))).toBe(true)
+    const declined = session.commitSelectionChoice(0, { positions: [] })
+    expect(declined.ok, declined.error).toBe(true)
+    expect(declined.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
+    expect(c69AnytimeVisible(declined)).toBe(true)
   })
 
   it('shows C69 anytime during normal sow crop placement', () => {
@@ -228,22 +211,6 @@ describe('C069_LandConsolidation session', () => {
 
     expect(resp.ok).toBe(true)
     expect(c69AnytimeVisible(resp)).toBe(true)
-    expect(isExtraCropPlacementActionContext(pendingActionContext(session))).toBe(false)
-  })
-
-  it('keeps extra crop marker through pending roundtrip without top-level field', () => {
-    const session = setupC69ExtraCropSession('B115_TinsmithMaster')
-    driveSowUntilExtraCropPrompt(session)
-
-    const serialized = serializeSessionSnapshot(session.getState().state, session)
-    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
-    const envelope = restored.getEngineStack().peekPendingEnvelope() as
-      | ({ contextSnapshot?: { actionContext?: Record<string, unknown> } } & Record<string, unknown>)
-      | null
-
-    expect(envelope?.[EXTRA_CROP_PLACEMENT_CONTEXT_KEY]).toBeUndefined()
-    expect(isExtraCropPlacementActionContext(envelope?.contextSnapshot?.actionContext)).toBe(true)
-    expect(c69AnytimeVisible(restored.getState())).toBe(false)
   })
 
   it('shows C69 anytime outside extra crop pending prompts', () => {

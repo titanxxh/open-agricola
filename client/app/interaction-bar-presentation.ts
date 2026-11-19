@@ -401,8 +401,12 @@ const buildChoiceModel = (
     ? visibleOptions.find((option) => !isSkipChoiceOption(option))
     : undefined
   const optionalActionName = getOptionalActionName(locale, optionalActionOption)
-  const triggerCardName = choice.sourceCard
-    ? getCardDisplayName(locale, choice.sourceCard)
+  // A prompt may name the card it asks about without changing the action's source card.
+  const triggerCardId = typeof choice.promptParams?.triggerCardId === 'string'
+    ? choice.promptParams.triggerCardId
+    : choice.sourceCard
+  const triggerCardName = triggerCardId
+    ? getCardDisplayName(locale, triggerCardId)
     : null
   const promptHintKey =
     typeof choice.promptParams?.hintKey === 'string'

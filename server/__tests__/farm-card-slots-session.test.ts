@@ -87,21 +87,16 @@ describe('Farm-side Card Field and animal-slot interactions', () => {
     expect(started.state.players[0]!.cardStates[FIELD]?.extraData?.cardFieldStacks).toEqual([null])
     expect(session.getState().interaction).toEqual(started.interaction)
 
-    let response = session.commitSelectionChoice(0, { crops: [
+    const response = session.commitSelectionChoice(0, { crops: [
       { row: 0, col: 2, crop: 'grain' },
       { row: -1, col: 2113, crop: 'grain' },
     ] })
+    // The Sow asks for the bonus before it places or pays anything.
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.grain).toBe(0)
-    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
-    expect(response.state.players[0]!.cardStates[FIELD]?.extraData?.cardFieldStacks)
-      .toEqual([{ crop: 'grain', remaining: 3 }])
-    if (response.interaction.stateId !== 'wait') throw new Error('Expected the optional crop bonus')
-    const accept = response.interaction.request.options?.filter(option => option.value !== '__skip__')
-    expect(accept).toHaveLength(1)
-    response = session.resolveChoice(0, accept![0]!.value)
-    expect(response.ok, response.error).toBe(true)
-    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: {
+    expect(response.state.players[0]!.resources.grain).toBe(2)
+    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([])
+    expect(response.state.players[0]!.cardStates[FIELD]?.extraData?.cardFieldStacks).toEqual([null])
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, promptParams: { triggerCardId: BONUS }, request: {
       kind: 'selection', selection: { kind: 'farm-position', selectablePositions: [
         { row: 0, col: 2 },
         { row: -1, col: 2113, sourceCard: FIELD, groupKey: FIELD, cardFieldSlot: 0 },
@@ -109,7 +104,7 @@ describe('Farm-side Card Field and animal-slot interactions', () => {
     } })
     expect(project(session, response).cardFieldTargets).toEqual([{
       tile: { row: -1, col: 2113, sourceCard: FIELD, groupKey: FIELD, cardFieldSlot: 0 },
-      stacks: [{ kind: 'grain', remaining: 3 }],
+      stacks: [],
     }])
     expect(project(session, response, 1).cardFieldTargets).toEqual([])
 
@@ -124,8 +119,8 @@ describe('Farm-side Card Field and animal-slot interactions', () => {
     expect(confirmed.state.events.filter(event => event.type === 'farm.sown')).toHaveLength(1)
     expect(confirmed.state.events).toContainEqual(expect.objectContaining({
       type: 'farm.sown', sows: [
-        { location: { kind: 'field', playerId: 'p1', row: 0, col: 2 }, crop: 'grain', added: 3 },
-        { location: { kind: 'field', playerId: 'p1', row: -1, col: 2113 }, crop: 'grain', added: 3 },
+        { location: { kind: 'field', playerId: 'p1', row: 0, col: 2 }, crop: 'grain', added: 4 },
+        { location: { kind: 'field', playerId: 'p1', row: -1, col: 2113 }, crop: 'grain', added: 4 },
       ],
     }))
     expect(confirmed.state.log).toContainEqual(expect.objectContaining({ key: 'log.actionDetail' }))

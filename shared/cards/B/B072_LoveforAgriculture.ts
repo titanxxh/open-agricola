@@ -1,3 +1,4 @@
+import { BASE_SOW_AMOUNT } from '../../domain/sow-amount'
 import { defineMinorCard } from '../card-source'
 import { getPastureSize } from '../../domain/pasture'
 import type { ExtraSowableField } from '../card-effects'
@@ -117,7 +118,7 @@ const cardImpl = {
   },
 
   // Handle sowing into a pasture tile
-  onSowExtraField: (player, tile, crop): boolean => {
+  onSowExtraField: (player, tile, crop, amount): boolean => {
     const pastureId = findPastureByTile(player, tile)
     if (!pastureId) return false
     if (crop !== 'grain' && crop !== 'vegetable') return false
@@ -133,7 +134,7 @@ const cardImpl = {
     player.resources[crop] -= 1
 
     // Store sown crop
-    const remaining = crop === 'grain' ? 3 : 2
+    const remaining = amount ?? BASE_SOW_AMOUNT[crop]
     existing.push({
       pastureId,
       tiles: pasture.tiles ?? [],
