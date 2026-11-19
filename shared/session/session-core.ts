@@ -109,6 +109,7 @@ import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { getMajorCard, majorCardDefinitions } from '../cards/major/index.ts'
+import { getClassicCardKind } from '../cards/classic-catalog.ts'
 import { resolveDevCardIdInput } from '../cards/dev-card-id.ts'
 import * as setupPhase from './phases/setup.ts'
 import * as roundPhase from './phases/round.ts'
@@ -5486,6 +5487,9 @@ export class GameCore {
   private isOccupationCard(cardId: string): boolean {
     // Built-in cards: [A-E]NNN_ pattern, check if it's NOT a minor improvement
     if (cardId.match(/^[A-E]\d+_/)) return !getMinorImprovement(cardId)
+    // Classic cards (C-prefixed decks) are outside the catalog; their generated definitions carry the kind.
+    const classicKind = getClassicCardKind(cardId)
+    if (classicKind) return classicKind === 'occupation'
     // Custom cards: check session card context
     if (this.sessionCardContext) {
       if (this.sessionCardContext.getCustomOccupation(cardId)) return true

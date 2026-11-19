@@ -29,9 +29,12 @@ describe('generate-register-all Card Source', () => {
         expect(result.registerAll).toContain(`import { ${id} } from './classic/${deck}/${id}'`)
         expect(result.registerAll).toContain(`'${id}': ${id}.impl`)
         expect(result.catalogGenerated).not.toContain(id)
+        expect(result.classicCatalogGenerated).toContain(`"id": "${id}"`)
       }
       expect(result.implCount).toBe(4)
       expect(result.catalogDefinitionCount).toBe(0)
+      expect(result.classicDefinitionCount).toBe(4)
+      expect(result.classicCatalogGenerated).toContain('"kind": "minor"')
       expect(result.registerAll).not.toContain('IgnoredTest')
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true })
