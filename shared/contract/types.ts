@@ -766,6 +766,8 @@ export type ActionContext = Record<string, unknown> & {
   /** Renovation bonuses supplied by this invocation, separate from computeCosts results. */
   costBonuses?: Bonus[]
   submittedExchangeBatch?: ExchangeBatchEntry[]
+  reserveAnimalPayment?: true
+  animalAcquisition?: true
   harvestFeed?: true
 }
 
@@ -1240,6 +1242,11 @@ export type FeedExchangeCatalogEntry = {
   fromFarmyard?: boolean
 }
 
+export type ReserveCookingOffer = {
+  catalog: FeedExchangeCatalogEntry[]
+  available: Partial<Record<AnimalKey, number>>
+}
+
 export type SubFlowKind =
   | 'choice'
   | 'animal-reorg'
@@ -1267,7 +1274,7 @@ export type ChoiceMultiSelect = {
 export type InteractionRequest = (
   | { kind: 'solo-hand-selection'; groups: SoloHandSelectionGroup[] }
   | { kind: 'choice'; options: ActionChoiceOption[]; defaultValue?: string; confirmLabelKey?: string; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean; moorSolo?: MoorSoloChoice }
-  | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
+  | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean; reserveCooking?: ReserveCookingOffer }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }
   | {

@@ -93,6 +93,8 @@ describe('ordinary harvest breeding forbids animal cooking', () => {
     const session = setup(animal)
     const pending = advance(session)
     expect(pending.state.roundPhase).toBe('breeding')
+    if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'animal-reorg') throw new Error('Expected breeding placement')
+    expect(pending.interaction.request.reserveCooking).toBeUndefined()
     expect(pending.state.players[0]!.resources[animal]).toBe(3)
     expect(pending.state.players[0]!.pastures[0]!.animalCount).toBe(2)
     const host = session.peekEnginePendingEnvelope()?.hostNodeId
@@ -260,7 +262,8 @@ const CARD_IMPL = { effect: { id: CARD_ID, onEndHarvestFeedingPhase: () => ({ ty
       : advance(session)
     expect(pending.state.roundPhase).not.toBe('breeding')
     expect(pending.state.players[0]!.resources.sheep).toBe(3)
-    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'animal-reorg') throw new Error('Expected newborn placement')
+    expect(pending.interaction.request.reserveCooking).toBeUndefined()
     if (card === 'C084_PerennialRye') expect(pending.state.players[0]!.resources.grain).toBe(0)
     expect(pending.state.events).toContainEqual(expect.objectContaining({
       type: 'farm.animalBred', source: 'cardEffect', sourceCardId: card, animals: { sheep: 1 },

@@ -355,7 +355,7 @@ const positiveAnimals = (
   return result
 }
 
-const validateAssignments = (
+export const validateAnimalAssignments = (
   state: GameState,
   player: PlayerState,
   computed: AnimalZone[],
@@ -444,7 +444,7 @@ export const reorganizeAction: ActionDefinition = {
     if (!assignments) return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
     const playerIndex = ctx.state.players.indexOf(ctx.player)
     const computedZones = playerBoard(ctx.state, playerIndex).animals.zones()
-    const zones = validateAssignments(ctx.state, ctx.player, computedZones, assignments)
+    const zones = validateAnimalAssignments(ctx.state, ctx.player, computedZones, assignments)
     if (!zones) {
       return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
     }

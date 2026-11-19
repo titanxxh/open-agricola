@@ -64,7 +64,7 @@ export const wouldExceedZoneOccupancyLimit = (
 export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>
   Boolean(remaining && ALL_ANIMAL_KEYS.some((animal) => remaining[animal] > 0))
 
-export const computeReorgAvailableAnimals = (player: PlayerState): AnimalTotals => {
+export const computeReorgAvailableAnimals = (player: Pick<PlayerState, 'resources'>): AnimalTotals => {
   const totals = {} as AnimalTotals
   for (const animal of ALL_ANIMAL_KEYS) {
     totals[animal] = Math.max(0, Math.floor(player.resources[animal] ?? 0))

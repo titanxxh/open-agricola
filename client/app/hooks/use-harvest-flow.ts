@@ -50,6 +50,35 @@ const playerCanAfford = (player: PlayerState, ex: CardExchange) => {
   return true
 }
 
+export const buildExchangeCatalogOptions = (
+  catalog: readonly FeedExchangeCatalogEntry[],
+  locale: Locale,
+  cardLabel: (id: string) => string,
+  maxTradeTimesBySourceId?: Record<string, number>,
+): HarvestFeedOption[] => {
+  const basicSourceName = translateMessage(locale, "ui.copy.app_hooks_use_harvest_flow.basic_conversion_347cd5")
+  return catalog.flatMap((entry) => {
+    const sourceMax = maxTradeTimesBySourceId?.[entry.sourceId]
+    if (sourceMax !== undefined && sourceMax <= 0) return []
+    const [sourceCardId, derivedCardId] = entry.sourceId.split('::')
+    const sourceName = entry.sourceId === BASIC_CONVERSION_SOURCE_ID
+      ? basicSourceName
+      : derivedCardId
+        ? `${cardLabel(sourceCardId!)} · ${cardLabel(derivedCardId)}`
+        : cardLabel(entry.sourceId)
+    return [{
+      id: `${entry.sourceId}-ex${entry.exchangeIndex}`,
+      sourceName,
+      sourceId: entry.sourceId,
+      exchangeIndex: entry.exchangeIndex,
+      from: { ...entry.from },
+      to: { ...entry.to },
+      max: sourceMax === undefined ? entry.max : Math.min(entry.max ?? sourceMax, sourceMax),
+      ...(entry.fromFarmyard ? { fromFarmyard: true } : {}),
+    }]
+  })
+}
+
 export const buildHarvestFeedOptions = (
   player: PlayerState,
   locale: Locale,
@@ -57,30 +86,9 @@ export const buildHarvestFeedOptions = (
   maxTradeTimesBySourceId?: Record<string, number>,
   exchangeCatalog?: readonly FeedExchangeCatalogEntry[],
 ): HarvestFeedOption[] => {
+  if (exchangeCatalog) return buildExchangeCatalogOptions(exchangeCatalog, locale, cardLabel, maxTradeTimesBySourceId)
   const options: HarvestFeedOption[] = []
   const basicSourceName = translateMessage(locale, "ui.copy.app_hooks_use_harvest_flow.basic_conversion_347cd5")
-  if (exchangeCatalog) {
-    return exchangeCatalog.flatMap((entry) => {
-      const sourceMax = maxTradeTimesBySourceId?.[entry.sourceId]
-      if (sourceMax !== undefined && sourceMax <= 0) return []
-      const [sourceCardId, derivedCardId] = entry.sourceId.split('::')
-      const sourceName = entry.sourceId === BASIC_CONVERSION_SOURCE_ID
-        ? basicSourceName
-        : derivedCardId
-          ? `${cardLabel(sourceCardId!)} · ${cardLabel(derivedCardId)}`
-          : cardLabel(entry.sourceId)
-      return [{
-        id: `${entry.sourceId}-ex${entry.exchangeIndex}`,
-        sourceName,
-        sourceId: entry.sourceId,
-        exchangeIndex: entry.exchangeIndex,
-        from: { ...entry.from },
-        to: { ...entry.to },
-        max: sourceMax === undefined ? entry.max : Math.min(entry.max ?? sourceMax, sourceMax),
-        ...(entry.fromFarmyard ? { fromFarmyard: true } : {}),
-      }]
-    })
-  }
 
   const pushFromExchanges = (
     sourceId: string,

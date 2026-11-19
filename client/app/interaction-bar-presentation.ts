@@ -197,6 +197,7 @@ export type InteractionBarActionInput = {
   takeAnytimeAction: (actionId: string) => void
   confirmAnimalReorg: () => void
   cancelAnimalDiscardPrompt: () => void
+  openReserveCooking?: () => void
 }
 
 export type InteractionBarActions = InteractionBarActionInput

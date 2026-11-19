@@ -9,6 +9,7 @@ import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import type { AnytimeActivationFlow } from '../contract/anytime-activation'
 import { commitRoomConstruction } from '../domain/room-construction'
 import { buildAnimalReorgRequest } from '../domain/animal-reorg'
+import { buildReserveCookingOffer, resolveReserveCookingBatch } from './reserve-cooking'
 import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
 import { restoreSessionState } from './state-recovery'
 import { evaluateFlowDoable, isActionVetoedInFlowContext, isPlacementActionDoableInFlowContext } from '../actions/flow'
@@ -1642,6 +1643,7 @@ export class GameCore {
       originPlayerIndex?: number | null
       triggerActionId?: string | null
       harvestBreedPlacementMinimums?: unknown
+      animalAcquisition?: boolean
       /** The leaf only performs the interaction of a host `reorganize` node. */
       hostOwnedListenerPhases?: boolean
     } = {},
@@ -1661,12 +1663,14 @@ export class GameCore {
     }
     const player = this.state.players[playerIndex]
     if (!player) return
+    const trackedAcquisition = visibleFrame && this.takeAnimalAcquisition(visibleFrame, player.id)
     const flow: ActionFlow = {
       type: 'leaf',
       actionId: 'reorganize',
       actionContext: {
         trigger,
         harvestBreedPlacementMinimums: resumeExtra.harvestBreedPlacementMinimums,
+        ...(resumeExtra.animalAcquisition || trackedAcquisition ? { animalAcquisition: true } : {}),
         ...(resumeExtra.hostOwnedListenerPhases ? { [HOST_OWNED_LISTENER_PHASES_KEY]: true } : {}),
       },
     }
@@ -1818,6 +1822,35 @@ export class GameCore {
 
   private hasPendingAnimals(p: PlayerState) {
     return this.getAnimalCount(p) > this.getAssignedAnimalCountForPending(p)
+  }
+
+  private trackAnimalAcquisitions<T>(frame: EngineFrame | undefined, run: () => T) {
+    const animals = animalKeysForState(this.state)
+    const before = this.state.players.map(player => animals.map(animal => player.resources[animal] ?? 0))
+    const result = run()
+    const acquired = new Set<string>()
+    if (frame) {
+      const pending = new Set(frame.animalAcquisitions)
+      for (const [index, player] of this.state.players.entries()) {
+        const previous = before[index]
+        if (!previous) continue
+        if (animals.some((animal, offset) => (player.resources[animal] ?? 0) > (previous[offset] ?? 0))) {
+          acquired.add(player.id)
+        }
+        if (acquired.has(player.id) || pending.has(player.id)) {
+          if (this.hasPendingAnimals(player)) pending.add(player.id)
+          else pending.delete(player.id)
+        }
+      }
+      frame.animalAcquisitions = pending.size > 0 ? [...pending] : undefined
+    }
+    return { result, acquired }
+  }
+
+  private takeAnimalAcquisition(frame: EngineFrame, playerId: string): boolean {
+    if (!frame.animalAcquisitions?.includes(playerId)) return false
+    frame.animalAcquisitions = frame.animalAcquisitions.filter(id => id !== playerId)
+    return true
   }
 
   private getHarvestPlayerIndices() {
@@ -2412,6 +2445,13 @@ export class GameCore {
       ),
     })
     if (interaction.stateId !== 'wait') return interaction
+    if (interaction.request.kind === 'animal-reorg' && interaction.anytimeActions.some(action => action.id === 'exchange')) {
+      const player = this.state.players[interaction.playerIndex]
+      const acquired = player && (this.peekHostContextSnapshot()?.actionContext?.animalAcquisition === true
+        || this.engineStack.current()?.animalAcquisitions?.includes(player.id))
+      const offer = player && acquired && buildReserveCookingOffer(this.state, player, this.actionHooks)
+      if (offer) interaction.request = { ...interaction.request, reserveCooking: offer }
+    }
     const rejectedCommandKeys = this.currentFailedAuthoritativeCommandKeys()
     return rejectedCommandKeys.length > 0
       ? { ...interaction, rejectedCommandKeys }
@@ -3787,9 +3827,9 @@ export class GameCore {
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
       if (!frameOwnerPlayer || !player) return
-      const before = this.clonePlayer(player)
       this.syncDynamicActionSpaces()
-      const step = frame.engine.proceed(this.buildEngineExecutionContext(player, space))
+      const { result: step, acquired } = this.trackAnimalAcquisitions(frame,
+        () => frame.engine.proceed(this.buildEngineExecutionContext(player, space)))
       this.flushEngineLog()
 
       if (step.type === 'blocked' && step.mandatory === true) {
@@ -3868,6 +3908,7 @@ export class GameCore {
           this.startReorganizeSubFlow(ownerIdx, 'anytime', {
             originPlayerIndex: originIdx,
             triggerActionId: this.endTurnTriggerActionId(frame),
+            animalAcquisition: this.takeAnimalAcquisition(frame, frameOwnerPlayer.id),
           })
           return
         }
@@ -3914,7 +3955,10 @@ export class GameCore {
           const trigger = frame.stageResume?.hook === 'onBreedPhase'
             ? 'harvest-breed'
             : 'anytime'
-          this.startReorganizeSubFlow(pIdx, trigger, { hostOwnedListenerPhases: hostActionId === 'reorganize' })
+          this.startReorganizeSubFlow(pIdx, trigger, {
+            hostOwnedListenerPhases: hostActionId === 'reorganize',
+            animalAcquisition: pendingContextSnapshot(pendingCursor)?.actionContext?.animalAcquisition === true,
+          })
           return
         }
         // Synthetic interaction-only frames (the `__interaction_only__`
@@ -4004,10 +4048,10 @@ export class GameCore {
             if (auto?.disabled === true) return
             const resolvedActionId = this.peekHostPendingActionId()
             const resolvedSourceCard = this.peekPendingSourceCard()
-            const result = frame.engine.resolveChoice(
+            const { result, acquired } = this.trackAnimalAcquisitions(frame, () => frame.engine.resolveChoice(
               auto.value,
               this.buildEngineExecutionContext(player, space),
-            )
+            ))
             this.flushEngineLog()
             if (result.type === 'flow') {
               this.pushNestedReturnPointForFrame(frame, effectivePlayerIndex)
@@ -4046,7 +4090,7 @@ export class GameCore {
               this.turnOwnerPlayerIndex = null
               return
             }
-            if (this.getAnimalCount(player) > this.getAnimalCount(before) &&
+            if (acquired.has(player.id) && frame.animalAcquisitions?.includes(player.id) && frame.reason !== 'reorganize' &&
               !(result.type === 'ok' && result.internalChildren?.afterHostListeners?.some((child) => child.actionId === 'reorganize'))) {
               const pIdx = effectivePlayerIndex
               frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
@@ -4100,7 +4144,7 @@ export class GameCore {
       // sub-flow. An `animal-reorg` request (last-harvest enforcement without
       // newborns) is handled in the `step.type === 'choice'` block above.
 
-      if (this.getAnimalCount(player) > this.getAnimalCount(before) &&
+      if (acquired.has(player.id) && frame.animalAcquisitions?.includes(player.id) && frame.reason !== 'reorganize' &&
         !(step.type === 'ok' && step.result.type === 'ok' &&
           step.result.internalChildren?.afterHostListeners?.some((child) => child.actionId === 'reorganize'))) {
         const pIdx = effectivePlayerIndex
@@ -4378,11 +4422,12 @@ export class GameCore {
     if (playerResponse && !protectedDirectCancel) {
       this.pushHistory(false, frame?.undoBoundaryOnResolve === true)
     }
-    const result = this.engine.resolveChoice(
+    const engine = this.engine
+    const { result } = this.trackAnimalAcquisitions(frame, () => engine.resolveChoice(
       value,
       this.buildEngineExecutionContext(player, space),
       payload,
-    )
+    ))
     if (playerResponse) this.recordAcceptedResponse(pendingPlayerIndex, result)
     this.flushEngineLog()
     if (frame && (result.type === 'flow' || (result.type === 'ok' && result.extraData?.cardChoiceFollowUp === true))) {
@@ -4480,6 +4525,8 @@ export class GameCore {
           return this.handleHeatingResolved(playerIndex, plan.selections, plan.fuelUsed)
         case 'post-reap-anytime':
           return this.handlePostReapAnytimeResolved(playerIndex)
+        case 'cook-reserve':
+          return this.handleReserveCookingResolved(playerIndex, payload)
         case 'engine-choice':
           return this.resolveEngineChoice(playerIndex, value, true, payload)
       }
@@ -4556,6 +4603,22 @@ export class GameCore {
     }
 
     return entries
+  }
+
+  private handleReserveCookingResolved(playerIndex: number, payload?: Record<string, unknown>): SessionResponse {
+    const interaction = this.buildInteraction()
+    if (interaction.stateId !== 'wait' || interaction.request.kind !== 'animal-reorg'
+      || interaction.playerIndex !== playerIndex || !interaction.request.reserveCooking
+      || typeof payload?.requestKey !== 'string' || interaction.requestKey !== payload.requestKey) {
+      return this.rejectInput('no matching reserve cooking offer')
+    }
+    const player = this.state.players[playerIndex]
+    if (!player) return this.rejectInput('invalid player')
+    const entries = resolveReserveCookingBatch({
+      state: this.state, player, payload, offer: interaction.request.reserveCooking, actionHooks: this.actionHooks,
+    })
+    if (!entries) return this.rejectInput('invalid reserve cooking selections')
+    return roundPhase.takeAnytimeAction(this, playerIndex, 'exchange', entries)
   }
 
   private handleFeedResolved(
