@@ -24,6 +24,8 @@ export type ExtraSowableField = {
   allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
   sourceCard: string
   groupKey?: string
+  /** True when card text treats this space as a field (B072 pastures); false for non-field crop spaces. */
+  isField?: boolean
 }
 
 export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]
@@ -32,7 +34,7 @@ export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]
 export type SowTarget =
   | { kind: 'farmyard'; row: number; col: number }
   | { kind: 'card-field'; row: number; col: number; cardId: string; slot: number }
-  | { kind: 'extra'; row: number; col: number; cardId: string }
+  | { kind: 'extra'; row: number; col: number; cardId: string; isField: boolean }
 
 export type SowAmountContext = {
   state: GameState

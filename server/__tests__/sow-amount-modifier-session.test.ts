@@ -9,6 +9,8 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import '../../shared/cards/E/E017_SkimmerPlow'
 import '../../shared/cards/B/B115_TinsmithMaster'
 import '../../shared/cards/E/E071_CowPatty'
+import '../../shared/cards/M/M111_NoTillFarming'
+import '../../shared/cards/B/B072_LoveforAgriculture'
 
 /**
  * #1891 Sow amount modifier point: fixed and optional modifiers are settled
@@ -192,15 +194,33 @@ describe('#1891 Sow amount modifiers through Session', () => {
     expect(stacksAt(ordinary, 1, 2)).toEqual([{ kind: 'grain', remaining: 3 }])
   })
 
-  it('counts a repeated target once, by its first crop, like seed validation', () => {
-    const session = setup({ vegetable: 1 })
+  it('rejects a target repeated with another crop without placing or paying anything, then accepts a legal retry', () => {
+    const session = setup({ vegetable: 1, grain: 1 })
 
-    const response = sow(session, [{ row: 0, col: 2, crop: 'vegetable' }, { row: 0, col: 2, crop: 'grain' }])
+    const rejected = sow(session, [{ row: 0, col: 2, crop: 'vegetable' }, { row: 0, col: 2, crop: 'grain' }])
 
-    expect(response.ok, response.error).toBe(true)
-    expect(stacksAt(response, 0, 2)).toEqual([{ kind: 'vegetable', remaining: 2 }])
-    expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 0, grain: 0 })
-    expect(sownEvents(response).flatMap((event) => event.sows.map((sow) => [sow.crop, sow.added]))).toEqual([['vegetable', 2]])
+    expect(rejected.ok).toBe(false)
+    expect(stacksAt(rejected, 0, 2)).toEqual([])
+    expect(rejected.state.players[0]!.resources).toMatchObject({ vegetable: 1, grain: 1 })
+    const retried = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'vegetable' }] })
+    expect(retried.ok, retried.error).toBe(true)
+    expect(stacksAt(retried, 0, 2)).toEqual([{ kind: 'vegetable', remaining: 2 }])
+  })
+
+  it('Skimmer Plow reduces pastures that count as fields but not non-field crop spaces', () => {
+    for (const [card, expected] of [['M111_NoTillFarming', 3], ['B072_LoveforAgriculture', 2]] as const) {
+      const session = setup({ minorPlayed: [SKIMMER, card], grain: 1, fields: [], pastureTiles: [{ row: 1, col: 4 }] })
+      const started = session.takeAction(0, 'grain-utilization')
+      expect(started.ok, started.error).toBe(true)
+      if (started.interaction.stateId !== 'wait' || started.interaction.request.kind !== 'farm-select') throw new Error('expected Sow')
+      const target = started.interaction.request.farm.selectableFields.find((field) => field.sourceCard === card)
+      expect(target, JSON.stringify(started.interaction.request.farm)).toBeDefined()
+
+      const response = session.commitSelectionChoice(0, { crops: [{ ...target!.tile, crop: 'grain' }] })
+
+      expect(response.ok, response.error).toBe(true)
+      expect(sownEvents(response).flatMap((event) => event.sows.map((sow) => sow.added))).toEqual([expected])
+    }
   })
 
   it('does not apply a card in hand or an opponent card', () => {

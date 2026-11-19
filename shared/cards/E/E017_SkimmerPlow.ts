@@ -29,8 +29,9 @@ const cardImpl = {
   listeners: [listener],
   effect: {
     id: CARD_ID,
-    // Each sown target gets one fewer good; the Sow amount floor keeps the seed.
-    modifySowAmount: () => ({ delta: -1 }),
+    // Each sown field gets one fewer good; the Sow amount floor keeps the seed.
+    // Non-field crop spaces (M111) are not fields.
+    modifySowAmount: ({ target }) => target.kind === 'extra' && !target.isField ? undefined : { delta: -1 },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
