@@ -284,6 +284,11 @@
   color: #333;
 }
 
+.player-card-inner[data-card-edition="classic"] .card-numbering {
+  width: max-content;
+  white-space: nowrap;
+}
+
 /* Card score */
 .card-score {
   position: absolute;

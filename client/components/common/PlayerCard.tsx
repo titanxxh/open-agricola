@@ -7,7 +7,7 @@ import type { ComplexCost, PaymentResourceMap } from '../../../shared/contract/t
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-card-metadata'
-import { moorMajorDisplayNumber, officialCardDeck, officialCardDisplayNumber } from '../../../shared/projections/card-display-number'
+import { classicCardDeck, moorMajorDisplayNumber, officialCardDeck, officialCardDisplayNumber } from '../../../shared/projections/card-display-number'
 import { getCardMeta, type CardMeta } from '../../services/card-meta'
 import { moorMajorArtPath, officialCardArtPath } from './playerCardArt'
 import { publicAssetUrl } from '../../utils/public-asset-url'
@@ -309,6 +309,7 @@ export const PlayerCard = ({
         className="player-card-inner" 
         data-id={cardId} 
         data-numbering={numbering}
+        data-card-edition={classicCardDeck(cardId) ? 'classic' : undefined}
         data-scan-deck={cardData.scanDeck}
         data-moor-major={moorMajor ? 'true' : undefined}
         data-cook={cardData.isCookery ? 'true' : undefined}
