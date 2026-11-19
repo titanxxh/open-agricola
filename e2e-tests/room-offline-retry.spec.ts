@@ -157,20 +157,27 @@ test('origin HTTP errors and an API outage keep their normal results @webkit', a
   await expect(retryHeading(page)).toHaveCount(0)
 })
 
-test('a fresh browser HTTP cache can still serve the original room document @webkit', async ({ page, context }) => {
-  await controlledLobby(page)
-  const target = new URL(`/?room=${randomUUID()}`, site.origin)
-  documents.set(target.search, 'cacheable')
-  await page.goto(target.href, documentLoad)
-  await expect(page.getByRole('heading', { name: 'Game not found' })).toBeVisible()
-  documents.set(target.search, 'disconnect')
-  const requestsBefore = documentRequests.length
+test('a fresh browser HTTP cache can still serve the original room document @webkit', async ({ playwright, browserName }) => {
+  // WebKit needs a normal browser profile to reuse the HTTP cache across tabs.
+  const context = await playwright[browserName].launchPersistentContext('')
+  try {
+    const page = await context.newPage()
+    await controlledLobby(page)
+    const target = new URL(`/?room=${randomUUID()}`, site.origin)
+    documents.set(target.search, 'cacheable')
+    await page.goto(target.href, documentLoad)
+    await expect(page.getByRole('heading', { name: 'Game not found' })).toBeVisible()
+    documents.set(target.search, 'disconnect')
+    const requestsBefore = documentRequests.length
 
-  const revisit = await context.newPage()
-  await revisit.goto(target.href, documentLoad)
-  await expect(revisit.getByRole('heading', { name: 'Game not found' })).toBeVisible()
-  await expect(retryHeading(revisit)).toHaveCount(0)
-  expect(documentRequests).toHaveLength(requestsBefore)
+    const revisit = await context.newPage()
+    await revisit.goto(target.href, documentLoad)
+    await expect(revisit.getByRole('heading', { name: 'Game not found' })).toBeVisible()
+    await expect(retryHeading(revisit)).toHaveCount(0)
+    expect(documentRequests).toHaveLength(requestsBefore)
+  } finally {
+    await context.close()
+  }
 })
 
 test('the browser reports network errors outside the fallback scope or without the saved page @webkit', async ({ browser, page }) => {
