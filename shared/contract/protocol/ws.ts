@@ -171,4 +171,6 @@ export type RoomSummary = {
   status?: 'waiting' | 'playing'
   canSpectate?: boolean
   access?: RoomAccess['kind']
+  /** Present only for a classic game (ADR 0049); absent means revised. */
+  cardEdition?: 'classic'
 }

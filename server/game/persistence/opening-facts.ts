@@ -19,10 +19,10 @@ export class OpeningFacts {
     this.insert = db.prepare(`INSERT INTO game_opening_facts (
       room_id, started_at, playing_at, mode, seat_count, parent_cards,
       through_the_seasons, farmers_of_the_moor, snake_opening,
-      moor_balance_rules, community_deck, origin
+      moor_balance_rules, community_deck, classic_edition, origin
     ) SELECT @roomId, @startedAt,
       CASE WHEN @startedAt>=tracking_since AND @playing THEN @committedAt::bigint ELSE NULL END,
-      @mode, @seats, @parents, @seasons, @moor, @snake, @balance, @community,
+      @mode, @seats, @parents, @seasons, @moor, @snake, @balance, @community, @classic,
       CASE WHEN @startedAt>=tracking_since THEN 'live' ELSE 'legacy' END
     FROM game_opening_tracking WHERE singleton
       AND NOT EXISTS(SELECT 1 FROM room_ownership WHERE room_id=@roomId AND development)
@@ -45,6 +45,7 @@ export class OpeningFacts {
       snake: meta.enableSnakeOpening === true,
       balance: meta.enableFarmersOfTheMoor === true && meta.enableMoorBalanceRules === true,
       community: state?.enableCommunityDeck ?? null,
+      classic: meta.cardEdition === 'classic',
     })
     if (inserted.changes) {
       for (const userId of new Set(meta.players.map(player => player.userId))) {

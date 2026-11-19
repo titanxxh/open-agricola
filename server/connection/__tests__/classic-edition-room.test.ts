@@ -5,6 +5,8 @@ import { withClassicCardDefinitions } from '../../../shared/cards/classic-catalo
 import { classicFixtureCards } from '../../../shared/cards/__tests__/__fixtures__/classic-definitions'
 import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
 import { createConnectionCtx } from '../connection-ctx'
+import { snapshotToRoom } from '../../game/room'
+import { buildGameResult } from '../../game/room-persistence-checkpoint'
 
 // ADR 0049: room creation admits the classic option only through the injectable switch, and rejects classic games
 // combined with Farmers of the Moor, the community deck, Parent Cards, Through the Seasons or solo.
@@ -54,6 +56,7 @@ describe('classic room admission', () => {
 
     await dispatch(actor.ctx, { type: 'createRoom', maxPlayers: 2, name: 'Host', cardEdition: 'revised' })
     expect(actor.ctx.currentRoom!.session.state.cardEdition).toBeUndefined()
+    expect(await actor.deps.lobby.getRooms()).toEqual([expect.not.objectContaining({ cardEdition: expect.anything() })])
     expect(lastOutcome(actor)).toMatchObject({ ok: true })
   })
 
@@ -86,6 +89,7 @@ describe('classic room admission', () => {
     expect(lastOutcome(actor)).toMatchObject({ ok: true, roomId: room.id })
     expect(room.session.state).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CI', 'CE'], enableSnakeOpening: true })
     expect(room).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CI', 'CE'] })
+    expect(await actor.deps.lobby.getRooms()).toEqual([expect.objectContaining({ id: room.id, cardEdition: 'classic' })])
     for (const player of room.session.state.players) {
       expect(player.occupationHand).toHaveLength(7)
       expect(player.minorHand).toHaveLength(7)
@@ -140,5 +144,32 @@ describe('classic rematch', () => {
     expect(lastOutcome(actor)).toMatchObject({ ok: true })
     expect(room.session.state.players[actingIndex]!.resources.wood).toBeGreaterThan(wood)
     expect(room.session.state.cardEdition).toBe('classic')
+  }))
+})
+
+describe('existing classic games', () => {
+  it('restores a classic room after restart and resumes its seats while the switch is off', () => withFixtures(async () => {
+    const host = createActor(true, 'host')
+    await dispatch(host.ctx, classicRoom())
+    const guest = createActor(true, 'guest', host.deps)
+    const roomId = host.ctx.currentRoom!.id
+    await dispatch(guest.ctx, { type: 'joinRoom', roomId, name: 'Guest' })
+    expect(host.ctx.currentRoom!.status).toBe('playing')
+    const hands = host.ctx.currentRoom!.session.state.players.map(player => player.occupationHand)
+
+    const saved = (await host.deps.persistence.load(roomId))!
+    expect(saved.meta).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CE', 'CI'] })
+    const restarted = newDeps(host.deps.persistence)
+    const restored = snapshotToRoom(saved)
+    expect(restored).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CE', 'CI'] })
+    expect(buildGameResult(restored, Date.now()).cardEdition).toBe('classic')
+    restarted.registry.set(restored)
+    const resumed = createActor(false, 'host', restarted)
+    await dispatch(resumed.ctx, { type: 'joinRoom', roomId, intent: 'resume', name: 'Host' })
+
+    expect(resumed.ctx.currentRoom).toBe(restored)
+    expect(messagesOf(resumed)).toContainEqual(expect.objectContaining({ type: 'roomJoined', roomId, status: 'playing' }))
+    expect(restored.session.state).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CE', 'CI'] })
+    expect(restored.session.state.players.map(player => player.occupationHand)).toEqual(hands)
   }))
 })

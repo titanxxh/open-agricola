@@ -382,6 +382,20 @@ describe('PostgresRoomPersistence', () => {
 
   })
 
+  it('round-trips the classic Card Edition and its decks through save, load and restore', async () => {
+    ;(await p.save('classic', STATE, { ...META, cardEdition: 'classic', classicDeckIds: ['CI', 'CE'] }))
+    ;(await p.save('revised', STATE, META))
+
+    expect((await p.load('classic'))?.meta).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CI', 'CE'] })
+    expect((await p.load('revised'))?.meta).not.toHaveProperty('cardEdition')
+    expect((await p.load('revised'))?.meta).not.toHaveProperty('classicDeckIds')
+    expect((await p.listRestorable({ now: NOW, waitingTtlMs: WAITING_TTL, playingTtlMs: PLAYING_TTL }))
+      .map(snap => [snap.id, snap.meta.cardEdition ?? 'revised', snap.meta.classicDeckIds ?? null]).sort()).toEqual([
+      ['classic', 'classic', ['CI', 'CE']],
+      ['revised', 'revised', null],
+    ])
+  })
+
   it('metadata saves preserve the authoritative committed version', async () => {
     ;(await p.save('r1', STATE, META))
     const v1 = (await db.prepare('SELECT version FROM rooms WHERE id = ?').get('r1')) as { version: number }

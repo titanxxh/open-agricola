@@ -217,6 +217,14 @@ export const roomConnections = (room: Pick<Room, 'players'>): WebSocket[] =>
 export const roomConnectedPlayerCount = (room: Pick<Room, 'players'>): number =>
   roomConnections(room).filter(ws => ws.readyState === ws.OPEN).length
 
+/** The room's classic edition and decks, falling back to its game state; empty for a revised room. */
+const roomCardEdition = (room: Pick<Room, 'cardEdition' | 'classicDeckIds' | 'session'>): Pick<RoomMeta, 'cardEdition' | 'classicDeckIds'> => {
+  const state = room.session.state
+  return (room.cardEdition ?? state.cardEdition) === 'classic'
+    ? { cardEdition: 'classic', classicDeckIds: room.classicDeckIds ?? state.classicDeckIds ?? [] }
+    : {}
+}
+
 export const toRoomMeta = (room: Room): RoomMeta => ({
   endProposal: room.endProposal ?? null,
   awaitingRematchPlayers: room.awaitingRematchPlayers === true,
@@ -247,6 +255,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   enableMoorBalanceRules: room.session.state.enableMoorBalanceRules === true,
   allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
   enableSnakeOpening: room.enableSnakeOpening ?? (room.session.state.enableSnakeOpening === true),
+  ...roomCardEdition(room),
   hotseat: room.hotseat === true,
   status: getRoomStatus(room),
   players: roomSeatOwners(room),
@@ -329,7 +338,7 @@ export const removePlayerFromRoom = (
 
 type RoomLikeForSummary = Pick<
   Room,
-  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy' | 'hotseat' | 'access' | 'status'
+  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy' | 'hotseat' | 'access' | 'status' | 'cardEdition' | 'session'
 >
 
 export function summarizeRoomsForLobby(
@@ -353,10 +362,18 @@ export function summarizeRoomsForLobby(
       status: r.status === 'playing' ? 'playing' : 'waiting',
       ...(isPublicSpectatableRoom(r) && roomConnectedPlayerCount(r) > 0 ? { canSpectate: true } : {}),
       ...(r.access?.kind === 'invited' ? { access: 'invited' } : {}),
+      ...((r.cardEdition ?? r.session.state.cardEdition) === 'classic' ? { cardEdition: 'classic' } : {}),
     })
     if (typeof limit === 'number' && list.length >= limit) break
   }
   return list
+}
+
+/** A classic room's edition and decks from its metadata, or from its saved game state for a row written before them. */
+const snapshotCardEdition = (snapshot: RoomSnapshot): Pick<RoomMeta, 'cardEdition' | 'classicDeckIds'> => {
+  const state = snapshot.serialized?.state
+  if (snapshot.meta.cardEdition === 'classic') return { cardEdition: 'classic', classicDeckIds: snapshot.meta.classicDeckIds ?? [] }
+  return state?.cardEdition === 'classic' ? { cardEdition: 'classic', classicDeckIds: state.classicDeckIds ?? [] } : {}
 }
 
 const createSessionFromSnapshot = (
@@ -374,6 +391,7 @@ const createSessionFromSnapshot = (
       enableMoorBalanceRules: snapshot.meta.enableMoorBalanceRules === true,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
       enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? false,
+      ...snapshotCardEdition(snapshot),
     })
   }
   try {
@@ -393,6 +411,7 @@ const createSessionFromSnapshot = (
       enableMoorBalanceRules: snapshot.meta.enableMoorBalanceRules === true,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
       enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? false,
+      ...snapshotCardEdition(snapshot),
     })
   }
 }
@@ -444,6 +463,7 @@ export const snapshotToRoom = (
     enableMoorBalanceRules: session.state.enableMoorBalanceRules === true,
     allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
     enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? (snapshot.serialized?.state?.enableSnakeOpening === true),
+    ...snapshotCardEdition(snapshot),
     ...(snapshotRehydrationFailed ? { snapshotRehydrationFailed: true } : {}),
   }
 }

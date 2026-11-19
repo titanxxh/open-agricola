@@ -63,6 +63,19 @@ it('records only real starts, freezes distinct starting accounts and preserves t
   expect(await db.prepare('SELECT user_id FROM game_opening_accounts').all()).toEqual([{ user_id: 'u1' }])
 })
 
+it('records whether a started game deals classic cards', async () => {
+  const playing = { phase: 'playing', gameOver: false, enableCommunityDeck: false } as const
+  for (const id of ['classic-opening', 'revised-opening']) await context(id)
+  await db.transaction(async () => {
+    await facts.capture({ roomId: 'classic-opening', meta: meta({ cardEdition: 'classic', classicDeckIds: ['CE'] }), state: playing, committedAt: now })
+    await facts.capture({ roomId: 'revised-opening', meta: meta(), state: playing, committedAt: now })
+  })()
+  expect(await db.prepare('SELECT room_id,classic_edition FROM game_opening_facts ORDER BY room_id').all()).toEqual([
+    { room_id: 'classic-opening', classic_edition: true },
+    { room_id: 'revised-opening', classic_edition: false },
+  ])
+})
+
 it('captures through the public save transaction and rolls back the whole start when its account snapshot cannot be stored', async () => {
   const session = createWorkSession({ seed: 31208, configure: state => {
     for (const player of state.players) {
@@ -145,7 +158,7 @@ it('backfills only proven surviving starts as legacy and never replaces missing 
   await persistence.save('legacy', null, meta({ startedAt: now - 60_000 }))
   await db.exec(`DROP VIEW operations_current_openings;
     DROP TABLE game_opening_accounts,game_opening_facts,game_opening_tracking;
-    DELETE FROM postgres_schema_migrations WHERE version=31;`)
+    DELETE FROM postgres_schema_migrations WHERE version IN (31,48);`)
   await migratePostgres(db)
   expect(await db.prepare('SELECT started_at,playing_at,origin,community_deck FROM game_opening_facts').get())
     .toEqual({ started_at: now - 60_000, playing_at: null, origin: 'legacy', community_deck: null })

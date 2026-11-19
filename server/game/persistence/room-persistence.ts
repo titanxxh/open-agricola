@@ -36,6 +36,9 @@ export type RoomMeta = {
   enableMoorBalanceRules?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
   enableSnakeOpening?: boolean
+  /** A classic game and its normalized Classic Decks (ADR 0049); both absent for a revised game. */
+  cardEdition?: 'classic'
+  classicDeckIds?: string[]
   /** One device plays every seat: hidden from the room list, creator-only resume. */
   hotseat?: boolean
   status: RoomStatus
@@ -84,6 +87,7 @@ export type GameResult = {
   farmersOfTheMoor: boolean
   moorBalanceRules?: boolean
   snakeOpening: boolean
+  cardEdition?: 'classic'
   players: GameResultPlayer[]
 }
 
