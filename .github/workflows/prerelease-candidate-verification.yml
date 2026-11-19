@@ -92,12 +92,45 @@ jobs:
         with:
           node-version: 24
       - run: corepack enable
-      - name: Install trusted browser prerequisites
+      - name: Key trusted browser system packages
+        id: browser-packages-key
         if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
         working-directory: policy
         run: |
+          playwright=$(grep -m1 -oE '^  playwright@[0-9][^:(]*' pnpm-lock.yaml | cut -d@ -f2)
+          [ -n "$playwright" ] || { echo 'pnpm-lock.yaml names no playwright version' >&2; exit 1; }
+          prefix="browser-system-packages-v1-$(. /etc/os-release && echo "$ID-$VERSION_ID")-$(uname -m)-"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "key=$prefix$playwright" >> "$GITHUB_OUTPUT"
+      - name: Restore trusted browser system packages
+        id: browser-packages
+        if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/browser-system-packages
+          key: ${{ steps.browser-packages-key.outputs.key }}
+          restore-keys: ${{ steps.browser-packages-key.outputs.prefix }}
+      - name: Install trusted browser prerequisites
+        if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
+        working-directory: policy
+        env:
+          APT_ARCHIVES: ${{ runner.temp }}/browser-system-packages
+        run: |
           pnpm install --frozen-lockfile
+          # apt checks each cached .deb against the signed package indices and downloads any stale or altered file again.
+          sudo install -d -m 755 "$APT_ARCHIVES"
+          sudo install -d -m 700 -o _apt -g root "$APT_ARCHIVES/partial"
+          printf 'Dir::Cache::archives "%s/";\nAPT::Keep-Downloaded-Packages "true";\n' "$APT_ARCHIVES" | sudo tee /etc/apt/apt.conf.d/90-browser-system-packages > /dev/null
           pnpm exec playwright install-deps chromium webkit firefox
+          sudo apt-get autoclean -qq
+          sudo rm -rf /etc/apt/apt.conf.d/90-browser-system-packages "$APT_ARCHIVES/partial" "$APT_ARCHIVES/lock"
+          sudo chown -R "$(id -u):$(id -g)" "$APT_ARCHIVES"
+      - name: Save trusted browser system packages
+        if: (startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit') && steps.browser-packages.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/browser-system-packages
+          key: ${{ steps.browser-packages-key.outputs.key }}
       - name: Checkout pinned public assets
         id: public-assets
         if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
