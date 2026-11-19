@@ -1,4 +1,4 @@
-import { expect, type Page, type APIRequestContext } from '@playwright/test'
+import { expect, type Page, type APIRequestContext, type Locator } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'fs'
 import path from 'path'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../shared/contract/browser-auth'
@@ -120,4 +120,25 @@ export function saveState(name: string, data: unknown, dir = OUTPUT_DIR) {
   const filePath = path.join(dir, name.endsWith('.json') ? name : `${name}.json`)
   writeFileSync(filePath, JSON.stringify(data, null, 2))
   return filePath
+}
+
+/**
+ * Restarts the Workshop's embedded browser sandbox with a fixed setup. The
+ * Workshop picks a random seed per launch; tests that need a known deal
+ * rewrite the stashed launch config (keeping its launch identity) and reload
+ * the game frame, which then starts fresh from that config.
+ */
+export async function relaunchBrowserSandbox(iframe: Locator, overrides: Record<string, unknown>): Promise<void> {
+  await iframe.evaluate(async (element: HTMLIFrameElement, values) => {
+    const frame = element.contentWindow
+    if (!frame) throw new Error('Sandbox frame is unavailable')
+    const key = 'open-agricola-local-sandbox-config'
+    const stash = JSON.parse(frame.sessionStorage.getItem(key) ?? 'null') as { owner: string; config: Record<string, unknown> } | null
+    if (!stash) throw new Error('The Workshop did not stash a browser sandbox launch')
+    frame.sessionStorage.setItem(key, JSON.stringify({ ...stash, config: { ...stash.config, ...values } }))
+    await new Promise<void>((resolve) => {
+      element.addEventListener('load', () => resolve(), { once: true })
+      frame.location.reload()
+    })
+  }, overrides)
 }
