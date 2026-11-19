@@ -15,6 +15,7 @@ import { PlayerAccountId } from '../components/common/PlayerAccountId'
 import { BetaAccessSettings } from './BetaAccessSettings'
 import { PrereleaseEntry } from './PrereleaseEntry'
 import { BugReportFeedbackSettings } from './BugReportFeedbackSettings'
+import { WebPushSettings } from './WebPushSettings'
 
 type LinkedIdentity = {
   provider: 'github' | 'google'
@@ -446,6 +447,7 @@ export function SettingsPage() {
       {user?.isAdmin && <Section icon="📊" title={t('platform.operationsTitle')} variant="parchment"><button className="btn btn-primary" onClick={() => setPage('operations')}>{t('platform.operationsTitle')}</button></Section>}
 
       <BetaAccessSettings />
+      <WebPushSettings />
       <BugReportFeedbackSettings />
 
       {user?.isAdmin && (

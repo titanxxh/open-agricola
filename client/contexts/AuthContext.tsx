@@ -1,4 +1,5 @@
 import { browserApiFetch } from '../services/browser-api'
+import { reconcileWebPushDevice } from '../services/web-push'
 import { checkServerAvailability, isServerUnavailableStatus, onServerRecovered } from '../services/server-availability'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
@@ -200,6 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshSessionFn])
 
   const logoutFn = useCallback(async () => {
+    void reconcileWebPushDevice(null).catch(() => {})
     await browserApiFetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
@@ -208,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logoutAllFn = useCallback(async () => {
+    void reconcileWebPushDevice(null).catch(() => {})
     await browserApiFetch(`${API_BASE}/api/auth/logout-all`, {
       method: 'POST',
       credentials: 'include',

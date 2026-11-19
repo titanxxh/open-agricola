@@ -2,3 +2,8 @@
 @import './base.css';
 @import './components.css';
 @import './pages/workshop.css';
+
+.web-push-notice {
+  padding: 0.5rem 1rem;
+  text-align: center;
+}

@@ -5,6 +5,7 @@ import { AppErrorBoundary } from './app/AppErrorBoundary'
 import { AppLoadFailure } from './app/AppLoadFailure'
 import { GameContextRouter } from './app/GameContextRouter'
 import { InboxProvider } from './app/Inbox'
+import { WebPushClickRouter } from './app/WebPushClickRouter'
 import { PageRouter } from './app/PageRouter'
 import { getBrowserReloadRequired, subscribeBrowserReload } from './services/browser-api'
 import './styles/bootstrap-shell.css'
@@ -15,7 +16,7 @@ function App() {
     <LocaleProvider>
       {reloadRequired ? <AppLoadFailure /> : <GameContextRouter>
         <AppErrorBoundary fallback={<AppLoadFailure />}>
-          <AuthProvider><InboxProvider><PageRouter /></InboxProvider></AuthProvider>
+          <AuthProvider><InboxProvider><WebPushClickRouter /><PageRouter /></InboxProvider></AuthProvider>
         </AppErrorBoundary>
       </GameContextRouter>}
     </LocaleProvider>

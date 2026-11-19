@@ -5,7 +5,7 @@ import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
 import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { createTestDatabase } from './_helpers/postgres'
 import type { PostgresDatabase } from '../database/postgres'
-import { GameSession } from '../game/authoritative-session'
+import { createOpeningSession } from './_helpers/session-fixtures'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
 import { RoomCommitter, replayIntentFromCommand } from '../game/room-committer'
 import { snapshotToRoom, type Room } from '../game/room'
@@ -42,14 +42,15 @@ beforeEach(async () => {
   }
   room = {
     id: randomUUID(),
-    session: new GameSession(587, undefined, { playerCount: 2, draftMode: 'simultaneous', draftPoolSize: 7 }),
+    session: createOpeningSession({ seed: 587, options: { playerCount: 2, draftMode: 'simultaneous', draftPoolSize: 7 },
+      expected: { phase: 'draft', roundPhase: 'work', interaction: { stateId: 'idle' } } }),
     players: [], seatOwners: SITE_USER.map((userId, playerIndex) => ({ userId, playerIndex })),
     maxPlayers: 2, version: 0, status: 'playing', startedAt: now,
     replayRecording: true, replayViewerBuildId: 'test-viewer', replayGameBuildId: 'test-build',
   }
 })
 
-afterEach(async () => { await db?.close() })
+afterEach(async () => { room?.session.dispose(); await db?.close() })
 
 async function subscribe(session: string, endpointSuffix: string) {
   const deviceId = randomUUID()
@@ -109,7 +110,8 @@ it('drops the spent first reminder and retries only the new waiting-to-selecting
   const sent: Array<{ id: string; ttl: number }> = []
   const delivery = new WebPushDelivery(store, async (attempt, ttl) => {
     sent.push({ id: attempt.deliveryId, ttl })
-    return { kind: sent.length === 1 ? 'retry' : 'accepted' }
+    if (sent.length === 1) throw new Error('Provider outcome unknown')
+    return { kind: 'accepted' }
   }, () => now)
   await delivery.deliverDue(['draft'])
   expect(sent).toHaveLength(1)
@@ -148,4 +150,50 @@ it('uses active login binding and stops when the reminder expires or the account
   await db.prepare('DELETE FROM sessions WHERE user_id=?').run(SITE_USER[0])
   expect(await store.preferences(SESSION[0]!, otherDevice, option('fcm.googleapis.com', 'tablet').endpoint)).toBeNull()
   committer.shutdown()
+})
+
+it('keeps one continuous draft reminder when a Moor stage immediately advances', async () => {
+  room.session.dispose()
+  room.session = createOpeningSession({ seed: 587,
+    options: { playerCount: 2, draftMode: 'simultaneous', draftPoolSize: 7, enableFarmersOfTheMoor: true },
+    expected: { phase: 'draft', roundPhase: 'work', interaction: { stateId: 'idle' } } })
+  await subscribe(SESSION[0]!, 'phone')
+  const committer = makeCommitter()
+  expect((await committer.prepareRoom(room, { missingPrefix: false })).kind).toBe('committed')
+  const sent: PushDelivery[] = []
+  const delivery = new WebPushDelivery(store, async attempt => { sent.push(attempt); return { kind: 'accepted' } }, () => now)
+  await delivery.deliverDue(['draft'])
+
+  for (let i = 0; i < 10; i++) {
+    await play(committer, 1)
+    await play(committer, 0)
+    const draft = room.session.state.draft
+    const player = room.session.state.players[0]
+    if (!draft || !player) throw new Error('Missing Moor draft')
+    const progress = draftSeatProgress(draft, player.id)
+    expect(progress.kind).toBe('selecting')
+    if (progress.kind === 'selecting' && progress.stageIndex === 1) {
+      await delivery.deliverDue(['draft'])
+      expect(sent).toHaveLength(1)
+      committer.shutdown()
+      return
+    }
+  }
+  throw new Error('Moor draft did not advance')
+})
+
+it('does not deliver any notification from a rolled back Room transaction', async () => {
+  await subscribe(SESSION[0]!, 'phone')
+  const committer = makeCommitter()
+  await expect(db.transaction(async () => {
+    expect((await committer.prepareRoom(room, { missingPrefix: false })).kind).toBe('committed')
+    throw new Error('Commit aborted')
+  })()).rejects.toThrow('Commit aborted')
+  committer.shutdown()
+
+  const sent: PushDelivery[] = []
+  const delivery = new WebPushDelivery(store, async attempt => { sent.push(attempt); return { kind: 'accepted' } }, () => now)
+  await delivery.deliverDue(['draft'])
+  expect(sent).toEqual([])
+  expect(await persistence.load(room.id)).toBeNull()
 })
