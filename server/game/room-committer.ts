@@ -1,5 +1,6 @@
 import type { GameTermination } from '../../shared/contract/protocol/game-termination'
 import { measure } from '../observability/metrics'
+import { draftPushOpportunities, newDraftPushEvents } from '../web-push/draft'
 import { ExecutionRevokedError } from './execution-access'
 import type { OwnerToken } from './room-directory'
 import { RoomOwnershipError } from './room-directory'
@@ -53,6 +54,7 @@ type RoomHead = {
   frame: JsonValue
   frameHash: string
   privateCursor: PrivateCursorComparison
+  draftOpportunities: ReadonlyArray<string | null>
   stepNo: number
   roomVersion: number
   checkpointStepNo: number
@@ -389,6 +391,7 @@ export class RoomCommitter {
     const customCardsJson = canonicalJson(this.resources
       ? await this.resources.archiveCards(room.id, definitions)
       : definitions)
+    const meta = { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, 'initial') }
     const commit: ReplayCommit = {
       roomId: room.id,
       retireRoomId: options.retireRoomId,
@@ -398,7 +401,9 @@ export class RoomCommitter {
       retiredVersion: options.retiredVersion,
       retiredTermination: options.retiredTermination,
       serialized,
-      meta: { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, 'initial') },
+      meta,
+      draftPushEvents: newDraftPushEvents({ roomId: room.id, before: [], after: draftPushOpportunities(room, serialized.state),
+        owners: meta.players, stepNo: 0, createdAt }),
       ...(options.receipt ? { receipt: { request: { ...options.receipt.request }, outcome: { ...options.receipt.outcome, roomId: room.id, roomVersion: 0, stepNo: 0, frameHash: encoded.frameHash } } } : {}),
       header: {
         schemaVersion: REPLAY_SCHEMA_VERSION,
@@ -461,10 +466,13 @@ export class RoomCommitter {
       return this.blockPermanently(room.id, 'game start time is missing')
     }
     const createdAt = this.now()
+    const meta = { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, replayIntent.commandType) }
     const commit: ReplayCommit = {
       roomId: room.id,
       serialized,
-      meta: { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, replayIntent.commandType) },
+      meta,
+      draftPushEvents: newDraftPushEvents({ roomId: room.id, before: head.draftOpportunities, after: draftPushOpportunities(room, serialized.state),
+        owners: meta.players, stepNo, createdAt }),
       ...(receipt ? { receipt: { request: { ...receipt.request }, outcome: { ...receipt.outcome, roomId: room.id, roomVersion, stepNo, frameHash: encoded.frameHash } } } : {}),
       step: {
         stepNo,
@@ -544,6 +552,7 @@ export class RoomCommitter {
         frame,
         frameHash: hash,
         privateCursor: capturePrivateCursor(current.sessionCursor),
+        draftOpportunities: draftPushOpportunities(room, current.state),
         stepNo: persisted.latestStepNo,
         roomVersion: persisted.roomVersion,
         checkpointStepNo: persisted.checkpointStepNo,
@@ -622,6 +631,7 @@ export class RoomCommitter {
         frame,
         frameHash: encoded.frameHash,
         privateCursor,
+        draftOpportunities: draftPushOpportunities(room, commit.serialized.state),
         stepNo: commit.step.stepNo,
         roomVersion: commit.step.roomVersion,
         checkpointStepNo: encoded.checkpointStepNo,
