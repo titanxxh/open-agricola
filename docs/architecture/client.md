@@ -17,7 +17,7 @@ Harvest needs use server `harvestRequirements`. UI: `harvest-requirements.spec.t
 | Bundle | Entry | Paths | Constraint |
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | Uses WebSocket. From `shared/*`, imports only `contract`, `domain` and `i18n`; card display uses manifest-backed `card-meta` plus `custom-card-metadata`. |
-| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | Lazy Workshop sandbox UI; rules execute through the backend sandbox path. |
+| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | Lazy Workshop sandbox UI; playtests execute in the browser `local-sandbox-worker`. |
 | `workshop-game` | `client/workshop-game/main.ts` | `client/workshop-game/` | Dedicated game iframe; admits only a direct child of the same-origin top-level Workshop before loading language, metadata, Auth or transport. |
 | `local-sandbox-worker` | `client/local-sandbox/worker.ts` | `client/local-sandbox/` | Browser-mode engine Worker for Workshop playtesting; only its Worker-side files may import complete `shared/*`, and main-bundle `local-transport`, `persistence` and `workshop-launch` use type-only shared imports. |
 | `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | No login, cookies, WebSocket or commands; reads only public Replay JSON with display filtering compiled at archive time. |

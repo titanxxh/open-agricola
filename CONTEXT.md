@@ -1165,7 +1165,7 @@ _Avoid_: 自动保存历史、Design Draft、Published Card
 _Avoid_: 实时 Design Draft、生成记录、Generation Provenance
 
 **Replay Card Snapshot**:
-正式多人局把实际使用的自定义卡名称、说明、美术和规则参数固化进 Game Replay Archive，使回放不依赖后续 Workshop Card。它不包含 LLM prompt、编辑历史、Generation Provenance、能力源码或编译产物；只有已审核并上线的卡能进入正式多人局，其快照随发布公开。
+固化在 Game Replay Archive 中的自定义卡名称、说明、美术和规则参数，使回放不依赖后续 Workshop Card。它不包含 LLM prompt、编辑历史、Generation Provenance、能力源码或编译产物。正式对局只加载部署版本中的卡（ADR 0052），因此新的正式局不再产生该快照。
 _Avoid_: Published Card、Draft Version、可执行卡牌实现
 
 **Workshop Sandbox（工坊沙盒）**:
@@ -1173,11 +1173,11 @@ Workshop 中组合自定义卡、配置测试局并运行独立试卡会话的�
 _Avoid_: 中文界面中的 Sandbox、Reset Sandbox、Custom Code Sandbox
 
 **Custom Code Sandbox**:
-自定义卡代码的校验、编译和隔离执行链路，服务端通过 `server/custom-code/` 和 executor-backed runtime 注入卡牌能力。
+已退役沙盒格式（`CARD_DEF` / `CARD_IMPL`）自定义卡代码的校验、编译和隔离执行链路，服务端通过 `server/custom-code/` 和 executor-backed runtime 注入卡牌能力；#1887 移除前供旧草稿使用。原生 Card Source 模块不经过它。
 _Avoid_: 直接执行用户源码
 
 **Workshop Capability Contract（工坊能力契约）**:
-一个部署承诺执行的自定义卡能力及其限制，是模型生成、源码校验和实际执行共用的同一范围。它可以小于原生卡牌能力；GitHub 上存在对应的原生实现不代表该能力可用。
+一个部署承诺执行的自定义卡能力及其限制，只约束已退役沙盒格式的草稿（#1887 移除前）；原生 Card Source 模块不受能力契约限制（ADR 0052）。它可以小于原生卡牌能力；GitHub 上存在对应的原生实现不代表该能力可用。
 _Avoid_: 沙盒契约、部署契约、执行契约、原生接口全集、仅用于提示词的允许名单
 
 **主 client bundle**:
@@ -1276,7 +1276,7 @@ _Avoid_: 永久放弃、全局出局名单
 - 进行局的私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输；结束局的 **Game Replay Archive** 可按座位视角或全开视角展示归档规则状态，但不保存 Private Event envelope。
 - **Game Replay Archive** 由 **Replay Step** 组织，用 **Replay Participant** 表达座位身份，并由 **Replay Perspective** 决定展示遮蔽；内容删除后原 `roomId` 只解析为 **Replay Tombstone**。
 - **Game Bug Reporter** 可以用自己的 **Issue Submission Connection** 提交，也可以明确选择 **Hosted Issue Identity**；两者都从同一 **Bug Report Draft** 和 **Bug Report Anchor** 创建公开 Issue，未完成局可用 **Reported Game Evidence** 暂时还原该 Anchor。
-- **Workshop** 生成或上传自定义卡；**Custom Code Sandbox** 校验、编译并隔离执行这些卡的 impl。
+- **Workshop** 生成或上传自定义卡，写成原生 Card Source 模块，只在作者浏览器的 opaque-origin Worker 中运行，服务端只检查结构、不执行；已退役沙盒格式的旧草稿仍由 **Custom Code Sandbox** 校验、编译并隔离执行。
 - **Custom Code Sandbox** 只接受 **Workshop Capability Contract** 内的能力；原生 **Card Impl** 不受该契约限制。
 - Workshop Card 只有在 PR 合入并随版本发布为社区卡后才进入正式对局；在此之前只在作者自己浏览器的 **Workshop Sandbox** 中运行（ADR 0052）。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。

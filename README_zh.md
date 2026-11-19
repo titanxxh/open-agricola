@@ -26,7 +26,7 @@ Open Agricola 项目的目标是支持全部的 Agricola 扩展。目前支持�
 ## Features
 
 - 后端权威 + WebSocket 实时多人同步
-- 2-6 人房间、simultaneous draft、Community Deck、自定义工坊卡
+- 2-6 人房间、simultaneous draft、由已合入工坊卡组成的 Community Deck
 - **LLM-Assisted Card Design** — 浏览器内调用 LLM 设计自定义卡牌，自动生成农场主画风的卡牌图片和**实现代码**；配置 GitHub 集成后可从工坊提交 PR
 
 ## Live Demo
@@ -84,7 +84,6 @@ CI 根据 PR 或 main 的完整改动选择检查。本地调试使用 `pnpm ver
 | `enableThroughTheSeasons=true` | 创建 WS 房间时启用 Through the Seasons |
 | `enableFarmersOfTheMoor=true` | 创建 WS 房间时启用 Farmers of the Moor |
 | `allowIncompleteFarmersOfTheMoorMinorDeal=true` | Farmers of the Moor 小改良池不完整时仍允许开局 |
-| `customCards=id1,id2` | 创建 WS 房间时加载工坊卡 ID |
 | `devMode=1` | 在固定 dev 房间或 embedded sandbox 启用开发者面板 |
 | `page=workshop` | 打开工坊页面 |
 | `page=login` | 强制跳登录页（认证后默认跳大厅）|

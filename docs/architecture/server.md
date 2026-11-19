@@ -95,7 +95,7 @@ type RoomCommitResult =
 ClientCommand
   -> room-router: validate seat and payload
   -> GameSession: built-in cards synchronously produce SessionResponse;
-     executable Workshop cards return asynchronously from the session Worker
+     Workshop cards in restored Rooms return asynchronously from the session Worker
   -> RoomCommitter: serialize once and atomically write Room snapshot plus Replay Step
   -> Broadcaster: after commit, build viewer-filtered envelopes and send them
 ```
@@ -123,7 +123,7 @@ server/custom-code/
 └── client.ts            synchronous main-process to Worker Thread client
 ```
 
-- The backend stores only `compiled_code + code_manifest`. A non-built-in executable Workshop card runs every `GameSession` command of its HTTP sandbox or WebSocket Room in a dedicated Worker (`CustomSessionExecutor`); one Room runs FIFO through Durable Commit, different Rooms in parallel, and a later Room or seat change on the same connection cannot alter an in-flight command's Room or Replay actor.
+- Used only by retired-format drafts and restored Rooms with Workshop cards until #1887. The backend stores only `compiled_code + code_manifest`. A non-built-in executable Workshop card runs every `GameSession` command of its Room in a dedicated Worker (`CustomSessionExecutor`); one Room runs FIFO through Durable Commit, different Rooms in parallel, and a later Room or seat change on the same connection cannot alter an in-flight command's Room or Replay actor.
 - The main thread keeps only a non-executing mirror of the last successful snapshot, restored through a non-settling path so it never re-probes continuations. Inside the Worker, `client.ts` calls isolated-vm synchronously, so `Atomics.wait()` never blocks the HTTP or WebSocket event loop.
 - Before each command an in-memory checkpoint preserves pending state and undo history. A hook timeout or runtime warning restores it and keeps the diagnostic; a Worker crash or overall timeout rebuilds from the last snapshot.
 - `built_in=1` cards use the built-in implementation without a Worker.
@@ -182,7 +182,7 @@ Viewer entry HTML revalidates its response policy; content-addressed assets rema
 
 - `sandbox_settings` and `sandbox_cards` persist test setup for `POST /api/game/new-sandbox`.
 - `workshop-status.ts` separates review from publication. Binding/publishing require an open, non-draft `main` PR, a fixed Draft Version and authorized exact-head approval. Mismatch or failed reconciliation becomes `stale·offline`; transient initial refresh failure preserves `in_review` for retry.
-- Approved `main` merges become read-only `merged` after exact-head reconciliation; other bases become stale/offline. Reviewed live snapshots serve until `markBuiltInMergedCards` hands them to built-in definitions at release.
+- Approved `main` merges become read-only `merged` after exact-head reconciliation; other bases become stale/offline. `live` only affects gallery display; `markBuiltInMergedCards` makes merged cards built-in at release.
 - Games load only deployed cards (ADR 0052): creation rejects any `customCardIds`, and the sandbox accepts only the author's own cards. Rooms recorded with Workshop cards still restore through the executor.
 - Author unpublish permits existing games; administrator takedown ends affected Rooms without scoring or Replay.
 - `workshop-public-cards.ts` owns the catalog of live approved versions, fixed source and image inputs and 30-second status. Catalog pages exclude drafts and compiler output. Reads never write sandbox state; consumers compile and suspend on expiry. [Platform design](../PLATFORM_DESIGN.md#d3-sandbox-isolation-and-fault-tolerance) defines lifecycle policy.
