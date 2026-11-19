@@ -541,6 +541,121 @@ import { C180_Trapper } from './C/C180_Trapper'
 import { CE203_Shepherd } from './classic/CE/CE203_Shepherd'
 import { CI097_Slaughterhouse } from './classic/CI/CI097_Slaughterhouse'
 import { CUSTOM_FixtureHarvester } from './community/CUSTOM_FixtureHarvester'
+import { CWM001_Amazon } from './classic/CWM/CWM001_Amazon'
+import { CWM002_AnimalBuyer } from './classic/CWM/CWM002_AnimalBuyer'
+import { CWM003_ApplePicker } from './classic/CWM/CWM003_ApplePicker'
+import { CWM004_BargainingBakerr } from './classic/CWM/CWM004_BargainingBakerr'
+import { CWM005_BeeKeeper } from './classic/CWM/CWM005_BeeKeeper'
+import { CWM006_Borrower } from './classic/CWM/CWM006_Borrower'
+import { CWM007_BranchCollector } from './classic/CWM/CWM007_BranchCollector'
+import { CWM008_BreadCarrier } from './classic/CWM/CWM008_BreadCarrier'
+import { CWM009_Chemist } from './classic/CWM/CWM009_Chemist'
+import { CWM010_CloisterDweller } from './classic/CWM/CWM010_CloisterDweller'
+import { CWM011_Contractor } from './classic/CWM/CWM011_Contractor'
+import { CWM012_CovetousFarmer } from './classic/CWM/CWM012_CovetousFarmer'
+import { CWM013_Cowboy } from './classic/CWM/CWM013_Cowboy'
+import { CWM014_CropRotator } from './classic/CWM/CWM014_CropRotator'
+import { CWM015_DebrisDealer } from './classic/CWM/CWM015_DebrisDealer'
+import { CWM016_Diplomat } from './classic/CWM/CWM016_Diplomat'
+import { CWM017_Engineer } from './classic/CWM/CWM017_Engineer'
+import { CWM018_ExpertBuilder } from './classic/CWM/CWM018_ExpertBuilder'
+import { CWM019_FamilyPlanner } from './classic/CWM/CWM019_FamilyPlanner'
+import { CWM020_FarmSchoolGraduate } from './classic/CWM/CWM020_FarmSchoolGraduate'
+import { CWM021_FenceDealer } from './classic/CWM/CWM021_FenceDealer'
+import { CWM022_FoodConnoisseur } from './classic/CWM/CWM022_FoodConnoisseur'
+import { CWM023_ForestFarmer } from './classic/CWM/CWM023_ForestFarmer'
+import { CWM024_GemHunter } from './classic/CWM/CWM024_GemHunter'
+import { CWM025_Godfather } from './classic/CWM/CWM025_Godfather'
+import { CWM026_HedgeMaster } from './classic/CWM/CWM026_HedgeMaster'
+import { CWM027_Heiress } from './classic/CWM/CWM027_Heiress'
+import { CWM028_Herdsman } from './classic/CWM/CWM028_Herdsman'
+import { CWM029_HillFarmer } from './classic/CWM/CWM029_HillFarmer'
+import { CWM030_Hoarder } from './classic/CWM/CWM030_Hoarder'
+import { CWM031_HumbleFarmboy } from './classic/CWM/CWM031_HumbleFarmboy'
+import { CWM032_Hunter } from './classic/CWM/CWM032_Hunter'
+import { CWM033_LadyinWaiting } from './classic/CWM/CWM033_LadyinWaiting'
+import { CWM034_LivestockKeeper } from './classic/CWM/CWM034_LivestockKeeper'
+import { CWM035_Mailman } from './classic/CWM/CWM035_Mailman'
+import { CWM036_MasterCook } from './classic/CWM/CWM036_MasterCook'
+import { CWM037_MasterStableman } from './classic/CWM/CWM037_MasterStableman'
+import { CWM038_Minimalist } from './classic/CWM/CWM038_Minimalist'
+import { CWM039_Pawnbroker } from './classic/CWM/CWM039_Pawnbroker'
+import { CWM040_Permaculturist } from './classic/CWM/CWM040_Permaculturist'
+import { CWM041_Politician } from './classic/CWM/CWM041_Politician'
+import { CWM042_Remodeler } from './classic/CWM/CWM042_Remodeler'
+import { CWM043_ResourceLender } from './classic/CWM/CWM043_ResourceLender'
+import { CWM044_SiloGirl } from './classic/CWM/CWM044_SiloGirl'
+import { CWM045_StableDeliveryman } from './classic/CWM/CWM045_StableDeliveryman'
+import { CWM046_StoneCurator } from './classic/CWM/CWM046_StoneCurator'
+import { CWM047_StorehouseMinder } from './classic/CWM/CWM047_StorehouseMinder'
+import { CWM048_SundayWorker } from './classic/CWM/CWM048_SundayWorker'
+import { CWM049_SunriseAdmirer } from './classic/CWM/CWM049_SunriseAdmirer'
+import { CWM050_TapestryWeaver } from './classic/CWM/CWM050_TapestryWeaver'
+import { CWM051_TavernKeeper } from './classic/CWM/CWM051_TavernKeeper'
+import { CWM052_TileMaker } from './classic/CWM/CWM052_TileMaker'
+import { CWM053_VillageFool } from './classic/CWM/CWM053_VillageFool'
+import { CWM054_WheelbarrowPusher } from './classic/CWM/CWM054_WheelbarrowPusher'
+import { CWM055_WoodWorker } from './classic/CWM/CWM055_WoodWorker'
+import { CWM056_Almshouse } from './classic/CWM/CWM056_Almshouse'
+import { CWM057_AnimalNursery } from './classic/CWM/CWM057_AnimalNursery'
+import { CWM058_AppleTree } from './classic/CWM/CWM058_AppleTree'
+import { CWM059_Apprenticeship } from './classic/CWM/CWM059_Apprenticeship'
+import { CWM060_Attic } from './classic/CWM/CWM060_Attic'
+import { CWM061_BackDoor } from './classic/CWM/CWM061_BackDoor'
+import { CWM062_BackyardWell } from './classic/CWM/CWM062_BackyardWell'
+import { CWM063_Birdcage } from './classic/CWM/CWM063_Birdcage'
+import { CWM064_Bonre } from './classic/CWM/CWM064_Bonre'
+import { CWM065_BoundaryStones } from './classic/CWM/CWM065_BoundaryStones'
+import { CWM066_Brazier } from './classic/CWM/CWM066_Brazier'
+import { CWM067_BuriedTreasure } from './classic/CWM/CWM067_BuriedTreasure'
+import { CWM068_CashCrop } from './classic/CWM/CWM068_CashCrop'
+import { CWM069_ChangingPlans } from './classic/CWM/CWM069_ChangingPlans'
+import { CWM070_ClockworkMan } from './classic/CWM/CWM070_ClockworkMan'
+import { CWM071_Cookies } from './classic/CWM/CWM071_Cookies'
+import { CWM072_Crib } from './classic/CWM/CWM072_Crib'
+import { CWM073_DiamondMine } from './classic/CWM/CWM073_DiamondMine'
+import { CWM074_Donkey } from './classic/CWM/CWM074_Donkey'
+import { CWM075_Downsizing } from './classic/CWM/CWM075_Downsizing'
+import { CWM076_DrainedPond } from './classic/CWM/CWM076_DrainedPond'
+import { CWM077_EdibleRoots } from './classic/CWM/CWM077_EdibleRoots'
+import { CWM078_FarmSchool } from './classic/CWM/CWM078_FarmSchool'
+import { CWM079_FestivalHall } from './classic/CWM/CWM079_FestivalHall'
+import { CWM080_FishHook } from './classic/CWM/CWM080_FishHook'
+import { CWM081_FishPond } from './classic/CWM/CWM081_FishPond'
+import { CWM082_FlowerPots } from './classic/CWM/CWM082_FlowerPots'
+import { CWM083_FreeRangeChickens } from './classic/CWM/CWM083_FreeRangeChickens'
+import { CWM084_FriendlyPastures } from './classic/CWM/CWM084_FriendlyPastures'
+import { CWM085_Fruitcake } from './classic/CWM/CWM085_Fruitcake'
+import { CWM086_GlassblowersShop } from './classic/CWM/CWM086_GlassblowersShop'
+import { CWM087_GoldMedal } from './classic/CWM/CWM087_GoldMedal'
+import { CWM088_GrainElevator } from './classic/CWM/CWM088_GrainElevator'
+import { CWM089_HomeGarden } from './classic/CWM/CWM089_HomeGarden'
+import { CWM090_Honeymoon } from './classic/CWM/CWM090_Honeymoon'
+import { CWM091_IronPlow } from './classic/CWM/CWM091_IronPlow'
+import { CWM092_Keys } from './classic/CWM/CWM092_Keys'
+import { CWM093_Kindling } from './classic/CWM/CWM093_Kindling'
+import { CWM094_LampOil } from './classic/CWM/CWM094_LampOil'
+import { CWM095_MountainCave } from './classic/CWM/CWM095_MountainCave'
+import { CWM096_OakCask } from './classic/CWM/CWM096_OakCask'
+import { CWM097_OpenGate } from './classic/CWM/CWM097_OpenGate'
+import { CWM098_PettingZoo } from './classic/CWM/CWM098_PettingZoo'
+import { CWM099_PigWallow } from './classic/CWM/CWM099_PigWallow'
+import { CWM100_PlumPatch } from './classic/CWM/CWM100_PlumPatch'
+import { CWM101_PrizewinningSheep } from './classic/CWM/CWM101_PrizewinningSheep'
+import { CWM102_Ram } from './classic/CWM/CWM102_Ram'
+import { CWM103_Raspberries } from './classic/CWM/CWM103_Raspberries'
+import { CWM104_ReedNursery } from './classic/CWM/CWM104_ReedNursery'
+import { CWM105_RotherhamPlow } from './classic/CWM/CWM105_RotherhamPlow'
+import { CWM106_Ruins } from './classic/CWM/CWM106_Ruins'
+import { CWM107_SlapdashRenovation } from './classic/CWM/CWM107_SlapdashRenovation'
+import { CWM108_Steamer } from './classic/CWM/CWM108_Steamer'
+import { CWM109_SteelPlow } from './classic/CWM/CWM109_SteelPlow'
+import { CWM110_StorageShed } from './classic/CWM/CWM110_StorageShed'
+import { CWM111_UndisturbedPond } from './classic/CWM/CWM111_UndisturbedPond'
+import { CWM112_VillageSchool } from './classic/CWM/CWM112_VillageSchool'
+import { CWM113_WildBreeding } from './classic/CWM/CWM113_WildBreeding'
+import { CWM114_WineCloset } from './classic/CWM/CWM114_WineCloset'
+import { CWM115_WormBait } from './classic/CWM/CWM115_WormBait'
 import { D001_ZigzagHarrow } from './D/D001_ZigzagHarrow'
 import { D002_DwellingPlan } from './D/D002_DwellingPlan'
 import { D003_Furrows } from './D/D003_Furrows'
@@ -1558,6 +1673,121 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CE203_Shepherd': CE203_Shepherd.impl,
   'CI097_Slaughterhouse': CI097_Slaughterhouse.impl,
   'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester.impl,
+  'CWM001_Amazon': CWM001_Amazon.impl,
+  'CWM002_AnimalBuyer': CWM002_AnimalBuyer.impl,
+  'CWM003_ApplePicker': CWM003_ApplePicker.impl,
+  'CWM004_BargainingBakerr': CWM004_BargainingBakerr.impl,
+  'CWM005_BeeKeeper': CWM005_BeeKeeper.impl,
+  'CWM006_Borrower': CWM006_Borrower.impl,
+  'CWM007_BranchCollector': CWM007_BranchCollector.impl,
+  'CWM008_BreadCarrier': CWM008_BreadCarrier.impl,
+  'CWM009_Chemist': CWM009_Chemist.impl,
+  'CWM010_CloisterDweller': CWM010_CloisterDweller.impl,
+  'CWM011_Contractor': CWM011_Contractor.impl,
+  'CWM012_CovetousFarmer': CWM012_CovetousFarmer.impl,
+  'CWM013_Cowboy': CWM013_Cowboy.impl,
+  'CWM014_CropRotator': CWM014_CropRotator.impl,
+  'CWM015_DebrisDealer': CWM015_DebrisDealer.impl,
+  'CWM016_Diplomat': CWM016_Diplomat.impl,
+  'CWM017_Engineer': CWM017_Engineer.impl,
+  'CWM018_ExpertBuilder': CWM018_ExpertBuilder.impl,
+  'CWM019_FamilyPlanner': CWM019_FamilyPlanner.impl,
+  'CWM020_FarmSchoolGraduate': CWM020_FarmSchoolGraduate.impl,
+  'CWM021_FenceDealer': CWM021_FenceDealer.impl,
+  'CWM022_FoodConnoisseur': CWM022_FoodConnoisseur.impl,
+  'CWM023_ForestFarmer': CWM023_ForestFarmer.impl,
+  'CWM024_GemHunter': CWM024_GemHunter.impl,
+  'CWM025_Godfather': CWM025_Godfather.impl,
+  'CWM026_HedgeMaster': CWM026_HedgeMaster.impl,
+  'CWM027_Heiress': CWM027_Heiress.impl,
+  'CWM028_Herdsman': CWM028_Herdsman.impl,
+  'CWM029_HillFarmer': CWM029_HillFarmer.impl,
+  'CWM030_Hoarder': CWM030_Hoarder.impl,
+  'CWM031_HumbleFarmboy': CWM031_HumbleFarmboy.impl,
+  'CWM032_Hunter': CWM032_Hunter.impl,
+  'CWM033_LadyinWaiting': CWM033_LadyinWaiting.impl,
+  'CWM034_LivestockKeeper': CWM034_LivestockKeeper.impl,
+  'CWM035_Mailman': CWM035_Mailman.impl,
+  'CWM036_MasterCook': CWM036_MasterCook.impl,
+  'CWM037_MasterStableman': CWM037_MasterStableman.impl,
+  'CWM038_Minimalist': CWM038_Minimalist.impl,
+  'CWM039_Pawnbroker': CWM039_Pawnbroker.impl,
+  'CWM040_Permaculturist': CWM040_Permaculturist.impl,
+  'CWM041_Politician': CWM041_Politician.impl,
+  'CWM042_Remodeler': CWM042_Remodeler.impl,
+  'CWM043_ResourceLender': CWM043_ResourceLender.impl,
+  'CWM044_SiloGirl': CWM044_SiloGirl.impl,
+  'CWM045_StableDeliveryman': CWM045_StableDeliveryman.impl,
+  'CWM046_StoneCurator': CWM046_StoneCurator.impl,
+  'CWM047_StorehouseMinder': CWM047_StorehouseMinder.impl,
+  'CWM048_SundayWorker': CWM048_SundayWorker.impl,
+  'CWM049_SunriseAdmirer': CWM049_SunriseAdmirer.impl,
+  'CWM050_TapestryWeaver': CWM050_TapestryWeaver.impl,
+  'CWM051_TavernKeeper': CWM051_TavernKeeper.impl,
+  'CWM052_TileMaker': CWM052_TileMaker.impl,
+  'CWM053_VillageFool': CWM053_VillageFool.impl,
+  'CWM054_WheelbarrowPusher': CWM054_WheelbarrowPusher.impl,
+  'CWM055_WoodWorker': CWM055_WoodWorker.impl,
+  'CWM056_Almshouse': CWM056_Almshouse.impl,
+  'CWM057_AnimalNursery': CWM057_AnimalNursery.impl,
+  'CWM058_AppleTree': CWM058_AppleTree.impl,
+  'CWM059_Apprenticeship': CWM059_Apprenticeship.impl,
+  'CWM060_Attic': CWM060_Attic.impl,
+  'CWM061_BackDoor': CWM061_BackDoor.impl,
+  'CWM062_BackyardWell': CWM062_BackyardWell.impl,
+  'CWM063_Birdcage': CWM063_Birdcage.impl,
+  'CWM064_Bonre': CWM064_Bonre.impl,
+  'CWM065_BoundaryStones': CWM065_BoundaryStones.impl,
+  'CWM066_Brazier': CWM066_Brazier.impl,
+  'CWM067_BuriedTreasure': CWM067_BuriedTreasure.impl,
+  'CWM068_CashCrop': CWM068_CashCrop.impl,
+  'CWM069_ChangingPlans': CWM069_ChangingPlans.impl,
+  'CWM070_ClockworkMan': CWM070_ClockworkMan.impl,
+  'CWM071_Cookies': CWM071_Cookies.impl,
+  'CWM072_Crib': CWM072_Crib.impl,
+  'CWM073_DiamondMine': CWM073_DiamondMine.impl,
+  'CWM074_Donkey': CWM074_Donkey.impl,
+  'CWM075_Downsizing': CWM075_Downsizing.impl,
+  'CWM076_DrainedPond': CWM076_DrainedPond.impl,
+  'CWM077_EdibleRoots': CWM077_EdibleRoots.impl,
+  'CWM078_FarmSchool': CWM078_FarmSchool.impl,
+  'CWM079_FestivalHall': CWM079_FestivalHall.impl,
+  'CWM080_FishHook': CWM080_FishHook.impl,
+  'CWM081_FishPond': CWM081_FishPond.impl,
+  'CWM082_FlowerPots': CWM082_FlowerPots.impl,
+  'CWM083_FreeRangeChickens': CWM083_FreeRangeChickens.impl,
+  'CWM084_FriendlyPastures': CWM084_FriendlyPastures.impl,
+  'CWM085_Fruitcake': CWM085_Fruitcake.impl,
+  'CWM086_GlassblowersShop': CWM086_GlassblowersShop.impl,
+  'CWM087_GoldMedal': CWM087_GoldMedal.impl,
+  'CWM088_GrainElevator': CWM088_GrainElevator.impl,
+  'CWM089_HomeGarden': CWM089_HomeGarden.impl,
+  'CWM090_Honeymoon': CWM090_Honeymoon.impl,
+  'CWM091_IronPlow': CWM091_IronPlow.impl,
+  'CWM092_Keys': CWM092_Keys.impl,
+  'CWM093_Kindling': CWM093_Kindling.impl,
+  'CWM094_LampOil': CWM094_LampOil.impl,
+  'CWM095_MountainCave': CWM095_MountainCave.impl,
+  'CWM096_OakCask': CWM096_OakCask.impl,
+  'CWM097_OpenGate': CWM097_OpenGate.impl,
+  'CWM098_PettingZoo': CWM098_PettingZoo.impl,
+  'CWM099_PigWallow': CWM099_PigWallow.impl,
+  'CWM100_PlumPatch': CWM100_PlumPatch.impl,
+  'CWM101_PrizewinningSheep': CWM101_PrizewinningSheep.impl,
+  'CWM102_Ram': CWM102_Ram.impl,
+  'CWM103_Raspberries': CWM103_Raspberries.impl,
+  'CWM104_ReedNursery': CWM104_ReedNursery.impl,
+  'CWM105_RotherhamPlow': CWM105_RotherhamPlow.impl,
+  'CWM106_Ruins': CWM106_Ruins.impl,
+  'CWM107_SlapdashRenovation': CWM107_SlapdashRenovation.impl,
+  'CWM108_Steamer': CWM108_Steamer.impl,
+  'CWM109_SteelPlow': CWM109_SteelPlow.impl,
+  'CWM110_StorageShed': CWM110_StorageShed.impl,
+  'CWM111_UndisturbedPond': CWM111_UndisturbedPond.impl,
+  'CWM112_VillageSchool': CWM112_VillageSchool.impl,
+  'CWM113_WildBreeding': CWM113_WildBreeding.impl,
+  'CWM114_WineCloset': CWM114_WineCloset.impl,
+  'CWM115_WormBait': CWM115_WormBait.impl,
   'D001_ZigzagHarrow': D001_ZigzagHarrow.impl,
   'D002_DwellingPlan': D002_DwellingPlan.impl,
   'D003_Furrows': D003_Furrows.impl,

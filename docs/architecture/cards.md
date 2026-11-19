@@ -52,6 +52,7 @@ Tests: `shared/cards/__tests__/card-source-representatives.test.ts`, `scripts/ch
 - The server and sandbox register only custom runtime parts; the main client registers only display metadata and never imports the custom runtime registry.
 
 - Classic sources live under `classic/{deck}/`. Their deck prefixes prepend `C` to the original deck, and card IDs use three-digit numbers. The runtime generator discovers every direct `classic/*` directory; these sources remain outside the ordinary deal catalog until a separate integration enables them.
+- `classic/CWM/` contains 55 occupations and 60 minor improvements from the classic WM deck. Four-player Session regressions cover placement, payment, feeding, farm edits, recovery and undo. Purchase resource grants are projected separately from actual-payment grants; committed animals expose a minimum zone allocation; plows contribute their action-space-use identity instead of reading another card's storage. Reed sowing and room/field removal stay in reusable domain operations. Card counters, stacks and crop layers require explicit presentation opt-ins.
 
 ## Local state in `cardStates`
 
