@@ -197,12 +197,24 @@ const readSowPayload = (actionContext?: Record<string, unknown>): SowPayload | u
 }
 
 /** Plans the final amounts; asks for the next optional bonus source, or places everything. */
+/** One selection per position; later repeats are ignored, as `validateSowSelection` does. */
+const uniqueSowSelections = (crops: readonly SowSelection[]) => {
+  const seen = new Set<string>()
+  return crops.filter((sel) => {
+    const key = positionKey({ row: Number(sel?.row), col: Number(sel?.col) })
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 const continueSow = (
   outerCtx: ActionMutationContext,
-  crops: SowSelection[],
+  submittedCrops: SowSelection[],
   chosen: Record<string, string[]>,
   previous?: SowPayload,
 ): ActionExecutionResult => {
+  const crops = uniqueSowSelections(submittedCrops)
   const ctx = previous ? { ...outerCtx, actionContext: sowActionContext(outerCtx.actionContext, previous) } : outerCtx
   const { validated, extraSourceCards } = validateSow(ctx, crops)
   if (!validated.ok) {
@@ -229,6 +241,8 @@ const continueSow = (
       kind: 'selection',
       selection: buildFarmPositionSelectionInteraction(ctx.player, selectionContext),
       options: [{ value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' }],
+      // The chosen seeds are committed but not yet paid; no anytime action may spend them.
+      anytimeWindow: { allowed: false },
     },
     promptKey: 'ui.interactionSelection',
     // The Sow keeps its own source card; the prompt only names the bonus card.

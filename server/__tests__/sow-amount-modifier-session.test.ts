@@ -122,6 +122,11 @@ describe('#1891 Sow amount modifiers through Session', () => {
       expect(stacksAt(prompt, 0, 2)).toEqual([])
       expect(prompt.state.players[0]!.resources.vegetable).toBe(1)
       expect(sownEvents(prompt)).toEqual([])
+      // Seeds are committed but unpaid, so no anytime action can spend them here.
+      expect(prompt.interaction.stateId === 'wait' ? prompt.interaction.anytimeActions : undefined).toEqual([])
+      const discard = session.takeAnytimeAction(0, 'discard-goods')
+      expect(discard.ok).toBe(false)
+      expect(discard.state.players[0]!.resources.vegetable).toBe(1)
       const resent = session.resolveChoice(0, 'confirm', { crops: [{ row: 0, col: 2, crop: 'vegetable' }] })
       expect(resent.ok).toBe(false)
       expect(stacksAt(resent, 0, 2)).toEqual([])
@@ -185,6 +190,17 @@ describe('#1891 Sow amount modifiers through Session', () => {
     const ordinary = sow(session, [{ row: 1, col: 2, crop: 'grain' }])
     expect(ordinary.ok, ordinary.error).toBe(true)
     expect(stacksAt(ordinary, 1, 2)).toEqual([{ kind: 'grain', remaining: 3 }])
+  })
+
+  it('counts a repeated target once, by its first crop, like seed validation', () => {
+    const session = setup({ vegetable: 1 })
+
+    const response = sow(session, [{ row: 0, col: 2, crop: 'vegetable' }, { row: 0, col: 2, crop: 'grain' }])
+
+    expect(response.ok, response.error).toBe(true)
+    expect(stacksAt(response, 0, 2)).toEqual([{ kind: 'vegetable', remaining: 2 }])
+    expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 0, grain: 0 })
+    expect(sownEvents(response).flatMap((event) => event.sows.map((sow) => [sow.crop, sow.added]))).toEqual([['vegetable', 2]])
   })
 
   it('does not apply a card in hand or an opponent card', () => {
