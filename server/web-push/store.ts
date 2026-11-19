@@ -4,10 +4,10 @@ import {
   emptyWebPushPreferences,
   type BrowserPushSubscription, type WebPushKind, type WebPushPreferences, type WebPushTarget,
 } from '../../shared/contract/web-push'
-import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { getSessionByToken } from '../auth'
 import type { PostgresDatabase } from '../database/postgres'
 import { RoomHistoryStore } from '../game/persistence/room-history-store'
+import { draftPushOpportunity } from './draft'
 
 const HOUR_MS = 60 * 60 * 1_000
 const CLAIM_MS = 30_000
@@ -286,9 +286,6 @@ export class WebPushStore {
     `).get<{ state_json: string | null }>(roomId, this.now(), userId, seat)
     if (!row?.state_json) return null
     const { state } = await this.history.restore(roomId, row.state_json)
-    const player = state.players[seat]
-    if (state.phase !== 'draft' || !state.draft || !player) return null
-    const progress = draftSeatProgress(state.draft, player.id)
-    return progress.kind === 'selecting' ? progress.opportunityKey : null
+    return draftPushOpportunity(state, seat)
   }
 }

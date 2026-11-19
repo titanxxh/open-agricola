@@ -6,6 +6,7 @@ import { CommandStore } from '../command-store'
 import { ResourceStore } from '../../storage/resource-store'
 import { ReplayResources } from '../../storage/replay-resources'
 import { S3ObjectStore } from '../../storage/s3-store'
+import { createInboxPushLogin } from '../../__tests__/_helpers/inbox-push'
 import { testStorageEnvironment } from '../../__tests__/_helpers/objects'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -150,8 +151,16 @@ describe('RoomCommitter', () => {
     now: () => 1_000,
   })
 
-  it.each([legacyStandard, legacyMoor])('upgrades retained draft state without rewriting its original Replay or Viewer %#', async fixture => {
+  it.each([
+    { fixture: legacyStandard, selectingSeat: 0 },
+    { fixture: legacyMoor, selectingSeat: 1 },
+  ])('upgrades retained draft state without rewriting its original Replay or Viewer %#', async ({ fixture, selectingSeat }) => {
     const room = makeRoom()
+    const userId = 'legacy-draft-recipient'
+    await db.prepare('INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)')
+      .run(userId, userId, userId, 'hash', 1_000)
+    const { store } = await createInboxPushLogin(db, () => 1_000, userId, 'draft')
+    room.seatOwners = [{ userId, playerIndex: selectingSeat }]
     room.session.dispose()
     room.session = createOpeningSession({ seed: fixture.seed,
       options: { playerCount: 2, draftMode: 'simultaneous', draftPoolSize: fixture.options.draftPoolSize,
@@ -162,6 +171,7 @@ describe('RoomCommitter', () => {
     Object.assign(room.session.state, { draft: fixture.draft })
     const initial = createCommitter()
     expect(await initial.prepareRoom(room, { missingPrefix: false })).toMatchObject({ kind: 'committed', stepNo: 0 })
+    expect(await store.claimDue(['draft'])).toBeNull()
     const header = await persistence.loadReplayHead(room.id)
     const before = await db.prepare('SELECT state_json FROM rooms WHERE id = ?').get(room.id)
     const stepZero = await db.prepare('SELECT * FROM game_replay_steps WHERE room_id = ? AND step_no = 0').get(room.id)
@@ -173,6 +183,7 @@ describe('RoomCommitter', () => {
     let reconnected: Room | undefined
     try {
       expect(await next.prepareRoom(restored, { missingPrefix: true })).toMatchObject({ kind: 'committed', stepNo: 0 })
+      expect(await store.claimDue(['draft'])).toBeNull()
       expect(await persistence.loadReplayHead(room.id)).toEqual(header)
       expect(await db.prepare('SELECT state_json FROM rooms WHERE id = ?').get(room.id)).toEqual(before)
       const response = restored.session.getState()
@@ -181,6 +192,7 @@ describe('RoomCommitter', () => {
       if (!draft) throw new Error('Expected migrated draft')
       const actor = draft.seatOrder.find(id => draftSeatProgress(draft, id).kind === 'selecting')
       if (!actor) throw new Error('Expected an available packet')
+      expect(draft.seatOrder.indexOf(actor)).toBe(selectingSeat)
       const choice = firstDraftPick(draft, actor)
       const submitted = restored.session.submitDraftPick(actor, choice)
       expect(submitted.ok).toBe(true)
