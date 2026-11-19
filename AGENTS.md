@@ -79,7 +79,7 @@ Issues 和 PRDs 使用 `gh` 管理在 `titanxxh/open-agricola`，见 `docs/agent
 
 ## Card workflow
 
-新增或修改卡牌实现时，先给出基于 `docs/CARD_TEST_TEMPLATE.md` 的测试说明，得到确认后再编码。测试说明先交代：
+新增或修改卡牌实现时，先用 `docs/CARD_AUTHORING.md` 找到卡面句式对应的现有机制、范例卡和范例测试，再给出基于 `docs/CARD_TEST_TEMPLATE.md` 的测试说明，得到确认后再编码。测试说明先交代：
 
 - 难易程度：单卡局部修复、复用现有 hook/helper，还是需要通用机制。
 - 基础设施缺口：ActionFlow、pending、payment、field、animal、action-pool 是否已有所需能力；缺失时先设计通用扩展。
@@ -127,6 +127,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 | `docs/card_implementation_status.md` | 官方卡实现变化时，按下方清单核对；只覆盖官方卡，已对齐卡牌不逐条记录 |
 | `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单 |
 | `docs/ARCHITECTURE.md`、`docs/architecture/*.md` | 通用扩展点或模块职责、不变量、seam 变化时，更新对应模块文档；索引只保留设计不变量、拓扑、分层与模块表 |
+| `docs/CARD_AUTHORING.md` | 新增或改变卡牌可复用的机制、范例卡或可行性规则；工坊 agent 也读它 |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略或卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 对应议题变化 |
 
@@ -189,6 +190,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 | Architecture | `docs/ARCHITECTURE.md`（索引）→ `docs/architecture/*.md` |
 | Deployment | `docs/HOW_TO_DEPLOY.md` |
 | Platform & Workshop | `docs/PLATFORM_DESIGN.md` |
+| Card authoring guide | `docs/CARD_AUTHORING.md` |
 | Card test template | `docs/CARD_TEST_TEMPLATE.md` |
 | 卡牌实现现状 | `docs/card_implementation_status.md` |
 | CI checks | `docs/operations/ci-checks.md` |

@@ -40,7 +40,7 @@ Moor Balance Rules 是默认关闭的开局选项，由 `contract/game-variants.
 
 ## `shared/custom-code/`
 
-工坊卡只通过已部署的 Workshop Capability Contract 准入（[ADR 0025](../adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)）。
+在 #1887 完成 [ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md)（取代 ADR 0025）之前，工坊源码只通过下列已部署的 Workshop Capability Contract 准入。卡牌机制与范例见[写卡指南](../CARD_AUTHORING.md)。
 
 - `ast-validator.ts` 用 AST 校验自定义卡 TypeScript：只允许批准的导入，禁止被禁 API、网络与 I/O；`effect` 必须是对象字面量；listener phase 与 effect key 必须在契约白名单内。
 - `validate-and-compile.ts` 统一源码准入、编译和 manifest 提取脚本，服务端与浏览器只提供各自执行边界。`registrar.ts` 通过传入的执行器注册同一组 hook、metadata 和 listener；适配器不扩大能力契约。

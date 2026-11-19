@@ -37,7 +37,7 @@ Moor Balance Rules are a default-off creation choice, normalized by `contract/ga
 
 ## `shared/custom-code/`
 
-Workshop cards are admitted only through the deployed Workshop Capability Contract ([ADR 0025](../adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)).
+Until #1887 completes [ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md), which supersedes ADR 0025, Workshop source is admitted only through the deployed Workshop Capability Contract below. Card mechanisms and examples are in the [card authoring guide](../CARD_AUTHORING.md).
 
 - `ast-validator.ts` validates custom-card TypeScript with an AST: approved imports only, no forbidden APIs, network or I/O; `effect` must be an object literal; listener phases and effect keys must be in the contract allowlist.
 - `validate-and-compile.ts` owns source admission, compilation and the manifest extraction script; server and browser supply only their execution boundary. `registrar.ts` registers the same hooks, metadata and listeners through the supplied executor. Neither adapter extends the capability contract.
