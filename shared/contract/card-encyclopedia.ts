@@ -27,14 +27,14 @@ export type EncyclopediaPublicType =
 /** Declared deck / expansion order; the catalog's default order starts from this. */
 export const ENCYCLOPEDIA_GROUPS = [
   'A', 'B', 'C', 'D', 'E', 'M', 'majorStandard', 'major56', 'majorMoor', 'parents', 'moor', 'seasons',
-  'L', 'X', 'legendairyForest', 'LE', 'changelings', 'newdale',
+  'L', 'X', 'legendairyForest', 'LE', 'changelings', 'newdale', 'classic',
 ] as const
 
 export type EncyclopediaGroup = typeof ENCYCLOPEDIA_GROUPS[number]
 
 /** Parts are concatenated; keys resolve through the language pack exactly like `t(locale, key, params)`. */
 export type EncyclopediaTextPart =
-  | { readonly key: string; readonly params?: Readonly<Record<string, string | number>> }
+  | { readonly key: string; readonly params?: Readonly<Record<string, string | number>>; readonly fallback?: string }
   | { readonly literal: string }
 
 export type EncyclopediaText = readonly EncyclopediaTextPart[]
@@ -82,6 +82,7 @@ export type EncyclopediaEntry = {
   readonly sourceKind: EncyclopediaSourceKind
   readonly sourceId: string
   readonly group: EncyclopediaGroup
+  readonly classicDeck?: string
   readonly publicType: EncyclopediaPublicType
   readonly displayNumber: string | null
   readonly players: EncyclopediaPlayers | null

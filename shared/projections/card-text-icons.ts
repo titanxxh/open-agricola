@@ -44,6 +44,13 @@ const ICON_TOKEN = /<([A-Z0-9_-]+)>/g
 export const isCardTextIconToken = (token: string): token is CardTextIconToken =>
   Object.hasOwn(CARD_TEXT_ICON_NAMES, token)
 
+/** Classic source and translated faces can use lowercase spellings of the established icons. */
+export const normalizeClassicCardTextIcons = (text: string): string =>
+  text.replace(/<([a-z0-9_-]+)>/gi, (markup, token: string) => {
+    const canonical = token.toUpperCase()
+    return isCardTextIconToken(canonical) ? `<${canonical}>` : markup
+  })
+
 export const cardTextIconTokens = (text: string): string[] => [...text.matchAll(ICON_TOKEN)].map((match) => match[1])
 
 export const cardTextIconNameKeys = (token: string): readonly string[] | undefined =>

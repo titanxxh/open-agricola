@@ -20,7 +20,7 @@ import { isScanSkin, scanPlainText, scanPrintedText, type ScanCard } from '../..
 import type { EncyclopediaSources, MajorCardSource, OrdinaryCardSource } from './sources'
 import { cardTexts, moorSpecialActionTexts, moorStartTexts, parentTexts, seasonTexts } from './text'
 
-const OFFICIAL_DECKS = new Set<string>(['A', 'B', 'C', 'D', 'E', 'M'])
+const OFFICIAL_DECKS = ['A', 'B', 'C', 'D', 'E', 'M'] as const
 const PRINTED_RESOURCES = new Set<string>(PAYMENT_RESOURCE_KEYS)
 const PRINTED_COMPLEX_COST_FIELDS = new Set(['fee', 'fees', 'cards'])
 
@@ -95,26 +95,26 @@ const parentScore = (card: ParentCardDefinition): EncyclopediaScore => card.kind
   ? { fixed: card.score, extraVp: false }
   : { fixed: null, extraVp: card.rewards.some((reward) => reward.effects.some((effect) => effect.type === 'bonus-points')) }
 
-const isOfficialOrdinaryCard = (card: OrdinaryCardSource) =>
-  OFFICIAL_DECKS.has(card.deck) && officialCardDeck(card.id) === card.deck
-
 const ordinaryPublicType = (card: OrdinaryCardSource): 'minor' | 'occupation' => {
   if (card.kind !== 'playerAction') return card.kind
   if (!card.playerActionCardType) throw new Error(`${card.id} has no public card type`)
   return card.playerActionCardType
 }
 
-const ordinaryEntry = (card: OrdinaryCardSource): EncyclopediaEntry => {
+const ordinaryEntry = (
+  card: OrdinaryCardSource,
+  group: Pick<EncyclopediaEntry, 'group' | 'classicDeck'>,
+): EncyclopediaEntry => {
   const publicType = ordinaryPublicType(card)
   return entry({
     sourceKind: 'card',
     sourceId: card.id,
-    group: card.deck as EncyclopediaGroup,
+    ...group,
     publicType,
     displayNumber: officialCardDisplayNumber(card.id) ?? null,
     players: projectPlayers(card),
     face: { kind: 'card', cardId: card.id, cardType: publicType },
-    text: cardTexts(card),
+    text: cardTexts(card, group.group === 'classic'),
     cost: projectPrintedCost(card),
     score: cardScore(card),
   })
@@ -200,7 +200,11 @@ export const compareEncyclopediaEntries = (a: EncyclopediaEntry, b: Encyclopedia
 
 export const buildEncyclopediaEntries = (sources: EncyclopediaSources): EncyclopediaEntry[] => {
   const entries: EncyclopediaEntry[] = [
-    ...sources.ordinaryCards.filter(isOfficialOrdinaryCard).map(ordinaryEntry),
+    ...sources.ordinaryCards.flatMap((card) => {
+      const group = OFFICIAL_DECKS.find(deck => card.deck === deck && officialCardDeck(card.id) === deck)
+      return group ? [ordinaryEntry(card, { group })] : []
+    }),
+    ...sources.classicCards.map(card => ordinaryEntry(card, { group: 'classic', classicDeck: card.deck })),
     ...sources.majorCards.map((card) => majorEntry(card, sources)),
     ...sources.parentCards.map((card) => entry({
       sourceKind: 'parent',

@@ -40,6 +40,7 @@ const GROUP_LABEL_KEYS: Readonly<Record<EncyclopediaGroup, string>> = {
   LE: 'ui.encyclopedia.groups.deck',
   changelings: 'ui.encyclopedia.groups.deck',
   newdale: 'ui.encyclopedia.groups.deck',
+  classic: 'ui.encyclopedia.groups.classic',
 }
 
 /** Expansion names as printed; they are not translated. */

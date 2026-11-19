@@ -3,7 +3,7 @@ import { ENCYCLOPEDIA_GROUPS } from '../../shared/contract/card-encyclopedia'
 import { buildEncyclopediaEntries, projectPlayers } from '../card-encyclopedia/catalog'
 import { loadEncyclopediaSources } from '../card-encyclopedia/sources'
 
-const entries = buildEncyclopediaEntries(loadEncyclopediaSources())
+const entries = buildEncyclopediaEntries(loadEncyclopediaSources(false))
 const byKey = new Map(entries.map((entry) => [entry.key, entry]))
 const entry = (key: string) => {
   const found = byKey.get(key)
@@ -101,7 +101,7 @@ describe('card encyclopedia identity facts', () => {
       'A', 'B', 'C', 'D', 'E', 'M', 'majorStandard', 'major56', 'majorMoor', 'parents', 'moor', 'seasons',
       'L', 'X', 'legendairyForest', 'LE', 'changelings', 'newdale',
     ])
-    expect(ENCYCLOPEDIA_GROUPS).toEqual([...new Set(entries.map((item) => item.group))])
+    expect(ENCYCLOPEDIA_GROUPS.filter(group => group !== 'classic')).toEqual([...new Set(entries.map((item) => item.group))])
     expect(entries.slice(0, 2).map((item) => item.key)).toEqual(['card:A001_Shelter', 'card:A002_ShiftingCultivation'])
     expect(entries.filter((item) => item.group === 'M').slice(0, 2).map((item) => item.displayNumber)).toEqual(['M015', 'M016'])
     expect(entries.filter((item) => item.group === 'majorMoor').map((item) => item.displayNumber)).toEqual([

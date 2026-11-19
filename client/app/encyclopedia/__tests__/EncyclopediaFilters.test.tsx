@@ -39,6 +39,37 @@ const sidebar = () => screen.getByRole('complementary', { name: 'Filters' })
 const results = (count: number) => screen.findByRole('heading', { name: `Results: ${count}` })
 
 describe('encyclopedia filter sidebar', () => {
+  it('narrows the Classic group by deck while keeping other selected groups', async () => {
+    const classicCards = [
+      cardEntry('CE203_Shepherd', 'CE203', {
+        group: 'classic', classicDeck: 'CE', text: { name: [{ literal: 'Classic Shepherd' }] },
+      }),
+      cardEntry('CI097_Slaughterhouse', 'CI097', {
+        group: 'classic', classicDeck: 'CI', text: { name: [{ literal: 'Classic Slaughterhouse' }] },
+      }),
+    ]
+    const encyclopedia = encyclopediaOf([BASEBOARDS, FARM_HAND, ...classicCards].map(entry => itemFor(entry)))
+    render(<EncyclopediaBrowser encyclopedia={encyclopedia} navigation={navigation} locale="en" store={createEncyclopediaBrowseStore()} />)
+    const panel = within(sidebar())
+    expect(panel.queryByRole('group', { name: 'Classic decks' })).toBeNull()
+
+    fireEvent.click(panel.getByRole('checkbox', { name: 'Classic', exact: true }))
+    await results(2)
+    const decks = within(panel.getByRole('group', { name: 'Classic decks' }))
+    expect(decks.getByRole('checkbox', { name: 'CI' })).not.toBeChecked()
+    fireEvent.click(decks.getByRole('checkbox', { name: 'CE' }))
+    await results(1)
+    expect(screen.getByRole('button', { name: 'View Classic Shepherd' })).toBeInTheDocument()
+
+    fireEvent.click(panel.getByRole('checkbox', { name: 'Deck A' }))
+    await results(2)
+    expect(screen.getByRole('button', { name: 'View Baseboards' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Classic' }))
+    await results(1)
+    expect(panel.queryByRole('group', { name: 'Classic decks' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove filter: CE' })).toBeNull()
+  })
+
   it('applies each change at once, any option within a group and every group together', async () => {
     const store = renderBrowser()
     store.setPage(2)

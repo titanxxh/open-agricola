@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ENCYCLOPEDIA_GROUPS } from '../../../shared/contract/card-encyclopedia'
+import { ENCYCLOPEDIA_GROUPS, type EncyclopediaGroup } from '../../../shared/contract/card-encyclopedia'
 import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { t, type Locale } from '../../../shared/i18n'
 import { useEncyclopediaBrowseState, type EncyclopediaBrowseStore } from './encyclopedia-browse-store'
@@ -45,6 +45,9 @@ const COST_RESOURCE_LABEL_KEYS: Record<EncyclopediaCostResource, string> = {
 const toggled = <T,>(order: readonly T[], selected: readonly T[], option: T): T[] =>
   order.filter(candidate => (candidate === option) !== selected.includes(candidate))
 
+const withGroups = ({ classicDecks, ...filters }: EncyclopediaFilters, groups: readonly EncyclopediaGroup[]): EncyclopediaFilters =>
+  ({ ...filters, groups, ...(classicDecks?.length && groups.includes('classic') ? { classicDecks } : {}) })
+
 type FieldsProps = {
   filters: EncyclopediaFilters
   options: EncyclopediaFilterOptions
@@ -75,11 +78,29 @@ function FilterFields({ filters, options, locale, onChange }: FieldsProps) {
               key={group}
               label={encyclopediaGroupLabel(locale, group)}
               checked={filters.groups.includes(group)}
-              onToggle={() => onChange({ ...filters, groups: toggled(ENCYCLOPEDIA_GROUPS, filters.groups, group) })}
+              onToggle={() => onChange(withGroups(filters, toggled(ENCYCLOPEDIA_GROUPS, filters.groups, group)))}
             />
           ))}
         </div>
       </fieldset>
+      {filters.groups.includes('classic') && options.classicDecks.length > 0 ? (
+        <fieldset className="encyclopedia-filters__group">
+          <legend>{t(locale, 'ui.encyclopedia.filters.classicDeck')}</legend>
+          <div className="encyclopedia-filters__options">
+            {options.classicDecks.map(deck => (
+              <Option
+                key={deck}
+                label={deck}
+                checked={filters.classicDecks?.includes(deck) ?? false}
+                onToggle={() => onChange({
+                  ...filters,
+                  classicDecks: toggled(options.classicDecks, filters.classicDecks ?? [], deck),
+                })}
+              />
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
       <fieldset className="encyclopedia-filters__group">
         <legend>{t(locale, 'ui.encyclopedia.filters.type')}</legend>
         <div className="encyclopedia-filters__options">
@@ -202,7 +223,12 @@ function filterChips(filters: EncyclopediaFilters, locale: Locale): FilterChip[]
     ...filters.groups.map(group => ({
       id: `group-${group}`,
       label: encyclopediaGroupLabel(locale, group),
-      without: () => ({ ...filters, groups: filters.groups.filter(other => other !== group) }),
+      without: () => withGroups(filters, filters.groups.filter(other => other !== group)),
+    })),
+    ...(filters.classicDecks ?? []).map(deck => ({
+      id: `classic-deck-${deck}`,
+      label: deck,
+      without: () => ({ ...filters, classicDecks: filters.classicDecks?.filter(other => other !== deck) }),
     })),
     ...filters.types.map(type => ({
       id: `type-${type}`,

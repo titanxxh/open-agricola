@@ -1,5 +1,7 @@
 // @covers client/app/encyclopedia/
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { CLASSIC_EDITION_ENABLED } from '../shared/contract/card-edition'
+import { classicCardDefinitions } from '../shared/cards/classic-catalog.generated'
 import {
   CATALOG, DESKTOP, expectNoHorizontalOverflow, expectResults, filterOption as option, filterPanel, filterSidebar as sidebar,
   galleryEntries, galleryNames, LANDSCAPE, MOBILE, NARROW, newVisitor, resultsHeading, selectedFilters, tabTo,
@@ -20,6 +22,29 @@ test.describe(DESKTOP.name, () => {
 
   test.afterEach(async () => {
     await context.close()
+  })
+
+  test('D1 follows the Classic switch and opens a filtered classic card face', async () => {
+    await openCatalog(page)
+    const panel = sidebar(page)
+    const classic = option(panel, 'Classic')
+    if (!CLASSIC_EDITION_ENABLED) {
+      await expect(classic).toHaveCount(0)
+      await page.getByRole('searchbox').fill('CE203')
+      await expectResults(page, 0)
+      return
+    }
+
+    await classic.check()
+    const decks = panel.getByRole('group', { name: 'Classic decks' })
+    await option(decks, 'CE').check()
+    await page.getByRole('searchbox').fill('CE203')
+    await expectResults(page, 1)
+    await page.getByRole('button', { name: 'View Shepherd', exact: true }).click()
+    const detail = page.getByRole('dialog', { name: 'Shepherd' })
+    const face = detail.locator('.encyclopedia-face__card[data-id="CE203_Shepherd"]')
+    await expect(face.locator('.card-numbering')).toHaveText('CE203')
+    await expect(face.locator('.card-desc .res-icon-sheep').first()).toBeVisible()
   })
 
   test('F1 combines deck, printed cost, type and points filters and clearing restores the catalog', async () => {
@@ -217,7 +242,10 @@ test.describe(MOBILE.name, () => {
     await tabTo(page, page.getByRole('button', { name: 'Remove filter: Deck B' }))
     await page.keyboard.press('Enter')
 
-    await expectResults(page, 229)
+    const classicMatches = CLASSIC_EDITION_ENABLED
+      ? classicCardDefinitions.filter(card => typeof card.vp === 'number' && card.vp >= -1).length
+      : 0
+    await expectResults(page, 229 + classicMatches)
     await expect(page.getByRole('button', { name: 'Remove filter: Fixed points ≥ -1' })).toBeFocused()
   })
 })

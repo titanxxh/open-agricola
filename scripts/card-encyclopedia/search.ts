@@ -15,6 +15,7 @@ import {
   CARD_TEXT_SEARCH_ALIASES,
   cardTextIconNameKeys,
   cardTextIconTokens,
+  normalizeClassicCardTextIcons,
   searchableCardText,
   type CardTextIconToken,
 } from '../../shared/projections/card-text-icons'
@@ -63,7 +64,7 @@ const fieldStatus = (
   if (!text.trim()) return 'missing'
   if (language.id === BASE_LANGUAGE || !english) return 'localized'
   const fallsBack = parts.some((part) => 'key' in part
-    && translate(english, part.key, part.params).trim() !== ''
+    && (translate(english, part.key, part.params) || part.fallback)?.trim()
     && !sourceKeys(entry, part.key).some((key) => language.ownKeys.has(key)))
   return fallsBack ? 'fallback' : 'localized'
 }
@@ -93,7 +94,8 @@ const searchDocument = (entry: EncyclopediaEntry, languages: readonly Encycloped
     for (const field of TEXT_FIELDS) {
       const parts = entry.text[field]
       if (!parts) continue
-      const raw = resolveEncyclopediaText(parts, (key, params) => translate(language, key, params))
+      const resolved = resolveEncyclopediaText(parts, (key, params) => translate(language, key, params))
+      const raw = entry.group === 'classic' ? normalizeClassicCardTextIcons(resolved) : resolved
       rawTexts.push(raw)
       fields[field] = {
         text: searchableCardText(raw, (token) => iconWords(language, token).join(' ')),

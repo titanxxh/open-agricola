@@ -39,8 +39,7 @@ export const withClassicCardDefinitions = <T>(definitions: readonly ClassicCardD
 }
 
 /**
- * Classic Card Definitions. The ordinary catalog, revised deal pool and encyclopedia never include them (the client
- * manifest does, for display); callers that reach classic cards by exact ID (dev draw / play) read their kind here.
+ * Classic Card Definitions. Exact-ID lookups, the classic deal pool, and dev draw and play use this catalog.
  */
 export const getClassicCardDefinition = (id: string): ClassicCardDefinition | undefined => activeCatalog.byId.get(id)
 
