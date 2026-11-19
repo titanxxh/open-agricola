@@ -20,7 +20,7 @@ async function loadInitialLanguage() {
 
 void startApplication(container, async () => {
   installStaleChunkRecovery()
-  if (import.meta.env.VITE_PUBLIC_ASSET_WORKER === '1' && window.top === window && 'serviceWorker' in navigator) {
+  if (import.meta.env.VITE_STABLE_PAGES_WORKER === '1' && window.top === window && 'serviceWorker' in navigator) {
     void navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(() => {})
   }
   forgetEncyclopediaBrowseOnReload()

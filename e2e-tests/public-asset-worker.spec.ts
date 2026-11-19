@@ -1,6 +1,6 @@
 // @covers client/main.tsx
 // @covers client/public-assets/
-// @covers scripts/vite-public-asset-worker.ts
+// @covers scripts/vite-service-worker.ts
 import { expect, test, type BrowserContext, type BrowserType, type Page, type Request, type WebSocket } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { createHash, createPublicKey } from 'node:crypto'
@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { extname, join, resolve } from 'node:path'
 import type { Duplex } from 'node:stream'
 import { publicAssetBaseUrl } from '../scripts/public-assets'
-import { publicAssetWorkerPassThroughSource } from '../scripts/vite-public-asset-worker'
+import { publicAssetWorkerPassThroughSource } from '../scripts/vite-service-worker'
 import { BACKEND_URL, FRONTEND_URL, browserRequestHeaders } from './fixtures'
 import { buildPagesFrontend, servePagesFrontend } from './helpers/pages-frontend'
 import { authenticateSolo, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
