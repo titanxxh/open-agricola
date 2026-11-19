@@ -8,6 +8,7 @@ import type { DraftGameEvent, EventSink, FarmCropRemovedEvent } from '../../cont
 import { readCardExtraData, writeCardExtraData } from './card-state'
 import { defaultReapTrigger, type ReapTrigger } from '../../actions/helpers/reap-listener'
 import { appendImmediateEvents } from '../../events/append'
+import { BASE_SOW_AMOUNT } from '../../domain/sow-amount'
 
 type Crop = ExtraSowableCrop
 
@@ -42,9 +43,7 @@ export type CardFieldOptions = {
   extraListeners?: CardListenerRegistration[]
 }
 
-const RHYTHM: Record<Crop, number> = {
-  grain: 3, vegetable: 2, wood: 3, stone: 2,
-}
+const RHYTHM: Readonly<Record<Crop, number>> = BASE_SOW_AMOUNT
 
 const DECK_ORDINAL: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5 }
 const cardFieldDefs = new Map<string, CardFieldDef>()
@@ -547,7 +546,7 @@ export const makeCardFieldImpl = (
         return entries
       },
 
-      onSowExtraField: (player, tile, crop) => {
+      onSowExtraField: (player, tile, crop, amount) => {
         const slotIdx = tileMatchesCard(tile)
         if (slotIdx === null) return false
         if (!def.allowedCrops.includes(crop)) return false
@@ -555,7 +554,7 @@ export const makeCardFieldImpl = (
         if (slots[slotIdx]) return false
         if ((player.resources[crop] ?? 0) <= 0) return false
         player.resources[crop] -= 1
-        slots[slotIdx] = { crop, remaining: RHYTHM[crop] }
+        slots[slotIdx] = { crop, remaining: amount ?? RHYTHM[crop] }
         writeSlots(player, cardId, slots)
         return true
       },

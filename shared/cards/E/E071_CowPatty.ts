@@ -1,14 +1,8 @@
 import { countRoomAnimals } from '../../domain/animals'
 import { defineMinorCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { parsePositionKey, positionKey } from '../../domain/farm'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { extraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
-import type { ActionFlow, PlayerState } from '../../contract/types'
-import type { FarmSownEvent } from '../../contract/events'
 import type { CardImpl } from '../registry'
-import { getFarmyardFields, mutateLogicalFields } from '../helpers/card-field'
+import type { PlayerState } from '../../contract/types'
+import { positionKey } from '../../domain/farm'
 
 const CARD_ID = 'E071_CowPatty'
 
@@ -31,102 +25,29 @@ const countCattleOnBoard = (player: PlayerState): number => {
  *
  * Prerequisite: 1 Cattle (checked at play time, not at trigger time).
  *
- * Implementation: after sow listener. Detect freshly sown fields,
- * filter to those adjacent to pastures, then offer an optional selection.
+ * Implementation: optional Sow amount modifier, chosen inside the Sow before placement.
  */
 
-registerSelectionEffect('cow-patty-bonus-crop', ({ state, player, positions, eventSink }) => {
-  for (const key of positions) {
-    const position = parsePositionKey(key)
-    const field = position && getFarmyardFields(player).find((candidate) =>
-      candidate.row === position.row && candidate.col === position.col,
-    )
-    if (!field) continue
-    const top = field.slots.at(-1)
-    if (!top?.stack) continue
-    mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
-      .grow({ fieldId: field.id, slot: top.index }, 1)
-  }
-})
-
-/**
- * Check if a tile is orthogonally adjacent to any pasture tile.
- */
-const isAdjacentToPasture = (
-  row: number,
-  col: number,
-  context: CardListenerContext,
-): boolean => {
-  const pastureTileKeys = new Set<string>()
-  for (const pasture of context.player.pastures) {
-    for (const tile of pasture.tiles) {
-      pastureTileKeys.add(positionKey(tile))
-    }
-  }
-  const neighbors = [
+const isAdjacentToPasture = (player: PlayerState, row: number, col: number): boolean => {
+  const pastureTileKeys = new Set(player.pastures.flatMap((pasture) => pasture.tiles.map(positionKey)))
+  return [
     { row: row - 1, col },
     { row: row + 1, col },
     { row, col: col - 1 },
     { row, col: col + 1 },
-  ]
-  return neighbors.some((n) => pastureTileKeys.has(positionKey(n)))
-}
-
-const getFreshlySownFields = (context: CardListenerContext) => {
-  const cropByPosition = new Map(
-    (context.actionEvents ?? context.transactionEvents)
-      .flatMap((event) =>
-        event.type === 'farm.sown'
-          ? (event as Pick<FarmSownEvent, 'sows'>).sows
-          : [],
-      )
-      .flatMap((sow) => {
-        const location = sow.location
-        if (location.kind !== 'field') return []
-        if (location.playerId !== context.player.id) return []
-        if (sow.crop !== 'grain' && sow.crop !== 'vegetable') return []
-        return [[`${location.row}-${location.col}`, sow.crop] as const]
-      }),
-  )
-  return getFarmyardFields(context.player).filter((field) => {
-    const crop = cropByPosition.get(`${field.row}-${field.col}`)
-    const top = field.stacks.at(-1)
-    return !!crop && !!top && top.kind === crop && top.remaining > 0
-  })
-}
-
-const afterSowListener: CardListenerRegistration = {
-  id: 'E71-cow-patty-after-sow',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['sow'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    const freshFields = getFreshlySownFields(context)
-    const eligible = freshFields.filter((f) => isAdjacentToPasture(f.row, f.col, context))
-    if (eligible.length === 0) return
-
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'selection',
-        sourceCard: CARD_ID,
-        optional: true,
-        actionContext: extraCropPlacementActionContext({
-          selectionKind: 'farm-position',
-          selectableTiles: eligible.map(({ row, col }) => ({ row, col })),
-          minSelections: 1,
-          maxSelections: eligible.length,
-          selectionEffect: 'cow-patty-bonus-crop',
-        }),
-      } as ActionFlow,
-      sourceCard: CARD_ID,
-    }
-  },
+  ].some((neighbor) => pastureTileKeys.has(positionKey(neighbor)))
 }
 
 const cardImpl = {
   prerequisiteCheck: (player) => countCattleOnBoard(player) >= 1,
-  listeners: [afterSowListener],
+  effect: {
+    id: CARD_ID,
+    modifySowAmount: ({ player, crop, target }) =>
+      (crop === 'grain' || crop === 'vegetable') && target.kind === 'farmyard'
+        && isAdjacentToPasture(player, target.row, target.col)
+        ? { delta: 1, optional: true }
+        : undefined,
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
+import type { FarmTilePosition } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -108,13 +108,16 @@ const sow = (session: GameSession, crops: Array<FieldSpec & { crop: Crop }>) => 
   return session.commitSelectionChoice(0, { crops })
 }
 
-const acceptCowPatty = (session: GameSession, response: SessionResponse) => {
-  expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') throw new Error('expected Cow Patty optional choice')
-  const accept = response.interaction.request.options?.find((option: ActionChoiceOption) =>
-    option.value !== '__skip__' && option.sourceCard === CARD_ID)
-  expect(accept, JSON.stringify(response.interaction)).toBeDefined()
-  return session.resolveChoice(response.interaction.playerIndex, accept!.value)
+/** Cow Patty is asked inside the Sow, before the crop is placed. */
+const cowPattyPrompted = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  && response.interaction.promptParams?.triggerCardId === CARD_ID
+
+const acceptCowPatty = (_session: GameSession, response: SessionResponse) => {
+  expect(cowPattyPrompted(response), JSON.stringify(response.interaction)).toBe(true)
+  if (response.interaction.stateId !== 'wait') throw new Error('expected Cow Patty bonus selection')
+  expect(response.interaction.request.selection?.kind).toBe('farm-position')
+  expect(response.state.players[0]!.fields.every((field) => field.stacks.length === 0)).toBe(true)
+  return response
 }
 
 const select = (session: GameSession, positions: FarmTilePosition[]) =>
@@ -153,10 +156,10 @@ describe('E071 Cow Patty parity', () => {
   it('E071 S4: accepting after sowing grain beside a pasture adds one grain', () => {
     const session = setup({ played: true, grain: 1, fields: [{ row: 1, col: 3 }] })
 
-    let response = acceptCowPatty(session, sow(session, [
+    acceptCowPatty(session, sow(session, [
       { row: 1, col: 3, crop: 'grain' },
     ]))
-    response = select(session, [{ row: 1, col: 3 }])
+    const response = select(session, [{ row: 1, col: 3 }])
 
     expect(response.ok, response.error).toBe(true)
     expect(cropCount(response, 'grain', 1, 3)).toBe(4)
@@ -165,10 +168,10 @@ describe('E071 Cow Patty parity', () => {
   it('E071 S5: accepting after sowing vegetables beside a pasture adds one vegetable', () => {
     const session = setup({ played: true, vegetable: 1, fields: [{ row: 1, col: 3 }] })
 
-    let response = acceptCowPatty(session, sow(session, [
+    acceptCowPatty(session, sow(session, [
       { row: 1, col: 3, crop: 'vegetable' },
     ]))
-    response = select(session, [{ row: 1, col: 3 }])
+    const response = select(session, [{ row: 1, col: 3 }])
 
     expect(response.ok, response.error).toBe(true)
     expect(cropCount(response, 'vegetable', 1, 3)).toBe(3)
@@ -178,8 +181,8 @@ describe('E071 Cow Patty parity', () => {
     const session = setup({ played: true, grain: 1, fields: [{ row: 1, col: 3 }] })
     let response = sow(session, [{ row: 1, col: 3, crop: 'grain' }])
 
-    expect(options(response).some((option) => option.sourceCard === CARD_ID)).toBe(true)
-    response = session.resolveChoice(0, '__skip__')
+    expect(cowPattyPrompted(response)).toBe(true)
+    response = select(session, [])
 
     expect(response.ok, response.error).toBe(true)
     expect(cropCount(response, 'grain', 1, 3)).toBe(3)
@@ -190,7 +193,7 @@ describe('E071 Cow Patty parity', () => {
 
     const response = sow(session, [{ row: 0, col: 4, crop: 'grain' }])
 
-    expect(options(response).some((option) => option.sourceCard === CARD_ID)).toBe(false)
+    expect(cowPattyPrompted(response)).toBe(false)
     expect(cropCount(response, 'grain', 0, 4)).toBe(3)
   })
 
@@ -229,10 +232,12 @@ describe('E071 Cow Patty parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(cropCount(response, 'grain', 1, 1)).toBe(all ? 4 : 3)
     expect(cropCount(response, 'vegetable', 1, 3)).toBe(3)
+    // Undoing the bonus step returns to the prompt; nothing has been placed there yet.
     const undone = session.undoStep(0)
     expect(undone.ok, undone.error).toBe(true)
-    expect(cropCount(undone, 'grain', 1, 1)).toBe(3)
-    expect(cropCount(undone, 'vegetable', 1, 3)).toBe(2)
+    expect(cowPattyPrompted(undone)).toBe(true)
+    expect(cropCount(undone, 'grain', 1, 1)).toBe(0)
+    expect(cropCount(undone, 'vegetable', 1, 3)).toBe(0)
   })
 
   it('E071 S10: Cow Patty contributes its printed one point at scoring', () => {

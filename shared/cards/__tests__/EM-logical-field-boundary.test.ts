@@ -93,24 +93,16 @@ describe('E/M Farmyard Field consumers', () => {
     const { session: ruleSession, state, player } = setup()
     setCardField(player, 'B113_PatchCaregiver', 'grain', 2, 'occupation')
 
-    const cowPatty = E071_CowPatty_impl.listeners![0]!
     const fieldDoctor = E092_FieldDoctor_impl.listeners![0]!
     expect(ruleSession.withCtx(() => E034_LandRegister_impl.effect.computeBonusScore!(state, player))).toBe(0)
-    expect(ruleSession.withCtx(() => cowPatty.handler!({
+    // Cow Patty only adds to farmyard fields, even if a Card Field sits at a pasture-adjacent column.
+    expect(E071_CowPatty_impl.effect.modifySowAmount!({
       state,
       player,
-      actionId: 'sow',
-      phase: 'after',
-      actionEvents: [{
-        type: 'farm.sown',
-        sows: [{
-          location: { kind: 'card', playerId: player.id, cardId: 'B113_PatchCaregiver' },
-          crop: 'grain',
-          amount: 3,
-        }],
-      }],
-      transactionEvents: [],
-    } as unknown as CardListenerContext))).toBeUndefined()
+      crop: 'grain',
+      target: { kind: 'card-field', row: -1, col: 2113, cardId: 'B113_PatchCaregiver', slot: 0 },
+      selections: [{ row: -1, col: 2113, crop: 'grain' }],
+    })).toBeUndefined()
     expect(ruleSession.withCtx(() => fieldDoctor.handler!({
       state,
       player,

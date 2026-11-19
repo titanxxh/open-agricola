@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import type { ActionChoiceOption, Field } from '../../shared/contract/types'
+import type { Field } from '../../shared/contract/types'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A079_GardenHoe'
@@ -134,17 +134,12 @@ describe('Logical Field sow session', () => {
     expect(response.state.players[0]!.resources.food).toBe(foodBefore)
   })
 
-  it('B115 offers and grows the freshly sown Card Field with current metadata', () => {
+  it('B115 offers the Card Field being sown with current metadata and places four grain at once', () => {
     const session = setup({ occupationPlayed: [CARD_FIELD, 'B115_TinsmithMaster'], grain: 1 })
 
     let response = sow(session, 'grain')
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    const accept = response.interaction.request.options?.find(
-      (option: ActionChoiceOption) => option.value !== '__skip__',
-    )
-    expect(accept).toBeDefined()
-    response = session.resolveChoice(0, accept!.value)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', promptParams: { triggerCardId: 'B115_TinsmithMaster' } })
+    expect(response.state.players[0]!.cardStates[CARD_FIELD]?.extraData?.cardFieldStacks ?? [null]).toEqual([null])
     expect(response.interaction.stateId === 'wait'
       ? response.interaction.request.selection?.selectablePositions
       : []).toEqual([{
@@ -159,6 +154,9 @@ describe('Logical Field sow session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.cardStates[CARD_FIELD]?.extraData?.cardFieldStacks).toEqual([
       { crop: 'grain', remaining: 4 },
+    ])
+    expect(response.state.events.filter((event) => event.type === 'farm.sown')).toEqual([
+      expect.objectContaining({ sows: [expect.objectContaining({ crop: 'grain', added: 4 })] }),
     ])
   })
 

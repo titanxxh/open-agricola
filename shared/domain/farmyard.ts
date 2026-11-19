@@ -23,6 +23,7 @@ import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals.ts'
 import { getPastureCapacity, getPastureSize, getPastureViews, type Pasture as PastureView } from './pasture.ts'
 import { isOwnOrdinaryFenceSegment } from './fence-segments.ts'
 import { computeFencedRegions } from './farmyard-regions.ts'
+import { BASE_SOW_AMOUNT } from './sow-amount.ts'
 
 export { computeFencedRegions } from './farmyard-regions.ts'
 export const defaultFenceWoodCosts = { fence: 1, palisade: 2 } as const
@@ -220,6 +221,8 @@ type SowValidationOptions = {
    *  should derive from `actionContext.cropType` (wood/stone → [] since
    *  normal fields don't physically host wood/stone stacks). */
   normalFieldAllowedCrops?: SowSelection['crop'][]
+  /** Final goods per sown farmyard field, keyed by position; defaults to `BASE_SOW_AMOUNT`. */
+  sowAmounts?: ReadonlyMap<string, number>
 }
 
 const DEFAULT_NORMAL_FIELD_CROPS = ['grain', 'vegetable'] as const satisfies readonly SowSelection['crop'][]
@@ -602,19 +605,14 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     if (!selection) return field
     const key = localPositionKey({ row: field.row, col: field.col })
     if (options.extraAllowedCrops?.has(key)) return field
-    if (selection.crop === 'grain') {
-      return {
-        ...field,
-        stacks: [...field.stacks, { kind: 'grain', remaining: 3 }],
-      }
+    if (selection.crop !== 'grain' && selection.crop !== 'vegetable') return field
+    return {
+      ...field,
+      stacks: [...field.stacks, {
+        kind: selection.crop,
+        remaining: options.sowAmounts?.get(key) ?? BASE_SOW_AMOUNT[selection.crop],
+      }],
     }
-    if (selection.crop === 'vegetable') {
-      return {
-        ...field,
-        stacks: [...field.stacks, { kind: 'vegetable', remaining: 2 }],
-      }
-    }
-    return field
   })
   const updated = {
     ...normalized,

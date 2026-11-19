@@ -2,14 +2,10 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldOperationFlow } from '../../actions/plans/field-operation'
-import { isExtraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { CardImpl } from '../registry'
 import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'C069_LandConsolidation'
-const hasExtraCropPending = (context: CardListenerContext): boolean => {
-  return isExtraCropPlacementActionContext(context.actionContext)
-}
 
 /**
  * C69 Land Consolidation (MinorImprovement, C, 69)
@@ -24,7 +20,6 @@ const anytimeListener: CardListenerRegistration = {
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (hasExtraCropPending(context)) return
     const qualifying = getLogicalFields(context.player).flatMap((field) => {
       const slot = [...field.slots].reverse().find((candidate) => candidate.stack)
       const total = field.stacks.reduce((sum, stack) => sum + stack.remaining, 0)
