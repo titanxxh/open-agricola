@@ -1,6 +1,6 @@
 # 22. Distributed Rooms require recording and may reconnect players
 
-- Status: Accepted
+- Status: Accepted (Workshop lines superseded by ADR 0052)
 - Date: 2026-10-05
 
 ## Context

@@ -1,6 +1,6 @@
 # 8. Same-timing reactions use parallel trigger selection
 
-- Status: Accepted
+- Status: Accepted (Workshop lines superseded by ADR 0052)
 - Date: 2026-07-02
 
 ## Context
