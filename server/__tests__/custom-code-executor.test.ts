@@ -508,70 +508,21 @@ const CARD_IMPL = {
     })).toEqual({ ok: false, error: expect.stringContaining('costAttribution') })
   })
 
-  it('rejects invalid results from a normally registered custom listener', () => {
-    const state = createInitialState(42)
-    const player = state.players[0]!
-    const space = state.actionSpaces[0]!
-    const registry = new CardRegistry()
-    registry.loadImpl('CUSTOM_ExecutorCard', {
-      listeners: [{
-        id: 'opaque-listener-id',
-        actions: ['construct'], phases: ['computeCosts'],
-        handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
-      }],
-    })
-
-    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
-      state,
-      player,
-      space,
-      actionId: 'construct',
-      phase: 'computeCosts',
-    })).toThrow('costAttribution')
-  })
-
-  it('rejects inherited costs from a normally registered custom listener', () => {
+  it('returns native results for a natively registered CUSTOM_ listener (ADR 0052)', () => {
+    // Retired-format cards are checked at their executor boundary; native cards are not contract-bound.
     const state = createInitialState(42)
     const registry = new CardRegistry()
+    const costs = { wood: -2 }
     registry.loadImpl('CUSTOM_ExecutorCard', {
       listeners: [{
-        id: 'opaque-listener-id',
+        id: 'opaque-listener-id', cardIds: ['CUSTOM_ExecutorCard'],
         actions: ['construct'], phases: ['computeCosts'],
-        handler: () => ({
-          __proto__: Object.fromEntries([['costs', { wood: -2 }]]),
-        }),
+        handler: () => ({ costs, costAttribution: [{ sourceCard: 'CUSTOM_ExecutorCard', costs }] }),
       }],
     })
-
-    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
-      state,
-      player: state.players[0]!,
-      space: state.actionSpaces[0]!,
-      actionId: 'construct',
-      phase: 'computeCosts',
-    })).toThrow('plain object')
-  })
-
-  it('rejects cost attribution without costs from a custom listener', () => {
-    const state = createInitialState(42)
-    const registry = new CardRegistry()
-    registry.loadImpl('CUSTOM_ExecutorCard', {
-      listeners: [{
-        id: 'opaque-listener-id',
-        actions: ['construct'], phases: ['computeCosts'],
-        handler: () => ({
-          costAttribution: [{ sourceCard: 'CUSTOM_ExecutorCard', costs: { wood: -2 } }],
-        } as never),
-      }],
-    })
-
-    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
-      state,
-      player: state.players[0]!,
-      space: state.actionSpaces[0]!,
-      actionId: 'construct',
-      phase: 'computeCosts',
-    })).toThrow('costAttribution')
+    expect(executeCardListener(registry.getAllListeners()[0]!, {
+      state, player: state.players[0]!, space: state.actionSpaces[0]!, actionId: 'construct', phase: 'computeCosts',
+    })).toEqual({ costs, costAttribution: [{ sourceCard: 'CUSTOM_ExecutorCard', costs }] })
   })
 
   it('executes registered effect and listener through runtime proxies', () => {

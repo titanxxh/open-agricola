@@ -130,6 +130,11 @@ export function admitNativeCardSource(source: string, cardId: string): NativeCar
     errors.push(`${cardId} must be defined with an object literal { meta, impl }`)
     return { valid: false, errors }
   }
+  // Pull-request generation rewrites meta in place, so it is written inline like every built-in card.
+  if (!ts.isObjectLiteralExpression(metaProperty.initializer)) {
+    errors.push('meta must be written inline as an object literal')
+    return { valid: false, errors }
+  }
   let meta: Record<string, unknown> | undefined
   try {
     const value = staticValue(metaProperty.initializer, constants, 'meta')
