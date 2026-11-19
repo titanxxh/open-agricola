@@ -36,6 +36,7 @@ describe('checkGeneratedCardsSync', () => {
     writeSource(path.join(cardsRoot, 'catalog.generated.ts'), generated.catalogGenerated)
     writeSource(path.join(majorRoot, 'generated.ts'), generated.majorGenerated)
     writeSource(path.join(majorRoot, 'runtime.generated.ts'), generated.majorRuntimeGenerated)
+    writeSource(path.join(cardsRoot, 'classic-catalog.generated.ts'), generated.classicCatalogGenerated)
 
     const result = checkGeneratedCardsSync(tmp)
 

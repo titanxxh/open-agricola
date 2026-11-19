@@ -190,6 +190,24 @@ describe('dependency routine verification plan', () => {
     expect(plan.fullTrigger).toBe(false)
   })
 
+  it('stops a classic definition change at its generated registry like the ordinary catalog', () => {
+    const root = writeTree({
+      'shared/cards/classic-catalog.generated.ts': 'export const classicCardDefinitions = []\n',
+      'shared/cards/classic-catalog.ts': "import { classicCardDefinitions } from './classic-catalog.generated'\nexport const lookup = classicCardDefinitions\n",
+      'shared/session/core.ts': "import { lookup } from '../cards/classic-catalog'\nexport const core = lookup\n",
+      'server/__tests__/session-core.test.ts': "import { core } from '../../shared/session/core'\nexport const used = core\n",
+      'server/__tests__/classic-direct.test.ts': "import '../../shared/cards/classic-catalog.generated'\nexport const loaded = true\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'shared/cards/classic-catalog.generated.ts' }],
+    })
+
+    expect(plan.vitestFiles).toEqual(['server/__tests__/classic-direct.test.ts'])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
   it('selects Vitest files that import a changed card registry directly', () => {
     const root = writeTree({
       'shared/cards/register-all.ts': 'export const ALL_CARD_IMPLS = {}\n',
