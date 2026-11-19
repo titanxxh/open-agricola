@@ -2,6 +2,8 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { SerializedPlayerState, SerializedGameState } from '../../../shared/session/serialization'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
+import { MOOR_SPECIAL_ACTION_BORROW_FOOD } from '../../../shared/domain/moor-special-action-values'
+import { ResourceLine } from '../common/ResourceLine'
 import { SpecialActionEffect, SpecialActionHeading, SpecialActionImprovementNote } from './SpecialActionCardFace'
 import { specialActionIconStyle, specialActionLabel } from './special-action-art'
 
@@ -37,6 +39,11 @@ const locationLabel = (
   return t(locale, 'moor.specialActions.faceDown')
 }
 
+const borrowFoodForActor = (card: MoorSpecialActionCardState, actorId: string): number =>
+  card.location.kind === 'playerFaceUp' && card.location.playerId !== actorId
+    ? MOOR_SPECIAL_ACTION_BORROW_FOOD
+    : 0
+
 export function SpecialActionsPanel({
   locale,
   playerCount,
@@ -50,22 +57,32 @@ export function SpecialActionsPanel({
 }: SpecialActionsPanelProps) {
   const renderCards = (visibleCards: MoorSpecialActionCardState[]) => visibleCards.map((card) => {
     const cardUsable = availability[card.id]?.cardUsable === true
+    const borrowFood = borrowFoodForActor(card, currentPlayerId)
+    const actionStates = card.actions.map((actionId) => ({
+      actionId,
+      available: cardUsable && canTakeSpecialAction(card, actionId),
+    }))
+    const paidClass = borrowFood <= 0
+      ? ''
+      : actionStates.some((action) => action.available)
+        ? ' special-action-card--paid'
+        : ' special-action-card--paid-unavailable'
     const cardLabel = card.actions.map((actionId) => specialActionLabel(locale, actionId)).join(' / ')
+    const statusId = `${card.id}-status`
     return (
       <div
         key={card.id}
         data-card-id={card.id}
         role="group"
         aria-label={cardLabel}
-        className={`special-action-card${cardUsable ? '' : ' special-action-card--disabled'}`}
+        className={`special-action-card${cardUsable ? '' : ' special-action-card--disabled'}${paidClass}`}
       >
         <div className="special-action-card__players">
           {t(locale, 'moor.specialActions.players', { count: card.players.join('/') })}
         </div>
         <div className="special-action-card__actions">
-          {card.actions.map((actionId) => {
+          {actionStates.map(({ actionId, available }) => {
             const label = specialActionLabel(locale, actionId)
-            const available = cardUsable && canTakeSpecialAction(card, actionId)
             const isSelected = selected?.cardId === card.id && selected.actionId === actionId
             const effectId = `${card.id}-${actionId}-effect`
             return (
@@ -76,7 +93,7 @@ export function SpecialActionsPanel({
                 disabled={!available}
                 aria-label={label}
                 aria-pressed={isSelected}
-                aria-describedby={effectId}
+                aria-describedby={borrowFood > 0 ? `${effectId} ${statusId}` : effectId}
                 title={label}
                 onClick={() => onTakeAction(card.id, actionId)}
               >
@@ -87,7 +104,12 @@ export function SpecialActionsPanel({
             )
           })}
         </div>
-        <div className="special-action-card__status">
+        {borrowFood > 0 ? (
+          <div className="special-action-card__payment" data-special-action-fee={`food:${borrowFood}`} aria-hidden="true">
+            <ResourceLine locale={locale} resources={{ food: borrowFood }} mode="payment" />
+          </div>
+        ) : null}
+        <div id={statusId} className="special-action-card__status">
           {locationLabel(locale, card, currentPlayerId)}
         </div>
       </div>
