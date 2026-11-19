@@ -189,19 +189,13 @@ const useTransportSetup = (
     })
     window.addEventListener('pagehide', () => { void saver.flush() })
 
-    // An explicit "restart" (freshSandbox=1) drops any saved slot and starts
-    // clean instead of offering to resume the previous game.
+    // An explicit restart skips the resume prompt.
     const forceFresh = new URLSearchParams(window.location.search).get('freshSandbox') === '1'
 
     const init = async () => {
       try {
-        // Clearing the optional slot is best-effort: a storage-disabled context
-        // must not block starting a fresh in-memory game.
         if (forceFresh) {
-          try { await store.clear() } catch { /* ignore */ }
-          // Consume the flag so a later reload of this frame (manual or the
-          // stale-chunk recovery path) resumes the restarted game instead of
-          // clearing its snapshots again.
+          // Consume the flag so a reload can resume the latest save.
           const params = new URLSearchParams(window.location.search)
           params.delete('freshSandbox')
           const q = params.toString()
@@ -212,13 +206,13 @@ const useTransportSetup = (
           try {
             await transport.startFromPersisted(persisted)
           } catch {
-            await store.clear()
             await transport.start()
           }
         } else {
-          if (persisted) await store.clear()
           await transport.start()
         }
+        // A successful Worker response supplies the snapshot that replaces the save.
+        await saver.flush()
         setLocalTransport(transport)
         setLocalReady(true)
       } catch (err) {
