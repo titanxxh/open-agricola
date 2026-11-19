@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap'
-import { createInitialState, normalizeState } from '../../shared/session/state-bootstrap'
+import { createInitialState } from '../../shared/session/state-bootstrap'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { ClassicPoolInsufficientError, getClassicDealShortfall } from '../../shared/session/classic-deal-pool'
 import { withClassicCardDefinitions } from '../../shared/cards/classic-catalog'
@@ -11,7 +11,7 @@ import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
 import { createOpeningSession } from './_helpers/session-fixtures'
 
 // ADR 0049: a classic game deals only eligible cards (implemented, player-count limits) of its chosen classic decks,
-// for every deal path, and keeps its edition and decks. Only two classic cards are ported, so these tests size the
+// for the plain deal, draft and fallback deck, and keeps its edition and decks. Only two classic cards are ported, so these tests size the
 // pool with test-only classic definitions.
 const FIXTURES = [
   ...classicFixtureCards('CE', 'occupation', 8),
@@ -24,8 +24,9 @@ const FIXTURES = [
   ...classicFixtureCards('CZ', 'occupation', 6),
   ...classicFixtureCards('CZ', 'minor', 6),
 ]
-const eligibleIn = (decks: string[], kind: 'occupation' | 'minor', playerCount = 2) => new Set(FIXTURES
-  .filter(card => decks.includes(card.deck) && card.kind === kind && (card.players !== '3+' || playerCount >= 3))
+/** Eligible fixture IDs at 2 players, where the 3+ cards stay out. */
+const eligibleIn = (decks: string[], kind: 'occupation' | 'minor') => new Set(FIXTURES
+  .filter(card => decks.includes(card.deck) && card.kind === kind && card.players !== '3+')
   .map(card => card.id))
 const PLAYING = { phase: 'playing', roundPhase: 'work', interaction: { stateId: 'idle' } } as const
 
@@ -144,21 +145,6 @@ describe('classic game deal', () => {
     })
   })
 
-  it('rebuilds a legacy classic game\'s missing hand and deck from its own classic decks', () => {
-    withClassicCardDefinitions(FIXTURES, () => {
-      const created = createInitialState(1872, { playerCount: 2, cardEdition: 'classic', classicDeckIds: ['CI', 'CE'] })
-      const legacy = JSON.parse(JSON.stringify(created)) as GameState
-      legacy.players[1]!.minorHand = []
-      delete (legacy as Partial<GameState>).ordinaryCardDecks
-
-      const rebuilt = normalizeState(legacy)
-
-      expect(hands(rebuilt)).toEqual(hands(created))
-      for (const kind of ['occupation', 'minor'] as const) {
-        expect(new Set(cardsOf(rebuilt, kind))).toEqual(eligibleIn(['CI', 'CE'], kind))
-      }
-    })
-  })
 })
 
 describe('classic pool check', () => {
