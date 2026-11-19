@@ -107,6 +107,11 @@ describe('B104 Sheep Walker parity', () => {
     expect(reorg.interaction.request.zones.find((zone) => zone.zoneType === 'house'))
       .toMatchObject({ animalType: 'boar', animalCount: 1 })
     expect(reorg.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+    const { reserveCooking, ...reorgRequest } = reorg.interaction.request
+    expect(reserveCooking).toMatchObject({
+      available: { boar: 1 },
+      catalog: [expect.objectContaining({ sourceId: 'Major_Fireplace1', from: { boar: 1 }, to: { food: 2 } })],
+    })
 
     let nested = session.takeAnytimeAction(0, 'exchange')
     expect(nested.ok, nested.error).toBe(true)
@@ -130,10 +135,10 @@ describe('B104 Sheep Walker parity', () => {
     expect(cooked.ok, cooked.error).toBe(true)
     expect(cooked.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 0, food: 2 })
     if (cooked.interaction.stateId !== 'wait' || cooked.interaction.request.kind !== 'animal-reorg') throw new Error('expected reorganization')
-    // Cooking changes inventory, so the same pending host refreshes its draft.
+    // The same pending host refreshes its draft and drops the depleted reserve offer.
     expect(cooked.interaction.request).toEqual({
-      ...reorg.interaction.request,
-      zones: reorg.interaction.request.zones.map((zone) => zone.zoneType === 'house'
+      ...reorgRequest,
+      zones: reorgRequest.zones.map((zone) => zone.zoneType === 'house'
         ? { ...zone, animalType: null, animalCount: 0 }
         : zone),
     })
