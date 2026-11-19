@@ -15,7 +15,7 @@ export type WebPushStatus = {
   preferences: WebPushPreferences
 }
 
-export const webPushEnabledBuild = import.meta.env.VITE_PUBLIC_ASSET_WORKER === '1'
+export const webPushEnabledBuild = import.meta.env.VITE_STABLE_PAGES_WORKER === '1'
 
 function storedValue(key: string): unknown {
   try { return JSON.parse(localStorage.getItem(key) ?? 'null') } catch { return null }
