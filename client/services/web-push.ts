@@ -4,6 +4,7 @@ import {
 } from '../../shared/contract/web-push'
 import { API_BASE } from '../config'
 import { browserApiFetch } from './browser-api'
+import { findPagesWorkerRegistration } from './pages-worker'
 
 const DEVICE = 'open-agricola:web-push-device-v1'
 const PENDING_UNBIND = 'open-agricola:web-push-unbind-v1'
@@ -50,12 +51,12 @@ export async function drainWebPushUnbinds(): Promise<void> {
   }
 }
 
-export async function findWebPushRegistration(): Promise<ServiceWorkerRegistration | null> {
-  if (!webPushEnabledBuild || !('serviceWorker' in navigator) || !('PushManager' in window)) return null
-  const registration = await navigator.serviceWorker.getRegistration('/')
-  const scriptUrl = new URL('/sw.js', window.location.origin).href
-  return registration?.active?.scriptURL === scriptUrl ? registration : null
+async function localPushRegistration(capability: 'webPush' | 'retireSubscription'): Promise<ServiceWorkerRegistration | null> {
+  if (!webPushEnabledBuild || !('PushManager' in window)) return null
+  return findPagesWorkerRegistration(capability)
 }
+
+export const findWebPushRegistration = () => localPushRegistration('webPush')
 
 export async function reconcileWebPushDevice(
   userId: string | null,
@@ -68,7 +69,7 @@ export async function reconcileWebPushDevice(
     localStorage.removeItem(DEVICE)
     if (options.unsubscribe) {
       // Explicit sign-out tries local unsubscribe even if there is no network.
-      const registration = await findWebPushRegistration().catch(() => null)
+      const registration = await localPushRegistration('retireSubscription').catch(() => null)
       const subscription = await registration?.pushManager.getSubscription().catch(() => null)
       if (!currentDevice()) await subscription?.unsubscribe().catch(() => false)
     }

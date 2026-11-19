@@ -1,7 +1,9 @@
 // @covers client/app/encyclopedia/
 // @covers client/service-worker/offline-encyclopedia.worker.ts
+// @covers client/service-worker/capabilities.ts
 // @covers client/services/offline-encyclopedia.ts
 // @covers client/services/offline-encyclopedia-storage.ts
+// @covers client/services/pages-worker.ts
 // @covers scripts/card-encyclopedia/offline-artifacts.ts
 import { expect, test, type BrowserType, type Page } from '@playwright/test'
 import { createHash } from 'node:crypto'
@@ -54,6 +56,43 @@ async function readCard(page: Page, query: string, heading: string, body: RegExp
   await entry.locator('summary').click()
   await expect(entry.getByText(body).first()).toBeVisible()
 }
+
+test('waits for an active Worker that supports the offline reader @webkit', async ({ playwright, browserName }) => {
+  const workerPath = join(siteDirectory, 'sw.js')
+  const currentWorker = readFileSync(workerPath, 'utf8')
+  const context = await persistent(playwright[browserName], join(directory, 'worker-upgrade-profile'), browserName)
+  try {
+    writeFileSync(workerPath, 'self.addEventListener("fetch", () => {});\n')
+    writeFileSync(join(siteDirectory, 'worker-upgrade.html'), '<!doctype html><title>Previous Worker</title>')
+    const page = context.pages()[0] ?? await context.newPage()
+    await page.goto(`${site.origin}/worker-upgrade.html`)
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+      await navigator.serviceWorker.ready
+      localStorage.setItem('open-agricola-locale-v2', 'en')
+    })
+    await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.ready).active?.state)).toBe('activated')
+
+    writeFileSync(workerPath, currentWorker)
+    await page.goto(online())
+    await expect.poll(() => page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration('/')
+      return !!navigator.serviceWorker.controller && registration?.waiting?.state
+    })).toBe('installed')
+    const save = controls(page).getByRole('button', { name: 'Save for offline reading' })
+    const open = controls(page).getByRole('link', { name: 'Open offline encyclopedia' })
+    await expect(save).toBeDisabled()
+    await expect(open).toHaveCount(0)
+
+    writeFileSync(workerPath, `${currentWorker}\nself.addEventListener('install', event => event.waitUntil(self.skipWaiting()));\n`)
+    await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration('/'))?.update() })
+    await expect(save).toBeEnabled()
+    await expect(open).toHaveAttribute('href', OFFLINE_ENCYCLOPEDIA_PATH)
+  } finally {
+    await context.close()
+    writeFileSync(workerPath, currentWorker)
+  }
+})
 
 test('saves one language and opens its independent offline bookmark after restarting the browser @webkit', async ({ playwright, browserName }) => {
   const profile = join(directory, 'restart-profile')

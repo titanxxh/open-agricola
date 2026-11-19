@@ -4,6 +4,7 @@ import { useLocale } from '../../contexts/LocaleContext'
 import { getLanguageManifest } from '../../services/language-pack'
 import { downloadOfflineEncyclopedia, loadOfflineEncyclopediaManifest } from '../../services/offline-encyclopedia'
 import { deleteOfflineEncyclopedia, readSavedOfflineEncyclopedia, type SavedOfflineEncyclopedia } from '../../services/offline-encyclopedia-storage'
+import { findPagesWorkerRegistration, onPagesWorkerChange } from '../../services/pages-worker'
 import './offline-encyclopedia.css'
 
 const prefix = 'ui.encyclopedia.offline.'
@@ -20,6 +21,13 @@ export function OfflineEncyclopediaControls() {
 
   useEffect(() => {
     let mounted = true
+    let capabilityRequest = 0
+    function refreshCapability() {
+      const request = ++capabilityRequest
+      void findPagesWorkerRegistration('offlineEncyclopedia').catch(() => null).then(registration => {
+        if (mounted && request === capabilityRequest) setActive(registration !== null)
+      })
+    }
     function refresh() {
       void readSavedOfflineEncyclopedia().then((value) => {
         if (mounted) setSaved(value)
@@ -27,13 +35,18 @@ export function OfflineEncyclopediaControls() {
       void loadOfflineEncyclopediaManifest().then((value) => {
         if (mounted) setManifest(value)
       }).catch(() => { if (mounted) setManifest(undefined) })
+      refreshCapability()
     }
     refresh()
-    void navigator.serviceWorker.ready.then(() => { if (mounted) setActive(true) }).catch(() => undefined)
+    const stopWatching = onPagesWorkerChange(() => {
+      setActive(false)
+      refreshCapability()
+    })
     window.addEventListener('focus', refresh)
     window.addEventListener('online', refresh)
     return () => {
       mounted = false
+      stopWatching()
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refresh)
     }
@@ -88,7 +101,7 @@ export function OfflineEncyclopediaControls() {
       {details && <p>{details}</p>}
       {updateAvailable && <p>{t(prefix + 'updateAvailable')}</p>}
       <div className="encyclopedia-offline__actions">
-        <a href={OFFLINE_ENCYCLOPEDIA_PATH}>{t(prefix + 'open')}</a>
+        {active && <a href={OFFLINE_ENCYCLOPEDIA_PATH}>{t(prefix + 'open')}</a>}
         {candidate && (!saved || !sameLanguage || updateAvailable) && (
           <button type="button" disabled={!active || busy} onClick={() => void handleSave()}>{t(prefix + action)}</button>
         )}

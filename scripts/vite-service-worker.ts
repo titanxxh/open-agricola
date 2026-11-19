@@ -120,6 +120,7 @@ function workerSource(config: AssetWorkerConfig, encyclopediaFallback: string, f
     add('installOfflineEncyclopedia', 'service-worker/offline-encyclopedia.worker.ts', encyclopediaFallback)
   }
   add('installWebPush', 'service-worker/web-push.worker.ts')
+  add('installWorkerCapabilities', 'service-worker/capabilities.ts', { offlineEncyclopedia: features.offlineEncyclopedia, webPush: true })
   if (features.emergencyTakeover) {
     install.push('self.addEventListener("install", event => event.waitUntil(self.skipWaiting()));')
   }
