@@ -3,6 +3,7 @@ import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
 import type { GameState, InteractionAnimalReorgZone } from '../../shared/contract/types'
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
 import type { AnimalReorgState, PendingAnimalReorg } from '../types/ui'
+import { areRequiredEmptyAnimalZoneGroupsSatisfied } from './interaction-presentation'
 import {
   computeReorgAvailableAnimals,
   shouldShowAnimalDiscardPrompt,
@@ -64,12 +65,56 @@ const addAnimalCounts = (
   }
 }
 
+const restoreDraftAssignments = (
+  previous: readonly InteractionAnimalReorgZone[],
+  current: InteractionAnimalReorgZone[],
+  available: AnimalTotals,
+): InteractionAnimalReorgZone[] => {
+  const previousById = new Map(previous.map(zone => [zone.id, zone]))
+  const remaining = { ...available }
+  const restored: InteractionAnimalReorgZone[] = current.map(({ animalCounts: _animalCounts, ...zone }) => ({
+    ...zone, animalType: null, animalCount: 0,
+  }))
+  current.forEach((zone, index) => {
+    const oldZone = previousById.get(zone.id)
+    if (!oldZone || oldZone.zoneType !== zone.zoneType || oldZone.ownerPlayerId !== zone.ownerPlayerId
+      || oldZone.animalOwnerPlayerId !== zone.animalOwnerPlayerId || wouldExceedZoneOccupancyLimit(restored, zone.id)) return
+    const previousCounts = zoneAnimalCounts(oldZone)
+    const counts = emptyAnimalTotals()
+    let capacity = zone.capacity
+    const allowsMixed = cardZoneAllowsMixedAnimals(zone)
+    for (const animal of REORG_ANIMAL_TYPES) {
+      if (zone.allowedAnimalType && zone.allowedAnimalType !== animal) continue
+      if (zone.allowedAnimalTypes && !zone.allowedAnimalTypes.includes(animal)) continue
+      const count = Math.min(previousCounts[animal], remaining[animal], capacity)
+      if (count <= 0) continue
+      counts[animal] = count
+      capacity -= count
+      if (!allowsMixed) break
+    }
+    const emptyZone = restored[index]!
+    restored[index] = {
+      ...emptyZone,
+      animalType: singleAnimalType(counts),
+      animalCount: animalCountsTotal(counts),
+      ...(allowsMixed ? { animalCounts: compactAnimalCounts(counts) } : {}),
+    }
+    if (!areRequiredEmptyAnimalZoneGroupsSatisfied(current, restored)) {
+      restored[index] = emptyZone
+      return
+    }
+    for (const animal of REORG_ANIMAL_TYPES) remaining[animal] -= counts[animal]
+  })
+  return restored
+}
+
 export const useAnimalReorgDraftPresentation = ({
   state,
   pendingAnimalReorg,
 }: AnimalReorgDraftPresentationInput) => {
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
-  const sourceKey = useRef<string | null>(null)
+  const source = useRef<{ fingerprint: string; requestKey?: string; canCook: boolean } | null>(null)
+  const cookingDraft = useRef<{ requestKey: string; zones: InteractionAnimalReorgZone[] } | null>(null)
 
   const syncFromInteraction = useCallback((interaction: ClientInteractionState, snapshotState: ReorgSourceState | null | undefined) => {
     if (
@@ -77,25 +122,49 @@ export const useAnimalReorgDraftPresentation = ({
       interaction.request.kind === 'animal-reorg'
     ) {
       const player = snapshotState?.players[interaction.playerIndex]
-      const key = JSON.stringify([
-        interaction.playerIndex, interaction.spaceId, interaction.request,
+      const { requestKey } = interaction
+      const { zones, reserveCooking, prefill } = interaction.request
+      const fingerprint = JSON.stringify([
+        interaction.playerIndex, interaction.spaceId, requestKey, zones, prefill,
         REORG_ANIMAL_TYPES.map((type) => player?.resources[type] ?? 0),
       ])
-      if (sourceKey.current === key) return
-      sourceKey.current = key
-      setAnimalReorg({
-        zones: interaction.request.zones,
-        confirmDiscard: false,
+      const former = source.current
+      const retained = cookingDraft.current
+      const returningFromCooking = !!retained && retained.requestKey === requestKey
+      if (former?.fingerprint === fingerprint) return
+      const preserve = requestKey && former?.requestKey === requestKey && (former.canCook || !!reserveCooking)
+      source.current = { fingerprint, requestKey, canCook: !!reserveCooking }
+      if (returningFromCooking) cookingDraft.current = null
+      setAnimalReorg(previous => {
+        const previousZones = returningFromCooking ? retained.zones : preserve ? previous?.zones : undefined
+        return {
+          zones: previousZones && player
+            ? restoreDraftAssignments(previousZones, zones, computeReorgAvailableAnimals(player))
+            : zones,
+          confirmDiscard: !returningFromCooking && !!preserve && !!previous?.confirmDiscard,
+        }
       })
       return
     }
-    sourceKey.current = null
+    if (interaction.stateId !== 'wait' || interaction.request.kind === 'confirm-next-player') {
+      cookingDraft.current = null
+    }
+    source.current = null
     setAnimalReorg(null)
   }, [])
 
   const reset = useCallback(() => {
-    sourceKey.current = null
+    cookingDraft.current = null
+    source.current = null
     setAnimalReorg(null)
+  }, [])
+
+  const retainForCooking = useCallback((requestKey: string) => {
+    if (animalReorg) cookingDraft.current = { requestKey, zones: animalReorg.zones }
+  }, [animalReorg])
+
+  const cancelCooking = useCallback((requestKey: string) => {
+    if (cookingDraft.current?.requestKey === requestKey) cookingDraft.current = null
   }, [])
 
   const reorgAvailable = useMemo(() => {
@@ -242,6 +311,8 @@ export const useAnimalReorgDraftPresentation = ({
     submitDraft,
     syncFromInteraction,
     reset,
+    retainForCooking,
+    cancelCooking,
     controls: {
       adjustAnimal,
       confirm,

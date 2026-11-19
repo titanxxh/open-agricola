@@ -16,6 +16,7 @@ import { viewerBuildExists } from '../../game/replay-viewer-build'
 import { serializeSessionSnapshot } from '../../../shared/session/serialization'
 import { getDb } from '../../db'
 import { recordingResources } from '../../__tests__/_helpers/recording'
+import { createWorkSession } from '../../__tests__/_helpers/session-fixtures'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter'
 import { RoomDirectory } from '../../game/room-directory'
 import { CommandStore } from '../../game/command-store'
@@ -1093,6 +1094,89 @@ describe('room-manager ws sync', () => {
       expect(undone.cause).toBe('undo')
       expect(findTakenBy(undone, 'day-laborer')).toEqual([])
     })
+  })
+
+  it('offers reserve cooking only to the acting seat and settles one versioned command once', async () => {
+    const connectSeat = async (requestedPlayerIndex: number) => {
+      const ws = Object.assign(new WebSocket(baseUrl), { received: [] as ServerEvent[] })
+      sockets.push(ws)
+      attachCollector(ws)
+      await waitForOpen(ws)
+      await sendCommand(ws, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex, name: `Seat ${requestedPlayerIndex + 1}` })
+      await waitForEvent(ws, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+      return ws
+    }
+    const stateUpdate = (ws: TestSocket, requestId: string) =>
+      waitForEvent(ws, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate' && event.requestId === requestId)
+    const commandReceipt = (ws: TestSocket, requestId: string) =>
+      waitForEvent(ws, (event): event is Extract<ServerEvent, { type: 'commandReceipt' }> =>
+        event.type === 'commandReceipt' && event.requestId === requestId)
+    const actor = await connectSeat(0)
+    const observer = await connectSeat(1)
+    const fixture = createWorkSession({ configure: state => {
+      state.round = 5
+      const player = state.players[0]!
+      player.improvements = ['Major_Fireplace1']
+      Object.assign(player.resources, { sheep: 0, food: 0 })
+      state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep = 2
+    } })
+    try {
+      await sendCommand(actor, { type: 'loadGame', state: fixture.state, requestId: 'cooking-fixture' })
+    } finally {
+      fixture.dispose()
+    }
+    const initial = await stateUpdate(actor, 'cooking-fixture')
+    await sendCommand(actor, { type: 'action', spaceId: 'sheep-market', requestId: 'collect-sheep' })
+    const collected = await stateUpdate(actor, 'collect-sheep')
+    const interaction = collected.payload.interaction
+    if (interaction.stateId !== 'wait' || interaction.request.kind !== 'animal-reorg') throw new Error('Expected animal reorganization')
+    const recipe = interaction.request.reserveCooking?.catalog.find(entry => entry.sourceId === 'Major_Fireplace1' && entry.from.sheep === 1)
+    expect(recipe?.to.food).toBe(2)
+    if (!recipe) throw new Error('Expected the Fireplace sheep recipe')
+
+    const peerView = await waitForEvent(observer, (event): event is StateUpdateEnvelope =>
+      event.type === 'stateUpdate' && event.version === collected.version)
+    expect(peerView.payload.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, allowedCommands: [], request: { kind: 'private-prompt', promptKind: 'animal-reorg' },
+    })
+    expect(peerView.payload.interaction).not.toHaveProperty('request.reserveCooking')
+
+    const cooking = {
+      type: 'choice', value: 'cook-reserve',
+      payload: {
+        requestKey: interaction.requestKey, zones: interaction.request.zones,
+        exchanges: [{ sourceId: recipe.sourceId, exchangeIndex: recipe.exchangeIndex, count: 1 }],
+      },
+    } satisfies ClientCommand
+    await sendCommand(observer, { ...cooking, requestId: 'cook-wrong-seat' })
+    expect(await commandReceipt(observer, 'cook-wrong-seat')).toMatchObject({
+      status: 'completed', receipt: { outcome: { ok: false, error: 'seat mismatch: you cannot act on another player' } },
+    })
+
+    actor.send(JSON.stringify({ type: 'getCommandScope', requestId: 'cooking-scope' }))
+    const { scope } = await waitForEvent(actor, (event): event is Extract<ServerEvent, { type: 'commandScope' }> =>
+      event.type === 'commandScope' && event.requestId === 'cooking-scope')
+    const commandContext = { scopeId: scope.scopeId, commandId: randomUUID(), roomId: 'dev2', expectedVersion: collected.version }
+    actor.send(JSON.stringify({ ...cooking, commandContext: { ...commandContext, commandId: randomUUID(), expectedVersion: initial.version }, requestId: 'cook-stale' }))
+    expect(await commandReceipt(actor, 'cook-stale')).toMatchObject({
+      status: 'completed', receipt: { outcome: { ok: false, code: 'command_input_stale' } },
+    })
+
+    actor.send(JSON.stringify({ ...cooking, commandContext, requestId: 'cook-once' }))
+    const cooked = await stateUpdate(actor, 'cook-once')
+    const receipt = await commandReceipt(actor, 'cook-once')
+    expect(receipt).toMatchObject({ status: 'completed', receipt: { outcome: { ok: true, roomVersion: collected.version + 1 } } })
+    expect(cooked.payload.interaction).toMatchObject({ stateId: 'wait', requestKey: interaction.requestKey, request: { kind: 'animal-reorg' } })
+    expect(cooked.payload.state.players[0]!.resources).toMatchObject({ sheep: 1, food: 2 })
+
+    actor.send(JSON.stringify({ ...cooking, commandContext, requestId: 'cook-retry' }))
+    expect(await commandReceipt(actor, 'cook-retry')).toEqual({ ...receipt, requestId: 'cook-retry' })
+    const retried = await stateUpdate(actor, 'cook-retry')
+    expect(retried.version).toBe(cooked.version)
+    expect(retried.payload.state.players[0]!.resources).toMatchObject({ sheep: 1, food: 2 })
+    expect(retried.payload.state.events.filter(event => event.type === 'resource.exchanged')).toEqual([
+      expect.objectContaining({ paid: { sheep: 1 }, gained: { food: 2 }, times: 1 }),
+    ])
   })
 
   it('broadcasts devSetResources and devSetRound updates over ws', async () => {

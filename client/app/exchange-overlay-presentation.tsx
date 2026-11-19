@@ -7,6 +7,7 @@ import { ResourceLine } from '../components/common/ResourceLine'
 import { translateCardText } from '../components/common/cardText'
 import type { AnytimeExchangeOption } from './anytime-exchange-ui'
 import type { HarvestFeedOption } from './hooks/use-harvest-flow'
+import type { useReserveCookingDraftPresentation } from './reserve-cooking-draft-presentation'
 import type { PendingChoice } from '../types/ui'
 
 type BakeExchangeInfo = Record<string, { food: number; max: number }>
@@ -72,6 +73,11 @@ type ExchangeOverlayPresentationProps = {
   heatingConfirmDisabled?: boolean
   harvestFeedConfirmDisabled?: boolean
   draft: ExchangeOverlayDraft
+  reserveCooking?: {
+    draft: NonNullable<ReturnType<typeof useReserveCookingDraftPresentation>['overlay']>
+    confirm: () => void
+    cancel: () => void
+  }
   cardLabel: (id: string) => string
   actions: ExchangeOverlayActions
   navigation?: ReactNode
@@ -195,6 +201,7 @@ export const ExchangeOverlayPresentation = ({
   heatingConfirmDisabled,
   harvestFeedConfirmDisabled,
   draft,
+  reserveCooking,
   cardLabel,
   actions,
   navigation,
@@ -273,33 +280,38 @@ export const ExchangeOverlayPresentation = ({
     )
   }
 
-  if (draft.anytime.isActive && pendingChoice && isInteractive) {
+  const recipeDraft = reserveCooking?.draft ?? draft.anytime
+  if ((reserveCooking || (draft.anytime.isActive && pendingChoice)) && isInteractive) {
+    const summary = reserveCooking ? { food: reserveCooking.draft.food } : draft.anytime.summary
+    const hasSummary = reserveCooking ? reserveCooking.draft.food > 0 : draft.anytime.hasSummary
     return (
       <ExchangeModal
         title={t(locale, 'ui.exchangeCenterTitle')}
-        subtitle={translateCardText(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+        subtitle={reserveCooking
+          ? t(locale, 'ui.reorgConvertToFood')
+          : translateCardText(locale, pendingChoice?.promptKey ?? 'ui.interactionChooseOne')}
         navigation={navigation}
       >
         <div className="exchange-options">
-          {draft.anytime.options.map((option) => (
+          {recipeDraft.options.map((option) => (
             <ResourceExchangeRow
               key={option.id}
               locale={locale}
               option={option}
-              current={draft.anytime.counts[option.id] ?? 0}
-              limit={draft.anytime.limitById[option.id] ?? 0}
+              current={recipeDraft.counts[option.id] ?? 0}
+              limit={recipeDraft.limitById[option.id] ?? 0}
               mode="payment"
-              testId={`anytime-exchange-option-${option.sourceId}-ex${option.exchangeIndex}`}
-              onChange={draft.anytime.updateCount}
+              testId={`${reserveCooking ? 'reserve-cooking' : 'anytime-exchange'}-option-${option.sourceId}-ex${option.exchangeIndex}`}
+              onChange={recipeDraft.updateCount}
             />
           ))}
         </div>
         <div className="exchange-footer">
           <div className="exchange-summary">
-            {draft.anytime.hasSummary ? (
+            {hasSummary ? (
               <ResourceLine
                 locale={locale}
-                resources={draft.anytime.summary}
+                resources={summary}
                 emptyLabel={t(locale, 'ui.noResources')}
               />
             ) : (
@@ -310,15 +322,15 @@ export const ExchangeOverlayPresentation = ({
             <button
               type="button"
               className="exchange-cancel"
-              onClick={actions.cancelAnytimeExchange}
+              onClick={reserveCooking?.cancel ?? actions.cancelAnytimeExchange}
             >
               {t(locale, 'ui.interactionCancel')}
             </button>
             <button
               type="button"
               className="exchange-confirm"
-              onClick={actions.confirmAnytimeExchange}
-              disabled={!draft.anytime.hasSelection}
+              onClick={reserveCooking?.confirm ?? actions.confirmAnytimeExchange}
+              disabled={!(reserveCooking?.draft.canConfirm ?? draft.anytime.hasSelection)}
             >
               {t(locale, 'ui.interactionConfirmButton')}
             </button>

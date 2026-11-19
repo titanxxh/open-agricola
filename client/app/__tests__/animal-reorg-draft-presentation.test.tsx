@@ -150,3 +150,34 @@ describe('useAnimalReorgDraftPresentation', () => {
     expect(result.current.submitDraft.animalReorgZones).toBeUndefined()
   })
 })
+
+it('restores the same cooking draft after an intervening player-switch confirmation', () => {
+  const snapshot = state()
+  const requestKey = 'market-reorganization'
+  const pending = { ...animalReorgInteraction(), requestKey }
+  const { result } = renderHook(() => useAnimalReorgDraftPresentation({
+    state: snapshot, pendingAnimalReorg: { playerIndex: 0, spaceId: 'animal-reorg' },
+  }))
+
+  act(() => result.current.syncFromInteraction(pending, snapshot))
+  act(() => result.current.controls.adjustAnimal('pasture-1', 'sheep', 1))
+  act(() => result.current.retainForCooking(requestKey))
+  act(() => result.current.syncFromInteraction({
+    stateId: 'wait',
+    requestKey: 'reaction-player-switch',
+    playerIndex: 1,
+    spaceId: 'animal-reorg',
+    allowedCommands: ['confirmPlayerSwitch'],
+    anytimeActions: [],
+    request: { kind: 'confirm-player-switch', fromPlayerIndex: 0, toPlayerIndex: 1 },
+  }, snapshot))
+  expect(result.current.isActive).toBe(false)
+
+  const afterCooking = state(player({
+    resources: { ...emptyResources, sheep: 1, boar: 1, horse: 1, food: 2 },
+  }))
+  act(() => result.current.syncFromInteraction(pending, afterCooking))
+  expect(result.current.submitDraft.animalReorgZones?.[0]).toMatchObject({
+    id: 'pasture-1', animalType: 'sheep', animalCount: 1,
+  })
+})

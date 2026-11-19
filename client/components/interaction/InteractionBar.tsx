@@ -405,7 +405,13 @@ export const InteractionBar = ({
     takeAnytimeAction,
     confirmAnimalReorg,
     cancelAnimalDiscardPrompt,
+    openReserveCooking,
   } = actions
+  const convertToFood = openReserveCooking ? (
+    <button type="button" onClick={openReserveCooking} disabled={!isInteractive}>
+      {t(locale, 'ui.reorgConvertToFood')}
+    </button>
+  ) : null
 
   useLayoutEffect(() => {
     const bar = barRef.current
@@ -471,6 +477,9 @@ export const InteractionBar = ({
                 <div className="interaction-reorg-row">
                   <span>{t(locale, 'ui.reorgPending')}</span>
                   <AnimalCountLine locale={locale} counts={reorgRemaining ?? emptyAnimalCounts} />
+                  {!animalReorg?.confirmDiscard && convertToFood ? (
+                    <div className="interaction-actions">{convertToFood}</div>
+                  ) : null}
                 </div>
                 {hasReorgOverflow ? (
                   <div className="interaction-error">{t(locale, 'ui.reorgOverAssign')}</div>
@@ -486,6 +495,7 @@ export const InteractionBar = ({
                       })}
                     </div>
                     <div className="interaction-actions">
+                      {convertToFood}
                       <button onClick={cancelAnimalDiscardPrompt} disabled={!isInteractive}>
                         {t(locale, 'ui.reorgAdjustMore')}
                       </button>

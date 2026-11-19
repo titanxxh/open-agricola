@@ -68,6 +68,7 @@ import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
 import { useAnimalReorgDraftPresentation } from './animal-reorg-draft-presentation'
 import { ExchangeOverlayPresentation } from './exchange-overlay-presentation'
 import { useExchangeDraftPresentation } from './exchange-draft-presentation'
+import { useReserveCookingDraftPresentation } from './reserve-cooking-draft-presentation'
 import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
 import { checkServerAvailability, isServerUnavailableCode, onServerRecovered, useServerAvailability } from '../services/server-availability'
@@ -684,6 +685,9 @@ export const GameContainerApi = () => {
     hasReorgOverflow,
     submitDraft: animalReorgSubmitDraft,
     syncFromInteraction: syncAnimalReorgFromInteraction,
+    reset: resetAnimalReorgDraft,
+    retainForCooking,
+    cancelCooking,
     controls: {
       adjustAnimal: adjustReorgAnimal,
       confirm: confirmAnimalReorgDraft,
@@ -1165,8 +1169,13 @@ export const GameContainerApi = () => {
   }, [isAnytimeExchange, pendingChoice, resolveChoice])
 
   const draftRequestKey = useRef<string | null>(null)
+  const animalReorgRoom = useRef<string | null>(null)
   const handleSnapshot = useCallback((payload: GameSyncPayload, roomId?: string) => {
-    if (roomId) setRoomInUrl(roomId)
+    if (roomId) {
+      if (animalReorgRoom.current && animalReorgRoom.current !== roomId) resetAnimalReorgDraft()
+      animalReorgRoom.current = roomId
+      setRoomInUrl(roomId)
+    }
     applySnapshot(payload)
     applySnapshotPublicEventCancellations(payload)
     syncAnimalReorgFromInteraction(payload.interaction, payload.state)
@@ -1179,7 +1188,7 @@ export const GameContainerApi = () => {
       draftRequestKey.current = nextRequestKey
       resetExchangeDraft()
     }
-  }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction])
+  }, [applySnapshot, applySnapshotPublicEventCancellations, resetAnimalReorgDraft, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction])
 
   const snapshotTransport = isWs ? wsTransport : transport
   useEffect(() => {
@@ -1278,6 +1287,36 @@ export const GameContainerApi = () => {
     [baseActions, locale, roundSlots, state?.players, state?.round],
   )
   const { reorgRemaining } = farmBoardProjection
+  const reserveCooking = useReserveCookingDraftPresentation({
+    interaction,
+    zones: animalReorgSubmitDraft.animalReorgZones,
+    remaining: reorgRemaining,
+    isInteractive: isInteractive && !isPublicFarmView && isReorgActive && !hasReorgOverflow,
+    locale,
+    cardLabel,
+  })
+  const confirmReserveCooking = async () => {
+    if (!reserveCooking.overlay?.canConfirm || interaction.stateId !== 'wait' || !interaction.requestKey) return
+    const { requestKey } = interaction
+    const command = buildInteractionSubmitCommand(interaction, {
+      value: 'cook-reserve',
+      ...animalReorgSubmitDraft,
+      reserveCookingExchanges: reserveCooking.selections,
+    })
+    if (command.kind !== 'resolveChoice') return
+    retainForCooking(requestKey)
+    reserveCooking.close()
+    try {
+      const response = await transport.resolveChoice(command.playerIndex, command.value, command.payload)
+      if (!response.ok || (response.interaction.stateId === 'wait' && response.interaction.requestKey === requestKey)) {
+        cancelCooking(requestKey)
+        if (response.ok) cancelAnimalDiscardPrompt()
+      }
+    } catch (error) {
+      cancelCooking(requestKey)
+      console.error('reserve cooking error', error)
+    }
+  }
 
   const confirmAnimalReorg = useCallback(() => {
     confirmAnimalReorgDraft(reorgRemaining, resolveChoice)
@@ -1991,6 +2030,7 @@ export const GameContainerApi = () => {
     takeAnytimeAction,
     confirmAnimalReorg,
     cancelAnimalDiscardPrompt,
+    openReserveCooking: reserveCooking.open,
   })
   const playerTabsPresentation = (
     <PlayerTabs
@@ -2009,7 +2049,7 @@ export const GameContainerApi = () => {
     />
   )
   const hasHotseatExchangeOverlay = isHotseat && !isPublicFarmView && (
-    isBakeExchange || isAnytimeExchange || exchangeDraft.harvest.isActive
+    isBakeExchange || isAnytimeExchange || exchangeDraft.harvest.isActive || !!reserveCooking.overlay
   )
   const nearbyMajorSupply = isInteractive && !isPublicFarmView && !!improvementSelection && selectableMajorIds.size > 0
   const majorImprovementsPresentation = (
@@ -2144,6 +2184,11 @@ export const GameContainerApi = () => {
           } })}
           harvestFeedConfirmDisabled={harvestFeedConfirmDisabled}
           draft={exchangeDraft}
+          reserveCooking={reserveCooking.overlay ? {
+            draft: reserveCooking.overlay,
+            confirm: confirmReserveCooking,
+            cancel: reserveCooking.close,
+          } : undefined}
           cardLabel={cardLabel}
           navigation={isHotseat ? playerTabsPresentation : undefined}
           actions={{

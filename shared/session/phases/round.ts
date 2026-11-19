@@ -13,7 +13,7 @@ import type { ActionHookRegistry } from '../../actions/hooks'
  * full inventory.
  */
 
-import type { GameState, InteractionRequest, PlayerState } from '../../contract/types.ts'
+import type { ActionFlow, ExchangeBatchEntry, GameState, InteractionRequest, PlayerState } from '../../contract/types.ts'
 import { workersAvailable, workersAtHome } from '../../domain/player.ts'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones.ts'
 import { findActionSpaceById } from '../../domain/space.ts'
@@ -529,6 +529,7 @@ export const takeAnytimeAction = (
   core: GameCore,
   playerIndex: number,
   actionId: string,
+  reserveCookingBatch?: ExchangeBatchEntry[],
 ): SessionResponse => {
   if (core.state.gameOver) return core.emitResponse(false, 'game is over')
   if (core.state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
@@ -577,7 +578,16 @@ export const takeAnytimeAction = (
   const parent = core.getEngineStack().getActiveAnytimeActivation()
   const anytimeActivation = { id: `anytime-${core.allocActionToken()}`, turn: anytimeTurn,
     ...(parent ? { parentId: parent.id } : {}) }
-  const flow = { ...entry.flow, anytimeActivation, children: entry.flow.children.map(child => tagAnytimeTurnFlow(child, anytimeTurn)) }
+  const children: ActionFlow[] = reserveCookingBatch ? [{
+    type: 'leaf',
+    actionId: 'exchange',
+    actionContext: {
+      anytimeInteractionKind: 'animal-reorg',
+      submittedExchangeBatch: reserveCookingBatch,
+      reserveAnimalPayment: true,
+    },
+  }] : entry.flow.children
+  const flow = { ...entry.flow, anytimeActivation, children: children.map(child => tagAnytimeTurnFlow(child, anytimeTurn)) }
   if (engine) {
     engine.injectBeforeFlows([tagInjectedAnytimeFlow(flow)], undefined, owner.id)
   } else {

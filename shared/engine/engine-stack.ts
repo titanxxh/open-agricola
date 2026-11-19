@@ -71,6 +71,7 @@ export type EngineFrame = {
   undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
   harvestSettlementResume?: HarvestSettlementResume
+  animalAcquisitions?: string[]
 }
 
 export type EngineFrameCursor = {
@@ -92,6 +93,7 @@ export type EngineFrameCursor = {
   undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
   harvestSettlementResume?: HarvestSettlementResume
+  animalAcquisitions?: string[]
 }
 
 export type EngineStackCursor = {
@@ -265,6 +267,7 @@ export class EngineStack {
         undoBoundaryOnResolve: f.undoBoundaryOnResolve,
         reason: f.reason,
         ...(f.harvestSettlementResume ? { harvestSettlementResume: f.harvestSettlementResume } : {}),
+        ...(f.animalAcquisitions?.length ? { animalAcquisitions: [...f.animalAcquisitions] } : {}),
       })),
     }
   }
@@ -293,6 +296,7 @@ export class EngineStack {
         undoBoundaryOnResolve: fc.undoBoundaryOnResolve,
         reason: fc.reason,
         ...(fc.harvestSettlementResume ? { harvestSettlementResume: fc.harvestSettlementResume } : {}),
+        ...(fc.animalAcquisitions?.length ? { animalAcquisitions: [...fc.animalAcquisitions] } : {}),
       })
     }
     return stack

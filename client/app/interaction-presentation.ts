@@ -135,6 +135,7 @@ export type InteractionPresentationPlan =
 export type InteractionSubmitDraft = {
   value: string
   animalReorgZones?: readonly InteractionAnimalReorgZone[]
+  reserveCookingExchanges?: readonly InteractionFeedSelection[]
   feedSelections?: readonly InteractionFeedSelection[]
   heatingPayment?: HeatingPayment
   occupationCardIds?: readonly string[]
@@ -400,7 +401,7 @@ const cropsFromSowSelections = (
     })
     .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' } => !!entry)
 
-const areRequiredEmptyAnimalZoneGroupsSatisfied = (
+export const areRequiredEmptyAnimalZoneGroupsSatisfied = (
   requestZones: readonly InteractionAnimalReorgZone[],
   assignedZones: readonly InteractionAnimalReorgZone[],
 ): boolean => {
@@ -432,10 +433,21 @@ const buildInteractionSubmitCommandUnchecked = (
   if (interaction.request.kind === 'animal-reorg') {
     const zones = [...(draft.animalReorgZones ?? interaction.request.zones)]
     if (
-      draft.value === 'confirm'
+      (draft.value === 'confirm' || draft.value === 'cook-reserve')
       && !areRequiredEmptyAnimalZoneGroupsSatisfied(interaction.request.zones, zones)
     ) {
       return { kind: 'rejected' }
+    }
+    if (draft.value === 'cook-reserve') {
+      if (!interaction.request.reserveCooking || !interaction.requestKey || !draft.reserveCookingExchanges?.length) {
+        return { kind: 'rejected' }
+      }
+      return {
+        kind: 'resolveChoice',
+        playerIndex: interaction.playerIndex,
+        value: draft.value,
+        payload: { zones, exchanges: draft.reserveCookingExchanges, requestKey: interaction.requestKey },
+      }
     }
     return {
       kind: 'resolveChoice',

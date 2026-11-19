@@ -39,6 +39,7 @@ export type ResolveChoiceSubmissionPlan =
   | { ok: true; kind: 'feed'; selections: FeedSelections }
   | { ok: true; kind: 'heating'; selections: FeedSelections; fuelUsed: number }
   | { ok: true; kind: 'post-reap-anytime' }
+  | { ok: true; kind: 'cook-reserve' }
   | { ok: true; kind: 'engine-choice' }
 
 export type ResolveChoiceSubmissionInput = {
@@ -66,6 +67,9 @@ export const planResolveChoiceSubmission = (
 ): ResolveChoiceSubmissionPlan => {
   const { envelope, view, value, payload } = input
   const request = view.request
+  if (request.kind === 'animal-reorg' && value === 'cook-reserve') {
+    return { ok: true, kind: 'cook-reserve' }
+  }
   const protectedDirectCancel = isProtectedActionCancel(input.pendingActionId, value)
   if (!protectedDirectCancel && !isPendingChoiceValueAllowed(envelope, value)) {
     const disabled = pendingEnvelopeChoices(envelope)

@@ -17,7 +17,7 @@ import type {
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
 import { PaymentSolver } from '../payment'
-import { animalKeysForState } from '../../contract/animals'
+import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import { REAL_RESOURCE_KEYS } from '../../contract/resource-keys'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
@@ -281,12 +281,13 @@ export const applyTrade = (
   times: number = 1,
   animalPaymentPreference?: AnimalPaymentPreference,
   state?: GameState,
+  reserveAnimalPayment = false,
 ): void => {
   // Deduct 'from' resources
   const fromKeys = Object.keys(trade.from) as ResourceKey[]
   for (const key of fromKeys) {
     const amount = (trade.from[key] ?? 0) * times
-    if (amount > 0 && isAnimalResourceKey(key)) {
+    if (amount > 0 && isAnimalResourceKey(key) && !reserveAnimalPayment) {
       applyAnimalPayment(
         player,
         state,
@@ -406,6 +407,46 @@ export const getExchangeCatalog = ({
 export const getFeedExchangeCatalog = (player: PlayerState, state: GameState, actionHooks?: ActionHookRegistry) =>
   getExchangeCatalog({ player, windows: ['harvest', 'anytime'], state, actionHooks, includeBasicConversions: true })
 
+const isReserveFoodTrade = (state: GameState, trade: Trade): boolean => {
+  const animals = animalKeysForState(state)
+  const food = trade.to.food ?? 0
+  return !trade.fromFarmyard && Number.isSafeInteger(food) && food > 0
+    && Object.entries(trade.to).every(([key, count]) => key === 'food' || count === 0)
+    && animals.some(animal => (trade.from[animal] ?? 0) > 0)
+    && Object.entries(trade.from).every(([key, count]) =>
+      count === 0 || (animals.some(animal => animal === key) && Number.isSafeInteger(count) && count > 0),
+    )
+}
+
+export const reserveAnimalCounts = (state: GameState, player: PlayerState): Partial<Record<AnimalKey, number>> => {
+  const placed = getPlacedAnimalsByType(player, state)
+  const available: Partial<Record<AnimalKey, number>> = {}
+  for (const animal of animalKeysForState(state)) {
+    const reserve = (player.resources[animal] ?? 0) - (placed[animal] ?? 0)
+    if (reserve > 0) available[animal] = reserve
+  }
+  return available
+}
+
+export const getReserveCookingCatalog = (
+  state: GameState,
+  player: PlayerState,
+  available: Partial<Record<AnimalKey, number>>,
+  actionHooks?: ActionHookRegistry,
+): ResolvedExchange[] => {
+  const animals = animalKeysForState(state)
+  return getExchangeCatalog({ player, windows: ['anytime'], state, actionHooks }).flatMap(entry => {
+    if (!isReserveFoodTrade(state, entry.trade)
+      || !isTradeAllowed(entry.trade, state, player, { anytimeInteractionKind: 'animal-reorg' })) return []
+    let max = getMaxTradeTimes(player, entry.trade, state)
+    for (const animal of animals) {
+      const cost = entry.from[animal] ?? 0
+      if (cost > 0) max = Math.min(max, Math.floor((available[animal] ?? 0) / cost))
+    }
+    return max > 0 ? [{ ...entry, max }] : []
+  })
+}
+
 export const getExchangesInWindow = (
   player: PlayerState,
   window: ExchangeWindow,
@@ -500,11 +541,12 @@ type ExchangeBatchInput = {
   player: PlayerState
   entries: readonly ExchangeBatchEntry[]
   maxTradeTimesBySourceId?: Readonly<Record<string, number>>
+  reserveAnimalPayment?: true
 }
 
 /** Plans use only direct recipe credits, before listeners can award goods. */
 export const validateExchangeBatch = ({
-  state, player, entries, maxTradeTimesBySourceId,
+  state, player, entries, maxTradeTimesBySourceId, reserveAnimalPayment,
 }: ExchangeBatchInput): boolean => {
   const resources = { ...player.resources }
   const placedAnimals = getPlacedAnimalsByType(player, state)
@@ -513,6 +555,7 @@ export const validateExchangeBatch = ({
   const harvestUses = new Map<string, number>()
   for (const { trade, count, harvestRound } of entries) {
     if (!Number.isSafeInteger(count) || count <= 0 || !isTradeAllowedDuringPhase(trade, state, player)) return false
+    if (reserveAnimalPayment && (!isReserveFoodTrade(state, trade) || harvestRound !== undefined)) return false
     const recipeKey = JSON.stringify(trade)
     const used = (recipeUses.get(recipeKey) ?? 0) + count
     if (used > (trade.max ?? Infinity)) return false
@@ -533,7 +576,11 @@ export const validateExchangeBatch = ({
       if (amount > (resources[resource] ?? 0)) return false
       if (isAnimalResourceKey(resource)) {
         if (trade.fromFarmyard && amount > (placedAnimals[resource] ?? 0)) return false
-        placedAnimals[resource] = Math.max(0, (placedAnimals[resource] ?? 0) - amount)
+        if (reserveAnimalPayment) {
+          if (amount > 0 && amount > (resources[resource] ?? 0) - (placedAnimals[resource] ?? 0)) return false
+        } else {
+          placedAnimals[resource] = Math.max(0, (placedAnimals[resource] ?? 0) - amount)
+        }
       }
       resources[resource] = (resources[resource] ?? 0) - amount
     }
@@ -546,7 +593,7 @@ export const validateExchangeBatch = ({
 }
 
 export const executeExchangeBatch = ({
-  state, player, entries, maxTradeTimesBySourceId,
+  state, player, entries, maxTradeTimesBySourceId, reserveAnimalPayment,
   animalPaymentPreference, eventSink, actionHooks, harvestFeed, reorganizeAnimals = true,
 }: ExchangeBatchInput & {
   animalPaymentPreference?: AnimalPaymentPreference
@@ -555,7 +602,7 @@ export const executeExchangeBatch = ({
   harvestFeed?: true
   reorganizeAnimals?: boolean
 }): ExchangeBatchResult => {
-  if (!validateExchangeBatch({ state, player, entries, maxTradeTimesBySourceId })) {
+  if (!validateExchangeBatch({ state, player, entries, maxTradeTimesBySourceId, reserveAnimalPayment })) {
     return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
   }
   let paid: Partial<Resource> = {}
@@ -564,7 +611,7 @@ export const executeExchangeBatch = ({
   for (const { trade, count, harvestRound } of entries) {
     const preResources = { ...player.resources }
     const sourceId = trade.sourceId ?? trade.source
-    applyTrade(player, trade, count, animalPaymentPreference, state)
+    applyTrade(player, trade, count, animalPaymentPreference, state, reserveAnimalPayment)
     recordCookeryConversion(player, trade, count)
     if (trade.sideEffect) {
       PaymentSolver.applyTradeSideEffect(state, player, trade.sideEffect, count, sourceId ?? 'unknown')
@@ -597,7 +644,9 @@ export const executeExchangeBatch = ({
   return {
     type: 'ok', resourcesPaid: paid, resourcesGained: gained, extraData: { exchangeBatch: receipts },
     ...(needsReorganization ? {
-      internalChildren: { afterHostListeners: [{ actionId: 'reorganize', actionContext: { onlyIfUnplaced: true } }] },
+      internalChildren: {
+        afterHostListeners: [{ actionId: 'reorganize', actionContext: { onlyIfUnplaced: true, animalAcquisition: true } }],
+      },
     } : {}),
   }
 }
@@ -758,7 +807,9 @@ export const anytimeExchangeAction: ActionDefinition = {
   allowAnytimeReentry: true,
   canBeExecutedByPlayer: (state, player, ctx) => {
     const submitted = ctx?.actionContext?.submittedExchangeBatch
-    if (submitted) return validateExchangeBatch({ state, player, entries: submitted })
+    if (submitted) return validateExchangeBatch({
+      state, player, entries: submitted, reserveAnimalPayment: ctx?.actionContext?.reserveAnimalPayment,
+    })
     const batch = ctx?.actionContext?.batchExchange as { maxTotal?: number } | undefined
     if (batch) {
       return BUILDING_RESOURCES.some((resource) => (player.resources[resource] ?? 0) > 0)
@@ -775,6 +826,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       return executeExchangeBatch({
         state, player, entries: actionContext.submittedExchangeBatch,
         actionHooks, eventSink, harvestFeed: actionContext.harvestFeed,
+        reserveAnimalPayment: actionContext.reserveAnimalPayment,
         reorganizeAnimals: actionContext.anytimeInteractionKind !== 'animal-reorg',
       })
     }
