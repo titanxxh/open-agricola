@@ -85,7 +85,7 @@ describe('C027_Blueprint session — verify chooseOne aligned to the reference m
     expect(PaymentSolver.isComplexCost(resolved.cost)).toBe(true)
     if (!PaymentSolver.isComplexCost(resolved.cost)) return
 
-    const options = computePaymentOptionsForTest(player, resolved.cost)
+    const options = ruleSession.withCtx(() => computePaymentOptionsForTest(player, resolved.cost))
     // ADR 0004 amendment: the printed {wood:2, stone:2} row is strictly
     // dominated by the discounted row and pruned from the payment options.
     expect(options.some((option) =>

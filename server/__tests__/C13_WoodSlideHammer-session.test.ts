@@ -64,7 +64,7 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
   })
 
   it('4 rooms → modifier surfaces statically, but minNumRooms gates inside enumerate', () => {
-    const { player } = setupOwner()
+    const { session, player } = setupOwner()
     player.houseType = 'wood'
     player.rooms = 4
     player.roomTiles = [
@@ -77,39 +77,39 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
 
     // End-to-end: 4 rooms wood→stone renovation. C13 condition
     // (minNumRooms:5) fails at the enumerate condition gate → no discount.
-    const sols = computePaymentOptionsForTest(
+    const sols = session.withCtx(() => computePaymentOptionsForTest(
       player,
       { fee: { stone: 4, reed: 1 } },
       'renovation',
-    )
+    ))
     expect(sols.length).toBeGreaterThan(0)
     expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 4)).toBe(true)
   })
 
   it('houseType already clay → modifier filtered out (houseTypeWood not met)', () => {
-    const { player } = setupOwner()
+    const { session, player } = setupOwner()
     player.houseType = 'clay'
     player.rooms = 5
 
     player.resources = { ...player.resources, stone: 6, reed: 2 }
-    const sols = computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation')
+    const sols = session.withCtx(() => computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation'))
     expect(sols.length).toBeGreaterThan(0)
     expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 5)).toBe(true)
   })
 
   it('houseType stone → modifier filtered out', () => {
-    const { player } = setupOwner()
+    const { session, player } = setupOwner()
     player.houseType = 'stone'
     player.rooms = 5
 
     player.resources = { ...player.resources, stone: 6, reed: 2 }
-    const sols = computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation')
+    const sols = session.withCtx(() => computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation'))
     expect(sols.length).toBeGreaterThan(0)
     expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 5)).toBe(true)
   })
 
   it('canRenovate path: with 5 wood rooms + 3 stone, can renovate (without discount would need clay anyway)', () => {
-    const { player } = setupOwner()
+    const { session, player } = setupOwner()
     player.houseType = 'wood'
     player.rooms = 5
     player.roomTiles = [
@@ -118,7 +118,7 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
     ]
     // Wood→clay needs 5 clay + 1 reed (one per room)
     player.resources = { ...player.resources, reed: 5, clay: 5, stone: 0 }
-    expect(canRenovate(player)).toBe(true)
+    expect(session.withCtx(() => canRenovate(player))).toBe(true)
   })
 
   it('without C13 modifier: 5-room wood stays gated normally on stone-deficient renovate', () => {
@@ -143,7 +143,7 @@ describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E fol
   // gate (minNumRooms) runs against the actual renovation/construct nb.
 
   it('5 wood rooms + stone payment → C13 surfaces a -2 stone discount path', () => {
-    const { player } = setupOwner()
+    const { session, player } = setupOwner()
     player.houseType = 'wood'
     player.rooms = 5
     player.resources = { ...player.resources, stone: 5, reed: 2 }
@@ -154,14 +154,14 @@ describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E fol
     // bonus path reduces it to 3.
     const mods = c13RenovationModifiers(player)
     expect(mods).toHaveLength(1)
-    const sols = computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation')
+    const sols = session.withCtx(() => computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation'))
     expect(sols.length).toBeGreaterThan(0)
     // At least one solution applies the C13 discount → stone paid <= 3.
     expect(sols.some((s) => (s.resourcesPaid.stone ?? 0) <= 3)).toBe(true)
   })
 
   it('4 wood rooms → C13 surfaces statically (T1.7), but enumerate gate filters the discount path', () => {
-    const { player } = setupOwner()
+    const { session, player } = setupOwner()
     player.houseType = 'wood'
     player.rooms = 4
     player.resources = { ...player.resources, stone: 5, reed: 2 }
@@ -170,19 +170,19 @@ describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E fol
     // The end-to-end check below verifies minNumRooms still gates the discount.
     const mods = c13RenovationModifiers(player)
     expect(mods).toHaveLength(1)
-    const sols = computePaymentOptionsForTest(player, { fee: { stone: 4, reed: 1 } }, 'renovation')
+    const sols = session.withCtx(() => computePaymentOptionsForTest(player, { fee: { stone: 4, reed: 1 } }, 'renovation'))
     // No bonus path → all solutions pay full stone (and full reed).
     expect(sols.length).toBeGreaterThan(0)
     expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 4)).toBe(true)
   })
 
   it('houseType clay (already renovated once) → C13 filtered out, clay→stone pays full', () => {
-    const { player } = setupOwner()
+    const { session, player } = setupOwner()
     player.houseType = 'clay'
     player.rooms = 5
     player.resources = { ...player.resources, stone: 6, reed: 2 }
 
-    const sols = computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation')
+    const sols = session.withCtx(() => computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation'))
     expect(sols.length).toBeGreaterThan(0)
     expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 5)).toBe(true)
   })
