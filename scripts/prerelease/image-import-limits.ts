@@ -13,15 +13,19 @@ export function assertImageIntakeLimits(target: PrereleaseTarget, operationId: s
   assertNativeImageIntake(unitName(target, operationId), target.budgets.import.intake)
 }
 
-export function runBoundedImageImport(target: PrereleaseTarget, operationId: string, envelope: string) {
+export function imageIntakeCommand(target: PrereleaseTarget, operationId: string, args: string[]): string[] {
   const budget = target.budgets.import.intake
   const environment = ['PATH', 'HOME', 'USER', 'DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_CONFIG']
     .flatMap(name => process.env[name] === undefined ? [] : [`--setenv=${name}=${process.env[name]}`])
-  return spawnSync('systemd-run', ['--user', '--quiet', '--wait', '--pipe', '--collect', '--service-type=exec',
+  return ['--user', '--quiet', '--wait', '--pipe', '--collect', '--service-type=exec',
     `--unit=${unitName(target, operationId)}`, `--working-directory=${target.policyDirectory}`,
     ...imageIntakeProperties(budget),
     `--setenv=PRERELEASE_LOCK_SCOPE=${targetFingerprint(target)}`, ...environment,
     '--', 'setsid', '--wait', 'flock', '-w', '60', join(target.directory, 'control/.operation.lock'),
-    process.execPath, ...typescriptLoaderArgs(), join(target.policyDirectory, 'scripts/prerelease/operations.ts'), '_locked'],
-  { cwd: target.policyDirectory, input: envelope, encoding: 'utf8', timeout: 21 * 60_000 })
+    process.execPath, ...typescriptLoaderArgs(), ...args]
+}
+
+export function runBoundedImageImport(target: PrereleaseTarget, operationId: string, envelope: string) {
+  return spawnSync('systemd-run', imageIntakeCommand(target, operationId,
+    [join(target.policyDirectory, 'scripts/prerelease/operations.ts'), '_locked']), { cwd: target.policyDirectory, input: envelope, encoding: 'utf8', timeout: 21 * 60_000 })
 }

@@ -1,16 +1,19 @@
+import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { applicationDataEnvironment, assertOwnerPath, assertScopedPaths, type PrereleaseTarget, targetFingerprint } from './config'
 import { candidateAlias } from './gateway'
+import { sourceReleaseDirectory } from './source-release-path'
 
-export type InstalledBuild = { buildId: string; image: string; installedAt: number }
-export type Operation = { id: string; kind: 'deploy' | 'reset' | 'restore' | 'reverify'; buildId: string; image: string;
-  sourceBuildId: string | null; sourceImage: string | null; stage: 'backup' | 'migration' | 'startup' | 'acceptance'; backupStem: string | null; generation: string }
+export type InstalledBuild = { buildId: string; image: string; installedAt: number; runtimeDigest?: string }
+export type Operation = { id: string; kind: 'deploy' | 'reset' | 'restore' | 'reverify' | 'rollback'; buildId: string; image: string;
+  runtimeDigest?: string; sourceRuntimeDigest?: string; rollbackCompatible?: boolean;
+  sourceBuildId: string | null; sourceImage: string | null; stage: 'backup' | 'prepared' | 'migration' | 'startup' | 'acceptance'; backupStem: string | null; generation: string }
 export type RuntimeRecord = {
   format: 1; channel: 'prerelease'; targetId: string; fingerprint: string; generation: string;
   mode: 'maintenance' | 'open' | 'closed'; buildId: string | null; installed: InstalledBuild | null;
-  operation: Operation | null; acceptance: { acceptedAt: number; sha256: string; formalBuildId: string | null; healthyCycle: string | null } | null
+  operation: Operation | null; acceptance: { acceptedAt: number; sha256: string; formalBuildId: string | null; identityBoundary?: string; healthyCycle: string | null } | null
 }
 
 export const controlDirectory = (target: PrereleaseTarget) => join(target.directory, 'control')
@@ -46,20 +49,31 @@ export function readRuntime(target: PrereleaseTarget): RuntimeRecord {
     const row = value.installed
     if (!row || typeof row !== 'object' || !('buildId' in row) || !sha(row.buildId) || !('image' in row) || !digest(row.image)
       || !('installedAt' in row) || typeof row.installedAt !== 'number' || row.buildId !== value.buildId) throw new Error('Invalid installed prerelease build')
-    installed = { buildId: row.buildId, image: row.image, installedAt: row.installedAt }
+    const runtimeDigest = 'runtimeDigest' in row ? row.runtimeDigest : undefined
+    if (runtimeDigest !== undefined && !digest(runtimeDigest)) throw new Error('Invalid installed runtime digest')
+    installed = { buildId: row.buildId, image: row.image, installedAt: row.installedAt,
+      ...(runtimeDigest ? { runtimeDigest } : {}) }
   }
   let operation: Operation | null = null
   if (value.operation !== null) {
     const row = value.operation
     if (!row || typeof row !== 'object' || !('id' in row) || !uuid(row.id) || !('kind' in row)
-      || (row.kind !== 'deploy' && row.kind !== 'reset' && row.kind !== 'restore' && row.kind !== 'reverify') || !('buildId' in row) || !sha(row.buildId)
+      || (row.kind !== 'deploy' && row.kind !== 'reset' && row.kind !== 'restore' && row.kind !== 'reverify' && row.kind !== 'rollback') || !('buildId' in row) || !sha(row.buildId)
       || !('image' in row) || !digest(row.image) || !('sourceBuildId' in row) || row.sourceBuildId !== null && !sha(row.sourceBuildId)
-      || !('stage' in row) || (row.stage !== 'backup' && row.stage !== 'migration' && row.stage !== 'startup' && row.stage !== 'acceptance')
+      || !('stage' in row) || (row.stage !== 'backup' && row.stage !== 'prepared' && row.stage !== 'migration' && row.stage !== 'startup' && row.stage !== 'acceptance')
       || !('backupStem' in row) || row.backupStem !== null && (typeof row.backupStem !== 'string' || !/^(daily|pre|manual)-[a-zA-Z0-9._-]+$/.test(row.backupStem))
       || !('generation' in row) || !uuid(row.generation) || row.generation !== value.generation) throw new Error('Invalid pending prerelease operation')
     const sourceImage = 'sourceImage' in row ? row.sourceImage : null
     if (sourceImage !== null && (!digest(sourceImage) || row.sourceBuildId === null)) throw new Error('Invalid pending source image')
-    operation = { id: row.id, kind: row.kind, buildId: row.buildId, image: row.image, sourceBuildId: row.sourceBuildId,
+    const runtimeDigest = 'runtimeDigest' in row ? row.runtimeDigest : undefined
+    const sourceRuntimeDigest = 'sourceRuntimeDigest' in row ? row.sourceRuntimeDigest : undefined
+    const rollbackCompatible = 'rollbackCompatible' in row ? row.rollbackCompatible : undefined
+    if (runtimeDigest !== undefined && !digest(runtimeDigest)
+      || sourceRuntimeDigest !== undefined && (!digest(sourceRuntimeDigest) || !sourceImage)
+      || rollbackCompatible !== undefined && (typeof rollbackCompatible !== 'boolean' || !runtimeDigest || row.kind !== 'deploy')
+      || row.stage === 'prepared' && (!rollbackCompatible || !sourceImage || !row.backupStem)) throw new Error('Invalid source deployment binding')
+    operation = { ...(runtimeDigest ? { runtimeDigest } : {}), ...(sourceRuntimeDigest ? { sourceRuntimeDigest } : {}),
+      ...(rollbackCompatible !== undefined ? { rollbackCompatible } : {}), id: row.id, kind: row.kind, buildId: row.buildId, image: row.image, sourceBuildId: row.sourceBuildId,
       sourceImage, stage: row.stage, backupStem: row.backupStem, generation: row.generation }
   }
   let acceptance: RuntimeRecord['acceptance'] = null
@@ -70,7 +84,10 @@ export function readRuntime(target: PrereleaseTarget): RuntimeRecord {
     const formalBuildId = 'formalBuildId' in row ? row.formalBuildId : null
     if (formalBuildId !== null && !sha(formalBuildId)) throw new Error('Invalid accepted formal build')
     const healthyCycle = 'healthyCycle' in row && uuid(row.healthyCycle) ? row.healthyCycle : null
-    acceptance = { acceptedAt: row.acceptedAt, sha256: row.sha256, formalBuildId, healthyCycle }
+    const identityBoundary = 'identityBoundary' in row ? row.identityBoundary : undefined
+    if (identityBoundary !== undefined && (typeof identityBoundary !== 'string' || !/^[a-f0-9]{64}$/.test(identityBoundary))) throw new Error('Invalid accepted formal identity boundary')
+    acceptance = { acceptedAt: row.acceptedAt, sha256: row.sha256, formalBuildId, healthyCycle,
+      ...(identityBoundary ? { identityBoundary } : {}) }
   }
   if (value.mode !== 'maintenance' && value.mode !== 'open' && value.mode !== 'closed') throw new Error('Invalid gateway mode')
   return { format: 1, channel: 'prerelease', targetId: target.targetId, fingerprint: value.fingerprint, generation: value.generation,
@@ -95,22 +112,28 @@ export function renderCompose(target: PrereleaseTarget, record: RuntimeRecord, c
   const image = record.installed?.image ?? candidateImage
   if (!image) return { name: target.project, services: { gateway }, networks: { default: {}, ...proxyNetwork } }
   if (!digest(image) || candidateImage && !digest(candidateImage)) throw new Error('Compose requires immutable image digests')
+  const sourceVolumes = (build: { buildId: string; runtimeDigest?: string } | null) =>
+    build?.runtimeDigest ? [{ type: 'bind', source: sourceReleaseDirectory(target, build.buildId), target: '/app', read_only: true,
+      bind: { create_host_path: false } }] : []
+  const installedVolumes = sourceVolumes(record.installed)
+  // A pending image deployment may replace a mounted source with code from the image itself.
+  const toolVolumes = record.operation ? sourceVolumes(record.operation) : installedVolumes
   const app = { image, init: true, user: gateway.user, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
     ...limits('app'), env_file: [join(target.directory, '.env')], labels, restart: 'unless-stopped', stop_grace_period: '90s',
-    tmpfs: ['/tmp:size=67108864'], volumes: [`${join(target.directory, 'output')}:/app/output`],
+    tmpfs: ['/tmp:size=67108864'], volumes: [...installedVolumes, `${join(target.directory, 'output')}:/app/output`],
     networks: { default: { aliases: [candidateAlias(target.targetId)] }, dependencies: {} },
     environment: { RELEASE_CHANNEL: 'prerelease', NODE_ENV: 'production', APP_INSTANCES: '1', BACKEND_HOST: '0.0.0.0', BACKEND_PORT: '5175',
       APP_ROOM_CAPACITY: String(target.budgets.sessions.rooms), CUSTOM_SESSION_WORKER_CAPACITY: String(target.budgets.sessions.customWorkers),
       ALLOW_ANONYMOUS_WS: 'false', ACCOUNT_REGISTRATION_POLICY: 'invite_only', REPLAY_TRUST_PROXY: 'true',
       GAME_BUILD_ID: record.installed?.buildId ?? record.operation?.buildId, CORS_ORIGIN: target.origin,
-      PUBLIC_APP_ORIGIN: target.origin, PUBLIC_API_BASE: target.origin, FORMAL_APP_ORIGIN: target.formal.appOrigin, FORMAL_API_BASE: target.formal.apiOrigin,
+      PUBLIC_APP_ORIGIN: record.installed?.runtimeDigest ? target.origin + HOSTED_APP_PATH : target.origin, PUBLIC_API_BASE: target.origin, FORMAL_APP_ORIGIN: target.formal.appOrigin, FORMAL_API_BASE: target.formal.apiOrigin,
       PRERELEASE_TARGET_ID: target.targetId, PRERELEASE_DATA_GENERATION: record.generation } }
-  const tool = { image: candidateImage ?? image, init: true, user: gateway.user, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
+  const tool = { image: candidateImage ?? record.operation?.image ?? image, volumes: toolVolumes, init: true, user: gateway.user, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
     ...limits('tools'), profiles: ['tools'], labels, networks: ['dependencies'], tmpfs: ['/tmp:size=67108864'],
     environment: { GAME_BUILD_ID: record.operation?.buildId ?? record.buildId, RELEASE_CHANNEL: 'prerelease' } }
   const appDataEnvironment = applicationDataEnvironment(target)
   return { name: target.project, services: { gateway, app, tools: { ...tool, env_file: [join(target.directory, 'data/dependencies.compose.env')] },
-    migrate: { ...tool, environment: { ...appDataEnvironment, ...tool.environment } }, capture: { ...tool, image, environment: { ...appDataEnvironment, ...tool.environment } } },
+    migrate: { ...tool, environment: { ...appDataEnvironment, ...tool.environment } }, capture: { ...tool, image, volumes: installedVolumes, environment: { ...appDataEnvironment, ...tool.environment } } },
   networks: { default: {}, dependencies: { external: true, name: target.network }, ...proxyNetwork } }
 }
 

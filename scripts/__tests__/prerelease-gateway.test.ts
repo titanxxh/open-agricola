@@ -98,6 +98,32 @@ it('rejects ambiguous credentials and foreign browser requests and closes stream
       cookie: '__Host-oa-pre-session=pre', 'x-forwarded-host': 'pre.agricola.test', 'x-forwarded-proto': 'https' })
     expect(upgraded[0].headers.authorization).toBeUndefined()
     expect(upgraded[0].headers['x-oa-principal']).toBeUndefined()
+    // Accept the boundary of the admitted formal build, then change its game code alone.
+    const boundary = 'd'.repeat(64)
+    formal.state.identityBoundary = boundary
+    await gateway.refreshBrowserPolicy()
+    await writeFile(stateFile, JSON.stringify({ ...state, acceptance: { ...state.acceptance, identityBoundary: boundary } }))
+    formal.state.buildId = 'c'.repeat(40)
+    await gateway.refreshBrowserPolicy()
+    expect(await read()).toBe(200)
+    expect(client.readyState).toBe(WebSocket.OPEN)
+    const boundaryClosed = once(client, 'close')
+    formal.state.identityBoundary = 'e'.repeat(64)
+    await gateway.refreshBrowserPolicy()
+    await boundaryClosed
+    expect(await read()).toBe(503)
+    formal.state.identityBoundary = ''
+    await gateway.refreshBrowserPolicy()
+    expect(await read()).toBe(503)
+    formal.state.identityBoundary = boundary
+    await gateway.refreshBrowserPolicy()
+    expect(await read()).toBe(200)
+
+    await writeFile(stateFile, JSON.stringify(state))
+    formal.state.buildId = state.acceptance.formalBuildId
+    await gateway.refreshBrowserPolicy()
+    client = new WebSocket(base.replace('http:', 'ws:') + routedPath, { headers: { Host: 'pre.agricola.test', Origin: origin } })
+    await once(client, 'open')
     const closed = once(client, 'close')
     formal.state.version = 1; await gateway.refreshBrowserPolicy(); await closed
     expect(await read()).toBe(503)

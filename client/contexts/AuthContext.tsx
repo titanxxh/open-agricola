@@ -3,7 +3,7 @@ import { captureWebPushAccountReconciliation, reconcileWebPushDevice } from '../
 import { checkServerAvailability, isServerUnavailableStatus, onServerRecovered } from '../services/server-availability'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
-import { isDevModeAllowedFromQuery } from '../app/game-container-helpers'
+import { isDevModeAllowedFromQuery } from '../utils/game-room-url'
 
 export type AuthUser = {
   id: string

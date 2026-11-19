@@ -11,13 +11,13 @@ export async function formalBrowserPolicyFixture() {
     '-addext', 'subjectAltName=IP:127.0.0.1', '-keyout', join(root, 'key'), '-out', join(root, 'cert')], { stdio: 'ignore' })
   const ca = readFileSync(join(root, 'cert'))
   const formal = { appOrigin: '', apiOrigin: '' }
-  const state = { version: 2, buildId: 'b'.repeat(40), pagesBuildId: 'b'.repeat(40), status: 200, originMismatch: false }
+  const state = { version: 2, buildId: 'b'.repeat(40), pagesBuildId: 'b'.repeat(40), status: 200, originMismatch: false, identityBoundary: '' }
   const headers: Array<{ cookie?: string; authorization?: string }> = []
   const server = createServer({ key: readFileSync(join(root, 'key')), cert: ca }, (req, res) => {
     headers.push({ cookie: req.headers.cookie, authorization: req.headers.authorization })
     if (req.url === '/api/auth/browser-policy') {
       res.writeHead(state.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', Location: '/wrong' })
-      res.end(JSON.stringify({ ...formal, version: state.version, buildId: state.buildId, ...(state.originMismatch ? { appOrigin: 'https://wrong.invalid' } : {}) }))
+      res.end(JSON.stringify({ ...formal, version: state.version, buildId: state.buildId, ...(state.identityBoundary ? { identityBoundary: state.identityBoundary } : {}), ...(state.originMismatch ? { appOrigin: 'https://wrong.invalid' } : {}) }))
     } else if (req.url === '/frontend-build.json') {
       res.end(JSON.stringify({ format: 1, gameBuildId: state.pagesBuildId, basePath: '/', releaseChannel: 'stable', deploymentTarget: 'stable-pages' }))
     } else if (req.url === '/') res.end('<!doctype html><script type="module" crossorigin src="/assets/index-fixture.js"></script>')

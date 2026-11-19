@@ -1,3 +1,4 @@
+import { formalIdentityBoundary } from './formal-identity-boundary.ts'
 import { fullSha } from './verification-tasks.ts'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -28,11 +29,13 @@ const maxImageBytes = MAX_CONTAINER_IMAGE_BYTES
  * image, one platform, and an uncompressed Docker archive of the tracked `context.tar`. GitHub builds the deployed
  * linux/amd64 image; the owner machine builds a same-source linux/arm64 validator image (#1817).
  */
-export function isolatedImageBuildScript(sourceSha: string, channel: string, platform: ContainerImagePlatform = 'linux/amd64'): string {
+export function isolatedImageBuildScript(sourceSha: string, channel: string, platform: ContainerImagePlatform = 'linux/amd64', formalBoundary?: string): string {
+  if (formalBoundary !== undefined && !/^[a-f0-9]{64}$/.test(formalBoundary)) throw new Error('Invalid formal identity boundary')
+  const boundaryArg = formalBoundary ? ` --build-arg FORMAL_IDENTITY_BOUNDARY=${formalBoundary}` : ''
   return [
     `docker buildx create --name oa-image --driver docker-container --driver-opt image=${CONTAINER_IMAGE_BUILDERS[platform]},memory=4g,memory-swap=4g,cpu-quota=200000,cpu-period=100000 --use`,
     'docker buildx inspect --bootstrap oa-image',
-    `docker buildx build --builder oa-image --platform ${platform} --provenance=false --sbom=false --metadata-file image-metadata.json --output type=docker,dest=image.tar,compression=uncompressed,force-compression=true --tag oa-container-image:${sourceSha} --build-arg GAME_BUILD_ID=${sourceSha} --build-arg RELEASE_CHANNEL=${channel} - < context.tar`,
+    `docker buildx build --builder oa-image --platform ${platform} --provenance=false --sbom=false --metadata-file image-metadata.json --output type=docker,dest=image.tar,compression=uncompressed,force-compression=true --tag oa-container-image:${sourceSha} --build-arg GAME_BUILD_ID=${sourceSha} --build-arg RELEASE_CHANNEL=${channel}${boundaryArg} - < context.tar`,
   ].join('\n')
 }
 
@@ -89,6 +92,9 @@ export function prepareImageBuild(policy: string, source: string, input: { purpo
   const root = privateRoot(), payload = join(root, 'payload')
   mkdirSync(root, { mode: 0o700 }); mkdirSync(payload, { mode: 0o700 })
   writeFileSync(join(root, 'request.json'), JSON.stringify({ purpose: request.purpose, sourceSha: request.sourceSha }), { mode: 0o600, flag: 'wx' })
+  if (request.purpose === 'formal-candidate') {
+    writeFileSync(join(root, 'formal-boundary'), formalIdentityBoundary(source, request.sourceSha), { flag: 'wx', mode: 0o600 })
+  }
   command('git', ['archive', '--format=tar', '--output', join(payload, 'context.tar'), request.sourceSha], { cwd: source })
   if (lstatSync(join(payload, 'context.tar')).size > 256 * 1024 * 1024) throw new Error('Tracked image context exceeds the bounded producer input')
 }
@@ -99,7 +105,8 @@ export function buildIsolatedImage(): void {
   command('sudo', ['-n', 'systemctl', 'set-property', '--runtime', 'user-61000.slice', 'MemoryMax=6G', 'MemorySwapMax=0', 'CPUQuota=200%', 'TasksMax=768'])
   const limits = command('systemctl', ['show', 'user-61000.slice', '-p', 'MemoryMax', '-p', 'MemorySwapMax', '-p', 'CPUQuotaPerSecUSec', '-p', 'TasksMax']).split('\n')
   if (!['MemoryMax=6442450944', 'MemorySwapMax=0', 'CPUQuotaPerSecUSec=2s', 'TasksMax=768'].every(limit => limits.includes(limit))) throw new Error('Image build cgroup limits were not applied')
-  const script = isolatedImageBuildScript(request.sourceSha, request.channel)
+  const boundary = request.purpose === 'formal-candidate' ? readFileSync(join(privateRoot(), 'formal-boundary'), 'utf8') : undefined
+  const script = isolatedImageBuildScript(request.sourceSha, request.channel, 'linux/amd64', boundary)
   try {
     if (executeCandidate(execution, '/usr/bin/timeout', ['--signal=TERM', '--kill-after=10s', '1800', '/bin/bash', '-euo', 'pipefail', '-c', script], 'image-build') !== 0) {
       throw new Error('Isolated image build failed; no image was published')

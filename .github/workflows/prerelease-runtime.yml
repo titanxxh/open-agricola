@@ -1,0 +1,58 @@
+name: Prerelease Runtime
+run-name: Prerelease runtime / ${{ github.sha }}
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['deploy/prerelease-runtime/**']
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: private-container-image
+  cancel-in-progress: false
+
+jobs:
+  runtime:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: prerelease-image-publish
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Build a single-platform runtime from protected policy
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y skopeo
+          docker buildx create --use --driver docker-container
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+            --output "type=oci,dest=$RUNNER_TEMP/runtime.tar" deploy/prerelease-runtime
+          skopeo copy "oci-archive:$RUNNER_TEMP/runtime.tar" docker-daemon:oa-runtime:smoke
+          docker run --rm --network none --entrypoint bash oa-runtime:smoke -ec '
+            test "$(uname -m)" = x86_64
+            node --version && pnpm --version && pg_restore --version
+            /usr/local/lib/oa/trial-rustfs --version
+            python3 -c "import yaml"
+            bash -n /usr/local/lib/oa/prepare.sh && bash -n /usr/local/lib/oa/trial.sh'
+      - name: Verify native preparation and isolated startup
+        run: bash scripts/ci/check-prerelease-runtime.sh
+      - name: Publish runtime and produce the pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_PUBLISH_TOKEN: ${{ secrets.GHCR_PUBLISH_TOKEN }}
+          GHCR_PUBLISH_USER: ${{ vars.GHCR_PUBLISH_USER }}
+          GHCR_PRIVATE_PACKAGE_ID: ${{ vars.GHCR_PRIVATE_PACKAGE_ID }}
+        run: node scripts/ci/publish-prerelease-runtime.ts
+      - uses: actions/upload-artifact@v7
+        with:
+          name: prerelease-runtime-pin-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/prerelease-runtime.ref

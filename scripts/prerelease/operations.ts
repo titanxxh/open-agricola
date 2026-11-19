@@ -1,3 +1,7 @@
+import { parseSourceBudget } from './source-budget'
+import { preparePrereleaseSource } from './source-preparation'
+import { readSourceProof, verifySourceUpdate } from './source-verification'
+import { assertStorageAdmission } from './storage-guard-state'
 import { registerStorageOperation } from './storage-operation'
 import { chmodSync, closeSync, constants, copyFileSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -10,7 +14,7 @@ import { parsePrereleaseOwnerLocalProof } from '../ci/owner-local-verification.t
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { ownerMachine, RELEASE_REPOSITORY } from '../release/candidate'
 import { runPrereleaseOperation, type OperationRequest } from './flow'
-import { controlDirectory, gatewayAlias } from './runtime'
+import { controlDirectory, gatewayAlias, readRuntime } from './runtime'
 import { parseImageImportRequest, runImageImport } from './image-import'
 import { assertExpectedContainerImage, verifyContainerImageBuild } from '../release/container-images.ts'
 import { prepareContainerImageArchive } from '../release/container-images-owner.ts'
@@ -98,9 +102,9 @@ export function readVerifiedOpenReceipt(path: string, binding: VerifiedOpenBindi
 
 function parseRequest(value: unknown): OperationRequest {
   const input = object(value)
-  const actions = ['initialize', 'status', 'maintain', 'backup', 'budget-check', 'retention', 'image-cleanup-plan', 'image-cleanup', 'deploy', 'reset', 'reinitialize', 'finish-close', 'open', 'identities', 'apply-identities', 'restore', 'activate-recovery', 'verify-access', 'verify-formal-browser', 'reverify']
+  const actions = ['prepare-source', 'prepare-restore-source', 'backup-source', 'deploy-source', 'restore-source', 'open-source', 'open-rollback-source', 'rollback-source', 'initialize', 'status', 'maintain', 'backup', 'budget-check', 'retention', 'image-cleanup-plan', 'image-cleanup', 'deploy', 'reset', 'reinitialize', 'finish-close', 'open', 'identities', 'apply-identities', 'restore', 'activate-recovery', 'verify-access', 'verify-formal-browser', 'reverify']
   if (typeof input.action !== 'string' || !actions.includes(input.action) || typeof input.expectedCurrent !== 'string'
-    || !/^(empty|[a-f0-9]{40})$/.test(input.expectedCurrent)) throw new Error('Explicit operation and expected-current SHA are required')
+    || !(input.action === 'status' && input.expectedCurrent === 'installed') && !/^(empty|[a-f0-9]{40})$/.test(input.expectedCurrent)) throw new Error('Explicit operation and expected-current SHA are required')
   const optional = (key: string): string | undefined => {
     const entry = input[key]
     if (entry === undefined) return undefined
@@ -111,6 +115,13 @@ function parseRequest(value: unknown): OperationRequest {
     acceptLoss: optional('acceptLoss'), operationId: optional('operationId'), acceptanceFile: optional('acceptanceFile'), authorityFile: optional('authorityFile'), retirementFile: optional('retirementFile'),
     associationsFile: optional('associationsFile'), auditFile: optional('auditFile'), verificationFile: optional('verificationFile'), backupStem: optional('backupStem'),
     backupGeneration: optional('backupGeneration'), expectedSourceCurrent: optional('expectedSourceCurrent'), sourceTarget: input.sourceTarget === undefined ? undefined : parsePrereleaseTarget(input.sourceTarget) }
+}
+
+function prepareSource(target: ReturnType<typeof parsePrereleaseTarget>, sha: string, budgetInput: unknown) {
+  const budget = budgetInput === undefined ? undefined : parseSourceBudget(budgetInput)
+  assertStorageAdmission(target, targetFingerprint(target), 'operation')
+  const cleanup = registerStorageOperation(target)
+  try { return preparePrereleaseSource(target, sha, budget) } finally { cleanup() }
 }
 
 async function inputEnvelope(): Promise<Record<string, unknown>> {
@@ -136,14 +147,50 @@ export async function operations(args: string[]): Promise<void> {
     assertScopedPaths(target)
     if (!imageImport && request.action !== 'retention') loadPrereleaseEnvironment(target)
     if ('buildId' in request && (request.action === 'deploy' || request.action === 'open' || request.action === 'restore')) admitReceipt(input.receipt, request.buildId, request.action)
+    if ('buildId' in request && ['prepare-restore-source', 'restore-source'].includes(request.action)) admitReceipt(input.receipt, request.buildId, 'restore')
     if (args[0] === 'receive') { process.stdout.write(locked(target, input)); return }
+    if (!('transfer' in request)) {
+      if (request.action === 'prepare-restore-source') {
+        const current = readRuntime(target)
+        if (!request.buildId || request.expectedCurrent !== 'empty' || current.installed || current.buildId || current.operation || current.mode !== 'maintenance') throw new Error('Preparing a replacement requires an empty maintenance target')
+        process.stdout.write(JSON.stringify(prepareSource(target, request.buildId, input.sourceBudget)) + '\n')
+        return
+      }
+      if (request.action === 'status' && request.expectedCurrent === 'installed') request.expectedCurrent = readRuntime(target).buildId ?? 'empty'
+      if (request.action === 'open-rollback-source') {
+        const proof = readSourceProof(input.receipt), record = readRuntime(target)
+        if (proof.producer !== input.policySha || proof.scope !== 'routine' || proof.from !== request.buildId
+          || record.operation?.kind !== 'rollback' || record.operation.id !== request.operationId
+          || record.operation.sourceBuildId !== proof.sha || record.installed?.buildId !== proof.from) {
+          throw new Error('Source recovery proof does not match the restored installation')
+        }
+        request.action = 'open'
+      }
+      if (['prepare-source', 'backup-source', 'deploy-source', 'open-source'].includes(request.action)) {
+        const proof = readSourceProof(input.receipt)
+        const record = readRuntime(target)
+        const from = request.action === 'open-source' ? record.operation?.sourceBuildId : request.expectedCurrent
+        if (proof.producer !== input.policySha || proof.sha !== request.buildId || from !== proof.from) throw new Error('Source proof belongs to another installation')
+        if (request.action === 'prepare-source') {
+          if (record.buildId !== proof.from || record.operation || record.mode !== 'open') throw new Error('Source preparation requires the selected open installation')
+          process.stdout.write(JSON.stringify(prepareSource(target, proof.sha, input.sourceBudget)) + '\n')
+          return
+        }
+        request.rollbackCompatible = proof.scope === 'routine'
+        if (request.action === 'open-source') {
+          if (record.operation?.kind !== 'deploy' || !record.installed?.runtimeDigest || record.installed.buildId !== proof.sha ||
+            (record.operation.rollbackCompatible === true) !== request.rollbackCompatible) throw new Error('Cannot open source update with this proof')
+          request.action = 'open'
+        }
+      }
+    }
     const cleanup = ['status', 'initialize', 'retention', 'maintain', 'reverify', 'finish-close', 'budget-check', 'image-cleanup-plan', 'image-cleanup'].includes(request.action) ? () => {} : registerStorageOperation(target)
     try { process.stdout.write(JSON.stringify('transfer' in request ? runImageImport(target, request) : await runPrereleaseOperation(target, request)) + '\n') }
     finally { cleanup() }
     return
   }
   const values = new Map<string, string>()
-  const flags = ['--config', '--expected-current', '--sha', '--generation', '--accept-loss', '--operation-id', '--acceptance', '--authority-receipt', '--retirement-receipt', '--ssh', '--associations', '--audit', '--verification', '--source-config', '--expected-source-current', '--backup', '--backup-generation', '--purpose', '--build-run', '--build-attempt', '--artifact-id', '--auth-file', '--output', '--verified-receipt', '--strict-producer']
+  const flags = ['--config', '--expected-current', '--sha', '--generation', '--accept-loss', '--operation-id', '--acceptance', '--authority-receipt', '--retirement-receipt', '--ssh', '--associations', '--audit', '--verification', '--source-config', '--expected-source-current', '--backup', '--backup-generation', '--purpose', '--build-run', '--build-attempt', '--artifact-id', '--auth-file', '--output', '--verified-receipt', '--strict-producer', '--source-proof', '--force-full', '--source-budget']
   for (let index = 1; index < args.length; index += 2) {
     if (!flags.includes(args[index]) || !args[index + 1] || values.has(args[index])) throw new Error('Unknown, duplicate or incomplete owner option')
     values.set(args[index], args[index + 1])
@@ -155,6 +202,16 @@ export async function operations(args: string[]): Promise<void> {
     process.stdout.write(JSON.stringify(prerequisitePlan(config).summary) + '\n'); return
   }
   ownerMachine()
+  if (args[0] === 'authorize-source') {
+    const from = values.get('--expected-current'), sha = values.get('--sha'), output = values.get('--output')
+    if (!from || !sha || !output) throw new Error('authorize-source requires the installed SHA, candidate SHA and output')
+    const producer = policySha(policyRoot)
+    const receipt = await verifySourceUpdate(policyRoot, { sha, from, producer }, values.get('--force-full') === 'true')
+    const file = openSync(output, 'wx', 0o600)
+    try { writeSync(file, JSON.stringify(receipt) + '\n') } finally { closeSync(file) }
+    process.stdout.write(JSON.stringify(receipt) + '\n')
+    return
+  }
   if (args[0] === 'import-image') return ownerImport(target, values)
   // Reopening the installed build accepts complete evidence from an earlier compatible producer unless strict.
   const strict = values.get('--strict-producer')
@@ -167,7 +224,7 @@ export async function operations(args: string[]): Promise<void> {
       candidate => checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, candidate, { continuity }))) + '\n'); return
   }
   if (values.has('--verified-receipt') && args[0] !== 'open') throw new Error('--verified-receipt applies only to open')
-  const request = parseRequest({ action: args[0], expectedCurrent: values.get('--expected-current'), buildId: values.get('--sha'), generation: values.get('--generation'),
+  const request = parseRequest({ action: args[0], expectedCurrent: values.get('--expected-current') ?? (args[0] === 'status' ? 'installed' : undefined), buildId: values.get('--sha'), generation: values.get('--generation'),
     acceptLoss: values.get('--accept-loss'), operationId: values.get('--operation-id'), acceptanceFile: values.get('--acceptance'), authorityFile: values.get('--authority-receipt'), retirementFile: values.get('--retirement-receipt'),
     associationsFile: values.get('--associations'), auditFile: values.get('--audit'), verificationFile: values.get('--verification'), backupStem: values.get('--backup'),
     backupGeneration: values.get('--backup-generation'), expectedSourceCurrent: values.get('--expected-source-current'),
@@ -175,14 +232,24 @@ export async function operations(args: string[]): Promise<void> {
   const ssh = values.get('--ssh')
   if (!ssh && request.action !== 'retention') loadPrereleaseEnvironment(target)
   let receipt: unknown = null
-  if (request.action === 'deploy' || request.action === 'open' || request.action === 'restore') {
+  if (['prepare-source', 'deploy-source', 'backup-source', 'open-source', 'open-rollback-source'].includes(request.action)) {
+    const path = values.get('--source-proof')
+    if (!path) throw new Error('A private verified source update file is required')
+    const info = lstatSync(path)
+    if (!info.isFile() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0 || info.nlink !== 1) throw new Error('Source proof must be owner-private')
+    receipt = readSourceProof(JSON.parse(readFileSync(path, 'utf8')))
+  }
+  if (request.action === 'deploy' || request.action === 'open' || request.action === 'restore' || request.action === 'restore-source' || request.action === 'prepare-restore-source') {
     if (!request.buildId || !/^[a-f0-9]{40}$/.test(request.buildId)) throw new Error('A fixed full candidate SHA is required')
     const verified = values.get('--verified-receipt')
     if (verified) receipt = readVerifiedOpenReceipt(verified, { buildId: request.buildId, policySha: policySha(policyRoot), fingerprint: targetFingerprint(target) })
     else receipt = checkPrereleaseVerification(policyRoot, RELEASE_REPOSITORY, request.buildId, { continuity: continuity && request.action === 'open' })
     admitReceipt(receipt, request.buildId, request.action, { strict: !continuity })
   }
-  const envelope = { format: 1, policySha: policySha(policyRoot), expiresAt: Date.now() + 5 * 60_000, fingerprint: targetFingerprint(target), target, request, receipt }
+  const budget = values.get('--source-budget')
+  if (budget && !['prepare-source', 'prepare-restore-source'].includes(request.action)) throw new Error('A preparation budget applies only to source staging')
+  const sourceBudget = budget === undefined ? undefined : parseSourceBudget(JSON.parse(budget))
+  const envelope = { format: 1, sourceBudget, policySha: policySha(policyRoot), expiresAt: Date.now() + 5 * 60_000, fingerprint: targetFingerprint(target), target, request, receipt }
   process.stdout.write(sendEnvelope(target, envelope, ssh))
 }
 

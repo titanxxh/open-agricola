@@ -42,7 +42,12 @@ export async function readBrowserAuthPolicy(formal: FormalOrigins, options: Form
     || !('buildId' in value) || typeof value.buildId !== 'string' || !/^[a-f0-9]{40}$/.test(value.buildId)
     || !('appOrigin' in value) || value.appOrigin !== formal.appOrigin
     || !('apiOrigin' in value) || value.apiOrigin !== formal.apiOrigin) throw new Error('Formal browser authentication policy is incompatible')
-  return { version: BROWSER_AUTH_VERSION, buildId: value.buildId, ...formal }
+  const identityBoundary = 'identityBoundary' in value ? value.identityBoundary : undefined
+  if (identityBoundary !== undefined && (typeof identityBoundary !== 'string' || !/^[a-f0-9]{64}$/.test(identityBoundary))) {
+    throw new Error('Invalid formal identity boundary')
+  }
+  return { version: BROWSER_AUTH_VERSION, buildId: value.buildId, ...formal,
+    ...(identityBoundary ? { identityBoundary } : {}) }
 }
 
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
@@ -66,7 +71,7 @@ export async function readFormalBrowserDeployment(formal: FormalOrigins, options
   if (entries.length !== 1 || !entryPath || !/^\/assets\/[A-Za-z0-9_.-]+\.js$/.test(entryPath)) throw new Error('Formal Pages has no unique same-origin module entry')
   const entry = await read(new URL(entryPath, formal.appOrigin), 16 * 1024 * 1024, options)
   const current = await readBrowserAuthPolicy(formal, options)
-  if (current.buildId !== policy.buildId) throw new Error('Formal build changed during browser policy verification')
+  if (current.buildId !== policy.buildId || current.identityBoundary !== policy.identityBoundary) throw new Error('Formal build changed during browser policy verification')
   return { ...policy, pages: { markerSha256: sha256(marker), htmlSha256: sha256(html), entryPath, entrySha256: sha256(entry) } }
 }
 
@@ -77,7 +82,7 @@ export async function verifyFormalBrowserAcceptance(formal: FormalOrigins, proof
     || proof.observedAt > Date.now() || Date.now() - proof.observedAt > 30 * 60_000
     || !('deployment' in proof) || !proof.deployment || typeof proof.deployment !== 'object') throw new Error('Formal browser proof belongs to a different or expired acceptance')
   const live = await readFormalBrowserDeployment(formal, options), observed = proof.deployment
-  if (['version', 'buildId', 'appOrigin', 'apiOrigin'].some(key => Reflect.get(observed, key) !== Reflect.get(live, key))
+  if (['version', 'buildId', 'identityBoundary', 'appOrigin', 'apiOrigin'].some(key => Reflect.get(observed, key) !== Reflect.get(live, key))
     || !('pages' in observed) || !observed.pages || typeof observed.pages !== 'object') throw new Error('Formal browser deployment changed after acceptance')
   const pages = observed.pages
   if (Object.entries(live.pages).some(([key, value]) => Reflect.get(pages, key) !== value)) throw new Error('Formal browser deployment changed after acceptance')

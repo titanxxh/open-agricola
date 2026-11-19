@@ -65,6 +65,7 @@ export function parseWindowConfig(value) {
   if (!/^\/[A-Za-z0-9._/-]+$/.test(value.exchangeDirectory ?? '') || value.exchangeDirectory.split('/').includes('..')) throw new Error('Exchange directory must be a plain absolute path')
   for (const key of ['previousRun', 'run', 'windowDirectory']) if (typeof value[key] !== 'string' || !value[key]) throw new Error(`Window config needs ${key}`)
   if (value.ownerNotes !== undefined && (typeof value.ownerNotes !== 'string' || !value.ownerNotes)) throw new Error('ownerNotes must be a path')
+  if (value.acceptanceRoom !== undefined && !uuid.test(value.acceptanceRoom)) throw new Error('acceptanceRoom must identify a participating Beta game')
   if (value.policy !== undefined) parsePolicy(value.policy)
   if (value.install !== undefined) parseInstall(value.install)
   if (value.fullAcceptance !== undefined && (typeof value.fullAcceptance !== 'string' || !value.fullAcceptance)) throw new Error('fullAcceptance must be a path')
@@ -83,6 +84,10 @@ export function parseWindowConfig(value) {
  */
 function parseInstall(install) {
   if (!install || typeof install !== 'object' || !sha.test(install.from ?? '') || !sha.test(install.to ?? '') || install.from === install.to) throw new Error('install needs the installed and new candidate SHAs')
+  if (install.sourceProof !== undefined) {
+    if (install.image !== undefined || typeof install.sourceProof !== 'string' || !install.sourceProof.startsWith('/')) throw new Error('Source install needs an absolute source verification file')
+    return install
+  }
   const image = install.image ?? {}
   if (!['run', 'attempt', 'artifact'].every(key => Number.isSafeInteger(image[key]) && image[key] > 0)) throw new Error('install.image needs the candidate image build run, attempt and artifact ids')
   if (typeof install.authFile !== 'string' || !install.authFile.startsWith('/')) throw new Error('install.authFile must be the absolute private GHCR read credential path')
@@ -355,7 +360,9 @@ function hostTools(io, ctx, current = ctx.config.candidate) {
 function liveOpen(t, ctx, win, reverifyOperationId, acceptancePath) {
   const live = t.deploy('status')
   const previous = existsSync(acceptancePath) ? { ...JSON.parse(readFileSync(acceptancePath, 'utf8')), sha256: hashFile(acceptancePath) } : null
-  return { live, binding: openBinding(live, { candidate: ctx.config.candidate, generation: win.generation, formalBuild: win.formalBuild, reverifyOperationId, acceptance: previous }) }
+  const observed = join(win.exchangeDirectory, 'formal-browser.json')
+  const formalBuild = previous && existsSync(observed) ? privateJson(observed, 'Formal browser proof').deployment?.buildId ?? win.formalBuild : win.formalBuild
+  return { live, binding: openBinding(live, { candidate: ctx.config.candidate, generation: win.generation, formalBuild, reverifyOperationId, acceptance: previous }) }
 }
 const OPEN_ELSEWHERE = 'Pre is already open under a different acceptance or build; inspect it before continuing this window'
 
@@ -365,10 +372,10 @@ function storageCycle(t, ctx) {
   return cycle
 }
 
-async function liveFormalBuild(io, origins) {
+export async function liveFormalBuild(io, origins) {
   const read = async url => { const response = await io.fetch(url, { signal: AbortSignal.timeout(15_000) }); return { status: response.status, body: await response.json().catch(() => ({})) } }
   const pages = await read(origins.formalApp + '/frontend-build.json'), policy = await read(origins.formalApi + '/api/auth/browser-policy'), health = await read(origins.formalApi + '/api/health')
-  return { pages: pages.body.gameBuildId ?? null, policy: policy.body.buildId ?? null, healthy: health.status === 200 && health.body.ok === true }
+  return { pages: pages.body.gameBuildId ?? null, policy: policy.body.buildId ?? null, identityBoundary: policy.body.identityBoundary ?? null, healthy: health.status === 200 && health.body.ok === true }
 }
 
 /** Audit chain on the installed candidate. Nothing runs between audit-complete and activate (<30 s apart). */
@@ -428,6 +435,10 @@ function decideRebind(io, win, status, now) {
 function makeSteps({ io, win, env, getCtx, reload, setOps, state, setRebind, now = Date.now }) {
   const X = win.exchangeDirectory
   const install = win.install
+  const source = install?.sourceProof ? privateJson(install.sourceProof, 'Source update proof') : null
+  if (source && (source.kind !== 'prerelease-source' || source.sha !== install.to || source.from !== install.from
+    || !['routine', 'full'].includes(source.scope))) throw new WindowStop('Source proof does not match the selected install')
+  const sourceArgs = source ? ['--source-proof', install.sourceProof] : []
   // Until the install deploy finishes, host operations lease the replaced build; the pending deploy also accepts it.
   const current = () => install && state().steps.reverify?.status !== 'done' ? install.from : getCtx().config.candidate
   const tools = () => hostTools(io, getCtx(), current())
@@ -466,7 +477,7 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
       return {}
     },
     async 'policy-maintain'() {
-      if (!policy && !install) return {}
+      if (!policy && (!install || source)) return {}
       const t = tools(), close = local('policy-close.json')
       t.authority('close', win.generation, randomUUID(), ['--output', close])
       t.toHost([close], X)
@@ -485,6 +496,27 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
     },
     async 'candidate-import'() {
       if (!install) return {}
+      if (source) {
+        const id = state().ops.reverify ?? randomUUID()
+        setOps({ reverify: id })
+        const status = tools().deploy('status')
+        if (status.operation?.id === id && status.operation?.buildId === install.to && status.operation.stage !== 'backup') return {}
+        if (!status.operation) {
+          if (source.scope === 'routine' && !uuid.test(win.acceptanceRoom ?? '')) throw new WindowStop('A participating Beta game is required for this update')
+          const prepareBudget = win.sourcePreparation ? ['--source-budget', JSON.stringify(win.sourcePreparation)] : []
+          const prepared = tools().deploy('prepare-source', ['--sha', install.to, ...sourceArgs, ...prepareBudget], 60 * 60_000)
+          if (prepared.buildId !== install.to) throw new WindowStop('Prepared source SHA differs')
+          writeAndReturn(local('prepared-source.json'), prepared)
+          if (source.scope === 'routine') {
+            const configPath = join(win.windowDirectory, 'before-update.json'), run = join(win.windowDirectory, 'before-update')
+            mkdirSync(run, { recursive: true, mode: 0o700 })
+            writePrivateJson(configPath, { ...getCtx().config, sourcePreflight: true, candidate: install.from })
+            must(tools().cli(['run', '--config', configPath, '--run', run, '--suite', 'source-smoke', '--room', win.acceptanceRoom]), 'check existing Beta game before cutover')
+          }
+        } else if (status.operation.id !== id || status.operation.buildId !== install.to) throw new WindowStop('Another installation is pending')
+        if (source.scope === 'routine') tools().deploy('backup-source', ['--sha', install.to, '--generation', win.generation, '--operation-id', id, ...sourceArgs], 30 * 60_000)
+        return { prepared: local('prepared-source.json') }
+      }
       const operation = state().ops.candidateImport ?? randomUUID()
       setOps({ candidateImport: operation })
       const result = tools().deploy('import-image', ['--purpose', 'candidate', '--sha', install.to, '--build-run', String(install.image.run),
@@ -493,6 +525,11 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
     },
     async preconditions() {
       const ctx = getCtx(), live = await liveFormalBuild(io, ctx.origins)
+      if (source && live.healthy && live.pages === live.policy && sha.test(live.policy) && live.policy !== win.formalBuild
+        && typeof win.formalIdentityBoundary === 'string' && /^[a-f0-9]{64}$/.test(win.formalIdentityBoundary) && live.identityBoundary === win.formalIdentityBoundary) {
+        win.formalBuild = live.policy
+        writePrivateJson(env.windowPath, win)
+      }
       if (live.pages !== win.formalBuild || live.policy !== win.formalBuild || !live.healthy) throw new WindowStop(`Formal API, Pages and health must all be on ${win.formalBuild} before reverifying pre`)
       if (ctx.config.formalBuild !== win.formalBuild) {
         const raw = privateJson(env.configPath, 'Acceptance config'); writePrivateJson(env.configPath, { ...raw, formalBuild: win.formalBuild }); reload()
@@ -511,7 +548,7 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
       mkdirSync(X, { recursive: true, mode: 0o700 }); chmodSync(X, 0o700); privateDirectory(X, 'Exchange directory')
       t.ssh(`mkdir -p -m 700 '${X}' && chmod 700 '${X}'`, undefined, 'host exchange directory')
       // The path is fixed by the first decision; a resume that would decide differently stops instead of mixing paths.
-      const rebind = decideRebind(io, win, status, now())
+      const rebind = source ? { path: source.scope === 'routine' ? 'routine-source' : 'full', reasons: ['verified source update'] } : decideRebind(io, win, status, now())
       // A boundary change is the owner's call: stop before fixing a path so they can acknowledge it or choose full.
       if (rebind.path === 'full' && win.rebind !== 'full' && rebind.boundary?.files.length && !rebind.boundary.acknowledged && rebind.reasons.length === 1) {
         throw new WindowStop(`Identity-boundary files changed since the last full acceptance (${rebind.boundary.files.join(', ')}). Review the diff, then set acknowledgeBoundaryDiff to ${rebind.boundary.diffSha256} for the fast path or rebind to "full", and rerun with --resume true`,
@@ -526,12 +563,14 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
     async reverify() {
       // An install deploys the new candidate here instead; its deploy operation is this window's acceptance operation.
       const t = tools(), ops = reverifyOps(state()); setOps({ reverify: ops.reverify })
+      if (source?.scope === 'routine') t.deploy('backup-source', ['--sha', install.to, '--generation', win.generation, '--operation-id', ops.reverify, ...sourceArgs], 30 * 60_000)
       t.authority('close', win.generation, ops.close, ['--output', local('close.json')])
       const closed = Date.now()
+      if (source && !existsSync(local('source-closed.json'))) writePrivateJson(local('source-closed.json'), { closedAt: closed })
       t.toHost([local('close.json')], X)
       assertWithin(install ? 'close → deploy' : 'close → reverify', Date.now() - closed, LIMITS.closeToReverifyMs)
       if (install) {
-        const result = t.deploy('deploy', ['--sha', install.to, '--generation', win.generation, '--operation-id', ops.reverify, '--authority-receipt', local('close.json')], 60 * 60_000)
+        const result = t.deploy(source ? 'deploy-source' : 'deploy', [...sourceArgs, '--sha', install.to, '--generation', win.generation, '--operation-id', ops.reverify, '--authority-receipt', local('close.json')], 60 * 60_000)
         const operation = result.operation ?? {}
         if (result.mode !== 'maintenance' || operation.id !== ops.reverify || operation.kind !== 'deploy' || operation.stage !== 'acceptance' || result.installed?.buildId !== install.to) {
           throw new WindowStop('Deploy did not leave the new candidate in its own acceptance maintenance')
@@ -553,6 +592,7 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
         }
         return rows
       }
+      if (source?.scope === 'routine') return {}
       if (state().rebind?.path === 'fast') return { beta: writeAndReturn(join(win.windowDirectory, 'beta-granted.json'), { engines: await grantEngines() }) }
       let request, created = null
       if (decision.action === 'check-accounts') {
@@ -592,6 +632,8 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
       return { rows: path }
     },
     async 'owner-notes'() {
+      if (source?.scope === 'routine') return { notes: writeAndReturn(local('owner-notes.json'), { candidate: source.sha }) }
+
       const ctx = getCtx(), owner = win.ownerNotes ? privateJson(win.ownerNotes, 'Owner notes') : {}, rebind = state().rebind ?? null, fast = rebind?.path === 'fast'
       const receipts = fast ? null : Object.fromEntries(['close', 'associations', 'identity-verified', 'audit', 'activate'].map(name => {
         const path = local(`deletion-${name}.json`); return [name, { path, sha256: hashFile(path) }]
@@ -603,6 +645,11 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
     },
     async bundle() {
       const output = local('evidence'); mkdirSync(output, { recursive: true, mode: 0o700 }); chmodSync(output, 0o700)
+      if (source?.scope === 'routine') {
+        const path = sourceSmokeEvidence(tools(), env.configPath, env.runDirectory, win.acceptanceRoom, getCtx().config.candidate, state().ops.reverify, output)
+        writePrivateJson(join(output, 'index.json'), { 'source-smoke': path })
+        return { index: join(output, 'index.json') }
+      }
       const carry = state().rebind?.path === 'fast'
         ? ['--carry', win.fullAcceptance, ...(win.acknowledgeBoundaryDiff ? ['--acknowledge-boundary-diff', win.acknowledgeBoundaryDiff] : [])] : []
       must(tools().cli(['bundle', '--config', env.configPath, '--runs', env.runDirectory, '--output', output, '--extra', local('owner-notes.json'), ...carry]), 'bundle')
@@ -634,19 +681,21 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
       t.toHost([accepted], X)
       // GitHub receipt verification for `open` also runs now, so activate → open holds only a local check and SSH.
       const verified = join(win.windowDirectory, 'verified-open.json')
-      if (!verifiedOpenFresh(verified)) {
+      if (!source && !verifiedOpenFresh(verified)) {
         rmSync(verified, { force: true })
         must(io.run('./deploy-prerelease.sh', ['verify-open', '--config', ctx.config.targetConfig, '--sha', ctx.config.candidate, '--output', verified], { timeoutMs: 5 * 60_000 }), 'verify-open')
       }
       const chain = await auditChain(io, t, win, 'final')
       assertWithin('activate → open', Date.now() - chain.activatedAt, LIMITS.activateToOpenMs)
-      const opened = t.deploy('open', ['--sha', ctx.config.candidate, '--authority-receipt', chain.files.activate, '--audit', chain.files.audit,
-        '--verification', chain.files['identity-verified'], '--acceptance', accepted, '--verified-receipt', verified])
+      const opened = t.deploy(source ? 'open-source' : 'open', ['--sha', ctx.config.candidate, '--authority-receipt', chain.files.activate, '--audit', chain.files.audit,
+        '--verification', chain.files['identity-verified'], '--acceptance', accepted, ...(source ? sourceArgs : ['--verified-receipt', verified])])
       if (opened.mode !== 'open') throw new WindowStop('Open did not report an open target')
       return { ...chain.files, acceptance: accepted, open: writeAndReturn(local('open.json'), opened) }
     },
     readback: async () => runSuite(tools(), env, SUITE_RUNS.find(entry => entry.step === 'readback')),
     async cleanup() {
+      if (source?.scope === 'routine') return {}
+
       const ctx = getCtx(), origins = ctx.origins, beta = {}, sessions = {}
       for (const [engine, accounts] of Object.entries(ctx.engineAccounts)) {
         beta[engine] = await setBeta({ origins, ownerCookieFile: ctx.config.ownerCookie, fetchImpl: io.fetch }, 'revoke', accounts, ['A', 'B'])
@@ -662,6 +711,15 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
   }
   for (const entry of SUITE_STEPS) steps[entry.step] = async () => runSuite(tools(), env, entry)
   return steps
+}
+
+export function sourceSmokeEvidence(tools, configPath, runDirectory, room, build, operation, output) {
+  must(tools.cli(['run', '--config', configPath, '--run', runDirectory, '--suite', 'source-smoke', '--room', room]), 'source frontend and room reconnect')
+  const row = collectResults([runDirectory]).find(row => row.result.case === 'source-smoke')
+  if (!row || !row.result.passed || row.run.candidate !== build || row.run.operationId !== operation) throw new WindowStop('No matching source reconnect evidence')
+  const path = join(output, 'source-smoke.json')
+  cpSync(row.path, path)
+  return { path, sha256: hashFile(path), passed: true }
 }
 
 function writeAndReturn(path, value) { writePrivateJson(path, value); return path }
@@ -695,16 +753,19 @@ export async function runWindow({ configPath, windowPath, resume = false, confir
   }
   // Preconditions are rechecked on every resume: formal or pre may have changed since the last attempt.
   state = resetSteps(state, [...(nextStep(state) ? ['preconditions'] : []), ...staleSteps(state, now())]); save()
-  const env = { configPath: resolve(configPath), runDirectory: resolve(win.run), room: () => (room ??= previousTeamRoom(win.previousRun)) }
+  const env = { configPath: resolve(configPath), windowPath: resolve(windowPath), runDirectory: resolve(win.run), room: () => (room ??= previousTeamRoom(win.previousRun)) }
   const steps = makeSteps({ io, win, env, getCtx: () => ctx, reload: () => { ctx = loadAcceptanceConfig(configPath) }, state: () => state, now,
     setOps: ops => { state = { ...state, ops: { ...state.ops, ...ops } }; save() }, setRebind: rebind => { state = { ...state, rebind }; save() } })
   for (const step of WINDOW_STEPS) {
     const entry = state.steps[step]
     if (entry?.status === 'done') continue
     const fast = state.rebind?.path === 'fast'
+    if (state.rebind?.path === 'routine-source' && (SUITE_STEPS.some(entry => entry.step === step) || ['deletion', 'chain-deletion', 'deletion-rows', 'readback'].includes(step))) {
+      state = markStep(state, step, 'done', now(), { note: 'Routine source update uses participant reconnect evidence' }); save(); continue
+    }
     if (fast && FAST_SKIPPED_STEPS.includes(step)) { state = markStep(state, step, 'done', now(), { note: 'skipped: fast rebind carries this evidence from the last full acceptance' }); save(); continue }
     const suite = SUITE_RUNS.find(candidate => candidate.step === step)
-    const decision = resumeDecision(step, entry, { gaps: entry && suite ? suiteGaps(collectResults([env.runDirectory]), suite.suite) : null, confirmed: confirmStep === step, fast })
+    const decision = resumeDecision(step, entry, { gaps: entry && suite ? suiteGaps(collectResults([env.runDirectory]), suite.suite) : null, confirmed: confirmStep === step, fast: fast || state.rebind?.path === 'routine-source' })
     if (decision.action === 'stop') {
       const gaps = suite ? suiteGaps(collectResults([env.runDirectory]), suite.suite) : []
       throw new WindowStop(decision.reason, suite && step !== 'deletion' ? rerunCommands({ ...env, room: suite.room ? env.room() : null }, step, gaps) : [])
@@ -724,3 +785,5 @@ export async function runWindow({ configPath, windowPath, resume = false, confir
   }
   return state
 }
+
+export { auditChain, hashFile, hostTools, must, storageCycle, writePrivateJson }

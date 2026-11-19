@@ -7,30 +7,8 @@ import { basename, dirname, join } from 'node:path'
 import { privateJson } from './context.mjs'
 import { SUITE_CASES } from './suites.mjs'
 
-/**
- * Formal-side files that define the identity boundary pre relies on: handoff issue/exchange, sessions and logout,
- * Beta eligibility, account deletion, the browser policy and the gateway's copy of it. Broad routers (server/index.ts,
- * ws-server, PageRouter) are left out on purpose: the fast path still runs handoff and boundary on every engine
- * against the live formal build, which exercises those routes. Git pathspecs, relative to the repository root.
- */
-export const IDENTITY_BOUNDARY_PATHS = [
-  'client/app/PrereleaseHandoffPage.tsx',
-  'client/services/prerelease.ts',
-  'server/auth.ts',
-  'server/auth-cookies.ts',
-  'server/request-auth.ts',
-  'server/http-origin.ts',
-  'server/oauth/handler.ts',
-  ':(glob)server/beta-access-*.ts',
-  ':(glob)server/prerelease-*.ts',
-  'shared/contract/beta-access.ts',
-  'shared/contract/browser-auth.ts',
-  'shared/contract/prerelease-identity.ts',
-  ':(glob)server/database/*beta-access*.sql',
-  ':(glob)server/database/*prerelease*.sql',
-  ':(glob)server/database/*browser-auth*.sql',
-  'scripts/prerelease/browser-policy.ts',
-]
+import { IDENTITY_BOUNDARY_PATHS } from '../identity-boundary-paths.ts'
+export { IDENTITY_BOUNDARY_PATHS }
 
 /** Steps the fast path marks done without running; their evidence comes from the last full acceptance. */
 export const FAST_SKIPPED_STEPS = ['suite-multihand', 'suite-team', 'suite-sandbox', 'suite-viewer', 'suite-continuity', 'deletion', 'chain-deletion', 'deletion-rows']

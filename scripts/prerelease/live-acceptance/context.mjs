@@ -45,18 +45,23 @@ export const PARALLEL_ENGINES = ['chromium', 'firefox', 'webkit']
 export function loadAcceptanceConfig(path) {
   const config = privateJson(path, 'Acceptance config')
   if (config?.format !== 1) throw new Error('Acceptance config format 1 is required')
-  for (const key of ['targetConfig', 'ssh', 'candidate', 'candidateReceipt', 'formalBuild', 'accounts', 'ownerCookie', 'guardConfig', 'outputRoot']) {
+  for (const key of ['targetConfig', 'ssh', 'candidate', 'formalBuild', 'accounts', 'ownerCookie', 'guardConfig', 'outputRoot']) {
     if (typeof config[key] !== 'string' || !config[key]) throw new Error(`Acceptance config needs ${key}`)
   }
   if (!sha.test(config.candidate) || !sha.test(config.formalBuild)) throw new Error('Candidate and formal build must be full SHAs')
   if (!/^[A-Za-z0-9._@-]+$/.test(config.ssh)) throw new Error('Invalid SSH destination')
   if (!/^\/[A-Za-z0-9._/-]+$/.test(config.guardConfig)) throw new Error('Invalid host guard config path')
   const target = privateJson(config.targetConfig, 'Target config')
-  const receipt = privateJson(config.candidateReceipt, 'Candidate image receipt')
-  if (receipt.purpose !== 'candidate' || receipt.channel !== 'prerelease' || receipt.sourceSha !== config.candidate || !sha.test(receipt.producerSha ?? '')) {
-    throw new Error('Candidate image receipt does not match the configured candidate')
-  }
-  const accounts = loadAccounts(config.accounts, ['A', 'B', 'C'])
+  const receipt = config.sourceProof
+    ? privateJson(config.sourceProof, 'Source update proof')
+    : privateJson(config.candidateReceipt, 'Candidate image receipt')
+  const producer = config.sourceProof ? receipt.producer : receipt.producerSha
+  const matches = config.sourceProof
+    ? receipt.kind === 'prerelease-source' && (config.sourceRecovery === true || config.sourcePreflight === true
+      ? receipt.scope === 'routine' && receipt.from === config.candidate : receipt.sha === config.candidate)
+    : receipt.purpose === 'candidate' && receipt.channel === 'prerelease' && receipt.sourceSha === config.candidate
+  if (!matches || !sha.test(producer ?? '')) throw new Error('Candidate image receipt or source proof does not match the configured candidate')
+  const accounts = loadAccounts(config.accounts, config.sourceProof && receipt.scope === 'routine' ? ['A'] : ['A', 'B', 'C'])
   const team = config.teamAccounts ? loadAccounts(config.teamAccounts, ['D', 'E']) : []
   const engineAccounts = { chromium: accounts }
   if (config.engineAccounts !== undefined) {
@@ -71,7 +76,7 @@ export function loadAcceptanceConfig(path) {
   }
   privatePath(config.ownerCookie, 'Formal owner cookie')
   return {
-    path: resolve(path), config, target, producer: receipt.producerSha, accounts, team, engineAccounts,
+    path: resolve(path), config, target, producer, accounts, team, engineAccounts,
     /** Every configured account, for leak checks and full logout. */
     allAccounts: [...Object.values(engineAccounts).flat(), ...team],
     origins: { pre: new URL(target.origin).origin, formalApp: new URL(target.formal.appOrigin).origin, formalApi: new URL(target.formal.apiOrigin).origin },

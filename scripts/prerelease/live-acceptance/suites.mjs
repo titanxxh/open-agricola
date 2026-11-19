@@ -4,13 +4,13 @@ import { bounded, sleep, poll, pollTrue } from './browser.mjs'
 
 /** Stable case labels per suite: failures are recorded under the same label as a pass, so the newest result wins. */
 export const SUITE_CASES = {
-  handoff: ['handoff'], boundary: ['visitor', 'ordinary', 'beta-boundary', 'revocation'], multihand: ['multihand-cooperation-viewer'], team: ['team-game'],
+  'source-smoke': ['source-smoke'], handoff: ['handoff'], boundary: ['visitor', 'ordinary', 'beta-boundary', 'revocation'], multihand: ['multihand-cooperation-viewer'], team: ['team-game'],
   sandbox: ['public-sandbox'], viewer: ['viewer-firefox', 'viewer-webkit'], continuity: ['continuity'], deletion: ['formal-account-deletion'], readback: ['public-readback'],
 }
 
 /** Engines each suite must pass on; acceptance requires every case of every suite except `readback` on each of them. */
 export const SUITE_ENGINES = {
-  handoff: ['chromium', 'firefox', 'webkit'], boundary: ['chromium', 'firefox', 'webkit'], multihand: ['chromium'], team: ['chromium'],
+  'source-smoke': ['chromium'], handoff: ['chromium', 'firefox', 'webkit'], boundary: ['chromium', 'firefox', 'webkit'], multihand: ['chromium'], team: ['chromium'],
   sandbox: ['chromium'], viewer: ['firefox', 'webkit'], continuity: ['chromium'], deletion: ['chromium'], readback: ['chromium'],
 }
 
@@ -39,7 +39,7 @@ export const selectCases = (suite, engine, requested) => caseLabels(suite, engin
   .map((label, index) => ({ label, index })).filter(({ label }) => !requested || requested.includes(label))
 
 /** Every (case, engine) pair acceptance needs a passing newest result for. */
-export const REQUIRED_CASES = Object.entries(SUITE_ENGINES).filter(([suite]) => suite !== 'readback')
+export const REQUIRED_CASES = Object.entries(SUITE_ENGINES).filter(([suite]) => suite !== 'readback' && suite !== 'source-smoke')
   .flatMap(([suite, engines]) => engines.flatMap(engine => caseLabels(suite, engine).map(label => ({ case: label, engine }))))
 
 const within = (ms, fence = 31_000) => ms !== null && ms !== undefined && ms <= fence
@@ -497,4 +497,40 @@ export async function readbackCase(kit, browser, accounts) {
   const { A, C, visitor: v } = r.results
   r.passed = A.me?.status === 200 && A.me.user === 'A' && A.banner === true && A.formalEntryControls > 0 && C.me?.status === 401 && C.formalEntryControls === 0 && v.me.status === 401 && v.rooms.status === 401
   return r
+}
+
+/** Reconnect an existing Beta participant twice and observe its selected room without sending a game command. */
+export async function sourceSmokeCase(kit, browser, accounts, roomId) {
+  assert.match(roomId ?? '', /^[a-f0-9-]{36}$/)
+  const side = await kit.gameContext(browser)
+  try {
+    const page = await side.context.newPage()
+    await kit.enterPre(page, byLabel(accounts, 'A'), side)
+    const identity = await kit.preFetch(page, '/api/auth/me')
+    assert.equal(identity.status, 200)
+    assert.equal(identity.user, 'A')
+    const [descriptor, location] = await page.evaluate(async bind => {
+      const read = async path => {
+        const response = await fetch(path, { cache: 'no-store', headers: { 'x-oa-browser-protocol': '2', 'x-oa-pre-build': bind.build, 'x-oa-pre-generation': bind.generation } })
+        if (!response.ok) throw new Error('Could not read pre build at ' + path)
+        return response.json()
+      }
+      return Promise.all(['/open-agricola/frontend-build.json', '/api/app-location'].map(read))
+    }, kit.binding)
+    assert.equal(location.buildId, kit.binding.build)
+    assert.equal(descriptor.gameBuildId, kit.binding.build)
+    assert.equal(descriptor.releaseChannel, 'prerelease')
+    const wire = kit.observeGameSocket(page)
+    await page.goto(kit.origins.pre + '/open-agricola/?room=' + roomId)
+    const joined = () => wire.joins.filter(row => row.roomId === roomId && row.status === 'playing' && row.playerIndex >= 0).length
+    const snapshots = () => wire.states.filter(row => row.roomId === roomId && row.sync === 'snapshot' && row.payload?.state).length
+    await pollTrue(() => joined() > 0 && snapshots() > 0)
+    const previousJoins = joined(), previousSnapshots = snapshots()
+    await page.reload()
+    await pollTrue(() => joined() > previousJoins && snapshots() > previousSnapshots)
+    return { case: 'source-smoke', participant: identity.user, buildId: descriptor.gameBuildId, backendBuildId: location.buildId, roomId, version: wire.latest().version, passed: true }
+  } finally {
+    if (side.logged) await kit.formalPost(side.context, '/api/auth/logout').catch(() => {})
+    await side.context.close()
+  }
 }

@@ -34,6 +34,8 @@ COPY --chown=node:node scripts/ ./scripts/
 RUN mkdir -p data output && chown node:node data output
 ARG GAME_BUILD_ID=development
 ARG RELEASE_CHANNEL=stable
+ARG FORMAL_IDENTITY_BOUNDARY
+RUN if [ -n "$FORMAL_IDENTITY_BOUNDARY" ]; then printf '%s %s\n' "$GAME_BUILD_ID" "$FORMAL_IDENTITY_BOUNDARY" > /app/formal-identity-boundary; fi
 ENV GAME_BUILD_ID=$GAME_BUILD_ID RELEASE_CHANNEL=$RELEASE_CHANNEL
 LABEL org.opencontainers.image.revision=$GAME_BUILD_ID io.open-agricola.release-channel=$RELEASE_CHANNEL
 ENV NODE_ENV=production BACKEND_PORT=5175 BACKEND_HOST=0.0.0.0 APP_INSTANCES=1 PG_CLIENT_MODE=local FRONTEND_ROOT=/app/frontend-dist

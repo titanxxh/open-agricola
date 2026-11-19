@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { browserCardTestsPlugin } from './scripts/vite-browser-card-tests.ts'
+import { browserCardTestsPlugin, preparedSandboxWorkerPlugin } from './scripts/vite-browser-card-tests.ts'
 import { serviceWorkerPlugin, OFFLINE_ENCYCLOPEDIA_ENABLED, PUBLIC_ASSET_CACHE_ENABLED } from './scripts/vite-service-worker.ts'
 import { loadBrowserDataDefines } from './scripts/browser-data.ts'
 import {
@@ -59,9 +59,12 @@ const servePublicAssets = (assetRoot: string, missingIsNotFound: boolean) => {
   }
 }
 
+const preparedWorkers = process.env.RELEASE_CHANNEL === 'prerelease' && process.env.OPEN_AGRICOLA_FRONTEND_TARGET === 'prerelease-hosted'
+  ? process.env.OA_PREPARED_FRONTEND_WORKERS : undefined
 const plugins: PluginOption[] = [
   react(),
-  browserCardTestsPlugin(),
+  browserCardTestsPlugin(preparedWorkers),
+  ...(preparedWorkers ? [preparedSandboxWorkerPlugin(preparedWorkers)] : []),
   publicAssetUrls(publicAssets, [process.env.VITE_BASE_PATH ?? '/', '/']),
 ]
 if (publicAssets.localDir) {

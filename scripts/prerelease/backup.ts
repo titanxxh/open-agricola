@@ -11,8 +11,8 @@ export const fileHash = (path: string): string => {
   return value
 }
 
-/** Verifies paired bytes and source scope before extraction or database/object writes. */
-export function readPairedPrereleaseBackup(target: PrereleaseTarget, stem: string, generationId: string) {
+/** The owner sealed these bytes at capture; admission also checks that retention has not removed the pair. */
+export function inspectPairedPrereleaseBackup(target: PrereleaseTarget, stem: string, generationId: string) {
   if (!/^(daily|pre|manual)-[a-zA-Z0-9._-]+$/.test(stem)) throw new Error('Invalid recovery-point name')
   const root = join(target.directory, 'backups')
   const value: unknown = JSON.parse(readFileSync(join(root, `${stem}.manifest.json`), 'utf8'))
@@ -27,10 +27,18 @@ export function readPairedPrereleaseBackup(target: PrereleaseTarget, stem: strin
     || !('targetBuildId' in value) || typeof value.targetBuildId !== 'string' || !/^[a-f0-9]{40}$/.test(value.targetBuildId)
     || !('archiveSizeBytes' in value) || value.archiveSizeBytes !== statSync(join(root, `${stem}.tgz`)).size
     || !('configurationSizeBytes' in value) || value.configurationSizeBytes !== statSync(join(root, `env-${stem}`)).size
-    || !('archiveSha256' in value) || value.archiveSha256 !== fileHash(join(root, `${stem}.tgz`))
-    || !('configurationSha256' in value) || value.configurationSha256 !== fileHash(join(root, `env-${stem}`))) throw new Error('Recovery point is incomplete, altered, expired or belongs to another environment/generation')
+    || !('archiveSha256' in value) || typeof value.archiveSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.archiveSha256)
+    || !('configurationSha256' in value) || typeof value.configurationSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.configurationSha256)) throw new Error('Recovery point is incomplete, altered, expired or belongs to another environment/generation')
   return { root, archive: join(root, `${stem}.tgz`), sourceBuildId: value.sourceBuildId, targetBuildId: value.targetBuildId,
     manifest: value, archiveSha256: value.archiveSha256, createdAt: value.createdAt }
+}
+
+export function readPairedPrereleaseBackup(target: PrereleaseTarget, stem: string, generationId: string) {
+  const point = inspectPairedPrereleaseBackup(target, stem, generationId)
+  if (point.archiveSha256 !== fileHash(point.archive) || point.manifest.configurationSha256 !== fileHash(join(point.root, `env-${stem}`))) {
+    throw new Error('Recovery point is incomplete, altered, expired or belongs to another environment/generation')
+  }
+  return point
 }
 
 export function prepareRestoreStaging(target: PrereleaseTarget, point: ReturnType<typeof readPairedPrereleaseBackup>, operationId: string, generation: string): string {

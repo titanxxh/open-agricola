@@ -23,6 +23,24 @@ function expectWorkflowSecrets(file: string, workflow: string): void {
     expect(imageJob).toContain(publishAfterStop)
     workflow = workflow.replace(publishAfterStop, publishAfterStop.replace('${{ secrets.GHCR_PUBLISH_TOKEN }}', ''))
   }
+  if (file === 'prerelease-runtime.yml') {
+    const runtime = workflow.match(/^ {2}runtime:\n(?: {4}[^\n]*\n|\n)*/m)?.[0] ?? ''
+    expect(workflow).toContain("on:\n  workflow_dispatch:\n  push:\n    branches: [main]\n    paths: ['deploy/prerelease-runtime/**']\n")
+    expect(runtime).toMatch(/^ {2}runtime:\n {4}if: github.ref == 'refs\/heads\/main'\n {4}runs-on: ubuntu-latest\n {4}timeout-minutes: 45\n {4}environment: prerelease-image-publish\n {4}steps:\n/)
+    const publishStep = [
+      '      - name: Publish runtime and produce the pin',
+      '        env:',
+      '          GH_TOKEN: ${{ github.token }}',
+      '          GHCR_PUBLISH_TOKEN: ${{ secrets.GHCR_PUBLISH_TOKEN }}',
+      '          GHCR_PUBLISH_USER: ${{ vars.GHCR_PUBLISH_USER }}',
+      '          GHCR_PRIVATE_PACKAGE_ID: ${{ vars.GHCR_PRIVATE_PACKAGE_ID }}',
+      '        run: node scripts/ci/publish-prerelease-runtime.ts',
+      '',
+    ].join('\n')
+    expect(runtime).toContain(publishStep)
+    expect(runtime).toContain('ref: ${{ github.sha }}')
+    workflow = workflow.replace(publishStep, '')
+  }
   expect(workflow).not.toMatch(/\bsecrets\s*(?:\.|\[)/)
 }
 

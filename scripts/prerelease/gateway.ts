@@ -53,12 +53,14 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
         const formalBuildId = acceptance && typeof acceptance === 'object' && 'formalBuildId' in acceptance && typeof acceptance.formalBuildId === 'string'
           && /^[a-f0-9]{40}$/.test(acceptance.formalBuildId) ? acceptance.formalBuildId : null
         const healthyCycle = acceptance && typeof acceptance === 'object' && 'healthyCycle' in acceptance ? acceptance.healthyCycle : null
-        return { mode: state.mode, buildId: state.buildId, generation: state.generation, formalBuildId, healthyCycle }
+        const identityBoundary = acceptance && typeof acceptance === 'object' && 'identityBoundary' in acceptance ? acceptance.identityBoundary : undefined
+        if (identityBoundary !== undefined && (typeof identityBoundary !== 'string' || !/^[a-f0-9]{64}$/.test(identityBoundary))) return null
+        return { mode: state.mode, buildId: state.buildId, generation: state.generation, formalBuildId, healthyCycle, identityBoundary }
       }
       return null
     } catch { return null }
   }
-  let capability: { buildId: string; validUntil: number } | null = null
+  let capability: { buildId: string; identityBoundary?: string; validUntil: number } | null = null
   let capabilityExpiry: ReturnType<typeof setTimeout> | undefined
   let refresh: Promise<void> | undefined
   let stopped = false
@@ -68,7 +70,7 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     const startedAt = Date.now()
     refresh = readBrowserAuthPolicy(options.formal, options).then(policy => {
       if (!stopped) {
-        capability = { buildId: policy.buildId, validUntil: startedAt + 30_000 }
+        capability = { buildId: policy.buildId, identityBoundary: policy.identityBoundary, validUntil: startedAt + 30_000 }
         clearTimeout(capabilityExpiry)
         capabilityExpiry = setTimeout(closeInputs, Math.max(0, capability.validUntil - Date.now()))
         capabilityExpiry.unref()
@@ -99,7 +101,12 @@ export function createPrereleaseGateway(options: { stateFile: string; targetId: 
     if (!guard) return false
     const current = state()
     if (!capability || capability.validUntil <= Date.now()) return false
-    if (current?.mode === 'open') return current.formalBuildId === capability.buildId && current.healthyCycle === guard.healthyCycle
+    if (current?.mode === 'open') {
+      if (!current.formalBuildId || current.healthyCycle !== guard.healthyCycle) return false
+      return current.identityBoundary === undefined
+        ? current.formalBuildId === capability.buildId
+        : current.identityBoundary === capability.identityBoundary
+    }
     // Public immutable programs carry no archive data or credentials. During
     // private acceptance only, their anonymous iframe can use the active window.
     if (current?.mode === 'maintenance' && viewerProgram) return verificationHash() !== null

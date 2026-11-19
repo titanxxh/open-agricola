@@ -236,6 +236,6 @@ describe('acceptance evidence', () => {
 
 it('records every suite case under a label the evidence mapping reads, so a retried pass replaces the failure', () => {
   const referenced = new Set(Object.values(SOURCES).flat())
-  const labels = Object.entries(SUITE_CASES).filter(([suite]) => suite !== 'readback').flatMap(([, cases]) => cases)
+  const labels = Object.entries(SUITE_CASES).filter(([suite]) => suite !== 'readback' && suite !== 'source-smoke').flatMap(([, cases]) => cases)
   expect(labels.filter(label => !referenced.has(label))).toEqual([])
 })
