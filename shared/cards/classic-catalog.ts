@@ -16,3 +16,11 @@ export const getClassicCardKind = (id: string): 'occupation' | 'minor' | undefin
   if (card.kind === 'playerAction') return card.playerActionCardType === 'occupation' ? 'occupation' : 'minor'
   return card.kind
 }
+
+/** Classic minor-like definitions (minor or minor-type player action), for lookups by exact ID only. */
+export const getClassicMinorImprovement = (id: string): ClassicCardDefinition | undefined =>
+  getClassicCardKind(id) === 'minor' ? byId.get(id) : undefined
+
+/** Classic occupation-like definitions (occupation or occupation-type player action), for lookups by exact ID only. */
+export const getClassicOccupation = (id: string): ClassicCardDefinition | undefined =>
+  getClassicCardKind(id) === 'occupation' ? byId.get(id) : undefined

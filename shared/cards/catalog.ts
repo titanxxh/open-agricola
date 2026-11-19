@@ -1,4 +1,5 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
+import { getClassicMinorImprovement, getClassicOccupation } from './classic-catalog'
 import type { CardDefinition } from '../contract/cards'
 import { majorCardDefinitionsList } from './major/generated'
 import {
@@ -26,13 +27,16 @@ export const implementedCommunityOccupations = communityOccupations.filter(isImp
 export const minorImprovementIds = implementedMinorImprovementCards.map((card) => card.id)
 export const occupationIds = implementedOccupationCards.map((card) => card.id)
 
+// Lookups by exact ID also find classic Card Definitions (ADR 0049); the enumerations above never include them.
 export const getMinorImprovementCard = (id: string) => {
   return allMinorImprovementCards.find((card) => card.id === id)
+    ?? getClassicMinorImprovement(id)
     ?? getCustomMinorImprovement(id)
 }
 
 export const getOccupationCard = (id: string) => {
   return allOccupationCards.find((card) => card.id === id)
+    ?? getClassicOccupation(id)
     ?? getCustomOccupation(id)
 }
 
