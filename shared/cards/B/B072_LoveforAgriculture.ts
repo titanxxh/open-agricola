@@ -112,6 +112,8 @@ const cardImpl = {
         tile: anchor,
         allowedCrops: ['grain', 'vegetable'],
         sourceCard: CARD_ID,
+        // "these pastures are also considered fields"
+        isField: true,
       })
     }
     return extras

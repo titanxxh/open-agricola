@@ -159,14 +159,15 @@ export const validateSow = (
       sowAmounts,
     },
   )
-  const extraSourceCards = new Map(extraFields.map((field) => [positionKey(field.tile), field.sourceCard] as const))
+  const extraSourceCards = new Map(extraFields.map((field) =>
+    [positionKey(field.tile), { cardId: field.sourceCard, isField: field.isField === true }] as const))
   return { validated, extraAllowedCrops, extraSourceCards }
 }
 
 const sowTargets = (
   player: PlayerState,
   crops: readonly SowSelection[],
-  extraSourceCards: ReadonlyMap<string, string>,
+  extraSourceCards: ReadonlyMap<string, { cardId: string; isField: boolean }>,
 ) => {
   const cardSlots = new Map(
     getLogicalFields(player).flatMap((field) => field.kind === 'card' && field.sourceCard
@@ -180,7 +181,7 @@ const sowTargets = (
     const target: SowTarget = cardSlot
       ? { kind: 'card-field', row: sel.row, col: sel.col, cardId: cardSlot.cardId, slot: cardSlot.slot }
       : extraCard
-        ? { kind: 'extra', row: sel.row, col: sel.col, cardId: extraCard }
+        ? { kind: 'extra', row: sel.row, col: sel.col, cardId: extraCard.cardId, isField: extraCard.isField }
         : { kind: 'farmyard', row: sel.row, col: sel.col }
     // Card Field targets keep their card metadata so the board can render them as selectable.
     const selectionTile = cardSlot
@@ -197,15 +198,26 @@ const readSowPayload = (actionContext?: Record<string, unknown>): SowPayload | u
 }
 
 /** Plans the final amounts; asks for the next optional bonus source, or places everything. */
-/** One selection per position; later repeats are ignored, as `validateSowSelection` does. */
-const uniqueSowSelections = (crops: readonly SowSelection[]) => {
-  const seen = new Set<string>()
-  return crops.filter((sel) => {
+/**
+ * One entry per target. An identical repeat on a farmyard field collapses, as
+ * `validateSowSelection` always did; a repeat with another crop, or on a card or
+ * extra target, is rejected so a plan can never differ from what is planted.
+ */
+const canonicalSowSelections = (
+  crops: readonly SowSelection[],
+  extraKeys: ReadonlySet<string>,
+): SowSelection[] | undefined => {
+  const byKey = new Map<string, SowSelection>()
+  for (const sel of crops) {
     const key = positionKey({ row: Number(sel?.row), col: Number(sel?.col) })
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+    const first = byKey.get(key)
+    if (!first) {
+      byKey.set(key, sel)
+      continue
+    }
+    if (first.crop !== sel.crop || extraKeys.has(key)) return undefined
+  }
+  return [...byKey.values()]
 }
 
 const continueSow = (
@@ -214,12 +226,14 @@ const continueSow = (
   chosen: Record<string, string[]>,
   previous?: SowPayload,
 ): ActionExecutionResult => {
-  const crops = uniqueSowSelections(submittedCrops)
   const ctx = previous ? { ...outerCtx, actionContext: sowActionContext(outerCtx.actionContext, previous) } : outerCtx
-  const { validated, extraSourceCards } = validateSow(ctx, crops)
+  if (!Array.isArray(submittedCrops)) return { type: 'fail', errorKey: 'log.action', recoverable: true }
+  const { validated, extraSourceCards } = validateSow(ctx, submittedCrops)
   if (!validated.ok) {
     return { type: 'fail', errorKey: validated.error?.code ?? 'log.action', recoverable: true }
   }
+  const crops = canonicalSowSelections(submittedCrops, new Set(extraSourceCards.keys()))
+  if (!crops) return { type: 'fail', errorKey: 'INVALID_POSITION', recoverable: true }
   const targets = sowTargets(ctx.player, crops, extraSourceCards)
   const plans = planSowAmounts({
     state: ctx.state,
