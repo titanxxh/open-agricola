@@ -42,6 +42,27 @@ export const CANDIDATE_TMPDIR = '/home/oa-candidate/tmp'
 const CANDIDATE_PUBLIC_ASSETS = '/home/oa-candidate/public-assets'
 const COMMAND_TIMEOUT_MS = 60 * 60_000
 export const NETWORK_ATTEMPTS = 3
+/**
+ * Docker Hub images that tasks start themselves. Preparation pulls them with network retries, so a registry stall
+ * cannot fail a task midway; a test checks that each literal still appears in its file.
+ */
+export const TASK_FIXTURE_IMAGES = [
+  { image: 'ubuntu:26.04@sha256:065aa8626841f16057b78b027b464cd59c4fac36c204c72dcbf48d66f5fa8a96', file: 'scripts/__tests__/candidate-verification-isolation.test.ts' },
+  { image: 'prom/prometheus:v3.15.0', file: 'e2e-tests/operations-dashboard.spec.ts' },
+  { image: 'grafana/grafana:13.2.3', file: 'e2e-tests/operations-dashboard.spec.ts' },
+] as const
+/** The isolation test's ACL fixture: `acl` installed once during preparation instead of by apt inside a timed task. */
+export const ACL_FIXTURE_IMAGE = 'oa-candidate-acl-fixture:ubuntu-26.04-065aa862'
+export function aclFixtureBuild(): string {
+  const dockerfile = [`FROM ${TASK_FIXTURE_IMAGES[0].image}`,
+    'RUN apt-get -o Acquire::Retries=3 update && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends acl && rm -rf /var/lib/apt/lists/*']
+  return `printf '%s\\n' ${dockerfile.map(line => `'${line}'`).join(' ')} | docker build --quiet -t ${ACL_FIXTURE_IMAGE} -`
+}
+/**
+ * The harness test cluster is disposable: without fsync, the immediate checkpoint that each CREATE/DROP DATABASE
+ * waits for no longer stalls every database-level test for minutes under a CPU-bound run.
+ */
+export const HARNESS_POSTGRES_ARGS = '-c fsync=off -c full_page_writes=off -c synchronous_commit=off'
 export const PREPARATION_RETRY_DELAY_MS = 5_000
 // Candidates migrate test schemas concurrently and serve E2E assets locally (#1779), so `fast` keeps Vitest's own
 // worker count and the CPU budget alone limits the browser tasks. For a candidate from before those changes use
@@ -224,7 +245,7 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
   const failed: string[] = []
   // The pinned asset checkout validates build metadata offline and lets the E2E dev server serve card art locally,
   // so concurrent browser tasks never hit the public asset host from one owner IP (it rate-limits with HTTP 429).
-  const services = { LOCAL_POSTGRES_PORT: String(inputs.servicePorts.postgres), LOCAL_S3_PORT: String(inputs.servicePorts.objects), TMPDIR: CANDIDATE_TMPDIR,
+  const services = { LOCAL_POSTGRES_PORT: String(inputs.servicePorts.postgres), LOCAL_S3_PORT: String(inputs.servicePorts.objects), LOCAL_POSTGRES_ARGS: HARNESS_POSTGRES_ARGS, TMPDIR: CANDIDATE_TMPDIR,
     PUBLIC_ASSET_VALIDATION_DIR: CANDIDATE_PUBLIC_ASSETS, E2E_PUBLIC_ASSET_DIR: CANDIDATE_PUBLIC_ASSETS,
     ...(inputs.testWorkers ? { VITEST_MAX_WORKERS: String(inputs.testWorkers) } : {}) }
   const properties = candidateProperties(inputs.ownerHome)
@@ -277,6 +298,8 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
     // The first install fills the candidate's pnpm store; the other copies then link from it.
     await pool(tasks.slice(1), 3, task => prepare(task, pnpm, ['install', '--frozen-lockfile'], `install-${task}`, NETWORK_ATTEMPTS))
     await prepare(tasks[0], pnpm, ['exec', 'playwright', 'install', 'chromium', 'webkit', 'firefox'], 'browsers', NETWORK_ATTEMPTS)
+    for (const [index, { image }] of TASK_FIXTURE_IMAGES.entries()) await prepare(tasks[0], 'docker', ['pull', '--quiet', image], `fixture-image-${index + 1}`, NETWORK_ATTEMPTS)
+    await prepare(tasks[0], '/bin/sh', ['-c', aclFixtureBuild()], 'acl-fixture-image', NETWORK_ATTEMPTS)
     // One start of the shared test services before tasks run concurrently, so no two tasks race to create them.
     await prepare(tasks[0], inputs.node.path, ['scripts/local-services.mjs', '--test'], 'services', NETWORK_ATTEMPTS)
     const failures = new Map<FullTaskId, string>()

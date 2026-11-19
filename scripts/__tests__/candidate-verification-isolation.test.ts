@@ -6,6 +6,7 @@ import { parseEnv } from 'node:util'
 import { afterEach, expect, it } from 'vitest'
 import { taskCommands } from '../ci/verification-tasks'
 import { collectCandidateDiagnostics, displayCandidateLog, verifyCandidateSources, escapeWorkflowCommands, candidateEnvironment } from '../ci/candidate-isolation'
+import { ACL_FIXTURE_IMAGE } from '../ci/owner-local-run'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -109,14 +110,16 @@ it('creates a private candidate home without inherited host ACLs and allocates s
   const before = setup.indexOf('# Candidate identity and automatic subordinate IDs.')
   const after = setup.indexOf('cp -a "$source_directory"', before)
   if (before < 0 || after < 0) throw new Error('Missing identity setup stage')
+  // Owner-local preparation builds this image with network retries; elsewhere the test installs acl itself.
+  const prebuilt = spawnSync('docker', ['image', 'inspect', ACL_FIXTURE_IMAGE], { stdio: 'ignore' }).status === 0
   const result = spawnSync('docker', ['run', '--rm', '--network', 'bridge', '-i',
-    'ubuntu:26.04@sha256:065aa8626841f16057b78b027b464cd59c4fac36c204c72dcbf48d66f5fa8a96',
+    prebuilt ? ACL_FIXTURE_IMAGE : 'ubuntu:26.04@sha256:065aa8626841f16057b78b027b464cd59c4fac36c204c72dcbf48d66f5fa8a96',
     'timeout', '--signal=TERM', '--kill-after=5s', '60s', 'bash', '-s'], {
     encoding: 'utf8', timeout: 90000,
     input: `set -euo pipefail
-acl_fixture_apt=(-o Acquire::Retries=1 -o Acquire::http::Timeout=10 -o Acquire::https::Timeout=10)
+${prebuilt ? '' : `acl_fixture_apt=(-o Acquire::Retries=1 -o Acquire::http::Timeout=10 -o Acquire::https::Timeout=10)
 apt-get "\${acl_fixture_apt[@]}" update >/dev/null
-DEBIAN_FRONTEND=noninteractive apt-get "\${acl_fixture_apt[@]}" install -y --no-install-recommends acl >/dev/null
+DEBIAN_FRONTEND=noninteractive apt-get "\${acl_fixture_apt[@]}" install -y --no-install-recommends acl >/dev/null`}
 setfacl -m d:u:1001:rwx /home
 ${setup.slice(before, after)}
 id -u oa-candidate

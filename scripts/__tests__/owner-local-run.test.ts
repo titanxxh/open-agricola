@@ -2,10 +2,10 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FULL_TASK_IDS, type FullTaskId, type VerificationCommand } from '../ci/verification-tasks'
-import { BROWSER_PORT_SLICES, TASK_ORDER, budgetPool, isolationSmokeImage, taskCost, assertNoReservedCandidatePaths, browserEnvironment, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
+import { ACL_FIXTURE_IMAGE, BROWSER_PORT_SLICES, HARNESS_POSTGRES_ARGS, TASK_FIXTURE_IMAGES, TASK_ORDER, aclFixtureBuild, budgetPool, isolationSmokeImage, taskCost, assertNoReservedCandidatePaths, browserEnvironment, assertPrivateHome, pool, runIsolated, semaphore, taskEnvironment, type Inputs, type Runner } from '../ci/owner-local-run'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -171,9 +171,15 @@ describe('isolated owner-local run', () => {
     // The smoke's pinned image is pulled first by the trusted Docker CLI, so a registry stall can retry.
     expect(fake.calls.find(call => call.startsWith('candidate smoke-image '))).toContain(` docker pull --quiet ${isolationSmokeImage()} `)
     expect(fake.calls.some(call => call.startsWith('candidate services ') && call.includes('scripts/local-services.mjs --test'))).toBe(true)
+    // Images that tasks start themselves are pulled, and the ACL fixture built, before the services and every task.
+    const phases = fake.calls.filter(call => call.startsWith('candidate ')).map(call => call.split(' ')[1])
+    const prepared = ['browsers', ...TASK_FIXTURE_IMAGES.map((_, index) => `fixture-image-${index + 1}`), 'acl-fixture-image', 'services'].map(phase => phases.indexOf(phase))
+    expect(prepared.every((index, i) => index > (prepared[i - 1] ?? -1))).toBe(true)
+    expect(prepared.at(-1)).toBeLessThan(phases.findIndex(phase => phase.startsWith('task-')))
+    for (const [index, { image }] of TASK_FIXTURE_IMAGES.entries()) expect(fake.calls.find(call => call.startsWith(`candidate fixture-image-${index + 1} `))).toContain(` docker pull --quiet ${image} `)
     // Every candidate command, preparation included, uses the run's own service ports.
     const candidateCalls = fake.calls.filter(call => call.startsWith('candidate '))
-    expect(candidateCalls.every(call => call.includes('"LOCAL_POSTGRES_PORT":"41001","LOCAL_S3_PORT":"41002","TMPDIR":"/home/oa-candidate/tmp","PUBLIC_ASSET_VALIDATION_DIR":"/home/oa-candidate/public-assets","E2E_PUBLIC_ASSET_DIR":"/home/oa-candidate/public-assets","VITEST_MAX_WORKERS":"6"') && call.includes(' PrivateTmp=yes,InaccessiblePaths=/home/owner'))).toBe(true)
+    expect(candidateCalls.every(call => call.includes(`"LOCAL_POSTGRES_PORT":"41001","LOCAL_S3_PORT":"41002","LOCAL_POSTGRES_ARGS":"${HARNESS_POSTGRES_ARGS}","TMPDIR":"/home/oa-candidate/tmp","PUBLIC_ASSET_VALIDATION_DIR":"/home/oa-candidate/public-assets","E2E_PUBLIC_ASSET_DIR":"/home/oa-candidate/public-assets","VITEST_MAX_WORKERS":"6"`) && call.includes(' PrivateTmp=yes,InaccessiblePaths=/home/owner'))).toBe(true)
     // The browser wave starts only after every CPU-bound task finished.
     const taskStarts = candidateCalls.filter(call => call.startsWith('candidate task-')).map(call => call.split(' ')[1].replace(/^task-|-\d+$/g, ''))
     expect(taskStarts.slice(0, taskStarts.findIndex(task => task.startsWith('chromium')))).toEqual(['fast', 'fast', 'slow'])
@@ -250,6 +256,11 @@ describe('isolated owner-local run', () => {
     expect(await runIsolated(once, failed.runner, Date.now, sleep)).toEqual({ failed: ['Candidate smoke failed (exit 1)'] })
     expect(failed.calls.filter(call => call.startsWith('candidate smoke ')).length).toBe(1)
     expect(isolationSmokeImage()).toMatch(/^postgres:[\w.-]+@sha256:[0-9a-f]{64}$/)
+    // Fixture images stay the ones their tasks start; the ACL fixture builds on the isolation test's pinned Ubuntu.
+    for (const { image, file } of TASK_FIXTURE_IMAGES) expect(readFileSync(resolve(import.meta.dirname, '../..', file), 'utf8'), file).toContain(`'${image}'`)
+    expect(aclFixtureBuild()).toContain(`'FROM ${TASK_FIXTURE_IMAGES[0].image}'`)
+    expect(aclFixtureBuild()).toContain(`docker build --quiet -t ${ACL_FIXTURE_IMAGE} -`)
+    expect(readFileSync(resolve(import.meta.dirname, '../../docker-compose.local.yml'), 'utf8')).toContain('command: postgres -c max_locks_per_transaction=1024 ${LOCAL_POSTGRES_ARGS:-}')
   })
 
   it('tears down after a failed preparation or a partly failed start', async () => {

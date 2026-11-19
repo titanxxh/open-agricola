@@ -7,8 +7,9 @@ services:
       POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:?Initialize local dependencies first}
       POSTGRES_DB: agricola
     # Test and E2E schemas migrate concurrently; one migration transaction holds about 1,200 locks
-    # (CONCURRENT_MIGRATION_LOCKS in server/database/migrations.ts).
-    command: ["postgres", "-c", "max_locks_per_transaction=1024"]
+    # (CONCURRENT_MIGRATION_LOCKS in server/database/migrations.ts). LOCAL_POSTGRES_ARGS adds server options
+    # for a disposable cluster only (the owner-local harness); developer data never sets it.
+    command: postgres -c max_locks_per_transaction=1024 ${LOCAL_POSTGRES_ARGS:-}
     ports:
       - "127.0.0.1:${LOCAL_POSTGRES_PORT:-55432}:5432"
     volumes:
@@ -18,7 +19,8 @@ services:
         volume:
           nocopy: true
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agricola -d agricola"]
+      # TCP, as clients connect: a fresh volume first starts a socket-only init server that pg_isready on the socket accepts.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U agricola -d agricola"]
       interval: 2s
       timeout: 3s
       retries: 30
