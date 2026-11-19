@@ -1,4 +1,6 @@
 const OFFICIAL_CARD_ID = /^([A-E]|M)(\d{3})(?:_|$)/
+/** Classic Deck IDs: `C` + the original deck code + three digits. The prefix stays in the printed number. */
+const CLASSIC_CARD_ID = /^(C[A-Z]+)(\d{3})(?:_|$)/
 
 const MOOR_MAJOR_DISPLAY_NUMBERS: Readonly<Record<string, string>> = {
   Major_Moor_HorseSlaughterhouse1: 'M001',
@@ -24,10 +26,11 @@ export const moorMajorDisplayNumber = (cardId: string): string | undefined =>
 export const officialCardDisplayNumber = (cardId: string): string | undefined => {
   const moorMajor = moorMajorDisplayNumber(cardId)
   if (moorMajor) return moorMajor
-  const match = OFFICIAL_CARD_ID.exec(cardId)
+  const match = OFFICIAL_CARD_ID.exec(cardId) ?? CLASSIC_CARD_ID.exec(cardId)
   return match ? `${match[1]}${match[2]}` : undefined
 }
 
+/** Revised deck badge on the card face; classic faces carry their deck in the number instead. */
 export const officialCardDeck = (cardId: string): string | undefined => {
   if (moorMajorDisplayNumber(cardId)) return 'M'
   return OFFICIAL_CARD_ID.exec(cardId)?.[1]

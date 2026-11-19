@@ -8,6 +8,14 @@ describe('official card display numbers', () => {
     expect(officialCardDisplayNumber('M015_PeatBurnOff')).toBe('M015')
   })
 
+  it('keeps the classic deck prefix, so a classic card never reads as the revised card of the same number', () => {
+    expect(officialCardDisplayNumber('CE203_Shepherd')).toBe('CE203')
+    expect(officialCardDisplayNumber('CI097_Slaughterhouse')).toBe('CI097')
+    expect(officialCardDisplayNumber('CWM001_Example')).toBe('CWM001')
+    expect(officialCardDisplayNumber('E203_Example')).toBe('E203')
+    expect(officialCardDisplayNumber('C097_SeedResearcher')).toBe('C097')
+  })
+
   it('numbers Farmers of the Moor major improvements in the M deck instead of by internal number', () => {
     expect(officialCardDisplayNumber('Major_Moor_HorseSlaughterhouse1')).toBe('M001')
     expect(officialCardDisplayNumber('Major_Moor_VillageChurch')).toBe('M005')
@@ -26,5 +34,7 @@ describe('official card display numbers', () => {
     expect(officialCardDeck('C057_Crudite')).toBe('C')
     expect(officialCardDeck('Major_Moor_CeramicsStall')).toBe('M')
     expect(officialCardDeck('Major_Well')).toBeUndefined()
+    // Classic faces print the deck in their number and carry no revised deck badge.
+    expect(officialCardDeck('CE203_Shepherd')).toBeUndefined()
   })
 })
