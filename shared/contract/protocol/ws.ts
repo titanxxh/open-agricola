@@ -9,7 +9,7 @@ import type { MoorSpecialActionId } from '../../moor/types'
 import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 import type { SoloHandMode } from '../game-creation'
 import type { SoloHandSelectionSubmission } from '../solo-hand-selection'
-import type { CardEdition, ClassicAdmissionErrorCode } from '../card-edition'
+import type { CardEdition, ClassicAdmissionErrorCode, ClassicPoolShortfall } from '../card-edition'
 
 import type { GameEndProposal } from './game-termination'
 
@@ -128,6 +128,7 @@ export type ServerEvent =
       error: string
       code?: RoomColorErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | ClassicAdmissionErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
       lifecycle?: GameContextLifecycle
+      shortfall?: ClassicPoolShortfall
       requestId?: string
     }
   | { type: 'authOk'; userId: string; username: string }

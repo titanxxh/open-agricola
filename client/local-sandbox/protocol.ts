@@ -2,6 +2,7 @@
  * postMessage protocol between the main thread (`LocalGameTransport`) and the
  * local-sandbox engine worker. See wayfinder T1 (#606) for the design notes.
  */
+import type { CardEdition, ClassicAdmissionErrorCode, ClassicPoolShortfall } from '../../shared/contract/card-edition'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { PersistedSessionSnapshot } from '../../shared/session/serialization.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
@@ -22,7 +23,11 @@ export type LocalGameConfig = {
   cards: LocalCardInput[]
   playerCount: number
   deckIds?: string[]
+  cardEdition?: CardEdition
+  classicDeckIds?: string[]
   enableThroughTheSeasons?: boolean
+  enableParentCards?: boolean
+  enableCommunityDeck?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
   enableSnakeOpening?: boolean
@@ -50,4 +55,4 @@ export type LocalSandboxResponse =
   | { kind: 'ready' }
   | { kind: 'result'; id: number; ok: true; payload: GameSyncPayload; persist: PersistedLocalGame }
   | { kind: 'result'; id: number; ok: true; raw: unknown }
-  | { kind: 'result'; id: number; ok: false; error: string }
+  | { kind: 'result'; id: number; ok: false; error: string; code?: ClassicAdmissionErrorCode; shortfall?: ClassicPoolShortfall }

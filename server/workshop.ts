@@ -1,3 +1,5 @@
+import { CLASSIC_EDITION_ENABLED } from '../shared/contract/card-edition'
+import { classicSetupRejection, parseCardEditionChoice, type CardEditionChoice } from '../shared/session/card-edition-admission'
 import { requestSessionToken } from './request-auth'
 import { handleWorkshopPublicCards } from './workshop-public-cards'
 import { isWorkshopSubmissionInProgress } from './database/errors'
@@ -211,6 +213,8 @@ const serialisePublishedCardForApi = (
 type SandboxSettings = {
   player_count: number
   deck_ids: string[]
+  card_edition?: 'classic'
+  classic_deck_ids?: string[]
   enable_through_the_seasons: boolean
   enable_farmers_of_the_moor: boolean
   allow_incomplete_farmers_of_the_moor_minor_deal: boolean
@@ -221,6 +225,10 @@ type SandboxSettings = {
 type SandboxSettingsInput = {
   player_count?: unknown
   deck_ids?: unknown
+  card_edition?: unknown
+  classic_deck_ids?: unknown
+  enable_parent_cards?: unknown
+  enable_community_deck?: unknown
   enable_through_the_seasons?: unknown
   enable_farmers_of_the_moor?: unknown
   allow_incomplete_farmers_of_the_moor_minor_deal?: unknown
@@ -261,12 +269,16 @@ const sanitizeSandboxSettings = (settings?: SandboxSettingsInput): SandboxSettin
 const getSandboxSettings = async (userId: string): Promise<Awaited<SandboxSettings>> => {
   const db = getDb()
   const row = (await db.prepare(`
-    SELECT player_count, deck_ids_json, enable_through_the_seasons, enable_farmers_of_the_moor, allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, updated_at
+    SELECT player_count, deck_ids_json, enable_through_the_seasons, enable_farmers_of_the_moor,
+           allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening,
+           card_edition, classic_deck_ids_json, updated_at
     FROM sandbox_settings
     WHERE user_id = ?
   `).get(userId)) as {
     player_count: number
     deck_ids_json: string
+    card_edition: 'classic' | null
+    classic_deck_ids_json: string | null
     enable_through_the_seasons: number
     enable_farmers_of_the_moor: number
     allow_incomplete_farmers_of_the_moor_minor_deal: number
@@ -283,16 +295,21 @@ const getSandboxSettings = async (userId: string): Promise<Awaited<SandboxSettin
       enable_snake_opening: false,
     }
   }
-  let rawDeckIds: unknown = []
-  try {
-    rawDeckIds = JSON.parse(row.deck_ids_json)
-  } catch {
-    rawDeckIds = []
+  const parseDeckList = (value: string | null): string[] => {
+    try {
+      const parsed: unknown = value === null ? null : JSON.parse(value)
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+    } catch {
+      return []
+    }
   }
   const enableFarmersOfTheMoor = row.enable_farmers_of_the_moor === 1
   return {
     player_count: sanitizeSandboxPlayerCount(row.player_count),
-    deck_ids: sanitizeSandboxDeckIds(rawDeckIds),
+    deck_ids: sanitizeSandboxDeckIds(parseDeckList(row.deck_ids_json)),
+    ...(row.card_edition === 'classic'
+      ? { card_edition: 'classic', classic_deck_ids: parseDeckList(row.classic_deck_ids_json) }
+      : {}),
     enable_through_the_seasons: row.enable_through_the_seasons === 1,
     enable_farmers_of_the_moor: enableFarmersOfTheMoor,
     allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && row.allow_incomplete_farmers_of_the_moor_minor_deal === 1,
@@ -301,9 +318,9 @@ const getSandboxSettings = async (userId: string): Promise<Awaited<SandboxSettin
   }
 }
 
-const saveSandboxSettings = async (userId: string, settings?: SandboxSettingsInput): Promise<Awaited<SandboxSettings>> => {
+const saveSandboxSettings = async (userId: string, settings: SandboxSettings): Promise<SandboxSettings> => {
   const next: SandboxSettings = {
-    ...sanitizeSandboxSettings(settings),
+    ...settings,
     updated_at: Date.now(),
   }
   const db = getDb()
@@ -316,9 +333,11 @@ const saveSandboxSettings = async (userId: string, settings?: SandboxSettingsInp
       enable_farmers_of_the_moor,
       allow_incomplete_farmers_of_the_moor_minor_deal,
       enable_snake_opening,
+      card_edition,
+      classic_deck_ids_json,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET
       player_count = excluded.player_count,
       deck_ids_json = excluded.deck_ids_json,
@@ -326,6 +345,8 @@ const saveSandboxSettings = async (userId: string, settings?: SandboxSettingsInp
       enable_farmers_of_the_moor = excluded.enable_farmers_of_the_moor,
       allow_incomplete_farmers_of_the_moor_minor_deal = excluded.allow_incomplete_farmers_of_the_moor_minor_deal,
       enable_snake_opening = excluded.enable_snake_opening,
+      card_edition = excluded.card_edition,
+      classic_deck_ids_json = excluded.classic_deck_ids_json,
       updated_at = excluded.updated_at
   `).run(
     userId,
@@ -335,6 +356,8 @@ const saveSandboxSettings = async (userId: string, settings?: SandboxSettingsInp
     next.enable_farmers_of_the_moor ? 1 : 0,
     next.allow_incomplete_farmers_of_the_moor_minor_deal ? 1 : 0,
     next.enable_snake_opening ? 1 : 0,
+    next.card_edition ?? null,
+    next.classic_deck_ids ? JSON.stringify(next.classic_deck_ids) : null,
     next.updated_at,
   ))
   return next
@@ -345,6 +368,7 @@ export async function handleWorkshopRoute(
   req: IncomingMessage,
   res: ServerResponse,
   reviewRuntime: WorkshopReviewRuntime | null = defaultReviewRuntime,
+  classicEditionEnabled: boolean = CLASSIC_EDITION_ENABLED,
 ): Promise<boolean> {
   const url = req.url ?? ''
   if (
@@ -1155,17 +1179,42 @@ export async function handleWorkshopRoute(
       return true
     }
 
+    const input = body.settings
+    const nextSettings = sanitizeSandboxSettings(input)
+    let choice: CardEditionChoice
+    try {
+      choice = parseCardEditionChoice({ cardEdition: input?.card_edition, classicDeckIds: input?.classic_deck_ids })
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid sandbox settings' })
+      return true
+    }
+    const playerCount = input?.player_count === 1 ? 1 : nextSettings.player_count
+    const rejection = classicSetupRejection({
+      ...choice,
+      playerCount,
+      enableThroughTheSeasons: nextSettings.enable_through_the_seasons,
+      enableFarmersOfTheMoor: nextSettings.enable_farmers_of_the_moor,
+      enableParentCards: input?.enable_parent_cards === true,
+      enableCommunityDeck: input?.enable_community_deck === true,
+    }, classicEditionEnabled)
+    if (rejection) {
+      sendJson(res, 400, { ok: false, ...rejection })
+      return true
+    }
+    if (choice.cardEdition === 'classic') {
+      nextSettings.card_edition = 'classic'
+      nextSettings.classic_deck_ids = choice.classicDeckIds
+    }
+
     const nextIds = Array.from(new Set(body.workshop_card_ids.filter((id): id is string => typeof id === 'string')))
       .slice(0, MAX_SANDBOX_CARDS)
     const now = Date.now()
     const insertSandboxCard = db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
-    ;(await db.transaction(async () => {
-      ;(await db.prepare('DELETE FROM sandbox_cards WHERE user_id = ?').run(user.id))
-      for (const cardId of nextIds) {
-        ;(await insertSandboxCard.run(user.id, cardId, now))
-      }
-    })())
-    const settings = (await saveSandboxSettings(user.id, body.settings))
+    const settings = await db.transaction(async () => {
+      await db.prepare('DELETE FROM sandbox_cards WHERE user_id = ?').run(user.id)
+      for (const cardId of nextIds) await insertSandboxCard.run(user.id, cardId, now)
+      return saveSandboxSettings(user.id, nextSettings)
+    })()
     sendJson(res, 200, { ok: true, settings })
     return true
   }

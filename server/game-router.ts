@@ -1,4 +1,7 @@
 import { requestSessionToken } from './request-auth'
+import { CLASSIC_EDITION_ENABLED } from '../shared/contract/card-edition'
+import { classicAdmissionRejection, parseCardEditionChoice, type CardEditionChoice } from '../shared/session/card-edition-admission'
+import { ClassicPoolInsufficientError } from '../shared/session/classic-deal-pool'
 import { CLIENT_CAPABILITIES_HEADER } from '../shared/contract/client-capabilities'
 import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
@@ -31,6 +34,7 @@ import {
   assertSupportedLoadedState,
   assertSupportedGameConfiguration,
   buildInitialStateOptions,
+  clampPlayerCount,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
 } from './game/game-setup-options.ts'
@@ -302,6 +306,7 @@ const respondWith = (
 const handleAuthorizedGameRoute = async (
   req: IncomingMessage,
   res: ServerResponse,
+  classicEditionEnabled: boolean,
 ): Promise<boolean> => {
   if (req.method === 'OPTIONS') {
     await sendJson(res, 204, null)
@@ -651,6 +656,12 @@ const handleAuthorizedGameRoute = async (
     let setup: ReturnType<typeof parseGameSetupRequest>
     try { setup = parseGameSetupRequest(raw, draftOptions.value) }
     catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid game configuration' }); return true }
+    const options = buildInitialStateOptions(setup)
+    const rejection = classicAdmissionRejection(options, classicEditionEnabled)
+    if (rejection) {
+      await sendJson(res, 400, { ok: false, ...rejection })
+      return true
+    }
     const requestUserId = (await validateSession(requestSessionToken(req)))?.id
     const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
@@ -677,7 +688,7 @@ const handleAuthorizedGameRoute = async (
     const created = createIsolatedGameSession(
       seed,
       customCards.length > 0 ? customCards : undefined,
-      buildInitialStateOptions(setup),
+      options,
     )
     const session = created.session
     if (created.executor && !created.executor.reserveWorkerSlot()) {
@@ -707,66 +718,62 @@ const handleAuthorizedGameRoute = async (
     return true
   }
 
-  // Sandbox game: start a new single-player game with custom workshop cards loaded
   if (req.method === 'POST' && req.url === '/api/game/new-sandbox') {
     const sessionKey = (await getSessionKey(req))
-    let seed: number | undefined
-    let customCardDbIds: string[] = []
-    let playerCount = 2
-    let deckIds = [...defaultSandboxDeckIds]
-    let enableThroughTheSeasons = false
-    let enableFarmersOfTheMoor = false
-    let allowIncompleteFarmersOfTheMoorMinorDeal = false
-    let enableSnakeOpening = false
-    const customCardVersions = new Map<string, string>()
+    let body: Record<string, unknown> = {}
     try {
-      const rawBody: unknown = JSON.parse(await readBody(req))
-      assertSupportedGameConfiguration(asSetupPayload(rawBody))
-      const body = asSetupPayload(rawBody) as {
-        seed?: number
-        customCardIds?: string[]
-        customCardVersions?: Array<{ cardId?: unknown; versionId?: unknown }>
-        playerCount?: number
-        deckIds?: string[]
-        enableThroughTheSeasons?: boolean
-        enableFarmersOfTheMoor?: boolean
-        allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
-        enableSnakeOpening?: boolean
-      }
-      if (typeof body.seed === 'number') seed = body.seed
-      if (Array.isArray(body.customCardIds)) {
-        customCardDbIds = body.customCardIds.filter((id): id is string => typeof id === 'string')
-      }
-      if (Array.isArray(body.customCardVersions)) {
-        for (const binding of body.customCardVersions) {
-          if (typeof binding.cardId !== 'string' || typeof binding.versionId !== 'string') continue
-          customCardVersions.set(binding.cardId, binding.versionId)
-          if (!customCardDbIds.includes(binding.cardId)) customCardDbIds.push(binding.cardId)
-        }
-      }
-      if (typeof body.playerCount === 'number') {
-        playerCount = Number.isFinite(body.playerCount)
-          ? Math.max(2, Math.min(6, Math.floor(body.playerCount)))
-          : 2
-      }
-      if (Array.isArray(body.deckIds)) {
-        const nextDecks = body.deckIds
-          .filter((deck): deck is string => typeof deck === 'string')
-          .map((deck) => deck.trim().toUpperCase())
-          .filter((deck) => (defaultSandboxDeckIds as readonly string[]).includes(deck))
-        if (nextDecks.length > 0) {
-          deckIds = Array.from(new Set(nextDecks)) as typeof deckIds
-        }
-      }
-      enableThroughTheSeasons = body.enableThroughTheSeasons === true
-      enableFarmersOfTheMoor = body.enableFarmersOfTheMoor === true
-      allowIncompleteFarmersOfTheMoorMinorDeal = enableFarmersOfTheMoor && body.allowIncompleteFarmersOfTheMoorMinorDeal === true
-      enableSnakeOpening = body.enableSnakeOpening === true
+      body = asSetupPayload(JSON.parse(await readBody(req)))
+    } catch { /* malformed or missing JSON uses the default sandbox setup */ }
+
+    let cardEdition: CardEditionChoice
+    try {
+      assertSupportedGameConfiguration(body)
+      cardEdition = parseCardEditionChoice(body)
     } catch (error) {
-      if (error instanceof Error && error.message === 'Unsupported game configuration') {
-        await sendJson(res, 400, { ok: false, error: error.message }); return true
+      await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid game configuration' })
+      return true
+    }
+
+    const requestedPlayerCount = clampPlayerCount(body.playerCount)
+    const enableFarmersOfTheMoor = body.enableFarmersOfTheMoor === true
+    const sandboxOptions = {
+      ...cardEdition,
+      playerCount: Math.max(2, requestedPlayerCount),
+      enableThroughTheSeasons: body.enableThroughTheSeasons === true,
+      enableFarmersOfTheMoor,
+      allowIncompleteFarmersOfTheMoorMinorDeal: enableFarmersOfTheMoor && body.allowIncompleteFarmersOfTheMoorMinorDeal === true,
+      enableSnakeOpening: body.enableSnakeOpening === true,
+    }
+    const rejection = classicAdmissionRejection({
+      ...sandboxOptions,
+      playerCount: requestedPlayerCount,
+      enableCommunityDeck: body.enableCommunityDeck === true,
+      enableParentCards: body.enableParentCards === true,
+    }, classicEditionEnabled)
+    if (rejection) {
+      await sendJson(res, 400, { ok: false, ...rejection })
+      return true
+    }
+
+    const seed = typeof body.seed === 'number' ? body.seed : undefined
+    const customCardDbIds = Array.isArray(body.customCardIds)
+      ? body.customCardIds.filter((id): id is string => typeof id === 'string')
+      : []
+    const customCardVersions = new Map<string, string>()
+    if (Array.isArray(body.customCardVersions)) {
+      for (const rawBinding of body.customCardVersions) {
+        const { cardId, versionId } = asSetupPayload(rawBinding)
+        if (typeof cardId !== 'string' || typeof versionId !== 'string') continue
+        customCardVersions.set(cardId, versionId)
+        if (!customCardDbIds.includes(cardId)) customCardDbIds.push(cardId)
       }
     }
+    const nextDecks = Array.isArray(body.deckIds) ? body.deckIds
+      .filter((deck): deck is string => typeof deck === 'string')
+      .map((deck) => deck.trim().toUpperCase())
+      .filter((deck): deck is typeof defaultSandboxDeckIds[number] =>
+        (defaultSandboxDeckIds as readonly string[]).includes(deck)) : []
+    const deckIds = nextDecks.length > 0 ? [...new Set(nextDecks)] : [...defaultSandboxDeckIds]
 
     // Identify the requesting user (optional — allows loading own draft cards)
     const requestUser = (await validateSession(requestSessionToken(req)))
@@ -857,14 +864,7 @@ const handleAuthorizedGameRoute = async (
     const created = createIsolatedGameSession(
       seed,
       customCards.length > 0 ? customCards : undefined,
-      {
-        playerCount,
-        deckIds,
-        enableThroughTheSeasons,
-        enableFarmersOfTheMoor,
-        allowIncompleteFarmersOfTheMoorMinorDeal,
-        enableSnakeOpening,
-      },
+      { ...sandboxOptions, deckIds },
     )
     const sandboxSession = created.session
     if (created.executor && !created.executor.reserveWorkerSlot()) {
@@ -1064,7 +1064,11 @@ const handleAuthorizedGameRoute = async (
 return false
 }
 
-export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
+export const handleGameRoute = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  classicEditionEnabled: boolean = CLASSIC_EDITION_ENABLED,
+): Promise<boolean> => {
   if (!req.url?.startsWith('/api/game/')) return false
   if (req.method === 'OPTIONS') { rawJson(res, 204, null); return true }
   // The debug sandbox is a development surface (#993): without anonymous
@@ -1075,14 +1079,18 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
     return true
   }
   try {
-    if (!authority) return await handleAuthorizedGameRoute(req, res)
+    if (!authority) return await handleAuthorizedGameRoute(req, res, classicEditionEnabled)
     const key = await getSessionKey(req)
     const stamp = sessionStamps.get(key) ?? await authority.access.capture([], key === 'anonymous' ? [] : [key])
     await authority.check(stamp)
     requests.set(req, { stamp, revision: await authority.access.revision() })
     responses.set(res, req)
-    return await handleAuthorizedGameRoute(req, res)
+    return await handleAuthorizedGameRoute(req, res, classicEditionEnabled)
   } catch (error) {
+    if (error instanceof ClassicPoolInsufficientError) {
+      rawJson(res, 400, { ok: false, code: error.code, error: error.message, shortfall: error.shortfall })
+      return true
+    }
     if (error instanceof UnsupportedSandboxListenerError) {
       rawJson(res, 400, { ok: false, code: error.code, error: error.message })
       return true

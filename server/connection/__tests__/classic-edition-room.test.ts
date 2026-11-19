@@ -79,7 +79,10 @@ describe('classic room admission', () => {
     const actor = createActor(true)
     await dispatch(actor.ctx, classicRoom({ maxPlayers: 3, hotseat: true }))
     expect(actor.ctx.currentRoom).toBeNull()
-    expect(lastOutcome(actor)).toMatchObject({ ok: false, code: 'classic_pool_insufficient' })
+    expect(lastOutcome(actor)).toMatchObject({
+      ok: false, code: 'classic_pool_insufficient',
+      shortfall: { playerCount: 3, needed: { occupation: 21, minor: 21 } },
+    })
   })
 
   it('accepts a classic room with the snake opening and deals only its chosen decks', () => withFixtures(async () => {

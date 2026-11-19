@@ -1,3 +1,4 @@
+import type { ClassicPoolShortfall } from '../card-edition'
 import type { SoloCreationErrorCode, SoloCreationConfiguration, SoloCreationIssue } from '../game-creation'
 
 /** Stable across transports; requestId is only a single-connection correlation. */
@@ -13,6 +14,7 @@ export type CommandOutcome = {
   playerIndex?: number
   error?: string
   code?: string
+  shortfall?: ClassicPoolShortfall
   creationAdjustment?: { configuration: SoloCreationConfiguration; issues: SoloCreationIssue[] }
 }
 export type CommandErrorCode = 'command_identity_required' | 'command_scope_expired' | 'command_content_conflict' | 'command_input_stale' | 'command_pending' | 'client_refresh_required' | SoloCreationErrorCode

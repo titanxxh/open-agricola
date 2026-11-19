@@ -18,6 +18,8 @@ export type WorkshopSandboxCardLike = {
 export type WorkshopSandboxSettingsLike = {
   player_count: number
   deck_ids: string[]
+  card_edition?: 'classic'
+  classic_deck_ids?: string[]
   enable_through_the_seasons: boolean
   enable_farmers_of_the_moor: boolean
   allow_incomplete_farmers_of_the_moor_minor_deal: boolean
@@ -38,6 +40,9 @@ export const buildLocalGameConfig = (
   })),
   playerCount: settings.player_count,
   deckIds: settings.deck_ids,
+  ...(settings.card_edition === 'classic'
+    ? { cardEdition: 'classic', classicDeckIds: settings.classic_deck_ids }
+    : {}),
   enableThroughTheSeasons: settings.enable_through_the_seasons,
   enableFarmersOfTheMoor: settings.enable_farmers_of_the_moor,
   allowIncompleteFarmersOfTheMoorMinorDeal: settings.allow_incomplete_farmers_of_the_moor_minor_deal,
