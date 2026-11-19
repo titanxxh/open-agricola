@@ -1,4 +1,5 @@
 import '../../__tests__/_helpers/opening-seat-random'
+import { WORKSHOP_CARDS_UNAVAILABLE } from '../../game/game-setup-options'
 import { randomUUID } from 'node:crypto'
 import * as rng from '../../../shared/utils/rng'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -162,21 +163,21 @@ it('retains an action for retry and keeps later input and seat reconnect behind 
   expect(receipt).toMatchObject({ status: 'completed', receipt: { outcome: { ok: true, roomVersion: 1, stepNo: 1 } } })
 })
 
-it('loads only published community cards when the room enables the community deck', async () => {
+it('never loads Workshop cards into a room, even approved and live ones (ADR 0052)', async () => {
   const draft = await createCard(db, { authorId: 'u1', draft: {
     cardId: 'CUSTOM_Published', cardType: 'minor', name: 'Published', description: 'Published',
     cardJson: { id: 'CUSTOM_Published', name: 'Published', card_type: 'minor', deck: 'CUSTOM', number: 1, desc: ['Published'] },
     effectCode: null, compiledCode: null, codeManifest: null, artUrl: null, generation: {},
   } as never })
-  await dispatch(host, { type: 'createRoom', maxPlayers: 2, customCardIds: [draft.id], enableCommunityDeck: true, requestId: 'unpublished' })
-  expect(host.currentRoom).toBeNull()
-  expect(messages(host)).toContainEqual(expect.objectContaining({ type: 'error', requestId: 'unpublished' }))
   await approveCurrentDraft(db, { cardId: draft.id, authorId: 'u1' })
   await publish(db, { cardId: draft.id, authorId: 'u1', baseRevision: draft.revision })
-  await dispatch(host, { type: 'createRoom', maxPlayers: 2, customCardIds: [draft.id] })
+  for (const enableCommunityDeck of [true, false]) {
+    const requestId = `live-${enableCommunityDeck}`
+    await dispatch(host, { type: 'createRoom', maxPlayers: 2, customCardIds: [draft.id], enableCommunityDeck, requestId })
+    expect(host.currentRoom).toBeNull()
+    expect(messages(host)).toContainEqual(expect.objectContaining({ type: 'error', requestId, error: WORKSHOP_CARDS_UNAVAILABLE }))
+  }
+  await dispatch(host, { type: 'createRoom', maxPlayers: 2, enableCommunityDeck: true })
   expect(host.currentRoom?.customCardDbIds).toEqual([])
-  await dispatch(host, { type: 'dissolveRoom' })
-  await dispatch(host, { type: 'createRoom', maxPlayers: 2, customCardIds: [draft.id], enableCommunityDeck: true })
-  expect(host.currentRoom?.customCardDbIds).toEqual([draft.id])
-  expect(host.currentRoom?.customCards).toHaveLength(1)
+  expect(host.currentRoom?.customCards).toEqual([])
 })

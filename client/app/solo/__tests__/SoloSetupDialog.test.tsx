@@ -40,36 +40,19 @@ it('offers a fixed one-player setup and submits both hand modes with independent
     enableParentCards: true, draftParents: false, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true, enableMoorBalanceRules: false })
 })
 
-it('preserves unavailable explicit choices until the player removes them and then submits adjusted settings', async () => {
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, cards: [], hasMore: false }))))
+it('drops a retained Workshop selection: games load only merged cards (ADR 0052)', () => {
+  vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
+  vi.stubGlobal('fetch', vi.fn())
   const configuration: SoloCreationConfiguration = { kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random',
-    officialCardPool: 'default-implemented-A-E', enableCommunityDeck: true, customCardIds: ['missing-card'],
+    officialCardPool: 'default-implemented-A-E', enableCommunityDeck: true, customCardIds: ['retained-card'],
     enableParentCards: false, draftParents: true, enableThroughTheSeasons: false, enableFarmersOfTheMoor: false, enableMoorBalanceRules: false }
   const submit = vi.fn()
   render(<SoloSetupDialog locale="en" creating={false} initialConfiguration={configuration}
-    issues={[{ workshopCardId: 'missing-card', reason: 'missing' }]} onClose={vi.fn()} onSubmit={submit} />)
-  expect(screen.getByText('This selected card no longer exists.')).toBeVisible()
-  expect(await screen.findByRole('checkbox', { name: /missing-card/ })).toBeChecked()
-  fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
-  expect(submit).toHaveBeenLastCalledWith(configuration)
-  fireEvent.click(screen.getByRole('checkbox', { name: /missing-card/ }))
+    issues={[{ workshopCardId: 'retained-card', reason: 'missing' }]} onClose={vi.fn()} onSubmit={submit} />)
+  expect(screen.queryByText('Reviewed workshop cards')).toBeNull()
+  expect(screen.queryByText('This selected card no longer exists.')).toBeNull()
+  expect(screen.getByRole('checkbox', { name: /Enable community cards/ })).toBeChecked()
   fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
   expect(submit).toHaveBeenLastCalledWith({ ...configuration, customCardIds: [] })
-})
-
-it('keeps selected Workshop cards when community is disabled and requires an explicit correction', async () => {
-  vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, cards: [{ id: 'explicit-card', name: 'Explicit card' }], hasMore: false }))))
-  const submit = vi.fn()
-  render(<SoloSetupDialog locale="en" creating={false} onClose={vi.fn()} onSubmit={submit} />)
-  const community = screen.getByRole('checkbox', { name: /Enable community cards/ })
-  fireEvent.click(community)
-  fireEvent.click(await screen.findByRole('checkbox', { name: 'Explicit card' }))
-  fireEvent.click(community)
-  expect(screen.getByRole('checkbox', { name: 'Explicit card' })).toBeChecked()
-  expect(screen.getByText('Enable community cards to use the selected Workshop cards, or deselect them.')).toBeVisible()
-  expect(screen.getByRole('button', { name: 'Start solo game' })).toBeDisabled()
-  fireEvent.click(community)
-  fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
-  expect(submit).toHaveBeenCalledWith(expect.objectContaining({ enableCommunityDeck: true, customCardIds: ['explicit-card'] }))
+  expect(fetch).not.toHaveBeenCalled()
 })

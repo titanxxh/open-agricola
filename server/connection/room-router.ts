@@ -592,8 +592,9 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     sendCommandError(ctx, 'Unsupported standard solo setup', msg.requestId)
     return
   }
-  const enableCommunityDeck = setup.enableCommunityDeck
-  const customCardDbIds = resolveCustomCardDbIds(input, maxPlayers === 1 || enableCommunityDeck)
+  let customCardDbIds: string[]
+  try { customCardDbIds = resolveCustomCardDbIds(input) }
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid game configuration', msg.requestId); return }
   const executionStamp = ctx.authority ? await new ExecutionAccess(ctx.authority.directory.db).capture(customCardDbIds, ctx.currentUserId ? [ctx.currentUserId] : []) : undefined
   const configuration = setup.soloHandMode ? soloCreationConfiguration(setup, customCardDbIds) : undefined
   const soloCards = configuration ? await resolveSoloWorkshopCards(getDb(), configuration) : undefined

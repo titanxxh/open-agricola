@@ -277,7 +277,7 @@ registry。
 
 ### D2. 游戏中加载自定义卡牌
 
-1. 大厅仅在启用 community deck 时通过 `GET /api/workshop/cards?scope=room` 分页列出可进入真实房间的已审核上线卡，创建房间时把勾选结果传入 WS `createRoom.customCardIds`；服务端也只在 `enableCommunityDeck === true` 时接受这些 id；作者试玩只在浏览器沙盒运行（ADR 0052），HTTP `/api/game/new-sandbox` 拒绝工坊卡
+1. 对局只加载部署版本中的卡（ADR 0052）。工坊卡要等 PR 合入并随版本发布为社区卡后才进入他人的对局，由 community deck 选项发牌。Room、单人和 HTTP 对局创建都拒绝任何 `customCardIds`，大厅不再提供工坊卡选择。作者试玩只在浏览器沙盒运行，且只用作者自己的卡；HTTP `/api/game/new-sandbox` 拒绝工坊卡
 2. `server/connection/room-router.ts` 或 `server/game-router.ts` 从数据库构造 `CustomCardData[]`
 3. `GameSession` 构造时把卡牌定义和运行时实现注册到本局 `SessionCardContext`
 4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从编译产物 + manifest 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
@@ -538,7 +538,7 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 自定义卡牌注册表 + catalog fallback    | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts`                                                                 |
 | 自定义卡牌 try-catch 容错             | `shared/cards/card-effects.ts` (CUSTOM_ 前缀卡牌异常时跳过)                                                                           |
 | 可配置人数 HTTP 沙盒游戏（不含工坊卡）          | `/api/game/new-sandbox`, `server/game-router.ts`                                                                             |
-| WS 多人游戏含自定义卡牌                  | `shared/contract/protocol/ws.ts` (`createRoom.customCardIds`), `server/connection/room-router.ts`                              |
+| WS 对局中的已合入社区卡（`customCardIds` 必须为空） | `shared/contract/protocol/ws.ts`, `server/game/game-setup-options.ts`                                                    |
 | LLM 卡牌设计师                      | `client/app/workshop/AiCardDesigner.tsx`, `client/services/llm/`（多 provider 聚合层）                                            |
 | 多 LLM Provider 支持              | Gemini / OpenRouter / DeepSeek / AiHubMix；完整模型表见 §C1.1                                                                       |
 | API Key 浏览器隔离                  | localStorage 存储，绝不发往服务器                                                                                                      |

@@ -43,35 +43,16 @@ it('starts from the durable source and navigates only after successful creation'
   expect(fetch).toHaveBeenCalledWith('/api/v1/game-contexts/finished/creation-configuration', expect.objectContaining({ credentials: 'include', cache: 'no-store' }))
 })
 
-it('opens unchanged unavailable settings and submits an adjusted ordinary creation without the source id', async () => {
-  vi.stubGlobal('fetch', vi.fn(async url => new Response(JSON.stringify(String(url).includes('creation-configuration')
-    ? { ok: true, configuration, issues: [{ workshopCardId: 'missing-card', reason: 'missing' }] }
-    : { ok: true, cards: [], hasMore: false }))))
+it('opens a retained Workshop selection for adjustment and creates without it (ADR 0052)', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(
+    { ok: true, configuration, issues: [{ workshopCardId: 'missing-card', reason: 'missing' }] }))))
   vi.mocked(startRoomCreation).mockReturnValueOnce(new Promise(() => undefined))
   render(<SameConfigurationRematch roomId="finished" locale="en" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Play again with these settings' }))
-  expect(screen.getByText('This selected card no longer exists.')).toBeVisible()
   expect(startRoomCreation).not.toHaveBeenCalled()
-  fireEvent.click(await screen.findByRole('checkbox', { name: /missing-card/ }))
+  expect(screen.queryByRole('checkbox', { name: /missing-card/ })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
   expect(startRoomCreation).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ maxPlayers: 1, soloHandMode: 'choose-7', customCardIds: [], enableFarmersOfTheMoor: true, enableMoorBalanceRules: true }))
   expect(vi.mocked(startRoomCreation).mock.calls[0]?.[0]).not.toHaveProperty('sourceGameContextId')
   expect(setPage).not.toHaveBeenCalled()
-})
-
-it('uses the full submission-time adjustment when a card changes after successful private preflight', async () => {
-  vi.stubGlobal('fetch', vi.fn(async url => new Response(JSON.stringify(String(url).includes('creation-configuration')
-    ? { ok: true, configuration, issues: [] } : { ok: true, cards: [], hasMore: false }))))
-  vi.mocked(startRoomCreation).mockRejectedValueOnce(new CommandRejectedError({ ok: false, code: 'creation_requires_adjustment',
-    creationAdjustment: { configuration, issues: [{ workshopCardId: 'missing-card', reason: 'load-failed' }] } }))
-  render(<SameConfigurationRematch roomId="finished" locale="en" />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Play again with these settings' }))
-  expect(await screen.findByText('This card could not be loaded. You can retry without removing it.')).toBeVisible()
-  expect(screen.getByRole('checkbox', { name: /missing-card/ })).toBeChecked()
-  expect(setPage).not.toHaveBeenCalled()
-  vi.mocked(startRoomCreation).mockReturnValueOnce(new Promise(() => undefined))
-  fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
-  expect(screen.getByRole('dialog')).toBeVisible()
-  expect(screen.getByRole('checkbox', { name: /missing-card/ })).toBeChecked()
-  expect(screen.getByRole('checkbox', { name: /missing-card/ })).toBeDisabled()
 })

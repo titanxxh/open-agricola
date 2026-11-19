@@ -1,4 +1,5 @@
 import { CLASSIC_EDITION_ENABLED } from '../shared/contract/card-edition'
+import { WORKSHOP_CARDS_UNAVAILABLE } from './game/game-setup-options.ts'
 import { classicSetupRejection, parseCardEditionChoice, type CardEditionChoice } from '../shared/session/card-edition-admission'
 import { requestSessionToken } from './request-auth'
 import { handleWorkshopPublicCards } from './workshop-public-cards'
@@ -443,7 +444,8 @@ export async function handleWorkshopRoute(
     const offset = (page - 1) * limit
     const statusFilter = q.get('status')
     const mineOnly = q.get('scope') === 'mine'
-    const roomOnly = q.get('scope') === 'room'
+    // Rooms load only merged cards (ADR 0052); there is no room-selectable listing.
+    if (q.get('scope') === 'room') { sendJson(res, 400, { ok: false, error: WORKSHOP_CARDS_UNAVAILABLE }); return true }
     const featured = q.get('featured') === '1'
 
     if (mineOnly) {
@@ -495,9 +497,7 @@ export async function handleWorkshopRoute(
       return true
     }
 
-    let where = roomOnly
-      ? "w.live = 1 AND (w.review_status = 'approved' OR (w.review_status = 'merged' AND w.built_in = 0)) AND w.approved_version_id IS NOT NULL"
-      : "((w.review_status = 'approved' AND w.live = 1) OR w.review_status = 'merged') AND w.approved_version_id IS NOT NULL"
+    let where = "((w.review_status = 'approved' AND w.live = 1) OR w.review_status = 'merged') AND w.approved_version_id IS NOT NULL"
     const params: unknown[] = []
     if (featured) where += ' AND w.featured = 1'
     if (search) {
@@ -1127,24 +1127,16 @@ export async function handleWorkshopRoute(
   // ── GET /api/workshop/sandbox ─────────────────────────────────────────────
   if (req.method === 'GET' && url === '/api/workshop/sandbox') {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    // Unmerged Workshop code runs only in its author's browser (ADR 0052).
     const rows = (await db.prepare(`
       SELECT w.*, u.display_name AS author_name
       FROM sandbox_cards s
       JOIN workshop_cards w ON s.workshop_card_id = w.id
       LEFT JOIN users u ON w.author_id = u.id
-      WHERE s.user_id = ?
+      WHERE s.user_id = ? AND w.author_id = ?
       ORDER BY s.added_at DESC
-    `).all(user.id)) as WorkshopCard[]
-    const cards = (await Promise.all(rows.map(async row => {
-      if (isLoadableLive(row)) {
-        try {
-          return [serialisePublishedCardForApi((await loadPublishedCard(db, row.id, user.id)))]
-        } catch {
-          return []
-        }
-      }
-      return row.author_id === user.id ? [serialiseCardForApi(row)] : []
-    }))).flat()
+    `).all(user.id, user.id)) as WorkshopCard[]
+    const cards = rows.map(row => serialiseCardForApi(row))
     sendJson(res, 200, { ok: true, cards, settings: (await getSandboxSettings(user.id)) })
     return true
   }
@@ -1206,8 +1198,15 @@ export async function handleWorkshopRoute(
       nextSettings.classic_deck_ids = choice.classicDeckIds
     }
 
-    const nextIds = Array.from(new Set(body.workshop_card_ids.filter((id): id is string => typeof id === 'string')))
-      .slice(0, MAX_SANDBOX_CARDS)
+    const requestedIds = Array.from(new Set(body.workshop_card_ids.filter((id): id is string => typeof id === 'string')))
+    const ownIds = requestedIds.length ? new Set(((await db.prepare(
+      `SELECT id FROM workshop_cards WHERE author_id = ? AND id IN (${requestedIds.map(() => '?').join(',')})`,
+    ).all(user.id, ...requestedIds)) as { id: string }[]).map(row => row.id)) : new Set<string>()
+    if (requestedIds.some(id => !ownIds.has(id))) {
+      sendJson(res, 400, { ok: false, error: 'The sandbox accepts only your own Workshop cards' })
+      return true
+    }
+    const nextIds = requestedIds.slice(0, MAX_SANDBOX_CARDS)
     const now = Date.now()
     const insertSandboxCard = db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
     const settings = await db.transaction(async () => {

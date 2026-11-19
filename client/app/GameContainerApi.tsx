@@ -349,7 +349,6 @@ const useTransportSetup = (
               ? params.get('soloHandMode') === 'choose-7' ? 'choose-7' : 'random'
               : undefined,
             name: displayName ?? '',
-            customCardIds: params.get('customCards')?.split(',').filter(Boolean),
             hotseat: isHotseatSetupQuery(window.location.search) || undefined,
             enableCommunityDeck: params.get('enableCommunityDeck') === 'true' || undefined,
             enableParentCards: params.get('enableParentCards') === 'true' || undefined,

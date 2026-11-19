@@ -101,13 +101,16 @@ export const soloCreationConfiguration = (setup: GameSetupRequest, customCardIds
   enableMoorBalanceRules: isMoorBalanceRulesEnabled(setup),
 })
 
-/** Community-deck cards are only honoured when the community deck is on. */
-export const resolveCustomCardDbIds = (
-  raw: Record<string, unknown>,
-  enableCommunityDeck: boolean,
-): string[] => {
-  if (!enableCommunityDeck || !Array.isArray(raw.customCardIds)) return []
-  return raw.customCardIds.filter((id): id is string => typeof id === 'string')
+export const WORKSHOP_CARDS_UNAVAILABLE = 'Workshop cards join games only after they are merged and released as community cards'
+
+/**
+ * Games load only the cards in the deployed build (ADR 0052): a merged
+ * community card comes with the community deck. Retained configurations carry
+ * an empty `customCardIds`; any explicit Workshop selection is rejected.
+ */
+export const resolveCustomCardDbIds = (raw: Record<string, unknown>): string[] => {
+  if (Array.isArray(raw.customCardIds) && raw.customCardIds.length > 0) throw new Error(WORKSHOP_CARDS_UNAVAILABLE)
+  return []
 }
 
 /** Removed game modes must fail at ingress rather than becoming ordinary games. */
