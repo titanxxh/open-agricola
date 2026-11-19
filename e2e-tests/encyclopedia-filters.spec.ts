@@ -42,7 +42,7 @@ test.describe(DESKTOP.name, () => {
     await expectResults(page, 1)
     await page.getByRole('button', { name: 'View Shepherd', exact: true }).click()
     const detail = page.getByRole('dialog', { name: 'Shepherd' })
-    const face = detail.locator('.encyclopedia-face__card[data-id="CE203_Shepherd"]')
+    const face = detail.locator('.encyclopedia-face__card [data-id="CE203_Shepherd"]')
     await expect(face.locator('.card-numbering')).toHaveText('CE203')
     await expect(face.locator('.card-desc .res-icon-sheep').first()).toBeVisible()
   })
