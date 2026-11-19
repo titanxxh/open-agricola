@@ -12,6 +12,7 @@ import type { FarmersOfTheMoorState, FarmTerrainTile, MoorSoloChoice } from '../
 import type { AnimalKey } from './animals'
 import type { SeasonalAdjustment } from './seasonal-adjustments'
 import type { SoloHandMode } from './game-creation'
+import type { CardEdition } from './card-edition'
 import type { SoloHandSelectionState, SoloHandSelectionGroup } from './solo-hand-selection'
 
 export type Resource = {
@@ -711,6 +712,10 @@ export type GameState = {
   /** Snake Opening variant: every player starts with 3 food and the round-1 second placement runs in reverse Round Work Order. */
   enableSnakeOpening: boolean
   snakeOpening: SnakeOpeningState | null
+  /** Card Edition (ADR 0049): written only for classic games; absent means revised. */
+  cardEdition?: CardEdition
+  /** The normalized Classic Decks a classic game deals from, including fallback and legacy decks. */
+  classicDeckIds?: string[]
   ordinaryCardDecks: OrdinaryCardDecks
   ordinaryCardDrawChoices: Record<string, OrdinaryCardDrawChoice>
   nextOrdinaryCardDrawChoiceSeq: number

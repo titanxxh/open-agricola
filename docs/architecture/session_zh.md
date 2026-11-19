@@ -140,6 +140,10 @@ type SessionResponse = {
 
 `handleHeatingResolved()` 与喂养共用已提供目录、实时目录校验和 Exchange 批次执行器。带类型的 `harvestSettlementResume` 在反应和动物整理期间保存所选燃料支付与已转换木材，随后由 `finishHeatingSettlement()` 一次结算支付和生病。`shared/domain/heating-payment.ts` 根据服务端报价投影需求和支付边界，供权威结算与交换中心共用。木材转换先由普通兑换记入燃料库存，再由供暖支付。测试：`server/__tests__/heating-exchange-session.test.ts`。
 
+## Card Edition 与发牌
+
+`state-bootstrap.ts` 按对局的 Card Edition 发普通卡（[ADR 0049](../adr/0049-classic-card-edition-behind-a-switch.md)）。`InitialStateOptions.cardEdition: 'classic'` 加上 `classicDeckIds` 开出一局旧版对局：建局时用 `normalizeClassicDeckIds()` 规范化牌组，并把 `cardEdition` 和 `classicDeckIds` 写入 `GameState`。修订版对局两个字段都不写，缺省即修订版，因此保留中的对局无需迁移。`dealHands()` 随后只从这些牌组的合格卡（`getEligibleClassicCardIds()`）中发牌；修订版牌组 ID 和 community 牌组都不会加入，工坊卡照常加入。普通发牌、轮抽、兜底牌堆和旧存档的 `normalizeState()` 重建都按对局自己的版本，不回落到修订版 A–E。这两个字段在序列化和重新水合后保持不变。测试：`server/__tests__/classic-deal-session.test.ts`。
+
 ## 快照数据与可执行规则恢复
 
 见 [ADR 0028](../adr/0028-session-recovery-preserves-authoritative-snapshot-data.md)。新局创建负责初始发牌。加载或恢复 Session 时保留现有的空手牌、已存的卡牌身份、缺失的可选规则字段、动物安置与历史；从不重新发牌，非法的必需输入会被拒绝，而不是转成新局。`rehydrateState()` 只解码数据；所属 Core 随后重建已知的可执行定义与引擎游标，不替换捕获的数据。撤销、命令检查点、暂定检查点与进程恢复共用这一契约。

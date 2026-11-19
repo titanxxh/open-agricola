@@ -15,6 +15,7 @@
 import type { FenceSegment, FenceSegmentSource, GameState, PlayerState, Resource } from '../contract/types'
 import type { DraftMode } from '../draft/types'
 import type { SoloHandMode } from '../contract/game-creation'
+import type { CardEdition } from '../contract/card-edition'
 import { createSeededRng, shuffleWithRng, type GameSeed } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
 import { findPlayerById } from '../domain/player'
@@ -84,7 +85,12 @@ export type InitialStateOptions = {
   soloHandMode?: SoloHandMode
   extraMinorIds?: string[]
   extraOccupationIds?: string[]
+  /** Revised decks (A–E); ignored by a classic game. */
   deckIds?: string[]
+  /** `'classic'` deals only eligible cards of `classicDeckIds` (ADR 0049). Absent or `'revised'` deals revised cards. */
+  cardEdition?: CardEdition
+  /** Chosen Classic Decks; normalized by `normalizeClassicDeckIds`, so missing or unknown decks fall back to the default. */
+  classicDeckIds?: string[]
   playerNames?: string[]
   /**
    * Optional simultaneous-draft configuration. When `draftMode='simultaneous'`,

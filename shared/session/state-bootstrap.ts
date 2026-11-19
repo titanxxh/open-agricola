@@ -28,6 +28,7 @@ import {
   implementedCommunityMinors,
   implementedCommunityOccupations,
 } from '../cards/catalog'
+import { getEligibleClassicCardIds, normalizeClassicDeckIds } from '../cards/classic-catalog'
 import { initDraftState, initStagedDraftState } from '../draft/draft-manager'
 import type { DraftPool, DraftStageSpec } from '../draft/types'
 import type { ActionDefinition, ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
@@ -133,6 +134,51 @@ const dealFarmersOfTheMoorMinorHands = (
   )
 }
 
+/**
+ * The Classic Decks a game deals from, or `undefined` for a revised game. Creation, fallback decks and legacy rebuilds
+ * all follow the game's own edition, never the revised A–E default (ADR 0049).
+ */
+const resolveClassicDeckIds = (source: Pick<InitialStateOptions, 'cardEdition' | 'classicDeckIds'>): string[] | undefined =>
+  source.cardEdition === 'classic' ? normalizeClassicDeckIds(source.classicDeckIds) : undefined
+
+const revisedDealPool = (
+  playerCount: number,
+  deckIds: string[] | undefined,
+  enableCommunityDeck: boolean,
+): { occupation: string[]; minor: string[] } => {
+  const allowedDecks = new Set<string>(normalizeDeckIds(deckIds))
+  const allow = (players: string | undefined) =>
+    cardAllowedForPlayerCount(players, playerCount)
+  return {
+    minor: [
+      ...implementedMinorImprovementCards
+        .filter((card) => allowedDecks.has(card.deck))
+        .filter((card) => allow(card.players))
+        .map((card) => card.id),
+      ...(enableCommunityDeck
+        ? implementedCommunityMinors
+            .filter((card) => allow(card.players))
+            .map((card) => card.id)
+        : []),
+    ],
+    occupation: [
+      ...implementedOccupationCards
+        .filter((card) => allowedDecks.has(card.deck))
+        .filter((card) => allow(card.players))
+        .map((card) => card.id),
+      ...(enableCommunityDeck
+        ? implementedCommunityOccupations
+            .filter((card) => allow(card.players))
+            .map((card) => card.id)
+        : []),
+    ],
+  }
+}
+
+/**
+ * Deals from the revised pool by `deckIds`, or, when `classicDeckIds` is given, only from the eligible cards of those
+ * Classic Decks (ADR 0049): no revised or community card joins a classic deal. Workshop cards join either pool.
+ */
 export const dealHands = (
   playerCount: number,
   seed: GameSeed,
@@ -141,9 +187,9 @@ export const dealHands = (
   deckIds?: string[],
   handSize = 7,
   enableCommunityDeck = false,
+  classicDeckIds?: readonly string[],
 ) => {
   const rng = createSeededRng(seed, 'deal-hands')
-  const allowedDecks = new Set<string>(normalizeDeckIds(deckIds))
   const allow = (players: string | undefined) =>
     cardAllowedForPlayerCount(players, playerCount)
   const lookupPlayersField = (id: string): string | undefined =>
@@ -153,28 +199,15 @@ export const dealHands = (
     ?? getRegisteredOccupation(id)?.players
     ?? undefined
   const allowExtra = (id: string) => allow(lookupPlayersField(id))
+  const officialPool = classicDeckIds
+    ? getEligibleClassicCardIds(classicDeckIds, playerCount)
+    : revisedDealPool(playerCount, deckIds, enableCommunityDeck)
   const minorPool = Array.from(new Set([
-    ...implementedMinorImprovementCards
-      .filter((card) => allowedDecks.has(card.deck))
-      .filter((card) => allow(card.players))
-      .map((card) => card.id),
-    ...(enableCommunityDeck
-      ? implementedCommunityMinors
-          .filter((card) => allow(card.players))
-          .map((card) => card.id)
-      : []),
+    ...officialPool.minor,
     ...extraMinorIds.filter(allowExtra),
   ]))
   const occupationPool = Array.from(new Set([
-    ...implementedOccupationCards
-      .filter((card) => allowedDecks.has(card.deck))
-      .filter((card) => allow(card.players))
-      .map((card) => card.id),
-    ...(enableCommunityDeck
-      ? implementedCommunityOccupations
-          .filter((card) => allow(card.players))
-          .map((card) => card.id)
-      : []),
+    ...officialPool.occupation,
     ...extraOccupationIds.filter(allowExtra),
   ]))
   const shuffledMinor = shuffleWithRng(minorPool, rng)
@@ -214,7 +247,7 @@ const createFallbackOrdinaryCardDecks = (
   seed: GameSeed,
   draft: GameState['draft'],
   enableCommunityDeck: boolean,
-  options: Pick<InitialStateOptions, 'extraMinorIds' | 'extraOccupationIds' | 'deckIds'> = {},
+  options: Pick<InitialStateOptions, 'extraMinorIds' | 'extraOccupationIds' | 'deckIds' | 'classicDeckIds'> = {},
 ): OrdinaryCardDecks => {
   const full = dealHands(
     players.length,
@@ -224,6 +257,7 @@ const createFallbackOrdinaryCardDecks = (
     options.deckIds,
     0,
     enableCommunityDeck,
+    options.classicDeckIds,
   )
   const draftIds = cardIdsInDraft(draft)
   const dealtOccupation = new Set(players.flatMap((player) => player.occupationHand ?? []))
@@ -246,7 +280,9 @@ const normalizeOrdinaryCardDecks = (
       minor: decks.minor.filter((id): id is string => typeof id === 'string'),
     }
   }
-  return createFallbackOrdinaryCardDecks(players, seed, raw.draft ?? null, raw.enableCommunityDeck ?? false)
+  return createFallbackOrdinaryCardDecks(players, seed, raw.draft ?? null, raw.enableCommunityDeck ?? false, {
+    classicDeckIds: resolveClassicDeckIds(raw),
+  })
 }
 
 type ActionDefinitionLookup = (id: string) => ActionDefinition | undefined
@@ -348,7 +384,9 @@ export const normalizeState = (raw: GameState, getActionDefinition?: ActionDefin
         (player.minorHand?.length ?? 0) === 0 ||
         (player.occupationHand?.length ?? 0) === 0,
     )
-  const dealtHands = needsHands ? dealHands(raw.players.length, seed) : null
+  const dealtHands = needsHands
+    ? dealHands(raw.players.length, seed, [], [], undefined, 7, false, resolveClassicDeckIds(raw))
+    : null
   const players = raw.players.map((player, index) => {
     const improvements = player.improvements ?? []
     const minorHand = player.minorHand ?? []
@@ -622,6 +660,7 @@ const isSnakeOpeningActive = (options: InitialStateOptions): boolean =>
 const createInitialPlayers = (
   seed: GameSeed,
   options: InitialStateOptions = {},
+  classicDeckIds?: readonly string[],
 ): PlayerState[] => {
   const {
     playerCount = 2,
@@ -647,6 +686,7 @@ const createInitialPlayers = (
         deckIds,
         farmersOfTheMoorPublishedMinorHandSize,
         enableCommunityDeck,
+        classicDeckIds,
       )
       const occupationDeal = dealHands(
         count,
@@ -656,6 +696,7 @@ const createInitialPlayers = (
         deckIds,
         7,
         enableCommunityDeck,
+        classicDeckIds,
       )
       const moorMinorHandSize = resolveFarmersOfTheMoorMinorHandSize(
         count,
@@ -670,7 +711,7 @@ const createInitialPlayers = (
         ]),
       }
     } else {
-      dealtHands = dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds, 7, enableCommunityDeck)
+      dealtHands = dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds, 7, enableCommunityDeck, classicDeckIds)
     }
   }
   const base: Array<{
@@ -748,12 +789,14 @@ export const createInitialState = (
     roundActionOrder.unshift('major-improvement')
   }
   const useDraft = options.draftMode === 'simultaneous'
-  const players = createInitialPlayers(gameSeed, options)
+  const classicDeckIds = resolveClassicDeckIds(options)
+  const players = createInitialPlayers(gameSeed, options, classicDeckIds)
   const soloHandMode = players.length === 1 ? options.soloHandMode ?? 'random' : undefined
   if (options.soloHandMode !== undefined && players.length !== 1) throw new Error('Solo hand mode requires one player')
   if (soloHandMode && useDraft) throw new Error('Solo hand selection cannot use simultaneous draft')
   const soloDeal = soloHandMode
-    ? dealHands(1, gameSeed, options.extraMinorIds, options.extraOccupationIds, options.deckIds, 0, options.enableCommunityDeck) : null
+    ? dealHands(1, gameSeed, options.extraMinorIds, options.extraOccupationIds, options.deckIds, 0, options.enableCommunityDeck,
+      classicDeckIds) : null
   const soloMoorMinors = soloHandMode
     ? dealFarmersOfTheMoorMinorHands(1, gameSeed, getImplementedFarmersOfTheMoorMinorIds(1).length)[0] ?? [] : []
   const soloGroups = soloHandMode && soloDeal ? createSoloHandGroups(soloHandMode, {
@@ -804,6 +847,7 @@ export const createInitialState = (
         options.deckIds,
         7,
         options.enableCommunityDeck ?? false,
+        classicDeckIds,
       )
       const publishedMinorDeal = dealHands(
         playerCount,
@@ -813,6 +857,7 @@ export const createInitialState = (
         options.deckIds,
         farmersOfTheMoorPublishedMinorHandSize,
         options.enableCommunityDeck ?? false,
+        classicDeckIds,
       )
       const moorMinorHandSize = resolveFarmersOfTheMoorMinorHandSize(
         playerCount,
@@ -866,6 +911,7 @@ export const createInitialState = (
         options.deckIds,
         poolSize,
         options.enableCommunityDeck ?? false,
+        classicDeckIds,
       )
       const hands: Record<string, DraftPool> = {}
       seatOrder.forEach((pid, i) => {
@@ -881,7 +927,7 @@ export const createInitialState = (
       ordinaryCardDeckSeed,
       draft,
       options.enableCommunityDeck ?? false,
-      options,
+      { ...options, classicDeckIds },
     )
     phase = 'draft'
   } else {
@@ -890,7 +936,7 @@ export const createInitialState = (
       ordinaryCardDeckSeed,
       null,
       options.enableCommunityDeck ?? false,
-      options,
+      { ...options, classicDeckIds },
     )
   }
   if (soloHandSelection) {
@@ -964,6 +1010,7 @@ export const createInitialState = (
     enableMoorBalanceRules: isMoorBalanceRulesEnabled(options),
     enableSnakeOpening,
     snakeOpening: enableSnakeOpening ? { reversed: false } : null,
+    ...(classicDeckIds ? { cardEdition: 'classic' as const, classicDeckIds } : {}),
     ordinaryCardDecks,
     ordinaryCardDrawChoices: {},
     nextOrdinaryCardDrawChoiceSeq: 1,
