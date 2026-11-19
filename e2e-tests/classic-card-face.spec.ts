@@ -124,7 +124,9 @@ test.describe('Classic Edition through the lobby', () => {
       expect(card.title).toBeTruthy()
       expect(card.numberWidth).toBeGreaterThanOrEqual(card.textWidth)
     }
-    const face = cards.first().locator('.card-icon')
+    const longestNumber = Math.max(...numbered.map(card => card.number?.length ?? 0))
+    const longestCard = cards.nth(numbered.findIndex(card => card.number?.length === longestNumber))
+    const face = longestCard.locator('.card-icon')
     await face.scrollIntoViewIfNeeded()
     const path = await face.evaluate(async element => {
       const source = getComputedStyle(element).backgroundImage.slice(5, -2)
@@ -134,6 +136,6 @@ test.describe('Classic Edition through the lobby', () => {
       return source
     })
     expect(path).toMatch(/\/assets\/classic\/[A-Z]+\/C[A-Z]+\d{3}\.png/)
-    await cards.first().screenshot({ path: test.info().outputPath('classic-hand-card.png') })
+    await longestCard.screenshot({ path: test.info().outputPath('classic-hand-card.png') })
   })
 })
