@@ -813,7 +813,7 @@ Keep the same `/sw.js` URL and root scope. For emergency replacement, set `SERVI
 
 ### Enable or pause browser notifications
 
-`server/web-push/` owns device opt-in, delivery, and click resolution. The Room Commit writes a draft opportunity with its durable state. The feedback service writes an inbox event with each new formal request for information or first release message. The durable queue targets opted-in devices and checks current account, device, and event eligibility on each attempt. Provider payloads carry an opaque delivery ID and generic localized copy. Coverage: `web-push-draft.test.ts` and `bug-report-{feedback,release-feedback}.test.ts`.
+`server/web-push/` owns device opt-in, delivery, and click resolution. The Room Commit writes a draft opportunity with its durable state. The feedback service writes an inbox event with each new formal request for information or first release message. The durable queue targets opted-in devices and checks current account, device, and event eligibility on each attempt. Encrypted payloads carry the category, an opaque delivery ID, and generic localized copy. Coverage: `web-push-draft.test.ts` and `bug-report-{feedback,release-feedback}.test.ts`.
 
 After stable Pages is serving `/sw.js`, configure `WEB_PUSH_VAPID_SUBJECT`, `WEB_PUSH_VAPID_PUBLIC_KEY`, and `WEB_PUSH_VAPID_PRIVATE_KEY` in the backend environment. Use an HTTPS or `mailto:` contact as the subject and keep the private key on the backend. Reuse the key pair across deployments so devices can keep their subscriptions.
 
