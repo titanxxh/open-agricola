@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
@@ -14,8 +14,8 @@ const listener: CardListenerRegistration = {
   requiresNewPlacement: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isTravelingPlayersSpaceId(context.space?.id)) return
-    // Only triggers when placing the last person
-    if (workersAvailable(context.state, context.player) > 0) return
+    // Only the last person of the round, a Guest still to place included
+    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) > 0) return
     return {
       flow: {
         type: 'leaf',

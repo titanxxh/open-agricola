@@ -445,3 +445,237 @@ describe('Guest next to a revised card that ends the work phase on the last acti
     ])
   })
 })
+
+// #1896: revised cards that count the people left to place count a pending Guest that a legal space awaits.
+describe('Guest counted among the people left to place by revised cards', () => {
+  const MARKET_MASTER = 'E131_MarketMaster'
+  const SOUR_DOUGH = 'E062_SourDough'
+  const CURATOR = 'A100_Curator'
+  const NOWHERE = { kind: 'spaces', spaceIds: ['traveling-players'] } as const
+
+  function setupCounting(playerCount: 2 | 4, configure: (state: GameState) => void) {
+    const session = createWorkSession({ seed: 62, options: { playerCount }, configure(state) {
+      state.round = 6
+      for (const player of state.players) {
+        player.minorHand = [PLACEHOLDER]
+        player.occupationHand = [PLACEHOLDER]
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        setActiveWorkerCount(player, 1)
+      }
+      configure(state)
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  /** Hands `playerIndex` a pending Guest of this round, then reloads so rotation sees it. */
+  function withGuest(session: GameSession, playerIndex: number, where?: typeof NOWHERE) {
+    const state = session.state
+    state.players[playerIndex]!.guests = [{ id: 'guest:1', sourceCardId: ANIMAL_FARM, round: state.round, ...(where ? { where } : {}) }]
+    expect(session.loadState(state).ok).toBe(true)
+  }
+
+  const anytimeIds = (response: SessionResponse) =>
+    response.interaction.stateId === 'gameover' ? [] : response.interaction.anytimeActions.map(action => action.id)
+
+  describe('E131 Market Master (four players, for Traveling Players)', () => {
+    const setupMarketMaster = () => setupCounting(4, state => {
+      const owner = state.players[0]!
+      owner.occupationPlayed = [MARKET_MASTER]
+      owner.occupationHand = [CURATOR]
+      owner.resources.food = 1
+    })
+
+    it('does not treat the last family member as the last person while a Guest is to come', () => {
+      const session = setupMarketMaster()
+      withGuest(session, 0)
+      const placed = takeNormalWorkerTurn(session, 'traveling-players')
+      expect(placed.ok, placed.error).toBe(true)
+      expect(placed.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player' } })
+      expect(placed.state.players[0]!.occupationPlayed).toEqual([MARKET_MASTER])
+    })
+
+    it('offers the occupation when the Guest is the last person, on Traveling Players', () => {
+      const session = setupMarketMaster()
+      withGuest(session, 0)
+      expect(takeNormalWorkerTurn(session, 'forest').ok).toBe(true)
+      expect(confirmNextPlayer(session).ok).toBe(true)
+      for (const [seat, spaceId] of [[1, 'clay-pit'], [2, 'reed-bank'], [3, 'fishing']] as const) {
+        act(session, seat, spaceId)
+        expect(confirmNextPlayer(session).ok).toBe(true)
+      }
+      const offered = dispatchGuest(session, 'traveling-players')
+      expect(offered.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: MARKET_MASTER })
+      const foodBefore = offered.state.players[0]!.resources.food
+      const accept = getChoiceOptions(offered).find(candidate => candidate.value !== '__skip__')
+      let played = session.resolveChoice(0, accept!.value)
+      expect(played.ok, played.error).toBe(true)
+      // Curator is the only occupation in hand, so the choice may resolve without a prompt.
+      const curator = getChoiceOptions(played).find(candidate => candidate.value === CURATOR || candidate.value.endsWith(CURATOR))
+      if (curator) played = session.resolveChoice(0, curator.value)
+      expect(played.ok, played.error).toBe(true)
+      expect(played.state.players[0]!.occupationPlayed).toEqual([MARKET_MASTER, CURATOR])
+      expect(played.state.players[0]!.resources.food).toBe(foodBefore - 1)
+    })
+
+    it('treats the last family member as the last person when the Guest has no legal space left', () => {
+      const session = setupMarketMaster()
+      withGuest(session, 0, NOWHERE)
+      const placed = takeNormalWorkerTurn(session, 'traveling-players')
+      expect(placed.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: MARKET_MASTER })
+    })
+  })
+
+  describe('E062 Sour Dough', () => {
+    const setupSourDough = () => setupCounting(2, state => {
+      const owner = state.players[0]!
+      setActiveWorkerCount(owner, 2)
+      owner.minorPlayed = [SOUR_DOUGH]
+      owner.improvements = ['Major_Fireplace1']
+      owner.resources.grain = 1
+    })
+
+    it('counts B\'s pending Guest as a person left to place', () => {
+      const session = setupSourDough()
+      withGuest(session, 1)
+      act(session, 0, 'forest')
+      expect(confirmNextPlayer(session).ok).toBe(true)
+      expect(takeNormalWorkerTurn(session, 'clay-pit').ok).toBe(true)
+      const aTurn = confirmNextPlayer(session)
+      expect(aTurn.state.currentPlayerIndex).toBe(0)
+      expect(anytimeIds(aTurn)).toContain('E62-sour-dough-anytime')
+      const baked = session.takeAnytimeAction(0, 'E62-sour-dough-anytime')
+      expect(baked.ok, baked.error).toBe(true)
+      expect(baked.state.players[0]!.cardStates[SOUR_DOUGH]?.flagged).toBe(true)
+    })
+
+    it('is not offered when B\'s Guest has no legal space left', () => {
+      const session = setupSourDough()
+      withGuest(session, 1, NOWHERE)
+      act(session, 0, 'forest')
+      expect(confirmNextPlayer(session).ok).toBe(true)
+      act(session, 1, 'clay-pit')
+      const aTurn = confirmNextPlayer(session)
+      expect(aTurn.state.currentPlayerIndex).toBe(0)
+      expect(anytimeIds(aTurn)).not.toContain('E62-sour-dough-anytime')
+    })
+  })
+})
+
+// #1896: a revised card's "place another person" may send a pending Guest instead of a family member.
+describe('Guest sent as a revised card\'s extra person', () => {
+  const RAVENOUS_HUNGER = 'C042_RavenousHunger'
+  const CANAL_BOATMAN = 'D103_CanalBoatman'
+  const NOWHERE = { kind: 'spaces', spaceIds: ['__nowhere__'] } as const
+
+  function setupExtraPerson(family: number, cardId: string, configure?: (state: GameState) => void, round = 14) {
+    const session = createWorkSession({ seed: 62, configure(state) {
+      state.round = 6
+      for (const player of state.players) {
+        player.minorHand = [PLACEHOLDER]
+        player.occupationHand = [PLACEHOLDER]
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        setActiveWorkerCount(player, 1)
+      }
+      setActiveWorkerCount(state.players[0]!, family)
+      state.players[0]!.minorPlayed = [cardId]
+      // Round 14 has every round card revealed, Vegetable Seeds included.
+      state.round = round
+      for (const candidate of state.actionSpaces) candidate.roundAvailable = Math.min(candidate.roundAvailable, round)
+      configure?.(state)
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  function withGuest(session: GameSession, where?: typeof NOWHERE) {
+    const state = session.state
+    state.players[0]!.guests = [{ id: 'guest:1', sourceCardId: ANIMAL_FARM, round: state.round, ...(where ? { where } : {}) }]
+    expect(session.loadState(state).ok).toBe(true)
+  }
+
+  const accept = (session: GameSession, response: SessionResponse, cardId: string) => {
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: cardId })
+    const option = getChoiceOptions(response).find(candidate => candidate.value !== '__skip__')
+    const accepted = session.resolveChoice(0, option!.value)
+    expect(accepted.ok, accepted.error).toBe(true)
+    return accepted
+  }
+
+  it('sends the only pending Guest with Ravenous Hunger, to an accumulation space, with the extra good', () => {
+    const session = setupExtraPerson(1, RAVENOUS_HUNGER)
+    withGuest(session)
+    const a = session.state.players[0]!.id
+    const used = takeNormalWorkerTurn(session, 'vegetable-seeds')
+    expect(used.ok, used.error).toBe(true)
+    // No family member is left, so the card's extra person is the Guest: no person prompt.
+    const targets = accept(session, used, RAVENOUS_HUNGER)
+    expect(targets.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, promptKey: 'ui.interactionPlaceFarmerExtra' })
+    const values = getChoiceOptions(targets).map(option => option.value)
+    expect(values).toContain('forest')
+    expect(values).not.toContain('farmland')
+    const forestWood = space(targets, 'forest').resources.wood ?? 0
+    const wood = targets.state.players[0]!.resources.wood
+    const placed = session.resolveChoice(0, 'forest')
+    expect(placed.ok, placed.error).toBe(true)
+    expect(space(placed, 'forest').takenBy).toEqual([{ playerId: a, workerId: 'guest:1', guest: true }])
+    expect(placed.state.players[0]!.resources.wood).toBe(wood + forestWood + 1)
+    expect(placed.state.players[0]!.guests).toEqual([expect.objectContaining({ id: 'guest:1', dispatched: true })])
+  })
+
+  it('asks whether Ravenous Hunger sends a family member or the Guest when both are left', () => {
+    const session = setupExtraPerson(2, RAVENOUS_HUNGER)
+    withGuest(session)
+    const a = session.state.players[0]!.id
+    const used = takeNormalWorkerTurn(session, 'vegetable-seeds')
+    const people = accept(session, used, RAVENOUS_HUNGER)
+    // The card's own person choice: a family member or the Guest.
+    expect(getChoiceOptions(people).map(option => [option.labelKey, option.labelParams?.guestId]))
+      .toEqual([['actions.place-farmer.name', undefined], ['actions.activate-extra-turn.name', 'guest:1']])
+    const guest = getChoiceOptions(people).find(option => option.labelParams?.guestId === 'guest:1')!
+    const targets = session.resolveChoice(0, guest.value)
+    expect(targets.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, promptKey: 'ui.interactionPlaceFarmerExtra' })
+    const placed = session.resolveChoice(0, 'forest')
+    expect(placed.ok, placed.error).toBe(true)
+    expect(space(placed, 'forest').takenBy).toEqual([{ playerId: a, workerId: 'guest:1', guest: true }])
+    expect(workersAvailable(placed.state, placed.state.players[0]!)).toBe(1)
+  })
+
+  it('offers no extra person when no family member is left and the Guest has no legal space', () => {
+    const session = setupExtraPerson(1, RAVENOUS_HUNGER)
+    withGuest(session, NOWHERE)
+    const used = takeNormalWorkerTurn(session, 'vegetable-seeds')
+    expect(used.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player' } })
+  })
+
+  it('puts the only pending Guest on Canal Boatman, then the Guest leaves at return home', () => {
+    const session = setupExtraPerson(1, CANAL_BOATMAN, state => { state.players[0]!.resources.food = 1 }, 6)
+    withGuest(session)
+    const a = session.state.players[0]!.id
+    const used = takeNormalWorkerTurn(session, 'fishing')
+    expect(used.ok, used.error).toBe(true)
+    const food = used.state.players[0]!.resources.food
+    const reward = accept(session, used, CANAL_BOATMAN)
+    expect(reward.state.players[0]!.resources.food).toBe(food - 1)
+    expect(space(reward, `card-worker:${CANAL_BOATMAN}`).takenBy).toEqual([{ playerId: a, workerId: 'guest:1', guest: true }])
+    const stone = getChoiceOptions(reward)[0]!
+    const rewarded = session.resolveChoice(0, stone.value)
+    expect(rewarded.ok, rewarded.error).toBe(true)
+    expect(rewarded.state.players[0]!.resources.stone).toBe(3)
+
+    expect(confirmNextPlayer(session).ok).toBe(true)
+    act(session, 1, 'clay-pit')
+    const next = confirmNextPlayer(session)
+    expect(next.state.round).toBe(7)
+    expect(next.state.players[0]!.guests).toEqual([])
+    expect(space(next, `card-worker:${CANAL_BOATMAN}`).takenBy).toEqual([])
+  })
+
+  it('offers Canal Boatman no extra person when no family member and no Guest is left', () => {
+    const session = setupExtraPerson(1, CANAL_BOATMAN, state => { state.players[0]!.resources.food = 1 }, 6)
+    const used = takeNormalWorkerTurn(session, 'fishing')
+    expect(used.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player' } })
+  })
+})

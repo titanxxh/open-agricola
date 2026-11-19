@@ -101,9 +101,9 @@ type SessionResponse = {
 
 - 食客是 `player.guests` 中的 `GuestRecord`（`shared/domain/guests.ts`）：`id`（`guest:<n>`，从不占用工人槽位）、`sourceCardId`、`round`、可选的 `where` 与 `dispatched`。家庭人数、家庭成员 token 上限、住房、喂食与计分只读 `workers`。记录属于玩家：没有任何逻辑询问来源卡是否仍在场，也没有规则读取本局的卡牌版本。
 - `shared/cards/helpers/guest-flow.ts` 提供原生食客流程。`grantGuestLeaf()` 指定回合和放置范围。`grantImmediateGuestLeaf()` 授予一名在同一流程内按普通放人规则派遣的食客，放弃或无合法目标时作废。食客本身没有时机：需要在其他时刻派遣食客的卡，从那个时刻的 hook 发起放置，可用 `grantImmediateGuestLeaf()` 或定时规则操作 `guest-placement`（例如 `onAllWorkersPlaced`，或经 `timedExtraTurnResolution()` 用于 `contributeExtraTurn`）。该操作派遣一名食客，或按来源卡 `countFact` 记录的数量派遣，所以在那个时刻之前打出两次的卡保留两名食客。
-- `shared/actions/guest-turns.ts` 在所有者该回合的任一工作回合提供每名有合法行动格的本回合食客，与普通放人并列。所有者没有家庭成员可放时可以放弃，食客随即作废。额外回合用于派遣食客的卡声明 `extraTurnGuest: { where }`，其贡献标记为 `guest`。强制消耗（`consumePendingExtraTurns()`）不消耗任何食客机会。卡牌判断所有者是否还有人可放时使用 `hasPendingGuestPlacement()`：已授予的食客或派遣食客的额外回合，只有仍有合法行动格时才计入。
+- `shared/actions/guest-turns.ts` 在所有者该回合的任一工作回合提供每名有合法行动格的本回合食客，与普通放人并列。所有者没有家庭成员可放时可以放弃，食客随即作废。额外回合用于派遣食客的卡声明 `extraTurnGuest: { where }`，其贡献标记为 `guest`。强制消耗（`consumePendingExtraTurns()`）不消耗任何食客机会。牌文问剩余人数、最后一人或是否都已放完时读 `peopleLeftToPlace()`：在家的家庭成员，加上仍有合法行动格的已授予食客和派遣食客的额外回合（`hasPendingGuestPlacement()` 只问后者）。它收集食客机会时不计算其它额外回合，所以卡牌自己的额外回合也能问它。
 - `state.workEndWindowRound` 记录 `onAllWorkersPlaced` 窗口已开始的回合。此后不再有工作回合，所以此时起授予的本回合食客立即派遣，或放弃后作废。
-- 派遣是带 `workerSource: { kind: 'guest', guestId }` 的 `place-farmer`。`shared/actions/helpers/placement-person.ts` 通过与供应人物相同的 `PlacementPerson` seam 解析它。派遣占用行动格并推进人员放置序号。这次用格属于食客本人（`PlacementPerson.ownsUse`）：无论哪张卡授予了食客，用格和行动格的行动都不带卡牌来源，卡牌反应对它与对家庭成员的用格一视同仁。`addWorkerRef()` 在食客被放置或移动到的任何位置都把引用标为 `guest: true`。
+- 派遣是带 `workerSource: { kind: 'guest', guestId }` 的 `place-farmer`。`shared/actions/helpers/placement-person.ts` 通过与供应人物相同的 `PlacementPerson` seam 解析它。派遣占用行动格并推进人员放置序号。由轮转或授予它的卡派遣时，这次用格属于食客本人（`PlacementPerson.ownsUse`）：用格和行动格的行动都不带卡牌来源，与家庭成员的普通回合相同。卡牌的“再放一人”（带来源卡、未指定人员的 `place-farmer`）和 `spend-worker` 在有食客可去时先问放谁：家庭成员或每名可派食客，只有一个候选时直接放。这样的用格保留该卡为来源，与放家庭成员时相同。`addWorkerRef()` 在食客被放置或移动到的任何位置都把引用标为 `guest: true`。
 - 食客站在哪里以版面为准，与家庭成员相同。食客只能派遣一次：被效果召回的食客本回合不再派遣，返家时离场。
 - 返家时食客的引用随其他行动格一起清空，且不列入 `worker.returned`。随后 `returnGuests()` 移除所有到期回合的记录，并把从未派遣的记录作为 `guest.voided` 报告。来源卡传入隐藏手牌后，食客的公开授予、派遣和作废仍然可见。
 

@@ -921,11 +921,12 @@ const collectCardExtraTurnContributions = (
   state: GameState,
   player: PlayerState,
   actionHooks?: ActionHookRegistry,
+  includes: (cardId: string) => boolean = () => true,
 ): ExtraTurnContribution[] => {
   const contributions: ExtraTurnContribution[] = []
   for (const cardId of extraTurnCardIds(player)) {
     const effect = getCardEffect(cardId)
-    if (!effect?.contributeExtraTurn) continue
+    if (!effect?.contributeExtraTurn || !includes(cardId)) continue
     try {
       const count = extraTurnCountForCard(state, player, effect, actionHooks)
       const remaining = Math.max(0, count - spentExtraTurns(player, cardId))
@@ -944,13 +945,26 @@ const collectCardExtraTurnContributions = (
   }
   const owned = new Set(extraTurnCardIds(player))
   for (const source of timedRuleSources(state, player, id => getCardEffect(id)?.timedRules ?? [])) {
-    if (owned.has(source.cardId)) continue
+    if (owned.has(source.cardId) || !includes(source.cardId)) continue
     if (spentExtraTurns(player, source.cardId) > 0) continue
     const flow = timedExtraTurnFlow(state, player, source.cardId, source.rules)
     if (flow) contributions.push(cardExtraTurnContribution(player, source.cardId, 1, flow))
   }
   return contributions
 }
+
+/**
+ * Only the opportunities that place a Guest. No other card's extra turn is evaluated,
+ * so a card whose own extra turn asks whether people are left may read this.
+ */
+export const collectGuestExtraTurnContributions = (
+  state: GameState,
+  player: PlayerState,
+  actionHooks?: ActionHookRegistry,
+): ExtraTurnContribution[] => [
+  ...collectCardExtraTurnContributions(state, player, actionHooks, cardId => getCardEffect(cardId)?.extraTurnGuest !== undefined),
+  ...extraTurnProviders.flatMap(provider => provider({ state, player, actionHooks })),
+].filter(contribution => contribution.guest)
 
 export const collectExtraTurnContributions = (
   state: GameState,

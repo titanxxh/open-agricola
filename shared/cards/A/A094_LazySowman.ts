@@ -5,7 +5,7 @@ import type { ActionChoiceOption, ActionSpace, GameState } from '../../contract/
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { canSow, isUnconditionalSow } from '../../actions/effects/sow'
 import { isSpaceOccupied } from '../../domain/space'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 import { readTurnScopeToken } from '../helpers/turn-token'
 
@@ -37,7 +37,7 @@ const computeReplaceListener: CardListenerRegistration = {
     if (!isOwnersActiveWorkTurn(context)) return
     if (context.actionContext?.checkedReplaceAction === true) return
     if (!isUnconditionalSow(context.actionContext, context.player)) return
-    if (workersAvailable(context.state, context.player) <= 0) return
+    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) return
     const constraints = context.state.actionSpaces
       .filter((space) => !isMeetingPlace(space))
       .map((space) => space.id)
@@ -75,7 +75,7 @@ const isDoableListener: CardListenerRegistration = {
     if (context.actionContext?.checkedReplaceAction === true) return
     if (!isUnconditionalSow(context.actionContext, context.player)) return
     if (canSow(context.player)) return
-    if (workersAvailable(context.state, context.player) <= 0) return
+    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) return
     return { doable: true }
   },
 }

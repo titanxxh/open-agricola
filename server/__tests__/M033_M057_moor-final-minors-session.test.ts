@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
-import type { ActionChoiceOption } from '../../shared/contract/types'
+import type { ActionChoiceOption, GameState } from '../../shared/contract/types'
 import { markAllWorkersUsed, newbornCount, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import type { SessionResponse } from '../game/authoritative-session'
@@ -28,7 +28,7 @@ const placeableSpaces = (session: GameSession) =>
 const reqKind = (resp: SessionResponse): string | undefined =>
   resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : undefined
 
-const setupM057Rotation = (minorPlayed: string[] = [M057], occupationPlayed: string[] = []) => {
+const setupM057Rotation = (minorPlayed: string[] = [M057], occupationPlayed: string[] = [], configure?: (state: GameState) => void) => {
   const session = new GameSession(57057, undefined, {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
@@ -55,6 +55,7 @@ const setupM057Rotation = (minorPlayed: string[] = [M057], occupationPlayed: str
   })
   state.players[0]!.minorPlayed = [...minorPlayed]
   state.players[0]!.occupationPlayed = [...occupationPlayed]
+  configure?.(state)
   session.loadState(state)
   return session
 }
@@ -220,6 +221,37 @@ describe('M057 Taps', () => {
       .toEqual({ kind: 'playerFaceUp', playerId: player.id })
     expect(chosen.state.players[0]!.cardStates?.[M057]?.extraData?.usedThisRound).toBe(true)
     expect(session.withCtx(() => hasPendingExtraTurn(chosen.state, chosen.state.players[0]!))).toBe(false)
+  })
+
+  it('waits for a pending Guest before the Taps turn (#1896)', () => {
+    const session = setupM057Rotation([M057], [], state => {
+      state.players[0]!.guests = [{ id: 'guest:1', sourceCardId: 'CG062_AnimalFarm', round: state.round }]
+    })
+    // A has placed both family members, but the Guest is still a person to place.
+    const guestTurn = driveToM057Offer(session)
+    expect(guestTurn.state.currentPlayerIndex).toBe(0)
+    const options = guestTurn.interaction.stateId === 'wait' ? guestTurn.interaction.request.options ?? [] : []
+    expect(options.some((option) => option.labelKey?.startsWith('moor.specialActions.'))).toBe(false)
+    const dispatch = options.find((option) => option.labelParams?.guestId === 'guest:1')
+    expect(dispatch, JSON.stringify(guestTurn.interaction)).toBeDefined()
+    const targets = session.resolveChoice(0, dispatch!.value)
+    expect(targets.ok, targets.error).toBe(true)
+    const placed = session.resolveChoice(0, placeableSpaces(session)[0]!)
+    expect(placed.ok, placed.error).toBe(true)
+
+    // With every person placed, A's next turn is the Taps turn.
+    const tapsTurn = confirmNextPlayer(session)
+    expect(tapsTurn.state.currentPlayerIndex).toBe(0)
+    expect(optionFor(tapsTurn, 'hiring-fair')).toBeDefined()
+  })
+
+  it('offers the Taps turn at once when the pending Guest has no legal space (#1896)', () => {
+    const session = setupM057Rotation([M057], [], state => {
+      state.players[0]!.guests = [{ id: 'guest:1', sourceCardId: 'CG062_AnimalFarm', round: state.round, where: { kind: 'spaces', spaceIds: ['__nowhere__'] } }]
+    })
+    const offer = driveToM057Offer(session)
+    expect(session.state.currentPlayerIndex).toBe(0)
+    expect(optionFor(offer, 'hiring-fair')).toBeDefined()
   })
 
   it('fires after-special-action listeners from the Taps extra turn', () => {

@@ -20,6 +20,7 @@ import {
   removeWorkerRef,
 } from '../../domain/space'
 import { smallestAvailableWorker } from '../../domain/player'
+import { dispatchableGuests } from '../../domain/guests'
 import { selectWorkerForMoorAction } from '../../moor/heating'
 import { incPlacedFarmers } from '../../session/stats'
 import type { ActionHookRegistry } from '../hooks'
@@ -31,6 +32,9 @@ import { collectBeforeActionSpaceUseFlows } from '../../cards/card-listeners'
 import { recordActionSpaceUse } from '../../domain/action-space-use'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
+
+/** Marks a card's placement whose person has been chosen as a family member. */
+const FAMILY_PERSON_KEY = 'familyPerson'
 
 /**
  * Low-level helper: place a worker belonging to `player` onto `space`.
@@ -138,6 +142,50 @@ const placePerson = (
   return { type: 'ok', workerId, personUse }
 }
 
+/**
+ * The Guests of this round a card's "place another person" may send instead of a family
+ * member: those a legal target awaits under this placement's constraints. An ordinary
+ * turn's placement has no source card, and rotation offers Guests on their own.
+ */
+const cardPlacementGuests = (
+  state: GameState,
+  player: PlayerState,
+  actionHooks: ActionHookRegistry | undefined,
+  sourceCard: string | undefined,
+  actionContext: Record<string, unknown> | undefined,
+) => sourceCard === undefined || declaresPlacementPerson(actionContext) || actionContext?.[FAMILY_PERSON_KEY] === true
+  ? []
+  : dispatchableGuests(state, player).filter(guest => legalPlacements(state, player, actionHooks, sourceCard,
+    { ...actionContext, workerSource: { kind: 'guest', guestId: guest.id } }).length > 0)
+
+/** Asks which person a card's placement sends when a Guest could go; a single candidate goes directly. */
+const choosePlacementPerson = (
+  state: GameState,
+  player: PlayerState,
+  actionHooks: ActionHookRegistry | undefined,
+  sourceCard: string | undefined,
+  actionContext: Record<string, unknown> | undefined,
+): ActionFlow | undefined => {
+  const guests = cardPlacementGuests(state, player, actionHooks, sourceCard, actionContext)
+  if (guests.length === 0) return
+  const familyContext = { ...actionContext, [FAMILY_PERSON_KEY]: true }
+  const family = smallestAvailableWorker(state, player) !== null
+    && legalPlacements(state, player, actionHooks, sourceCard, familyContext).length > 0
+  const choices: ActionFlow[] = [
+    ...(family ? [{
+      type: 'leaf' as const, actionId: 'place-farmer', sourceCard, actionContext: familyContext,
+      choiceLabelKey: 'actions.place-farmer.name',
+    }] : []),
+    ...guests.map((guest): ActionFlow => ({
+      type: 'leaf', actionId: 'place-farmer', sourceCard,
+      actionContext: { ...actionContext, workerSource: { kind: 'guest', guestId: guest.id } },
+      choiceLabelKey: 'actions.activate-extra-turn.name',
+      choiceLabelParams: { guestId: guest.id, guestCardId: guest.sourceCardId },
+    })),
+  ]
+  return choices.length === 1 ? choices[0] : { type: 'xor', children: choices }
+}
+
 const placementPersonAvailable = (
   state: GameState,
   player: PlayerState,
@@ -177,7 +225,8 @@ export const placeFarmerAction: ActionDefinition = {
       )
       : declaresPlacementPerson(context?.actionContext)
       ? placementPersonAvailable(state, player, context?.actionHooks, context?.sourceCard, context?.actionContext)
-      : smallestAvailableWorker(state, player) !== null,
+      : smallestAvailableWorker(state, player) !== null
+        || cardPlacementGuests(state, player, context?.actionHooks, context?.sourceCard, context?.actionContext).length > 0,
   previewEffect: ({ state, actionContext }) => {
     const constraints = actionContext?.constraints
     const fixedTarget = Array.isArray(constraints) && constraints.length === 1 && typeof constraints[0] === 'string'
@@ -271,6 +320,8 @@ export const placeFarmerAction: ActionDefinition = {
       return { type: 'flow', flow: targetLeaf }
     }
 
+    const personChoice = choosePlacementPerson(state, player, actionHooks, sourceCard, actionContext)
+    if (personChoice) return { type: 'flow', flow: personChoice }
     const person = resolvePlacementPerson({ state, player, actionContext, sourceCard })
     if (declaresPlacementPerson(actionContext)) {
       if (!person) return { type: 'fail', errorKey: 'log.placeFarmerFail' }

@@ -2,7 +2,7 @@ import type { ActionHookRegistry } from '../../actions/hooks'
 import { defineMinorCard } from '../card-source'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import { MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID, hasMoorSpecialActionChoice } from '../../moor/special-action-flow'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
@@ -16,7 +16,7 @@ const isUsed = (player: PlayerState): boolean =>
 const tapsAvailable = (state: GameState, player: PlayerState, actionHooks?: ActionHookRegistry): boolean =>
   state.enableFarmersOfTheMoor === true &&
   state.roundPhase === 'work' &&
-  workersAvailable(state, player) <= 0 &&
+  peopleLeftToPlace(state, player, actionHooks) <= 0 &&
   !isUsed(player) &&
   hasMoorSpecialActionChoice(state, player, ACTION_CONTEXT, actionHooks)
 

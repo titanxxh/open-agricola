@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { workersAvailable } from '../../domain/player'
+import { peopleLeftToPlace } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E062_SourDough'
@@ -14,9 +14,9 @@ const anytimeListener: CardListenerRegistration = {
   replacesTurn: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    // All players must still have workers to place
+    // Every player must still have a person to place, a Guest included
     const allPlayersHaveWorkers = context.state.players.every(
-      (p) => workersAvailable(context.state, p) > 0,
+      (p) => peopleLeftToPlace(context.state, p, context.actionHooks) > 0,
     )
     if (!allPlayersHaveWorkers) return
     return {
