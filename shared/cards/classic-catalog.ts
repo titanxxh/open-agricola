@@ -24,3 +24,7 @@ export const getClassicMinorImprovement = (id: string): ClassicCardDefinition | 
 /** Classic occupation-like definitions (occupation or occupation-type player action), for lookups by exact ID only. */
 export const getClassicOccupation = (id: string): ClassicCardDefinition | undefined =>
   getClassicCardKind(id) === 'occupation' ? byId.get(id) : undefined
+
+/** Classic Card Definitions printed as `<deck><number>`, for the dev deck-number shorthand (`CE203`). */
+export const getClassicCardsByDeckNumber = (deck: string, number: number): readonly ClassicCardDefinition[] =>
+  classicCardDefinitions.filter(card => card.deck === deck && card.number === number)
