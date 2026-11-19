@@ -735,9 +735,12 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
               className={`ws-like-btn${liked ? ' liked' : ''}`}
               onClick={handleLike}
             >♥ {likeCount}</button>
-            <button type="button" className="btn-secondary ws-btn-sm" onClick={() => onAddSandbox(card.id)}>
-              {t('platform.addToSandbox')}
-            </button>
+            {/* Unmerged code runs only in its author's browser (ADR 0052). */}
+            {isOwner && (
+              <button type="button" className="btn-secondary ws-btn-sm" onClick={() => onAddSandbox(card.id)}>
+                {t('platform.addToSandbox')}
+              </button>
+            )}
             {onEdit && (
               <button type="button" className="btn-secondary ws-btn-sm" onClick={onEdit}>{t('platform.edit')}</button>
             )}

@@ -1151,6 +1151,14 @@ export async function handleWorkshopRoute(
     }>(req)
     const MAX_SANDBOX_CARDS = 20
     if (body?.workshop_card_id) {
+      const own = await db.prepare('SELECT 1 FROM workshop_cards WHERE id = ? AND author_id = ?').get(body.workshop_card_id, user.id)
+      if (!own) {
+        sendJson(res, 400, { ok: false, error: 'The sandbox accepts only your own Workshop cards' })
+        return true
+      }
+      // Entries for other authors' cards from before ADR 0052 neither show nor count.
+      await db.prepare(`DELETE FROM sandbox_cards WHERE user_id = ? AND workshop_card_id NOT IN
+        (SELECT id FROM workshop_cards WHERE author_id = ?)`).run(user.id, user.id)
       const count = ((await db.prepare('SELECT COUNT(*) as c FROM sandbox_cards WHERE user_id = ?')
         .get(user.id)) as { c: number }).c
       if (count >= MAX_SANDBOX_CARDS) {
