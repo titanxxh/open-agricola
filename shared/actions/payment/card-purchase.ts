@@ -1,3 +1,5 @@
+import { canReturnImprovement } from '../../cards/helpers/return-card'
+import { projectPurchaseResourceGrants } from '../../cards/helpers/purchase-resource-grants'
 import type { ActionHookRegistry } from '../hooks'
 import type {
   ActionExecutionResult,
@@ -72,9 +74,9 @@ const getReturnCardPool = (
   const hasFireplaceSlot = list.some(isFireplaceIdentityCard)
   const hasCookingHearthSlot = list.some(isCookingHearthIdentityCard)
   return [...player.improvements, ...player.minorPlayed].filter((id) =>
-    listed.has(id) ||
+    canReturnImprovement(player, id) && (listed.has(id) ||
     (hasFireplaceSlot && isFireplaceIdentityCard(id)) ||
-    (hasCookingHearthSlot && isCookingHearthIdentityCard(id)),
+    (hasCookingHearthSlot && isCookingHearthIdentityCard(id))),
   )
 }
 
@@ -104,7 +106,7 @@ const buildCtx = (
   optionPrefix = directOptionPrefix(kind, cardId),
 ): PaymentCtx => ({
   actionId: actionId(kind),
-  costType: 'none',
+  costType: costType(kind),
   sourceCard: cardId,
   playedCards: getPlayedCards(player, preview.cost),
   optionPrefix,
@@ -154,11 +156,13 @@ const buildPayParams = (
 const hasPaymentOption = (args: PaymentOptionArgs): boolean => {
   const effectiveState = args.playerIndex >= 0 ? args.state : { ...args.state, players: [args.player] }
   const effectiveIndex = args.playerIndex >= 0 ? args.playerIndex : 0
-  return PaymentSolver.hasPaymentOption(
-    effectiveState,
-    effectiveIndex,
-    args.preview.cost,
-    buildCtx(args.player, args.kind, args.cardId, args.preview),
+  return projectPurchaseResourceGrants(effectiveState, args.player, args.cardId, args.kind).some(projected =>
+    PaymentSolver.hasPaymentOption(
+      { ...effectiveState, players: effectiveState.players.map((player, index) => index === effectiveIndex ? projected : player) },
+      effectiveIndex,
+      args.preview.cost,
+      buildCtx(projected, args.kind, args.cardId, args.preview),
+    ),
   )
 }
 

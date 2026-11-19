@@ -1,3 +1,4 @@
+import { getCardEffect } from '../cards/card-effects'
 import { planFarmyardExtension } from './farmyard-extensions'
 import type { FarmTerrainKind } from '../moor/types'
 import type { FarmOperationResult, FarmTilePosition, FarmyardExtension, FarmyardSpaceState, PlayerState, Resource, StableConstruction } from '../contract/types'
@@ -11,6 +12,8 @@ export type FarmOperation = (
   | { kind: 'space-states'; states: FarmyardSpaceState[]; positions: readonly FarmTilePosition[] }
   | { kind: 'extension'; extension: FarmyardExtension; terrain: PlayerState['farmTerrain']; positions: readonly FarmTilePosition[] }
   | { kind: 'remove-stables'; positions: readonly FarmTilePosition[] }
+  | { kind: 'remove-fields'; positions: readonly FarmTilePosition[] }
+  | { kind: 'remove-rooms'; positions: readonly FarmTilePosition[] }
   | { kind: 'remove-fences'; indexes: readonly number[]; positions: readonly FarmTilePosition[] }
   | { kind: 'crops'; preparedPlayer: PlayerState; positions: readonly FarmTilePosition[] }
   | { kind: 'rooms'; positions: readonly FarmTilePosition[] }
@@ -70,6 +73,22 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
       player.farmyardExtensions = [...(player.farmyardExtensions ?? []), operation.extension]
       if (operation.terrain) player.farmTerrain = operation.terrain
       break
+    case 'remove-fields': {
+      const removed = new Set(operation.positions.map(positionKey))
+      player.fields = player.fields.filter(field => !removed.has(positionKey(field)))
+      player.farmyardSpaceStates = player.farmyardSpaceStates?.filter(s => !removed.has(s.spaceKey))
+      break
+    }
+    case 'remove-rooms': {
+      const removed = new Set(operation.positions.map(positionKey))
+      player.roomTiles = player.roomTiles.filter(tile => !removed.has(positionKey(tile)))
+      player.rooms = player.roomTiles.length
+      player.farmyardSpaceStates = player.farmyardSpaceStates?.filter(s => !removed.has(s.spaceKey))
+      for (const card of [...player.occupationPlayed, ...player.minorPlayed, ...player.improvements]) {
+        getCardEffect(card)?.onRoomsRemoved?.(player, operation.positions)
+      }
+      break
+    }
     case 'remove-stables': {
       const removed = new Set(operation.positions.map(positionKey))
       player.stableTiles = player.stableTiles.filter(tile => !removed.has(positionKey(tile)))

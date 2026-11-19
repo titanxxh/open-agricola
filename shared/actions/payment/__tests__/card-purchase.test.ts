@@ -25,6 +25,7 @@ const player = (): PlayerState => ({
   },
   improvements: ['Major_Fireplace1'],
   minorPlayed: [],
+  occupationPlayed: [],
 } as unknown as PlayerState)
 
 const state = (p: PlayerState): GameState => ({

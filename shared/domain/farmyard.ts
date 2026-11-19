@@ -186,7 +186,7 @@ export type PlowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
 export type SowSelection = {
   row: number
   col: number
-  crop: 'grain' | 'vegetable' | 'wood' | 'stone'
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
 }
 
 export type SowValidationError = {
@@ -223,7 +223,7 @@ type SowValidationOptions = {
 }
 
 const DEFAULT_NORMAL_FIELD_CROPS = ['grain', 'vegetable'] as const satisfies readonly SowSelection['crop'][]
-const ALL_CROPS = ['grain', 'vegetable', 'wood', 'stone'] as const satisfies readonly SowSelection['crop'][]
+const ALL_CROPS = ['grain', 'vegetable', 'wood', 'stone', 'reed'] as const satisfies readonly SowSelection['crop'][]
 
 export const isBorrowedFenceSourcePolicy = (
   policy: FenceSourcePolicy | undefined,
@@ -528,12 +528,14 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     vegetable: 0,
     wood: 0,
     stone: 0,
+    reed: 0,
   }
   const farmyardCropCount: Record<SowSelection['crop'], number> = {
     grain: 0,
     vegetable: 0,
     wood: 0,
     stone: 0,
+    reed: 0,
   }
   for (const selection of selections) {
     const row = Number(selection?.row)

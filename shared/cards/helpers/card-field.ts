@@ -17,6 +17,8 @@ export type CardFieldSlot = (CardFieldStack & { below?: CardFieldStack[] }) | nu
 export type CardFieldDef = {
   allowedCrops: readonly Crop[]
   capacity: number
+  /** Harvested goods become card-owned bonus points instead of reserve goods. */
+  harvestDestination?: 'bonus-vp'
 }
 
 export type CardFieldReapContext = {
@@ -43,18 +45,22 @@ export type CardFieldOptions = {
 }
 
 const RHYTHM: Record<Crop, number> = {
-  grain: 3, vegetable: 2, wood: 3, stone: 2,
+  grain: 3, vegetable: 2, wood: 3, stone: 2, reed: 3,
 }
 
 const DECK_ORDINAL: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5 }
 const cardFieldDefs = new Map<string, CardFieldDef>()
+export const cardFieldHarvestDestination = (cardId: string) => cardFieldDefs.get(cardId)?.harvestDestination
 
 const parseCardBaseCol = (cardId: string): number => {
   const match = cardId.match(/^([A-E])(\d+)_/)
-  if (!match) throw new Error(`[card-field] cardId "${cardId}" not in <Deck><Number>_ format`)
-  const ord = DECK_ORDINAL[match[1]]
-  if (ord === undefined) throw new Error(`[card-field] unknown deck letter "${match[1]}" in ${cardId}`)
-  return ord * 1000 + Number(match[2])
+  // Preserve coordinates already present in saved A–E games. New deck names
+  // get a separate namespace and 1,000 slots per card, independent of load order.
+  if (match) return DECK_ORDINAL[match[1]] * 1000 + Number(match[2])
+  const extended = cardId.match(/^([A-Z]{1,4})(\d{1,3})_/)
+  if (!extended) throw new Error(`[card-field] cardId "${cardId}" not in <Deck><Number>_ format`)
+  const deck = [...extended[1]].reduce((value, letter) => value * 27 + letter.charCodeAt(0) - 64, 0)
+  return 10_000_000 + deck * 1_000_000 + Number(extended[2]) * 1000
 }
 
 export const deriveVirtualTileCol = (cardId: string, slotIdx: number): number =>

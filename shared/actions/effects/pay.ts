@@ -1,3 +1,5 @@
+import { cardEffectHandChangedEvent } from '../../session/private-hand-events'
+import type { ActionMutationContext } from '../../contract/types'
 import type {
   ActionDefinition,
   ActionExecutionResult,
@@ -12,7 +14,7 @@ import type {
   Resource,
 } from '../../contract/types'
 import type { CardPayment, EventSink, PaymentPurpose, ResourceLocation } from '../../contract/events'
-import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/helpers/card-state'
+import { addCardResourceGained, addCardResourcePaid, recordCardCostAttribution } from '../../cards/helpers/card-state'
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx, PaymentExecuteError, PaymentReceipt } from '../payment'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
@@ -91,8 +93,18 @@ const looksLikeFlatResource = (
 
 const normalizePayParams = (
   raw: Record<string, unknown> | undefined,
+  providers?: CardProvidedPaymentResourceProvider[],
 ): PayParams | undefined => {
   if (!raw) return undefined
+  if (providers?.length) {
+    const normalized = normalizePayParams(raw)
+    if (!normalized) return undefined
+    const cost = PaymentSolver.isComplexCost(normalized.cost) ? normalized.cost : { fee: normalized.cost }
+    const combined = [...new Map(
+      [...(cost.paymentResourceProviders ?? []), ...providers].map(provider => [provider.key, provider]),
+    ).values()]
+    return { ...normalized, cost: { ...cost, paymentResourceProviders: combined } }
+  }
   // SAFETY: internal pay-flow params use this shape; PaymentSolver validates costs before deduction.
   if ('cost' in raw) return raw as unknown as PayParams
   if (looksLikeFlatResource(raw)) {
@@ -125,6 +137,11 @@ const buildPaymentSources = (
     if (provider.consume.type === 'actionSpace') {
       sources.push({
         from: { kind: 'actionSpace', spaceId: provider.consume.spaceId },
+        resources: { [provider.consume.resource]: amount },
+      })
+    } else if (provider.consume.type === 'cardCounter') {
+      sources.push({
+        from: { kind: 'card', cardId: provider.consume.cardId, playerId: provider.consume.playerId },
         resources: { [provider.consume.resource]: amount },
       })
     }
@@ -232,11 +249,27 @@ const buildSelectedResult = (
   sourceActionId?: string,
   trackSourceCardPaymentStats = costType === undefined,
   paymentId?: string,
+  emitPrivateEvent?: ActionMutationContext['emitPrivateEvent'],
 ): ActionExecutionResult => {
   if (receipt.returnedCardId) {
     returnCardToBoard(player, receipt.returnedCardId, state)
   }
   const resourcesPaid = receipt.resourcesPaid
+  for (const provider of receipt.paymentResourceProviders ?? []) {
+    if ((resourcesPaid[provider.key] ?? 0) > 0 && provider.consume.type === 'handCard') {
+      emitPrivateEvent?.(cardEffectHandChangedEvent(
+        player.id, [provider.consume.cardId], 'mixed', provider.sourceCard, 'pay',
+      ))
+    }
+  }
+  for (const grant of receipt.solution.resourceGrants ?? []) {
+    addCardResourceGained(player, grant.sourceCard, grant.resources)
+    eventSink?.emit<'resource.moved'>({
+      type: 'resource.moved', resources: grant.resources,
+      from: { kind: 'supply' }, to: { kind: 'player', playerId: player.id },
+      sourceCardId: grant.sourceCard, reason: 'cardEffect',
+    })
+  }
   if (sourceCard && trackSourceCardPaymentStats) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
@@ -295,8 +328,8 @@ export const payAction: ActionDefinition = {
   // player choice back through resolveChoice.
   skipChoiceWrap: true,
   canBeExecutedByPlayer: () => true,
-  previewEffect: ({ state, player, params, sourceCard }) => {
-    const payment = normalizePayParams(params)
+  previewEffect: ({ state, player, params, sourceCard, paymentResourceProviders }) => {
+    const payment = normalizePayParams(params, paymentResourceProviders)
     if (!payment) return undefined
     const previews = PaymentSolver.describeOptions(state, state.players.indexOf(player), payment.cost, buildPaymentCtx(payment, undefined, sourceCard))
     if (previews.length === 1) return previews[0]!.descriptionPreview ? { kind: 'rule', description: previews[0]!.descriptionPreview } : previews[0]!.effectPreview
@@ -304,8 +337,8 @@ export const payAction: ActionDefinition = {
     return PaymentSolver.isComplexCost(payment.cost) ? undefined : { kind: 'payment', resourcesPaid: payment.cost }
   },
   costPreview: {
-    getBaseCost: ({ params }) => {
-      const p = normalizePayParams(params)
+    getBaseCost: ({ params, paymentResourceProviders }) => {
+      const p = normalizePayParams(params, paymentResourceProviders)
       if (!p?.cost) return {}
       if (PaymentSolver.isComplexCost(p.cost)) return p.cost.fee ?? {}
       return p.cost
@@ -316,8 +349,8 @@ export const payAction: ActionDefinition = {
     // computeAllBuyableCombinations so multi-solution payments — including
     // ones that require returning a card via cards.list — stay doable
     // inside seq nodes.
-    canExecute: ({ state, player, params }) => {
-      const p = normalizePayParams(params)
+    canExecute: ({ state, player, params, paymentResourceProviders }) => {
+      const p = normalizePayParams(params, paymentResourceProviders)
       if (!p?.cost) return false
       const playerIndex = state.players.indexOf(player)
       const effectiveState = playerIndex >= 0 ? state : buildSingletonState(player)
@@ -330,8 +363,8 @@ export const payAction: ActionDefinition = {
       )
     },
   },
-  execute: ({ player, params, sourceCard, state, eventSink }) => {
-    const p = normalizePayParams(params)
+  execute: ({ player, params, sourceCard, state, eventSink, emitPrivateEvent, paymentResourceProviders }) => {
+    const p = normalizePayParams(params, paymentResourceProviders)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     const playerIndex = state.players.indexOf(player)
     const effectiveState = playerIndex >= 0 ? state : buildSingletonState(player)
@@ -354,6 +387,7 @@ export const payAction: ActionDefinition = {
       p.sourceActionId,
       shouldTrackSourceCardPaymentStats(p),
       p.paymentId,
+      emitPrivateEvent,
     )
   },
   // Multi-solution payments emit a `prompt.selectPayment` choice from
@@ -362,8 +396,8 @@ export const payAction: ActionDefinition = {
   // time landing on the `selected` branch and actually mutating resources.
   // Without this hook the engine's fallthrough would return `{type:'ok'}`
   // without paying, leaving host action completion running on un-paid state.
-  resolveChoice: ({ actionHooks, player, params, sourceCard, state, eventSink }, choice) => {
-    const p = normalizePayParams(params)
+  resolveChoice: ({ actionHooks, player, params, sourceCard, state, eventSink, emitPrivateEvent, paymentResourceProviders }, choice) => {
+    const p = normalizePayParams(params, paymentResourceProviders)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     const optionPrefix = p.optionPrefix ?? 'pay:generic'
     const choiceLooksLikePayment =
@@ -381,6 +415,8 @@ export const payAction: ActionDefinition = {
           state,
           space: undefined as never,
           eventSink,
+          emitPrivateEvent,
+          paymentResourceProviders,
         })
       }
       const playerIndex = state.players.indexOf(player)
@@ -404,6 +440,7 @@ export const payAction: ActionDefinition = {
         p.sourceActionId,
         shouldTrackSourceCardPaymentStats(p),
         p.paymentId,
+        emitPrivateEvent,
       )
     }
     if (!PaymentSolver.isComplexCost(p.cost)) {
@@ -425,6 +462,8 @@ export const payAction: ActionDefinition = {
         state,
         space: undefined as never,
         eventSink,
+        emitPrivateEvent,
+        paymentResourceProviders,
       })
     }
     const playerIndex = state.players.indexOf(player)
@@ -448,6 +487,7 @@ export const payAction: ActionDefinition = {
       p.sourceActionId,
       shouldTrackSourceCardPaymentStats(p),
       p.paymentId,
+      emitPrivateEvent,
     )
   },
 }

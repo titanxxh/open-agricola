@@ -62,7 +62,7 @@ export const commitFirstPlow = (session: GameSession, response: SessionResponse)
 
 export const sowCrops = (
   session: GameSession,
-  crops: Array<{ row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }>,
+  crops: Array<{ row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed' }>,
 ) => {
   let response = session.takeAction(0, 'grain-utilization')
   if (response.interaction.stateId === 'wait' && response.interaction.request.kind !== 'farm-select') {

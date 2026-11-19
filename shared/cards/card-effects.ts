@@ -21,7 +21,7 @@ import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals'
  */
 export type ExtraSowableField = {
   tile: FarmTilePosition
-  allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
+  allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone' | 'reed')[]
   sourceCard: string
   groupKey?: string
 }
@@ -232,6 +232,7 @@ export type CardEffect = {
     state: GameState, player: PlayerState, ctx: FlowEffectContext,
   ) => boolean>>
   timedRules?: readonly TimedRule[]
+  retainFutureMeeplesOnReturn?: boolean
   projectInteractionRequest?: (state: GameState, player: PlayerState, request: InteractionRequest, actionId: string | undefined) => InteractionRequest
   computeResourceCommitments?: (state: GameState, owner: PlayerState) => readonly ResourceCommitment[]
   /** Supply goods this played card forbids the owner to return to the general supply. */
@@ -239,6 +240,21 @@ export type CardEffect = {
   preHarvestGoodsWanted?: ResourceKey[]
   preHarvestGoodsWantedBeforeReap?: ResourceKey[]
   maySkipHarvestFieldPhase?: boolean
+  /** Read-only grants derived from the selected payment after substitutions and discounts. */
+  computePaymentResourceGrants?: (
+    state: GameState, player: PlayerState,
+    payment: {
+      costType?: import('../contract/types').CostModifierType
+      units: number
+      resourcesPaid: PaymentResourceMap
+    },
+  ) => Partial<Resource> | void
+  onRoomsRemoved?: (player: PlayerState, positions: readonly FarmTilePosition[]) => void
+  protectedImprovementIds?: (player: PlayerState) => readonly string[]
+  /** Independent resource alternatives resolved after selecting an improvement and before paying. */
+  computePurchaseResourceGrants?: (
+    state: GameState, player: PlayerState, purchase: { cardId: string; kind: 'minor' | 'major' },
+  ) => readonly Partial<Resource>[]
   onBuy?: FlowEffectHandlerWithPayment
   /** Fires when a pending `choice` whose sourceCard is this card is resolved.
    *  If the handler returns an ActionFlow, it is inserted as the next engine node. */
@@ -291,6 +307,9 @@ export type CardEffect = {
    * `onBeforeStartOfTurn` which fires once per round at round start.
    */
   onBeforePlayerTurn?: (state: GameState, player: PlayerState) => { skipTurn?: boolean } | void
+  /** Temporary placement veto, independent of remaining family members and feeding. */
+  blocksWorkerPlacement?: (state: GameState, player: PlayerState) => boolean
+  permitsActionSpaceEntry?: (state: GameState, owner: PlayerState, actor: PlayerState, spaceId: string) => boolean
   onAllWorkersPlaced?: FlowEffectHandler
   computeBonusScore?: BonusScoreHandler
   computeCostedBonus?: CostedBonusHandler
@@ -1177,3 +1196,15 @@ export const applySpecialStableAt = (
   }
   return null
 }
+
+/** Temporary placement restrictions do not change family size or feeding. */
+export const isWorkerPlacementBlocked = (state: GameState, player: PlayerState): boolean =>
+  [...player.occupationPlayed, ...player.minorPlayed, ...player.improvements].some(
+    id => getCardEffect(id)?.blocksWorkerPlacement?.(state, player) === true,
+  )
+
+export const cardEffectsPermitSpaceEntry = (state: GameState, actor: PlayerState, spaceId: string): boolean =>
+  state.players.every(owner =>
+    [...owner.occupationPlayed, ...owner.minorPlayed, ...owner.improvements].every(
+      id => getCardEffect(id)?.permitsActionSpaceEntry?.(state, owner, actor, spaceId) !== false,
+    ))

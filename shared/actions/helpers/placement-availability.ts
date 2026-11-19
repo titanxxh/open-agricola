@@ -1,3 +1,4 @@
+import { isWorkerPlacementBlocked, cardEffectsPermitSpaceEntry } from '../../cards/card-effects'
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerDispatchInput } from '../../cards/card-listeners'
 import { canSpaceAcceptWorker, filterActionSpacesByIds, findActionSpaceById, isSpaceBlocked } from '../../domain/space'
@@ -49,6 +50,7 @@ export const openRoundForSpace = (state: GameState, space: ActionSpace): number 
 }
 
 export const canEnterSpace = (space: ActionSpace, player: PlayerState, state: GameState): boolean => {
+  if (!cardEffectsPermitSpaceEntry(state, player, space.id)) return false
   const exclusiveOverride = exclusiveOwnerOverride(space, player, state)
   if (exclusiveOverride) return true
   if (state.round < openRoundForSpace(state, space)) return false
@@ -108,6 +110,7 @@ export const canPlaceWorkerOnSpace = (
   space: ActionSpace,
   check: WorkerPlacementCheck,
 ): boolean => {
+  if (isWorkerPlacementBlocked(state, player)) return false
   if (!canEnterSpace(space, player, state)) return false
   if (isSpaceBlocked(space)) return false
   if (!check.allowOccupied && !canSpaceAcceptWorker(space)) return false

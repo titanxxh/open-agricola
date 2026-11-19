@@ -40,6 +40,8 @@ export const getCardHeldWorkerIds = (player: PlayerState): Set<string> => {
   for (const key of Object.keys(cardStates)) {
     const value = cardStates[key]?.extraData?.[HELD_KEY]
     if (typeof value === 'string') out.add(value)
+    const values = cardStates[key]?.extraData?.heldWorkerIds
+    if (Array.isArray(values)) for (const id of values) if (typeof id === 'string') out.add(id)
   }
   return out
 }

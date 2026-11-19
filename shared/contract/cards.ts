@@ -113,7 +113,7 @@ export type CardDefinition = {
    * `onReap` callback, not via this metadata.
    */
   cardField?: {
-    allowedCrops: readonly ('grain' | 'vegetable' | 'wood' | 'stone')[]
+    allowedCrops: readonly ('grain' | 'vegetable' | 'wood' | 'stone' | 'reed')[]
     capacity: number
   }
   artUrl?: string

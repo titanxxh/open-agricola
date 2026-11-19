@@ -31,6 +31,8 @@ import {
 // ---------------------------------------------------------------------------
 
 export type AnimalZone = {
+  /** Animals committed to this holder cannot be reassigned or cooked. */
+  minimumAnimalCounts?: Partial<Record<AnimalKey, number>>
   id: string
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   capacity: number

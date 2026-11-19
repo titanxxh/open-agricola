@@ -4,7 +4,7 @@ import { readCardResourceStats } from './card-state'
 import { readPublicCardMarkers } from './public-card-markers'
 
 const cropStack = (kind: unknown, remaining: unknown): CropStack | null =>
-  (kind === 'grain' || kind === 'vegetable' || kind === 'wood' || kind === 'stone')
+  (kind === 'grain' || kind === 'vegetable' || kind === 'wood' || kind === 'stone' || kind === 'reed')
     && typeof remaining === 'number' && Number.isFinite(remaining) && remaining > 0
     ? { kind, remaining } : null
 

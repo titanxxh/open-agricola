@@ -395,6 +395,7 @@ export const validateAnimalAssignments = (
     animalCount: byId.get(zone.id)?.animalCount ?? 0,
     animalCounts: readAnimalCountsForZoneAssignment(byId.get(zone.id)),
   }))
+  if (finalZones.some(zone => keys.some(animal => (zone.animalCounts[animal] ?? 0) < (zone.minimumAnimalCounts?.[animal] ?? 0)))) return
   if (!areRequiredEmptyZoneGroupsSatisfied(finalZones)) return
   if (!areZoneOccupancyLimitsSatisfied(finalZones)) return
   return [...byId.values()]

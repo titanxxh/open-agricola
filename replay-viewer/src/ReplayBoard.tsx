@@ -249,7 +249,7 @@ function ReplayBoardContent({
     pendingPlowTile: null,
     pendingPositionSelections: new Set<string>(),
     pendingSowSelections: {},
-    sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
+    sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0, reed: 0 },
     isReorgActive: false,
     hasReorgOverflow: false,
     animalReorg: null,

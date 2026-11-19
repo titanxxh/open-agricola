@@ -181,3 +181,24 @@ it('restores the same cooking draft after an intervening player-switch confirmat
     id: 'pasture-1', animalType: 'sheep', animalCount: 1,
   })
 })
+
+
+it('keeps fixed card animals in their zone while ordinary animals can still move', () => {
+  const snapshot = state()
+  const interaction = animalReorgInteraction()
+  if (interaction.stateId !== 'wait' || interaction.request.kind !== 'animal-reorg') throw new Error('fixture')
+  interaction.request.zones[1] = {
+    id: 'card:fixed', zoneType: 'card', capacity: 1, animalCount: 1,
+    animalCounts: { sheep: 1 }, animalType: 'sheep', allowedAnimalType: null,
+    minimumAnimalCounts: { sheep: 1 },
+  }
+  const { result } = renderHook(() => useAnimalReorgDraftPresentation({ state: snapshot, pendingAnimalReorg: { playerIndex: 0, spaceId: 'animal-reorg' } }))
+  act(() => result.current.syncFromInteraction(interaction, snapshot))
+  act(() => result.current.controls.adjustAnimal('card:fixed', 'sheep', -1))
+  act(() => result.current.controls.adjustAnimal('card:fixed', 'boar', 1))
+  act(() => result.current.controls.adjustAnimal('pasture-1', 'sheep', 1))
+  expect(result.current.submitDraft.animalReorgZones).toEqual([
+    expect.objectContaining({ id: 'pasture-1', animalType: 'sheep', animalCount: 1 }),
+    expect.objectContaining({ id: 'card:fixed', animalCounts: { sheep: 1 }, animalCount: 1 }),
+  ])
+})

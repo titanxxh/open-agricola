@@ -34,6 +34,7 @@ export const buildAnimalReorgRequest = (
       ...(zone.occupiedZoneLimit !== undefined ? { occupiedZoneLimit: zone.occupiedZoneLimit } : {}),
       ...(zone.requiredEmptyZoneGroupIds ? { requiredEmptyZoneGroupIds: zone.requiredEmptyZoneGroupIds } : {}),
       capacity: zone.capacity,
+      ...(zone.minimumAnimalCounts ? { minimumAnimalCounts: zone.minimumAnimalCounts } : {}),
     })),
   }
 }

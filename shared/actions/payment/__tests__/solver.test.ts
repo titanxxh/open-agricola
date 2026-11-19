@@ -1,7 +1,11 @@
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it, beforeEach } from 'vitest'
 import { PaymentSolver } from '../index'
 import type { PaymentCtx } from '../index'
-import type { CostModifier, GameState, PlayerState } from '../../../contract/types'
+import type { ComplexCost, CostModifier, GameState, PlayerState } from '../../../contract/types'
 
 const makePlayerWithResources = (res: Partial<Record<string, number>>): PlayerState => {
   return {
@@ -10,6 +14,9 @@ const makePlayerWithResources = (res: Partial<Record<string, number>>): PlayerSt
     stableTiles: [],
     fenceSegments: [],
     minorHand: [],
+    occupationPlayed: [],
+    minorPlayed: [],
+    improvements: [],
     cardStates: {},
     activeModifiers: [],
     supplyTokensConsumed: {},
@@ -60,6 +67,32 @@ describe('PaymentSolver', () => {
   })
 
   describe('computeOptions', () => {
+    it('previews a fresh Turn hand-card discount but never settles an admission-only provider', () => {
+      const player = makePlayerWithResources({ wood: 0 })
+      player.occupationHand = ['test-hand-card']
+      player.occupationPlayed = []
+      player.minorPlayed = []
+      player.improvements = []
+      player.cardStates['test-discount'] = { extraData: { usedTurnToken: 'gap:0' } }
+      const state = makeState(player)
+      const cost: ComplexCost = { fee: { wood: 1 }, paymentResourceProviders: [{
+        key: 'test-discount:hand0', sourceCard: 'test-discount', available: 1,
+        covers: [{ resource: 'wood', costAmount: 1, paymentAmount: 1 }],
+        consume: { type: 'handCard', playerId: player.id, cardId: 'test-hand-card',
+          usageSource: 'test-discount', turnToken: 'gap:0', previewNextTurn: true },
+      }] }
+      expect(PaymentSolver.computeOptions(state, 0, cost, ctx)).toHaveLength(1)
+      expect(PaymentSolver.resolvePayment(state, 0, cost, ctx)).toEqual({ type: 'failed', reason: 'cannot-afford' })
+      expect(player.occupationHand).toEqual(['test-hand-card'])
+      const backing = cost.paymentResourceProviders![0]!.consume
+      if (backing.type !== 'handCard') throw new Error('Expected a hand-card provider')
+      delete backing.previewNextTurn
+      expect(PaymentSolver.computeOptions(state, 0, cost, ctx)).toEqual([])
+      delete player.cardStates['test-discount']
+      expect(PaymentSolver.resolvePayment(state, 0, cost, ctx).type).toBe('paid')
+      expect(player.occupationHand).toEqual([])
+      expect(player.cardStates['test-discount']?.extraData?.usedTurnToken).toBe('gap:0')
+    })
     it('returns empty array when player cannot afford simple cost', () => {
       const state = makeState(makePlayerWithResources({ wood: 0 }))
       const options = PaymentSolver.computeOptions(state, 0, { wood: 3 }, ctx)

@@ -20,7 +20,8 @@ import type {
   TradeSideEffect,
 } from '../../../contract/types'
 import { recordPaymentStats } from '../../../cards/helpers/payment-stats'
-import { incCounter } from '../../../cards/helpers/card-state'
+import { USED_THIS_TURN_KEY } from '../../../cards/helpers/turn-token'
+import { incCounter, writeCardExtraData } from '../../../cards/helpers/card-state'
 import { payResources, paySupplyTokens } from './affordability'
 import { findActionSpaceById } from '../../../domain/space'
 import { canConsumePaymentResourceProviders } from './provider-backing'
@@ -47,6 +48,18 @@ const consumePaymentResourceProviders = (
       if (!space?.resources) return false
       space.resources[provider.consume.resource] =
         (space.resources[provider.consume.resource] ?? 0) - amount
+    } else if (provider.consume.type === 'cardCounter') {
+      const playerId = provider.consume.playerId
+      const owner = state?.players.find(p => p.id === playerId)
+      if (!owner) return false
+      incCounter(owner, provider.consume.cardId, provider.consume.counterKey, -amount)
+    } else if (provider.consume.type === 'handCard') {
+      const backing = provider.consume
+      const owner = state?.players.find(p => p.id === backing.playerId)
+      if (!owner) return false
+      owner.occupationHand = owner.occupationHand.filter(id => id !== backing.cardId)
+      owner.minorHand = owner.minorHand.filter(id => id !== backing.cardId)
+      writeCardExtraData(owner, backing.usageSource, USED_THIS_TURN_KEY, backing.turnToken)
     }
   }
   return true
@@ -131,6 +144,11 @@ export const executePaymentSolution = (
 ): string | undefined => {
   if (!consumePaymentResourceProviders(options.state, solution, options.paymentResourceProviders)) {
     throw new Error('Cannot consume card-provided payment resource')
+  }
+  for (const grant of solution.resourceGrants ?? []) {
+    for (const [key, amount] of Object.entries(grant.resources)) {
+      if (amount && amount > 0) player.resources[key as keyof Resource] += amount
+    }
   }
   payResources(player, solution.resourcesPaid, options.state)
   paySupplyTokens(player, solution.resourcesPaid)

@@ -12,6 +12,8 @@
  * the public API instead.
  */
 
+import { canReturnImprovement } from '../../../cards/helpers/return-card'
+import { paymentGrantSources, paymentResourceGrants, withPaymentGrants } from '../../../cards/helpers/payment-resource-grants'
 import type {
   ComplexCost,
   CostAttribution,
@@ -952,7 +954,7 @@ export const computeAllBuyableCombinations = (
   validateComplexCost(effectiveCost)
 
   // Provider backing is live action-space state, outside the cache key.
-  const canUseCache = !hasSupplyTokenCost(effectiveCost) && !effectiveCost.paymentResourceProviders?.length
+  const canUseCache = !paymentGrantSources(player).length && !hasSupplyTokenCost(effectiveCost) && !effectiveCost.paymentResourceProviders?.length
   const cacheKey = canUseCache ? makeCacheKey(player, effectiveCost, costType, playedCards) : ''
   const cached = canUseCache ? solutionCache.get(cacheKey) : undefined
   if (cached) return cached
@@ -1171,7 +1173,10 @@ export const computeAllBuyableCombinations = (
           const { resources: realCost, supplyTokens } = splitSupplyTokenCost(mergePaymentResources(effectiveCostFee, effectiveCost.protectedFee ?? {}))
           const providerCoverOptions = buildProviderCoverOptions(realCost, paymentResourceProviders)
           for (const providerCover of providerCoverOptions) {
-            if (!canCoverCost(tradeCombo.result, providerCover.remainingCost)
+            const paidCostWithProviders = mergePaymentResources(providerCover.remainingCost, providerCover.resourcesPaid)
+            const actualPaid = subtractResources(playerResources, subtractResources(tradeCombo.result, paidCostWithProviders))
+            const grants = paymentResourceGrants(state, player, costType, nb ?? 1, actualPaid, paymentResourceProviders)
+            if (!canCoverCost(withPaymentGrants(tradeCombo.result, grants), providerCover.remainingCost)
               || !canPaySupplyTokens(state, player, mergePaymentResources(effectiveCostFee, effectiveCost.protectedFee ?? {}))) {
               continue
             }
@@ -1220,7 +1225,7 @@ export const computeAllBuyableCombinations = (
           total + (cover.costResource === resource ? cover.costAmount : 0), 0)
         if (protectedAmount > 0) resourcesPaid[resource] = Math.max(resourcesPaid[resource] ?? 0, protectedAmount - covered)
       }
-      if (!canPayResources(player, resourcesPaid) || !canPaySupplyTokens(state, player, resourcesPaid)) continue
+      if (!canCoverCost(withPaymentGrants(player.resources, paymentResourceGrants(state, player, costType, nb ?? 1, resourcesPaid, paymentResourceProviders)), splitSupplyTokenCost(resourcesPaid).resources) || !canPaySupplyTokens(state, player, resourcesPaid)) continue
     }
     if (
       costType
@@ -1230,6 +1235,7 @@ export const computeAllBuyableCombinations = (
     }
     const solution: PaymentSolution = {
       resourcesPaid,
+      ...(paymentGrantSources(player).length ? { resourceGrants: paymentResourceGrants(state, player, costType, nb ?? 1, resourcesPaid, paymentResourceProviders) } : {}),
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
       bonusChoiceIndex: sol.bonusChoiceIndex,
@@ -1249,7 +1255,7 @@ export const computeAllBuyableCombinations = (
 
   if (cost.cards?.list && cost.cards.list.length > 0) {
     const eligibleCards = playedCards
-      ? playedCards.filter((cardId) => cardMatchesCostList(cardId, cost.cards!.list))
+      ? playedCards.filter((cardId) => canReturnImprovement(player, cardId) && cardMatchesCostList(cardId, cost.cards!.list))
       : []
     const cardCost = cost.cards.cost ?? {}
     const alternativeCardCost = mergePaymentResources(cardCost, effectiveCost.protectedFee ?? {})
@@ -1262,7 +1268,7 @@ export const computeAllBuyableCombinations = (
         paymentSolutions.forEach((solution) => {
           eligibleCards.forEach((cardId) => {
             const resourcesPaid = mergePaymentResources(solution.resourcesPaid, cardCost)
-            if (!canPayResources(player, resourcesPaid) || !canPaySupplyTokens(state, player, resourcesPaid)) {
+            if (!canCoverCost(withPaymentGrants(player.resources, paymentResourceGrants(state, player, costType, nb ?? 1, resourcesPaid, paymentResourceProviders)), splitSupplyTokenCost(resourcesPaid).resources) || !canPaySupplyTokens(state, player, resourcesPaid)) {
               return
             }
             requiredCardSolutions.push({
@@ -1291,8 +1297,8 @@ export const computeAllBuyableCombinations = (
     withinPaymentBudget(solution, effectiveCost.paymentBudget)
       && Object.entries(effectiveCost.minimumResourcesPaid ?? {}).every(([resource, amount]) =>
         (solution.resourcesPaid[resource as PaymentResourceKey] ?? 0) >= (amount ?? 0))
-      // Offer only provider payments that settlement could consume now.
-      && (!state || canConsumePaymentResourceProviders(state, solution, paymentResourceProviders)),
+      // Admission may preview a fresh Turn; settlement rejects those projected providers.
+      && (!state || canConsumePaymentResourceProviders(state, solution, paymentResourceProviders, true)),
   )
   const result = sortPaymentSolutions(keepOnlyOptimals(budgetedSolutions))
   if (canUseCache) solutionCache.set(cacheKey, result)

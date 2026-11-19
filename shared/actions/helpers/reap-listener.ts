@@ -17,11 +17,13 @@ export type ReapListenerOptions = {
   trigger?: ReapTrigger
   sourceCard?: string
   afterCompletion?: 'manual' | 'action'
+  emptiedFields?: readonly string[]
+  emptiedFieldCrops?: Readonly<Record<string, ReapCrop>>
 }
 
-type ReapCrop = 'grain' | 'vegetable' | 'wood' | 'stone'
+type ReapCrop = 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
 export type ReapedCropAmounts = Partial<Record<ReapCrop, number>>
-export type ReapReceipt = { reapedCropAmounts: ReapedCropAmounts; trigger: ReapTrigger; sourceCard?: string }
+export type ReapReceipt = { reapedCropAmounts: ReapedCropAmounts; trigger: ReapTrigger; sourceCard?: string; emptiedFields?: readonly string[]; emptiedFieldCrops?: Readonly<Record<string, ReapCrop>> }
 
 export const getReapedCropAmount = (context: CardListenerContext, crop: ReapCrop): number => {
   const extraData = context.result && 'extraData' in context.result ? context.result.extraData : context.extraData
@@ -64,13 +66,13 @@ export const dispatchReapListeners = (
         : { type: 'parallel', mode: 'trigger-select', targetPlayerId: ownerPlayerId, children: activations })
     }
   }
-  for (const crop of ['grain', 'vegetable', 'wood', 'stone'] as const) {
+  for (const crop of ['grain', 'vegetable', 'wood', 'stone', 'reed'] as const) {
     const amount = amounts[crop] ?? 0
     if (amount <= 0) continue
     appendPhase('immediatelyAfter', { crop, amount, trigger, ...(options.sourceCard ? { sourceCard: options.sourceCard } : {}) })
   }
   if (options.afterCompletion !== 'action' && Object.values(amounts).some(amount => amount > 0)) {
-    appendPhase('after', { reapedCropAmounts: amounts, trigger, ...(options.sourceCard ? { sourceCard: options.sourceCard } : {}) } satisfies ReapReceipt)
+    appendPhase('after', { reapedCropAmounts: amounts, emptiedFields: options.emptiedFields, emptiedFieldCrops: options.emptiedFieldCrops, trigger, ...(options.sourceCard ? { sourceCard: options.sourceCard } : {}) } satisfies ReapReceipt)
   }
   if (children.length === 0) return
   return { type: 'seq', children }

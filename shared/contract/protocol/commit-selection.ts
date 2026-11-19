@@ -14,7 +14,7 @@ export type CommitSelectionPayload = {
   stables?: FarmTilePosition[]
   farmHand?: FarmTilePosition
   tile?: FarmTilePosition
-  crops?: (FarmTilePosition & { crop: 'grain' | 'vegetable' | 'wood' | 'stone' })[]
+  crops?: (FarmTilePosition & { crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed' })[]
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -23,7 +23,7 @@ const isPosition = (value: unknown): boolean =>
   isRecord(value) && typeof value.row === 'number' && typeof value.col === 'number'
 const isPositions = (value: unknown): boolean => Array.isArray(value) && value.every(isPosition)
 const isCrop = (value: unknown): boolean => isPosition(value)
-  && ['grain', 'vegetable', 'wood', 'stone'].includes((value as { crop?: unknown }).crop as string)
+  && ['grain', 'vegetable', 'wood', 'stone', 'reed'].includes((value as { crop?: unknown }).crop as string)
 
 const fieldValidators: Record<keyof CommitSelectionPayload, (value: unknown) => boolean> = {
   cancel: value => value === true,

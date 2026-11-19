@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import type { GameState, PlayerState } from '../../../contract/types'
 import { createInitialPlayerStats } from '../../../session/stats'
 import { commitImprovementPurchaseLifecycle } from '../improvement-purchase-lifecycle'
 
 import '../../../cards/A/A001_Shelter'
+
+installOfficialCardRegistry()
 
 const resources = {
   wood: 0,

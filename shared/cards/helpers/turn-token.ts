@@ -25,7 +25,7 @@ export const markUsedThisTurnLeaf = (player: PlayerState, cardId: string, key = 
  * The open Turn, or else the gap since the player's last Turn ended (other players' Turns, harvest,
  * round end and start) until their next Turn begins. A gap never equals a Turn token.
  */
-const readTurnOrGapToken = (player: PlayerState): number | string =>
+export const readTurnOrGapToken = (player: PlayerState): number | string =>
   readTurnScopeToken(player) ?? `gap:${readActionSnapshotExtraData<number>(player, 'lastToken') ?? 0}`
 
 /**
