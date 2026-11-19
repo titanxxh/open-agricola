@@ -855,6 +855,8 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 ### 启用或暂停浏览器通知
 
+`server/web-push/` 管理设备开关、发送和点击解析。Room Commit 在持久化对局状态时记录轮抽机会。反馈服务在正式流程写入新补资料请求或首封上线通知时记录站内信事件。持久队列面向已开启的设备，每次尝试重新核对账号、设备和事件资格。推送服务只收到通用本地化文案和不透明投递 ID。测试见 `web-push-draft.test.ts` 和 `bug-report-{feedback,release-feedback}.test.ts`。
+
 正式 Pages 提供 `/sw.js` 后，在后端环境配置 `WEB_PUSH_VAPID_SUBJECT`、`WEB_PUSH_VAPID_PUBLIC_KEY` 和 `WEB_PUSH_VAPID_PRIVATE_KEY`。使用 HTTPS 地址或 `mailto:` 邮箱作为联系地址，将私钥留在后端。各次部署沿用同一对密钥，以保留设备订阅。
 
 将 `WEB_PUSH_DRAFT_ENABLED`、`WEB_PUSH_INBOX_ENABLED` 或两者设为 `true`，开放设备设置并启用发送。两个开关默认关闭。暂停某一类时，将对应开关设为 `false` 并重启后端。正式 Pages 的 Worker 继续处理此前已送达的通知点击。
