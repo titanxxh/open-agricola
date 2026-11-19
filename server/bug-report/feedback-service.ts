@@ -2,6 +2,7 @@ import { HistoricalFeedback, readHistoricalIssue, type HistoricalIssueReader } f
 import { parseAssociateDuplicate, parseAssociateFix, parseFeedbackDetails, parseRecordFeedback, type FeedbackRecord, type FixAssociation, type InboxMessage, type InboxPage, type ReportFeedbackView, type VerifiedFixPullRequest, type ReleaseFeedbackRecord, type VerifiedProductionRelease } from '../../shared/contract/bug-report-feedback'
 import { parseDeploymentProof, planFixDeployment, type DeploymentProof } from './deployment-proof'
 import type { PostgresDatabase } from '../database/postgres'
+import { enqueueWebPush } from '../web-push/store'
 import { BUG_REPORT_GITHUB_REPOSITORY } from './github-issue-client'
 import { GitHubFixVerifier, fixEvidenceFingerprint } from './github-fix-verifier'
 
@@ -256,6 +257,9 @@ export class BugReportFeedbackService {
         .get<Omit<FeedbackRow, 'github_issue_number'>>(report.submission_id, recipient, actorId, input.requestId, input.kind,
           input.reportSummary, input.explanation, input.kind === 'needs_info' ? JSON.stringify(input.missingItems) : null, input.expectedVersion + 1, this.now())
       if (!inserted) throw new Error('Feedback insert returned no record')
+      if (!context && input.kind === 'needs_info') {
+        await enqueueWebPush(this.db, { kind: 'bug-report-inbox', userId: recipient, messageId: inserted.id, createdAt: inserted.created_at })
+      }
       await this.queueReconciliation(report.submission_id, input.requestId, context?.issueNumbers)
       return { ...record({ ...inserted, github_issue_number: input.issueNumber }), ...(context ? { inserted: true } : {}) }
     })()
@@ -422,9 +426,14 @@ export class BugReportFeedbackService {
         const release = { rootId: root.root_id, firstVerified: first, ...(historical?.historical_first_included && fixEvidenceFingerprint(historical.historical_first_included.pullRequests) === fixEvidenceFingerprint(root.pull_requests) ? { historicalFirstIncluded: { version: historical.historical_first_included.version, url: historical.historical_first_included.url } } : {}),
           reports: recipientReports.map(entry => ({ submissionId: entry.report.submission_id, issueNumber: entry.report.github_issue_number })) }
         const inserted = await this.db.prepare(`INSERT INTO bug_report_feedback(submission_id,recipient_user_id,request_id,kind,report_summary,explanation,
-          version,created_at,root_id,release) VALUES(?,?,?,'fix_released',?,?,NULL,?,?,?::jsonb) ON CONFLICT DO NOTHING`)
-          .run(primary.report.submission_id, recipient, `release:${root.root_id}`, primary.feedback.report_summary, root.fix_summary, this.now(), root.root_id, JSON.stringify(release))
-        result.sentMessages += inserted.changes
+          version,created_at,root_id,release) VALUES(?,?,?,'fix_released',?,?,NULL,?,?,?::jsonb) ON CONFLICT DO NOTHING RETURNING id,created_at`)
+          .get<{ id: number; created_at: number }>(primary.report.submission_id, recipient, `release:${root.root_id}`,
+            primary.feedback.report_summary, root.fix_summary, this.now(), root.root_id, JSON.stringify(release))
+        if (!inserted) continue
+        result.sentMessages++
+        if (scope === null && expectations === null) {
+          await enqueueWebPush(this.db, { kind: 'bug-report-inbox', userId: recipient, messageId: inserted.id, createdAt: inserted.created_at })
+        }
       }
     }
     return result

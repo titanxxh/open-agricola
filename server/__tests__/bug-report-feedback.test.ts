@@ -4,6 +4,8 @@ import { requestAccountDeletion } from '../auth'
 import { createTestDatabase } from './_helpers/postgres'
 import type { PostgresDatabase } from '../database/postgres'
 import { BugReportFeedbackService } from '../bug-report/feedback-service'
+import { WebPushDelivery } from '../web-push/delivery'
+import { createInboxPushLogin } from './_helpers/inbox-push'
 
 let db: PostgresDatabase
 let service: BugReportFeedbackService
@@ -61,6 +63,51 @@ describe('Bug Report feedback', () => {
     expect((await service.getReport(1465)).feedback).toEqual([needsInfo, confirmed])
     expect(await service.listInbox('reporter')).toEqual({ messages: [{ ...confirmed, readAt: null }, { ...needsInfo, readAt: 1000 }],
       unreadCount: 1, nextCursor: null })
+  })
+
+  it('pushes only a new formal needs-info message to the reporter’s opted-in device', async () => {
+    const now = () => 1000
+    const recipient = await createInboxPushLogin(db, now, 'reporter')
+    const other = await createInboxPushLogin(db, now, 'other')
+    await createInboxPushLogin(db, now, 'reporter', 'draft')
+    const needsInfo = { ...confirmation, kind: 'needs_info', requestId: 'push-needs-info',
+      missingItems: ['The action immediately before the disconnect'] }
+    await service.recordFeedback('admin', { ...needsInfo, requestId: 'historical-needs-info' }, {
+      issueNumbers: [1465], submissionId: 'report', recipientId: 'reporter', recipientVersion: 0,
+    })
+    const message = await service.recordFeedback('admin', { ...needsInfo, expectedVersion: 1 })
+    await service.recordFeedback('admin', { ...needsInfo, expectedVersion: 1 })
+    await service.recordFeedback('admin', { ...confirmation, expectedVersion: 2 })
+    const sent: Array<{ deliveryId: string; endpoint: string; ttl: number }> = []
+    const delivery = new WebPushDelivery(recipient.store, async (item, ttl) => {
+      sent.push({ deliveryId: item.deliveryId, endpoint: item.subscription.endpoint, ttl })
+      return { kind: 'accepted' }
+    }, now)
+    await delivery.deliverDue(['bug-report-inbox'])
+    await delivery.deliverDue(['bug-report-inbox'])
+    expect(sent).toEqual([{ deliveryId: expect.any(String), endpoint: recipient.endpoint, ttl: 86_400 }])
+    const [{ deliveryId }] = sent
+    expect(await recipient.store.resolveClick(recipient.token, deliveryId, 'bug-report-inbox'))
+      .toEqual({ kind: 'bug-report-inbox', messageId: message.id })
+    expect(await recipient.store.resolveClick(other.token, deliveryId, 'bug-report-inbox'))
+      .toEqual({ kind: 'unavailable' })
+    expect((await service.listInbox('reporter')).unreadCount).toBe(3)
+  })
+
+  it('stops retrying inbox push after the recipient reads the message', async () => {
+    let time = 1000
+    const now = () => time
+    const recipient = await createInboxPushLogin(db, now, 'reporter')
+    const message = await service.recordFeedback('admin', { ...confirmation, kind: 'needs_info',
+      requestId: 'retry-needs-info', missingItems: ['A screenshot of the action space'] })
+    const send = vi.fn(async () => ({ kind: 'retry' as const }))
+    const delivery = new WebPushDelivery(recipient.store, send, now)
+    await delivery.deliverDue(['bug-report-inbox'])
+    expect(send).toHaveBeenCalledTimes(1)
+    await service.markRead('reporter', message.id)
+    time += 5_000
+    await delivery.deliverDue(['bug-report-inbox'])
+    expect(send).toHaveBeenCalledTimes(1)
   })
 
   it('supports needs-info to non-bug and later correction without replacing prior explanations or read state', async () => {
