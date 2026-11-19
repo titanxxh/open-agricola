@@ -1,7 +1,7 @@
 import { browserApiFetch } from '../services/browser-api'
 import { checkServerAvailability, isServerUnavailableStatus, onServerRecovered, useServerAvailability } from '../services/server-availability'
 import { MaintenancePage } from './MaintenancePage'
-import { isDevRoomId, roomIdFromQuery } from '../utils/game-room-url'
+import { gameContextLinkFromQuery } from '../utils/game-room-url'
 import {
   useCallback,
   useEffect,
@@ -339,11 +339,9 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   const { t } = useLocale()
   const [location, setLocation] = useState(() => ({ search: window.location.search, version: 0 }))
   const [closedEvidenceKey, setClosedEvidenceKey] = useState<string | null>(null)
-  const params = new URLSearchParams(location.search)
-  const participantOnly = params.has('context')
-  const roomId = roomIdFromQuery(location.search) ?? ''
-  const hasContext = (params.has('context') || params.has('room'))
-    && !isDevRoomId(roomId) && (!params.has('page') || params.get('page') === 'game')
+  const link = gameContextLinkFromQuery(location.search)
+  const { roomId, participantOnly } = link ?? { roomId: '', participantOnly: false }
+  const hasContext = link !== null
   const resolutionKey = `${location.version}:${roomId}`
   const [resolution, setResolution] = useState<{
     key: string
@@ -491,7 +489,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   ) {
     return children
   }
-  if (!response.ok && response.code === 'not_participant' && !params.has('context')) {
+  if (!response.ok && response.code === 'not_participant' && !participantOnly) {
     return children
   }
   return <PublicContext response={response} />
