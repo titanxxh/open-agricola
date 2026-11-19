@@ -2,6 +2,7 @@ import path from 'node:path'
 import { readFileSync } from 'node:fs'
 import { build, type Plugin } from 'vite'
 import { parseLanguageManifest, parseLanguagePack } from '../shared/i18n/index.ts'
+import { browserBoundaryPlugin } from './browser-boundary-plugin.ts'
 import { buildOfflineEncyclopedia } from './card-encyclopedia/offline-artifacts.ts'
 import type { PublicAssetConfig } from './public-assets.ts'
 
@@ -75,11 +76,14 @@ export async function buildServiceWorker(config: AssetWorkerConfig, encyclopedia
     configFile: false,
     publicDir: false,
     logLevel: 'warn',
-    plugins: [{
-      name: 'open-agricola-service-worker-entry',
-      resolveId: id => id === virtualEntry ? virtualId : undefined,
-      load: id => id === virtualId ? workerSource(config, encyclopediaFallback, features) : undefined,
-    }],
+    plugins: [
+      {
+        name: 'open-agricola-service-worker-entry',
+        resolveId: id => id === virtualEntry ? virtualId : undefined,
+        load: id => id === virtualId ? workerSource(config, encyclopediaFallback, features) : undefined,
+      },
+      browserBoundaryPlugin(root, { [virtualId]: virtualId }),
+    ],
     build: {
       write: false,
       rolldownOptions: {
