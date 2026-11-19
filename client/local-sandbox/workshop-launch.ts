@@ -89,20 +89,25 @@ export const readLocalSandboxConfig = (ownerKey: string): LocalGameConfig | null
 /** Message type the embedded game posts to its Workshop parent. */
 export const LOCAL_SANDBOX_STATUS = 'open-agricola:local-sandbox-status'
 
+/**
+ * `launchId` names the Workshop launch that opened the frame; `instanceId`
+ * names the game it runs, which differs after resuming a save.
+ */
 export type LocalSandboxStatus =
-  | { type: typeof LOCAL_SANDBOX_STATUS; kind: 'running'; instanceId: string; cardWarnings: string[] }
-  | { type: typeof LOCAL_SANDBOX_STATUS; kind: 'failed'; instanceId: string; error: string }
+  | { type: typeof LOCAL_SANDBOX_STATUS; kind: 'running'; launchId: string; instanceId: string; cardWarnings: string[] }
+  | { type: typeof LOCAL_SANDBOX_STATUS; kind: 'failed'; launchId: string; instanceId: string; error: string }
 
 export const parseLocalSandboxStatus = (value: unknown): LocalSandboxStatus | null => {
   if (!value || typeof value !== 'object') return null
   const data = value as Record<string, unknown>
-  if (data.type !== LOCAL_SANDBOX_STATUS || typeof data.instanceId !== 'string') return null
+  if (data.type !== LOCAL_SANDBOX_STATUS || typeof data.launchId !== 'string' || typeof data.instanceId !== 'string') return null
+  const ids = { launchId: data.launchId, instanceId: data.instanceId }
   if (data.kind === 'running' && Array.isArray(data.cardWarnings)
     && data.cardWarnings.every((warning): warning is string => typeof warning === 'string')) {
-    return { type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: data.instanceId, cardWarnings: data.cardWarnings }
+    return { type: LOCAL_SANDBOX_STATUS, kind: 'running', ...ids, cardWarnings: data.cardWarnings }
   }
   if (data.kind === 'failed' && typeof data.error === 'string') {
-    return { type: LOCAL_SANDBOX_STATUS, kind: 'failed', instanceId: data.instanceId, error: data.error }
+    return { type: LOCAL_SANDBOX_STATUS, kind: 'failed', ...ids, error: data.error }
   }
   return null
 }

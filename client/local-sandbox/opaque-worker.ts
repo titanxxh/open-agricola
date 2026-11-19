@@ -7,6 +7,7 @@
  */
 import type { LocalSandboxRequest, LocalSandboxResponse } from './protocol.ts'
 import type { WorkerLike } from './local-transport.ts'
+import { randomUuid } from '../utils/uuid.ts'
 
 // The Vite plugin emits a self-contained classic Worker, including in dev.
 const workerUrl = new URL('./worker.ts', import.meta.url).href
@@ -58,8 +59,8 @@ const frameDocument = (channel: string, nonce: string) => `<!doctype html><html>
 
 /** A `WorkerLike` whose Worker lives in a fresh opaque iframe. */
 export function createOpaqueEngineWorker(): WorkerLike {
-  const channel = crypto.randomUUID()
-  const nonce = crypto.randomUUID().replaceAll('-', '')
+  const channel = randomUuid()
+  const nonce = randomUuid().replaceAll('-', '')
   const frame = document.createElement('iframe')
   frame.hidden = true
   frame.setAttribute('sandbox', 'allow-scripts')

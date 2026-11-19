@@ -1,4 +1,5 @@
 import type { WorkshopBrowserTestOutcome } from '../../shared/contract/workshop.ts'
+import { randomUuid } from '../utils/uuid.ts'
 
 // The Vite plugin emits a self-contained classic Worker, including in dev.
 const workerUrl = new URL('./card-tests.worker.ts', import.meta.url).href
@@ -52,9 +53,9 @@ export async function runBrowserCardTests(input: {
     })
   })
   input.signal.throwIfAborted()
-  const channel = crypto.randomUUID()
-  const id = crypto.randomUUID()
-  const nonce = crypto.randomUUID().replaceAll('-', '')
+  const channel = randomUuid()
+  const id = randomUuid()
+  const nonce = randomUuid().replaceAll('-', '')
   const frame = document.createElement('iframe')
   frame.hidden = true
   frame.setAttribute('sandbox', 'allow-scripts')

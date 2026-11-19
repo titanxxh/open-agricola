@@ -26,15 +26,17 @@ describe('Workshop browser sandbox launch', () => {
   })
 
   it('accepts only well-formed status messages', () => {
-    expect(parseLocalSandboxStatus({ type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: 'a', cardWarnings: ['w'] }))
-      .toEqual({ type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: 'a', cardWarnings: ['w'] })
-    expect(parseLocalSandboxStatus({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', instanceId: 'a', error: 'boom' }))
-      .toEqual({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', instanceId: 'a', error: 'boom' })
+    // A resumed save keeps its own game identity under the current launch.
+    expect(parseLocalSandboxStatus({ type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId: 'l', instanceId: 'a', cardWarnings: ['w'] }))
+      .toEqual({ type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId: 'l', instanceId: 'a', cardWarnings: ['w'] })
+    expect(parseLocalSandboxStatus({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', launchId: 'l', instanceId: '', error: 'boom' }))
+      .toEqual({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', launchId: 'l', instanceId: '', error: 'boom' })
     for (const value of [
-      null, 'text', { type: 'other', kind: 'running', instanceId: 'a', cardWarnings: [] },
-      { type: LOCAL_SANDBOX_STATUS, kind: 'running', cardWarnings: [] },
-      { type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: 'a', cardWarnings: [1] },
-      { type: LOCAL_SANDBOX_STATUS, kind: 'failed', instanceId: 'a' },
+      null, 'text', { type: 'other', kind: 'running', launchId: 'l', instanceId: 'a', cardWarnings: [] },
+      { type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId: 'l', cardWarnings: [] },
+      { type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: 'a', cardWarnings: [] },
+      { type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId: 'l', instanceId: 'a', cardWarnings: [1] },
+      { type: LOCAL_SANDBOX_STATUS, kind: 'failed', launchId: 'l', instanceId: 'a' },
     ]) expect(parseLocalSandboxStatus(value)).toBeNull()
   })
 })

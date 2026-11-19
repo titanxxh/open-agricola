@@ -21,6 +21,7 @@ import { API_BASE } from '../config'
 import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
 import { buildLocalGameConfig, parseLocalSandboxStatus, stashLocalSandboxConfig, toLocalCard, type LocalSandboxStatus } from '../local-sandbox/workshop-launch'
 import type { LocalCardInput } from '../local-sandbox/protocol'
+import { randomUuid } from '../utils/uuid'
 import { CardEditionSetup } from './CardEditionSetup'
 import { classicDeckPoolNotice, classicPoolMessage, toggleClassicDeck, useClassicDeckPool } from './classic-card-setup'
 
@@ -1605,7 +1606,7 @@ export function WorkshopPage() {
       ...sandboxCards.filter(card => card.id !== pinned?.cardDbId).map(toLocalCard),
       ...(pinned ? [pinned.card] : []),
     ]
-    const instanceId = crypto.randomUUID()
+    const instanceId = randomUuid()
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]! % 2_147_483_647
     try {
       stashLocalSandboxConfig(buildLocalGameConfig(cards, sandboxSettings, { instanceId, seed }), user?.id ?? 'anon')
@@ -1630,7 +1631,7 @@ export function WorkshopPage() {
       if (event.origin !== window.location.origin || !sandboxFrameRef.current
         || event.source !== sandboxFrameRef.current.contentWindow) return
       const status = parseLocalSandboxStatus(event.data)
-      if (!status || status.instanceId !== sandboxInstanceRef.current) return
+      if (!status || status.launchId !== sandboxInstanceRef.current) return
       setSandboxStatus(status)
       if (status.kind === 'failed') setPendingSandboxErrors([status.error])
       else setPendingSandboxErrors(status.cardWarnings.length > 0 ? status.cardWarnings : null)

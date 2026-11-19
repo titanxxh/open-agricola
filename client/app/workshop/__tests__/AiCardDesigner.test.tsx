@@ -651,7 +651,7 @@ describe('AiCardDesigner AI config header', () => {
           onClose={() => {}}
           onAddToSandboxAndRestart={startSandbox}
           sandboxPlaytest={sandboxPlaytest}
-          sandboxStatus={{ type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: 'tested-instance', cardWarnings }}
+          sandboxStatus={{ type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId: 'tested-instance', instanceId: 'tested-instance', cardWarnings }}
           apiFetch={apiFetch}
         />
       </LocaleProvider>
