@@ -402,6 +402,7 @@ export type FarmBoardView = {
   displayPlayer: PlayerState
   visiblePlayerIds: readonly string[]
   activePlayerId?: string
+  turnPlayerId?: string
   playerPanelSummary: PlayerPanelSupplySummary
   harvestRequirements?: ClientGameState['players'][number]['harvestRequirements']
   devMode: boolean
@@ -847,6 +848,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     displayPlayer,
     visiblePlayerIds,
     activePlayerId,
+    turnPlayerId: respondingPlayerId,
     playerPanelSummary,
     harvestRequirements,
     currentStartPlayerId,
@@ -914,6 +916,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     isOccupationHandSelectionRejected,
   } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
+  const turnPlayerId = respondingPlayerId ?? currentPlayer.id
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const playCardChoice = actions.playCardChoice ?? resolveChoice
   const summary = playerPanelSummary
@@ -1241,14 +1244,14 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
             <button
               key={player.id}
               type="button"
-              className={`player-tab${player.id === displayPlayer.id ? ' active' : ''}${currentPlayer.id === player.id ? ' is-current-turn' : ''}`}
+              className={`player-tab${player.id === displayPlayer.id ? ' active' : ''}${turnPlayerId === player.id ? ' is-current-turn' : ''}`}
               aria-pressed={player.id === displayPlayer.id}
-              aria-current={currentPlayer.id === player.id ? 'true' : undefined}
+              aria-current={turnPlayerId === player.id ? 'true' : undefined}
               onClick={() => setViewPlayerId(player.id)}
             >
               <span className="player-tab-label">
                 {getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)}
-                {currentPlayer.id === player.id ? (
+                {turnPlayerId === player.id ? (
                   <span
                     className="turn-marker"
                     title={t(locale, 'ui.currentPlayer')}
