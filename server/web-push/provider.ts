@@ -1,6 +1,6 @@
 import { createECDH } from 'node:crypto'
 import { encrypt, getVapidHeaders } from 'web-push'
-import { t } from '../../shared/i18n'
+import { getLanguagePack } from '../../shared/i18n'
 import { type BrowserPushSubscription, type WebPushPayload, type WebPushPreferences } from '../../shared/contract/web-push'
 import type { PushProvider } from './delivery'
 
@@ -56,11 +56,10 @@ export function createPushProvider(vapid: Vapid, request = fetch, now = Date.now
     if (!endpoint) return { kind: 'discarded' }
     const { kind, locale, deliveryId } = delivery
     const key = kind === 'draft' ? 'webPush.draftNotification' : 'webPush.inboxNotification'
-    const localizedTitle = t(locale, key)
-    const englishTitle = t('en', key)
-    const payload: WebPushPayload = {
-      kind, deliveryId, title: localizedTitle !== key ? localizedTitle : englishTitle !== key ? englishTitle : 'Open Agricola',
-    }
+    const title = getLanguagePack(locale)?.messages[key]
+      ?? getLanguagePack('en')?.messages[key]
+      ?? 'Open Agricola'
+    const payload: WebPushPayload = { kind, deliveryId, title }
     let authorization = headersByOrigin.get(endpoint.origin)
     if (!authorization || authorization.expiresAt <= now()) {
       const headers = getVapidHeaders(endpoint.origin, vapid.subject, vapid.publicKey, vapid.privateKey, 'aes128gcm')
