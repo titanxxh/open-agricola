@@ -1,3 +1,4 @@
+import { defaultClassicDeckIds } from '../contract/card-edition'
 import { classicCardDefinitions } from './classic-catalog.generated.ts'
 import { cardAllowedForPlayerCount } from './player-count-filter'
 
@@ -65,18 +66,12 @@ export const getClassicOccupation = (id: string): ClassicCardDefinition | undefi
 export const getClassicCardsByDeckNumber = (deck: string, number: number): readonly ClassicCardDefinition[] =>
   activeCatalog.definitions.filter(card => card.deck === deck && card.number === number)
 
-const DEFAULT_CLASSIC_DECK_PREFERENCE = ['CE', 'CI', 'CK'] as const
-
 /** Classic Decks a game can choose: those with at least one ported card (ADR 0049). */
 export const getSelectableClassicDeckIds = (): string[] =>
   [...new Set(activeCatalog.definitions.map(card => card.deck))].sort()
 
 /** CE, CI and CK where they have cards; every selectable deck when none of them has. */
-export const getDefaultClassicDeckIds = (): string[] => {
-  const selectable = getSelectableClassicDeckIds()
-  const preferred = DEFAULT_CLASSIC_DECK_PREFERENCE.filter(deck => selectable.includes(deck))
-  return preferred.length > 0 ? [...preferred] : selectable
-}
+export const getDefaultClassicDeckIds = (): string[] => defaultClassicDeckIds(getSelectableClassicDeckIds())
 
 /** Trims, uppercases and filters chosen decks by the selectable list, like sandbox decks; none left means default. */
 export const normalizeClassicDeckIds = (raw: unknown): string[] => {

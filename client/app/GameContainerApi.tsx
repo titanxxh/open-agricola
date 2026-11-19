@@ -351,6 +351,10 @@ const useTransportSetup = (
             enableMoorBalanceRules: enableMoorBalanceRulesFromQuery(window.location.search) || undefined,
             allowIncompleteFarmersOfTheMoorMinorDeal: allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined,
             enableSnakeOpening: enableSnakeOpeningFromQuery(window.location.search) || undefined,
+            ...(params.get('cardEdition') === 'classic' ? {
+              cardEdition: 'classic',
+              classicDeckIds: params.get('classicDeckIds')?.split(',').filter(Boolean),
+            } : {}),
             ...parseDraftParamsFromQuery(window.location.search),
           })
         } else setWsStatus({ phase: 'error', message: 'No room in URL. Use the link shared by Player 1.' })

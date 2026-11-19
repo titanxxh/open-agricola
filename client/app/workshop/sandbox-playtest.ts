@@ -1,8 +1,10 @@
+import type { ClassicPoolShortfall } from '../../../shared/contract/card-edition'
 import type { PlaytestFailure, PlaytestSource } from '../../services/llm/generation/request'
 
 export type SandboxStartResult = {
   ok: boolean
   error?: string
+  shortfall?: ClassicPoolShortfall
   cardWarnings?: string[]
   gameInstanceId?: string
   state?: { gameSeed?: number | string }

@@ -12,6 +12,8 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'transport',
   'hotseat',
   'maxPlayers',
+  'cardEdition',
+  'classicDeckIds',
   'roomAccess',
   'invitedUserIds',
   'soloHandMode',

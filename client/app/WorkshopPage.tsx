@@ -2,7 +2,7 @@ import { workshopGameUrl } from '../workshop-game/bootstrap'
 import { browserApiFetch } from '../services/browser-api'
 import { t as translateMessage } from '../../shared/i18n'
 import { CardTakedownButton } from './workshop/CardTakedownButton'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale, useCurrentLocale } from '../contexts/LocaleContext'
 import { AiCardDesigner } from './workshop/AiCardDesigner'
@@ -15,10 +15,13 @@ import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { ResourceText } from '../components/common/ResourceText'
 import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
+import { CLASSIC_EDITION_ENABLED, type CardEdition } from '../../shared/contract/card-edition'
 import { resolveCardArtUrl } from '../../shared/utils/card-art-url'
 import { API_BASE } from '../config'
 import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
 import { buildLocalGameConfig, isBrowserSandbox, stashLocalSandboxConfig } from '../local-sandbox/workshop-launch'
+import { CardEditionSetup } from './CardEditionSetup'
+import { classicDeckPoolNotice, classicPoolMessage, toggleClassicDeck, useClassicDeckPool } from './classic-card-setup'
 
 export type WorkshopCard = {
   id: string
@@ -80,6 +83,8 @@ type Comment = {
 export type SandboxSettings = {
   player_count: number
   deck_ids: string[]
+  card_edition?: 'classic'
+  classic_deck_ids?: string[]
   enable_through_the_seasons: boolean
   enable_farmers_of_the_moor: boolean
   allow_incomplete_farmers_of_the_moor_minor_deal: boolean
@@ -271,6 +276,12 @@ export function normalizeSandboxSettings(raw: unknown): SandboxSettings {
   return {
     player_count: playerCount,
     deck_ids: deckIds.length > 0 ? Array.from(new Set(deckIds)) : [...DEFAULT_SANDBOX_SETTINGS.deck_ids],
+    ...(source.card_edition === 'classic' ? {
+      card_edition: 'classic',
+      classic_deck_ids: Array.isArray(source.classic_deck_ids)
+        ? source.classic_deck_ids.filter((deck): deck is string => typeof deck === 'string')
+        : undefined,
+    } : {}),
     enable_through_the_seasons: source.enable_through_the_seasons === true,
     enable_farmers_of_the_moor: enableFarmersOfTheMoor,
     allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && source.allow_incomplete_farmers_of_the_moor_minor_deal === true,
@@ -931,6 +942,11 @@ function SandboxResetModal({
   const [selectedIds, setSelectedIds] = useState<string[]>(currentCards.map(card => card.id))
   const [playerCount, setPlayerCount] = useState(currentSettings.player_count)
   const [deckIds, setDeckIds] = useState<string[]>(currentSettings.deck_ids)
+  const [cardEdition, setCardEdition] = useState<CardEdition>(currentSettings.card_edition ?? 'revised')
+  const [classicDeckIds, setClassicDeckIds] = useState(currentSettings.classic_deck_ids)
+  const incompatibilityHintId = useId()
+  const isClassic = CLASSIC_EDITION_ENABLED && cardEdition === 'classic'
+  const classicPool = useClassicDeckPool(isClassic, { playerCount }, classicDeckIds)
   const [enableThroughTheSeasons, setEnableThroughTheSeasons] = useState(currentSettings.enable_through_the_seasons)
   const [enableFarmersOfTheMoor, setEnableFarmersOfTheMoor] = useState(currentSettings.enable_farmers_of_the_moor)
   const [allowIncompleteFarmersOfTheMoorMinorDeal, setAllowIncompleteFarmersOfTheMoorMinorDeal] = useState(
@@ -942,6 +958,7 @@ function SandboxResetModal({
   const [loadingMine, setLoadingMine] = useState(false)
   const [loadingPublished, setLoadingPublished] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     setSelectedIds(currentCards.map(card => card.id))
@@ -950,6 +967,8 @@ function SandboxResetModal({
   useEffect(() => {
     setPlayerCount(currentSettings.player_count)
     setDeckIds(currentSettings.deck_ids)
+    setCardEdition(currentSettings.card_edition ?? 'revised')
+    setClassicDeckIds(currentSettings.classic_deck_ids)
     setEnableThroughTheSeasons(currentSettings.enable_through_the_seasons)
     setEnableFarmersOfTheMoor(currentSettings.enable_farmers_of_the_moor)
     setAllowIncompleteFarmersOfTheMoorMinorDeal(currentSettings.allow_incomplete_farmers_of_the_moor_minor_deal)
@@ -1019,16 +1038,20 @@ function SandboxResetModal({
 
   const handleSave = async () => {
     setSaving(true)
+    setSaveError('')
     try {
       await onSave(selectedIds, {
         player_count: playerCount,
         deck_ids: deckIds,
-        enable_through_the_seasons: enableThroughTheSeasons,
-        enable_farmers_of_the_moor: enableFarmersOfTheMoor,
-        allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && allowIncompleteFarmersOfTheMoorMinorDeal,
+        ...(isClassic ? { card_edition: 'classic', classic_deck_ids: classicPool.selectedDeckIds } : {}),
+        enable_through_the_seasons: !isClassic && enableThroughTheSeasons,
+        enable_farmers_of_the_moor: !isClassic && enableFarmersOfTheMoor,
+        allow_incomplete_farmers_of_the_moor_minor_deal: !isClassic && enableFarmersOfTheMoor && allowIncompleteFarmersOfTheMoorMinorDeal,
         enable_snake_opening: enableSnakeOpening,
       })
       onClose()
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : t('platform.sandboxUnknownError'))
     } finally {
       setSaving(false)
     }
@@ -1062,28 +1085,45 @@ function SandboxResetModal({
                 ))}
               </div>
             </div>
-            <div className="ws-sandbox-config-group">
-              <span className="ws-sandbox-config-label">{t('platform.sandboxDecks')}</span>
-              <div className="ws-sandbox-chip-row">
-                {DEFAULT_SANDBOX_SETTINGS.deck_ids.map((deckId) => (
-                  <button
-                    key={deckId}
-                    type="button"
-                    className={`ws-sandbox-chip${deckIds.includes(deckId) ? ' active' : ''}`}
-                    onClick={() => toggleDeck(deckId)}
-                  >
-                    {deckId}
-                  </button>
-                ))}
+            {CLASSIC_EDITION_ENABLED && (
+              <CardEditionSetup
+                edition={cardEdition}
+                onEditionChange={setCardEdition}
+                pool={classicPool}
+                onDeckToggle={deck => {
+                  if (classicPool.status === 'ready') {
+                    setClassicDeckIds(current => toggleClassicDeck(current ?? classicPool.defaultDeckIds, deck))
+                  }
+                }}
+                incompatibleDescriptionId={incompatibilityHintId}
+              />
+            )}
+            {!isClassic && (
+              <div className="ws-sandbox-config-group">
+                <span className="ws-sandbox-config-label">{t('platform.sandboxDecks')}</span>
+                <div className="ws-sandbox-chip-row">
+                  {DEFAULT_SANDBOX_SETTINGS.deck_ids.map((deckId) => (
+                    <button
+                      key={deckId}
+                      type="button"
+                      className={`ws-sandbox-chip${deckIds.includes(deckId) ? ' active' : ''}`}
+                      onClick={() => toggleDeck(deckId)}
+                    >
+                      {deckId}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
             <div className="ws-sandbox-config-group">
               <span className="ws-sandbox-config-label">{t('platform.sandboxVariants')}</span>
               <div className="ws-sandbox-toggle-column">
                 <label className="ws-sandbox-toggle">
                   <input
                     type="checkbox"
-                    checked={enableThroughTheSeasons}
+                    checked={!isClassic && enableThroughTheSeasons}
+                    disabled={isClassic}
+                    aria-describedby={isClassic ? incompatibilityHintId : undefined}
                     onChange={event => setEnableThroughTheSeasons(event.target.checked)}
                   />
                   <span>{t('platform.sandboxVariantThroughTheSeasons')}</span>
@@ -1091,7 +1131,9 @@ function SandboxResetModal({
                 <label className="ws-sandbox-toggle">
                   <input
                     type="checkbox"
-                    checked={enableFarmersOfTheMoor}
+                    checked={!isClassic && enableFarmersOfTheMoor}
+                    disabled={isClassic}
+                    aria-describedby={isClassic ? incompatibilityHintId : undefined}
                     onChange={event => {
                       setEnableFarmersOfTheMoor(event.target.checked)
                       if (!event.target.checked) setAllowIncompleteFarmersOfTheMoorMinorDeal(false)
@@ -1099,7 +1141,7 @@ function SandboxResetModal({
                   />
                   <span>{t('platform.sandboxVariantFarmersOfTheMoor')}</span>
                 </label>
-                {enableFarmersOfTheMoor && (
+                {!isClassic && enableFarmersOfTheMoor && (
                   <label className="ws-sandbox-toggle">
                     <input
                       type="checkbox"
@@ -1185,6 +1227,7 @@ function SandboxResetModal({
           </WorkshopSection>
         </div>
 
+        {saveError && <p role="alert" className="form-error">{saveError}</p>}
         <div className="ws-modal-actions">
           <button type="button" className="btn-secondary" onClick={() => setSelectedIds([])}>
             {t('platform.clearSelection')}
@@ -1195,6 +1238,8 @@ function SandboxResetModal({
             onClick={() => {
               setPlayerCount(DEFAULT_SANDBOX_SETTINGS.player_count)
               setDeckIds([...DEFAULT_SANDBOX_SETTINGS.deck_ids])
+              setCardEdition('revised')
+              setClassicDeckIds(undefined)
               setEnableThroughTheSeasons(DEFAULT_SANDBOX_SETTINGS.enable_through_the_seasons)
               setEnableFarmersOfTheMoor(DEFAULT_SANDBOX_SETTINGS.enable_farmers_of_the_moor)
               setAllowIncompleteFarmersOfTheMoorMinorDeal(DEFAULT_SANDBOX_SETTINGS.allow_incomplete_farmers_of_the_moor_minor_deal)
@@ -1206,7 +1251,7 @@ function SandboxResetModal({
           <button type="button" className="btn-secondary" onClick={onClose}>
             {t('platform.cancel')}
           </button>
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving || (isClassic && classicPool.selectedDeckIds.length === 0)}>
             {saving ? t('platform.saving') : t('platform.applySandbox')}
           </button>
         </div>
@@ -1220,6 +1265,7 @@ function SandboxResetModal({
 function SandboxView({
   cards,
   settings,
+  startNotice,
   onSelect,
   onStartGame,
   onRemove,
@@ -1228,13 +1274,16 @@ function SandboxView({
 }: {
   cards: WorkshopCard[]
   settings: SandboxSettings
+  startNotice: string | null
   onSelect: (c: WorkshopCard) => void
   onStartGame: () => void
   onRemove: (workshopCardId: string) => Promise<void>
   onOpenReset: () => void
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
+  const isClassic = CLASSIC_EDITION_ENABLED && settings.card_edition === 'classic'
   const variants = sandboxVariantLabels(settings, t)
+  if (isClassic) variants.unshift(t('platform.cardEditionClassic'))
   return (
     <div className="ws-sandbox">
       <div className="ws-sandbox-header">
@@ -1244,7 +1293,7 @@ function SandboxView({
           <p className="ws-section-subtitle">
             {t('platform.sandboxSettingsSummary', {
               players: settings.player_count,
-              decks: settings.deck_ids.join(', '),
+              decks: (isClassic ? settings.classic_deck_ids ?? [] : settings.deck_ids).join(', '),
             })}
           </p>
           {variants.length > 0 && (
@@ -1281,11 +1330,13 @@ function SandboxView({
           </ul>
         </>
       )}
+      {startNotice && <p role="status" className="card-edition-notice">{startNotice}</p>}
       <div className="ws-sandbox-btns">
         <button
           type="button"
           className="btn-primary"
           onClick={() => { onStartGame() }}
+          disabled={startNotice !== null}
         >
           {t('platform.startSandbox')}
         </button>
@@ -1305,6 +1356,9 @@ export function WorkshopPage() {
   const [myCards, setMyCards] = useState<WorkshopCard[]>([])
   const [sandboxCards, setSandboxCards] = useState<WorkshopCard[]>([])
   const [sandboxSettings, setSandboxSettings] = useState<SandboxSettings>(DEFAULT_SANDBOX_SETTINGS)
+  const classicSandbox = CLASSIC_EDITION_ENABLED && sandboxSettings.card_edition === 'classic'
+  const sandboxClassicPool = useClassicDeckPool(classicSandbox, { playerCount: sandboxSettings.player_count }, sandboxSettings.classic_deck_ids)
+  const sandboxStartNotice = classicSandbox ? classicDeckPoolNotice(t, sandboxClassicPool) : null
   const [selectedCard, setSelectedCard] = useState<WorkshopCard | null>(null)
   const [editCard, setEditCard] = useState<WorkshopCard | undefined>(undefined)
   const [editCardId, setEditCardId] = useState<string | undefined>(undefined)
@@ -1512,7 +1566,7 @@ export function WorkshopPage() {
 
   const handleResetSandbox = async (nextCardIds: string[], nextSettings: SandboxSettings) => {
     if (!user) return
-    await apiFetch('/api/workshop/sandbox', {
+    const response = await apiFetch('/api/workshop/sandbox', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1520,6 +1574,10 @@ export function WorkshopPage() {
         settings: nextSettings,
       }),
     })
+    if (!response.ok) {
+      const result = await readSandboxStartResponse(response, t('platform.sandboxUnknownError'))
+      throw new Error(result.shortfall ? classicPoolMessage(t, result.shortfall) : result.error)
+    }
     await loadSandboxData()
   }
 
@@ -1545,6 +1603,10 @@ export function WorkshopPage() {
   ): Promise<boolean> => {
     const launch = ++sandboxLaunchRef.current
     setSandboxPlaytest(null)
+    if (sandboxStartNotice) {
+      setPendingSandboxErrors([sandboxStartNotice])
+      return false
+    }
     // Browser-local executor: the playtest runs entirely in this browser.
     // Editor flows that pin an extra card / exact draft version still go
     // through the server sandbox (card data isn't in workshop state yet).
@@ -1585,6 +1647,8 @@ export function WorkshopPage() {
             : {}),
           playerCount: sandboxSettings.player_count,
           deckIds: sandboxSettings.deck_ids,
+          cardEdition: sandboxSettings.card_edition,
+          classicDeckIds: sandboxSettings.classic_deck_ids,
           enableThroughTheSeasons: sandboxSettings.enable_through_the_seasons,
           enableFarmersOfTheMoor: sandboxSettings.enable_farmers_of_the_moor,
           allowIncompleteFarmersOfTheMoorMinorDeal: sandboxSettings.allow_incomplete_farmers_of_the_moor_minor_deal,
@@ -1606,7 +1670,7 @@ export function WorkshopPage() {
         setPendingSandboxErrors(warnings.length > 0 ? warnings : null)
         return true
       } else {
-        const errors = [data.error ?? t('platform.sandboxUnknownError')]
+        const errors = [data.shortfall ? classicPoolMessage(t, data.shortfall) : data.error ?? t('platform.sandboxUnknownError')]
         setPendingSandboxErrors(errors)
         alert(errors.join('\n'))
         return false
@@ -1791,10 +1855,11 @@ export function WorkshopPage() {
           sandboxPlaytest={sandboxPlaytest}
         />
         <div className="sandbox-embed">
+          {sandboxStartNotice && <p role="status" className="card-edition-notice">{sandboxStartNotice}</p>}
           <div className="sandbox-embed-toolbar">
             {sandboxActive ? (
               <>
-                <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
+                <button type="button" className="btn-primary ws-btn-sm" disabled={sandboxStartNotice !== null} onClick={() => { void handleStartSandboxGame() }}>
                   {t('platform.restartSandbox')}
                 </button>
                 <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
@@ -1802,7 +1867,7 @@ export function WorkshopPage() {
                 </button>
               </>
             ) : (
-              <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
+              <button type="button" className="btn-primary ws-btn-sm" disabled={sandboxStartNotice !== null} onClick={() => { void handleStartSandboxGame() }}>
                 {t('platform.startSandbox')}
               </button>
             )}
@@ -1835,6 +1900,7 @@ export function WorkshopPage() {
         <SandboxView
           cards={sandboxCards}
           settings={sandboxSettings}
+          startNotice={sandboxStartNotice}
           onSelect={selectCard}
           onStartGame={handleStartSandboxGame}
           onRemove={handleRemoveSandboxCard}
@@ -1856,7 +1922,7 @@ export function WorkshopPage() {
           <div className="sandbox-embed-toolbar">
             {sandboxActive ? (
               <>
-                <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
+                <button type="button" className="btn-primary ws-btn-sm" disabled={sandboxStartNotice !== null} onClick={() => { void handleStartSandboxGame() }}>
                   {t('platform.restartSandbox')}
                 </button>
                 <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setSandboxActive(false)}>
@@ -1864,7 +1930,7 @@ export function WorkshopPage() {
                 </button>
               </>
             ) : (
-              <button type="button" className="btn-primary ws-btn-sm" onClick={() => { void handleStartSandboxGame() }}>
+              <button type="button" className="btn-primary ws-btn-sm" disabled={sandboxStartNotice !== null} onClick={() => { void handleStartSandboxGame() }}>
                 {t('platform.startSandbox')}
               </button>
             )}

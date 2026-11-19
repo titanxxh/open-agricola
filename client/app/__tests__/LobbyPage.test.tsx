@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LobbyPage } from '../LobbyPage'
 import { setPage } from '../../utils/platform-page-url'
+import { __resetCardsManifestCache } from '../../services/card-meta'
 import { startRoomCreation } from '../../services/room-creation'
 
 vi.mock('../../services/room-creation', async importOriginal => ({
@@ -50,6 +51,16 @@ vi.mock('../../contexts/LocaleContext', async () => {
     'platform.draftModeLabel': 'Card draft',
     'platform.draftModeNone': 'Random hand',
     'platform.draftModeSimultaneous': 'Simultaneous draft',
+    'platform.draftPoolSizeLabel': 'Draft packet size',
+    'platform.draftPoolSizeOption': '{n} cards',
+    'platform.cardEditionLabel': 'Card Edition',
+    'platform.cardEditionRevised': 'Revised',
+    'platform.cardEditionClassic': 'Classic',
+    'platform.classicDecksLabel': 'Classic Decks',
+    'platform.classicDeckCount': '{deck} · {occupations} occupations, {minors} minor improvements',
+    'platform.classicPoolInsufficient': 'Classic decks {decks} cannot fill {players} hands: need {neededOccupations} occupations and {neededMinors} minor improvements, have {eligibleOccupations} and {eligibleMinors} eligible cards',
+    'platform.classicIncompatibleOptions': 'Classic games exclude Farmers of the Moor, the community deck, Parent Cards, and Through the Seasons.',
+    'platform.classicNoDeckSelected': 'Select a Classic Deck with eligible cards.',
     'platform.reviewedWorkshopCards': 'Reviewed workshop cards',
     'platform.reviewedWorkshopCardsHint': 'Select reviewed cards for this room only.',
     'platform.reviewedWorkshopCardsLoading': 'Loading reviewed cards…',
@@ -100,8 +111,8 @@ vi.mock('../../contexts/LocaleContext', async () => {
     useLocale: () => ({
       locale: 'en',
       setLocale: vi.fn(),
-      t: (key: string, params: Record<string, string> = {}) => Object.entries(params)
-        .reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), labels[key] ?? message('en', key)),
+      t: (key: string, params: Record<string, string | number> = {}) => Object.entries(params)
+        .reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), labels[key] ?? message('en', key)),
     }),
   }
 })
@@ -278,6 +289,66 @@ describe('LobbyPage my active games', () => {
     expect(screen.getByText('Waiting', { exact: true })).toBeInTheDocument()
     expect(screen.queryByText('Started', { exact: false })).toBeNull()
     expect(screen.queryByText('Your turn')).toBeNull()
+  })
+})
+
+describe('LobbyPage Card Edition', () => {
+  it('hides Card Edition with the switch off', () => {
+    render(<LobbyPage classicEditionEnabled={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    expect(screen.queryByRole('group', { name: 'Card Edition' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Create Game' })).toBeEnabled()
+  })
+
+  it('uses the eligible manifest pool for the chosen seats and draft, and creates a hotseat room with those decks', async () => {
+    const typedCards = (deck: string, type: 'occupation' | 'minor', count: number, players?: string) =>
+      Array.from({ length: count }, (_, index) => {
+        const id = `${deck}${String(index + (type === 'occupation' ? 1 : 101)).padStart(3, '0')}_Fixture`
+        return [id, { meta: { id, deck, type, players } }]
+      })
+    __resetCardsManifestCache()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(Object.fromEntries([
+      ...typedCards('CE', 'occupation', 14),
+      ...typedCards('CE', 'minor', 14),
+      ...typedCards('CI', 'occupation', 1, '4+'),
+      ...typedCards('CI', 'minor', 1, '4+'),
+      ...typedCards('A', 'minor', 28),
+    ])))))
+    render(<LobbyPage classicEditionEnabled />)
+    fireEvent.click(screen.getByRole('button', { name: 'Local Hotseat' }))
+    const moor = screen.getByRole('checkbox', { name: 'Enable Farmers of the Moor expansion' })
+    fireEvent.click(moor)
+    fireEvent.click(screen.getByRole('radio', { name: 'Classic' }))
+    const create = screen.getByRole('button', { name: 'Start Hotseat Game' })
+    const ce = await screen.findByRole('checkbox', { name: 'CE · 14 occupations, 14 minor improvements' })
+    expect(ce).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'CI · 0 occupations, 0 minor improvements' })).toBeDisabled()
+    expect(screen.getByRole('group', { name: 'Classic Decks' })).not.toHaveTextContent('A ·')
+    expect(moor).toBeDisabled()
+    expect(moor).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /Snake opening/ })).toBeEnabled()
+    expect(create).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: '4 Players' }))
+    expect(screen.getByRole('checkbox', { name: 'CI · 1 occupations, 1 minor improvements' })).toBeEnabled()
+    expect(screen.getByText('Classic decks CE, CI cannot fill 4 hands: need 28 occupations and 28 minor improvements, have 15 and 15 eligible cards')).toBeVisible()
+    expect(create).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: '2 Players' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Simultaneous draft' }))
+    expect(screen.getByText('Classic decks CE cannot fill 2 hands: need 16 occupations and 16 minor improvements, have 14 and 14 eligible cards')).toBeVisible()
+    expect(create).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Random hand' }))
+    fireEvent.click(ce)
+    expect(screen.getByText('Select a Classic Deck with eligible cards.')).toBeVisible()
+    expect(create).toBeDisabled()
+    fireEvent.click(ce)
+    fireEvent.click(create)
+    expect(setPage).toHaveBeenCalledExactlyOnceWith('game', {
+      transport: 'ws', maxPlayers: '2', hotseat: '1', cardEdition: 'classic', classicDeckIds: 'CE', enableSnakeOpening: 'true',
+    })
+    __resetCardsManifestCache()
   })
 })
 
