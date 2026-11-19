@@ -5,6 +5,27 @@ import type { GameEvent } from '../../contract/events'
 import { buildLogPresentationPlan, eventsToLogEntries } from '../log-mapper'
 
 describe('eventsToLogEntries', () => {
+  it('logs a Guest grant, its dispatch to an action space and a declined Guest', () => {
+    const base = { schemaVersion: 1, round: 2, phase: 'work', visibility: 'public', actorPlayerId: 'p1' } as const
+    const guest = { playerId: 'p1', guestId: 'guest:1', cardId: 'CI073_Guest' }
+    const use = { ...base, type: 'actionSpace.useStarted', spaceId: 'fishing', accumulation: {}, workPhase: true } as const
+    const events = [
+      { ...base, ...guest, id: 'grant', seq: 1, type: 'guest.granted', targetRound: 3 },
+      { ...base, id: 'occupy', seq: 2, type: 'worker.placed', workerId: 'guest:1', spaceId: 'fishing' },
+      { ...use, id: 'dispatch', seq: 3, useId: 'use-1', newPlacement: true, personUse: { workerId: 'guest:1', placementOrdinal: 3 } },
+      { ...use, id: 'move', seq: 4, useId: 'use-2', newPlacement: false },
+      { ...base, ...guest, id: 'decline', seq: 5, type: 'guest.voided', guestId: 'guest:2' },
+    ] satisfies GameEvent[]
+    const plan = buildLogPresentationPlan(events, {
+      playerNames: { p1: 'Alice' }, actionNames: { fishing: 'actions.fishing.name' },
+    })
+    expect(plan.rows.map(row => [row.sourceEventRef.id, row.logEntry.key, row.logEntry.params])).toEqual([
+      ['decline', 'log.guestVoided', { player: 'Alice', cardId: 'CI073_Guest' }],
+      ['dispatch', 'log.guestDispatched', { player: 'Alice', space: 'actions.fishing.name' }],
+      ['grant', 'log.guestGranted', { player: 'Alice', cardId: 'CI073_Guest', round: 3 }],
+    ])
+  })
+
   it('merges only the identified fence payment without assigning later or other-player costs to a free operation', () => {
     const base = { schemaVersion: 1, round: 7, phase: 'work', visibility: 'public', actorPlayerId: 'p1' } as const
     const fence = {

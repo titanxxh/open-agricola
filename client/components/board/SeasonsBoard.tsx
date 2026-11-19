@@ -5,6 +5,8 @@ import type { SeasonId, ThroughTheSeasonsState } from '../../../shared/seasons/t
 import { seasonActionIdBySeason } from '../../../shared/projections/season-actions'
 import { seasonBoardAdjustments, seasonBoardNotes, seasonDisplay } from '../../../shared/projections/season-display'
 import { getPlayerDisplayName } from '../../utils/player-name'
+import { GuestToken } from '../common/GuestToken'
+import { getGuestMarkerLabel } from '../common/guestText'
 import { SeasonActionCard, SeasonAdjustment, SeasonBoardCopy } from './SeasonBoardPieces'
 
 type Props = {
@@ -68,6 +70,9 @@ export const SeasonsBoard = ({
           const occupantName = occupant
             ? getPlayerDisplayName(locale, occupant.name, players.indexOf(occupant), occupant.nameIsDefault)
             : undefined
+          const occupantLabel = occupant && occupantRef?.guest && occupantName !== undefined
+            ? getGuestMarkerLabel(locale, occupantName, occupant.guests, occupantRef.workerId)
+            : occupantName
           const occupyingWorker = occupant?.workers.find(worker => worker.id === occupantRef?.workerId)
           const isOccupied = !!occupantRef
           const available = !!action && !isOccupied && canTakeAction(action)
@@ -94,9 +99,11 @@ export const SeasonsBoard = ({
               </span>
               {occupant ? (
                 <span className="seasons-board__worker" data-player-color={occupant.color}
-                  role="img" aria-label={occupantName} title={occupantName}>
-                  <span className={`action-farmer action-farmer-${occupant.color}${occupyingWorker?.isNewborn ? ' child' : ''}`}
-                    aria-hidden="true" />
+                  role="img" aria-label={occupantLabel} title={occupantLabel}>
+                  {occupantRef?.guest
+                    ? <GuestToken color={occupant.color} />
+                    : <span className={`action-farmer action-farmer-${occupant.color}${occupyingWorker?.isNewborn ? ' child' : ''}`}
+                      aria-hidden="true" />}
                 </span>
               ) : null}
             </button>

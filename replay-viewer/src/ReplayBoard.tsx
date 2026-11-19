@@ -15,7 +15,9 @@ import {
   buildFarmBoardProjection,
 } from '../../client/app/farm-board-projection'
 import { splitBoardActionSpaces } from '../../client/app/game-container-helpers'
+import { buildReplayActionLogPresentation } from '../../client/app/replay-action-log-presentation'
 import { ActionBoard } from '../../client/components/board/ActionBoard'
+import { ActionLog } from '../../client/components/board/ActionLog'
 import { MajorImprovements, type MajorSupplyExpansion } from '../../client/components/board/MajorImprovements'
 import { PlayerFarmPanel } from '../../client/components/board/PlayerFarmPanel'
 import { PlayerTabs } from '../../client/components/board/PlayerTabs'
@@ -227,6 +229,21 @@ function ReplayBoardContent({
     }),
     [baseActions, locale, roundSlots, state.players, state.round],
   )
+  const { playerNames, timelineBuckets } = useMemo(() => {
+    const playerNames = Object.fromEntries(frame.players.map((player, index) =>
+      [player.id, getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)]))
+    const { timelineBuckets } = buildReplayActionLogPresentation({
+      events: frame.events ?? [],
+      publicEventArchive: frame.publicEventArchive ?? [],
+      stateLog: frame.log,
+      currentRound: frame.round,
+      locale,
+      playerNames,
+      actionNames: Object.fromEntries(frame.actionSpaces.map(space => [space.id, space.nameKey])),
+      replayFilter: 'all',
+    })
+    return { playerNames, timelineBuckets }
+  }, [frame, locale])
 
   if (state.phase === 'draft' && state.draft) {
     return <ReplayDraftPhase state={state} locale={locale} />
@@ -289,6 +306,8 @@ function ReplayBoardContent({
           currentPlayer={currentPlayer}
           players={state.players}
           futureMeeples={state.futureMeeples}
+          scheduledEffects={state.players.flatMap(player =>
+            (player.scheduledEffects ?? []).map(effect => ({ ...effect, playerId: player.id })))}
           canTakeAction={() => false}
           takeAction={noOp}
           currentRound={state.round}
@@ -359,6 +378,14 @@ function ReplayBoardContent({
           actions={farmActions}
         />
       </section>
+      <ActionLog
+        locale={locale}
+        log={frame.log}
+        currentRound={state.round}
+        playerNames={playerNames}
+        timelineBuckets={timelineBuckets}
+        hideReplayControls
+      />
     </div>
   )
 }

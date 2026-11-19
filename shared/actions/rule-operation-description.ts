@@ -35,6 +35,7 @@ export const describeRuleOperation = (operation: RuleOperation, context: ActionE
     }
     case 'expire-extra-room': return { kind: operation.kind, removeUnhousedWorker: operation.removeUnhousedWorker }
     case 'release-reserved-worker': return { kind: operation.kind }
+    case 'guest-placement': return { kind: operation.kind, cardId: context.sourceCard ?? '' }
     case 'skip-next-turns': return { kind: operation.kind, count: positiveFact(context, operation.countFact) }
     case 'harvest-selected-supply-reward': {
       const raw = context.sourceCard ? readCardExtraData<unknown>(context.player, context.sourceCard, operation.selectionFact) : undefined

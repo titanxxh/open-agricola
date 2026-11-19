@@ -1603,7 +1603,7 @@ const CARD_IMPL = {}
     })
 
     it('saves a Classic Deck preference and keeps it when a later edit is rejected', async () => {
-      const setup = { card_edition: 'classic', classic_deck_ids: [' ci ', 'CI', 'CZ'], player_count: 3, enable_snake_opening: true }
+      const setup = { card_edition: 'classic', classic_deck_ids: [' ci ', 'CI', 'CK'], player_count: 3, enable_snake_opening: true }
       const save = async (settings: object, enabled: boolean, ids = [cardDbId]) => {
         const res = mockRes()
         await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_ids: ids, settings }, 'tok-bob'), res, enabled)

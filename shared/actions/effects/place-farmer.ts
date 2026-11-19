@@ -21,13 +21,12 @@ import {
 } from '../../domain/space'
 import { smallestAvailableWorker } from '../../domain/player'
 import { selectWorkerForMoorAction } from '../../moor/heating'
-import { findSupplyWorker } from '../../domain/supply-workers'
-import type { SupplyWorkerSource } from '../../contract/types'
 import { incPlacedFarmers } from '../../session/stats'
 import type { ActionHookRegistry } from '../hooks'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { missingBuildingResourceSpaceIds } from '../helpers/missing-building-resource-spaces'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
+import { declaresPlacementPerson, resolvePlacementPerson, type PlacementPerson } from '../helpers/placement-person'
 import { collectBeforeActionSpaceUseFlows } from '../../cards/card-listeners'
 import { recordActionSpaceUse } from '../../domain/action-space-use'
 
@@ -67,14 +66,20 @@ const legalPlacements = (
   actionHooks: ActionHookRegistry | undefined,
   sourceCard: string | undefined,
   actionContext: Record<string, unknown> | undefined,
+  person = resolvePlacementPerson({ state, player, actionContext, sourceCard }),
 ) => {
-  const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext, sourceCard)
-  return constrainPlacements(computeAllowedPlacementSpaces(state, player, {
+  const allowed = constrainPlacements(computeAllowedPlacementSpaces(state, player, {
     actionHooks,
     sourceCard,
     actionContext,
-    ignoreWorkerAvailability: temporarySupplyWorker !== undefined,
+    ignoreWorkerAvailability: person !== undefined,
   }), state, player, actionContext)
+  const allowsSpace = person?.allowsSpace
+  if (!allowsSpace) return allowed
+  return allowed.filter((placement) => {
+    const space = findActionSpaceById(state, placement.spaceId)
+    return space !== undefined && allowsSpace(space)
+  })
 }
 
 export function hasLegalPlaceFarmerTargets(
@@ -119,41 +124,30 @@ const placeFarmer = (
   return { type: 'ok', workerId: worker.id, personUse }
 }
 
-const readSupplySource = (
-  context: Record<string, unknown> | undefined,
-): SupplyWorkerSource | undefined => {
-  const source = context?.workerSource
-  if (!source || typeof source !== 'object' || !('kind' in source) || source.kind !== 'supply') return
-  if (!('disposition' in source) || (
-    source.disposition !== 'return-to-supply' && source.disposition !== 'remove-from-game'
-  )) return
-  if ('workerId' in source && typeof source.workerId !== 'string') return
-  return source as SupplyWorkerSource
-}
-
-const readTemporarySupplyWorker = (
-  player: PlayerState,
-  context: Record<string, unknown> | undefined,
-  sourceCard?: string,
-) => {
-  const source = readSupplySource(context)
-  if (!source) return
-  const workerId = typeof context?.supplyWorkerId === 'string' ? context.supplyWorkerId : source.workerId
-  return findSupplyWorker(player, sourceCard, workerId)
-}
-
-const placeTemporarySupplyWorker = (
+const placePerson = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
-  workerId: string,
+  person: PlacementPerson,
 ): ActionExecutionResult & { workerId?: string; personUse?: PersonUseReceipt } => {
-  const alreadyPlaced = findActionSpaceByWorker(state, player.id, workerId) !== undefined
-  if (alreadyPlaced) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
+  const workerId = person.enter(space)
+  if (!workerId) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
   addWorkerRef(space, player.id, workerId)
   addLinkedSpaceBlocks(state, space, player.id, workerId)
   const personUse = recordRoundPlacement(player, space.id, workerId)
   return { type: 'ok', workerId, personUse }
+}
+
+const placementPersonAvailable = (
+  state: GameState,
+  player: PlayerState,
+  actionHooks: ActionHookRegistry | undefined,
+  sourceCard: string | undefined,
+  actionContext: Record<string, unknown> | undefined,
+): boolean => {
+  const person = resolvePlacementPerson({ state, player, actionContext, sourceCard })
+  if (!person) return false
+  return !person.needsTarget || legalPlacements(state, player, actionHooks, sourceCard, actionContext, person).length > 0
 }
 
 export const placeFarmerAction: ActionDefinition = {
@@ -181,8 +175,8 @@ export const placeFarmerAction: ActionDefinition = {
         typeof context.actionContext.workerId === 'string'
         && findActionSpaceByWorker(state, player.id, context.actionContext.workerId) !== undefined
       )
-      : context?.actionContext?.workerSource !== undefined
-      ? readTemporarySupplyWorker(player, context.actionContext, context.sourceCard) !== undefined
+      : declaresPlacementPerson(context?.actionContext)
+      ? placementPersonAvailable(state, player, context?.actionHooks, context?.sourceCard, context?.actionContext)
       : smallestAvailableWorker(state, player) !== null,
   previewEffect: ({ state, actionContext }) => {
     const constraints = actionContext?.constraints
@@ -277,19 +271,12 @@ export const placeFarmerAction: ActionDefinition = {
       return { type: 'flow', flow: targetLeaf }
     }
 
-    const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext, sourceCard)
-    if (actionContext?.workerSource !== undefined) {
-      const source = readSupplySource(actionContext)
-      if (!source || !temporarySupplyWorker) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
-      actionContext.supplyWorkerId = temporarySupplyWorker.id
-      temporarySupplyWorker.supplyUse = {
-        sourceCard,
-        disposition: source.disposition,
-        status: 'pending',
-        returnRound: state.round,
-      }
+    const person = resolvePlacementPerson({ state, player, actionContext, sourceCard })
+    if (declaresPlacementPerson(actionContext)) {
+      if (!person) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
+      person.claim?.()
     }
-    const allowed = legalPlacements(state, player, actionHooks, sourceCard, actionContext)
+    const allowed = legalPlacements(state, player, actionHooks, sourceCard, actionContext, person)
     if (allowed.length === 0) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     const options = placementOptions(state, allowed)
     return {
@@ -306,45 +293,47 @@ export const placeFarmerAction: ActionDefinition = {
     const targetSpace = findActionSpaceById(state, targetSpaceId)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
 
-    const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext, sourceCard)
-    if (actionContext?.workerSource !== undefined && !temporarySupplyWorker) {
+    const person = resolvePlacementPerson({ state, player, actionContext, sourceCard })
+    if (declaresPlacementPerson(actionContext) && !person) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     }
-    const allowed = legalPlacements(state, player, actionHooks, sourceCard, actionContext)
+    const allowed = legalPlacements(state, player, actionHooks, sourceCard, actionContext, person)
     const allowedPlacement = allowed.find((placement) => placement.spaceId === targetSpaceId)
     if (!allowedPlacement || allowedPlacement.allowOccupied !== allowOccupied) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     }
 
-    const placeResult = temporarySupplyWorker
-      ? placeTemporarySupplyWorker(state, player, targetSpace, temporarySupplyWorker.id)
+    const placeResult = person
+      ? placePerson(state, player, targetSpace, person)
       : placeFarmer(state, player, targetSpace)
     if (placeResult.type === 'fail') return placeResult
     incPlacedFarmers(player)
     writeActionSnapshotExtraData(player, 'placedWorkerId', placeResult.workerId)
-    if (temporarySupplyWorker?.supplyUse) temporarySupplyWorker.supplyUse.status = 'temporary'
+    const personActionContext = person?.placed?.()
+    // A Guest's use is its own, whichever card granted it; a card-supplied person keeps the card as the use's source.
+    const useSourceCard = person?.ownsUse ? undefined : sourceCard
     eventSink?.emit<'worker.placed'>({
       type: 'worker.placed',
       workerId: placeResult.workerId!,
       spaceId: targetSpaceId,
-      ...(sourceCard ? { viaCardId: sourceCard } : {}),
+      ...(useSourceCard ? { viaCardId: useSourceCard } : {}),
     })
     const actionContextWrite = {
       targetSpaceId,
       placedWorkerId: placeResult.workerId,
     }
-    const targetActionContext = { ...resetComputeReplaceGuards(actionContext), ...actionContextWrite, ...(temporarySupplyWorker ? { trueAction: true } : {}) }
+    const targetActionContext = { ...resetComputeReplaceGuards(actionContext), ...actionContextWrite, ...personActionContext }
     if (actionContext) {
       actionContext.targetSpaceId = targetSpaceId
       actionContext.placedWorkerId = placeResult.workerId
     }
-    const use = recordActionSpaceUse({ state, player, space: targetSpace, eventSink, sourceCard, completedTransactionEvents }, { newPlacement: true, personUse: placeResult.personUse })
+    const use = recordActionSpaceUse({ state, player, space: targetSpace, eventSink, sourceCard: useSourceCard, completedTransactionEvents }, { newPlacement: true, personUse: placeResult.personUse })
     const targetLeaf: ActionFlow = {
       type: 'leaf',
       actionId: targetSpaceId,
       spaceUse: use,
       expandFlow: true,
-      sourceCard,
+      sourceCard: useSourceCard,
       actionContext: targetActionContext,
     }
     const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, use, targetActionContext)

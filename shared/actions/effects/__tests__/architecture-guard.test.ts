@@ -123,6 +123,7 @@ describe('effects architecture guard', () => {
       'field-operation',
       'future-meeples',
       'gain',
+      'guest',
       'improvement',
       'individual-food-cost',
       'lie-animal',

@@ -783,6 +783,10 @@ _Avoid_: 仍在供应中的人物、已永久移出游戏的人物、卡牌持�
 卡牌授予在指定时机使用一名可用供应人物的资格；资格本身不预留人物。
 _Avoid_: 已预留供应人物、永久家庭成员、尚未执行的家庭增长
 
+**Guest（食客）**:
+由卡牌授予、来自游戏供应区的人员标记。它不属于任何玩家的家庭成员 token，在卡牌规定的期间内像家庭成员一样被派遣。食客不是家庭成员：不计入家庭人数、喂食、家庭成员计分和 Family Token Limit，也不占住房。计数家庭规模的牌文不含食客；计数人员放置的牌文（第几个放置的人、最后放置的人、已放置或待放置的人数）含食客，即使牌面写的是家庭成员。派遣食客是一次真实的人员放置，会占用行动格并推进 Person Placement Order。食客默认只为一个指定回合授予且只能派遣一次：它让玩家在该回合多一个工作回合，可在自己任一工作回合使用，最晚在放完最后一名家庭成员后的下一个工作回合；工作阶段结束窗口开始后不再有工作回合，此时起授予的本回合食客立即派遣，否则作废；已派遣的食客在该回合返家阶段退还游戏供应区，未派遣的在回合结束时作废。食客授予后属于玩家，不因来源卡之后被传递、弃掉或失效而消失。食客数量没有上限。牌面另有规定的以牌面为准。
+_Avoid_: Supply Person、家庭成员、把“从个人供应放人”的卡牌称作食客
+
 **Removed Family Token（已移除家庭成员 token）**:
 被卡牌永久移出玩家 family token supply 的 worker token。它不再是可通过 family growth 激活的 inactive worker，也不计入家庭成员 token 上限。
 _Avoid_: newborn、暂时在行动格或卡牌上的 worker、尚未出生的 inactive worker
@@ -932,7 +936,7 @@ Card Source 的 `meta` 部分，包含可序列化、前端可见、无运行时
 _Avoid_: modifier、listener、effect、prerequisiteCheck、卡牌运行时局部状态
 
 **Card Edition（卡牌版本）**:
-一局游戏发放的职业卡和次要发展卡所属的版本：修订版（A–E）或旧版（`C` 前缀牌组，如 CE、CI、CK）。只换卡牌，棋盘、行动格、大发展和计分仍按修订版引擎；同一局不混用两个版本。旧版能否开局由 `CLASSIC_EDITION_ENABLED` 控制，见 ADR 0049。
+一局游戏发放的职业卡和次要发展卡所属的版本：修订版（A–E）或旧版（`C` 前缀牌组，如 CE、CI、CK）。只换卡牌，棋盘、行动格、大发展和计分仍按修订版引擎；同一局发牌不混用两个版本。旧版能否开局由 `CLASSIC_EDITION_ENABLED` 控制，见 ADR 0049。它只用于开局、发牌池和显示：规则代码不按它分支，两个版本的卡同局时仍须正确，见 ADR 0050。
 _Avoid_: 旧版规则、扩展、把牌组（deck）当成版本
 
 **Revised Edition / Classic Edition（修订版 / 旧版）**:
@@ -1237,7 +1241,7 @@ _Avoid_: 每轮一次的标记
 _Avoid_: 单纯增加工人计数
 
 **Extra Turn（额外工作回合）**:
-玩家普通工人耗尽后由卡牌贡献的一次额外轮转机会；轮转不再提前跳过这类玩家，且该机会会开启新的 Turn。新的 Turn 不一定是 Extra Turn：Archway、Straw Hat 这类轮转外行动不新增轮转机会。
+玩家普通工人耗尽后由卡牌或 Guest 贡献的一次额外轮转机会；轮转不再提前跳过这类玩家，且该机会会开启新的 Turn。新的 Turn 不一定是 Extra Turn：Archway、Straw Hat 这类轮转外行动不新增轮转机会。
 _Avoid_: 把轮转外 Turn 算作 Extra Turn、连续放工（破坏交替）
 
 **Forfeit（放弃额外行动）**:
@@ -1279,6 +1283,7 @@ _Avoid_: 永久放弃、全局出局名单
 - 规则正确性优先用 **Session Test**；前端视觉和多人连接行为再用 E2E。
 - **Routine Verification** 证据不全时做 **Bounded Widening**，只有 **Full Trigger** 才让它运行完整验证任务集；完整性只由 **Release Candidate Verification** 保证。浏览器证据过宽时，扩大落到 **Routine Browser Smoke Set**。
 - **Promote** 一个 **Newborn** 使其成为可放置工人，是 **Adoptive Available** 玩家把后代换成一次 **Extra Turn** 的前提；**Forfeit** 则让该玩家放弃 **Extra Turn** 并退出本轮后续行动。
+- 每名可派遣的 **Guest** 给所有者一次 **Extra Turn**；派遣它是推进 **Person Placement Order** 的人员放置。它不是 **Supply Person**，不占用所有者的家庭成员 token，也不受 **Family Token Limit** 限制。所有者没有家庭成员可放时可以放弃这次机会，这名 **Guest** 随即作废，其他机会不受影响。
 
 ## Example dialogue
 

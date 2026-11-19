@@ -81,6 +81,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - `card-state.ts`、`round-placement.ts`：一次性状态、原始 Work Placement Chronology 与人员放置序号（[Turn Scope 与行动执行作用域](session_zh.md#turn-scope-与行动执行作用域)）。
 - `turn-token.ts`：活动 Turn Scope 身份与卡牌的“本 Turn 已用”记录。`isUsedThisTurnOrGap` / `markUsedThisTurnOrGapLeaf` 另把玩家两次自己 Turn 之间的间隔（其他玩家的 Turn、收获、回合结束与开始）视为单独一份记录；只有普通放人准入显式传入 `turnScopeProjection` 时，才把下一 Turn 视为未使用；真实 anytime、pending 与替代查询仍读取当前间隙。`action-snapshot.ts`：Turn 起点快照（[Turn Scope 与行动执行作用域](session_zh.md#turn-scope-与行动执行作用域)）。
 - `card-held-workers.ts`、`card-field.ts`：卡上工人（[cardStates 中的局部状态](#cardstates-中的局部状态)）与 Card Field（[Card Field 与 Logical Field seam](#card-field-与-logical-field-seam)）。
+- `guest-flow.ts`：原生食客辅助函数，支持轮转授予和卡牌流程内放置。派遣、作废和返还由共享层负责（[轮转、额外回合与供应人物](session_zh.md#轮转额外回合与供应人物)）。
 
 ## Card Field 与 Logical Field seam
 

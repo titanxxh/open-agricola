@@ -85,6 +85,16 @@ export const timedExtraTurnFlow = (state: GameState, player: PlayerState, cardId
   const due = timedRuleOccurrences(state, player, cardId, rules, 'contributeExtraTurn').filter(occurrence => occurrence.round === state.round && occurrence.rule.at.phase === 'contributeExtraTurn')
   return due.length ? { type: 'seq', children: due.map(occurrence => compileRuleBody(cardId, occurrence.rule.key, occurrence.rule.body)) } : undefined
 }
+/**
+ * An extra turn that resolves this round's due `contributeExtraTurn` rules. Each
+ * one is recorded as it resolves, so the card offers it once, for any body.
+ */
+export const timedExtraTurnResolution = (state: GameState, player: PlayerState, cardId: string, rules: readonly TimedRule[]): ActionFlow | undefined => {
+  const due = timedRuleOccurrences(state, player, cardId, rules, 'contributeExtraTurn').filter(occurrence => occurrence.round === state.round && occurrence.rule.at.phase === 'contributeExtraTurn')
+  return due.length ? { type: 'seq', children: due.map((occurrence): ActionFlow => ({
+    type: 'leaf', sourceCard: cardId, actionId: 'resolve-timed-rule', params: { ruleKey: occurrence.rule.key, identity: occurrence.identity },
+  })) } : undefined
+}
 export const retainedTimedExtraTurnFlows = (state: GameState, player: PlayerState, resolveRules: TimedRuleResolver): ActionFlow[] => {
   const owned = new Set(playedCards(player))
   return timedRuleSources(state, player, resolveRules).filter(source => !owned.has(source.cardId)).flatMap(source => {

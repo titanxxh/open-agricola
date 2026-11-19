@@ -95,6 +95,7 @@ import { getMinorImprovement } from '../cards/registry-display.ts'
 import { buildEndTurnReactionFlow } from '../cards/helpers/end-turn-reactions'
 import { endTurnScope, readActionSnapshotExtraData } from '../cards/helpers/action-snapshot.ts'
 import { returnSupplyWorkers } from '../domain/supply-workers.ts'
+import { isGuestWorkerId, returnGuests } from '../domain/guests.ts'
 import {
   registerCustomCard,
   getCustomMinorImprovementIds,
@@ -333,6 +334,8 @@ export type HistoryEntry = {
   /** At action start, the boundary protects older history, not this post-observation snapshot. */
   undoBoundary?: boolean
   postObservation?: true
+  /** Taken before an extra-turn offer was injected; restoring it brings the same offer back. */
+  turnOffer?: true
 }
 
 const isRestorableUndoBoundary = (entry: HistoryEntry): boolean =>
@@ -659,6 +662,11 @@ export class GameCore {
 
   /** @internal phase access — append history entry (Round/Harvest/Draft mixins). */
   appendHistory(actionStart = false, undoBoundary = false): void { this.pushHistory(actionStart, undoBoundary) }
+  /** @internal phase access — the action-start snapshot of an injected extra-turn offer. */
+  appendTurnOfferHistory(): void {
+    this.pushHistory(true)
+    this.history[this.history.length - 1]!.turnOffer = true
+  }
   appendAnytimeHistory(replacesTurn: boolean): void {
     this.pushHistory(replacesTurn, false, this.state.pendingUndoBoundary === true)
   }
@@ -2715,10 +2723,21 @@ export class GameCore {
     return -1
   }
 
+  /**
+   * The snapshot a step undo restores. An untouched extra-turn offer comes
+   * straight back when its own snapshot is restored, so stepping back from it
+   * undoes the step before the offer instead (never across an undo boundary).
+   */
+  private undoStepIndex(): number {
+    const top = this.history.length - 1
+    const offer = this.history[top]
+    return offer?.turnOffer && offer.undoBoundary !== true && top > 0 ? top - 1 : top
+  }
+
   private canUndoStepNow(): boolean {
     if (this.state.pendingUndoBoundary === true) return false
     if (this.isFailedAuthoritativeCommand(normalizedCommand('undoStep', null, {}))) return false
-    const entry = this.history[this.history.length - 1]
+    const entry = this.history[this.undoStepIndex()]
     return !!entry && (entry.undoBoundary !== true || isRestorableUndoBoundary(entry))
   }
 
@@ -3921,6 +3940,9 @@ export class GameCore {
         }
         this.finalizeActionLog(frameOwnerPlayer)
         this.engineStack.pop()
+        // A flow outside any turn (an anytime action from an idle work turn) can
+        // leave the player to move with a new extra-turn opportunity.
+        if (this.engineStack.depth() === 0) roundPhase.startPendingExtraTurnIfAny(this)
         return
       }
 
@@ -4764,6 +4786,8 @@ export class GameCore {
   }
 
   private continueAllWorkersPlacedHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    // No work turn follows this window, so a Guest granted from here on is placed at once.
+    this.state.workEndWindowRound = this.state.round
     if (this.stageDispatch.continueStageHook('onAllWorkersPlaced', playerIndex, cardIndex)) {
       return this.respond()
     }
@@ -4806,8 +4830,9 @@ export class GameCore {
     if (this.stageDispatch.continueStageHook('onReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
+    // Guests leave with the cleared spaces but go back to the general supply, not home.
     const returnedWorkers = this.state.actionSpaces.flatMap((space) =>
-      (space.takenBy ?? []).map((worker) => ({
+      (space.takenBy ?? []).filter((worker) => !isGuestWorkerId(worker.workerId)).map((worker) => ({
         playerId: worker.playerId,
         workerId: worker.workerId,
       })),
@@ -4832,6 +4857,12 @@ export class GameCore {
         releaseWorkerFromCard(p, cardId)
       }
     }
+    appendImmediateEvents(this.state, returnGuests(this.state).map(({ playerId, guest }) => ({
+      type: 'guest.voided' as const,
+      playerId,
+      guestId: guest.id,
+      cardId: guest.sourceCardId,
+    })))
 
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
     if (pendingAnimal !== -1) {
@@ -5721,11 +5752,11 @@ export class GameCore {
     if (this.state.pendingUndoBoundary === true) {
       return this.respond(false, 'cannot undo past boundary')
     }
-    const latest = this.history[this.history.length - 1]
-    if (latest?.undoBoundary && !isRestorableUndoBoundary(latest)) {
+    const index = this.undoStepIndex()
+    const entry = this.history[index]
+    if (entry?.undoBoundary && !isRestorableUndoBoundary(entry)) {
       return this.respond(false, 'cannot undo past boundary')
     }
-    const entry = this.history[this.history.length - 1]
     if (!entry) return this.respond(false, 'no history to undo')
     const beforeEvents = [...this.state.events]
     const beforeArchive = this.capturePublicEventArchive()
@@ -5735,7 +5766,7 @@ export class GameCore {
       entry.state.events,
       beforeArchive,
     )
-    this.history.pop()
+    this.history.length = index
     this.restoreHistory(entry)
     this.recomputeActionStartIndex()
     this.restorePendingExtraTurnAfterUndo()

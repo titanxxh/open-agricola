@@ -81,7 +81,7 @@
 - `SectionNav` 仅滚动到已经渲染的分区锚点，不改变 Farm View Player、私有信息可见性或 Interaction Focus。其实测高度为页面底部留白，并与固定操作栏一起计入农场缩放及交互滚动的可用视口。窄屏时按钮换行而非横向滚动，并让出报告问题按钮自行发布的占位宽度。覆盖见 `section-navigation.spec.ts` 和 section-nav 组件测试。
 - 农场选择、空间目标选择、动物整理及本机选中的 Moor 地形操作使用农场目标。格盘根据有效视口和固定控件调整尺寸，也支持扩展农场。围栏控件扩大命中范围，并以收窄端点区分相邻边。同一步的重复快照保留草稿，只移除撤回的合法目标。`fence-selection-quote.ts` 显示权威选择费用，在快照、请求或草稿改变后丢弃旧回复；费用查询不决定是否允许提交。验收见 `farm-interaction-focus.spec.ts` 及聚焦、农场草稿和费用组件测试。
 
-- `board/ActionSpaceDescription.tsx` 根据权威 `baseDescriptionPreview` 渲染行动格图标，费用和数量始终取自该规则树。详细悬停说明与交互选项使用 `interaction/ActionDescription.tsx`。棋盘保留图形表达，不再另行维护规则表；组件和浏览器覆盖见 `ActionBoard.test.tsx` 与 `action-space-icons.spec.ts`。
+- `ActionSpaceDescription.tsx` 渲染 `baseDescriptionPreview`，`ActionDescription.tsx` 渲染悬停说明和选项。食客标记显示所属玩家和来源卡，回合格显示预定的食客。派遣沿用放置高亮并显示来源卡。`ReplayBoard` 共用标记、数量和基于存档的行动日志，含撤销记录。测试见 `classic-guest.spec.ts` 与 `ReplayBoard.test.tsx`。
 - `client/app/GameContainerApi.tsx`（含 `useTransportSetup`）、`LobbyPage.tsx` 与 `PageRouter.tsx` 编排视图，并根据 `viewPlayerId` 与 `playerIndex` 推导可交互性。
 - `FarmBoardView.visiblePlayerIds` 决定可读手牌，独立于控制权限和 Interaction Player。手牌提交（含职业多选）只允许当前显示且拥有权限的响应座位。热座只使用已确认接机者。重复快照保留浏览和本地勾选。覆盖见 `GameContainerApi.hotseat.test.tsx`、`FarmBoard.test.tsx` 和 `hotseat-public-farms.spec.ts`。
 - `DraftOverlay` 与 `PublicOpeningProgress` 共用个人数量及选牌中／等牌／完成状态。本地勾选绑定显示时的选择机会，其他人提交不清除勾选，换包才清除。实时 envelope 的座位在线信息独立于轮抽状态；离开大厅后仍消费加入和断开事件。热座从最后一次手选者之后轮转，跳过无牌座位并保留私密接机确认。覆盖：`DraftOverlay.render.test.tsx`、`gameTransport-reconnect.test.ts`、`draft-opening-order.spec.ts`。
@@ -92,7 +92,7 @@
 - 构建开关控制大厅和工坊的卡牌版本选择。旧版牌组的张数按清单和当前人数计算。房间标签使用服务端投影的卡牌版本。
 - `app/use-turn-tab-title.ts` 提醒大厅 Waiting Seat。普通进行中只提醒自有的待回应者：等待中的 Interaction Player，否则是工作轮转玩家。轮抽、父母选择和热座保持原样。顶栏、标签、农场标记和总览使用同一待回应者，不改轮转或 takeAction。大厅座位仍是栈顶帧主人。覆盖：`responding-player-markers.test.tsx`、`lobby-active-games.spec.ts`、`ws-dual-player.spec.ts`、`lobby-my-rooms.test.ts`。
 - `app/solo/SoloHandOverlay.tsx` 按权威候选分组收集一次本地选择并原子提交。重复快照和语言切换保留可编辑勾选；刷新恢复候选并清空未确认勾选。Moor 准备和保留继续使用 `InteractionBar` 原生选择；`SpecialActionsPanel` 读取公开当前牌、弃牌及 `soloSupply` 投影。覆盖见 `standard-solo-ui.spec.ts` 与单人组件测试。
-- 对局布局共用玩家总览与只读公开农场。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。
+- 对局布局共用玩家总览与只读公开农场。两处食客计数均读取 `playerPanelSummary.guests.pending`。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。
 - 不支持容器单位或 CSS 长度除法的浏览器通过 `useElementWidth` 与 `ResizeObserver` 测量卡牌和农场容器，提供卡牌缩放比例与农场宽度；支持这些特性的浏览器继续使用 CSS 容器尺寸。旧浏览器尺寸、横竖屏切换与农场输入由 `touch-card-play.spec.ts` 覆盖。
 - `common/CardWithCopy.tsx` 负责触屏查看详情和绑定当前请求的出牌确认。`CardDetails.tsx` 使用模态对话框，内容独立滚动，关闭与打出按钮持续可见。`useCardPlayChoice` 防止手牌或供应区重复提交，跟随传输结果解除失败请求的提交锁；提交权限取自当前权威选项与本机座位。提交锁与详情权限使用 `useRequestActivation`：重复快照保留当前激活阶段，离开请求后即使恢复同一标识，也建立新的激活阶段；迟到结果仅影响所属阶段。职业多选保留整组确认。覆盖见 `PlayerCard.touch.test.tsx`、`touch-card-play.spec.ts` 与 `card-play-undo.spec.ts`。
 - `improvement-selection.ts` 将当前可用请求选项与应答玩家手牌、主要改良供应区求交。发展请求有小发展候选时聚焦手牌，仅主要改良合法时展开并聚焦供应区，两者皆无候选时聚焦操作控件。`PlayerFarmPanel.improvementSupply` 将唯一供应区视图放在手牌旁；`GameContainerApi` 持有绑定请求标识的展开状态，重复快照及响应式手牌挂载位置变化都保留该状态。覆盖见 `GameContainerApi.presentation.test.tsx`、`MajorImprovements.test.tsx` 与 `improvement-focus.spec.ts`。

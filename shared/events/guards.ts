@@ -52,6 +52,8 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'anytime.completed': ['anytimeActionId', 'activationId', 'parentActivationId', 'turn'],
   'worker.returned': ['workers', 'to'],
   'worker.promoted': ['playerId', 'workerId', 'from', 'to'],
+  'guest.granted': ['playerId', 'guestId', 'cardId', 'targetRound'],
+  'guest.voided': ['playerId', 'guestId', 'cardId'],
   'action.revealed': ['actionId', 'roundSlot'],
   'action.accumulated': ['spaceId', 'resources', 'normalResources', 'seasonalAdjustments'],
   'action.exclusiveUseSet': ['actionId', 'playerId', 'sourceCardId', 'untilRound'],
@@ -593,6 +595,17 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.workerId, 'workerId')
       assertStringField(event.from, 'from')
       assertStringField(event.to, 'to')
+      return
+    case 'guest.granted':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.guestId, 'guestId')
+      assertStringField(event.cardId, 'cardId')
+      assertFiniteNumberField(event.targetRound, 'targetRound')
+      return
+    case 'guest.voided':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.guestId, 'guestId')
+      assertStringField(event.cardId, 'cardId')
       return
     case 'action.revealed':
       assertStringField(event.actionId, 'actionId')

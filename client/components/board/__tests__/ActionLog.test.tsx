@@ -6,6 +6,44 @@ import type { GameEvent } from '../../../../shared/contract/events'
 import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
 import { buildActionLogTimelineRows } from '../../../app/action-log-timeline'
 import { ActionLog } from '../ActionLog'
+import { registerLanguagePack } from '../../../../shared/i18n'
+
+it('renders the same localized Guest rows and portraits from the snapshot or replay timeline', () => {
+  const locale = 'guest-log-fixture'
+  registerLanguagePack({ version: 1, locale, messages: {
+    'log.guestGranted': '{player} receives a Guest from {card} for round {round}',
+    'log.guestDispatched': '{player} dispatches a Guest to {space}',
+    'log.guestVoided': "{player}'s Guest from {card} expires unused",
+    'cardFaces.CI073_Guest.name': 'Guest',
+    'actions.fishing.name': 'Fishing',
+  } })
+  const base = { schemaVersion: 1, round: 2, phase: 'work', visibility: 'public', actorPlayerId: 'p1' } as const
+  const guest = { playerId: 'p1', guestId: 'guest:1', cardId: 'CI073_Guest' }
+  const events: GameEvent[] = [
+    { ...base, ...guest, id: 'grant', occurrenceId: 'grant', seq: 1, type: 'guest.granted', targetRound: 2 },
+    { ...base, id: 'dispatch', occurrenceId: 'dispatch', seq: 2, type: 'actionSpace.useStarted', useId: 'use', spaceId: 'fishing',
+      newPlacement: true, personUse: { workerId: 'guest:1', placementOrdinal: 3 }, accumulation: {}, workPhase: true },
+    { ...base, ...guest, id: 'void', occurrenceId: 'void', seq: 3, type: 'guest.voided', guestId: 'guest:2' },
+  ]
+  const playerNames = { p1: 'Alice' }
+  const actionNames = { fishing: 'actions.fishing.name' }
+  const log = eventsToLogEntries(events, { playerNames, actionNames })
+  const timelineBuckets = buildActionLogTimelineRows({
+    entries: events.map((event, packetLocalIndex) => ({ key: event.id, kind: 'event', packetSeq: 1, packetLocalIndex,
+      event, status: 'active', payloadSource: 'currentEvents', replayable: true })),
+    stateLog: log, currentRound: 2, locale, playerNames, actionNames,
+  })
+  const { container, rerender } = render(<ActionLog locale={locale} log={log} playerNames={playerNames} currentRound={2} />)
+  const checkRows = () => {
+    expect(container.querySelectorAll('.action-log__icon img.res-icon-guest')).toHaveLength(3)
+    expect(container).toHaveTextContent('Alice receives a Guest from Guest for round 2')
+    expect(container).toHaveTextContent('Alice dispatches a Guest to Fishing')
+    expect(container).toHaveTextContent("Alice's Guest from Guest expires unused")
+  }
+  checkRows()
+  rerender(<ActionLog locale={locale} log={log} playerNames={playerNames} currentRound={2} timelineBuckets={timelineBuckets} />)
+  checkRows()
+})
 
 it.each(['zh', 'en'] as const)('renders summer grain provenance in its single result row in %s', locale => {
   const event: GameEvent = {

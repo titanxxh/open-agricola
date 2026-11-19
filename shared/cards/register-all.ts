@@ -539,8 +539,17 @@ import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C179_BovinePioneer } from './C/C179_BovinePioneer'
 import { C180_Trapper } from './C/C180_Trapper'
 import { CE203_Shepherd } from './classic/CE/CE203_Shepherd'
+import { CFL026_SpeculoosBakery } from './classic/CFL/CFL026_SpeculoosBakery'
+import { CFL040_Anatomist } from './classic/CFL/CFL040_Anatomist'
+import { CG062_AnimalFarm } from './classic/CG/CG062_AnimalFarm'
+import { CI073_Guest } from './classic/CI/CI073_Guest'
 import { CI097_Slaughterhouse } from './classic/CI/CI097_Slaughterhouse'
+import { CNL017_MonasticVows } from './classic/CNL/CNL017_MonasticVows'
+import { CNL061_Employer } from './classic/CNL/CNL061_Employer'
+import { CPI007_MarriageCounselor } from './classic/CPI/CPI007_MarriageCounselor'
 import { CUSTOM_FixtureHarvester } from './community/CUSTOM_FixtureHarvester'
+import { CWA014_CatTongue } from './classic/CWA/CWA014_CatTongue'
+import { CZ314_Keg } from './classic/CZ/CZ314_Keg'
 import { D001_ZigzagHarrow } from './D/D001_ZigzagHarrow'
 import { D002_DwellingPlan } from './D/D002_DwellingPlan'
 import { D003_Furrows } from './D/D003_Furrows'
@@ -1556,8 +1565,17 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C179_BovinePioneer': C179_BovinePioneer.impl,
   'C180_Trapper': C180_Trapper.impl,
   'CE203_Shepherd': CE203_Shepherd.impl,
+  'CFL026_SpeculoosBakery': CFL026_SpeculoosBakery.impl,
+  'CFL040_Anatomist': CFL040_Anatomist.impl,
+  'CG062_AnimalFarm': CG062_AnimalFarm.impl,
+  'CI073_Guest': CI073_Guest.impl,
   'CI097_Slaughterhouse': CI097_Slaughterhouse.impl,
+  'CNL017_MonasticVows': CNL017_MonasticVows.impl,
+  'CNL061_Employer': CNL061_Employer.impl,
+  'CPI007_MarriageCounselor': CPI007_MarriageCounselor.impl,
   'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester.impl,
+  'CWA014_CatTongue': CWA014_CatTongue.impl,
+  'CZ314_Keg': CZ314_Keg.impl,
   'D001_ZigzagHarrow': D001_ZigzagHarrow.impl,
   'D002_DwellingPlan': D002_DwellingPlan.impl,
   'D003_Furrows': D003_Furrows.impl,

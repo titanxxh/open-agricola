@@ -81,9 +81,9 @@ type SessionResponse = {
 **额外回合**（[ADR 0001](../adr/0001-a92-adoptive-pull-model-extra-turn-hook.md)、[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）：
 
 - `contributeExtraTurn?: (state, player) => ActionFlow | void` 是 `CardEffect` hook，由 `shared/session/phases/round.ts` 的轮转显式消费，`runCardEffectHook` 不会执行它。
-- `collectExtraTurnContributions()` 是唯一来源；`hasPendingExtraTurn()` 据此判断，`collectExtraTurnFlow()` 构造交互。三个门禁把待处理的额外回合视为资格：`nextSeatedPlayerIdx`、`roundWorkComplete` 与轮转跳过循环。
-- `startPendingExtraTurnIfAny(core)` 是唯一注入路径，工作阶段入口、确认下一玩家的轮转、加载状态与撤销恢复共用，且只在当前座位的空栈中注入。带 `extraTurnBeforeWorkers: true` 的 provider 与普通放人及合法的沼泽特殊行动并列出现；其余 provider 在普通工人用完后才运行。供应类 provider 只有在普通工人用完后才能放弃；选择普通放人会保留之后的机会，除非该卡要求占用第一个回合，此时它在 `onEndTurn` 中消耗该机会。待处理的普通抽牌会推迟注入。
-- 可重复的 provider 可定义 `countExtraTurns`。跳过与强制消耗按来源卡计入 `PlayerState` 字段，`countPendingExtraTurns()` 复用 provider 聚合，而不用玩家级计数器；只有在必须自动推进时，非交互回退才按稳定卡序消耗一个来源。
+- `collectExtraTurnContributions()` 是唯一来源；`hasPendingExtraTurn()` 据此判断，`collectExtraTurnFlow()` 构造交互。它汇集卡牌 provider 和通过 `registerExtraTurnProvider()` 注册的 provider（见下文食客）。每个贡献带有自己的计数键、是否可在所有者还有人未放时使用，以及与其他机会并列时提供的 leaf。三个门禁把待处理的额外回合视为资格：`nextSeatedPlayerIdx`、`roundWorkComplete` 与轮转跳过循环。
+- `startPendingExtraTurnIfAny(core)` 是唯一注入路径，工作阶段入口、确认下一玩家的轮转、加载状态、撤销恢复，以及不属于任何回合的流程结束时（空闲工作回合中的随时操作）共用，且只在当前座位的空栈中注入。它的历史条目带有 `turnOffer` 标记：恢复该条目只会让同一个机会再次出现，所以在未动过的机会上逐步撤回会撤回它之前的那一步，但不会越过撤回边界。带 `extraTurnBeforeWorkers: true` 的 provider 与普通放人及合法的沼泽特殊行动并列出现；其余 provider 在普通工人用完后才运行。供应类 provider 只有在普通工人用完后才能放弃；选择普通放人会保留之后的机会，除非该卡要求占用第一个回合，此时它在 `onEndTurn` 中消耗该机会。待处理的普通抽牌会推迟注入。
+- 可重复的 provider 可定义 `countExtraTurns`。跳过与强制消耗按贡献的计数键（卡牌 ID 或食客 ID）计入 `PlayerState` 字段，`countPendingExtraTurns()` 复用 provider 聚合，而不用玩家级计数器；只有在必须自动推进时，非交互回退才按稳定卡序消耗一个来源。
 - `onBeforePlayerTurn` 返回 `{ skipTurn: true }` 时，轮转在该玩家回合开始前跳过他。
 - Snake Opening（单座位时忽略）让每位玩家以 3 食物开局。第 1 轮中，`nextWorkRotationIdx()` 在工作轮转第一次要越过本轮工作顺序起点时反转，发出 `snakeOpening.reversed`，并在该工作阶段内保持反向；反向轮转从刚行动的座位开始，该座位会先被再次考虑；其他顺序使用正向 helper。
 
@@ -96,6 +96,18 @@ type SessionResponse = {
 - 额外住房到期时先清除其容量；住房不足时只永久移除稳定家庭顺序中的第一名活动成员（`removedFromSupply`、清除引用、发出 `to=removed` 的 `worker.returned`）。
 
 测试：`server/__tests__/{supply-workers-session,snake-opening-session}.test.ts`。
+
+**食客**（[ADR 0050](../adr/0050-rules-code-does-not-assume-one-card-edition.md)）：
+
+- 食客是 `player.guests` 中的 `GuestRecord`（`shared/domain/guests.ts`）：`id`（`guest:<n>`，从不占用工人槽位）、`sourceCardId`、`round`、可选的 `where` 与 `dispatched`。家庭人数、家庭成员 token 上限、住房、喂食与计分只读 `workers`。记录属于玩家：没有任何逻辑询问来源卡是否仍在场，也没有规则读取本局的卡牌版本。
+- `shared/cards/helpers/guest-flow.ts` 提供原生食客流程。`grantGuestLeaf()` 指定回合和放置范围。`grantImmediateGuestLeaf()` 授予一名在同一流程内按普通放人规则派遣的食客，放弃或无合法目标时作废。食客本身没有时机：需要在其他时刻派遣食客的卡，从那个时刻的 hook 发起放置，可用 `grantImmediateGuestLeaf()` 或定时规则操作 `guest-placement`（例如 `onAllWorkersPlaced`，或经 `timedExtraTurnResolution()` 用于 `contributeExtraTurn`）。该操作派遣一名食客，或按来源卡 `countFact` 记录的数量派遣，所以在那个时刻之前打出两次的卡保留两名食客。
+- `shared/actions/guest-turns.ts` 在所有者该回合的任一工作回合提供每名有合法行动格的本回合食客，与普通放人并列。所有者没有家庭成员可放时可以放弃，食客随即作废。额外回合用于派遣食客的卡声明 `extraTurnGuest: { where }`，其贡献标记为 `guest`。强制消耗（`consumePendingExtraTurns()`）不消耗任何食客机会。卡牌判断所有者是否还有人可放时使用 `hasPendingGuestPlacement()`：已授予的食客或派遣食客的额外回合，只有仍有合法行动格时才计入。
+- `state.workEndWindowRound` 记录 `onAllWorkersPlaced` 窗口已开始的回合。此后不再有工作回合，所以此时起授予的本回合食客立即派遣，或放弃后作废。
+- 派遣是带 `workerSource: { kind: 'guest', guestId }` 的 `place-farmer`。`shared/actions/helpers/placement-person.ts` 通过与供应人物相同的 `PlacementPerson` seam 解析它。派遣占用行动格并推进人员放置序号。这次用格属于食客本人（`PlacementPerson.ownsUse`）：无论哪张卡授予了食客，用格和行动格的行动都不带卡牌来源，卡牌反应对它与对家庭成员的用格一视同仁。`addWorkerRef()` 在食客被放置或移动到的任何位置都把引用标为 `guest: true`。
+- 食客站在哪里以版面为准，与家庭成员相同。食客只能派遣一次：被效果召回的食客本回合不再派遣，返家时离场。
+- 返家时食客的引用随其他行动格一起清空，且不列入 `worker.returned`。随后 `returnGuests()` 移除所有到期回合的记录，并把从未派遣的记录作为 `guest.voided` 报告。来源卡传入隐藏手牌后，食客的公开授予、派遣和作废仍然可见。
+
+测试：`server/__tests__/{guest-mechanism-session,classic-animal-farm-session,immediate-guest-cards-session}.test.ts`、`shared/domain/__tests__/guests.test.ts`。旧版食客卡与修订版卡同局：`server/__tests__/guest-mixed-edition-session.test.ts`。
 
 ## Turn Scope 与行动执行作用域
 
@@ -142,7 +154,7 @@ type SessionResponse = {
 
 ## Card Edition 与发牌
 
-`state-bootstrap.ts` 按对局的 Card Edition 发普通卡（[ADR 0049](../adr/0049-classic-card-edition-behind-a-switch.md)）。`InitialStateOptions.cardEdition: 'classic'` 加上 `classicDeckIds` 开出一局旧版对局：建局时用 `normalizeClassicDeckIds()` 规范化牌组，并把 `cardEdition` 和 `classicDeckIds` 写入 `GameState`。修订版对局两个字段都不写，缺省即修订版，因此保留中的对局无需迁移。`dealHands()` 随后只从这些牌组的合格卡（`getEligibleClassicCardIds()`）中发牌；修订版牌组 ID 和 community 牌组都不会加入，工坊卡照常加入。普通发牌、轮抽、兜底牌堆和旧存档的 `normalizeState()` 重建都按对局自己的版本，不回落到修订版 A–E。这两个字段在序列化和重新水合后保持不变。旧存档重建测试：`shared/session/__tests__/classic-legacy-rebuild.test.ts`。
+`state-bootstrap.ts` 按对局的 Card Edition 发普通卡（[ADR 0049](../adr/0049-classic-card-edition-behind-a-switch.md)）。`InitialStateOptions.cardEdition: 'classic'` 加上 `classicDeckIds` 开出一局旧版对局：建局时用 `normalizeClassicDeckIds()` 规范化牌组，并把 `cardEdition` 和 `classicDeckIds` 写入 `GameState`。修订版对局两个字段都不写，缺省即修订版，因此保留中的对局无需迁移。`dealHands()` 随后只从这些牌组的合格卡（`getEligibleClassicCardIds()`）中发牌；修订版牌组 ID 和 community 牌组都不会加入，工坊卡照常加入。普通发牌、轮抽、兜底牌堆和旧存档的 `normalizeState()` 重建都按对局自己的版本，不回落到修订版 A–E。这两个字段在序列化和重新水合后保持不变。它们只用于开局、发牌池和显示：规则代码不读它们，两个版本的卡同局时仍须正确（[ADR 0050](../adr/0050-rules-code-does-not-assume-one-card-edition.md)）。旧存档重建测试：`shared/session/__tests__/classic-legacy-rebuild.test.ts`。
 
 `classic-deal-pool.ts` 中的 `getClassicDealShortfall(options)` 是旧版对局的建局检查。每个座位每种类型需要 7 张，轮抽时为每个座位一包 `draftPoolSize` 张（`shared/contract/card-edition.ts` 的 `classicCardsNeededPerType()`），且只计旧版合格卡。卡池不足时返回 `ClassicPoolShortfall`，含错误码 `classic_pool_insufficient`、所需与合格张数以及牌组。准入传入房间的 `maxPlayers`。手牌不会缩减，修订版卡也不会补缺：旧版 `dealHands()` 以同一 shortfall 抛出 `ClassicPoolInsufficientError`。测试：`server/__tests__/classic-deal-session.test.ts`。
 

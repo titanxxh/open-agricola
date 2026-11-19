@@ -50,6 +50,7 @@ import { selectionAction } from './effects/internal/selection'
 import { spendWorkerAction } from './effects/internal/spend-worker'
 import { activateCardEffectAction } from './effects/internal/activate-card-effect'
 import { activateExtraTurnAction } from './effects/internal/activate-extra-turn'
+import { guestAction } from './effects/internal/guest'
 import { drawOrdinaryCardsAction } from './effects/internal/draw-ordinary-cards'
 import { placeFarmerOnSpaceAction } from './effects/internal/place-farmer-on-space'
 import { turnScopeAction } from './effects/internal/turn-scope'
@@ -121,6 +122,7 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   consumeCardCounterAction,
   activateCardEffectAction,
   activateExtraTurnAction,
+  guestAction,
   drawOrdinaryCardsAction,
   placeFarmerOnSpaceAction,
   turnScopeAction,

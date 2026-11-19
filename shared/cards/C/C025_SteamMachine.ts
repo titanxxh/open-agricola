@@ -3,6 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
+import { hasPendingGuestPlacement } from '../../actions/guest-turns'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C025_SteamMachine'
@@ -29,6 +30,10 @@ const steamMachineListener: CardListenerRegistration = {
     }
 
     if (workersAvailable(state, player) > 0) {
+      return
+    }
+    // A Guest still to place on a legal space makes a later one the last; it is never consumed here.
+    if (hasPendingGuestPlacement(state, player, context.actionHooks)) {
       return
     }
 

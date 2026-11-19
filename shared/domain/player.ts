@@ -4,6 +4,15 @@ import { findActionSpaceById, findActionSpaceByWorker } from './space'
 
 export type PlayerQueryState = Pick<GameState, 'players'>
 
+/** The seat that opened this round, even if the start-player marker has moved. */
+export const roundWorkOrderStartIdx = (state: Pick<GameState, 'players' | 'roundFirstPlayerId'>): number => {
+  const frozen = state.players.findIndex(player => player.id === state.roundFirstPlayerId)
+  return frozen < 0 ? Math.max(0, state.players.findIndex(player => player.startPlayer)) : frozen
+}
+
+export const activeWorkSnakeOpening = (state: Pick<GameState, 'enableSnakeOpening' | 'round' | 'roundPhase' | 'snakeOpening'>) =>
+  state.enableSnakeOpening && state.round === 1 && state.roundPhase === 'work' ? state.snakeOpening : null
+
 export const findPlayerById = (
   state: PlayerQueryState,
   playerId: unknown,

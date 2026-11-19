@@ -46,7 +46,7 @@ Selected fields:
 }
 ```
 
-- `actionSpaces[*].takenBy` is `WorkerRef[]`. Card-created linked occupancy adds `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`, so cleanup reads semantic metadata instead of another card's ID.
+- `actionSpaces[*].takenBy` is `WorkerRef[]`. Card-created linked occupancy adds `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`, so cleanup reads semantic metadata instead of another card's ID. A Guest's ref carries `guest: true` and a `guest:<n>` worker ID.
 - `spend-worker` puts a Card-held Person on a non-interactive `card-worker:<sourceCard>` holder created by the pure factory in `shared/domain/card-worker-space.ts`. Its WorkerRefs are placement facts until return-home cleanup, even if the source card leaves the played zone; recovery recreates the holder definition from code and never accepts stored callbacks.
 - `workPhaseObtainedResources` (cleared after returning home) and `completedFeedingPhases` are shared facts cards read instead of keeping per-card counters.
 - Placement facts are aggregates: `farm.animalMoved.newlyPlacedOnFarmyard` counts newly placed reserve animals in physical farmyard zones (a card zone with a `farmPosition` on the owner's farm counts as physical), and `addFarmyardSpaceState(..., eventSink)` emits positive goods additions to a physical field as `resource.moved`; logical card fields stay separate locations.
@@ -87,6 +87,7 @@ Tests: `shared/events/__tests__/{event-mapping-policy,log-mapper}.test.ts`, `sha
 - Supply tokens: `supplyTokensConsumed` records permanently consumed fence or stable components; helpers calculate the remaining limit
 - Card-local state: `cardStates` ([Local state in cardStates](cards.md#local-state-in-cardstates))
 - Worker identity: `workers: Worker[]` with five fixed slots `'1'..'5'`; `isActive` / `isNewborn` describe permanent family members, and optional `supplyUse` records a reserved, pending or temporarily placed supply person and its disposition
+- Guests: optional `guests: GuestRecord[]`, apart from the worker slots and absent until the first grant, so retained games need no migration ([Rotation, extra turns and supply people](session.md#rotation-extra-turns-and-supply-people))
 
 `PlayerState.fields` stores Farmyard Fields (bottom stack first). Card-facing rules use the Logical Field seam ([Card Fields and the Logical Field seam](cards.md#card-fields-and-the-logical-field-seam)); only geometry and occupancy rules ask for Farmyard Fields.
 

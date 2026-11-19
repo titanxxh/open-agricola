@@ -349,7 +349,31 @@ export type WorkerRef = {
     sourceCard: string
     linkedWorkerId: string
   }
+  /** The person standing here is a Guest, not one of the player's family tokens. */
+  guest?: true
 }
+
+/** The action spaces a Guest may be dispatched to; a Guest without one may go to any space. */
+export type GuestPlacementScope =
+  | { kind: 'spaces'; spaceIds: string[] }
+  | { kind: 'accumulation' }
+
+/**
+ * A Guest: a person token from the general supply that a card grants for one
+ * round. It is never one of the family tokens in `workers`.
+ */
+export type GuestRecord = {
+  id: string
+  sourceCardId: string
+  /** The only round in which it can be dispatched, on any of its owner's work turns. */
+  round: number
+  where?: GuestPlacementScope
+  /** Set once it has been dispatched to an action space. */
+  dispatched?: true
+}
+
+/** `place-farmer` person source for a Guest already granted to the player. */
+export type GuestWorkerSource = { kind: 'guest'; guestId: string }
 
 export type BlockedActionSpaceRef = {
   playerId: string
@@ -385,6 +409,8 @@ export type PlayerState = {
   farmTerrain?: FarmTerrainTile[]
   farmyardSpaceStates?: FarmyardSpaceState[]
   workers: Worker[]
+  /** Guests granted to this player; absent when there has never been one. */
+  guests?: GuestRecord[]
   sickWorkerIds?: string[]
   rooms: number
   houseType: 'wood' | 'clay' | 'stone'
@@ -429,7 +455,8 @@ export type PlayerState = {
   /**
    * Session-transient count: mandatory skip-turn effects (e.g. D134
    * OysterEater) consume this many turn-rotation extra-action opportunities
-   * before the remaining contributed extra turns are offered.
+   * before the remaining contributed extra turns are offered. Keyed by the
+   * contribution: a card id, or a Guest id.
    */
   _extraTurnSkipCountsByCard?: Record<string, number>
   _extraTurnConsumedCountsByCard?: Record<string, number>
@@ -682,6 +709,8 @@ export type GameState = {
   parentSelection: ParentSelectionState | null
   currentPlayerIndex: number
   roundFirstPlayerId?: string
+  /** The round whose work-end window (`onAllWorkersPlaced`) has begun; absent before the first one. */
+  workEndWindowRound?: number
   players: PlayerState[]
   actionSpaces: ActionSpace[]
   log: LogEntry[]
@@ -912,7 +941,7 @@ export type ChoiceEffectPreview =
   | { kind: 'ruleOperation'; operation: RuleOperationPreview }
   | { kind: 'unitCost'; resourcesPaid: Partial<Resource>; actionNameKey: string; unit?: 'room' | 'stable' | 'fence'; fixedFee?: Partial<Resource> }
   | { kind: 'occupationFees'; food: readonly number[] }
-  | { kind: 'timedOperation'; operation: 'return-worker' | 'remove-worker' | 'release-held-worker' | 'skip-harvest' | 'skip-field-and-breed' | 'exclusive-use-expires'; actionNameKey?: string }
+  | { kind: 'timedOperation'; operation: 'return-worker' | 'remove-worker' | 'release-held-worker' | 'skip-harvest' | 'skip-field-and-breed' | 'exclusive-use-expires' | 'receive-guest'; actionNameKey?: string }
   | { kind: 'formulaGain'; resources: Readonly<Partial<Record<keyof Resource, RuleAmount>>> }
   | { kind: 'rule'; description: ChoiceDescriptionPreview }
   | { kind: 'actionCosts'; actionNameKey: string; options: { amount: number; paymentOptions: Extract<ChoiceEffectPreview, { kind: 'payment' }>[] }[] }

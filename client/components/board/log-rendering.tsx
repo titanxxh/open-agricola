@@ -376,6 +376,12 @@ export const prepareLogEntry = (
   if (params && typeof params.action === 'string') {
     params.action = resolveMaybeTranslationKey(locale, params.action)
   }
+  if (params && (entry.key === 'log.guestGranted' || entry.key === 'log.guestVoided') && typeof params.cardId === 'string') {
+    params.card = resolveCardDisplayName(locale, params.cardId)
+  }
+  if (params && entry.key === 'log.guestDispatched' && typeof params.space === 'string') {
+    params.space = resolveMaybeTranslationKey(locale, params.space)
+  }
   if (params && entry.key === 'log.cardTriggered') {
     const details: string[] = []
     if (typeof params.triggerAction === 'string' && params.triggerAction) {

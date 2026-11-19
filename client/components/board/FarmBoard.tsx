@@ -25,6 +25,7 @@ import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../typ
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines, type CardStatLine } from '../common/cardStatsFormat'
 import { CardWithCopy } from '../common/CardWithCopy'
+import { GuestIcon } from '../common/GuestIcon'
 import { ParentCardFace } from '../common/ParentCardFace'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { getCardDisplayName } from '../common/cardText'
@@ -920,6 +921,8 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const playCardChoice = actions.playCardChoice ?? resolveChoice
   const summary = playerPanelSummary
+  // Frames saved before Guests existed, and players without one, carry no Guest entry.
+  const pendingGuests = summary.guests?.pending ?? 0
   const farmContainerRef = useRef<HTMLDivElement>(null)
   const measuredFarmWidth = useElementWidth(farmContainerRef,
     !globalThis.CSS?.supports?.('width', '1cqw'))
@@ -1204,6 +1207,17 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
           <span className="res-compact-divider" />
           <span className="res-compact-group">
             <CompactResourceItem iconClass="res-icon-child" value={`${summary.family.used}/${summary.family.limit}`} label={`${compactLabels.family}: ${summary.family.used}/${summary.family.limit}`} />
+            {pendingGuests > 0 ? (
+              <span
+                role="img"
+                title={t(locale, 'ui.guest.pending', { count: pendingGuests })}
+                className="res-compact-item is-nonzero"
+                data-testid="player-pending-guests"
+              >
+                <GuestIcon />
+                <span className="res-compact-num">{pendingGuests}</span>
+              </span>
+            ) : null}
             {typeof infirmaryWorkerCount === 'number' ? (
               <CompactResourceItem iconClass="res-icon-infirmary-worker res-icon-child-free" value={infirmaryWorkerCount} label={`${compactLabels.infirmary}: ${infirmaryWorkerCount}`} />
             ) : null}

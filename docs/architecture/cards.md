@@ -79,6 +79,7 @@ Tests: `server/__tests__/card-state-visibility-session.test.ts`.
 - `card-state.ts`, `round-placement.ts`: one-time state, the raw Work Placement Chronology and Person Placement Order ([Turn Scope and Action-Execution Scope](session.md#turn-scope-and-action-execution-scope)).
 - `turn-token.ts`: the active Turn Scope identity and a card's once-per-Turn records. `isUsedThisTurnOrGap` / `markUsedThisTurnOrGapLeaf` also give the gap between two of the player's Turns (other players' Turns, harvest, round end and start) one record of its own; only an explicit `turnScopeProjection` from ordinary-placement admission previews the next Turn as unused. Actual anytime, pending and replacement queries retain the current gap. `action-snapshot.ts`: the Turn start snapshot ([Turn Scope and Action-Execution Scope](session.md#turn-scope-and-action-execution-scope)).
 - `card-held-workers.ts`, `card-field.ts`: held workers ([Local state in cardStates](#local-state-in-cardstates)) and Card Fields ([Card Fields and the Logical Field seam](#card-fields-and-the-logical-field-seam)).
+- `guest-flow.ts`: native-only helpers for granting Guests through rotation or placing them within a card flow. The shared layer handles dispatch, forfeiture and return ([Rotation, extra turns and supply people](session.md#rotation-extra-turns-and-supply-people)).
 
 ## Card Fields and the Logical Field seam
 

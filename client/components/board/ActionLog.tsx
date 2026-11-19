@@ -4,6 +4,7 @@ import { t } from '../../../shared/i18n'
 import type { GameState } from '../../../shared/contract/types'
 import { LogParts, prepareLogEntry } from './log-rendering'
 import { pickLogIcon, type LogIconKey } from './action-log-icons'
+import { GuestIcon } from '../common/GuestIcon'
 import type { ActionLogTimelineBucket, ActionLogTimelineRow } from '../../app/action-log-timeline'
 import type {
   ReplayTimelineEntry,
@@ -19,6 +20,7 @@ interface Props {
   /** Cap entries (newest first) to keep the panel snappy. Default: 80. */
   limit?: number
   timelineBuckets?: ActionLogTimelineBucket[]
+  hideReplayControls?: boolean
   selectedReplayKey?: string | null
   replayFilter?: ReplayTimelineFilter
   replaySummary?: ReplayTimelineSummary
@@ -111,6 +113,7 @@ const LOG_ICON_CLASS: Partial<Record<LogIconKey, string>> = {
 }
 
 function LogIcon({ icon }: { icon: LogIconKey }) {
+  if (icon === 'guest') return <GuestIcon />
   const resourceClass = LOG_ICON_CLASS[icon]
   if (resourceClass) return <span className={`res-icon res-icon-${resourceClass}`} />
   return (
@@ -128,6 +131,7 @@ export function ActionLog({
   currentRound,
   limit = 80,
   timelineBuckets,
+  hideReplayControls = false,
   selectedReplayKey,
   replayFilter = 'all',
   replaySummary,
@@ -156,7 +160,7 @@ export function ActionLog({
   return (
     <div className="action-log">
       <h3 className="action-log__title">{t(locale, 'ui.actionLog')}</h3>
-      {isTimelineMode && (
+      {isTimelineMode && !hideReplayControls && (
         <div className="action-log__controls">
           {filters.map((filter) => {
             const labelKey =
@@ -254,7 +258,7 @@ export function ActionLog({
                     }}
                   >
                     <span className="action-log__icon" aria-hidden>
-                      <LogIcon icon={pickLogIcon(plainText)} />
+                      <LogIcon icon={pickLogIcon(plainText, entry?.key)} />
                     </span>
                     {playerName ? (
                       <span className="action-log__player">{playerName.slice(0, 1)}</span>

@@ -67,6 +67,7 @@ const renderRuleOperation = (locale: Locale, operation: RuleOperationPreview): R
     case 'put-on-action-space': return <span>{t(locale, 'ui.rulePutOnSpace', { space: t(locale, operation.spaceNameKey) })}{' '}<ResourceLine locale={locale} resources={operation.resources} /></span>
     case 'move-worker-from-space': return t(locale, 'ui.ruleMoveWorkerFromSpace', { space: t(locale, operation.spaceNameKey) })
     case 'supply-worker-placement': return t(locale, 'ui.ruleSupplyWorkerPlacement')
+    case 'guest-placement': return t(locale, 'ui.guest.dispatch', { card: getCardDisplayName(locale, operation.cardId) })
     case 'supply-worker-turn': return t(locale, 'ui.ruleSupplyWorkerTurn')
     case 'card-fact-refund': return <span>{t(locale, 'ui.ruleRefund', { amount: operation.paidAmount, divisor: operation.divisor })}{' '}<ResourceLine locale={locale} resources={{ [operation.resource]: operation.amount }} /></span>
     case 'take-stored-resources': return <span>{t(locale, 'ui.ruleTakeStoredResources')}{' '}<ResourceLine locale={locale} resources={operation.resources} /></span>

@@ -53,6 +53,9 @@ export const collectScheduledEffectPreviews = (state: GameState, player: PlayerS
   }
   const operation = (round: number, cardId: string, effectPreview: Extract<import('../contract/types').ChoiceEffectPreview, { kind: 'timedOperation' }>, timing?: ScheduledEffectPreview['timing']) =>
     add(round, cardId, { kind: 'action', showLabel: false, labelKey: 'actions.special-effect.name', effectPreview }, timing)
+  for (const guest of player.guests ?? []) {
+    if (guest.round > state.round) operation(guest.round, guest.sourceCardId, { kind: 'timedOperation', operation: 'receive-guest' }, 'onRoundStart')
+  }
   const projectedSupplyOffers = new Set<string>()
   for (const worker of player.workers) {
     const use = worker.supplyUse

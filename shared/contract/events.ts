@@ -241,6 +241,21 @@ export type WorkerReturnedEvent = GameEventBase<'worker.returned'> & {
   to: 'home' | 'reserve' | 'supply' | 'removed'
 }
 
+/** A card handed `playerId` a Guest to dispatch in `targetRound`. */
+export type GuestGrantedEvent = GameEventBase<'guest.granted'> & {
+  playerId: string
+  guestId: string
+  cardId: string
+  targetRound: number
+}
+
+/** A Guest left without being dispatched: its owner declined it, or its round ended first. */
+export type GuestVoidedEvent = GameEventBase<'guest.voided'> & {
+  playerId: string
+  guestId: string
+  cardId: string
+}
+
 export type WorkerPromotedEvent = GameEventBase<'worker.promoted'> & {
   playerId: string
   workerId: string
@@ -496,6 +511,8 @@ export type GameEvent =
   | AnytimeCompletedEvent
   | WorkerReturnedEvent
   | WorkerPromotedEvent
+  | GuestGrantedEvent
+  | GuestVoidedEvent
   | ActionRevealedEvent
   | ActionAccumulatedEvent
   | ActionExclusiveUseSetEvent

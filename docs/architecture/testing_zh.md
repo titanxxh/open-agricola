@@ -15,6 +15,7 @@
 | E2E | `e2e-tests/*.spec.ts` | Playwright 浏览器测试，覆盖渲染与多人路径 |
 
 - Session 测试默认 2 人游戏，并使用 `server/__tests__/_helpers/session-fixtures.ts`（`createOpeningSession`、`createWorkSession`）。
+- 每个新增或修改的共享机制都在同一条 Session 用例中用一张旧版卡和一张修订版卡验证。食客用例见 `server/__tests__/guest-mixed-edition-session.test.ts`（[ADR 0050](../adr/0050-rules-code-does-not-assume-one-card-edition.md)）。
 - 不要用 DOM 结构、按钮文案或页面结构证明规则；渲染另用 E2E 测试。
 - 多人开局 helper 根据权威快照选择交互所属玩家，每次选择后等待所有测试浏览器的 Room version 推进。固定开局夹具覆盖消息延迟；DOM 可见性不能单独证明 WebSocket 命令已完成。开局、双玩家同步、上下文恢复和 owner verification spec 在失败时保留 trace，包括首次执行。候选诊断收集器的单个 Playwright trace 上限为 64 MiB，其他诊断单文件上限为 16 MiB，总上限为 128 MiB；日常 CI 连同失败截图一起上传 trace。
 - 发布验证在隔离 Hosted 前端和显式配置的目标上复用 `scripts/release/` 中的同一浏览器流程。持久化检查使用 PostgreSQL 适配器和 Room／创建配置 codec。`release-rehearsal.spec.ts` 验证真实应用整合，`release-diagnostics.spec.ts` 与 `release-rendering.spec.ts` 验证传输、脱敏和素材就绪；入口见[CI 操作](../operations/ci-checks.md)。

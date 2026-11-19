@@ -13,8 +13,11 @@ import { join } from 'node:path'
 
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/contract/types'
 import { createInitialState } from '../../../../shared/session/state-bootstrap'
+import { serializeState } from '../../../../shared/session/serialization'
 import { collectScheduledEffectPreviews } from '../../../../shared/actions/scheduled-effect-preview'
 import { ActionBoard } from '../ActionBoard'
+import guestIcon from '../../common/guest-icon.svg'
+import { registerLanguagePack } from '../../../../shared/i18n'
 import { createActionSpaces } from '../../../../shared/actions'
 import { createMoorActionSpaces } from '../../../../shared/moor/action-spaces'
 import { createBaseActionDescriber } from '../../../../shared/actions/base-description'
@@ -819,6 +822,45 @@ describe('ActionBoard', () => {
     expect(css).toContain('/assets/moor/terrain/moor.webp')
   })
 
+  it('shows scheduled Guests on their unrevealed round slots with the recipient color until the round starts', () => {
+    const state = createInitialState(6069, { playerCount: 2 })
+    const owner = state.players[1]!
+    owner.color = 'blue'
+    owner.guests = [
+      { id: 'guest:1', round: 6, sourceCardId: 'CNL061_Employer' },
+      { id: 'guest:2', round: 9, sourceCardId: 'CNL061_Employer' },
+    ]
+    const renderBoard = (round: number) => {
+      const snapshot = serializeState({ ...state, round }, { actionHooks: new ActionHookRegistry() })
+      const html = renderToStaticMarkup(<ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[{ round: 5 }, { round: 6 }, { round: 9 }]}
+        currentPlayer={snapshot.players[0]!}
+        players={snapshot.players}
+        futureMeeples={[]}
+        scheduledEffects={snapshot.players.flatMap(player => player.scheduledEffects.map(effect => ({ ...effect, playerId: player.id })))}
+        canTakeAction={() => false}
+        takeAction={() => {}}
+        currentRound={round}
+        devMode={false}
+      />)
+      const container = document.createElement('div')
+      container.innerHTML = html
+      return Array.from(container.querySelectorAll<HTMLImageElement>('.future-effect-owner[data-player-color="blue"] img.res-icon-guest')).map(icon => ({
+        isGuestPortrait: icon.getAttribute('src') === guestIcon,
+        owner: icon.closest('[data-owner-player]')?.getAttribute('data-owner-player'),
+        round: icon.closest('.future-meeple-holder')?.parentElement?.querySelector('.turn-round')?.textContent,
+      }))
+    }
+
+    expect(renderBoard(5)).toEqual([
+      { isGuestPortrait: true, owner: owner.id, round: '6' },
+      { isGuestPortrait: true, owner: owner.id, round: '9' },
+    ])
+    expect(renderBoard(6)).toEqual([{ isGuestPortrait: true, owner: owner.id, round: '9' }])
+  })
+
   it('renders exclusive-use round slot as locked for non-owner before its normal round', () => {
     const owner = createPlayer('p1', 'Alice', 'red')
     const viewer = createPlayer('p2', 'Bob', 'blue')
@@ -1289,5 +1331,43 @@ describe('ActionBoard', () => {
     expect(html).toMatch(
       /action-farmer-stack"[^>]*><div class="action-farmer action-farmer-red"><\/div><\/div>[\s\S]*action-farmer-stack"[^>]*><div class="action-farmer action-farmer-red"><\/div><\/div>[\s\S]*action-farmer-stack"[^>]*><div class="action-farmer action-farmer-red child"><\/div><\/div>/,
     )
+  })
+
+  it('shows a dispatched Guest as the Guest portrait ringed in its owner colour, unlike a family member', () => {
+    const locale = 'action-board-guest-fixture'
+    registerLanguagePack({ version: 1, locale, messages: {
+      'ui.guest.marker': "{player}'s Guest ({card})",
+      'cardFaces.CI073_Guest.name': 'Guest',
+      'cardFaces.CG062_AnimalFarm.name': 'Animal Farm',
+    } })
+    const anna = createPlayer('p1', 'Anna', 'blue')
+    const ben = createPlayer('p2', 'Ben', 'red')
+    anna.guests = [{ id: 'guest:1', sourceCardId: 'CI073_Guest', round: 1, dispatched: true }]
+    ben.guests = [{ id: 'guest:1', sourceCardId: 'CG062_AnimalFarm', round: 1, dispatched: true }]
+    const forest = createAction('forest', 'actions.forest.name')
+    forest.takenBy = [{ playerId: 'p1', workerId: 'guest:1', guest: true }]
+    const clayPit = createAction('clay-pit', 'actions.clay-pit.name')
+    clayPit.takenBy = [{ playerId: 'p1', workerId: '1' }, { playerId: 'p2', workerId: 'guest:1', guest: true }]
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+
+    const { container } = render(<ActionBoard locale={locale}
+      baseActions={[forest, clayPit]} roundSlots={[]} currentPlayer={anna} players={[anna, ben]} futureMeeples={[]}
+      canTakeAction={() => false} takeAction={vi.fn()} currentRound={1} devMode={false} />)
+    const holder = (actionId: string) =>
+      container.querySelector(`[data-action-id="${actionId}"]`)!.closest('.action-card-holder')!.querySelector('.farmer-holder')!
+
+    // The Guest is the portrait token in Anna's blue; it is not drawn as a meeple.
+    const guest = holder('forest').querySelector('.action-guest')
+    expect(guest).toHaveClass('action-farmer-blue')
+    expect(guest).not.toHaveClass('action-farmer')
+    expect(guest?.querySelector('img.action-guest-icon')).toHaveAttribute('src', guestIcon)
+    expect(holder('forest').querySelector('.action-farmer')).toBeNull()
+    expect(guest?.closest('.action-farmer-stack')).toHaveAttribute('title', "Anna's Guest (Guest)")
+
+    // Next to a family member each keeps its own shape and its own owner's colour.
+    const tokens = [...holder('clay-pit').querySelectorAll('.action-farmer-stack > *')]
+    expect(tokens.map(token => token.className)).toEqual(['action-farmer action-farmer-blue', 'action-guest action-farmer-red'])
+    expect(tokens[1]?.closest('.action-farmer-stack')).toHaveAttribute('title', "Ben's Guest (Animal Farm)")
+    expect(holder('clay-pit')).toHaveAttribute('data-n', '2')
   })
 })

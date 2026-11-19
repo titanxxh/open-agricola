@@ -34,6 +34,7 @@ import type {
 } from '../contract/events'
 import type { ActionDetailParts } from '../contract/protocol/game'
 import type { FutureMeepleResourceMap, LogEntry, Resource } from '../contract/types'
+import { isGuestWorkerId } from '../domain/guest-id'
 
 export type EventLogMapperContext = {
   playerNames: Record<string, string>
@@ -378,6 +379,7 @@ const mapResourceMoved = (
 }
 
 const mapWorkerPlaced = (event: WorkerPlacedEvent, ctx: EventLogMapperContext): LogEntry | null => {
+  if (isGuestWorkerId(event.workerId)) return null
   if (event.sourceActionId === 'family-growth') {
     return {
       key: 'log.familyGrowth',
@@ -918,6 +920,29 @@ export const buildLogPresentationPlan = (
       if (event.type === 'worker.placed') {
         const entry = mapWorkerPlaced(event, ctx)
         return entry ? presentationRows(event, [entry]) : []
+      }
+
+      if (event.type === 'actionSpace.useStarted' && event.newPlacement && isGuestWorkerId(event.personUse?.workerId)) {
+        return presentationRows(event, [{
+          key: 'log.guestDispatched',
+          playerId: event.actorPlayerId,
+          params: {
+            player: playerName(ctx, event.actorPlayerId),
+            space: actionName(ctx, event.spaceId),
+          },
+        }])
+      }
+
+      if (event.type === 'guest.granted' || event.type === 'guest.voided') {
+        return presentationRows(event, [{
+          key: event.type === 'guest.granted' ? 'log.guestGranted' : 'log.guestVoided',
+          playerId: event.playerId,
+          params: {
+            player: playerName(ctx, event.playerId),
+            cardId: event.cardId,
+            ...(event.type === 'guest.granted' ? { round: event.targetRound } : {}),
+          },
+        }])
       }
 
       if (event.type === 'worker.returned') {

@@ -4,6 +4,7 @@ import type { RuleActivatedOperation } from '../contract/rule-activated-operatio
 import { readCardExtraData, writeCardExtraData } from '../cards/helpers/card-state'
 import { getStoredResource } from '../cards/helpers/card-storage'
 import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../cards/helpers/supply-worker-flow'
+import { grantImmediateGuestLeaf } from '../cards/helpers/guest-flow'
 import { releaseSupplyWorker } from '../domain/supply-workers'
 import { hasInactiveWorkerInSupply } from '../domain/player'
 
@@ -68,6 +69,12 @@ export const executeActivatedRuleOperation = (operation: RuleActivatedOperation,
       type: 'leaf', actionId: 'place-farmer', sourceCard,
       actionContext: { trueAction: false, extraPlacement: true, workerSource: { kind: 'supply', disposition: 'return-to-supply' } },
     } } : { type: 'ok' }
+    case 'guest-placement': {
+      const count = operation.countFact === undefined ? 1 : readCardExtraData<unknown>(player, sourceCard, operation.countFact)
+      if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 1) return { type: 'ok' }
+      const guest = grantImmediateGuestLeaf(sourceCard, { ...(operation.where ? { where: operation.where } : {}), optional: true })
+      return { type: 'flow', flow: count === 1 ? guest : { type: 'seq', children: Array.from({ length: count }, () => guest) } }
+    }
     case 'move-worker-from-space': {
       const flow = planMoveWorkerFromSpace(operation, context)
       return flow ? { type: 'flow', flow } : { type: 'ok' }
