@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BACKEND_URL, FRONTEND_URL, browserRequestHeaders } from './fixtures'
 import { buildPagesFrontend, servePagesFrontend } from './helpers/pages-frontend'
+import { ownLaunchOptions } from './helpers/pinned-asset-host'
 import { authenticateSolo, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
 
 const english = 'Unable to open the room right now. Check your connection and try again.'
@@ -159,7 +160,7 @@ test('origin HTTP errors and an API outage keep their normal results @webkit', a
 
 test('a fresh browser HTTP cache can still serve the original room document @webkit', async ({ playwright, browserName }) => {
   // WebKit needs a normal browser profile to reuse the HTTP cache across tabs.
-  const context = await playwright[browserName].launchPersistentContext('')
+  const context = await playwright[browserName].launchPersistentContext('', ownLaunchOptions(browserName))
   try {
     const page = await context.newPage()
     await controlledLobby(page)
