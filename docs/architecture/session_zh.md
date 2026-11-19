@@ -142,7 +142,9 @@ type SessionResponse = {
 
 ## Card Edition 与发牌
 
-`state-bootstrap.ts` 按对局的 Card Edition 发普通卡（[ADR 0049](../adr/0049-classic-card-edition-behind-a-switch.md)）。`InitialStateOptions.cardEdition: 'classic'` 加上 `classicDeckIds` 开出一局旧版对局：建局时用 `normalizeClassicDeckIds()` 规范化牌组，并把 `cardEdition` 和 `classicDeckIds` 写入 `GameState`。修订版对局两个字段都不写，缺省即修订版，因此保留中的对局无需迁移。`dealHands()` 随后只从这些牌组的合格卡（`getEligibleClassicCardIds()`）中发牌；修订版牌组 ID 和 community 牌组都不会加入，工坊卡照常加入。普通发牌、轮抽、兜底牌堆和旧存档的 `normalizeState()` 重建都按对局自己的版本，不回落到修订版 A–E。这两个字段在序列化和重新水合后保持不变。测试：`server/__tests__/classic-deal-session.test.ts`。
+`state-bootstrap.ts` 按对局的 Card Edition 发普通卡（[ADR 0049](../adr/0049-classic-card-edition-behind-a-switch.md)）。`InitialStateOptions.cardEdition: 'classic'` 加上 `classicDeckIds` 开出一局旧版对局：建局时用 `normalizeClassicDeckIds()` 规范化牌组，并把 `cardEdition` 和 `classicDeckIds` 写入 `GameState`。修订版对局两个字段都不写，缺省即修订版，因此保留中的对局无需迁移。`dealHands()` 随后只从这些牌组的合格卡（`getEligibleClassicCardIds()`）中发牌；修订版牌组 ID 和 community 牌组都不会加入，工坊卡照常加入。普通发牌、轮抽、兜底牌堆和旧存档的 `normalizeState()` 重建都按对局自己的版本，不回落到修订版 A–E。这两个字段在序列化和重新水合后保持不变。
+
+`classic-deal-pool.ts` 中的 `getClassicDealShortfall(options)` 是旧版对局的建局检查。每个座位每种类型需要 7 张，轮抽时为每个座位一包 `draftPoolSize` 张（`shared/contract/card-edition.ts` 的 `classicCardsNeededPerType()`），且只计旧版合格卡。卡池不足时返回 `ClassicPoolShortfall`，含错误码 `classic_pool_insufficient`、所需与合格张数以及牌组。准入传入房间的 `maxPlayers`。手牌不会缩减，修订版卡也不会补缺：旧版 `dealHands()` 以同一 shortfall 抛出 `ClassicPoolInsufficientError`。测试：`server/__tests__/classic-deal-session.test.ts`。
 
 ## 快照数据与可执行规则恢复
 

@@ -4,6 +4,7 @@ import type { GameState, PlayerState } from '../../shared/contract/types'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap'
 import { createInitialState, normalizeState } from '../../shared/session/state-bootstrap'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import { ClassicPoolInsufficientError, getClassicDealShortfall } from '../../shared/session/classic-deal-pool'
 import { withClassicCardDefinitions } from '../../shared/cards/classic-catalog'
 import { classicFixtureCards } from '../../shared/cards/__tests__/__fixtures__/classic-definitions'
 import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
@@ -156,6 +157,50 @@ describe('classic game deal', () => {
       for (const kind of ['occupation', 'minor'] as const) {
         expect(new Set(cardsOf(rebuilt, kind))).toEqual(eligibleIn(['CI', 'CE'], kind))
       }
+    })
+  })
+})
+
+describe('classic pool check', () => {
+  const creationError = (options: InitialStateOptions) => {
+    try {
+      sessions.push(new GameSession(1872, undefined, { playerCount: 2, ...options }))
+    } catch (error) {
+      return error
+    }
+    throw new Error('Expected classic game creation to be rejected')
+  }
+
+  it('reports the cards each type needs for the player count and variant against the eligible cards', () => {
+    withClassicCardDefinitions(FIXTURES, () => {
+      const classic = { cardEdition: 'classic', classicDeckIds: ['CE', 'CI'] } as const
+      expect(getClassicDealShortfall({ ...classic, playerCount: 2 })).toBeNull()
+      // A 9-card draft needs 18 of each; the 3+ occupations stay out at 2 players.
+      expect(getClassicDealShortfall({ ...classic, playerCount: 2, draftMode: 'simultaneous', draftPoolSize: 9 })).toEqual({
+        code: 'classic_pool_insufficient', playerCount: 2, classicDeckIds: ['CE', 'CI'],
+        needed: { occupation: 18, minor: 18 }, eligible: { occupation: 16, minor: 18 },
+      })
+      // At 3 players they count, but 21 cards of each are needed.
+      expect(getClassicDealShortfall({ ...classic, playerCount: 3 })).toMatchObject({
+        needed: { occupation: 21, minor: 21 }, eligible: { occupation: 18, minor: 18 },
+      })
+      expect(getClassicDealShortfall({ playerCount: 6, classicDeckIds: ['CK'] })).toBeNull()
+    })
+  })
+
+  it('rejects creating a classic game the eligible pool cannot fill, rather than shrinking hands or adding revised cards', () => {
+    withClassicCardDefinitions(FIXTURES, () => {
+      const plain = creationError({ cardEdition: 'classic', classicDeckIds: ['CK', 'CZ'] })
+      expect(plain).toBeInstanceOf(ClassicPoolInsufficientError)
+      expect(plain).toMatchObject({ code: 'classic_pool_insufficient', shortfall: {
+        playerCount: 2, classicDeckIds: ['CK', 'CZ'], needed: { occupation: 14, minor: 14 }, eligible: { occupation: 8, minor: 8 },
+      } })
+      expect(String(plain)).toMatch(/CK, CZ.*14 occupations.*8/)
+
+      const draft = creationError({
+        cardEdition: 'classic', classicDeckIds: ['CE', 'CI'], draftMode: 'simultaneous', draftPoolSize: 9,
+      })
+      expect(draft).toMatchObject({ code: 'classic_pool_insufficient', shortfall: { needed: { occupation: 18 } } })
     })
   })
 })
