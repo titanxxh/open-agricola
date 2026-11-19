@@ -30,7 +30,7 @@ describe('minimal Workshop generation context', () => {
 
   it('exposes the four tools and lets the model read its real browser test and game APIs', () => {
     expect(GENERATION_TOOLS.map(tool => tool.function.name)).toEqual(['search_references', 'read_reference', 'write_artifacts', 'run_tests'])
-    for (const path of ['client/local-sandbox/card-test-runtime.ts', 'shared/session/session-core.ts']) {
+    for (const path of ['docs/CARD_AUTHORING.md', 'client/local-sandbox/card-test-runtime.ts', 'shared/session/session-core.ts']) {
       expect(prompt).toContain(path)
       expect(allowedReferencePath(path)).toBe(true)
     }
