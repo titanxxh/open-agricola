@@ -9,6 +9,7 @@ export const CARD_REGISTRIES = [
   'shared/cards/catalog.generated.ts',
   'shared/cards/major/generated.ts',
   'shared/cards/major/runtime.generated.ts',
+  'shared/cards/classic-catalog.generated.ts',
 ] as const
 
 export type IncompleteEvidence = { file: string; reason: string }
