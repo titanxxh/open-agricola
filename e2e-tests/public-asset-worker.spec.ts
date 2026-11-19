@@ -430,6 +430,7 @@ test('normal and emergency updates keep an open game playable on its original co
     assets.requests.length = 0
     await loadAssets(await context.newPage(), site.origin, IMAGE_DIMENSIONS)
     expect(assets.requests.filter(path => path === IMAGE)).toEqual([IMAGE])
+    await context.setOffline(true)
     const bookmark = await context.newPage()
     await bookmark.goto(`${site.origin}/offline-encyclopedia/`)
     await expect(bookmark.getByRole('searchbox', { name: 'Search cards by number, name, or text' })).toBeVisible()
