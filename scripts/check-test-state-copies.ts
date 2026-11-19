@@ -28,6 +28,7 @@ const exemptions = [
   { file: 'shared/session/__tests__/event-state.test.ts', reason: 'Tests how normalizeState repairs persisted event state.' },
   { file: 'server/__tests__/state-clone-preview-session.test.ts', reason: 'Tests cloneState on a live session state.' },
   { file: 'server/__tests__/player-count-action-spaces.test.ts', reason: 'Tests that normalizeState keeps player-count filtering.' },
+  { file: 'shared/session/__tests__/classic-legacy-rebuild.test.ts', reason: 'Tests how normalizeState rebuilds a classic game from its own decks.' },
 ] as const
 
 const unwrapParent = (node: ts.Node): ts.Node => {

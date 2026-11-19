@@ -17,6 +17,7 @@ const exemptFiles = [
   'shared/session/__tests__/event-state.test.ts',
   'server/__tests__/state-clone-preview-session.test.ts',
   'server/__tests__/player-count-action-spaces.test.ts',
+  'shared/session/__tests__/classic-legacy-rebuild.test.ts',
 ]
 
 const write = (root: string, file: string, content: string): void => {
