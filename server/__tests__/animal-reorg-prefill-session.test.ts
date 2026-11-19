@@ -120,11 +120,46 @@ describe('Animal Reorg Prefill', () => {
     const pending = session.devSetResources(0, { sheep: 1, boar: 2 })
     const draft = zones(pending)
     expect(draft.find((z) => z.id === 'p')).toMatchObject({ animalType: 'boar', animalCount: 2 })
-    expect(draft.find((z) => z.cardId === 'E084_DollysMother')).toMatchObject({ animalType: 'sheep', animalCount: 1 })
+    expect(draft.find((z) => z.cardId === 'E084_DollysMother')).toMatchObject({
+      animalType: 'sheep', animalCount: 1, allowedAnimalTypes: ['sheep'],
+    })
     expect(pending.state.players[0]!.cardStates.E084_DollysMother?.extraData?.animalCounts).toBeUndefined()
     const confirmed = session.resolveChoice(0, 'confirm', draft)
     expect(confirmed.ok, confirmed.error).toBe(true)
     expect(confirmed.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 2, cattle: 1 })
+  })
+
+  it('lets the player replace the species prefilled into an empty Stockyard', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.round = 14
+    const player = state.players[0]!
+    player.minorPlayed = ['B012_Stockyard']
+    player.resources.boar = 3
+    Object.assign(player.pastures[0]!, { animalType: 'boar', animalCount: 3 })
+    state.actionSpaces.find((space) => space.id === 'cattle-market')!.resources.cattle = 3
+    session.loadState(state)
+
+    const pending = session.takeAction(0, 'cattle-market')
+    const draft = zones(pending)
+    expect(draft.find((zone) => zone.cardId === 'B012_Stockyard')).toMatchObject({
+      animalType: 'cattle', animalCount: 3, allowedAnimalTypes: ['sheep', 'boar', 'cattle'],
+    })
+    expect(zones(session.getState())).toEqual(draft)
+    expect(pending.state.players[0]!.cardStates.B012_Stockyard?.extraData?.animalCounts).toBeUndefined()
+
+    const confirmed = session.resolveChoice(0, 'confirm', draft.map((zone) => {
+      if (zone.cardId === 'B012_Stockyard') return { ...zone, animalType: 'boar', animalCount: 3 }
+      if (zone.id === 'p') return { ...zone, animalType: 'cattle', animalCount: 3 }
+      return zone
+    }))
+    expect(confirmed.ok, confirmed.error).toBe(true)
+    expect(confirmed.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'cattle', animalCount: 3 })
+    expect(confirmed.state.players[0]!.cardStates.B012_Stockyard?.extraData?.animalCounts).toEqual({ boar: 3 })
+    expect(confirmed.state.players[0]!.resources).toMatchObject({ boar: 3, cattle: 4 })
+    expect(confirmed.state.log.some((entry) => entry.key === 'log.reorganizeDiscard')).toBe(false)
+    expect(confirmed.scores).toEqual(pending.scores)
+    expect(confirmed.interaction.stateId === 'wait' && confirmed.interaction.request.kind).toBe('confirm-next-player')
   })
 
   it('keeps an existing sheep in place even when moving it could fit more pigs', () => {

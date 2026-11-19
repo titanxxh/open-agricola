@@ -8,6 +8,9 @@ export const buildAnimalReorgRequest = (
   prefill = true,
 ): Extract<InteractionRequest, { kind: 'animal-reorg' }> => {
   const current = computeAnimalZones(player, state)
+  const allowedTypesByZone = new Map(current
+    .filter((zone) => zone.zoneType === 'card')
+    .map((zone) => [zone.id, getAllowedAnimalTypesForZone(state, player, zone)]))
   const zones = prefill ? prefillAnimalZones(state, player, current) : current
   return {
     kind: 'animal-reorg',
@@ -23,7 +26,7 @@ export const buildAnimalReorgRequest = (
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
-      ...(zone.zoneType === 'card' ? { allowedAnimalTypes: getAllowedAnimalTypesForZone(state, player, zone) } : {}),
+      ...(zone.zoneType === 'card' ? { allowedAnimalTypes: allowedTypesByZone.get(zone.id) } : {}),
       ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
       ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
       ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
