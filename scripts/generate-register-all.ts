@@ -169,6 +169,12 @@ export function buildRegisterAll(options: BuildOptions = {}): RegisterAllBuildRe
   const catalogMetas = parseSourceMetas(catalogSources)
   const majorMetas = parseSourceMetas(majorSources)
   const classicMetas = parseSourceMetas(classicSources)
+  // ADR 0049: classic sources are implemented cards only, so the deal pool, manifest and encyclopedia see one set.
+  for (const source of classicSources) {
+    if (classicMetas.get(source.name)?.implemented === false) {
+      throw new Error(`${source.filePath}: classic source ${source.name} is a placeholder (implemented: false); port it or remove it`)
+    }
+  }
 
   const registerImports = implSources.map((source) =>
     `import { ${source.name} } from '${source.moduleRel}'`)

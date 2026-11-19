@@ -41,6 +41,27 @@ describe('generate-register-all Card Source', () => {
     }
   })
 
+  it('rejects a classic source that is a placeholder, so ported and implemented classic cards are one set', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'classic-placeholder-'))
+    const dir = path.join(tmp, 'shared', 'cards', 'classic', 'CK')
+    try {
+      fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(path.join(dir, 'CK001_Ported.ts'),
+        `export const CK001_Ported = defineOccupationCard({
+          meta: { id: 'CK001_Ported', name: 'Ported', deck: 'CK', number: 1, desc: [] },
+        })\n`)
+      expect(buildRegisterAll({ repoRoot: tmp }).classicDefinitionCount).toBe(1)
+
+      fs.writeFileSync(path.join(dir, 'CK002_Placeholder.ts'),
+        `export const CK002_Placeholder = defineMinorCard({
+          meta: { id: 'CK002_Placeholder', name: 'Placeholder', deck: 'CK', number: 2, desc: [], cost: {}, implemented: false },
+        })\n`)
+      expect(() => buildRegisterAll({ repoRoot: tmp })).toThrow(/CK002_Placeholder.*implemented: false/)
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
   it('includes only Card Source impl exports in ALL_CARD_IMPLS', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'card-source-register-all-'))
     const cardsRoot = path.join(tmp, 'shared', 'cards')
