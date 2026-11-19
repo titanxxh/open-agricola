@@ -111,3 +111,21 @@ export const parseLocalSandboxStatus = (value: unknown): LocalSandboxStatus | nu
   }
   return null
 }
+
+/**
+ * Reports one launch's status to the Workshop parent. A timeout recovery
+ * rolls the game back to an error-free snapshot, so its failure stays attached
+ * to every later status of this launch; only a fresh launch clears it.
+ */
+export function createSandboxStatusReporter(launchId: string, post: (status: LocalSandboxStatus) => void) {
+  let instanceId = launchId
+  let snapshotWarnings: string[] = []
+  const sticky: string[] = []
+  const running = () => post({ type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId, instanceId, cardWarnings: [...sticky, ...snapshotWarnings] })
+  return {
+    setInstance(id: string) { instanceId = id },
+    snapshot(cardWarnings: readonly string[] = []) { snapshotWarnings = [...cardWarnings]; running() },
+    recovered(error: string) { sticky.push(`Card code stopped responding and the sandbox rolled back one step: ${error}`); running() },
+    failed(error: string) { post({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', launchId, instanceId, error }) },
+  }
+}
