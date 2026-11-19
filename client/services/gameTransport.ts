@@ -1,4 +1,5 @@
 import { browserApiFetch } from './browser-api'
+import { randomUuid } from '../utils/uuid'
 import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { recordBugReportDisconnect } from './bug-report-diagnostics'
@@ -269,15 +270,8 @@ export class HttpGameTransport implements GameTransport {
   }
 }
 
-const commandUuid = (): string => {
-  if (globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID()
-  // getRandomValues also works on the explicitly supported HTTP LAN launcher.
-  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80
-  const hex = [...bytes].map(value => value.toString(16).padStart(2, '0')).join('')
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
-}
+// randomUuid also works on the explicitly supported HTTP LAN launcher.
+const commandUuid = randomUuid
 
 // WS_BASE imported from config
 

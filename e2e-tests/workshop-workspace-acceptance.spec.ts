@@ -1152,7 +1152,8 @@ const scenarioHandoff = async ({
     if (!frame) throw new Error('Missing the browser sandbox frame')
     await frame.evaluate(value => {
       const stash = JSON.parse(sessionStorage.getItem('open-agricola-local-sandbox-config') ?? '{}') as { config?: { instanceId?: string } }
-      window.parent.postMessage({ type: 'open-agricola:local-sandbox-status', instanceId: stash.config?.instanceId, ...value }, window.location.origin)
+      const launchId = stash.config?.instanceId
+      window.parent.postMessage({ type: 'open-agricola:local-sandbox-status', launchId, instanceId: launchId, ...value }, window.location.origin)
     }, status)
   }
   const gameRequests: string[] = []
@@ -1172,8 +1173,25 @@ const scenarioHandoff = async ({
   await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
 
   // A status from another launch never clears this playtest's errors.
-  await postSandboxStatus({ kind: 'running', instanceId: 'another-instance', cardWarnings: [] })
+  await postSandboxStatus({ kind: 'running', launchId: 'another-launch', cardWarnings: [] })
   await expect(sandboxConfirmation).toBeDisabled()
+
+  // A resumed save runs another game under this launch: its warnings still
+  // show, but it cannot confirm the pinned version.
+  await postSandboxStatus({ kind: 'running', instanceId: 'resumed-game', cardWarnings: ['resumed game warning'] })
+  await expect(sandboxConfirmation).toBeDisabled()
+  await stage(page, variant.locale, '卡牌能力', 'Card ability')
+  await expect(page.getByRole('button', { name: text(variant.locale, 'AI 修复', 'AI repair'), exact: true })).toHaveCount(0)
+  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
+  await postSandboxStatus({ kind: 'running', instanceId: 'resumed-game', cardWarnings: [] })
+  await sandboxConfirmation.check()
+  await page.getByRole('button', {
+    name: text(variant.locale, '确认沙盒通过', 'Confirm sandbox pass'),
+  }).click()
+  await expect(page.getByText(text(variant.locale,
+    '试玩版本已改变，请重新固化并启动沙盒。',
+    'The playtest version changed. Pin and start the sandbox again.',
+  ))).toBeVisible()
 
   await postSandboxStatus({ kind: 'running', cardWarnings: [] })
   await expect(sandboxConfirmation).toBeEnabled()

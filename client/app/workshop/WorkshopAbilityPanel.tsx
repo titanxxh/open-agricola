@@ -1,4 +1,5 @@
 import { t as translateMessage } from '../../../shared/i18n'
+import { randomUuid } from '../../utils/uuid'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocale } from '../../contexts/LocaleContext'
 import type { LlmConfig } from '../../services/llm'
@@ -179,7 +180,7 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
   const validate = async (candidate: AbilityCandidate) => {
     stopValidation()
     setValidating(candidate.id); setError('')
-    const validationId = crypto.randomUUID()
+    const validationId = randomUuid()
     const controller = new AbortController()
     const validation = { validationId, controller }
     validationRef.current = validation
@@ -230,7 +231,7 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
 
   const importSource = async () => {
     if (!draft.effectCode) return
-    dispatch({ type: 'candidateCompleted', candidate: { id: crypto.randomUUID(), kind: 'ability', prompt: translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.manually_edit_adopted_source_cbecf3"), sourceCode: draft.effectCode, cardJson: draft.cardJson, testing: { code: currentAbilityTesting(draft)?.code ?? '' }, validation: { valid: false, errors: [] }, createdAt: Date.now(), baseRevision: state.baseRevision, stale: false } })
+    dispatch({ type: 'candidateCompleted', candidate: { id: randomUuid(), kind: 'ability', prompt: translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.manually_edit_adopted_source_cbecf3"), sourceCode: draft.effectCode, cardJson: draft.cardJson, testing: { code: currentAbilityTesting(draft)?.code ?? '' }, validation: { valid: false, errors: [] }, createdAt: Date.now(), baseRevision: state.baseRevision, stale: false } })
     await checkpoint()
   }
   const latest = progress?.result ?? session.latestAbilityResult

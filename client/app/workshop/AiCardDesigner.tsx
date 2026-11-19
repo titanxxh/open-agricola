@@ -966,7 +966,9 @@ export function AiCardDesigner({
   const [runtimeSandboxErrors, setRuntimeSandboxErrors] = useState<string[] | null>(null)
   const [runtimeSandboxFailure, setRuntimeSandboxFailure] = useState<PlaytestFailure | null>(null)
   const testedSource = sandboxPlaytest?.source
-  const sandboxFailure = sandboxFailureFor(sandboxPlaytest, sandboxErrors ?? [])
+  // Errors of a resumed save belong to another game, never to the pinned source.
+  const sandboxFailure = sandboxStatus && sandboxStatus.instanceId !== sandboxPlaytest?.instanceId
+    ? null : sandboxFailureFor(sandboxPlaytest, sandboxErrors ?? [])
   const sandboxGateErrors = sandboxErrors?.length ? sandboxErrors : runtimeSandboxErrors
   const [versions, setVersions] = useState<WorkshopDraftVersion[]>([])
   const [versionsLoading, setVersionsLoading] = useState(false)

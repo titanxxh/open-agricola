@@ -188,13 +188,15 @@ const useTransportSetup = (
       onRecovered: () => { window.alert(t(locale, 'platform.localSandboxTimeout')) },
     })
     window.addEventListener('pagehide', () => { void saver.flush() })
-    // The Workshop parent binds its playtest to this launch and reads card warnings from here.
-    let runningInstanceId = config.instanceId ?? ''
+    // The Workshop parent accepts statuses of its current launch and binds a pinned
+    // playtest to the game actually running, which a resumed save replaces.
+    const launchId = config.instanceId ?? ''
+    let runningInstanceId = launchId
     const postStatus = (status: LocalSandboxStatus) => {
       if (window.parent !== window) window.parent.postMessage(status, window.location.origin)
     }
     transport.onSnapshot(payload => postStatus({
-      type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: runningInstanceId, cardWarnings: payload.cardWarnings ?? [],
+      type: LOCAL_SANDBOX_STATUS, kind: 'running', launchId, instanceId: runningInstanceId, cardWarnings: payload.cardWarnings ?? [],
     }))
 
     // An explicit restart skips the resume prompt.
@@ -228,7 +230,7 @@ const useTransportSetup = (
       } catch (err) {
         console.error('[local-sandbox] failed to start:', err)
         const error = err instanceof Error ? err.message : String(err)
-        postStatus({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', instanceId: runningInstanceId, error })
+        postStatus({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', launchId, instanceId: runningInstanceId, error })
         window.alert(error)
       }
     }
