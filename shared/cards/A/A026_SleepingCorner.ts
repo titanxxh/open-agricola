@@ -32,6 +32,8 @@ const computeArgsListener: CardListenerRegistration = {
         if (space.takenBy.some((ref) => ref.playerId === context.player.id)) return false
         const otherAdultWorkers = space.takenBy.filter((ref) => {
           if (ref.synthetic) return false
+          // A Guest is a placed person too, though it is none of its owner's family tokens.
+          if (ref.guest) return true
           const owner = context.state.players.find((candidate) => candidate.id === ref.playerId)
           const worker = owner?.workers.find((candidate) => candidate.id === ref.workerId)
           return worker?.isActive === true && worker.isNewborn === false

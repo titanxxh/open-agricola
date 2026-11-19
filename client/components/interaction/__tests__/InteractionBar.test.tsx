@@ -17,8 +17,29 @@ import { InteractionBar } from '../InteractionBar'
 import { describeFutureSchedule } from '../../../../shared/actions/future-schedule'
 import { GameSession } from '../../../../server/game/authoritative-session'
 import { createWorkSession } from '../../../../server/__tests__/_helpers/session-fixtures'
+import { registerLanguagePack } from '../../../../shared/i18n'
 
 const noop = () => {}
+
+it('lets the player choose a Guest by its source card', () => {
+  const locale = 'guest-choice-fixture'
+  registerLanguagePack({ version: 1, locale, messages: {
+    'ui.guest.dispatch': 'Dispatch Guest ({card})',
+    'cardFaces.CI073_Guest.name': 'Guest',
+    'cardFaces.CG062_AnimalFarm.name': 'Animal Farm',
+  } })
+  const resolveChoice = vi.fn()
+  renderBar(input => {
+    input.locale = locale
+    input.pending.choice = { ...pendingChoice, options: [
+      { value: 'first', labelKey: 'actions.activate-extra-turn.name', labelParams: { guestId: 'guest:1', guestCardId: 'CI073_Guest' } },
+      { value: 'second', labelKey: 'actions.activate-extra-turn.name', labelParams: { guestId: 'guest:2', guestCardId: 'CG062_AnimalFarm' } },
+    ] }
+  }, { resolveChoice })
+  expect(screen.getByRole('button', { name: 'Dispatch Guest (Guest)' })).toBeEnabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Dispatch Guest (Animal Farm)' }))
+  expect(resolveChoice).toHaveBeenCalledExactlyOnceWith('second')
+})
 
 it('labels the ordinary one-player confirmation Continue while retaining the multiplayer switch label', () => {
   const solo = baseInput()

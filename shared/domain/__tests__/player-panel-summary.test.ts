@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState, Resource, Worker } from '../../contract/types'
+import type { GameState, GuestRecord, PlayerState, Resource, Worker } from '../../contract/types'
 import { getPlayerPanelSupplySummary } from '../player-panel-summary'
 import { activateSmallestInactive } from '../player'
 
@@ -142,5 +142,29 @@ describe('player panel summary family and housing capacity', () => {
     p.workers.find((w) => w.id === '4')!.removedFromSupply = true
 
     expect(activateSmallestInactive(p)).toBe(null)
+  })
+})
+
+describe('player panel summary pending Guests', () => {
+  const guest = (id: string, overrides: Partial<GuestRecord> = {}): GuestRecord =>
+    ({ id, sourceCardId: 'CI073_Guest', round: 4, ...overrides })
+  const inRound = (p: PlayerState, round: number): GameState => ({ ...state(p), round })
+
+  it('counts the Guests the player can still dispatch this round, next to an unchanged family', () => {
+    const p = player({ guests: [guest('guest:1'), guest('guest:2', { where: { kind: 'accumulation' } })] })
+
+    expect(getPlayerPanelSupplySummary(inRound(p, 4), p)).toMatchObject({
+      family: { used: 2, limit: 5 },
+      guests: { pending: 2 },
+    })
+  })
+
+  it('has no Guest entry while none is pending: a later round\'s Guest waits for its round, a dispatched one is spent', () => {
+    const p = player({ guests: [guest('guest:1', { round: 5 }), guest('guest:2', { dispatched: true })] })
+
+    expect(getPlayerPanelSupplySummary(inRound(p, 4), p)).not.toHaveProperty('guests')
+    expect(getPlayerPanelSupplySummary(inRound(p, 5), p).guests).toEqual({ pending: 1 })
+    const without = player()
+    expect(getPlayerPanelSupplySummary(inRound(without, 4), without)).not.toHaveProperty('guests')
   })
 })

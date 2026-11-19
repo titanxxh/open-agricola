@@ -1,4 +1,5 @@
 import type { ActionSpace, BlockedActionSpaceRef, GameState, WorkerRef } from '../contract/types'
+import { isGuestWorkerId } from './guest-id'
 
 export type ActionSpaceQueryState = Pick<GameState, 'actionSpaces'>
 
@@ -123,8 +124,9 @@ export const spaceOccupantCount = (s: ActionSpace): number =>
 export const spaceHasPlayer = (s: ActionSpace, playerId: string): boolean =>
   s.takenBy.some(t => t.playerId === playerId)
 
+/** A Guest's ref is marked wherever it is placed or moved, so readers need no lookup to tell it from a family member. */
 export const addWorkerRef = (s: ActionSpace, playerId: string, workerId: string): void => {
-  s.takenBy.push({ playerId, workerId })
+  s.takenBy.push(isGuestWorkerId(workerId) ? { playerId, workerId, guest: true } : { playerId, workerId })
 }
 
 export const addSyntheticLinkedOccupancyRef = (

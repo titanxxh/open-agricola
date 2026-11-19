@@ -5,6 +5,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import { getCardDisplayName } from '../common/cardText'
 import { getPlayerDisplayName } from '../../utils/player-name'
+import { GuestIcon } from '../common/GuestIcon'
 import { ResourceLine } from '../common/ResourceLine'
 import { renderDescriptionPreview } from '../interaction/ActionDescription'
 
@@ -15,6 +16,7 @@ type Props = { locale: Locale; effects: OwnedScheduledEffect[]; players: PlayerS
 const multipliedResources = (resources: Record<string, number | undefined>, count: number) => Object.fromEntries(Object.entries(resources).map(([key, value]) => [key, (value ?? 0) * count]))
 
 const effectMarkers = (locale: Locale, preview: ChoiceEffectPreview, count: number) => {
+  if (preview.kind === 'timedOperation' && preview.operation === 'receive-guest') return <GuestIcon />
   if (preview.kind === 'futureSchedule') return preview.entries.flatMap((entry, index) => [
     <ResourceLine locale={locale} key={`resources-${index}`} resources={Object.fromEntries(Object.entries(entry.resources).map(([key, value]) => [key, (value ?? 0) * count]))} />,
     ...(entry.actions ?? []).map((action) => <span key={`${index}-${action.kind}`} className={`res-icon res-icon-${action.kind === 'stable' ? 'barn' : action.kind}`}><b>{action.amount * count}</b></span>),
@@ -38,6 +40,7 @@ const effectMarkers = (locale: Locale, preview: ChoiceEffectPreview, count: numb
     if (operation.kind === 'put-on-action-space') return <><span title={t(locale, 'ui.rulePutOnSpace', { space: t(locale, operation.spaceNameKey) })}>↦</span><ResourceLine locale={locale} resources={multipliedResources(operation.resources, count)} /></>
     if (operation.kind === 'take-stored-resources') return <ResourceLine locale={locale} resources={multipliedResources(operation.resources, count)} />
     if (operation.kind === 'card-fact-refund') return <ResourceLine locale={locale} resources={{ [operation.resource]: operation.amount * count }} />
+    if (operation.kind === 'guest-placement') return <GuestIcon />
     if (operation.kind === 'supply-worker-placement' || operation.kind === 'supply-worker-turn' || operation.kind === 'release-reserved-worker') return <span className="res-icon res-icon-farmer"><b>{count}</b></span>
     if (operation.kind === 'bounded-exchange' || operation.kind === 'discounted-action') return <span title={t(locale, 'ui.ruleRequiresPayment')}>¤◇</span>
   }

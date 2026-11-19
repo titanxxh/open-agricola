@@ -212,6 +212,10 @@ input {
   gap: 14px;
 }
 
+.replay-board > .action-log {
+  max-height: 28rem;
+}
+
 .replay-setup {
   min-height: 70vh;
   padding: 18px;

@@ -82,6 +82,7 @@ Generic internal actions and their contracts:
 | `special-effect` | The generic mutation dispatcher for listener-returned leaves: counters, flags, infobox, card stacks, supply tokens and farmyard space states. It never credits goods to a supply. `countCardUse: false` marks housekeeping that must not count as a card use. |
 | `receive` | The only credit for existing goods entering a supply ([ADR 0030](../adr/0030-existing-goods-enter-supply-through-receive.md)). It settles mature future goods for one player in one transaction (see [Stage hooks](hooks.md#stage-hooks)) and credits goods a source action already removed from its card (`params.fromCard`). `gain` only brings new goods from the general supply. |
 | `activate-card` / `activate-card-effect` / `activate-extra-turn` | Activation leaves for listeners, stage effects and extra-turn providers; see [Stage hooks](hooks.md#stage-hooks) and [Listener purity](hooks.md#listener-purity). |
+| `guest` | Guest bookkeeping for native flows: `grant` adds a Guest for the leaf's source card, `grant-immediate` adds one placed in the same flow, `void` drops one its owner declines. See [Rotation, extra turns and supply people](session.md#rotation-extra-turns-and-supply-people). |
 | `reap` | Ordinary and private-field harvest; see [Stage hooks](hooks.md#stage-hooks). |
 
 - Occupation availability, choice submission and direct or free play share one prerequisite gate. Improvement cost preview and payment use the granting `sourceCard` or physical action-space ID as `actionCardId`.

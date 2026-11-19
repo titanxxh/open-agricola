@@ -57,7 +57,7 @@ describe('admitCustomFlow', () => {
       .toThrow("flow: __futureMeepleRequest.cardId must be this card's id")
   })
 
-  it.each(['place-farmer', 'collect', 'card_E112_GrainThief_protect'])('rejects the native leaf %s', (actionId) => {
+  it.each(['place-farmer', 'guest', 'collect', 'card_E112_GrainThief_protect'])('rejects the native leaf %s', (actionId) => {
     expect(admit(leaf(actionId))).toThrow(`flow: actionId '${actionId}' is not in the Workshop Capability Contract`)
   })
 

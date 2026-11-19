@@ -14,7 +14,7 @@ import type { ActionHookRegistry } from '../../actions/hooks'
  */
 
 import type { ActionFlow, ExchangeBatchEntry, GameState, InteractionRequest, PlayerState } from '../../contract/types.ts'
-import { workersAvailable, workersAtHome } from '../../domain/player.ts'
+import { activeWorkSnakeOpening, roundWorkOrderStartIdx, workersAvailable, workersAtHome } from '../../domain/player.ts'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones.ts'
 import { findActionSpaceById } from '../../domain/space.ts'
 import {
@@ -70,12 +70,6 @@ const walkSeats = (
   return current
 }
 
-/** Seat index that opens this round's Round Work Order (frozen `roundFirstPlayerId`, else the live marker). */
-const roundWorkOrderStartIdx = (state: GameState): number => {
-  const frozen = state.players.findIndex((player) => player.id === state.roundFirstPlayerId)
-  return frozen === -1 ? computeStartPlayerIdx(state) : frozen
-}
-
 /**
  * Work-phase rotation step. Identical to `nextSeatedPlayerIdx` unless Snake
  * Opening is active in round 1: the first time the forward walk from `current`
@@ -84,9 +78,7 @@ const roundWorkOrderStartIdx = (state: GameState): number => {
  * last seat of the forward pass places again immediately (reference behaviour).
  */
 export const nextWorkRotationIdx = (state: GameState, current: number, actionHooks?: ActionHookRegistry): number => {
-  const snake = state.enableSnakeOpening && state.round === 1 && state.roundPhase === 'work'
-    ? state.snakeOpening
-    : null
+  const snake = activeWorkSnakeOpening(state)
   if (!snake) return nextSeatedPlayerIdx(state, state.players, current, undefined, actionHooks)
   if (snake.reversed) return nextSeatedPlayerIdx(state, state.players, current, -1, actionHooks)
   const count = state.players.length
@@ -126,7 +118,7 @@ export const startPendingExtraTurnIfAny = (core: GameCore): boolean => {
     })
   }
 
-  core.appendHistory(true)
+  core.appendTurnOfferHistory()
   core.setTurnOwner(state.currentPlayerIndex)
   current._activeActionBonusSources = []
   core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(current))

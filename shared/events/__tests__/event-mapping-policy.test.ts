@@ -45,6 +45,8 @@ const expectedPublicEventTypes = [
   'futureMeeple.resolved',
   'game.ended',
   'game.started',
+  'guest.granted',
+  'guest.voided',
   'harvest.feedConverted',
   'harvest.heated',
   'harvest.phaseStarted',
@@ -137,6 +139,18 @@ const findCardPassedEmitters = (): string[] => {
 }
 
 const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
+  'worker.placed': {
+    log: {
+      mapped: { ...base, type: 'worker.placed', workerId: '1', spaceId: 'fishing' },
+      silent: { ...base, type: 'worker.placed', workerId: 'guest:1', spaceId: 'fishing' },
+    },
+  },
+  'actionSpace.useStarted': {
+    log: {
+      mapped: { ...base, type: 'actionSpace.useStarted', useId: 'use', spaceId: 'fishing', newPlacement: true, personUse: { workerId: 'guest:1', placementOrdinal: 3 }, accumulation: {}, workPhase: true },
+      silent: { ...base, type: 'actionSpace.useStarted', useId: 'use', spaceId: 'fishing', newPlacement: true, personUse: { workerId: '1', placementOrdinal: 1 }, accumulation: {}, workPhase: true },
+    },
+  },
   'resource.moved': {
     log: {
       mapped: { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' },

@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { ActionSpace, PlayerState, Resource } from '../../../../shared/contract/types'
+import { registerLanguagePack } from '../../../../shared/i18n'
 import { SeasonsBoard } from '../SeasonsBoard'
 
 const resources = (): Resource => ({
@@ -73,6 +74,27 @@ describe('SeasonsBoard', () => {
     expect(marker?.textContent).toBe('')
     expect(marker).toHaveAccessibleName(nameIsDefault ? '玩家 2' : 'Player 2')
     expect(marker).toHaveAttribute('title', nameIsDefault ? '玩家 2' : 'Player 2')
+  })
+
+  it('renders an occupying Guest as the Guest portrait in its owner colour', () => {
+    const locale = 'season-board-guest-fixture'
+    registerLanguagePack({ version: 1, locale, messages: {
+      'ui.guest.marker': "{player}'s Guest ({card})",
+      'cardFaces.CI073_Guest.name': 'Guest',
+    } })
+    const action = createAction('season-winter-romantic-evening', 'actions.season-winter-romantic-evening.name')
+    action.takenBy = [{ playerId: 'p2', workerId: 'guest:1', guest: true }]
+    const blue = createPlayer('p2', 'Blue player', 'blue')
+    blue.guests = [{ id: 'guest:1', sourceCardId: 'CI073_Guest', round: 1, dispatched: true }]
+    const { container } = render(<SeasonsBoard locale={locale}
+      throughTheSeasons={{ startSeason: 'winter', currentSeason: 'winter' }}
+      seasonActions={[action]} players={[createPlayer('p1', 'Red player', 'red'), blue]}
+      canTakeAction={() => false} takeAction={vi.fn()} />)
+    const marker = container.querySelector('.seasons-board__worker')
+    expect(marker?.querySelector('.action-guest')).toHaveClass('action-farmer-blue')
+    expect(marker?.querySelector('.action-farmer')).toBeNull()
+    expect(marker).toHaveAccessibleName("Blue player's Guest (Guest)")
+    expect(marker).toHaveAttribute('title', "Blue player's Guest (Guest)")
   })
 
   it.each([true, false])('matches the placed worker newborn status (%s)', (isNewborn) => {

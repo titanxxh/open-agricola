@@ -5,6 +5,7 @@ import type { RuleFixedOperation } from './rule-fixed-operations'
 export type RuleActivatedOperationPreview =
   | { kind: 'put-on-action-space'; spaceId: string; spaceNameKey: string; resources: Partial<Resource> }
   | { kind: 'supply-worker-placement' }
+  | { kind: 'guest-placement'; cardId: string }
   | { kind: 'supply-worker-turn' }
   | { kind: 'move-worker-from-space'; spaceId: string; spaceNameKey: string }
   | { kind: 'card-fact-refund'; resource: keyof Resource; paidAmount: number; amount: number; divisor: number }

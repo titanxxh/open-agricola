@@ -5,6 +5,7 @@ export type LogIconKey =
   | 'cattle'
   | 'home'
   | 'family'
+  | 'guest'
   | 'resource'
   | 'card'
   | 'system'
@@ -20,7 +21,8 @@ const RULES: Array<[RegExp, LogIconKey]> = [
   [/卡|card|发展|occupation/i, 'card'],
 ]
 
-export function pickLogIcon(text: string): LogIconKey {
+export function pickLogIcon(text: string, logKey?: string): LogIconKey {
+  if (logKey === 'log.guestGranted' || logKey === 'log.guestDispatched' || logKey === 'log.guestVoided') return 'guest'
   for (const [re, icon] of RULES) if (re.test(text)) return icon
   return 'system'
 }

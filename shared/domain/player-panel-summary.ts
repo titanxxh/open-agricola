@@ -1,10 +1,11 @@
-import { getExtraRoomCapacity } from '../cards/card-effects'
+import { getExtraRoomCapacity, spentExtraTurns } from '../cards/card-effects'
 import type { GameState, PlayerState } from '../contract/types'
 import {
   getBorrowedFenceCount,
   getFenceCount,
   getPalisadeCount,
 } from './fence-segments'
+import { dispatchableGuests } from './guests'
 import { familySize, getFamilyTokenLimit } from './player'
 import {
   getAvailableStableSupplyCount,
@@ -14,6 +15,8 @@ import {
 
 export type PlayerPanelSupplySummary = {
   family: { used: number; limit: number }
+  /** Guests the player can still dispatch this round; absent while there is none. */
+  guests?: { pending: number }
   rooms: { count: number }
   housingCapacity: { value: number }
   fence: { used: number; limit: number }
@@ -36,8 +39,10 @@ export const getPlayerPanelSupplySummary = (
   player: PlayerState,
 ): PlayerPanelSupplySummary => {
   const stableLimit = getStableSupplyLimit(player)
+  const pendingGuests = dispatchableGuests(state, player).filter(guest => spentExtraTurns(player, guest.id) === 0).length
   return {
     family: { used: familySize(player), limit: getFamilyTokenLimit(player) },
+    ...(pendingGuests > 0 ? { guests: { pending: pendingGuests } } : {}),
     rooms: { count: player.rooms },
     housingCapacity: { value: getEffectiveHousingCapacity(player) },
     fence: {

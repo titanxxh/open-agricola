@@ -94,6 +94,18 @@ describe('space helpers', () => {
     ])
   })
 
+  it('addWorkerRef marks a Guest, and the mark follows it to another space', () => {
+    const from = mkSpace([])
+    const to = mkSpace([])
+    addWorkerRef(from, 'p1', 'guest:1')
+    expect(from.takenBy).toEqual([{ playerId: 'p1', workerId: 'guest:1', guest: true }])
+
+    const moved = removeWorkerRef(from, 'p1', 'guest:1')!
+    addWorkerRef(to, 'p1', moved.workerId)
+    expect(from.takenBy).toEqual([])
+    expect(to.takenBy).toEqual([{ playerId: 'p1', workerId: 'guest:1', guest: true }])
+  })
+
   it('removeWorkerRef removes first match by playerId', () => {
     const s = mkSpace([
       { playerId: 'p1', workerId: '1' },

@@ -13,6 +13,7 @@ import type {
 } from '../../../shared/contract/types'
 import { AnytimeBar } from './AnytimeBar'
 import { getCardDisplayName, translateCardText } from '../common/cardText'
+import { getGuestDispatchLabel } from '../common/guestText'
 import { getParentFatherOptionText } from '../common/parentCardText'
 import { ResourceQuantitySelectPanel } from './ResourceQuantitySelectPanel'
 import { ResourceBatchExchangePanel } from './ResourceBatchExchangePanel'
@@ -171,6 +172,8 @@ const renderOptionContent = (
   locale: Locale,
   option: ActionChoiceOption,
 ): ReactNode => {
+  const guest = getGuestDispatchLabel(locale, option)
+  if (guest) return guest
   const description = option.descriptionPreview ?? (option.effectPreview?.kind === 'rule' ? option.effectPreview.description : undefined)
   const identityInDescription = description && description.kind !== 'conditional' && description.labelKey === option.labelKey
     && (description.kind !== 'action' || description.showLabel !== false)
@@ -241,7 +244,7 @@ function ChoiceSingleSelectPanel({ locale, options, defaultValue, confirmLabelKe
       {options.map(option => <button key={option.value} type="button" role="radio"
         aria-checked={selected === option.value} disabled={!isInteractive || option.disabled}
         data-choice-value={option.value} onClick={() => setSelected(option.value)}>
-        {renderOptionLabel(locale, option)}
+        {getGuestDispatchLabel(locale, option) ?? renderOptionLabel(locale, option)}
       </button>)}
     </div>
     <button type="button" disabled={!isInteractive || !options.some(option => option.value === selected && !option.disabled)}

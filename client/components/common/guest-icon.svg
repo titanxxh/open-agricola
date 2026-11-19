@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 840">
+  <defs>
+    <radialGradient id="bg" cx="38%" cy="34%" r="78%">
+      <stop offset="0" stop-color="#f7e585"/><stop offset=".6" stop-color="#ecc94a"/><stop offset="1" stop-color="#dba92c"/>
+    </radialGradient>
+    <clipPath id="c"><circle cx="420" cy="420" r="420"/></clipPath>
+  </defs>
+  <g clip-path="url(#c)" stroke="#4b3a1e" stroke-linejoin="round" stroke-linecap="round">
+    <rect width="840" height="840" fill="url(#bg)" stroke="none"/>
+    <!-- vest -->
+    <path d="M30 860 C60 752 160 690 262 648 L340 668 L385 762 L440 652 L505 628 C612 664 732 730 812 860 Z" fill="#96281f" stroke-width="16"/>
+    <path d="M70 860 C100 790 170 730 250 700 C240 760 250 820 270 860 Z" fill="#7d1f19" stroke="none" opacity=".55"/>
+    <!-- neck and shirt opening -->
+    <path d="M334 596 L330 668 L385 762 L440 652 L438 588 Z" fill="#e6c0a2" stroke-width="14"/>
+    <!-- hair on the far side -->
+    <path d="M428 372 C486 398 522 452 516 520 C513 566 522 598 500 622 C482 600 462 588 450 602 L440 470 Z" fill="#7d6c8c" stroke-width="14"/>
+    <!-- face -->
+    <path d="M215 378 C203 440 206 500 226 560 C240 606 276 646 326 656 C386 661 433 620 446 540 C452 480 450 420 442 372 Z" fill="#ecd0b4" stroke-width="16"/>
+    <path d="M404 380 C432 430 440 505 430 570 C420 612 400 636 378 650 C408 600 414 520 404 380 Z" fill="#c9b2c6" stroke="none" opacity=".75"/>
+    <path d="M222 470 C232 520 246 560 262 590 C240 560 226 520 222 470 Z" fill="#dcbfa8" stroke="none"/>
+    <!-- eyes -->
+    <ellipse cx="250" cy="408" rx="17" ry="9" fill="#4a3550" stroke="none"/>
+    <ellipse cx="353" cy="408" rx="21" ry="10" fill="#57426a" stroke="none"/>
+    <path d="M226 388 C240 380 258 380 272 388" fill="none" stroke-width="9"/>
+    <path d="M326 386 C344 378 366 378 382 388" fill="none" stroke-width="9"/>
+    <!-- nose -->
+    <path d="M300 418 C297 462 291 500 276 526 C283 538 299 540 311 531" fill="none" stroke-width="11"/>
+    <!-- mouth -->
+    <path d="M236 567 C282 591 346 579 392 541" fill="none" stroke-width="12"/>
+    <path d="M392 541 C399 533 401 524 398 516" fill="none" stroke-width="9"/>
+    <path d="M300 614 C312 620 326 620 338 614" fill="none" stroke-width="8" opacity=".7"/>
+    <!-- feather -->
+    <path d="M508 324 C520 250 580 196 660 186 C700 182 740 186 768 196 C740 250 690 312 620 352 C590 368 565 370 548 362 Z" fill="#c1672b" stroke-width="16"/>
+    <path d="M562 330 C592 270 652 220 732 204 C692 252 642 302 586 340 Z" fill="#dc8d49" stroke="none" opacity=".85"/>
+    <path d="M546 346 C602 290 682 230 756 200" fill="none" stroke="#7a3a12" stroke-width="9"/>
+    <!-- hat -->
+    <path d="M82 296 C140 270 250 248 345 240 C420 238 470 262 498 300 C560 350 620 410 652 478 C640 512 610 526 588 518 C560 470 520 426 470 398 C400 360 300 350 215 368 C180 378 150 386 135 372 C110 350 92 322 82 296 Z" fill="#d2cc4c" stroke-width="16"/>
+    <path d="M150 304 C230 278 330 264 400 270 C440 274 468 292 480 312 C400 302 280 306 172 336 Z" fill="#e2df68" stroke="none"/>
+    <path d="M470 398 C505 388 540 396 570 420 C600 450 630 470 652 478 C640 512 610 526 588 518 C560 470 520 426 470 398 Z" fill="#a8a657" stroke="none"/>
+    <path d="M135 372 C150 386 180 378 215 368 C300 350 400 360 470 398 C520 426 560 470 588 518" fill="none" stroke-width="13"/>
+    <path d="M82 296 C140 270 250 248 345 240 C420 238 470 262 498 300 C560 350 620 410 652 478 C640 512 610 526 588 518" fill="none" stroke-width="16"/>
+  </g>
+</svg>

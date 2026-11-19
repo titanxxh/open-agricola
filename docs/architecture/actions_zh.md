@@ -84,6 +84,7 @@ type ActionDefinition = {
 | `special-effect` | listener 返回 leaf 的通用修改分发器：counter、flag、infobox、卡堆、supply token 与农场格状态。它从不向供应区入账货物。`countCardUse: false` 标记不应计为卡牌使用的整理操作。 |
 | `receive` | 已有货物进入供应区的唯一入账方式（[ADR 0030](../adr/0030-existing-goods-enter-supply-through-receive.md)）。它在一次 transaction 中为一名玩家结算到期的未来货物（见 [阶段 hook](hooks_zh.md#阶段-hook)），也为来源动作已从卡上移除的货物入账（`params.fromCard`）。`gain` 只表示从公共供应区获得新货物。 |
 | `activate-card` / `activate-card-effect` / `activate-extra-turn` | listener、阶段效果和额外回合 provider 的激活 leaf，见 [阶段 hook](hooks_zh.md#阶段-hook)与[Listener 纯度](hooks_zh.md#listener-纯度)。 |
+| `guest` | 原生 flow 的食客记账：`grant` 为 leaf 的来源卡增加一名食客，`grant-immediate` 增加一名在同一流程内派遣的食客，`void` 移除所有者放弃的食客。见[轮转、额外回合与供应人物](session_zh.md#轮转额外回合与供应人物)。 |
 | `reap` | 普通收获与私人田间阶段收获，见 [阶段 hook](hooks_zh.md#阶段-hook)。 |
 
 - 职业可用性、选择提交和直接 / 免费打出共用同一个前置门禁。改良费用预览与支付以授予的 `sourceCard` 或实体行动格 ID 作为 `actionCardId`。

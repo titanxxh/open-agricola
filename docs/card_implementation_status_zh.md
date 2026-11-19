@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 更新日期：2026-11-12。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
+> 更新日期：2026-11-19。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
 
 > 本文只覆盖官方卡牌。Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本；需要时直接查注册表。
 
@@ -24,6 +24,7 @@
 | 维护者方案 B：可开始的 before 流程可能让宿主无法完成的格子可选，此时需要撤销。准入不模拟奖励，各卡不加准入守卫。 | 用格 before 收益；[ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md) |
 | 维护者于 2026-10-30 确认的项目解释：完整取得格上货物，再可选返还一半换动物，保留原始取得事实和阈值判断。取得动物后先正常完成整理，包括弃养，再进入返还；不能通过返还绕过该结算。按 [#1481](https://github.com/titanxxh/open-agricola/issues/1481) 取代本卡 #1336 的旧口径，不作为新查证的官方裁定，不改变其他卡按数量或类型取物的能力。 | `D180_PartTimeWorker` |
 | 同一 Turn 内，放人末尾反应再授予 Bake Bread 时不能再次替代，不受参考实现清标记反应顺序影响。维护者裁定见 [#1331](https://github.com/titanxxh/open-agricola/issues/1331)。 | `A097_Freshman` |
+| [#1862](https://github.com/titanxxh/open-agricola/issues/1862) 采纳的旧版食客裁定。动物农场离场后，已取得的食客仍可派遣。解剖学家的最后一轮次派遣可以放弃。焦糖饼干店响应来源为行动格的烤面包行动，四季扩展的行动格也算；卡牌给的烤面包（含买烤炉附带的）不算。在所有人放完后才打出的木桶立即给出食客。接受修士誓言后，即使食客无处可派，仍取得乞讨卡和食物。 | `CG062_AnimalFarm`、`CFL040_Anatomist`、`CFL026_SpeculoosBakery`、`CNL017_MonasticVows`、`CZ314_Keg` |
 | 维护者裁定的普通牌堆耗尽边界：满足条件即可完成所选档位，每个适用牌类独立抽至多三张剩余牌并留一；空堆跳过，两类皆空也可完成，不降档、不洗牌、不后补。这是 OA 边界裁定，不是官方 FAQ。 | `PS03` |
 | Reseller 排除包含畜栏或围栏组件的整条印刷费用候选；没有受支持候选时保留一次性机会。本期边界不排除未来支持组件返还，由 [#849](https://github.com/titanxxh/open-agricola/issues/849) 继续跟踪。 | `E146_Reseller` |
 | 用 schema-up metadata 替代参考实现 custom `isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |

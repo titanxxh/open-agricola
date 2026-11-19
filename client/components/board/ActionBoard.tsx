@@ -4,6 +4,8 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } from '../../../shared/contract/types'
 import { FutureEffectMarkers, type OwnedScheduledEffect } from './FutureEffectMarkers'
+import { GuestToken } from '../common/GuestToken'
+import { getGuestMarkerLabel } from '../common/guestText'
 import { PlayerCard } from '../common/PlayerCard'
 import { getCardDisplayName, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
@@ -267,6 +269,8 @@ type SpaceFarmerMarker = {
   player: PlayerState
   key: string
   isNewbornOnly: boolean
+  isGuest: boolean
+  label: string
 }
 
 type ActionBoardPlayerDisplay = Pick<PlayerState, 'id' | 'name' | 'color'>
@@ -648,14 +652,16 @@ export const ActionBoard = ({
     const entries = space.takenBy
       .map((ref) => {
         const player = playerById.get(ref.playerId)
-        const worker = player?.workers?.find((candidate) => candidate.id === ref.workerId)
-        return player
-          ? {
-              player,
-              key: `${player.id}-${space.id}-${ref.workerId}`,
-              isNewbornOnly: !!worker?.isNewborn,
-            }
-          : null
+        if (!player) return null
+        const worker = player.workers?.find(candidate => candidate.id === ref.workerId)
+        const playerName = playerDisplayName(player)
+        return {
+          player,
+          key: `${player.id}-${space.id}-${ref.workerId}`,
+          isNewbornOnly: !!worker?.isNewborn,
+          isGuest: ref.guest === true,
+          label: ref.guest ? getGuestMarkerLabel(locale, playerName, player.guests, ref.workerId) : playerName,
+        }
       })
       .filter((entry): entry is SpaceFarmerMarker => entry !== null)
     if (entries.length === 0) return null
@@ -665,9 +671,13 @@ export const ActionBoard = ({
           <div
             key={entry.key}
             className="action-farmer-stack"
-            title={playerDisplayName(entry.player)}
+            title={entry.label}
+            role={entry.isGuest ? 'img' : undefined}
+            aria-label={entry.isGuest ? entry.label : undefined}
           >
-            <div className={`action-farmer action-farmer-${entry.player.color}${entry.isNewbornOnly ? ' child' : ''}`} />
+            {entry.isGuest
+              ? <GuestToken color={entry.player.color} />
+              : <div className={`action-farmer action-farmer-${entry.player.color}${entry.isNewbornOnly ? ' child' : ''}`} />}
           </div>
         ))}
       </div>

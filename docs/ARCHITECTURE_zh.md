@@ -50,6 +50,7 @@
 - **listener 契约**：注册必须显式声明封闭契约内的目标和阶段，可执行的内部动作不自动获得订阅资格；注册后的筛选条件为脱离输入的不可变快照。listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
 - **卡牌就地闭环**：卡牌在 `shared/cards/{Deck}/{Card}.ts` 内部完成；`shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件不为单卡修改。新增 Hook 点必须同时补测试和文档。
 - **cardStates 局部状态**：持续计数 / 标记写 `player.cardStates[cardId]`；后续选择走显式 `pending` / continuation。
+- **规则不依赖卡牌版本**。`GameState` 记录的 Card Edition 只用于开局、发牌池和显示。两个版本的卡同局时，规则照常运行。版本差异由卡牌声明，能力 metadata 覆盖两个版本的同类卡。每个新增或修改的共享机制都要有一条 Session 用例，让一张旧版卡和一张修订版卡在同局使用该机制（[ADR 0050](adr/0050-rules-code-does-not-assume-one-card-edition.md)）。
 - **Supply token 也是支付资源**：fence / stable 这类玩家 supply 上限不能写死为 15 / 4；读取必须走 supply-token helper 或 payment resource pipeline。
 - **Durable Room Commit**：成功且改变公开 Frame 或 Private Session Cursor 的命令，以及任何带 `durableTransition` 标记的响应，先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
 - **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。

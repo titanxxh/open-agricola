@@ -1,6 +1,7 @@
 import { draftSeatProgress } from './draft-progress'
 import { migrateLegacyDraft } from '../draft/legacy-draft'
 import { inheritHistoryRecordIdentity } from './history-record-identity'
+import { isGuestWorkerId } from '../domain/guest-id'
 import type { CardStates, PlayerState, LogEntry } from '../contract/types'
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
 import type { ClientInteractionState, PublicEventCancellation } from '../contract/protocol/game'
@@ -94,6 +95,7 @@ const isHiddenHandCardLogEntry = (
   entry: LogEntry,
   hiddenCardIds: ReadonlyMap<string, ReadonlySet<string>>,
 ): boolean => {
+  if (entry.key === 'log.guestGranted' || entry.key === 'log.guestVoided') return false
   if (!entry.params) return false
   return Object.entries(entry.params).some(([key, value]) =>
     key.toLowerCase().includes('card') && logParamContainsHiddenHandCard(value, hiddenCardIds)
@@ -110,6 +112,10 @@ const isHiddenHandCardEvent = (
   event: GameEvent,
   hiddenCardIds: ReadonlyMap<string, ReadonlySet<string>>,
 ): boolean => {
+  // An acknowledged Guest grant stays public after its source card is passed into a hand.
+  if (event.type === 'guest.granted' || event.type === 'guest.voided'
+    || (event.type === 'worker.placed' && isGuestWorkerId(event.workerId))
+    || (event.type === 'actionSpace.useStarted' && event.newPlacement && isGuestWorkerId(event.personUse?.workerId))) return false
   const target = hiddenHandCardEventTarget(event)
   if (target && (hiddenCardIds.get(target.playerId)?.has(target.cardId) ?? false)) return true
   return hiddenHandCardSourceTargets(event).some((target) =>
@@ -574,7 +580,11 @@ export const filterSerializedStateForPlayer = (
     const cardStatePresentation = Object.fromEntries(Object.entries(p.cardStatePresentation ?? {}).filter(([id]) =>
       !hiddenCardIds.get(p.id)?.has(id),
     ))
-    visiblePlayer.scheduledEffects = (p.scheduledEffects ?? []).filter(effect => !hiddenCardIds.get(p.id)?.has(effect.sourceCard))
+    visiblePlayer.scheduledEffects = (p.scheduledEffects ?? []).filter(({ sourceCard, description }) =>
+      !hiddenCardIds.get(p.id)?.has(sourceCard)
+      || (description.kind === 'action' && description.effectPreview?.kind === 'timedOperation'
+        && description.effectPreview.operation === 'receive-guest'),
+    )
     return visiblePlayerIds.includes(p.id)
       ? { ...visiblePlayer, cardStates, cardStatePresentation }
       : {

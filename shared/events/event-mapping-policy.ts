@@ -158,7 +158,7 @@ export const publicEventMappingPolicy = {
   'farm.animalDiscarded': silentPublicCues(mapped()),
   'farm.animalBred': silentPublicCues(conditional("source === 'harvest' || positive newborn animals", 'non-harvest events without actual newborns have no birth result')),
   'worker.placed': {
-    log: mapped(),
+    log: conditional('placed person is not a Guest', 'Guest dispatch uses the action-space entry fact'),
     notification: silent('worker placement is frequent and already visible on board'),
     highlight: mapped(),
     resourceAnimation: silent('worker placement does not move resources'),
@@ -172,7 +172,7 @@ export const publicEventMappingPolicy = {
     replay: 'replayable',
   },
   'actionSpace.useStarted': {
-    log: silent('space-use entry is a rule fact'),
+    log: conditional('a new placement dispatches a Guest', 'other space uses have no entry log'),
     notification: silent('space-use entry is a rule fact'),
     highlight: silent('space-use entry has no separate board cue'),
     resourceAnimation: silent('space-use entry moves no resources'),
@@ -200,6 +200,8 @@ export const publicEventMappingPolicy = {
     resourceAnimation: silent('worker promotion does not move resources'),
     replay: 'replayable',
   },
+  'guest.granted': silentPublicCues(mapped()),
+  'guest.voided': silentPublicCues(mapped()),
   'action.revealed': {
     log: mapped(),
     notification: mapped(),

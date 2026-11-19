@@ -17,6 +17,67 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CFL026_SpeculoosBakery",
+    "name": "Speculoos Bakery",
+    "deck": "CFL",
+    "number": 26,
+    "desc": [
+      "Each time you take a __Bake Bread__ action on an action space, you can pay 1 <GRAIN> to receive 1 Guest to use that round. Return it to the supply at the end of the round."
+    ],
+    "cost": {
+      "wood": 2,
+      "clay": 2
+    },
+    "vp": 1,
+    "passing": false,
+    "extraVp": false,
+    "kind": "minor"
+  },
+  {
+    "id": "CFL040_Anatomist",
+    "name": "Anatomist",
+    "deck": "CFL",
+    "number": 40,
+    "desc": [
+      "Place 1 guest token on each unrevealed round space for rounds 7, 10, and 13. At the start of each of those rounds, take the guest token. You must place it on an accumulation space on your last turn of that round."
+    ],
+    "players": "1+",
+    "kind": "occupation"
+  },
+  {
+    "id": "CG062_AnimalFarm",
+    "name": "Animal Farm",
+    "deck": "CG",
+    "number": 62,
+    "desc": [
+      "Once per round, you may return 1 of your animals to the supply for a guest token, which you place this round as you would a family member."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "prerequisite": "2 Animal Types",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "kind": "minor"
+  },
+  {
+    "id": "CI073_Guest",
+    "name": "Guest",
+    "deck": "CI",
+    "number": 73,
+    "desc": [
+      "When you play this card, you receive a guest token, which you may place once in the next round as you would a person. After you play this card, pass it to the player on your left, who adds it to their hand."
+    ],
+    "cost": {
+      "food": 2
+    },
+    "passing": true,
+    "extraVp": false,
+    "implemented": true,
+    "kind": "minor"
+  },
+  {
     "id": "CI097_Slaughterhouse",
     "name": "Slaughterhouse",
     "deck": "CI",
@@ -35,6 +96,67 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "prerequisite": "",
     "passing": false,
     "extraVp": false,
+    "implemented": true,
+    "kind": "minor"
+  },
+  {
+    "id": "CNL017_MonasticVows",
+    "name": "Monastic Vows",
+    "deck": "CNL",
+    "number": 17,
+    "desc": [
+      "At the end of each work phase, you may take 1 <BEGGING> card, 3 <FOOD> and 1 guest. Place the guest immediately, then return it."
+    ],
+    "cost": {},
+    "kind": "minor"
+  },
+  {
+    "id": "CNL061_Employer",
+    "name": "Employer",
+    "deck": "CNL",
+    "number": 61,
+    "desc": [
+      "Add 4, 7, and 10 to the current round number and place 1 guest token on each corresponding round space. At the start of each of those rounds, take the guest token and use it once that round. Return it to the supply at the end of the round."
+    ],
+    "players": "1+",
+    "kind": "occupation"
+  },
+  {
+    "id": "CPI007_MarriageCounselor",
+    "name": "Marriage Counselor",
+    "deck": "CPI",
+    "number": 7,
+    "desc": [
+      "At the start of each round, if another player has at least 2 more family members than you, or if all other players have more family members than you, you may pay 1 <FOOD> to use 1 Guest this round."
+    ],
+    "players": "4+",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWA014_CatTongue",
+    "name": "Cat Tongue",
+    "deck": "CWA",
+    "number": 14,
+    "desc": [
+      "Each time you take a __Family Growth__ action, you receive 1 guest. In the work phase, you can immediately place the guest on the __space:fishing|Fishing__ accumulation space."
+    ],
+    "cost": {
+      "food": 1
+    },
+    "kind": "minor"
+  },
+  {
+    "id": "CZ314_Keg",
+    "name": "Keg",
+    "deck": "CZ",
+    "number": 314,
+    "desc": [
+      "After everyone has placed their people this round, you may place a Guest to take an extra action. Pass this card to the player on your left to add to their hand."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "passing": true,
     "implemented": true,
     "kind": "minor"
   },
