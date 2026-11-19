@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { WORKSHOP_CARDS_UNAVAILABLE } from '../../game/game-setup-options'
 import type { WebSocket } from 'ws'
 import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
 import { getDb } from '../../db'
@@ -165,25 +166,19 @@ describe('formal solo creation', () => {
     }
   })
 
-  it('returns the unchanged choices and a missing-card difference instead of creating a subset game', async () => {
-    const { ctx, socket } = createActor()
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: ['missing-card'] })
-    expect(ctx.currentRoom === null).toBe(true)
-    const messages = socket.send.mock.calls.map(([raw]: [string]) => JSON.parse(raw))
-    expect(messages.some(message => message.type === 'roomCreated' || message.type === 'stateUpdate')).toBe(false)
-    expect(messages.find(message => message.type === 'commandReceipt' && message.status === 'completed')?.receipt.outcome)
-      .toMatchObject({ ok: false, code: 'creation_requires_adjustment', creationAdjustment: {
-        configuration: { enableCommunityDeck: true, customCardIds: ['missing-card'] },
-        issues: [{ workshopCardId: 'missing-card', reason: 'missing' }],
-      } })
+  it('rejects an explicit Workshop selection without creating a game (ADR 0052)', async () => {
+    await seedWorkshopCard('valid')
+    for (const enableCommunityDeck of [true, false]) {
+      const { ctx, socket } = createActor()
+      await dispatch(ctx, { type: 'createRoom', maxPlayers: 1, enableCommunityDeck, customCardIds: ['valid'] })
+      expect(ctx.currentRoom === null).toBe(true)
+      const messages = socket.send.mock.calls.map(([raw]: [string]) => JSON.parse(raw))
+      expect(messages.some(message => message.type === 'roomCreated' || message.type === 'stateUpdate')).toBe(false)
+      expect(messages.find(message => message.type === 'commandReceipt' && message.status === 'completed')?.receipt.outcome)
+        .toMatchObject({ ok: false, error: WORKSHOP_CARDS_UNAVAILABLE })
+    }
     expect(await getDb().prepare('SELECT count(*) AS count FROM rooms').get()).toEqual({ count: 0 })
     expect(await getDb().prepare('SELECT count(*) AS count FROM game_creation_configurations').get()).toEqual({ count: 0 })
-    await seedWorkshopCard('valid')
-    const disabled = createActor()
-    await dispatch(disabled.ctx, { type: 'createRoom', maxPlayers: 1, enableCommunityDeck: false, customCardIds: ['valid'] })
-    const disabledMessages = disabled.socket.send.mock.calls.map(([raw]: [string]) => JSON.parse(raw))
-    expect(disabledMessages.find(message => message.type === 'commandReceipt' && message.status === 'completed')?.receipt.outcome)
-      .toMatchObject({ ok: false, creationAdjustment: { configuration: { customCardIds: ['valid'] }, issues: [{ workshopCardId: 'valid', reason: 'not-applicable' }] } })
   })
 
   it('hides active solo games from both public discovery implementations while preserving their seats', async () => {
@@ -235,47 +230,6 @@ describe('formal solo creation', () => {
     expect(await deps.commands.db.prepare('SELECT 1 FROM game_results WHERE room_id=?').get(oldId)).toBeUndefined()
   })
 
-  it('resolves the current approved Workshop version for rematch and ignores unpublished drafts', async () => {
-    const card = await seedWorkshopCard('selected')
-    const { ctx, deps } = createActor()
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: ['selected'] })
-    const source = ctx.currentRoom!
-    expect(source.customCards?.[0]?.cardJson.name).toBe('Approved selected')
-    expect((await deps.persistence.loadCreationConfiguration(source.id))?.resolvedWorkshopSources)
-      .toEqual([{ workshopCardId: 'selected', logicalCardId: card.id, approvedVersionId: 'selected-v1' }])
-    const terminal = source.session.loadState({ ...source.session.state, round: 14, gameOver: true })
-    await deps.committer.commit(source, terminal, { commandType: 'test-completion', intentJson: '{}' }, 0)
-    await getDb().prepare("INSERT INTO workshop_card_versions(id,card_id,card_json,version_number,created_by,created_at) VALUES('selected-v2','selected',?,2,'author',2)")
-      .run(JSON.stringify({ ...card, name: 'New approved card' }))
-    await getDb().prepare("UPDATE workshop_cards SET approved_version_id='selected-v2',card_json=? WHERE id='selected'")
-      .run(JSON.stringify({ ...card, name: 'Still unpublished draft' }))
-    await dispatch(ctx, { type: 'createRoom', sourceGameContextId: source.id })
-    expect(ctx.currentRoom!.customCards?.[0]?.cardJson.name).toBe('New approved card')
-    expect((await deps.persistence.loadCreationConfiguration(ctx.currentRoom!.id))?.resolvedWorkshopSources[0]?.approvedVersionId).toBe('selected-v2')
-    expect((await deps.persistence.loadCreationConfiguration(source.id))?.resolvedWorkshopSources[0]?.approvedVersionId).toBe('selected-v1')
-  })
-
-  it('keeps every unavailable explicit source for adjustment instead of accepting the remaining subset', async () => {
-    await seedWorkshopCard('valid')
-    await seedWorkshopCard('off')
-    await seedWorkshopCard('other-count', '2+')
-    await seedWorkshopCard('takeover')
-    await seedWorkshopCard('broken')
-    await getDb().prepare("UPDATE workshop_cards SET live=0 WHERE id='off'").run()
-    await getDb().prepare("UPDATE workshop_cards SET review_status='merged',built_in=1 WHERE id='takeover'").run()
-    await getDb().prepare("UPDATE workshop_card_versions SET card_json='{' WHERE id='broken-v1'").run()
-    const { ctx, socket } = createActor()
-    const selected = ['valid', 'off', 'other-count', 'takeover', 'broken', 'missing']
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: selected })
-    const messages = socket.send.mock.calls.map(([raw]: [string]) => JSON.parse(raw))
-    const outcome = messages.find(message => message.type === 'commandReceipt' && message.status === 'completed')?.receipt.outcome
-    expect(ctx.currentRoom === null).toBe(true)
-    expect(outcome.creationAdjustment.configuration.customCardIds).toEqual([...selected].sort())
-    expect(outcome.creationAdjustment.issues.map(({ workshopCardId, reason }: { workshopCardId: string; reason: string }) => [workshopCardId, reason]))
-      .toEqual([['broken', 'load-failed'], ['missing', 'missing'], ['off', 'not-live'], ['other-count', 'not-applicable'], ['takeover', 'community-takeover']])
-    expect(await getDb().prepare('SELECT count(*) AS count FROM game_creation_configurations').get()).toEqual({ count: 0 })
-  })
-
   it('rolls back Room, Step 0, configuration and receipt together and retries the captured initialization', async () => {
     const { ctx, deps, socket } = createActor()
     const writes = vi.spyOn(deps.persistence, 'commitReplay')
@@ -321,24 +275,6 @@ describe('formal solo creation', () => {
     const messages = socket.send.mock.calls.map(([raw]: [string]) => JSON.parse(raw))
     expect(messages.some(message => ['roomCreated', 'stateUpdate'].includes(message.type))).toBe(false)
     expect(messages.find(message => message.type === 'commandReceipt' && message.status === 'completed')?.receipt.outcome.code).toBe('source_removed')
-  })
-
-  it('stops a selected source withdrawn after preflight instead of committing it with the first frame', async () => {
-    await seedWorkshopCard('withdrawn')
-    const { ctx, deps, socket } = createActor()
-    const commit = deps.persistence.commitReplay.bind(deps.persistence)
-    vi.spyOn(deps.persistence, 'commitReplay').mockImplementationOnce(async input => {
-      await getDb().prepare("UPDATE workshop_cards SET live=0 WHERE id='withdrawn'").run()
-      return commit(input)
-    })
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: ['withdrawn'] })
-    expect(ctx.currentRoom === null).toBe(true)
-    expect(await getDb().prepare('SELECT count(*) AS count FROM rooms').get()).toEqual({ count: 0 })
-    const messages = socket.send.mock.calls.map(([raw]: [string]) => JSON.parse(raw))
-    expect(messages.find(message => message.type === 'commandReceipt' && message.status === 'completed')?.receipt.outcome)
-      .toMatchObject({ ok: false, code: 'creation_requires_adjustment', creationAdjustment: {
-        configuration: { customCardIds: ['withdrawn'] }, issues: [{ workshopCardId: 'withdrawn', reason: 'not-live' }],
-      } })
   })
 
   it('finishes a pending creation with a typed rejection when its completed source is removed during storage retry', async () => {
@@ -390,16 +326,14 @@ describe('formal solo creation', () => {
     expect(await getDb().prepare('SELECT count(*) AS count FROM rooms').get()).toEqual({ count: 0 })
   })
 
-  it('recovers a durably committed initialization after its database acknowledgement is lost even if a card is subsequently unpublished', async () => {
-    await seedWorkshopCard('later-offline')
+  it('recovers a durably committed initialization after its database acknowledgement is lost', async () => {
     const { ctx, deps, socket } = createActor()
     const commit = deps.persistence.commitReplay.bind(deps.persistence)
     vi.spyOn(deps.persistence, 'commitReplay').mockImplementationOnce(async input => {
       await commit(input)
-      await getDb().prepare("UPDATE workshop_cards SET live=0 WHERE id='later-offline'").run()
       throw new Error('Database acknowledgement lost after commit')
     })
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: ['later-offline'] })
+    await dispatch(ctx, { type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true })
     expect(ctx.currentRoom !== null).toBe(true)
     expect(await getDb().prepare('SELECT count(*) AS count FROM rooms').get()).toEqual({ count: 1 })
     expect(await getDb().prepare('SELECT count(*) AS count FROM game_replay_steps').get()).toEqual({ count: 1 })

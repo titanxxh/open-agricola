@@ -1,4 +1,5 @@
 import { seedResourceCatalog } from './_helpers/objects'
+import { WORKSHOP_CARDS_UNAVAILABLE } from '../game/game-setup-options'
 /**
  * Workshop API integration tests.
  * Tests card CRUD, like toggle, and comment operations
@@ -674,36 +675,11 @@ const CARD_IMPL = {
       expect(Array.isArray(d.cards)).toBe(true)
     })
 
-    it('returns only cards loadable into real rooms for scope=room', async () => {
-      const liveId = await createPublishedCard({
-        card_id: 'CUSTOM_RoomLiveCard',
-        card_type: 'minor',
-        name: 'Room Live Card',
-        card_json: { id: 'CUSTOM_RoomLiveCard', name: 'Room Live Card', deck: 'CUSTOM', number: 0, desc: [] },
-      }, 'tok-alice')
-      const builtInId = await createPublishedCard({
-        card_id: 'CUSTOM_RoomBuiltInCard',
-        card_type: 'minor',
-        name: 'Room Built-in Card',
-        card_json: { id: 'CUSTOM_RoomBuiltInCard', name: 'Room Built-in Card', deck: 'CUSTOM', number: 0, desc: [] },
-      }, 'tok-bob')
-      const mergedWindowId = await createPublishedCard({
-        card_id: 'CUSTOM_RoomMergedWindowCard',
-        card_type: 'occupation',
-        name: 'Room Merged Window Card',
-        card_json: { id: 'CUSTOM_RoomMergedWindowCard', name: 'Room Merged Window Card', deck: 'CUSTOM', number: 0, desc: [] },
-      }, 'tok-alice')
-      ;(await db.prepare("UPDATE workshop_cards SET review_status = 'merged', built_in = 1 WHERE id = ?").run(builtInId))
-      ;(await db.prepare("UPDATE workshop_cards SET review_status = 'merged' WHERE id = ?").run(mergedWindowId))
-
+    it('offers no room-selectable listing: rooms load only merged cards (ADR 0052)', async () => {
       const res = mockRes()
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/cards?scope=room'), res)
-      const d = JSON.parse(res.body)
-      const ids = d.cards.map((card: { id: string }) => card.id)
-
-      expect(ids).toContain(liveId)
-      expect(ids).toContain(mergedWindowId)
-      expect(ids).not.toContain(builtInId)
+      expect(res.statusCode).toBe(400)
+      expect(JSON.parse(res.body)).toMatchObject({ ok: false, error: WORKSHOP_CARDS_UNAVAILABLE })
     })
 
     it('returns both draft and published cards for scope=mine', async () => {
@@ -1427,18 +1403,12 @@ const CARD_IMPL = {}
       expect(publicListRes.body).not.toContain('generation-time subject')
       expect(publicListRes.body).not.toContain('Unpublished change')
 
+      // Another user can no longer run a live card in their own sandbox (ADR 0052).
+      const foreignSandboxRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', {
         workshop_card_ids: [cardDbId],
-      }, 'tok-bob'), mockRes())
-      const sandboxRes = mockRes()
-      await handleWorkshopRoute(
-        mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob'),
-        sandboxRes,
-      )
-      const sandboxCard = JSON.parse(sandboxRes.body).cards[0]
-      expect(sandboxCard.name).toBe('Pinned Public')
-      expect(sandboxCard.art_url).toBe('/card-art/published.png')
-      expect(sandboxRes.body).not.toContain('Unpublished change')
+      }, 'tok-bob'), foreignSandboxRes)
+      expect(foreignSandboxRes.statusCode).toBe(400)
 
       // taking the card offline unlocks editing; the fork voids the approval
       await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/unpublish`, {
@@ -1564,7 +1534,7 @@ const CARD_IMPL = {}
     })
 
     it('returns default sandbox settings when none saved', async () => {
-      const req = mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob')
+      const req = mockReq('GET', '/api/workshop/sandbox', null, 'tok-alice')
       const res = mockRes()
       await handleWorkshopRoute(req, res)
       const data = JSON.parse(res.body)
@@ -1583,12 +1553,12 @@ const CARD_IMPL = {}
           enable_farmers_of_the_moor: true,
           allow_incomplete_farmers_of_the_moor_minor_deal: true,
         },
-      }, 'tok-bob')
+      }, 'tok-alice')
       const res = mockRes()
       await handleWorkshopRoute(req, res)
       expect(JSON.parse(res.body).ok).toBe(true)
 
-      const getReq = mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob')
+      const getReq = mockReq('GET', '/api/workshop/sandbox', null, 'tok-alice')
       const getRes = mockRes()
       await handleWorkshopRoute(getReq, getRes)
       const data = JSON.parse(getRes.body)
@@ -1606,7 +1576,7 @@ const CARD_IMPL = {}
       const setup = { card_edition: 'classic', classic_deck_ids: [' ci ', 'CI', 'CK'], player_count: 3, enable_snake_opening: true }
       const save = async (settings: object, enabled: boolean, ids = [cardDbId]) => {
         const res = mockRes()
-        await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_ids: ids, settings }, 'tok-bob'), res, enabled)
+        await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_ids: ids, settings }, 'tok-alice'), res, enabled)
         return res
       }
       const saved = await save(setup, true)
@@ -1623,7 +1593,7 @@ const CARD_IMPL = {}
       expect(JSON.parse(incompatible.body)).toMatchObject({ ok: false, code: 'classic_edition_incompatible' })
 
       const getRes = mockRes()
-      await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob'), getRes, false)
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox', null, 'tok-alice'), getRes, false)
       const data = JSON.parse(getRes.body)
       expect(data.cards.map((card: { id: string }) => card.id)).toEqual([cardDbId])
       expect(data.settings).toMatchObject({ card_edition: 'classic', classic_deck_ids: ['CI'], player_count: 3 })
@@ -1638,14 +1608,14 @@ const CARD_IMPL = {}
           deck_ids: ['A'],
           enable_snake_opening: true,
         },
-      }, 'tok-bob')
+      }, 'tok-alice')
       const res = mockRes()
       await handleWorkshopRoute(req, res)
       const saved = JSON.parse(res.body)
       expect(saved.ok).toBe(true)
       expect(saved.settings.enable_snake_opening).toBe(true)
 
-      const getReq = mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob')
+      const getReq = mockReq('GET', '/api/workshop/sandbox', null, 'tok-alice')
       const getRes = mockRes()
       await handleWorkshopRoute(getReq, getRes)
       const data = JSON.parse(getRes.body)
@@ -1655,10 +1625,20 @@ const CARD_IMPL = {}
       const offReq = mockReq('POST', '/api/workshop/sandbox', {
         workshop_card_ids: [cardDbId],
         settings: { player_count: 3, deck_ids: ['A'], enable_snake_opening: 'true' },
-      }, 'tok-bob')
+      }, 'tok-alice')
       const offRes = mockRes()
       await handleWorkshopRoute(offReq, offRes)
       expect(JSON.parse(offRes.body).settings.enable_snake_opening).toBe(false)
+    })
+
+    it("accepts only the user's own cards: unmerged code runs only in its author's browser (ADR 0052)", async () => {
+      const res = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_ids: [cardDbId] }, 'tok-bob'), res)
+      expect(res.statusCode).toBe(400)
+      expect(JSON.parse(res.body)).toMatchObject({ ok: false, error: 'The sandbox accepts only your own Workshop cards' })
+      const getRes = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob'), getRes)
+      expect(JSON.parse(getRes.body).cards).toEqual([])
     })
   })
 })

@@ -130,7 +130,7 @@ type ClientCommand = (
 - HTTP、Room WebSocket 与浏览器本地沙盒在进入 session 前用 `parseCommitSelectionPayload()`（`shared/contract/protocol/commit-selection.ts`）解析 payload；未知或格式错误的字段使命令以 `invalid payload` 被拒绝。围栏报价用 `parseFenceSelectionPayload()` 做相同的围栏字段校验，同样拒绝未知字段。测试：`shared/contract/__tests__/commit-selection.test.ts`、`server/connection/__tests__/fence-selection-quote.test.ts`。
 - Game Variant 开关（`enableParentCards` / `draftParents`、`enableThroughTheSeasons`、`enableFarmersOfTheMoor` / `enableMoorBalanceRules`、`enableSnakeOpening`）是 Room 选项，跨 `newGame` 与重启保留；`draftParents: false` 时直接给每位玩家一组父母，不进入 `parent-selection`。Moor 与 balance 两项均为布尔 `true` 时才启用平衡规则，其余或缺省值规范化为 `false`。
 - `RoomAccess` 默认公开，也可指定稳定账号 ID 的邀请名单。邀请只允许加入活动 Room，不分配座位，也不改变完赛 Replay 的公开权限。`RoomSummary.access` 只暴露模式，不暴露邀请名单。
-- `customCardIds` 只在 `enableCommunityDeck: true` 时生效，且只接受已审核并上线的工坊卡（[工坊后端](server_zh.md#工坊后端)）。
+- `customCardIds` 为已保存的配置保留，必须为空：对局只加载已合入的社区卡，由 `enableCommunityDeck` 发牌（ADR 0052）。
 
 ## ServerEvent 与 StateUpdateEnvelope
 

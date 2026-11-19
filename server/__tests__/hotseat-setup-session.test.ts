@@ -7,6 +7,7 @@ import {
   buildInitialStateOptions,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
+  WORKSHOP_CARDS_UNAVAILABLE,
   soloCreationConfiguration,
 } from '../game/game-setup-options'
 import { parseDraftOptions } from '../connection/room-router'
@@ -169,16 +170,14 @@ describe('hotseat draft phase', () => {
 
 describe('hotseat community cards', () => {
   it('never deals community-deck cards when the deck switch is off', () => {
-    const setup = setupFromPayload({ maxPlayers: 2, customCardIds: ['card-a'] })
+    const setup = setupFromPayload({ maxPlayers: 2 })
     expect(setup.enableCommunityDeck).toBe(false)
-    expect(resolveCustomCardDbIds({ customCardIds: ['card-a'] }, false)).toEqual([])
   })
 
-  it('keeps the selected card ids once the deck switch is on', () => {
-    expect(resolveCustomCardDbIds(
-      { customCardIds: ['card-a', 'card-b', 7] },
-      true,
-    )).toEqual(['card-a', 'card-b'])
+  it('rejects an explicit Workshop selection; games load only merged cards (ADR 0052)', () => {
+    expect(() => resolveCustomCardDbIds({ customCardIds: ['card-a'] })).toThrow(WORKSHOP_CARDS_UNAVAILABLE)
+    expect(resolveCustomCardDbIds({ customCardIds: [] })).toEqual([])
+    expect(resolveCustomCardDbIds({})).toEqual([])
   })
 })
 

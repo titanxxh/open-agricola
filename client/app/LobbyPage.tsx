@@ -1,4 +1,3 @@
-import { browserApiFetch } from '../services/browser-api'
 import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useId, useState, type MouseEvent } from 'react'
 import { lobbyNeedsTurnTab, useTurnTabTitle } from './use-turn-tab-title'
@@ -11,7 +10,6 @@ import { BrandMark } from '../components/common/BrandMark'
 import { DonateWidgets } from '../components/common/DonateWidgets'
 import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
-import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from './game-container-helpers'
 import { CLASSIC_EDITION_ENABLED, type CardEdition } from '../../shared/contract/card-edition'
 import type { RoomSummary } from '../../shared/contract/protocol/ws'
@@ -27,12 +25,6 @@ import { InboxButton } from './Inbox'
 import { CardEditionSetup } from './CardEditionSetup'
 import { classicDeckPoolNotice, toggleClassicDeck, useClassicDeckPool } from './classic-card-setup'
 
-type RoomWorkshopCard = {
-  id: string
-  name: string
-  card_type: 'minor' | 'occupation'
-  author_name: string
-}
 
 export function LobbyPage({ classicEditionEnabled = CLASSIC_EDITION_ENABLED }: { classicEditionEnabled?: boolean } = {}) {
   const { user, logout, apiFetch } = useAuth()
@@ -53,9 +45,6 @@ export function LobbyPage({ classicEditionEnabled = CLASSIC_EDITION_ENABLED }: {
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
   const [draftPoolSize, setDraftPoolSize] = useState<number>(8)
   const [enableCommunityDeck, setEnableCommunityDeck] = useState(false)
-  const [workshopCards, setWorkshopCards] = useState<RoomWorkshopCard[]>([])
-  const [selectedWorkshopCardIds, setSelectedWorkshopCardIds] = useState<string[]>([])
-  const [workshopCardsStatus, setWorkshopCardsStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [enableParentCards, setEnableParentCards] = useState(false)
   const [enableThroughTheSeasons, setEnableThroughTheSeasons] = useState(false)
   const [enableFarmersOfTheMoor, setEnableFarmersOfTheMoor] = useState(false)
@@ -98,35 +87,6 @@ export function LobbyPage({ classicEditionEnabled = CLASSIC_EDITION_ENABLED }: {
     return () => clearInterval(interval)
   }, [fetchRooms, fetchMyRooms])
 
-  useEffect(() => {
-    if (!selectMode || isClassic || !showCommunityDeckToggle || !enableCommunityDeck) return
-    let cancelled = false
-    const load = async () => {
-      setWorkshopCardsStatus('loading')
-      try {
-        const cards: RoomWorkshopCard[] = []
-        let page = 1
-        let hasMore: boolean
-        do {
-          const resp = await browserApiFetch(`${API_BASE}/api/workshop/cards?scope=room&page=${page}`)
-          const data = await resp.json() as { ok: boolean; cards?: RoomWorkshopCard[]; hasMore?: boolean }
-          if (!resp.ok || !data.ok || !Array.isArray(data.cards)) throw new Error('Failed to load workshop cards')
-          cards.push(...data.cards)
-          hasMore = data.hasMore === true
-          page += 1
-        } while (hasMore)
-        if (!cancelled) {
-          setWorkshopCards(cards)
-          setWorkshopCardsStatus('idle')
-        }
-      } catch {
-        if (!cancelled) setWorkshopCardsStatus('error')
-      }
-    }
-    void load()
-    return () => { cancelled = true }
-  }, [enableCommunityDeck, isClassic, selectMode, showCommunityDeckToggle])
-
   const handleCreateGame = () => {
     if (classicBlocked) return
     // Hotseat is an ordinary authoritative room — it just belongs to one device,
@@ -162,9 +122,6 @@ export function LobbyPage({ classicEditionEnabled = CLASSIC_EDITION_ENABLED }: {
     } else {
       if (enableCommunityDeck) {
         params.enableCommunityDeck = 'true'
-      }
-      if (enableCommunityDeck && selectedWorkshopCardIds.length > 0) {
-        params.customCards = selectedWorkshopCardIds.join(',')
       }
       if (enableParentCards) {
         params.enableParentCards = 'true'
@@ -435,40 +392,6 @@ export function LobbyPage({ classicEditionEnabled = CLASSIC_EDITION_ENABLED }: {
                         {translateMessage(locale, "ui.copy.client_app_LobbyPage_tsx.these_cards_are_submitted_through_workshop_and_a2b6bf")}</span>
                     </span>
                   </label>
-                  {!isClassic && enableCommunityDeck && (
-                    <div className="room-workshop-picker">
-                      <div className="player-select-label">{t('platform.reviewedWorkshopCards')}</div>
-                      <div className="community-deck-toggle-hint">{t('platform.reviewedWorkshopCardsHint')}</div>
-                      {workshopCardsStatus === 'loading' ? (
-                        <div className="room-workshop-picker__status">{t('platform.reviewedWorkshopCardsLoading')}</div>
-                      ) : workshopCardsStatus === 'error' ? (
-                        <div className="room-workshop-picker__status form-error">{t('platform.reviewedWorkshopCardsError')}</div>
-                      ) : workshopCards.length === 0 ? (
-                        <div className="room-workshop-picker__status">{t('platform.reviewedWorkshopCardsEmpty')}</div>
-                      ) : (
-                        <div className="room-workshop-picker__list">
-                          {workshopCards.map(card => (
-                            <label key={card.id} className="community-deck-toggle">
-                              <input
-                                type="checkbox"
-                                checked={selectedWorkshopCardIds.includes(card.id)}
-                                onChange={() => setSelectedWorkshopCardIds(ids => ids.includes(card.id)
-                                  ? ids.filter(id => id !== card.id)
-                                  : [...ids, card.id])}
-                              />
-                              <span>
-                                {card.name}
-                                <br />
-                                <span className="community-deck-toggle-hint">
-                                  {t(`platform.${card.card_type}`)}{card.author_name ? ` · ${card.author_name}` : ''}
-                                </span>
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </>
               )}
               <label className="community-deck-toggle">

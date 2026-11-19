@@ -1278,7 +1278,7 @@ _Avoid_: 永久放弃、全局出局名单
 - **Game Bug Reporter** 可以用自己的 **Issue Submission Connection** 提交，也可以明确选择 **Hosted Issue Identity**；两者都从同一 **Bug Report Draft** 和 **Bug Report Anchor** 创建公开 Issue，未完成局可用 **Reported Game Evidence** 暂时还原该 Anchor。
 - **Workshop** 生成或上传自定义卡；**Custom Code Sandbox** 校验、编译并隔离执行这些卡的 impl。
 - **Custom Code Sandbox** 只接受 **Workshop Capability Contract** 内的能力；原生 **Card Impl** 不受该契约限制。
-- 只有已审核并上线的 Workshop Card 能进入正式多人局，其 **Replay Card Snapshot** 随发布公开；未审核的卡只能在 **Workshop Sandbox** 使用。
+- Workshop Card 只有在 PR 合入并随版本发布为社区卡后才进入正式对局；在此之前只在作者自己浏览器的 **Workshop Sandbox** 中运行（ADR 0052）。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
 - 规则正确性优先用 **Session Test**；前端视觉和多人连接行为再用 E2E。
 - **Routine Verification** 证据不全时做 **Bounded Widening**，只有 **Full Trigger** 才让它运行完整验证任务集；完整性只由 **Release Candidate Verification** 保证。浏览器证据过宽时，扩大落到 **Routine Browser Smoke Set**。

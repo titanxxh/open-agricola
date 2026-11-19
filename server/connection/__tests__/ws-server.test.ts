@@ -378,20 +378,13 @@ it('recovers an authenticated solo rematch after a lost receipt through allocati
   }
 }, 30_000)
 
-it.each(['card-epoch', 'retired-lease', 'lifecycle-read', 'other-active-lease'] as const)('keeps the completed solo connection usable after %s changes while reporting and correcting missing-card settings', async stale => {
+it.each(['card-epoch', 'retired-lease', 'lifecycle-read', 'other-active-lease'] as const)('keeps the completed solo connection usable after %s changes while rejecting Workshop cards', async stale => {
   vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
   const { createLocalUserForTests, createSession } = await import('../../auth.ts')
   const user = await createLocalUserForTests(`solo_${randomUUID().replaceAll('-', '').slice(0, 12)}`, 'password123', 'Solo owner')
   const token = await createSession(user.id)
   const db = getDb()
   const workshopId = randomUUID()
-  const versionId = randomUUID()
-  const card = { id: 'CUSTOM_CompletedSource', name: 'Completed source', deck: 'CUSTOM', number: 1, desc: ['Probe'], players: '1+' }
-  await db.prepare(`INSERT INTO workshop_cards(id,author_id,card_id,card_type,name,card_json,created_at,updated_at,review_status,live,approved_version_id)
-    VALUES (?, ?, ?, 'minor', ?, ?, 1, 1, 'approved', 1, ?)`)
-    .run(workshopId, user.id, card.id, card.name, JSON.stringify(card), versionId)
-  await db.prepare('INSERT INTO workshop_card_versions(id,card_id,card_json,version_number,created_by,created_at) VALUES(?,?,?,1,?,1)')
-    .run(versionId, workshopId, JSON.stringify(card), user.id)
   const directory = new RoomDirectory(db)
   const persistence = new PostgresRoomPersistence(db, directory)
   const http = createServer()
@@ -414,15 +407,11 @@ it.each(['card-epoch', 'retired-lease', 'lifecycle-read', 'other-active-lease'] 
   }
   try {
     await waitForOpen(peer)
-    const disabledWorkshop = await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: false, customCardIds: [workshopId] }, 'disabled-workshop')
-    expect(disabledWorkshop).toMatchObject({ status: 'completed', receipt: { outcome: {
-      ok: false, code: 'creation_requires_adjustment', creationAdjustment: {
-        configuration: { enableCommunityDeck: false, customCardIds: [workshopId] },
-        issues: [{ workshopCardId: workshopId, reason: 'not-applicable' }],
-      },
-    } } })
+    // Games load only merged cards (ADR 0052): an explicit Workshop selection creates nothing.
+    const workshopSelection = await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: [workshopId] }, 'workshop-selection')
+    expect(workshopSelection).toMatchObject({ status: 'completed', receipt: { outcome: { ok: false } } })
     expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: 0 })
-    await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: [workshopId] }, 'original')
+    await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true }, 'original')
     const opening = await waitForEvent(peer, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
     const source = backend.registry.get(opening.roomId)!
     const terminal = source.session.loadState({ ...source.session.state, round: 14, gameOver: true })
@@ -430,9 +419,7 @@ it.each(['card-epoch', 'retired-lease', 'lifecycle-read', 'other-active-lease'] 
     const before = await recording.gameContextStore.resolve(source.id)
     const originalConfiguration = await persistence.loadCreationConfiguration(source.id)
     expect(await persistence.load(source.id)).toBeNull()
-    const invalidation = await new InvalidationStore(db).begin('card', workshopId, async () => {
-      await db.prepare('DELETE FROM workshop_cards WHERE id=?').run(workshopId)
-    })
+    const invalidation = await new InvalidationStore(db).begin('card', workshopId, async () => {})
     expect(invalidation.roomIds).toEqual([])
     await backend.applyInvalidation(invalidation)
     if (stale === 'retired-lease') await db.transaction(() => directory.retire(source.id, source.owner!, source.version))()
@@ -445,10 +432,6 @@ it.each(['card-epoch', 'retired-lease', 'lifecycle-read', 'other-active-lease'] 
       existingActiveRooms = 1
     }
 
-    const adjustment = await create({ type: 'createRoom', sourceGameContextId: source.id }, 'adjustment')
-    expect(adjustment).toMatchObject({ status: 'completed', receipt: { outcome: { ok: false, code: 'creation_requires_adjustment', creationAdjustment: {
-      configuration: { customCardIds: [workshopId] }, issues: [{ workshopCardId: workshopId, reason: 'missing' }],
-    } } } })
     expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: existingActiveRooms })
 
     const lifecycleReads: Array<{ roomId: string; rooms: number; stepNos: number[] }> = []

@@ -260,7 +260,7 @@ An early design considered a declarative JSON-only V1 DSL. It was not adopted; p
 
 ### D2. Loading custom cards into a game
 
-1. Only when the community deck is enabled does the lobby page through reviewed live cards eligible for a real Room via `GET /api/workshop/cards?scope=room`. Room creation sends the selection in WebSocket `createRoom.customCardIds`, and the server accepts those IDs only when `enableCommunityDeck === true`. Author playtests run only in the browser sandbox (ADR 0052); HTTP `/api/game/new-sandbox` rejects Workshop cards.
+1. Games load only the cards in the deployed build (ADR 0052). A Workshop card reaches other players after its pull request merges and a release ships it as a community card, which the community-deck option deals. Room, solo and HTTP game creation reject any `customCardIds`, and the lobby offers no Workshop card selection. Author playtests run only in the browser sandbox with the author's own cards; HTTP `/api/game/new-sandbox` rejects Workshop cards.
 2. `server/connection/room-router.ts` or `server/game-router.ts` constructs `CustomCardData[]` from the database.
 3. The `GameSession` constructor registers definitions and runtime implementations into that game's `SessionCardContext`.
 4. `registerExecutorBackedCustomCard()` in `server/custom-code/runtime.ts` injects effect hooks and listeners from compiled output and manifest, delegating to Worker Thread plus isolated-vm through `invokeCustomCodeEffectSync` and `invokeCustomCodeListenerSync`.
@@ -516,7 +516,7 @@ Last updated 2026-10-06.
 | Custom-card registry and catalog fallback | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts` |
 | Custom-card `try/catch` resilience | `shared/cards/card-effects.ts`, skipping failures for `CUSTOM_` cards |
 | Player-count-configurable HTTP sandbox game (no Workshop cards) | `/api/game/new-sandbox`, `server/game-router.ts` |
-| Custom cards in multiplayer WebSocket games | `shared/contract/protocol/ws.ts` `createRoom.customCardIds`, `server/connection/room-router.ts` |
+| Merged community cards in WebSocket games (`customCardIds` must be empty) | `shared/contract/protocol/ws.ts`, `server/game/game-setup-options.ts` |
 | LLM card designer | `client/app/workshop/AiCardDesigner.tsx`, `client/services/llm/` |
 | Multiple LLM providers | Gemini, OpenRouter, DeepSeek, and AiHubMix; see section C1.1 |
 | Browser-isolated API keys | Stored in localStorage and never sent to the server |

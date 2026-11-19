@@ -542,92 +542,21 @@ describe('LobbyPage player count selection', () => {
     })
   })
 
-  it('adds selected reviewed workshop cards to game setup', async () => {
+  it('offers the merged community deck but no Workshop card selection (ADR 0052)', async () => {
     vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.includes('/api/workshop/cards')) {
-        return new Response(JSON.stringify({
-          ok: true,
-          cards: url.includes('page=2') ? [{
-            id: 'reviewed-card-1',
-            name: 'Reviewed Card',
-            card_type: 'minor',
-            author_name: 'Alice',
-          }] : [],
-          page: url.includes('page=2') ? 2 : 1,
-          total: 1,
-          hasMore: !url.includes('page=2'),
-        }))
-      }
-      return new Response(JSON.stringify({ ok: true, rooms: [] }))
-    }))
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
 
     render(<LobbyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
     fireEvent.click(screen.getByRole('checkbox', { name: /Enable community cards/ }))
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Reviewed Card/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
-
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards?scope=room&page=1'), expect.objectContaining({ credentials: 'include' }))
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards?scope=room&page=2'), expect.objectContaining({ credentials: 'include' }))
-    expect(setPage).toHaveBeenCalledWith('game', {
-      transport: 'ws',
-      maxPlayers: '2',
-      enableCommunityDeck: 'true',
-      customCards: 'reviewed-card-1',
-      enableSnakeOpening: 'true',
-    })
-  })
-
-  it('keeps reviewed card selections hidden and inert while the community deck is disabled', async () => {
-    vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.includes('/api/workshop/cards')) {
-        return new Response(JSON.stringify({
-          ok: true,
-          cards: [{
-            id: 'reviewed-card-1',
-            name: 'Reviewed Card',
-            card_type: 'minor',
-            author_name: 'Alice',
-          }],
-          page: 1,
-          total: 1,
-          hasMore: false,
-        }))
-      }
-      return new Response(JSON.stringify({ ok: true, rooms: [] }))
-    }))
-
-    render(<LobbyPage />)
-    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
-
-    const communityDeck = screen.getByRole('checkbox', { name: /Enable community cards/ })
-    expect(screen.queryByText('Reviewed workshop cards')).toBeNull()
-    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards'))
-
-    fireEvent.click(communityDeck)
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Reviewed Card/ }))
-    fireEvent.click(communityDeck)
-
     expect(screen.queryByText('Reviewed workshop cards')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
-    expect(setPage).toHaveBeenLastCalledWith('game', {
-      transport: 'ws',
-      maxPlayers: '2',
-      enableSnakeOpening: 'true',
-    })
 
-    fireEvent.click(communityDeck)
-    expect(await screen.findByRole('checkbox', { name: /Reviewed Card/ })).toBeChecked()
-    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards'), expect.anything())
     expect(setPage).toHaveBeenLastCalledWith('game', {
       transport: 'ws',
       maxPlayers: '2',
       enableCommunityDeck: 'true',
-      customCards: 'reviewed-card-1',
       enableSnakeOpening: 'true',
     })
   })

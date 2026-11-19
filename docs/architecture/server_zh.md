@@ -184,7 +184,7 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 - 沙盒设置（`sandbox_settings`、`sandbox_cards`）持久化人数、牌组与变体开关；`POST /api/game/new-sandbox` 把它们传给 `createInitialState()`。
 - `workshop-status.ts` 将审核与 `live` 发布分开。绑定和发布要求打开、非草稿且基于 `main` 的 PR、固定 Draft Version 与有权限的精确 head 批准。不一致或 GitHub 对账失败进入 `stale·offline`；绑定后首次刷新暂时失败保留 `in_review` 供重试。完整转换以状态代码和工坊测试为准。
 - 已批准的 `main` 合入毕业为只读 `merged`；先观察到的合入等待有权限的精确 head 核对。其他 base 进入 `stale·offline`。已上线审核快照持续提供到发版，由 `markBuiltInMergedCards` 在启动时交给内置定义。
-- 真实 Room 中的 `customCardIds` 只接受已批准、已上线的卡，并使用其审核过的快照。正式单人保留全部显式选择，卡源不可用或来源变化时拒绝创建并返回配置调整；其他 Room 对作者自己未上线的卡给出指引，过滤其他无法加载的 ID。未审核的代码只在工坊沙盒中运行，从不进入多人 `GameSession`。
+- 对局只加载部署版本中的卡（ADR 0052）：创建时拒绝任何 `customCardIds`，沙盒只接受作者自己的卡。已录制的带工坊卡的 Room 仍经执行器恢复。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。
 - `workshop-public-cards.ts` 提供当前审核上线版本的目录、固定公共输入和 30 秒状态。目录只投影批准定义，不交付草稿或编译产物。读取不写沙盒状态；输入以 SHA-256 绑定来源、版本、公开定义与源码及图片字节。发布记录保留曾上线版本，状态区分新建和固定输入继续执行；失败不续期，管理员下架禁用全部公共版本。消费环境负责校验、编译与到期暂停。

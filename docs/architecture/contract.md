@@ -128,7 +128,7 @@ type ClientCommand = (
 - HTTP, Room WebSocket and the browser-local sandbox parse the payload with `parseCommitSelectionPayload()` (`shared/contract/protocol/commit-selection.ts`) before the session; an unknown or malformed field rejects the command as `invalid payload`. Fence quotes use `parseFenceSelectionPayload()` with the same fence field checks and also reject unknown fields. Tests: `shared/contract/__tests__/commit-selection.test.ts`, `server/connection/__tests__/fence-selection-quote.test.ts`.
 - Game Variant flags (`enableParentCards` / `draftParents`, `enableThroughTheSeasons`, `enableFarmersOfTheMoor` / `enableMoorBalanceRules`, `enableSnakeOpening`) are Room options persisted across `newGame` and restarts; `draftParents: false` deals each player a parent pair without `parent-selection`. Moor balance requires both Moor and balance to be boolean `true`; other or absent values normalize to `false`.
 - `RoomAccess` is public by default or invited with stable account IDs. Invitation permission allows joining an active Room; it never assigns a seat or changes public completed Replay access. `RoomSummary.access` exposes only the mode, never the invitation list.
-- `customCardIds` take effect only with `enableCommunityDeck: true` and only for live, approved Workshop cards ([Workshop backend](server.md#workshop-backend)).
+- `customCardIds` is retained for stored configurations and must be empty: games load only merged community cards, which `enableCommunityDeck` deals (ADR 0052).
 
 ## ServerEvent and StateUpdateEnvelope
 

@@ -733,7 +733,9 @@ const handleAuthorizedGameRoute = async (
     }
     const requestUserId = (await validateSession(requestSessionToken(req)))?.id
     const generation = beginReplacement(sessionKey)
-    const customCardDbIds = resolveCustomCardDbIds(raw, setup.enableCommunityDeck)
+    let customCardDbIds: string[]
+    try { customCardDbIds = resolveCustomCardDbIds(raw) }
+    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid game configuration' }); return true }
     const loadedCustomCards = customCardDbIds.length > 0
       ? (await loadLiveCustomCards(customCardDbIds, requestUserId))
       : null
