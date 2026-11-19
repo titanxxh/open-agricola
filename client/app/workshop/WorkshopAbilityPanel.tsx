@@ -7,10 +7,11 @@ import { getBrowserTestRuntimeId, runBrowserCardTests } from '../../local-sandbo
 import { GenerationAttempt, type AttemptSnapshot } from '../../services/llm/generation/attempt'
 import { createBrowserGenerationPorts, createSandboxPorts } from '../../services/llm/generation/browser'
 import { buildGenerationRequest, matchesGenerationIdentity, type GenerationIntent, type GenerationRequest, type PlaytestFailure } from '../../services/llm/generation/request'
-import type { WorkshopVisibleMessage } from '../../../shared/contract/workshop-generation'
+import type { GenerationFeasibility, WorkshopVisibleMessage } from '../../../shared/contract/workshop-generation'
 import { abilityArtifactFingerprint, currentAbilityTesting, isAbilityCandidateReady, sourceFingerprint } from '../../../shared/projections/workshop-generation'
 import { isCurrentAbilityAttempt, type AbilityCandidate, type WorkshopDraftAction, type WorkshopDraftState } from './workshop-draft-model'
 import { MessageContent } from './WorkshopMessageContent'
+import { platformIssueUrl } from './platform-issue'
 
 type Props = {
   state: WorkshopDraftState
@@ -263,7 +264,11 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
       {live && <button type="button" className="aicw-button" onClick={() => { void stop() }}>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.stop_attempt_56ddbc")}</button>}
     </section>}
 
-    {!live && latest && latest.kind !== 'candidate' && latest.kind !== 'failed-source' && <section className="aicw-generation-result" role="status"><strong>{({ answer: 'AI', failure: translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.generation_incomplete_e6bd1c"), interrupted: translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.previous_attempt_interrupted_64e6b1") })[latest.kind]}</strong><p>{latest.message}</p></section>}
+    {!live && latest && latest.kind !== 'candidate' && latest.kind !== 'failed-source' && <section className="aicw-generation-result" role="status"><strong>{({ answer: 'AI', 'needs-info': translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.more_information_needed_f4cf20"), 'needs-platform': translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.needs_a_platform_change_81615b"), failure: translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.generation_incomplete_e6bd1c"), interrupted: translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.previous_attempt_interrupted_64e6b1") })[latest.kind]}</strong><p>{latest.message}</p>
+      {latest.feasibility && latest.kind !== 'answer' && <FeasibilityReport feasibility={latest.feasibility} locale={locale} issueUrl={latest.kind === 'needs-platform' ? platformIssueUrl({
+        draft, feasibility: latest.feasibility, referenceCommit: latest.provenance?.referenceCommit,
+        request: [...messages].reverse().find(message => message.role === 'user' && message.attemptId === latest.attemptId)?.content ?? '',
+      }) : undefined} />}</section>}
     <div className="ai-chat-area">
       {!messages.length && <div className="ai-chat-hint"><p>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.describe_the_effect_the_model_will_request_7bd2cb")}</p></div>}
       {messages.map((message, index) => <div key={`${message.attemptId ?? index}-${message.role}-${index}`} className={`ai-message ai-message-${message.role}`}>
@@ -298,5 +303,16 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
     </section>}
     {sandboxFailure && <section className="ai-validation-error-bar"><div><strong>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.playtest_failed_33437a")} · {sandboxFailure.versionId.slice(0, 10)}</strong><p>{sandboxFailure.errors.join('\n')}</p><p>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.repair_targets_the_source_actually_used_in_c3eebb")}</p></div><button type="button" className="aicw-button" disabled={running || !config} onClick={() => { void begin({ kind: 'repair', message: translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.fix_the_complete_source_for_this_playtest_d9ccac"), failure: sandboxFailure }) }}>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.ai_repair_b4d072")}</button></section>}
     {validationErrors && <div className="ai-validation-error-bar"><div>{validationErrors}</div><button type="button" className="aicw-button" disabled={running || !config} onClick={() => { void begin({ kind: 'follow-up', message: `${translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.fix_these_code_validation_errors_229c94")}:\n${validationErrors}` }); onValidationErrorsConsumed?.() }}>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.send_to_ai_d5662e")}</button></div>}
+  </div>
+}
+
+function FeasibilityReport({ feasibility, locale, issueUrl }: { feasibility: GenerationFeasibility; locale: string; issueUrl?: string }) {
+  const section = (title: string, items: string[]) => items.length > 0 && <><h4>{title}</h4><ul>{items.map((item, index) => <li key={index}>{item}</li>)}</ul></>
+  return <div className="aicw-feasibility">
+    <p>{feasibility.summary}</p>
+    {section(translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.missing_shared_mechanisms_6a7560"), feasibility.gaps)}
+    {section(translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.questions_for_you_839ba7"), feasibility.questions)}
+    {section(translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.evidence_7ea014"), feasibility.evidence.map(item => `${item.path}: ${item.finding}`))}
+    {issueUrl && <p><a className="aicw-button" href={issueUrl} target="_blank" rel="noopener noreferrer">{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.prefill_a_github_issue_92266b")}</a> <span className="form-hint">{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.opens_a_new_issue_from_your_own_github_account_5c7d69")}</span></p>}
   </div>
 }

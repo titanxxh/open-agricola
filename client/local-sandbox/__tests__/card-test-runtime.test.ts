@@ -86,3 +86,13 @@ test('negative: the opponent owning the card gives the actor nothing', () => {
   const result = await runBrowserCardTestScript({ kind: 'run', id: 'native-woodpile', source: WOODPILE_SOURCE, tests })
   expect(result.outcome).toEqual({ kind: 'passed', count: 3 })
 })
+
+it('fails passing tests that lack a positive or a negative case', async () => {
+  const { WOODPILE_SOURCE } = await import('../../../shared/custom-code/__tests__/native-card-fixture.ts')
+  const run = (tests: string) => runBrowserCardTestScript({ kind: 'run', id: 'case-kinds', source: WOODPILE_SOURCE, tests })
+  const coverage = (kind: string) => ({ name: 'Test coverage', error: expect.stringContaining(`"${kind}: ..."`) })
+  expect((await run("test('fires', () => {})")).outcome).toEqual({ kind: 'failed', failures: [coverage('positive'), coverage('negative')] })
+  expect((await run("test('Positive: fires', () => {})\ntest('negative: silent', () => { throw new Error('boom') })")).outcome)
+    .toEqual({ kind: 'failed', failures: [{ name: 'negative: silent', error: 'boom' }, coverage('negative')] })
+  expect((await run("test('positive: fires', () => {})\ntest('negative: silent', () => {})")).outcome).toEqual({ kind: 'passed', count: 2 })
+})
