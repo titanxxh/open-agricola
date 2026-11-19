@@ -2,7 +2,7 @@
 
 [English](CUSTOM_CARD_SANDBOX.md) | [中文](CUSTOM_CARD_SANDBOX_zh.md)
 
-> This is the current Workshop sandbox format, which [ADR 0052](adr/0052-workshop-code-runs-only-in-the-browser.md) replaces with native Card Source modules (#1887). For which mechanism a card text needs, with example cards and tests, start from the [card authoring guide](CARD_AUTHORING.md).
+> This describes the retired Workshop sandbox format that older drafts still use until #1887 removes it. New Workshop cards are native Card Source modules ([ADR 0052](adr/0052-workshop-code-runs-only-in-the-browser.md)); start from the [card authoring guide](CARD_AUTHORING.md).
 
 This reference explains the execution boundaries for custom-card TypeScript submitted through Workshop or AI Designer. Linked source files own the allowed names and injected helper implementations.
 

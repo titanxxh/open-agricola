@@ -203,7 +203,7 @@ export class GenerationAttempt {
       if (validation.sourceFingerprint !== fingerprint || validation.sandboxContractId !== this.contract.id) throw new GenerationStopError('The validation result belongs to different source or a different sandbox deployment. Start a new attempt.')
       if (validation.valid && !matchesGenerationIdentity(validation.cardJson, this.request.input.card)) {
         validation.valid = false
-        validation.errors = [...validation.errors, 'CARD_DEF id, card type and name must match the immutable request identity.']
+        validation.errors = [...validation.errors, 'The card definition id, card type and name must match the immutable request identity.']
       }
       this.lastCandidate = { ...this.lastCandidate, cardJson: validation.cardJson ?? {}, validation }
       if (!validation.valid) return JSON.stringify({ artifactFingerprint, validation: { valid: false, errors: validation.errors } })

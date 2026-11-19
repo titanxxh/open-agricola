@@ -46,3 +46,36 @@ test('unrelated assertion', () => { expect(0).to.equal(1) })
     { name: 'unrelated assertion', error: 'expected +0 to equal 1' },
   ] })
 })
+
+it('runs a native Card Source with action-space subscriptions (ADR 0052)', async () => {
+  const { WOODPILE_SOURCE } = await import('../../../shared/custom-code/__tests__/native-card-fixture.ts')
+  const tests = `
+const played = (owner) => {
+  const session = createSession()
+  const state = session.getState().state
+  state.actionSpaces.find(space => space.id === 'fishing').resources.food = 2
+  for (const player of state.players) player.resources.wood = 0
+  session.loadState(state)
+  session.devPlayCard(owner, 'CUSTOM_WoodpileHook')
+  return session
+}
+test('positive: using Fishing also gives 1 wood', () => {
+  const session = played(0)
+  const response = session.takeAction(0, 'fishing')
+  expect(response.ok).to.equal(true)
+  expect(response.state.players[0].resources.wood).to.equal(1)
+  expect(response.state.players[0].resources.food).to.be.greaterThan(0)
+})
+test('negative: another space gives no wood', () => {
+  const response = played(0).takeAction(0, 'day-laborer')
+  expect(response.state.players[0].resources.wood).to.equal(0)
+})
+test('negative: the opponent owning the card gives the actor nothing', () => {
+  const response = played(1).takeAction(0, 'fishing')
+  expect(response.state.players[0].resources.wood).to.equal(0)
+  expect(response.state.players[1].resources.wood).to.equal(0)
+})
+`
+  const result = await runBrowserCardTestScript({ kind: 'run', id: 'native-woodpile', source: WOODPILE_SOURCE, tests })
+  expect(result.outcome).toEqual({ kind: 'passed', count: 3 })
+})

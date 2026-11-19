@@ -10,7 +10,8 @@ import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { emptyResources } from '../../shared/contract/state-constants.ts'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player.ts'
 import { validateAndCompileCustomCodeLocal } from './browser-executor.ts'
-import { registerBrowserBackedCustomCard } from './browser-runtime.ts'
+import { prepareLocalCustomCard, registerLocalCustomCard } from './local-custom-card.ts'
+import { isNativeCardSource, nativeCardId } from '../../shared/custom-code/card-source-admission.ts'
 
 export type BrowserCardTestRequest = {
   kind: 'run'
@@ -101,16 +102,21 @@ export async function runBrowserCardTestScript(request: BrowserCardTestRequest, 
   }
   try {
     const sourceFile = ts.createSourceFile('card.ts', request.source, ts.ScriptTarget.ES2022, true)
-    const cardId = sourceFile.statements.flatMap(statement => ts.isVariableStatement(statement)
+    // A native Card Source names its card by its single export (ADR 0052).
+    const cardId = nativeCardId(request.source) ?? sourceFile.statements.flatMap(statement => ts.isVariableStatement(statement)
       ? statement.declarationList.declarations.flatMap(declaration => ts.isIdentifier(declaration.name)
         && declaration.name.text === 'CARD_ID' && declaration.initializer && ts.isStringLiteralLike(declaration.initializer)
         ? [declaration.initializer.text] : []) : [])[0]
-    if (!cardId) throw new Error('CARD_ID must be a top-level string literal')
-    const compiled = validateAndCompileCustomCodeLocal(request.source, cardId)
-    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
-    const card: CustomCardData = {
-      ...parseCardDefinition(compiled.cardDefinition, cardId),
-      effectCode: request.source, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest,
+    if (!cardId) throw new Error('Export the card as export const <CARD_ID> = defineMinorCard(...) or defineOccupationCard(...)')
+    let card: CustomCardData
+    if (isNativeCardSource(request.source)) card = prepareLocalCustomCard({ cardId, source: request.source })
+    else {
+      const compiled = validateAndCompileCustomCodeLocal(request.source, cardId)
+      if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+      card = {
+        ...parseCardDefinition(compiled.cardDefinition, cardId),
+        effectCode: request.source, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest,
+      }
     }
     const createSession = () => {
       ensureCatalogLookupsInstalled()
@@ -120,7 +126,7 @@ export async function runBrowserCardTestScript(request: BrowserCardTestRequest, 
         player.occupationHand = ['__test_placeholder__']
       }
       const core = new GameCore({
-        stateOrSeed: state, customCards: [card], registerCustomCardImpl: registerBrowserBackedCustomCard,
+        stateOrSeed: state, customCards: [card], registerCustomCardImpl: registerLocalCustomCard,
       })
       sessions.push(core)
       const loaded = core.loadState(state)

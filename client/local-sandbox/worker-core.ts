@@ -33,8 +33,7 @@ import type {
   FarmChoiceType,
   FarmChoiceValidation,
 } from '../../shared/session/farm-choice-validation.ts'
-import { registerBrowserBackedCustomCard } from './browser-runtime.ts'
-import { validateAndCompileCustomCodeLocal } from './browser-executor.ts'
+import { prepareLocalCustomCard, registerLocalCustomCard } from './local-custom-card.ts'
 import {
   LOCAL_SANDBOX_SCHEMA_VERSION,
   type LocalCardInput,
@@ -63,17 +62,11 @@ const compileCards = (cards: LocalCardInput[]): CustomCardData[] =>
         artUrl: card.artUrl ?? null,
       }
     }
-    const result = validateAndCompileCustomCodeLocal(card.source, card.cardJson.id)
-    if (!result.valid) {
-      throw new Error(`Card ${card.cardJson.id} failed to compile: ${result.errors.join('; ')}`)
-    }
-    return {
-      cardType: card.cardType,
-      cardJson: card.cardJson,
-      effectCode: card.source,
-      compiledCode: result.compiledCode,
-      codeManifest: result.manifest,
-      artUrl: card.artUrl ?? null,
+    try {
+      // A native source supplies its own definition; a retired-format draft keeps its stored one.
+      return prepareLocalCustomCard({ cardId: card.cardJson.id, source: card.source, cardType: card.cardType, cardJson: card.cardJson, artUrl: card.artUrl })
+    } catch (error) {
+      throw new Error(`Card ${card.cardJson.id} failed to compile: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
     }
   })
 
@@ -131,7 +124,7 @@ export class LocalSandboxCore {
     const core = new GameCore({
       stateOrSeed: rehydrateState(persisted.serializedState),
       customCards: customCards.length > 0 ? customCards : undefined,
-      registerCustomCardImpl: registerBrowserBackedCustomCard,
+      registerCustomCardImpl: registerLocalCustomCard,
     })
     this.core?.dispose()
     this.core = core
@@ -207,7 +200,7 @@ export class LocalSandboxCore {
       stateOrSeed: config.seed,
       customCards: customCards.length > 0 ? customCards : undefined,
       initialStateOptions,
-      registerCustomCardImpl: registerBrowserBackedCustomCard,
+      registerCustomCardImpl: registerLocalCustomCard,
     })
     this.core?.dispose()
     this.core = core

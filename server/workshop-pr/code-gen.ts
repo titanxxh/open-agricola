@@ -10,6 +10,7 @@
  *   5. public/card-art/community/{card_id}.{ext}        — (optional) binary art
  */
 import ts from 'typescript'
+import { isNativeCardSource } from '../../shared/custom-code/card-source-admission.ts'
 
 // ---------------------------------------------------------------------------
 // C-12: AST helper scan
@@ -732,10 +733,55 @@ function cardSourceFactory(cardType: string): string {
   return cardType === 'occupation' ? 'defineOccupationCard' : 'defineMinorCard'
 }
 
+/**
+ * A native Card Source draft (ADR 0052) is already the module its pull request
+ * adds: drop translations, which ship as a separate language patch, set the
+ * adopted artwork, and add the `_impl` export the registry imports.
+ */
+function generateNativeCardSourceFile(
+  wcard: WorkshopCardForGen & { card_json?: string },
+  ctx: { githubLogin: string; iso: string; artUrl?: string | null },
+): string {
+  const sf = ts.createSourceFile(`${wcard.card_id}.ts`, wcard.effect_code, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS)
+  const transformer: ts.TransformerFactory<ts.SourceFile> = context => {
+    const { factory } = context
+    const visit = (node: ts.Node): ts.Node => {
+      if (ts.isPropertyAssignment(node) && propertyNameMatches(node.name, 'meta') && ts.isObjectLiteralExpression(node.initializer)
+        && ts.isCallExpression(node.parent.parent) && ts.isIdentifier(node.parent.parent.expression)
+        && ['defineMinorCard', 'defineOccupationCard'].includes(node.parent.parent.expression.text)) {
+        const kept = node.initializer.properties.filter(property => !(ts.isPropertyAssignment(property)
+          && (propertyNameMatches(property.name, 'locales') || propertyNameMatches(property.name, 'artUrl'))))
+        const art = ctx.artUrl ? [factory.createPropertyAssignment('artUrl', factory.createStringLiteral(ctx.artUrl))] : []
+        return factory.updatePropertyAssignment(node, node.name, factory.updateObjectLiteralExpression(node.initializer, [...kept, ...art]))
+      }
+      return ts.visitEachChild(node, visit, context)
+    }
+    return node => ts.visitEachChild(node, visit, context)
+  }
+  const result = ts.transform(sf, [transformer])
+  let body: string
+  try {
+    body = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed }).printFile(result.transformed[0]!).trim()
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+  } finally {
+    result.dispose()
+  }
+  return `// Generated from Open Agricola workshop. Do not hand-edit.
+// Workshop card: ${wcard.card_id}
+// Author: ${(wcard.author_name ?? 'unknown').replace(/[\r\n\u2028\u2029]/g, ' ')}${ctx.githubLogin ? ` (github: @${ctx.githubLogin})` : ''}
+// Submitted: ${ctx.iso}
+${wcard.description ? `// Description: ${wcard.description.replace(/[\r\n\u2028\u2029]/g, ' ')}\n` : ''}
+${body}
+
+export const ${wcard.card_id}_impl = ${wcard.card_id}.impl
+`
+}
+
 export function generateCardSourceFile(
   wcard: WorkshopCardForGen & { card_json?: string },
   ctx: { githubLogin: string; iso: string; artUrl?: string | null },
 ): string {
+  if (isNativeCardSource(wcard.effect_code)) return generateNativeCardSourceFile(wcard, ctx)
   const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, {
     artUrl: ctx.artUrl,
   })

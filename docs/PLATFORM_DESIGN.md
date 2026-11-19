@@ -179,7 +179,7 @@ The page retains raw tool protocol and provider reasoning/signatures only in mem
 
 Tests and reports remain private to candidates and the current draft. They do not enter public card JSON, submissions, Replay snapshots, immutable version provenance or its content hash. Restoring an old version clears tests and reports, requiring new tests and execution. Identical card content keeps its existing immutable version. The browser report is a client declaration, not server execution proof; adoption independently recompiles source and checks identity and revision. See `workshop-generation.test.ts`, `workshop-drafts.test.ts`, and `workshop-generation.spec.ts` for behavior.
 
-`GET /api/workshop/sandbox-contract` exposes the deployed capability name arrays, runtime identity and isolation limits. The model reads implementation details through the reference tools. Its identifier hashes deployed shared/executor source, the resolved dependency lockfile and runtime versions, independently of the GitHub reference commit. `POST /api/workshop/cards/validate-code` binds success and failure to that identifier and the submitted source fingerprint; an obsolete contract returns `sandbox_changed` so a new attempt is required. The main browser receives data only, never imports the rule runtime.
+`GET /api/workshop/sandbox-contract` exposes the runtime identity, plus the capability names and isolation limits that still apply to drafts in the retired sandbox format; native Card Source modules are validated structurally (`shared/custom-code/card-source-admission.ts`) without running on the server. The model reads implementation details through the reference tools. Its identifier hashes deployed shared/executor source, the resolved dependency lockfile and runtime versions, independently of the GitHub reference commit. `POST /api/workshop/cards/validate-code` binds success and failure to that identifier and the submitted source fingerprint; an obsolete contract returns `sandbox_changed` so a new attempt is required. The main browser receives data only, never imports the rule runtime.
 
 #### C1.4 Quality and cost acceptance
 
@@ -199,7 +199,7 @@ The original single-file artifact remains on the separate `prototype/llm-tool-lo
 
 ### C2. System prompt and references
 
-The compact prompt in [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts) defines the task, immutable card identity, trust boundary, and four tools: `search_references`, `read_reference`, `write_artifacts`, and `run_tests`. The deployed format-2 Workshop Capability Contract supplies capability name arrays, runtime identity, and execution limits. Runtime identity and reference commit remain separate.
+The compact prompt in [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts) defines the task, immutable card identity, trust boundary, and four tools: `search_references`, `read_reference`, `write_artifacts`, and `run_tests`. It asks for a native Card Source module (ADR 0052), starts the research at `docs/CARD_AUTHORING.md`, requires positive and negative tests, and embeds no capability list. The deployed contract only identifies the runtime for validation binding; runtime identity and reference commit remain separate.
 
 The model reads source, engine consumers, and direct or Session tests from GitHub at the attempt's fixed commit. [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) explains the execution boundaries and links to the source allowlists and injected helpers. The site keeps no separate few-shot corpus or descriptive capability maps.
 

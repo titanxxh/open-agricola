@@ -188,7 +188,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 测试及报告只属于候选与当前私有草稿，不进入公开 cardJson、投稿、Replay、不可变版本溯源或其 contentHash。恢复旧版本会清除测试和报告，必须重新生成并执行；相同卡牌内容仍复用已有不可变版本。浏览器报告只是客户端声明，不是服务端执行证明；采用时服务端独立重编译源码并检查身份与 revision。行为入口见 `workshop-generation.test.ts`、`workshop-drafts.test.ts` 和 `workshop-generation.spec.ts`。
 
-`GET /api/workshop/sandbox-contract` 提供部署中的能力名称数组、运行时标识与隔离限制；模型通过资料工具读取实现细节。其标识来自部署中的 shared/executor 源码、锁文件中解析出的依赖版本及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
+`GET /api/workshop/sandbox-contract` 提供运行时标识，以及仍适用于已退役沙盒格式草稿的能力名称和隔离限制；原生 Card Source 模块只做结构校验（`shared/custom-code/card-source-admission.ts`），不在服务端运行；模型通过资料工具读取实现细节。其标识来自部署中的 shared/executor 源码、锁文件中解析出的依赖版本及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
 
 #### C1.4 质量与成本验收
 
@@ -208,7 +208,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 ### C2. 系统提示词与参考资料
 
-精简提示词位于 [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts)，定义任务、不可变卡牌身份、信任边界与四个工具：`search_references`、`read_reference`、`write_artifacts` 和 `run_tests`。已部署的 format-2 工坊能力契约提供能力名称数组、运行时标识和执行限制。运行时标识与资料 commit 分别记录。
+精简提示词位于 [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts)，定义任务、不可变卡牌身份、信任边界与四个工具：`search_references`、`read_reference`、`write_artifacts` 和 `run_tests`。它要求输出原生 Card Source 模块（ADR 0052），从 `docs/CARD_AUTHORING.md` 开始研究，要求正向与反向测试，不嵌入能力清单。已部署的契约只用于标识运行时、绑定校验结果；运行时标识与资料 commit 分别记录。
 
 模型从本次尝试固定 commit 的 GitHub 资料读取源码、引擎消费者及直接行为或 Session 测试。[`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) 说明执行边界，并链接源码白名单和注入 helper。站点不另存少样本语料或能力描述 map。
 
