@@ -1636,9 +1636,27 @@ const CARD_IMPL = {}
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_ids: [cardDbId] }, 'tok-bob'), res)
       expect(res.statusCode).toBe(400)
       expect(JSON.parse(res.body)).toMatchObject({ ok: false, error: 'The sandbox accepts only your own Workshop cards' })
+      const single = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_id: cardDbId }, 'tok-bob'), single)
+      expect(single.statusCode).toBe(400)
+      expect(await db.prepare("SELECT COUNT(*) AS c FROM sandbox_cards WHERE user_id = 'u2'").get()).toEqual({ c: 0 })
       const getRes = mockRes()
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob'), getRes)
       expect(JSON.parse(getRes.body).cards).toEqual([])
+    })
+
+    it('drops entries for other authors\' cards from the quota when adding one card', async () => {
+      const own = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_BobSandboxCard', card_type: 'minor', name: 'Bob Sandbox Card',
+        card_json: { id: 'CUSTOM_BobSandboxCard', name: 'Bob Sandbox Card', deck: 'CUSTOM', number: 0, desc: [] },
+      }, 'tok-bob'), own)
+      const ownId = JSON.parse(own.body).id as string
+      await db.prepare("INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES ('u2', ?, 1)").run(cardDbId)
+      const added = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_id: ownId }, 'tok-bob'), added)
+      expect(added.statusCode).toBe(200)
+      expect(await db.prepare("SELECT workshop_card_id AS id FROM sandbox_cards WHERE user_id = 'u2'").all()).toEqual([{ id: ownId }])
     })
   })
 })
