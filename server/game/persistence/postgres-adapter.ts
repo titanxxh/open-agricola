@@ -1,4 +1,5 @@
 import { operationsMetrics, safe } from '../../observability/metrics'
+import { enqueueWebPush, type WebPushEvent } from '../../web-push/store'
 import { replaceDevelopmentRoom } from '../development-room-slots'
 import { ExecutionAccess } from '../execution-access'
 import { RoomDirectory, RoomOwnershipError, type OwnerToken } from '../room-directory'
@@ -78,6 +79,7 @@ export type ReplayCommit = {
   retiredTermination?: GameTermination
   receipt?: CommandReceiptWrite
   serialized: PersistedSessionSnapshot
+  draftPushEvents?: ReadonlyArray<Extract<WebPushEvent, { kind: 'draft' }>>
   meta: RoomMeta
   header?: {
     schemaVersion: number
@@ -677,6 +679,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       packed.writtenBytes = await this.history.write(commit.roomId, packed.nodes, packed.recoveryNodes)
       ;(await savePlayers(commit.roomId, commit.step.createdAt, commit.meta.players))
       await openingFacts.capture({ roomId: commit.roomId, meta: commit.meta, state: commit.serialized.state, committedAt: commit.step.createdAt })
+      for (const notification of commit.draftPushEvents ?? []) await enqueueWebPush(db, notification)
       ;(await this.insertReplayStep.run({ roomId: commit.roomId, ...commit.step }))
       const advanced = (await this.advanceReplay.run({
         roomId: commit.roomId,

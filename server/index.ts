@@ -6,6 +6,11 @@ import { betaAccountState } from './experimental-features'
 import { createBugReportFeedbackHandler } from './bug-report-feedback-routes'
 import { BugReportFeedbackService } from './bug-report/feedback-service'
 import './language-packs'
+import { WEB_PUSH_KINDS } from '../shared/contract/web-push'
+import { WebPushStore } from './web-push/store'
+import { WebPushDelivery } from './web-push/delivery'
+import { webPushRuntime } from './web-push/provider'
+import { createWebPushHandler } from './web-push/routes'
 import { recoverPendingSubmissions } from './workshop-pr/submission-service'
 import { SubmissionStore } from './workshop-pr/submission-store'
 import { WorkshopGitHubApp } from './workshop-pr/github-app'
@@ -391,6 +396,16 @@ const sessionCleanupTimer = setInterval(async () => {
     await wssCtx?.committer?.cleanupReplayAssets()
   } catch (error) { console.error('[storage] periodic cleanup pending', error) }
 }, 60 * 60 * 1000)
+const pushStore = new WebPushStore(getDb())
+const pushRuntime = webPushRuntime()
+const handleWebPush = createWebPushHandler({ store: pushStore, ...pushRuntime, sendJson })
+const pushDelivery = pushRuntime.send ? new WebPushDelivery(pushStore, pushRuntime.send) : null
+const pushKinds = WEB_PUSH_KINDS.filter(kind => pushRuntime.allowed[kind])
+const pushTimer = pushDelivery && pushKinds.length ? setInterval(() => {
+  void pushDelivery.deliverDue(pushKinds).catch(() => { console.warn('[web-push] delivery deferred') })
+}, 5_000) : null
+pushTimer?.unref()
+
 const bugReportDeliveryTimer = setInterval(() => {
   void retryPendingAccountDeletion().then(
     () => bugReportDelivery?.retryGrantRevocation(),
@@ -464,6 +479,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   if (await handlePrereleaseAuthority(req, res)) return
   if (await handleBetaAccess(req, res)) return
   if (await handleBugReportFeedback(req, res)) return
+  if (await handleWebPush(req, res)) return
   if (await handleRetentionPolicy(req, res)) return
   if (await handleOperations(req, res)) return
 
@@ -1126,6 +1142,7 @@ installShutdownHandlers(async () => {
   clearInterval(invalidationTimer)
   shutdownSandboxSessions()
   clearInterval(bugReportDeliveryTimer)
+  if (pushTimer) clearInterval(pushTimer)
   clearInterval(submissionRecoveryTimer)
   await wssCtx?.shutdown()
   await observationDb.close()
