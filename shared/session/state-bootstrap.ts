@@ -29,6 +29,7 @@ import {
   implementedCommunityOccupations,
 } from '../cards/catalog'
 import { getEligibleClassicCardIds, normalizeClassicDeckIds } from '../cards/classic-catalog'
+import { ClassicPoolInsufficientError, classicPoolShortfall } from './classic-deal-pool'
 import { initDraftState, initStagedDraftState } from '../draft/draft-manager'
 import type { DraftPool, DraftStageSpec } from '../draft/types'
 import type { ActionDefinition, ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
@@ -177,7 +178,8 @@ const revisedDealPool = (
 
 /**
  * Deals from the revised pool by `deckIds`, or, when `classicDeckIds` is given, only from the eligible cards of those
- * Classic Decks (ADR 0049): no revised or community card joins a classic deal. Workshop cards join either pool.
+ * Classic Decks (ADR 0049): no revised or community card joins a classic deal. Workshop cards join either pool, but a
+ * classic deal throws `ClassicPoolInsufficientError` unless the eligible cards alone fill every hand.
  */
 export const dealHands = (
   playerCount: number,
@@ -199,6 +201,10 @@ export const dealHands = (
     ?? getRegisteredOccupation(id)?.players
     ?? undefined
   const allowExtra = (id: string) => allow(lookupPlayersField(id))
+  if (classicDeckIds) {
+    const shortfall = classicPoolShortfall(classicDeckIds, playerCount, playerCount * handSize)
+    if (shortfall) throw new ClassicPoolInsufficientError(shortfall)
+  }
   const officialPool = classicDeckIds
     ? getEligibleClassicCardIds(classicDeckIds, playerCount)
     : revisedDealPool(playerCount, deckIds, enableCommunityDeck)
