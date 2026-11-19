@@ -131,7 +131,7 @@ export const reap = (
     }
     const override = options.harvestCounts?.[fieldKey(field.row, field.col)]
     const harvestCount = override ?? computeHarvestCount(state, player, field, {
-      baseCount: logicalField.kind === 'card' ? occupiedSlots.length : 1,
+      baseCount: slots.some(slot => slot.stack.independentHarvest) ? slots.filter(slot => slot.top || slot.stack.independentHarvest).length : logicalField.kind === 'card' ? occupiedSlots.length : 1,
       logicalField,
     })
     let remainingCount = Math.max(0, Math.floor(harvestCount.count))
@@ -184,15 +184,15 @@ export const reap = (
       planned.set(slot.key, (planned.get(slot.key) ?? 0) + amount)
       remainingCount -= amount
     }
-    if (logicalField.kind === 'card' && scope !== 'field') {
-      orderedSlots.filter((slot) => slot.top).forEach((slot) => allocate(slot, 1))
+    if (scope !== 'field' && (logicalField.kind === 'card' || slots.some(slot => slot.stack.independentHarvest))) {
+      orderedSlots.filter((slot) => slot.top || slot.stack.independentHarvest).forEach((slot) => allocate(slot, 1))
     }
     orderedSlots.forEach((slot) => allocate(slot))
 
     for (const slot of orderedSlots) {
       const amount = planned.get(slot.key) ?? 0
       if (amount <= 0 || !slot.stack) continue
-      const removed = mutations.remove({ fieldId: logicalField.id, slot: slot.index }, amount)
+      const removed = mutations.remove({ fieldId: logicalField.id, slot: slot.index, ...(logicalField.kind === 'card' ? { layer: slot.layerIndex } : {}) }, amount)
       if (!removed.ok || !removed.crop) {
         throw new Error(`[reap] failed to persist ${logicalField.id} slot ${slot.index}`)
       }
@@ -207,13 +207,14 @@ export const reap = (
       player.resources[kind] = (player.resources[kind] ?? 0) + amount
       reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + amount
       reapedCropAmounts[kind] = (reapedCropAmounts[kind] ?? 0) + amount
-      const countedFieldCropKey = `${logicalField.id}-${kind}`
-      if (kind === 'grain') {
+      const identity = slot.stack.fieldIdentity ?? kind
+      const countedFieldCropKey = `${logicalField.id}-${identity}`
+      if (identity === 'grain') {
         if (!countedFieldCrops.has(countedFieldCropKey)) {
           reapSummary.grainFields += 1
           countedFieldCrops.add(countedFieldCropKey)
         }
-      } else if (kind === 'vegetable') {
+      } else if (identity === 'vegetable') {
         if (!countedFieldCrops.has(countedFieldCropKey)) {
           reapSummary.vegetableFields += 1
           countedFieldCrops.add(countedFieldCropKey)

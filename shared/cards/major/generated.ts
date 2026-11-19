@@ -256,6 +256,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "kind": "major"
   },
   {
+    "wellIdentity": true,
     "id": "Major_Well",
     "name": "Well",
     "deck": "major",
@@ -573,6 +574,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "kind": "major"
   },
   {
+    "wellIdentity": true,
     "id": "Major_Well2",
     "name": "Well",
     "deck": "major",

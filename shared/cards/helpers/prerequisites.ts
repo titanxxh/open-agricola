@@ -1,3 +1,4 @@
+import { fieldHasCrop } from '../../domain/field'
 import type { GameState, PlayerState } from '../../contract/types'
 import type { CardDefinition } from '../../contract/cards'
 import { getRegisteredMinorImprovement } from '../registry-display'
@@ -86,7 +87,7 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
   const grainFieldsMatch = trimmed.match(/^(\d+)\s+Grain Fields?$/i)
   if (grainFieldsMatch) {
     const grainFields = getLogicalFields(player).filter((field) =>
-      field.stacks.some((stack) => stack.kind === 'grain'),
+      fieldHasCrop(field, 'grain'),
     )
     return grainFields.length >= Number(grainFieldsMatch[1])
   }

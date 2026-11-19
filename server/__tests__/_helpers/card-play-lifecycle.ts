@@ -4,7 +4,7 @@ import { rehydrateState, serializeSessionSnapshot } from '../../../shared/sessio
 
 export const choose = (session: GameSession, response: SessionResponse, value: string): SessionResponse => {
   expect(response.ok, response.error).toBe(true)
-  if (response.interaction.stateId !== 'wait') throw new Error(`Expected a choice for ${value}`)
+  if (response.interaction.stateId !== 'wait' || !('options' in response.interaction.request)) throw new Error(`Expected a choice for ${value}`)
   expect(response.interaction.request.options?.some((option) => option.value === value && !option.disabled),
     JSON.stringify(response.interaction)).toBe(true)
   const next = session.resolveChoice(response.interaction.playerIndex, value)
@@ -28,7 +28,7 @@ export const playImprovement = (
     const player = response.state.players[playerIndex]!
     return player.minorPlayed.includes(cardId) || player.improvements.includes(cardId)
   }
-  if (!played() && response.interaction.stateId === 'wait') {
+  if (!played() && response.interaction.stateId === 'wait' && 'options' in response.interaction.request) {
     const branch = response.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
     if (branch) response = choose(session, response, branch.value)
   }

@@ -1,3 +1,5 @@
+import { addTemporaryGuest, returnSupplyWorkers } from '../supply-workers'
+import { getFamilyTokenLimit, inactiveWorkersInSupply } from '../player'
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Worker } from '../../contract/types'
 import { holdWorkerOnCard, releaseWorkerFromCard } from '../../cards/helpers/card-held-workers'
@@ -36,6 +38,33 @@ const emptyState = (players: PlayerState[]): GameState => ({
 } as unknown as GameState)
 
 describe('player helpers', () => {
+  it('temporary guests work beyond the family limit without becoming family or reusable supply', () => {
+    const p = makePlayer(Array.from({ length: 5 }, (_, index) => makeWorker(String(index + 1))))
+    const s = emptyState([p])
+    const a = addTemporaryGuest(s, p, 'test-guest')
+    const b = addTemporaryGuest(s, p, 'test-guest')
+    expect(a.id).not.toBe(b.id)
+    expect(workersAvailable(s, p)).toBe(7)
+    expect(familySize(p)).toBe(5)
+    expect(getFamilyTokenLimit(p)).toBe(5)
+    expect(inactiveWorkersInSupply(p)).toHaveLength(0)
+    expect(returnSupplyWorkers(s).flatMap(entry => entry.workers)).toHaveLength(2)
+    expect(p.workers).toHaveLength(5)
+    expect(workersAvailable(s, p)).toBe(5)
+  })
+
+  it('a skipped work phase disables guests and family without removing their family status', () => {
+    const p = makePlayer([makeWorker('1'), makeWorker('2')])
+    const s = emptyState([p])
+    addTemporaryGuest(s, p, 'test-guest')
+    p.workPhaseSkippedAtRound = 1
+    expect(workersAvailable(s, p)).toBe(0)
+    expect(familySize(p)).toBe(2)
+    returnSupplyWorkers(s)
+    s.round = 2
+    expect(workersAvailable(s, p)).toBe(2)
+  })
+
   it('findPlayerById returns the matching player', () => {
     const p1 = makePlayer([makeWorker('1')])
     const p2 = { ...makePlayer([makeWorker('1')]), id: 'p2', name: 'P2' }

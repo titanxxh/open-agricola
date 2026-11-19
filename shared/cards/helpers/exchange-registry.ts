@@ -6,6 +6,14 @@ export type BakeRate = {
   rate: number
   max: number
   labelKey: string
+  /** Alternative recipes for one oven cannot both be used in the same Bake action. */
+  exclusiveGroup?: string
+}
+
+type BakeRateProvider = (player: PlayerState, rates: readonly BakeRate[]) => readonly BakeRate[]
+const bakeRateProviders = new Map<string, BakeRateProvider>()
+export const registerBakeRateProvider = (cardId: string, provider: BakeRateProvider): void => {
+  bakeRateProviders.set(cardId, provider)
 }
 
 const majorBakeTable: Record<string, { rate: number; max: number; labelKey: string }> = {
@@ -64,6 +72,10 @@ export const getPlayerBakeRates = (player: PlayerState): BakeRate[] => {
         })
       }
     }
+  }
+  const owned = new Set([...player.improvements, ...player.minorPlayed, ...player.occupationPlayed])
+  for (const [cardId, provider] of bakeRateProviders) {
+    if (owned.has(cardId)) rates.push(...provider(player, rates.map(rate => ({ ...rate }))))
   }
   return rates
 }

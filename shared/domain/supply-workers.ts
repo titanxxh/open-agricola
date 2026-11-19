@@ -3,6 +3,25 @@ import { inactiveWorkersInSupply } from './player'
 import { clearLinkedSpaceBlocksForWorker, removeWorkerRef } from './space'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers'
 
+/** Guests can be granted even when all five family tokens are active. */
+export const addTemporaryGuest = (
+  state: Pick<GameState, 'round'>,
+  player: PlayerState,
+  sourceCard: string,
+  reserved = false,
+): Worker => {
+  const ids = new Set(player.workers.map(worker => worker.id))
+  let sequence = 1
+  while (ids.has(`guest:${sourceCard}:${state.round}:${sequence}`)) sequence++
+  const worker: Worker = {
+    id: `guest:${sourceCard}:${state.round}:${sequence}`,
+    isActive: false, isNewborn: false, isGuest: true,
+    supplyUse: { sourceCard, disposition: 'remove-from-game', status: reserved ? 'reserved' : 'temporary', returnRound: state.round },
+  }
+  player.workers.push(worker)
+  return worker
+}
+
 export const findSupplyWorker = (
   player: PlayerState,
   sourceCard?: string,
@@ -39,6 +58,7 @@ export const releaseSupplyWorker = (state: GameState, player: PlayerState, worke
   worker.isActive = false
   worker.isNewborn = false
   delete worker.supplyUse
+  if (worker.isGuest) player.workers = player.workers.filter(entry => entry.id !== worker.id)
 }
 
 export const returnSupplyWorkers = (state: GameState): {

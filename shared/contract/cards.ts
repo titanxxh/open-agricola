@@ -80,6 +80,7 @@ export type CardDefinition = {
   preventsHandDiscard?: boolean
   animalHolder?: boolean
   blocksHouseAnimalZones?: boolean
+  wellIdentity?: boolean
   blocksRenovation?: boolean
   waresSalesmanGains?: readonly Partial<Resource>[]
   mustBePlayedViaMinorAction?: boolean

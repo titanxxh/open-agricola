@@ -67,6 +67,7 @@ export type CardCapability =
   | 'fireplaceIdentity'
   | 'cookingHearthIdentity'
   | 'ovenIdentity'
+  | 'wellIdentity'
   | 'joineryIdentity'
   | 'potteryIdentity'
   | 'animalHolder'

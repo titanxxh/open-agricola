@@ -42,3 +42,5 @@
 测试：`shared/actions/payment/__tests__/protected-fee.test.ts`、`shared/actions/payment/internal/__tests__/{candidate-closure,cost-modifier-permutation-probe,enumerate,cost-modifiers}.test.ts`、`shared/actions/payment/__tests__/{solver,card-purchase}.test.ts`、`shared/actions/effects/__tests__/{improvement-cost-candidates,pay-supply-token,pay-seasonal-adjustment,renovation}.test.ts`、`server/__tests__/{seasonal-fence-payment,seasonal-major-payment}-session.test.ts`。
 
 完整单位单价与恢复不变量见 [ADR 0044](../adr/0044-unit-prices-precede-cost-transformations.md)。测试：`server/__tests__/{fixed-room-prices-session,fixed-room-prices-recovery}.test.ts`；前驱快照由 `scripts/fixtures/generate-legacy-room-prices.ts` 生成。
+
+**储存资源与收款人。** provider 可消耗行动格资源，也可消耗指定玩家的卡牌计数器。结算重新验证余额，指向同一余额的别名不能重复透支。只能支付卡上资源时，`payStoredResourceLeaf()` 同时设置 provider 和个人库存为零的支付预算。购卡的 `computeCosts.paymentTransfers` 将受保护费用及收款人加入同一次支付；先检查收款人，再扣款，成功后才入账。回执保留转账信息，pay 宿主发出资源移动事件。测试：`shared/actions/payment/__tests__/card-resource-backing.test.ts`、`server/__tests__/classic-fl-payments-session.test.ts`。

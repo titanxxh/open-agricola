@@ -15,6 +15,12 @@ const readResourceTypes = (value: unknown): CollectableResource[] | null => {
   return [...new Set(value)]
 }
 
+const retained = (context: Record<string, unknown> | undefined, key: keyof Resource): number => {
+  const raw = context?.leaveOnSpace
+  const value = raw && typeof raw === 'object' ? (raw as Partial<Resource>)[key] : 0
+  return typeof value === 'number' && Number.isSafeInteger(value) ? Math.max(0, value) : 0
+}
+
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const out: Partial<Resource> = {}
   Object.entries(resources).forEach(([key, value]) => {
@@ -66,14 +72,14 @@ export const hasCollectableResources = (context: ActionExecutionContext): boolea
   const { actionContext } = context
   if (actionContext?.resourceTypes !== undefined) {
     const types = readResourceTypes(actionContext.resourceTypes)
-    return types !== null && types.some(resource => (target.resources[resource] ?? 0) > 0)
+    return types !== null && types.some(resource => (target.resources[resource] ?? 0) > retained(actionContext, resource))
   }
   if (actionContext?.spaceId) {
     const { resource, amount } = actionContext
     return isCollectableResource(resource) && typeof amount === 'number' && Number.isFinite(amount)
       && amount > 0 && (target.resources[resource] ?? 0) >= amount
   }
-  return COLLECTABLE_RESOURCES.some(resource => (target.resources[resource] ?? 0) > 0)
+  return COLLECTABLE_RESOURCES.some(resource => (target.resources[resource] ?? 0) > retained(actionContext, resource))
 }
 
 export const collectAction: ActionDefinition = {
@@ -95,7 +101,7 @@ export const collectAction: ActionDefinition = {
     const amount = actionContext?.amount
     if (actionContext?.spaceId && !types && isCollectableResource(resource) && typeof amount === 'number' && Number.isFinite(amount) && amount > 0) return { kind: 'resourceExchange', resourcesGained: { [resource]: amount } }
     if (previewMode === 'base') return { kind: 'collection', spaceId: target.id, spaceNameKey: target.nameKey, resourceTypes: types ?? Object.keys(positiveResources(target.gainPerRound)) as (keyof Resource)[] }
-    const resources = types ? Object.fromEntries(types.map(resourceType => [resourceType, target.resources[resourceType] ?? 0])) : target.resources
+    const resources = Object.fromEntries((types ?? COLLECTABLE_RESOURCES).map(resourceType => [resourceType, Math.max(0, (target.resources[resourceType] ?? 0) - retained(actionContext, resourceType))]))
     return { kind: 'resourceExchange', resourcesGained: positiveResources(resources) }
   },
   execute: ({ state, player, space, actionContext, eventSink }) => {
@@ -112,9 +118,9 @@ export const collectAction: ActionDefinition = {
         if (!resourceTypes) return { type: 'fail', errorKey: 'log.collectInvalidPartial' }
         const gained: Partial<Resource> = {}
         for (const resourceType of resourceTypes) {
-          const available = targetSpace.resources[resourceType] ?? 0
+          const available = Math.max(0, (targetSpace.resources[resourceType] ?? 0) - retained(actionContext, resourceType))
           if (available <= 0) continue
-          targetSpace.resources[resourceType] = 0
+          targetSpace.resources[resourceType] -= available
           player.resources[resourceType] = (player.resources[resourceType] ?? 0) + available
           gained[resourceType] = available
         }
@@ -140,9 +146,13 @@ export const collectAction: ActionDefinition = {
     const gained: Record<string, number> = {}
     const resources = targetSpace.resources
     COLLECTABLE_RESOURCES.forEach((key) => {
-      if (resources[key] > 0) gained[key] = resources[key]
+      const count = Math.max(0, resources[key] - retained(actionContext, key))
+      if (count > 0) {
+        gained[key] = count
+        resources[key] -= count
+        player.resources[key] = (player.resources[key] ?? 0) + count
+      }
     })
-    collectAccumulatedResources(player, targetSpace)
     trackWorkPhaseBuildingResources(state, player.id, gained)
     addResourcesFromBoard(player, gained)
     emitCollectedResources(eventSink, player.id, targetSpace.id, gained)

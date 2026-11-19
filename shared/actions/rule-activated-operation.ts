@@ -72,6 +72,15 @@ export const executeActivatedRuleOperation = (operation: RuleActivatedOperation,
       const flow = planMoveWorkerFromSpace(operation, context)
       return flow ? { type: 'flow', flow } : { type: 'ok' }
     }
+    case 'repay-resource-debt': {
+      const raw = readCardExtraData<unknown>(player, sourceCard, operation.fact)
+      const debt = typeof raw === 'number' && Number.isSafeInteger(raw) ? Math.max(0, raw) : 0
+      const paid = Math.min(debt, player.resources[operation.resource] ?? 0)
+      player.resources[operation.resource] -= paid
+      writeCardExtraData(player, sourceCard, operation.fact, 0)
+      if (paid > 0) context.eventSink?.emit<'resource.paid'>({ type: 'resource.paid', resources: { [operation.resource]: paid }, to: { kind: 'supply' }, paymentFor: 'cardEffect', sourceCardId: sourceCard })
+      return debt > paid ? { type: 'flow', flow: { type: 'leaf', actionId: 'gain', sourceCard, params: { [operation.shortfallResource]: debt - paid } } } : { type: 'ok' }
+    }
     case 'card-fact-refund': {
       const raw = readCardExtraData<unknown>(player, sourceCard, operation.fact)
       const amount = typeof raw === 'number' ? Math.floor(raw / operation.divisor) : 0

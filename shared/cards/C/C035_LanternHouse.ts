@@ -4,6 +4,7 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'C035_LanternHouse'
 
 const cardImpl = {
+  prerequisiteCheck: player => (player.discardedHandCardCount ?? 0) === 0,
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {

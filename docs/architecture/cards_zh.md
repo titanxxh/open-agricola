@@ -119,3 +119,11 @@ cardField?: {
 
 `actions/helpers/minor-card-passing.ts` 负责购买及显式 `pass-minor-card-to-left` 行动的传递终点和公开事件。只有一名真实参与者时，卡移出游戏并发出 reason 为 `passed` 的 `card.destroyed`，不回到本人手牌或普通抽牌供给。支付和完整的 `onBuy` continuation 仍各执行一次；已有对局恢复时保留耗尽的空手牌。多人传递使用真实下家并保留普通交牌事件。Session 回归位于 Clay Embankment、Shifting Cultivation 与 Savings Deposit 的测试文件。
 
+## 由来源卡定义的补充计划
+
+- 玩家行动卡可提供一个 `createDefinition(ownerId)`，或多个 `createDefinitions(state, ownerId)` 定义。各实体行动格具有稳定且唯一的 ID；运行时和恢复时均从已打出的小发展及职业重建。井的逻辑身份通过 `wellIdentity` 声明，并保留在静态目录生成结果中。
+- 替代烤面包配方通过 `registerBakeRateProvider()` 注册。`exclusiveGroup` 将同一实体烤炉的配方分组，一次烘焙不能混用组内替代配方。
+- 主动弃手牌通过 `discardHandCards()` 检查所有权、重复项及禁止弃牌能力。成功后增加 `discardedHandCardCount`，与打出、传递和摸取卡牌区分。
+- `classic-board-topology.ts` 提供独立于响应式界面的印刷版图列及相邻关系。回合卡使用实际翻开的槽位，独立版图的边缘不相邻。
+
+行为和恢复测试：`server/__tests__/classic-fl-{placement,combinations,triggers}-session.test.ts`。

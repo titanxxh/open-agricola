@@ -7,8 +7,8 @@ export const fieldTopStack = (f: Field): CropStack | undefined =>
 
 export const fieldBottomStack = (f: Field): CropStack | undefined => f.stacks[0]
 
-export const fieldHasCrop = (f: Field, kind: CropStack['kind']): boolean =>
-  f.stacks.some((s) => s.kind === kind)
+export const fieldHasCrop = (f: { stacks: readonly Readonly<CropStack>[] }, kind: CropStack['kind']): boolean =>
+  f.stacks.some((s) => (s.fieldIdentity ?? s.kind) === kind)
 
 export const fieldTotalRemaining = (f: Field): number =>
   f.stacks.reduce((acc, s) => acc + s.remaining, 0)

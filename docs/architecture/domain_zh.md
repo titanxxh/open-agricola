@@ -74,3 +74,8 @@ shared/domain/
 
 `work.ended` 在 `onBeforeReturnHome` 完成后、归家位置快照及临时人员归还前关闭工作阶段资格。工作末尾和回家前的用格仍符合资格，即使显示的 `roundPhase` 已是 `returning-home`；之后的归家用格不符合。该事实不改变阶段 hook 顺序。覆盖：`server/__tests__/action-space-use-history-session.test.ts`。
 
+## 混种与临时棋子
+
+- `mutateLogicalFields().addCompanion()` 添加独立收获的作物，不产生第二块逻辑田。`fieldIdentity` 保留原作物分类；`independentHarvest` 让每个标记层分别收获一个。收获逆序移除作物层，记录两种资源但只有一个田地身份。旧的无标记堆仍只按顶层收获。虚拟坐标保留 A–E 存档，多字母牌组使用独立、确定的坐标空间。测试：`shared/cards/helpers/__tests__/card-field.test.ts`。
+- 动物区的 `fixedAnimalCounts` 在重新安排和容量搜索中锁定现有棋子。支付和繁殖排除由来源卡负责；客户端只展示服务端约束。
+- `addTemporaryGuest()` 分配独立临时人员，即使家庭人数已满也可获得。客人不计入家庭人数或未使用的家庭人员供应，`returnSupplyWorkers()` 移除客人及其放置。`workPhaseSkippedAtRound` 禁用当轮普通及额外行动，不改变家庭成员身份。`Worker.firstWorkPlacement` 记录首次正常放人，排除搬迁及客人。这些可选字段在旧存档中缺失时保持普通行为。测试：`shared/domain/__tests__/player.test.ts`、`server/__tests__/classic-fl-placement-session.test.ts`。

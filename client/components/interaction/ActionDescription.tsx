@@ -68,6 +68,7 @@ const renderRuleOperation = (locale: Locale, operation: RuleOperationPreview): R
     case 'move-worker-from-space': return t(locale, 'ui.ruleMoveWorkerFromSpace', { space: t(locale, operation.spaceNameKey) })
     case 'supply-worker-placement': return t(locale, 'ui.ruleSupplyWorkerPlacement')
     case 'supply-worker-turn': return t(locale, 'ui.ruleSupplyWorkerTurn')
+    case 'repay-resource-debt': return <span><ResourceLine locale={locale} resources={{ [operation.resource]: -operation.amount, [operation.shortfallResource]: operation.shortfall }} /></span>
     case 'card-fact-refund': return <span>{t(locale, 'ui.ruleRefund', { amount: operation.paidAmount, divisor: operation.divisor })}{' '}<ResourceLine locale={locale} resources={{ [operation.resource]: operation.amount }} /></span>
     case 'take-stored-resources': return <span>{t(locale, 'ui.ruleTakeStoredResources')}{' '}<ResourceLine locale={locale} resources={operation.resources} /></span>
     case 'harvest-selected-supply-reward': return <span>{t(locale, 'ui.ruleSelectedHarvestReward', { selected: operation.selectedFields })}{' '}<ResourceLine locale={locale} resources={{ [operation.crop]: 1 }} />{' × '}{operation.appliedFields ?? t(locale, 'ui.ruleActualHarvestedFields')}</span>

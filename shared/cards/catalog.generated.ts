@@ -8920,6 +8920,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "kind": "minor"
   },
   {
+    "wellIdentity": true,
     "id": "D044_ForestWell",
     "name": "Forest Well",
     "deck": "D",
@@ -8940,6 +8941,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "kind": "minor"
   },
   {
+    "wellIdentity": true,
     "id": "D045_SheepWell",
     "name": "Sheep Well",
     "deck": "D",

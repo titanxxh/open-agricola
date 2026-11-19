@@ -144,3 +144,4 @@ Tests: `shared/actions/__tests__/fencing.test.ts`, `shared/actions/effects/__tes
 
 Tests: `shared/session/__tests__/anytime-policy.test.ts`, `server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session,exchange-batch-session}.test.ts`.
 
+**Bounded collection and retained debt.** `collect` accepts `actionContext.leaveOnSpace` as a nonnegative integer map, checks the live pile and credits only the remainder. Events and previews report that actual collection. The typed `repay-resource-debt` timed operation settles a retained fact by returning available goods and charging a declared shortfall resource; it clears the debt and can remain active after its card leaves play. `set-first-player` admits `computeReplace` through the ordinary replacement pipeline, so a card can replace marker transfer without replacing the enclosing action. Tests: `server/__tests__/classic-fl-{placement,rounds}-session.test.ts`.

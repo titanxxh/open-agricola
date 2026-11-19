@@ -19,7 +19,7 @@ export const ruleOperationAction: ActionDefinition = {
         })
       }
       case 'put-on-action-space': case 'supply-worker-placement':
-      case 'card-fact-refund': case 'take-stored-resources': case 'harvest-selected-supply-reward':
+      case 'repay-resource-debt': case 'card-fact-refund': case 'take-stored-resources': case 'harvest-selected-supply-reward':
       case 'supply-worker-turn': case 'release-reserved-worker': case 'gain-per-building-resource-collected': case 'skip-next-turns':
         return true
       default: return canExecuteFixedRuleOperation(match.body.operation, { actionHooks: options?.actionHooks, state, player, sourceCard: options?.sourceCard, space: options?.space })
@@ -34,7 +34,7 @@ export const ruleOperationAction: ActionDefinition = {
     if (match?.body.kind !== 'operation') return { type: 'fail', errorKey: 'log.cardEffectFail' }
     switch (match.body.operation.kind) {
       case 'put-on-action-space': case 'supply-worker-placement': case 'move-worker-from-space':
-      case 'card-fact-refund': case 'take-stored-resources': case 'harvest-selected-supply-reward':
+      case 'repay-resource-debt': case 'card-fact-refund': case 'take-stored-resources': case 'harvest-selected-supply-reward':
       case 'supply-worker-turn': case 'release-reserved-worker': case 'gain-per-building-resource-collected': case 'skip-next-turns':
         return executeActivatedRuleOperation(match.body.operation, context)
       default: return executeFixedRuleOperation(match.body.operation, context)

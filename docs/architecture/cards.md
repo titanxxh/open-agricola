@@ -117,3 +117,11 @@ Tests: `shared/cards/__tests__/{AB,CD,EM}-logical-field-boundary.test.ts`, `shar
 
 `actions/helpers/minor-card-passing.ts` owns the passing destination and public event for purchases and the explicit `pass-minor-card-to-left` action. With one actual participant, the card leaves the game and emits `card.destroyed` with reason `passed`; it never returns to its owner's hand or enters the ordinary draw supply. Payment and the full `onBuy` continuation still execute once. Existing-game recovery preserves an exhausted hand. With multiple participants, passing uses the actual next participant and retains the ordinary hand-transfer event. Session regressions live with Clay Embankment, Shifting Cultivation and Savings Deposit.
 
+## Additional source-owned plans
+
+- Player action cards can provide either one `createDefinition(ownerId)` or multiple `createDefinitions(state, ownerId)` definitions. Each physical space has a stable unique ID; runtime and recovery rebuild from played minors and occupations. Logical well identity is declared by `wellIdentity` and retained in static catalog generation.
+- Alternative baking recipes register through `registerBakeRateProvider()`. `exclusiveGroup` groups recipes belonging to the same physical oven; one bake cannot combine alternatives in the group.
+- Voluntary hand discards use `discardHandCards()` for ownership, uniqueness and discard-prohibition checks. Successful discards increment `discardedHandCardCount`, which is separate from playing, passing and drawing cards.
+- `classic-board-topology.ts` supplies printed board columns and adjacency independently of responsive rendering. Round cards occupy their revealed slot; separate board edges are not adjacent.
+
+Behavior and recovery tests: `server/__tests__/classic-fl-{placement,combinations,triggers}-session.test.ts`.

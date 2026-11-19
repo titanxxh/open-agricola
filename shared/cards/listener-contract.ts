@@ -10,6 +10,7 @@ export type ActionSpaceListenerPhase = typeof actionSpaceListenerPhases[number]
 /** Subscription permission is deliberate; registering an executable action does not grant it. */
 export const listenerActionContract = {
   collect: actionPhases,
+  'set-first-player': actionPhases,
   gain: actionPhases,
   receive: actionPhases,
   plow: actionPhases,

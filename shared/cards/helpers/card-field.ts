@@ -11,7 +11,7 @@ import { appendImmediateEvents } from '../../events/append'
 
 type Crop = ExtraSowableCrop
 
-export type CardFieldStack = { crop: Crop; remaining: number }
+export type CardFieldStack = { crop: Crop; remaining: number; fieldIdentity?: Crop; independentHarvest?: true }
 export type CardFieldSlot = (CardFieldStack & { below?: CardFieldStack[] }) | null
 
 export type CardFieldDef = {
@@ -51,14 +51,19 @@ const cardFieldDefs = new Map<string, CardFieldDef>()
 
 const parseCardBaseCol = (cardId: string): number => {
   const match = cardId.match(/^([A-E])(\d+)_/)
-  if (!match) throw new Error(`[card-field] cardId "${cardId}" not in <Deck><Number>_ format`)
-  const ord = DECK_ORDINAL[match[1]]
-  if (ord === undefined) throw new Error(`[card-field] unknown deck letter "${match[1]}" in ${cardId}`)
-  return ord * 1000 + Number(match[2])
+  // Preserve coordinates already present in saved A–E games. New deck names
+  // get a separate namespace and 1,000 slots per card, independent of load order.
+  if (match) return DECK_ORDINAL[match[1]] * 1000 + Number(match[2])
+  const extended = cardId.match(/^([A-Z]{1,4})(\d{1,3})_/)
+  if (!extended) throw new Error(`[card-field] cardId "${cardId}" not in <Deck><Number>_ format`)
+  const deck = [...extended[1]].reduce((value, letter) => value * 27 + letter.charCodeAt(0) - 64, 0)
+  return 10_000_000 + deck * 1_000_000 + Number(extended[2]) * 1000
 }
 
-export const deriveVirtualTileCol = (cardId: string, slotIdx: number): number =>
-  parseCardBaseCol(cardId) + slotIdx
+export const deriveVirtualTileCol = (cardId: string, slotIdx: number): number => {
+  if (!Number.isSafeInteger(slotIdx) || slotIdx < 0 || slotIdx >= 1000) throw new Error('[card-field] invalid slot index')
+  return parseCardBaseCol(cardId) + slotIdx
+}
 
 const readSlots = (
   player: PlayerState,
@@ -138,6 +143,7 @@ export type LogicalField = Readonly<{
 export type LogicalFieldTarget = {
   fieldId: string
   slot?: number
+  layer?: number
 }
 
 export type LogicalFieldMutationTarget = LogicalFieldTarget | FarmTilePosition
@@ -191,13 +197,13 @@ const getCardFields = (player: PlayerState): readonly LogicalField[] =>
     .map((cardId): LogicalField => {
       const slots = readSlots(player, cardId)
       const logicalSlots = Object.freeze(slots.map((slot, index) => {
-        const stack = slot ? freezeStack({ kind: slot.crop, remaining: slot.remaining }) : null
+        const stack = slot ? freezeStack({ kind: slot.crop, remaining: slot.remaining, ...(slot.fieldIdentity ? { fieldIdentity: slot.fieldIdentity } : {}), ...(slot.independentHarvest ? { independentHarvest: true } : {}) }) : null
         return Object.freeze({
           index,
           tile: Object.freeze({ row: -1, col: deriveVirtualTileCol(cardId, index) }),
           stack,
           layers: Object.freeze(slot
-            ? [...(slot.below ?? []).map((layer) => freezeStack({ kind: layer.crop, remaining: layer.remaining })), stack!]
+            ? [...(slot.below ?? []).map((layer) => freezeStack({ kind: layer.crop, remaining: layer.remaining, ...(layer.fieldIdentity ? { fieldIdentity: layer.fieldIdentity } : {}), ...(layer.independentHarvest ? { independentHarvest: true } : {}) })), stack!]
             : []),
         })
       }))
@@ -391,6 +397,31 @@ export const mutateLogicalFields = (
     emitAdded(card, crop, amount)
     return { ok: true }
   }
+  const addCompanion = (requestedTarget: LogicalFieldMutationTarget, crop: Crop, amount: number): LogicalFieldMutationResult => {
+    validateCardFields()
+    if (!validAmount(amount)) return { ok: false, error: 'invalid-amount' }
+    const target = normalizeTarget(requestedTarget)
+    if (!target) return { ok: false, error: 'invalid-target' }
+    const field = farmyardTarget(target)
+    if (field) {
+      const original = field.stacks.find(stack => stack.remaining > 0)
+      if (!original || field.stacks.some(stack => stack.kind === crop)) return { ok: false, error: 'occupied' }
+      const identity = original.fieldIdentity ?? original.kind
+      field.stacks.forEach(stack => { stack.fieldIdentity = identity; stack.independentHarvest = true })
+      field.stacks.push({ kind: crop, remaining: amount, fieldIdentity: identity, independentHarvest: true })
+      emitAdded(field, crop, amount)
+      return { ok: true }
+    }
+    const card = cardTarget(target)
+    const top = card?.slots[card.slot]
+    if (!card || !top || top.crop === crop || top.below?.some(layer => layer.crop === crop)) return { ok: false, error: 'occupied' }
+    const identity = top.fieldIdentity ?? top.crop
+    card.slots[card.slot] = { ...top, fieldIdentity: identity, independentHarvest: true,
+      below: [...(top.below ?? []), { crop, remaining: amount, fieldIdentity: identity, independentHarvest: true }] }
+    writeSlots(player, card.cardId, card.slots)
+    emitAdded(card, crop, amount)
+    return { ok: true }
+  }
   const grow = (
     requestedTarget: LogicalFieldMutationTarget,
     amount = 1,
@@ -440,6 +471,21 @@ export const mutateLogicalFields = (
     if (!card) return { ok: false, error: 'invalid-target' }
     const stack = card.slots[card.slot]
     if (!stack) return { ok: false, error: 'empty' }
+    if (target.layer !== undefined) {
+      const layers = [...(stack.below ?? []), { crop: stack.crop, remaining: stack.remaining, ...(stack.fieldIdentity ? { fieldIdentity: stack.fieldIdentity } : {}), ...(stack.independentHarvest ? { independentHarvest: true as const } : {}) }]
+      const layer = layers[target.layer]
+      if (!layer) return { ok: false, error: 'invalid-target' }
+      const amount = requestedAmount ?? layer.remaining
+      if (!validAmount(amount) || amount > layer.remaining) return { ok: false, error: 'invalid-amount' }
+      layer.remaining -= amount
+      if (layer.remaining === 0) layers.splice(target.layer, 1)
+      const nextTop = layers.pop()
+      card.slots[card.slot] = nextTop ? { ...nextTop, ...(layers.length ? { below: layers } : {}) } : null
+      writeSlots(player, card.cardId, card.slots)
+      emitRemoved(card, layer.crop, amount)
+      const callback = cardRemovalCallback(card.cardId, layer.crop, amount, card.slots)
+      return { ok: true, crop: layer.crop, amount, ...(options.deferOwnerCallbacks ? { ownerCallback: callback } : { flow: callback() }) }
+    }
     const amount = requestedAmount ?? stack.remaining
     if (!validAmount(amount) || amount > stack.remaining) return { ok: false, error: 'invalid-amount' }
     const crop = stack.crop
@@ -490,7 +536,7 @@ export const mutateLogicalFields = (
     const flow = cardRemovalCallback(card.cardId, previous.crop, previous.remaining, card.slots)()
     return { ok: true, ...(flow ? { flow } : {}) }
   }
-  return { place, insertBottom, grow, remove, replace }
+  return { place, insertBottom, addCompanion, grow, remove, replace }
 }
 
 export const makeCardFieldImpl = (
@@ -498,6 +544,7 @@ export const makeCardFieldImpl = (
   def: CardFieldDef,
   options?: CardFieldOptions,
 ): CardImpl => {
+  if (!Number.isSafeInteger(def.capacity) || def.capacity < 1 || def.capacity > 1000) throw new Error('[card-field] invalid capacity')
   const baseCol = parseCardBaseCol(cardId)
   cardFieldDefs.set(cardId, def)
   cardFieldOptions.set(cardId, options ?? {})

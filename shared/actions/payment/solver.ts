@@ -216,6 +216,8 @@ const resolvePayment = (
     // A submitted choice that matches no current payment keeps its menu.
     return { type: 'failed', reason: ctx.paymentChoice !== undefined || options.length > 0 ? 'invalid-choice' : 'cannot-afford' }
   }
+  const transfers = isComplexCost(effectiveCost) ? effectiveCost.paymentTransfers ?? [] : []
+  if (transfers.some(transfer => !state.players.some(recipient => recipient.id === transfer.recipientPlayerId))) return { type: 'failed', reason: 'cannot-afford' }
   if (isComplexCost(effectiveCost)) {
     if (!canConsumePaymentResourceProviders(state, selection.solution, paymentResourceProviders)) {
       return { type: 'failed', reason: 'cannot-afford' }
@@ -229,7 +231,13 @@ const resolvePayment = (
     payResources(player, selection.solution.resourcesPaid, state)
     paySupplyTokens(player, selection.solution.resourcesPaid)
   }
-  return { type: 'paid', receipt: receiptForSolution(selection.solution, effectiveCost, ctx) }
+  for (const transfer of transfers) {
+    const recipient = state.players.find(recipient => recipient.id === transfer.recipientPlayerId)!
+    for (const [key, amount] of Object.entries(transfer.resources)) {
+      if (typeof amount === 'number' && amount > 0) recipient.resources[key as keyof typeof recipient.resources] += amount
+    }
+  }
+  return { type: 'paid', receipt: { ...receiptForSolution(selection.solution, effectiveCost, ctx), ...(transfers.length ? { paymentTransfers: transfers } : {}) } }
 }
 
 const hasPaymentOption = (
