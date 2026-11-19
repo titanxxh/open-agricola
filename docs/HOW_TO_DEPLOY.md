@@ -799,7 +799,25 @@ The stable Pages build reads `asset-digests.json` from the same asset publicatio
 
 Cache hits reuse verified assets by URL and SHA-256 across app builds. A miss revalidates through credentialless CORS. The page can use mismatched bytes but the Worker leaves them out of its cache. Normal activation waits for controlled pages to close and removes obsolete entries from its own cache.
 
-To pause this cache, set `PUBLIC_ASSET_CACHE_ENABLED` to `false` in `scripts/vite-public-asset-worker.ts` and publish a new stable Pages candidate through the normal release gates. Keep `/sw.js` at the same URL and scope. The replacement restores ordinary requests when the browser installs and activates it, without reloading open tabs. Keep the published asset pin valid; reverting to an artifact that predates `/sw.js` is not a recovery path for browsers with an installed Worker.
+### Pause a Service Worker feature
+
+Edit the individual switch in `scripts/vite-service-worker.ts` and publish a stable Pages candidate through the normal release gates.
+
+| Switch | Effect when disabled |
+|---|---|
+| `PUBLIC_ASSET_CACHE_ENABLED` | Images and fonts use ordinary HTTP requests. |
+| `ROOM_OFFLINE_RETRY_ENABLED` | Room document requests use ordinary browser navigation. |
+| `OFFLINE_ENCYCLOPEDIA_ENABLED` | Pages hides downloads and pauses offline reading. Saved copies stay in the browser. |
+
+Keep the same `/sw.js` URL and root scope. For emergency replacement, set `SERVICE_WORKER_EMERGENCY_TAKEOVER` to `true` in the same candidate. Once an online browser discovers and installs that build, the new Worker activates without reloading open pages or restarting their WebSockets. Reset the switch to `false` for subsequent normal releases. An installed Worker needs a valid replacement script at `/sw.js`.
+
+### Enable or pause browser notifications
+
+After stable Pages is serving `/sw.js`, configure `WEB_PUSH_VAPID_SUBJECT`, `WEB_PUSH_VAPID_PUBLIC_KEY`, and `WEB_PUSH_VAPID_PRIVATE_KEY` in the backend environment. Use an HTTPS or `mailto:` contact as the subject and keep the private key on the backend. Reuse the key pair across deployments so devices can keep their subscriptions.
+
+Set `WEB_PUSH_DRAFT_ENABLED=true`, `WEB_PUSH_INBOX_ENABLED=true`, or both to expose device opt-in and enable sending. Both switches default to `false`. Set the affected switch to `false` and restart the backend to pause that category. The stable Pages Worker continues to handle clicks on previously delivered notifications.
+
+On each supported device, opt in from the browser notification settings. On iOS, use the installed Home Screen app. Verify one draft notification and one inbox notification, then turn off each category independently. Check that clicking the inbox notification in an open room shows the exact message while the room connection stays active.
 
 The asset site limits requests per address, so several browser tasks run from one machine receive HTTP 429 for card art. For browser verification, serve the same pinned checkout from the development server:
 

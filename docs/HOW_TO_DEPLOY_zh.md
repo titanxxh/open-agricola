@@ -841,7 +841,25 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 缓存按 URL 和 SHA-256 跨应用版本复用已校验素材。未命中时用不带凭证的 CORS 请求重新验证。哈希不符的字节仍可供页面使用，Worker 跳过写入。常规激活等待受控页面退出，只清理自身缓存的旧条目。
 
-需要暂停缓存时，将 `scripts/vite-public-asset-worker.ts` 的 `PUBLIC_ASSET_CACHE_ENABLED` 设为 `false`，按正常发布门禁发布新的正式 Pages 候选。保持 `/sw.js` 的地址和作用域。浏览器安装并激活替换版本后恢复普通素材请求，已打开的标签页无需刷新。发布使用仍有效的素材 pin；缺少 `/sw.js` 的历史产物无法替换浏览器已有的 Worker。
+### 暂停单项 Service Worker 功能
+
+在 `scripts/vite-service-worker.ts` 修改对应开关，按正常发布门禁发布正式 Pages 候选。
+
+| 开关 | 关闭后的行为 |
+|---|---|
+| `PUBLIC_ASSET_CACHE_ENABLED` | 图片和字体恢复普通 HTTP 请求。 |
+| `ROOM_OFFLINE_RETRY_ENABLED` | 回房文档请求恢复普通浏览器导航。 |
+| `OFFLINE_ENCYCLOPEDIA_ENABLED` | Pages 隐藏下载入口并暂停离线阅读。浏览器保留已下载副本。 |
+
+保持 `/sw.js` 地址和根作用域。需要紧急接管时，在同一候选将 `SERVICE_WORKER_EMERGENCY_TAKEOVER` 设为 `true`。在线浏览器发现并安装该版本后会激活新 Worker，已打开的页面无需刷新，WebSocket 无需重连。后续常规发布将开关恢复为 `false`。已安装的 Worker 需要在 `/sw.js` 收到有效的替换脚本。
+
+### 启用或暂停浏览器通知
+
+正式 Pages 提供 `/sw.js` 后，在后端环境配置 `WEB_PUSH_VAPID_SUBJECT`、`WEB_PUSH_VAPID_PUBLIC_KEY` 和 `WEB_PUSH_VAPID_PRIVATE_KEY`。使用 HTTPS 地址或 `mailto:` 邮箱作为联系地址，将私钥留在后端。各次部署沿用同一对密钥，以保留设备订阅。
+
+将 `WEB_PUSH_DRAFT_ENABLED`、`WEB_PUSH_INBOX_ENABLED` 或两者设为 `true`，开放设备设置并启用发送。两个开关默认关闭。暂停某一类时，将对应开关设为 `false` 并重启后端。正式 Pages 的 Worker 继续处理此前已送达的通知点击。
+
+在每台支持的设备上通过浏览器通知设置开启。iOS 使用已安装到主屏幕的应用。各验证一次轮抽和站内信通知，再分别关闭两类通知。确认在已有房间中点击站内信通知能打开指定消息，对局连接保持有效。
 
 图片站按来源地址限流，同一台机器并行运行多个浏览器任务时，卡图请求会收到 HTTP 429。浏览器验收可让开发服务器直接提供同一个固定版本的 checkout：
 
