@@ -55,11 +55,21 @@ function draftAsset(binding: DraftBinding, bytes: Buffer, completedAt: number) {
   if (!uploaded.equals(bytes)) throw new Error('Existing owner-local receipt bytes differ; preserve the draft and inspect it')
   return { id, createdAt }
 }
-function verifyDraftStatus(binding: DraftBinding, digest: string, target: string, assetCreatedAt: number): void {
-  const latest = collection(binding.repository, `commits/${binding.sha}/statuses?per_page=100`)
+/** GitHub may list a just-created commit status a moment later; waits up to `STATUS_READBACK_ATTEMPTS` reads for it. */
+export const STATUS_READBACK_ATTEMPTS = 10
+const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+function newestOwnerStatus(binding: DraftBinding): Record<string, unknown> | undefined {
+  return collection(binding.repository, `commits/${binding.sha}/statuses?per_page=100`)
     .filter(status => status.context === (binding.channel === 'stable' ? OWNER_LOCAL_CONTEXT : PRERELEASE_OWNER_LOCAL_CONTEXT) && status.creator !== null && typeof status.creator === 'object'
       && 'id' in status.creator && status.creator.id === binding.ownerId).sort((a, b) => nativeId(b.id) - nativeId(a.id))[0]
-  if (!latest || latest.state !== 'success' || latest.target_url !== target || latest.description !== `owner-local sha256:${digest}`) throw new Error('Native owner-local authorization did not bind the prepared draft')
+}
+function verifyDraftStatus(binding: DraftBinding, digest: string, target: string, assetCreatedAt: number, createdId: number, pollMs: number): void {
+  let latest = newestOwnerStatus(binding)
+  for (let attempt = 1; attempt < STATUS_READBACK_ATTEMPTS && (!latest || nativeId(latest.id) < createdId); attempt++) {
+    pause(pollMs)
+    latest = newestOwnerStatus(binding)
+  }
+  if (!latest || nativeId(latest.id) < createdId || latest.state !== 'success' || latest.target_url !== target || latest.description !== `owner-local sha256:${digest}`) throw new Error('Native owner-local authorization did not bind the prepared draft')
   nativeId(latest.id)
   if (nativeTime(latest.created_at) < assetCreatedAt) throw new Error('Native owner-local status predates the prepared asset')
 }
@@ -87,7 +97,7 @@ function reconcilePublishedRelease(cwd: string, binding: DraftBinding, digest: s
   return publishedReleaseUrl(binding)
 }
 
-export function publishOwnerLocalRelease(cwd: string, selected: { version: string; repository: string; sha: string; path: string; channel?: 'stable' | 'prerelease' }): void {
+export function publishOwnerLocalRelease(cwd: string, selected: { version: string; repository: string; sha: string; path: string; channel?: 'stable' | 'prerelease'; pollMs?: number }): void {
   const { version, repository, sha, channel = 'stable' } = selected
   const admit = () => {
     if (channel === 'stable') return admitFinalSnapshot(cwd, repository, sha)
@@ -144,8 +154,9 @@ export function publishOwnerLocalRelease(cwd: string, selected: { version: strin
     }
     const url = `https://github.com/${repository}/releases/download/${version}/${OWNER_LOCAL_ASSET}`
     const asset = draftAsset(binding, bytes, Date.parse(receipt.completedAt))
-    api(repository, `statuses/${sha}`, 'POST', { state: 'success', context: channel === 'stable' ? OWNER_LOCAL_CONTEXT : PRERELEASE_OWNER_LOCAL_CONTEXT, description: `owner-local sha256:${digest}`, target_url: url })
-    verifyDraftStatus(binding, digest, url, asset.createdAt)
+    const created = object(api(repository, `statuses/${sha}`, 'POST', { state: 'success', context: channel === 'stable' ? OWNER_LOCAL_CONTEXT : PRERELEASE_OWNER_LOCAL_CONTEXT, description: `owner-local sha256:${digest}`, target_url: url }))
+    // Binding this run's own status also keeps an older, equal status from standing in for it.
+    verifyDraftStatus(binding, digest, url, asset.createdAt, nativeId(created.id), Math.min(selected.pollMs ?? 1000, 1000))
     if (draftAsset(binding, bytes, Date.parse(receipt.completedAt)).id !== asset.id) throw new Error('Owner-local draft receipt changed before publication')
     const final = admit()
     rebind(cwd, receipt, { repository, repositoryId: final.repositoryId, candidateSha: sha, producerSha: final.main })

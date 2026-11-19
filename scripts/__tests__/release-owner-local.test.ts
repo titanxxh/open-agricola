@@ -22,7 +22,7 @@ type NativeRelease = { id: number; tag_name: string; target_commitish: string; h
 type Status = { id: number; context: string; state: string; creator: Actor; target_url: string; description: string; created_at: string }
 type PublishResponseFailure = 'none' | 'response lost' | 'still draft' | 'wrong release' | 'wrong asset' | 'wrong owner' | 'wrong tag' | 'wrong digest' | 'wrong published URL' | 'unavailable'
 type FixtureState = { sha: string; version: string; owner: Actor; user: Actor; refs: Record<string, string>; release: NativeRelease | null;
-  assetBytes: string; statuses: Status[]; dropStatus: boolean; foreignStatus: boolean; foreignAsset: boolean; hideDraftByTag: boolean;
+  assetBytes: string; statuses: Status[]; dropStatus: boolean; statusReadLag: number; foreignStatus: boolean; foreignAsset: boolean; hideDraftByTag: boolean;
   wrongStatusField: 'target' | 'digest' | null; moveTagAfterStatus: boolean; preserveDraftAssetUrlOnPublish: boolean;
   publishResponseFailure: PublishResponseFailure; publishAttempted: boolean;
   releaseTime: string; assetTime: string; statusTime: string; publishedTime: string; provenance: Record<string, unknown> }
@@ -71,7 +71,7 @@ function fixture(rebound = false, channel: 'stable' | 'prerelease' = 'stable') {
   const policy = channel === 'stable' ? root : join(root, 'policy')
   if (channel === 'prerelease') git('worktree', 'add', '--detach', policy, mainSha)
   const version = channel === 'stable' ? 'v9.9.9' : 'v9.9.9-beta.1'
-  const state: FixtureState = { sha, version, owner, user: owner, refs: {}, release: null, assetBytes: '', statuses: [], dropStatus: false, foreignStatus: false, foreignAsset: false, hideDraftByTag: false,
+  const state: FixtureState = { sha, version, owner, user: owner, refs: {}, release: null, assetBytes: '', statuses: [], dropStatus: false, statusReadLag: 0, foreignStatus: false, foreignAsset: false, hideDraftByTag: false,
     wrongStatusField: null, moveTagAfterStatus: false, preserveDraftAssetUrlOnPublish: false,
     publishResponseFailure: 'none', publishAttempted: false,
     releaseTime: at(61), assetTime: at(62), statusTime: at(63), publishedTime: at(64),
@@ -114,11 +114,14 @@ if (method !== 'GET') {
   else if (endpoint === prefix + '/releases') state.release = { ...body, id: 11, author: state.owner, assets: [], created_at: state.releaseTime,
     published_at: null, html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/untagged-0123456789abcdef0123' };
   else if (endpoint === prefix + '/statuses/' + state.sha) {
-    if (!state.dropStatus) state.statuses.unshift({ ...body, id: 20 + state.statuses.length, created_at: state.statusTime,
+    const created = { ...body, id: 20 + state.statuses.length, created_at: state.statusTime,
       creator: state.foreignStatus ? { id: 8, login: 'collaborator', type: 'User' } : state.owner,
       ...(state.wrongStatusField === 'target' ? { target_url: 'https://evil.example/proof.json' } : {}),
-      ...(state.wrongStatusField === 'digest' ? { description: 'owner-local sha256:' + 'f'.repeat(64) } : {}) });
+      ...(state.wrongStatusField === 'digest' ? { description: 'owner-local sha256:' + 'f'.repeat(64) } : {}) };
+    // A dropped status answers like GitHub but is never listed.
+    if (!state.dropStatus) state.statuses.unshift(created);
     if (state.moveTagAfterStatus) state.refs['tags/' + state.version] = 'f'.repeat(40);
+    save(); output(created); process.exit(0);
   } else if (endpoint === prefix + '/releases/11' && method === 'PATCH') {
     state.publishAttempted = true;
     if (state.publishResponseFailure !== 'still draft') state.release = { ...state.release, ...body, published_at: state.publishedTime,
@@ -141,7 +144,10 @@ if (state.publishAttempted && state.publishResponseFailure === 'unavailable') { 
 if (endpoint === 'user') output(state.user);
 else if (endpoint === prefix) output({ id: 123, full_name: 'titanxxh/open-agricola', default_branch: 'main', owner: state.owner });
 else if (endpoint === prefix + '/commits/' + state.sha) output({ sha: state.sha });
-else if (endpoint === prefix + '/commits/' + state.sha + '/statuses?per_page=100') state.statuses.forEach(output);
+else if (endpoint === prefix + '/commits/' + state.sha + '/statuses?per_page=100') {
+  // GitHub can list a just-created status a moment later: hide the newest for statusReadLag reads.
+  if (state.statusReadLag > 0) { state.statusReadLag--; save(); state.statuses.slice(1).forEach(output); } else state.statuses.forEach(output);
+}
 else if (endpoint === prefix + '/releases?per_page=100') { if (state.release) output(state.release); }
 else if (endpoint === prefix + '/releases/11') { if (!state.release) absent(); output(state.release); }
 else if (endpoint === prefix + '/releases/assets/' + state.release?.assets[0]?.id) process.stdout.write(state.assetBytes);
@@ -243,6 +249,33 @@ describe('owner-local public release entry', () => {
     const result = value.run()
     expect(result.status, result.stderr).toBe(0)
     expect(JSON.parse(value.load().assetBytes)).toMatchObject({ testedSha: value.testedSha, candidateSha: value.sha })
+  })
+
+  it.each(['stable', 'prerelease'] as const)('waits for its own %s status to appear in the native list before publishing', channel => {
+    const value = fixture(false, channel); value.state.statusReadLag = 2; value.save()
+    const result = value.run()
+    expect(result.status, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout.trim().split('\n').at(-1)!)).toMatchObject({ status: 'published', channel })
+    const stored = value.load()
+    expect(stored.statusReadLag).toBe(0)
+    expect(stored.statuses).toHaveLength(1)
+    expect(value.events().filter(event => event.endpoint.endsWith(`/statuses/${value.sha}`))).toHaveLength(1)
+    expect(value.events().filter(event => event.method === 'PATCH')).toHaveLength(1)
+  })
+
+  it('does not let an older equal status stand in for the one this run created', () => {
+    const value = fixture(); value.state.dropStatus = true; value.save()
+    expect(value.run().status).not.toBe(0)
+    const interrupted = value.load()
+    // An earlier run's matching status is listed, but this run's newer status never appears.
+    const digest = createHash('sha256').update(interrupted.assetBytes).digest('hex')
+    interrupted.statuses = [{ id: 5, context: 'owner-local-verification', state: 'success', creator: interrupted.owner, created_at: interrupted.statusTime,
+      target_url: 'https://github.com/titanxxh/open-agricola/releases/download/v9.9.9/owner-local-verification.json', description: `owner-local sha256:${digest}` }]
+    writeFileSync(join(value.root, 'state.json'), JSON.stringify(interrupted))
+    const failed = value.run()
+    expect(failed.status).not.toBe(0)
+    expect(failed.stderr).toContain('Native owner-local authorization did not bind the prepared draft')
+    expect(value.load().release?.draft).toBe(true)
   })
 
   it('keeps its draft unpublished when native authorization is missing, then resumes without replacing the asset', () => {
