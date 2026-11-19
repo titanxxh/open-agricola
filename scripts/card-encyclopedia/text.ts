@@ -20,12 +20,19 @@ const joinWith = (parts: readonly EncyclopediaText[], separator: EncyclopediaTex
 const joinLines = (lines: readonly EncyclopediaText[]): EncyclopediaText => joinWith(lines, NEWLINE)
 
 /** Same language-pack face fields the card face renders through `cardText`. */
-export const cardTexts = (card: Pick<CardDefinition, 'id' | 'rules' | 'prerequisite'>): EncyclopediaTexts => ({
-  name: [{ key: `cardFaces.${card.id}.name` }],
-  body: [{ key: `cardFaces.${card.id}.description` }],
-  ...(card.rules?.some((line) => line.trim()) ? { rules: [{ key: `cardFaces.${card.id}.rules` }] } : {}),
-  ...(card.prerequisite?.trim() ? { prerequisite: [{ key: `cardFaces.${card.id}.prerequisite` }] } : {}),
-})
+export const cardTexts = (
+  card: Pick<CardDefinition, 'id' | 'name' | 'desc' | 'rules' | 'prerequisite'>,
+  sourceFallback = false,
+): EncyclopediaTexts => {
+  const faceField = (field: string, source?: string): EncyclopediaText =>
+    [{ key: `cardFaces.${card.id}.${field}`, ...(sourceFallback && source ? { fallback: source } : {}) }]
+  return {
+    name: faceField('name', card.name),
+    body: faceField('description', card.desc.join('\n')),
+    ...(card.rules?.some((line) => line.trim()) ? { rules: faceField('rules', card.rules.join('\n')) } : {}),
+    ...(card.prerequisite?.trim() ? { prerequisite: faceField('prerequisite', card.prerequisite) } : {}),
+  }
+}
 
 export const parentTexts = (card: ParentCardDefinition): EncyclopediaTexts => ({
   name: [{ key: `ui.parentCard.${card.kind}` }, { literal: ` ${card.id}` }],

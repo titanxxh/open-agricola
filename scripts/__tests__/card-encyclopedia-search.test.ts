@@ -11,6 +11,26 @@ const pick = (...keys: string[]) => keys.map((key) => {
 })
 
 describe('encyclopedia search documents from injected languages', () => {
+  it('indexes the source English face when a classic card has no English pack entry', () => {
+    const classic = buildEncyclopediaEntries(loadEncyclopediaSources(true))
+      .find((entry) => entry.sourceId === 'CE203_Shepherd')
+    if (!classic) throw new Error('missing CE203_Shepherd')
+    const [shepherd] = buildSearchDocuments([classic], [
+      { id: 'en', messages: { 'resources.sheep': 'Sheep' }, ownKeys: new Set() },
+      {
+        id: 'zh',
+        messages: { 'cardFaces.CE203_Shepherd.name': '牧羊人' },
+        ownKeys: new Set(['occupations.CE203_Shepherd.name']),
+      },
+    ])
+
+    expect(shepherd.identifiers).toEqual(['CE203_Shepherd', 'CE203'])
+    expect(shepherd.locales.en.name).toEqual({ text: 'Shepherd', status: 'localized' })
+    expect(shepherd.locales.en.body?.text).toContain('at least 4 Sheep')
+    expect(shepherd.locales.zh.name).toEqual({ text: '牧羊人', status: 'localized' })
+    expect(shepherd.locales.zh.body?.status).toBe('fallback')
+  })
+
   const english: Record<string, string> = {
     'cardFaces.C057_Crudite.name': 'Crudité',
     'cardFaces.C057_Crudite.description': '[Anytime] Buy 1 <VEGETABLE> <ARROW> 3 <FOOD>.',

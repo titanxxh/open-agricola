@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CLASSIC_EDITION_ENABLED } from '../shared/contract/card-edition'
 import { writeCardEncyclopedia } from './card-encyclopedia/artifacts'
 import { buildEncyclopediaEntries } from './card-encyclopedia/catalog'
 import { buildSearchDocuments, loadEncyclopediaLanguages } from './card-encyclopedia/search'
@@ -7,10 +8,10 @@ import { loadEncyclopediaSources } from './card-encyclopedia/sources'
 import { buildActionReferences } from './build-action-references'
 
 /** Runs after `prepare-language-packs`, which provides the pinned packs and their source dictionaries. */
-export function buildCardEncyclopedia(root = resolve('.')) {
+export function buildCardEncyclopedia(root = resolve('.'), classicEditionEnabled = CLASSIC_EDITION_ENABLED) {
   buildActionReferences(root)
   const languages = loadEncyclopediaLanguages(root)
-  const entries = buildEncyclopediaEntries(loadEncyclopediaSources())
+  const entries = buildEncyclopediaEntries(loadEncyclopediaSources(classicEditionEnabled))
   const manifest = writeCardEncyclopedia({
     outputDir: resolve(root, 'public/card-encyclopedia'),
     entries,

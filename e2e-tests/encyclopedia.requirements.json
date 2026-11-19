@@ -22,6 +22,7 @@
     {"file":"e2e-tests/encyclopedia-faces.spec.ts","titlePath":["encyclopedia mobile 390x844","D2 shows moor special action, starting terrain and season faces in the gallery"],"project":"chromium","browser":"chromium"},
     {"file":"e2e-tests/encyclopedia-faces.spec.ts","titlePath":["encyclopedia mobile 390x844","D2 shows each special face with its printed details in the entry detail"],"project":"chromium","browser":"chromium"},
     {"file":"e2e-tests/encyclopedia-faces.spec.ts","titlePath":["encyclopedia mobile 390x844","E1 falls back to text faces when special card art is missing"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/encyclopedia-filters.spec.ts","titlePath":["encyclopedia desktop 1400x1000","D1 follows the Classic switch and opens a filtered classic card face"],"project":"chromium","browser":"chromium"},
     {"file":"e2e-tests/encyclopedia-filters.spec.ts","titlePath":["encyclopedia desktop 1400x1000","F1 combines deck, printed cost, type and points filters and clearing restores the catalog"],"project":"chromium","browser":"chromium"},
     {"file":"e2e-tests/encyclopedia-filters.spec.ts","titlePath":["encyclopedia desktop 1400x1000","F2 finds a card through either printed cost and never reads a missing cost as free"],"project":"chromium","browser":"chromium"},
     {"file":"e2e-tests/encyclopedia-filters.spec.ts","titlePath":["encyclopedia desktop 1400x1000","F3 keeps negative decimal bounds, unlisted points and bonus marks apart"],"project":"chromium","browser":"chromium"},

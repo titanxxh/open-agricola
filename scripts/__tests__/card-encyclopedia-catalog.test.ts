@@ -27,10 +27,33 @@ const publishedIdentities: Record<EncyclopediaSourceKind, string[]> = {
   scan: unique(SCAN_CARDS.map((card) => card.id)),
 }
 
-const sources = loadEncyclopediaSources()
+const sources = loadEncyclopediaSources(false)
 const entries = buildEncyclopediaEntries(sources)
 
 describe('card encyclopedia catalog membership (D1)', () => {
+  it('adds a classic group with printed deck numbers only when enabled', () => {
+    const enabled = buildEncyclopediaEntries(loadEncyclopediaSources(true))
+    const classic = enabled.filter((entry) => entry.group === 'classic')
+
+    expect(entries.some((entry) => entry.group === 'classic')).toBe(false)
+    expect(classic).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: 'CE203_Shepherd',
+        classicDeck: 'CE',
+        displayNumber: 'CE203',
+        face: { kind: 'card', cardId: 'CE203_Shepherd', cardType: 'occupation' },
+      }),
+      expect.objectContaining({
+        sourceId: 'CI097_Slaughterhouse',
+        classicDeck: 'CI',
+        displayNumber: 'CI097',
+        face: { kind: 'card', cardId: 'CI097_Slaughterhouse', cardType: 'minor' },
+      }),
+    ]))
+    expect(JSON.stringify(enabled.filter((entry) => entry.group !== 'classic'))).toBe(JSON.stringify(entries))
+    expect(enabled.slice(entries.length)).toEqual(classic)
+  })
+
   it.each(Object.entries(publishedIdentities))('lists exactly the published %s identities', (kind, expected) => {
     expect(expected.length).toBeGreaterThan(0)
     expect(unique(entries.filter((entry) => entry.sourceKind === kind).map((entry) => entry.sourceId))).toEqual(expected)

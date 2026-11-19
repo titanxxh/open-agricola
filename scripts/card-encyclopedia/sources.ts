@@ -1,7 +1,9 @@
 import { catalogCardDefinitions } from '../../shared/cards/catalog.generated'
+import { classicCardDefinitions } from '../../shared/cards/classic-catalog.generated'
 import { majorCardDefinitionsList } from '../../shared/cards/major/generated'
 import { sixPlayerDuplicateMajorImprovementIds, standardMajorImprovementIds } from '../../shared/cards/major/supply'
 import type { MajorCardDisplay } from '../../shared/cards/major/types'
+import { CLASSIC_EDITION_ENABLED } from '../../shared/contract/card-edition'
 import type { CardDefinition } from '../../shared/contract/cards'
 import { moorSpecialActionCardDefinitions } from '../../shared/moor/special-action-cards'
 import { moorStartCards, type MoorStartCardDefinition } from '../../shared/moor/start-cards'
@@ -16,6 +18,7 @@ export type MoorSpecialActionCardSource = (typeof moorSpecialActionCardDefinitio
 /** Production definitions only; nothing here runs a Card Impl. */
 export type EncyclopediaSources = {
   readonly ordinaryCards: readonly OrdinaryCardSource[]
+  readonly classicCards: readonly OrdinaryCardSource[]
   readonly majorCards: readonly MajorCardSource[]
   readonly baseMajorIds: readonly string[]
   readonly fiveSixMajorIds: readonly string[]
@@ -26,8 +29,9 @@ export type EncyclopediaSources = {
   readonly scanCards: readonly ScanCard[]
 }
 
-export const loadEncyclopediaSources = (): EncyclopediaSources => ({
+export const loadEncyclopediaSources = (classicEditionEnabled = CLASSIC_EDITION_ENABLED): EncyclopediaSources => ({
   ordinaryCards: catalogCardDefinitions,
+  classicCards: classicEditionEnabled ? classicCardDefinitions : [],
   majorCards: majorCardDefinitionsList,
   baseMajorIds: standardMajorImprovementIds,
   fiveSixMajorIds: sixPlayerDuplicateMajorImprovementIds,

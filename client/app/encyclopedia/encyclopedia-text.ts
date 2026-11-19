@@ -1,6 +1,7 @@
 import type { EncyclopediaTextField, EncyclopediaTextStatus } from '../../../shared/contract/card-encyclopedia'
 import { t, type Locale } from '../../../shared/i18n'
 import { resolveEncyclopediaText } from '../../../shared/projections/card-encyclopedia-text'
+import { normalizeClassicCardTextIcons } from '../../../shared/projections/card-text-icons'
 import type { EncyclopediaItem } from './encyclopedia-item'
 
 export type EncyclopediaFieldText = Readonly<{
@@ -19,5 +20,6 @@ export const encyclopediaFieldText = (
   if (!parts) return undefined
   const status = document.locales[locale]?.[field]?.status ?? 'localized'
   if (status === 'missing') return { text: '', status }
-  return { text: resolveEncyclopediaText(parts, (key, params) => t(locale, key, params)), status }
+  const text = resolveEncyclopediaText(parts, (key, params) => t(locale, key, params))
+  return { text: entry.group === 'classic' ? normalizeClassicCardTextIcons(text) : text, status }
 }

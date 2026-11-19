@@ -220,12 +220,14 @@ describe('encyclopediaFilterOptions', () => {
   it('offers the options the catalog uses, in option order', () => {
     expect(encyclopediaFilterOptions(CATALOG)).toEqual({
       groups: ['A', 'B', 'C', 'majorStandard', 'parents', 'moor', 'seasons'],
+      classicDecks: [],
       types: ['minor', 'occupation', 'major', 'mother', 'father', 'moorSpecialAction', 'moorStart', 'season'],
       costResources: ['wood', 'clay', 'reed', 'stone', 'food', 'grain'],
       upgradeReturn: true,
     })
     expect(encyclopediaFilterOptions([itemFor(PAPER_KNIFE), itemFor(HOMEKEEPER)])).toEqual({
       groups: ['A'],
+      classicDecks: [],
       types: ['minor', 'occupation'],
       costResources: ['wood'],
       upgradeReturn: false,

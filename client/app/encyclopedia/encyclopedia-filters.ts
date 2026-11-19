@@ -16,6 +16,7 @@ export type EncyclopediaCostResource = typeof PAYMENT_RESOURCE_KEYS[number]
  */
 export type EncyclopediaFilters = Readonly<{
   groups: readonly EncyclopediaGroup[]
+  classicDecks?: readonly string[]
   types: readonly EncyclopediaPublicType[]
   /** Printed payment data only; the return-a-card upgrade is a separate option of the same group. */
   cost: Readonly<{ resources: readonly EncyclopediaCostResource[]; upgradeReturn: boolean }>
@@ -39,6 +40,7 @@ export const ENCYCLOPEDIA_FILTER_TYPES = [
 
 export type EncyclopediaFilterOptions = Readonly<{
   groups: readonly EncyclopediaGroup[]
+  classicDecks: readonly string[]
   types: readonly EncyclopediaPublicType[]
   costResources: readonly EncyclopediaCostResource[]
   upgradeReturn: boolean
@@ -55,10 +57,12 @@ const printedResources = ({ cost }: EncyclopediaEntry): EncyclopediaCostResource
 /** Only options some entry of the catalog can match. */
 export function encyclopediaFilterOptions(items: readonly EncyclopediaItem[]): EncyclopediaFilterOptions {
   const groups = new Set(items.map(({ entry }) => entry.group))
+  const classicDecks = new Set(items.flatMap(({ entry }) => entry.classicDeck ? [entry.classicDeck] : []))
   const types = new Set<EncyclopediaPublicType>(items.map(({ entry }) => entry.publicType))
   const resources = new Set(items.flatMap(({ entry }) => printedResources(entry)))
   return {
     groups: ENCYCLOPEDIA_GROUPS.filter(group => groups.has(group)),
+    classicDecks: [...classicDecks].sort(),
     types: ENCYCLOPEDIA_FILTER_TYPES.filter(type => types.has(type)),
     costResources: PAYMENT_RESOURCE_KEYS.filter(resource => resources.has(resource)),
     upgradeReturn: items.some(({ entry }) => returnsCards(entry)),
@@ -88,6 +92,7 @@ export const filterEncyclopedia = (
   filters: EncyclopediaFilters,
 ): readonly EncyclopediaItem[] => items.filter(({ entry }) =>
   anyOf(filters.groups, group => entry.group === group)
+  && (entry.group !== 'classic' || anyOf(filters.classicDecks ?? [], deck => entry.classicDeck === deck))
   && anyOf(filters.types, type => entry.publicType === type)
   && matchesCost(entry, filters.cost)
   && matchesPoints(entry, filters.points)
@@ -109,8 +114,13 @@ export function normalizeEncyclopediaFilters(value: unknown): EncyclopediaFilter
   const fields = fieldsOf(value)
   const cost = fieldsOf(fields.cost)
   const points = fieldsOf(fields.points)
+  const groups = optionsOf(ENCYCLOPEDIA_GROUPS, fields.groups)
+  const classicDecks = groups.includes('classic') && Array.isArray(fields.classicDecks)
+    ? [...new Set(fields.classicDecks.filter((deck): deck is string => typeof deck === 'string' && /^C[A-Z]+$/.test(deck)))].sort()
+    : []
   return {
-    groups: optionsOf(ENCYCLOPEDIA_GROUPS, fields.groups),
+    groups,
+    ...(classicDecks.length > 0 ? { classicDecks } : {}),
     types: optionsOf(ENCYCLOPEDIA_FILTER_TYPES, fields.types),
     cost: { resources: optionsOf(PAYMENT_RESOURCE_KEYS, cost.resources), upgradeReturn: cost.upgradeReturn === true },
     points: { min: boundOf(points.min), max: boundOf(points.max), unlisted: points.unlisted === true },

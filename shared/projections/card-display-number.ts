@@ -35,3 +35,5 @@ export const officialCardDeck = (cardId: string): string | undefined => {
   if (moorMajorDisplayNumber(cardId)) return 'M'
   return OFFICIAL_CARD_ID.exec(cardId)?.[1]
 }
+
+export const classicCardDeck = (cardId: string): string | undefined => CLASSIC_CARD_ID.exec(cardId)?.[1]

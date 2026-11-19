@@ -1,3 +1,6 @@
+import { classicCardDeck } from '../projections/card-display-number'
+import { normalizeClassicCardTextIcons } from '../projections/card-text-icons'
+
 export type Locale = string
 export type TranslationParams = Readonly<Record<string, string | number>>
 export type LanguagePack = Readonly<{
@@ -81,9 +84,12 @@ export function cardText(locale: Locale, id: string, source?: CardTextSource) {
   const translated = source?.locales?.[locale]
   const lines = (value: readonly string[] | undefined) => value?.join('\n').trim() ? value.join('\n') : undefined
   const custom = source?.authored === true || !messages?.[`cardFaces.${id}.name`]
-  const field = (name: string, authored?: string, english = '') => custom
-    ? authored?.trim() ? authored : english
-    : messages?.[`cardFaces.${id}.${name}`] ?? ''
+  const classic = classicCardDeck(id) !== undefined
+  const field = (name: string, authored?: string, english = '') => {
+    const localized = custom ? authored : messages?.[`cardFaces.${id}.${name}`]
+    const text = (custom || classic) && !localized?.trim() ? english : localized ?? ''
+    return classic ? normalizeClassicCardTextIcons(text) : text
+  }
   return {
     name: field('name', translated?.name, source?.name ?? id),
     description: field('description', lines(translated?.desc), source?.desc?.join('\n')),
