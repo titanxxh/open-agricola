@@ -21,6 +21,7 @@ it('opens only with fresh target-bound proof that still matches the deployed Pag
   const scope = { targetId: 'prerelease-test', targetFingerprint: 'e'.repeat(64), origin: 'https://pre.agricola.test',
     buildId: 'a'.repeat(40), generation: 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', operationId: 'cb4d6c82-676f-4dcc-a570-52377b3b32f5' }
   try {
+    fixture.state.identityBoundary = 'a'.repeat(64)
     const deployment = await readFormalBrowserDeployment(fixture.formal, { ca: fixture.ca })
     const proof = { format: 1, ...scope, observedAt: Date.now(), deployment }
     expect(await verifyFormalBrowserAcceptance(fixture.formal, proof, scope, { ca: fixture.ca })).toEqual(deployment)
@@ -29,6 +30,11 @@ it('opens only with fresh target-bound proof that still matches the deployed Pag
       await expect(verifyFormalBrowserAcceptance(fixture.formal, { ...proof, ...changed }, scope, { ca: fixture.ca })).rejects.toThrow('different or expired')
     }
     await expect(verifyFormalBrowserAcceptance(fixture.formal, { ...proof, deployment: { ...deployment, pages: { ...deployment.pages, entrySha256: 'f'.repeat(64) } } }, scope, { ca: fixture.ca })).rejects.toThrow('changed after acceptance')
+    fixture.state.identityBoundary = 'b'.repeat(64)
+    await expect(verifyFormalBrowserAcceptance(fixture.formal, proof, scope, { ca: fixture.ca })).rejects.toThrow('changed after acceptance')
+    fixture.state.identityBoundary = 'invalid'
+    await expect(readBrowserAuthPolicy(fixture.formal, { ca: fixture.ca })).rejects.toThrow('Invalid formal identity boundary')
+    fixture.state.identityBoundary = 'a'.repeat(64)
     fixture.state.buildId = fixture.state.pagesBuildId = 'c'.repeat(40)
     await expect(verifyFormalBrowserAcceptance(fixture.formal, proof, scope, { ca: fixture.ca })).rejects.toThrow('changed after acceptance')
   } finally { await fixture.close() }

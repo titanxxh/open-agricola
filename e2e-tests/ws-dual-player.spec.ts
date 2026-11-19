@@ -91,8 +91,8 @@ test.describe('WS dual-player sync', () => {
         await expect(waiting).toHaveText('Waiting for zero21 to act')
         await expect(waiting).toHaveAttribute('data-player-color', 'blue')
         await expect(responder.locator('.header-compact .your-turn')).toBeVisible()
-        await expect(observer).toHaveTitle('◢ Open Agricola')
-        await expect(responder).toHaveTitle('Open Agricola')
+        await expect(observer).toHaveTitle('Open Agricola')
+        await expect(responder).toHaveTitle('◢ Open Agricola')
         await expect(observer.locator('[data-action-id="forest"] button').first()).toBeDisabled()
         await observer.screenshot({ path: testInfo.outputPath('waiting-for-reaction.png') })
 
@@ -109,6 +109,8 @@ test.describe('WS dual-player sync', () => {
         await confirm.click()
         await expect(observer.locator('.header-compact .your-turn')).toBeVisible()
         await expect(responder.locator('.header-compact .waiting-turn')).toHaveText('Waiting for xxh to act')
+        await expect(observer).toHaveTitle('◢ Open Agricola')
+        await expect(responder).toHaveTitle('Open Agricola')
       } finally { session.dispose(); await context.close() }
     })
   }

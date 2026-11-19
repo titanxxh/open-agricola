@@ -8,6 +8,7 @@ import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { targetFingerprint, parsePrereleaseTarget } from '../prerelease/config'
 import { readRuntime, writeRuntime, renderCompose } from '../prerelease/runtime'
 import type { OperationRequest } from '../prerelease/flow'
+import { sourceReleaseDirectory } from '../prerelease/source-release-path'
 import { afterEach, expect, it } from 'vitest'
 
 const roots: string[] = []
@@ -336,7 +337,7 @@ esac
 })
 
 
-function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNetwork?: string) {
+function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNetwork?: string, interruptAtStartup = true) {
   const value = fixture(proxyNetwork), target = parsePrereleaseTarget(value.config)
   const buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   const image = `sha256:${'e'.repeat(64)}`, sourceBuildId = sameBuild ? buildId : 'a'.repeat(40)
@@ -348,6 +349,9 @@ function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNet
   expect(value.invoke('initialize', '--expected-current', 'empty', '--generation', generation).status).toBe(0)
   const state = () => readRuntime(target)
   const containerImage = join(value.temporary, 'container-image'), containerState = join(value.temporary, 'container-state')
+  const containerMounts = join(value.temporary, 'container-mounts'), liveBuild = join(value.temporary, 'live-build')
+  writeFileSync(containerMounts, '[]')
+  writeFileSync(liveBuild, sourceBuildId)
   writeFileSync(containerState, '{"Running":false,"OOMKilled":false,"ExitCode":0}')
   if (sourceInstalled) {
     writeRuntime(target, { ...state(), mode: 'open', buildId: sourceBuildId,
@@ -386,7 +390,7 @@ case "$*" in
   *'{{.Image}}'*) cat '${containerImage}';;
   *'com.docker.compose.project'*) if [ -f '${value.temporary}/container-project' ]; then cat '${value.temporary}/container-project'; else printf '${target.project}'; fi;;
   *'{{json .Config}}'*) printf '{"User":"1000:1000"}';;
-  *'{{json .Mounts}}'*) printf '[]';;
+  *'{{json .Mounts}}'*) cat '${containerMounts}';;
   'image inspect --format {{json .Config.Labels}}'*)
     case "$*" in *'${policyImage}'*) channel=stable;; *) channel=prerelease;; esac
     printf '{"org.opencontainers.image.revision":"${buildId}","io.open-agricola.release-channel":"%s"}' "$channel";;
@@ -396,9 +400,12 @@ case "$*" in
     case "$*" in *'${policyImage}'*) channel=stable;; *) channel=prerelease;; esac
     printf '{"format":1,"gameBuildId":"${buildId}","basePath":"/open-agricola/","releaseChannel":"%s","deploymentTarget":"%s-hosted"}' "$channel" "$channel";;
   *' up -d --no-build --wait --wait-timeout 120 app')
-    [ ! -f '${value.temporary}/startup-fail' ] || exit 43
-    printf '${image}' > '${containerImage}';;
-  *' exec -T app node '*) printf '{"buildId":"${buildId}","channel":"prerelease","generation":"${generation}"}';;
+    node -e 'const fs=require("node:fs"), app=require(process.argv[1]).services.app;
+      if (fs.existsSync(process.argv[5]) && ["",app.environment.GAME_BUILD_ID].includes(fs.readFileSync(process.argv[5],"utf8"))) process.exit(43);
+      fs.writeFileSync(process.argv[2],app.image);fs.writeFileSync(process.argv[3],app.environment.GAME_BUILD_ID);
+      fs.writeFileSync(process.argv[4],JSON.stringify(app.volumes.filter(v=>v.target==="/app").map(v=>({Type:v.type,RW:!v.read_only,Destination:v.target,Source:v.source}))))' \
+      '${join(value.root, 'control/compose.json')}' '${containerImage}' '${liveBuild}' '${containerMounts}' '${value.temporary}/startup-fail';;
+  *' exec -T app node '*) printf '{"buildId":"%s","channel":"prerelease","generation":"${generation}"}' "$(cat '${liveBuild}')";;
 esac
 `, { mode: 0o700 })
   const invoke = () => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
@@ -408,13 +415,146 @@ esac
         configuration: 'e'.repeat(64), producerConfiguration: 'f'.repeat(64), tasks: FULL_TASK_IDS.map((id, index) => ({ id, status: 'passed', runId: 1, jobId: index + 1 })) } }),
     encoding: 'utf8', timeout: 30000, env: { ...value.env, SSH_CONNECTION: 'owner fixture' },
   })
-  writeFileSync(join(value.temporary, 'startup-fail'), '')
-  const interrupted = invoke()
-  expect(interrupted.status, interrupted.stderr).not.toBe(0)
-  expect(state()).toMatchObject({ mode: 'maintenance', buildId, operation: { stage: 'startup', id: operationId } })
-  rmSync(join(value.temporary, 'startup-fail'))
+  if (interruptAtStartup) {
+    writeFileSync(join(value.temporary, 'startup-fail'), '')
+    const interrupted = invoke()
+    expect(interrupted.status, interrupted.stderr).not.toBe(0)
+    expect(state()).toMatchObject({ mode: 'maintenance', buildId, operation: { stage: 'startup', id: operationId } })
+    rmSync(join(value.temporary, 'startup-fail'))
+  }
   return { ...value, invoke, state, sourceImage, image, containerImage, containerState, generation, operationId, authorityFile }
 }
+
+function seedPreparedSource(target: ReturnType<typeof parsePrereleaseTarget>, sha: string, image: string, runtimeDigest: string) {
+  const app = sourceReleaseDirectory(target, sha)
+  mkdirSync(join(app, 'frontend-dist'), { recursive: true })
+  writeFileSync(join(app, 'frontend-dist/frontend-build.json'), JSON.stringify({
+    format: 1, basePath: '/open-agricola/', gameBuildId: sha, releaseChannel: 'prerelease', deploymentTarget: 'prerelease-hosted' }), { mode: 0o600 })
+  writeFileSync(join(app, '../receipt.json'), JSON.stringify({ format: 1, targetFingerprint: targetFingerprint(target), buildId: sha, image, runtimeDigest }), { mode: 0o600 })
+  return app
+}
+
+function preparedSourceFixture(previousSource = false) {
+  const host = startupRetryFixture(true, false, undefined, false), target = parsePrereleaseTarget(host.config)
+  const buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const from = 'a'.repeat(40), runtimeDigest = `sha256:${'2'.repeat(64)}`
+  const directory = seedPreparedSource(target, buildId, host.image, runtimeDigest)
+  if (previousSource) {
+    const app = seedPreparedSource(target, from, host.image, runtimeDigest), state = host.state()
+    writeRuntime(target, { ...state, installed: { image: host.image, runtimeDigest, buildId: from, installedAt: Date.now() } })
+    writeFileSync(host.containerImage, host.image)
+    writeFileSync(join(host.temporary, 'container-mounts'), JSON.stringify([{ Source: app, Destination: '/app', Type: 'bind', RW: false }]))
+  }
+  const run = (action: 'backup-source' | 'deploy-source' | 'rollback-source' | 'open-rollback-source', scope: 'routine' | 'full' = 'routine') =>
+    spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
+      input: JSON.stringify({ policySha: buildId, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(target), target,
+        receipt: { kind: 'prerelease-source', scope, sha: buildId, from, producer: buildId, runId: scope === 'full' ? null : 5, attempt: scope === 'full' ? null : 1 },
+        request: { action, expectedCurrent: action === 'rollback-source' ? buildId : from, operationId: host.operationId,
+          authorityFile: host.authorityFile, buildId: action === 'open-rollback-source' ? from : buildId, generation: host.generation } }),
+      encoding: 'utf8', timeout: 30000, env: { ...host.env, SSH_CONNECTION: 'owner fixture' } })
+  return { host, target, from, buildId, directory, runtimeDigest, run }
+}
+
+it('validates the online backup using the prepared tree before draining the prior writer, then installs and verifies the source mount', () => {
+  const { host, from, buildId, directory, runtimeDigest, run } = preparedSourceFixture()
+  const early = run('deploy-source')
+  expect(early.status).not.toBe(0)
+  expect(early.stderr).toContain('online backup')
+  expect(host.state().mode).toBe('open')
+  const before = run('backup-source')
+  expect(before.status, before.stderr).toBe(0)
+  expect(host.state()).toMatchObject({ mode: 'open', buildId: from, operation: { stage: 'prepared', runtimeDigest } })
+  expect(host.calls()).not.toContain('stop --timeout 90 app')
+  const readCompose = () => JSON.parse(readFileSync(join(host.root, 'control/compose.json'), 'utf8')).services
+  const volume = { source: directory, target: '/app', read_only: true, type: 'bind', bind: { create_host_path: false } }
+  expect(readCompose().tools.volumes).toContainEqual(volume)
+  expect(readCompose().migrate.volumes).toContainEqual(volume)
+  expect(readCompose().app.volumes).not.toContainEqual(volume)
+  expect(readCompose().capture.volumes).not.toContainEqual(volume)
+  const after = run('deploy-source')
+  expect(after.status, after.stderr).toBe(0)
+  expect(host.state()).toMatchObject({ mode: 'maintenance', installed: { buildId, runtimeDigest, image: host.image }, operation: { stage: 'acceptance' } })
+  expect(readCompose().app.volumes).toContainEqual(volume)
+  expect(readCompose().app.environment).toMatchObject({
+    PUBLIC_APP_ORIGIN: host.config.origin + '/open-agricola/', PUBLIC_API_BASE: host.config.origin, CORS_ORIGIN: host.config.origin,
+  })
+  expect(readCompose().capture.volumes).toContainEqual(volume)
+  const calls = host.calls()
+  const retry = run('deploy-source')
+  expect(retry.status, retry.stderr).toBe(0)
+  expect(host.calls().slice(calls.length)).not.toContain('stop --timeout 90 app')
+})
+
+it('refuses to drain for a prepared restore point that retention has removed', () => {
+  const { host, run } = preparedSourceFixture()
+  const prepared = run('backup-source')
+  expect(prepared.status, prepared.stderr).toBe(0)
+  const stem = host.state().operation?.backupStem
+  rmSync(join(host.root, 'backups', `${stem}.tgz`))
+  const calls = host.calls()
+  const expired = run('deploy-source')
+  expect(expired.status).not.toBe(0)
+  expect(host.calls().slice(calls.length)).not.toContain('stop --timeout 90 app')
+  expect(host.state().mode).toBe('open')
+})
+
+it('restarts the previous image installation after a compatible source startup failure and keeps public admission closed across retries', () => {
+  const { host, buildId, from, run } = preparedSourceFixture()
+  const before = run('backup-source')
+  expect(before.status, before.stderr).toBe(0)
+  writeFileSync(join(host.temporary, 'startup-fail'), buildId)
+  const failed = run('deploy-source')
+  expect(failed.status).not.toBe(0)
+  expect(failed.stderr).toContain(`restored ${from} in maintenance`)
+  expect(host.state()).toMatchObject({ mode: 'maintenance', acceptance: null, installed: { buildId: from, image: host.sourceImage },
+    operation: { kind: 'rollback', stage: 'acceptance', sourceBuildId: buildId } })
+  expect(host.state().installed).not.toHaveProperty('runtimeDigest')
+  const retry = run('rollback-source')
+  expect(retry.status, retry.stderr).toBe(0)
+  expect(host.state().mode).toBe('maintenance')
+})
+
+it('rolls back a failed private acceptance to the exact source mount even when both revisions use the same image', () => {
+  const { host, buildId, from, target, runtimeDigest, run } = preparedSourceFixture(true)
+  for (const action of ['backup-source', 'deploy-source', 'rollback-source'] as const) {
+    const result = run(action)
+    expect(result.status, result.stderr).toBe(0)
+  }
+  expect(host.state()).toMatchObject({ mode: 'maintenance', installed: { buildId: from, runtimeDigest, image: host.image },
+    operation: { kind: 'rollback', stage: 'acceptance', sourceBuildId: buildId } })
+  expect(JSON.parse(readFileSync(join(host.temporary, 'container-mounts'), 'utf8')))
+    .toContainEqual({ Source: sourceReleaseDirectory(target, from), Destination: '/app', Type: 'bind', RW: false })
+  expect(run('open-rollback-source', 'full').stderr).toContain('Source recovery proof does not match')
+  expect(run('open-rollback-source').stderr).toContain('Complete target acceptance is required')
+  expect(host.state().mode).toBe('maintenance')
+})
+
+it('restores the previous installation when the source candidate exhausted memory before admission', () => {
+  const { host, target, run, from } = preparedSourceFixture(true)
+  for (const action of ['backup-source', 'deploy-source'] as const) {
+    const ready = run(action)
+    expect(ready.status, ready.stderr).toBe(0)
+  }
+  const crashed = host.state()
+  if (!crashed.operation) throw new Error('Expected a pending deployment')
+  writeRuntime(target, { ...crashed, operation: { ...crashed.operation, stage: 'startup' } })
+  writeFileSync(host.containerState, JSON.stringify({ Running: false, OOMKilled: true, ExitCode: 137 }))
+  const restored = run('rollback-source')
+  expect(restored.status, restored.stderr).toBe(0)
+  expect(host.state()).toMatchObject({ mode: 'maintenance', installed: { buildId: from }, operation: { kind: 'rollback', stage: 'acceptance' } })
+})
+
+it('preserves the recovery point after an incompatible migration followed by a failed startup', () => {
+  const { host, buildId, run } = preparedSourceFixture()
+  writeFileSync(join(host.temporary, 'startup-fail'), buildId)
+  const failed = run('deploy-source', 'full')
+  expect(failed.status).not.toBe(0)
+  expect(failed.stderr).toContain(`Recovery point: pre-${host.operationId}`)
+  const rollback = run('rollback-source')
+  expect(rollback.status).not.toBe(0)
+  expect(rollback.stderr).toContain('incompatible')
+  expect(host.state()).toMatchObject({ mode: 'maintenance', installed: { buildId: buildId }, operation: { stage: 'startup' } })
+})
 
 it.each(['candidate', 'trusted-policy'])('refuses a missing %s import before resuming a pending deployment', purpose => {
   const value = startupRetryFixture(), state = value.state()
@@ -477,7 +617,7 @@ it.each(['foreign-image', 'foreign-project', 'running', 'unclean', 'oom'])('refu
   expect(value.calls().split('up -d --no-build --wait --wait-timeout 120 app')).toHaveLength(starts)
 })
 
-it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging across the %s completion path', completion => {
+it.each(['normal', 'source', 'migration-retry', 'startup-retry'])('cleans restore staging across the %s completion path', completion => {
   const source = startupRetryFixture(true, false, 'open-agricola_default')
   expect(source.invoke().status).toBe(0)
   const replacement = fixture('open-agricola_default'), directory = join(replacement.temporary, 'open-agricola-prerelease-replacement')
@@ -512,7 +652,9 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
   const buildId = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   seedImportedImage(target, 'candidate', buildId, `sha256:${'e'.repeat(64)}`)
   seedImportedImage(target, 'trusted-policy', buildId, `sha256:${'f'.repeat(64)}`)
-  const request: OperationRequest = { action: 'restore', expectedCurrent: 'empty', buildId, generation: next, operationId,
+  const runtimeDigest = `sha256:${'2'.repeat(64)}`
+  if (completion === 'source') seedPreparedSource(target, buildId, source.image, runtimeDigest)
+  const request: OperationRequest = { action: completion === 'source' ? 'restore-source' : 'restore', expectedCurrent: 'empty', buildId, generation: next, operationId,
     sourceTarget: parsePrereleaseTarget(source.config), expectedSourceCurrent: buildId, acceptLoss: source.generation,
     backupStem: stem, backupGeneration: source.generation, authorityFile: source.authorityFile }
   const invoke = (operationTarget = target) => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', 'receive'], {
@@ -531,7 +673,7 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
   if (completion === 'migration-retry') writeFileSync(join(replacement.temporary, 'restore-fail'), '')
   if (completion === 'startup-retry') writeFileSync(join(replacement.temporary, 'startup-fail'), '')
   let result = invoke()
-  if (completion !== 'normal') {
+  if (completion.endsWith('-retry')) {
     expect(result.status).not.toBe(0)
     expect(readRuntime(target)).toMatchObject({ mode: 'maintenance', operation: { stage: completion === 'migration-retry' ? 'migration' : 'startup' } })
     if (completion === 'migration-retry') {
@@ -544,6 +686,7 @@ it.each(['normal', 'migration-retry', 'startup-retry'])('cleans restore staging 
   }
   expect(result.status, result.stderr).toBe(0)
   expect(readRuntime(target)).toMatchObject({ mode: 'maintenance', generation: next, operation: { stage: 'acceptance' } })
+  if (completion === 'source') expect(readRuntime(target).installed).toMatchObject({ buildId, runtimeDigest })
   const replacementApp = renderCompose(target, readRuntime(target)).services.app
   if (!replacementApp) throw new Error('Expected an installed replacement app')
   expect(replacementApp.networks).toEqual({ default: { aliases: ['prerelease-replacement-app'] }, dependencies: {} })

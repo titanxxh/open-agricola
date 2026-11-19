@@ -9,6 +9,7 @@ import { parseContainerImageTransfer, assertExpectedContainerImage, type Contain
 import { nativeContainerImageId } from '../release/container-images-archive.ts'
 import { applicationDataEnvironment, assertOwnerPath, targetFingerprint, type PrereleaseTarget } from './config'
 import { readApplicationMemory } from './application-memory'
+import { sourceReleaseDirectory } from './source-release-path'
 
 // Tool containers run TypeScript from their own image or policy archive with
 // Node's native type stripping; the preload ships at this path in both.
@@ -33,7 +34,7 @@ const object = (value: unknown): Record<string, unknown> => {
 }
 const parsed = (text: string): Record<string, unknown> => object(JSON.parse(text))
 
-export function assertCapacity(target: PrereleaseTarget, phase: 'import' | 'tool' | 'inspect-image' | 'app' | 'idle'): void {
+export function assertCapacity(target: PrereleaseTarget, phase: 'import' | 'tool' | 'inspect-image' | 'app' | 'idle', toolMemoryMiB = target.budgets.tools.memoryMiB): void {
   assertStorageAdmission(target, targetFingerprint(target), phase === 'idle' ? 'idle' : 'operation')
   command('bash', ['-euo', 'pipefail', '-c', 'source "$1"; backup_reap_tools', 'prerelease-reap', join(target.policyDirectory, 'scripts/backup-process.sh')],
     { env: toolEnvironment({ BACKUP_ENVIRONMENT: target.targetId, BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + 30_000) }) })
@@ -44,7 +45,7 @@ export function assertCapacity(target: PrereleaseTarget, phase: 'import' | 'tool
   const record = readRuntime(target)
   const running = appId ? readApplicationMemory({ target, appId, images: [record.installed?.image, record.operation?.image, record.operation?.sourceImage],
     docker: args => command('docker', args) }) : { anonymousBytes: 0, availableBytes: freemem() }
-  const phaseMemory = phase === 'import' ? target.budgets.import.memoryHeadroomMiB : phase === 'tool' ? target.budgets.tools.memoryMiB : phase === 'inspect-image' ? 64 : 0
+  const phaseMemory = phase === 'import' ? target.budgets.import.memoryHeadroomMiB : phase === 'tool' ? toolMemoryMiB : phase === 'inspect-image' ? 64 : 0
   const required = (64 + (appId || phase === 'app' ? target.budgets.app.memoryMiB : 0) + phaseMemory + target.budgets.reserveMemoryMiB) * 1024 * 1024 - running.anonymousBytes
   const fs = statfsSync(target.directory), remaining = fs.bavail * fs.bsize, available = running.availableBytes
   if (available < required || remaining < target.budgets.diskMiB * 1024 * 1024) {
@@ -89,6 +90,18 @@ export function importedImage(target: PrereleaseTarget, purpose: ContainerImageP
 export const trustedArchiveImage = (target: PrereleaseTarget): string =>
   importedImage(target, 'trusted-policy', command('git', ['rev-parse', 'HEAD'], { cwd: target.policyDirectory }))
 
+/** Two revisions may share the same runtime image. Check the daemon-owned mount identity as well. */
+function containerSourceMount(container: string): string | null {
+  const mounts: unknown = JSON.parse(command('docker', ['inspect', '--format', '{{json .Mounts}}', container]))
+  if (!Array.isArray(mounts)) throw new Error('Cannot inspect the prerelease source mount')
+  const app = mounts.map(object).filter(mount => mount.Destination === '/app')
+  if (!app.length) return null
+  if (app.length !== 1 || app[0].Type !== 'bind' || app[0].RW !== false || typeof app[0].Source !== 'string') {
+    throw new Error('Prerelease source must be an immutable read-only bind mount')
+  }
+  return app[0].Source
+}
+
 export function stopWriters(target: PrereleaseTarget, record: RuntimeRecord): void {
   if (!record.installed) return
   const container = compose(target, ['ps', '-a', '-q', 'app'])
@@ -96,14 +109,22 @@ export function stopWriters(target: PrereleaseTarget, record: RuntimeRecord): vo
   if (!container && unacceptedStartup) return
   if (!/^[a-f0-9]+$/.test(container)) throw new Error('Cannot identify exactly one prerelease application writer')
   const image = command('docker', ['inspect', '--format', '{{.Image}}', container])
-  const drainedSource = image !== record.installed.image && unacceptedStartup && record.operation?.kind === 'deploy' && image === record.operation.sourceImage
-  if (image !== record.installed.image && !drainedSource
+  const mount = record.installed.runtimeDigest || record.operation?.sourceRuntimeDigest ? containerSourceMount(container) : null
+  const installedMount = record.installed.runtimeDigest ? sourceReleaseDirectory(target, record.installed.buildId) : null
+  const installedContainer = image === record.installed.image && mount === installedMount
+  const sourceMount = record.operation?.sourceRuntimeDigest && record.operation.sourceBuildId
+    ? sourceReleaseDirectory(target, record.operation.sourceBuildId) : null
+  const drainedSource = !installedContainer && unacceptedStartup && record.operation?.kind === 'deploy'
+    && image === record.operation.sourceImage && mount === sourceMount
+  if (!installedContainer && !drainedSource
     || command('docker', ['inspect', '--format', '{{index .Config.Labels "com.docker.compose.project"}}', container]) !== target.project) throw new Error('Running application differs from the expected deployment')
   const before = parsed(command('docker', ['inspect', '--format', '{{json .State}}', container]))
   if (drainedSource && (before.Running !== false || before.OOMKilled !== false || before.ExitCode !== 0)) throw new Error('Recorded source application is not cleanly stopped')
   compose(target, ['stop', '--timeout', '90', 'app'])
   const status = parsed(command('docker', ['inspect', '--format', '{{json .State}}', container]))
-  if (status.Running !== false || status.OOMKilled !== false || status.ExitCode !== 0 && !(unacceptedStartup && !drainedSource && before.Running === false)) throw new Error('Application did not drain cleanly; keep maintenance and inspect accepted commits')
+  const failedStartup = unacceptedStartup && installedContainer && before.Running === false
+  const stoppedBeforeAdmission = failedStartup && record.operation?.rollbackCompatible === true
+  if (status.Running !== false || status.OOMKilled !== false && !stoppedBeforeAdmission || status.ExitCode !== 0 && !failedStartup) throw new Error('Application did not drain cleanly; keep maintenance and inspect accepted commits')
 }
 
 /**
@@ -135,6 +156,9 @@ export function verifyRunning(target: PrereleaseTarget, record: RuntimeRecord): 
   const container = compose(target, ['ps', '-a', '-q', 'app'])
   if (!/^[a-f0-9]+$/.test(container) || command('docker', ['inspect', '--format', '{{.Image}}', container]) !== record.installed.image
     || command('docker', ['inspect', '--format', '{{index .Config.Labels "com.docker.compose.project"}}', container]) !== target.project) throw new Error('Live candidate image/project differs from the runtime record')
+  if (record.installed.runtimeDigest && containerSourceMount(container) !== sourceReleaseDirectory(target, record.installed.buildId)) {
+    throw new Error('Running source differs from the installed prerelease commit')
+  }
   const result = parsed(compose(target, ['exec', '-T', 'app', 'node', '--input-type=module', '-e',
     startupCheckScript({ buildId: record.installed.buildId, generation: record.generation, origin: target.origin })]))
   if (result.buildId !== record.installed.buildId || result.channel !== 'prerelease' || result.generation !== record.generation) throw new Error('Installed prerelease identity did not verify')

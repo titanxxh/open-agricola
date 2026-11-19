@@ -3,7 +3,7 @@ import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeF
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { checkPrereleaseVerification, prereleaseConfiguration, requestPrereleaseVerification, runPrereleaseCandidateTask, syncPrerelease, validateIntegrationManifest } from '../ci/prerelease-verification'
+import { checkPrereleaseVerification, fixPrereleaseCandidate, prereleaseConfiguration, requestPrereleaseVerification, runPrereleaseCandidateTask, syncPrerelease, validateIntegrationManifest } from '../ci/prerelease-verification'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 
 const roots: string[] = []
@@ -53,7 +53,13 @@ const fs = require('node:fs'); const path = require('node:path');
 const root = ${JSON.stringify(cwd)}; const args = process.argv.slice(2); const api = JSON.parse(fs.readFileSync(path.join(root, 'api.json'), 'utf8'));
 const body = args.includes('POST') ? JSON.parse(fs.readFileSync(0, 'utf8')) : null;
 fs.appendFileSync(path.join(root, 'calls.jsonl'), JSON.stringify({ args, body }) + '\\n');
-if (body) { console.log('{}'); process.exit(0); }
+if (body) {
+  if (args[1].endsWith('/git/refs') && body.ref) {
+    api[args[1].slice(0,-1) + '/' + body.ref.slice(5)] = { ref: body.ref, object: { type: 'commit', sha: body.sha } };
+    fs.writeFileSync(path.join(root, 'api.json'), JSON.stringify(api));
+  }
+  console.log('{}'); process.exit(0);
+}
 const value = api[args[1]];
 if (value === undefined) { console.error('gh: Not Found (HTTP 404)'); process.exit(1); }
 if (args.includes('--paginate')) value.forEach(x => console.log(JSON.stringify(x))); else console.log(JSON.stringify(value));
@@ -72,6 +78,27 @@ describe('fixed prerelease candidates and main orchestration', () => {
     expect(result.status).toBe('blocked')
     expect(result.channel).toBe('prerelease')
     expect(result.tasks.every(task => task.reason === 'No verified task evidence')).toBe(true)
+  })
+
+  it('pins the live integration head with an earlier reachable baseline only for the source path', () => {
+    const value = fixture()
+    const current = advanceMain(value, 'new-main.txt')
+    delete value.api[`repos/${value.repository}/git/ref/heads/${value.fixedRef}`]
+    value.save()
+    expect(() => fixPrereleaseCandidate(value.cwd, value.repository, value.sha)).toThrow(/baseline/)
+    expect(fixPrereleaseCandidate(value.cwd, value.repository, value.sha, { allowEarlierBaseline: true }).main).toBe(current)
+    expect(value.calls().flatMap(call => call.body ?? [])).toContainEqual({ ref: `refs/heads/${value.fixedRef}`, sha: value.sha })
+  })
+
+  it('rejects a baseline outside the protected main lineage before creating a pin', () => {
+    const value = fixture()
+    delete value.api[`repos/${value.repository}/git/ref/heads/${value.fixedRef}`]
+    value.git('checkout', '--orphan', 'unrelated')
+    value.git('commit', '-m', 'unrelated main')
+    value.api[`repos/${value.repository}/git/ref/heads/main`] = { ref: 'refs/heads/main', object: { type: 'commit', sha: value.git('rev-parse', 'HEAD') } }
+    value.save()
+    expect(() => fixPrereleaseCandidate(value.cwd, value.repository, value.sha, { allowEarlierBaseline: true })).toThrow(/outside protected main/)
+    expect(value.calls().filter(call => call.body)).toEqual([])
   })
 
   it('dispatches the trusted main workflow with the immutable pre reference and only requested failed tasks', () => {

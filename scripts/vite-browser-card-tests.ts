@@ -1,11 +1,12 @@
 import path from 'node:path'
+import { readFileSync } from 'node:fs'
 import { build, type Plugin } from 'vite'
 
 const runtimeEvent = 'browser-card-tests:invalidate'
 const workerExpression = "new URL('./card-tests.worker.ts', import.meta.url).href"
 
 /** Blob Workers in opaque frames cannot fetch an ESM graph, including in Vite dev. */
-export function browserCardTestsPlugin(): Plugin {
+export function browserCardTestsPlugin(preparedDirectory?: string): Plugin {
   const root = path.resolve(import.meta.dirname, '..')
   const host = path.join(root, 'client/local-sandbox/card-tests.ts')
   const entry = path.join(root, 'client/local-sandbox/card-tests.worker.ts')
@@ -55,8 +56,26 @@ export function browserCardTestsPlugin(): Plugin {
       if (id.split('?')[0] !== host) return
       if (!source.includes(workerExpression)) this.error('Missing browser card test Worker entry')
       const url = command === 'serve' ? JSON.stringify(base.replace(/\/$/, '') + devUrl)
-        : `import.meta.ROLLUP_FILE_URL_${this.emitFile({ type: 'asset', name: 'card-tests.worker.js', source: await bundle() })}`
+        : `import.meta.ROLLUP_FILE_URL_${this.emitFile({ type: 'asset', name: 'card-tests.worker.js', source: preparedDirectory ? readFileSync(path.join(preparedDirectory, 'card-tests.js')) : await bundle() })}`
       return { code: source.replace(workerExpression, url), map: null }
+    },
+  }
+}
+
+/** Reuse the worker emitted by Vite's own ?worker&url entry in the preceding process. */
+export function preparedSandboxWorkerPlugin(directory: string): Plugin {
+  const transport = path.resolve(import.meta.dirname, '../client/local-sandbox/local-transport.ts')
+  const workerUrl = "new URL('./worker.ts', import.meta.url)"
+  return {
+    name: 'prepared-prerelease-sandbox-worker',
+    enforce: 'pre',
+    transform(source, id) {
+      if (id.split('?')[0] !== transport) return
+      if (!source.includes(workerUrl)) this.error('Missing sandbox Worker entry')
+      const fileName = readFileSync(path.join(directory, 'sandbox-name'), 'utf8')
+      if (!/^assets\/worker-[\w-]+\.js$/.test(fileName)) this.error('Invalid prepared sandbox worker filename')
+      const asset = this.emitFile({ type: 'asset', fileName, source: readFileSync(path.join(directory, 'sandbox.js')) })
+      return { code: source.replace(workerUrl, `new URL(import.meta.ROLLUP_FILE_URL_${asset}, '' + import.meta.url)`), map: null }
     },
   }
 }

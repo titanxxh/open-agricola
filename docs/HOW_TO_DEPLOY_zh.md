@@ -96,6 +96,40 @@ pnpm release:accept --config /owner/live-acceptance.json --execute
 
 owner 私有验收 JSON 包含 `format: 1`、`appUrl`、`apiUrl`、`expectedBuild`、`credentialsFile`、`inventoryFile`、`artifactDirectory`、`outputDirectory`。使用根路径 HTTPS 应用/API URL、固定 SHA、新鲜清单与已校验 Pages 产物目录。专用 0600 凭据文件仅含 `MY_TEST_USER_ID` 和 `MY_TEST_PASSWORD`，配置只存路径。每次尝试使用新的私有输出目录。规划模式只校验配置，不读取凭据；执行要求清单在十分钟内，覆盖 Chromium/WebKit、双实例路由、已有普通局及刷新恢复、Replay、可见素材、移动布局和当前 session 退出。所有 frame 拒绝游戏写入和其他房间 join，只允许已选参与者房间的 locate 与 join/resume 请求。首失败与清理失败分别留证。会创建和操作测试局的 `release:rehearse` 仍限定回环环境，并覆盖这些浏览器保护回归。
 
+## 更新正在运行的 pre
+
+在干净的 owner 策略工作树执行以下命令。本机和后端 owner tools 须使用同一受保护策略提交。
+
+```bash
+./deploy-prerelease.sh update
+```
+
+命令会固定当前 `prerelease` 分支的 SHA。用 `--sha <完整 SHA>` 可选择已准入的提交。中途中断后再执行同一命令，会继续原来的更新。成功时输出已安装的 SHA、验收目录，以及正式站确认关闭准入到 pre 确认重开的时间。目标已在运行所选源码版本时直接返回。
+
+将下列配置保存到 `~/.config/open-agricola/pre-update.json`，权限设为 0600，也可用 `--config` 或 `OA_PRE_UPDATE_CONFIG` 指定。路径使用绝对路径，回执交换路径须在本机与后端都可用。
+
+```json
+{
+  "format": 1,
+  "acceptanceConfig": "/home/owner/.config/oa/pre-acceptance.json",
+  "stateDirectory": "/home/owner/.local/state/oa/pre-updates",
+  "exchangeRoot": "/var/tmp/oa-pre-exchange",
+  "sourcePreparation": { "memoryMiB": 416, "cpus": 1, "pids": 128, "swapMiB": 960 },
+  "routineAccounts": "/home/owner/.config/oa/pre-participant.json",
+  "acceptanceRoom": "00000000-0000-4000-8000-000000000001",
+  "previousRun": "/home/owner/.local/state/oa/last-full-browser-run",
+  "authFile": "/home/owner/.config/oa/ghcr-read.json"
+}
+```
+
+`acceptanceConfig` 使用已有的私有浏览器验收配置。完整验收从中读取 A–E 账号文件、SSH 目标、存储守护配置和 owner cookie。每次更新的证据单独保存。把示例房间 UUID 换成专用 Beta 账号正在参与的对局。`routineAccounts` 是私有 JSON，`accounts` 数组中只有该账号的 `id`、`username` 和 `password`。完整验收会撤销临时测试账号的 Beta 权限，因此日常账号需独立。`previousRun` 指向首次连续性检查使用的完整浏览器运行目录，其中须有已归档的队伍房间。此后自动取上次成功的完整运行。`authFile` 为 owner 的 GHCR 只读凭据，后端缺少所需运行时镜像时才使用。
+
+可选的 `sourcePreparation` 对象设置临时构建容器的 `memoryMiB`、`cpus`、`pids`，以及额外可用的 `swapMiB`（默认 0）。省略时使用目标的工具配额。用冷构建测量原生编译、前端打包和隔离试启动所需的容量。每个阶段开始前，后端核对在线应用的内存余量、预留内存、可用 swap 和磁盘。容量不足会在旧版持续服务时退出，可修改私有配置中的构建配额后重试。若准备中的候选需要替换，旧版本仍开放且后端没有待办操作时，可显式传入另一个 SHA。
+
+**首次准备和更新运行时镜像。** 受保护的 main 上 `deploy/prerelease-runtime/` 变化时会自动构建。获取首个 pin 或单独更新基础镜像安全补丁时，也可执行 `gh workflow run prerelease-runtime.yml --ref main`。从成功的 run/attempt 下载 `prerelease-runtime.ref`，作为 `deploy/prerelease-runtime.ref` 提交到受保护的 main，把同一个 pin 同步进 pre，并让本机和后端 owner tools 切到已审阅的策略提交。Node、原生模块 ABI、系统库或安全补丁需要更换镜像时重复此流程。日常更新只在后端缺镜像时传输。后端在独立版本目录准备锁定的依赖、语言包、托管前端和 Replay Viewer，并用临时数据试启动。准备期间旧版持续服务。
+
+**验证和恢复。** 首次从应用镜像迁移及超出日常范围的改动都走完整候选验证和浏览器验收。普通卡牌或界面改动复用已安装 SHA 到新 SHA 的范围 CI。源码准备与日常在线备份完成后才关闭准入。重新开放前，Beta 玩家通过真实入口读取前后端 SHA，再次进入指定对局并收到 WebSocket 快照。兼容更新若切换失败，会恢复上一版源码、依赖目录及运行时镜像，重新验收后开放。若已执行不兼容迁移，则保持维护状态并记录对应备份。失败步骤在本次 `window/state.json`。完整验收若在不可重复执行的账号创建或删除步骤中断，核对账号后可加 `--confirm-step accounts` 或 `--confirm-step deletion` 续跑。需要发布有版本号的 GitHub beta Release 时，使用下节流程。
+
 ## 发布固定预发布候选
 
 owner 验收独立目标前保持 `PRERELEASE_ENTRY_ENABLED=false`。正式 app 需要 `PUBLIC_APP_ORIGIN`、`PUBLIC_API_BASE`、`PRERELEASE_APP_ORIGIN` 及仅目标服务端持有的密钥，两个 Compose 入口均显式传入。正式大厅和设置只向 Beta 账号或管理员显示入口，目标缺失或关闭时明确不可用。应用发布消费新 pin 前，语言源及 packs 必须先发布并通过其独立 CI。
@@ -284,7 +318,7 @@ helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的�
 
 open 重扫 native view，核对 completion/activation 绑定、证据哈希及运行身份，仅原子开放该已验收候选；health 不会自动开放。正式入口 flag 仍由 owner 独立激活，也不能绕过代次准入和维护态。最终审计链之前，可以运行 `./deploy-prerelease.sh verify-open --config "$pre_config" --sha "$pre_sha" --output <新的私有文件>`，在本机完成 GitHub 候选回执校验，不连接主机。之后 `open --verified-receipt <文件>` 只在本机复核一次就使用这份回执，因此 activate 到 open 的 30 秒时限内只剩下发往主机的请求。该文件必须为 owner 私有，绑定候选、策略 SHA 和 target，并且生成不超过十分钟。主机只检查回执的结构，不检查生成时间。不带这个参数时，open 仍按原方式校验。
 
-可信网关每十秒读取固定的正式策略接口，确认期限不超过请求开始后三十秒。能力缺失、不兼容或过期时，关闭候选 HTTP/WS 及已有连接。开放状态还绑定已验收的正式 build；正式发布 SHA 改变后，pre 关闭直至重新验收。无需重建、迁移或替换 pre 数据代次，先取得新 authority close 回执再执行：
+可信网关每十秒读取固定的正式策略接口，确认期限不超过请求开始后三十秒。能力缺失、不兼容或过期时，关闭候选 HTTP/WS 及已有连接。验收时记录正式镜像返回的身份边界指纹。镜像构建器根据固定 Git 源码计算身份和准入模块、其运行时依赖、HTTP/WS 和页面路由、数据库迁移以及正式部署配置的哈希。遇到无法解析的动态模块加载时，标记仅对该提交有效。正式 API 将指纹与运行构建和已配置的 pre 来源绑定。新正式版本边界相同时，已开放的 pre 继续提供服务。指纹缺失或变化会阻止跨构建准入。旧回执在下次验收前继续核对原正式 SHA。无需重建、迁移或替换 pre 数据代次，先取得新 authority close 回执再执行：
 
 ```bash
 ./deploy-prerelease.sh reverify --config "$pre_config" --expected-current "$pre_sha" --operation-id "$pre_op" --authority-receipt close.json
@@ -348,6 +382,8 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 配对清单绑定归档/配置哈希和大小、源/目标 SHA、代次、指纹及实际隔离恢复验证。本地和离站副本最多保留七天，独立删除账本另行保留。工具保留原 CPU/内存/PID 限额、原 deadline、run/environment 标签和定域清理。引入 pre 任务前必须升级正式备份脚本，防止旧全局 reaper 清理 pre 工具。通过 CLI 定时执行 budget-check 和每日 retention；retention 在关闭通道后无需 app 凭据或 Docker 仍可执行。离站另装 `offsite-retention.sh <独占pre目录> 7`，确保 app 宿主失联仍遵守期限。
 
 兼容回退仍用 deploy，明确选择经过验证的旧 SHA，并重新经过备份、目标数据验证和验收。当前保留数据不能通过时留在维护态，选择 reset 或隔离恢复；换镜像不能撤销 schema 或已确认写入。reset 前取得 close 回执，运行 `reset --expected-current <SHA> --accept-loss <当前代次> --operation-id <UUID> --authority-receipt close.json`。它先备份并离站同步、合并最新独立删除账本，再验证停写后的真实库/prefix 清空，输出绑定源 build/代次/账本哈希的 `purge-<操作>.json`。authority retire 使用 `--purge <产物>` 及同一 purge 操作 UUID。最终关闭再执行 `finish-close --authority-receipt <retire.json>`；只有不可变 retirement 回执存在后才能移除正式 target 配置，在此之前保留 source cleanup/status/ack。复用资源时先以 `--previous-generation <旧UUID>` prepare 新 UUID，再 `reinitialize --generation <新UUID> --retirement-receipt <retire.json> --authority-receipt <prepare.json>`，重新部署。旧 retire 重试不会关闭新代次。
+
+用源码恢复到替代目标时，先选定通过完整验证的恢复 SHA。在 source-runtime-transfer 命令中指定替代目标配置，传入该 SHA 的运行时镜像，然后执行 `./deploy-prerelease.sh prepare-restore-source --config <replacement.json> --ssh <host> --sha <recovery-sha> --expected-current empty`。接着执行 `restore-source`，替代目标、源目标、代次和明确接受数据损失的参数与下文 `restore` 相同。最后仍需完成旧代次退役、新代次激活及完整开放验收。
 
 恢复时 owner 显式选择 `--backup <stem> --backup-generation <UUID>`，以 `--accept-loss <源当前代次>` 接受恢复点之后进度丢失。使用 `restore --config <全新replacement.json> --source-config <old.json> --expected-current empty --expected-source-current <old-SHA> --sha <已验证目标SHA> --generation <新UUID> --operation-id <UUID> --authority-receipt <old-close.json> ...`。replacement 的目录/project、源/验证库、role、bucket 必须独立，固定公网 origin/port 相同。工具先校验配对文件及七天期限，再安全解包纯数据，绝不安装归档凭据；使用当前独立账本，实际隔离验证目标并真实恢复。重试只清理尚未验收的 replacement，保留旧 source。关闭状态启动成功后，对旧 target purge/retire/finish-close，再 prepare replacement 代次，执行 `activate-recovery --source-config <old.json> --expected-current <new-SHA> --expected-source-current <old-SHA> --retirement-receipt <retire.json>`，只切换固定维护网关。完成全套真实身份审计和验收才开放。不能清理全宿主或复用正式资源。七天归档期限届满后，owner 仅可删除清单中的已退休 project 资源，保留 retirement 回执及独立删除账本。
 

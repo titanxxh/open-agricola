@@ -92,17 +92,21 @@ export function admitPrereleaseSnapshot(cwd: string, repository: string, sha: st
   return source
 }
 
-export function fixPrereleaseCandidate(cwd: string, repository: string, sha: string): void {
+export function fixPrereleaseCandidate(cwd: string, repository: string, sha: string, options: { allowEarlierBaseline?: boolean } = {}) {
   ownerMachine()
   fullSha(sha)
   const source = authority(cwd, repository)
   const existing = commitRef(repository, `heads/${prereleaseCandidateRef(sha)}`)
-  if (existing !== null) { admitPrereleaseSnapshot(cwd, repository, sha); return }
+  if (existing !== null) return admitPrereleaseSnapshot(cwd, repository, sha)
   requireRules(repository, 'prerelease', ['pull_request', 'deletion', 'required_linear_history'])
   if (commitRef(repository, 'heads/prerelease') !== sha) throw new Error('Selected prerelease ref changed before candidate fixation')
-  validateIntegrationManifest(cwd, repository, sha, source.main)
+  const baseline = options.allowEarlierBaseline
+    ? fullSha(text(object(JSON.parse(git(cwd, ['show', `${sha}:prerelease-integration.json`]))).baselineMainSha))
+    : source.main
+  if (!ancestor(cwd, baseline, source.main)) throw new Error('Prerelease baseline is outside protected main')
+  validateIntegrationManifest(cwd, repository, sha, baseline)
   ensureCommitRef(repository, `heads/${prereleaseCandidateRef(sha)}`, sha)
-  admitPrereleaseSnapshot(cwd, repository, sha)
+  return admitPrereleaseSnapshot(cwd, repository, sha)
 }
 
 const configurationPair = (candidate: string, producer: string): string => createHash('sha256').update('open-agricola-prerelease-verification-v1\0')

@@ -71,7 +71,9 @@ export function bundleEvidence({ results, output, common, accounts, extra = {}, 
 export function acceptanceRecord({ targetId, status, healthyCycle, index, formalBrowser }) {
   const evidence = Object.fromEntries(Object.entries(index).map(([item, entry]) => [item, { path: entry.path, sha256: entry.sha256 }]))
   evidence['formal-browser-policy'] = { path: formalBrowser.path, sha256: formalBrowser.sha256 }
-  for (const item of REQUIRED_EVIDENCE) if (!evidence[item]) throw new Error(`Missing acceptance evidence: ${item}`)
+  const required = status.operation?.kind === 'rollback' || status.operation?.kind === 'deploy' && status.operation.runtimeDigest && status.operation.rollbackCompatible === true
+    ? ['source-smoke', 'formal-browser-policy'] : REQUIRED_EVIDENCE
+  for (const item of required) if (!evidence[item]) throw new Error(`Missing acceptance evidence: ${item}`)
   return { format: 1, channel: 'prerelease', targetId, targetFingerprint: status.fingerprint, buildId: status.installed.buildId,
     image: status.installed.image, generation: status.generation, operationId: status.operation.id, acceptedAt: Date.now(), healthyCycle, evidence }
 }

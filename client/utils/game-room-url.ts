@@ -33,3 +33,22 @@ export function buildRoomSearch(roomId: string, search = ''): string {
   }
   return `?${params}`
 }
+
+export const isDevModeAllowedFromQuery = (search: string): boolean => {
+  const params = new URLSearchParams(search)
+  if (params.get('devMode') !== '1') return false
+  const page = params.get('page')
+  const roomId = params.get('room')
+  if (
+    (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1') &&
+    page === 'game' && params.get('transport') === 'ws' &&
+    params.get('hotseat') === '1' && params.has('player')
+  ) return true
+  if (!page) {
+    if (params.get('transport') === 'ws' || roomId) return !!roomId && isDevRoomId(roomId)
+    return true
+  }
+  if (page === 'lobby' || page === 'workshop') return true
+  if (roomId && isDevRoomId(roomId)) return true
+  return params.get('embedded') === '1' && params.get('transport') !== 'ws'
+}

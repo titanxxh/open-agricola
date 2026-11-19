@@ -5,6 +5,7 @@ export const BROWSER_WS_PROTOCOL = 'oa.browser.v2'
 export interface BrowserAuthPolicy {
   version: typeof BROWSER_AUTH_VERSION
   buildId: string
+  identityBoundary?: string
   appOrigin: string
   apiOrigin: string
 }

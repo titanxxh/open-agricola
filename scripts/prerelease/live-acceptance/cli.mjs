@@ -69,12 +69,14 @@ async function runSuite(ctx, options) {
     viewer: { cases: [(k, b, a) => suites.viewerCase(k, b, a, options.room, runDirectory)] },
     continuity: { cases: [(k, b, a) => suites.continuityCase(k, b, a, options.room)] },
     deletion: { cases: [(k, b, a) => suites.deletionCase(k, b, a, list(options.labels ?? ''))] },
+    'source-smoke': { cases: [(k, b, a) => suites.sourceSmokeCase(k, b, a, options.room)] },
     readback: { cases: [suites.readbackCase] },
   }[suite]
   if (!plan) throw new Error(`Unknown suite ${suite}`)
   plan.engines = suites.SUITE_ENGINES[suite]
   if (['viewer', 'continuity'].includes(suite) && !/^[a-f0-9-]{36}$/.test(options.room ?? '')) throw new Error('--room <archived room id> is required')
-  if (suite === 'readback' ? status.mode !== 'open' : status.mode !== 'maintenance') throw new Error(`Suite ${suite} needs the target in ${suite === 'readback' ? 'open' : 'maintenance'} mode`)
+  const mode = suite === 'readback' || suite === 'source-smoke' && ctx.config.sourcePreflight === true ? 'open' : 'maintenance'
+  if (status.mode !== mode) throw new Error(`Suite ${suite} needs the target in ${mode} mode`)
   const selectedEngines = options.engine ? list(options.engine) : plan.engines
   for (const engineName of selectedEngines) if (!engines[engineName]) throw new Error(`Unknown engine ${engineName}`)
   if (!selectedEngines.some(engineName => suites.selectCases(suite, engineName, requested).length)) throw new Error(`No selected ${suite} case runs on ${selectedEngines.join(', ')}`)

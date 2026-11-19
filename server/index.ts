@@ -1,3 +1,4 @@
+import { formalIdentityPolicy } from './formal-identity-boundary.ts'
 import { BetaAccessStore } from './beta-access-store'
 import { createBetaAccessHandler } from './beta-access-routes'
 import { createPrereleaseAuthorityHandler } from './prerelease-authority-routes'
@@ -469,7 +470,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     if (process.env.NODE_ENV !== 'production' || !appOrigin?.startsWith('https:') || !apiOrigin?.startsWith('https:') || !/^[a-f0-9]{40}$/.test(buildId)) {
       sendJson(res, 503, { ok: false, code: 'browser_policy_unavailable' })
     } else {
-      sendJson(res, 200, { version: BROWSER_AUTH_VERSION, buildId, appOrigin, apiOrigin } satisfies BrowserAuthPolicy)
+      sendJson(res, 200, { version: BROWSER_AUTH_VERSION, buildId, appOrigin, apiOrigin, ...formalIdentityPolicy(buildId) } satisfies BrowserAuthPolicy)
     }
     return
   }

@@ -1,4 +1,5 @@
 import { isDevRoomId, roomIdFromQuery } from '../utils/game-room-url'
+export { isDevModeAllowedFromQuery } from '../utils/game-room-url'
 import { extendedResourceKeyList, resourceKeyList, roundCardActionIds } from '../../shared/contract/state-constants'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/contract/placement-constants'
 import { seasonActionIds } from '../../shared/projections/season-actions'
@@ -346,23 +347,4 @@ export const splitBoardActionSpaces = (
     baseActions: actionSpaces.filter((space) => !roundIds.has(space.id) && !seasonIds.has(space.id)),
     seasonActions: actionSpaces.filter((space) => seasonIds.has(space.id)),
   }
-}
-
-export const isDevModeAllowedFromQuery = (search: string): boolean => {
-  const params = new URLSearchParams(search)
-  if (params.get('devMode') !== '1') return false
-  const page = params.get('page')
-  const roomId = params.get('room')
-  if (
-    (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1') &&
-    page === 'game' && params.get('transport') === 'ws' &&
-    params.get('hotseat') === '1' && params.has('player')
-  ) return true
-  if (!page) {
-    if (params.get('transport') === 'ws' || roomId) return !!roomId && isDevRoomId(roomId)
-    return true
-  }
-  if (page === 'lobby' || page === 'workshop') return true
-  if (roomId && isDevRoomId(roomId)) return true
-  return params.get('embedded') === '1' && params.get('transport') !== 'ws'
 }
