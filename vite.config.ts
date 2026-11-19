@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { browserCardTestsPlugin } from './scripts/vite-browser-card-tests.ts'
-import { publicAssetWorkerPlugin, PUBLIC_ASSET_CACHE_ENABLED } from './scripts/vite-public-asset-worker.ts'
+import { serviceWorkerPlugin, OFFLINE_ENCYCLOPEDIA_ENABLED, PUBLIC_ASSET_CACHE_ENABLED } from './scripts/vite-service-worker.ts'
 import { loadBrowserDataDefines } from './scripts/browser-data.ts'
 import {
   isViteDevServerCli,
@@ -67,7 +67,7 @@ const plugins: PluginOption[] = [
 if (publicAssets.localDir) {
   plugins.push(servePublicAssets(publicAssets.localDir, publicAssets.pinned === true))
 }
-if (pagesWorker) plugins.push(publicAssetWorkerPlugin(publicAssets))
+if (pagesWorker) plugins.push(serviceWorkerPlugin(publicAssets))
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
@@ -119,6 +119,7 @@ export default defineConfig({
     'import.meta.env.VITE_GAME_BUILD_ID': JSON.stringify(process.env.GAME_BUILD_ID ?? 'development'),
     'import.meta.env.VITE_RELEASE_CHANNEL': JSON.stringify(process.env.RELEASE_CHANNEL ?? 'stable'),
     'import.meta.env.VITE_PUBLIC_ASSET_BASE_URL': JSON.stringify(publicAssets.baseUrl),
-    'import.meta.env.VITE_PUBLIC_ASSET_WORKER': JSON.stringify(pagesWorker ? '1' : '0'),
+    'import.meta.env.VITE_STABLE_PAGES_WORKER': JSON.stringify(pagesWorker ? '1' : '0'),
+    'import.meta.env.VITE_OFFLINE_ENCYCLOPEDIA': JSON.stringify(pagesWorker && OFFLINE_ENCYCLOPEDIA_ENABLED ? '1' : '0'),
   },
 })
