@@ -29,6 +29,7 @@
   "e2e-tests/card-play-undo.spec.ts": 5,
   "e2e-tests/card-state-presentation.spec.ts": 4,
   "e2e-tests/choice-previews.spec.ts": 22,
+  "e2e-tests/classic-card-face.spec.ts": 4,
   "e2e-tests/crop-scoring.spec.ts": 2,
   "e2e-tests/desktop-table-layout.spec.ts": 9,
   "e2e-tests/draft-opening-order.spec.ts": 12,
