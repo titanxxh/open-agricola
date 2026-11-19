@@ -14,6 +14,12 @@ export const CLASSIC_EDITION_ENABLED: boolean = false
 
 export type ClassicPoolErrorCode = 'classic_pool_insufficient'
 
+/**
+ * Why creation rejected the classic option: the switch is off, another option excludes it (Farmers of the Moor, the
+ * community deck, Parent Cards, Through the Seasons, solo), or its eligible pool cannot fill every hand.
+ */
+export type ClassicAdmissionErrorCode = 'classic_edition_disabled' | 'classic_edition_incompatible' | ClassicPoolErrorCode
+
 /** Why a classic game cannot be created: per card type, the cards its hands need and the eligible cards available. */
 export type ClassicPoolShortfall = {
   code: ClassicPoolErrorCode

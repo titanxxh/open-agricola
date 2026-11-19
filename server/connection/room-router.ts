@@ -56,6 +56,10 @@ import {
   createIsolatedGameSession,
   type CustomSessionMethod,
 } from '../game/custom-session-executor.ts'
+import { CLASSIC_EDITION_ENABLED, type ClassicAdmissionErrorCode } from '../../shared/contract/card-edition'
+import { classicAdmissionRejection } from '../../shared/session/card-edition-admission'
+import { ClassicPoolInsufficientError } from '../../shared/session/classic-deal-pool'
+import type { InitialStateOptions } from '../../shared/session/state-constants'
 import {
   buildInitialStateOptions,
   assertSupportedGameConfiguration,
@@ -185,6 +189,12 @@ const generateRoomId = async (ctx: ConnectionCtx, devRoomRootId?: string | null)
   }
   return null
 }
+
+const classicEditionEnabled = (ctx: ConnectionCtx): boolean => ctx.classicEditionEnabled ?? CLASSIC_EDITION_ENABLED
+
+/** A classic deal that still finds its pool short at creation reports the admission code, not a bare message. */
+const creationErrorCode = (error: unknown): ClassicAdmissionErrorCode | undefined =>
+  error instanceof ClassicPoolInsufficientError ? error.code : undefined
 
 const sendCommandError = (
   ctx: ConnectionCtx,
@@ -551,6 +561,8 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   let setup: ReturnType<typeof parseGameSetupRequest>
   try { setup = parseGameSetupRequest(input, draftOptions.value) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid game configuration', msg.requestId); return }
+  const classicRejection = classicAdmissionRejection(buildInitialStateOptions(setup), classicEditionEnabled(ctx))
+  if (classicRejection) { sendCommandError(ctx, classicRejection.error, msg.requestId, classicRejection.code); return }
   const maxPlayers = setup.playerCount
   const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
@@ -591,7 +603,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     )
   } catch (err) {
     commandOutcome('error')
-    sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
+    sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId, creationErrorCode(err))
     return
   }
   if (created.executor && !created.executor.reserveWorkerSlot()) {
@@ -630,6 +642,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     enableMoorBalanceRules: setup.enableMoorBalanceRules,
     allowIncompleteFarmersOfTheMoorMinorDeal: setup.allowIncompleteFarmersOfTheMoorMinorDeal,
     enableSnakeOpening: setup.enableSnakeOpening,
+    ...(setup.cardEdition === 'classic' ? { cardEdition: 'classic', classicDeckIds: setup.classicDeckIds } : {}),
   }
   ctx.committer?.lockNewRoom(room)
 
@@ -1136,6 +1149,8 @@ async function handleProposeGameEnd(ctx: ConnectionCtx, msg: Extract<ClientComma
   const room = requireWritableRoom(ctx, msg.requestId)
   if (!room) return
   if (msg.intent !== 'end' && msg.intent !== 'rematch') { sendCommandError(ctx, 'Invalid end intent', msg.requestId); return }
+  const rejection = msg.intent === 'rematch' ? rematchRejection(ctx, room) : null
+  if (rejection) { sendCommandError(ctx, rejection.error, msg.requestId, rejection.code); return }
   let proposal: GameEndProposal
   try { proposal = createGameEndProposal(room, ctx.currentPlayerIndex, msg.intent, ctx.controlledPlayerIndices) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid end proposal', msg.requestId); return }
@@ -1374,8 +1389,42 @@ function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   )
 }
 
+/**
+ * A rematch repeats the room's accepted choices, its Card Edition and Classic Decks included. It is a new creation, so
+ * classic admission applies to it as to `createRoom`.
+ */
+const rematchInitialStateOptions = (room: Room): InitialStateOptions => {
+  const state = room.session.state
+  const enableFarmersOfTheMoor = room.enableFarmersOfTheMoor ?? (state.enableFarmersOfTheMoor === true)
+  const draftMode = room.draftMode ?? state.draftMode
+  const cardEdition = room.cardEdition ?? state.cardEdition
+  return {
+    playerCount: room.maxPlayers,
+    ...(room.soloHandMode ? { soloHandMode: room.soloHandMode } : {}),
+    enableCommunityDeck: state.enableCommunityDeck,
+    enableParentCards: room.enableParentCards ?? state.enableParentCards,
+    ...(room.draftParents === false ? { draftParents: false } : {}),
+    ...(draftMode === 'simultaneous'
+      ? { draftMode, draftPoolSize: room.draftPoolSize ?? state.draftPoolSize ?? 7 }
+      : {}),
+    enableThroughTheSeasons: room.enableThroughTheSeasons ?? state.enableThroughTheSeasons,
+    enableFarmersOfTheMoor,
+    enableMoorBalanceRules: enableFarmersOfTheMoor && state.enableMoorBalanceRules === true,
+    allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+    enableSnakeOpening: room.enableSnakeOpening ?? (state.enableSnakeOpening === true),
+    ...(cardEdition === 'classic'
+      ? { cardEdition, classicDeckIds: room.classicDeckIds ?? state.classicDeckIds }
+      : {}),
+  }
+}
+
+const rematchRejection = (ctx: ConnectionCtx, room: Room) =>
+  classicAdmissionRejection(rematchInitialStateOptions(room), classicEditionEnabled(ctx))
+
 async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>, termination?: GameTermination): Promise<Awaited<void | Promise<void>>> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const rejection = rematchRejection(ctx, room)
+  if (rejection) { sendCommandError(ctx, rejection.error, msg.requestId, rejection.code); return }
   if (!termination && room.status === 'playing' && !room.session.state.gameOver && !isDevRoom(room.id)) {
     await handleProposeGameEnd(ctx, { type: 'proposeGameEnd', intent: 'rematch', requestId: msg.requestId })
     return
@@ -1410,39 +1459,22 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     { liveOnly: true },
   ))
   const customCards = reloaded.cards
-  const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
+  const options = rematchInitialStateOptions(room)
   const draftMode = room.draftMode ?? room.session.state.draftMode
   const draftPoolSize = room.draftPoolSize ?? room.session.state.draftPoolSize
-  const enableThroughTheSeasons = room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons
-  const enableFarmersOfTheMoor = room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true)
-  const enableMoorBalanceRules = enableFarmersOfTheMoor && room.session.state.enableMoorBalanceRules === true
-  const allowIncompleteFarmersOfTheMoorMinorDeal = room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false
-  const enableSnakeOpening = room.enableSnakeOpening ?? (room.session.state.enableSnakeOpening === true)
+  const { enableParentCards, enableThroughTheSeasons, enableFarmersOfTheMoor, enableMoorBalanceRules,
+    allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening, cardEdition, classicDeckIds } = options
   let created: ReturnType<typeof createIsolatedGameSession>
   try {
     created = createIsolatedGameSession(
       // Only a dev room may pick its Explicit Seed (ADR-0020).
       typeof msg.seed === 'number' && isDevRoom(room.id) ? msg.seed : undefined,
       customCards.length > 0 ? customCards : undefined,
-      {
-        playerCount: room.maxPlayers,
-        ...(room.soloHandMode ? { soloHandMode: room.soloHandMode } : {}),
-        enableCommunityDeck,
-        enableParentCards,
-        ...(room.draftParents === false ? { draftParents: false } : {}),
-        ...(draftMode === 'simultaneous'
-          ? { draftMode, draftPoolSize: draftPoolSize ?? 7 }
-          : {}),
-        enableThroughTheSeasons,
-        enableFarmersOfTheMoor,
-        enableMoorBalanceRules,
-        allowIncompleteFarmersOfTheMoorMinorDeal,
-        enableSnakeOpening,
-      },
+      options,
     )
   } catch (err) {
     commandOutcome('error')
-    sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
+    sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId, creationErrorCode(err))
     return
   }
   if (created.executor && !created.executor.reserveWorkerSlot()) {
@@ -1522,6 +1554,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         colorConfirmationPlayerIndex: undefined,
         enableParentCards, draftMode, draftPoolSize, enableThroughTheSeasons,
         enableFarmersOfTheMoor, enableMoorBalanceRules, allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening,
+        ...(cardEdition === 'classic' ? { cardEdition, classicDeckIds } : {}),
         customCardDbIds: reloaded.loadedDbIds, customCards,
       }
       nextRoom.startedAt = nextRoom.status === 'playing' ? Date.now() : undefined

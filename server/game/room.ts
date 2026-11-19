@@ -68,6 +68,9 @@ export type Room = {
   enableMoorBalanceRules?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
   enableSnakeOpening?: boolean
+  /** A classic game and its normalized Classic Decks (ADR 0049); absent means revised. */
+  cardEdition?: 'classic'
+  classicDeckIds?: string[]
   /**
    * Local hotseat: one person plays every seat from a single connection.
    * Such a room is hidden from the lobby list and only its creator can rejoin,

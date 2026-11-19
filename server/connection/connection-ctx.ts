@@ -21,6 +21,8 @@ export type ConnectionDeps = {
   lobby: Lobby
   committer?: RoomCommitter
   gameContextStore?: GameContextStore
+  /** Admits new classic games (ADR 0049); absent means the build's `CLASSIC_EDITION_ENABLED`. Tests inject it. */
+  classicEditionEnabled?: boolean
 }
 
 export type ConnectionCtx = {
