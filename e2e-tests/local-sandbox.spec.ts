@@ -28,6 +28,8 @@ const CONFIG = {
   seed: 42,
 }
 
+const sandboxUrl = '/?page=game&player=p1&embedded=1&devMode=1&localSandbox=1'
+
 const seedAndOpen = async (page: Page): Promise<string[]> => {
   const gameApiCalls: string[] = []
   page.on('request', (req) => {
@@ -36,9 +38,12 @@ const seedAndOpen = async (page: Page): Promise<string[]> => {
   // devMode + player=p1 → the dev auth shortcut sets user.id to 'p1', so the
   // owner-scoped stash key must match (GameContainerApi uses user?.id ?? 'anon').
   await page.addInitScript((config) => {
-    sessionStorage.setItem('open-agricola-local-sandbox-config', JSON.stringify({ owner: 'p1', config }))
+    const key = 'open-agricola-local-sandbox-config'
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, JSON.stringify({ owner: 'p1', config }))
+    }
   }, CONFIG)
-  await page.goto('/?page=game&player=p1&embedded=1&devMode=1&localSandbox=1')
+  await page.goto(sandboxUrl)
   await expect(page.locator('.action-board, [class*="ActionBoard"]').first())
     .toBeVisible({ timeout: 30_000 })
   return gameApiCalls
@@ -48,6 +53,22 @@ const addWoodToPlayerA = async (page: Page, amount: number) => {
   await page.locator('.dev-field', { hasText: '资源类型' }).getByRole('combobox').selectOption('wood')
   await page.locator('.dev-field', { hasText: '数量' }).getByRole('spinbutton').fill(String(amount))
   await page.getByRole('button', { name: '增加资源' }).click()
+}
+
+const expectSavedWood = async (page: Page, amount: number) => {
+  await expect.poll(() => page.evaluate(() => new Promise<number | undefined>((resolve, reject) => {
+    const open = indexedDB.open('open-agricola-local-sandbox')
+    open.onupgradeneeded = () => open.transaction?.abort()
+    open.onerror = () => resolve(undefined)
+    open.onsuccess = () => {
+      const db = open.result
+      const tx = db.transaction('games', 'readonly')
+      const request = tx.objectStore('games').get('current:p1')
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve(request.result?.serializedState.state.players[0]?.resources.wood)
+      tx.oncomplete = () => db.close()
+    }
+  }))).toBe(amount)
 }
 
 test.describe('browser-local sandbox', () => {
@@ -69,8 +90,7 @@ test.describe('browser-local sandbox', () => {
     await addWoodToPlayerA(page, 88)
     await expect(playerAHeader).toContainText('88')
 
-    // Let the debounced saver flush to IndexedDB, then reload the same tab.
-    await page.waitForTimeout(800)
+    await expectSavedWood(page, 88)
     page.once('dialog', (d) => { void d.accept() }) // "continue previous game?"
     await page.reload()
 
@@ -79,4 +99,38 @@ test.describe('browser-local sandbox', () => {
       .toBeVisible({ timeout: 30_000 })
     await expect(page.locator('.farm-header', { hasText: '玩家 1' }).first()).toContainText('88')
   })
+
+  for (const restart of ['explicit restart', 'declining resume']) {
+    test(`a rejected Classic setup preserves the saved game after ${restart}`, async ({ page }) => {
+      await seedAndOpen(page)
+      await addWoodToPlayerA(page, 88)
+      await expectSavedWood(page, 88)
+
+      await page.evaluate(config => {
+        sessionStorage.setItem('open-agricola-local-sandbox-config', JSON.stringify({
+          owner: 'p1',
+          config: { ...config, cardEdition: 'classic', enableCommunityDeck: true },
+        }))
+      }, CONFIG)
+      const alerts: string[] = []
+      let resume = false
+      page.on('dialog', dialog => {
+        if (dialog.type() === 'confirm' && !resume) {
+          void dialog.dismiss()
+          return
+        }
+        if (dialog.type() === 'alert') alerts.push(dialog.message())
+        void dialog.accept()
+      })
+
+      await page.goto(restart === 'explicit restart' ? `${sandboxUrl}&freshSandbox=1` : sandboxUrl)
+      await expect.poll(() => alerts).toEqual([expect.stringMatching(/classic/i)])
+      await expect(page).not.toHaveURL(/freshSandbox/)
+      await expectSavedWood(page, 88)
+
+      resume = true
+      await page.reload()
+      await expect(page.locator('.farm-header', { hasText: '玩家 1' }).first()).toContainText('88', { timeout: 30_000 })
+    })
+  }
 })
