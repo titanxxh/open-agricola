@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { extname, join, resolve } from 'node:path'
 import type { Duplex } from 'node:stream'
 import { publicAssetBaseUrl } from '../scripts/public-assets'
-import { publicAssetWorkerPassThroughSource } from '../scripts/vite-service-worker'
+import { buildServiceWorker } from '../scripts/vite-service-worker'
 import { BACKEND_URL, FRONTEND_URL, browserRequestHeaders } from './fixtures'
 import { buildPagesFrontend, servePagesFrontend } from './helpers/pages-frontend'
 import { authenticateSolo, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
@@ -170,6 +170,7 @@ let site: Awaited<ReturnType<typeof servePagesFrontend>>
 let assets: Awaited<ReturnType<typeof startAssetOrigin>>
 let workerPath: string
 let normalWorker: string
+let emergencyWorker: string
 
 test.beforeAll(async () => {
   const assetCheckout = process.env.E2E_PUBLIC_ASSET_DIR || process.env.PUBLIC_ASSET_VALIDATION_DIR
@@ -182,6 +183,9 @@ test.beforeAll(async () => {
   cpSync(artifact.directory, siteDirectory, { recursive: true })
   workerPath = join(siteDirectory, 'sw.js')
   normalWorker = readFileSync(workerPath, 'utf8')
+  emergencyWorker = await buildServiceWorker({ baseUrl: PUBLISH_URL },
+    readFileSync(join(siteDirectory, 'offline-encyclopedia/index.html'), 'utf8'),
+    { assets: false, roomOffline: true, offlineEncyclopedia: true, emergencyTakeover: true })
   assets = await startAssetOrigin(resolve(assetCheckout), directory)
 })
 
@@ -395,6 +399,14 @@ test('normal and emergency updates keep an open game playable on its original co
     expect(assets.requests.filter(path => path === IMAGE)).toEqual([IMAGE])
     await page.locator('iframe[name="asset-embed"]').evaluate(frame => frame.remove())
 
+    const encyclopedia = await context.newPage()
+    await encyclopedia.goto(`${site.origin}/?page=encyclopedia`)
+    await encyclopedia.evaluate(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    await encyclopedia.reload()
+    await encyclopedia.getByRole('button', { name: 'Save for offline reading' }).click()
+    await expect(encyclopedia.getByRole('link', { name: 'Open offline encyclopedia' })).toBeVisible()
+    await encyclopedia.close()
+
     const resumedGame = observeGame(page)
     await page.goto(roomUrl)
     await expect(page.locator('.game-layout')).toBeVisible()
@@ -406,7 +418,7 @@ test('normal and emergency updates keep an open game playable on its original co
       navigator.serviceWorker.addEventListener('controllerchange',
         () => { Reflect.set(window, 'publicAssetTestControllerChanged', true) }, { once: true })
     })
-    writeFileSync(workerPath, publicAssetWorkerPassThroughSource)
+    writeFileSync(workerPath, emergencyWorker)
     await updateWorker(page)
     await expect.poll(() => page.evaluate(() => Reflect.get(window, 'publicAssetTestControllerChanged'))).toBe(true)
     const food = resumedGame.driver.state.players[0]!.resources.food
@@ -418,6 +430,9 @@ test('normal and emergency updates keep an open game playable on its original co
     assets.requests.length = 0
     await loadAssets(await context.newPage(), site.origin, IMAGE_DIMENSIONS)
     expect(assets.requests.filter(path => path === IMAGE)).toEqual([IMAGE])
+    const bookmark = await context.newPage()
+    await bookmark.goto(`${site.origin}/offline-encyclopedia/`)
+    await expect(bookmark.getByRole('searchbox', { name: 'Search cards by number, name, or text' })).toBeVisible()
   } finally {
     writeFileSync(workerPath, normalWorker)
     await context.close()
