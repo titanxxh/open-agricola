@@ -56,8 +56,8 @@ import {
   createIsolatedGameSession,
   type CustomSessionMethod,
 } from '../game/custom-session-executor.ts'
-import { CLASSIC_EDITION_ENABLED, type ClassicAdmissionErrorCode } from '../../shared/contract/card-edition'
-import { classicAdmissionRejection } from '../../shared/session/card-edition-admission'
+import { CLASSIC_EDITION_ENABLED, type ClassicPoolShortfall } from '../../shared/contract/card-edition'
+import { classicAdmissionRejection, type ClassicAdmissionRejection } from '../../shared/session/card-edition-admission'
 import { ClassicPoolInsufficientError } from '../../shared/session/classic-deal-pool'
 import type { InitialStateOptions } from '../../shared/session/state-constants'
 import {
@@ -192,20 +192,20 @@ const generateRoomId = async (ctx: ConnectionCtx, devRoomRootId?: string | null)
 
 const classicEditionEnabled = (ctx: ConnectionCtx): boolean => ctx.classicEditionEnabled ?? CLASSIC_EDITION_ENABLED
 
-/** A classic deal that still finds its pool short at creation reports the admission code, not a bare message. */
-const creationErrorCode = (error: unknown): ClassicAdmissionErrorCode | undefined =>
-  error instanceof ClassicPoolInsufficientError ? error.code : undefined
-
 const sendCommandError = (
   ctx: ConnectionCtx,
   error: string,
   requestId?: string,
   code?: Extract<ServerEvent, { type: 'error' }>['code'],
   lifecycle?: GameContextLifecycle,
+  shortfall?: ClassicPoolShortfall,
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
   if (ctx.activeCommand) {
-    ctx.activeCommand.outcome = { ok: false, error, ...(code ? { code } : {}), ...(ctx.currentRoom ? { roomId: ctx.currentRoom.id } : {}) }
+    ctx.activeCommand.outcome = {
+      ok: false, error, ...(code ? { code } : {}), ...(shortfall ? { shortfall } : {}),
+      ...(ctx.currentRoom ? { roomId: ctx.currentRoom.id } : {}),
+    }
     return
   }
   ctx.broadcaster.sendTo(ctx.ws, {
@@ -214,7 +214,21 @@ const sendCommandError = (
     requestId,
     ...(code ? { code } : {}),
     ...(lifecycle ? { lifecycle } : {}),
+    ...(shortfall ? { shortfall } : {}),
   })
+}
+
+const sendClassicRejection = (ctx: ConnectionCtx, rejection: ClassicAdmissionRejection, requestId?: string): void => {
+  const shortfall = rejection.code === 'classic_pool_insufficient' ? rejection.shortfall : undefined
+  sendCommandError(ctx, rejection.error, requestId, rejection.code, undefined, shortfall)
+}
+
+const sendCreationError = (ctx: ConnectionCtx, error: unknown, requestId?: string): void => {
+  if (error instanceof ClassicPoolInsufficientError) {
+    sendClassicRejection(ctx, { code: error.code, error: error.message, shortfall: error.shortfall }, requestId)
+  } else {
+    sendCommandError(ctx, error instanceof Error ? error.message : String(error), requestId)
+  }
 }
 
 const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
@@ -562,7 +576,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   try { setup = parseGameSetupRequest(input, draftOptions.value) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid game configuration', msg.requestId); return }
   const classicRejection = classicAdmissionRejection(buildInitialStateOptions(setup), classicEditionEnabled(ctx))
-  if (classicRejection) { sendCommandError(ctx, classicRejection.error, msg.requestId, classicRejection.code); return }
+  if (classicRejection) { sendClassicRejection(ctx, classicRejection, msg.requestId); return }
   const maxPlayers = setup.playerCount
   const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
@@ -603,7 +617,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     )
   } catch (err) {
     commandOutcome('error')
-    sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId, creationErrorCode(err))
+    sendCreationError(ctx, err, msg.requestId)
     return
   }
   if (created.executor && !created.executor.reserveWorkerSlot()) {
@@ -1150,7 +1164,7 @@ async function handleProposeGameEnd(ctx: ConnectionCtx, msg: Extract<ClientComma
   if (!room) return
   if (msg.intent !== 'end' && msg.intent !== 'rematch') { sendCommandError(ctx, 'Invalid end intent', msg.requestId); return }
   const rejection = msg.intent === 'rematch' ? rematchRejection(ctx, room) : null
-  if (rejection) { sendCommandError(ctx, rejection.error, msg.requestId, rejection.code); return }
+  if (rejection) { sendClassicRejection(ctx, rejection, msg.requestId); return }
   let proposal: GameEndProposal
   try { proposal = createGameEndProposal(room, ctx.currentPlayerIndex, msg.intent, ctx.controlledPlayerIndices) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid end proposal', msg.requestId); return }
@@ -1424,7 +1438,7 @@ const rematchRejection = (ctx: ConnectionCtx, room: Room) =>
 async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>, termination?: GameTermination): Promise<Awaited<void | Promise<void>>> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const rejection = rematchRejection(ctx, room)
-  if (rejection) { sendCommandError(ctx, rejection.error, msg.requestId, rejection.code); return }
+  if (rejection) { sendClassicRejection(ctx, rejection, msg.requestId); return }
   if (!termination && room.status === 'playing' && !room.session.state.gameOver && !isDevRoom(room.id)) {
     await handleProposeGameEnd(ctx, { type: 'proposeGameEnd', intent: 'rematch', requestId: msg.requestId })
     return
@@ -1474,7 +1488,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     )
   } catch (err) {
     commandOutcome('error')
-    sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId, creationErrorCode(err))
+    sendCreationError(ctx, err, msg.requestId)
     return
   }
   if (created.executor && !created.executor.reserveWorkerSlot()) {

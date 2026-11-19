@@ -1,12 +1,26 @@
-import { CLASSIC_EDITION_ENABLED, type ClassicAdmissionErrorCode } from '../contract/card-edition'
+import { CLASSIC_EDITION_ENABLED, type ClassicAdmissionErrorCode, type ClassicPoolShortfall } from '../contract/card-edition'
 import { normalizeClassicDeckIds } from '../cards/classic-catalog'
 import { ClassicPoolInsufficientError, getClassicDealShortfall } from './classic-deal-pool'
 import type { InitialStateOptions } from './state-constants'
 
 /** The edition part of a creation request; revised leaves both fields out, as in game state. */
-export type CardEditionChoice = Pick<InitialStateOptions, 'cardEdition' | 'classicDeckIds'>
+export type CardEditionChoice =
+  | { cardEdition?: never; classicDeckIds?: never }
+  | { cardEdition: 'classic'; classicDeckIds: string[] }
 
-export type ClassicAdmissionRejection = { code: ClassicAdmissionErrorCode; error: string }
+export type ClassicAdmissionRejection =
+  | { code: Exclude<ClassicAdmissionErrorCode, 'classic_pool_insufficient'>; error: string }
+  | { code: 'classic_pool_insufficient'; error: string; shortfall: ClassicPoolShortfall }
+
+export class ClassicAdmissionError extends Error {
+  readonly rejection: ClassicAdmissionRejection
+
+  constructor(rejection: ClassicAdmissionRejection) {
+    super(rejection.error)
+    this.name = 'ClassicAdmissionError'
+    this.rejection = rejection
+  }
+}
 
 /**
  * Reads `cardEdition` and `classicDeckIds` from a raw creation payload. A missing edition or `'revised'` is revised;
@@ -34,10 +48,10 @@ const EXCLUSIVE_OPTIONS: ReadonlyArray<readonly [(options: InitialStateOptions) 
  * `classicEditionEnabled` defaults to the build's switch; tests inject either value. Loading, continuing,
  * reconnecting to and replaying an existing classic game never come here.
  */
-export const classicAdmissionRejection = (
+export const classicSetupRejection = (
   options: InitialStateOptions,
-  classicEditionEnabled: boolean = CLASSIC_EDITION_ENABLED,
-): ClassicAdmissionRejection | null => {
+  classicEditionEnabled: boolean,
+): Exclude<ClassicAdmissionRejection, { code: 'classic_pool_insufficient' }> | null => {
   if (options.cardEdition !== 'classic') return null
   if (!classicEditionEnabled) {
     return { code: 'classic_edition_disabled', error: 'Classic card games are not available' }
@@ -46,6 +60,15 @@ export const classicAdmissionRejection = (
   if (excluded) {
     return { code: 'classic_edition_incompatible', error: `Classic cards cannot be combined with ${excluded[1]}` }
   }
+  return null
+}
+
+export const classicAdmissionRejection = (
+  options: InitialStateOptions,
+  classicEditionEnabled: boolean = CLASSIC_EDITION_ENABLED,
+): ClassicAdmissionRejection | null => {
+  const setupRejection = classicSetupRejection(options, classicEditionEnabled)
+  if (setupRejection) return setupRejection
   const shortfall = getClassicDealShortfall(options)
-  return shortfall ? { code: shortfall.code, error: new ClassicPoolInsufficientError(shortfall).message } : null
+  return shortfall ? { code: shortfall.code, error: new ClassicPoolInsufficientError(shortfall).message, shortfall } : null
 }

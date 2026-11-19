@@ -17,6 +17,9 @@ import { parseFenceSelectionPayload } from '../../shared/contract/protocol/farm-
  * (real-match card execution stays server-side; only the workshop dry-run is
  * local). Do not route multiplayer rule decisions through this path.
  */
+import { CLASSIC_EDITION_ENABLED } from '../../shared/contract/card-edition'
+import { ClassicAdmissionError, classicAdmissionRejection, parseCardEditionChoice } from '../../shared/session/card-edition-admission'
+import { ClassicPoolInsufficientError } from '../../shared/session/classic-deal-pool'
 import { GameCore, type SessionResponse } from '../../shared/session/session-core.ts'
 import { buildSyncPayload } from '../../shared/session/sync-payload.ts'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization.ts'
@@ -74,8 +77,10 @@ const compileCards = (cards: LocalCardInput[]): CustomCardData[] =>
     }
   })
 
-const toInitialStateOptions = (config: LocalGameConfig): InitialStateOptions => {
-  const playerCount = Math.max(2, Math.min(6, Math.floor(config.playerCount)))
+const toInitialStateOptions = (config: LocalGameConfig, classicEditionEnabled: boolean): InitialStateOptions => {
+  const playerCount = Number.isFinite(config.playerCount)
+    ? Math.max(1, Math.min(6, Math.floor(config.playerCount)))
+    : 2
   const requestedDecks = (config.deckIds ?? [])
     .map((deck) => deck.trim().toUpperCase())
     .filter((deck) => (defaultSandboxDeckIds as readonly string[]).includes(deck))
@@ -83,7 +88,8 @@ const toInitialStateOptions = (config: LocalGameConfig): InitialStateOptions => 
     ? Array.from(new Set(requestedDecks))
     : [...defaultSandboxDeckIds]
   const enableFarmersOfTheMoor = config.enableFarmersOfTheMoor === true
-  return {
+  const options: InitialStateOptions = {
+    ...parseCardEditionChoice(config),
     playerCount,
     deckIds: deckIds as InitialStateOptions['deckIds'],
     enableThroughTheSeasons: config.enableThroughTheSeasons === true,
@@ -92,23 +98,27 @@ const toInitialStateOptions = (config: LocalGameConfig): InitialStateOptions => 
       enableFarmersOfTheMoor && config.allowIncompleteFarmersOfTheMoorMinorDeal === true,
     enableSnakeOpening: config.enableSnakeOpening === true,
   }
+  const rejection = classicAdmissionRejection({
+    ...options,
+    enableCommunityDeck: config.enableCommunityDeck,
+    enableParentCards: config.enableParentCards,
+  }, classicEditionEnabled)
+  if (rejection) throw new ClassicAdmissionError(rejection)
+  return { ...options, playerCount: Math.max(2, playerCount) }
 }
 
 export class LocalSandboxCore {
   private core: GameCore | null = null
   private config: LocalGameConfig | null = null
 
+  private readonly classicEditionEnabled: boolean
+
+  constructor(classicEditionEnabled: boolean = CLASSIC_EDITION_ENABLED) {
+    this.classicEditionEnabled = classicEditionEnabled
+  }
+
   init(config: LocalGameConfig, viewer: ViewerSpec): LocalSandboxResult {
-    const customCards = compileCards(config.cards)
-    this.config = config
-    const core = new GameCore({
-      stateOrSeed: config.seed,
-      customCards: customCards.length > 0 ? customCards : undefined,
-      initialStateOptions: toInitialStateOptions(config),
-      registerCustomCardImpl: registerBrowserBackedCustomCard,
-    })
-    this.core = core
-    return this.respond(core.withCtx(() => core.getState()), viewer)
+    return this.respond(this.reinit(config), viewer)
   }
 
   restore(persisted: PersistedLocalGame, viewer: ViewerSpec): LocalSandboxResult {
@@ -118,13 +128,14 @@ export class LocalSandboxCore {
       )
     }
     const customCards = compileCards(persisted.config.cards)
-    this.config = persisted.config
     const core = new GameCore({
       stateOrSeed: rehydrateState(persisted.serializedState),
       customCards: customCards.length > 0 ? customCards : undefined,
       registerCustomCardImpl: registerBrowserBackedCustomCard,
     })
+    this.core?.dispose()
     this.core = core
+    this.config = persisted.config
     return this.respond(core.withCtx(() => core.getState()), viewer)
   }
 
@@ -190,15 +201,17 @@ export class LocalSandboxCore {
   }
 
   private reinit(config: LocalGameConfig): SessionResponse {
+    const initialStateOptions = toInitialStateOptions(config, this.classicEditionEnabled)
     const customCards = compileCards(config.cards)
-    this.config = config
     const core = new GameCore({
       stateOrSeed: config.seed,
       customCards: customCards.length > 0 ? customCards : undefined,
-      initialStateOptions: toInitialStateOptions(config),
+      initialStateOptions,
       registerCustomCardImpl: registerBrowserBackedCustomCard,
     })
+    this.core?.dispose()
     this.core = core
+    this.config = config
     return core.withCtx(() => core.getState())
   }
 
@@ -246,6 +259,12 @@ export const handleLocalSandboxRequest = (
         : core.call(request.method, request.args, request.viewer)
     return { kind: 'result', id: request.id, ok: true, ...result }
   } catch (error) {
+    if (error instanceof ClassicAdmissionError) {
+      return { kind: 'result', id: request.id, ok: false, ...error.rejection }
+    }
+    if (error instanceof ClassicPoolInsufficientError) {
+      return { kind: 'result', id: request.id, ok: false, error: error.message, code: error.code, shortfall: error.shortfall }
+    }
     return {
       kind: 'result',
       id: request.id,

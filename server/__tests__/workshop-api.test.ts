@@ -108,7 +108,7 @@ function mockRes(): ServerResponse & { statusCode: number; body: string } {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 // Imported lazily after mocks are set up
-let handleWorkshopRoute: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>
+let handleWorkshopRoute: (req: IncomingMessage, res: ServerResponse, classicEditionEnabled?: boolean) => Promise<boolean>
 const reviewProvider = vi.fn(async () => ({
   reviewDecision: 'APPROVED',
   headRefOid: 'approved-head',
@@ -132,7 +132,7 @@ let nextReviewPrNumber = 1
 
 beforeAll(async () => {
   const mod = await import('../workshop.ts')
-  handleWorkshopRoute = (req, res) => mod.handleWorkshopRoute(req, res, reviewRuntime)
+  handleWorkshopRoute = (req, res, classicEditionEnabled) => mod.handleWorkshopRoute(req, res, reviewRuntime, classicEditionEnabled)
 })
 
 describe('Workshop reference metadata', () => {
@@ -1600,6 +1600,34 @@ const CARD_IMPL = {}
       expect(data.settings.enable_farmers_of_the_moor).toBe(true)
       expect(data.settings.allow_incomplete_farmers_of_the_moor_minor_deal).toBe(true)
       expect(data.settings.enable_snake_opening).toBe(false)
+    })
+
+    it('saves a Classic Deck preference and keeps it when a later edit is rejected', async () => {
+      const setup = { card_edition: 'classic', classic_deck_ids: [' ci ', 'CI', 'CZ'], player_count: 3, enable_snake_opening: true }
+      const save = async (settings: object, enabled: boolean, ids = [cardDbId]) => {
+        const res = mockRes()
+        await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_ids: ids, settings }, 'tok-bob'), res, enabled)
+        return res
+      }
+      const saved = await save(setup, true)
+      expect(saved.statusCode).toBe(200)
+      expect(JSON.parse(saved.body).settings).toMatchObject({
+        card_edition: 'classic', classic_deck_ids: ['CI'], player_count: 3, enable_snake_opening: true,
+      })
+
+      const disabled = await save({ ...setup, player_count: 2 }, false, [])
+      expect(disabled.statusCode).toBe(400)
+      expect(JSON.parse(disabled.body)).toMatchObject({ ok: false, code: 'classic_edition_disabled' })
+      const incompatible = await save({ ...setup, enable_farmers_of_the_moor: true }, true, [])
+      expect(incompatible.statusCode).toBe(400)
+      expect(JSON.parse(incompatible.body)).toMatchObject({ ok: false, code: 'classic_edition_incompatible' })
+
+      const getRes = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob'), getRes, false)
+      const data = JSON.parse(getRes.body)
+      expect(data.cards.map((card: { id: string }) => card.id)).toEqual([cardDbId])
+      expect(data.settings).toMatchObject({ card_edition: 'classic', classic_deck_ids: ['CI'], player_count: 3 })
+      expect((await save({ ...setup, card_edition: 'revised' }, false)).statusCode).toBe(200)
     })
 
     it('persists and reads back enable_snake_opening in sandbox settings', async () => {

@@ -22,6 +22,8 @@ import '../../shared/cards/E/E078_SleightofHand'
 import '../../shared/cards/D/D036_BreedRegistry'
 import '../../shared/cards/B/B178_TagAlong'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { classicFixtureCards } from '../../shared/cards/__tests__/__fixtures__/classic-definitions'
+import { withClassicCardDefinitions } from '../../shared/cards/classic-catalog'
 
 const E078_CARD_ID = 'E078_SleightofHand'
 
@@ -103,6 +105,58 @@ describe('HTTP privacy + seat binding', () => {
   beforeEach(() => {
     // Fresh session per test — default map key is 'anonymous' (no auth header).
     setSession(new GameSession(12345))
+  })
+
+  describe.each(['/api/game/new', '/api/game/new-sandbox'])('classic creation through %s', (url) => {
+    const classic = { cardEdition: 'classic', playerCount: 2, classicDeckIds: [' ci ', 'CE', 'CZ'] }
+
+    it('rejects classic when the switch is off without replacing the sandbox', async () => {
+      const previous = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state'), previous)
+      const res = mockRes()
+      await handleGameRoute(mockReq('POST', url, classic), res, false)
+      expect(res.statusCode).toBe(400)
+      expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'classic_edition_disabled' })
+
+      const current = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state'), current)
+      expect(JSON.parse(current.body).state).toEqual(JSON.parse(previous.body).state)
+    })
+
+    it.each([
+      { playerCount: 1 }, { enableFarmersOfTheMoor: true }, { enableCommunityDeck: true },
+      { enableParentCards: true }, { enableThroughTheSeasons: true },
+    ])('rejects incompatible classic setup %j', async (conflict) => {
+      const res = mockRes()
+      await handleGameRoute(mockReq('POST', url, { ...classic, ...conflict }), res, true)
+      expect(res.statusCode).toBe(400)
+      expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'classic_edition_incompatible' })
+    })
+
+    it('returns the classic pool shortfall and ignores revised deck IDs', async () => {
+      const res = mockRes()
+      await handleGameRoute(mockReq('POST', url, { ...classic, deckIds: ['A'], classicDeckIds: ['CI'] }), res, true)
+      expect(res.statusCode).toBe(400)
+      expect(JSON.parse(res.body)).toMatchObject({
+        ok: false,
+        code: 'classic_pool_insufficient',
+        shortfall: { classicDeckIds: ['CI'], needed: { occupation: 14, minor: 14 } },
+      })
+    })
+
+    it('accepts normalized Classic Decks with the snake opening', async () => {
+      const fixtures = [...classicFixtureCards('CE', 'occupation', 14), ...classicFixtureCards('CI', 'minor', 14)]
+      await withClassicCardDefinitions(fixtures, async () => {
+        const res = mockRes()
+        await handleGameRoute(mockReq('POST', url, { ...classic, enableSnakeOpening: true }), res, true)
+        expect(res.statusCode).toBe(200)
+        const { state } = JSON.parse(res.body)
+        expect(state).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CI', 'CE'], enableSnakeOpening: true })
+        const dealt = state.players.flatMap((player: { occupationHand: string[]; minorHand: string[] }) =>
+          [...player.occupationHand, ...player.minorHand])
+        expect(dealt.sort()).toEqual(fixtures.map(({ id }) => id).sort())
+      })
+    })
   })
 
   describe('viewer-less (default) — unfiltered, no seat guard', () => {

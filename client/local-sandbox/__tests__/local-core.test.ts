@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { LocalSandboxCore } from '../worker-core.ts'
+import { handleLocalSandboxRequest, LocalSandboxCore } from '../worker-core.ts'
 import { LOCAL_SANDBOX_SCHEMA_VERSION, type LocalCardInput, type ViewerSpec } from '../protocol.ts'
 import {
   invokeCustomCodeEffectLocal,
@@ -8,6 +8,9 @@ import {
 } from '../browser-executor.ts'
 import { compileCardCode } from '../../../shared/custom-code/compiler.ts'
 import '../../../shared/cards/B/B178_TagAlong'
+import { withClassicCardDefinitions } from '../../../shared/cards/classic-catalog'
+import { classicFixtureCards } from '../../../shared/cards/__tests__/__fixtures__/classic-definitions'
+import type { LocalGameConfig } from '../protocol.ts'
 
 const DEBUG_VIEWER: ViewerSpec = { visiblePlayerIds: [], mode: 'debug' }
 
@@ -45,6 +48,36 @@ const localCard: LocalCardInput = {
 }
 
 describe('LocalSandboxCore', () => {
+  it('admits a classic browser game only when enabled and restores it after the switch is off', () => {
+    const config: LocalGameConfig = {
+      cardEdition: 'classic', classicDeckIds: [' ce ', 'CI', 'CZ'],
+      cards: [localCard], playerCount: 2, seed: 42, enableSnakeOpening: true,
+    }
+    const request = { id: 1, kind: 'init', config, viewer: DEBUG_VIEWER } as const
+    const disabled = new LocalSandboxCore(false)
+    expect(handleLocalSandboxRequest(disabled, request)).toMatchObject({ ok: false, code: 'classic_edition_disabled' })
+
+    const enabled = new LocalSandboxCore(true)
+    expect(handleLocalSandboxRequest(enabled, {
+      ...request, config: { ...config, enableThroughTheSeasons: true },
+    })).toMatchObject({ ok: false, code: 'classic_edition_incompatible' })
+    expect(handleLocalSandboxRequest(enabled, request)).toMatchObject({
+      ok: false, code: 'classic_pool_insufficient', shortfall: { playerCount: 2, needed: { occupation: 14, minor: 14 } },
+    })
+
+    const fixtures = [...classicFixtureCards('CE', 'occupation', 14), ...classicFixtureCards('CI', 'minor', 14)]
+    withClassicCardDefinitions(fixtures, () => {
+      const { payload, persist } = enabled.init(config, DEBUG_VIEWER)
+      expect(payload.state).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CE', 'CI'], enableSnakeOpening: true })
+      expect(payload.customCardDefs?.map(({ cardJson }) => cardJson.id)).toContain(localCard.cardJson.id)
+      expect(disabled.restore(persist, DEBUG_VIEWER).payload.state).toEqual(payload.state)
+      expect(handleLocalSandboxRequest(disabled, {
+        id: 2, kind: 'call', method: 'newGame', args: [], viewer: DEBUG_VIEWER,
+      })).toMatchObject({ ok: false, code: 'classic_edition_disabled' })
+      expect(disabled.call('getState', [], DEBUG_VIEWER).payload.state).toEqual(payload.state)
+    })
+  })
+
   it('inits a 2-player game with a locally compiled custom card', () => {
     const core = new LocalSandboxCore()
     const { payload, persist } = core.init(
