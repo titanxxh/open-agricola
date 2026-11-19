@@ -25,7 +25,7 @@ A native card is one module, `shared/cards/<Deck>/<Id>_<Name>.ts` (community car
 
 - top-level `CARD_ID`, `CARD_DEF = { cardType, meta }` and `CARD_IMPL = { effect, listeners }` stand in for `defineMinorCard` / `defineOccupationCard`;
 - `imports` are unavailable, so helpers come from the injected set: `gainLeaf(cardId, resources)`, `payLeaf({ cardId, cost })`, `spaceHasPlayer`, `positionKey`, `getCardStack` and `readCardExtraData`;
-- only the deployed capability names are admitted.
+- only the deployed capability names are admitted, and a listener may select only `actions`: `actionSpaces`, `events` and `globalQuery` are rejected. A card that needs one of them, such as "each time you use space X" (§4.1), needs a platform change until #1887 lands.
 
 The mechanisms and timing rules below are the same in both shapes. Build helper results such as `payGainFlow` by hand: an optional `seq` of a `pay` leaf and a `gain` leaf.
 
