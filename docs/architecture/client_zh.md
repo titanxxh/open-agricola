@@ -108,7 +108,7 @@
 
 `PrereleaseHandoffPage` 和 `services/prerelease.ts` 清除绑定 fragment，校验配置的目标/正式根，只请求一个短期 code。仅固定回调接收 fragment；不持久化凭据/verifier，不跟随调用者回调，错误返回正式根。浏览器仅验证时间戳格式/目标；兑换过期由正式权威时钟裁决。
 
-覆盖：`PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx`、`services/__tests__/prerelease.test.ts`（时钟偏差/错误响应）及 HTTPS `hosted-password-login.spec.ts`。
+测试：`PrereleaseEntry.test.tsx`、`PrereleaseHandoffPage.test.tsx`、`services/__tests__/prerelease.test.ts`、HTTPS `hosted-password-login.spec.ts`。
 
 ### 卡牌百科
 
@@ -154,6 +154,4 @@ GameContextRouter
 
 `WsGameTransport` 在每个新 socket 声明能力，`HttpGameTransport` 发送请求 header。要求刷新时沿用可读 reload 界面，并在停止重试前结算未完成的持久 receipt。认证和 journal 的命令身份保持独立。见[客户端能力](contract.md#client-capabilities)。
 
-pre Team 持久建房，`TeamWaitingRoom` 在开局前列出成员。Multihand 跟随自有应答者，不随农场浏览；`ScoringPad`/`ArchivedTeamResults` 展示权威分数。测试：`team-network.test.ts`、`prerelease-session.spec.ts`。
-
-- 合作建造以响应者手牌（`FarmBoard.handPlayer`）展示 `farmOwnerPlayerId` 的农场；命令与费用属于 builder，palisade 限自家权限。测试见 `player-palisades.test.ts` 与预发布合作 E2E。
+pre Team 持久建房，`TeamWaitingRoom` 在开局前列出成员。Multihand 跟随自有应答者，不随农场浏览；`ScoringPad`/`ArchivedTeamResults` 展示权威分数。合作建造以响应者手牌（`FarmBoard.handPlayer`）展示 `farmOwnerPlayerId` 的农场；命令与费用属于 builder，palisade 限自家权限。测试：`team-network.test.ts`、`player-palisades.test.ts`、`prerelease-session.spec.ts`。

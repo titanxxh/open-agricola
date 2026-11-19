@@ -1,7 +1,7 @@
 {
  "format": 1,
  "unit": "seconds",
- "source": "single-lane chromium tasks of an owner-local harness profile of 39937991 on the owner machine, all six browser tasks concurrent on 20 cores, 2026-11-18 (#1779), rounded up; pinned-asset-host added from its local runs, 2 seconds rounded up; server-maintenance added from its local run, 25 seconds rounded up; classic-guest added from its local run, 4 seconds rounded up",
+ "source": "single-lane chromium tasks of an owner-local harness profile of 39937991 on the owner machine, all six browser tasks concurrent on 20 cores, 2026-11-18 (#1779), rounded up; pinned-asset-host added from its local runs, 2 seconds rounded up; server-maintenance added from its local run, 25 seconds rounded up; classic-guest added from its local run, 4 seconds rounded up; prerelease-session added from its unloaded single-worker local run, 247 seconds rounded up",
  "files": {
   "e2e-tests/D180_PartTimeWorker.spec.ts": 4,
   "e2e-tests/E148_Lazybones.spec.ts": 3,
@@ -92,6 +92,7 @@
   "e2e-tests/platform.spec.ts": 33,
   "e2e-tests/played-card-chronology.spec.ts": 7,
   "e2e-tests/prerelease-owner-verification.spec.ts": 9,
+  "e2e-tests/prerelease-session.spec.ts": 247,
   "e2e-tests/public-asset-worker.spec.ts": 13,
   "e2e-tests/release-diagnostics.spec.ts": 1,
   "e2e-tests/release-rehearsal.spec.ts": 11,
