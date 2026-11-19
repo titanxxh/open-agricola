@@ -404,7 +404,7 @@ test('normal and emergency updates keep an open game playable on its original co
     await encyclopedia.evaluate(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     await encyclopedia.reload()
     await encyclopedia.getByRole('button', { name: 'Save for offline reading' }).click()
-    await expect(encyclopedia.getByRole('link', { name: 'Open offline encyclopedia' })).toBeVisible()
+    await expect(encyclopedia.getByText(/^English · Version [a-f0-9]{12} · Saved/)).toBeVisible()
     await encyclopedia.close()
 
     const resumedGame = observeGame(page)
