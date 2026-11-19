@@ -3,6 +3,7 @@ import { WEB_PUSH_KINDS, type WebPushKind } from '../../shared/contract/web-push
 import { Section } from '../components/common/Section'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
+import { onPagesWorkerChange } from '../services/pages-worker'
 import { findWebPushRegistration, getWebPushStatus, setWebPushPreference, webPushEnabledBuild, type WebPushStatus } from '../services/web-push'
 
 const settingsText: Record<WebPushKind, string> = { draft: 'webPush.draft', 'bug-report-inbox': 'webPush.inbox' }
@@ -35,7 +36,7 @@ function AccountWebPushSettings({ userId }: { userId: string }) {
       try {
         const registration = await findWebPushRegistration()
         if (!current()) return
-        if (!registration) { setReady(true); return }
+        if (!registration) { setDevice(null); setFailure(false); return }
         const status = await getWebPushStatus(registration, userId)
         if (current()) { setDevice({ registration, status }); setFailure(false) }
       } catch { if (current()) setFailure(true) }
@@ -48,10 +49,10 @@ function AccountWebPushSettings({ userId }: { userId: string }) {
     }
     window.addEventListener('focus', refresh)
     window.addEventListener('online', refresh)
-    // First installation may finish shortly after app bootstrap.
-    navigator.serviceWorker?.ready.then(() => { if (!cancelled) void load() }).catch(() => {})
+    const stopWatching = onPagesWorkerChange(refresh)
     return () => {
       cancelled = true
+      stopWatching()
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refresh)
     }
