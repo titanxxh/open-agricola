@@ -70,7 +70,7 @@ Reference targets follow the English source meaning, independently of their tran
 
 ### Existing views
 
-- `exchange-overlay-presentation.tsx` and `exchange-draft-presentation.ts` share exchange, feeding and heating controls and fuel/sickness previews. Recipe scrolling keeps confirmation and responses above the measured `InteractionBar`. Coverage: `heating-exchange.spec.ts`, `listener-lifecycle-room.spec.ts`, `issue-893-rules.spec.ts`.
+- The Exchange Center shares recipe controls across exchange, feeding, heating and reserve cooking. Recipe scrolling keeps confirmation reachable above `InteractionBar`. Reserve cooking submits the draft and restores valid assignments on resume. `exchange-overlay-presentation.tsx` and `exchange-draft-presentation.ts` also own fuel and sickness previews. Coverage: `heating-exchange.spec.ts`, `listener-lifecycle-room.spec.ts`, `issue-893-rules.spec.ts`. [ADR 0048](../adr/0048-cook-reserve-animals-during-reorganization.md)
 
 - `interaction-presentation.ts` selects exchange overlays for batch trade/cancel requests, including cancel-only. Drafts follow that plan; other choices and explicit zero scores remain visible after restore. Coverage: `exchange-choice-routing.spec.ts`.
 

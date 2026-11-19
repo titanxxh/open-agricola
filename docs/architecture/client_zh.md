@@ -73,7 +73,7 @@
 
 ### 现有视图
 
-- `exchange-overlay-presentation.tsx` 与 `exchange-draft-presentation.ts` 共用普通兑换、喂养和供暖控件，展示燃料和生病预览。配方滚动区域根据 `InteractionBar` 实测高度保持确认和响应可达。覆盖见 `heating-exchange.spec.ts`、`listener-lifecycle-room.spec.ts`、`issue-893-rules.spec.ts`。
+- 交换中心共用普通兑换、喂养、供暖和待安置动物烹饪的配方控件。配方滚动区域根据 `InteractionBar` 高度保持确认可达。待安置动物烹饪提交草稿，恢复重整时保留有效分配。 `exchange-overlay-presentation.tsx` 与 `exchange-draft-presentation.ts` 还负责燃料和生病的预览。覆盖见 `heating-exchange.spec.ts`、`listener-lifecycle-room.spec.ts`、`issue-893-rules.spec.ts`。 [ADR 0048](../adr/0048-cook-reserve-animals-during-reorganization.md)
 
 - `interaction-presentation.ts` 为批量 trade/cancel 请求选择兑换面板，包括只剩取消的请求。草稿遵循该计划；其他选择和明确声明的零分在恢复后保持可见。覆盖见 `exchange-choice-routing.spec.ts`。
 
