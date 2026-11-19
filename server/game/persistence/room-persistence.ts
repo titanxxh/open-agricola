@@ -88,6 +88,7 @@ export type GameResult = {
   moorBalanceRules?: boolean
   snakeOpening: boolean
   cardEdition?: 'classic'
+  classicDeckIds?: string[]
   players: GameResultPlayer[]
 }
 

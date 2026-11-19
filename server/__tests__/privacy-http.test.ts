@@ -133,16 +133,17 @@ describe('HTTP privacy + seat binding', () => {
       expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'classic_edition_incompatible' })
     })
 
-    it('returns the classic pool shortfall and ignores revised deck IDs', async () => {
+    it('returns the classic pool shortfall and ignores revised deck IDs', () => withClassicCardDefinitions(
+      classicFixtureCards('CI', 'minor', 1), async () => {
       const res = mockRes()
       await handleGameRoute(mockReq('POST', url, { ...classic, deckIds: ['A'], classicDeckIds: ['CI'] }), res, true)
       expect(res.statusCode).toBe(400)
       expect(JSON.parse(res.body)).toMatchObject({
         ok: false,
         code: 'classic_pool_insufficient',
-        shortfall: { classicDeckIds: ['CI'], needed: { occupation: 14, minor: 14 } },
+        shortfall: { classicDeckIds: ['CI'], needed: { occupation: 14, minor: 14 }, eligible: { occupation: 0, minor: 1 } },
       })
-    })
+    }))
 
     it('accepts normalized Classic Decks with the snake opening', async () => {
       const fixtures = [...classicFixtureCards('CE', 'occupation', 14), ...classicFixtureCards('CI', 'minor', 14)]

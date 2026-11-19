@@ -66,6 +66,7 @@ describe('classic room admission', () => {
     ['Parent Cards', { enableParentCards: true }],
     ['Through the Seasons', { enableThroughTheSeasons: true }],
     ['solo', { maxPlayers: 1 }],
+    ['completed solo setup reuse', { sourceGameContextId: 'solo-source' }],
   ] as const)('rejects a classic room combined with %s while the switch is on', async (_name, extra) => {
     const actor = createActor(true)
     await dispatch(actor.ctx, classicRoom(extra))
@@ -74,16 +75,15 @@ describe('classic room admission', () => {
     expect(messagesOf(actor).some(message => message.type === 'roomCreated' || message.type === 'stateUpdate')).toBe(false)
   })
 
-  it('rejects a classic room whose eligible pool cannot fill every hand of maxPlayers', async () => {
-    // Only two classic cards are ported, far short of 7 occupations and 7 minors per seat.
+  it('rejects a classic room whose eligible pool cannot fill every hand of maxPlayers', () => withFixtures(async () => {
     const actor = createActor(true)
     await dispatch(actor.ctx, classicRoom({ maxPlayers: 3, hotseat: true }))
     expect(actor.ctx.currentRoom).toBeNull()
     expect(lastOutcome(actor)).toMatchObject({
       ok: false, code: 'classic_pool_insufficient',
-      shortfall: { playerCount: 3, needed: { occupation: 21, minor: 21 } },
+      shortfall: { playerCount: 3, needed: { occupation: 21, minor: 21 }, eligible: { occupation: 18, minor: 18 } },
     })
-  })
+  }))
 
   it('accepts a classic room with the snake opening and deals only its chosen decks', () => withFixtures(async () => {
     const actor = createActor(true)
@@ -165,7 +165,7 @@ describe('existing classic games', () => {
     const restarted = newDeps(host.deps.persistence)
     const restored = snapshotToRoom(saved)
     expect(restored).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CE', 'CI'] })
-    expect(buildGameResult(restored, Date.now()).cardEdition).toBe('classic')
+    expect(buildGameResult(restored, Date.now())).toMatchObject({ cardEdition: 'classic', classicDeckIds: ['CE', 'CI'] })
     restarted.registry.set(restored)
     const resumed = createActor(false, 'host', restarted)
     await dispatch(resumed.ctx, { type: 'joinRoom', roomId, intent: 'resume', name: 'Host' })

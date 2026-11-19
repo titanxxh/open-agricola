@@ -4,9 +4,10 @@ import { waitingSeatIndexes } from '../shared/session/waiting-seats'
 import type { PostgresDatabase } from './database/postgres'
 import { parseRoomBody } from './game/persistence/room-body-codec'
 
-type RoomDetails = Pick<MyActiveRoom, 'players' | 'progress' | 'expansions' | 'waiting_player_indexes' | 'card_edition'>
-type RoomRow = Omit<MyActiveRoom, keyof RoomDetails | 'hotseat'> & {
+type RoomDetails = Pick<MyActiveRoom, 'players' | 'progress' | 'expansions' | 'waiting_player_indexes'>
+type RoomRow = Omit<MyActiveRoom, keyof RoomDetails | 'hotseat' | 'card_edition'> & {
   state_json: string | null
+  card_edition: 'classic' | null
   occupied_seats: number[]
   hotseat: number | string | boolean | null
 }
@@ -44,7 +45,6 @@ function lobbyDetails(state: Record<string, unknown> | null, seats: number[], st
     players: participants,
     progress,
     expansions: expansionFlags.filter(flag => state[flag] === true),
-    ...(state.cardEdition === 'classic' ? { card_edition: 'classic' as const } : {}),
     waiting_player_indexes: waitingSeatIndexes(status, state, seats, actor),
   }
 }
@@ -54,7 +54,7 @@ export async function listMyActiveRooms(db: PostgresDatabase, userId: string): P
   const rows = await db.prepare(`
     WITH my_rooms AS (
       SELECT r.id, r.status, r.max_players, r.hotseat, r.created_at, r.started_at, r.updated_at,
-             r.state_json, rp.player_index,
+             r.state_json, r.card_edition, rp.player_index,
              ARRAY(SELECT owner.player_index::integer FROM room_players owner
                WHERE owner.room_id=r.id AND owner.user_id=rp.user_id ORDER BY owner.player_index) AS owned_player_indexes,
              ARRAY(SELECT player_index::integer FROM room_players WHERE room_id = r.id ORDER BY player_index) AS occupied_seats,
@@ -78,9 +78,10 @@ export async function listMyActiveRooms(db: PostgresDatabase, userId: string): P
     ORDER BY my_turn DESC, updated_at DESC
     LIMIT 20
   `).all<RoomRow>(userId)
-  return rows.map(({ state_json, occupied_seats, hotseat, ...room }) => {
+  return rows.map(({ state_json, occupied_seats, hotseat, card_edition, ...room }) => {
     const state = readLobbyState(state_json)
     return { ...room, hotseat: Number(hotseat) === 1,
+      ...((card_edition ?? state?.cardEdition) === 'classic' ? { card_edition: 'classic' } : {}),
       ...lobbyDetails(state, occupied_seats, room.status, room.current_player_index),
     }
   })

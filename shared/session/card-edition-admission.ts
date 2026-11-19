@@ -41,13 +41,7 @@ const EXCLUSIVE_OPTIONS: ReadonlyArray<readonly [(options: InitialStateOptions) 
   [options => (options.playerCount ?? 2) === 1, 'a solo game'],
 ]
 
-/**
- * Creation admission of the classic option (ADR 0049), shared by every entry that creates a game: room creation and
- * rematch, the HTTP sandboxes, the browser sandbox Worker and Workshop sandbox settings. `options` are the initial
- * state options about to be created, with `playerCount` the room's `maxPlayers`. Revised options always pass.
- * `classicEditionEnabled` defaults to the build's switch; tests inject either value. Loading, continuing,
- * reconnecting to and replaying an existing classic game never come here.
- */
+/** Checks the switch and incompatible options for new games and saved Workshop setups. */
 export const classicSetupRejection = (
   options: InitialStateOptions,
   classicEditionEnabled: boolean,
@@ -63,6 +57,10 @@ export const classicSetupRejection = (
   return null
 }
 
+/**
+ * Creation checks the Classic Deck pool for all seats in addition to the setup.
+ * Existing games load, resume and replay independently of this check.
+ */
 export const classicAdmissionRejection = (
   options: InitialStateOptions,
   classicEditionEnabled: boolean = CLASSIC_EDITION_ENABLED,

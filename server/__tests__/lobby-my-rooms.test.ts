@@ -147,9 +147,11 @@ describe('my active room summaries', () => {
     const { db, persistence, snapshot, meta } = await setup()
     await persistence.save('classic', { ...snapshot, state: { ...snapshot.state, cardEdition: 'classic', classicDeckIds: ['CE'] } },
       { ...meta, cardEdition: 'classic', classicDeckIds: ['CE'] })
+    await persistence.save('classic-waiting', null, { ...meta, status: 'waiting', cardEdition: 'classic', classicDeckIds: ['CE'] })
     await persistence.save('revised', snapshot, meta)
     const rooms = await listMyActiveRooms(db, 'alice')
     expect(rooms.find(room => room.id === 'classic')).toMatchObject({ card_edition: 'classic', expansions: [] })
+    expect(rooms.find(room => room.id === 'classic-waiting')).toMatchObject({ card_edition: 'classic', status: 'waiting' })
     expect(rooms.find(room => room.id === 'revised')).not.toHaveProperty('card_edition')
     expect(JSON.stringify(rooms)).not.toContain('classicDeckIds')
   })

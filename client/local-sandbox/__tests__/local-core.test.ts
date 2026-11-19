@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { handleLocalSandboxRequest, LocalSandboxCore } from '../worker-core.ts'
-import { LOCAL_SANDBOX_SCHEMA_VERSION, type LocalCardInput, type ViewerSpec } from '../protocol.ts'
+import { LOCAL_SANDBOX_SCHEMA_VERSION, type LocalCardInput, type LocalGameConfig, type ViewerSpec } from '../protocol.ts'
 import {
   invokeCustomCodeEffectLocal,
   invokeCustomCodeListenerLocal,
@@ -10,7 +10,6 @@ import { compileCardCode } from '../../../shared/custom-code/compiler.ts'
 import '../../../shared/cards/B/B178_TagAlong'
 import { withClassicCardDefinitions } from '../../../shared/cards/classic-catalog'
 import { classicFixtureCards } from '../../../shared/cards/__tests__/__fixtures__/classic-definitions'
-import type { LocalGameConfig } from '../protocol.ts'
 
 const DEBUG_VIEWER: ViewerSpec = { visiblePlayerIds: [], mode: 'debug' }
 
@@ -61,8 +60,10 @@ describe('LocalSandboxCore', () => {
     expect(handleLocalSandboxRequest(enabled, {
       ...request, config: { ...config, enableThroughTheSeasons: true },
     })).toMatchObject({ ok: false, code: 'classic_edition_incompatible' })
-    expect(handleLocalSandboxRequest(enabled, request)).toMatchObject({
-      ok: false, code: 'classic_pool_insufficient', shortfall: { playerCount: 2, needed: { occupation: 14, minor: 14 } },
+    withClassicCardDefinitions(classicFixtureCards('CI', 'minor', 1), () => {
+      expect(handleLocalSandboxRequest(enabled, request)).toMatchObject({
+        ok: false, code: 'classic_pool_insufficient', shortfall: { playerCount: 2, needed: { occupation: 14, minor: 14 } },
+      })
     })
 
     const fixtures = [...classicFixtureCards('CE', 'occupation', 14), ...classicFixtureCards('CI', 'minor', 14)]

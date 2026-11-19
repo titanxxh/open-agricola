@@ -394,11 +394,11 @@ export class PostgresRoomPersistence implements RoomPersistence {
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
-        enable_snake_opening, enable_moor_balance_rules, card_edition
+        enable_snake_opening, enable_moor_balance_rules, card_edition, classic_deck_ids
       ) VALUES (
         @roomId, @startedAt, @finishedAt, @roundsPlayed, @playerCount,
         @communityDeck, @parentCards, @throughTheSeasons, @farmersOfTheMoor,
-        @snakeOpening, @moorBalanceRules, @cardEdition
+        @snakeOpening, @moorBalanceRules, @cardEdition, @classicDeckIds::jsonb
       )
     `)
     this.insertResultPlayer = db.prepare(`
@@ -542,6 +542,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         moorBalanceRules: result.farmersOfTheMoor && result.moorBalanceRules === true ? 1 : 0,
         snakeOpening: result.snakeOpening ? 1 : 0,
         cardEdition: result.cardEdition === 'classic' ? 'classic' : null,
+        classicDeckIds: result.cardEdition === 'classic' ? JSON.stringify(result.classicDeckIds ?? []) : null,
       }))
       for (const player of result.players) {
         ;(await this.insertResultPlayer.run({
