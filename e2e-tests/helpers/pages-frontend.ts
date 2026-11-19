@@ -36,8 +36,13 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
 }
 
 /** Serves the artifact from the site root like a static host: files as built, 404 for everything else. */
-export async function servePagesFrontend(directory: string, backend?: { backendUrl: string; frontendOrigin: string }) {
+export async function servePagesFrontend(
+  directory: string,
+  backend?: { backendUrl: string; frontendOrigin: string },
+  override?: (request: IncomingMessage, response: ServerResponse) => boolean,
+) {
   const serveFrontend = (request: IncomingMessage, response: ServerResponse) => {
+    if (override?.(request, response)) return true
     const path = decodeURIComponent(new URL(request.url ?? '/', 'http://pages.invalid').pathname)
     const file = resolve(directory, `.${path.endsWith('/') ? `${path}index.html` : path}`)
     if (!file.startsWith(`${directory}${sep}`) || !existsSync(file) || !statSync(file).isFile()) {

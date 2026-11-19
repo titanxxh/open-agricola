@@ -6,9 +6,16 @@ export const isDevRoomId = (roomId: string): boolean => {
     && (roomId === prefix || (roomId[4] === '-' && UUID_PATTERN.test(roomId.slice(5))))
 }
 
-export const roomIdFromQuery = (search: string): string | null => {
+export const roomIdFromQuery = (search: string | URLSearchParams): string | null => {
   const params = new URLSearchParams(search)
   return params.get('context') ?? params.get('room')
+}
+
+export function gameContextLinkFromQuery(search: string) {
+  const params = new URLSearchParams(search)
+  const roomId = roomIdFromQuery(params)
+  if (roomId === null || isDevRoomId(roomId) || (params.has('page') && params.get('page') !== 'game')) return null
+  return { roomId, participantOnly: params.has('context') }
 }
 
 export function buildRoomSearch(roomId: string, search = ''): string {
