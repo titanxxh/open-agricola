@@ -1,27 +1,12 @@
 // @covers client/components/interaction/
 import { expect, test, type FrameLocator, type Page } from '@playwright/test'
-import { FRONTEND_URL } from './fixtures'
+import { FRONTEND_URL, relaunchBrowserSandbox } from './fixtures'
 
 const setEnglish = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
     localStorage.setItem('open-agricola-locale-v2', 'en')
   })
 }
-
-const readSandboxVariants = async (sandbox: FrameLocator) =>
-  sandbox.locator('body').evaluate(async () => {
-    const response = await fetch('/api/game/state', { headers: { 'x-oa-browser-protocol': '2' } })
-    const payload = await response.json() as {
-      state?: {
-        enableThroughTheSeasons?: boolean
-        enableFarmersOfTheMoor?: boolean
-      }
-    }
-    return {
-      seasons: payload.state?.enableThroughTheSeasons === true,
-      moor: payload.state?.enableFarmersOfTheMoor === true,
-    }
-  })
 
 const configureAndStartSandbox = async (
   page: Page,
@@ -34,31 +19,14 @@ const configureAndStartSandbox = async (
   const iframe = page.locator('iframe[title="Sandbox"]')
   await expect(iframe).toBeVisible({ timeout: 30_000 })
 
-  const configured = await page.evaluate(async ({ seasons, moor, playerCount }) => {
-    const response = await fetch('/api/game/new-sandbox', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-oa-browser-protocol': '2' },
-      body: JSON.stringify({
-        seed: 4242,
-        customCardIds: [],
-        playerCount: playerCount ?? 2,
-        deckIds: ['A', 'B', 'C', 'D', 'E'],
-        enableThroughTheSeasons: seasons,
-        enableFarmersOfTheMoor: moor,
-        allowIncompleteFarmersOfTheMoorMinorDeal: moor,
-      }),
-    })
-    return response.ok
-  }, variants)
-  expect(configured).toBe(true)
-
-  await iframe.evaluate(async (element: HTMLIFrameElement) => {
-    const frame = element.contentWindow
-    if (!frame) throw new Error('Sandbox frame is unavailable')
-    await new Promise<void>((resolve) => {
-      element.addEventListener('load', () => resolve(), { once: true })
-      frame.location.reload()
-    })
+  // Workshop playtests run only in the browser sandbox; fix its deal and variants.
+  await relaunchBrowserSandbox(iframe, {
+    seed: 4242,
+    playerCount: variants.playerCount ?? 2,
+    deckIds: ['A', 'B', 'C', 'D', 'E'],
+    enableThroughTheSeasons: variants.seasons,
+    enableFarmersOfTheMoor: variants.moor,
+    allowIncompleteFarmersOfTheMoorMinorDeal: variants.moor,
   })
   const sandbox = page.frameLocator('iframe[title="Sandbox"]')
   await expect(sandbox.locator('.action-board')).toBeVisible({ timeout: 30_000 })
@@ -91,10 +59,7 @@ test('workshop variants expose every action family as graphical boards', async (
   await setEnglish(page)
 
   const seasonsSandbox = await configureAndStartSandbox(page, { seasons: true, moor: false })
-  await expect.poll(() => readSandboxVariants(seasonsSandbox)).toEqual({
-    seasons: true,
-    moor: false,
-  })
+  await expect(seasonsSandbox.locator('[aria-label="Special Actions"]')).toHaveCount(0)
   const seasonButtons = seasonsSandbox.locator(
     '[aria-label="Seasons Board"] .seasons-board__space-button',
   )
@@ -103,13 +68,13 @@ test('workshop variants expose every action family as graphical boards', async (
     '[aria-label="Seasons Board"] .seasons-board__space-button:not([disabled])',
   ).first()
   await expect(enabledSeason).toBeEnabled()
-  const seasonRequestPromise = page.waitForRequest((requestEvent) =>
-    requestEvent.url().endsWith('/api/game/action') && requestEvent.method() === 'POST')
+  await expect(seasonsSandbox.locator('[aria-label="Seasons Board"] [role="img"]')).toHaveCount(0)
   await enabledSeason.click()
-  const seasonRequest = await seasonRequestPromise
-  expect((await seasonRequest.postDataJSON()).spaceId).toMatch(/^season-/)
+  // The season space now holds the player's person.
+  await expect(seasonsSandbox.locator('[aria-label="Seasons Board"] [role="img"]')).toHaveCount(1)
 
   const moorSandbox = await configureAndStartSandbox(page, { seasons: false, moor: true })
+  await expect(moorSandbox.locator('[aria-label="Seasons Board"]')).toHaveCount(0)
   const specialActions = moorSandbox.locator('[aria-label="Special Actions"]')
   await expect(specialActions.locator('.special-action-card')).toHaveCount(2)
   await expect(specialActions.getByRole('img', { name: 'Remove 1 moor to gain 3 fuel' })).toBeVisible()
@@ -122,11 +87,9 @@ test('workshop variants expose every action family as graphical boards', async (
 
   const hiringFair = specialActions.getByRole('button', { name: 'Hiring Fair' })
   await expect(hiringFair).toBeEnabled()
-  const specialRequestPromise = page.waitForRequest((requestEvent) =>
-    requestEvent.url().endsWith('/api/game/special-action') && requestEvent.method() === 'POST')
   await hiringFair.click()
-  const specialRequest = await specialRequestPromise
-  expect(await specialRequest.postDataJSON()).toMatchObject({ actionId: 'hiring-fair' })
+  // The special action ran in the browser sandbox and is used up for this round.
+  await expect(hiringFair).toBeDisabled()
   await expect(moorSandbox.locator('.major-improvements')).toBeVisible()
 
   const combinedSandbox = await configureAndStartSandbox(page, { seasons: true, moor: true })
@@ -169,8 +132,7 @@ test('narrow 6-player board keeps its overview and offers touch-size graphical c
   const precisionTarget = await copse.boundingBox()
   expect(precisionTarget?.width).toBeGreaterThanOrEqual(44)
   expect(precisionTarget?.height).toBeGreaterThanOrEqual(44)
-  const actionRequestPromise = page.waitForRequest((requestEvent) =>
-    requestEvent.url().endsWith('/api/game/action') && requestEvent.method() === 'POST')
   await copse.click()
-  expect((await actionRequestPromise).postDataJSON()).toMatchObject({ spaceId: 'copse-56' })
+  // The space now holds the player's person.
+  await expect(sandbox.locator('[data-action-id="copse-56"] .farmer-holder')).toHaveCount(1)
 })

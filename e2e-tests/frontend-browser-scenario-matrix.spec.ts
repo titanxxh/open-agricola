@@ -181,21 +181,6 @@ const openWorkshopSandbox = async (
   return sandbox
 }
 
-const readSandboxVariants = (sandbox: FrameLocator) =>
-  sandbox.locator('body').evaluate(async () => {
-    const response = await fetch('/api/game/state', { headers: { 'x-oa-browser-protocol': '2' } })
-    const payload = await response.json() as {
-      state?: {
-        enableThroughTheSeasons?: boolean
-        enableFarmersOfTheMoor?: boolean
-      }
-    }
-    return {
-      seasons: payload.state?.enableThroughTheSeasons === true,
-      moor: payload.state?.enableFarmersOfTheMoor === true,
-    }
-  })
-
 const openFixedRoom = async (
   page: Page,
   room: 'dev2' | 'dev6',
@@ -335,11 +320,8 @@ for (const variants of WORKSHOP_VARIANTS) {
     page,
     request,
   }) => {
+    // The browser sandbox runs the saved Workshop settings; its boards show the variants.
     const sandbox = await openWorkshopSandbox(page, request, variants)
-    await expect.poll(() => readSandboxVariants(sandbox)).toEqual({
-      seasons: variants.seasons,
-      moor: variants.moor,
-    })
     await expect(sandbox.locator('.action-board')).toBeVisible()
     await expect(sandbox.locator('[aria-label="Seasons Board"]')).toHaveCount(
       variants.seasons ? 1 : 0,
