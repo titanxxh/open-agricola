@@ -31,11 +31,11 @@ case "$1" in
     # Candidate verification owns typechecking. Generate the same production frontend without repeating tsc on the app host.
     pnpm run build:cards-manifest
     export OPEN_AGRICOLA_FRONTEND_TARGET=prerelease-hosted VITE_BASE_PATH=/open-agricola/ VITE_API_BASE='' VITE_WS_BASE=''
-    export VITE_ENABLE_COMMUNITY_DECK=true VITE_SANDBOX_EXECUTOR=browser RAYON_NUM_THREADS=1 MALLOC_ARENA_MAX=2
+    export VITE_ENABLE_COMMUNITY_DECK=true RAYON_NUM_THREADS=1 MALLOC_ARENA_MAX=2
     mkdir /tmp/oa-workers
     for worker in sandbox card-tests; do node scripts/prerelease/prepare-frontend-worker.mjs "$worker" /tmp/oa-workers; done
     OA_PREPARED_FRONTEND_WORKERS=/tmp/oa-workers pnpm run build:hosted-frontend --no-typecheck
-    unset OPEN_AGRICOLA_FRONTEND_TARGET VITE_BASE_PATH VITE_API_BASE VITE_WS_BASE VITE_ENABLE_COMMUNITY_DECK VITE_SANDBOX_EXECUTOR
+    unset OPEN_AGRICOLA_FRONTEND_TARGET VITE_BASE_PATH VITE_API_BASE VITE_WS_BASE VITE_ENABLE_COMMUNITY_DECK
     pnpm run build:replay-viewer
     mv dist frontend-dist
     # Keep the dependency tree built for this revision, including native addons.
