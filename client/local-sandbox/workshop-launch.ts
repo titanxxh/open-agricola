@@ -1,9 +1,9 @@
 /**
- * Workshop-side glue for the browser-local sandbox: decides whether the
- * playtest runs locally, assembles a `LocalGameConfig` from workshop state,
- * and hands it to the embedded game iframe via sessionStorage (same-origin).
+ * Workshop-side glue for the browser-local sandbox, the only place Workshop
+ * code runs (ADR 0052): assembles a `LocalGameConfig` from workshop state and
+ * hands it to the embedded game iframe via sessionStorage (same-origin). The
+ * game iframe reports its status back with `LOCAL_SANDBOX_STATUS`.
  */
-import { SANDBOX_EXECUTOR } from '../config'
 import type { LocalCardInput, LocalGameConfig } from './protocol.ts'
 
 const STASH_KEY = 'open-agricola-local-sandbox-config'
@@ -26,18 +26,33 @@ export type WorkshopSandboxSettingsLike = {
   enable_snake_opening: boolean
 }
 
-export const isBrowserSandbox = (): boolean => SANDBOX_EXECUTOR === 'browser'
+export const toLocalCard = (card: WorkshopSandboxCardLike): LocalCardInput => ({
+  cardType: card.card_type,
+  cardJson: card.card_json as LocalCardInput['cardJson'],
+  source: card.effect_code,
+  artUrl: card.art_url,
+})
+
+/** A pinned Draft Version snapshot (`pin-version` response) as a sandbox card. */
+export const pinnedVersionToLocalCard = (cardJson: Record<string, unknown>, artUrl: string | null): LocalCardInput => {
+  const definition = { ...cardJson }
+  const source = definition._code
+  delete definition._code
+  delete definition._compiled
+  const cardType = definition.card_type
+  if (cardType !== 'minor' && cardType !== 'occupation') throw new Error('Pinned version has no card type')
+  if (typeof source !== 'string' || !source.trim()) throw new Error('Pinned version has no source')
+  return { cardType, cardJson: definition as LocalCardInput['cardJson'], source, artUrl }
+}
 
 export const buildLocalGameConfig = (
-  cards: ReadonlyArray<WorkshopSandboxCardLike>,
+  cards: ReadonlyArray<LocalCardInput>,
   settings: WorkshopSandboxSettingsLike,
+  launch: { instanceId: string; seed: number },
 ): LocalGameConfig => ({
-  cards: cards.map((card): LocalCardInput => ({
-    cardType: card.card_type,
-    cardJson: card.card_json as LocalCardInput['cardJson'],
-    source: card.effect_code,
-    artUrl: card.art_url,
-  })),
+  instanceId: launch.instanceId,
+  seed: launch.seed,
+  cards: [...cards],
   playerCount: settings.player_count,
   deckIds: settings.deck_ids,
   ...(settings.card_edition === 'classic'
@@ -69,4 +84,25 @@ export const readLocalSandboxConfig = (ownerKey: string): LocalGameConfig | null
   } catch {
     return null
   }
+}
+
+/** Message type the embedded game posts to its Workshop parent. */
+export const LOCAL_SANDBOX_STATUS = 'open-agricola:local-sandbox-status'
+
+export type LocalSandboxStatus =
+  | { type: typeof LOCAL_SANDBOX_STATUS; kind: 'running'; instanceId: string; cardWarnings: string[] }
+  | { type: typeof LOCAL_SANDBOX_STATUS; kind: 'failed'; instanceId: string; error: string }
+
+export const parseLocalSandboxStatus = (value: unknown): LocalSandboxStatus | null => {
+  if (!value || typeof value !== 'object') return null
+  const data = value as Record<string, unknown>
+  if (data.type !== LOCAL_SANDBOX_STATUS || typeof data.instanceId !== 'string') return null
+  if (data.kind === 'running' && Array.isArray(data.cardWarnings)
+    && data.cardWarnings.every((warning): warning is string => typeof warning === 'string')) {
+    return { type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: data.instanceId, cardWarnings: data.cardWarnings }
+  }
+  if (data.kind === 'failed' && typeof data.error === 'string') {
+    return { type: LOCAL_SANDBOX_STATUS, kind: 'failed', instanceId: data.instanceId, error: data.error }
+  }
+  return null
 }

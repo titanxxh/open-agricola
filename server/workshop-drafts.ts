@@ -1199,6 +1199,7 @@ export async function pinCurrentDraftVersion(
       workspace: current,
       versionId,
       cardJson: parseRecord(version.card_json),
+      artUrl: version.art_url,
     }
   })())
 }

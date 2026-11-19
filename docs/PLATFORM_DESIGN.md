@@ -165,7 +165,7 @@ The model controls four tools: `search_references`, `read_reference`, `write_art
 
 One model POST may run at a time. A failed POST requires explicit retry; cancellation retains written artifacts. Retries keep the reference commit and accounting. Existing reference file, line, response-size and blob-hash checks remain; there is no separate reference-call quota. Provider reasoning/signatures and tool IDs remain in page-memory protocol history. Streaming limits remain 32 MiB cumulative SSE transport and 2 MiB per event and decoded message.
 
-The opaque sandboxed iframe creates a fresh Blob Worker with a no-network CSP. `client/local-sandbox/card-tests.ts` owns deadlines, cancellation and cleanup; its Worker runs the shared GameCore with two players and Chai. `scripts/vite-browser-card-tests.ts` supplies the same self-contained lazy Worker artifact in development and production. Reports identify the exact fetched Worker bytes. Browser isolation does not provide the server isolate's heap or per-hook CPU limits.
+The opaque sandboxed iframe creates a fresh Blob Worker with a no-network CSP. `client/local-sandbox/card-tests.ts` owns deadlines, cancellation and cleanup; its Worker runs the shared GameCore with two players and Chai. `scripts/vite-browser-card-tests.ts` supplies the same self-contained lazy Worker artifact in development and production, for these tests and for the playtest engine Worker that `client/local-sandbox/opaque-worker.ts` starts in its own opaque frame. Reports identify the exact fetched Worker bytes. Browser isolation does not provide the server isolate's heap or per-hook CPU limits.
 
 Users may try the existing provider/model selections without a hardcoded model whitelist. Actual protocol, endpoint, CORS and authentication errors remain visible. HTTPS and credential-destination checks remain; no model credential enters backend calls. The current decisions and implementation boundary are recorded in [Workshop generation simplification](https://github.com/titanxxh/open-agricola/issues/1477#issuecomment-6513962005).
 
@@ -260,7 +260,7 @@ An early design considered a declarative JSON-only V1 DSL. It was not adopted; p
 
 ### D2. Loading custom cards into a game
 
-1. Only when the community deck is enabled does the lobby page through reviewed live cards eligible for a real Room via `GET /api/workshop/cards?scope=room`. Room creation sends the selection in WebSocket `createRoom.customCardIds`, and the server accepts those IDs only when `enableCommunityDeck === true`. Author sandboxes continue to use HTTP `/api/game/new-sandbox`.
+1. Only when the community deck is enabled does the lobby page through reviewed live cards eligible for a real Room via `GET /api/workshop/cards?scope=room`. Room creation sends the selection in WebSocket `createRoom.customCardIds`, and the server accepts those IDs only when `enableCommunityDeck === true`. Author playtests run only in the browser sandbox (ADR 0052); HTTP `/api/game/new-sandbox` rejects Workshop cards.
 2. `server/connection/room-router.ts` or `server/game-router.ts` constructs `CustomCardData[]` from the database.
 3. The `GameSession` constructor registers definitions and runtime implementations into that game's `SessionCardContext`.
 4. `registerExecutorBackedCustomCard()` in `server/custom-code/runtime.ts` injects effect hooks and listeners from compiled output and manifest, delegating to Worker Thread plus isolated-vm through `invokeCustomCodeEffectSync` and `invokeCustomCodeListenerSync`.
@@ -268,7 +268,7 @@ An early design considered a declarative JSON-only V1 DSL. It was not adopted; p
 
 ### D3. Sandbox isolation and fault tolerance
 
-Workshop embeds `workshop-game.html`, a game-only entry admitted before initialization only under a same-origin top-level Workshop parent. It accepts the fixed server/browser sandbox modes, without Room, account or WebSocket routing. Nested or cross-origin parents and direct navigation receive a static standalone link. The main application still refuses all iframe initialization. Entry contracts and browser coverage are in [Client architecture](architecture/client.md).
+Workshop embeds `workshop-game.html`, a game-only entry admitted before initialization only under a same-origin top-level Workshop parent. It accepts only the fixed browser sandbox mode, without Room, account or WebSocket routing. Nested or cross-origin parents and direct navigation receive a static standalone link. The main application still refuses all iframe initialization. Entry contracts and browser coverage are in [Client architecture](architecture/client.md).
 
 - Every custom-card effect and listener call is wrapped in `try/catch`.
 - On failure, record the error, skip the effect, and continue the game. The current sandbox session accumulates deduplicated runtime errors; the Workshop confirmation gate rereads them and rejects the erroneous version before submission.
@@ -515,7 +515,7 @@ Last updated 2026-10-06.
 | Workshop sandbox | `server/workshop.ts`, WorkshopPage SandboxView |
 | Custom-card registry and catalog fallback | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts` |
 | Custom-card `try/catch` resilience | `shared/cards/card-effects.ts`, skipping failures for `CUSTOM_` cards |
-| Player-count-configurable sandbox game with custom cards | `/api/game/new-sandbox`, `server/game-router.ts` |
+| Player-count-configurable HTTP sandbox game (no Workshop cards) | `/api/game/new-sandbox`, `server/game-router.ts` |
 | Custom cards in multiplayer WebSocket games | `shared/contract/protocol/ws.ts` `createRoom.customCardIds`, `server/connection/room-router.ts` |
 | LLM card designer | `client/app/workshop/AiCardDesigner.tsx`, `client/services/llm/` |
 | Multiple LLM providers | Gemini, OpenRouter, DeepSeek, and AiHubMix; see section C1.1 |

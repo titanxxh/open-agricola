@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 
-import { SANDBOX_PLAYER_COUNTS, buildSandboxCardIds, normalizeSandboxSettings, readSandboxStartResponse } from '../WorkshopPage'
+import { SANDBOX_PLAYER_COUNTS, normalizeSandboxSettings, readSandboxStartResponse } from '../WorkshopPage'
 
 describe('WorkshopPage sandbox launch helpers', () => {
   it('offers sandbox player counts from 2 to 6', () => {
@@ -29,40 +29,6 @@ describe('WorkshopPage sandbox launch helpers', () => {
   it('treats a missing or non-boolean snake opening setting as disabled', () => {
     expect(normalizeSandboxSettings({ player_count: 2 }).enable_snake_opening).toBe(false)
     expect(normalizeSandboxSettings({ player_count: 2, enable_snake_opening: 'true' }).enable_snake_opening).toBe(false)
-  })
-
-  it('includes the newly saved card id when launching before React state refreshes', () => {
-    const cardIds = buildSandboxCardIds(
-      [
-        { id: 'existing-db-id' },
-      ],
-      'new-db-id',
-    )
-
-    expect(cardIds).toEqual(['existing-db-id', 'new-db-id'])
-  })
-
-  it('deduplicates the newly saved card id if it is already present', () => {
-    const cardIds = buildSandboxCardIds(
-      [
-        { id: 'existing-db-id' },
-        { id: 'new-db-id' },
-      ],
-      'new-db-id',
-    )
-
-    expect(cardIds).toEqual(['existing-db-id', 'new-db-id'])
-  })
-
-  it('ignores non-string extras such as click events', () => {
-    const cardIds = buildSandboxCardIds(
-      [
-        { id: 'existing-db-id' },
-      ],
-      { type: 'click' },
-    )
-
-    expect(cardIds).toEqual(['existing-db-id'])
   })
 
   it('turns non-JSON sandbox start failures into a readable error', async () => {

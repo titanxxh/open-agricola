@@ -193,7 +193,7 @@ for (const { label, desc, expected } of [
     await expect(game.getByRole('button', { name: 'Set Round Number', exact: true })).toBeVisible()
     await expect(game.locator('.dev-panel')).toContainText('Only changes the round number. Workers stay placed; accumulated resources and harvests are not advanced.')
     expect(invalidCardArtRequests).toEqual([])
-    if (process.env.VITE_SANDBOX_EXECUTOR === 'browser') expect(serverGameRequests).toEqual([])
+    expect(serverGameRequests).toEqual([])
   })
 }
 

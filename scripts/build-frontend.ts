@@ -35,7 +35,6 @@ const build = spawnSync('pnpm', skipTypecheck
     VITE_API_BASE: mode === 'hosted' ? '' : process.env.VITE_API_BASE,
     VITE_WS_BASE: mode === 'hosted' ? '' : process.env.VITE_WS_BASE,
     VITE_ENABLE_COMMUNITY_DECK: process.env.VITE_ENABLE_COMMUNITY_DECK ?? 'true',
-    VITE_SANDBOX_EXECUTOR: process.env.VITE_SANDBOX_EXECUTOR ?? 'browser',
   },
   stdio: 'inherit',
 })

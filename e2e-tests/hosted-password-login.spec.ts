@@ -222,7 +222,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
       if (topology === 'legacy-cross-site' && req.headers.host === new URL(appOrigin).host) {
         if (url.pathname === '/client/config.ts') {
           res.setHeader('Content-Type', 'text/javascript')
-          res.end(`export const API_BASE=${JSON.stringify(apiOrigin)};export const WS_BASE=${JSON.stringify(apiOrigin.replace('https:', 'wss:') + '/ws')};export const SANDBOX_EXECUTOR='browser';`)
+          res.end(`export const API_BASE=${JSON.stringify(apiOrigin)};export const WS_BASE=${JSON.stringify(apiOrigin.replace('https:', 'wss:') + '/ws')};`)
           return
         }
         const upstream = await fetch(`${FRONTEND_URL}${req.url}`, { redirect: 'manual' })

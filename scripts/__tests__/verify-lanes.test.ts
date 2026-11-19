@@ -71,13 +71,13 @@ describe('hosted frontend reuse', () => {
     return root
   }
   it('reuses only a parent build of the same commit, sources and build environment', () => {
-    const env = { VITE_SANDBOX_EXECUTOR: 'server', RELEASE_CHANNEL: 'stable', PATH: '/bin' }
+    const env = { VITE_ENABLE_COMMUNITY_DECK: 'false', RELEASE_CHANNEL: 'stable', PATH: '/bin' }
     const root = parent(env)
     // Lanes add service and selection variables that never change the bundle.
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, PATH: '/usr/bin', BACKEND_PORT: '20001', E2E_DEPENDENCIES_READY: '1', E2E_EXTENDED: '1' })).toBeNull()
     expect(hostedFrontendMismatch(root, head, 'e'.repeat(64), env)).toBe('parent build sources differ')
     expect(hostedFrontendMismatch(root, 'b'.repeat(40), 'f'.repeat(64), env)).toBe('parent build is for another commit')
-    expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, VITE_SANDBOX_EXECUTOR: 'browser' })).toBe('parent build environment differs')
+    expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, VITE_ENABLE_COMMUNITY_DECK: 'true' })).toBe('parent build environment differs')
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, PUBLIC_ASSET_VALIDATION_DIR: '/assets' })).toBe('parent build environment differs')
     // The local asset checkout steers the development server each lane starts; a lane only reuses a parent of the same choice.
     expect(hostedFrontendMismatch(root, head, 'f'.repeat(64), { ...env, E2E_PUBLIC_ASSET_DIR: '/assets' })).toBe('parent build environment differs')
@@ -101,7 +101,7 @@ describe('hosted frontend reuse', () => {
     head: () => head, fingerprint: async () => 'f'.repeat(64) })
 
   it('copies a named build that matches exactly, builds otherwise, and keeps a named build that is the checkout itself', async () => {
-    const env = { VITE_SANDBOX_EXECUTOR: 'server', RELEASE_CHANNEL: 'stable' }
+    const env = { VITE_ENABLE_COMMUNITY_DECK: 'false', RELEASE_CHANNEL: 'stable' }
     const source = parent(env)
     const lane = checkout([]); mkdirSync(join(lane, 'dist')); writeFileSync(join(lane, 'dist/stale.js'), 'stale\n')
     // verify-parallel's root and verify.ts take the reuse step only while a source build is named.
@@ -113,9 +113,9 @@ describe('hosted frontend reuse', () => {
     expect(calls).toEqual([[lane, 'pnpm', 'run', 'build:cards-manifest']])
     expect(readFileSync(join(lane, 'dist/index.html'), 'utf8')).toBe('source build\n')
     expect(existsSync(join(lane, 'dist/stale.js'))).toBe(false)
-    // The browser-local sandbox bundle differs, and without a named source the step is the plain build.
+    // A different Vite build variable changes the bundle, and without a named source the step is the plain build.
     calls.length = 0
-    expect(await hostedFrontendStep(lane, { ...env, VITE_SANDBOX_EXECUTOR: 'browser', [HOSTED_FRONTEND_SOURCE]: source }, recording(calls))).toBe(0)
+    expect(await hostedFrontendStep(lane, { ...env, VITE_ENABLE_COMMUNITY_DECK: 'true', [HOSTED_FRONTEND_SOURCE]: source }, recording(calls))).toBe(0)
     expect(await hostedFrontendStep(lane, env, recording(calls))).toBe(0)
     expect(calls).toEqual([[lane, 'pnpm', 'run', 'build:hosted-frontend'], [lane, 'pnpm', 'run', 'build:hosted-frontend']])
     // Naming the checkout itself, directly or through a symlink, never removes the build it would copy.

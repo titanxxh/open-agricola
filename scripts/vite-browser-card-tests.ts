@@ -2,15 +2,32 @@ import path from 'node:path'
 import { readFileSync } from 'node:fs'
 import { build, type Plugin } from 'vite'
 
-const runtimeEvent = 'browser-card-tests:invalidate'
-const workerExpression = "new URL('./card-tests.worker.ts', import.meta.url).href"
+type OpaqueWorkerEntry = {
+  /** Plugin and dev-route name; the dev route is `/@<name>.js`. */
+  name: string
+  /** Host module whose `new URL(...)` expression names the Worker. */
+  host: string
+  entry: string
+  /** Asset file name emitted for production builds. */
+  fileName: string
+  /** HMR event that tells the host to drop its cached bundle. */
+  event: string
+  /** File name of this Worker in a prerelease prepared-workers directory. */
+  prepared: string
+}
 
-/** Blob Workers in opaque frames cannot fetch an ESM graph, including in Vite dev. */
-export function browserCardTestsPlugin(preparedDirectory?: string): Plugin {
+export const OPAQUE_WORKER_ENTRIES: readonly OpaqueWorkerEntry[] = [
+  { name: 'browser-card-tests-worker', host: 'client/local-sandbox/card-tests.ts', entry: 'client/local-sandbox/card-tests.worker.ts', fileName: 'card-tests.worker.js', event: 'browser-card-tests:invalidate', prepared: 'card-tests.js' },
+  { name: 'local-sandbox-engine-worker', host: 'client/local-sandbox/opaque-worker.ts', entry: 'client/local-sandbox/worker.ts', fileName: 'local-sandbox.worker.js', event: 'local-sandbox-engine:invalidate', prepared: 'sandbox.js' },
+]
+
+function opaqueWorkerPlugin(spec: OpaqueWorkerEntry, preparedDirectory?: string): Plugin {
   const root = path.resolve(import.meta.dirname, '..')
-  const host = path.join(root, 'client/local-sandbox/card-tests.ts')
-  const entry = path.join(root, 'client/local-sandbox/card-tests.worker.ts')
-  const devUrl = '/@browser-card-tests-worker.js'
+  const host = path.join(root, spec.host)
+  const entry = path.join(root, spec.entry)
+  const workerExpression = `new URL('./${path.basename(spec.entry)}', import.meta.url).href`
+  const devUrl = `/@${spec.name}.js`
+  const runtimeEvent = spec.event
   let command: 'build' | 'serve'
   let base = '/'
   let cached: Promise<string> | undefined
@@ -18,19 +35,19 @@ export function browserCardTestsPlugin(preparedDirectory?: string): Plugin {
   const bundle = () => cached ??= build({
     root, configFile: false, logLevel: 'error',
     build: { write: false, minify: true, target: 'es2022',
-      lib: { entry, name: 'BrowserCardTests', formats: ['iife'] } },
+      lib: { entry, name: spec.name.replace(/(^|-)(\w)/g, (_, _dash, letter: string) => letter.toUpperCase()), formats: ['iife'] } },
   }).then(result => {
     const outputs = Array.isArray(result) ? result : [result]
     const chunks = outputs.flatMap(output => 'output' in output ? output.output.filter(item => item.type === 'chunk') : [])
     const chunk = chunks[0]
     if (chunks.length !== 1 || !chunk || chunk.imports.length || chunk.dynamicImports.length) {
-      throw new Error('Browser card tests require one self-contained Worker bundle')
+      throw new Error(`${spec.entry} requires one self-contained Worker bundle`)
     }
     dependencies = new Set(Object.keys(chunk.modules).map(file => path.resolve(file.split('?')[0]!)))
     return chunk.code
   }).catch(error => { cached = undefined; throw error })
   return {
-    name: 'browser-card-tests-worker', enforce: 'pre',
+    name: spec.name, enforce: 'pre',
     configResolved(config) { command = config.command; base = config.base },
     configureServer(server) {
       const invalidate = (file: string) => {
@@ -54,28 +71,20 @@ export function browserCardTestsPlugin(preparedDirectory?: string): Plugin {
     },
     async transform(source, id) {
       if (id.split('?')[0] !== host) return
-      if (!source.includes(workerExpression)) this.error('Missing browser card test Worker entry')
+      if (!source.includes(workerExpression)) this.error(`Missing ${spec.entry} Worker entry`)
       const url = command === 'serve' ? JSON.stringify(base.replace(/\/$/, '') + devUrl)
-        : `import.meta.ROLLUP_FILE_URL_${this.emitFile({ type: 'asset', name: 'card-tests.worker.js', source: preparedDirectory ? readFileSync(path.join(preparedDirectory, 'card-tests.js')) : await bundle() })}`
+        : `import.meta.ROLLUP_FILE_URL_${this.emitFile({ type: 'asset', name: spec.fileName,
+          source: preparedDirectory ? readFileSync(path.join(preparedDirectory, spec.prepared)) : await bundle() })}`
       return { code: source.replace(workerExpression, url), map: null }
     },
   }
 }
 
-/** Reuse the worker emitted by Vite's own ?worker&url entry in the preceding process. */
-export function preparedSandboxWorkerPlugin(directory: string): Plugin {
-  const transport = path.resolve(import.meta.dirname, '../client/local-sandbox/local-transport.ts')
-  const workerUrl = "new URL('./worker.ts', import.meta.url)"
-  return {
-    name: 'prepared-prerelease-sandbox-worker',
-    enforce: 'pre',
-    transform(source, id) {
-      if (id.split('?')[0] !== transport) return
-      if (!source.includes(workerUrl)) this.error('Missing sandbox Worker entry')
-      const fileName = readFileSync(path.join(directory, 'sandbox-name'), 'utf8')
-      if (!/^assets\/worker-[\w-]+\.js$/.test(fileName)) this.error('Invalid prepared sandbox worker filename')
-      const asset = this.emitFile({ type: 'asset', fileName, source: readFileSync(path.join(directory, 'sandbox.js')) })
-      return { code: source.replace(workerUrl, `new URL(import.meta.ROLLUP_FILE_URL_${asset}, '' + import.meta.url)`), map: null }
-    },
-  }
+/**
+ * Blob Workers in opaque frames cannot fetch an ESM graph, including in Vite dev.
+ * A prerelease build may pass the directory where an earlier process emitted
+ * these same Worker assets (`scripts/prerelease/prepare-frontend-worker.mjs`).
+ */
+export function browserCardTestsPlugin(preparedDirectory?: string): Plugin[] {
+  return OPAQUE_WORKER_ENTRIES.map(spec => opaqueWorkerPlugin(spec, preparedDirectory))
 }

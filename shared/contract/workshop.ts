@@ -40,6 +40,7 @@ export type WorkshopWorkspaceContract = {
 export type WorkshopPinnedVersionContract = {
   versionId: string
   cardJson: Record<string, unknown>
+  artUrl: string | null
 }
 
 export type WorkshopGenerationCandidateBase = {

@@ -2,14 +2,16 @@
 // @covers client/sandbox/
 import { test, expect, type Page } from '@playwright/test'
 
-// Browser-local workshop sandbox (VITE_SANDBOX_EXECUTOR=browser). The engine
-// and custom card code run entirely in a browser Worker — no server round-trips.
+// Browser-local workshop sandbox, the only place Workshop code runs (ADR 0052).
+// The engine and custom card code run in a Worker inside an opaque-origin
+// iframe — no server round-trips.
 //
 // Custom-card execution equivalence with the server isolated-vm executor is
 // pinned by server/__tests__/local-sandbox-parity.test.ts; runaway-card timeout
 // recovery is pinned by client/local-sandbox/__tests__/local-transport.test.ts.
 // This spec covers what only a real browser proves: local boot with zero server
-// calls, dev-panel dispatch through the worker, and IndexedDB resume on reload.
+// calls inside the opaque engine frame, dev-panel dispatch through the worker,
+// and IndexedDB resume on reload.
 
 const CONFIG = {
   // A custom card with source forces the worker to compile (typescript) and
@@ -72,14 +74,16 @@ const expectSavedWood = async (page: Page, amount: number) => {
 }
 
 test.describe('browser-local sandbox', () => {
-  test.skip(process.env.VITE_SANDBOX_EXECUTOR !== 'browser', 'run with VITE_SANDBOX_EXECUTOR=browser')
-
   test('boots locally with zero server calls and both seats visible', async ({ page }) => {
     const gameApiCalls = await seedAndOpen(page)
     // Debug viewer renders every seat — a single player drives all of them.
     await expect(page.locator('.farm-header', { hasText: '玩家 1' }).first()).toBeVisible()
     await expect(page.locator('.farm-header', { hasText: '玩家 2' }).first()).toBeVisible()
     expect(gameApiCalls, `unexpected server calls: ${gameApiCalls.join(', ')}`).toEqual([])
+    // The engine Worker lives in one hidden opaque frame whose CSP blocks the network.
+    const engineFrame = page.locator('iframe[sandbox="allow-scripts"]')
+    await expect(engineFrame).toHaveCount(1)
+    expect(await engineFrame.getAttribute('srcdoc')).toContain("connect-src 'none'")
   })
 
   test('dev panel dispatches through the worker and IndexedDB resumes after reload', async ({ page }) => {

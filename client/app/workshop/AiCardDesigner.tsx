@@ -17,6 +17,8 @@ import {
 import { WorkshopAbilityPanel } from './WorkshopAbilityPanel'
 import type { PlaytestFailure, PlaytestSource } from '../../services/llm/generation/request'
 import { sandboxFailureFor, type SandboxPlaytest } from './sandbox-playtest'
+import { pinnedVersionToLocalCard, type LocalSandboxStatus } from '../../local-sandbox/workshop-launch'
+import type { LocalCardInput } from '../../local-sandbox/protocol'
 import { LocalizationModal, isLocaleEntryComplete } from './LocalizationModal'
 import { useLocale } from '../../contexts/LocaleContext'
 import { PlayerCard } from '../../components/common/PlayerCard'
@@ -918,7 +920,9 @@ type AiCardDesignerProps = {
   initialCard?: ApiCard
   initialCardId?: string
   onClose: () => void
-  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string, source: PlaytestSource) => Promise<boolean>
+  onAddToSandboxAndRestart?: (cardDbId: string, card: LocalCardInput, source: PlaytestSource) => Promise<boolean>
+  /** Latest status the embedded browser sandbox reported for the current launch. */
+  sandboxStatus?: LocalSandboxStatus | null
   sandboxErrors?: string[] | null
   sandboxPlaytest?: SandboxPlaytest | null
   onCardLoaded?: (cardDbId: string) => void
@@ -932,6 +936,7 @@ export function AiCardDesigner({
   onAddToSandboxAndRestart,
   sandboxErrors,
   sandboxPlaytest,
+  sandboxStatus,
   onCardLoaded,
   apiFetch,
 }: AiCardDesignerProps) {
@@ -1410,7 +1415,7 @@ export function AiCardDesigner({
     try {
       const pinned = await pinDraftVersion()
       if (!pinned) return
-      const { versionId, cardJson: pinnedCard } = pinned
+      const { versionId, cardJson: pinnedCard, artUrl } = pinned
       const source = pinnedCard?._code
       if (typeof source !== 'string' || !source.trim()
         || typeof pinnedCard?.id !== 'string' || !pinnedCard.id.trim()
@@ -1426,7 +1431,7 @@ export function AiCardDesigner({
       setSandboxConfirmation(false)
       setRuntimeSandboxErrors(null)
       setRuntimeSandboxFailure(null)
-      if (await onAddToSandboxAndRestart(currentCardDbId, versionId, binding)) {
+      if (await onAddToSandboxAndRestart(currentCardDbId, pinnedVersionToLocalCard(pinnedCard, artUrl), binding)) {
         updateSession({ sandboxTestVersionId: versionId })
       }
     } catch (reason) {
@@ -1449,22 +1454,14 @@ export function AiCardDesigner({
     setSaving(true)
     setError('')
     try {
-      const response = await workshopApiFetch('/api/game/state')
-      const payload = await response.json() as {
-        cardWarnings?: unknown
-        error?: string
-        gameInstanceId?: string
+      // The embedded browser sandbox reports the launch it runs and its card warnings.
+      if (!sandboxStatus || sandboxStatus.kind !== 'running') {
+        throw new Error(translateMessage(locale, "ui.copy.app_workshop_AiCardDesigner.the_playtest_version_changed_pin_and_start_e267da"))
       }
-      if (!stillCurrent()) return
-      if (!response.ok) {
-        throw new Error(payload.error ?? `Request failed (${response.status})`)
-      }
-      const errors = Array.isArray(payload.cardWarnings)
-        ? payload.cardWarnings.filter((value): value is string => typeof value === 'string')
-        : []
+      const errors = sandboxStatus.cardWarnings
       setRuntimeSandboxErrors(errors.length > 0 ? errors : null)
       const samePlaytest = testedSource?.workspaceId === currentCardDbId && testedSource?.versionId === versionId
-        && sandboxPlaytest?.instanceId === payload.gameInstanceId
+        && sandboxPlaytest?.instanceId === sandboxStatus.instanceId
       setRuntimeSandboxFailure(samePlaytest ? sandboxFailureFor(sandboxPlaytest, errors) : null)
       if (!samePlaytest) throw new Error(translateMessage(locale, "ui.copy.app_workshop_AiCardDesigner.the_playtest_version_changed_pin_and_start_e267da"))
       if (errors.length > 0) return

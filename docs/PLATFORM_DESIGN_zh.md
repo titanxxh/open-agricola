@@ -174,7 +174,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 同时最多一个模型 POST；失败后必须显式重试，沿用资料 commit 和累计统计。取消保留已写产物。资料的文件、行数、响应大小及 blob hash 检查继续保留，不另设资料调用次数额度。provider 推理、签名和 tool ID 只在页面协议内存中保留。流限制仍为累计 SSE 32 MiB、单事件与解码消息各 2 MiB。
 
-opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`client/local-sandbox/card-tests.ts` 负责期限、取消与清理，Worker 使用共享 GameCore、两名玩家及 Chai。`scripts/vite-browser-card-tests.ts` 在开发和生产环境提供同样的独立延迟加载 Worker 产物，报告绑定实际拉取的 Worker 字节。浏览器隔离不提供服务端 isolate 的堆大小或单 hook CPU 限制。
+opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`client/local-sandbox/card-tests.ts` 负责期限、取消与清理，Worker 使用共享 GameCore、两名玩家及 Chai。`scripts/vite-browser-card-tests.ts` 在开发和生产环境提供同样的独立延迟加载 Worker 产物，既用于这些测试，也用于 `client/local-sandbox/opaque-worker.ts` 在独立 opaque iframe 中启动的试玩引擎 Worker；报告绑定实际拉取的 Worker 字节。浏览器隔离不提供服务端 isolate 的堆大小或单 hook CPU 限制。
 
 用户可直接尝试网站已有 provider/model 选择，不再由硬编码模型白名单限制。协议、端点、CORS 与鉴权错误按实际调用反馈，HTTPS 与凭据目的地检查继续保留，后端不接收模型凭据。当前决议与实施边界见[工坊生成简化](https://github.com/titanxxh/open-agricola/issues/1477#issuecomment-6513962005)。
 
@@ -277,7 +277,7 @@ registry。
 
 ### D2. 游戏中加载自定义卡牌
 
-1. 大厅仅在启用 community deck 时通过 `GET /api/workshop/cards?scope=room` 分页列出可进入真实房间的已审核上线卡，创建房间时把勾选结果传入 WS `createRoom.customCardIds`；服务端也只在 `enableCommunityDeck === true` 时接受这些 id，HTTP `/api/game/new-sandbox` 仍用于作者沙盒
+1. 大厅仅在启用 community deck 时通过 `GET /api/workshop/cards?scope=room` 分页列出可进入真实房间的已审核上线卡，创建房间时把勾选结果传入 WS `createRoom.customCardIds`；服务端也只在 `enableCommunityDeck === true` 时接受这些 id；作者试玩只在浏览器沙盒运行（ADR 0052），HTTP `/api/game/new-sandbox` 拒绝工坊卡
 2. `server/connection/room-router.ts` 或 `server/game-router.ts` 从数据库构造 `CustomCardData[]`
 3. `GameSession` 构造时把卡牌定义和运行时实现注册到本局 `SessionCardContext`
 4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从编译产物 + manifest 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
@@ -285,7 +285,7 @@ registry。
 
 ### D3. 沙盒隔离与容错
 
-工坊嵌入只提供对局的 `workshop-game.html`，初始化前只允许同源顶层工坊父页面的直接子窗口。入口只接纳固定的服务器／浏览器沙盒模式，不提供 Room、账号或 WebSocket 路由。嵌套、跨源父窗口和直接打开均只显示独立打开应用的静态链接。主应用仍拒绝所有 iframe 初始化。入口契约与浏览器覆盖见[客户端架构](architecture/client_zh.md)。
+工坊嵌入只提供对局的 `workshop-game.html`，初始化前只允许同源顶层工坊父页面的直接子窗口。入口只接纳固定的浏览器沙盒模式，不提供 Room、账号或 WebSocket 路由。嵌套、跨源父窗口和直接打开均只显示独立打开应用的静态链接。主应用仍拒绝所有 iframe 初始化。入口契约与浏览器覆盖见[客户端架构](architecture/client_zh.md)。
 
 - 所有自定义卡牌效果/监听器调用包裹在 try/catch 中
 - 异常时：记录错误、跳过该效果、游戏继续；当前沙盒会话累计去重后的运行错误，工坊确认门禁提交前重新读取并拒绝带错版本
@@ -537,7 +537,7 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 工坊沙盒                           | `server/workshop.ts`, WorkshopPage SandboxView                                                                               |
 | 自定义卡牌注册表 + catalog fallback    | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts`                                                                 |
 | 自定义卡牌 try-catch 容错             | `shared/cards/card-effects.ts` (CUSTOM_ 前缀卡牌异常时跳过)                                                                           |
-| 可配置人数沙盒游戏（含自定义卡牌）              | `/api/game/new-sandbox`, `server/game-router.ts`                                                                             |
+| 可配置人数 HTTP 沙盒游戏（不含工坊卡）          | `/api/game/new-sandbox`, `server/game-router.ts`                                                                             |
 | WS 多人游戏含自定义卡牌                  | `shared/contract/protocol/ws.ts` (`createRoom.customCardIds`), `server/connection/room-router.ts`                              |
 | LLM 卡牌设计师                      | `client/app/workshop/AiCardDesigner.tsx`, `client/services/llm/`（多 provider 聚合层）                                            |
 | 多 LLM Provider 支持              | Gemini / OpenRouter / DeepSeek / AiHubMix；完整模型表见 §C1.1                                                                       |

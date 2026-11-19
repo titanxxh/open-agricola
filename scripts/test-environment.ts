@@ -50,7 +50,6 @@ if (operation === 'create') {
     ADMIN_USERS: 'e2e_admin',
     PUBLIC_API_BASE: base, PUBLIC_APP_ORIGIN: client, CORS_ORIGIN: client,
     FRONTEND_URL: client, BACKEND_URL: base, VITE_API_BASE: base, VITE_WS_BASE: `ws://127.0.0.1:${backend}/ws`,
-    VITE_SANDBOX_EXECUTOR: process.env.VITE_SANDBOX_EXECUTOR || 'server',
   }
   await writeFile(envPath, Object.entries(values).map(([key, value]) => `${key}='${(value ?? '').replaceAll("'", "'\\''")}'`).join('\n') + '\n', { mode: 0o600 })
 } else {
