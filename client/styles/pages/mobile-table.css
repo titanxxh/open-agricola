@@ -92,6 +92,8 @@
   .game-layout .special-action-card__action-label { font-size: 13px; }
   .game-layout .special-action-card__diagram { gap: 2px; }
   .game-layout .special-action-card__diagram .resource-inline-item { gap: 2px; }
+  .game-layout .special-action-card__payment .resource-inline-item.resource-food { font-size: 15px; padding: 2px 7px 2px 3px; }
+  .game-layout .special-action-card__payment .res-icon { font-size: 20px; }
   .game-layout .moor-action-spaces .player-action-card-wrapper { width: calc((100% - 10px) / 2); }
   .game-layout .board-seasons,
   .game-layout .board-special-actions { min-width: 0; }

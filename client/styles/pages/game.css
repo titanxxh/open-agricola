@@ -1106,6 +1106,16 @@
   background: #eeede7;
   border-color: #c7c7be;
 }
+.special-action-card--paid {
+  border: 2px solid var(--color-accent-strong);
+  background: var(--color-accent-bg);
+  box-shadow: inset 5px 0 0 var(--color-accent-strong);
+}
+.special-action-card--paid-unavailable {
+  border: 2px dashed #6f624c;
+  background: #eeede7;
+  box-shadow: inset 5px 0 0 #6f624c;
+}
 .special-action-card__players {
   margin-bottom: 4px;
   color: #516050;
@@ -1185,10 +1195,48 @@
 .special-action-card__action:disabled .special-action-card__diagram {
   filter: grayscale(1);
 }
-.special-action-card__action.selected {
+.special-action-card__action.selected,
+.special-action-card--paid .special-action-card__action.selected {
   outline: 3px solid #245e47;
   outline-offset: -3px;
   background: #e2ebc9;
+  border-color: #245e47;
+}
+.special-action-card--paid .special-action-card__action:not(:disabled):not(.selected) {
+  border-color: #a8740a;
+  background: #fff8e4;
+}
+.special-action-card--paid .special-action-card__action:hover:not(:disabled):not(.selected),
+.special-action-card--paid .special-action-card__action:focus-visible:not(.selected) {
+  outline: 2px solid #245e47;
+  outline-offset: -2px;
+  background: #fff1c9;
+}
+.special-action-card__payment {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+.special-action-card__payment .resource-inline {
+  justify-content: center;
+}
+.special-action-card__payment .resource-inline-item.resource-food {
+  gap: 2px;
+  padding: 2px 8px 2px 4px;
+  border: 1px solid var(--color-accent-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: #2a1a00;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+.special-action-card__payment .res-icon { font-size: 22px; }
+.special-action-card__payment .resource-inline-amount { font-variant-numeric: tabular-nums; }
+.special-action-card--paid-unavailable .special-action-card__payment .resource-inline-item.resource-food {
+  border-style: dashed;
+  background: #f7f6f2;
 }
 .special-action-card__status {
   margin-top: 6px;
@@ -1196,6 +1244,7 @@
   color: #516050;
   text-align: center;
 }
+.special-action-card__payment + .special-action-card__status { margin-top: 4px; }
 .game-layout__center {
   min-width: 0;
   display: flex;
