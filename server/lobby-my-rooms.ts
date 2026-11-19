@@ -4,7 +4,7 @@ import { waitingSeatIndexes } from '../shared/session/waiting-seats'
 import type { PostgresDatabase } from './database/postgres'
 import { parseRoomBody } from './game/persistence/room-body-codec'
 
-type RoomDetails = Pick<MyActiveRoom, 'players' | 'progress' | 'expansions' | 'waiting_player_indexes'>
+type RoomDetails = Pick<MyActiveRoom, 'players' | 'progress' | 'expansions' | 'waiting_player_indexes' | 'card_edition'>
 type RoomRow = Omit<MyActiveRoom, keyof RoomDetails | 'hotseat'> & {
   state_json: string | null
   occupied_seats: number[]
@@ -44,6 +44,7 @@ function lobbyDetails(state: Record<string, unknown> | null, seats: number[], st
     players: participants,
     progress,
     expansions: expansionFlags.filter(flag => state[flag] === true),
+    ...(state.cardEdition === 'classic' ? { card_edition: 'classic' as const } : {}),
     waiting_player_indexes: waitingSeatIndexes(status, state, seats, actor),
   }
 }

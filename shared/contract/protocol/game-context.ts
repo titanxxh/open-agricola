@@ -38,6 +38,8 @@ export type CompletedGameContextDescriptor = {
     enableFarmersOfTheMoor: boolean
     enableMoorBalanceRules?: boolean
     enableSnakeOpening: boolean
+    /** Present only for a classic game (ADR 0049); absent means revised. */
+    cardEdition?: 'classic'
     players: Array<{
       playerIndex: number
       displayName: string

@@ -21,5 +21,7 @@ export type MyActiveRoom = {
   hotseat: boolean
   progress: LobbyGameProgress | null
   expansions: LobbyExpansion[]
+  /** Present only for a classic game (ADR 0049); absent means revised. */
+  card_edition?: 'classic'
   players: Array<Pick<PlayerState, 'name' | 'nameIsDefault' | 'color'> & { playerIndex: number }>
 }

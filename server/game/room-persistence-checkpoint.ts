@@ -23,6 +23,7 @@ export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
     farmersOfTheMoor: state.enableFarmersOfTheMoor === true,
     moorBalanceRules: state.enableFarmersOfTheMoor === true && state.enableMoorBalanceRules === true,
     snakeOpening: state.enableSnakeOpening === true,
+    ...(state.cardEdition === 'classic' ? { cardEdition: 'classic' } : {}),
     players: scores.map((score, playerIndex) => ({
       playerIndex,
       gamePlayerId: score.playerId,

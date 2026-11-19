@@ -143,6 +143,17 @@ describe('my active room summaries', () => {
     expect(room).not.toHaveProperty('state')
   })
 
+  it('marks a classic game without exposing its decks or hands', async () => {
+    const { db, persistence, snapshot, meta } = await setup()
+    await persistence.save('classic', { ...snapshot, state: { ...snapshot.state, cardEdition: 'classic', classicDeckIds: ['CE'] } },
+      { ...meta, cardEdition: 'classic', classicDeckIds: ['CE'] })
+    await persistence.save('revised', snapshot, meta)
+    const rooms = await listMyActiveRooms(db, 'alice')
+    expect(rooms.find(room => room.id === 'classic')).toMatchObject({ card_edition: 'classic', expansions: [] })
+    expect(rooms.find(room => room.id === 'revised')).not.toHaveProperty('card_edition')
+    expect(JSON.stringify(rooms)).not.toContain('classicDeckIds')
+  })
+
   it.each(['standard', 'occupation', 'farmersOfTheMoorMinor', 'publishedMinor'] satisfies DraftStageKind[])(
     'only circles players with a current packet during the %s draft stage', async stage => {
       const { db, persistence, snapshot, meta } = await setup()

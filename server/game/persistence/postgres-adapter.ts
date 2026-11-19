@@ -57,6 +57,8 @@ type RoomRow = {
   enable_moor_balance_rules: number
   allow_incomplete_farmers_of_the_moor_minor_deal: number
   enable_snake_opening: number
+  card_edition: 'classic' | null
+  classic_deck_ids: string | null
   hotseat: number
   started_at: number | null
   updated_at: number
@@ -141,7 +143,7 @@ type ReplayCustomCardsRow = { custom_cards_json: string }
 class ReplayConflictError extends Error {}
 const REPLAY_ASSET_URL_PATTERN = /^\/replay-assets\/([a-f0-9]{64})$/
 
-const parseCustomCardDbIds = (raw: string | null): string[] => {
+const parseIdList = (raw: string | null): string[] => {
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw) as unknown
@@ -195,6 +197,8 @@ const roomValues = (
   allowIncompleteFarmersOfTheMoorMinorDeal:
     meta.allowIncompleteFarmersOfTheMoorMinorDeal === true ? 1 : 0,
   enableSnakeOpening: meta.enableSnakeOpening === true ? 1 : 0,
+  cardEdition: meta.cardEdition === 'classic' ? 'classic' : null,
+  classicDeckIds: meta.cardEdition === 'classic' ? JSON.stringify(meta.classicDeckIds ?? []) : null,
   hotseat: meta.hotseat === true ? 1 : 0,
   startedAt: meta.startedAt ?? null,
   now,
@@ -220,7 +224,7 @@ const toSnapshot = (
     startedAt: row.started_at,
     maxPlayers: row.max_players,
     ...(row.solo_hand_mode ? { soloHandMode: row.solo_hand_mode } : {}),
-    customCardDbIds: parseCustomCardDbIds(row.custom_card_ids),
+    customCardDbIds: parseIdList(row.custom_card_ids),
     ...(row.custom_cards_runtime_json === null
       ? {}
       : { customCards: parseCustomCards(row.custom_cards_runtime_json) }),
@@ -240,6 +244,9 @@ const toSnapshot = (
     enableMoorBalanceRules: row.enable_moor_balance_rules === 1,
     allowIncompleteFarmersOfTheMoorMinorDeal: row.allow_incomplete_farmers_of_the_moor_minor_deal === 1,
     enableSnakeOpening: row.enable_snake_opening === 1,
+    ...(row.card_edition === 'classic'
+      ? { cardEdition: 'classic' as const, classicDeckIds: parseIdList(row.classic_deck_ids) }
+      : {}),
     hotseat: row.hotseat === 1,
     status: toStatus(row.status),
     colorConfirmationPlayerIndex: row.color_confirmation_player_index ?? undefined,
@@ -301,7 +308,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
-              allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, updated_at
+              allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, card_edition, classic_deck_ids, hotseat,
+              started_at, updated_at
        FROM rooms LEFT JOIN game_creation_configurations ON game_creation_configurations.room_id=rooms.id WHERE id = ?`,
     )
     this.loadPlayers = db.prepare(
@@ -313,13 +321,15 @@ export class PostgresRoomPersistence implements RoomPersistence {
         custom_cards_runtime_json, solo_hand_mode,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
-        allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, created_at, updated_at
+        allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, card_edition, classic_deck_ids, hotseat, started_at,
+        created_at, updated_at
       ) VALUES (
         @id, @createdBy, @invitedUserIds::jsonb, @colorConfirmationPlayerIndex, @stateJson, @inputWindowJson, @endProposalJson, @awaitingRematchPlayers, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
         @customCards, @soloHandMode,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor, @enableMoorBalanceRules,
-        @allowIncompleteFarmersOfTheMoorMinorDeal, @enableSnakeOpening, @hotseat, @startedAt, @now, @now
+        @allowIncompleteFarmersOfTheMoorMinorDeal, @enableSnakeOpening, @cardEdition, @classicDeckIds, @hotseat, @startedAt,
+        @now, @now
       )
       ON CONFLICT(id) DO UPDATE SET
         state_json = COALESCE(excluded.state_json, rooms.state_json),
@@ -342,6 +352,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
         enable_moor_balance_rules = excluded.enable_moor_balance_rules,
         allow_incomplete_farmers_of_the_moor_minor_deal = excluded.allow_incomplete_farmers_of_the_moor_minor_deal,
         enable_snake_opening = excluded.enable_snake_opening,
+        card_edition = excluded.card_edition,
+        classic_deck_ids = excluded.classic_deck_ids,
         hotseat = excluded.hotseat,
         started_at = COALESCE(rooms.started_at, excluded.started_at),
         version = COALESCE(@version, rooms.version),
@@ -382,11 +394,11 @@ export class PostgresRoomPersistence implements RoomPersistence {
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
-        enable_snake_opening, enable_moor_balance_rules
+        enable_snake_opening, enable_moor_balance_rules, card_edition
       ) VALUES (
         @roomId, @startedAt, @finishedAt, @roundsPlayed, @playerCount,
         @communityDeck, @parentCards, @throughTheSeasons, @farmersOfTheMoor,
-        @snakeOpening, @moorBalanceRules
+        @snakeOpening, @moorBalanceRules, @cardEdition
       )
     `)
     this.insertResultPlayer = db.prepare(`
@@ -417,7 +429,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
              rooms.enable_parent_cards, rooms.draft_parents,
              rooms.enable_through_the_seasons, rooms.enable_farmers_of_the_moor,
-             rooms.allow_incomplete_farmers_of_the_moor_minor_deal, rooms.enable_snake_opening, rooms.hotseat,
+             rooms.allow_incomplete_farmers_of_the_moor_minor_deal, rooms.enable_snake_opening,
+             rooms.card_edition, rooms.classic_deck_ids, rooms.hotseat,
              rooms.started_at, rooms.updated_at,
              room_players.user_id AS player_user_id, room_players.player_index
       FROM rooms
@@ -528,6 +541,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         farmersOfTheMoor: result.farmersOfTheMoor ? 1 : 0,
         moorBalanceRules: result.farmersOfTheMoor && result.moorBalanceRules === true ? 1 : 0,
         snakeOpening: result.snakeOpening ? 1 : 0,
+        cardEdition: result.cardEdition === 'classic' ? 'classic' : null,
       }))
       for (const player of result.players) {
         ;(await this.insertResultPlayer.run({
