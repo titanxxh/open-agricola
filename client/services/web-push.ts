@@ -1,0 +1,140 @@
+import {
+  isWebPushId, WEB_PUSH_CLICK_PATH, WEB_PUSH_DEVICE_PATH,
+  WEB_PUSH_UNBIND_PATH, type WebPushClick, type WebPushKind, type WebPushPreferences, type WebPushTarget,
+} from '../../shared/contract/web-push'
+import { API_BASE } from '../config'
+import { browserApiFetch } from './browser-api'
+
+const DEVICE = 'open-agricola:web-push-device-v1'
+const PENDING_UNBIND = 'open-agricola:web-push-unbind-v1'
+
+type LocalBinding = { deviceId: string; userId: string }
+export type WebPushStatus = {
+  publicKey: string | null
+  allowed: WebPushPreferences
+  preferences: WebPushPreferences
+}
+
+export const webPushEnabledBuild = import.meta.env.VITE_PUBLIC_ASSET_WORKER === '1'
+
+function storedValue(key: string): unknown {
+  try { return JSON.parse(localStorage.getItem(key) ?? 'null') } catch { return null }
+}
+
+function currentDevice(): LocalBinding | null {
+  const value = storedValue(DEVICE)
+  return value && typeof value === 'object' && 'deviceId' in value && isWebPushId(value.deviceId)
+    && 'userId' in value && typeof value.userId === 'string' ? { deviceId: value.deviceId, userId: value.userId } : null
+}
+
+function pendingUnbinds(): string[] {
+  const values = storedValue(PENDING_UNBIND)
+  return Array.isArray(values) ? values.filter(isWebPushId) : []
+}
+
+function fetchWebPush(path: string, body: unknown, signal = AbortSignal.timeout(10_000)) {
+  return browserApiFetch(`${API_BASE}${path}`, {
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body), signal,
+  })
+}
+
+async function drainUnbinds(): Promise<void> {
+  for (const deviceId of pendingUnbinds()) {
+    try {
+      const response = await fetchWebPush(WEB_PUSH_UNBIND_PATH, { deviceId })
+      if (!response.ok) continue
+      localStorage.setItem(PENDING_UNBIND, JSON.stringify(pendingUnbinds().filter(id => id !== deviceId)))
+    } catch { return }
+  }
+}
+
+export async function findWebPushRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (!webPushEnabledBuild || !('serviceWorker' in navigator) || !('PushManager' in window)) return null
+  const registration = await navigator.serviceWorker.getRegistration('/')
+  const scriptUrl = new URL('/sw.js', window.location.origin).href
+  return registration?.active?.scriptURL === scriptUrl ? registration : null
+}
+
+export async function reconcileWebPushDevice(userId: string | null): Promise<void> {
+  if (!webPushEnabledBuild) return
+  const binding = currentDevice()
+  if (binding && binding.userId !== userId) {
+    localStorage.setItem(PENDING_UNBIND, JSON.stringify([...new Set([...pendingUnbinds(), binding.deviceId])]))
+    localStorage.removeItem(DEVICE)
+    // A browser may still have the old cookie while it is offline. Remove the
+    // local subscription before relying on any server response.
+    const registration = await findWebPushRegistration().catch(() => null)
+    const subscription = await registration?.pushManager.getSubscription().catch(() => null)
+    await subscription?.unsubscribe().catch(() => false)
+  }
+  await drainUnbinds()
+}
+
+async function deviceFor(userId: string): Promise<LocalBinding> {
+  await reconcileWebPushDevice(userId)
+  const existing = currentDevice()
+  if (existing?.userId === userId) return existing
+  const value = { deviceId: crypto.randomUUID(), userId }
+  localStorage.setItem(DEVICE, JSON.stringify(value))
+  return value
+}
+
+const isPreferences = (value: unknown): value is WebPushPreferences =>
+  !!value && typeof value === 'object' && 'draft' in value && typeof value.draft === 'boolean'
+  && 'bug-report-inbox' in value && typeof value['bug-report-inbox'] === 'boolean'
+
+async function readStatus(response: Response): Promise<WebPushStatus> {
+  if (!response.ok) throw new Error('Notification settings unavailable')
+  const value: unknown = await response.json()
+  if (!value || typeof value !== 'object' || !('ok' in value) || value.ok !== true || !('publicKey' in value)
+    || (value.publicKey !== null && typeof value.publicKey !== 'string')
+    || !('allowed' in value) || !isPreferences(value.allowed)
+    || !('preferences' in value) || !isPreferences(value.preferences)) throw new Error('Invalid notification settings')
+  return { publicKey: value.publicKey, allowed: value.allowed, preferences: value.preferences }
+}
+
+export async function getWebPushStatus(registration: ServiceWorkerRegistration, userId: string): Promise<WebPushStatus> {
+  const binding = await deviceFor(userId)
+  const subscription = await registration.pushManager.getSubscription()
+  return readStatus(await fetchWebPush(WEB_PUSH_DEVICE_PATH, { operation: 'status', accountId: userId, deviceId: binding.deviceId, endpoint: subscription?.endpoint ?? null }))
+}
+
+function applicationServerKey(value: string) {
+  return Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0))
+}
+
+export async function setWebPushPreference(args: {
+  registration: ServiceWorkerRegistration
+  userId: string
+  key: string
+  kind: WebPushKind
+  enabled: boolean
+  locale: string
+}): Promise<WebPushStatus> {
+  const { registration, userId, key, kind, enabled, locale } = args
+  // Subscribe while the browser still has the click's user activation.
+  const device = currentDevice()
+  if (!device || device.userId !== userId) throw new Error('Notification account changed')
+  const subscription = enabled
+    ? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: applicationServerKey(key) })
+    : await registration.pushManager.getSubscription()
+  if (currentDevice()?.deviceId !== device.deviceId) throw new Error('Notification account changed')
+  const status = await readStatus(await fetchWebPush(WEB_PUSH_DEVICE_PATH, {
+    operation: 'set', accountId: userId, deviceId: device.deviceId, subscription: subscription?.toJSON() ?? null, kind, enabled, locale,
+  }))
+  if (!status.preferences.draft && !status.preferences['bug-report-inbox']) await subscription?.unsubscribe().catch(() => false)
+  return status
+}
+
+export async function resolveWebPushClick(click: WebPushClick, accountId: string, signal: AbortSignal): Promise<WebPushTarget> {
+  const response = await fetchWebPush(WEB_PUSH_CLICK_PATH, { ...click, accountId }, signal)
+  if (!response.ok) return { kind: 'unavailable' }
+  const value: unknown = await response.json()
+  if (value && typeof value === 'object' && 'kind' in value && value.kind === click.kind) {
+    if (value.kind === 'draft' && 'roomId' in value && typeof value.roomId === 'string') return { kind: 'draft', roomId: value.roomId }
+    if (value.kind === 'bug-report-inbox' && 'messageId' in value && typeof value.messageId === 'number'
+      && Number.isSafeInteger(value.messageId) && value.messageId > 0) return { kind: 'bug-report-inbox', messageId: value.messageId }
+  }
+  return { kind: 'unavailable' }
+}
