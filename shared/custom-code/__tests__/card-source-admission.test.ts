@@ -39,6 +39,7 @@ describe('native Card Source admission (ADR 0052)', () => {
     [WOODPILE_SOURCE.replace("deck: 'community'", "deck: 'A'"), "meta.deck must be 'community'"],
     [WOODPILE_SOURCE.replace("name: 'Woodpile Hook'", 'name: makeName()'), 'meta.name: must be a literal value'],
     [WOODPILE_SOURCE.replace("const CARD_ID = 'CUSTOM_WoodpileHook'", "const CARD_ID = 'CUSTOM_Other'"), "meta.id must be 'CUSTOM_WoodpileHook'"],
+    [WOODPILE_SOURCE.replace("defineMinorCard({\n  meta: {", "defineMinorCard({\n  meta: META,\n  extra: {"), 'meta must be written inline as an object literal'],
   ])('rejects a structural problem (%#)', (source, error) => {
     const result = admitNativeCardSource(source, 'CUSTOM_WoodpileHook')
     expect(result.valid).toBe(false)
