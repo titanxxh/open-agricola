@@ -12,9 +12,9 @@ import type {
 
 const HASHED_FILE = /^(catalog|search)\.[a-f0-9]{16}\.json$/
 
-const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
+export const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
 
-const publish = (path: string, content: string) => {
+export const publishArtifact = (path: string, content: string) => {
   try {
     if (readFileSync(path, 'utf8') === content) return
   } catch (error) {
@@ -33,7 +33,7 @@ const publishHashed = (outputDir: string, name: string, value: unknown): CardEnc
   const text = `${JSON.stringify(value)}\n`
   const digest = sha256(text)
   const file = `${name}.${digest.slice(0, 16)}.json`
-  publish(resolve(outputDir, file), text)
+  publishArtifact(resolve(outputDir, file), text)
   return { file, sha256: digest }
 }
 
@@ -60,7 +60,7 @@ export const writeCardEncyclopedia = ({ outputDir, entries, documents, languages
     catalog: publishHashed(outputDir, 'catalog', catalog),
     search: publishHashed(outputDir, 'search', search),
   }
-  publish(resolve(outputDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+  publishArtifact(resolve(outputDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
   const current = new Set([manifest.catalog.file, manifest.search.file])
   for (const file of readdirSync(outputDir)) {
     if (HASHED_FILE.test(file) && !current.has(file)) rmSync(resolve(outputDir, file), { force: true })

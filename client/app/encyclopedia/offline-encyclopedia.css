@@ -1,0 +1,23 @@
+.encyclopedia-offline {
+  margin-block: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+}
+
+.encyclopedia-offline h2 {
+  margin-block: 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.encyclopedia-offline p {
+  margin-block: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+.encyclopedia-offline__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
