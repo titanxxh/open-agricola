@@ -148,5 +148,7 @@ Explicit format migrations precede ordinary restoration and preserve the game's 
 
 The explicit ordinary-pet rule in ADR 0026 is the assignment exception. After restoring its rules or a command checkpoint, the Core reconciles an existing ordinary pet to the legal room without changing animal totals or emitting placement events. Pending animal-reorganization zones are projected again from the restored state.
 
+Acquisition origin stays with the private reorganization continuation, so restoring the current request can rederive reserve-cooking offers from the live rules. A retained continuation without the origin resumes its ordinary reorganization. [ADR 0048](../adr/0048-cook-reserve-animals-during-reorganization.md)
+
 Tests: `server/__tests__/session-recovery-data.test.ts`, `server/__tests__/room-animal-holders-session.test.ts`.
 

@@ -150,5 +150,7 @@ type SessionResponse = {
 
 ADR 0026 明确规定的普通宠物位置是安置数据的例外。Core 恢复规则或命令检查点后，把已有普通宠物移到合法房间，不改变动物总量，也不发出新安置事件。未完成的动物重整区域根据恢复后的状态重新投影。
 
+取得动物的来源随私有重整续行保存。恢复等待请求时，按实时规则重新派生待安置动物烹饪配方。缺少来源的保留续行恢复普通动物重整。 [ADR 0048](../adr/0048-cook-reserve-animals-during-reorganization.md)
+
 测试：`server/__tests__/session-recovery-data.test.ts`、`server/__tests__/room-animal-holders-session.test.ts`。
 
