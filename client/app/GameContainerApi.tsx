@@ -27,7 +27,7 @@ import { assertSupportedSetupQuery, isHotseatSetupQuery, parseDraftParamsFromQue
 import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { HotseatHandoff } from './HotseatHandoff'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
-import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
+import { LOCAL_SANDBOX_STATUS, readLocalSandboxConfig, type LocalSandboxStatus } from '../local-sandbox/workshop-launch'
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
@@ -188,6 +188,14 @@ const useTransportSetup = (
       onRecovered: () => { window.alert(t(locale, 'platform.localSandboxTimeout')) },
     })
     window.addEventListener('pagehide', () => { void saver.flush() })
+    // The Workshop parent binds its playtest to this launch and reads card warnings from here.
+    let runningInstanceId = config.instanceId ?? ''
+    const postStatus = (status: LocalSandboxStatus) => {
+      if (window.parent !== window) window.parent.postMessage(status, window.location.origin)
+    }
+    transport.onSnapshot(payload => postStatus({
+      type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: runningInstanceId, cardWarnings: payload.cardWarnings ?? [],
+    }))
 
     // An explicit restart skips the resume prompt.
     const forceFresh = new URLSearchParams(window.location.search).get('freshSandbox') === '1'
@@ -204,8 +212,10 @@ const useTransportSetup = (
         const persisted = forceFresh ? null : await loadResumable(store)
         if (persisted && window.confirm(t(locale, 'platform.localSandboxResume'))) {
           try {
+            runningInstanceId = persisted.config.instanceId ?? ''
             await transport.startFromPersisted(persisted)
           } catch {
+            runningInstanceId = config.instanceId ?? ''
             await transport.start()
           }
         } else {
@@ -217,7 +227,9 @@ const useTransportSetup = (
         setLocalReady(true)
       } catch (err) {
         console.error('[local-sandbox] failed to start:', err)
-        window.alert(err instanceof Error ? err.message : String(err))
+        const error = err instanceof Error ? err.message : String(err)
+        postStatus({ type: LOCAL_SANDBOX_STATUS, kind: 'failed', instanceId: runningInstanceId, error })
+        window.alert(error)
       }
     }
     void init()
@@ -386,10 +398,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
   const roomId = roomIdFromQuery(window.location.search)
-  // Gate on the configured executor too, so flipping VITE_SANDBOX_EXECUTOR back
-  // to 'server' is an effective kill switch: a reload of an already-open
-  // localSandbox=1 tab (new bundle) no longer runs custom code in the browser.
-  const isLocalMode = currentUrlParams.get('localSandbox') === '1' && isBrowserSandbox()
+  const isLocalMode = currentUrlParams.get('localSandbox') === '1'
   const isWsMode = !isLocalMode && (roomId !== null || currentUrlParams.get('transport') === 'ws')
   const isEmbedded = currentUrlParams.get('embedded') === '1'
   // Confirmation is scoped to this room and the seat holding the shared device.

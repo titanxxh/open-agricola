@@ -3,8 +3,11 @@
 // @covers client/app/application-bootstrap.ts
 import { expect, test, type Page } from '@playwright/test'
 
-const query = '?page=game&player=p1&embedded=1&devMode=1'
+// Workshop playtests run only in the browser sandbox (ADR 0052).
+const query = '?page=game&embedded=1&devMode=1&localSandbox=1'
 const entry = `/workshop-game.html${query}`
+const devEntry = '/workshop-game.html?page=game&player=p1&embedded=1&devMode=1&localSandbox=1'
+const retiredServerEntry = '/workshop-game.html?page=game&player=p1&embedded=1&devMode=1'
 
 function observeStartup(page: Page) {
   const requests: string[] = []
@@ -82,10 +85,11 @@ for (const suffix of ['&room=private-room', '&transport=ws', '&page=login', '&co
 }
 
 for (const { parent, child } of [
-  { parent: '/?page=workshop', child: `${entry}&localSandbox=1` },
-  { parent: '/?page=workshop&player=p1&devMode=1', child: '/workshop-game.html?page=game&embedded=1&devMode=1&localSandbox=1' },
+  { parent: '/?page=workshop', child: devEntry },
+  { parent: '/?page=workshop&player=p1&devMode=1', child: entry },
+  { parent: '/?page=workshop&player=p1&devMode=1', child: retiredServerEntry },
 ]) {
-  test(`the local entry cannot change its parent's identity mode ${parent}`, async ({ page, baseURL }) => {
+  test(`the local entry cannot change its parent's identity mode ${parent} -> ${child}`, async ({ page, baseURL }) => {
     if (!baseURL) throw new Error('The frontend URL is required')
     await page.route(`${baseURL}${parent}`, route => route.fulfill({
       contentType: 'text/html', body: documentWithFrame(child),
@@ -108,10 +112,9 @@ test('the real top-level Workshop starts its game through the bounded entry', as
   await page.getByRole('button', { name: 'Enter Sandbox' }).click()
   await page.locator('.ws-sandbox-btns').getByRole('button', { name: 'Start Sandbox' }).click()
   const iframe = page.locator('iframe[title="Sandbox"]')
-  await expect(iframe).toHaveAttribute('src', /^\/workshop-game\.html\?page=game&player=p1&embedded=1&devMode=1/)
+  await expect(iframe).toHaveAttribute('src', /^\/workshop-game\.html\?page=game&player=p1&embedded=1&devMode=1&localSandbox=1/)
   const game = page.frameLocator('iframe[title="Sandbox"]')
   await expect(game.locator('.action-board')).toBeVisible({ timeout: 30_000 })
   await expect(game.locator('.farm-grid').first()).toBeVisible()
-  if (process.env.VITE_SANDBOX_EXECUTOR === 'browser') expect(gameRequests).toEqual([])
-  else expect(gameRequests.length).toBeGreaterThan(0)
+  expect(gameRequests).toEqual([])
 })

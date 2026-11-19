@@ -5,6 +5,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { LocaleProvider, useLocale } from '../../../contexts/LocaleContext'
+import { LOCAL_SANDBOX_STATUS } from '../../../local-sandbox/workshop-launch'
 import {
   AiCardDesigner,
   CARD_ART_BADGE_RATIO,
@@ -603,24 +604,13 @@ describe('AiCardDesigner AI config header', () => {
       sandboxPassVersionId: null,
       sandboxPassedAt: null,
     }
-    let sandboxStateReads = 0
-    let releaseState: (() => void) | undefined
+    let releasePass: (() => void) | undefined
     let includePinnedIdentity = false
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       if (path.includes('scope=mine')) {
         return new Response(JSON.stringify({ ok: true, cards: [completeCard] }))
       }
-      if (path === '/api/game/state') {
-        sandboxStateReads += 1
-        if (completion === 'unmount' && sandboxStateReads === 2) return new Promise<Response>(resolve => {
-          releaseState = () => resolve(new Response(JSON.stringify({ ok: true, gameInstanceId: 'tested-instance', cardWarnings: [] })))
-        })
-        return new Response(JSON.stringify({
-          ok: true,
-          cardWarnings: sandboxStateReads === 1 ? ['runtime hook failed'] : [],
-          gameInstanceId: 'tested-instance',
-        }))
-      }
+      if (path === '/api/game/state') throw new Error('The browser sandbox reports its own status')
       if (path.endsWith('/versions')) return new Response(JSON.stringify({ ok: true, versions: [] }))
       if (!init) {
         return new Response(JSON.stringify({ ok: true, workspace: baseWorkspace }))
@@ -631,9 +621,10 @@ describe('AiCardDesigner AI config header', () => {
           workspace: baseWorkspace,
           versionId: 'version-2',
           cardJson: { ...(includePinnedIdentity ? { id: 'CUSTOM_TestedB', card_type: 'minor', name: 'Pinned B' } : {}), _code: 'fixed version B source' },
+          artUrl: '/card-art/pinned.png',
         }))
       }
-      return new Response(JSON.stringify({
+      const passed = new Response(JSON.stringify({
         ok: true,
         workspace: {
           ...baseWorkspace,
@@ -641,27 +632,31 @@ describe('AiCardDesigner AI config header', () => {
           sandboxPassedAt: 100,
         },
       }))
+      if (completion === 'unmount') return new Promise<Response>(resolve => { releasePass = () => resolve(passed) })
+      return passed
     })
     const startSandbox = vi.fn(async () => false)
     startSandbox
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(true)
-
-    const mounted = render(
+    const sandboxPlaytest = {
+      instanceId: 'tested-instance', warningScope: 'single-custom-card' as const,
+      source: { workspaceId: completeCard.id, versionId: 'version-2', source: 'fixed version B source', sourceFingerprint: 'tested-source', identity: { id: 'CUSTOM_TestedB', type: 'minor' as const, name: 'Pinned B' } },
+    }
+    const designer = (cardWarnings: string[]) => (
       <LocaleProvider>
         <AiCardDesigner
           initialCard={completeCard}
           onClose={() => {}}
           onAddToSandboxAndRestart={startSandbox}
-          sandboxPlaytest={{
-            instanceId: 'tested-instance', warningScope: 'single-custom-card',
-            source: { workspaceId: completeCard.id, versionId: 'version-2', source: 'fixed version B source', sourceFingerprint: 'tested-source', identity: { id: 'CUSTOM_TestedB', type: 'minor', name: 'Pinned B' } },
-          }}
+          sandboxPlaytest={sandboxPlaytest}
+          sandboxStatus={{ type: LOCAL_SANDBOX_STATUS, kind: 'running', instanceId: 'tested-instance', cardWarnings }}
           apiFetch={apiFetch}
         />
-      </LocaleProvider>,
+      </LocaleProvider>
     )
+    const mounted = render(designer(['runtime hook failed']))
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /验证与交付\s*沙盒测试和发布检查/ }))
@@ -672,7 +667,7 @@ describe('AiCardDesigner AI config header', () => {
     await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
     await waitFor(() => expect(startSandbox).toHaveBeenCalledWith(
       completeCard.id,
-      'version-2',
+      { cardType: 'minor', cardJson: { id: 'CUSTOM_TestedB', card_type: 'minor', name: 'Pinned B' }, source: 'fixed version B source', artUrl: '/card-art/pinned.png' },
       expect.objectContaining({ workspaceId: completeCard.id, versionId: 'version-2', source: 'fixed version B source', identity: { id: 'CUSTOM_TestedB', type: 'minor', name: 'Pinned B' } }),
     ))
     expect(screen.queryByRole('checkbox', {
@@ -689,28 +684,28 @@ describe('AiCardDesigner AI config header', () => {
     await waitFor(() => expect(screen.getByText('先修复已知沙盒错误并重新固化。')).toBeInTheDocument())
     expect(apiFetch.mock.calls.some(([path]) => path.endsWith('/sandbox-pass'))).toBe(false)
 
+    mounted.rerender(designer([]))
     await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
     await waitFor(() => expect(startSandbox).toHaveBeenCalledTimes(3))
     await userEvent.click(screen.getByRole('checkbox', {
       name: '我确认这个固定版本在沙盒中没有运行错误',
     }))
     await userEvent.click(screen.getByRole('button', { name: '确认沙盒通过' }))
-    if (completion === 'unmount') {
-      await waitFor(() => expect(releaseState).toBeTypeOf('function'))
-      mounted.unmount()
-      await act(async () => { releaseState!() })
-      expect(apiFetch.mock.calls.some(([path]) => path.endsWith('/sandbox-pass'))).toBe(false)
-      return
-    }
-    await waitFor(() => expect(screen.getByText('已满足社区 PR 交接门槛')).toBeInTheDocument())
-
-    const passCall = apiFetch.mock.calls.find(([path]) => path.endsWith('/sandbox-pass'))
-    expect(JSON.parse(String(passCall?.[1]?.body))).toEqual({
+    const passCall = () => apiFetch.mock.calls.find(([path]) => path.endsWith('/sandbox-pass'))
+    await waitFor(() => expect(passCall()).toBeDefined())
+    expect(JSON.parse(String(passCall()?.[1]?.body))).toEqual({
       versionId: 'version-2',
       authorConfirmed: true,
       runtimeErrors: [],
     })
-    expect(sandboxStateReads).toBe(2)
+    if (completion === 'unmount') {
+      await waitFor(() => expect(releasePass).toBeTypeOf('function'))
+      mounted.unmount()
+      await act(async () => { releasePass!() })
+      return
+    }
+    await waitFor(() => expect(screen.getByText('已满足社区 PR 交接门槛')).toBeInTheDocument())
+    expect(apiFetch.mock.calls.some(([path]) => path === '/api/game/state')).toBe(false)
   })
 
   it('restores version history and offers one local undo', async () => {

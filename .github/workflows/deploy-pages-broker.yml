@@ -39,7 +39,6 @@ jobs:
           PUBLIC_APP_ORIGIN: ${{ vars.PUBLIC_APP_ORIGIN }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
           VITE_ENABLE_COMMUNITY_DECK: ${{ vars.VITE_ENABLE_COMMUNITY_DECK }}
-          VITE_SANDBOX_EXECUTOR: ${{ vars.VITE_SANDBOX_EXECUTOR }}
         run: node scripts/ci/pages-deployment.ts build --repository "$GITHUB_REPOSITORY"
 
       - uses: actions/upload-pages-artifact@v5

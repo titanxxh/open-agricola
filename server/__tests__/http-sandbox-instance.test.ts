@@ -6,7 +6,6 @@ type MockRes = ServerResponse & { statusCode: number; body: string }
 import { getDb } from '../db'
 import { classicFixtureCards } from '../../shared/cards/__tests__/__fixtures__/classic-definitions'
 import { withClassicCardDefinitions } from '../../shared/cards/classic-catalog'
-import { seedResourceCatalog } from './_helpers/objects'
 vi.mock('../db', async () => {
   const { createTestDatabase } = await import('./_helpers/postgres')
   const db = await createTestDatabase()
@@ -46,15 +45,21 @@ const mockRes = (): MockRes => {
   } as unknown as MockRes
 }
 
-describe('sandbox version binding', () => {
-  it('loads the requested immutable workshop version instead of the mutable draft', async () => {
-    const { getDb } = await import('../db.ts')
-    const {
-      adoptCandidate,
-      checkpointDraft,
-      createCard,
-      approveCurrentDraft,
-    } = await import('../workshop-drafts.ts')
+describe('HTTP sandbox', () => {
+  it('rejects Workshop cards, which are playtested only in the browser sandbox', async () => {
+    const { handleGameRoute } = await import('../game-router.ts')
+    for (const body of [
+      { seed: 42, customCardIds: ['workshop-card'] },
+      { seed: 42, customCardVersions: [{ cardId: 'workshop-card', versionId: 'version-1' }] },
+    ]) {
+      const response = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', body, 'sandbox-token'), response)
+      expect(response.statusCode).toBe(400)
+      expect(JSON.parse(response.body)).toEqual({ ok: false, error: 'Workshop cards are playtested only in the browser sandbox' })
+    }
+  })
+
+  it('gives every start, load and reset its own game instance', async () => {
     const db = getDb()
     const now = Date.now()
     ;(await db.prepare(`
@@ -64,86 +69,12 @@ describe('sandbox version binding', () => {
     ;(await db.prepare(`
       INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version) VALUES ('sandbox-token', 'author', ?, ?, 2)
     `).run(now + 3_600_000, now))
-    const original = (await createCard(db, {
-      authorId: 'author',
-      draft: {
-        cardId: 'CUSTOM_PinnedVersion',
-        cardType: 'minor',
-        name: 'Pinned Version',
-        description: '',
-        cardJson: {
-          id: 'CUSTOM_PinnedVersion',
-          name: 'Pinned Version',
-          card_type: 'minor',
-          deck: 'CUSTOM',
-          number: 0,
-          desc: [],
-          cost: {},
-          vp: 0,
-          implemented: true,
-        },
-        effectCode: null,
-        compiledCode: null,
-        codeManifest: null,
-        artUrl: null,
-        generation: {},
-      },
-    }))
-    await seedResourceCatalog(db, ['pinned.png'])
-    const pinned = (await adoptCandidate(db, {
-      cardId: original.id,
-      authorId: 'author',
-      baseRevision: 1,
-      candidate: {
-        id: 'art-pinned',
-        kind: 'art',
-        prompt: 'pinned',
-        promptFormat: 'subject',
-        resultUrl: '/card-art/pinned.png',
-        createdAt: now,
-      },
-    }))
-    const approved = (await approveCurrentDraft(db, { cardId: original.id, authorId: 'author' }))
-    expect(approved.versionId).toBe(pinned.versionId)
-    // author keeps editing offline; the approval goes stale but the pinned
-    // immutable version stays loadable for the author sandbox
-    ;(await checkpointDraft(db, {
-      cardId: original.id,
-      authorId: 'author',
-      baseRevision: 2,
-      draft: {
-        ...pinned.workspace.draft,
-        cardId: 'CUSTOM_MutableDraft',
-        name: 'Mutable Draft',
-        cardJson: {
-          ...pinned.workspace.draft.cardJson,
-          id: 'CUSTOM_MutableDraft',
-          name: 'Mutable Draft',
-        },
-      },
-    }))
     const { handleGameRoute } = await import('../game-router.ts')
     const startRes = mockRes()
-    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-      seed: 42,
-      customCardIds: [original.id],
-      customCardVersions: [{
-        cardId: original.id,
-        versionId: pinned.versionId,
-      }],
-    }, 'sandbox-token'), startRes)
-
+    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', { seed: 42, customCardIds: [] }, 'sandbox-token'), startRes)
     expect(startRes.statusCode).toBe(200)
-    expect(JSON.parse(startRes.body)).toMatchObject({
-      ok: true,
-      customCardsLoaded: 1,
-      customCardVersionsLoaded: [{
-        cardId: original.id,
-        versionId: pinned.versionId,
-      }],
-    })
-
     const started = JSON.parse(startRes.body)
+    expect(started).toMatchObject({ ok: true, customCardsLoaded: 0, customCardVersionsLoaded: [] })
     expect(started.gameInstanceId).toEqual(expect.any(String))
     const readRes = mockRes()
     await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), readRes)
@@ -164,48 +95,25 @@ describe('sandbox version binding', () => {
     expect(loaded.gameInstanceId).not.toBe(started.gameInstanceId)
     expect(loaded.state.gameSeed).toBe(started.state.gameSeed)
 
-    const drawRes = mockRes()
-    await handleGameRoute(mockReq('POST', '/api/game/dev/draw-card', {
-      playerIndex: 0,
-      cardId: 'CUSTOM_PinnedVersion',
-    }, 'sandbox-token'), drawRes)
-    expect(drawRes.statusCode).toBe(200)
-
-    const defaultStartRes = mockRes()
-    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-      seed: 42,
-      customCardIds: [original.id],
-    }, 'sandbox-token'), defaultStartRes)
-    expect(defaultStartRes.statusCode).toBe(200)
-    const restarted = JSON.parse(defaultStartRes.body)
+    const restartRes = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', { seed: 42 }, 'sandbox-token'), restartRes)
+    expect(restartRes.statusCode).toBe(200)
+    const restarted = JSON.parse(restartRes.body)
     expect(restarted.gameInstanceId).not.toBe(started.gameInstanceId)
     expect(restarted.gameInstanceId).not.toBe(loaded.gameInstanceId)
     expect(restarted.state.gameSeed).toBe(started.state.gameSeed)
     const restartedReadRes = mockRes()
     await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), restartedReadRes)
     expect(JSON.parse(restartedReadRes.body).gameInstanceId).toBe(restarted.gameInstanceId)
-    expect(JSON.parse(defaultStartRes.body)).toMatchObject({
-      ok: true,
-      customCardsLoaded: 1,
-      customCardVersionsLoaded: [],
-    })
-
-    const defaultDrawRes = mockRes()
-    await handleGameRoute(mockReq('POST', '/api/game/dev/draw-card', {
-      playerIndex: 0,
-      cardId: 'CUSTOM_PinnedVersion',
-    }, 'sandbox-token'), defaultDrawRes)
-    expect(defaultDrawRes.statusCode).toBe(200)
 
     const classicCards = [...classicFixtureCards('CE', 'occupation', 21), ...classicFixtureCards('CI', 'minor', 21)]
     await withClassicCardDefinitions(classicCards, async () => {
       const classicStart = mockRes()
       await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
         cardEdition: 'classic', classicDeckIds: ['CI', 'CE'], playerCount: 3, seed: 42, enableSnakeOpening: true,
-        customCardVersions: [{ cardId: original.id, versionId: pinned.versionId }],
       }, 'sandbox-token'), classicStart, true)
       const initial = JSON.parse(classicStart.body)
-      expect(initial).toMatchObject({ ok: true, customCardsLoaded: 1 })
+      expect(initial).toMatchObject({ ok: true, customCardsLoaded: 0 })
       const reset = (instanceId: string, enabled: boolean) => {
         const response = mockRes()
         return handleGameRoute(mockReq('POST', '/api/game/reset-sandbox', {
@@ -229,8 +137,7 @@ describe('sandbox version binding', () => {
         body: {
           ok: true,
           state: { gameSeed: 93, cardEdition: 'classic', classicDeckIds: ['CI', 'CE'], enableSnakeOpening: true },
-          customCardVersionsLoaded: [{ cardId: original.id, versionId: pinned.versionId }],
-          customCardDefs: [{ cardJson: { id: 'CUSTOM_PinnedVersion' } }],
+          customCardVersionsLoaded: [],
         },
       })
       expect(resetGame.body.state.players).toHaveLength(3)
@@ -242,6 +149,5 @@ describe('sandbox version binding', () => {
       await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), current, true)
       expect(JSON.parse(current.body).gameInstanceId).toBe(resetGame.body.gameInstanceId)
     })
-
   })
 })

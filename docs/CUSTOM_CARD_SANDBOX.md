@@ -620,7 +620,7 @@ Important rules:
 
 ## 8. Browser-local executor parity
 
-The browser-local executor in `client/local-sandbox/browser-executor.ts`, used when `VITE_SANDBOX_EXECUTOR=browser`, runs a user's own source in the browser without an isolate. Its premise is that the user can affect only their own browser. Its injection contract exactly matches the server isolate in `server/custom-code/isolate-runner.ts`:
+The browser-local executor in `client/local-sandbox/browser-executor.ts`, the only Workshop playtest path (ADR 0052), runs a user's own source in the browser without an isolate, inside the opaque-origin engine frame. Its premise is that the user can affect only their own browser. Its injection contract exactly matches the server isolate in `server/custom-code/isolate-runner.ts`:
 
 - It exposes the same `MinorImprovement(def) => def`, `Occupation(def) => def`, simplified `console`, and every helper in section 1 through the same string constants in `shared/custom-code/injected-helpers.ts`.
 - Inputs use `JSON.parse(JSON.stringify(...))` and outputs complete a JSON round trip.

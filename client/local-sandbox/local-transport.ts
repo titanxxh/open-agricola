@@ -1,7 +1,8 @@
 /**
  * LocalGameTransport — `GameTransport` implementation backed by the
  * local-sandbox engine worker. The whole game (engine + custom card code)
- * runs in the author's browser; no server round-trips.
+ * runs in the author's browser, inside an opaque-origin iframe; no server
+ * round-trips.
  *
  * Timeout recovery: if the worker does not answer within `timeoutMs`
  * (runaway card code), it is terminated and rebuilt from the last good
@@ -23,6 +24,7 @@ import type {
   ViewerSpec,
 } from './protocol.ts'
 import type { FarmChoiceType } from '../../shared/session/farm-choice-validation.ts'
+import { createOpaqueEngineWorker } from './opaque-worker.ts'
 
 export type WorkerLike = {
   postMessage(message: LocalSandboxRequest): void
@@ -32,7 +34,7 @@ export type WorkerLike = {
 }
 
 export type LocalTransportOptions = {
-  /** Injected in tests; defaults to spawning the real module worker. */
+  /** Injected in tests; defaults to the engine Worker inside an opaque iframe. */
   workerFactory?: () => WorkerLike
   /** Per-request deadline before the worker is considered stuck. */
   timeoutMs?: number
@@ -45,8 +47,7 @@ export type LocalTransportOptions = {
 
 const DEFAULT_TIMEOUT_MS = 10_000
 
-const defaultWorkerFactory = (): WorkerLike =>
-  new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as WorkerLike
+const defaultWorkerFactory = (): WorkerLike => createOpaqueEngineWorker()
 
 type PendingEntry = {
   resolve: (response: LocalSandboxResponse & { ok: true }) => void

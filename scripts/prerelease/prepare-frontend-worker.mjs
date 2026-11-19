@@ -8,7 +8,8 @@ const [worker, directory] = process.argv.slice(2)
 if (process.env.RELEASE_CHANNEL !== 'prerelease' || process.env.OA_PREPARED_FRONTEND_WORKERS || !directory ||
     !['card-tests', 'sandbox'].includes(worker)) throw new Error('Expected an independent prerelease worker preparation')
 const entry = 'virtual:prerelease-prepare-worker'
-const input = worker === 'sandbox' ? 'import url from "/client/local-sandbox/worker.ts?worker&url"; console.log(url)'
+// Both Workers are self-contained opaque-frame bundles emitted for their host module.
+const input = worker === 'sandbox' ? 'import * as host from "/client/local-sandbox/opaque-worker.ts"; console.log(host)'
   : 'import * as tests from "/client/local-sandbox/card-tests.ts"; console.log(tests)'
 // vite.config.ts selects production data defines using the CLI build argument.
 process.argv.push('build')
@@ -22,9 +23,8 @@ const result = await build({
   }],
 })
 const outputs = (Array.isArray(result) ? result : [result]).flatMap(result => result.output ?? [])
-const pattern = worker === 'sandbox' ? /^assets\/worker-[\w-]+\.js$/ : /^assets\/card-tests\.worker-[\w-]+\.js$/
+const pattern = worker === 'sandbox' ? /^assets\/local-sandbox\.worker-[\w-]+\.js$/ : /^assets\/card-tests\.worker-[\w-]+\.js$/
 const bundles = outputs.filter(output => output.type === 'asset' && pattern.test(output.fileName))
 if (bundles.length !== 1) throw new Error('Expected one native Vite ' + worker + ' worker')
 const [bundle] = bundles
 writeFileSync(join(directory, worker + '.js'), bundle.source, { flag: 'wx' })
-if (worker === 'sandbox') writeFileSync(join(directory, 'sandbox-name'), bundle.fileName, { flag: 'wx' })

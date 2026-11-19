@@ -3,11 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { startWorkshopGame, workshopGameUrl } from '../bootstrap'
 
 const query = '?page=game&player=p1&embedded=1&devMode=1'
+// The server sandbox mode is retired (ADR 0052); only the browser mode starts.
 const localQuery = '?page=game&embedded=1&devMode=1&localSandbox=1'
 const origin = 'https://formal.titanxxh.com'
 const devParent = `${origin}/?page=workshop&player=p1&devMode=1`
 
-function embed(childQuery = query, parentUrl = `${origin}/?page=workshop`, base = '/') {
+function embed(childQuery = localQuery, parentUrl = `${origin}/?page=workshop`, base = '/') {
   vi.stubEnv('BASE_URL', base)
   const parent = { location: new URL(parentUrl) }
   const child = { parent, top: parent, location: new URL(`${origin}${base}workshop-game.html${childQuery}`) }
@@ -33,7 +34,7 @@ async function expectInert() {
 }
 
 describe('Workshop game entry', () => {
-  it.each([query, localQuery, `${localQuery}&freshSandbox=1`])('starts the bounded sandbox %s', async childQuery => {
+  it.each([localQuery, `${localQuery}&freshSandbox=1`])('starts the bounded sandbox %s', async childQuery => {
     embed(childQuery)
     const start = vi.fn().mockResolvedValue(undefined)
     await startWorkshopGame(document.body, start)
@@ -41,13 +42,13 @@ describe('Workshop game entry', () => {
   })
 
   it.each(['/', '/open-agricola/'])('preserves the %s application base', async base => {
-    const child = embed(query, `${origin}${base}index.html?page=workshop&view=sandbox`, base)
+    const child = embed(localQuery, `${origin}${base}index.html?page=workshop&view=sandbox`, base)
     const start = vi.fn().mockResolvedValue(undefined)
     await startWorkshopGame(document.body, start)
     expect(start).toHaveBeenCalledOnce()
     vi.stubGlobal('window', child.parent)
-    expect(workshopGameUrl(false, false)).toBe(`${base}workshop-game.html${query}`)
-    expect(workshopGameUrl(true, true)).toBe(`${base}workshop-game.html${localQuery}&freshSandbox=1`)
+    expect(workshopGameUrl(false)).toBe(`${base}workshop-game.html${localQuery}`)
+    expect(workshopGameUrl(true)).toBe(`${base}workshop-game.html${localQuery}&freshSandbox=1`)
   })
 
   it.each([
@@ -62,7 +63,7 @@ describe('Workshop game entry', () => {
     await startWorkshopGame(document.body, start)
     expect(start).toHaveBeenCalledOnce()
     vi.stubGlobal('window', child.parent)
-    expect(workshopGameUrl(true, false)).toBe(`/workshop-game.html${childQuery}`)
+    expect(workshopGameUrl(false)).toBe(`/workshop-game.html${childQuery}`)
   })
 
   it.each([
@@ -96,7 +97,7 @@ describe('Workshop game entry', () => {
     `${origin}/workshop-game.html?page=workshop`,
     `${origin}/untrusted/?page=workshop`,
   ])('rejects an unexpected parent %s', async parent => {
-    embed(query, parent)
+    embed(localQuery, parent)
     await expectInert()
   })
 
@@ -108,11 +109,10 @@ describe('Workshop game entry', () => {
   })
 
   it.each([
-    '', '?page=login', query.replace('player=p1', 'player=p2'),
-    query.replace('embedded=1', 'embedded=0'), `${query}&room=room-id`,
-    `${query}&transport=ws`, `${query}&context=secret`, `${query}&account=1`,
-    `${query}&page=game`, `${query}&localSandbox=0`, `${query}&freshSandbox=1`,
-    `${query}&localSandbox=1&freshSandbox=0`, `${query}#code=secret`,
+    '', '?page=login', query, `${query}&freshSandbox=1`, localQuery.replace('embedded=1', 'embedded=0'),
+    `${localQuery}&room=room-id`, `${localQuery}&transport=ws`, `${localQuery}&context=secret`, `${localQuery}&account=1`,
+    `${localQuery}&page=game`, localQuery.replace('localSandbox=1', 'localSandbox=0'), `${localQuery}&player=p2`,
+    `${localQuery}&freshSandbox=0`, `${localQuery}#code=secret`,
   ])('rejects an unexpected child route %s', async childQuery => {
     embed(childQuery)
     await expectInert()
@@ -120,7 +120,7 @@ describe('Workshop game entry', () => {
 
   it('rejects the main application pathname even with a sandbox query', async () => {
     const child = embed()
-    vi.stubGlobal('window', { ...child, location: new URL(`${origin}/${query}`) })
+    vi.stubGlobal('window', { ...child, location: new URL(`${origin}/${localQuery}`) })
     await expectInert()
   })
 })

@@ -88,7 +88,7 @@ for (const provider of ['github', 'google'] as const) {
           }
           if (url.pathname === '/client/config.ts') {
             res.setHeader('Content-Type', 'text/javascript')
-            res.end(`export const API_BASE=${JSON.stringify(apiOrigin)}; export const WS_BASE=''; export const SANDBOX_EXECUTOR='server';`)
+            res.end(`export const API_BASE=${JSON.stringify(apiOrigin)}; export const WS_BASE='';`)
             return
           }
           const upstream = await realFetch(`${FRONTEND_URL}${req.url}`, { redirect: 'manual' })

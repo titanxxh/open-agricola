@@ -15,6 +15,7 @@ export const workerFiles = new Set([
   'client/local-sandbox/card-test-runtime.ts',
   'client/local-sandbox/browser-runtime.ts',
   'client/local-sandbox/browser-executor.ts',
+  'client/local-sandbox/worker-crypto.ts',
 ])
 const nodeModules = new Set(builtinModules.flatMap(name => [name, `node:${name}`]))
 export const isTestFile = file => /(?:^|\/)(?:__tests__|fixtures)\/|\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)

@@ -1130,30 +1130,8 @@ const scenarioHandoff = async ({
 
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
-  let sandboxLaunchMode: 'failure' | 'warning' | 'single-warning' | 'real' = 'failure'
-  await page.route('**/api/game/new-sandbox', route => {
-    if (sandboxLaunchMode === 'failure') {
-      return route.fulfill({
-        status: 503,
-        contentType: 'application/json',
-        body: JSON.stringify({ ok: false, error: 'deterministic sandbox failure' }),
-      })
-    }
-    if (sandboxLaunchMode === 'warning' || sandboxLaunchMode === 'single-warning') {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          cardWarnings: ['deterministic sandbox warning'],
-          gameInstanceId: 'controlled-playtest',
-          customCardsLoaded: sandboxLaunchMode === 'single-warning' ? 1 : 2,
-          customCardVersionsLoaded: route.request().postDataJSON().customCardVersions,
-        }),
-      })
-    }
-    return route.continue()
-  })
+  // The pinned version runs only in the browser sandbox (ADR 0052); its game
+  // frame reports launch status to the Workshop, which the test drives directly.
   const launch = page.getByRole('button', {
     name: text(
       variant.locale,
@@ -1161,18 +1139,6 @@ const scenarioHandoff = async ({
       'Pin current version and start sandbox',
     ),
   })
-  page.once('dialog', dialog => dialog.accept())
-  await launch.click()
-  await expect(page.getByRole('checkbox', {
-    name: text(
-      variant.locale,
-      '我确认这个固定版本在沙盒中没有运行错误',
-      'I confirm this pinned version has no sandbox runtime errors',
-    ),
-  })).toBeHidden()
-
-  sandboxLaunchMode = 'warning'
-  await launch.click()
   const sandboxConfirmation = page.getByRole('checkbox', {
     name: text(
       variant.locale,
@@ -1180,56 +1146,36 @@ const scenarioHandoff = async ({
       'I confirm this pinned version has no sandbox runtime errors',
     ),
   })
-  await expect(sandboxConfirmation).toBeDisabled()
-  await stage(page, variant.locale, '卡牌能力', 'Card ability')
-  await expect(page.getByText('deterministic sandbox warning', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: text(variant.locale, 'AI 修复', 'AI repair'), exact: true })).toHaveCount(0)
-  await expect(page.getByText(text(variant.locale,
-    '无法确认这些错误属于当前固定源码。请在沙盒中只保留这张卡，再重新固化并试玩。',
-    'These errors cannot be attributed to the pinned source. Keep only this card in the sandbox, then pin and playtest again.',
-  ))).toBeVisible()
-  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
+  const postSandboxStatus = async (status: Record<string, unknown>) => {
+    await expect(page.frameLocator('.sandbox-embed-frame').locator('.action-board')).toBeVisible({ timeout: 30_000 })
+    const frame = page.frames().find(candidate => candidate.url().includes('/workshop-game.html'))
+    if (!frame) throw new Error('Missing the browser sandbox frame')
+    await frame.evaluate(value => {
+      const stash = JSON.parse(sessionStorage.getItem('open-agricola-local-sandbox-config') ?? '{}') as { config?: { instanceId?: string } }
+      window.parent.postMessage({ type: 'open-agricola:local-sandbox-status', instanceId: stash.config?.instanceId, ...value }, window.location.origin)
+    }, status)
+  }
+  const gameRequests: string[] = []
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.startsWith('/api/game/')) gameRequests.push(request.url())
+  })
+  await launch.click()
+  await expect(sandboxConfirmation).toBeEnabled()
+
+  await postSandboxStatus({ kind: 'failed', error: 'deterministic sandbox failure' })
   await expect(sandboxConfirmation).toBeDisabled()
 
-  sandboxLaunchMode = 'single-warning'
-  await launch.click()
+  await postSandboxStatus({ kind: 'running', cardWarnings: ['deterministic sandbox warning'] })
+  await expect(sandboxConfirmation).toBeDisabled()
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
   await expect(page.getByRole('button', { name: text(variant.locale, 'AI 修复', 'AI repair'), exact: true })).toHaveCount(1)
   await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
 
-  sandboxLaunchMode = 'real'
-  const sandboxResponse = page.waitForResponse(response =>
-    response.url().endsWith('/api/game/new-sandbox') && response.ok(),
-  )
-  await launch.click()
-  const sandbox = await (await sandboxResponse).json() as {
-    customCardVersionsLoaded: Array<{ cardId: string; versionId: string }>
-  }
-  expect(sandbox.customCardVersionsLoaded).toEqual([{
-    cardId: workspace.id,
-    versionId,
-  }])
-  await expect(sandboxConfirmation).toBeEnabled()
-  // Another tab can reuse the seed while replacing the HTTP session.
-  await page.route('**/api/game/state', async route => {
-    const response = await route.fetch()
-    const payload = await response.json()
-    await route.fulfill({ response, json: { ...payload, gameInstanceId: 'another-instance', cardWarnings: ['other game warning'] } })
-  })
-  await sandboxConfirmation.check()
-  await page.getByRole('button', {
-    name: text(variant.locale, '确认沙盒通过', 'Confirm sandbox pass'),
-  }).click()
-  await expect(page.getByText(text(variant.locale,
-    '试玩版本已改变，请重新固化并启动沙盒。',
-    'The playtest version changed. Pin and start the sandbox again.',
-  ))).toBeVisible()
-  await stage(page, variant.locale, '卡牌能力', 'Card ability')
-  await expect(page.getByRole('button', { name: text(variant.locale, 'AI 修复', 'AI repair'), exact: true })).toHaveCount(0)
-  await expect(page.getByText('other game warning', { exact: true })).toBeVisible()
-  await page.unroute('**/api/game/state')
-  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
-  await launch.click()
+  // A status from another launch never clears this playtest's errors.
+  await postSandboxStatus({ kind: 'running', instanceId: 'another-instance', cardWarnings: [] })
+  await expect(sandboxConfirmation).toBeDisabled()
+
+  await postSandboxStatus({ kind: 'running', cardWarnings: [] })
   await expect(sandboxConfirmation).toBeEnabled()
   await sandboxConfirmation.check()
   await page.getByRole('button', {
@@ -1238,7 +1184,7 @@ const scenarioHandoff = async ({
   await expect(page.locator('.aicw-version-gate')).toContainText(
     text(variant.locale, '已满足社区 PR 交接门槛', 'Community PR gate satisfied'),
   )
-  await page.unroute('**/api/game/new-sandbox')
+  expect(gameRequests).toEqual([])
   workspace = await loadWorkspace(request, account, workspace.id)
   const readiness = await responseJson<{ readiness: { ready: boolean } }>(
     await api(request, account, `/api/workshop/cards/${workspace.id}/workspace`),

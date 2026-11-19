@@ -115,6 +115,14 @@ const createRunawayCard = (db: PostgresDatabase, authorId: string, manifestPhase
   })
 }
 
+// HTTP debug games load only reviewed live cards; the HTTP sandbox loads none (ADR 0052).
+const createLiveRunawayCard = async (db: PostgresDatabase, authorId: string) => {
+  const card = await createRunawayCard(db, authorId)
+  await approveCurrentDraft(db, { cardId: card.id, authorId })
+  await publish(db, { cardId: card.id, authorId, baseRevision: card.revision })
+  return card
+}
+
 const addUser = async (db: PostgresDatabase, id: string, token: string) => {
   const now = Date.now()
   await db.prepare(`
@@ -168,7 +176,7 @@ describe('custom session routes', () => {
     } finally { prepared.dispose(); disposeSandboxSessionsForUser('fence-author') }
   })
 
-  it.each(['/api/game/new', '/api/game/new-sandbox'].flatMap(url =>
+  it.each(['/api/game/new'].flatMap(url =>
     [false, true].flatMap(guarded => ['phase', 'target'].map(invalid => ({ url, guarded, invalid }))),
   ))('rejects unsupported saved $invalid in $url (authority=$guarded) without replacing the game', async ({ url, guarded, invalid }) => {
     const db = await createTestDatabase()
@@ -215,18 +223,18 @@ describe('custom session routes', () => {
     }
   })
 
-  it('runs POST /api/game/new-sandbox commands off the HTTP event loop', async () => {
+  it('runs POST /api/game/new commands off the HTTP event loop', async () => {
     const db = await createTestDatabase()
     databases.push(db)
     await addUser(db, 'author', 'sandbox-token')
-    const customCard = await createRunawayCard(db, 'author')
+    const customCard = await createLiveRunawayCard(db, 'author')
     const gameDatabase = await import('../db.ts')
     vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
     const { handleGameRoute, disposeSandboxSessionsUsingCard } = await import('../game-router.ts')
     const start = mockRes()
-    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-      seed: 42,
-      customCardIds: [customCard.id],
+    await handleGameRoute(mockReq('POST', '/api/game/new', {
+      seed: 42, playerCount: 2,
+      enableCommunityDeck: true, customCardIds: [customCard.id],
     }, 'sandbox-token'), start)
     expect(start.statusCode).toBe(200)
     // A listener only reacts while its card is in play.
@@ -259,11 +267,11 @@ describe('custom session routes', () => {
 
   }, 20_000)
 
-  it('keeps the existing sandbox when executable worker capacity is exhausted', async () => {
+  it('keeps the existing game when executable worker capacity is exhausted', async () => {
     const db = await createTestDatabase()
     databases.push(db)
     await addUser(db, 'capacity-author', 'capacity-token')
-    const customCard = await createRunawayCard(db, 'capacity-author')
+    const customCard = await createLiveRunawayCard(db, 'capacity-author')
     const gameDatabase = await import('../db.ts')
     vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
     const { GameSession } = await import('../game/authoritative-session.ts')
@@ -277,16 +285,16 @@ describe('custom session routes', () => {
 
     try {
       const start = mockRes()
-      await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-        seed: 42,
-        customCardIds: [customCard.id],
+      await handleGameRoute(mockReq('POST', '/api/game/new', {
+        seed: 42, playerCount: 2,
+        enableCommunityDeck: true, customCardIds: [customCard.id],
       }, 'capacity-token'), start)
       expect(start.statusCode).toBe(200)
 
       const rejected = mockRes()
-      await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-        seed: 99,
-        customCardIds: [customCard.id],
+      await handleGameRoute(mockReq('POST', '/api/game/new', {
+        seed: 99, playerCount: 2,
+        enableCommunityDeck: true, customCardIds: [customCard.id],
       }, 'capacity-token'), rejected)
       expect(rejected.statusCode).toBe(503)
       expect(JSON.parse(rejected.body).error).toMatch(/capacity/i)
@@ -301,145 +309,6 @@ describe('custom session routes', () => {
         executor.dispose()
         executor.session.dispose()
       })
-
-    }
-  })
-
-  it('keeps the existing sandbox when worker initialization fails', async () => {
-    const db = await createTestDatabase()
-    databases.push(db)
-    await addUser(db, 'failure-author', 'failure-token')
-    const customCard = await createRunawayCard(db, 'failure-author')
-    const gameDatabase = await import('../db.ts')
-    vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
-    const { CustomSessionExecutor } = await import('../game/custom-session-executor.ts')
-    const execute = vi.spyOn(CustomSessionExecutor.prototype, 'execute')
-      .mockImplementationOnce(async function (this: InstanceType<typeof CustomSessionExecutor>) {
-        return {
-          ...this.session.getState(),
-          ok: false,
-          error: 'worker initialization failed',
-        }
-      })
-    const dispose = vi.spyOn(CustomSessionExecutor.prototype, 'dispose')
-    const { handleGameRoute } = await import('../game-router.ts')
-
-    const start = mockRes()
-    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-      seed: 42,
-    }, 'failure-token'), start)
-    const failed = mockRes()
-    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-      seed: 99,
-      customCardIds: [customCard.id],
-    }, 'failure-token'), failed)
-    const current = mockRes()
-    await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'failure-token'), current)
-
-    expect(execute).toHaveBeenCalled()
-    expect(JSON.parse(failed.body)).toMatchObject({
-      ok: false,
-      error: 'worker initialization failed',
-    })
-    expect(JSON.parse(current.body).state).toEqual(JSON.parse(start.body).state)
-    expect(dispose).toHaveBeenCalledOnce()
-
-  })
-
-  it('keeps the last submitted concurrent sandbox replacement', async () => {
-    const db = await createTestDatabase()
-    databases.push(db)
-    await addUser(db, 'concurrent-author', 'concurrent-token')
-    const customCard = await createRunawayCard(db, 'concurrent-author')
-    const gameDatabase = await import('../db.ts')
-    vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
-    const { CustomSessionExecutor } = await import('../game/custom-session-executor.ts')
-    let releaseFirst = () => {}
-    const firstReady = new Promise<void>((resolve) => {
-      releaseFirst = resolve
-    })
-    let releaseCrossRoute = () => {}
-    const crossRouteReady = new Promise<void>((resolve) => {
-      releaseCrossRoute = resolve
-    })
-    let releaseTakedown = () => {}
-    const takedownReady = new Promise<void>((resolve) => {
-      releaseTakedown = resolve
-    })
-    const enteredSeeds = new Set<number>()
-    const execute = vi.spyOn(CustomSessionExecutor.prototype, 'execute')
-      .mockImplementation(function (this: InstanceType<typeof CustomSessionExecutor>) {
-        enteredSeeds.add(this.session.state.gameSeed)
-        const response = this.session.withCtx(() => this.session.getState())
-        const wait = this.session.state.gameSeed === 42
-          ? firstReady
-          : this.session.state.gameSeed === 43
-            ? crossRouteReady
-            : this.session.state.gameSeed === 44
-              ? takedownReady
-              : null
-        return wait ? wait.then(() => response) : Promise.resolve(response)
-      })
-    const { handleGameRoute, disposeSandboxSessionsUsingCard } = await import('../game-router.ts')
-
-    try {
-      const firstResponse = mockRes()
-      const first = handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-        seed: 42,
-        customCardIds: [customCard.id],
-      }, 'concurrent-token'), firstResponse)
-      await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce())
-
-      const secondResponse = mockRes()
-      await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-        seed: 99,
-        customCardIds: [customCard.id],
-      }, 'concurrent-token'), secondResponse)
-      releaseFirst()
-      await first
-
-      const current = mockRes()
-      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'concurrent-token'), current)
-      expect(secondResponse.statusCode).toBe(200)
-      expect(firstResponse.statusCode).toBe(409)
-      expect(JSON.parse(current.body).state.gameSeed).toBe(99)
-
-      const crossRouteResponse = mockRes()
-      const crossRoute = handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-        seed: 43,
-        customCardIds: [customCard.id],
-      }, 'concurrent-token'), crossRouteResponse)
-      await vi.waitFor(() => expect(enteredSeeds.has(43)).toBe(true))
-
-      const normalResponse = mockRes()
-      await handleGameRoute(mockReq('POST', '/api/game/new', {
-        seed: 77,
-      }, 'concurrent-token'), normalResponse)
-      releaseCrossRoute()
-      await crossRoute
-
-      const finalState = mockRes()
-      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'concurrent-token'), finalState)
-      expect(normalResponse.statusCode).toBe(200)
-      expect(crossRouteResponse.statusCode).toBe(409)
-      expect(JSON.parse(finalState.body).state.gameSeed).toBe(77)
-
-      const takedownResponse = mockRes()
-      const pendingTakedown = handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
-        seed: 44,
-        customCardIds: [customCard.id],
-      }, 'concurrent-token'), takedownResponse)
-      await vi.waitFor(() => expect(enteredSeeds.has(44)).toBe(true))
-      expect(disposeSandboxSessionsUsingCard(customCard.id)).toBe(0)
-      releaseTakedown()
-      await pendingTakedown
-
-      const stateAfterTakedown = mockRes()
-      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'concurrent-token'), stateAfterTakedown)
-      expect(takedownResponse.statusCode).toBe(409)
-      expect(JSON.parse(stateAfterTakedown.body).state.gameSeed).toBe(77)
-    } finally {
-      disposeSandboxSessionsUsingCard(customCard.id)
 
     }
   })

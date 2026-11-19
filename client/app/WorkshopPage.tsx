@@ -19,7 +19,8 @@ import { CLASSIC_EDITION_ENABLED, type CardEdition } from '../../shared/contract
 import { resolveCardArtUrl } from '../../shared/utils/card-art-url'
 import { API_BASE } from '../config'
 import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
-import { buildLocalGameConfig, isBrowserSandbox, stashLocalSandboxConfig } from '../local-sandbox/workshop-launch'
+import { buildLocalGameConfig, parseLocalSandboxStatus, stashLocalSandboxConfig, toLocalCard, type LocalSandboxStatus } from '../local-sandbox/workshop-launch'
+import type { LocalCardInput } from '../local-sandbox/protocol'
 import { CardEditionSetup } from './CardEditionSetup'
 import { classicDeckPoolNotice, classicPoolMessage, toggleClassicDeck, useClassicDeckPool } from './classic-card-setup'
 
@@ -298,16 +299,6 @@ function sandboxVariantLabels(
   if (settings.enable_farmers_of_the_moor) labels.push(t('platform.sandboxVariantFarmersOfTheMoor'))
   if (settings.enable_snake_opening) labels.push(t('platform.sandboxVariantSnakeOpening'))
   return labels
-}
-
-export function buildSandboxCardIds(
-  cards: ReadonlyArray<{ id: string }>,
-  extraCardId?: unknown,
-): string[] {
-  const ids = cards.map(card => card.id)
-  const trimmed = typeof extraCardId === 'string' ? extraCardId.trim() : ''
-  if (trimmed && !ids.includes(trimmed)) ids.push(trimmed)
-  return ids
 }
 
 export async function readSandboxStartResponse(
@@ -835,15 +826,16 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, sandboxPlaytest, onCardLoaded }: {
+function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, sandboxPlaytest, sandboxStatus, onCardLoaded }: {
   initial?: WorkshopCard
   initialCardId?: string
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   onCancel: () => void
-  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string, source: PlaytestSource) => Promise<boolean>
+  onAddToSandboxAndRestart?: (cardDbId: string, card: LocalCardInput, source: PlaytestSource) => Promise<boolean>
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
   sandboxPlaytest?: SandboxPlaytest | null
+  sandboxStatus?: LocalSandboxStatus | null
   onCardLoaded?: (cardDbId: string) => void
 }) {
   return (
@@ -855,6 +847,7 @@ function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandbox
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
         sandboxErrors={sandboxErrors}
         sandboxPlaytest={sandboxPlaytest}
+        sandboxStatus={sandboxStatus}
         onCardLoaded={onCardLoaded}
         apiFetch={apiFetch}
       />
@@ -1377,8 +1370,10 @@ export function WorkshopPage() {
   const sandboxLaunchRef = useRef(0)
   const [sandboxActive, setSandboxActive] = useState(false)
   const [sandboxKey, setSandboxKey] = useState(0)
-  const [sandboxLocalMode, setSandboxLocalMode] = useState(false)
   const [sandboxLocalFresh, setSandboxLocalFresh] = useState(false)
+  const [sandboxStatus, setSandboxStatus] = useState<LocalSandboxStatus | null>(null)
+  const sandboxInstanceRef = useRef<string | null>(null)
+  const sandboxFrameRef = useRef<HTMLIFrameElement | null>(null)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
@@ -1597,93 +1592,52 @@ export function WorkshopPage() {
   }
 
   const handleStartSandboxGame = async (
-    extraCardId?: string,
-    exactVersionId?: string,
-    testedSource?: PlaytestSource,
+    pinned?: { cardDbId: string; card: LocalCardInput; source: PlaytestSource },
   ): Promise<boolean> => {
-    const launch = ++sandboxLaunchRef.current
+    ++sandboxLaunchRef.current
     setSandboxPlaytest(null)
     if (sandboxStartNotice) {
       setPendingSandboxErrors([sandboxStartNotice])
       return false
     }
-    // Browser-local executor: the playtest runs entirely in this browser.
-    // Editor flows that pin an extra card / exact draft version still go
-    // through the server sandbox (card data isn't in workshop state yet).
-    if (isBrowserSandbox() && !extraCardId && !exactVersionId) {
-      let stashed = true
-      try {
-        stashLocalSandboxConfig(buildLocalGameConfig(sandboxCards, sandboxSettings), user?.id ?? 'anon')
-      } catch {
-        // sessionStorage disabled or over quota — fall through to the server
-        // sandbox path below instead of leaving an unhandled rejection.
-        stashed = false
-      }
-      if (stashed) {
-        setSandboxLocalMode(true)
-        // A restart (sandbox already active) must start fresh, not resume the
-        // persisted slot; the first launch may still offer to resume.
-        setSandboxLocalFresh(sandboxActive)
-        setSandboxActive(true)
-        setSandboxKey(k => k + 1)
-        setPendingSandboxErrors(null)
-        return true
-      }
-    }
-    setSandboxLocalMode(false)
+    // Workshop code runs only in this browser, inside the opaque engine frame (ADR 0052).
+    const cards = [
+      ...sandboxCards.filter(card => card.id !== pinned?.cardDbId).map(toLocalCard),
+      ...(pinned ? [pinned.card] : []),
+    ]
+    const instanceId = crypto.randomUUID()
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0]! % 2_147_483_647
     try {
-      const response = await apiFetch('/api/game/new-sandbox', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customCardIds: buildSandboxCardIds(sandboxCards, extraCardId),
-          ...(extraCardId && exactVersionId
-            ? {
-                customCardVersions: [{
-                  cardId: extraCardId,
-                  versionId: exactVersionId,
-                }],
-              }
-            : {}),
-          playerCount: sandboxSettings.player_count,
-          deckIds: sandboxSettings.deck_ids,
-          cardEdition: sandboxSettings.card_edition,
-          classicDeckIds: sandboxSettings.classic_deck_ids,
-          enableThroughTheSeasons: sandboxSettings.enable_through_the_seasons,
-          enableFarmersOfTheMoor: sandboxSettings.enable_farmers_of_the_moor,
-          allowIncompleteFarmersOfTheMoorMinorDeal: sandboxSettings.allow_incomplete_farmers_of_the_moor_minor_deal,
-          enableSnakeOpening: sandboxSettings.enable_snake_opening,
-        }),
-      })
-      const fallbackError = response.ok
-        ? t('platform.sandboxUnknownError')
-        : t('platform.sandboxFailed', {
-          error: `${response.status} ${response.statusText || 'HTTP error'}`,
-        })
-      const data = await readSandboxStartResponse(response, fallbackError)
-      if (launch !== sandboxLaunchRef.current) return false
-      if (data.ok) {
-        const warnings: string[] = data.cardWarnings ?? []
-        setSandboxPlaytest(bindSandboxPlaytest(data, testedSource))
-        setSandboxActive(true)
-        setSandboxKey(k => k + 1)
-        setPendingSandboxErrors(warnings.length > 0 ? warnings : null)
-        return true
-      } else {
-        const errors = [data.shortfall ? classicPoolMessage(t, data.shortfall) : data.error ?? t('platform.sandboxUnknownError')]
-        setPendingSandboxErrors(errors)
-        alert(errors.join('\n'))
-        return false
-      }
-    } catch (err) {
-      if (launch !== sandboxLaunchRef.current) return false
-      const detail = err instanceof Error && err.message ? `: ${err.message}` : ''
-      const error = `${t('platform.sandboxNetworkError')}${detail}`
+      stashLocalSandboxConfig(buildLocalGameConfig(cards, sandboxSettings, { instanceId, seed }), user?.id ?? 'anon')
+    } catch (reason) {
+      const error = `${t('platform.sandboxNetworkError')}${reason instanceof Error && reason.message ? `: ${reason.message}` : ''}`
       setPendingSandboxErrors([error])
-      alert(error)
       return false
     }
+    sandboxInstanceRef.current = instanceId
+    setSandboxStatus(null)
+    setSandboxPlaytest(pinned ? bindSandboxPlaytest({ instanceId, seed, cardCount: cards.length, source: pinned.source }) : null)
+    // A restart or a pinned playtest starts fresh; the first plain launch may resume the save.
+    setSandboxLocalFresh(sandboxActive || pinned !== undefined)
+    setSandboxActive(true)
+    setSandboxKey(k => k + 1)
+    setPendingSandboxErrors(null)
+    return true
   }
+
+  useEffect(() => {
+    const receive = (event: MessageEvent<unknown>) => {
+      if (event.origin !== window.location.origin || !sandboxFrameRef.current
+        || event.source !== sandboxFrameRef.current.contentWindow) return
+      const status = parseLocalSandboxStatus(event.data)
+      if (!status || status.instanceId !== sandboxInstanceRef.current) return
+      setSandboxStatus(status)
+      if (status.kind === 'failed') setPendingSandboxErrors([status.error])
+      else setPendingSandboxErrors(status.cardWarnings.length > 0 ? status.cardWarnings : null)
+    }
+    window.addEventListener('message', receive)
+    return () => window.removeEventListener('message', receive)
+  }, [])
 
   const writeWorkshopUrl = useCallback((
     opts: { view?: 'sandbox' | 'editor' | null; card?: string | null },
@@ -1846,13 +1800,14 @@ export function WorkshopPage() {
             // the link or refresh without losing their selection.
             writeWorkshopUrl({ view: 'editor', card: cardDbId }, 'replace')
           }}
-          onAddToSandboxAndRestart={async (cardDbId, versionId, source) => {
+          onAddToSandboxAndRestart={async (cardDbId, card, source) => {
             await handleAddSandbox(cardDbId)
-            return handleStartSandboxGame(cardDbId, versionId, source)
+            return handleStartSandboxGame({ cardDbId, card, source })
           }}
           t={t}
           sandboxErrors={pendingSandboxErrors}
           sandboxPlaytest={sandboxPlaytest}
+        sandboxStatus={sandboxStatus}
         />
         <div className="sandbox-embed">
           {sandboxStartNotice && <p role="status" className="card-edition-notice">{sandboxStartNotice}</p>}
@@ -1880,7 +1835,8 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={workshopGameUrl(sandboxLocalMode, sandboxLocalFresh)}
+              ref={sandboxFrameRef}
+              src={workshopGameUrl(sandboxLocalFresh)}
               title={t('platform.sandbox')}
             />
           )}
@@ -1902,7 +1858,7 @@ export function WorkshopPage() {
           settings={sandboxSettings}
           startNotice={sandboxStartNotice}
           onSelect={selectCard}
-          onStartGame={handleStartSandboxGame}
+          onStartGame={() => handleStartSandboxGame()}
           onRemove={handleRemoveSandboxCard}
           onOpenReset={() => setResetSandboxOpen(true)}
           t={t}
@@ -1943,7 +1899,8 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={workshopGameUrl(sandboxLocalMode, sandboxLocalFresh)}
+              ref={sandboxFrameRef}
+              src={workshopGameUrl(sandboxLocalFresh)}
               title={t('platform.sandbox')}
             />
           )}

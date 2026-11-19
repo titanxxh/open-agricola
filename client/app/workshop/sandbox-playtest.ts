@@ -1,15 +1,11 @@
 import type { ClassicPoolShortfall } from '../../../shared/contract/card-edition'
 import type { PlaytestFailure, PlaytestSource } from '../../services/llm/generation/request'
 
+/** Error body of a Workshop sandbox settings request. */
 export type SandboxStartResult = {
   ok: boolean
   error?: string
   shortfall?: ClassicPoolShortfall
-  cardWarnings?: string[]
-  gameInstanceId?: string
-  state?: { gameSeed?: number | string }
-  customCardsLoaded?: number
-  customCardVersionsLoaded?: Array<{ cardId: string; versionId: string }>
 }
 
 /** Page-local proof; none of these envelope fields enters a model request. */
@@ -19,18 +15,17 @@ export type SandboxPlaytest = {
   warningScope: 'single-custom-card' | 'unattributed'
 }
 
-export function bindSandboxPlaytest(
-  result: SandboxStartResult,
-  source?: PlaytestSource,
-): SandboxPlaytest | null {
-  const versions = result.customCardVersionsLoaded
-  if (!result.ok || !source || !result.gameInstanceId
-    || !versions?.some(version => version.cardId === source.workspaceId && version.versionId === source.versionId)) return null
+/** Binds a pinned version to the browser launch that loads it. */
+export function bindSandboxPlaytest(launch: {
+  instanceId: string
+  seed: number
+  cardCount: number
+  source: PlaytestSource
+}): SandboxPlaytest {
   return {
-    source: { ...source, gameSeed: result.state?.gameSeed },
-    instanceId: result.gameInstanceId,
-    warningScope: result.customCardsLoaded === 1 && versions.length === 1
-      ? 'single-custom-card' : 'unattributed',
+    source: { ...launch.source, gameSeed: launch.seed },
+    instanceId: launch.instanceId,
+    warningScope: launch.cardCount === 1 ? 'single-custom-card' : 'unattributed',
   }
 }
 

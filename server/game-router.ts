@@ -14,20 +14,12 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
 import type { FarmChoiceType, FarmChoiceValidation } from '../shared/session/farm-choice-validation.ts'
 import type { MoorSpecialActionId } from '../shared/moor/types.ts'
-import { getDb } from './db.ts'
 import { validateSession } from './auth.ts'
 import { allowAnonymousAccess } from './anonymous-access.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
-import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { UnsupportedSandboxListenerError } from '../shared/custom-code/sandbox-listener-phases.ts'
 import { defaultSandboxDeckIds, type InitialStateOptions } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
-import {
-  loadLiveDraft,
-  loadSandboxVersion,
-  type WorkshopDraft,
-} from './workshop-drafts.ts'
-import { isLoadableLive } from './workshop-status.ts'
 import { parseDraftOptions, loadLiveCustomCards } from './connection/room-router.ts'
 import {
   asSetupPayload,
@@ -45,14 +37,6 @@ import {
   type CustomSessionMethod,
 } from './game/custom-session-executor.ts'
 
-const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
-  cardType: draft.cardType,
-  cardJson: draft.cardJson as unknown as CustomCardData['cardJson'],
-  effectCode: draft.effectCode,
-  compiledCode: draft.compiledCode,
-  codeManifest: draft.codeManifest as CustomCodeManifest | null,
-  artUrl: draft.artUrl,
-})
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
@@ -821,17 +805,11 @@ const handleAuthorizedGameRoute = async (
     }
 
     const seed = typeof body.seed === 'number' ? body.seed : undefined
-    const customCardDbIds = Array.isArray(body.customCardIds)
-      ? body.customCardIds.filter((id): id is string => typeof id === 'string')
-      : []
-    const customCardVersions = new Map<string, string>()
-    if (Array.isArray(body.customCardVersions)) {
-      for (const rawBinding of body.customCardVersions) {
-        const { cardId, versionId } = asSetupPayload(rawBinding)
-        if (typeof cardId !== 'string' || typeof versionId !== 'string') continue
-        customCardVersions.set(cardId, versionId)
-        if (!customCardDbIds.includes(cardId)) customCardDbIds.push(cardId)
-      }
+    // Workshop cards play only in the browser sandbox (ADR 0052).
+    if ((Array.isArray(body.customCardIds) && body.customCardIds.length > 0)
+      || (Array.isArray(body.customCardVersions) && body.customCardVersions.length > 0)) {
+      await sendJson(res, 400, { ok: false, error: 'Workshop cards are playtested only in the browser sandbox' })
+      return true
     }
     const nextDecks = Array.isArray(body.deckIds) ? body.deckIds
       .filter((deck): deck is string => typeof deck === 'string')
@@ -840,91 +818,14 @@ const handleAuthorizedGameRoute = async (
         (defaultSandboxDeckIds as readonly string[]).includes(deck)) : []
     const deckIds = nextDecks.length > 0 ? [...new Set(nextDecks)] : [...defaultSandboxDeckIds]
 
-    // Identify the requesting user (optional — allows loading own draft cards)
-    const requestUser = (await validateSession(requestSessionToken(req)))
     const generation = beginReplacement(sessionKey)
-    // Load custom card data from the database.
-    // Allow: published cards (anyone) OR draft cards owned by the requesting user.
-    const customCards: CustomCardData[] = []
-    const loadedCardDbIds: string[] = []
-    const customCardVersionsLoaded: Array<{ cardId: string; versionId: string }> = []
-    if (customCardDbIds.length > 0) {
-      const db = getDb()
-      for (const dbId of customCardDbIds) {
-        const versionId = customCardVersions.get(dbId)
-        if (versionId) {
-          if (!requestUser) {
-            await sendJson(res, 401, { ok: false, error: 'Authentication required for a draft version' })
-            return true
-          }
-          try {
-            const draft = (await loadSandboxVersion(db, {
-              cardId: dbId,
-              authorId: requestUser.id,
-              versionId,
-            }))
-            customCards.push(workshopDraftToCustomCard(draft))
-            loadedCardDbIds.push(dbId)
-            customCardVersionsLoaded.push({ cardId: dbId, versionId })
-          } catch (error) {
-            await sendJson(res, 400, {
-              ok: false,
-              error: error instanceof Error ? error.message : 'Unable to load sandbox version',
-            })
-            return true
-          }
-          continue
-        }
-        const row = (await db.prepare(
-          `SELECT card_type, card_json, code_manifest, art_url, review_status, live, built_in, author_id
-           FROM workshop_cards WHERE id = ?`,
-        ).get(dbId)) as {
-          card_type: string
-          card_json: string
-          code_manifest: string | null
-          art_url: string | null
-          review_status: string; live: number; built_in: number; author_id: string
-        } | undefined
-        if (!row) continue
-        // Graduated + built-in (#642): served by the built-in registry, not
-        // injected per-session.
-        if (row.review_status === 'merged' && row.built_in === 1) continue
-        if (isLoadableLive(row)) {
-          try {
-            customCards.push(workshopDraftToCustomCard((await loadLiveDraft(db, dbId))))
-            loadedCardDbIds.push(dbId)
-          } catch (err) {
-            console.warn(`[game-router] failed to load live custom card ${dbId}:`, err)
-          }
-          continue
-        }
-        const allowed = requestUser?.id === row.author_id
-        if (!allowed) continue
-        try {
-          const parsed = JSON.parse(row.card_json) as Record<string, unknown>
-          const effectCode = typeof parsed._code === 'string' ? parsed._code : null
-          const compiledCode = typeof parsed._compiled === 'string' ? parsed._compiled : null
-          customCards.push({
-            cardType: row.card_type as 'minor' | 'occupation',
-            cardJson: parsed as unknown as CustomCardData['cardJson'],
-            effectCode,
-            compiledCode,
-            codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
-            artUrl: row.art_url ?? null,
-          })
-          loadedCardDbIds.push(dbId)
-        } catch (err) {
-          console.warn(`[game-router] failed to parse custom card ${dbId}:`, err)
-        }
-      }
-    }
 
     await startSandboxGame(req, res, seed, {
       options: { ...sandboxOptions, deckIds },
-      customCards,
-      cardDbIds: loadedCardDbIds,
-      versions: customCardVersionsLoaded,
-    }, { key: sessionKey, generation, takedownGenerations: recordTakedownGenerations(loadedCardDbIds) })
+      customCards: [],
+      cardDbIds: [],
+      versions: [],
+    }, { key: sessionKey, generation, takedownGenerations: recordTakedownGenerations([]) })
     return true
   }
 

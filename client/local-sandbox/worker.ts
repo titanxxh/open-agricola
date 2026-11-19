@@ -1,12 +1,15 @@
 /**
  * Local-sandbox engine worker — thin onmessage shell around
- * `LocalSandboxCore`. Loaded lazily via `new Worker(new URL(...))` only when
- * the workshop runs in browser-executor mode, so the engine + typescript
- * compiler stay out of the main bundle.
+ * `LocalSandboxCore`. `opaque-worker.ts` starts it as a self-contained Blob
+ * Worker inside an opaque-origin iframe, so the engine and TypeScript compiler
+ * stay out of the main bundle and Workshop code cannot reach page credentials.
  */
 import { handleLocalSandboxRequest, LocalSandboxCore } from './worker-core.ts'
 import { stripWorkerCapabilities } from './worker-capabilities.ts'
+import { ensureRandomUUID } from './worker-crypto.ts'
 import type { LocalSandboxRequest, LocalSandboxResponse } from './protocol.ts'
+
+ensureRandomUUID()
 
 // Strip dangerous worker/DOM APIs from this worker's global before any card
 // code runs (see worker-capabilities.ts). The engine only needs
@@ -28,4 +31,4 @@ self.onmessage = (event: MessageEvent<LocalSandboxRequest>) => {
   post(handleLocalSandboxRequest(core, event.data))
 }
 
-post({ kind: 'ready' })
+post({ kind: 'ready', origin: self.origin })

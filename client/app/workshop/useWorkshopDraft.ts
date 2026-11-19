@@ -24,6 +24,7 @@ type WorkspaceResponse = {
   current?: WorkshopWorkspaceDto
   versionId?: string
   cardJson?: WorkshopPinnedVersionContract['cardJson']
+  artUrl?: WorkshopPinnedVersionContract['artUrl']
   error?: string
   code?: WorkshopDraftErrorCode
 }
@@ -608,7 +609,7 @@ export const useWorkshopDraft = ({
         })
         return null
       }
-      return { versionId: payload.versionId, cardJson: payload.cardJson }
+      return { versionId: payload.versionId, cardJson: payload.cardJson, artUrl: typeof payload.artUrl === 'string' ? payload.artUrl : null }
     } catch (reason) {
       dispatch({
         type: 'saveFailed',

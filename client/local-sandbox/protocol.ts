@@ -20,6 +20,8 @@ export type LocalCardInput = {
 }
 
 export type LocalGameConfig = {
+  /** Identifies one Workshop launch; status messages and playtest binding carry it. */
+  instanceId?: string
   cards: LocalCardInput[]
   playerCount: number
   deckIds?: string[]
@@ -52,7 +54,7 @@ export type LocalSandboxRequest =
   | { id: number; kind: 'call'; method: string; args: unknown[]; viewer: ViewerSpec }
 
 export type LocalSandboxResponse =
-  | { kind: 'ready' }
+  | { kind: 'ready'; origin?: string }
   | { kind: 'result'; id: number; ok: true; payload: GameSyncPayload; persist: PersistedLocalGame }
   | { kind: 'result'; id: number; ok: true; raw: unknown }
   | { kind: 'result'; id: number; ok: false; error: string; code?: ClassicAdmissionErrorCode; shortfall?: ClassicPoolShortfall }
