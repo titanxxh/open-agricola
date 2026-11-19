@@ -6,6 +6,13 @@
 
 > 当前 `main` 的架构地图。本索引只写设计不变量、总体拓扑与分层结构；[`architecture/`](architecture/) 下的每份 module 文档说明该 module 的职责、不变量和 seam，并指向承载细节的入口文件、ADR 和测试。卡牌行为以各卡的测试为准，设计决策见 [`docs/adr/`](adr/)。
 
+## 从哪里开始
+
+| 任务 | 阅读 |
+|---|---|
+| 实现或修改一张卡，或判断它是否需要共享机制 | [写卡指南](CARD_AUTHORING.md)：卡面句式对应的机制、范例卡与范例 Session 测试，以及可行性判断规则；再读 [CARD_TEST_TEMPLATE](CARD_TEST_TEMPLATE_zh.md) 写测试。 |
+| 修改共享机制：engine、session、actions、hooks、payment、协议 | 下表中的 module 文档，再读其链接的 ADR。 |
+
 ## Module 地图
 
 | Module | 文档 | 职责 |

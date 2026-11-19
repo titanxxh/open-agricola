@@ -2,7 +2,7 @@
 
 [English](cards.md) | [中文](cards_zh.md)
 
-This module owns every card's single source and the generic seams a card plugs into: hooks and listeners ([hooks](hooks.md)), local state, Card Fields and capability metadata. A card's ability stays closed inside its own file.
+This module owns every card's single source and the generic seams a card plugs into: hooks and listeners ([hooks](hooks.md)), local state, Card Fields and capability metadata. A card's ability stays closed inside its own file. To implement a card, start from the [card authoring guide](../CARD_AUTHORING.md), which maps card text to these seams with example cards and tests.
 
 ## Card Source and projections
 
@@ -72,10 +72,10 @@ Tests: `server/__tests__/card-state-visibility-session.test.ts`.
 
 ## Helpers under `shared/cards/helpers/`
 
-- `pay-gain-node.ts`: pay-then-gain, pay-then-action and return-then-gain templates.
+- `pay-gain-node.ts`: leaf and flow builders: `gainLeaf`, `payLeaf`, `bonusVpLeaf`, optional `payGainFlow` / `payGainNode`, mandatory `payGainActionFlow`, `payThenActionFlow` and return-then-gain templates.
 - `reserved-resources.ts`: `evaluateWithReservedResources()` checks an action after subtracting a resource reservation; `evaluateWithGrantedResources()` checks it after adding a preceding reward. Both pass a copied player and matching state view to the evaluator without changing stored resources.
 - `farmyard-events.ts`: `getActionFarmOperations()` reads the successful original host's typed farm receipts, including detached before/after layouts. Usage and terrain queries reuse those receipts; only absent receipts permit an event fallback. An empty receipt excludes nested child facts. Tests: `shared/cards/helpers/__tests__/farmyard-events.test.ts`.
-- `stage-effects.ts`: stage-effect flags and optional once-per-card Harvest exchanges through the existing exchange executor. A recipe provider supports dynamic eligibility; early offers and later catalog exchanges share the source's round usage.
+- `stage-effects.ts`: stage-effect flags and optional once-per-card Harvest exchange recipes (not a pay-then-gain stage hook; see `pay-gain-node.ts`) through the existing exchange executor. A recipe provider supports dynamic eligibility; early offers and later catalog exchanges share the source's round usage.
 - `card-state.ts`, `round-placement.ts`: one-time state, the raw Work Placement Chronology and Person Placement Order ([Turn Scope and Action-Execution Scope](session.md#turn-scope-and-action-execution-scope)).
 - `turn-token.ts`: the active Turn Scope identity and a card's once-per-Turn records. `isUsedThisTurnOrGap` / `markUsedThisTurnOrGapLeaf` also give the gap between two of the player's Turns (other players' Turns, harvest, round end and start) one record of its own; only an explicit `turnScopeProjection` from ordinary-placement admission previews the next Turn as unused. Actual anytime, pending and replacement queries retain the current gap. `action-snapshot.ts`: the Turn start snapshot ([Turn Scope and Action-Execution Scope](session.md#turn-scope-and-action-execution-scope)).
 - `card-held-workers.ts`, `card-field.ts`: held workers ([Local state in cardStates](#local-state-in-cardstates)) and Card Fields ([Card Fields and the Logical Field seam](#card-fields-and-the-logical-field-seam)).

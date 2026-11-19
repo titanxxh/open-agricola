@@ -4,7 +4,7 @@ import type { GenerationReference } from '../../../../shared/contract/workshop-g
 import type { ToolCall, ToolDefinition } from './protocol'
 
 export const REFERENCE_REPOSITORY = 'titanxxh/open-agricola'
-export const REFERENCE_TOOL_VERSION = 'github-text-v8'
+export const REFERENCE_TOOL_VERSION = 'github-text-v9'
 export const REFERENCE_LIMITS = Object.freeze({ fileBytes: 256 * 1024, readLines: 160, resultBytes: 16 * 1024, searchHits: 40, httpRetries: 2 })
 export const REFERENCE_TOOLS: readonly ToolDefinition[] = [
   { type: 'function', function: {
@@ -35,8 +35,10 @@ export class ReferenceError extends Error {
 
 export function allowedReferencePath(path: string): boolean {
   if (!/^[\w./-]+$/.test(path) || path.split('/').some(part => !part || part === '..' || part === '.')) return false
-  return /^(docs\/(CUSTOM_CARD_SANDBOX|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status)\.md)$/.test(path)
+  return /^(docs\/(CARD_AUTHORING|CUSTOM_CARD_SANDBOX|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status)\.md)$/.test(path)
     || /^docs\/architecture\/[a-z-]+\.md$/.test(path)
+    // Architecture documents link ADRs for the decisions behind their rules.
+    || /^docs\/adr\/\d{4}-[a-z0-9-]+\.md$/.test(path)
     || /^shared\/(cards|custom-code|actions|contract|domain|projections|session|engine)\/.+\.ts$/.test(path)
     || /^client\/local-sandbox\/(?:card-test-runtime|card-tests|card-tests\.worker|browser-executor|browser-runtime)\.ts$/.test(path)
     || /^client\/local-sandbox\/__tests__\/card-(?:test-runtime|tests)\.test\.ts$/.test(path)

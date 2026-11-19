@@ -28,13 +28,14 @@ Use this template for:
 - Action-triggered passive cards
 - Round-phase-triggered cards
 - Cards that introduce waiting interactions, follow-up actions, additional choices, or delayed effects
+- Community cards under `shared/cards/community/`, which are native Card Source modules tested the same way
 
-Do not use it for:
+Find the mechanism and an example test for a card in the [card authoring guide](CARD_AUTHORING.md). Do not use this template for:
 
 - Style-only changes
 - Text-only translation changes
 - General UI component tests unrelated to cards
-- Tests of whether Workshop or AI Designer generated code runs; local acceptance is documented in `docs/test/llm-card-gen.md`
+- Acceptance of the Workshop generation tool itself (model round trips), which has its own local procedure
 
 ## 3. Test Layers
 
@@ -393,7 +394,7 @@ First assert `interaction.stateId === 'wait'`, then call the corresponding metho
 - `animal-reorg`: `session.resolveChoice(X, 'confirm', interaction.request.zones)`
 - `feed`: `session.resolveChoice(X, 'confirm', { selections: [...] })`
 - `confirm-next-player`: `session.resolveChoice(interaction.request.nextPlayerIndex, 'confirm')`
-- `confirm-player-switch`: `session.resolveChoice(interaction.request.toPlayerIndex, 'confirm')`
+- `confirm-player-switch`: `session.resolveChoice(interaction.request.fromPlayerIndex, 'confirm')` (the outgoing player confirms)
 - `farm-select` / `selection`: `session.commitSelectionChoice(X, payload)`
 
 Assert:

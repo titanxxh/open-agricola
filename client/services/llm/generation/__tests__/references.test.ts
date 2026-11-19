@@ -141,11 +141,15 @@ describe('project metadata and anonymous pinned source reads', () => {
     expect(fetchReference).toHaveBeenCalledTimes(3)
   })
 
-  it('allows the architecture index and English module documents, not their Chinese mirrors', () => {
+  it('allows the architecture index, English module documents, the authoring guide and ADRs, not Chinese mirrors', () => {
     expect(allowedReferencePath('docs/ARCHITECTURE.md')).toBe(true)
+    expect(allowedReferencePath('docs/CARD_AUTHORING.md')).toBe(true)
     expect(allowedReferencePath('docs/architecture/hooks.md')).toBe(true)
     expect(allowedReferencePath('docs/architecture/hooks_zh.md')).toBe(false)
     expect(allowedReferencePath('docs/architecture/nested/hooks.md')).toBe(false)
+    expect(allowedReferencePath('docs/adr/0033-card-listener-timing-follows-project-semantics.md')).toBe(true)
+    expect(allowedReferencePath('docs/adr/README.md')).toBe(false)
+    expect(allowedReferencePath('docs/adr/0033-Card_Timing.md')).toBe(false)
   })
 
   it('rejects traversal, arbitrary URLs and incomplete arguments without network requests', async () => {

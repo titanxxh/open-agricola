@@ -24,8 +24,9 @@ describe('documentation budgets', () => {
   })
 
   it('keeps every document the Workshop generator can read under its reference limit', () => {
-    const readable = ['docs', MODULE_DIR].flatMap(dir => readdirSync(dir).map(name => `${dir}/${name}`)).filter(allowedReferencePath)
+    const readable = ['docs', MODULE_DIR, 'docs/adr'].flatMap(dir => readdirSync(dir).map(name => `${dir}/${name}`)).filter(allowedReferencePath)
     expect(readable).toContain('docs/ARCHITECTURE.md')
+    expect(readable).toContain('docs/adr/0033-card-listener-timing-follows-project-semantics.md')
     expect(readable).toContain(`${MODULE_DIR}/hooks.md`)
     for (const path of readable) expect(statSync(path).size, path).toBeLessThanOrEqual(REFERENCE_LIMITS.fileBytes)
   })

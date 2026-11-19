@@ -30,13 +30,14 @@
 - 行动触发型被动卡
 - 回合阶段触发型卡
 - 会引入等待交互、follow-up action、额外选择、延迟效果的卡
+- `shared/cards/community/` 下的社区卡：它们是原生 Card Source 模块，测试方式相同
 
-不适用于：
+卡牌所需机制与范例测试见[写卡指南](CARD_AUTHORING.md)。不适用于：
 
 - 纯样式改动
 - 纯文案翻译改动
 - 与卡牌无关的通用 UI 组件测试
-- **Workshop / AI Designer 自定义卡的"LLM 生成代码能否跑通"测试** —— 本地验收见 `docs/test/llm-card-gen.md`
+- 工坊生成工具本身的验收（模型往返），它有单独的本地流程
 
 ## 3. 测试分层约定
 
@@ -397,7 +398,7 @@ const resp = session.takeAction(X, 'ACTION_ID')
 - `animal-reorg`：`session.resolveChoice(X, 'confirm', interaction.request.zones)`
 - `feed`：`session.resolveChoice(X, 'confirm', { selections: [...] })`
 - `confirm-next-player`：`session.resolveChoice(interaction.request.nextPlayerIndex, 'confirm')`
-- `confirm-player-switch`：`session.resolveChoice(interaction.request.toPlayerIndex, 'confirm')`
+- `confirm-player-switch`：`session.resolveChoice(interaction.request.fromPlayerIndex, 'confirm')`（由交出控制的玩家确认）
 - `farm-select` / `selection`：`session.commitSelectionChoice(X, payload)`
 
 断言：
