@@ -935,6 +935,14 @@ _Avoid_: modifier、listener、effect、prerequisiteCheck、卡牌运行时局�
 一局游戏发放的职业卡和次要发展卡所属的版本：修订版（A–E）或旧版（`C` 前缀牌组，如 CE、CI、CK）。只换卡牌，棋盘、行动格、大发展和计分仍按修订版引擎；同一局不混用两个版本。旧版能否开局由 `CLASSIC_EDITION_ENABLED` 控制，见 ADR 0049。
 _Avoid_: 旧版规则、扩展、把牌组（deck）当成版本
 
+**Revised Edition / Classic Edition（修订版 / 旧版）**:
+Card Edition 的两个取值。修订版发 A–E 牌组；旧版发 Classic Deck。对局未声明版本时即修订版。
+_Avoid_: 新版 / 老版、经典版
+
+**Classic Deck（旧版牌组）**:
+旧版里的一副职业和次要发展牌，以 `C` 加原牌组代号表示，如 CE、CI、CK；只在旧版对局中选择，卡面编号同样带前缀（如 CE203）。
+_Avoid_: 用“E 牌组”同时指修订版 E 和旧版 CE
+
 **Parent Card Definition**:
 Parent Cards 扩展的独立结构化数据定义，描述 mother / father parent card 的卡号、规则原文、逻辑头像引用、逻辑卡背引用、mother 小数分值、mother 轮次奖励、father 任务条件和三档奖励；father 条件与奖励同时保留原文和机器可读结构。mother 小数分直接按规则印刷的小数存储。它只描述可验证数据，不执行规则。它不属于 `shared/cards` 的 Card Source / Card Definition / Card Display / Card Impl 投影，也不进入普通手牌、已打出卡、cards-manifest 或常规卡牌注册表。
 _Avoid_: Card Definition、Card Source、MinorImprovement、Occupation、玩家手牌
