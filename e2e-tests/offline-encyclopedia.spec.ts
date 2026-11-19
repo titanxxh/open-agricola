@@ -42,6 +42,7 @@ const persistent = (launcher: BrowserType, profile: string, browserName: 'chromi
   launcher.launchPersistentContext(profile, { ...ownLaunchOptions(browserName), locale: 'en-US' })
 
 async function openOnline(page: Page) {
+  await page.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'en') })
   await page.goto(online(), { waitUntil: 'domcontentloaded' })
   await expect(controls(page).getByRole('button', { name: 'Save for offline reading' })).toBeEnabled()
 }
@@ -51,7 +52,7 @@ async function readCard(page: Page, query: string, heading: string, body: RegExp
   const entry = page.locator('details').filter({ has: page.locator('summary', { hasText: heading }) }).first()
   await expect(entry).toBeVisible()
   await entry.locator('summary').click()
-  await expect(entry).toContainText(body)
+  await expect(entry.getByText(body).first()).toBeVisible()
 }
 
 test('saves one language and opens its independent offline bookmark after restarting the browser @webkit', async ({ playwright, browserName }) => {
@@ -168,6 +169,19 @@ test('keeps the saved archive through incomplete, corrupt and quota-limited upda
     await controls(page).getByRole('button', { name: 'Delete offline encyclopedia' }).click()
     await expect(controls(page).getByRole('button', { name: 'Save for offline reading' })).toBeEnabled()
     expect(await page.evaluate(async () => (await caches.match('/unrelated-artwork'))?.text())).toBe('retained')
+    await context.setOffline(true)
+    await page.goto(offline())
+    await expect(page.getByText('Download the offline encyclopedia again from the online encyclopedia.')).toBeVisible()
+
+    await context.setOffline(false)
+    await page.goto(online())
+    await controls(page).getByRole('button', { name: 'Save for offline reading' }).click()
+    await expect(controls(page)).toContainText(sha256.slice(0, 12))
+    await page.evaluate(() => new Promise<void>((resolve, reject) => {
+      const removal = indexedDB.deleteDatabase('open-agricola-offline-encyclopedia')
+      removal.onsuccess = () => resolve()
+      removal.onerror = () => reject(removal.error)
+    }))
     await context.setOffline(true)
     await page.goto(offline())
     await expect(page.getByText('Download the offline encyclopedia again from the online encyclopedia.')).toBeVisible()
