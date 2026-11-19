@@ -1,0 +1,6 @@
+{
+  "format": 1,
+  "recipeTree": "ccf33197da17321bafc612f7dbd836f90d2e9ddf",
+  "image": "ghcr.io/titanxxh/open-agricola-images@sha256:bcf1602c60585ed58df012d482d7885da92b1905f08bbf0d0027c1b5b31a05e7",
+  "configDigest": "sha256:2e1b6888dbf2c5289e8bfc71f13237a72300fb023a865a5e9fa20d9e425faf1d"
+}
