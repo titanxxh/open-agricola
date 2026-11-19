@@ -53,14 +53,14 @@ vi.mock('../../contexts/LocaleContext', async () => {
     'platform.draftModeSimultaneous': 'Simultaneous draft',
     'platform.draftPoolSizeLabel': 'Draft packet size',
     'platform.draftPoolSizeOption': '{n} cards',
-    'platform.cardEditionLabel': 'Card Edition',
+    'platform.cardEditionLabel': 'Card edition',
     'platform.cardEditionRevised': 'Revised',
     'platform.cardEditionClassic': 'Classic',
-    'platform.classicDecksLabel': 'Classic Decks',
+    'platform.classicDecksLabel': 'Classic decks',
     'platform.classicDeckCount': '{deck} · {occupations} occupations, {minors} minor improvements',
     'platform.classicPoolInsufficient': 'Classic decks {decks} cannot fill {players} hands: need {neededOccupations} occupations and {neededMinors} minor improvements, have {eligibleOccupations} and {eligibleMinors} eligible cards',
     'platform.classicIncompatibleOptions': 'Classic games exclude Farmers of the Moor, the community deck, Parent Cards, and Through the Seasons.',
-    'platform.classicNoDeckSelected': 'Select a Classic Deck with eligible cards.',
+    'platform.classicNoDeckSelected': 'Select a classic deck with eligible cards.',
     'platform.reviewedWorkshopCards': 'Reviewed workshop cards',
     'platform.reviewedWorkshopCardsHint': 'Select reviewed cards for this room only.',
     'platform.reviewedWorkshopCardsLoading': 'Loading reviewed cards…',
@@ -296,8 +296,15 @@ describe('LobbyPage Card Edition', () => {
   it('hides Card Edition with the switch off', () => {
     render(<LobbyPage classicEditionEnabled={false} />)
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
-    expect(screen.queryByRole('group', { name: 'Card Edition' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Card edition' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Create Game' })).toBeEnabled()
+  })
+
+  it('keeps the solo setup revised with the switch on', () => {
+    render(<LobbyPage classicEditionEnabled />)
+    fireEvent.click(screen.getByRole('button', { name: 'Solo game' }))
+    expect(screen.getByRole('button', { name: 'Start solo game' })).toBeVisible()
+    expect(screen.queryByRole('group', { name: 'Card edition' })).toBeNull()
   })
 
   it('uses the eligible manifest pool for the chosen seats and draft, and creates a hotseat room with those decks', async () => {
@@ -323,7 +330,7 @@ describe('LobbyPage Card Edition', () => {
     const ce = await screen.findByRole('checkbox', { name: 'CE · 14 occupations, 14 minor improvements' })
     expect(ce).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'CI · 0 occupations, 0 minor improvements' })).toBeDisabled()
-    expect(screen.getByRole('group', { name: 'Classic Decks' })).not.toHaveTextContent('A ·')
+    expect(screen.getByRole('group', { name: 'Classic decks' })).not.toHaveTextContent('A ·')
     expect(moor).toBeDisabled()
     expect(moor).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: /Snake opening/ })).toBeEnabled()
@@ -341,7 +348,7 @@ describe('LobbyPage Card Edition', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Random hand' }))
     fireEvent.click(ce)
-    expect(screen.getByText('Select a Classic Deck with eligible cards.')).toBeVisible()
+    expect(screen.getByText('Select a classic deck with eligible cards.')).toBeVisible()
     expect(create).toBeDisabled()
     fireEvent.click(ce)
     fireEvent.click(create)

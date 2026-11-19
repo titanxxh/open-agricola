@@ -626,7 +626,12 @@ export class WsGameTransport implements GameTransport {
   private finishCommand(commandId: string, outcome: CommandOutcome): void {
     const command = this.journal.commands.get(commandId)
     if (this.recovering && !outcome.ok && command?.type === 'createRoom') {
-      this.eventListeners.forEach(listener => listener({ type: 'error', error: outcome.error ?? 'Room creation failed', code: outcome.code === 'client_refresh_required' ? outcome.code : undefined }))
+      this.eventListeners.forEach(listener => listener({
+        type: 'error',
+        error: outcome.error ?? 'Room creation failed',
+        code: outcome.code === 'client_refresh_required' ? outcome.code : outcome.shortfall?.code,
+        shortfall: outcome.shortfall,
+      }))
     }
     let waitingForSnapshot = false
     const creation = this.pendingCreations.get(commandId)
