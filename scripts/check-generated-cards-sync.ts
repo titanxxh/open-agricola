@@ -8,6 +8,7 @@ export const GENERATED_CARD_FILES = [
   'shared/cards/catalog.generated.ts',
   'shared/cards/major/generated.ts',
   'shared/cards/major/runtime.generated.ts',
+  'shared/cards/classic-catalog.generated.ts',
 ] as const
 
 export type GeneratedCardsSyncCheck = {
@@ -22,6 +23,7 @@ export function checkGeneratedCardsSync(repoRoot = process.cwd()): GeneratedCard
     ['shared/cards/catalog.generated.ts', generated.catalogGenerated],
     ['shared/cards/major/generated.ts', generated.majorGenerated],
     ['shared/cards/major/runtime.generated.ts', generated.majorRuntimeGenerated],
+    ['shared/cards/classic-catalog.generated.ts', generated.classicCatalogGenerated],
   ])
   const staleFiles = GENERATED_CARD_FILES.filter((file) => {
     const filePath = path.join(repoRoot, file)
