@@ -1,6 +1,6 @@
 import { browserApiFetch } from '../services/browser-api'
 import { t as translateMessage } from '../../shared/i18n'
-import { useCallback, useEffect, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useId, useState, type MouseEvent } from 'react'
 import { lobbyNeedsTurnTab, useTurnTabTitle } from './use-turn-tab-title'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -13,6 +13,7 @@ import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from './game-container-helpers'
+import { CLASSIC_EDITION_ENABLED, type CardEdition } from '../../shared/contract/card-edition'
 import type { RoomSummary } from '../../shared/contract/protocol/ws'
 import { RoomInvitePicker } from './RoomInvitePicker'
 import type { MyActiveRoom } from '../../shared/contract/lobby'
@@ -23,6 +24,8 @@ import { useRoomCreation } from './solo/useRoomCreation'
 import { soloRoomOptions } from '../services/room-creation'
 import { PrereleaseEntry } from './PrereleaseEntry'
 import { InboxButton } from './Inbox'
+import { CardEditionSetup } from './CardEditionSetup'
+import { classicDeckPoolNotice, toggleClassicDeck, useClassicDeckPool } from './classic-card-setup'
 
 type RoomWorkshopCard = {
   id: string
@@ -31,7 +34,7 @@ type RoomWorkshopCard = {
   author_name: string
 }
 
-export function LobbyPage() {
+export function LobbyPage({ classicEditionEnabled = CLASSIC_EDITION_ENABLED }: { classicEditionEnabled?: boolean } = {}) {
   const { user, logout, apiFetch } = useAuth()
   const { locale, t } = useLocale()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
@@ -60,6 +63,14 @@ export function LobbyPage() {
   const [allowIncompleteFarmersOfTheMoorMinorDeal, setAllowIncompleteFarmersOfTheMoorMinorDeal] = useState(false)
   const [enableSnakeOpening, setEnableSnakeOpening] = useState(true)
   const showCommunityDeckToggle = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
+  const [cardEdition, setCardEdition] = useState<CardEdition>('revised')
+  const [classicDeckIds, setClassicDeckIds] = useState<string[]>()
+  const incompatibilityHintId = useId()
+  const isClassic = classicEditionEnabled && cardEdition === 'classic'
+  const classicPool = useClassicDeckPool(isClassic && selectMode !== null, {
+    playerCount: selectedMaxPlayers, draftMode, draftPoolSize,
+  }, classicDeckIds)
+  const classicBlocked = isClassic && classicDeckPoolNotice(t, classicPool) !== null
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -88,7 +99,7 @@ export function LobbyPage() {
   }, [fetchRooms, fetchMyRooms])
 
   useEffect(() => {
-    if (!selectMode || !showCommunityDeckToggle || !enableCommunityDeck) return
+    if (!selectMode || isClassic || !showCommunityDeckToggle || !enableCommunityDeck) return
     let cancelled = false
     const load = async () => {
       setWorkshopCardsStatus('loading')
@@ -114,9 +125,10 @@ export function LobbyPage() {
     }
     void load()
     return () => { cancelled = true }
-  }, [enableCommunityDeck, selectMode, showCommunityDeckToggle])
+  }, [enableCommunityDeck, isClassic, selectMode, showCommunityDeckToggle])
 
   const handleCreateGame = () => {
+    if (classicBlocked) return
     // Hotseat is an ordinary authoritative room — it just belongs to one device,
     // so it takes the same transport and only adds the hotseat flag.
     const params: Record<string, string> = {
@@ -144,23 +156,28 @@ export function LobbyPage() {
       params.draftMode = draftMode
       params.draftPoolSize = String(draftPoolSize)
     }
-    if (enableCommunityDeck) {
-      params.enableCommunityDeck = 'true'
-    }
-    if (enableCommunityDeck && selectedWorkshopCardIds.length > 0) {
-      params.customCards = selectedWorkshopCardIds.join(',')
-    }
-    if (enableParentCards) {
-      params.enableParentCards = 'true'
-    }
-    if (enableThroughTheSeasons) {
-      params.enableThroughTheSeasons = 'true'
-    }
-    if (enableFarmersOfTheMoor) {
-      params.enableFarmersOfTheMoor = 'true'
-      if (enableMoorBalanceRules) params.enableMoorBalanceRules = 'true'
-      if (allowIncompleteFarmersOfTheMoorMinorDeal) {
-        params.allowIncompleteFarmersOfTheMoorMinorDeal = 'true'
+    if (isClassic) {
+      params.cardEdition = 'classic'
+      params.classicDeckIds = classicPool.selectedDeckIds.join(',')
+    } else {
+      if (enableCommunityDeck) {
+        params.enableCommunityDeck = 'true'
+      }
+      if (enableCommunityDeck && selectedWorkshopCardIds.length > 0) {
+        params.customCards = selectedWorkshopCardIds.join(',')
+      }
+      if (enableParentCards) {
+        params.enableParentCards = 'true'
+      }
+      if (enableThroughTheSeasons) {
+        params.enableThroughTheSeasons = 'true'
+      }
+      if (enableFarmersOfTheMoor) {
+        params.enableFarmersOfTheMoor = 'true'
+        if (enableMoorBalanceRules) params.enableMoorBalanceRules = 'true'
+        if (allowIncompleteFarmersOfTheMoorMinorDeal) {
+          params.allowIncompleteFarmersOfTheMoorMinorDeal = 'true'
+        }
       }
     }
     if (enableSnakeOpening) {
@@ -331,6 +348,19 @@ export function LobbyPage() {
                   </button>
                 ))}
               </div>
+              {classicEditionEnabled && (
+                <CardEditionSetup
+                  edition={cardEdition}
+                  onEditionChange={setCardEdition}
+                  pool={classicPool}
+                  onDeckToggle={deck => {
+                    if (classicPool.status === 'ready') {
+                      setClassicDeckIds(current => toggleClassicDeck(current ?? classicPool.defaultDeckIds, deck))
+                    }
+                  }}
+                  incompatibleDescriptionId={incompatibilityHintId}
+                />
+              )}
               {selectMode !== 'hotseat' && (
                 <fieldset className="room-access-options">
                   <legend className="player-select-label">{t('platform.roomAccessLabel')}</legend>
@@ -394,7 +424,9 @@ export function LobbyPage() {
                   <label className="community-deck-toggle">
                     <input
                       type="checkbox"
-                      checked={enableCommunityDeck}
+                      checked={!isClassic && enableCommunityDeck}
+                      disabled={isClassic}
+                      aria-describedby={isClassic ? incompatibilityHintId : undefined}
                       onChange={(e) => setEnableCommunityDeck(e.target.checked)}
                     />
                     <span>
@@ -403,7 +435,7 @@ export function LobbyPage() {
                         {translateMessage(locale, "ui.copy.client_app_LobbyPage_tsx.these_cards_are_submitted_through_workshop_and_a2b6bf")}</span>
                     </span>
                   </label>
-                  {enableCommunityDeck && (
+                  {!isClassic && enableCommunityDeck && (
                     <div className="room-workshop-picker">
                       <div className="player-select-label">{t('platform.reviewedWorkshopCards')}</div>
                       <div className="community-deck-toggle-hint">{t('platform.reviewedWorkshopCardsHint')}</div>
@@ -454,7 +486,9 @@ export function LobbyPage() {
               <label className="community-deck-toggle">
                 <input
                   type="checkbox"
-                  checked={enableParentCards}
+                  checked={!isClassic && enableParentCards}
+                  disabled={isClassic}
+                  aria-describedby={isClassic ? incompatibilityHintId : undefined}
                   onChange={(e) => setEnableParentCards(e.target.checked)}
                 />
                 <span>{t('platform.enableParentCards')}</span>
@@ -462,7 +496,9 @@ export function LobbyPage() {
               <label className="community-deck-toggle">
                 <input
                   type="checkbox"
-                  checked={enableThroughTheSeasons}
+                  checked={!isClassic && enableThroughTheSeasons}
+                  disabled={isClassic}
+                  aria-describedby={isClassic ? incompatibilityHintId : undefined}
                   onChange={(e) => setEnableThroughTheSeasons(e.target.checked)}
                 />
                 <span>{t('platform.enableThroughTheSeasons')}</span>
@@ -470,7 +506,9 @@ export function LobbyPage() {
               <label className="community-deck-toggle">
                 <input
                   type="checkbox"
-                  checked={enableFarmersOfTheMoor}
+                  checked={!isClassic && enableFarmersOfTheMoor}
+                  disabled={isClassic}
+                  aria-describedby={isClassic ? incompatibilityHintId : undefined}
                   onChange={(e) => {
                     setEnableFarmersOfTheMoor(e.target.checked)
                     if (!e.target.checked) {
@@ -481,7 +519,7 @@ export function LobbyPage() {
                 />
                 <span>{t('platform.enableFarmersOfTheMoor')}</span>
               </label>
-              {enableFarmersOfTheMoor && (
+              {!isClassic && enableFarmersOfTheMoor && (
                 <label className="community-deck-toggle">
                   <input type="checkbox" checked={enableMoorBalanceRules}
                     aria-label={t('platform.moorBalanceRules')}
@@ -492,7 +530,7 @@ export function LobbyPage() {
                   </span>
                 </label>
               )}
-              {enableFarmersOfTheMoor && (
+              {!isClassic && enableFarmersOfTheMoor && (
                 <label className="community-deck-toggle">
                   <input
                     type="checkbox"
@@ -503,7 +541,7 @@ export function LobbyPage() {
                 </label>
               )}
               <div className="player-select-actions">
-                <button type="button" className="btn-primary" onClick={handleCreateGame}>
+                <button type="button" className="btn-primary" onClick={handleCreateGame} disabled={classicBlocked}>
                   {t(selectMode === 'hotseat' ? 'platform.startHotseat' : 'platform.createGame')}
                 </button>
                 <button type="button" className="btn-link" onClick={() => setSelectMode(null)}>
@@ -558,6 +596,7 @@ export function LobbyPage() {
                 <span className="room-id">
                   {t('platform.roomLabel', { id: room.id })}
                   {room.access === 'invited' && <small className="room-access-badge">{t('platform.roomAccessInvited')}</small>}
+                  {room.cardEdition === 'classic' && <small className="room-access-badge">{t('platform.cardEditionClassic')}</small>}
                 </span>
                 <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
                 <span className="room-status" data-status={room.status}>

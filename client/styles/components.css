@@ -532,3 +532,36 @@ body.kofi-widget-hidden .floating-chat-kofi-popup-iframe-mobi {
     bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))) !important;
   }
 }
+
+.card-edition-field {
+  min-inline-size: 0;
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+.card-edition-field legend {
+  padding-inline: 4px;
+  font-weight: 600;
+}
+.card-edition-field label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.card-edition-field label:has(input:disabled) {
+  opacity: 0.6;
+}
+.card-edition-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.card-edition-notice {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}

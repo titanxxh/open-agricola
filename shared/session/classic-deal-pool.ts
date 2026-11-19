@@ -1,5 +1,5 @@
 import type { ClassicPoolShortfall } from '../contract/card-edition'
-import { classicCardsNeededPerType } from '../contract/card-edition'
+import { classicCardsNeededPerType, compareClassicPool, formatClassicPoolShortfall } from '../contract/card-edition'
 import { getEligibleClassicCardIds, normalizeClassicDeckIds } from '../cards/classic-catalog'
 import type { InitialStateOptions } from './state-constants'
 
@@ -10,14 +10,10 @@ export const classicPoolShortfall = (
   neededPerType: number,
 ): ClassicPoolShortfall | null => {
   const eligible = getEligibleClassicCardIds(classicDeckIds, playerCount)
-  if (eligible.occupation.length >= neededPerType && eligible.minor.length >= neededPerType) return null
-  return {
-    code: 'classic_pool_insufficient',
-    playerCount,
-    classicDeckIds: [...classicDeckIds],
-    needed: { occupation: neededPerType, minor: neededPerType },
-    eligible: { occupation: eligible.occupation.length, minor: eligible.minor.length },
-  }
+  return compareClassicPool(classicDeckIds, playerCount, neededPerType, {
+    occupation: eligible.occupation.length,
+    minor: eligible.minor.length,
+  })
 }
 
 /**
@@ -41,9 +37,7 @@ export class ClassicPoolInsufficientError extends Error {
   readonly shortfall: ClassicPoolShortfall
 
   constructor(shortfall: ClassicPoolShortfall) {
-    super(`Classic decks ${shortfall.classicDeckIds.join(', ')} cannot fill ${shortfall.playerCount} hands: need `
-      + `${shortfall.needed.occupation} occupations and ${shortfall.needed.minor} minor improvements, have `
-      + `${shortfall.eligible.occupation} and ${shortfall.eligible.minor} eligible cards`)
+    super(formatClassicPoolShortfall(shortfall))
     this.name = 'ClassicPoolInsufficientError'
     this.shortfall = shortfall
   }

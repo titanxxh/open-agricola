@@ -45,6 +45,7 @@ export function MyActiveGames({ rooms, onResume }: { rooms: MyActiveRoom[]; onRe
                       : t(progress.phase === 'draft' ? 'ui.draft.dialog'
                         : progress.phase === 'parent-selection' ? 'ui.parentSelection.dialog' : 'solo.handTitle')}
                   </span>}
+                  {room.card_edition === 'classic' && <small>{t('platform.cardEditionClassic')}</small>}
                   {room.expansions.length > 0 && <span className="my-game__expansions">
                     {room.expansions.map(expansion => <span key={expansion} role="img" data-expansion={expansion}
                       aria-label={t(expansionIcons[expansion].label)} title={t(expansionIcons[expansion].label)}>
