@@ -53,7 +53,7 @@ export async function publishRelease(cwd: string, input: string[]): Promise<void
   const { version, channel, repository, ref, pollMs, timeoutMs, localVerification } = releaseOptions(input)
   const sha = candidateSha(cwd, repository, ref)
   console.error(`Fixed release candidate: ${sha}. Retry with --ref ${sha} to keep this candidate.`)
-  if (localVerification) { publishOwnerLocalRelease(cwd, { version, repository, sha, channel, path: resolve(localVerification) }); return }
+  if (localVerification) { publishOwnerLocalRelease(cwd, { version, repository, sha, channel, path: resolve(localVerification), pollMs }); return }
   existingRelease(repository, version, sha, channel)
   if (channel === 'prerelease') fixPrereleaseCandidate(cwd, repository, sha)
   const check = () => channel === 'prerelease' ? checkPrereleaseVerification(cwd, repository, sha) : checkCandidateVerification(cwd, repository, sha)
