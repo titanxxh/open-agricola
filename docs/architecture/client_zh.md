@@ -33,7 +33,9 @@
 
 `scripts/browser-data.ts` 为主应用与新 Replay 构建提供卡牌身份。加载器在使用前验证以 SHA-256 命名的元数据和语言包。缓存错误或哈希不符时允许一次新请求。开发元数据和语言发现会重新验证。品牌素材使用 Vite 内容文件名。测试：card-meta、language-pack、browser-data 及 `BrandMark.test.tsx`。
 
-正式 Pages 在主窗口注册 `/sw.js`。`client/public-assets/cache.worker.ts` 按 URL 和 SHA-256 缓存清单内的图片和字体。测试：`e2e-tests/public-asset-worker.spec.ts`。 [更新与恢复](../HOW_TO_DEPLOY_zh.md#主站图片资源)
+正式 Pages 在主窗口注册一个 `/sw.js`。`scripts/vite-service-worker.ts` 打包独立的处理器，分别负责校验后的图片和字体、回房文档请求失败、离线百科专属路径和通知事件。常规激活等待已打开的受控页面退出。回房处理器在网络失败时提供本地重试页，在线 HTTP 响应原样通过。测试覆盖见 `public-asset-worker.spec.ts` 和 `room-offline-retry.spec.ts`。[恢复步骤](../HOW_TO_DEPLOY_zh.md#暂停单项-service-worker-功能)
+
+`WebPushSettings` 管理当前设备是否开启通知。点击时，已登录的应用把不透明 ID 交给服务端解析。`InboxProvider` 在共用弹窗中打开通过鉴权的指定消息，也可在进行中的房间内打开，实际显示后才标为已读。
 
 `workshop-game/bootstrap.ts` 只接纳应用 base 下 `workshop-game.html` 的固定 HTTP／浏览器沙盒参数。父窗口必须是同源、顶层且带 `page=workshop` 的主页面；直接打开、嵌套、跨源及意外模式均保持静态。准入后 `initialize.tsx` 只挂载 Locale、Auth 和 `GameContainerApi`；未登录时提供独立打开应用的链接，不渲染账号路由。自托管主 HTML 保留 `frame-ancestors 'none'`，只有独立对局 HTML 允许 `'self'`；Pages 同样执行 JavaScript 准入检查。覆盖：`bootstrap.test.ts`、`workshop-game-entry.spec.ts`、`frontend-hosting.test.ts`。
 
@@ -112,6 +114,8 @@
 - **公开路由。** `PageRouter` 在等待登录状态和登录拦截之前，通过懒加载的 `EncyclopediaPage` chunk 提供 `?page=encyclopedia[&entry=<key>]`。普通页面不加载它的 chunk、数据或卡图。复制的链接只带 `page` 与 `entry`，不带房间、座位、手牌或对局参数。浏览状态按标签页保存，任一页面刷新后重新开始；`client/main.tsx` 在首次渲染前清除它。覆盖见 `encyclopedia*.spec.ts`；`encyclopedia-pages.spec.ts` 针对静态 Pages 产物运行。
 - **局内面板。** `GameHeader` 打开模态的 `InGameEncyclopedia`。它从不写 URL，也不发送游戏命令；本地草稿留在容器中，按普通快照规则处理。`encyclopedia-attention.ts` 对每个新输入窗口只提醒一次，重连页重新挂载面板后同样如此。热座接机身份变化会关闭面板，交接页不提供入口。覆盖见 `GameContainerApi.encyclopedia.test.tsx` 与 `encyclopedia-in-game.spec.ts`。
 - **牌面。** `EncyclopediaFace` 用游戏自身的组件和 `shared/projections/` 绘制目录中的每种牌面，任一卡图失败时改用 `EncyclopediaTextFace`。某语言仍显示英文的文字，在出现的每处都加标注。扫描卡里职业、次要改良和主要改良沿用 `PlayerCard`，其余印刷版式各自用单独的框体模板（[扫描卡牌面](scan-cards.md)，仅英文）。覆盖见 `encyclopedia-faces.spec.ts` 与 `client/app/encyclopedia/__tests__/`。
+
+- **离线阅读。** 正式 Pages 从公开目录及其搜索投影为每种语言发布纯文字包。`OfflineEncyclopediaControls` 仅在用户主动操作时把一份校验通过的副本保存到 IndexedDB。更新在一个事务中替换副本。Worker 在 `/offline-encyclopedia/` 提供已存副本，缺失时提示重新下载。测试见 `offline-encyclopedia.spec.ts`。
 
 ### 交互展示不变量
 
