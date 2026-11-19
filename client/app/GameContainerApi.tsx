@@ -579,8 +579,14 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const bugReportBar = bugReportRoomId
     ? <BugReportBar roomId={bugReportRoomId} />
     : null
-  const mySeatIndex = controlledPlayerIndexes.find(index => waitingSeatIndexes?.includes(index)) ?? participantViewer?.playerIndex ?? null
-  useTurnTabTitle(gameNeedsTurnTab(isHotseat, mySeatIndex, waitingSeatIndexes))
+  const ordinaryPlay = !!state && state.phase === 'playing' && !state.gameOver
+  const respondingSeatIndex = state && activePlayer ? state.players.findIndex(player => player.id === activePlayer.id) : -1
+  const turnReminderSeats = ordinaryPlay && respondingSeatIndex >= 0
+    ? [respondingSeatIndex]
+    : (waitingSeatIndexes ?? [])
+  const mySeatIndex = controlledPlayerIndexes.find(index => turnReminderSeats.includes(index))
+    ?? (ordinaryPlay ? null : participantViewer?.playerIndex ?? null)
+  useTurnTabTitle(gameNeedsTurnTab(isHotseat, mySeatIndex, turnReminderSeats))
 
   useLayoutEffect(() => {
     if (!hasGameView) return
@@ -1849,6 +1855,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       ? hotseatSeatConfirmed === hotseatAudienceKey && hotseatAudienceId ? [hotseatAudienceId] : []
       : participantViewer?.visiblePlayerIds ?? (selfPlayer ? [selfPlayer.id] : []),
     activePlayerId: activePlayer?.id,
+    turnPlayerId: activePlayer?.id,
     currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     fieldPositions,
@@ -2050,7 +2057,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
         score: scores?.find((summary) => summary.playerId === p.id)?.total ?? 0,
         color: p.color,
         isYou: selfPlayer ? p.id === selfPlayer.id : false,
-        isCurrent: i === state.currentPlayerIndex,
+        isCurrent: activePlayer ? p.id === activePlayer.id : i === state.currentPlayerIndex,
       }))}
       active={displayPlayer.id}
       onChange={setViewPlayerIdSafe}
@@ -2086,7 +2093,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       playerNames={playerNames}
       scores={scores ?? []}
       viewedPlayerId={displayPlayer.id}
-      currentPlayerId={currentPlayer.id}
+      currentPlayerId={activePlayer?.id ?? currentPlayer.id}
       onViewPlayer={setViewPlayerIdSafe}
     />
   )

@@ -90,7 +90,7 @@
 - `RoomInvitePicker.tsx` 在输入两个字符后搜索用户名或显示名前缀，支持点击与键盘选择，等待输入法组字结束，并丢弃已取消请求的响应。已选玩家显示为带用户名、可移除的名字标签，账号 ID 只用于创建请求。服务端确认 Room 后从 URL 移除创建选项，所有准入决定仍由服务端执行。覆盖：`RoomInvitePicker.test.tsx`、`room-invitations.spec.ts`。
 - `MyActiveGames.tsx` 通过参与者名字和颜色识别对局，显示扩展图标、游戏回合或开局阶段、本地时区的创建或开局时间，以及服务端给出的等待玩家。当前有牌可选的轮抽玩家沿用普通游戏当前行动玩家的颜色标记描边。继续游戏使用 Room ID，但不展示该 ID。覆盖：`LobbyPage.test.tsx`、`room-invitations.spec.ts`、`lobby-active-games.spec.ts`、`draft-opening-order.spec.ts`。
 - 构建开关控制大厅和工坊的卡牌版本选择。旧版牌组的张数按清单和当前人数计算。房间标签使用服务端投影的卡牌版本。
-- `app/use-turn-tab-title.ts` 在 `LobbyPage` 和 `GameContainerApi` 消费 Waiting Seat。非热座提醒匹配任一自有座位，独立于农场浏览。大厅摘要用 `owned_player_indexes` 区分座位归属和当前响应者，标记全部自有农场。减少动态效果时固定前缀，清理时恢复标题。覆盖：`lobby-active-games.spec.ts`、`ws-dual-player.spec.ts`、`lobby-my-rooms.test.ts`。
+- `app/use-turn-tab-title.ts` 提醒大厅 Waiting Seat。普通进行中只提醒自有的待回应者：等待中的 Interaction Player，否则是工作轮转玩家。轮抽、父母选择和热座保持原样。顶栏、标签、农场标记和总览使用同一待回应者，不改轮转或 takeAction。大厅座位仍是栈顶帧主人。覆盖：`responding-player-markers.test.tsx`、`lobby-active-games.spec.ts`、`ws-dual-player.spec.ts`、`lobby-my-rooms.test.ts`。
 - `app/solo/SoloHandOverlay.tsx` 按权威候选分组收集一次本地选择并原子提交。重复快照和语言切换保留可编辑勾选；刷新恢复候选并清空未确认勾选。Moor 准备和保留继续使用 `InteractionBar` 原生选择；`SpecialActionsPanel` 读取公开当前牌、弃牌及 `soloSupply` 投影。覆盖见 `standard-solo-ui.spec.ts` 与单人组件测试。
 - 对局布局共用玩家总览与只读公开农场。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。
 - 不支持容器单位或 CSS 长度除法的浏览器通过 `useElementWidth` 与 `ResizeObserver` 测量卡牌和农场容器，提供卡牌缩放比例与农场宽度；支持这些特性的浏览器继续使用 CSS 容器尺寸。旧浏览器尺寸、横竖屏切换与农场输入由 `touch-card-play.spec.ts` 覆盖。
