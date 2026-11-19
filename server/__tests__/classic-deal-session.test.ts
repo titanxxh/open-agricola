@@ -3,7 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap'
 import { createInitialState } from '../../shared/session/state-bootstrap'
-import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import { rehydrateState, serializeSessionSnapshot, type PersistedSessionSnapshot } from '../../shared/session/serialization'
+import { startOrdinaryCardDrawChoice } from '../../shared/session/ordinary-card-draw'
 import { ClassicPoolInsufficientError, getClassicDealShortfall } from '../../shared/session/classic-deal-pool'
 import { withClassicCardDefinitions } from '../../shared/cards/classic-catalog'
 import { classicFixtureCards } from '../../shared/cards/__tests__/__fixtures__/classic-definitions'
@@ -52,6 +53,13 @@ const draftCardsOf = (state: GameState, kind: 'occupation' | 'minor') => (state.
   .flatMap(seat => [seat.kept, ...Object.values(seat.inbox)])
   .flatMap(pool => kind === 'occupation' ? pool.occ : pool.minor)
 const hands = (state: GameState) => state.players.map(player => [player.occupationHand, player.minorHand])
+
+const saveWithoutOrdinaryDecks = (session: GameSession) => {
+  const saved: PersistedSessionSnapshot = JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))
+  Reflect.deleteProperty(saved.state, 'ordinaryCardDecks')
+  Reflect.deleteProperty(saved.frame, 'ordinaryCardDecks')
+  return saved
+}
 
 describe('classic game deal', () => {
   it('deals full hands and the deck only from eligible cards of the chosen classic decks', () => {
@@ -103,7 +111,7 @@ describe('classic game deal', () => {
     })
   })
 
-  it('drafts only classic cards and keeps the undrafted rest in the classic deck', () => {
+  it('drafts only classic cards and restores the undrafted remainder during the draft', () => {
     withClassicCardDefinitions(FIXTURES, () => {
       const session = createOpeningSession({ seed: 1872, options: {
         playerCount: 2, cardEdition: 'classic', classicDeckIds: ['CE', 'CI'], draftMode: 'simultaneous', draftPoolSize: 8,
@@ -121,6 +129,15 @@ describe('classic game deal', () => {
       expect(response.ok, response.error).toBe(true)
       expect(eligibleIn(['CE', 'CI'], 'occupation').has(pick.occCardId!)).toBe(true)
       expect(eligibleIn(['CE', 'CI'], 'minor').has(pick.minorCardId!)).toBe(true)
+
+      const restored = new GameSession(rehydrateState(saveWithoutOrdinaryDecks(session)))
+      sessions.push(restored)
+      const restoredDraft = restored.getState().state
+      expect(restoredDraft.ordinaryCardDecks.occupation).toEqual([])
+      expect(new Set(restoredDraft.ordinaryCardDecks.minor)).toEqual(new Set(state.ordinaryCardDecks.minor))
+      const next = restored.submitDraftPick('p2', firstDraftPick(restoredDraft.draft!, 'p2'))
+      expect(next.ok, next.error).toBe(true)
+      expect(next.state.draft?.stages[0]?.seats.p1?.kept).toEqual({ occ: [pick.occCardId], minor: [pick.minorCardId] })
     })
   })
 
@@ -145,6 +162,51 @@ describe('classic game deal', () => {
     })
   })
 
+  it('restores a missing classic draw deck and publishes only its counts to a viewer', () => {
+    withClassicCardDefinitions(FIXTURES, () => {
+      const session = open({ cardEdition: 'classic', classicDeckIds: ['CI', 'CE'] })
+      const draw = startOrdinaryCardDrawChoice(session.state, { playerId: 'p1', cardType: 'minor', count: 2 })
+      if (!draw.ok) throw new Error(draw.error)
+      const remaining = session.state.ordinaryCardDecks
+      const saved = saveWithoutOrdinaryDecks(session)
+      const [owner, guest] = saved.state.players
+      owner!.occupationPlayed.push(...owner!.occupationHand.splice(0))
+
+      const restored = new GameSession(rehydrateState(saved))
+      const independentlyRestored = new GameSession(rehydrateState(saved))
+      sessions.push(restored, independentlyRestored)
+      const response = restored.getState()
+      expect(response.state.players[0]!.occupationHand).toEqual([])
+      expect(response.state.players[0]!.occupationPlayed).toEqual(owner!.occupationPlayed)
+      expect(response.state.players[1]!.occupationHand).toEqual(guest!.occupationHand)
+      expect(new Set(response.state.ordinaryCardDecks.occupation)).toEqual(new Set(remaining.occupation))
+      expect(new Set(response.state.ordinaryCardDecks.minor)).toEqual(new Set(remaining.minor))
+      expect(independentlyRestored.state.ordinaryCardDecks).toEqual(response.state.ordinaryCardDecks)
+
+      const viewer = restored.buildSyncPayload(response, ['p1']).state
+      expect(viewer.ordinaryCardDecks).toEqual({ occupation: ['?', '?'], minor: ['?', '?'] })
+      expect(viewer.players[1]!.occupationHand).toEqual(Array(7).fill('?'))
+      expect(viewer.ordinaryCardDrawChoices[draw.choice.id]!.candidates).toEqual(draw.choice.candidates)
+      const guestView = restored.buildSyncPayload(response, ['p2']).state
+      expect(guestView.ordinaryCardDrawChoices[draw.choice.id]!.candidates).toEqual(['?', '?'])
+      const kept = draw.choice.candidates[0]!
+      const resolved = restored.resolveOrdinaryCardDrawChoice(0, draw.choice.id, kept)
+      expect(resolved.ok, resolved.error).toBe(true)
+      expect(resolved.state.players[0]!.minorHand).toContain(kept)
+      expect(restored.takeAction(0, 'day-laborer').ok).toBe(true)
+    })
+  })
+
+  it('rejects rebuilding the draw deck when a resolved choice has discarded private cards', () => {
+    withClassicCardDefinitions(FIXTURES, () => {
+      const session = open({ cardEdition: 'classic', classicDeckIds: ['CI', 'CE'] })
+      const draw = startOrdinaryCardDrawChoice(session.state, { playerId: 'p1', cardType: 'minor', count: 2 })
+      if (!draw.ok) throw new Error(draw.error)
+      expect(session.resolveOrdinaryCardDrawChoice(0, draw.choice.id, draw.choice.candidates[0]!).ok).toBe(true)
+
+      expect(() => new GameSession(rehydrateState(saveWithoutOrdinaryDecks(session)))).toThrow(/ordinary draw history/)
+    })
+  })
 })
 
 describe('classic pool check', () => {
@@ -156,6 +218,16 @@ describe('classic pool check', () => {
     }
     throw new Error('Expected classic game creation to be rejected')
   }
+
+  it.each([
+    [{ enableFarmersOfTheMoor: true }, 'Farmers of the Moor'],
+    [{ playerCount: 0 }, 'a solo game'],
+    [{ playerCount: 1.9 }, 'a solo game'],
+  ] satisfies [InitialStateOptions, string][])('rejects direct classic construction with %j', (options, excluded) => {
+    expect(creationError({ cardEdition: 'classic', ...options })).toMatchObject({
+      rejection: { code: 'classic_edition_incompatible', error: `Classic cards cannot be combined with ${excluded}` },
+    })
+  })
 
   it('reports the cards each type needs for the player count and variant against the eligible cards', () => {
     withClassicCardDefinitions(FIXTURES, () => {

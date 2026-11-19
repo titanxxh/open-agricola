@@ -29,8 +29,9 @@ import {
   implementedCommunityOccupations,
 } from '../cards/catalog'
 import { getEligibleClassicCardIds, normalizeClassicDeckIds } from '../cards/classic-catalog'
+import { ClassicAdmissionError, classicSetupRejection } from './card-edition-admission'
 import { ClassicPoolInsufficientError, classicPoolShortfall } from './classic-deal-pool'
-import { initDraftState, initStagedDraftState } from '../draft/draft-manager'
+import { cardIdsInDraft, initDraftState, initStagedDraftState } from '../draft/draft-manager'
 import type { DraftPool, DraftStageSpec } from '../draft/types'
 import type { ActionDefinition, ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
@@ -231,21 +232,6 @@ export const dealHands = (
     minorDeck: shuffledMinor.slice(dealtCount),
     occupationDeck: shuffledOccupation.slice(dealtCount),
   }
-}
-
-const cardIdsInDraft = (draft: GameState['draft']): { occupation: Set<string>; minor: Set<string> } => {
-  const occupation = new Set<string>()
-  const minor = new Set<string>()
-  if (!draft) return { occupation, minor }
-  for (const stage of draft.stages) {
-    for (const seat of Object.values(stage.seats)) {
-      for (const pool of [seat.kept, ...Object.values(seat.inbox)]) {
-        pool.occ.forEach(id => occupation.add(id))
-        pool.minor.forEach(id => minor.add(id))
-      }
-    }
-  }
-  return { occupation, minor }
 }
 
 const createFallbackOrdinaryCardDecks = (
@@ -788,6 +774,8 @@ export const createInitialState = (
   const options: InitialStateOptions = Array.isArray(extraMinorIdsOrOptions)
     ? { extraMinorIds: extraMinorIdsOrOptions, extraOccupationIds }
     : extraMinorIdsOrOptions
+  const incompatible = classicSetupRejection(options, true)
+  if (incompatible) throw new ClassicAdmissionError(incompatible)
   const gameSeed = resolveSeed(seed)
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   if (options.enableFarmersOfTheMoor) {

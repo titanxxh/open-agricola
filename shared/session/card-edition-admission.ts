@@ -38,7 +38,7 @@ const EXCLUSIVE_OPTIONS: ReadonlyArray<readonly [(options: InitialStateOptions) 
   [options => options.enableCommunityDeck === true, 'the community deck'],
   [options => options.enableParentCards === true, 'Parent Cards'],
   [options => options.enableThroughTheSeasons === true, 'Through the Seasons'],
-  [options => (options.playerCount ?? 2) === 1, 'a solo game'],
+  [options => Math.floor(options.playerCount ?? 2) <= 1, 'a solo game'],
 ]
 
 /** Checks the switch and incompatible options for new games and saved Workshop setups. */
