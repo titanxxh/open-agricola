@@ -23,16 +23,16 @@ const row = (testCase: string, engine: string, passed: boolean, run: Record<stri
 
 describe('window plan', () => {
   it('follows the C5 order and stops at the first unfinished step', () => {
-    expect(WINDOW_STEPS.slice(0, 7)).toEqual(['policy-host', 'preconditions', 'policy-maintain', 'policy-import', 'reverify', 'accounts', 'chain-initial'])
+    expect(WINDOW_STEPS.slice(0, 8)).toEqual(['policy-host', 'preconditions', 'policy-maintain', 'policy-import', 'candidate-import', 'reverify', 'accounts', 'chain-initial'])
     expect(SUITE_STEPS.map(step => step.suite)).toEqual(['handoff', 'boundary', 'multihand', 'team', 'sandbox', 'viewer', 'continuity'])
-    expect(WINDOW_STEPS.slice(7, 7 + SUITE_STEPS.length)).toEqual(SUITE_STEPS.map(step => step.step))
-    expect(WINDOW_STEPS.slice(7 + SUITE_STEPS.length)).toEqual(['deletion', 'chain-deletion', 'deletion-rows', 'owner-notes', 'bundle', 'formal-browser', 'copy-evidence', 'final-open', 'readback', 'cleanup', 'archive'])
+    expect(WINDOW_STEPS.slice(8, 8 + SUITE_STEPS.length)).toEqual(SUITE_STEPS.map(step => step.step))
+    expect(WINDOW_STEPS.slice(8 + SUITE_STEPS.length)).toEqual(['deletion', 'chain-deletion', 'deletion-rows', 'owner-notes', 'bundle', 'formal-browser', 'copy-evidence', 'final-open', 'readback', 'cleanup', 'archive'])
     let state = markStep(markStep(newState('c6', 1), 'policy-host', 'started', 1), 'policy-host', 'done', 1)
     expect(nextStep(state)).toBe('preconditions')
     state = markStep(markStep(state, 'preconditions', 'started', 2), 'preconditions', 'done', 3, { outputs: {} })
     expect(state.steps.preconditions).toMatchObject({ status: 'done', attempts: 1, startedAt: 2, finishedAt: 3 })
     expect(nextStep(state)).toBe('policy-maintain')
-    for (const step of ['policy-maintain', 'policy-import']) state = markStep(markStep(state, step, 'started', 3), step, 'done', 3)
+    for (const step of ['policy-maintain', 'policy-import', 'candidate-import']) state = markStep(markStep(state, step, 'started', 3), step, 'done', 3)
     expect(nextStep(state)).toBe('reverify')
     state = markStep(markStep(state, 'reverify', 'started', 4), 'reverify', 'failed', 5, { error: 'ssh dropped' })
     state = markStep(state, 'reverify', 'started', 6)
@@ -224,7 +224,7 @@ describe('window run with an injected runner', () => {
     await expect(runWindow({ configPath, windowPath, io: host.io })).rejects.toThrow(/create helper failed/)
     const state = JSON.parse(readFileSync(join(value.windowDirectory, 'state.json'), 'utf8'))
     expect(Object.fromEntries(Object.entries(state.steps).map(([step, entry]) => [step, (entry as { status: string }).status])))
-      .toEqual({ 'policy-host': 'done', preconditions: 'done', 'policy-maintain': 'done', 'policy-import': 'done', reverify: 'done', accounts: 'failed' })
+      .toEqual({ 'policy-host': 'done', preconditions: 'done', 'policy-maintain': 'done', 'policy-import': 'done', 'candidate-import': 'done', reverify: 'done', accounts: 'failed' })
     expect(host.calls.some(call => call.includes('maintain') || call.includes('import-image') || call.includes('checkout'))).toBe(false)
     expect(JSON.parse(readFileSync(configPath, 'utf8')).formalBuild).toBe(sha('b'))
     const reverify = host.calls.filter(call => call.startsWith('./deploy-prerelease.sh reverify'))
@@ -527,6 +527,118 @@ describe('policy phase', () => {
   })
 })
 
+describe('candidate install', () => {
+  const from = sha('1'), to = sha('2'), owner = sha('9'), formal = sha('b'), generation = '44444444-4444-4444-8444-444444444444', cycle = '55555555-5555-4555-8555-555555555555'
+  function files(root: string, { candidate = to, install = {} }: { candidate?: string; install?: Record<string, unknown> } = {}) {
+    const secrets = privateDir(root, 'secrets')
+    const accounts = (labels: string[]) => ({ accounts: labels.map(label => ({ id: `id-${label}`, username: `user-${label}`, password: `password-${label}` })) })
+    const target = writePrivate(join(secrets, 'target.json'), { origin: 'https://pre.example.test', directory: '/srv/pre', policyDirectory: '/srv/policy', database: { name: 'pre' },
+      formal: { appOrigin: 'https://app.example.test', apiOrigin: 'https://api.example.test', project: 'formal' } })
+    writeFileSync(join(secrets, 'cookie'), '__Host-oa-session=abc\n', { mode: 0o600 })
+    const configPath = writePrivate(join(secrets, 'acceptance.json'), { format: 1, targetConfig: target, ssh: 'owner@host', candidate,
+      candidateReceipt: writePrivate(join(secrets, 'receipt.json'), { purpose: 'candidate', channel: 'prerelease', sourceSha: candidate, producerSha: owner }), formalBuild: formal,
+      accounts: writePrivate(join(secrets, 'accounts.json'), accounts(['A', 'B', 'C'])), teamAccounts: writePrivate(join(secrets, 'team.json'), accounts(['D', 'E'])),
+      ownerCookie: join(secrets, 'cookie'), guardConfig: '/srv/guard.json', outputRoot: privateDir(root, 'output') })
+    const value = { format: 1, windowId: 'c9', generation, formalFrom: formal, formalBuild: formal, previousRun: privateDir(root, 'previous'), run: privateDir(root, 'run'),
+      windowDirectory: privateDir(root, 'window'), exchangeDirectory: join(root, 'exchange'), install: { from, to, image: { run: 51, attempt: 1, artifact: 52 }, authFile: '/owner/pull.json', ...install } }
+    return { configPath, windowPath: writePrivate(join(root, 'window.json'), value), value }
+  }
+  // Owner checkout and host owner-tools at the same policy SHA; the host starts with `from` installed and open.
+  function host() {
+    const calls: string[] = []
+    const pre: { installed: string; operation: Record<string, unknown> | null } = { installed: from, operation: null }
+    const fail = { deployAfterMigration: false }
+    const ok = (stdout = '') => ({ status: 0, stdout, stderr: '', error: null })
+    const io = {
+      setLog: () => {},
+      fetch: async (url: string) => ({ status: 200, json: async () => (url.endsWith('/frontend-build.json') ? { gameBuildId: formal }
+        : url.endsWith('/browser-policy') ? { buildId: formal } : { ok: true }) }),
+      run(command: string, args: string[], { input = '' }: { input?: string } = {}) {
+        calls.push([command.endsWith('node') || command === process.execPath ? 'node' : command, ...args].join(' '))
+        if (command === 'git') return ok(args[0] === 'rev-parse' ? `${owner}\n` : '')
+        if (command === 'ssh' && args.at(-1) === '-s') return ok(input.includes('storage-guard.json') ? `${cycle}\n` : '')
+        if (command === 'ssh' && args.at(-1)!.includes('rev-parse HEAD')) return ok(`${owner}\n`)
+        if (command === 'ssh' && args.at(-1)!.includes('typescript-runtime.mjs')) return { status: 1, stdout: '', stderr: 'helper exited', error: null }
+        if (command === './deploy-prerelease.sh') {
+          const lease = args[args.indexOf('--expected-current') + 1]
+          if (lease !== pre.installed && lease !== pre.operation?.sourceBuildId) return { status: 1, stdout: '', stderr: 'Prerelease expected-current lease changed', error: null }
+          if (args[0] === 'status') return ok(JSON.stringify({ installed: { buildId: pre.installed }, generation, operation: pre.operation }) + '\n')
+          if (args[0] === 'maintain') return ok(JSON.stringify({ mode: 'maintenance' }) + '\n')
+          if (args[0] === 'import-image') return ok(JSON.stringify({ imageId: 'sha256:candidate' }) + '\n')
+          if (args[0] === 'deploy') {
+            const id = args[args.indexOf('--operation-id') + 1]
+            pre.installed = to; pre.operation = { id, kind: 'deploy', stage: 'acceptance', sourceBuildId: from, backupStem: `pre-${id}` }
+            if (fail.deployAfterMigration) { fail.deployAfterMigration = false; return { status: 1, stdout: '', stderr: 'startup identity check failed', error: null } }
+            return ok(JSON.stringify({ mode: 'maintenance', installed: { buildId: to }, generation, operation: pre.operation }) + '\n')
+          }
+        }
+        return ok()
+      },
+    }
+    return { io, calls, fail }
+  }
+  const readState = (value: { windowDirectory: string }) => JSON.parse(readFileSync(join(value.windowDirectory, 'state.json'), 'utf8'))
+  const stepStatus = (value: { windowDirectory: string }) => Object.fromEntries(Object.entries(readState(value).steps).map(([step, entry]) => [step, (entry as { status: string }).status]))
+
+  it('maintains, imports the candidate and deploys it under the replaced build lease, then takes the full path', async () => {
+    const root = privateRoot(), { configPath, windowPath, value } = files(root), fake = host()
+    await expect(runWindow({ configPath, windowPath, io: fake.io })).rejects.toThrow(/create helper failed/)
+    expect(stepStatus(value)).toMatchObject({ preconditions: 'done', 'policy-maintain': 'done', 'policy-import': 'done', 'candidate-import': 'done', reverify: 'done', accounts: 'failed' })
+    const state = readState(value)
+    expect(state.rebind).toMatchObject({ path: 'full', reasons: expect.arrayContaining(['a new candidate replaces the installed build']) })
+    expect(state.rebind.reasons).not.toContain('owner requested a full acceptance')
+    const deployCalls = fake.calls.filter(call => call.startsWith('./deploy-prerelease.sh'))
+    const at = (prefix: string) => deployCalls.findIndex(call => call.startsWith(`./deploy-prerelease.sh ${prefix}`))
+    const order = ['status', 'maintain', 'import-image', 'deploy'].map(at)
+    expect(order.every(index => index >= 0)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+    for (const call of deployCalls.slice(0, order[3] + 1)) expect(call).toContain(`--expected-current ${from}`)
+    expect(deployCalls[order[2]]).toContain(`--purpose candidate --sha ${to} --build-run 51 --build-attempt 1 --artifact-id 52 --auth-file /owner/pull.json --operation-id ${state.ops.candidateImport}`)
+    expect(deployCalls[order[3]]).toContain(`--sha ${to} --generation ${generation} --operation-id ${state.ops.reverify} --authority-receipt ${join(value.exchangeDirectory, 'close.json')}`)
+    expect(deployCalls.some(call => call.startsWith('./deploy-prerelease.sh reverify') || call.includes('--purpose trusted-policy'))).toBe(false)
+    expect(JSON.parse(readFileSync(join(value.exchangeDirectory, 'deploy.json'), 'utf8')).operation).toMatchObject({ id: state.ops.reverify, kind: 'deploy' })
+  })
+
+  it('resumes a deploy that failed after migration with the same operation, a fresh close and the replaced build lease', async () => {
+    const root = privateRoot(), { configPath, windowPath, value } = files(root), fake = host()
+    fake.fail.deployAfterMigration = true
+    await expect(runWindow({ configPath, windowPath, io: fake.io })).rejects.toThrow(/deploy-prerelease deploy failed/)
+    expect(stepStatus(value)).toMatchObject({ 'candidate-import': 'done', reverify: 'failed' })
+    await expect(runWindow({ configPath, windowPath, resume: true, io: fake.io })).rejects.toThrow(/create helper failed/)
+    const deploys = fake.calls.filter(call => call.startsWith('./deploy-prerelease.sh deploy'))
+    expect(deploys).toHaveLength(2)
+    expect(deploys[1]).toBe(deploys[0])
+    expect(deploys[0]).toContain(`--expected-current ${from}`)
+    expect(fake.calls.filter(call => call.startsWith('./deploy-prerelease.sh import-image'))).toHaveLength(1)
+    const closes = fake.calls.filter(call => call.startsWith('node --import tsx scripts/prerelease/authority.ts close'))
+    expect(new Set(closes).size).toBe(closes.length)
+    expect(stepStatus(value)).toMatchObject({ reverify: 'done', accounts: 'failed' })
+  })
+
+  it('stops before any host change when the acceptance config still names the replaced candidate', async () => {
+    const root = privateRoot(), { configPath, windowPath } = files(root, { candidate: from }), fake = host()
+    await expect(runWindow({ configPath, windowPath, io: fake.io })).rejects.toThrow(/Set the acceptance config candidate/)
+    expect(fake.calls.some(call => call.startsWith('./deploy-prerelease.sh'))).toBe(false)
+  })
+
+  it('validates the install block and lets only an install window keep the formal build', () => {
+    const root = privateRoot(), { value } = files(root)
+    expect(parseWindowConfig(value)).toBe(value)
+    expect(() => parseWindowConfig({ ...value, install: { ...value.install, to: from } })).toThrow(/installed and new candidate SHAs/)
+    expect(() => parseWindowConfig({ ...value, install: { ...value.install, image: { run: 51, attempt: 1, artifact: 0 } } })).toThrow(/candidate image build/)
+    expect(() => parseWindowConfig({ ...value, install: { ...value.install, authFile: 'pull.json' } })).toThrow(/absolute private GHCR/)
+    const { install: _install, ...reverifyOnly } = value
+    expect(() => parseWindowConfig(reverifyOnly)).toThrow(/previous and new formal SHAs/)
+  })
+
+  it('records the deploy, not a reverify, in the retained-data notes', () => {
+    const notes = ownerNotes({ candidate: to, formalFrom: formal, formalTo: formal, rows: { D: zeroRows, E: zeroRows }, receipts, diagnostics: [],
+      install: { from, operation: 'op-1', backupStem: 'pre-op-1' } }, { 'retained-data': { dailyBackup: 'host cron' } })
+    expect(notes['retained-data']).toMatchObject({ deploy: { installed: to, from, operation: 'op-1', backupStem: 'pre-op-1' }, dailyBackup: 'host cron' })
+    expect(notes['retained-data']).not.toHaveProperty('reverify')
+  })
+})
+
 describe('fast rebind window', () => {
   const candidate = sha('c'), generation = '44444444-4444-4444-8444-444444444444'
   // A fake host and formal API: suites "pass" by writing their own result files, and bundling stops the window.
@@ -590,8 +702,8 @@ describe('fast rebind window', () => {
     await expect(runWindow({ configPath: window.configPath, windowPath: window.windowPath, io: window.io })).rejects.toThrow(/bundle failed/)
     const state = JSON.parse(readFileSync(join(window.value.windowDirectory, 'state.json'), 'utf8'))
     expect(state.rebind).toMatchObject({ path: 'fast', reasons: [], boundary: { from: sha('a'), to: sha('b'), files: [] } })
-    // Policy steps are no-ops without `policy` and are never skipped by the fast path.
-    expect(statuses(window.value.windowDirectory)).toEqual({ 'policy-host': 'done', preconditions: 'done', 'policy-maintain': 'done', 'policy-import': 'done', reverify: 'done', accounts: 'done', 'chain-initial': 'done', 'suite-handoff': 'done', 'suite-boundary': 'done',
+    // Policy and install steps are no-ops without their blocks and are never skipped by the fast path.
+    expect(statuses(window.value.windowDirectory)).toEqual({ 'policy-host': 'done', preconditions: 'done', 'policy-maintain': 'done', 'policy-import': 'done', 'candidate-import': 'done', reverify: 'done', accounts: 'done', 'chain-initial': 'done', 'suite-handoff': 'done', 'suite-boundary': 'done',
       'suite-multihand': 'skipped', 'suite-team': 'skipped', 'suite-sandbox': 'skipped', 'suite-viewer': 'skipped', 'suite-continuity': 'skipped',
       deletion: 'skipped', 'chain-deletion': 'skipped', 'deletion-rows': 'skipped', 'owner-notes': 'done', bundle: 'failed' })
     expect(window.calls.filter(call => call.includes(' run ')).map(call => call.split('--suite ')[1].split(' ')[0])).toEqual(['handoff', 'boundary'])

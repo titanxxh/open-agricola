@@ -1,6 +1,7 @@
-// Owner-only scripted reverify window (#1731): after an accepted formal deploy, reverify the installed prerelease
-// candidate in place and reopen it with fresh acceptance. One command; it stops at the first failure, prints what to
-// run next and never retries by itself. Progress lives in <windowDirectory>/state.json with one log per step.
+// Owner-only scripted acceptance window (#1731): after an accepted formal deploy, reverify the installed prerelease
+// candidate in place and reopen it with fresh acceptance; with an `install` block, deploy a new candidate instead and
+// accept it in full. One command; it stops at the first failure, prints what to run next and never retries by itself.
+// Progress lives in <windowDirectory>/state.json with one log per step.
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -33,8 +34,11 @@ const SUITE_RUNS = [...SUITE_STEPS, { step: 'deletion', suite: 'deletion', args:
 // The optional policy phase (#1778) moves host owner-tools to the owner's newer main SHA inside the same closure:
 // checkout, maintain (stops the app), import that SHA's trusted-policy image. The installed candidate stays; `open`
 // then reuses its earlier complete verification (installed receipt continuity), so no candidate import or deploy runs.
+// The optional install phase imports the candidate that the policy SHA produced and deploys it in place of reverify;
+// `policy-maintain` then also runs without a policy block, because an import needs the app stopped.
 export const POLICY_STEPS = ['policy-host', 'policy-maintain', 'policy-import']
-export const WINDOW_STEPS = ['policy-host', 'preconditions', 'policy-maintain', 'policy-import', 'reverify', 'accounts', 'chain-initial', ...SUITE_STEPS.map(entry => entry.step),
+export const INSTALL_STEPS = ['policy-maintain', 'candidate-import', 'reverify']
+export const WINDOW_STEPS = ['policy-host', 'preconditions', 'policy-maintain', 'policy-import', 'candidate-import', 'reverify', 'accounts', 'chain-initial', ...SUITE_STEPS.map(entry => entry.step),
   'deletion', 'chain-deletion', 'deletion-rows', 'owner-notes', 'bundle', 'formal-browser', 'copy-evidence', 'final-open', 'readback', 'cleanup', 'archive']
 
 export class WindowStop extends Error {
@@ -46,19 +50,23 @@ const hashFile = path => createHash('sha256').update(readFileSync(path)).digest(
 
 /**
  * { format: 1, windowId, generation, formalFrom, formalBuild, previousRun, run, windowDirectory, exchangeDirectory, ownerNotes?,
- *   policy?, fullAcceptance?, acknowledgeBoundaryDiff?, rebind? }. `fullAcceptance` names the last full acceptance file (its
- *   evidence archived beside it) that a fast rebind carries from; `rebind: 'full'` forces the full suites.
+ *   policy?, install?, fullAcceptance?, acknowledgeBoundaryDiff?, rebind? }. `fullAcceptance` names the last full acceptance
+ *   file (its evidence archived beside it) that a fast rebind carries from; `rebind: 'full'` forces the full suites, and
+ *   `install` always does. An install window may keep the formal build (`formalFrom` equal to `formalBuild`).
  */
 export function parseWindowConfig(value) {
   if (value?.format !== 1) throw new Error('Window config format 1 is required')
   if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(value.windowId ?? '')) throw new Error('Window id must be a short lowercase label')
   if (!uuid.test(value.generation ?? '')) throw new Error('Window generation must be the installed pre data generation UUID')
-  if (!sha.test(value.formalFrom ?? '') || !sha.test(value.formalBuild ?? '') || value.formalFrom === value.formalBuild) throw new Error('formalFrom and formalBuild must be the previous and new formal SHAs')
+  if (!sha.test(value.formalFrom ?? '') || !sha.test(value.formalBuild ?? '') || (value.formalFrom === value.formalBuild && value.install === undefined)) {
+    throw new Error('formalFrom and formalBuild must be the previous and new formal SHAs')
+  }
   // Host and owner read receipts at identical paths, so the exchange directory is an absolute path valid on both.
   if (!/^\/[A-Za-z0-9._/-]+$/.test(value.exchangeDirectory ?? '') || value.exchangeDirectory.split('/').includes('..')) throw new Error('Exchange directory must be a plain absolute path')
   for (const key of ['previousRun', 'run', 'windowDirectory']) if (typeof value[key] !== 'string' || !value[key]) throw new Error(`Window config needs ${key}`)
   if (value.ownerNotes !== undefined && (typeof value.ownerNotes !== 'string' || !value.ownerNotes)) throw new Error('ownerNotes must be a path')
   if (value.policy !== undefined) parsePolicy(value.policy)
+  if (value.install !== undefined) parseInstall(value.install)
   if (value.fullAcceptance !== undefined && (typeof value.fullAcceptance !== 'string' || !value.fullAcceptance)) throw new Error('fullAcceptance must be a path')
   if (value.acknowledgeBoundaryDiff !== undefined && !/^[a-f0-9]{64}$/.test(value.acknowledgeBoundaryDiff)) throw new Error('acknowledgeBoundaryDiff must be the SHA-256 of the identity-boundary diff')
   if (value.rebind !== undefined && !['auto', 'full'].includes(value.rebind)) throw new Error("rebind must be 'auto' or 'full'")
@@ -69,6 +77,18 @@ export function parseWindowConfig(value) {
  * { from, to, image: { run, attempt, artifact }, authFile, dependenciesInstalled?, guardRestarted? }: host owner-tools
  * moves from `from` to `to` (the owner checkout HEAD); the image ids name the successful trusted-policy build of `to`.
  */
+/**
+ * `install` replaces the installed build `from` with candidate `to`, which must also be the acceptance config candidate;
+ * the image ids name the successful candidate image build of `to` by the current policy SHA.
+ */
+function parseInstall(install) {
+  if (!install || typeof install !== 'object' || !sha.test(install.from ?? '') || !sha.test(install.to ?? '') || install.from === install.to) throw new Error('install needs the installed and new candidate SHAs')
+  const image = install.image ?? {}
+  if (!['run', 'attempt', 'artifact'].every(key => Number.isSafeInteger(image[key]) && image[key] > 0)) throw new Error('install.image needs the candidate image build run, attempt and artifact ids')
+  if (typeof install.authFile !== 'string' || !install.authFile.startsWith('/')) throw new Error('install.authFile must be the absolute private GHCR read credential path')
+  return install
+}
+
 function parsePolicy(policy) {
   if (!policy || typeof policy !== 'object' || !sha.test(policy.from ?? '') || !sha.test(policy.to ?? '') || policy.from === policy.to) throw new Error('policy needs the previous and new host owner-tools SHAs')
   const image = policy.image ?? {}
@@ -254,14 +274,17 @@ export function assertNoResidualRows(rows) {
  * Generated owner notes. A full window proves D/E deletion here; a fast rebind deleted nobody, so its deletion-audit
  * item is carried and only the path decision (with any acknowledged boundary diff) is added to the boundary item.
  */
-export function ownerNotes({ candidate, formalFrom, formalTo, rows = null, receipts = null, diagnostics, rebind = null }, owner = {}) {
+export function ownerNotes({ candidate, formalFrom, formalTo, rows = null, receipts = null, diagnostics, rebind = null, install = null }, owner = {}) {
   const fast = rebind?.path === 'fast'
   if (!fast) {
     assertNoResidualRows(rows)
     for (const name of ['close', 'associations', 'identity-verified', 'audit', 'activate']) if (!receipts?.[name]?.sha256) throw new Error(`Deletion audit receipt ${name} is missing`)
   }
   return mergeNotes({
-    'retained-data': { reverify: { installed: candidate, formalFrom, formalTo, note: 'The formal build changed; pre was reverified in place without reinstalling or resetting data.' } },
+    'retained-data': install
+      ? { deploy: { installed: candidate, from: install.from, operation: install.operation, backupStem: install.backupStem, formalFrom, formalTo,
+        note: 'A new candidate was deployed in place: pre-change backup, retained-storage migration, same data generation.' } }
+      : { reverify: { installed: candidate, formalFrom, formalTo, note: 'The formal build changed; pre was reverified in place without reinstalling or resetting data.' } },
     ...(fast ? {} : { 'deletion-audit': { accounts: ['D', 'E'], remainingRows: rows, receipts } }),
     'browser-boundary': { diagnostics, ...(rebind ? { rebind } : {}) },
   }, owner)
@@ -297,13 +320,14 @@ const must = (result, label) => {
 }
 const lastJson = text => JSON.parse(text.trim().split('\n').at(-1))
 
-function hostTools(io, ctx) {
+/** `current` is the expected-current lease: the installed build, or the replaced build until an install deploys. */
+function hostTools(io, ctx, current = ctx.config.candidate) {
   const host = ctx.config.ssh, target = ctx.config.targetConfig, cookie = ctx.config.ownerCookie
   const ssh = (command, input, label = 'ssh') => must(io.run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', host, command], { input, timeoutMs: 120_000 }), label)
   const script = (body, label) => must(io.run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', host, 'bash', '-s'], { input: body + '\n', timeoutMs: 120_000 }), label).trim()
   const toHost = (paths, directory) => must(io.run('scp', ['-q', '-p', '-r', ...paths, `${host}:${directory}/`], { timeoutMs: 5 * 60_000 }), 'copy to host')
   const fromHost = (path, local) => must(io.run('scp', ['-q', '-p', `${host}:${path}`, local], { timeoutMs: 5 * 60_000 }), 'copy from host')
-  const deploy = (action, extra = [], timeoutMs = 10 * 60_000) => lastJson(must(io.run('./deploy-prerelease.sh', [action, '--config', target, '--ssh', host, '--expected-current', ctx.config.candidate, ...extra],
+  const deploy = (action, extra = [], timeoutMs = 10 * 60_000) => lastJson(must(io.run('./deploy-prerelease.sh', [action, '--config', target, '--ssh', host, '--expected-current', current, ...extra],
     { timeoutMs }), `deploy-prerelease ${action}`))
   const authority = (action, generation, operationId, extra) => must(io.run(process.execPath, ['--import', 'tsx', 'scripts/prerelease/authority.ts', action,
     '--config', target, '--cookie-file', cookie, '--generation', generation, '--operation-id', operationId, ...extra], { timeoutMs: 120_000 }), `authority ${action}`)
@@ -396,12 +420,17 @@ function decideRebind(io, win, status, now) {
     if (missing.length) git(['fetch', '--no-tags', 'origin', ...missing])
     boundary = boundaryDiff(git, full.formalBuild, win.formalBuild)
   }
-  return rebindDecision({ request: win.rebind ?? 'auto', full, status, boundary, acknowledged: win.acknowledgeBoundaryDiff ?? null, now })
+  const decision = rebindDecision({ request: win.install ? 'full' : win.rebind ?? 'auto', full, status, boundary, acknowledged: win.acknowledgeBoundaryDiff ?? null, now })
+  if (win.install) decision.reasons = ['a new candidate replaces the installed build', ...decision.reasons.filter(reason => reason !== 'owner requested a full acceptance')]
+  return decision
 }
 
 function makeSteps({ io, win, env, getCtx, reload, setOps, state, setRebind, now = Date.now }) {
   const X = win.exchangeDirectory
-  const tools = () => hostTools(io, getCtx())
+  const install = win.install
+  // Until the install deploy finishes, host operations lease the replaced build; the pending deploy also accepts it.
+  const current = () => install && state().steps.reverify?.status !== 'done' ? install.from : getCtx().config.candidate
+  const tools = () => hostTools(io, getCtx(), current())
   const local = name => join(X, name)
   const policy = win.policy
   const steps = {
@@ -437,7 +466,7 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
       return {}
     },
     async 'policy-maintain'() {
-      if (!policy) return {}
+      if (!policy && !install) return {}
       const t = tools(), close = local('policy-close.json')
       t.authority('close', win.generation, randomUUID(), ['--output', close])
       t.toHost([close], X)
@@ -454,6 +483,14 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
         '--build-attempt', String(policy.image.attempt), '--artifact-id', String(policy.image.artifact), '--auth-file', policy.authFile, '--operation-id', operation], 30 * 60_000)
       return { import: writeAndReturn(local('policy-import.json'), result) }
     },
+    async 'candidate-import'() {
+      if (!install) return {}
+      const operation = state().ops.candidateImport ?? randomUUID()
+      setOps({ candidateImport: operation })
+      const result = tools().deploy('import-image', ['--purpose', 'candidate', '--sha', install.to, '--build-run', String(install.image.run),
+        '--build-attempt', String(install.image.attempt), '--artifact-id', String(install.image.artifact), '--auth-file', install.authFile, '--operation-id', operation], 30 * 60_000)
+      return { import: writeAndReturn(local('candidate-import.json'), result) }
+    },
     async preconditions() {
       const ctx = getCtx(), live = await liveFormalBuild(io, ctx.origins)
       if (live.pages !== win.formalBuild || live.policy !== win.formalBuild || !live.healthy) throw new WindowStop(`Formal API, Pages and health must all be on ${win.formalBuild} before reverifying pre`)
@@ -465,8 +502,11 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
       if (must(io.run('git', ['status', '--porcelain', '--untracked-files=no']), 'git status').trim()) throw new WindowStop('The owner checkout has tracked local edits')
       const hostHead = t.ssh(`git -C '${getCtx().target.policyDirectory}' rev-parse HEAD`, undefined, 'host owner-tools HEAD').trim()
       if (head !== hostHead) throw new WindowStop(`Owner checkout ${head.slice(0, 12)} differs from host owner-tools ${hostHead.slice(0, 12)}; run from a checkout at the host policy SHA`)
+      if (install && getCtx().config.candidate !== install.to) throw new WindowStop('Set the acceptance config candidate and candidateReceipt to the install candidate before the window')
       const status = t.deploy('status')
-      if (status.installed?.buildId !== getCtx().config.candidate || status.generation !== win.generation) throw new WindowStop('The installed pre candidate or generation differs from the window config')
+      // A resumed install may find its own pending deploy past migration, with the new build already recorded.
+      const pendingInstall = !!install && status.installed?.buildId === install.to && status.operation?.kind === 'deploy' && status.operation?.id === state().ops.reverify
+      if ((status.installed?.buildId !== current() && !pendingInstall) || status.generation !== win.generation) throw new WindowStop('The installed pre candidate or generation differs from the window config')
       storageCycle(t, getCtx())
       mkdirSync(X, { recursive: true, mode: 0o700 }); chmodSync(X, 0o700); privateDirectory(X, 'Exchange directory')
       t.ssh(`mkdir -p -m 700 '${X}' && chmod 700 '${X}'`, undefined, 'host exchange directory')
@@ -484,11 +524,20 @@ git -C "$T" rev-parse HEAD`, 'host owner-tools checkout')
       return { status: writeAndReturn(local('pre-status.json'), status), rebind: writeAndReturn(local('rebind.json'), earlier ?? rebind) }
     },
     async reverify() {
+      // An install deploys the new candidate here instead; its deploy operation is this window's acceptance operation.
       const t = tools(), ops = reverifyOps(state()); setOps({ reverify: ops.reverify })
       t.authority('close', win.generation, ops.close, ['--output', local('close.json')])
       const closed = Date.now()
       t.toHost([local('close.json')], X)
-      assertWithin('close → reverify', Date.now() - closed, LIMITS.closeToReverifyMs)
+      assertWithin(install ? 'close → deploy' : 'close → reverify', Date.now() - closed, LIMITS.closeToReverifyMs)
+      if (install) {
+        const result = t.deploy('deploy', ['--sha', install.to, '--generation', win.generation, '--operation-id', ops.reverify, '--authority-receipt', local('close.json')], 60 * 60_000)
+        const operation = result.operation ?? {}
+        if (result.mode !== 'maintenance' || operation.id !== ops.reverify || operation.kind !== 'deploy' || operation.stage !== 'acceptance' || result.installed?.buildId !== install.to) {
+          throw new WindowStop('Deploy did not leave the new candidate in its own acceptance maintenance')
+        }
+        return { close: local('close.json'), deploy: writeAndReturn(local('deploy.json'), result) }
+      }
       const result = t.deploy('reverify', ['--operation-id', ops.reverify, '--authority-receipt', local('close.json')])
       if (result.mode !== 'maintenance' || result.operation?.id !== ops.reverify || result.operation?.kind !== 'reverify') throw new WindowStop('Reverify did not leave pre in its own acceptance maintenance')
       return { close: local('close.json'), reverify: writeAndReturn(local('reverify.json'), result) }
@@ -547,8 +596,9 @@ docker exec "$PG" psql -X -qAt -F, -U "$AD" -d '${ctx.target.database.name}' -c 
       const receipts = fast ? null : Object.fromEntries(['close', 'associations', 'identity-verified', 'audit', 'activate'].map(name => {
         const path = local(`deletion-${name}.json`); return [name, { path, sha256: hashFile(path) }]
       }))
+      const deployed = install ? JSON.parse(readFileSync(local('deploy.json'), 'utf8')).operation : null
       const notes = ownerNotes({ candidate: ctx.config.candidate, formalFrom: win.formalFrom, formalTo: win.formalBuild, rows: fast ? null : JSON.parse(readFileSync(local('deletion-rows.json'), 'utf8')),
-        receipts, diagnostics: runDiagnostics(env.runDirectory), rebind }, owner)
+        receipts, diagnostics: runDiagnostics(env.runDirectory), rebind, install: deployed && { from: install.from, operation: deployed.id, backupStem: deployed.backupStem ?? null } }, owner)
       return { notes: writeAndReturn(local('owner-notes.json'), notes) }
     },
     async bundle() {
