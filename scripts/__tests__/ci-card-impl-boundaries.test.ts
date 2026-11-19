@@ -145,6 +145,23 @@ describe('canonical architecture verification wiring', () => {
     expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: pnpm exec playwright install --with-deps chromium webkit firefox")
   })
 
+  it('installs trusted browser system packages from a restored apt archive and saves it only on a miss', () => {
+    for (const file of ['candidate-verification.yml', 'prerelease-candidate-verification.yml', 'candidate-rehearsal.yml']) {
+      const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', file), 'utf8')
+      const at = (name: string) => workflow.indexOf(`name: ${name}\n`)
+      const steps = ['Key trusted browser system packages', 'Restore trusted browser system packages', 'Install trusted browser prerequisites',
+        'Save trusted browser system packages', 'Prepare candidate isolation'].map(at)
+      expect(steps.every((index, i) => index > (steps[i - 1] ?? 0)), file).toBe(true)
+      expect(workflow.slice(steps[1], steps[2]), file).toContain('uses: actions/cache/restore@v6')
+      expect(workflow.slice(steps[3], steps[4]), file).toContain("&& steps.browser-packages.outputs.cache-hit != 'true'\n        uses: actions/cache/save@v6")
+      const install = workflow.slice(steps[2], steps[3])
+      expect(install, file).toContain('APT_ARCHIVES: ${{ runner.temp }}/browser-system-packages')
+      expect(install.indexOf('Dir::Cache::archives'), file).toBeGreaterThan(-1)
+      expect(install.indexOf('Dir::Cache::archives'), file).toBeLessThan(install.indexOf('pnpm exec playwright install-deps'))
+      expect(install.indexOf('sudo rm -rf /etc/apt/apt.conf.d/90-browser-system-packages'), file).toBeGreaterThan(install.indexOf('pnpm exec playwright install-deps'))
+    }
+  })
+
   it('serves pinned public assets to every browser task instead of GitHub Pages', () => {
     const routine = fs.readFileSync(path.join(repoRoot, '.github/workflows/scoped-verification.yml'), 'utf8')
     expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: bash scripts/ci/checkout-public-assets.sh . \"$RUNNER_TEMP/public-assets\"")
