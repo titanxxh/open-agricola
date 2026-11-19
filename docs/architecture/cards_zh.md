@@ -53,7 +53,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - 带实现的大改良源码经两条生成路径进入后端：`scripts/generate-register-all.ts` 把它加入 `ALL_CARD_IMPLS`；`major/runtime.generated.ts` 提供 `majorCardSources`，`shared/cards/major/index.ts` 把其中的 `impl.effect` 合并进大改良 Card Definition。
 - 服务端与沙盒只注册自定义卡的运行时部分；主客户端只注册展示 metadata，从不导入自定义运行时注册表。
 
-- 旧版卡牌源码放在 `classic/{deck}/`；牌组前缀在原牌组前加 `C`，卡牌 ID 使用三位卡号。运行时生成器自动发现所有直属 `classic/*` 目录；这些源码暂不进入普通发牌目录，由独立的接入变更启用。其卡牌定义生成到 `classic-catalog.generated.ts`；`classic-catalog.ts` 的 `getClassicCardDefinition` / `getClassicCardKind` 只服务按精确 ID 访问的调用方（如 dev 抽牌 / 打出），普通 catalog、发牌池和清单查询都不读取它。
+- 旧版卡牌源码放在 `classic/{deck}/`；牌组前缀在原牌组前加 `C`，卡牌 ID 使用三位卡号。运行时生成器自动发现所有直属 `classic/*` 目录；这些源码暂不进入普通发牌目录，由独立的接入变更启用。其卡牌定义生成到 `classic-catalog.generated.ts`（`classic-catalog.ts`）。按精确 ID 的查询（`getMinorImprovementCard` / `getOccupationCard` 及建立在其上的打出、费用、前置条件、类型、计分、dev 抽牌 / 打出）在 catalog 之后找到它们；枚举（catalog 列表、发牌池、百科）永不包含它们。见 [ADR 0049](../adr/0049-classic-card-edition-behind-a-switch.md)；测试：`classic-card-lookups-session.test.ts`。
 
 ## `cardStates` 中的局部状态
 
