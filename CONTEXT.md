@@ -384,7 +384,7 @@ _Avoid_: Farmyard 规则校验、Farm Selection Draft Presentation、真实 Game
 _Avoid_: Farm Selection Draft Presentation、Farm Board Render Cell、真实农场落子
 
 **Animal Reorg Draft Presentation**:
-Interaction Presentation 的一种本地草稿展示，覆盖 animal-reorg 的动物分配草稿、剩余/溢出展示、丢弃二次确认和提交 draft 派生。它只管理尚未提交的本地动物分配，不做容量合法性或动物规则裁定。
+Interaction Presentation 的一种本地草稿展示，覆盖 animal-reorg 的动物分配草稿、未分配数量、超额分配、弃养确认和提交草稿。草稿未分配数量是每种动物的库存减去草稿内的分配，会随玩家编辑变化。Animal Reorg Draft Presentation 只管理本地草稿，容量与动物规则由后端裁定。
 _Avoid_: Animal Zone Projection、后端容量验证、动物支付、真实 GameState 写入
 
 **Interaction State Adapter**:
@@ -845,7 +845,7 @@ _Avoid_: 建造农场设施、旧动物重排、取得后直接烹饪而未安�
 
 **Pending Reserve Animal（待安置动物）**:
 玩家已取得但尚未安置到当前有效动物区的动物，包括因容量缩减而失去原位置的动物。它尚不属于已安置在农场上的动物。
-_Avoid_: 已安置动物、已弃养动物
+_Avoid_: 已安置动物、已弃养动物、草稿未分配动物
 
 **Animal Reorg Prefill（动物重整自动补位）**:
 为被动动物重整提供的安置草稿，在保持已有有效安置的前提下，把待安置动物补入兼容的剩余空间；未能补入的动物仍为待安置动物。草稿由玩家修改或确认，确认前不属于 Animal Assignment 或新的 Placed Animal。
