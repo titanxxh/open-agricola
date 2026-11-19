@@ -33,7 +33,16 @@ function ports(): AttemptPorts {
     runTests: vi.fn<AttemptPorts['runTests']>(async () => ({ browserRuntimeId: 'browser-runtime-1', outcome: { kind: 'passed', count: 1 } })),
   }
 }
-function sequence(io: AttemptPorts, ...turns: ModelTurn[]) {
+const feasibility = { verdict: 'feasible', summary: 'The card pays out through an existing hook.', evidence: [{ path: 'docs/CARD_AUTHORING.md', finding: 'Action-space hooks exist.' }], gaps: [], questions: [] }
+const feasible = (verdict = feasibility, id = 'feasibility') => call('report_feasibility', verdict, id)
+/** Research comes first: the first turn that writes artifacts records a feasible verdict. */
+function withFeasibility(turns: ModelTurn[]): ModelTurn[] {
+  const first = turns.findIndex(item => item.calls.some(entry => entry.function.name === 'write_artifacts'))
+  if (first < 0 || turns.slice(0, first + 1).some(item => item.calls.some(entry => entry.function.name === 'report_feasibility'))) return turns
+  return turns.map((item, index) => index === first ? turn([feasible(), ...item.calls], item.text) : item)
+}
+function sequence(io: AttemptPorts, ...given: ModelTurn[]) {
+  const turns = withFeasibility(given)
   let next = 0
   const history: WireMessage[][] = []
   io.model.complete = vi.fn<AttemptPorts['model']['complete']>(async messages => { history.push(structuredClone([...messages])); return turns[next++] ?? turn() })
@@ -41,7 +50,7 @@ function sequence(io: AttemptPorts, ...turns: ModelTurn[]) {
 }
 afterEach(() => vi.useRealTimers())
 
-describe('four-tool generation loop', () => {
+describe('five-tool generation loop', () => {
   it('executes write/run/rewrite/run in model order and carries real failures into the next turn', async () => {
     const io = ports()
     const order: string[] = []
@@ -59,9 +68,9 @@ describe('four-tool generation loop', () => {
     const final = await new GenerationAttempt(request(), io).start()
     expect(order).toEqual([`validate:${source}`, `test:${source}:${tests}`, 'validate:fixed source', 'test:fixed source:fixed tests'])
     expect(JSON.parse(String(history[1].at(-1)?.content))).toMatchObject({ outcome: { kind: 'failed', failures: [{ name: 'gain', error: 'expected 2, got 1' }] } })
-    expect(history[1].slice(-3).map(message => message.role)).toEqual(['assistant', 'tool', 'tool'])
-    expect(history[1].at(-3)).toMatchObject({ reasoning_content: 'opaque', extra_content: { signature: 'private-signature' }, tool_calls: [{ id: 'write' }, { id: 'run' }] })
-    expect(history[1].slice(-2).map(message => message.tool_call_id)).toEqual(['write', 'run'])
+    expect(history[1].slice(-4).map(message => message.role)).toEqual(['assistant', 'tool', 'tool', 'tool'])
+    expect(history[1].at(-4)).toMatchObject({ reasoning_content: 'opaque', extra_content: { signature: 'private-signature' }, tool_calls: [{ id: 'feasibility' }, { id: 'write' }, { id: 'run' }] })
+    expect(history[1].slice(-3).map(message => message.tool_call_id)).toEqual(['feasibility', 'write', 'run'])
     expect(final).toMatchObject({ status: 'completed', modelRequests: 3, result: { kind: 'candidate', message: 'Ready for review' }, candidate: { sourceCode: 'fixed source', testing: { code: 'fixed tests', lastRun: { artifactFingerprint: abilityArtifactFingerprint('fixed source', 'fixed tests'), browserRuntimeId: 'browser-runtime-1', outcome: { kind: 'passed', count: 2 } } } }, usage: { inputTokens: 6, outputTokens: 9 } })
     expect(final.candidate && isAbilityCandidateReady(final.candidate)).toBe(true)
     expect(JSON.stringify(final)).not.toContain('opaque')
@@ -119,7 +128,7 @@ describe('four-tool generation loop', () => {
     const history = sequence(io, turn([run('missing'), invalid, call('unknown'), write(), run()]), turn())
     const final = await new GenerationAttempt(request(), io).start()
     const results = history[1].filter(message => message.role === 'tool').map(message => JSON.parse(String(message.content)))
-    expect(results).toMatchObject([{ error: expect.stringContaining('first') }, { error: expect.stringContaining('JSON') }, { error: 'Unknown tool: unknown' }, { tested: false }, { error: 'Worker unavailable' }])
+    expect(results).toMatchObject([{ recorded: 'feasible' }, { error: expect.stringContaining('first') }, { error: expect.stringContaining('JSON') }, { error: 'Unknown tool: unknown' }, { tested: false }, { error: 'Worker unavailable' }])
     expect(final).toMatchObject({ status: 'completed', result: { kind: 'failed-source' } })
   })
 
@@ -143,9 +152,9 @@ describe('four-tool generation loop', () => {
     const io = ports()
     let count = 0
     io.model.complete = vi.fn<AttemptPorts['model']['complete']>(async (_messages, tools) => {
-      expect(tools.map(tool => tool.function.name)).toEqual(['search_references', 'read_reference', 'write_artifacts', 'run_tests'])
+      expect(tools.map(tool => tool.function.name)).toEqual(['search_references', 'read_reference', 'report_feasibility', 'write_artifacts', 'run_tests'])
       count += 1
-      return count < 8 ? turn([read(`read-${count}`)]) : count === 8 ? turn([write(), run()]) : turn()
+      return count < 8 ? turn([read(`read-${count}`)]) : count === 8 ? turn([feasible(), write(), run()]) : turn()
     })
     const attempt = new GenerationAttempt(request(), io)
     expect(await attempt.start()).toMatchObject({ status: 'completed', modelRequests: 9, candidate: { validation: { valid: true }, testing: { lastRun: { outcome: { kind: 'passed' } } } }, result: { kind: 'candidate' } })
@@ -221,4 +230,44 @@ describe('four-tool generation loop', () => {
   })
 
 
+  it('rejects artifacts until research records a feasible verdict', async () => {
+    const io = ports()
+    const history = sequence(io, turn([write(), feasible({ ...feasibility, summary: '' }, 'empty')]), turn([feasible(), write('later', tests, 'write-2'), run()]), turn())
+    const final = await new GenerationAttempt(request(), io).start()
+    const results = (messages: WireMessage[]) => messages.filter(message => message.role === 'tool').map(message => JSON.parse(String(message.content)))
+    expect(results(history[1])).toMatchObject([{ error: expect.stringContaining('report_feasibility') }, { error: expect.stringContaining('summary') }])
+    expect(io.validate).toHaveBeenCalledExactlyOnceWith('later', draft.cardId, contract.id, expect.any(AbortSignal))
+    expect(final).toMatchObject({ result: { kind: 'candidate', feasibility: { verdict: 'feasible' } }, candidate: { sourceCode: 'later' } })
+  })
+
+  it.each([
+    ['needs-platform', { gaps: ['No hook fires when another player harvests.'] }],
+    ['needs-info', { questions: ['Does the bonus apply in the final harvest?'] }],
+  ] as const)('finishes a %s verdict without artifacts and blocks later writes', async (verdict, details) => {
+    const io = ports()
+    const report = { ...feasibility, ...details, verdict, summary: 'Research found a gap.' }
+    const history = sequence(io, turn([read(), feasible(report)]), turn([write()]), turn([], 'This card needs a platform change.'))
+    const final = await new GenerationAttempt(request(), io).start()
+    expect(JSON.parse(String(history[1].at(-1)?.content))).toMatchObject({ recorded: verdict, next: expect.stringContaining('Stop calling tools') })
+    expect(JSON.parse(String(history[2].at(-1)?.content))).toMatchObject({ error: expect.stringContaining('feasible') })
+    expect(final).toMatchObject({ status: 'completed', feasibility: report, result: { kind: verdict, message: 'This card needs a platform change.', feasibility: report } })
+    expect(final.candidate).toBeUndefined()
+    expect(io.validate).not.toHaveBeenCalled()
+  })
+
+  it('requires evidence and the list that matches a blocking verdict', async () => {
+    const io = ports()
+    const history = sequence(io, turn([
+      feasible({ ...feasibility, verdict: 'needs-platform', evidence: [], gaps: ['gap'] }, 'no-evidence'),
+      feasible({ ...feasibility, verdict: 'needs-platform' }, 'no-gaps'),
+      feasible({ ...feasibility, verdict: 'needs-info' }, 'no-questions'),
+      call('report_feasibility', { ...feasibility, extra: true }, 'extra-key'),
+    ]), turn())
+    const final = await new GenerationAttempt(request(), io).start()
+    expect(history[1].filter(message => message.role === 'tool').map(message => JSON.parse(String(message.content)).error)).toEqual([
+      expect.stringContaining('evidence'), expect.stringContaining('gaps'), expect.stringContaining('questions'), expect.stringContaining('report_feasibility requires'),
+    ])
+    expect(final).toMatchObject({ result: { kind: 'answer' } })
+    expect(final.feasibility).toBeUndefined()
+  })
 })

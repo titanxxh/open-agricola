@@ -18,11 +18,13 @@ describe('minimal Workshop generation context', () => {
     expect(prompt).not.toContain('DEPLOYED CAPABILITIES')
     expect(prompt).toContain('shared/cards/community/<CARD_ID>.ts')
     expect(prompt).toContain('defineMinorCard({ meta, impl })')
-    expect(prompt).toContain('one negative case')
+    expect(prompt).toContain('report_feasibility')
+    expect(prompt).toContain('"positive: ..."')
+    expect(prompt).toContain('"negative: ..."')
   })
 
-  it('exposes the four tools and lets the model read its real browser test and game APIs', () => {
-    expect(GENERATION_TOOLS.map(tool => tool.function.name)).toEqual(['search_references', 'read_reference', 'write_artifacts', 'run_tests'])
+  it('exposes the five tools and lets the model read its real browser test and game APIs', () => {
+    expect(GENERATION_TOOLS.map(tool => tool.function.name)).toEqual(['search_references', 'read_reference', 'report_feasibility', 'write_artifacts', 'run_tests'])
     for (const path of ['docs/CARD_AUTHORING.md', 'client/local-sandbox/card-test-runtime.ts']) {
       expect(prompt).toContain(path)
       expect(allowedReferencePath(path)).toBe(true)

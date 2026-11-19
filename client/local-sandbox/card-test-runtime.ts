@@ -58,6 +58,14 @@ function scopedSession(core: GameCore, onFailure: (method: string, error: string
   })
 }
 
+/** ADR 0052: a card's tests show where its effect fires and where it must not. */
+export const TEST_CASE_KINDS = ['positive', 'negative'] as const
+
+function missingCaseKinds(tests: Array<{ name: string; ok: boolean }>): Array<{ name: string; error: string }> {
+  return TEST_CASE_KINDS.flatMap(kind => tests.some(test => test.ok && test.name.trimStart().toLowerCase().startsWith(`${kind}:`))
+    ? [] : [{ name: 'Test coverage', error: `Add at least one passing test named "${kind}: ..." (${kind === 'positive' ? 'the effect fires' : 'the effect must not fire'}).` }])
+}
+
 export async function runBrowserCardTestScript(request: BrowserCardTestRequest, onTestStart: (name: string) => void = () => {}): Promise<BrowserCardTestResult> {
   const tests: Array<{ name: string; ok: boolean; error?: string }> = []
   let outcome: WorkshopBrowserTestOutcome
@@ -114,6 +122,7 @@ export async function runBrowserCardTestScript(request: BrowserCardTestRequest, 
     dispose(0)
     const failures = tests.flatMap(test => test.ok ? [] : [{ name: test.name, error: test.error ?? 'Test failed' }])
     failures.push(...warnings.map(error => ({ name: 'Card runtime', error })))
+    failures.push(...missingCaseKinds(tests))
     outcome = failures.length ? { kind: 'failed', failures } : { kind: 'passed', count: tests.length }
   } catch (error) { outcome = { kind: 'error', message: errorText(error) } }
   finally { dispose(0) }

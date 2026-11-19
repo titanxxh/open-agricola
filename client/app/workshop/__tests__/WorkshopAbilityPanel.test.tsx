@@ -54,6 +54,7 @@ describe('Workshop ability request entry points', () => {
     const ports: AttemptPorts = seams.create()
     vi.mocked(ports.validate).mockImplementation(async (source, _id, sandboxContractId) => ({ valid: true, errors: [], sourceFingerprint: sourceFingerprint(source), sandboxContractId, cardJson: { id: draft.cardId, card_type: draft.cardType, name: draft.name } }))
     const calls = [
+      { id: 'feasibility', type: 'function' as const, function: { name: 'report_feasibility', arguments: JSON.stringify({ verdict: 'feasible', summary: 'Existing hooks cover it.', evidence: [], gaps: [], questions: [] }) } },
       { id: 'write', type: 'function' as const, function: { name: 'write_artifacts', arguments: JSON.stringify({ source: 'selected C', tests: 'behavior test' }) } },
       { id: 'run', type: 'function' as const, function: { name: 'run_tests', arguments: '{}' } },
     ]
@@ -63,6 +64,25 @@ describe('Workshop ability request entry points', () => {
     await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), 'Implement and test')
     await userEvent.click(screen.getByRole('button', { name: '生成能力候选' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '采用为当前源码' })).toBeEnabled())
+  })
+
+  it('shows a needs-platform verdict with a prefilled GitHub issue and no candidate', async () => {
+    const report = { verdict: 'needs-platform', summary: 'No hook observes other players harvesting.', evidence: [{ path: 'docs/architecture/hooks.md', finding: 'Harvest hooks are owner-only.' }], gaps: ['A harvest hook for every player.'], questions: [] }
+    const calls = [{ id: 'feasibility', type: 'function' as const, function: { name: 'report_feasibility', arguments: JSON.stringify(report) } }]
+    complete.mockResolvedValueOnce({ ...clarification, calls, text: '', message: { role: 'assistant', content: null, tool_calls: calls }, finishReason: 'tool_calls' })
+      .mockResolvedValueOnce({ ...clarification, text: 'This needs a platform change.', message: { role: 'assistant', content: 'This needs a platform change.' } })
+    render(<Harness />)
+    await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), 'Gain food when others harvest')
+    await userEvent.click(screen.getByRole('button', { name: '生成能力候选' }))
+    const link = await screen.findByRole('link', { name: '预填 GitHub issue' })
+    const url = new URL(link.getAttribute('href')!)
+    expect(url.pathname).toBe('/titanxxh/open-agricola/issues/new')
+    expect(url.searchParams.get('body')).toContain('Author request: Gain food when others harvest')
+    expect(url.searchParams.get('body')).toContain('- A harvest hook for every player.')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(screen.getByText('需要平台改动')).toBeInTheDocument()
+    expect(screen.getByText('docs/architecture/hooks.md: Harvest hooks are owner-only.')).toBeInTheDocument()
+    expect(vi.mocked(seams.create.mock.results[0].value.validate)).not.toHaveBeenCalled()
   })
 
   it('requires current UT and invalidates its report when only the tests change', async () => {

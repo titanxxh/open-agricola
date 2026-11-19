@@ -1,7 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 import type { WorkshopAbilityCandidateContract, WorkshopAbilityTestingContract, WorkshopBrowserTestOutcome, WorkshopDraftContract } from '../contract/workshop'
-import type { GenerationProvenance, GenerationResult, WorkshopVisibleMessage } from '../contract/workshop-generation'
+import { FEASIBILITY_VERDICTS, type GenerationFeasibility, type GenerationProvenance, type GenerationResult, type WorkshopVisibleMessage } from '../contract/workshop-generation'
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
@@ -150,19 +150,40 @@ export function projectAbilityCandidate(value: unknown): WorkshopAbilityCandidat
   }
 }
 
+const texts = (value: unknown, items: number, limit: number): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && !!item.trim()).slice(0, items).map(item => text(item, limit)) : []
+
+export function projectGenerationFeasibility(value: unknown): GenerationFeasibility | undefined {
+  const raw = record(value)
+  const verdict = FEASIBILITY_VERDICTS.find(verdict => verdict === raw.verdict)
+  if (!verdict || typeof raw.summary !== 'string' || !raw.summary.trim()) return undefined
+  return {
+    verdict, summary: text(raw.summary, 4000),
+    evidence: (Array.isArray(raw.evidence) ? raw.evidence : []).flatMap(item => {
+      const entry = record(item)
+      return typeof entry.path === 'string' && entry.path.trim() && typeof entry.finding === 'string' && entry.finding.trim()
+        ? [{ path: text(entry.path, 300), finding: text(entry.finding, 1000) }] : []
+    }).slice(0, 20),
+    gaps: texts(raw.gaps, 10, 1000),
+    questions: texts(raw.questions, 10, 1000),
+  }
+}
+
 export function projectGenerationResult(value: unknown): GenerationResult | undefined {
   const raw = record(value)
-  const kinds = ['candidate', 'failed-source', 'answer', 'failure', 'interrupted'] as const
+  const kinds = ['candidate', 'failed-source', 'answer', 'needs-info', 'needs-platform', 'failure', 'interrupted'] as const
   const kind = kinds.find(kind => kind === raw.kind)
   if (!kind || !text(raw.attemptId)) return undefined
   const provenance = projectGenerationProvenance(raw.provenance)
   const failedCandidate = kind === 'failed-source' ? projectAbilityCandidate(raw.failedCandidate) : undefined
+  const feasibility = projectGenerationFeasibility(raw.feasibility)
   return {
     kind, attemptId: text(raw.attemptId, 200), createdAt: count(raw.createdAt), message: text(raw.message, 16000),
     ...(provenance ? { provenance } : {}),
     ...(typeof raw.candidateId === 'string' ? { candidateId: text(raw.candidateId, 200) } : {}),
     ...(typeof raw.sourceFingerprint === 'string' ? { sourceFingerprint: text(raw.sourceFingerprint, 64) } : {}),
     ...(failedCandidate && !isAbilityCandidateReady(failedCandidate) ? { failedCandidate } : {}),
+    ...(feasibility ? { feasibility } : {}),
   }
 }
 

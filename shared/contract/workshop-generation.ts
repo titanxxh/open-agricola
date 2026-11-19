@@ -34,8 +34,23 @@ export type GenerationProvenance = {
   references: GenerationReference[]
 }
 
+export const FEASIBILITY_VERDICTS = ['feasible', 'needs-info', 'needs-platform'] as const
+export type FeasibilityVerdict = typeof FEASIBILITY_VERDICTS[number]
+
+/** The model's researched verdict on whether the card closes over existing mechanisms (ADR 0052). */
+export type GenerationFeasibility = {
+  verdict: FeasibilityVerdict
+  summary: string
+  /** Code or docs the verdict rests on. */
+  evidence: { path: string; finding: string }[]
+  /** Shared mechanisms the card would need; set for needs-platform. */
+  gaps: string[]
+  /** Rule questions for the author; set for needs-info. */
+  questions: string[]
+}
+
 export type GenerationResult = {
-  kind: 'candidate' | 'failed-source' | 'answer' | 'failure' | 'interrupted'
+  kind: 'candidate' | 'failed-source' | 'answer' | 'needs-info' | 'needs-platform' | 'failure' | 'interrupted'
   attemptId: string
   createdAt: number
   message: string
@@ -45,6 +60,7 @@ export type GenerationResult = {
   sourceFingerprint?: string
   /** Complete artifacts which failed source validation or browser tests. */
   failedCandidate?: WorkshopAbilityCandidateContract
+  feasibility?: GenerationFeasibility
 }
 
 export type WorkshopVisibleMessage = {

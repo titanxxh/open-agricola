@@ -1,6 +1,6 @@
 import type { WorkshopAbilityCandidateContract, WorkshopBrowserTestOutcome } from '../../../../shared/contract/workshop'
-import type { GenerationProvenance, GenerationResult, GenerationUsage, WorkshopSandboxContract } from '../../../../shared/contract/workshop-generation'
-import { abilityArtifactFingerprint, isAbilityCandidateReady, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
+import type { GenerationFeasibility, GenerationProvenance, GenerationResult, GenerationUsage, WorkshopSandboxContract } from '../../../../shared/contract/workshop-generation'
+import { abilityArtifactFingerprint, isAbilityCandidateReady, projectGenerationFeasibility, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
 import { GENERATION_PROMPT_VERSION, generationSystemPrompt } from './prompt'
 import { matchesGenerationIdentity, type GenerationRequest } from './request'
 import type { ReferenceSession } from './references'
@@ -31,6 +31,7 @@ export type AttemptSnapshot = {
   sandboxContractId?: string
   result?: GenerationResult
   candidate?: WorkshopAbilityCandidateContract
+  feasibility?: GenerationFeasibility
 }
 export type RequestAccounting = {
   sequence: number; inputBytes: number; startedAt: number; elapsedMs: number
@@ -56,6 +57,7 @@ export class GenerationAttempt {
   private contract?: WorkshopSandboxContract
   private pendingCalls?: { calls: ToolCall[]; next: number }
   private lastCandidate?: WorkshopAbilityCandidateContract
+  private feasibility?: GenerationFeasibility
   private result?: GenerationResult
   private referenceCalls = 0
   private activeMs = 0
@@ -86,7 +88,7 @@ export class GenerationAttempt {
       modelRequests: this.accounting.length, referenceCalls: this.referenceCalls,
       activeMs: this.activeMs + (this.startedAt === undefined ? 0 : Math.max(0, this.clock() - this.startedAt)),
       usage, referenceCommit: this.references?.commit, sandboxContractId: this.contract?.id,
-      result: this.result, candidate: this.lastCandidate,
+      result: this.result, candidate: this.lastCandidate, feasibility: this.feasibility,
     })
   }
 
@@ -132,6 +134,7 @@ export class GenerationAttempt {
       kind, attemptId: this.request.attemptId, createdAt: this.clock(), message, provenance: this.provenance(),
       ...(this.lastCandidate ? { candidateId: this.lastCandidate.id, sourceFingerprint: sourceFingerprint(this.lastCandidate.sourceCode) } : {}),
       ...(failedCandidate ? { failedCandidate } : {}),
+      ...(this.feasibility ? { feasibility: this.feasibility } : {}),
     }
     this.publish()
   }
@@ -169,7 +172,23 @@ export class GenerationAttempt {
     let args: unknown
     try { args = JSON.parse(call.function.arguments) } catch { return JSON.stringify({ error: 'Tool arguments must be a JSON object.' }) }
     if (!args || typeof args !== 'object' || Array.isArray(args)) return JSON.stringify({ error: 'Tool arguments must be a JSON object.' })
+    if (name === 'report_feasibility') {
+      const keys = ['verdict', 'summary', 'evidence', 'gaps', 'questions']
+      const feasibility = projectGenerationFeasibility(args)
+      if (!feasibility || Object.keys(args).some(key => !keys.includes(key))) {
+        return JSON.stringify({ error: 'report_feasibility requires verdict (feasible, needs-info or needs-platform), a non-empty summary, evidence [{path, finding}], gaps and questions.' })
+      }
+      if (feasibility.verdict !== 'feasible' && !feasibility.evidence.length) return JSON.stringify({ error: 'Cite the code or docs that show the gap or the open rule in evidence.' })
+      if (feasibility.verdict === 'needs-platform' && !feasibility.gaps.length) return JSON.stringify({ error: 'List the missing shared mechanisms in gaps.' })
+      if (feasibility.verdict === 'needs-info' && !feasibility.questions.length) return JSON.stringify({ error: 'List the questions for the author in questions.' })
+      this.feasibility = feasibility
+      this.publish()
+      return JSON.stringify(feasibility.verdict === 'feasible'
+        ? { recorded: 'feasible', next: 'Write the card module and its positive and negative tests with write_artifacts.' }
+        : { recorded: feasibility.verdict, next: 'Stop calling tools and explain the verdict to the author in their language.' })
+    }
     if (name === 'write_artifacts') {
+      if (this.feasibility?.verdict !== 'feasible') return JSON.stringify({ error: 'Research the card, then call report_feasibility with verdict feasible before write_artifacts.' })
       if (!('source' in args) || typeof args.source !== 'string' || !('tests' in args) || typeof args.tests !== 'string'
         || Object.keys(args).length !== 2 || args.source.length > 160000 || args.tests.length > 160000) {
         return JSON.stringify({ error: 'write_artifacts requires complete source and tests strings, each at most 160000 characters.' })
@@ -260,7 +279,9 @@ export class GenerationAttempt {
         this.messages.push(turn.message)
         if (turn.calls.length) this.pendingCalls = { calls: turn.calls, next: 0 }
         else {
-          this.finish(this.lastCandidate ? isAbilityCandidateReady(this.lastCandidate) ? 'candidate' : 'failed-source' : 'answer', turn.text)
+          const verdict = this.feasibility?.verdict
+          this.finish(this.lastCandidate ? isAbilityCandidateReady(this.lastCandidate) ? 'candidate' : 'failed-source'
+            : verdict === 'needs-info' || verdict === 'needs-platform' ? verdict : 'answer', turn.text)
           return
         }
       } catch (error) {
