@@ -318,6 +318,14 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 
 策略 SHA 一确定就构建 trusted-policy 镜像，此时 pre 仍在开放。
 
+可选的 `install` 配置块在同一窗口内安装新候选，包含：已安装的 `from`；新候选 `to`（验收配置须已指向它及其镜像 `candidateReceipt`）；策略 SHA 构建的 `to` 候选镜像 `image.run`/`attempt`/`artifact`；以及 `authFile`。
+- 改动主机之前，先确认验收配置指向 `to`；
+- 即使没有 policy 块也执行 close 和 `maintain`，再用同一个保留的操作 ID 导入候选镜像；
+- 用 close 加 `deploy` 取代 reverify：变更前备份、迁移和启动校验，之后 gate 停在该 deploy 操作的 `acceptance` 阶段，最后的 `open` 绑定这个操作；
+- deploy 完成之前，主机操作以 `from` 为 expected-current（挂起的 deploy 同样接受）；resume 沿用 deploy 操作 ID，并重新 close。
+
+安装窗口总是走完整路径，且可以不换正式版（`formalFrom` 等于 `formalBuild`）；owner notes 记录 deploy、操作 ID 和备份 stem，而不是 reverify 说明。候选的 producer 比主机 owner-tools 新时，同时加上 `policy` 块。
+
 每一步都记录在 `state.json`，并有对应日志。遇到第一个失败即停止，并打印下一步命令（例如单个 case 的重跑命令），不会自动重试。`--resume true` 的行为：
 - 重新检查前置条件；
 - 沿用同一个 reverify 操作 ID，但重新做 close；
