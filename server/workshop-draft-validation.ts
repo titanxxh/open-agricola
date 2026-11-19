@@ -1,4 +1,6 @@
 import type { CustomCodeValidateResult } from '../shared/custom-code/types.ts'
+import { admitNativeCardSource, isNativeCardSource } from '../shared/custom-code/card-source-admission.ts'
+import { compileCardCode } from '../shared/custom-code/compiler.ts'
 import { validateAndCompileCustomCodeRemote } from './custom-code/client.ts'
 import type { WorkshopDraft } from './workshop-drafts.ts'
 import { projectWorkshopGeneration } from '../shared/projections/workshop-generation.ts'
@@ -33,6 +35,19 @@ const validateCode = async (
     }
   | ValidationFailure
 > => {
+  // A native Card Source module is checked without executing it; only the
+  // author's opaque browser Worker runs it (ADR 0052).
+  if (isNativeCardSource(sourceCode)) {
+    const admission = admitNativeCardSource(sourceCode, cardId)
+    if (!admission.valid) return { ok: false, status: 400, error: 'Code validation failed', errors: admission.errors }
+    const cardDefinition = { cardType: admission.cardType, meta: admission.meta }
+    return {
+      ok: true,
+      compiledCode: compileCardCode(sourceCode),
+      codeManifest: { format: 'native-card-source', effectHooks: [], listeners: [], cardDefinition },
+      cardDefinition,
+    }
+  }
   let validation: CustomCodeValidateResult
   try {
     validation = await validateAndCompileCustomCodeRemote(sourceCode, cardId)

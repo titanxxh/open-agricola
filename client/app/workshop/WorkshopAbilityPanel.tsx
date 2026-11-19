@@ -197,7 +197,7 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
       if (result.sourceFingerprint !== sourceFingerprint(candidate.sourceCode) || result.sandboxContractId !== contract.id) throw new Error('Validation belongs to different source or sandbox.')
       if (result.valid && !matchesGenerationIdentity(result.cardJson, { id: draft.cardId, type: draft.cardType, name: draft.name })) {
         result.valid = false
-        result.errors = [...result.errors, 'CARD_DEF id, card type and name must match the immutable request identity.']
+        result.errors = [...result.errors, 'The card definition id, card type and name must match the immutable request identity.']
       }
       const testing = { code: candidate.testing?.code ?? '' }
       let tested = candidate.testing

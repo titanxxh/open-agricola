@@ -21,13 +21,7 @@ Absence of evidence is not evidence of absence. Before declaring a gap, search t
 
 A native card is one module, `shared/cards/<Deck>/<Id>_<Name>.ts` (community cards: `shared/cards/community/<CARD_ID>.ts`). It exports `defineMinorCard({ meta, impl })` or `defineOccupationCard({ meta, impl })` from `shared/cards/card-source.ts`. `impl` holds `listeners`, `effect`, `modifiers`, `prerequisiteCheck`, `getBaseCosts` and `reaches`, typed in `shared/cards/registry.ts`. `reaches` lists other card IDs the source may name.
 
-**Workshop source today.** The Workshop still uses the sandbox format of [CUSTOM_CARD_SANDBOX](CUSTOM_CARD_SANDBOX.md) until #1887 replaces it with this Card Source shape (ADR 0052). In that format:
-
-- top-level `CARD_ID`, `CARD_DEF = { cardType, meta }` and `CARD_IMPL = { effect, listeners }` stand in for `defineMinorCard` / `defineOccupationCard`;
-- `imports` are unavailable, so helpers come from the injected set: `gainLeaf(cardId, resources)`, `payLeaf({ cardId, cost })`, `spaceHasPlayer`, `positionKey`, `getCardStack` and `readCardExtraData`;
-- only the deployed capability names are admitted, and a listener may select only `actions`: `actionSpaces`, `events` and `globalQuery` are rejected. A card that needs one of them, such as "each time you use space X" (§4.1), needs a platform change until #1887 lands.
-
-The mechanisms and timing rules below are the same in both shapes. Build helper results such as `payGainFlow` by hand: an optional `seq` of a `pay` leaf and a `gain` leaf.
+**Workshop source** is this same module (ADR 0052), written as the file its pull request adds. The author's browser Worker resolves its `shared/` imports to its own engine modules, and the server checks only its structure without running it (`shared/custom-code/card-source-admission.ts`): one export named after the card, relative imports of shared engine modules and card helpers (not other cards or tests), and a literal `meta` with `deck: 'community'`. Older drafts in the retired `CARD_DEF` / `CARD_IMPL` sandbox format ([CUSTOM_CARD_SANDBOX](CUSTOM_CARD_SANDBOX.md)) still run until #1887 removes that format; rewrite them as modules.
 
 ## 3. Choose the timing
 

@@ -9,8 +9,6 @@ import { exchangeToTrade } from '../actions/helpers/trades'
 import type { DraftGameEvent, GameEvent } from '../contract/events'
 import { createEventQuery, type EventQuery } from '../events/query'
 import type { TriggerSnapshot } from './helpers/trigger-snapshot'
-import { validateCustomListenerResult } from '../custom-code/listener-result-validator'
-import { getCardListenerSource } from './card-listener-source'
 import { isPlayerSkippingCurrentHarvest } from './helpers/harvest-skip'
 import type { ActionSpaceListenerPhase, CardListenerAction, CardListenerEvent } from './listener-contract'
 import { snapshotCardListener } from './listener-contract'
@@ -458,12 +456,8 @@ export const executeCardListener = (
     { kind: 'handler', registration, context: listenerContext },
     (invocationContext) => handler(invocationContext),
   )
-  const cardId = getCardListenerSource(registration)
-    ?? listenerContext.ownerCardId
-    ?? registration.cardIds?.find(candidate => candidate.startsWith('CUSTOM_'))
-  if (cardId?.startsWith('CUSTOM_')) {
-    return validateCustomListenerResult(result, cardId) ?? undefined
-  }
+  // Retired-format Workshop cards are checked at their executor boundary; native
+  // cards, community ones included, return native results (ADR 0052).
   return result ?? undefined
 }
 

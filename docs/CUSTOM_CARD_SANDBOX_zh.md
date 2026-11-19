@@ -2,7 +2,7 @@
 
 [English](CUSTOM_CARD_SANDBOX.md) | [中文](CUSTOM_CARD_SANDBOX_zh.md)
 
-> 本文描述当前的工坊沙盒格式，[ADR 0052](adr/0052-workshop-code-runs-only-in-the-browser.md) 将以原生 Card Source 模块取代它（#1887）。卡面文字需要哪个机制、范例卡与测试，先读[写卡指南](CARD_AUTHORING.md)。
+> 本文描述已退役的工坊沙盒格式，旧草稿在 #1887 移除它之前仍可运行。新的工坊卡是原生 Card Source 模块（[ADR 0052](adr/0052-workshop-code-runs-only-in-the-browser.md)），请先读[写卡指南](CARD_AUTHORING.md)。
 
 > 本文是 [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) 的中文镜像；英文版是本文的权威版本，允许的名称与 helper 实现以链接的源码为准。
 
