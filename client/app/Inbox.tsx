@@ -1,23 +1,42 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { InboxMessage, InboxPage } from '../../shared/contract/bug-report-feedback'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { feedbackKindKey, readInboxMessage, readInboxPage } from '../services/bug-report-feedback'
+import { inboxNotificationTarget, WEB_PUSH_INBOX_EVENT } from '../services/inbox-notification'
 import '../styles/components/inbox.css'
 
 const INBOX_CHANGED = 'open-agricola-inbox-changed'
+const OPEN_INBOX = 'open-agricola:open-inbox'
+const InboxUnreadContext = createContext(0)
+type InboxUnread = { userId: string; count: number }
 
 type InboxButtonProps = { className?: string; menuItem?: boolean }
 
-export function InboxButton(props: InboxButtonProps) {
+export function InboxButton({ className = '', menuItem = false }: InboxButtonProps) {
   const { user } = useAuth()
-  return user ? <AccountInboxButton key={user.id} {...props} /> : null
+  const unreadCount = useContext(InboxUnreadContext)
+  const { t } = useLocale()
+  if (!user) return null
+  const label = unreadCount ? t('feedback.unreadLabel', { count: unreadCount }) : t('feedback.inbox')
+  return <button type="button" className={`inbox-button ${className}`} role={menuItem ? 'menuitem' : undefined}
+    aria-label={label} aria-haspopup="dialog" onClick={() => window.dispatchEvent(new Event(OPEN_INBOX))}>
+    <span>{t('feedback.inbox')}</span>{unreadCount ? <span className="inbox-button__count" aria-hidden="true">{unreadCount}</span> : null}
+  </button>
 }
 
-function AccountInboxButton({ className = '', menuItem = false }: InboxButtonProps) {
-  const { user, apiFetch } = useAuth()
-  const userId = user?.id
+export function InboxProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  const [unread, setUnread] = useState<InboxUnread | null>(null)
+  return <InboxUnreadContext.Provider value={unread && unread.userId === user?.id ? unread.count : 0}>
+    {children}
+    {user && <AccountInbox key={user.id} userId={user.id} setUnread={setUnread} />}
+  </InboxUnreadContext.Provider>
+}
+
+function AccountInbox({ userId, setUnread }: { userId: string; setUnread: (value: InboxUnread) => void }) {
+  const { apiFetch } = useAuth()
   const { locale, t } = useLocale()
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -29,8 +48,8 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
   const [selected, setSelected] = useState<InboxMessage | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
+  const [unavailableNotification, setUnavailableNotification] = useState(false)
   const refresh = useCallback(async (before?: number) => {
-    if (!userId) return
     const version = ++requestVersion.current
     try {
       const oldest = loadedThrough.current
@@ -43,19 +62,53 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
       if (version !== requestVersion.current) return
       loadedThrough.current = value.messages.at(-1)?.id ?? (before ? oldest : null)
       setPage(current => before && current ? { ...value, messages: [...current.messages, ...value.messages] } : value)
+      setUnread({ userId, count: value.unreadCount })
       setError(false)
     } catch { if (version === requestVersion.current) setError(true) }
-  }, [apiFetch, userId])
+  }, [apiFetch, setUnread, userId])
+
+  const read = useCallback(async (id: number, fromNotification = false) => {
+    const version = ++reading.current
+    setBusy(true); setError(false); setUnavailableNotification(false)
+    try {
+      const value = await readInboxMessage(await apiFetch(`/api/v1/inbox/${id}`))
+      if (value.id !== id) throw new Error('Unexpected inbox message')
+      if (version === reading.current) setSelected(value)
+    } catch {
+      if (version !== reading.current) return
+      if (fromNotification) setUnavailableNotification(true)
+      else setError(true)
+    } finally { if (version === reading.current) setBusy(false) }
+  }, [apiFetch])
 
   useEffect(() => {
-    if (!userId) return
     const invalidate = () => { requestVersion.current++; reading.current++ }
     const load = () => { void refresh() }
+    const openInbox = () => {
+      reading.current++
+      setOpen(true); setSelected(null); setBusy(false); setUnavailableNotification(false)
+      load()
+    }
+    const openNotification = (event: Event) => {
+      const target = inboxNotificationTarget(event)
+      if (target?.userId !== userId) return
+      openInbox()
+      if (target.messageId === null) setUnavailableNotification(true)
+      else void read(target.messageId, true)
+    }
     load()
     window.addEventListener('focus', load)
     window.addEventListener(INBOX_CHANGED, load)
-    return () => { invalidate(); window.removeEventListener('focus', load); window.removeEventListener(INBOX_CHANGED, load) }
-  }, [refresh, userId])
+    window.addEventListener(OPEN_INBOX, openInbox)
+    window.addEventListener(WEB_PUSH_INBOX_EVENT, openNotification)
+    return () => {
+      invalidate()
+      window.removeEventListener('focus', load)
+      window.removeEventListener(INBOX_CHANGED, load)
+      window.removeEventListener(OPEN_INBOX, openInbox)
+      window.removeEventListener(WEB_PUSH_INBOX_EVENT, openNotification)
+    }
+  }, [read, refresh, userId])
   useEffect(() => {
     if (!open) return
     const element = dialog.current
@@ -63,32 +116,28 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
     return () => element?.close()
   }, [open])
 
+  useEffect(() => {
+    if (!open || !selected || selected.readAt !== null) return
+    const version = reading.current
+    const markDisplayed = async () => {
+      try {
+        const marked = await readInboxMessage(await apiFetch(`/api/v1/inbox/${selected.id}/read`, { method: 'POST' }))
+        if (marked.id !== selected.id || marked.readAt === null) throw new Error('Inbox message was not marked read')
+        if (version === reading.current) {
+          setSelected(marked)
+          window.dispatchEvent(new Event(INBOX_CHANGED))
+        }
+      } catch { if (version === reading.current) setError(true) }
+    }
+    void markDisplayed()
+  }, [apiFetch, open, selected])
+
   const close = () => { reading.current++; setOpen(false); setSelected(null) }
-  const read = async (id: number) => {
-    const version = ++reading.current
-    setBusy(true); setError(false)
-    try {
-      const value = await readInboxMessage(await apiFetch(`/api/v1/inbox/${id}`))
-      if (version !== reading.current) return
-      setSelected(value)
-      const marked = await readInboxMessage(await apiFetch(`/api/v1/inbox/${id}/read`, { method: 'POST' }))
-      if (version !== reading.current) return
-      setSelected(marked)
-      window.dispatchEvent(new Event(INBOX_CHANGED))
-    } catch { if (version === reading.current) setError(true) }
-    finally { if (version === reading.current) setBusy(false) }
-  }
-  if (!user) return null
-  const label = page?.unreadCount ? t('feedback.unreadLabel', { count: page.unreadCount }) : t('feedback.inbox')
-  return <>
-    <button type="button" className={`inbox-button ${className}`} role={menuItem ? 'menuitem' : undefined}
-      aria-label={label} aria-haspopup="dialog" onClick={() => { setOpen(true); setBusy(false); void refresh() }}>
-      <span>{t('feedback.inbox')}</span>{page?.unreadCount ? <span className="inbox-button__count" aria-hidden="true">{page.unreadCount}</span> : null}
-    </button>
-    {open && createPortal(<dialog ref={dialog} className="inbox-dialog" aria-labelledby={titleId}
+  return open ? createPortal(<dialog ref={dialog} className="inbox-dialog" aria-labelledby={titleId}
       onClose={event => { if (!event.currentTarget.open) close() }}
       onClick={event => { if (event.target === event.currentTarget) close() }}>
       <header><h2 id={titleId}>{t('feedback.inbox')}</h2><button type="button" className="btn-link" onClick={close} aria-label={t('ui.close')}>×</button></header>
+      {unavailableNotification && <p role="status">{t('webPush.notificationUnavailable')}</p>}
       {error && <div role="alert"><p>{t('feedback.failed')}</p><button type="button" className="btn-secondary" disabled={busy}
         onClick={() => { if (selected) void read(selected.id); else void refresh() }}>{t('feedback.retry')}</button></div>}
       {selected ? <article className="inbox-message">
@@ -125,6 +174,5 @@ function AccountInboxButton({ className = '', menuItem = false }: InboxButtonPro
         </li>)}</ol>}
         {page.nextCursor !== null && <button type="button" className="btn-secondary" onClick={() => { void refresh(page.nextCursor ?? undefined) }}>{t('feedback.more')}</button>}
       </>}
-    </dialog>, document.body)}
-  </>
+    </dialog>, document.body) : null
 }
