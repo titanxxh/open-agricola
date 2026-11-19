@@ -87,6 +87,7 @@ test('a verified notification opens draft and inbox in the existing Pages game w
       const deviceId = randomUUID()
       const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/isolated-pages-fixture',
         keys: { p256dh: 'A'.repeat(87), auth: 'A'.repeat(22) } }
+      await store.preferences(cookie.value, deviceId, null)
       for (const kind of ['draft', 'bug-report-inbox'] as const) {
         await store.bind(cookie.value, { deviceId, subscription, kind, enabled: true, locale: 'en' })
       }
@@ -149,9 +150,24 @@ test('a verified notification opens draft and inbox in the existing Pages game w
       await noApp.route(url => url.pathname.startsWith('/assets/index-'), route => route.abort())
       await noApp.goto(`${site.origin}/?bg=none`)
       await noApp.bringToFront()
+      // A newer tab on the same browser still renders the other account after
+      // the session cookie switches back. It can only return a generic probe.
+      const otherCookie = (await otherContext.cookies(site.origin)).find(item => item.name === authCookieNames().session)
+      if (!otherCookie) throw new Error('Missing the second test account login')
+      await context.addCookies([otherCookie])
+      const staleAccountTab = await context.newPage()
+      await staleAccountTab.goto(`${site.origin}/?page=settings&bg=none`)
+      await expect(staleAccountTab.getByText(`${name}_other`, { exact: true })).toBeVisible()
+      await context.addCookies([cookie])
+      await staleAccountTab.bringToFront()
+      await expect.poll(() => worker.evaluate(async () =>
+        (await (self as unknown as ServiceWorkerGlobalScope).clients.matchAll({ type: 'window' }))[0]?.url))
+        .toContain('page=settings')
+
       const lookup = game.waitForResponse(response => new URL(response.url()).pathname === `/api/v1/inbox/${messageId}`)
       expect(await clickPush(worker, 'bug-report-inbox', inbox)).toEqual({ title: 'You have a new inbox message', focusedUrl: gameClient, openedUrl: null })
       expect((await lookup).status()).toBe(200)
+      await expect(staleAccountTab.locator('dialog.inbox-dialog')).toHaveCount(0)
       const modal = game.locator('dialog.inbox-dialog')
       await expect(modal.getByRole('heading', { name: 'Pages test feedback' })).toBeVisible()
       await expect.poll(async () => (await getDb().prepare('SELECT read_at FROM bug_report_feedback WHERE id=?')

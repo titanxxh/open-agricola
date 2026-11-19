@@ -48,7 +48,8 @@ export function createWebPushHandler(args: {
     if (!token || typeof body.accountId !== 'string') return reply(401, { ok: false })
     if (body.operation === 'status') {
       const endpoint = typeof body.endpoint === 'string' && body.endpoint.length <= 2_048 ? body.endpoint : null
-      const preferences = await store.preferences(token, body.deviceId, endpoint, body.accountId)
+      const preferences = await store.preferences(token, body.deviceId, endpoint, body.accountId,
+        allowed.draft || allowed['bug-report-inbox'])
       return preferences ? reply(200, { ok: true, publicKey, allowed, preferences }) : reply(401, { ok: false })
     }
     if (body.operation !== 'set' || !isWebPushKind(body.kind) || typeof body.enabled !== 'boolean'

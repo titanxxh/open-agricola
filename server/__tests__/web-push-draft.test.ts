@@ -54,6 +54,7 @@ afterEach(async () => { room?.session.dispose(); await db?.close() })
 
 async function subscribe(session: string, endpointSuffix: string) {
   const deviceId = randomUUID()
+  await store.preferences(session, deviceId, null)
   await store.bind(session, { deviceId, subscription: option('fcm.googleapis.com', endpointSuffix), locale: 'en', kind: 'draft', enabled: true })
   return deviceId
 }
@@ -207,7 +208,29 @@ it('does not revive a retired device if an old account still has a session', asy
   expect(await store.preferences(SESSION[1]!, deviceId, options.subscription.endpoint)).toEqual({
     draft: false, 'bug-report-inbox': false,
   })
-  expect(await store.bind(SESSION[1]!, { ...options, deviceId: randomUUID() })).toEqual({
+  const nextDevice = randomUUID()
+  await store.preferences(SESSION[1]!, nextDevice, null)
+  expect(await store.bind(SESSION[1]!, { ...options, deviceId: nextDevice })).toEqual({
+    draft: true, 'bug-report-inbox': false,
+  })
+})
+
+it('retires a reserved browser before its first subscription write arrives', async () => {
+  const deviceId = randomUUID()
+  const options = { deviceId, subscription: option('fcm.googleapis.com', 'first-device'), locale: 'en',
+    kind: 'draft', enabled: true } as const
+  expect(await store.preferences(SESSION[0]!, deviceId, null)).toEqual({
+    draft: false, 'bug-report-inbox': false,
+  })
+
+  await store.preferences(SESSION[0]!, randomUUID(), null)
+  await store.unbind(deviceId)
+  expect(await store.bind(SESSION[0]!, options)).toBeNull()
+
+  const newDevice = randomUUID()
+  await store.unbind(newDevice)
+  await store.preferences(SESSION[0]!, newDevice, null)
+  expect(await store.bind(SESSION[0]!, { ...options, deviceId: newDevice })).toEqual({
     draft: true, 'bug-report-inbox': false,
   })
 })

@@ -14,9 +14,19 @@ CREATE TABLE web_push_bindings (
 CREATE INDEX idx_web_push_bindings_user ON web_push_bindings(user_id);
 CREATE INDEX idx_web_push_bindings_session ON web_push_bindings(session_token);
 
-CREATE TABLE web_push_retired_devices (
-  device_id UUID PRIMARY KEY
+CREATE TABLE web_push_device_reservations (
+  device_id UUID PRIMARY KEY,
+  session_token TEXT NOT NULL REFERENCES sessions(token) ON DELETE CASCADE
 );
+
+CREATE INDEX idx_web_push_device_reservations_session ON web_push_device_reservations(session_token);
+
+CREATE TABLE web_push_retired_devices (
+  device_id UUID PRIMARY KEY,
+  retired_at BIGINT NOT NULL
+);
+
+CREATE INDEX idx_web_push_retired_devices_age ON web_push_retired_devices(retired_at);
 
 CREATE TABLE web_push_events (
   id UUID PRIMARY KEY,
