@@ -4,6 +4,8 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 type MockRes = ServerResponse & { statusCode: number; body: string }
 
 import { getDb } from '../db'
+import { classicFixtureCards } from '../../shared/cards/__tests__/__fixtures__/classic-definitions'
+import { withClassicCardDefinitions } from '../../shared/cards/classic-catalog'
 import { seedResourceCatalog } from './_helpers/objects'
 vi.mock('../db', async () => {
   const { createTestDatabase } = await import('./_helpers/postgres')
@@ -194,6 +196,52 @@ describe('sandbox version binding', () => {
       cardId: 'CUSTOM_PinnedVersion',
     }, 'sandbox-token'), defaultDrawRes)
     expect(defaultDrawRes.statusCode).toBe(200)
+
+    const classicCards = [...classicFixtureCards('CE', 'occupation', 21), ...classicFixtureCards('CI', 'minor', 21)]
+    await withClassicCardDefinitions(classicCards, async () => {
+      const classicStart = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+        cardEdition: 'classic', classicDeckIds: ['CI', 'CE'], playerCount: 3, seed: 42, enableSnakeOpening: true,
+        customCardVersions: [{ cardId: original.id, versionId: pinned.versionId }],
+      }, 'sandbox-token'), classicStart, true)
+      const initial = JSON.parse(classicStart.body)
+      expect(initial).toMatchObject({ ok: true, customCardsLoaded: 1 })
+      const reset = (instanceId: string, enabled: boolean) => {
+        const response = mockRes()
+        return handleGameRoute(mockReq('POST', '/api/game/reset-sandbox', {
+          gameInstanceId: instanceId, seed: 93,
+        }, 'sandbox-token'), response, enabled).then(handled => {
+          expect(handled).toBe(true)
+          return { status: response.statusCode, body: JSON.parse(response.body) }
+        })
+      }
+
+      expect(await reset(initial.gameInstanceId, false)).toMatchObject({
+        status: 400, body: { ok: false, code: 'classic_edition_disabled' },
+      })
+      const retained = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), retained, false)
+      expect(JSON.parse(retained.body)).toMatchObject({ gameInstanceId: initial.gameInstanceId, state: { cardEdition: 'classic', gameSeed: 42 } })
+
+      const resetGame = await reset(initial.gameInstanceId, true)
+      expect(resetGame).toMatchObject({
+        status: 200,
+        body: {
+          ok: true,
+          state: { gameSeed: 93, cardEdition: 'classic', classicDeckIds: ['CI', 'CE'], enableSnakeOpening: true },
+          customCardVersionsLoaded: [{ cardId: original.id, versionId: pinned.versionId }],
+          customCardDefs: [{ cardJson: { id: 'CUSTOM_PinnedVersion' } }],
+        },
+      })
+      expect(resetGame.body.state.players).toHaveLength(3)
+      expect(resetGame.body.gameInstanceId).not.toBe(initial.gameInstanceId)
+      expect(await reset(initial.gameInstanceId, true)).toMatchObject({
+        status: 409, body: { ok: false, code: 'sandbox_replaced' },
+      })
+      const current = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), current, true)
+      expect(JSON.parse(current.body).gameInstanceId).toBe(resetGame.body.gameInstanceId)
+    })
 
   })
 })

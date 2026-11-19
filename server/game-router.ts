@@ -20,7 +20,7 @@ import { allowAnonymousAccess } from './anonymous-access.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { UnsupportedSandboxListenerError } from '../shared/custom-code/sandbox-listener-phases.ts'
-import { defaultSandboxDeckIds } from '../shared/session/state-bootstrap.ts'
+import { defaultSandboxDeckIds, type InitialStateOptions } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
 import {
   loadLiveDraft,
@@ -69,7 +69,7 @@ export const disposeSandboxSessionsForUser = (userId: string): void => {
   userSessions.get(userId)?.dispose()
   sessionExecutors.delete(userId); userSessions.delete(userId); sessionStamps.delete(userId)
   sessionCardDbIds.delete(userId); sessionLastAccess.delete(userId)
-  sessionReplacementGenerations.set(userId, (sessionReplacementGenerations.get(userId) ?? 0) + 1)
+  sessionReplacementGenerations.delete(userId)
 }
 export const shutdownSandboxSessions = (): void => {
   for (const key of [...userSessions.keys()]) disposeSandboxSessionsForUser(key)
@@ -77,10 +77,19 @@ export const shutdownSandboxSessions = (): void => {
 
 // A seed may be reused; HTTP playtest identity follows the actual session.
 const gameInstanceIds = new WeakMap<GameSession, string>()
+
+type SandboxSetup = {
+  options: InitialStateOptions
+  customCards: CustomCardData[]
+  cardDbIds: string[]
+  versions: Array<{ cardId: string; versionId: string }>
+}
+const sandboxSetups = new WeakMap<GameSession, SandboxSetup>()
+
 const userSessions = new Map<string, GameSession>()
 const sessionExecutors = new Map<string, CustomSessionExecutor>()
 const sessionLastAccess = new Map<string, number>()
-const sessionReplacementGenerations = new Map<string, number>()
+const sessionReplacementGenerations = new Map<string, symbol>()
 const cardTakedownGenerations = new Map<string, number>()
 // Workshop card db ids embedded in each sandbox session, so the admin kill
 // switch (#641) can dispose sessions still executing a taken-down card.
@@ -125,30 +134,70 @@ const getSessionForRequest = async (req: IncomingMessage): Promise<Awaited<GameS
   return userSessions.get(key)!
 }
 
+class SandboxReplacementError extends Error {
+  readonly code: 'sandbox_replaced' | 'sandbox_card_taken_down'
+
+  constructor(code: SandboxReplacementError['code'], message: string) {
+    super(message)
+    this.code = code
+  }
+}
+
+const beginReplacement = (key: string): symbol => {
+  const generation = Symbol()
+  sessionReplacementGenerations.set(key, generation)
+  sessionLastAccess.set(key, Date.now())
+  return generation
+}
+
+const recordTakedownGenerations = (ids: string[]) =>
+  ids.map(id => ({ id, generation: cardTakedownGenerations.get(id) ?? 0 }))
+
+type SessionReplacement = {
+  key: string
+  generation: symbol
+  takedownGenerations: ReturnType<typeof recordTakedownGenerations>
+  previousSandbox?: { session: GameSession; instanceId: string }
+}
+
 const setSessionForRequest = async (
   req: IncomingMessage,
-  s: GameSession,
-  cardDbIds: string[] = [],
-  executor?: CustomSessionExecutor,
-): Promise<Awaited<void>> => {
-  let key: string
-  try {
-    key = await getSessionKey(req)
-    if (authority) {
-      await authority.directory.db.transaction(async () => {
-        const revision = requests.get(req)?.revision
-        if (revision !== undefined) await authority!.access.assertRevision(revision)
-        const stamp = await authority!.access.capture(cardDbIds, key === 'anonymous' ? [] : [key])
-        await authority!.check(stamp)
-        sessionStamps.set(key, stamp)
-        requests.set(req, { stamp })
-      })()
-    }
-  } catch (error) { executor?.dispose(); s.dispose(); throw error }
+  session: GameSession,
+  cardDbIds: string[],
+  executor: CustomSessionExecutor | undefined,
+  replacement: SessionReplacement,
+): Promise<void> => {
+  let stamp: ExecutionStamp | undefined
+  const { key, generation, takedownGenerations, previousSandbox } = replacement
+  if (key !== await getSessionKey(req)) throw new ExecutionRevokedError('Session authorization ended')
+  if (authority) {
+    const auth = authority
+    stamp = await auth.directory.db.transaction(async () => {
+      const scope = requests.get(req)
+      if (scope?.revision !== undefined) await auth.access.assertRevision(scope.revision)
+      if (previousSandbox && scope) await auth.access.assert(scope.stamp)
+      const next = await auth.access.capture(cardDbIds, key === 'anonymous' ? [] : [key])
+      await auth.check(next)
+      return next
+    })()
+  }
+  if (takedownGenerations.some(item => (cardTakedownGenerations.get(item.id) ?? 0) !== item.generation)) {
+    throw new SandboxReplacementError('sandbox_card_taken_down', 'Card taken down during session initialization')
+  }
+  const replaced = previousSandbox && (userSessions.get(key) !== previousSandbox.session
+    || gameInstanceIds.get(previousSandbox.session) !== previousSandbox.instanceId)
+  if (sessionReplacementGenerations.get(key) !== generation || replaced) {
+    throw new SandboxReplacementError('sandbox_replaced', 'Sandbox replaced by a newer request')
+  }
+
   const old = userSessions.get(key)
-  if (old && old !== s) old.dispose()
+  if (old && old !== session) old.dispose()
   sessionExecutors.get(key)?.dispose()
-  userSessions.set(key, s)
+  userSessions.set(key, session)
+  if (stamp) {
+    sessionStamps.set(key, stamp)
+    requests.set(req, { stamp })
+  }
   if (executor) sessionExecutors.set(key, executor)
   else sessionExecutors.delete(key)
   sessionLastAccess.set(key, Date.now())
@@ -302,6 +351,42 @@ const respondWith = (
   }
 }
 
+
+const startSandboxGame = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  seed: number | undefined,
+  setup: SandboxSetup,
+  replacement: SessionReplacement,
+): Promise<void> => {
+  const { customCards, cardDbIds, options, versions } = setup
+  const { session, executor } = createIsolatedGameSession(seed, customCards.length > 0 ? customCards : undefined, options)
+  let adopted = false
+  try {
+    if (executor && !executor.reserveWorkerSlot()) {
+      await sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
+      return
+    }
+    const response = executor ? await executor.execute('getState', []) : session.withCtx(() => session.getState())
+    const payload = {
+      ...respondWith(response, session, resolveViewerPlayerId(req, session)),
+      customCardsLoaded: customCards.length,
+      customCardVersionsLoaded: versions,
+      cardWarnings: session.cardWarnings.length > 0 ? session.cardWarnings : undefined,
+    }
+    if (response.ok) {
+      await setSessionForRequest(req, session, cardDbIds, executor, replacement)
+      sandboxSetups.set(session, setup)
+      adopted = true
+    }
+    await sendJson(res, 200, payload)
+  } finally {
+    if (!adopted) {
+      executor?.dispose()
+      session.dispose()
+    }
+  }
+}
 
 const handleAuthorizedGameRoute = async (
   req: IncomingMessage,
@@ -663,9 +748,7 @@ const handleAuthorizedGameRoute = async (
       return true
     }
     const requestUserId = (await validateSession(requestSessionToken(req)))?.id
-    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
-    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
-    sessionLastAccess.set(sessionKey, Date.now())
+    const generation = beginReplacement(sessionKey)
     const customCardDbIds = resolveCustomCardDbIds(raw, setup.enableCommunityDeck)
     const loadedCustomCards = customCardDbIds.length > 0
       ? (await loadLiveCustomCards(customCardDbIds, requestUserId))
@@ -679,40 +762,22 @@ const handleAuthorizedGameRoute = async (
     }
     const customCards = loadedCustomCards?.cards ?? []
     const loadedCardDbIds = loadedCustomCards?.loadedDbIds ?? []
-    const takedownGenerations = loadedCardDbIds.map((cardDbId) => [
-      cardDbId,
-      cardTakedownGenerations.get(cardDbId) ?? 0,
-    ] as const)
-    // Community cards are executable, so they must run in an isolated session
-    // like the sandbox and Room paths do — never on the main event loop.
-    const created = createIsolatedGameSession(
-      seed,
-      customCards.length > 0 ? customCards : undefined,
-      options,
-    )
-    const session = created.session
-    if (created.executor && !created.executor.reserveWorkerSlot()) {
-      created.executor.dispose()
+    const takedownGenerations = recordTakedownGenerations(loadedCardDbIds)
+    // Community cards execute in an isolated session instead of on the HTTP event loop.
+    const { session, executor } = createIsolatedGameSession(seed, customCards.length > 0 ? customCards : undefined, options)
+    if (executor && !executor.reserveWorkerSlot()) {
+      executor.dispose()
       session.dispose()
       await sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
       return true
     }
-    if (takedownGenerations.some(([cardDbId, generation]) =>
-      (cardTakedownGenerations.get(cardDbId) ?? 0) !== generation
-    )) {
-      created.executor?.dispose()
+    try {
+      await setSessionForRequest(req, session, loadedCardDbIds, executor, { key: sessionKey, generation, takedownGenerations })
+    } catch (error) {
+      executor?.dispose()
       session.dispose()
-      await sendJson(res, 409, { ok: false, error: 'card taken down during initialization' })
-      return true
+      throw error
     }
-    if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
-      created.executor?.dispose()
-      session.dispose()
-      await sendJson(res, 409, { ok: false, error: 'session replaced by newer request' })
-      return true
-    }
-    // Registering the card ids lets an administrator takedown dispose this game.
-    ;(await setSessionForRequest(req, session, loadedCardDbIds, created.executor))
     const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     await sendJson(res, 200, result)
     return true
@@ -777,9 +842,7 @@ const handleAuthorizedGameRoute = async (
 
     // Identify the requesting user (optional — allows loading own draft cards)
     const requestUser = (await validateSession(requestSessionToken(req)))
-    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
-    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
-    sessionLastAccess.set(sessionKey, Date.now())
+    const generation = beginReplacement(sessionKey)
     // Load custom card data from the database.
     // Allow: published cards (anyone) OR draft cards owned by the requesting user.
     const customCards: CustomCardData[] = []
@@ -856,60 +919,39 @@ const handleAuthorizedGameRoute = async (
       }
     }
 
-    const takedownGenerations = loadedCardDbIds.map((cardDbId) => [
-      cardDbId,
-      cardTakedownGenerations.get(cardDbId) ?? 0,
-    ] as const)
+    await startSandboxGame(req, res, seed, {
+      options: { ...sandboxOptions, deckIds },
+      customCards,
+      cardDbIds: loadedCardDbIds,
+      versions: customCardVersionsLoaded,
+    }, { key: sessionKey, generation, takedownGenerations: recordTakedownGenerations(loadedCardDbIds) })
+    return true
+  }
 
-    const created = createIsolatedGameSession(
-      seed,
-      customCards.length > 0 ? customCards : undefined,
-      { ...sandboxOptions, deckIds },
-    )
-    const sandboxSession = created.session
-    if (created.executor && !created.executor.reserveWorkerSlot()) {
-      created.executor.dispose()
-      sandboxSession.dispose()
-      await sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
+  if (req.method === 'POST' && req.url === '/api/game/reset-sandbox') {
+    let body: Record<string, unknown> = {}
+    try { body = asSetupPayload(JSON.parse(await readBody(req))) } catch { /* reported below as invalid payload */ }
+    if (typeof body.gameInstanceId !== 'string' ||
+        (body.seed !== undefined && (typeof body.seed !== 'number' || !Number.isFinite(body.seed)))) {
+      await sendJson(res, 400, { ok: false, error: 'Invalid sandbox reset request' })
       return true
     }
-    const resp = created.executor
-      ? await created.executor.execute('getState', [])
-      : sandboxSession.withCtx(() => sandboxSession.getState())
-    if (takedownGenerations.some(([cardDbId, generation]) =>
-      (cardTakedownGenerations.get(cardDbId) ?? 0) !== generation
-    )) {
-      created.executor?.dispose()
-      sandboxSession.dispose()
-      await sendJson(res, 409, { ok: false, error: 'sandbox card taken down during initialization' })
+    const key = await getSessionKey(req)
+    const previousSandbox = userSessions.get(key)
+    const setup = previousSandbox && sandboxSetups.get(previousSandbox)
+    if (!previousSandbox || !setup || gameInstanceIds.get(previousSandbox) !== body.gameInstanceId) {
+      throw new SandboxReplacementError('sandbox_replaced', 'The active Workshop sandbox changed. Open it again to reset.')
+    }
+    const rejection = classicAdmissionRejection(setup.options, classicEditionEnabled)
+    if (rejection) {
+      await sendJson(res, 400, { ok: false, ...rejection })
       return true
     }
-    if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
-      created.executor?.dispose()
-      sandboxSession.dispose()
-      await sendJson(res, 409, { ok: false, error: 'sandbox replaced by newer request' })
-      return true
-    }
-    const result = respondWith(
-      resp,
-      sandboxSession,
-      resolveViewerPlayerId(req, sandboxSession),
-    )
-    const payload = {
-      ...result,
-      customCardsLoaded: customCards.length,
-      customCardVersionsLoaded,
-      cardWarnings: sandboxSession.cardWarnings.length > 0 ? sandboxSession.cardWarnings : undefined,
-    }
-    if (!resp.ok) {
-      created.executor?.dispose()
-      sandboxSession.dispose()
-      sessionLastAccess.set(sessionKey, Date.now())
-      await sendJson(res, 200, payload)
-      return true
-    }
-    ;(await setSessionForRequest(req, sandboxSession, loadedCardDbIds, created.executor))
-    await sendJson(res, 200, payload)
+    await startSandboxGame(req, res, body.seed, setup, {
+      key, generation: beginReplacement(key),
+      previousSandbox: { session: previousSandbox, instanceId: body.gameInstanceId },
+      takedownGenerations: recordTakedownGenerations(setup.cardDbIds),
+    })
     return true
   }
 
@@ -1095,7 +1137,7 @@ export const handleGameRoute = async (
       rawJson(res, 400, { ok: false, code: error.code, error: error.message })
       return true
     }
-    if (!(error instanceof ExecutionRevokedError || error instanceof RoomOwnershipError)) throw error
+    if (!(error instanceof ExecutionRevokedError || error instanceof RoomOwnershipError || error instanceof SandboxReplacementError)) throw error
     rawJson(res, 409, { ok: false, code: error.code, error: error.message })
     return true
   }

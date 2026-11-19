@@ -146,6 +146,8 @@ Tests: `server/__tests__/{exchange-batch-session,harvest-session,harvest-feed-co
 
 `card-edition-admission.ts` gates room creation, rematches and HTTP or browser sandbox creation. Admission defaults to `CLASSIC_EDITION_ENABLED` and tests can inject either value. The switch applies to new games. Existing games can load, continue, reconnect and replay with the switch off. Room metadata and opening facts retain the Card Edition and Classic Decks. Workshop stores the author's setup and checks the pool when the sandbox starts. Coverage is in `classic-edition-room.test.ts`, `privacy-http.test.ts`, `workshop-api.test.ts` and `client/local-sandbox/__tests__/local-core.test.ts`.
 
+The Workshop HTTP game uses `POST /api/game/reset-sandbox` to restart the active instance with its accepted setup and loaded card versions. A restart checks Card Edition admission and replaces the active game after initialization succeeds. See `sandbox-version-binding.test.ts`.
+
 ## Snapshot data and executable-rule recovery
 
 See [ADR 0028](../adr/0028-session-recovery-preserves-authoritative-snapshot-data.md). New-game creation owns initial dealing. Loading or restoring a Session preserves present empty hands, stored card identities, missing optional rule fields, animal assignments and history; it never re-deals, and it rejects invalid required input instead of converting it into a new game. `rehydrateState()` only decodes data; the owning Core then rebuilds known executable definitions and engine cursors without replacing the captured data. Undo, command checkpoints, provisional checkpoints and process recovery share this contract.

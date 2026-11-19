@@ -148,6 +148,8 @@ type SessionResponse = {
 
 `card-edition-admission.ts` 负责建房、再来一局以及 HTTP 或浏览器沙盒的建局准入。准入默认使用 `CLASSIC_EDITION_ENABLED`，测试可以注入开或关。开关用于新局。关闭时已有对局仍可加载、继续、重连和回放。房间元数据和开局事实保留卡牌版本与旧版牌组。工坊保存作者的设置，在启动沙盒时检查卡池。测试见 `classic-edition-room.test.ts`、`privacy-http.test.ts`、`workshop-api.test.ts` 和 `client/local-sandbox/__tests__/local-core.test.ts`。
 
+工坊的 HTTP 对局通过 `POST /api/game/reset-sandbox` 重新开始当前对局，复用已接受的设置与已加载的卡牌版本。重开会检查卡牌版本准入，初始化成功后才替换当前对局。测试见 `sandbox-version-binding.test.ts`。
+
 ## 快照数据与可执行规则恢复
 
 见 [ADR 0028](../adr/0028-session-recovery-preserves-authoritative-snapshot-data.md)。新局创建负责初始发牌。加载或恢复 Session 时保留现有的空手牌、已存的卡牌身份、缺失的可选规则字段、动物安置与历史；从不重新发牌，非法的必需输入会被拒绝，而不是转成新局。`rehydrateState()` 只解码数据；所属 Core 随后重建已知的可执行定义与引擎游标，不替换捕获的数据。撤销、命令检查点、暂定检查点与进程恢复共用这一契约。

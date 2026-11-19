@@ -91,24 +91,27 @@ import { CLIENT_CAPABILITIES_HEADER, GAME_CLIENT_CAPABILITIES } from '../../shar
 
 const clientCapabilityHeaders = { [CLIENT_CAPABILITIES_HEADER]: GAME_CLIENT_CAPABILITIES.join(',') }
 
-const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
+type HttpGamePayload = GameSyncPayload & { gameInstanceId?: string; code?: string }
+
+const post = async (path: string, body?: unknown): Promise<HttpGamePayload> => {
   const resp = await browserApiFetch(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...clientCapabilityHeaders },
     body: body ? JSON.stringify(body) : undefined,
   })
-  return resp.json() as Promise<GameSyncPayload>
+  return resp.json() as Promise<HttpGamePayload>
 }
 
-const get = async (path: string): Promise<GameSyncPayload> => {
+const get = async (path: string): Promise<HttpGamePayload> => {
   const resp = await browserApiFetch(`${API_BASE}${path}`, { credentials: 'include', headers: clientCapabilityHeaders })
-  return resp.json() as Promise<GameSyncPayload>
+  return resp.json() as Promise<HttpGamePayload>
 }
 
 export class HttpGameTransport implements GameTransport {
   private listeners = new Set<SnapshotListener>()
   private inflight = false
+  private gameInstanceId?: string
 
   private async guard<T>(fn: () => Promise<T>): Promise<T> {
     if (this.inflight) throw new Error('request already in flight')
@@ -116,7 +119,8 @@ export class HttpGameTransport implements GameTransport {
     try { return await fn() } finally { this.inflight = false }
   }
 
-  private emit(payload: GameSyncPayload) {
+  private emit(payload: HttpGamePayload) {
+    if (payload.gameInstanceId !== undefined) this.gameInstanceId = payload.gameInstanceId
     this.listeners.forEach((cb) => cb(payload))
   }
 
@@ -199,6 +203,14 @@ export class HttpGameTransport implements GameTransport {
 
   newGame(seed?: number) {
     return this.send(() => post('/api/game/new', seed !== undefined ? { seed } : undefined))
+  }
+
+  resetSandbox(seed?: number) {
+    return this.send(async () => {
+      const payload = await post('/api/game/reset-sandbox', { gameInstanceId: this.gameInstanceId, seed })
+      if (!payload.ok) throw new CommandRejectedError(payload)
+      return payload
+    })
   }
 
   loadGame(state: unknown) {
