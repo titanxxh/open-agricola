@@ -26,7 +26,7 @@ The project also aims to provide solid infrastructure for players to create new 
 ## Features
 
 - Server-authoritative gameplay with real-time multiplayer synchronization over WebSocket
-- Rooms for 2–6 players, simultaneous drafting, the Community Deck, and custom Workshop cards
+- Rooms for 2–6 players, simultaneous drafting, and the Community Deck of merged Workshop cards
 - **LLM-Assisted Card Design** — Design custom cards with an LLM in the browser and automatically generate Agricola-style artwork and **implementation code**; configure the GitHub integration to submit PRs directly from the Workshop
 
 ## Live Demo
@@ -84,7 +84,6 @@ CI selects checks from the complete PR or main change set. Use `pnpm verify focu
 | `enableThroughTheSeasons=true` | Enable Through the Seasons when creating a WebSocket room |
 | `enableFarmersOfTheMoor=true` | Enable Farmers of the Moor when creating a WebSocket room |
 | `allowIncompleteFarmersOfTheMoorMinorDeal=true` | Allow the game to start with an incomplete Farmers of the Moor minor improvement pool |
-| `customCards=id1,id2` | Load Workshop card IDs when creating a WebSocket room |
 | `devMode=1` | Enable the developer panel in the fixed development room or embedded sandbox |
 | `page=workshop` | Open the Workshop page |
 | `page=login` | Force the login page; authenticated users are redirected to the lobby |

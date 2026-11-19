@@ -33,7 +33,7 @@ and fixed, we will credit you in the fix (unless you prefer to stay anonymous).
 
 Reports of particular interest:
 
-- Custom card sandbox escapes (isolated-vm / worker isolation)
+- Custom card sandbox escapes (opaque-origin browser iframe / Worker; isolated-vm for the retired sandbox format)
 - Authentication, session, and OAuth flaws
 - Cross-room information leaks or unauthorized state mutation over WebSocket
 - SQL injection or data-integrity issues

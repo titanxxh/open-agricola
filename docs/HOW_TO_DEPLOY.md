@@ -741,7 +741,7 @@ CORS_ORIGIN=https://open-agricola.titanxxh.com
 
 Production acceptance must not create formal games or send gameplay commands to retained Rooms. Run game-creation, opening and persistence tests only through the isolated local `pnpm release:rehearse` workflow described in [CI checks](operations/ci-checks.md#发布工具演练与必需浏览器用例).
 
-`pnpm run build:pages-frontend` writes `dist-pages/` with base path `/`, explicit `VITE_API_BASE` and optional `VITE_WS_BASE`. It records `{ format: 1, gameBuildId, basePath }` in `frontend-build.json`; the build identity must match the selected backend. Community cards default to enabled and the Workshop sandbox defaults to `browser`, with explicit `VITE_*` overrides retained.
+`pnpm run build:pages-frontend` writes `dist-pages/` with base path `/`, explicit `VITE_API_BASE` and optional `VITE_WS_BASE`. It records `{ format: 1, gameBuildId, basePath }` in `frontend-build.json`; the build identity must match the selected backend. Community cards default to enabled, with an explicit `VITE_ENABLE_COMMUNITY_DECK` override retained; the Workshop sandbox always runs in the browser.
 
 The application stays at the Pages origin. The old API `/open-agricola`, `/open-agricola/` and `/open-agricola/index.html` GET/HEAD entries redirect to the configured same-site frontend, preserving public Room and Replay query parameters. The redirect explicitly clears fragments; old-origin onboarding restarts instead of forwarding its tab-bound credentials. GitHub manages the old `github.io` entry's custom-domain redirect. Browser-local drafts, LLM settings, preferences and command journals do not move between origins; accounts, Rooms, seats and saves remain on the same backend.
 

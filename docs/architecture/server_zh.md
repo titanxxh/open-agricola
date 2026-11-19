@@ -96,7 +96,7 @@ type RoomCommitResult =
 ```text
 ClientCommand
   → room-router：验证座位与 payload
-  → GameSession：内置卡同步产生 SessionResponse；可执行 Workshop 卡由会话 Worker 异步返回
+  → GameSession：内置卡同步产生 SessionResponse；恢复 Room 中的 Workshop 卡由会话 Worker 异步返回
   → RoomCommitter：序列化一次，原子写 Room snapshot + Replay Step
   → Broadcaster：提交成功后生成各座位遮蔽 envelope 并发送
 ```
@@ -124,7 +124,7 @@ server/custom-code/
 └── client.ts            主进程 → Worker Thread 同步调用客户端
 ```
 
-- 后端只保存 `compiled_code + code_manifest`。非内置的可执行工坊卡在其 HTTP 沙盒或 WebSocket Room 中，把每个 `GameSession` 命令放进专用 Worker（`CustomSessionExecutor`）执行；同一 Room 按 FIFO 执行直至 Durable Commit，不同 Room 并行；同一连接之后的 Room 或座位变更不能改变进行中命令的 Room 或 Replay 行动者。
+- 在 #1887 之前只供退役格式草稿和恢复的带工坊卡 Room 使用。后端只保存 `compiled_code + code_manifest`。非内置的可执行工坊卡在其 Room 中，把每个 `GameSession` 命令放进专用 Worker（`CustomSessionExecutor`）执行；同一 Room 按 FIFO 执行直至 Durable Commit，不同 Room 并行；同一连接之后的 Room 或座位变更不能改变进行中命令的 Room 或 Replay 行动者。
 - 主线程只保留最后一次成功快照的非执行镜像，经不结算的恢复路径载入，因此从不重新探测续行。在 Worker 内，`client.ts` 同步调用 isolated-vm，因此 `Atomics.wait()` 从不阻塞 HTTP 或 WebSocket 事件循环。
 - 每个命令前在内存中建立检查点，保留 pending 状态与撤销历史。hook 超时或运行时警告会恢复它并保留诊断；Worker 崩溃或整体超时会从最后快照重建。
 - `built_in=1` 的卡使用内置实现，不创建 Worker。
@@ -183,7 +183,7 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 
 - 沙盒设置（`sandbox_settings`、`sandbox_cards`）持久化人数、牌组与变体开关；`POST /api/game/new-sandbox` 把它们传给 `createInitialState()`。
 - `workshop-status.ts` 将审核与 `live` 发布分开。绑定和发布要求打开、非草稿且基于 `main` 的 PR、固定 Draft Version 与有权限的精确 head 批准。不一致或 GitHub 对账失败进入 `stale·offline`；绑定后首次刷新暂时失败保留 `in_review` 供重试。完整转换以状态代码和工坊测试为准。
-- 已批准的 `main` 合入毕业为只读 `merged`；先观察到的合入等待有权限的精确 head 核对。其他 base 进入 `stale·offline`。已上线审核快照持续提供到发版，由 `markBuiltInMergedCards` 在启动时交给内置定义。
+- 已批准的 `main` 合入毕业为只读 `merged`；先观察到的合入等待有权限的精确 head 核对。其他 base 进入 `stale·offline`。`live` 只影响展示；`markBuiltInMergedCards` 在发版时让已合入卡成为内置卡。
 - 对局只加载部署版本中的卡（ADR 0052）：创建时拒绝任何 `customCardIds`，沙盒只接受作者自己的卡。已录制的带工坊卡的 Room 仍经执行器恢复。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。

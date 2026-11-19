@@ -91,7 +91,7 @@ GitHub Pages serves the production frontend at `https://open-agricola.titanxxh.c
 
 `./restart-local.sh` prepares or reuses local PostgreSQL, private S3, schema, and an immutable Viewer. Worktrees share their main checkout's dependency data by default. Restart preserves that data. Use `./restart-local.sh --instances 2` for two local applications. `pnpm run verify` uses the same launcher with a separate test schema, S3 prefix, ports, and logs.
 
-All hosted Rooms record, including ordinary, Workshop, hotseat, and development Rooms. A development slot points at a fresh permanent Room ID after rematch/reset; the launcher prints current links. Earlier Game Context identities are never reused. Standalone HTTP/browser Workshop Sandboxes remain available.
+All hosted Rooms record, including ordinary, hotseat, and development Rooms. A development slot points at a fresh permanent Room ID after rematch/reset; the launcher prints current links. Earlier Game Context identities are never reused. The standalone browser Workshop Sandbox remains available; the HTTP sandbox runs only deployed cards.
 
 ### B3. Single-host deployment and later service migration
 
@@ -157,11 +157,11 @@ OpenRouter has no provider-level fallback `chat` or `image` capability. Every mo
 
 The production editor uses the browser runner under `client/services/llm/generation/`; the text-only ability path has been removed. The model table above lists existing UI registrations, not verified tool-calling combinations.
 
-A **Generation Attempt** encompasses reference queries, model responses, and model-directed repairs without an application request-count or total-time quota. Pausing and continuing preserves its model configuration, reference commit, and cumulative accounting; cancelling does not produce a completed candidate from partial output. Each new attempt resolves the latest GitHub `main` and pins that commit for its reference reads. Reference content is independent of site releases, while executable code must still obey the actual Custom Code Sandbox capabilities. LLM credentials remain browser-to-provider only. The logged-in browser reads main and pinned tree metadata through `GET /api/workshop/references/main` and `GET /api/workshop/references/tree/:sha`. The backend uses a project-owned GitHub read credential, fixes the repository and operations, bounds responses, and projects only commit/tree fields. It never receives model credentials or executes the model loop. Source text still comes directly from anonymous `raw.githubusercontent.com` requests and is verified against the pinned blob hash; nothing is bundled with a site release. Main is never cached or replaced by a stale fallback. Missing project credentials, inaccessible GitHub metadata or an incomplete tree pause generation.
+A **Generation Attempt** encompasses reference queries, model responses, and model-directed repairs without an application request-count or total-time quota. Pausing and continuing preserves its model configuration, reference commit, and cumulative accounting; cancelling does not produce a completed candidate from partial output. Each new attempt resolves the latest GitHub `main` and pins that commit for its reference reads. Reference content is independent of site releases, while source must still run against the deployed engine in the browser Worker. LLM credentials remain browser-to-provider only. The logged-in browser reads main and pinned tree metadata through `GET /api/workshop/references/main` and `GET /api/workshop/references/tree/:sha`. The backend uses a project-owned GitHub read credential, fixes the repository and operations, bounds responses, and projects only commit/tree fields. It never receives model credentials or executes the model loop. Source text still comes directly from anonymous `raw.githubusercontent.com` requests and is verified against the pinned blob hash; nothing is bundled with a site release. Main is never cached or replaced by a stale fallback. Missing project credentials, inaccessible GitHub metadata or an incomplete tree pause generation.
 
 Uncached metadata reads spend shared PostgreSQL budgets before acquiring a project token: 20/minute and 120/hour per authenticated user, plus 100/minute and 1,000/hour across the site. Rejected user requests do not spend the global allowance. GitHub cooldowns are shared across backend instances and returned as `429` with `Retry-After`; each process also caps concurrent upstream reads at three. Tree requests accept only commits confirmed by a successful main read within the last hour, checked before serving a cached tree. A retry after main succeeds keeps that SHA. Already initialized reference sessions retain their tree and continue reading the same SHA's raw text after the authorization window; they do not re-resolve main.
 
-The model controls four tools: `search_references`, `read_reference`, `write_artifacts({source, tests})`, and `run_tests()`. Tools execute in the returned order. Writing replaces the complete pair and invalidates its reports; testing first checks source against the deployed contract and then runs the authored TypeScript / Chai behavior tests in a browser Worker. Diagnostics return as tool results so the model can repair and rerun. Final prose does not supply source. No fixed repair count, reserved final response or special continuation JSON remains.
+The model controls four tools: `search_references`, `read_reference`, `write_artifacts({source, tests})`, and `run_tests()`. Tools execute in the returned order. Writing replaces the complete pair and invalidates its reports; testing first validates source on the server (structure only for a native Card Source module) and then runs the authored TypeScript / Chai behavior tests in a browser Worker. Diagnostics return as tool results so the model can repair and rerun. Final prose does not supply source. No fixed repair count, reserved final response or special continuation JSON remains.
 
 One model POST may run at a time. A failed POST requires explicit retry; cancellation retains written artifacts. Retries keep the reference commit and accounting. Existing reference file, line, response-size and blob-hash checks remain; there is no separate reference-call quota. Provider reasoning/signatures and tool IDs remain in page-memory protocol history. Streaming limits remain 32 MiB cumulative SSE transport and 2 MiB per event and decoded message.
 
@@ -201,9 +201,9 @@ The original single-file artifact remains on the separate `prototype/llm-tool-lo
 
 The compact prompt in [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts) defines the task, immutable card identity, trust boundary, and four tools: `search_references`, `read_reference`, `write_artifacts`, and `run_tests`. It asks for a native Card Source module (ADR 0052), starts the research at `docs/CARD_AUTHORING.md`, requires positive and negative tests, and embeds no capability list. The deployed contract only identifies the runtime for validation binding; runtime identity and reference commit remain separate.
 
-The model reads source, engine consumers, and direct or Session tests from GitHub at the attempt's fixed commit. [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) explains the execution boundaries and links to the source allowlists and injected helpers. The site keeps no separate few-shot corpus or descriptive capability maps.
+The model reads source, engine consumers, and direct or Session tests from GitHub at the attempt's fixed commit. [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) explains the execution boundaries of the retired sandbox format and links to the source allowlists and injected helpers. The site keeps no separate few-shot corpus or descriptive capability maps.
 
-`write_artifacts` writes the complete `CARD_ID` / `CARD_DEF` / `CARD_IMPL` source and ordinary TypeScript behavior tests together. `run_tests` returns source-validation and browser-UT feedback for the model to inspect and repair. Source or test edits invalidate the matching report. The final response is ordinary text; source is obtained from tool-written artifacts. A clarification or unsupported request can finish without a candidate.
+`write_artifacts` writes the complete Card Source module and ordinary TypeScript behavior tests together. `run_tests` returns source-validation and browser-UT feedback for the model to inspect and repair. Source or test edits invalidate the matching report. The final response is ordinary text; source is obtained from tool-written artifacts. A clarification or unsupported request can finish without a candidate.
 
 [`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) directly covers timing and payment behavior. Local model acceptance is described in [`llm-card-gen.md`](test/llm-card-gen.md).
 
@@ -227,7 +227,7 @@ Workshop thumbnails, adopted/candidate previews and custom card faces resolve ma
 
 ### C5. Security validation for LLM-generated code
 
-The model emits TypeScript containing `CARD_DEF`, `CARD_IMPL.effect` callbacks, and `CARD_IMPL.listeners`. The backend validates, compiles, and executes it in a sandbox.
+The model emits a native Card Source module. The server checks only its structure (`shared/custom-code/card-source-admission.ts`) and never executes it; it runs only in the author's browser, in an opaque-origin iframe Worker with a no-network CSP (ADR 0052). Drafts in the retired `CARD_DEF` / `CARD_IMPL` sandbox format still use the path below until #1887 removes it.
 
 1. **AST validation** in `shared/custom-code/ast-validator.ts` uses the TypeScript Compiler API and rejects:
 
@@ -248,7 +248,7 @@ The model emits TypeScript containing `CARD_DEF`, `CARD_IMPL.effect` callbacks, 
    - exception handling that records a warning, returns `null`, and lets the game continue;
    - pure read or leaf-building helpers from `injected-helpers.ts`: `gainLeaf`, `payLeaf`, `spaceHasPlayer`, `positionKey`, `getCardStack`, and `readCardExtraData`.
 
-An early design considered a declarative JSON-only V1 DSL. It was not adopted; production uses LLM to TypeScript, AST allowlisting, and isolated-vm.
+An early design considered a declarative JSON-only V1 DSL. It was not adopted; the retired sandbox format uses LLM to TypeScript, AST allowlisting, and isolated-vm.
 
 ---
 
@@ -261,7 +261,7 @@ An early design considered a declarative JSON-only V1 DSL. It was not adopted; p
 ### D2. Loading custom cards into a game
 
 1. Games load only the cards in the deployed build (ADR 0052). A Workshop card reaches other players after its pull request merges and a release ships it as a community card, which the community-deck option deals. Room, solo and HTTP game creation reject any `customCardIds`, and the lobby offers no Workshop card selection. Author playtests run only in the browser sandbox with the author's own cards; HTTP `/api/game/new-sandbox` rejects Workshop cards.
-2. `server/connection/room-router.ts` or `server/game-router.ts` constructs `CustomCardData[]` from the database.
+2. Only restoring a Room recorded with Workshop cards (none exist in production) still uses the retired path: `server/connection/ws-server.ts` loads `CustomCardData[]` from the snapshot or the database.
 3. The `GameSession` constructor registers definitions and runtime implementations into that game's `SessionCardContext`.
 4. `registerExecutorBackedCustomCard()` in `server/custom-code/runtime.ts` injects effect hooks and listeners from compiled output and manifest, delegating to Worker Thread plus isolated-vm through `invokeCustomCodeEffectSync` and `invokeCustomCodeListenerSync`.
 5. Add the custom-card IDs to the deal pool.
@@ -272,7 +272,7 @@ Workshop embeds `workshop-game.html`, a game-only entry admitted before initiali
 
 - Every custom-card effect and listener call is wrapped in `try/catch`.
 - On failure, record the error, skip the effect, and continue the game. The current sandbox session accumulates deduplicated runtime errors; the Workshop confirmation gate rereads them and rejects the erroneous version before submission.
-- isolated-vm has a 100 ms CPU timeout per execution.
+- On the server, the retired format's isolated-vm has a 100 ms CPU timeout per execution.
 - State snapshots can roll back through existing undo infrastructure.
 
 `GET /api/workshop/public-cards/v1/cards` discovers current live approved versions in pages of at most 20, ordered by Workshop Card ID in byte order. Its optional `after` cursor accepts one ID of 1–128 ASCII letters, digits, underscores or hyphens. The response includes `protocolVersion: 1`, `cards` and a nullable `nextCursor`. Entries contain the fixed source identity and only the approved definition's `cardId`, `name` and `cardType`. Author credentials do not expand this public set. A directory entry grants no execution permission; consumers still fetch its snapshot and status.
@@ -318,7 +318,7 @@ WorkshopPage
    GitHub HTTP failures are checked before parsing successful JSON; malformed responses (including missing or incorrectly typed required fields), network failures, timeouts and internal Workshop exceptions are classified separately. Each failure records the submission ID, attempt, phase, fixed operation name, HTTP status and format-validated GitHub request ID in the existing `github_propose_audit`. Raw exception messages, request/response bodies, tokens and card contents are excluded. Durable failure state and its audit entry commit in the same lease-fenced transaction; remote preflight failures also receive a sanitized audit entry. After four automatic attempts the dialog explicitly reports that recovery is paused, counts down the wait and enables manual recovery of the same operation when due. Status polling continues until completion or attention is required; the transport never automatically replays writes.
 6. A lost branch response is reconciled against the planned commit and expected head. PR recovery queries all states with pagination and verifies repository, branch, marker and commit. A creation intent is persisted before POST; an unknown result is never blindly POSTed again, even after an empty query. This is recoverable delivery, not an external exactly-once guarantee. `GET .../submit-review` reads authoritative status; `POST` with `action:recover` continues that operation only. Unknown or ambiguous results retain the operation and expose its ID for maintainer investigation.
 7. Bind the actual head and submitted version transactionally. A concurrently edited draft is retained and reported as `draft_changed`; it is not approved or silently bound to the old submission. New bindings clear old approvals. Temporary post-bind review-read failure retains the PR and clears freshness so refresh can retry.
-8. Signed, deduplicated webhooks and publish-time review reads require a real push-authorized review on the exact head. No OWNER approval is synthesized. Incomplete review connections fail closed. GraphQL reads are not claimed to be transactional snapshots; local binding and lifecycle checks fence reconciliation. Head changes, draft, retarget, close, dismissal and changes-requested invalidate approval. Approved authors may publish before merge; release inclusion completes built-in takeover.
+8. Signed, deduplicated webhooks and publish-time review reads require a real push-authorized review on the exact head. No OWNER approval is synthesized. Incomplete review connections fail closed. GraphQL reads are not claimed to be transactional snapshots; local binding and lifecycle checks fence reconciliation. Head changes, draft, retarget, close, dismissal and changes-requested invalidate approval. Approved authors may publish before merge, which affects only Workshop gallery display; games load the card only after release inclusion completes built-in takeover.
 
 Legacy migration is explicit. Reconstruct the old pinned version's generated source/art; ignore only its provenance header when comparing source. Missing baselines or manual changes require maintainer handling. Preserve independent tests, drafts, versions and old PR links. Run the read-only inventory and resolve synthetic approvals before enabling the App cutover; see [the runbook](operations/github-oauth-app-setup.md).
 
@@ -345,7 +345,7 @@ Every generated pull request contains:
 
 The generator creates no definition or export-shape smoke test. A simple immediate-resource effect uses a direct behavior test. Payment, choice or pending, delayed, cross-player, and multistep flows require a dedicated `GameSession` scenario written by the author, reviewer, or LLM.
 
-Necessary normalization prevents a sandbox-valid card from failing pull-request CI:
+A native Card Source draft is already the module its PR adds; generation only drops `locales`, sets adopted artwork and adds the `_impl` export. For a draft in the retired sandbox format, necessary normalization prevents a sandbox-valid card from failing pull-request CI:
 
 - Change `deck: 'CUSTOM'` to `deck: 'community'`.
 - Add the `CardImpl` context type to `CARD_IMPL`, preventing listener phase and action literals from widening to `string[]`.
@@ -376,7 +376,7 @@ Version history comes from `GET /api/workshop/cards/:id/versions`, and players s
 | `POST /api/workshop/cards/:id/publish` | Make only a review-approved card live; revalidate the atomic GraphQL snapshot at publish, rejecting and marking stale on provider disagreement |
 | `POST /api/workshop/cards/:id/unpublish` | Move live to offline without invalidating approval; an unchanged card can be republished under #638 |
 | `POST /api/admin/cards/:id/takedown` | Administrator kill switch under #641: force `stale·offline` and terminate every active game embedding the card, without scoring or completed Replay |
-| Webhook `pull_request` closed and merged | Graduate under #642 only when merged into `main`: enter terminal `merged`, serve the snapshot through the release gap, then switch to built-in on release. A merge to another base counts as unmerged closure and becomes `stale·offline` with `closed`. If merge arrives before approval, persist the merge fact; a later approval webhook or `refresh-pr-status` can graduate from an approved MERGED snapshot with frozen head and valid SHA binding, then reconcile built-in status immediately. |
+| Webhook `pull_request` closed and merged | Graduate under #642 only when merged into `main`: enter terminal `merged`, then switch to built-in when a release ships it as a community card; games never load the unreleased snapshot. A merge to another base counts as unmerged closure and becomes `stale·offline` with `closed`. If merge arrives before approval, persist the merge fact; a later approval webhook or `refresh-pr-status` can graduate from an approved MERGED snapshot with frozen head and valid SHA binding, then reconcile built-in status immediately. |
 | `POST /api/workshop/cards/:id/pin-version` | Freeze the current draft as an immutable version for sandbox confirmation without changing review state |
 | `POST /api/github/webhook` | Verify GitHub App HMAC and handle submitted or dismissed reviews and PR synchronize, edit, draft conversion, or close with idempotent delivery |
 | `POST /api/workshop/cards/:id/sandbox-pass` | Record author confirmation only for the exact current publishable version with no runtime errors |
@@ -385,7 +385,7 @@ Playtest failures are attributed to a fixed source only when the server confirms
 
 First ability generation and regeneration include current card context. `CARD_ID`, card type, and name remain fixed and are revalidated by the Workshop Card aggregate at adoption. Other definition fields, including description, cost, VP, and localization, may change with a candidate.
 
-Every ability-source validation writes the isolated-vm-extracted `CARD_DEF` snapshot into the server manifest. The publication static gate compares its deliverable fields bidirectionally with current `card_json`. PR handoff also requires validated source, preventing divergence among sandbox execution, published definition, and submitted source.
+Every ability-source validation writes the card definition snapshot into the server manifest: read statically from a native module's `meta`, or extracted in isolated-vm from a retired-format `CARD_DEF`. The publication static gate compares its deliverable fields bidirectionally with current `card_json`. PR handoff also requires validated source, preventing divergence among sandbox execution, published definition, and submitted source.
 
 Ordinary editing creates checkpoints only on stage change, in-site navigation, or explicit save; it creates no Draft Version. Refresh and crash recovery use a synchronously written localStorage copy. If its revision matches, it recovers as unsynchronized. If the server revision advanced, the user chooses the complete server or complete local draft.
 
@@ -403,7 +403,7 @@ A Draft Version serializes only final card content and provenance for adopted ca
 | Password exposure | Hash with `crypto.scrypt`; never store plaintext |
 | Session hijacking | HTTPS in production plus HttpOnly, Secure, SameSite session cookies |
 | Brute force | Rate-limit login to five attempts per minute per IP |
-| Malicious card code | AST allowlist blocking imports, exports, eval, process, fetch, timers, Proxy, Reflect, classes, and more; isolated-vm with a separate V8 heap; Worker Thread; 100 ms and 8 MB limits; rollbackable snapshots |
+| Malicious card code | Native Card Source runs only in the author's browser, in an opaque-origin iframe Worker with a no-network CSP; the server never executes it. Retired format: AST allowlist blocking imports, exports, eval, process, fetch, timers, Proxy, Reflect, classes, and more; isolated-vm with a separate V8 heap; Worker Thread; 100 ms and 8 MB limits; rollbackable snapshots |
 | XSS through card text | React's default HTML escaping; never `dangerouslySetInnerHTML` |
 | Unauthenticated WebSocket | Prefer session-cookie validation; otherwise require an auth message within five seconds or disconnect |
 
@@ -523,7 +523,7 @@ Last updated 2026-10-06.
 | Card-art generation and upload | Gemini, OpenRouter, and AiHubMix image models, `POST /api/workshop/art`, and `/card-art/` static service |
 | Resource-icon parsing | `client/components/common/ResourceText.tsx` |
 | Authentication and Workshop unit tests | `server/__tests__/auth.test.ts`, `workshop-api.test.ts` |
-| TypeScript AST validation and isolated-vm sandbox | `shared/custom-code/ast-validator.ts`, `server/custom-code/{compiler, engine, client, executor-worker, isolate-runner, runtime, injected-helpers}.ts` |
+| TypeScript AST validation and isolated-vm sandbox (retired format) | `shared/custom-code/ast-validator.ts`, `server/custom-code/{compiler, engine, client, executor-worker, isolate-runner, runtime, injected-helpers}.ts` |
 | Card version history | `workshop_card_versions`, versions and restore APIs, and the WorkshopPage version panel |
 | Featured Workshop page | `workshop_cards.featured`, administrator toggle, and Featured tab |
 | Production deployment with Docker and GitHub Pages | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/deploy-pages.yml`, `client/config.ts` |
