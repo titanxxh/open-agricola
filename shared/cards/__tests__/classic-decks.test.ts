@@ -61,4 +61,17 @@ describe('classic decks', () => {
     withClassicCardDefinitions(CE_CI_CZ, () => expect(getOccupationCard(id)?.id).toBe(id))
     expect(getOccupationCard(id) ?? null).toBeNull()
   })
+
+  it('keeps injected definitions in place until an asynchronous run settles', async () => {
+    const id = 'CZ900_FixtureOccupation900'
+    const run = withClassicCardDefinitions(CE_CI_CZ, async () => {
+      await Promise.resolve()
+      return getOccupationCard(id)?.id
+    })
+    expect(getOccupationCard(id)?.id).toBe(id)
+    expect(await run).toBe(id)
+    expect(getOccupationCard(id) ?? null).toBeNull()
+    await expect(withClassicCardDefinitions(CE_CI_CZ, async () => { throw new Error('boom') })).rejects.toThrow('boom')
+    expect(getOccupationCard(id) ?? null).toBeNull()
+  })
 })
