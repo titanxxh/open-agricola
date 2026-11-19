@@ -146,6 +146,8 @@ type SessionResponse = {
 
 `classic-deal-pool.ts` 中的 `getClassicDealShortfall(options)` 是旧版对局的建局检查。每个座位每种类型需要 7 张，轮抽时为每个座位一包 `draftPoolSize` 张（`shared/contract/card-edition.ts` 的 `classicCardsNeededPerType()`），且只计旧版合格卡。卡池不足时返回 `ClassicPoolShortfall`，含错误码 `classic_pool_insufficient`、所需与合格张数以及牌组。准入传入房间的 `maxPlayers`。手牌不会缩减，修订版卡也不会补缺：旧版 `dealHands()` 以同一 shortfall 抛出 `ClassicPoolInsufficientError`。测试：`server/__tests__/classic-deal-session.test.ts`。
 
+`card-edition-admission.ts` 负责建房、再来一局以及 HTTP 或浏览器沙盒的建局准入。准入默认使用 `CLASSIC_EDITION_ENABLED`，测试可以注入开或关。开关用于新局。关闭时已有对局仍可加载、继续、重连和回放。房间元数据和开局事实保留卡牌版本与旧版牌组。工坊保存作者的设置，在启动沙盒时检查卡池。测试见 `classic-edition-room.test.ts`、`privacy-http.test.ts`、`workshop-api.test.ts` 和 `client/local-sandbox/__tests__/local-core.test.ts`。
+
 ## 快照数据与可执行规则恢复
 
 见 [ADR 0028](../adr/0028-session-recovery-preserves-authoritative-snapshot-data.md)。新局创建负责初始发牌。加载或恢复 Session 时保留现有的空手牌、已存的卡牌身份、缺失的可选规则字段、动物安置与历史；从不重新发牌，非法的必需输入会被拒绝，而不是转成新局。`rehydrateState()` 只解码数据；所属 Core 随后重建已知的可执行定义与引擎游标，不替换捕获的数据。撤销、命令检查点、暂定检查点与进程恢复共用这一契约。

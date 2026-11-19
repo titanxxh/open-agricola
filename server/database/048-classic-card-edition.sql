@@ -3,8 +3,12 @@
 ALTER TABLE rooms
   ADD COLUMN IF NOT EXISTS card_edition TEXT CHECK (card_edition = 'classic'),
   ADD COLUMN IF NOT EXISTS classic_deck_ids TEXT CHECK ((card_edition IS NULL) = (classic_deck_ids IS NULL));
-ALTER TABLE game_results ADD COLUMN IF NOT EXISTS card_edition TEXT CHECK (card_edition = 'classic');
-ALTER TABLE game_opening_facts ADD COLUMN IF NOT EXISTS classic_edition BOOLEAN;
+ALTER TABLE game_results
+  ADD COLUMN IF NOT EXISTS card_edition TEXT CHECK (card_edition = 'classic'),
+  ADD COLUMN IF NOT EXISTS classic_deck_ids JSONB CHECK ((card_edition IS NULL) = (classic_deck_ids IS NULL));
+ALTER TABLE game_opening_facts
+  ADD COLUMN IF NOT EXISTS classic_edition BOOLEAN,
+  ADD COLUMN IF NOT EXISTS classic_deck_ids JSONB CHECK ((classic_edition IS TRUE) = (classic_deck_ids IS NOT NULL));
 ALTER TABLE sandbox_settings
   ADD COLUMN IF NOT EXISTS card_edition TEXT CHECK (card_edition = 'classic'),
   ADD COLUMN IF NOT EXISTS classic_deck_ids_json TEXT;

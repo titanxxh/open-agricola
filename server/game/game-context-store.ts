@@ -43,6 +43,7 @@ type ResultRow = {
   enable_moor_balance_rules: number
   enable_snake_opening: number
   card_edition: 'classic' | null
+  classic_deck_ids: unknown
 }
 
 type ResultPlayerRow = {
@@ -308,7 +309,7 @@ export class GameContextStore {
       SELECT started_at, finished_at, rounds_played, player_count,
              enable_community_deck, enable_parent_cards,
              enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
-             enable_snake_opening, card_edition
+             enable_snake_opening, card_edition, classic_deck_ids
       FROM game_results
       WHERE room_id = ?
     `).get(roomId)) as ResultRow | undefined
@@ -344,7 +345,12 @@ export class GameContextStore {
         enableFarmersOfTheMoor: result.enable_farmers_of_the_moor === 1,
         enableMoorBalanceRules: result.enable_moor_balance_rules === 1,
         enableSnakeOpening: result.enable_snake_opening === 1,
-        ...(result.card_edition === 'classic' ? { cardEdition: 'classic' as const } : {}),
+        ...(result.card_edition === 'classic' ? {
+          cardEdition: 'classic' as const,
+          classicDeckIds: Array.isArray(result.classic_deck_ids)
+            ? result.classic_deck_ids.filter((deck): deck is string => typeof deck === 'string')
+            : [],
+        } : {}),
         players: players.map((player) => ({
           playerIndex: player.player_index,
           displayName: player.display_name,

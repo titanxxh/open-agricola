@@ -372,8 +372,9 @@ export function summarizeRoomsForLobby(
 /** A classic room's edition and decks from its metadata, or from its saved game state for a row written before them. */
 const snapshotCardEdition = (snapshot: RoomSnapshot): Pick<RoomMeta, 'cardEdition' | 'classicDeckIds'> => {
   const state = snapshot.serialized?.state
-  if (snapshot.meta.cardEdition === 'classic') return { cardEdition: 'classic', classicDeckIds: snapshot.meta.classicDeckIds ?? [] }
-  return state?.cardEdition === 'classic' ? { cardEdition: 'classic', classicDeckIds: state.classicDeckIds ?? [] } : {}
+  return (snapshot.meta.cardEdition ?? state?.cardEdition) === 'classic'
+    ? { cardEdition: 'classic', classicDeckIds: snapshot.meta.classicDeckIds ?? state?.classicDeckIds ?? [] }
+    : {}
 }
 
 const createSessionFromSnapshot = (

@@ -324,13 +324,13 @@ describe('PostgresRoomPersistence replay commit', () => {
     await expect(persistence.save('room-1', STATE0, META)).rejects.toThrow('Room context is no longer active')
   })
 
-  it('archives the classic Card Edition with the final result and serves it in the completed Game Context', async () => {
+  it('archives the classic Card Edition and decks with the final result and serves it in the completed Game Context', async () => {
     await persistence.commitReplay(step0())
-    const final = { ...nextStep(), result: { ...RESULT, cardEdition: 'classic' as const } }
+    const final = { ...nextStep(), result: { ...RESULT, cardEdition: 'classic' as const, classicDeckIds: ['CI', 'CE'] } }
     expect(await persistence.commitReplay(final)).toEqual({ kind: 'committed' })
     expect(await db.prepare('SELECT card_edition FROM game_results').get()).toEqual({ card_edition: 'classic' })
     expect(await new GameContextStore(db).resolve('room-1')).toMatchObject({
-      lifecycle: 'completed', result: { cardEdition: 'classic' },
+      lifecycle: 'completed', result: { cardEdition: 'classic', classicDeckIds: ['CI', 'CE'] },
     })
   })
 

@@ -566,6 +566,8 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   if (!roomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
   let input = msg
   if (msg.sourceGameContextId !== undefined) {
+    const rejection = classicAdmissionRejection({ cardEdition: msg.cardEdition, playerCount: 1 }, classicEditionEnabled(ctx))
+    if (rejection) { sendClassicRejection(ctx, rejection, msg.requestId); return }
     const source = await new GameCreationStore(getDb()).completedSource(msg.sourceGameContextId, ctx.currentUserId)
     if (!source.ok) { sendCommandError(ctx, source.message, msg.requestId, source.code); return }
     input = { type: 'createRoom', ...source.record.configuration, name: msg.name }

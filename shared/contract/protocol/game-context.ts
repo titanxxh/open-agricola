@@ -40,6 +40,7 @@ export type CompletedGameContextDescriptor = {
     enableSnakeOpening: boolean
     /** Present only for a classic game (ADR 0049); absent means revised. */
     cardEdition?: 'classic'
+    classicDeckIds?: string[]
     players: Array<{
       playerIndex: number
       displayName: string
