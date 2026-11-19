@@ -39,7 +39,7 @@ The owner wants classic ports to keep merging into main while classic games stay
 - **Client.**
   - The manifest always includes ported classic cards, so classic faces render on main too.
   - Display numbers keep the ID prefix: classic `CE203`, revised `E203`. Dev input accepts `CE203` as well as `E203`.
-  - Missing translations fall back to the source's English text, as for any card.
+  - Missing translations fall back to the source's English text, as for any card. The language-package check therefore lets only the English package omit classic faces; every other package must carry them.
 - **Encyclopedia.** One top-level classic group, filtered by deck, shown only when the switch is on.
 
 ## Consequences
