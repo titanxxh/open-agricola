@@ -142,7 +142,7 @@ export function validateCapture({ capture, ledger, image, buildId, workParent }:
     run('docker', ['run', '-d', '--rm', ...labels, '--name', postgres, '--network', network, '--env-file', join(work, 'postgres.env'), '--tmpfs', '/var/lib/postgresql:rw,size=16g', '--shm-size=1g', POSTGRES_IMAGE])
     run('docker', ['run', '-d', '--rm', ...labels, '--name', objects, '--network', network, '--env-file', join(work, 'objects.env'), '--tmpfs', '/data:rw,uid=10001,gid=10001,mode=0700,size=8g', OBJECTS_IMAGE, '/data'])
     for (let attempt = 0; ; attempt++) {
-      try { run('docker', ['exec', postgres, 'pg_isready', '-U', 'agricola', '-d', 'agricola']); break } catch { if (attempt > 60) throw new Error('Validation database did not start') }
+      try { run('docker', ['exec', postgres, 'pg_isready', '-h', '127.0.0.1', '-U', 'agricola', '-d', 'agricola']); break } catch { if (attempt > 60) throw new Error('Validation database did not start') }
       execFileSync('sleep', ['1'])
     }
     const bucket = "const { S3Client, CreateBucketCommand } = await import('@aws-sdk/client-s3'); const client = new S3Client({ endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION, forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY } }); await client.send(new CreateBucketCommand({ Bucket: process.env.S3_BUCKET }))"
