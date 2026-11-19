@@ -94,6 +94,41 @@ describe('Bug Report feedback', () => {
     expect((await service.listInbox('reporter')).unreadCount).toBe(3)
   })
 
+  it('keeps the inbox write when the last opted-in device is concurrently removed', async () => {
+    const recipient = await createInboxPushLogin(db, () => 1000, 'reporter')
+    const removing = Promise.withResolvers<number>()
+    const release = Promise.withResolvers<void>()
+    const deletion = db.transaction(async () => {
+      const connection = await db.prepare('SELECT pg_backend_pid() AS pid').get<{ pid: number }>()
+      if (!connection) throw new Error('No PostgreSQL connection')
+      await db.prepare('DELETE FROM web_push_bindings WHERE endpoint=?').run(recipient.endpoint)
+      removing.resolve(connection.pid)
+      await release.promise
+    })()
+    const blocker = await Promise.race([removing.promise, deletion.then(() => {
+      throw new Error('Deletion completed before the inbox write began')
+    })])
+    const outcome = service.recordFeedback('admin', { ...confirmation, requestId: 'unbind-overlap', kind: 'needs_info',
+      missingItems: ['A screenshot of the action space'] }).then(
+      message => ({ message }),
+      (error: unknown) => ({ error }),
+    )
+    try {
+      await expect.poll(async () => {
+        const wait = await db.prepare(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity
+          WHERE pid<>pg_backend_pid() AND ?=ANY(pg_blocking_pids(pid))) AS blocked`).get<{ blocked: boolean }>(blocker)
+        return wait?.blocked
+      }).toBe(true)
+    } finally {
+      release.resolve()
+      await deletion
+    }
+    const inbox = await service.listInbox('reporter')
+    expect(await outcome).toEqual({ message: expect.objectContaining({ kind: 'needs_info', id: expect.any(Number) }) })
+    expect(inbox.messages.map(message => message.kind)).toEqual(['needs_info'])
+    expect(await recipient.store.claimDue(['bug-report-inbox'])).toBeNull()
+  })
+
   it('stops retrying inbox push after the recipient reads the message', async () => {
     let time = 1000
     const now = () => time
