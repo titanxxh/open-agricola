@@ -154,6 +154,8 @@ See [ADR 0028](../adr/0028-session-recovery-preserves-authoritative-snapshot-dat
 
 Explicit format migrations precede ordinary restoration and preserve the game's meaning. Changes to persisted state or private cursors follow the [retained-game upgrade policy](../HOW_TO_DEPLOY.md#compatibility-of-retained-games), including recovery followed by a real command, publication and reconnect.
 
+For a legacy Classic capture missing its ordinary draw piles, `restoreSessionState()` rebuilds the eligible remainder from its saved seed and chosen decks. Hands, played cards, pending choices and draft packets stay authoritative. Recovery rejects missing piles when a completed draw choice or an oversized draft has discarded unidentified cards. See `server/__tests__/classic-deal-session.test.ts`.
+
 `restoreSessionState()` converts retained global-round drafts through `shared/draft/legacy-draft.ts` before rebuilding rules. Publication and saved lobby summaries share that conversion. Authoritative state uses per-seat inboxes; migrated games' new Replay Frames also retain the fields required by their frozen Viewer. Live redaction removes those aliases. Historical Frames, hashes, cursor history and command receipts are not rewritten. Tests: `server/__tests__/legacy-draft-recovery-session.test.ts`, `server/game/__tests__/room-committer.test.ts`.
 
 The explicit ordinary-pet rule in ADR 0026 is the assignment exception. After restoring its rules or a command checkpoint, the Core reconciles an existing ordinary pet to the legal room without changing animal totals or emitting placement events. Pending animal-reorganization zones are projected again from the restored state.

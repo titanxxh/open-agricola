@@ -6,10 +6,11 @@ import { createSeasonActionSpaces } from '../seasons/action-spaces'
 import type { ActionDefinition, ActionSpace, GameState } from '../contract/types'
 import { captureStateWithHistory } from './history-streams'
 import { migrateLegacyDraft } from '../draft/legacy-draft'
+import { rebuildLegacyClassicDecks } from './classic-deal-pool'
 
 type ActionDefinitionLookup = (id: string) => ActionDefinition | undefined
 
-/** Restore an existing game's data; only executable rules are reattached. */
+/** Migrate known legacy data and reattach an existing game's executable rules. */
 export function restoreSessionState(raw: GameState, lookup?: ActionDefinitionLookup): GameState {
   if (!Array.isArray(raw.players) || !Array.isArray(raw.actionSpaces)) throw new Error('Invalid Session recovery state')
   for (const player of raw.players) {
@@ -25,6 +26,9 @@ export function restoreSessionState(raw: GameState, lookup?: ActionDefinitionLoo
     log: captured.log.slice(),
     events: captured.events.slice(),
     publicEventArchive: captured.publicEventArchive.slice(),
+  }
+  if (state.cardEdition === 'classic' && state.ordinaryCardDecks === undefined) {
+    state.ordinaryCardDecks = rebuildLegacyClassicDecks(state)
   }
   const dynamicSpaces = createPlayerActionSpaces(state)
   const workerSpaces = new Map(restoreCardWorkerSpaces(state.actionSpaces).map(space => [space.id, space]))

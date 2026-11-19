@@ -6,6 +6,20 @@ export function initDraftState(seatOrder: string[], hands: Record<string, DraftP
   return initStagedDraftState(seatOrder, [{ kind: 'standard', poolSize, totalRounds, pools: hands }])
 }
 
+export function cardIdsInDraft(draft: GameState['draft']): { occupation: Set<string>; minor: Set<string> } {
+  const occupation = new Set<string>()
+  const minor = new Set<string>()
+  for (const stage of draft?.stages ?? []) {
+    for (const seat of Object.values(stage.seats)) {
+      for (const pool of [seat.kept, ...Object.values(seat.inbox)]) {
+        pool.occ.forEach(id => occupation.add(id))
+        pool.minor.forEach(id => minor.add(id))
+      }
+    }
+  }
+  return { occupation, minor }
+}
+
 export function initStagedDraftState(seatOrder: string[], stages: DraftStageSpec[]): DraftState {
   if (seatOrder.length === 0 || stages.length === 0) throw new Error('draft requires seats and stages')
   return {
