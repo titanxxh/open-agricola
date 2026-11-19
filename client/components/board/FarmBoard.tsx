@@ -242,6 +242,7 @@ const SowChoiceButtons = ({
   availableVegetable,
   availableWood,
   availableStone,
+  availableReed,
   isInteractive,
   updateSowSelection,
   tile,
@@ -254,6 +255,7 @@ const SowChoiceButtons = ({
   availableVegetable: number
   availableWood: number
   availableStone: number
+  availableReed: number
   isInteractive: boolean
   updateSowSelection: (tile: FarmTilePosition, value: string) => void
   tile: FarmTilePosition
@@ -270,6 +272,9 @@ const SowChoiceButtons = ({
     {
       crop: 'wood',
       enabled: allowedCrops.includes('wood') && availableWood > 0,
+    },
+    {
+      crop: 'reed', enabled: allowedCrops.includes('reed') && availableReed > 0,
     },
     {
       crop: 'stone',
@@ -1471,6 +1476,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                   availableVegetable={availableVegetable}
                   availableWood={availableWood}
                   availableStone={availableStone}
+                    availableReed={(sowRemaining.reed ?? 0) + (currentSowChoice === 'reed' ? 1 : 0)}
                   isInteractive={isInteractive}
                   updateSowSelection={updateSowSelection}
                   tile={{ row: tileRow, col: tileCol }}
@@ -1833,6 +1839,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                     availableVegetable={availableVegetable}
                     availableWood={availableWood}
                     availableStone={availableStone}
+                    availableReed={(sowRemaining.reed ?? 0) + (currentSowChoice === 'reed' ? 1 : 0)}
                     isInteractive={isInteractive}
                     updateSowSelection={updateSowSelection}
                     tile={target.tile}

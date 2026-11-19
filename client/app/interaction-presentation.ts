@@ -149,7 +149,7 @@ export type InteractionSubmitDraft = {
   stableTiles?: readonly FarmTilePosition[]
   farmHand?: FarmTilePosition | null
   plowTile?: FarmTilePosition | null
-  sowSelections?: Record<string, 'grain' | 'vegetable' | 'wood' | 'stone'>
+  sowSelections?: Record<string, 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed' | 'reed'>
 }
 
 export type InteractionFeedSelection = {
@@ -393,13 +393,13 @@ const positionsFromKeys = (keys: readonly string[] | undefined): FarmTilePositio
 
 const cropsFromSowSelections = (
   selections: InteractionSubmitDraft['sowSelections'],
-): Array<{ row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }> =>
+): Array<{ row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed' }> =>
   Object.entries(selections ?? {})
     .map(([key, crop]) => {
       const tile = parsePositionKey(key)
       return tile ? { row: tile.row, col: tile.col, crop } : null
     })
-    .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' } => !!entry)
+    .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed' } => !!entry)
 
 export const areRequiredEmptyAnimalZoneGroupsSatisfied = (
   requestZones: readonly InteractionAnimalReorgZone[],

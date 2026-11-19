@@ -241,7 +241,7 @@ export const buildSowFarmInteraction = (
 
   const selectableFields: {
     tile: FarmTilePosition
-    allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
+    allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone' | 'reed')[]
     sourceCard?: string
     groupKey?: string
   }[] = normalized.fields.flatMap((field) => {
@@ -249,7 +249,7 @@ export const buildSowFarmInteraction = (
     const key = positionKey({ row: field.row, col: field.col })
     if (excludedKeys.has(key)) return []
     if (allowedKeys && !allowedKeys.has(key)) return []
-    const allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[] = []
+    const allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone' | 'reed')[] = []
     if (normalAllowed.includes('grain') && (normalized.resources.grain ?? 0) > 0) {
       allowedCrops.push('grain')
     }
@@ -269,6 +269,11 @@ export const buildSowFarmInteraction = (
       return true
     })
     if (filteredCrops.length === 0) continue
+    const existing = selectableFields.find(field => positionKey(field.tile) === positionKey(extra.tile))
+    if (existing) {
+      existing.allowedCrops = [...new Set([...existing.allowedCrops, ...filteredCrops])]
+      continue
+    }
     selectableFields.push({
       tile: extra.tile,
       allowedCrops: filteredCrops,

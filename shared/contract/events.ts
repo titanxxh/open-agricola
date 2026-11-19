@@ -107,7 +107,7 @@ export type ResourcePaidEvent = GameEventBase<'resource.paid'> & {
 export type FarmSownEvent = GameEventBase<'farm.sown'> & {
   sows: Array<{
     location: ResourceLocation
-    crop: 'grain' | 'vegetable' | 'wood' | 'stone'
+    crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
     added: number
   }>
   placementOnly?: boolean
@@ -116,7 +116,7 @@ export type FarmSownEvent = GameEventBase<'farm.sown'> & {
 export type FarmCropAddedEvent = GameEventBase<'farm.cropAdded'> & {
   crops: Array<{
     location: ResourceLocation
-    crop: 'grain' | 'vegetable' | 'wood' | 'stone'
+    crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
     amount: number
   }>
   reason: 'sow' | 'cardEffect' | 'placement'
@@ -125,7 +125,7 @@ export type FarmCropAddedEvent = GameEventBase<'farm.cropAdded'> & {
 export type FarmCropRemovedEvent = GameEventBase<'farm.cropRemoved'> & {
   crops: Array<{
     location: ResourceLocation
-    crop: 'grain' | 'vegetable' | 'wood' | 'stone'
+    crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
     amount: number
   }>
   reason: 'harvest' | 'reap' | 'pay' | 'cardEffect' | 'discard'

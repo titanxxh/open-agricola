@@ -1,3 +1,4 @@
+import { isWorkerPlacementBlocked, cardEffectsPermitSpaceEntry } from '../cards/card-effects'
 import type { PersonUseReceipt } from '../contract/person-use'
 import type { ActionHookRegistry } from '../actions/hooks'
 import type { ActionSpace, GameState, PlayerState } from '../contract/types'
@@ -48,6 +49,7 @@ export const canEnterActionSpace = (
   space: ActionSpace,
   options: ActionEntryQueryOptions,
 ): boolean => {
+  if (isWorkerPlacementBlocked(state, player) || !cardEffectsPermitSpaceEntry(state, player, space.id)) return false
   if (isSpaceBlocked(space)) return false
   if (!canUseExclusiveSpace(space, player, state)) return false
   if (space.strictCanExecute || options.isActionDoable) {
@@ -77,6 +79,7 @@ export const canProjectActionEntry = (
 ): boolean => {
   if (!canEnterSpace(space, player, state)) return false
   if (!canMoorWorkerEnterSpace(state, player, space.id)) return false
+  if (isWorkerPlacementBlocked(state, player) || !cardEffectsPermitSpaceEntry(state, player, space.id)) return false
   if (isSpaceBlocked(space)) return false
   if (isSpaceOccupied(space)) {
     const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks: options.actionHooks })

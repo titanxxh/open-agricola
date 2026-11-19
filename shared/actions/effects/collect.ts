@@ -60,10 +60,20 @@ const collectionTarget = ({ state, space, actionContext }: Pick<ActionExecutionC
   return typeof hint === 'string' ? hint === space.id ? space : findActionSpaceById(state, hint) : space
 }
 
+const replayResources = (target: ActionSpace, actionContext: Record<string, unknown> | undefined): Partial<Resource> | undefined => {
+  const raw = actionContext?.replayResources
+  if (actionContext?.replaySpaceId !== target.id || !raw || typeof raw !== 'object' || Array.isArray(raw)) return
+  const entries = Object.entries(raw)
+  if (!entries.every(([key, value]) => isCollectableResource(key) && Number.isSafeInteger(value) && Number(value) >= 0)) return
+  return positiveResources(raw as Partial<Resource>)
+}
+
 export const hasCollectableResources = (context: ActionExecutionContext): boolean => {
   const target = collectionTarget(context)
   if (!target) return false
   const { actionContext } = context
+  const replay = replayResources(target, actionContext)
+  if (replay) return Object.keys(replay).length > 0
   if (actionContext?.resourceTypes !== undefined) {
     const types = readResourceTypes(actionContext.resourceTypes)
     return types !== null && types.some(resource => (target.resources[resource] ?? 0) > 0)
@@ -90,6 +100,8 @@ export const collectAction: ActionDefinition = {
     const target = collectionTarget(context)
     if (!target) return undefined
     const { actionContext, previewMode } = context
+    const replay = replayResources(target, actionContext)
+    if (replay) return { kind: 'resourceExchange', resourcesGained: replay }
     const types = actionContext?.resourceTypes !== undefined ? readResourceTypes(actionContext.resourceTypes) : null
     const resource = actionContext?.resource
     const amount = actionContext?.amount
@@ -102,6 +114,14 @@ export const collectAction: ActionDefinition = {
     const spaceIdHint = actionContext?.spaceId as string | undefined
     const targetSpace = collectionTarget({ state, space, actionContext })
     if (!targetSpace) return { type: 'fail', errorKey: 'log.collectNoSpace' }
+    const replay = replayResources(targetSpace, actionContext)
+    if (replay) {
+      for (const [key, amount] of Object.entries(replay)) player.resources[key as keyof Resource] += amount!
+      trackWorkPhaseBuildingResources(state, player.id, replay)
+      addResourcesFromBoard(player, replay)
+      emitCollectedResources(eventSink, player.id, targetSpace.id, replay)
+      return { type: 'ok', resourcesGained: replay }
+    }
     const resource = actionContext?.resource
     const amount = actionContext?.amount
     const hasResourceTypes = actionContext?.resourceTypes !== undefined

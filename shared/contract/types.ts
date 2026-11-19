@@ -93,6 +93,16 @@ export type CardProvidedPaymentResourceCover = {
 
 export type CardProvidedPaymentResourceConsume =
   | { type: 'actionSpace'; spaceId: string; resource: ResourceKey }
+  | { type: 'cardCounter'; playerId: string; cardId: string; counterKey: string; resource: ResourceKey }
+  | {
+    type: 'handCard'
+    playerId: string
+    cardId: string
+    usageSource: string
+    turnToken: number | string
+    /** Admission-only provider; settlement must rebuild it inside the actual Turn. */
+    previewNextTurn?: true
+  }
 
 export type CardProvidedPaymentResourceProvider = {
   key: CardProvidedPaymentResourceKey
@@ -294,7 +304,10 @@ export type ActionCostAttribution = {
   costs: Partial<Resource>
 }
 
+export type PaymentResourceGrant = { sourceCard: string; resources: Partial<Resource> }
+
 export type PaymentSolution = {
+  resourceGrants?: PaymentResourceGrant[]
   resourcesPaid: PaymentResourceMap
   tradesUsed: TradeUsage[]
   cardUsed?: string
@@ -311,7 +324,7 @@ export type PaymentSolution = {
 export type PaymentSource = 'reserve' | 'field' | 'card'
 
 export type CropStack = {
-  kind: 'grain' | 'vegetable' | 'wood' | 'stone'
+  kind: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
   remaining: number
 }
 
@@ -778,6 +791,7 @@ export type ExchangeBatchEntry = {
 }
 
 export type ActionAvailabilityContext = {
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   /** Session-owned runtime dependency; never part of action metadata or snapshots. */
   actionHooks: ActionHookRegistry | undefined
   state: GameState
@@ -1056,7 +1070,7 @@ export type FarmOperationResult = {
 } & (
   | { kind: 'rooms'; roomType: PlayerState['houseType'] }
   | { kind: 'stables'; stables: StableConstruction[] }
-  | { kind: 'plow' | 'fence' | 'pastures' | 'space-states' | 'extension' | 'remove-stables' | 'remove-fences' | 'crops' }
+  | { kind: 'plow' | 'fence' | 'pastures' | 'space-states' | 'extension' | 'remove-stables' | 'remove-rooms' | 'remove-fields' | 'remove-fences' | 'crops' }
   | { kind: 'terrain'; terrainMode: FarmTerrainOperationMode; terrainChanges: FarmTerrainChange[] }
 )
 
@@ -1304,7 +1318,7 @@ export type InteractionRequest = (
             farmType: 'sow'
             selectableFields: {
               tile: FarmTilePosition
-              allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
+              allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone' | 'reed')[]
               sourceCard?: string
               groupKey?: string
             }[]
@@ -1383,6 +1397,8 @@ export type AnytimeAction = {
 }
 
 export type InteractionAnimalReorgZone = {
+  /** Animals committed to this holder cannot be reassigned or cooked. */
+  minimumAnimalCounts?: Partial<Record<AnimalKey, number>>
   id: string
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   cardId?: string
@@ -1428,7 +1444,7 @@ export type InteractionFarmSelection =
       farmType: 'sow'
       selectableFields: {
         tile: FarmTilePosition
-        allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
+        allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone' | 'reed')[]
         sourceCard?: string
         groupKey?: string
       }[]

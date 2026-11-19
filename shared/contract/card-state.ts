@@ -3,6 +3,8 @@ import type { AnimalKey } from './animals'
 
 /** Derived rule facts. Storage and interpretation belong to the contributing Card Source. */
 export type CardRuleContributions = {
+  /** One plow effect may be used per action-space visit. */
+  usedPlowActionSpaceUseId?: string
   reservedSupply?: Partial<Record<SupplyTokenKey, number>>
   unusedSpaceReduction?: number
   farmerScoreAdjustment?: number

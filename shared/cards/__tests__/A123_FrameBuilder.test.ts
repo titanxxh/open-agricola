@@ -1,3 +1,7 @@
+import { installOfficialCardRegistry } from './card-environment'
+
+installOfficialCardRegistry()
+
 import { describe, expect, it, beforeEach } from 'vitest'
 import { A123_FrameBuilder } from '../../cards/A/A123_FrameBuilder'
 import { PaymentSolver } from '../../actions/payment'

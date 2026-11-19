@@ -13,7 +13,7 @@ import { buildSowFarmInteraction, getAllowedSelectedFieldKeys, permittedSowCrops
 import { handleSowExtraField } from '../../cards/card-effects'
 import { getLogicalFields, mutateLogicalFields } from '../../cards/helpers/card-field'
 
-const sowedAmount = (crop: SowSelection['crop']) => crop === 'grain' || crop === 'wood' ? 3 : 2
+const sowedAmount = (crop: SowSelection['crop']) => crop === 'grain' || crop === 'wood' || crop === 'reed' ? 3 : 2
 
 export const getEmptyFields = (player: PlayerState) =>
   player.fields.filter(fieldIsEmpty)
@@ -40,7 +40,7 @@ export const isUnconditionalSow = (
   })) return false
   const permissionPlayer = {
     ...player,
-    resources: { ...player.resources, grain: 1, vegetable: 1, wood: 1, stone: 1 },
+    resources: { ...player.resources, grain: 1, vegetable: 1, wood: 1, stone: 1, reed: 1 },
   }
   const usual = buildSowFarmInteraction(permissionPlayer)
   const constrained = buildSowFarmInteraction(permissionPlayer, actionContext)
@@ -130,7 +130,7 @@ const finalizeSow = (
   const logicalTargets = new Map(
     getLogicalFields(nextPlayer).flatMap((field) => field.kind === 'card'
       ? field.slots.map((slot) => [positionKey(slot.tile), { fieldId: field.id, slot: slot.index }] as const)
-      : []),
+      : [[positionKey(field), { fieldId: field.id }]] as const),
   )
   const mutations = mutateLogicalFields(ctx.state, nextPlayer, { emitEvents: false })
   if (extraAllowedCrops.size > 0) {

@@ -1,3 +1,4 @@
+import { withPaymentGrants } from '../../../cards/helpers/payment-resource-grants'
 /**
  * Choice request constructors: buildPaymentChoiceResult,
  * resolvePaymentSolutionSelection, resolveCostPaymentSelection. Glue between
@@ -116,10 +117,35 @@ export const describePaymentChoicePreview = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
   options: PaymentChoiceResultOptions = {},
-) => ({
-  effectPreview: describePaymentEffectPreview(solution, includeReturnedCard, options),
-  descriptionPreview: describePaymentOutcome(solution, includeReturnedCard, options),
-})
+) => {
+  const payment = describePaymentEffectPreview(solution, includeReturnedCard, options)
+  let descriptionPreview = describePaymentOutcome(solution, includeReturnedCard, options)
+  const handCards = (options.paymentResourceProviders ?? []).flatMap(provider =>
+    provider.consume.type === 'handCard' && (solution.resourcesPaid[provider.key] ?? 0) > 0
+      ? [provider.consume.cardId] : [],
+  )
+  const grants = solution.resourceGrants ?? []
+  if (handCards.length || grants.length) {
+    descriptionPreview = {
+      kind: 'group', operator: 'sequence', separator: ' → ',
+      parts: [
+        ...grants.map(grant => ({
+          kind: 'action' as const, labelKey: 'actions.gain.name',
+          effectPreview: { kind: 'resourceExchange' as const, resourcesGained: grant.resources },
+        })),
+        ...handCards.map(cardId => ({
+          kind: 'group' as const, operator: 'sequence' as const, separator: ': ',
+          labelKey: 'actions.discard-from-hand.name',
+          parts: [{ kind: 'action' as const, labelKey: `cards.${cardId}.name` }],
+        })),
+        descriptionPreview ?? {
+          kind: 'action', labelKey: 'actions.pay.name', showLabel: false, effectPreview: payment,
+        },
+      ],
+    }
+  }
+  return { effectPreview: payment, descriptionPreview }
+}
 
 export const preservesResourceReserve = (
   resources: Partial<Resource>,
@@ -142,13 +168,13 @@ export const filterPaymentSolutionsByReserve = (
 ) =>
   solutions.filter((solution) =>
     preservesResourceReserve(
-      player.resources,
+      withPaymentGrants(player.resources, solution.resourceGrants ?? []),
       solution.resourcesPaid,
       reserveResources,
     ) && (
       !resourceReserve || resourceReserve.resources.reduce(
         (total, resource) => total
-          + (player.resources[resource] ?? 0)
+          + (withPaymentGrants(player.resources, solution.resourceGrants ?? [])[resource] ?? 0)
           - (solution.resourcesPaid[resource] ?? 0),
         0,
       ) >= resourceReserve.minimum

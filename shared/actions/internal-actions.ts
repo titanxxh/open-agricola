@@ -1,3 +1,4 @@
+import { preparePurchaseResourcesAction } from './effects/internal/prepare-purchase-resources'
 import { ruleOperationAction } from './effects/internal/rule-operation'
 import { createResolveTimedRuleAction } from './effects/internal/resolve-timed-rule'
 import { ruleConditionAction } from './effects/internal/rule-condition'
@@ -67,6 +68,7 @@ import { moorSoloRetentionAction } from './effects/internal/moor-solo-retention'
 import type { FlowActionResolver } from './flow'
 
 export const createInternalActionDefinitions = (resolveAction: FlowActionResolver): ActionDefinition[] => [
+  preparePurchaseResourcesAction,
   futureMeeplesAction,
   completePreparationAction,
   collectAction,

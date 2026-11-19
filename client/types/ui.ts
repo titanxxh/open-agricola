@@ -23,7 +23,7 @@ export type AnimalReorgState = {
   confirmDiscard: boolean
 }
 
-export type PendingSowCrop = 'grain' | 'vegetable' | 'wood' | 'stone'
+export type PendingSowCrop = 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
 
 export type ExtraSowTarget = {
   key: string

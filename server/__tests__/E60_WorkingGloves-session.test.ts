@@ -43,8 +43,8 @@ describe('E060 Working Gloves cost candidates', () => {
     const cost = PaymentSolver.isComplexCost(resolved.cost) ? resolved.cost : { fee: resolved.cost }
     const context = { actionId: 'occupation', costType: 'occupation' as const,
       candidateMetadataByFeeIndex: resolved.candidateMetadataByFeeIndex }
-    return { solutions: PaymentSolver.computeOptions(state, 0, cost, context),
-      previews: PaymentSolver.describeOptions(state, 0, cost, context) }
+    return session.withCtx(() => ({ solutions: PaymentSolver.computeOptions(state, 0, cost, context),
+      previews: PaymentSolver.describeOptions(state, 0, cost, context) }))
   }
 
   it.each([[1, 0], [2, 0], [3, 1], [4, 2]])('fee %i substitutes at most two food, leaving %i food payable', (fee, remainder) => {
@@ -76,9 +76,9 @@ describe('E060 Working Gloves cost candidates', () => {
     const live = session.getState().state
     const resolved = session.withCtx(() => PaymentSolver.resolveCardPreviewCostDetailedByProvider(live, live.players[0]!, 'occupation', 'A116_WoodCutter', () => ({ food: 4 }), undefined, session.actionHooks))
     if (!resolved) throw new Error('Expected cost candidates')
-    const previews = PaymentSolver.describeOptions(live, 0, resolved.cost, {
+    const previews = session.withCtx(() => PaymentSolver.describeOptions(live, 0, resolved.cost, {
       actionId: 'occupation', costType: 'occupation', candidateMetadataByFeeIndex: resolved.candidateMetadataByFeeIndex,
-    })
+    }))
     expect(previews.some(preview => preview.effectPreview?.kind === 'payment' &&
       preview.effectPreview.resourcesPaid?.clay === 1 && preview.effectPreview.resourcesPaid.wood === 2 &&
       preview.effectPreview.sourceCards?.includes(CARD_ID) && preview.effectPreview.sourceCards.includes('A028_ForestSchool'))).toBe(true)

@@ -28,7 +28,7 @@ import { applyActionPlacement, canEnterActionSpace } from '../action-entry-query
 import { endTurnScope, recordActionSnapshot, readActionSnapshotExtraData } from '../../cards/helpers/action-snapshot.ts'
 import { collectBeforeActionSpaceUseFlows } from '../../cards/card-listeners.ts'
 import { recordActionSpaceUse } from '../../domain/action-space-use'
-import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
+import { isWorkerPlacementBlocked, shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
 import { tagAnytimeTurnFlow, tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
 import { hasPendingOrdinaryCardDrawChoice } from '../ordinary-card-draw.ts'
@@ -52,7 +52,7 @@ export const nextSeatedPlayerIdx = (
 ): number => walkSeats(state, players, current, direction, 1, actionHooks)
 
 const canTakeRotationTurn = (state: GameState, candidate: PlayerState | undefined, actionHooks?: ActionHookRegistry): boolean =>
-  candidate !== undefined && (workersAvailable(state, candidate) > 0 || hasPendingExtraTurn(state, candidate, actionHooks))
+  candidate !== undefined && !isWorkerPlacementBlocked(state, candidate) && (workersAvailable(state, candidate) > 0 || hasPendingExtraTurn(state, candidate, actionHooks))
 
 const walkSeats = (
   state: GameState,
@@ -116,6 +116,7 @@ export const startPendingExtraTurnIfAny = (core: GameCore): boolean => {
   if (hasPendingOrdinaryCardDrawChoice(state)) return false
   const current = state.players[state.currentPlayerIndex]
   if (!current || state.roundPhase !== 'work' || state.gameOver || state.phase !== 'playing') return false
+  if (isWorkerPlacementBlocked(state, current)) return false
   const extra = collectExtraTurnFlow(state, current, workersAvailable(state, current) > 0, core.actionHooks)
   if (!extra) return false
   if (state.enableFarmersOfTheMoor && hasHealthyWorkerAtHome(state, current) && extra.flow.type === 'xor' && !extra.cardId) {

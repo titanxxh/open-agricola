@@ -1,9 +1,10 @@
 import type { ActionHookRegistry } from '../hooks'
 import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
+import { incCounter } from '../../cards/helpers/card-state'
 import type { EventSink } from '../../contract/events'
 import { fieldTopStack } from '../../domain/field'
 import { computeHarvestCount } from '../helpers/harvest-count-registry'
-import { getLogicalFields, mutateLogicalFields } from '../../cards/helpers/card-field'
+import { getLogicalFields, mutateLogicalFields, cardFieldHarvestDestination } from '../../cards/helpers/card-field'
 import {
   defaultReapTrigger,
   dispatchReapListeners,
@@ -40,7 +41,7 @@ const appendHarvestedCrop = (
   reapSummary: HarvestReapSummary,
   row: number,
   col: number,
-  crop: 'grain' | 'vegetable' | 'wood' | 'stone',
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed',
   amount: number,
   sources: string[],
 ) => {
@@ -60,7 +61,7 @@ const appendHarvestCountApplication = (
   reapSummary: HarvestReapSummary,
   row: number,
   col: number,
-  crop: 'grain' | 'vegetable' | 'wood' | 'stone',
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed',
   count: number,
   sources: string[],
   tags: string[],
@@ -84,8 +85,15 @@ export const reap = (
   eventSink?: EventSink,
   options: ReapOptions = {},
   actionHooks?: ActionHookRegistry,
-): ActionExecutionResult & { reapSummary: HarvestReapSummary; reactionFlow?: ActionFlow } => {
+): ActionExecutionResult & {
+  reapSummary: HarvestReapSummary
+  emptiedFields: string[]
+  emptiedFieldCrops: Record<string, NonNullable<ReturnType<typeof fieldTopStack>>['kind']>
+  reactionFlow?: ActionFlow
+} => {
   const trigger = options.trigger ?? defaultReapTrigger()
+  const reapedFieldIds = new Set<string>()
+  const removedKinds: Record<string, NonNullable<ReturnType<typeof fieldTopStack>>['kind']> = {}
   const reapSummary: HarvestReapSummary = {
     resources: {},
     grainFields: 0,
@@ -94,7 +102,7 @@ export const reap = (
     harvestCountApplications: [],
     harvestedPositions: [],
   }
-  const reapedCropAmounts: Partial<Record<'grain' | 'vegetable' | 'wood' | 'stone', number>> = {}
+  const reapedCropAmounts: Partial<Record<'grain' | 'vegetable' | 'wood' | 'stone' | 'reed', number>> = {}
   const countedFieldCrops = new Set<string>()
   const reactionChildren: ActionFlow[] = []
   const ownerReactionChildren: ActionFlow[] = []
@@ -204,6 +212,21 @@ export const reap = (
         crop: kind,
         amount,
       }
+      if (logicalField.sourceCard && cardFieldHarvestDestination(logicalField.sourceCard) === 'bonus-vp') {
+        incCounter(player, logicalField.sourceCard, 'bonusVp', amount)
+        eventSink?.emit<'farm.cropRemoved'>({
+          type: 'farm.cropRemoved', crops: [cropEvent],
+          sourceCardId: logicalField.sourceCard, reason: 'reap', trigger,
+        })
+        eventSink?.emit<'card.stateChanged'>({
+          type: 'card.stateChanged', cardId: logicalField.sourceCard,
+          key: 'bonusVp', targetPlayerId: player.id,
+        })
+        if (removed.ownerCallback) ownerCallbacks.push(removed.ownerCallback)
+        continue
+      }
+      reapedFieldIds.add(logicalField.id)
+      removedKinds[logicalField.id] = kind
       player.resources[kind] = (player.resources[kind] ?? 0) + amount
       reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + amount
       reapedCropAmounts[kind] = (reapedCropAmounts[kind] ?? 0) + amount
@@ -242,7 +265,11 @@ export const reap = (
     }
   }
 
-  appendReactionFlow(dispatchReapListeners(state, player, reapedCropAmounts, options, actionHooks))
+  const emptiedFields = getLogicalFields(player)
+    .filter(field => reapedFieldIds.has(field.id) && field.stacks.every(stack => stack.remaining <= 0))
+    .map(field => field.id)
+  const emptiedFieldCrops = Object.fromEntries(emptiedFields.map(id => [id, removedKinds[id]!]))
+  appendReactionFlow(dispatchReapListeners(state, player, reapedCropAmounts, { ...options, emptiedFields, emptiedFieldCrops }, actionHooks))
   for (const ownerCallback of ownerCallbacks) {
     appendReactionFlow(ownerCallback(), ownerReactionChildren)
   }
@@ -251,6 +278,8 @@ export const reap = (
   return {
     type: 'ok',
     reapSummary,
+    emptiedFields,
+    emptiedFieldCrops,
     ...(reactionChildren.length > 0 ? { reactionFlow: { type: 'parallel' as const, children: reactionChildren } } : {}),
   }
 }
@@ -297,13 +326,16 @@ export const reapAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.action' }
     }
 
-    const result = reap(state, player, eventSink, { trigger, sourceCard, afterCompletion: 'action' }, actionHooks)
+    const options: ReapOptions = { trigger, sourceCard, afterCompletion: 'action' }
+    const result = reap(state, player, eventSink, options, actionHooks)
     const reactionChildren: ActionFlow[] = []
     appendFlowChildren(reactionChildren, result.reactionFlow)
 
     const extraData = {
       reapSummary: result.reapSummary,
       reapedCropAmounts: result.reapSummary.resources,
+      emptiedFields: result.emptiedFields,
+      emptiedFieldCrops: result.emptiedFieldCrops,
       trigger,
       sourceCard,
     } satisfies ReapReceipt & { reapSummary: HarvestReapSummary }

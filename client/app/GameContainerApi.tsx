@@ -1831,7 +1831,7 @@ export const GameContainerApi = () => {
       pendingPlowTile: null,
       pendingPositionSelections: new Set<string>(),
       pendingSowSelections: {},
-      sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
+      sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0, reed: 0 },
       pendingFenceSet: new Set<string>(),
       pendingFenceSourceMap: undefined,
       pendingPalisadeSet: new Set<string>(),

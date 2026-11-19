@@ -202,6 +202,7 @@ export const useFarmSelectionDraftPresentation = ({
     grain: Math.max(0, (displayPlayer?.resources.grain ?? 0) - cropCount(farmDraft.pendingSowSelections, 'grain')),
     vegetable: Math.max(0, (displayPlayer?.resources.vegetable ?? 0) - cropCount(farmDraft.pendingSowSelections, 'vegetable')),
     wood: Math.max(0, (displayPlayer?.resources.wood ?? 0) - cropCount(farmDraft.pendingSowSelections, 'wood')),
+    reed: Math.max(0, (displayPlayer?.resources.reed ?? 0) - cropCount(farmDraft.pendingSowSelections, 'reed')),
     stone: Math.max(0, (displayPlayer?.resources.stone ?? 0) - cropCount(farmDraft.pendingSowSelections, 'stone')),
   }), [displayPlayer?.resources, farmDraft.pendingSowSelections])
 

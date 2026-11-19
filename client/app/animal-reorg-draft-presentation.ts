@@ -195,6 +195,11 @@ export const useAnimalReorgDraftPresentation = ({
       if (!player) return prev
       const current = prev.zones.find((zone) => zone.id === zoneId)
       if (!current) return prev
+      const minimum = current.minimumAnimalCounts ?? {}
+      const currentCountsForMinimum = zoneAnimalCounts(current)
+      if (delta < 0 && currentCountsForMinimum[animalType] <= (minimum[animalType] ?? 0)) return prev
+      if (delta > 0 && !cardZoneAllowsMixedAnimals(current)
+        && REORG_ANIMAL_TYPES.some(type => type !== animalType && (minimum[type] ?? 0) > 0)) return prev
       const capacity = current.capacity
       const totals = prev.zones.reduce((acc, zone) => {
         addAnimalCounts(acc, zoneAnimalCounts(zone))

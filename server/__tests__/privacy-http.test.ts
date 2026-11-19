@@ -213,7 +213,7 @@ describe('HTTP privacy + seat binding', () => {
       [{ cancel: true, unknown: 1 }],
       [{ cancel: false }],
       [{ positions: [{ row: 0, col: '0' }] }],
-      [{ crops: [{ row: 0, col: 0, crop: 'reed' }] }],
+      [{ crops: [{ row: 0, col: 0, crop: 'clay' }] }],
       [{ resourceCounts: null }],
       [{ edges: ['H-0-0'], extraWood: 0 }],
     ])('rejects invalid commit-selection payload %j', async (payload) => {

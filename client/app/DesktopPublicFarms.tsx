@@ -30,7 +30,7 @@ export function DesktopPublicFarms({ state, viewedPlayerId, pastureCapacities, v
                 pendingPlowTile: null,
                 pendingPositionSelections: new Set(),
                 pendingSowSelections: {},
-                sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
+                sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0, reed: 0 },
                 pendingFenceSet: new Set(),
                 pendingFenceSourceMap: undefined,
                 pendingPalisadeSet: new Set(),

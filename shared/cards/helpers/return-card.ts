@@ -1,3 +1,5 @@
+import { commitFarmOperation } from '../../domain/farm-operations'
+import { getCardEffect } from '../card-effects'
 /**
  * Card retire / return-to-board helper.
  *
@@ -12,11 +14,25 @@
 import type { GameState, PlayerState } from '../../contract/types'
 import { returnMajorImprovementToSupply } from '../major/supply'
 
+export const canReturnImprovement = (player: PlayerState, cardId: string): boolean =>
+  ![...player.occupationPlayed, ...player.minorPlayed, ...player.improvements].some(
+    source => getCardEffect(source)?.protectedImprovementIds?.(player).includes(cardId),
+  )
+
 export const returnCardToBoard = (
   player: PlayerState,
   cardId: string,
   state?: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
 ): void => {
+  if (!canReturnImprovement(player, cardId)) throw new Error('Improvement is committed and cannot be returned')
+  if (player.farmyardSpaceStates?.some(token => token.sourceCardId === cardId)) {
+    commitFarmOperation(player, {
+      kind: 'space-states',
+      states: player.farmyardSpaceStates.filter(token => token.sourceCardId !== cardId),
+      positions: [],
+      sourceCardId: cardId,
+    })
+  }
   const improvementIndex = player.improvements.indexOf(cardId)
   if (improvementIndex > -1) {
     player.improvements.splice(improvementIndex, 1)
@@ -31,7 +47,10 @@ export const returnCardToBoard = (
       )
     }
     if (player.cardStates) {
-      delete player.cardStates[cardId]
+      // Already awarded points belong to the player, even after the source retires.
+      const earned = player.cardStates[cardId]?.counters?.bonusVp ?? 0
+      if (earned > 0) player.cardStates[cardId] = { counters: { bonusVp: earned } }
+      else delete player.cardStates[cardId]
     }
   }
 }

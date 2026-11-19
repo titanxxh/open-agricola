@@ -23,7 +23,7 @@ import { removeFutureMeeples } from './internal/future-meeples'
 import { findFirstNewborn, findPlayerById } from '../../domain/player'
 import { findActionSpaceById, removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
-import { returnCardToBoard } from '../../cards/helpers/return-card'
+import { returnCardToBoard, canReturnImprovement } from '../../cards/helpers/return-card'
 import {
   isMajorImprovementAvailable,
   moveMajorImprovementToSupplyTop,
@@ -107,7 +107,7 @@ export type SpecialEffectParams =
     }
 
 type CardFieldStack = {
-  crop: 'grain' | 'vegetable' | 'wood' | 'stone'
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
   remaining: number
 }
 
@@ -264,6 +264,7 @@ export const specialEffectAction: ActionDefinition = {
         const playerIndex = target.improvements.indexOf(p.from)
         if (playerIndex < 0 || !isMajorImprovementAvailable(state, p.to)) return { type: 'ok' }
         if (target.improvements.includes(p.to)) return { type: 'ok' }
+        if (!canReturnImprovement(target, p.from)) return { type: 'fail', errorKey: 'log.actionNotAvailable' }
         target.improvements[playerIndex] = p.to
         swapMajorImprovementWithSupply(state, p.from, p.to)
         eventSink?.emit<'card.swappedWithBoard'>({
@@ -277,6 +278,7 @@ export const specialEffectAction: ActionDefinition = {
       }
       case 'return-card-to-board':
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        if (!canReturnImprovement(target, p.cardId)) return { type: 'fail', errorKey: 'log.actionNotAvailable' }
         returnCardToBoard(target, p.cardId, state)
         eventSink?.emit<'card.returnedToBoard'>({
           type: 'card.returnedToBoard',
@@ -615,7 +617,7 @@ export const specialEffectAction: ActionDefinition = {
           location:
             | { kind: 'field'; playerId: string; row: number; col: number }
             | { kind: 'card'; playerId: string; cardId: string }
-          crop: 'grain' | 'vegetable' | 'wood' | 'stone'
+          crop: 'grain' | 'vegetable' | 'wood' | 'stone' | 'reed'
           amount: number
         }> = []
         for (const loc of p.locations) {

@@ -1,3 +1,4 @@
+import { purchaseResourceGrants } from '../../cards/helpers/purchase-resource-grants'
 import type { ActionHookRegistry } from '../hooks'
 import type { ActionDefinition, ActionExecutionContext, ActionExecutionResult, ActionChoiceOption, ActionSpace, ChoiceEffectPreview, ExactCost, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState } from '../../contract/types'
 import { payAction } from './pay'
@@ -417,6 +418,10 @@ const buildImprovementInternalChildren = (
   }
   return {
     beforeHostListeners: [
+      ...(purchaseResourceGrants(state, player, id, kind).length ? [{
+        actionId: 'prepare-purchase-resources', sourceCard: id,
+        params: { cardId: id, kind, payment: payParams },
+      }] : []),
       buildImprovementPayChild(payParams, payActionContext, id),
     ],
     afterHostCommitListeners: [
@@ -477,7 +482,7 @@ const describeImprovementCandidates = (
   const exactCost = improvementExactCost(context)
   return options.map(option => {
     const children = buildImprovementInternalChildren(state, player, option.value, actionCardId, readTrueAction(params, actionContext), sourceCard, actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined, exactCost, purchaseActionCardId(context), context?.actionHooks)
-    const payment = children?.beforeHostListeners?.[0]
+    const payment = children?.beforeHostListeners?.find(child => child.actionId === 'pay')
     const effectPreview = payment ? payAction.previewEffect?.({ ...context, params: payment.params, actionContext: payment.actionContext, sourceCard: payment.sourceCard }) : undefined
     return { ...option, labelRole: 'identity', effectPreview } satisfies ActionChoiceOption
   })

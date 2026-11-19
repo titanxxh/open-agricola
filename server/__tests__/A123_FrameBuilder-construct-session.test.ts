@@ -59,12 +59,12 @@ const setup3RoomsClayHouse = (resources: Record<string, number>) => {
 describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.1.1)', () => {
   it('3 rooms no swap: {reed:6, clay:15} — affordable, k=0', () => {
     const { session, player } = setup3RoomsClayHouse({ clay: 15, reed: 6 })
-    expect(PaymentSolver.getMaxBuildableRooms({ state: session.state, player: player })).toBe(3)
-    const sols = computePaymentOptionsForTest(
+    expect(session.withCtx(() => PaymentSolver.getMaxBuildableRooms({ state: session.state, player }))).toBe(3)
+    const sols = session.withCtx(() => computePaymentOptionsForTest(
       player,
       { unitFee: { clay: 5, reed: 2 }, nb: 3 },
       'construct',
-    )
+    ))
     expect(sols.length).toBe(1)
     expect(sols[0]!.resourcesPaid.clay).toBe(15)
     expect(sols[0]!.resourcesPaid.reed).toBe(6)
@@ -75,12 +75,12 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
 
   it('3 rooms with 1 swap: {reed:6, clay:13, wood:1} affordable', () => {
     const { session, player } = setup3RoomsClayHouse({ clay: 13, reed: 6, wood: 1 })
-    expect(PaymentSolver.getMaxBuildableRooms({ state: session.state, player: player })).toBe(3)
-    const sols = computePaymentOptionsForTest(
+    expect(session.withCtx(() => PaymentSolver.getMaxBuildableRooms({ state: session.state, player }))).toBe(3)
+    const sols = session.withCtx(() => computePaymentOptionsForTest(
       player,
       { unitFee: { clay: 5, reed: 2 }, nb: 3 },
       'construct',
-    )
+    ))
     // Both k=0 and k=1 enumerated, but only k=1 fits resources (clay only 13).
     const affordable = sols.find((s) => (s.resourcesPaid.wood ?? 0) === 1)
     expect(affordable).toBeDefined()
@@ -92,12 +92,12 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
 
   it('3 rooms with 3 swaps: {reed:6, clay:9, wood:3} affordable — A123 trade tagged with sourceId', () => {
     const { session, player } = setup3RoomsClayHouse({ clay: 9, reed: 6, wood: 3 })
-    expect(PaymentSolver.getMaxBuildableRooms({ state: session.state, player: player })).toBe(3)
-    const sols = computePaymentOptionsForTest(
+    expect(session.withCtx(() => PaymentSolver.getMaxBuildableRooms({ state: session.state, player }))).toBe(3)
+    const sols = session.withCtx(() => computePaymentOptionsForTest(
       player,
       { unitFee: { clay: 5, reed: 2 }, nb: 3 },
       'construct',
-    )
+    ))
     const k3 = sols.find((s) => {
       const total = s.tradesUsed.reduce((acc, t) => acc + t.times, 0)
       return total === 3
@@ -117,12 +117,12 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
     const { session, player } = setup3RoomsClayHouse({ clay: 7, reed: 6, wood: 4 })
     // 3-room cost requires clay ≥ 9 even after maximum 3 swaps; clay=7 falls
     // short, so the max buildable rooms is < 3.
-    expect(PaymentSolver.getMaxBuildableRooms({ state: session.state, player: player })).toBeLessThan(3)
-    const sols = computePaymentOptionsForTest(
+    expect(session.withCtx(() => PaymentSolver.getMaxBuildableRooms({ state: session.state, player }))).toBeLessThan(3)
+    const sols = session.withCtx(() => computePaymentOptionsForTest(
       player,
       { unitFee: { clay: 5, reed: 2 }, nb: 3 },
       'construct',
-    )
+    ))
     expect(sols.length).toBe(0)
     // Σ-times ≤ nb constraint: even though the player has 4 wood, the
     // enumerator never returns a k=4 solution because the unit-scope budget
@@ -130,13 +130,13 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
   })
 
   it('wood house: A123 modifier filtered out — pure {wood:5, reed:2} per room', () => {
-    const { player } = setup3RoomsClayHouse({ wood: 15, reed: 6 })
+    const { session, player } = setup3RoomsClayHouse({ wood: 15, reed: 6 })
     ;(player as PlayerState).houseType = 'wood'
-    const sols = computePaymentOptionsForTest(
+    const sols = session.withCtx(() => computePaymentOptionsForTest(
       player,
       { unitFee: { wood: 5, reed: 2 }, nb: 3 },
       'construct',
-    )
+    ))
     expect(sols.length).toBe(1)
     expect(sols[0]!.resourcesPaid.wood).toBe(15)
     expect(sols[0]!.resourcesPaid.reed).toBe(6)

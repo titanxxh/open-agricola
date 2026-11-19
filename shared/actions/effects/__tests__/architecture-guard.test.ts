@@ -139,6 +139,7 @@ describe('effects architecture guard', () => {
       'place-farmer-on-space',
       'plow',
       'pop-card-stack',
+      'prepare-purchase-resources',
       'push-to-card-stack',
       'reap',
       'recall-placed-worker',
