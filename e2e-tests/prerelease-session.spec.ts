@@ -40,6 +40,7 @@ import { createPrereleaseGateway, OWNER_VERIFICATION_COOKIE } from '../scripts/p
 import { configureOwnerVerification } from '../scripts/prerelease/owner-browser'
 import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { test } from './server-fixtures'
+import { ownLaunchOptions } from './helpers/pinned-asset-host'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
 import { PostgresDatabase } from '../server/database/postgres'
 import { RoomDirectory } from '../server/game/room-directory'
@@ -414,7 +415,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], withPubli
         await test.info().attach('prerelease-entry-observations', { path, contentType: 'application/json' })
       }
     }
-    const browser = await playwright[options.browserName ?? 'chromium'].launch()
+    const engine = options.browserName ?? 'chromium'
+    const browser = await playwright[engine].launch(ownLaunchOptions(engine))
     const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' })
     await context.addInitScript(() => { if (window.top === window) localStorage.setItem('open-agricola-locale-v2', 'en') })
     const formalCookieName = authCookieNames().session
@@ -518,7 +520,7 @@ test('real prerelease HTTP and room WebSocket restore the same principal after r
     await environment.assertPrincipal(page)
     const state = await environment.context.storageState()
     await environment.context.close(); await environment.browser.close()
-    const reopened = await playwright.chromium.launch(), restored = await reopened.newContext({ ignoreHTTPSErrors: true, storageState: state })
+    const reopened = await playwright.chromium.launch(ownLaunchOptions('chromium')), restored = await reopened.newContext({ ignoreHTTPSErrors: true, storageState: state })
     try {
       const resumed = await restored.newPage(), restoredWire = observeRoomSocket(resumed)
       await resumed.goto(roomUrl)
