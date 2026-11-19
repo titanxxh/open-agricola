@@ -18,16 +18,23 @@ let activeCatalog = generatedCatalog
 
 /**
  * Test seam: while `run` executes, lookups, deck selection and the classic deal pool read `definitions` instead of
- * the ported classic cards, so tests can size a classic pool without porting cards.
+ * the ported classic cards, so tests can size a classic pool without porting cards. An asynchronous `run` keeps them
+ * until its promise settles, for tests that create games through rooms or HTTP routes.
  */
 export const withClassicCardDefinitions = <T>(definitions: readonly ClassicCardDefinition[], run: () => T): T => {
   const previous = activeCatalog
   activeCatalog = indexCatalog(definitions)
+  const restore = () => { activeCatalog = previous }
+  let result: T
   try {
-    return run()
-  } finally {
-    activeCatalog = previous
+    result = run()
+  } catch (error) {
+    restore()
+    throw error
   }
+  if (result instanceof Promise) return result.finally(restore) as T
+  restore()
+  return result
 }
 
 /**
