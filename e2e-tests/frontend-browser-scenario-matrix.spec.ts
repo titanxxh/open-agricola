@@ -256,19 +256,15 @@ const openScoringBoard = async (page: Page, locale: LocaleScenario) => {
   return board
 }
 
+// One phone, the widest mobile layout (900px) and a desktop with the player overview (>= 1101px).
 const GAMEPLAY_VIEWPORTS = [
-  { width: 375, height: 812, orientation: 'portrait' },
   { width: 390, height: 844, orientation: 'portrait' },
-  { width: 768, height: 1024, orientation: 'portrait' },
   { width: 900, height: 600, orientation: 'landscape' },
   { width: 1280, height: 800, orientation: 'landscape' },
-  { width: 1920, height: 1080, orientation: 'landscape' },
 ] as const
 
+// Both expansions at once show both expansion boards; single-expansion settings reach the sandbox the same way.
 const WORKSHOP_VARIANTS = [
-  { name: 'base', seasons: false, moor: false },
-  { name: 'Through the Seasons', seasons: true, moor: false },
-  { name: 'Farmers of the Moor', seasons: false, moor: true },
   { name: 'combined expansions', seasons: true, moor: true },
 ] as const
 

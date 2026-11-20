@@ -13,6 +13,11 @@ async function englishPage(page: Page) {
 const apiRequest = (url: URL) => url.pathname.startsWith('/api/')
 const serverDown = (page: Page) => page.route(apiRequest, route => route.fulfill(UNAVAILABLE))
 const serverBack = (page: Page) => page.unroute(apiRequest)
+// client/services/server-availability.ts probes again after SERVER_RETRY_MS. Cases that wait for that probe install the
+// page clock and skip most of the interval while the server is still down: a jump fires every due timer at once, and
+// after recovery that would also abort requests in flight. The last seconds pass in real time.
+const SERVER_RETRY_MS = 15_000
+const skipToNextProbe = (page: Page) => page.clock.fastForward(SERVER_RETRY_MS - 2_000)
 
 test('an unavailable server shows the maintenance page instead of the login form and returns when it answers', async ({ page }) => {
   await englishPage(page)
@@ -44,6 +49,7 @@ test('a login attempt during the outage shows the maintenance page, not a networ
 
 test('a game that loses an unavailable server keeps its board under the maintenance overlay and reconnects', async ({ page }) => {
   await englishPage(page)
+  await page.clock.install()
   let down = false
   const sockets: Array<{ client: WebSocketRoute; server?: WebSocketRoute }> = []
   await page.routeWebSocket('**/ws', socket => {
@@ -66,21 +72,24 @@ test('a game that loses an unavailable server keeps its board under the maintena
   await expect(layout).toBeVisible()
   expect(await layout.evaluate(element => element.closest('[inert]') !== null)).toBe(true)
 
+  await skipToNextProbe(page)
   down = false
   await serverBack(page)
-  await expect(overlay).toHaveCount(0, { timeout: 45_000 })
+  await expect(overlay).toHaveCount(0, { timeout: 15_000 })
   await expect(layout).toBeVisible()
   expect(sockets.length).toBeGreaterThan(0)
 })
 
 test('a game whose room cannot be found while the server is unavailable says so and starts over when it answers', async ({ page }) => {
   await englishPage(page)
+  await page.clock.install()
   await serverDown(page)
   await page.goto('/?player=p1&transport=ws&room=dev5&devMode=1')
   // Room discovery fails before any WebSocket opens; the stopped transport cannot retry, so the page reloads on recovery.
   await expect(page.locator('.ws-status-text')).toHaveText(GAME_TEXT)
+  await skipToNextProbe(page)
   await serverBack(page)
-  await expect(page.locator('.game-layout')).toBeVisible({ timeout: 45_000 })
+  await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30_000 })
 })
 
 test('a real room link opened during the outage shows the maintenance page and resolves the room when it answers', async ({ page }) => {

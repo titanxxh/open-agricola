@@ -4,6 +4,9 @@ import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures
 import { serializeState } from '../shared/session/serialization'
 import type { GameState } from '../shared/contract/types'
 import { joinRoomClients, publicRoomState, roomDriver, roomSnapshot } from './room-command-driver'
+import { sessionCovered } from './helpers/extended'
+
+sessionCovered('server/__tests__/action-space-use-history-session.test.ts')
 
 async function load(driver: ReturnType<typeof roomDriver>, configure: (state: GameState) => void) {
   const fixture = createWorkSession({ seed: 42, configure: state => {

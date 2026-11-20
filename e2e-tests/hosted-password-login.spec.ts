@@ -24,27 +24,23 @@ import { configuredPrereleaseTarget } from '../server/prerelease-authority'
 import { PrereleaseIdentityLifecycle } from '../server/prerelease-identity-lifecycle'
 import { HOSTED_APP_PATH } from '../shared/contract/protocol/app-location'
 import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, openGameEndControls } from './fixtures'
+import { buildPagesFrontend, PAGES_API_ORIGIN } from './helpers/pages-frontend'
 import { test } from './server-fixtures'
 
 type Topology = 'legacy-cross-site' | 'same-site-pages'
 type Engine = 'webkit' | 'chromium' | 'firefox'
 const PASSWORD = 'hosted-password-session-826'
 
-let pagesBuilt = false
 function frontendBuild(topology: Topology) {
-  if (topology === 'same-site-pages' && !pagesBuilt) {
-    execFileSync('pnpm', ['run', 'build:pages-frontend'], { stdio: 'pipe', env: {
-      ...process.env, RELEASE_CHANNEL: 'stable', VITE_API_BASE: 'https://api.agricola.test', VITE_WS_BASE: 'wss://api.agricola.test/ws',
-    } })
-    pagesBuilt = true
-  }
-  const directory = resolve(topology === 'same-site-pages' ? 'dist-pages' : 'dist')
+  // Same-site Pages shares the artifact other specs build for the same API origin (e2e-tests/helpers/pages-frontend.ts).
+  if (topology === 'same-site-pages') return buildPagesFrontend(PAGES_API_ORIGIN)
+  const directory = resolve('dist')
   const metadata: unknown = JSON.parse(readFileSync(join(directory, 'frontend-build.json'), 'utf8'))
   if (!metadata || typeof metadata !== 'object' || !('gameBuildId' in metadata) || typeof metadata.gameBuildId !== 'string') {
     throw new Error('Build the production frontend with pnpm run build:hosted-frontend before this spec')
   }
-  expect(metadata).toEqual({ format: 1, gameBuildId: metadata.gameBuildId, basePath: topology === 'same-site-pages' ? '/' : HOSTED_APP_PATH,
-    releaseChannel: 'stable', deploymentTarget: topology === 'same-site-pages' ? 'stable-pages' : 'stable-hosted' })
+  expect(metadata).toEqual({ format: 1, gameBuildId: metadata.gameBuildId, basePath: HOSTED_APP_PATH,
+    releaseChannel: 'stable', deploymentTarget: 'stable-hosted' })
   return { directory, gameBuildId: metadata.gameBuildId }
 }
 

@@ -6,7 +6,9 @@
 // This drives the published Worker with an injected browser event and the real Pages app,
 // backend and PostgreSQL. Operating-system delivery and click permission require a real device.
 import { randomUUID } from 'node:crypto'
-import { resolve } from 'node:path'
+import { cpSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, test, type Worker } from '@playwright/test'
 import { authCookieNames } from '../server/auth-cookies'
 import { getSessionByToken } from '../server/auth'
@@ -71,11 +73,12 @@ test('a verified notification opens draft and inbox in the existing Pages game w
     test.setTimeout(180_000)
     testInfo.annotations.push({ type: 'limitation', description: 'Worker events are injected in Chromium. Provider delivery and operating-system click activation remain device tests.' })
     expect(process.env.DATABASE_SCHEMA).toMatch(/^test_[a-f0-9]{32}$/)
-    const site = await servePagesFrontend(resolve('dist-pages'), { backendUrl: BACKEND_URL, frontendOrigin: FRONTEND_URL })
+    const siteDirectory = mkdtempSync(join(tmpdir(), 'oa-web-push-'))
+    const site = await servePagesFrontend(siteDirectory, { backendUrl: BACKEND_URL, frontendOrigin: FRONTEND_URL })
     const context = await browser.newContext()
     const otherContext = await browser.newContext()
     try {
-      buildPagesFrontend(site.origin)
+      cpSync(buildPagesFrontend(site.origin).directory, siteDirectory, { recursive: true })
       const name = `push_${randomUUID().slice(0, 8)}`
       await authenticateSolo(context, request, name, site.origin)
       await authenticateSolo(otherContext, request, `${name}_other`, site.origin)
@@ -183,6 +186,7 @@ test('a verified notification opens draft and inbox in the existing Pages game w
     } finally {
       await Promise.all([context.close(), otherContext.close()])
       await site.close()
+      rmSync(siteDirectory, { recursive: true, force: true })
     }
   })
 

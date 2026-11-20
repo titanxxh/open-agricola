@@ -4,6 +4,9 @@ import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures
 import { serializeState } from '../shared/session/serialization'
 import { setWorkersAtHome } from '../shared/domain/player'
 import { joinRoomClients, publicRoomState, roomDriver, roomSnapshot } from './room-command-driver'
+import { sessionCovered } from './helpers/extended'
+
+sessionCovered('server/__tests__/moor-completion-window-session.test.ts')
 
 const ALMANAC = 'E018_SeedAlmanac', MACHINE = 'M060_SowingMachine'
 

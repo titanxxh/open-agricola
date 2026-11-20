@@ -5,6 +5,9 @@ import { setWorkersAtHome } from '../shared/domain/player'
 import { serializeState } from '../shared/session/serialization'
 import type { SessionResponse } from '../shared/contract/types'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
+import { sessionCovered } from './helpers/extended'
+
+sessionCovered('server/__tests__/moor-granted-lifecycle-session.test.ts')
 
 async function prepare(request: APIRequestContext, scheduled: boolean) {
   expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: {

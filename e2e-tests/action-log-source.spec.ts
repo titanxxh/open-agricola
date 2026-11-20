@@ -3,6 +3,9 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ReplaySegment } from '../shared/contract/protocol/replay'
 import { browserRequestHeaders, BACKEND_URL, getJson, postJson } from './fixtures'
+import { sessionCovered } from './helpers/extended'
+
+sessionCovered('server/__tests__/action-log-source-session.test.ts', 'client/app/__tests__/action-log-source.test.tsx')
 
 const CARD = 'B033_Mantlepiece'
 const snapshot = async (request: APIRequestContext): Promise<GameSyncPayload> =>
