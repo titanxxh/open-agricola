@@ -22,7 +22,7 @@
 
 卡图、内容寻址的 Replay 资源和不可变 Viewer 放入私有 S3。PostgreSQL 保存暂存、引用和 GC claim；删除 ledger 独立保存在 S3，并在恢复前与最新独立副本合并。普通应用容器没有资源真源目录。
 
-本机通过 Docker Compose 启动 PostgreSQL 18 和 RustFS，无需申请外部服务。SQLite 仅由 `scripts/import-sqlite.ts` 作为只读、一次性迁移输入。它保留录制局和无关数据，仅丢弃已证实未录制的活动局；导入或目标版本校验失败会阻止应用启动。迁移与备份步骤见 [部署文档](HOW_TO_DEPLOY.md)。
+本机通过 Docker Compose 启动 PostgreSQL 18 和 RustFS，无需申请外部服务。恢复或目标版本校验失败会阻止应用启动。迁移与备份步骤见 [部署文档](HOW_TO_DEPLOY.md)。
 
 ### A2. 认证：服务端 Session Token
 
@@ -400,8 +400,6 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 
 | 依赖                      | 用途         | 备注                   |
 | ----------------------- | ---------- | -------------------- |
-| `better-sqlite3`        | SQLite 数据库 | 同步 API，适配现有代码风格      |
-| `@types/better-sqlite3` | 类型定义       | dev dep              |
 | `nanoid`                | 生成短 ID     | 用于 user/card/room ID |
 
 

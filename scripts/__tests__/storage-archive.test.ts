@@ -7,8 +7,7 @@ import { vi, afterEach, beforeEach, expect, it } from 'vitest'
 // Multiple native dump/restore containers also run on ARM hosts under full-suite load.
 // Keep all byte-integrity assertions; allow the complete restore sequence to finish.
 vi.setConfig({ testTimeout: 120000, hookTimeout: 180000 })
-import { importFixture } from './_helpers/import-fixture'
-import { importSqlite } from '../sqlite-import/import'
+import { storageFixture } from './_helpers/storage-fixture'
 import { directoryDumpDigest, exportStorageArchive, restoreStorageArchive } from '../storage-archive'
 import { validateStorage } from '../storage-validation'
 import { ResourceStore } from '../../server/storage/resource-store'
@@ -34,9 +33,8 @@ const dropDatabase = async (name: string) => {
   try { await admin.exec(`DROP DATABASE IF EXISTS "${name}"`) } finally { await admin.close() }
 }
 it('round-trips native PostgreSQL recovery bytes and private S3 objects, then applies newer erasure facts', async () => {
-  const fixture = await importFixture(); cleanups.register(() => fixture.close())
-  await importSqlite(fixture.paths, fixture.db, fixture.resources)
-  const archive = join(fixture.paths.cardArt, '..', 'archive')
+  const fixture = await storageFixture(); cleanups.register(() => fixture.close())
+  const archive = join(fixture.root, 'archive')
   const manifest = await exportStorageArchive({ connectionString: getTestDatabaseUrl(), db: fixture.db, objects: fixture.resources.objects, root: archive, sourceBuildId: 'test-build', mode: 'maintenance', signal: new AbortController().signal })
   expect((await readdir(archive)).filter(name => name.startsWith('.pg-client-'))).toEqual([])
   const admin = databaseMaintenance()
@@ -87,8 +85,7 @@ it('round-trips native PostgreSQL recovery bytes and private S3 objects, then ap
 }, 120000)
 
 it('round-trips an uncompressed directory dump and refuses a changed or extra dump file', async () => {
-  const fixture = await importFixture(); cleanups.register(() => fixture.close())
-  await importSqlite(fixture.paths, fixture.db, fixture.resources)
+  const fixture = await storageFixture(); cleanups.register(() => fixture.close())
   const archive = join(fixture.root, 'directory-archive')
   const manifest = await exportStorageArchive({ connectionString: getTestDatabaseUrl(), db: fixture.db, objects: fixture.resources.objects, root: archive,
     sourceBuildId: 'test-build', mode: 'maintenance', databaseFormat: 'directory', signal: new AbortController().signal })
@@ -132,8 +129,7 @@ it('round-trips an uncompressed directory dump and refuses a changed or extra du
 }, 120000)
 
 it('expires restored runtime routes so a new generation can immediately recover the same room', async () => {
-  const fixture = await importFixture(); cleanups.register(() => fixture.close())
-  await importSqlite(fixture.paths, fixture.db, fixture.resources)
+  const fixture = await storageFixture(); cleanups.register(() => fixture.close())
   const sourceDirectory = new RoomDirectory(fixture.db)
   await sourceDirectory.register('snapshot-source', 'http://127.0.0.1:5181', 'snapshot-build')
   await sourceDirectory.activate('snapshot-source')
@@ -179,7 +175,7 @@ it('expires restored runtime routes so a new generation can immediately recover 
 })
 
 it('cancels a maintenance native dump and waits for its child to stop before rejecting', async () => {
-  const fixture = await importFixture(); cleanups.register(() => fixture.close())
+  const fixture = await storageFixture(); cleanups.register(() => fixture.close())
   const bin = join(fixture.root, 'bin'), ready = join(fixture.root, 'dump-child.json')
   await mkdir(bin)
   await writeFile(join(bin, 'pg_dump'), `#!/usr/bin/env node
@@ -223,7 +219,7 @@ setInterval(() => {}, 1000)
 })
 
 it('does not leave database service credentials when the dump deadline has expired', async () => {
-  const fixture = await importFixture(); cleanups.register(() => fixture.close())
+  const fixture = await storageFixture(); cleanups.register(() => fixture.close())
   const before = new Set((await readdir(tmpdir())).filter(name => name.startsWith('agricola-pg-client-')))
   vi.stubEnv('BACKUP_DEADLINE_EPOCH_MS', String(Date.now() - 1))
   const archive = join(fixture.root, 'expired-archive')

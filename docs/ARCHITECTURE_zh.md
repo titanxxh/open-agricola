@@ -125,7 +125,7 @@ server/        Node 进程（HTTP + WS + persistence；从不执行工坊代码�
 ├── index.ts             装配 HTTP + WS + DB + 静态资源
 ├── connection/          WS 连接层（ws-server, room-router, broadcaster）
 ├── game/                Room、GameSession、Lobby、RoomRegistry
-│   └── persistence/     sqlite / json / memory adapter
+│   └── persistence/     PostgreSQL 房间存储与隔离的测试替身
 ├── game-router.ts       HTTP /api/* 路由
 ├── auth.ts              站点登录与 OAuth（GitHub、Google）
 ├── workshop.ts          Workshop / Sandbox 后端

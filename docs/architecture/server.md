@@ -180,7 +180,7 @@ Tests: `server/__tests__/{workshop-api,workshop-submissions}.test.ts`, `server/w
 ## Database
 
 - `server/db.ts` owns the asynchronous PostgreSQL connection through `pg`: transactions keep one connection across awaits, nested transactions use savepoints, and native migrations run under an advisory lock before startup. There is no SQLite or JSON runtime fallback.
-- `scripts/import-sqlite.ts` imports a stopped schema-33 SQLite database through exact comparisons and blocks on damaged recorded games, and `data_imports` keeps a failed import behind a startup barrier; `scripts/validate-backup.ts` validates a PostgreSQL / S3 restore.
+- `data_imports` keeps a failed restore behind a startup barrier; `scripts/validate-backup.ts` validates a PostgreSQL / S3 restore.
 - `schema.sql` and ordered migrations define product tables. Replay segments use `checkpointStepNo`; evidence payloads, quotas and webhook delivery have no parallel storage tables.
 - Games completed before recording are `legacy_no_replay`: they keep their result summary but have no Replay header or Frames.
 

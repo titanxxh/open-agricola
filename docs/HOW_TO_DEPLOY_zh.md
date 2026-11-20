@@ -536,35 +536,6 @@ networks:
 
 原地接入不会更新 Compose 保存的配置哈希。后续第一次协调配置可能重建共享依赖，应安排在正式维护中，先排空应用写入者。`deploy-backend.sh` 仅复用已准备的依赖，不协调依赖；这类变更须单独维护。之后重建依赖会保留声明的网络与 alias；单独执行 `docker network connect` 不提供该保证。
 
-#### 首次 SQLite 迁移
-
-导入器只接受当前发布的 SQLite 结构（版本 33）。旧结构的逐级升级链已退役；切换存储前应先用当前 `main` 版本导出。源数据以只读方式打开，并保留到目标验证成功。
-
-先停止旧应用，再复制它的数据目录。源目录挂载为只读，导入目标必须为空；禁止把旧卷覆盖为空数据库。下面的 `legacy-data` 必须包含原数据库、卡图、Replay 资源、Viewer 和 JSONL 删除 ledger。
-
-```bash
-docker compose -f docker-compose.prod.yml stop app
-mkdir -p legacy-data backups
-chmod 700 legacy-data backups
-docker cp "$(docker compose -f docker-compose.prod.yml ps -aq app):/app/data/." legacy-data/
-docker compose -f docker-compose.prod.yml run --rm --no-deps \
-  -v "$PWD/legacy-data:/legacy:ro" -v "$PWD/backups:/backup" app \
-  node --import tsx scripts/import-sqlite.ts /legacy /backup/sqlite-import.json --applications-stopped
-```
-
-导入校验原始行值、恢复文本、Replay 字节/hash、Room-owned 恢复及资源引用。只丢弃已证实未录制的活动局，不补造历史；账号、工坊、录制局、结果和被引用资源保留。失败会留下启动屏障，继续处理该导入，不删除无关数据。全新安装跳过这整段旧库迁移流程，包括下方目标库校验。先准备全新 PostgreSQL 数据库和空 S3 namespace，再使用「后端」的显式固定镜像 bootstrap；不要在其只读空存储证明前运行应用迁移。
-
-```bash
-docker compose -f docker-compose.prod.yml run --rm --no-deps app \
-  node --import tsx scripts/storage-archive-cli.ts check-live "$(git rev-parse HEAD)" --applications-stopped
-mkdir -p data
-touch data/postgres-cutover.validated
-# Configure deploy/Caddyfile using the existing public backend domain first.
-docker compose -f docker-compose.prod.yml up -d --no-build --wait app caddy
-```
-
-开发环境同样使用 `scripts/import-sqlite.ts`，加载 `data/dependencies.local` 后指向只读旧目录，再运行 `./restart-local.sh`。历史源数据应保留到目标版本验证完成。
-
 公开 API origin 保持不变。浏览器先通过 API 查询 Room 目录，再通过其 `/nodes/<instanceId>/ws` 连接 owner；私有实例端口不开放到公网。默认 Compose 本地入口只绑定 loopback。Caddy 生产入口继续支持现有 443/8443，OAuth callback、cookie 和跨域配置沿用现有值。
 
 Bug Report GitHub App、Workshop PR 和账号 OAuth 都仍是可选集成；配置表和独立 OAuth 文档保留它们的权限与回调要求。迁移 PostgreSQL/S3 不要求重新授权第三方账号。
@@ -1133,7 +1104,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 - [ ] Settings 能断开 Issue Submission Connection，GitHub 撤销授权后连接状态失效
 - [ ] Workshop：创建/浏览自定义卡牌
 - [ ] Card art 上传和显示正常
-- [ ] `docker compose down && docker compose up -d` 后数据仍在（SQLite 持久化）
+- [ ] `docker compose down && docker compose up -d` 后数据仍在（PostgreSQL 与对象存储持久化）
 
 ---
 

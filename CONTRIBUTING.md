@@ -8,7 +8,7 @@ Thank you for your interest in Open Agricola. Please read this guide before open
 
 Prerequisites:
 
-- **Node.js 24.15 or newer, excluding the Node 25 line.** `engines` declares `^24.15.0 || >=26.0.0`: `jsdom` 30 accepts only `^24.15.0 || >=26.0.0`, skipping Node 25 entirely. Native dependencies such as `better-sqlite3` are compiled against the Node ABI, so an older runtime causes a `NODE_MODULE_VERSION` mismatch.
+- **Node.js 24.15 or newer, excluding the Node 25 line.** `engines` declares `^24.15.0 || >=26.0.0`: `jsdom` 30 accepts only `^24.15.0 || >=26.0.0`, skipping Node 25 entirely. Native dependencies such as `canvas` are compiled against the Node ABI, so an older runtime causes a `NODE_MODULE_VERSION` mismatch.
 - **pnpm.** The required version is pinned in the `packageManager` field of `package.json`; run `corepack enable` to select it automatically.
 - **System libraries and build tools required by canvas.** Without them, `pnpm install` fails while compiling canvas:
 
