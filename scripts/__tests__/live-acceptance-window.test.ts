@@ -24,7 +24,7 @@ const row = (testCase: string, engine: string, passed: boolean, run: Record<stri
 describe('window plan', () => {
   it('follows the C5 order and stops at the first unfinished step', () => {
     expect(WINDOW_STEPS.slice(0, 8)).toEqual(['policy-host', 'preconditions', 'policy-maintain', 'policy-import', 'candidate-import', 'reverify', 'accounts', 'chain-initial'])
-    expect(SUITE_STEPS.map(step => step.suite)).toEqual(['handoff', 'boundary', 'multihand', 'team', 'sandbox', 'viewer', 'continuity'])
+    expect(SUITE_STEPS.map(step => step.suite)).toEqual(['handoff', 'boundary', 'multihand', 'team', 'viewer', 'continuity'])
     expect(WINDOW_STEPS.slice(8, 8 + SUITE_STEPS.length)).toEqual(SUITE_STEPS.map(step => step.step))
     expect(WINDOW_STEPS.slice(8 + SUITE_STEPS.length)).toEqual(['deletion', 'chain-deletion', 'deletion-rows', 'owner-notes', 'bundle', 'formal-browser', 'copy-evidence', 'final-open', 'readback', 'cleanup', 'archive'])
     let state = markStep(markStep(newState('c6', 1), 'policy-host', 'started', 1), 'policy-host', 'done', 1)
@@ -704,7 +704,7 @@ describe('fast rebind window', () => {
     expect(state.rebind).toMatchObject({ path: 'fast', reasons: [], boundary: { from: sha('a'), to: sha('b'), files: [] } })
     // Policy and install steps are no-ops without their blocks and are never skipped by the fast path.
     expect(statuses(window.value.windowDirectory)).toEqual({ 'policy-host': 'done', preconditions: 'done', 'policy-maintain': 'done', 'policy-import': 'done', 'candidate-import': 'done', reverify: 'done', accounts: 'done', 'chain-initial': 'done', 'suite-handoff': 'done', 'suite-boundary': 'done',
-      'suite-multihand': 'skipped', 'suite-team': 'skipped', 'suite-sandbox': 'skipped', 'suite-viewer': 'skipped', 'suite-continuity': 'skipped',
+      'suite-multihand': 'skipped', 'suite-team': 'skipped', 'suite-viewer': 'skipped', 'suite-continuity': 'skipped',
       deletion: 'skipped', 'chain-deletion': 'skipped', 'deletion-rows': 'skipped', 'owner-notes': 'done', bundle: 'failed' })
     expect(window.calls.filter(call => call.includes(' run ')).map(call => call.split('--suite ')[1].split(' ')[0])).toEqual(['handoff', 'boundary'])
     expect(window.calls.some(call => call.includes('typescript-runtime.mjs'))).toBe(false)

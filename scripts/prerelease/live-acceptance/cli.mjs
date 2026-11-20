@@ -65,7 +65,6 @@ async function runSuite(ctx, options) {
     boundary: { cases: [suites.visitorCase, suites.ordinaryCase, suites.betaBoundaryCase, suites.revocationCase] },
     multihand: { cases: [(k, b, a) => suites.multihandCase(k, b, a, options.guest ?? 'B', runDirectory)] },
     team: { cases: [(k, b, a) => suites.teamGameCase(k, b, a, list(options.players ?? 'A,B,C,D'), runDirectory)] },
-    sandbox: { cases: [(k, b, a) => suites.sandboxCase(k, b, a, runDirectory)] },
     viewer: { cases: [(k, b, a) => suites.viewerCase(k, b, a, options.room, runDirectory)] },
     continuity: { cases: [(k, b, a) => suites.continuityCase(k, b, a, options.room)] },
     deletion: { cases: [(k, b, a) => suites.deletionCase(k, b, a, list(options.labels ?? ''))] },

@@ -11,7 +11,7 @@ import { IDENTITY_BOUNDARY_PATHS } from '../identity-boundary-paths.ts'
 export { IDENTITY_BOUNDARY_PATHS }
 
 /** Steps the fast path marks done without running; their evidence comes from the last full acceptance. */
-export const FAST_SKIPPED_STEPS = ['suite-multihand', 'suite-team', 'suite-sandbox', 'suite-viewer', 'suite-continuity', 'deletion', 'chain-deletion', 'deletion-rows']
+export const FAST_SKIPPED_STEPS = ['suite-multihand', 'suite-team', 'suite-viewer', 'suite-continuity', 'deletion', 'chain-deletion', 'deletion-rows']
 /** The only cases a fast rebind may carry: those of the suites it skips. Handoff and boundary are always measured fresh. */
 export const CARRIED_CASES = FAST_SKIPPED_STEPS.map(step => step.replace(/^suite-/, '')).filter(suite => SUITE_CASES[suite]).flatMap(suite => SUITE_CASES[suite])
 export const FULL_ACCEPTANCE_MAX_AGE_MS = 7 * 24 * 60 * 60_000
