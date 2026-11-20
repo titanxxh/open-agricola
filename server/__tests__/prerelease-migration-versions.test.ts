@@ -16,7 +16,7 @@ const mainSchema = async (target: PostgresDatabase) => target.prepare(`
       AND table_name = 'rooms' AND column_name = 'card_edition') AS card_edition
 `).get<{ web_push: boolean; card_edition: boolean }>()
 
-/** The prerelease database as it was before main numbered Web Push 047 and Classic Card Edition 048. */
+/** The prerelease database as it was before main numbered its migrations 047-050 (Web Push, Classic Card Edition, Workshop). */
 async function recreateLegacyPrereleaseDatabase(target: PostgresDatabase) {
   await target.exec(`
     DROP TABLE web_push_deliveries, web_push_events, web_push_retired_devices, web_push_device_reservations, web_push_bindings;
@@ -24,7 +24,7 @@ async function recreateLegacyPrereleaseDatabase(target: PostgresDatabase) {
     ALTER TABLE game_results DROP COLUMN classic_deck_ids, DROP COLUMN card_edition;
     ALTER TABLE game_opening_facts DROP COLUMN classic_deck_ids, DROP COLUMN classic_edition;
     ALTER TABLE sandbox_settings DROP COLUMN classic_deck_ids_json, DROP COLUMN card_edition;
-    DELETE FROM postgres_schema_migrations WHERE version IN (47, 48);
+    DELETE FROM postgres_schema_migrations WHERE version IN (47, 48, 49, 50);
     UPDATE postgres_schema_migrations SET version = version - 9000 WHERE version IN (9047, 9048, 9050);
   `)
 }
@@ -32,30 +32,30 @@ async function recreateLegacyPrereleaseDatabase(target: PostgresDatabase) {
 describe('prerelease migration versions', () => {
   it('numbers prerelease-only migrations after main on a new database', async () => {
     db = await createTestDatabase()
-    expect(await versions(db)).toEqual([46, 47, 48, 9047, 9048, 9050])
+    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 9047, 9048, 9050])
     expect(await mainSchema(db)).toEqual({ web_push: true, card_edition: true })
   })
 
-  it('moves the legacy prerelease versions so the main 047 and 048 migrations run once', async () => {
+  it('moves the legacy prerelease versions so the main 047-050 migrations run once', async () => {
     db = await createTestDatabase()
     await recreateLegacyPrereleaseDatabase(db)
     expect(await versions(db)).toEqual([46, 47, 48, 50])
     expect(await mainSchema(db)).toEqual({ web_push: false, card_edition: false })
 
     await migratePostgres(db)
-    expect(await versions(db)).toEqual([46, 47, 48, 9047, 9048, 9050])
+    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 9047, 9048, 9050])
     expect(await mainSchema(db)).toEqual({ web_push: true, card_edition: true })
     expect(await db.prepare("SELECT to_regclass('prerelease_external_identities') IS NOT NULL AS present").get<{ present: boolean }>())
       .toEqual({ present: true })
 
     await migratePostgres(db)
-    expect(await versions(db)).toEqual([46, 47, 48, 9047, 9048, 9050])
+    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 9047, 9048, 9050])
   })
 
   it('refuses a prerelease database whose versions 47 and 48 cannot be told apart', async () => {
     db = await createTestDatabase()
     await db.exec('DELETE FROM postgres_schema_migrations WHERE version IN (9047, 9048, 9050)')
     await expect(migratePostgres(db)).rejects.toThrow('Prerelease migration versions 47-50 are ambiguous')
-    expect(await versions(db)).toEqual([46, 47, 48])
+    expect(await versions(db)).toEqual([46, 47, 48, 49, 50])
   })
 })
