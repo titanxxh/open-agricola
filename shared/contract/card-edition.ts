@@ -10,7 +10,7 @@ export type CardEdition = 'revised' | 'classic'
  * only exposure; admission entries take it as an injectable parameter defaulting to this value, and loading,
  * continuing, reconnecting to or replaying an existing classic game never reads it.
  */
-export const CLASSIC_EDITION_ENABLED: boolean = false
+export const CLASSIC_EDITION_ENABLED: boolean = true
 
 export type ClassicPoolErrorCode = 'classic_pool_insufficient'
 
