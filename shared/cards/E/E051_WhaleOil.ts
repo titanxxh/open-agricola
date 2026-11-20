@@ -24,12 +24,11 @@ const setStoredFoodFlow = (count: number): ActionFlow[] => [
 ]
 
 const fishingListener: CardListenerRegistration = {
-  id: 'E51-whale-oil-after-collect-fishing',
+  id: 'E51-whale-oil-before-fishing',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Check if this is the Fishing action space
     if (context.space?.id !== 'fishing') return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     const newCount = foodCount + 1

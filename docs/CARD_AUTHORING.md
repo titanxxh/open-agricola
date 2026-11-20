@@ -27,7 +27,7 @@ A native card is one module, `shared/cards/<Deck>/<Id>_<Name>.ts` (community car
 
 ## 3. Choose the timing
 
-Card text, official rulings and recorded project interpretations decide the timing. Reference implementations do not ([ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md), [ADR 0031](adr/0031-explicit-action-space-use-subscriptions.md)).
+Card text, official rulings and recorded project interpretations decide the timing. Reference implementations do not ([ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md), [ADR 0031](adr/0031-explicit-action-space-use-subscriptions.md)). ADR 0033 lists the default phase for text without printed timing.
 
 | Card text | Subscription |
 |---|---|
@@ -35,7 +35,7 @@ Card text, official rulings and recorded project interpretations decide the timi
 | "Each time you place a person" (not a move) | `actions: ['place-farmer']` with `requiresNewPlacement: true` |
 | "Each time you take the X action" (plow, sow, bake, build …) | `actions: ['x']` |
 | "Each time you get goods from an action space" | an acquisition: `actions: ['collect', 'gain']`, `phases: ['after']`, filtered by `hasActionSpaceAcquisition` |
-| The reward can pay for or feed into this same use | `before` |
+| An extra benefit for using a space that does not depend on that use's result, or a reward that pays for this same use | `before` |
 | Depends on this use's result and settles right after it | `immediatelyAfter` |
 | Any other "after" effect | `after` |
 | At a point of the round or harvest | a stage hook on `impl.effect` (§4.3) |

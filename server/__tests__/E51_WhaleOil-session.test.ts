@@ -245,6 +245,41 @@ describe('E051 Whale Oil parity', () => {
     expect(cardFood(response)).toBe(1)
   })
 
+  it('E051 S2b: Whale Oil stores its food before Fishing is collected (#1889)', () => {
+    const session = setup({ resources: { wood: 1 } })
+    const state = session.getState().state
+    state.players[0]!.occupationPlayed.push('A138_Harpooner')
+    session.loadState(state)
+    const fishingFood = (response: SessionResponse) =>
+      response.state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food
+
+    // Harpooner's optional reaction shares the before window and keeps it open.
+    let response = session.takeAction(0, 'fishing')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
+      .toBe('select-trigger')
+    expect(options(response).map((option) => option.value))
+      .toEqual(expect.arrayContaining([CARD_ID, 'A138_Harpooner']))
+    expect(options(response).find((option) => option.value === '__pass__')?.disabled).toBe(true)
+    expect(cardFood(response)).toBe(0)
+
+    response = session.resolveChoice(0, CARD_ID)
+    expect(response.ok, response.error).toBe(true)
+    expect(cardFood(response)).toBe(1)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(fishingFood(response)).toBe(3)
+
+    for (let step = 0; step < 3; step++) {
+      const decline = options(response).find((option) => option.value === '__pass__' || option.value === '__skip__')
+      if (!decline) break
+      response = session.resolveChoice(0, decline.value)
+      expect(response.ok, response.error).toBe(true)
+    }
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 3, wood: 1, reed: 0 })
+    expect(cardFood(response)).toBe(1)
+    expect(fishingFood(response)).toBe(0)
+  })
+
   it('E051 S3: a non-Fishing action places no food on Whale Oil', () => {
     const response = setup().takeAction(0, 'grain-seeds')
 

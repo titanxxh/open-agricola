@@ -106,23 +106,6 @@ describe('reference after reaction ordering', () => {
   }, 30_000)
 })
 
-describe('Stone Axe timing', () => {
-  it('lets the player order Stone Axe with other ordinary after reactions', () => {
-    const card = 'E075_StoneAxe'
-    const session = setup({ card, configure: state => {
-      state.players[0]!.resources.stone = 1
-      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
-    } })
-    companion(session, { actionSpaces: 'all' })
-    const offered = session.takeAction(0, 'forest')
-    afterGroup(offered, card)
-    let response = accept(session, select(session, offered, card))
-    response = finishCompanion(session, response)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 6, stone: 0, food: 1 })
-    expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'resource.paid', sourceCardId: card }))
-  }, 30_000)
-})
-
 describe('Beaver Colony timing', () => {
   it('offers its reed point with ordinary collect-after reactions', () => {
     const card = 'E033_BeaverColony'

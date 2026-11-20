@@ -1,6 +1,6 @@
 # ADR 0033: Card listener timing follows project semantics
 
-Status: Accepted. Revised by maintainer decision of 2026-10-31. This replaces the reference-handler timing policy adopted on 2026-10-20 in [#1315](https://github.com/titanxxh/open-agricola/issues/1315).
+Status: Accepted. Revised by maintainer decision of 2026-10-31. This replaces the reference-handler timing policy adopted on 2026-10-20 in [#1315](https://github.com/titanxxh/open-agricola/issues/1315). The default phases for unprinted timing were added by maintainer decision of 2026-11-20 in [#1889](https://github.com/titanxxh/open-agricola/issues/1889).
 
 ## Context
 
@@ -20,6 +20,18 @@ Reference implementations can use different event names, nested flows and platfo
   | `after` | Runs in the ordinary completion window, after the immediate window at the same completion boundary. |
 
 - Explicit printed timing constrains the phase. When timing is unspecified, use the required resource availability, result dependencies and established OA behavior for equivalent triggers. Record a Project Rule Interpretation when the available rules leave a material ambiguity.
+- These are OA's defaults. "Each time" alone selects no phase; the trigger and its dependence on the result do.
+
+  | Card text | Subscription | OA phase |
+  |---|---|---|
+  | Printed "immediately before" or "before" | as printed | `before` |
+  | Printed "immediately after" | as printed | `immediatelyAfter` |
+  | Printed "each time after" or "after" | as printed | `after` |
+  | An extra benefit for using a space (also get, can buy, can exchange) that does not depend on that use's result | `actionSpaces` | `before` |
+  | Taking at least N goods from an accumulation space | `collect`, an Action Space Acquisition under [ADR 0031](0031-explicit-action-space-use-subscriptions.md) | `after` |
+  | A rule action performed by the owner, another player or any player: plowing, building, renovating, fencing, sowing, family growth or exchanging for food | that rule action, with the matching `scope` | `after` |
+  | An extra benefit for taking a Moor Special Action | `moor-action` | `before` |
+
 - Sources belonging to the same Reaction Window use the existing owner and trigger-select scheduling. Players choose their own source order, and remaining sources are evaluated against current state after each selection. A temporarily unavailable source can become available after another source supplies resources. A requirement that permits a valid player-chosen order does not imply an engine-enforced order.
 - A selected source and its newly triggered reactions finish before the original window offers its next source. Phase priority compares peer reactions at the same completion boundary, not a nested reaction with a source still waiting in an outer window. Native listeners have no separate settlement mode.
 - Space-use and rule-action sources may share a completion window without changing their subscription identities. Express the required order using existing phases and player choice before adding another timing mechanism or a fixed card order. OA adds no `during` phase.
@@ -31,6 +43,6 @@ A `before` reward is usable within the same host action. Core current-step admis
 
 Card tests assert observable OA behavior. For `before` they show that the reward is usable inside the same host action. Completion tests show phase order, player-chosen order and reevaluation when one source enables another. They also cover non-triggering cases, pending state and recovery where applicable. A reference callback name or an existing implementation-specific ordering test is not a rule authority.
 
-This revision changes the phase-selection policy. It does not claim that all existing card timings have been audited or migrated. Each behavior change needs its own rule justification and focused verification.
+This revision changes the phase-selection policy. It does not claim that all existing card timings have been audited or migrated. Each behavior change needs its own rule justification and focused verification. The defaults describe OA behavior and were not derived from reference handler counts; cards that still differ from them are reviewed in #1889.
 
 The phase semantics and current-step admission are in [Hooks, stage dispatch and listener purity](../architecture/hooks.md). Test expectations are in the [card testing template](../CARD_TEST_TEMPLATE.md), and Workshop guidance is in section 5.5 of the [custom card sandbox reference](../CUSTOM_CARD_SANDBOX.md).

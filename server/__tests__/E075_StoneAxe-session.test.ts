@@ -87,6 +87,9 @@ const setSpaceResource = (
   session.loadState(state)
 }
 
+const forestWood = (response: SessionResponse) =>
+  response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood
+
 const stoneAxeOption = (response: SessionResponse) => options(response).find((option) =>
   option.sourceCard === CARD_ID && option.value !== '__skip__')
 
@@ -132,21 +135,28 @@ describe('E075 Stone Axe parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(1)
   })
 
-  it('E075 S5: after collecting wood the owner may pay one stone for three additional wood', () => {
+  it('E075 S5: before Forest is collected the owner may pay one stone for three additional wood', () => {
     const session = setup({ played: true, wood: 0, clay: 0, stone: 1 })
     setSpaceResource(session, 'forest', 'wood', 3)
 
-    const response = acceptStoneAxe(session, session.takeAction(0, 'forest'))
+    const offer = session.takeAction(0, 'forest')
+    expect(offer.interaction.stateId === 'wait' ? offer.interaction.sourceCard : undefined).toBe(CARD_ID)
+    expect(offer.state.players[0]!.resources).toMatchObject({ stone: 1, wood: 0 })
+    expect(forestWood(offer)).toBe(3)
+
+    const response = acceptStoneAxe(session, offer)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, wood: 6 })
+    expect(forestWood(response)).toBe(0)
   })
 
-  it('E075 S6: the Stone Axe exchange after collecting wood may be declined', () => {
+  it('E075 S6: the Stone Axe exchange before Forest is collected may be declined', () => {
     const session = setup({ played: true, wood: 0, clay: 0, stone: 1 })
     setSpaceResource(session, 'forest', 'wood', 3)
     let response = session.takeAction(0, 'forest')
     expect(stoneAxeOption(response)).toBeDefined()
+    expect(forestWood(response)).toBe(3)
 
     response = session.resolveChoice(0, '__skip__')
 

@@ -4,7 +4,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { D143_TreeCutter_impl } from '../../shared/cards/D/D143_TreeCutter'
-import type { DraftGameEvent } from '../../shared/contract/events'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import type { SessionResponse } from '../game/authoritative-session'
 
 import '../../shared/cards/D/D143_TreeCutter'
 import assert from 'node:assert/strict'
@@ -12,17 +14,6 @@ import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'D143_TreeCutter'
 const LISTENER = D143_TreeCutter_impl.listeners[0]!
-
-const moved = (
-  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
-): DraftGameEvent<'resource.moved'> => ({
-  type: 'resource.moved',
-  resources: { clay: 3 },
-  from: { kind: 'actionSpace', spaceId: 'clay-pit' },
-  to: { kind: 'player', playerId: 'p1' },
-  reason: 'collect',
-  ...overrides,
-})
 
 describe('D143_TreeCutter session', () => {
   const setup = () => {
@@ -41,7 +32,8 @@ describe('D143_TreeCutter session', () => {
   }
 
   const directContext = (
-    transactionEvents: DraftGameEvent<'resource.moved'>[],
+    spaceId: string,
+    resources: Record<string, number>,
   ): { session: GameSession; context: CardListenerContext } => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
@@ -50,16 +42,15 @@ describe('D143_TreeCutter session', () => {
     const player = state.players[0]!
     player.id = 'p1'
     player.occupationPlayed.push(CARD_ID)
+    const space = state.actionSpaces.find((candidate) => candidate.id === spaceId)!
+    Object.assign(space.resources, resources)
     return { session, context: {
-    actionHooks: session.actionHooks,
+      actionHooks: session.actionHooks,
       state,
       player,
-      space: state.actionSpaces.find((space) => space.id === 'clay-pit')!,
-      actionId: 'collect',
-      phase: 'after',
-      transactionEvents,
-      actionEvents: transactionEvents,
-      result: { type: 'ok', resourcesGained: { clay: 3 } },
+      space,
+      actionId: spaceId,
+      phase: 'before',
     } as unknown as CardListenerContext }
   }
 
@@ -154,9 +145,8 @@ describe('D143_TreeCutter session', () => {
     expect(after.players[0]!.resources.wood).toBe(woodBefore + 1)
   })
 
-  it('uses action-space non-wood events even without result gains', () => {
-    const { session: ruleSession1, context: ctx } = directContext([moved()])
-    ctx.result = { type: 'ok' }
+  it('reads the goods lying on the accumulation space before it is used', () => {
+    const { session: ruleSession1, context: ctx } = directContext('clay-pit', { clay: 3 })
 
     const result = ruleSession1.withCtx(() => executeCardListener(LISTENER, ctx))
 
@@ -168,15 +158,88 @@ describe('D143_TreeCutter session', () => {
     })
   })
 
-  it('does not trigger for supply/cardEffect clay even when result reports clay', () => {
-    const { session: ruleSession2, context: ctx } = directContext([moved({
-      from: { kind: 'supply' },
-      reason: 'cardEffect',
-    })])
+  it('does not trigger for three goods on a space that does not accumulate', () => {
+    const { session: ruleSession2, context: ctx } = directContext('day-laborer', { food: 3 })
+    expect(Object.values(ctx.space.gainPerRound ?? {}).some((amount) => (amount ?? 0) > 0)).toBe(false)
 
     const result = ruleSession2.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
+  })
+})
+
+describe('D143 before timing (#1889)', () => {
+  const HARPOONER = 'A138_Harpooner'
+  const FILLER = '__test_placeholder__'
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
+
+  const setup = () => {
+    const session = createWorkSession({
+      seed: 1889,
+      configure: (state) => {
+        state.currentPlayerIndex = 0
+        state.round = 14
+        state.actionSpaces.forEach((space) => { space.takenBy = [] })
+        state.players.forEach((player) => {
+          setWorkersAtHome(state, player, 2)
+          player.minorHand = [FILLER]
+          player.occupationHand = [FILLER]
+          player.minorPlayed = []
+          player.occupationPlayed = []
+          player.cardStates = {}
+          Object.assign(player.resources, {
+            wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+            sheep: 0, boar: 0, cattle: 0, begging: 0,
+          })
+        })
+        state.players[0]!.occupationPlayed = [CARD_ID, HARPOONER]
+        state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food = 3
+      },
+    })
+    sessions.push(session)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+  const fishingFood = (response: SessionResponse) =>
+    response.state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food
+
+  it('gives the wood before Fishing is collected, where it pays Harpooner on the same use', () => {
+    const session = setup()
+
+    let response = session.takeAction(0, 'fishing')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
+      .toBe('select-trigger')
+    // Without wood Harpooner cannot be paid yet, and the mandatory Tree Cutter blocks Pass.
+    expect(options(response).find((option) => option.value === CARD_ID)?.disabled).toBeFalsy()
+    expect(options(response).find((option) => option.value === HARPOONER)?.disabled).toBe(true)
+    expect(options(response).find((option) => option.value === '__pass__')?.disabled).toBe(true)
+    expect(fishingFood(response)).toBe(3)
+
+    response = session.resolveChoice(0, CARD_ID)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 20 })
+    expect(fishingFood(response)).toBe(3)
+
+    const harpooner = (current: SessionResponse) => options(current).find((option) =>
+      option.sourceCard === HARPOONER && !option.disabled && option.value !== '__skip__')
+    expect(harpooner(response), JSON.stringify(response.interaction)).toBeDefined()
+    for (let step = 0; step < 3; step++) {
+      const accept = harpooner(response)
+      if (!accept) break
+      response = session.resolveChoice(0, accept.value)
+      expect(response.ok, response.error).toBe(true)
+    }
+
+    // Harpooner: 1 wood for 1 food per person (2) and 1 reed; then Fishing pays its 3 food.
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 1, food: 25 })
+    expect(fishingFood(response)).toBe(0)
+    expect(response.state.log.filter((entry) => entry.params?.cardId === CARD_ID).map((entry) => entry.key))
+      .toEqual(['log.cardEffectGain', 'log.cardTriggered'])
   })
 })
 
