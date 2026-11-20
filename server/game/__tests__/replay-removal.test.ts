@@ -7,6 +7,7 @@ import { ResourceStore } from '../../storage/resource-store'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { GameContextStore } from '../game-context-store.ts'
 import { ReplayStore } from '../replay-store.ts'
+import { cleanExpiredSessions } from '../../db'
 import {
   applyReplayRemovalLedger,
   removeReplay,
@@ -315,6 +316,21 @@ describe('replay removal', () => {
     expect((await restored.prepare(`
       SELECT COUNT(*) AS count FROM game_results WHERE room_id = 'room-one'
     `).get())).toEqual({ count: 0 })
+  })
+
+  it('still applies a full-record legal erasure after the archive passed its retention', async () => {
+    const live = (await createDb())
+    ;(await seedReplay(live, 'room-one'))
+    // finished_at = 2 is far past the seven-day window.
+    ;(await cleanExpiredSessions(live))
+    expect(await live.prepare("SELECT replay_status FROM game_contexts WHERE room_id = 'room-one'").get()).toEqual({ replay_status: 'expired' })
+    expect(await live.prepare("SELECT 1 FROM game_replays WHERE room_id = 'room-one'").get()).toBeUndefined()
+
+    ;(await removeReplay(live, { roomId: 'room-one', reason: 'legal', eraseResult: true, resources: resourceFor(live), now: () => 300 }))
+
+    expect(await live.prepare("SELECT lifecycle, removal_reason FROM game_contexts WHERE room_id = 'room-one'").get())
+      .toEqual({ lifecycle: 'removed', removal_reason: 'legal' })
+    expect(await live.prepare("SELECT COUNT(*) AS count FROM game_results WHERE room_id = 'room-one'").get()).toEqual({ count: 0 })
   })
 
   it('clears participant identities when an asset sweep removes an active replay', async () => {

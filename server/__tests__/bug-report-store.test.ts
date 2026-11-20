@@ -352,6 +352,17 @@ describe('BugReportStore', () => {
     )
   })
 
+  it('fixes a 30-day evidence deadline when a completed-game report is first queued', async () => {
+    const roomId = (await insertContext('completed'))
+    const report = (await store.createDraft({ userId: 'u1', roomId, phenomenon: 'The score changed', stepNo: 12, frameHash: COMPLETED_HASH }))
+    ;(await store.updateDraft(report.submissionId, 'u1', { authorIdentity: 'hosted', confirmHosted: true }))
+    ;(await store.queue(report.submissionId, 'u1'))
+
+    const row = await db.prepare('SELECT evidence_expires_at, submitted_at FROM bug_reports WHERE submission_id = ?')
+      .get<{ evidence_expires_at: number; submitted_at: number }>(report.submissionId)
+    expect(Number(row?.evidence_expires_at) - Number(row?.submitted_at)).toBe(30 * 24 * 60 * 60 * 1000)
+  })
+
   it('revalidates a completed context before its first queue', async () => {
     const roomId = (await insertContext('completed'))
     const report = (await store.createDraft({

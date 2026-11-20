@@ -5,6 +5,7 @@ import { GameContextStore } from '../game/game-context-store'
 import { ReplayStore } from '../game/replay-store'
 import { expireReplayArchives, REPLAY_RETENTION_MS } from '../game/replay-retention'
 import { createTestDatabase } from './_helpers/postgres'
+import { migratePostgres } from '../database/migrations'
 
 const DAY = 24 * 60 * 60 * 1000
 const HASH = 'a'.repeat(64)
@@ -115,4 +116,18 @@ it('marks at most one batch per sweep and leaves other replay states alone', asy
   expect([await replayStatus('old-a'), await replayStatus('old-b'), await replayStatus('legacy')])
     .toEqual(['expired', 'expired', 'legacy_no_replay'])
   expect(await expireReplayArchives(db, now + REPLAY_RETENTION_MS)).toBe(0)
+})
+
+it('gives earlier completed-game reports a 30-day evidence deadline when the retention migration runs', async () => {
+  const now = Date.now()
+  await recordedGame('reported-before', 'completed', now - 2 * DAY)
+  await db.prepare(`INSERT INTO bug_reports (submission_id, room_id, player_index, lifecycle, room_version, step_no, frame_hash,
+    submitted_at, created_at, updated_at) VALUES ('legacy', 'reported-before', 0, 'completed', 3, 2, ?, ?, ?, ?)`)
+    .run(HASH, now - DAY, now - DAY, now - DAY)
+  await db.prepare('DELETE FROM postgres_schema_migrations WHERE version = 51').run()
+
+  await migratePostgres(db)
+
+  expect(Number((await db.prepare("SELECT evidence_expires_at FROM bug_reports WHERE submission_id = 'legacy'")
+    .get<{ evidence_expires_at: number }>())?.evidence_expires_at)).toBe(now - DAY + 30 * DAY)
 })

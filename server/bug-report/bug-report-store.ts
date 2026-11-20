@@ -971,8 +971,10 @@ try {
       UPDATE bug_reports
       SET status = ?,
           submitted_at = COALESCE(submitted_at, ?),
+          -- Every first submission fixes the evidence deadline: completed and
+          -- terminated archives also expire (ADR 0053).
           evidence_expires_at = CASE
-            WHEN submitted_at IS NULL AND lifecycle = 'active'
+            WHEN submitted_at IS NULL
               THEN ?
             ELSE evidence_expires_at
           END,

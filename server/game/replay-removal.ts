@@ -298,10 +298,13 @@ const planRows = async (
   assetHash?: string,
 ): Promise<Awaited<ReplayRow[]>> => {
   if (!assetHash) {
+    // An archive past retention (ADR 0053) may have no header left, but its
+    // result record and any evidence segment still accept whole-record removal.
+    const expired = target.replay_status === 'expired'
     if (
       !['completed', 'terminated'].includes(target.lifecycle)
-      || target.replay_status !== 'available'
-      || target.custom_cards_json === null
+      || (target.replay_status !== 'available' && !expired)
+      || (!expired && target.custom_cards_json === null)
     ) {
       throw new Error('replay is not removable')
     }
