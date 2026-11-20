@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { candidateCommand, collectCandidateDiagnostics, verifyCandidateSources, type CandidateExecution } from './candidate-isolation.ts'
 import { assertCandidateCheckout } from './candidate-verification.ts'
 import { canonicalOwnerLocalCommands, rebindOwnerLocalReceipt, rebindPrereleaseOwnerLocalReceipt } from './owner-local-verification.ts'
+import { composeImages, imageCacheDirectory, prepareImages } from './owner-local-image-cache.ts'
 import { FULL_TASK_IDS, fullSha, TASK_FIXTURE_IMAGES, verificationConfiguration, verificationTask, type FullTaskId, type VerificationCommand } from './verification-tasks.ts'
 
 export { TASK_FIXTURE_IMAGES }
@@ -75,6 +76,7 @@ export function isolationSmokeImage(root = policyRoot): string {
 const sha256 = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex')
 const fileSha256 = (path: string) => sha256(readFileSync(path))
 const iso = (time: number) => new Date(time).toISOString()
+const readIfPresent = (path: string) => existsSync(path) ? readFileSync(path, 'utf8') : ''
 
 // Every browser task gets its own slice of the 20000–32767 test port range, so lanes of concurrent tasks never race
 // for the same port between allocation and bind.
@@ -146,9 +148,13 @@ export function semaphore(limit: number): <R>(work: () => Promise<R>) => Promise
   }
 }
 
+export type CandidateIo = { stdin?: string; stdout?: string }
 export type Runner = {
-  /** Runs one command as the candidate in its task copy, logging to `<privateDirectory>/<phase>.log`. */
-  candidate(execution: CandidateExecution, command: string, args: string[], phase: string, environment: Record<string, string>, properties: string[], timeline?: boolean): Promise<number>
+  /**
+   * Runs one command as the candidate in its task copy, logging to `<privateDirectory>/<phase>.log`. `io` streams
+   * standard input from, or standard output to, an owner file the candidate itself cannot open.
+   */
+  candidate(execution: CandidateExecution, command: string, args: string[], phase: string, environment: Record<string, string>, properties: string[], timeline?: boolean, io?: CandidateIo): Promise<number>
   /** Runs the root isolation script through sudo; output goes to `log`. */
   isolation(args: string[], log: string): void
   verifySources(source: string, work: string, sha: string): void
@@ -158,13 +164,15 @@ export type Runner = {
 const exclusiveLog = (path: string) => openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
 
 export const nativeRunner: Runner = {
-  candidate(execution, command, args, phase, environment, properties, timeline = false) {
+  candidate(execution, command, args, phase, environment, properties, timeline = false, io = {}) {
     const argv = candidateCommand(execution, command, args, phase, environment, properties)
     const fd = exclusiveLog(join(execution.privateDirectory, `${phase}.log`))
+    const input = io.stdin ? openSync(io.stdin, constants.O_RDONLY | constants.O_NOFOLLOW) : null
+    const output = io.stdout ? exclusiveLog(io.stdout) : null
     // Profiling keeps the arrival time of every output chunk: the dot reporter prints one character per finished test.
     const timelineFd = timeline ? exclusiveLog(join(execution.privateDirectory, `${phase}.timeline`)) : null
     return new Promise((done, reject) => {
-      const child = spawn('/usr/bin/sudo', argv, { stdio: ['ignore', 'pipe', 'pipe'] })
+      const child = spawn('/usr/bin/sudo', argv, { stdio: [input ?? 'ignore', output ?? 'pipe', 'pipe'] })
       // Every log line starts with the seconds since the command began, so phases can be measured afterwards.
       const started = Date.now()
       let lineStart = true
@@ -176,10 +184,10 @@ export const nativeRunner: Runner = {
         lineStart = text.endsWith('\n')
         writeSync(fd, (lineStart ? text.slice(0, -1) : text).replaceAll('\n', `\n${stamp}`) + (lineStart ? '\n' : ''))
       }
-      child.stdout.on('data', record); child.stderr.on('data', record)
+      child.stdout?.on('data', record); child.stderr!.on('data', record)
       // A unit outliving the GitHub job budget is stopped as a whole, like a cancelled runner.
       const timer = setTimeout(() => spawnSync('/usr/bin/sudo', ['-n', '/usr/bin/systemctl', 'stop', `oa-candidate-${phase}.service`]), COMMAND_TIMEOUT_MS)
-      const finish = () => { clearTimeout(timer); closeSync(fd); if (timelineFd !== null) closeSync(timelineFd) }
+      const finish = () => { clearTimeout(timer); for (const open of [fd, timelineFd, input, output]) if (open !== null) closeSync(open) }
       child.once('error', error => { finish(); reject(error) })
       child.once('close', code => { finish(); done(code ?? 1) })
     })
@@ -219,6 +227,8 @@ export type Inputs = {
   cpuBudget: number
   /** Browser tasks running at once. */
   browserJobs: number
+  /** Owner-private image archives reused across runs; see `owner-local-image-cache.ts`. */
+  imageCache: string
 }
 
 /**
@@ -282,16 +292,23 @@ export async function runIsolated(inputs: Inputs, runner: Runner, now = Date.now
   try {
     // A partly failed start may already have created the identity, so teardown always follows it.
     runner.isolation(['start', policyRoot, output, String(inputs.ownerUid), inputs.publicAssets, ...tasks], join(output, 'isolation-start.log'))
-    // The smoke's first container would pull its image, and the smoke itself cannot rerun (it leaves a named container
-    // for the teardown proof). Pulling the pinned image first gives a registry or network stall the download retries;
-    // the trusted Docker CLI runs it, no candidate code.
-    await prepare(tasks[0], 'docker', ['pull', '--quiet', isolationSmokeImage()], 'smoke-image', NETWORK_ATTEMPTS)
+    // Every image the run starts comes first, from the owner's cache or the registry, through the trusted Docker CLI
+    // in the fresh daemon before any candidate code runs: the smoke's (it cannot rerun, since it leaves a named
+    // container for the teardown proof), the fixtures tasks start, and the pinned images the candidate's local
+    // services start. Registry pulls retry transient failures.
+    const images = [...new Set([isolationSmokeImage(), ...TASK_FIXTURE_IMAGES.map(({ image }) => image), ...composeImages(readIfPresent(join(source, 'docker-compose.local.yml')))])]
+    await prepareImages(images, { directory: inputs.imageCache, attempts: NETWORK_ATTEMPTS, retry: () => sleep(PREPARATION_RETRY_DELAY_MS),
+      docker: async (phase, args, io) => {
+        const exitCode = await runner.candidate(execution(tasks[0]), 'docker', args, phase, services, properties, false, io)
+        preparation.push({ phase, exitCode, logSha256: fileSha256(join(logs, `${phase}.log`)) })
+        return exitCode
+      },
+      output: phase => readFileSync(join(logs, `${phase}.log`), 'utf8').replace(/^\[\+ *[\d.]+s\] /gm, '') })
     await prepare(tasks[0], inputs.node.path, ['/run/oa-ci-isolation/smoke.mts'], 'smoke')
     await prepare(tasks[0], pnpm, ['install', '--frozen-lockfile'], `install-${tasks[0]}`, NETWORK_ATTEMPTS)
     // The first install fills the candidate's pnpm store; the other copies then link from it.
     await pool(tasks.slice(1), 3, task => prepare(task, pnpm, ['install', '--frozen-lockfile'], `install-${task}`, NETWORK_ATTEMPTS))
     await prepare(tasks[0], pnpm, ['exec', 'playwright', 'install', 'chromium', 'webkit', 'firefox'], 'browsers', NETWORK_ATTEMPTS)
-    for (const [index, { image }] of TASK_FIXTURE_IMAGES.entries()) await prepare(tasks[0], 'docker', ['pull', '--quiet', image], `fixture-image-${index + 1}`, NETWORK_ATTEMPTS)
     await prepare(tasks[0], '/bin/sh', ['-c', aclFixtureBuild()], 'acl-fixture-image', NETWORK_ATTEMPTS)
     // One start of the shared test services before tasks run concurrently, so no two tasks race to create them.
     await prepare(tasks[0], inputs.node.path, ['scripts/local-services.mjs', '--test'], 'services', NETWORK_ATTEMPTS)
@@ -457,13 +474,13 @@ export async function main(args: string[]): Promise<number> {
   if (typeof metadata.id !== 'number') throw new Error('Unreadable native repository identity')
   const node = { path: NODE, version: execFileSync(NODE, ['--version'], { encoding: 'utf8' }).trim(), sha256: fileSha256(NODE) }
   const policyFiles = Object.fromEntries(['scripts/ci/owner-local-run.ts', 'scripts/ci/owner-local-isolation.sh', 'scripts/ci/candidate-isolation.ts',
-    'scripts/ci/candidate-isolation-smoke.ts', 'scripts/ci/candidate-user-environment.sh'].map(file => [file, fileSha256(join(policyRoot, file))]))
+    'scripts/ci/candidate-isolation-smoke.ts', 'scripts/ci/candidate-user-environment.sh', 'scripts/ci/owner-local-image-cache.ts'].map(file => [file, fileSha256(join(policyRoot, file))]))
   const inputs: Inputs = { channel, sha, producerSha, output, jobs, repository: RELEASE_REPOSITORY, repositoryId: metadata.id,
     tree: git(['rev-parse', `${sha}^{tree}`]), configuration: verificationConfiguration(policyRoot, sha),
     producerConfiguration: verificationConfiguration(policyRoot, producerSha), commands: canonicalOwnerLocalCommands(policyRoot, sha, channel),
     ownerUid, node, dockerVersion: execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).trim(), policyFiles,
     servicePorts: { postgres: await freePort(), objects: await freePort() }, retries, testWorkers: testWorkers || null, publicAssets, profile: args.includes('--profile'), browserJobs,
-    ownerHome: homedir(), lanes, cpuBudget }
+    ownerHome: homedir(), lanes, cpuBudget, imageCache: imageCacheDirectory() }
   const result = await runIsolated(inputs, nativeRunner)
   if ('failed' in result) { console.error(`Owner-local verification failed:\n- ${result.failed.join('\n- ')}\nLogs: ${join(output, 'logs')}`); return 1 }
   // The publisher applies the same checks; failing here keeps an unusable receipt from being published.
