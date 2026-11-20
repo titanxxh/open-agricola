@@ -43,6 +43,8 @@ export default mergeConfig(
             include: FAST_SHARED_INCLUDE,
             exclude: FAST_SHARED_EXCLUDE,
             setupFiles: ['./tests/setup-language-packs.ts', './shared/cards/__tests__/setup-listener-purity.ts'],
+            // Pure-domain files share no module state across files (#1939: no cross-file leaks over four paired GitHub runs).
+            isolate: false,
           },
         },
         {
@@ -55,6 +57,8 @@ export default mergeConfig(
               './shared/cards/__tests__/setup-register-all.ts',
               './shared/cards/__tests__/setup-listener-purity.ts',
             ],
+            // Pure-domain files share no module state across files (#1939: no cross-file leaks over four paired GitHub runs).
+            isolate: false,
           },
         },
         {
@@ -67,6 +71,8 @@ export default mergeConfig(
               './shared/cards/__tests__/setup-register-all.ts',
               './shared/cards/__tests__/setup-listener-purity.ts',
             ],
+            // Pure-domain files share no module state across files (#1939: no cross-file leaks over four paired GitHub runs).
+            isolate: false,
           },
         },
         {
@@ -116,6 +122,8 @@ export default mergeConfig(
               './shared/cards/__tests__/setup-register-all.ts',
               './shared/cards/__tests__/setup-listener-purity.ts',
             ],
+            // Pure-domain files share no module state across files (#1939: no cross-file leaks over four paired GitHub runs).
+            isolate: false,
           },
         },
         {

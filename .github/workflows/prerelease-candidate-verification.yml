@@ -159,6 +159,8 @@ jobs:
           VERIFICATION_TASK: ${{ matrix.task }}
           # Two worktree lanes per chromium task (#1920, #1921); the task command and so the receipt stay the same.
           VERIFY_PARALLEL_LANES: '2'
+          # Four Vitest workers for the fast task only (#1939); slow keeps Vitest's default worker count.
+          VITEST_MAX_WORKERS: '4'
         run: node scripts/ci/prerelease-verification.ts run-task --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA" --task "$VERIFICATION_TASK"
       - name: Stop candidate descendants and collect private diagnostics
         if: always() && steps.isolation.outcome == 'success'

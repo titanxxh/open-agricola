@@ -145,6 +145,15 @@ export function chromiumLaneEnvironment(task: string, env: NodeJS.ProcessEnv = p
   return verificationTask(task).id.startsWith('chromium-') && env.VERIFY_PARALLEL_LANES ? { VERIFY_PARALLEL_LANES: env.VERIFY_PARALLEL_LANES } : {}
 }
 
+/**
+ * The `fast` task's `VITEST_MAX_WORKERS` from the runner environment (#1939: four workers on a 4 vCPU GitHub runner;
+ * `slow` keeps Vitest's default because four workers time out `D099_EarthenwarePotter-session` there). Like the lane
+ * count it never enters the task command.
+ */
+export function fastWorkerEnvironment(task: string, env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  return verificationTask(task).id === 'fast' && env.VITEST_MAX_WORKERS ? { VITEST_MAX_WORKERS: env.VITEST_MAX_WORKERS } : {}
+}
+
 /** `weights` defaults to this catalog's table; pass an earlier producer's table (or null) to reproduce its plan. */
 export function taskCommands(cwd: string, input: string, weights: BrowserSpecWeights | null = browserSpecWeights()): VerificationCommand[] {
   const task = verificationTask(input)

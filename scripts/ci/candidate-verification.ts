@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromiumLaneEnvironment, FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, taskFixtureImages, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
+import { chromiumLaneEnvironment, fastWorkerEnvironment, FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, taskFixtureImages, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
 import { checkOwnerLocalVerification, type OwnerLocalProof } from './owner-local-verification.ts'
 
 export const CANDIDATE_WORKFLOW = '.github/workflows/candidate-verification.yml'
@@ -467,7 +467,7 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
     const execution = candidateExecution(); let sequence = 0
     runCandidateTask(candidate, id, sha, (command, args) => executeCandidate(execution,
       command === 'pnpm' ? resolve(execution.node, '../pnpm') : command, args, `task-${sequence++}`,
-      { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'stable', RELEASE_CHANNEL: 'stable', ...chromiumLaneEnvironment(id) }), producer)
+      { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'stable', RELEASE_CHANNEL: 'stable', ...chromiumLaneEnvironment(id), ...fastWorkerEnvironment(id) }), producer)
     trustedStableProducer(producer); return 0
   }
   if (mode === 'source') {
