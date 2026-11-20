@@ -55,8 +55,8 @@ pnpm verify prepush
 # 真实应用行为：隔离 PostgreSQL / S3、端口，调用 restart-local.sh 后跑 Playwright
 pnpm verify e2e-tests/hosted-password-login.spec.ts
 pnpm verify e2e e2e-tests/hosted-password-login.spec.ts  # 显式模式，含义相同
-pnpm verify                                          # 单个隔离环境，完整 Playwright（默认不含 @extended 变体）
-E2E_EXTENDED=1 pnpm verify e2e-tests/whats-new.spec.ts # 同时运行全部视口、语言和设备变体
+pnpm verify                                          # 单个隔离环境，完整 Playwright（默认不含 @extended 变体，跳过 Session 已覆盖的规则用例）
+E2E_EXTENDED=1 pnpm verify e2e-tests/whats-new.spec.ts # 同时运行全部视口、语言和设备变体，以及 Session 已覆盖的规则用例
 pnpm verify:parallel --shards=4                       # 已提交且干净的源码，四个隔离环境并行（不带 --shards 时取 VERIFY_PARALLEL_LANES，默认 1 即原地 pnpm verify）
 
 pnpm verify status

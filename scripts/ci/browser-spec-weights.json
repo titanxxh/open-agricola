@@ -1,7 +1,7 @@
 {
  "format": 1,
  "unit": "seconds",
- "source": "single-lane chromium tasks of an owner-local harness profile of 39937991 on the owner machine, all six browser tasks concurrent on 20 cores, 2026-11-18 (#1779), rounded up; pinned-asset-host added from its local runs, 2 seconds rounded up; server-maintenance added from its local run, 25 seconds rounded up; classic-guest added from its local run, 4 seconds rounded up",
+ "source": "single-lane chromium tasks of an owner-local harness profile of 39937991 on the owner machine, all six browser tasks concurrent on 20 cores, 2026-11-18 (#1779), rounded up; pinned-asset-host added from its local runs, 2 seconds rounded up; server-maintenance added from its local run, 25 seconds rounded up; classic-guest added from its local run, 4 seconds rounded up; bug-report-admin estimated as its four merged specs (71 seconds) less three application starts",
  "files": {
   "e2e-tests/D180_PartTimeWorker.spec.ts": 4,
   "e2e-tests/E148_Lazybones.spec.ts": 3,
@@ -17,10 +17,7 @@
   "e2e-tests/application-loading.spec.ts": 44,
   "e2e-tests/beta-access-admin.spec.ts": 20,
   "e2e-tests/bga-preparation-order.spec.ts": 11,
-  "e2e-tests/bug-report-feedback.spec.ts": 25,
-  "e2e-tests/bug-report-fix-links.spec.ts": 17,
-  "e2e-tests/bug-report-historical-feedback.spec.ts": 17,
-  "e2e-tests/bug-report-release-feedback.spec.ts": 12,
+  "e2e-tests/bug-report-admin.spec.ts": 50,
   "e2e-tests/bug-report.spec.ts": 9,
   "e2e-tests/card-action-references.spec.ts": 15,
   "e2e-tests/card-cost-icons.spec.ts": 2,
@@ -105,7 +102,6 @@
   "e2e-tests/room-invitations.spec.ts": 14,
   "e2e-tests/room-retention-settings.spec.ts": 11,
   "e2e-tests/rule-derived-action-preview.spec.ts": 11,
-  "e2e-tests/seasonal-fence-log.spec.ts": 13,
   "e2e-tests/seasonal-settlement-logs.spec.ts": 64,
   "e2e-tests/seasons-worker-icons.spec.ts": 2,
   "e2e-tests/section-navigation.spec.ts": 1,

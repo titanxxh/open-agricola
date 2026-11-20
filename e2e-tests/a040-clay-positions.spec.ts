@@ -7,6 +7,9 @@ import type { ServerEvent } from '../shared/contract/protocol/ws'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { sessionCovered } from './helpers/extended'
+
+sessionCovered('server/__tests__/A040_PottersYard-session.test.ts', 'server/__tests__/A040_PottersYard-position-session.test.ts', 'server/__tests__/A040_PottersYard-action-facts-session.test.ts')
 
 test.use({ actionTimeout: 10000 })
 

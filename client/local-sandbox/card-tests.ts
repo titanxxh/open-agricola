@@ -38,9 +38,12 @@ function parseOutcome(value: unknown): WorkshopBrowserTestOutcome {
   throw new Error('Invalid browser test result')
 }
 
-/** Each run gets an opaque iframe and a fresh Worker. Cancellation kills the Worker. */
+/**
+ * Each run gets an opaque iframe and a fresh Worker. Cancellation kills the Worker, and so does the runaway timeout
+ * (20 s unless `timeoutMs` says otherwise; browser acceptance shortens it instead of waiting the full timeout).
+ */
 export async function runBrowserCardTests(input: {
-  source: string; tests: string; signal: AbortSignal
+  source: string; tests: string; signal: AbortSignal; timeoutMs?: number
 }): Promise<{ browserRuntimeId: string; outcome: WorkshopBrowserTestOutcome }> {
   input.signal.throwIfAborted()
   const bundle = await new Promise<Awaited<ReturnType<typeof loadRuntime>>>((resolve, reject) => {
@@ -118,7 +121,7 @@ export async function runBrowserCardTests(input: {
       } else cleanup()
     }
     const abort = () => finish({ kind: 'error', message: 'Browser tests cancelled' })
-    const timer = setTimeout(() => finish({ kind: 'error', message: 'Browser tests timed out' }), TIMEOUT_MS)
+    const timer = setTimeout(() => finish({ kind: 'error', message: 'Browser tests timed out' }), input.timeoutMs ?? TIMEOUT_MS)
     const message = (event: MessageEvent<unknown>) => {
       if (event.source !== frame.contentWindow || event.origin !== 'null') return
       const data = event.data

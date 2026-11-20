@@ -5,6 +5,7 @@ import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures
 import { serializeState } from '../shared/session/serialization'
 import { emptyResources } from '../shared/session/state-bootstrap'
 import { joinRoomClients, publicRoomState, roomDriver, roomSnapshot } from './room-command-driver'
+import { sessionCovered } from './helpers/extended'
 
 async function openRoom(browser: Browser, request: APIRequestContext, locale: 'en', configure: (state: GameState) => void, enableMoor = false) {
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
@@ -39,6 +40,7 @@ async function chooseByLabel(pages: [Page, Page], driver: ReturnType<typeof room
 for (const locale of ['en'] as const) {
   for (const pigBreeder of [false, true]) {
     test(`${pigBreeder ? 'Pig Breeder' : 'spring'} logs actual newborns in ${locale}`, async ({ browser, request }) => {
+      sessionCovered('server/__tests__/non-harvest-breeding-log-session.test.ts')
       const animal = pigBreeder ? 'boar' : 'sheep'
       const { pages, driver } = await openRoom(browser, request, locale, state => {
         state.round = pigBreeder ? 12 : 1
@@ -93,6 +95,7 @@ for (const locale of ['en'] as const) {
   }
 
   test(`summer heating logs the actual waived requirement in ${locale}`, async ({ browser, request }) => {
+    sessionCovered('server/__tests__/season-heating-log-session.test.ts')
     const { pages, driver } = await openRoom(browser, request, locale, state => {
       state.round = 4
       state.throughTheSeasons = { startSeason: 'summer', currentSeason: 'summer' }
@@ -132,6 +135,7 @@ for (const locale of ['en'] as const) {
   })
 
   test(`summer free stable keeps its grant source after pending reload in ${locale}`, async ({ browser, request }) => {
+    sessionCovered('server/__tests__/seasonal-grants-session.test.ts')
     const { pages, driver } = await openRoom(browser, request, locale, state => {
       state.throughTheSeasons = { startSeason: 'summer', currentSeason: 'summer' }
       Object.assign(state.players[0]!.resources, { wood: 5, reed: 2 })
@@ -160,6 +164,7 @@ for (const locale of ['en'] as const) {
   })
 
   test(`winter zero-net accumulation remains explained in ${locale}`, async ({ browser, request }) => {
+    sessionCovered('server/__tests__/season-accumulation-log-session.test.ts')
     const { pages, driver } = await openRoom(browser, request, locale, state => {
       state.round = 10
       state.throughTheSeasons = { startSeason: 'autumn', currentSeason: 'autumn' }
@@ -191,6 +196,7 @@ for (const locale of ['en'] as const) {
 
   for (const free of [false, true]) {
     test(`spring fence payment ${free ? 0 : 5} explains construction and two saved wood in ${locale}`, async ({ browser, request }, testInfo) => {
+      if (free) sessionCovered('server/__tests__/seasonal-fence-payment-session.test.ts')
       const { pages, driver } = await openRoom(browser, request, locale, state => {
         state.round = 3
         state.roundActionOrder[0] = 'fencing'
@@ -226,6 +232,7 @@ for (const locale of ['en'] as const) {
   }
 
   test(`winter plow logs the actual food surcharge in ${locale}`, async ({ browser, request }) => {
+    sessionCovered('server/__tests__/seasonal-plow-payment-session.test.ts')
     const { pages, driver } = await openRoom(browser, request, locale, state => {
       state.throughTheSeasons = { startSeason: 'winter', currentSeason: 'winter' }
       state.players[0]!.resources.food = 1
@@ -247,6 +254,7 @@ for (const locale of ['en'] as const) {
   })
 
   test(`autumn major purchase retains its selected discount in ${locale}`, async ({ browser, request }) => {
+    sessionCovered('server/__tests__/seasonal-major-payment-session.test.ts')
     const { pages, driver } = await openRoom(browser, request, locale, state => {
       state.round = 4
       state.roundActionOrder[0] = 'major-improvement'

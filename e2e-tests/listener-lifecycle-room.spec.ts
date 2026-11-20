@@ -4,6 +4,7 @@ import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import { serializeState } from '../shared/session/serialization'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { joinRoomClients, publicRoomState, roomDriver, roomSnapshot } from './room-command-driver'
+import { sessionCovered } from './helpers/extended'
 
 const TOOLBOX = 'B027_Toolbox'
 const POTTERS = 'A040_PottersYard'
@@ -32,6 +33,7 @@ const assertReadOnly = async (observer: Page) => {
 }
 
 test('Hat, Spear and Steam Machine share a player-ordered window across room reloads', async ({ browser, request }, testInfo) => {
+  sessionCovered('server/__tests__/space-reaction-settlement-session.test.ts', 'server/__tests__/space-use-listener-lifecycle-session.test.ts')
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
   const hat = 'C052_HuntsmansHat', spear = 'E053_BoarSpear', steam = 'C025_SteamMachine'
   try {
@@ -98,6 +100,7 @@ test('Hat, Spear and Steam Machine share a player-ordered window across room rel
 })
 
 test('C094 drains Potter\'s Yard before Toolbox and preserves both room clients across child and purchase reloads', async ({ browser, request }) => {
+  sessionCovered('server/__tests__/B27_Toolbox-session.test.ts', 'server/__tests__/construction-facts-session.test.ts')
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
   try {
     await joinRoomClients(pages, request)
@@ -274,6 +277,7 @@ test('feeding batch reactions survive a pending room reload without repeating th
 })
 
 test('feeding Joinery leaves Plow Builder available through a room reload before settling hunger once', async ({ browser, request }) => {
+  sessionCovered('server/__tests__/exchange-batch-session.test.ts', 'server/__tests__/E91_PlowBuilder-session.test.ts')
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
   try {
     await joinRoomClients(pages, request)
@@ -375,6 +379,7 @@ test('feeding Joinery leaves Plow Builder available through a room reload before
 })
 
 test('Shed Builder counts nested and enclosing stable builds once across a room reload', async ({ browser, request }) => {
+  sessionCovered('server/__tests__/construction-facts-session.test.ts', 'server/__tests__/E114_ShedBuilder-session.test.ts')
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
   try {
     await joinRoomClients(pages, request)

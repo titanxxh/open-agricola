@@ -5,8 +5,11 @@ import { test, expect, chromium, webkit, type Page } from '@playwright/test'
 import { ownLaunchOptions } from './helpers/pinned-asset-host'
 import { source, passingTests, choiceSource, choiceTests, handshakeTests, infiniteTests, isolationTests } from './fixtures/browser-card-tests.ts'
 
-async function run(page: Page, source: string, tests: string) {
-  return page.evaluate(async ({ source, tests }) => {
+// The runaway case shortens the 20 s product timeout; it still has to start the Worker and its test first.
+const RUNAWAY_TIMEOUT_MS = 5_000
+
+async function run(page: Page, source: string, tests: string, timeoutMs?: number) {
+  return page.evaluate(async ({ source, tests, timeoutMs }) => {
     const modulePath = '/client/local-sandbox/card-tests.ts'
     const api: typeof import('../client/local-sandbox/card-tests.ts') = await import(modulePath)
     const controller = new AbortController()
@@ -24,13 +27,13 @@ async function run(page: Page, source: string, tests: string) {
     delete document.body.dataset.terminated
     addEventListener('message', observe)
     addEventListener('cancel-browser-tests', cancel)
-    try { return await api.runBrowserCardTests({ source, tests, signal: controller.signal }) }
+    try { return await api.runBrowserCardTests({ source, tests, signal: controller.signal, timeoutMs }) }
     finally {
       document.body.dataset.runState = 'finished'
       removeEventListener('message', observe)
       removeEventListener('cancel-browser-tests', cancel)
     }
-  }, { source, tests })
+  }, { source, tests, timeoutMs })
 }
 
 for (const engine of ['chromium', 'webkit'] as const) {
@@ -135,7 +138,7 @@ test('next assertion', () => { expect(0).to.equal(1) })
       await expect(page.locator('body')).toHaveAttribute('data-terminated', 'true')
       await expect(page.locator('iframe')).toHaveCount(0)
 
-      const timeoutRun = run(page, source, infiniteTests)
+      const timeoutRun = run(page, source, infiniteTests, RUNAWAY_TIMEOUT_MS)
       await expect(page.locator('body')).toHaveAttribute('data-test-name', 'Runaway test')
       expect(await timeoutRun).toEqual({ browserRuntimeId: runtimeId, outcome: { kind: 'error', message: 'Browser tests timed out' } })
       await expect(page.locator('body')).toHaveAttribute('data-terminated', 'true')
