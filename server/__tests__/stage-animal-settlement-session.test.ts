@@ -3,7 +3,7 @@ import type { GameState, PlayerState } from '../../shared/contract/types'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
-import { validateAndCompileCustomCode } from '../custom-code/engine'
+import type { CardImpl } from '../../shared/cards/registry'
 import type { CustomCardData } from '../../shared/cards/session-card-context'
 import { playMinor } from './_helpers/card-regression-session'
 
@@ -85,21 +85,22 @@ function house(session: GameSession, response: SessionResponse, animal: 'sheep' 
 }
 
 
-function singleChoiceAnimalCard(cardId: string, hook: 'onAfterRoundEnd' | 'onBuy'): CustomCardData {
-  const compiled = validateAndCompileCustomCode(`
-const CARD_ID = '${cardId}'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Single Choice Stage Animals' })
-const CARD_IMPL = { effect: { id: CARD_ID,
-  ${hook}: (_state, player) => player.cardStates[CARD_ID]?.flagged ? undefined : ({ type: 'seq', children: [
-    { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-    { type: 'xor', children: [{ type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { sheep: 1 } }] },
-    { type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { food: 2 } }
-  ] })
-} }
-`, cardId)
-  if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
-  return { cardType: 'minor', cardJson: { id: cardId, name: 'Single Choice Stage Animals', deck: 'CUSTOM', number: 0, desc: [] },
-    compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }
+const stageCard = (cardId: string, hook: 'onAfterRoundEnd' | 'onBuy') => {
+  const { card, impl } = singleChoiceAnimalCard(cardId, hook)
+  return { customCards: [card], cardImpls: { [cardId]: impl } }
+}
+
+function singleChoiceAnimalCard(cardId: string, hook: 'onAfterRoundEnd' | 'onBuy'): { card: CustomCardData; impl: CardImpl } {
+  return {
+    card: { cardType: 'minor', cardJson: { id: cardId, name: 'Single Choice Stage Animals', deck: 'CUSTOM', number: 0, desc: [] } },
+    impl: { effect: { id: cardId,
+      [hook]: (_state: GameState, player: PlayerState) => player.cardStates[cardId]?.flagged ? undefined : ({ type: 'seq', children: [
+        { type: 'leaf', actionId: 'special-effect', sourceCard: cardId, params: { kind: 'set-flag', flag: true } },
+        { type: 'xor', children: [{ type: 'leaf', actionId: 'gain', sourceCard: cardId, params: { sheep: 1 } }] },
+        { type: 'leaf', actionId: 'gain', sourceCard: cardId, params: { food: 2 } },
+      ] }),
+    } },
+  }
 }
 
 describe('Stage animal gains settle before continuation', () => {
@@ -217,7 +218,7 @@ describe('Stage animal gains settle before continuation', () => {
   })
   it('retains the stage and trailing reward after an automatically resolved single animal choice', () => {
     const cardId = 'CUSTOM_SingleChoiceStageAnimals'
-    const session = createWorkSession({ seed: 1158, customCards: [singleChoiceAnimalCard(cardId, 'onAfterRoundEnd')], configure(state) {
+    const session = createWorkSession({ seed: 1158, ...stageCard(cardId, 'onAfterRoundEnd'), configure(state) {
       state.round = 5
       state.players.forEach(player => { player.resources.food = 100 })
       state.players[0]!.minorPlayed = [cardId]
@@ -234,7 +235,7 @@ describe('Stage animal gains settle before continuation', () => {
 
   it('retains an ordinary onBuy continuation after the same single animal choice', () => {
     const cardId = 'CUSTOM_SingleChoiceOnBuyAnimals'
-    const session = createWorkSession({ seed: 1158, customCards: [singleChoiceAnimalCard(cardId, 'onBuy')], configure(state) {
+    const session = createWorkSession({ seed: 1158, ...stageCard(cardId, 'onBuy'), configure(state) {
       state.round = 5
       state.players[0]!.minorHand = [cardId]
       state.players[0]!.resources.food = 100

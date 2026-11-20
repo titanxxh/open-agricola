@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PostgresDatabase } from './postgres'
+import { convertLegacyWorkshopDrafts } from './050-native-workshop-drafts.ts'
 
 /** Extensions belong to the database, not to a schema; `schema.sql` installs them for whichever schema migrates first. */
 export const DATABASE_EXTENSIONS = ['citext']
@@ -38,12 +39,15 @@ async function lockMigration(db: PostgresDatabase): Promise<void> {
   await db.prepare('SELECT pg_advisory_xact_lock(962, hashtext(?))').get(row.schema)
 }
 
+/** A data migration that needs application code; it runs once, in the same transaction as the SQL migrations. */
+type CodeMigration = { name: string; run: (db: PostgresDatabase) => Promise<unknown> }
+
 /** Serialize schema changes before any application instance starts accepting requests. */
 export async function migratePostgres(db: PostgresDatabase): Promise<void> {
   await db.transaction(async () => {
     await lockMigration(db)
     await db.exec('CREATE TABLE IF NOT EXISTS postgres_schema_migrations (version integer PRIMARY KEY)')
-    const migrations = ['schema.sql', '002-platform-concurrency.sql', '003-report-claims.sql', '004-shared-objects.sql', '005-resource-reference-validation.sql', '006-command-receipts.sql', '007-command-input-windows.sql', '008-data-imports.sql', '009-room-ownership.sql', '010-room-presence.sql', '011-shared-invalidation.sql', '012-development-room-slots.sql', '013-observability.sql', '014-room-seat-owners.sql', '015-workshop-submissions.sql', '016-retire-workshop-oauth.sql', '017-retire-workshop-owner-approval.sql', '018-workshop-submission-deletion.sql', '019-workshop-art-urls.sql', '020-workshop-references.sql', '021-account-link-pkce.sql', '022-fractional-result-scores.sql', '023-online-room-admission.sql', '024-onboarding-browser-binding.sql', '025-room-invitations.sql', '026-room-color-confirmation.sql']
+    const migrations: Array<string | CodeMigration> = ['schema.sql', '002-platform-concurrency.sql', '003-report-claims.sql', '004-shared-objects.sql', '005-resource-reference-validation.sql', '006-command-receipts.sql', '007-command-input-windows.sql', '008-data-imports.sql', '009-room-ownership.sql', '010-room-presence.sql', '011-shared-invalidation.sql', '012-development-room-slots.sql', '013-observability.sql', '014-room-seat-owners.sql', '015-workshop-submissions.sql', '016-retire-workshop-oauth.sql', '017-retire-workshop-owner-approval.sql', '018-workshop-submission-deletion.sql', '019-workshop-art-urls.sql', '020-workshop-references.sql', '021-account-link-pkce.sql', '022-fractional-result-scores.sql', '023-online-room-admission.sql', '024-onboarding-browser-binding.sql', '025-room-invitations.sql', '026-room-color-confirmation.sql']
     migrations.push('027-game-creation-configuration.sql')
     migrations.push('028-moor-balance-rules.sql')
     migrations.push('029-game-termination.sql')
@@ -66,10 +70,13 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('046-browser-auth-policy.sql')
     migrations.push('047-web-push.sql')
     migrations.push('048-classic-card-edition.sql')
+    migrations.push('049-retire-workshop-public-cards.sql')
+    migrations.push({ name: '050-native-workshop-drafts', run: convertLegacyWorkshopDrafts })
     for (const [index, filename] of migrations.entries()) {
       const version = index + 1
       if (await db.prepare('SELECT version FROM postgres_schema_migrations WHERE version = ?').get(version)) continue
-      await db.exec(readFileSync(join(import.meta.dirname, filename), 'utf8'))
+      if (typeof filename === 'string') await db.exec(readFileSync(join(import.meta.dirname, filename), 'utf8'))
+      else await filename.run(db)
       await db.prepare('INSERT INTO postgres_schema_migrations (version) VALUES (?)').run(version)
     }
   })()

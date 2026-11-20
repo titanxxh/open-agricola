@@ -62,7 +62,7 @@
 - **Durable Room Commit**：成功且改变公开 Frame 或 Private Session Cursor 的命令，以及任何带 `durableTransition` 标记的响应，先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
 - **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
 - **失败不扩散**：命令错误只回发起者；durable rejection 仍向其他座位发送已提交版本的无错快照。持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
-- **Room 上限**：单实例最多准入 30 个有 OPEN 玩家连接或有效 30 秒准入预留的普通 Room。离线存档与缓存 Room 不占在线配额。独立的 15 个 Worker 槽仍计入保留的 executor；新准入和 `newGame` 一换一替换同时遵守这两类限制。
+- **Room 上限**：单实例最多准入 30 个有 OPEN 玩家连接或有效 30 秒准入预留的普通 Room。离线存档与缓存 Room 不占在线配额；新准入和 `newGame` 一换一替换都遵守该上限。
 - **历史 Viewer 不可变**：Room 锁定 schema/build，完成回放由 credentialless 只读 Viewer 读取，不执行历史规则代码。
 - **测试默认 2 人游戏**：规则正确性站后端边界，不通过 DOM 反推规则。
 
@@ -117,11 +117,11 @@ shared/        零 React，前后端 + sandbox 共用
 ├── cards/         Card Source（按 deck A–E、M、major、community 分目录，单卡 meta + impl）
 ├── domain/        领域聚合层（PlayerBoard、farmyard、pasture、scoring、...）
 ├── draft/         异步卡牌轮抽
-├── custom-code/   自定义卡牌 AST 校验
+├── custom-code/   工坊 Card Source 结构准入
 ├── i18n/          多语 key
 └── utils/         通用工具
 
-server/        Node 进程（HTTP + WS + persistence + custom-code 隔离）
+server/        Node 进程（HTTP + WS + persistence；从不执行工坊代码）
 ├── index.ts             装配 HTTP + WS + DB + 静态资源
 ├── connection/          WS 连接层（ws-server, room-router, broadcaster）
 ├── game/                Room、GameSession、Lobby、RoomRegistry
@@ -130,7 +130,6 @@ server/        Node 进程（HTTP + WS + persistence + custom-code 隔离）
 ├── auth.ts              站点登录与 OAuth（GitHub、Google）
 ├── workshop.ts          Workshop / Sandbox 后端
 ├── workshop-pr/         Workshop PR 集成
-├── custom-code/         自定义代码隔离执行（engine、runtime、executor-worker）
 ├── payload-validation.ts  纯校验（不写状态）
 └── db.ts                PostgreSQL 连接
 

@@ -54,15 +54,24 @@ describe('PR files self-consistency (S9-B2)', () => {
         card_id: 'CUSTOM_SnapshotCard',
         card_type: 'minor',
         author_name: 'snapshot',
-        effect_code: `const CARD_ID = 'CUSTOM_SnapshotCard'
-const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Snapshot Card', deck: 'community', number: 0, desc: ['Each harvest, gain 1 <FOOD>.'], cost: { wood: 1 }, vp: 0 })
-const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { food: 1 }) } }`,
+        effect_code: `import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = 'CUSTOM_SnapshotCard'
+
+export const CUSTOM_SnapshotCard = defineMinorCard({
+  meta: { id: CARD_ID, name: 'Snapshot Card', deck: 'community', number: 0, desc: ['Each harvest, gain 1 <FOOD>.'], cost: { wood: 1 }, vp: 0 },
+  impl: { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { food: 1 }) } },
+})`,
         card_json: JSON.stringify({ name: 'Snapshot Card' }),
       }
       if (mode !== 'effect') {
-        wcard.effect_code = `const CARD_ID = 'CUSTOM_SnapshotCard'${mode === 'companion helper' ? ', FOOD = 1' : ''}
-const CARD_DEF = { cardType: 'minor', meta: { id: 'CUSTOM_SnapshotCard', name: 'Snapshot Card', deck: 'community', number: 0, desc: [], cost: {}, vp: 0 } }
-const CARD_IMPL = ${mode === 'companion helper' ? "{ effect: { id: 'CUSTOM_SnapshotCard', onHarvest: () => gainLeaf('CUSTOM_SnapshotCard', {food: FOOD}) } }" : '{}'}`
+        wcard.effect_code = `import { defineMinorCard } from '../card-source'
+${mode === 'companion helper' ? "import { gainLeaf } from '../helpers/pay-gain-node'\n\nconst FOOD = 1\n" : ''}
+export const CUSTOM_SnapshotCard = defineMinorCard({
+  meta: { id: 'CUSTOM_SnapshotCard', name: 'Snapshot Card', deck: 'community', number: 0, desc: [], cost: {}, vp: 0 },
+  impl: ${mode === 'companion helper' ? "{ effect: { id: 'CUSTOM_SnapshotCard', onHarvest: () => gainLeaf('CUSTOM_SnapshotCard', { food: FOOD }) } }" : '{}'},
+})`
       }
 
       const upstream_register_all = readFileSync(

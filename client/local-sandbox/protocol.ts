@@ -14,7 +14,7 @@ export const LOCAL_SANDBOX_SCHEMA_VERSION = 1
 export type LocalCardInput = {
   cardType: 'minor' | 'occupation'
   cardJson: CustomCardData['cardJson']
-  /** TypeScript source — compiled locally inside the worker. Null for data-only cards. */
+  /** Native Card Source module, loaded inside the worker. Null for data-only cards. */
   source: string | null
   artUrl?: string | null
 }

@@ -27,13 +27,12 @@ export class OperationsMetrics {
   readonly commandAttempts = new Counter({ name: 'agricola_commands_total', help: 'Command attempts, with rule rejections separate from system errors and duplicates.', labelNames: ['command', 'outcome'], registers: [this.registry] })
   readonly commandDuration = new Histogram({ name: 'agricola_command_duration_seconds', help: 'Parsed command dispatch through final local response/publication and receipt.', labelNames: ['command', 'outcome'], buckets: SECONDS, registers: [this.registry] })
   readonly responseDuration = new Histogram({ name: 'agricola_command_response_duration_seconds', help: 'Parsed command reception to first correlated local response enqueue.', labelNames: ['command'], buckets: SECONDS, registers: [this.registry] })
-  readonly ruleDuration = new Histogram({ name: 'agricola_rule_duration_seconds', help: 'GameSession execution through SessionResponse, including required Worker waits.', labelNames: ['command', 'mode'], buckets: SECONDS, registers: [this.registry] })
+  readonly ruleDuration = new Histogram({ name: 'agricola_rule_duration_seconds', help: 'GameSession execution through SessionResponse.', labelNames: ['command', 'mode'], buckets: SECONDS, registers: [this.registry] })
   readonly outgoingSize = new Histogram({ name: 'agricola_ws_outgoing_message_size_bytes', help: 'UTF-8 bytes of each locally enqueued complete JSON message, before transport compression/framing.', labelNames: ['round', 'message_type'], buckets: BYTES, registers: [this.registry] })
   readonly broadcastSize = new Histogram({ name: 'agricola_ws_broadcast_payload_bytes', help: 'Sum of actual per-recipient JSON payload bytes for one publication.', labelNames: ['round'], buckets: BYTES, registers: [this.registry] })
   readonly broadcastRecipients = new Histogram({ name: 'agricola_ws_broadcast_recipients', help: 'Actual open socket sends in one publication.', labelNames: ['round'], buckets: [1, 2, 3, 4, 5, 6], registers: [this.registry] })
   readonly dbErrors = new Counter({ name: 'agricola_db_errors_total', help: 'Database failures by bounded category; contains no SQL.', labelNames: ['reason'], registers: [this.registry] })
   readonly s3Bytes = new Counter({ name: 'agricola_s3_payload_bytes_total', help: 'Successful object payload bytes, excluding protocol overhead.', labelNames: ['kind'], registers: [this.registry] })
-  readonly workerFailures = new Counter({ name: 'agricola_worker_failures_total', help: 'Worker timeouts and execution failures.', labelNames: ['kind'], registers: [this.registry] })
   readonly socketErrors = new Counter({ name: 'agricola_ws_errors_total', help: 'WebSocket send, parse and disconnect failures by bounded reason.', labelNames: ['kind'], registers: [this.registry] })
   readonly incomingBytes = new Counter({ name: 'agricola_ws_incoming_payload_bytes_total', help: 'Received WebSocket application payload bytes.', registers: [this.registry] })
   readonly queueDepth = new Gauge({ name: 'agricola_queue_pending', help: 'Work items waiting for their predecessor; includes lifecycle work.', registers: [this.registry] })
@@ -145,7 +144,7 @@ export function sendObserved(ws: WebSocket, event: ServerEvent, capturedRound = 
   return bytes
 }
 
-export function measureRule<T>(mode: 'native' | 'worker', work: () => T): T {
+export function measureRule<T>(mode: 'native', work: () => T): T {
   const start = performance.now()
   const command = commands.getStore()?.command ?? 'other'
   const finish = () => safe(() => operationsMetrics.ruleDuration.observe({ command, mode }, (performance.now() - start) / 1000))

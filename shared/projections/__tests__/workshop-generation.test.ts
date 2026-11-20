@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { WorkshopAbilityCandidateContract, WorkshopBrowserTestOutcome, WorkshopDraftContract } from '../../contract/workshop'
 import { abilityArtifactFingerprint, abilityDraftFingerprint, currentAbilityTesting, isAbilityCandidateReady, projectAbilityCandidate, projectGenerationResult, projectWorkshopGeneration, projectVisibleMessages, sourceFingerprint } from '../workshop-generation'
 
-const sourceCode = 'const CARD_IMPL = {}'
+const sourceCode = 'const impl = {}'
 const testCode = 'test("gain food", () => expect(1).to.equal(1))'
 const candidate = {
   id: 'a', kind: 'ability', prompt: 'gain food', createdAt: 1, sourceCode, cardJson: {},

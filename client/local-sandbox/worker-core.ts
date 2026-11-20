@@ -57,14 +57,12 @@ const compileCards = (cards: LocalCardInput[]): CustomCardData[] =>
         cardType: card.cardType,
         cardJson: card.cardJson,
         effectCode: null,
-        compiledCode: null,
-        codeManifest: null,
         artUrl: card.artUrl ?? null,
       }
     }
     try {
-      // A native source supplies its own definition; a retired-format draft keeps its stored one.
-      return prepareLocalCustomCard({ cardId: card.cardJson.id, source: card.source, cardType: card.cardType, cardJson: card.cardJson, artUrl: card.artUrl })
+      // A native source supplies its own definition (ADR 0052).
+      return prepareLocalCustomCard({ cardId: card.cardJson.id, source: card.source, artUrl: card.artUrl })
     } catch (error) {
       throw new Error(`Card ${card.cardJson.id} failed to compile: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
     }

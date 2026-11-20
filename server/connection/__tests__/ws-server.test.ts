@@ -13,7 +13,6 @@ import { authCookieNames } from '../../auth-cookies'
 import { BROWSER_WS_PROTOCOL } from '../../../shared/contract/browser-auth'
 import { BROWSER_TEST_ORIGIN, openBrowserSocket } from '../../__tests__/_helpers/browser-auth'
 import { viewerBuildExists } from '../../game/replay-viewer-build'
-import { serializeSessionSnapshot } from '../../../shared/session/serialization'
 import { getDb } from '../../db'
 import { recordingResources } from '../../__tests__/_helpers/recording'
 import { createWorkSession } from '../../__tests__/_helpers/session-fixtures'
@@ -204,13 +203,12 @@ describe('fixed dev room startup persistence', () => {
 })
 
 describe('server shutdown', () => {
-  it('disposes room executors and clears the registry', async () => {
+  it('disposes room sessions and clears the registry', async () => {
     const result = (await createWsServer(createServer(), {
       persistence: new PostgresRoomPersistence(getDb()), ...recording,
     }))
     const room = result.registry.get('dev2')!
-    const dispose = vi.fn()
-    room.customSessionExecutor = { dispose } as never
+    const dispose = vi.spyOn(room.session, 'dispose')
 
     await result.shutdown()
 
@@ -607,70 +605,6 @@ describe('room-manager ws sync', () => {
     expect(await persistence.loadReplayHead(created.roomId)).toBeNull()
     expect((await persistence.load(created.roomId))?.serialized).toEqual(snapshot?.serialized)
     await vi.waitFor(async () => expect(await recording.gameContextStore.activeExpiresAt(created.roomId)).toBeGreaterThan(Date.now()))
-  })
-
-  it('disposes a completed custom executor when the last socket disconnects', async () => {
-    const ws = new WebSocket(baseUrl) as TestSocket
-    ws.received = []
-    attachCollector(ws)
-    sockets.push(ws)
-    await waitForOpen(ws)
-    await sendCommand(ws, { type: 'createRoom', name: 'P1', maxPlayers: 2 })
-    const created = await waitForEvent(
-      ws,
-      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated',
-    )
-    const room = wsServerResult.registry.get(created.roomId)!
-    const dispose = vi.fn()
-    room.session.state.gameOver = true
-    room.customSessionExecutor = { dispose } as never
-
-    const closed = new Promise<void>((resolve) => ws.once('close', () => resolve()))
-    ws.close()
-    await closed
-
-    await vi.waitFor(() => expect(dispose).toHaveBeenCalledOnce())
-    expect(room.customSessionExecutor).toBeDefined()
-  })
-
-  it('disposes a custom executor when an in-flight command completes an empty room', async () => {
-    const ws = new WebSocket(baseUrl) as TestSocket
-    ws.received = []
-    attachCollector(ws)
-    sockets.push(ws)
-    await waitForOpen(ws)
-    await sendCommand(ws, { type: 'createRoom', name: 'P1', maxPlayers: 2 })
-    const created = await waitForEvent(
-      ws,
-      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated',
-    )
-    const room = wsServerResult.registry.get(created.roomId)!
-    room.status = 'playing'
-    room.startedAt = Date.now()
-    expect((await wsServerResult.committer!.prepareRoom(room, { missingPrefix: false })).kind).toBe('committed')
-    const response = room.session.withCtx(() => room.session.getState())
-    const dispose = vi.fn()
-    let finishCommand = () => {}
-    const execute = vi.fn(() => new Promise<typeof response>((resolve) => {
-      finishCommand = () => {
-        room.session.state.gameOver = true
-        resolve(room.session.getState())
-      }
-    }))
-    room.customSessionExecutor = { session: room.session, execute, dispose,
-      serializedStateForPersistence: () => serializeSessionSnapshot(room.session.state, room.session),
-      scoresForPersistence: () => room.session.getState().scores ?? [],
-    } as never
-    await sendCommand(ws, { type: 'action', spaceId: 'forest' })
-    await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce())
-
-    const closed = new Promise<void>((resolve) => ws.once('close', () => resolve()))
-    ws.close()
-    await closed
-    expect(dispose).not.toHaveBeenCalled()
-
-    finishCommand()
-    await vi.waitFor(() => expect(dispose).toHaveBeenCalledOnce())
   })
 
   it.each(['browser', 'native'])('accepts createRoom over websocket with current %s authentication', async mode => {

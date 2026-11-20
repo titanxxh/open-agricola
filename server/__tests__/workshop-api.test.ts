@@ -23,6 +23,13 @@ import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-pr
 import { abilityArtifactFingerprint } from '../../shared/projections/workshop-generation'
 import type { WorkshopAbilityTestingContract } from '../../shared/contract/workshop'
 
+const NATIVE_TEST_SOURCE = `import { defineMinorCard } from '../card-source'
+
+export const CUSTOM_Test = defineMinorCard({
+  meta: { id: 'CUSTOM_Test', name: 'Test', deck: 'community', number: 0, desc: [] },
+  impl: {},
+})`
+
 const testedCandidate = <T extends { sourceCode: string }>(candidate: T) => {
   const code = 'test("card behavior", () => expect(1).to.equal(1))'
   return { ...candidate, testing: { code, lastRun: {
@@ -529,49 +536,45 @@ describe('workshop API', () => {
       const descriptor = mockRes()
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox-contract'), descriptor)
       const { contract } = JSON.parse(descriptor.body)
-      expect(contract.id).toMatch(/^sandbox-v1:[a-f0-9]{64}$/)
-      expect(contract.format).toBe(2)
-      expect(contract.effects).toContain('onBuy')
-      expect(contract).not.toHaveProperty('helpers')
-      expect(contract).not.toHaveProperty('semantics')
-      expect(contract.limits).toEqual({ executionTimeoutMs: 100, memoryLimitMb: 8 })
+      expect(contract).toEqual({ format: 2, id: expect.stringMatching(/^sandbox-v1:[a-f0-9]{64}$/), runtime: 'browser-card-source' })
       const invalid = mockRes()
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards/validate-code', {
-        source: 'import x from "node:fs"', card_id: 'CUSTOM_Test', sandboxContractId: contract.id,
+        source: NATIVE_TEST_SOURCE.replace("'../card-source'", "'node:fs'"), card_id: 'CUSTOM_Test', sandboxContractId: contract.id,
       }, 'tok-alice'), invalid)
       expect(JSON.parse(invalid.body)).toMatchObject({ valid: false, sandboxContractId: contract.id, sourceFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) })
       const changed = mockRes()
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards/validate-code', {
-        source: 'const CARD_IMPL = {}', card_id: 'CUSTOM_Test', sandboxContractId: 'old-deployment',
+        source: NATIVE_TEST_SOURCE, card_id: 'CUSTOM_Test', sandboxContractId: 'old-deployment',
       }, 'tok-alice'), changed)
       expect(changed.statusCode).toBe(409)
       expect(JSON.parse(changed.body)).toMatchObject({ code: 'sandbox_changed', sandboxContractId: contract.id })
     })
 
-    it('validates cost attribution against the submitted card ID', async () => {
-      const source = `
-const CARD_ID = 'CUSTOM_ValidatedCard'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Validated Card' })
-const CARD_IMPL = {
-  listeners: [{
-    cardIds: [CARD_ID],
-    actions: ['construct'],
-    phases: ['computeCosts'],
-    handler: () => ({
-      costs: { wood: -1 },
-      costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
-    }),
-  }],
-}
-      `
+    it('admits a native Card Source without running it and returns its card meta', async () => {
       const res = mockRes()
-
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards/validate-code', {
-        source,
-        card_id: 'CUSTOM_ValidatedCard',
+        source: NATIVE_TEST_SOURCE, card_id: 'CUSTOM_Test',
       }, 'tok-alice'), res)
 
-      expect(JSON.parse(res.body)).toMatchObject({ ok: true, valid: true })
+      expect(res.statusCode).toBe(200)
+      expect(JSON.parse(res.body)).toMatchObject({
+        ok: true, valid: true, manifest: { format: 'native-card-source' },
+        cardJson: { id: 'CUSTOM_Test', name: 'Test', card_type: 'minor', deck: 'CUSTOM' },
+      })
+    })
+
+    it('rejects the retired CARD_DEF / CARD_IMPL format with a request to regenerate it', async () => {
+      const res = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards/validate-code', {
+        source: "const CARD_ID = 'CUSTOM_Test'\nconst CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Test' })\nconst CARD_IMPL = {}",
+        card_id: 'CUSTOM_Test',
+      }, 'tok-alice'), res)
+
+      expect(res.statusCode).toBe(400)
+      expect(JSON.parse(res.body)).toMatchObject({
+        ok: false, code: 'legacy_card_format', error: expect.stringContaining('Regenerate it as a Card Source module'),
+        sourceFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      })
     })
   })
 
@@ -1184,20 +1187,12 @@ const CARD_IMPL = {
           id: 'wrong-identity',
           kind: 'ability',
           prompt: 'regenerate the ability',
-          sourceCode: `
-const CARD_ID = 'CUSTOM_MasterCarpenter'
-const CARD_DEF = {
-  cardType: 'occupation',
-  meta: {
-    id: CARD_ID,
-    name: 'Master Carpenter',
-    deck: 'CUSTOM',
-    number: 0,
-    desc: ['Different effect.'],
-  },
-}
-const CARD_IMPL = {}
-          `.trim(),
+          sourceCode: `import { defineOccupationCard } from '../card-source'
+
+export const CUSTOM_MasterCarpenter = defineOccupationCard({
+  meta: { id: 'CUSTOM_MasterCarpenter', name: 'Master Carpenter', deck: 'community', number: 0, desc: ['Different effect.'] },
+  impl: {},
+})`,
           createdAt: 100,
         }),
       }, 'tok-alice'), adoptRes)
@@ -1244,18 +1239,12 @@ const CARD_IMPL = {}
           id: 'factory-ability',
           kind: 'ability',
           prompt: 'factory metadata',
-          sourceCode: `
-const CARD_ID = 'CUSTOM_FactoryWorkspace'
-const CARD_DEF = MinorImprovement({
-  id: CARD_ID,
-  name: 'Factory Ability',
-  desc: ['Factory effect.'],
-  cost: { wood: 1 },
-  prerequisite: { occupation: 2 },
-  vp: 1,
-})
-const CARD_IMPL = {}
-          `.trim(),
+          sourceCode: `import { defineMinorCard } from '../card-source'
+
+export const CUSTOM_FactoryWorkspace = defineMinorCard({
+  meta: { id: 'CUSTOM_FactoryWorkspace', name: 'Factory Ability', deck: 'community', number: 0, desc: ['Factory effect.'], cost: { wood: 1 }, prerequisite: { occupation: 2 }, vp: 1 },
+  impl: {},
+})`,
           createdAt: 100,
       })
       for (const testing of [undefined, { ...candidate.testing, code: 'changed tests' }]) {
@@ -1307,19 +1296,12 @@ const CARD_IMPL = {}
           implemented: true,
           _draft: { costInput: '1w' },
         },
-        effect_code: `
-const CARD_DEF = {
-  cardType: 'minor',
-  meta: {
-    id: 'CUSTOM_PinnedPublic',
-    name: 'Pinned Public',
-    deck: 'CUSTOM',
-    number: 0,
-    desc: ['published text'],
-  },
-}
-const CARD_IMPL = {}
-        `.trim(),
+        effect_code: `import { defineMinorCard } from '../card-source'
+
+export const CUSTOM_PinnedPublic = defineMinorCard({
+  meta: { id: 'CUSTOM_PinnedPublic', name: 'Pinned Public', deck: 'community', number: 0, desc: ['published text'] },
+  impl: {},
+})`,
       }, 'tok-alice'), createRes)
       const cardDbId = JSON.parse(createRes.body).id
 

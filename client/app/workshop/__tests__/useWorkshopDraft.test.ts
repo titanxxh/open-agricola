@@ -686,8 +686,8 @@ describe('useWorkshopDraft', () => {
 
   it('adopts a replacement candidate without validating the old draft source', async () => {
     const calls: { path: string; body?: Record<string, unknown> }[] = []
-    const legacySource = "const CARD_IMPL = { listeners: [{ actions: ['improvement-any', 'minor-improvement'] }] }"
-    const replacementSource = "const CARD_IMPL = { listeners: [{ actions: ['improvement'] }] }"
+    const legacySource = "const impl = { listeners: [{ actions: ['improvement-any', 'minor-improvement'] }] }"
+    const replacementSource = "const impl = { listeners: [{ actions: ['improvement'] }] }"
     const initial = workspace(1)
     initial.draft.effectCode = legacySource
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
@@ -763,8 +763,8 @@ describe('useWorkshopDraft', () => {
     const apiFetch = vi.fn(async () => Response.json({ ok: true, workspace: workspace(1) }))
     const { result } = renderHook(() => useWorkshopDraft({ cardId: 'card-1', apiFetch }))
     await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
-    const candidate = { id: 'ability', kind: 'ability', prompt: 'gain food', sourceCode: 'const CARD_IMPL = {}', cardJson: {},
-      ...testedArtifacts('const CARD_IMPL = {}'), createdAt: 1, baseRevision: 1, stale: false,
+    const candidate = { id: 'ability', kind: 'ability', prompt: 'gain food', sourceCode: 'const impl = {}', cardJson: {},
+      ...testedArtifacts('const impl = {}'), createdAt: 1, baseRevision: 1, stale: false,
     } satisfies AbilityCandidate
     for (const invalid of [
       { ...candidate, testing: undefined },

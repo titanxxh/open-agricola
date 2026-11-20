@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import type { GameState } from '../../shared/contract/types'
 import { travelingPlayers } from '../../shared/cards/action/common-traveling-players'
-import { validateAndCompileCustomCode } from '../custom-code/engine'
 import type { GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { testCardImpl } from './_helpers/test-card-impl'
 import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 const CARD_ID = 'CUSTOM_ComposedBehavior'
@@ -12,14 +12,9 @@ const sessions: GameSession[] = []
 afterEach(() => { sessions.splice(0).forEach(session => session.dispose()) })
 
 function start(implementation: string, configure: (state: GameState) => void, type: 'minor' | 'occupation' = 'minor', metadata = {}) {
-  const result = validateAndCompileCustomCode(`
-const CARD_ID = '${CARD_ID}'
-const CARD_DEF = ${type === 'minor' ? 'MinorImprovement' : 'Occupation'}({ id: CARD_ID, name: 'Composed behavior' })
-const CARD_IMPL = ${implementation}
-`, CARD_ID)
-  if (!result.valid) throw new Error(result.errors.join('\n'))
   const session = createWorkSession({
-    customCards: [{ cardType: type, cardJson: { id: CARD_ID, name: 'Composed behavior', deck: 'CUSTOM', number: 0, desc: [], ...metadata }, compiledCode: result.compiledCode, codeManifest: result.manifest }],
+    customCards: [{ cardType: type, cardJson: { id: CARD_ID, name: 'Composed behavior', deck: 'CUSTOM', number: 0, desc: [], ...metadata } }],
+    cardImpls: { [CARD_ID]: testCardImpl(CARD_ID, implementation) },
     configure: state => {
       setWorkersAtHome(state, state.players[1]!, 0)
       configure(state)

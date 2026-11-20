@@ -6,8 +6,7 @@ import type { GameTermination } from '../../shared/contract/protocol/game-termin
 
 export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
   const state = room.session.state
-  const scores = room.customSessionExecutor?.scoresForPersistence()
-    ?? room.session.withCtx(() => Scoring.computeAll(state))
+  const scores = room.session.withCtx(() => Scoring.computeAll(state))
   const seatOwners = new Map(
     toRoomMeta(room).players.map((player) => [player.playerIndex, player.userId]),
   )

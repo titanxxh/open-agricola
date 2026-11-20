@@ -6,23 +6,26 @@ import { test, expect, type Page } from '@playwright/test'
 // The engine and custom card code run in a Worker inside an opaque-origin
 // iframe — no server round-trips.
 //
-// Custom-card execution equivalence with the server isolated-vm executor is
-// pinned by server/__tests__/local-sandbox-parity.test.ts; runaway-card timeout
-// recovery is pinned by client/local-sandbox/__tests__/local-transport.test.ts.
+// Runaway-card timeout recovery is pinned by
+// client/local-sandbox/__tests__/local-transport.test.ts.
 // This spec covers what only a real browser proves: local boot with zero server
 // calls inside the opaque engine frame, dev-panel dispatch through the worker,
 // and IndexedDB resume on reload.
 
 const CONFIG = {
-  // A custom card with source forces the worker to compile (typescript) and
+  // A native Card Source forces the worker to compile (typescript) and
   // register it — a real-browser proof that new Function works.
   cards: [{
     cardType: 'minor',
     cardJson: { id: 'CUSTOM_E2ECard', name: 'E2E Card', deck: 'CUSTOM', number: 0, desc: ['E2E'] },
     source: [
+      "import { defineMinorCard } from '../card-source'",
+      "import { gainLeaf } from '../helpers/pay-gain-node'",
       "const CARD_ID = 'CUSTOM_E2ECard'",
-      "const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'E2E Card' })",
-      'const CARD_IMPL = { effect: { id: CARD_ID, onReturnHome: () => gainLeaf(CARD_ID, { food: 1 }) } }',
+      'export const CUSTOM_E2ECard = defineMinorCard({',
+      "  meta: { id: CARD_ID, name: 'E2E Card', deck: 'community', number: 0, desc: ['E2E'] },",
+      '  impl: { effect: { id: CARD_ID, onReturnHome: () => gainLeaf(CARD_ID, { food: 1 }) } },',
+      '})',
     ].join('\n'),
     artUrl: null,
   }],

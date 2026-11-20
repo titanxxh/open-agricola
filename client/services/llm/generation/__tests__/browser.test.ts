@@ -2,12 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { WorkshopSandboxContract } from '../../../../../shared/contract/workshop-generation'
 import { createSandboxPorts } from '../browser'
 
-const contract: WorkshopSandboxContract = {
-  format: 2, id: `sandbox-v1:${'a'.repeat(64)}`, runtime: 'server-isolated-vm',
-  limits: { executionTimeoutMs: 100, memoryLimitMb: 8 }, effects: ['onBuy'], actions: ['gain'],
-  listeners: { actions: ['collect'], phases: ['after'], scopes: ['player'],
-    players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } },
-}
+const contract: WorkshopSandboxContract = { format: 2, id: `sandbox-v1:${'a'.repeat(64)}`, runtime: 'browser-card-source' }
 
 describe('deployed browser contract loading', () => {
   it('loads the current descriptor schema from the application API', async () => {

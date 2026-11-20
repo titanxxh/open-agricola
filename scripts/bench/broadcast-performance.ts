@@ -122,7 +122,7 @@ const summary = (selected: typeof samples) => {
 }
 const sourceFiles = ['scripts/bench/room-performance.ts', 'scripts/bench/broadcast-performance.ts',
   'server/connection/broadcaster.ts', 'server/connection/envelope-builder.ts', 'server/connection/room-router.ts',
-  'server/game/custom-session-executor.ts', 'server/game/custom-session-worker.ts', 'server/game/room-committer.ts',
+  'server/game/room-committer.ts',
   'server/game/authoritative-session.ts', 'server/connection/history-presentation.ts',
   'shared/session/sync-payload.ts', 'shared/session/session-core.ts', 'shared/session/history-window.ts',
   'shared/projections/serialized-state.ts', 'shared/projections/history-names.ts',

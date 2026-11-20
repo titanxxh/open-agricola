@@ -30,7 +30,7 @@
 
 我们特别关注：
 
-- 自定义卡沙盒逃逸（opaque-origin 浏览器 iframe / Worker；退役沙盒格式的 isolated-vm）
+- 自定义卡沙盒逃逸（运行工坊代码的 opaque-origin 浏览器 iframe / Worker）
 - 认证、session 和 OAuth 漏洞
 - 跨房间信息泄漏或通过 WebSocket 未授权修改状态
 - SQL 注入或数据完整性问题

@@ -11,16 +11,14 @@ import type { SandboxAuthority } from './game/sandbox-authority'
 import { ExecutionRevokedError, type ExecutionStamp } from './game/execution-access'
 import { RoomOwnershipError } from './game/room-directory'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { GameSession } from './game/authoritative-session.ts'
+import { buildSessionSyncPayload, GameSession } from './game/authoritative-session.ts'
 import type { FarmChoiceType, FarmChoiceValidation } from '../shared/session/farm-choice-validation.ts'
 import type { MoorSpecialActionId } from '../shared/moor/types.ts'
 import { validateSession } from './auth.ts'
 import { allowAnonymousAccess } from './anonymous-access.ts'
-import type { CustomCardData } from '../shared/cards/session-card-context.ts'
-import { UnsupportedSandboxListenerError } from '../shared/custom-code/sandbox-listener-phases.ts'
 import { defaultSandboxDeckIds, type InitialStateOptions } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
-import { parseDraftOptions, loadLiveCustomCards } from './connection/room-router.ts'
+import { parseDraftOptions } from './connection/room-router.ts'
 import {
   asSetupPayload,
   assertSupportedLoadedState,
@@ -30,12 +28,6 @@ import {
   parseGameSetupRequest,
   resolveCustomCardDbIds,
 } from './game/game-setup-options.ts'
-import {
-  buildSessionSyncPayload,
-  createIsolatedGameSession,
-  type CustomSessionExecutor,
-  type CustomSessionMethod,
-} from './game/custom-session-executor.ts'
 
 
 /**
@@ -49,10 +41,8 @@ const sessionStamps = new Map<string, ExecutionStamp>()
 const requests = new WeakMap<IncomingMessage, { stamp: ExecutionStamp; revision?: number }>()
 const responses = new WeakMap<ServerResponse, IncomingMessage>()
 export const disposeSandboxSessionsForUser = (userId: string): void => {
-  sessionExecutors.get(userId)?.dispose()
   userSessions.get(userId)?.dispose()
-  sessionExecutors.delete(userId); userSessions.delete(userId); sessionStamps.delete(userId)
-  sessionCardDbIds.delete(userId); sessionLastAccess.delete(userId)
+  userSessions.delete(userId); sessionStamps.delete(userId); sessionLastAccess.delete(userId)
   sessionReplacementGenerations.delete(userId)
 }
 export const shutdownSandboxSessions = (): void => {
@@ -64,20 +54,12 @@ const gameInstanceIds = new WeakMap<GameSession, string>()
 
 type SandboxSetup = {
   options: InitialStateOptions
-  customCards: CustomCardData[]
-  cardDbIds: string[]
-  versions: Array<{ cardId: string; versionId: string }>
 }
 const sandboxSetups = new WeakMap<GameSession, SandboxSetup>()
 
 const userSessions = new Map<string, GameSession>()
-const sessionExecutors = new Map<string, CustomSessionExecutor>()
 const sessionLastAccess = new Map<string, number>()
 const sessionReplacementGenerations = new Map<string, symbol>()
-const cardTakedownGenerations = new Map<string, number>()
-// Workshop card db ids embedded in each sandbox session, so the admin kill
-// switch (#641) can dispose sessions still executing a taken-down card.
-const sessionCardDbIds = new Map<string, string[]>()
 const SESSION_TTL_MS = 30 * 60 * 1000 // 30 minutes
 
 // Periodically clean up idle sessions
@@ -85,14 +67,10 @@ setInterval(() => {
   const now = Date.now()
   for (const [key, lastAccess] of sessionLastAccess) {
     if (now - lastAccess > SESSION_TTL_MS) {
-      const session = userSessions.get(key)
-      sessionExecutors.get(key)?.dispose()
-      session?.dispose()
+      userSessions.get(key)?.dispose()
       userSessions.delete(key)
-      sessionExecutors.delete(key)
       sessionLastAccess.delete(key)
       sessionReplacementGenerations.delete(key)
-      sessionCardDbIds.delete(key)
     }
   }
 }, 60_000).unref()
@@ -119,7 +97,7 @@ const getSessionForRequest = async (req: IncomingMessage): Promise<Awaited<GameS
 }
 
 class SandboxReplacementError extends Error {
-  readonly code: 'sandbox_replaced' | 'sandbox_card_taken_down'
+  readonly code: 'sandbox_replaced'
 
   constructor(code: SandboxReplacementError['code'], message: string) {
     super(message)
@@ -134,25 +112,19 @@ const beginReplacement = (key: string): symbol => {
   return generation
 }
 
-const recordTakedownGenerations = (ids: string[]) =>
-  ids.map(id => ({ id, generation: cardTakedownGenerations.get(id) ?? 0 }))
-
 type SessionReplacement = {
   key: string
   generation: symbol
-  takedownGenerations: ReturnType<typeof recordTakedownGenerations>
   previousSandbox?: { session: GameSession; instanceId: string }
 }
 
 const setSessionForRequest = async (
   req: IncomingMessage,
   session: GameSession,
-  cardDbIds: string[],
-  executor: CustomSessionExecutor | undefined,
   replacement: SessionReplacement,
 ): Promise<void> => {
   let stamp: ExecutionStamp | undefined
-  const { key, generation, takedownGenerations, previousSandbox } = replacement
+  const { key, generation, previousSandbox } = replacement
   if (key !== await getSessionKey(req)) throw new ExecutionRevokedError('Session authorization ended')
   if (authority) {
     const auth = authority
@@ -160,13 +132,10 @@ const setSessionForRequest = async (
       const scope = requests.get(req)
       if (scope?.revision !== undefined) await auth.access.assertRevision(scope.revision)
       if (previousSandbox && scope) await auth.access.assert(scope.stamp)
-      const next = await auth.access.capture(cardDbIds, key === 'anonymous' ? [] : [key])
+      const next = await auth.access.capture([], key === 'anonymous' ? [] : [key])
       await auth.check(next)
       return next
     })()
-  }
-  if (takedownGenerations.some(item => (cardTakedownGenerations.get(item.id) ?? 0) !== item.generation)) {
-    throw new SandboxReplacementError('sandbox_card_taken_down', 'Card taken down during session initialization')
   }
   const replaced = previousSandbox && (userSessions.get(key) !== previousSandbox.session
     || gameInstanceIds.get(previousSandbox.session) !== previousSandbox.instanceId)
@@ -176,40 +145,12 @@ const setSessionForRequest = async (
 
   const old = userSessions.get(key)
   if (old && old !== session) old.dispose()
-  sessionExecutors.get(key)?.dispose()
   userSessions.set(key, session)
   if (stamp) {
     sessionStamps.set(key, stamp)
     requests.set(req, { stamp })
   }
-  if (executor) sessionExecutors.set(key, executor)
-  else sessionExecutors.delete(key)
   sessionLastAccess.set(key, Date.now())
-  if (cardDbIds.length > 0) sessionCardDbIds.set(key, cardDbIds)
-  else sessionCardDbIds.delete(key)
-}
-
-/**
- * Admin kill switch (#641): dispose every HTTP sandbox session that embeds
- * the card, so its executable snapshot stops running (the TTL refresh would
- * otherwise keep it alive indefinitely).
- */
-export const disposeSandboxSessionsUsingCard = (cardDbId: string): number => {
-  cardTakedownGenerations.set(cardDbId, (cardTakedownGenerations.get(cardDbId) ?? 0) + 1)
-  let disposed = 0
-  for (const [key, ids] of [...sessionCardDbIds]) {
-    if (!ids.includes(cardDbId)) continue
-    sessionExecutors.get(key)?.dispose()
-    userSessions.get(key)?.dispose()
-    userSessions.delete(key)
-    sessionExecutors.delete(key)
-    sessionLastAccess.delete(key)
-    sessionReplacementGenerations.delete(key)
-    sessionCardDbIds.delete(key)
-    sessionStamps.delete(key)
-    disposed += 1
-  }
-  return disposed
 }
 
 /**
@@ -239,19 +180,15 @@ const resolveViewerPlayerId = (req: IncomingMessage, session: GameSession): stri
   return state.players.some((p) => p.id === candidate) ? candidate : null
 }
 
-/** Call a session method and build the respondWith payload (including custom card defs). */
+/** Call a session method and build the respondWith payload. */
 const callAndRespond = async (
   req: IncomingMessage,
-  method: CustomSessionMethod,
-  args: unknown[],
   fn: (session: GameSession) => import('./game/authoritative-session.ts').SessionResponse,
+  options: { loadsState?: boolean } = {},
 ) => {
   const session = (await getSessionForRequest(req))
-  const executor = sessionExecutors.get((await getSessionKey(req)))
-  const resp = executor
-    ? await executor.execute(method, args)
-    : session.withCtx(() => fn(session))
-  if (method === 'loadState' && resp.ok) gameInstanceIds.delete(session)
+  const resp = session.withCtx(() => fn(session))
+  if (options.loadsState && resp.ok) gameInstanceIds.delete(session)
   const viewerId = resolveViewerPlayerId(req, session)
   return { resp, result: respondWith(resp, session, viewerId), viewerId }
 }
@@ -288,8 +225,6 @@ const enforceSeatBinding = async (
  * tests. Production code paths use `getSessionForRequest` directly.
  */
 export const setSession = (s: GameSession) => {
-  sessionExecutors.get('anonymous')?.dispose()
-  sessionExecutors.delete('anonymous')
   userSessions.set('anonymous', s)
 }
 
@@ -343,32 +278,22 @@ const startSandboxGame = async (
   setup: SandboxSetup,
   replacement: SessionReplacement,
 ): Promise<void> => {
-  const { customCards, cardDbIds, options, versions } = setup
-  const { session, executor } = createIsolatedGameSession(seed, customCards.length > 0 ? customCards : undefined, options)
+  const session = new GameSession(seed, undefined, setup.options)
   let adopted = false
   try {
-    if (executor && !executor.reserveWorkerSlot()) {
-      await sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
-      return
-    }
-    const response = executor ? await executor.execute('getState', []) : session.withCtx(() => session.getState())
+    const response = session.withCtx(() => session.getState())
     const payload = {
       ...respondWith(response, session, resolveViewerPlayerId(req, session)),
-      customCardsLoaded: customCards.length,
-      customCardVersionsLoaded: versions,
       cardWarnings: session.cardWarnings.length > 0 ? session.cardWarnings : undefined,
     }
     if (response.ok) {
-      await setSessionForRequest(req, session, cardDbIds, executor, replacement)
+      await setSessionForRequest(req, session, replacement)
       sandboxSetups.set(session, setup)
       adopted = true
     }
     await sendJson(res, 200, payload)
   } finally {
-    if (!adopted) {
-      executor?.dispose()
-      session.dispose()
-    }
+    if (!adopted) session.dispose()
   }
 }
 
@@ -383,7 +308,7 @@ const handleAuthorizedGameRoute = async (
   }
 
   if (req.method === 'GET' && req.url === '/api/game/state') {
-    const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
+    const { result } = await callAndRespond(req, s => s.getState())
     await sendJson(res, 200, result)
     return true
   }
@@ -397,8 +322,6 @@ const handleAuthorizedGameRoute = async (
     if (!(await enforceSeatBinding(req, res, body.playerIndex))) return true
     const { resp, result } = await callAndRespond(
       req,
-      'takeAction',
-      [body.playerIndex, body.spaceId],
       s => s.takeAction(body.playerIndex!, body.spaceId!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -423,8 +346,6 @@ const handleAuthorizedGameRoute = async (
     if (!(await enforceSeatBinding(req, res, body.playerIndex))) return true
     const { resp, result } = await callAndRespond(
       req,
-      'takeSpecialAction',
-      [body.playerIndex, body.cardId, body.actionId, body.payload],
       s => s.takeSpecialAction(body.playerIndex!, body.cardId!, body.actionId!, body.payload),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -440,8 +361,6 @@ const handleAuthorizedGameRoute = async (
     if (!(await enforceSeatBinding(req, res, body.playerIndex))) return true
     const { resp, result } = await callAndRespond(
       req,
-      'resolveChoice',
-      [body.playerIndex, body.value, body.payload],
       s => s.resolveChoice(body.playerIndex!, body.value!, body.payload),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -457,8 +376,6 @@ const handleAuthorizedGameRoute = async (
     if (!(await enforceSeatBinding(req, res, body.playerIndex))) return true
     const { resp, result } = await callAndRespond(
       req,
-      'takeAnytimeAction',
-      [body.playerIndex, body.actionId],
       s => s.takeAnytimeAction(body.playerIndex!, body.actionId!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -482,8 +399,6 @@ const handleAuthorizedGameRoute = async (
     if (!(await enforceSeatBinding(req, res, body.playerIndex))) return true
     const { resp, result } = await callAndRespond(
       req,
-      'resolveOrdinaryCardDrawChoice',
-      [body.playerIndex, body.choiceId, body.keepCardId],
       s => s.resolveOrdinaryCardDrawChoice(body.playerIndex!, body.choiceId!, body.keepCardId!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -500,8 +415,6 @@ const handleAuthorizedGameRoute = async (
     // Task 9: forwarded through the unified resolveChoice dispatcher.
     const { resp, result } = await callAndRespond(
       req,
-      'resolveChoice',
-      [body.playerIndex, 'confirm', { selections: body.selections }],
       s => s.resolveChoice(body.playerIndex!, 'confirm', { selections: body.selections }),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -522,8 +435,6 @@ const handleAuthorizedGameRoute = async (
     if (!(await enforceSeatBinding(req, res, body.playerIndex))) return true
     const { resp, result } = await callAndRespond(
       req,
-      'commitSelectionChoice',
-      [body.playerIndex, payload],
       s => s.commitSelectionChoice(
         body.playerIndex!,
         payload,
@@ -542,8 +453,7 @@ const handleAuthorizedGameRoute = async (
     }
     const { playerIndex, selection } = body
     if (!(await enforceSeatBinding(req, res, playerIndex))) return true
-    const { resp, result } = await callAndRespond(req, 'submitSoloHandSelection',
-      [playerIndex, selection], s => s.submitSoloHandSelection(playerIndex, selection))
+    const { resp, result } = await callAndRespond(req, s => s.submitSoloHandSelection(playerIndex, selection))
     await sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -561,8 +471,6 @@ const handleAuthorizedGameRoute = async (
     const selection = body.selection as Parameters<GameSession['submitParentSelection']>[1]
     const { resp, result } = await callAndRespond(
       req,
-      'submitParentSelection',
-      [body.playerIndex, selection],
       s => s.submitParentSelection(body.playerIndex!, selection),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -572,7 +480,7 @@ const handleAuthorizedGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/next-player') {
     // Task 9: forwarded through resolveChoice; the synthetic
     // confirm-next-player pending envelope supplies `nextPlayerIndex`.
-    const { resp, result } = await callAndRespond(req, 'confirmCurrentPlayer', [], (s) => {
+    const { resp, result } = await callAndRespond(req, (s) => {
       const idx = s.getState().state.currentPlayerIndex
       return s.resolveChoice(idx, 'confirm')
     })
@@ -582,7 +490,7 @@ const handleAuthorizedGameRoute = async (
 
   if (req.method === 'POST' && req.url === '/api/game/confirm-player-switch') {
     // Task 9: forwarded through resolveChoice.
-    const { resp, result } = await callAndRespond(req, 'confirmCurrentPlayer', [], (s) => {
+    const { resp, result } = await callAndRespond(req, (s) => {
       const snapshot = s.getState()
       const idx = snapshot.interaction.stateId === 'wait' &&
         snapshot.interaction.request.kind === 'confirm-player-switch'
@@ -595,19 +503,19 @@ const handleAuthorizedGameRoute = async (
   }
 
   if (req.method === 'POST' && req.url === '/api/game/round-end') {
-    const { resp, result } = await callAndRespond(req, 'performRoundEnd', [], s => s.performRoundEnd())
+    const { resp, result } = await callAndRespond(req, s => s.performRoundEnd())
     await sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo') {
-    const { resp, result } = await callAndRespond(req, 'undoStep', [], s => s.undoStep())
+    const { resp, result } = await callAndRespond(req, s => s.undoStep())
     await sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo-action') {
-    const { resp, result } = await callAndRespond(req, 'undoAction', [], s => s.undoAction())
+    const { resp, result } = await callAndRespond(req, s => s.undoAction())
     await sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -616,11 +524,8 @@ const handleAuthorizedGameRoute = async (
     const url = new URL(req.url, 'http://localhost')
     const playerIndex = Number(url.searchParams.get('playerIndex') ?? '0')
     const session = (await getSessionForRequest(req))
-    const executor = sessionExecutors.get((await getSessionKey(req)))
     try {
-      const actions = executor
-        ? await executor.query<{ spaceId: string; nameKey: string }[]>('getAvailableActions', [playerIndex])
-        : session.withCtx(() => session.getAvailableActions(playerIndex))
+      const actions = session.withCtx(() => session.getAvailableActions(playerIndex))
       await sendJson(res, 200, { ok: true, actions })
     } catch (error) {
       await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
@@ -636,7 +541,7 @@ const handleAuthorizedGameRoute = async (
     }
     try { assertSupportedLoadedState(body.state) }
     catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Unsupported game configuration' }); return true }
-    const { result } = await callAndRespond(req, 'loadState', [body.state], s => s.loadState(body.state))
+    const { result } = await callAndRespond(req, s => s.loadState(body.state), { loadsState: true })
     await sendJson(res, 200, result)
     return true
   }
@@ -649,8 +554,6 @@ const handleAuthorizedGameRoute = async (
     }
     const { resp, result } = await callAndRespond(
       req,
-      'startDevFenceSelect',
-      [body.playerIndex],
       s => s.startDevFenceSelect(body.playerIndex!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -667,10 +570,7 @@ const handleAuthorizedGameRoute = async (
       const payload = parseFenceSelectionPayload(body.payload)
       const session = await getSessionForRequest(req)
       if (!await enforceSeatBinding(req, res, body.playerIndex)) return true
-      const executor = sessionExecutors.get(await getSessionKey(req))
-      const quote = executor
-        ? await executor.query<FenceSelectionQuote>('quoteFenceSelection', [body.playerIndex, body.requestKey, payload])
-        : session.quoteFenceSelection(body.playerIndex, body.requestKey, payload)
+      const quote: FenceSelectionQuote = session.quoteFenceSelection(body.playerIndex, body.requestKey, payload)
       await sendJson(res, 200, quote)
     } catch (error) {
       await sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) })
@@ -685,18 +585,12 @@ const handleAuthorizedGameRoute = async (
       payload: Record<string, unknown>
     }
     const session = (await getSessionForRequest(req))
-    const executor = sessionExecutors.get((await getSessionKey(req)))
     try {
-      const validation = executor
-        ? await executor.query<FarmChoiceValidation>(
-          'validateFarmChoice',
-          [body.type, body.playerId, body.payload],
-        )
-        : session.validateFarmChoice(
-          body.type,
-          body.playerId,
-          body.payload,
-        )
+      const validation: FarmChoiceValidation = session.validateFarmChoice(
+        body.type,
+        body.playerId,
+        body.payload,
+      )
       const { requestError, ...result } = validation
       // Preserve the pre-extraction contract: malformed requests (missing player /
       // unknown type) are 400; ordinary invalid placements are 200 valid:false.
@@ -731,40 +625,18 @@ const handleAuthorizedGameRoute = async (
       await sendJson(res, 400, { ok: false, ...rejection })
       return true
     }
-    const requestUserId = (await validateSession(requestSessionToken(req)))?.id
     const generation = beginReplacement(sessionKey)
-    let customCardDbIds: string[]
-    try { customCardDbIds = resolveCustomCardDbIds(raw) }
+    // Games use only deployed cards; Workshop cards play in the browser sandbox (ADR 0052).
+    try { resolveCustomCardDbIds(raw) }
     catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid game configuration' }); return true }
-    const loadedCustomCards = customCardDbIds.length > 0
-      ? (await loadLiveCustomCards(customCardDbIds, requestUserId))
-      : null
-    if (loadedCustomCards?.hasNotLive) {
-      await sendJson(res, 400, {
-        ok: false,
-        error: 'cards must pass review approval and be published live before they can be used in a game; unreviewed cards are only playable in the workshop sandbox',
-      })
-      return true
-    }
-    const customCards = loadedCustomCards?.cards ?? []
-    const loadedCardDbIds = loadedCustomCards?.loadedDbIds ?? []
-    const takedownGenerations = recordTakedownGenerations(loadedCardDbIds)
-    // Community cards execute in an isolated session instead of on the HTTP event loop.
-    const { session, executor } = createIsolatedGameSession(seed, customCards.length > 0 ? customCards : undefined, options)
-    if (executor && !executor.reserveWorkerSlot()) {
-      executor.dispose()
-      session.dispose()
-      await sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
-      return true
-    }
+    const session = new GameSession(seed, undefined, options)
     try {
-      await setSessionForRequest(req, session, loadedCardDbIds, executor, { key: sessionKey, generation, takedownGenerations })
+      await setSessionForRequest(req, session, { key: sessionKey, generation })
     } catch (error) {
-      executor?.dispose()
       session.dispose()
       throw error
     }
-    const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
+    const { result } = await callAndRespond(req, s => s.getState())
     await sendJson(res, 200, result)
     return true
   }
@@ -824,10 +696,7 @@ const handleAuthorizedGameRoute = async (
 
     await startSandboxGame(req, res, seed, {
       options: { ...sandboxOptions, deckIds },
-      customCards: [],
-      cardDbIds: [],
-      versions: [],
-    }, { key: sessionKey, generation, takedownGenerations: recordTakedownGenerations([]) })
+    }, { key: sessionKey, generation })
     return true
   }
 
@@ -853,7 +722,6 @@ const handleAuthorizedGameRoute = async (
     await startSandboxGame(req, res, body.seed, setup, {
       key, generation: beginReplacement(key),
       previousSandbox: { session: previousSandbox, instanceId: body.gameInstanceId },
-      takedownGenerations: recordTakedownGenerations(setup.cardDbIds),
     })
     return true
   }
@@ -866,8 +734,6 @@ const handleAuthorizedGameRoute = async (
     }
     const { resp, result } = await callAndRespond(
       req,
-      'devPlayCard',
-      [body.playerIndex, body.cardId],
       s => s.devPlayCard(body.playerIndex!, body.cardId!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -883,8 +749,6 @@ const handleAuthorizedGameRoute = async (
     if (!(await enforceSeatBinding(req, res, body.playerIndex))) return true
     const { resp, result } = await callAndRespond(
       req,
-      'devDrawCard',
-      [body.playerIndex, body.cardId],
       s => s.devDrawCard(body.playerIndex!, body.cardId!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -899,8 +763,6 @@ const handleAuthorizedGameRoute = async (
     }
     const { resp, result } = await callAndRespond(
       req,
-      'devSetSpaceTaken',
-      [body.spaceId, body.playerId ?? null],
       s => s.devSetSpaceTaken(body.spaceId!, body.playerId ?? null),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -915,8 +777,6 @@ const handleAuthorizedGameRoute = async (
     }
     const { resp, result } = await callAndRespond(
       req,
-      'devSetCurrentPlayer',
-      [body.playerIndex],
       s => s.devSetCurrentPlayer(body.playerIndex!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -931,8 +791,6 @@ const handleAuthorizedGameRoute = async (
     }
     const { resp, result } = await callAndRespond(
       req,
-      'devSetResources',
-      [body.playerIndex, body.resources],
       s => s.devSetResources(body.playerIndex!, body.resources!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -947,8 +805,6 @@ const handleAuthorizedGameRoute = async (
     }
     const { resp, result } = await callAndRespond(
       req,
-      'devAddRooms',
-      [body.playerIndex, body.rooms],
       s => s.devAddRooms(body.playerIndex!, body.rooms!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -963,8 +819,6 @@ const handleAuthorizedGameRoute = async (
     }
     const { resp, result } = await callAndRespond(
       req,
-      'devSetRound',
-      [body.round],
       s => s.devSetRound(body.round!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -998,8 +852,6 @@ const handleAuthorizedGameRoute = async (
     const pick = { opportunityKey: body.pick.opportunityKey, occCardId, minorCardId }
     const { resp, result } = await callAndRespond(
       req,
-      'submitDraftPick',
-      [body.playerId, pick],
       s => s.submitDraftPick(body.playerId!, pick),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
@@ -1018,7 +870,7 @@ export const handleGameRoute = async (
   if (req.method === 'OPTIONS') { rawJson(res, 204, null); return true }
   // The debug sandbox is a development surface (#993): without anonymous
   // access every call needs a session, so unauthenticated callers cannot
-  // drive server-side GameSessions or custom-code executors.
+  // drive server-side GameSessions.
   if (!allowAnonymousAccess() && !(await validateSession(requestSessionToken(req)))) {
     rawJson(res, 401, { ok: false, code: 'login_required', error: 'Login required' })
     return true
@@ -1034,10 +886,6 @@ export const handleGameRoute = async (
   } catch (error) {
     if (error instanceof ClassicPoolInsufficientError) {
       rawJson(res, 400, { ok: false, code: error.code, error: error.message, shortfall: error.shortfall })
-      return true
-    }
-    if (error instanceof UnsupportedSandboxListenerError) {
-      rawJson(res, 400, { ok: false, code: error.code, error: error.message })
       return true
     }
     if (!(error instanceof ExecutionRevokedError || error instanceof RoomOwnershipError || error instanceof SandboxReplacementError)) throw error

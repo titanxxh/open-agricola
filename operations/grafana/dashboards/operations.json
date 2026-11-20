@@ -2815,9 +2815,9 @@
     },
     {
       "id": 19,
-      "title": "数据库连接池与规则 Worker",
+      "title": "数据库连接池",
       "type": "timeseries",
-      "description": "按实例展示连接池总量、空闲、占用、等待，以及 Worker 的活动、忙碌、预约、等待与容量。",
+      "description": "按实例展示连接池总量、空闲、占用与等待。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -2859,7 +2859,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agricola_platform{role=\"app\",kind=~\"db_pool_.*|workers_.*\"}",
+          "expr": "agricola_platform{role=\"app\",kind=~\"db_pool_.*\"}",
           "legendFormat": "{{instance}} {{kind}}",
           "format": "time_series"
         }
@@ -2891,41 +2891,6 @@
           "options": {
             "regex": "(^|\\s)db_pool_waiting(?=\\s|$)",
             "renamePattern": "$1等待连接"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)workers_pending(?=\\s|$)",
-            "renamePattern": "$1等待 Worker"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)workers_busy(?=\\s|$)",
-            "renamePattern": "$1忙碌 Worker"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)workers_active(?=\\s|$)",
-            "renamePattern": "$1活动 Worker"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)workers_reserved(?=\\s|$)",
-            "renamePattern": "$1预约 Worker"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)workers_capacity(?=\\s|$)",
-            "renamePattern": "$1Worker 容量"
           }
         }
       ]

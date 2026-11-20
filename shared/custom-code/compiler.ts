@@ -1,7 +1,6 @@
 /**
- * Transpile validated TypeScript card code to JavaScript.
- *
- * The AST validator (ast-validator.ts) must pass BEFORE calling.
+ * Transpile a Workshop Card Source module to JavaScript. The server stores the
+ * output as validation evidence and never runs it (ADR 0052).
  */
 import ts from 'typescript'
 

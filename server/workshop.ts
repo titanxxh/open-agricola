@@ -2,7 +2,6 @@ import { CLASSIC_EDITION_ENABLED } from '../shared/contract/card-edition'
 import { WORKSHOP_CARDS_UNAVAILABLE } from './game/game-setup-options.ts'
 import { classicSetupRejection, parseCardEditionChoice, type CardEditionChoice } from '../shared/session/card-edition-admission'
 import { requestSessionToken } from './request-auth'
-import { handleWorkshopPublicCards } from './workshop-public-cards'
 import { isWorkshopSubmissionInProgress } from './database/errors'
 import { InvalidationStore } from './invalidation'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -12,6 +11,7 @@ import { nanoid } from 'nanoid'
 import { handleSubmitReviewRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 import { corsHeaders } from './http-origin.ts'
 import { getWorkshopSandboxContract } from './workshop-sandbox-contract.ts'
+import { nativeCardId } from '../shared/custom-code/card-source-admission.ts'
 import { readWorkshopReference, WorkshopReferenceError } from './workshop-references.ts'
 import { projectAbilityCandidate, projectGenerationProvenance, sourceFingerprint } from '../shared/projections/workshop-generation.ts'
 import {
@@ -384,7 +384,6 @@ export async function handleWorkshopRoute(
     }
     return handleWorkshopReviewWebhook(req, res, getDb(), reviewRuntime)
   }
-  if (await handleWorkshopPublicCards(req, res, getDb())) return true
   const routeUrl = new URL(url, 'http://localhost')
 
   if (req.method === 'GET' && url === '/api/workshop/sandbox-contract') {
@@ -646,27 +645,16 @@ export async function handleWorkshopRoute(
         if (sendWorkshopDraftError(res, error)) return true
         throw error
       }
-      let prepared = await prepareWorkshopAbilityCode(raw.sourceCode, currentCardDefinitionId)
+      // A Card Source names its own card; a different identity is rejected when adopted.
+      const prepared = await prepareWorkshopAbilityCode(raw.sourceCode, nativeCardId(raw.sourceCode) ?? currentCardDefinitionId)
       if (!prepared.ok) {
         sendJson(res, prepared.status, prepared)
         return true
       }
-      let cardJson = workshopCardJsonFromDefinition(prepared.cardDefinition)
+      const cardJson = workshopCardJsonFromDefinition(prepared.cardDefinition)
       if (!cardJson) {
-        sendJson(res, 400, { ok: false, error: 'Ability candidate has invalid CARD_DEF metadata' })
+        sendJson(res, 400, { ok: false, error: 'Ability candidate has invalid card meta' })
         return true
-      }
-      if (cardJson.id !== currentCardDefinitionId) {
-        prepared = await prepareWorkshopAbilityCode(raw.sourceCode, cardJson.id as string)
-        if (!prepared.ok) {
-          sendJson(res, prepared.status, prepared)
-          return true
-        }
-        cardJson = workshopCardJsonFromDefinition(prepared.cardDefinition)
-        if (!cardJson) {
-          sendJson(res, 400, { ok: false, error: 'Ability candidate has invalid CARD_DEF metadata' })
-          return true
-        }
       }
       const testing = projectAbilityCandidate(raw)?.testing
       candidate = {
@@ -951,7 +939,10 @@ export async function handleWorkshopRoute(
     }
     const result = await prepareWorkshopAbilityCode(body.source, body.card_id)
     if (!result.ok) {
-      if (result.status === 400) {
+      // The retired CARD_DEF / CARD_IMPL format is not a repairable validation failure.
+      if (result.code === 'legacy_card_format') {
+        sendJson(res, 400, { ...result, sandboxContractId, sourceFingerprint: fingerprint })
+      } else if (result.status === 400) {
         sendJson(res, 200, { ok: true, valid: false, errors: result.errors, sandboxContractId, sourceFingerprint: fingerprint })
       } else {
         sendJson(res, result.status, { ...result, sandboxContractId, sourceFingerprint: fingerprint })

@@ -10,7 +10,6 @@ const limit = (value: string | undefined, name: string, minimum: number, maximum
 
 export const readSessionCapacity = (env: NodeJS.ProcessEnv) => ({
   rooms: limit(env.APP_ROOM_CAPACITY, 'APP_ROOM_CAPACITY', 1, 30),
-  customWorkers: limit(env.CUSTOM_SESSION_WORKER_CAPACITY, 'CUSTOM_SESSION_WORKER_CAPACITY', 0, 15),
 })
 
 export const sessionCapacity = Object.freeze(readSessionCapacity(process.env))

@@ -73,7 +73,7 @@ describe('native TypeScript preload', () => {
     expect(result.stderr).toContain('ERR_MODULE_NOT_FOUND')
   })
 
-  it('loads the production entries’ module graph and a custom session worker without tsx', () => {
+  it('loads the production entries’ module graph without tsx', () => {
     // Modules the production entries import; the entries themselves start services.
     const entries = ['server/index.ts', 'scripts/container-entry.ts', 'scripts/local-backend.ts']
     const modules = entries.flatMap(entry => [...readFileSync(join(repository, entry), 'utf8')
@@ -84,19 +84,16 @@ describe('native TypeScript preload', () => {
       .map(path => [path, `${path}.ts`, join(path, 'index.ts')].find(file => file.endsWith('.ts') && existsSync(file))!)
     expect(modules.length).toBeGreaterThan(40)
     const probe = `
-      import { Worker } from 'node:worker_threads'
       for (const path of ${JSON.stringify(modules)}) await import(path)
-      const worker = new Worker(${JSON.stringify(join(repository, 'server/game/custom-session-worker-entry.mjs'))})
-      const reply = await new Promise((done, fail) => { worker.once('message', done); worker.once('error', fail); worker.postMessage({ id: 7, method: 'getState', args: [] }) })
-      console.log(JSON.stringify(reply))
+      console.log(JSON.stringify({ loaded: ${modules.length} }))
       process.exit(0)
     `
 
-    // A file entry: workers inherit execArgv, which may not carry --input-type.
+    // A file entry, so the loader hooks apply exactly as in production.
     const root = mkdtempSync(join(tmpdir(), 'oa-typescript-runtime-'))
     temporary.push(root)
     writeFileSync(join(root, 'probe.mjs'), probe)
-    // Every thread inherits this guard, so a silent tsx fallback fails the probe.
+    // This guard makes a silent tsx fallback fail the probe.
     writeFileSync(join(root, 'forbid-tsx.mjs'), `import { registerHooks } from 'node:module'
 registerHooks({ resolve(specifier, context, next) {
   if (specifier === 'tsx' || specifier.startsWith('tsx/')) throw new Error('tsx loaded under the native runtime: ' + specifier)
@@ -107,21 +104,6 @@ registerHooks({ resolve(specifier, context, next) {
 
     expect(result.stderr).toBe('')
     expect(result.status).toBe(0)
-    expect(JSON.parse(result.stdout.trim().split('\n').at(-1)!)).toEqual({ id: 7, ok: false, error: 'custom session worker is not initialized' })
-  }, 90_000)
-
-  it('keeps the custom session worker working under the tsx development fallback', () => {
-    const probe = `
-      import { Worker } from 'node:worker_threads'
-      const worker = new Worker(${JSON.stringify(join(repository, 'server/game/custom-session-worker-entry.mjs'))}, { execArgv: [] })
-      const reply = await new Promise((done, fail) => { worker.once('message', done); worker.once('error', fail); worker.postMessage({ id: 8, method: 'getState', args: [] }) })
-      console.log(JSON.stringify(reply))
-      process.exit(0)
-    `
-
-    const result = runNode(['--input-type=module', '--eval', probe])
-
-    expect(result.status).toBe(0)
-    expect(JSON.parse(result.stdout.trim().split('\n').at(-1)!)).toEqual({ id: 8, ok: false, error: 'custom session worker is not initialized' })
+    expect(JSON.parse(result.stdout.trim().split('\n').at(-1)!)).toEqual({ loaded: modules.length })
   }, 90_000)
 })

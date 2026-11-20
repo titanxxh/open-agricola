@@ -74,7 +74,7 @@ describe('HTTP sandbox', () => {
     await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', { seed: 42, customCardIds: [] }, 'sandbox-token'), startRes)
     expect(startRes.statusCode).toBe(200)
     const started = JSON.parse(startRes.body)
-    expect(started).toMatchObject({ ok: true, customCardsLoaded: 0, customCardVersionsLoaded: [] })
+    expect(started).toMatchObject({ ok: true })
     expect(started.gameInstanceId).toEqual(expect.any(String))
     const readRes = mockRes()
     await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), readRes)
@@ -113,7 +113,7 @@ describe('HTTP sandbox', () => {
         cardEdition: 'classic', classicDeckIds: ['CI', 'CE'], playerCount: 3, seed: 42, enableSnakeOpening: true,
       }, 'sandbox-token'), classicStart, true)
       const initial = JSON.parse(classicStart.body)
-      expect(initial).toMatchObject({ ok: true, customCardsLoaded: 0 })
+      expect(initial).toMatchObject({ ok: true })
       const reset = (instanceId: string, enabled: boolean) => {
         const response = mockRes()
         return handleGameRoute(mockReq('POST', '/api/game/reset-sandbox', {
@@ -137,7 +137,6 @@ describe('HTTP sandbox', () => {
         body: {
           ok: true,
           state: { gameSeed: 93, cardEdition: 'classic', classicDeckIds: ['CI', 'CE'], enableSnakeOpening: true },
-          customCardVersionsLoaded: [],
         },
       })
       expect(resetGame.body.state.players).toHaveLength(3)

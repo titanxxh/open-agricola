@@ -60,24 +60,13 @@ describe('RoomCommitter Frame isolation', () => {
     ;(await db.close())
   })
 
-  const frameSource = (source: 'native' | 'worker') => {
+  const frameSource = () => {
     let snapshot: PersistedSessionSnapshot
     const capture = () => {
       snapshot = serializeSessionSnapshot(room.session.state, room.session)
-      if (source === 'worker') {
-        // IPC gives the main process a writable structured clone of the saved view.
-        snapshot = structuredClone(snapshot)
-        snapshot.frame.players[0]!.pastureCapacities = { worker: 7 }
-      }
       return snapshot
     }
     capture()
-    if (source === 'worker') {
-      room.customSessionExecutor = {
-        serializedStateForPersistence: () => snapshot,
-        scoresForPersistence: () => room.session.getState().scores,
-      } as NonNullable<Room['customSessionExecutor']>
-    }
     return capture
   }
 
@@ -107,16 +96,15 @@ describe('RoomCommitter Frame isolation', () => {
     })
   }
 
-  it.each(['native', 'worker'] as const)(
-    'preserves the frozen %s Frame and the next delta across live changes and retry',
-    async source => {
-      const capture = frameSource(source)
+  it(
+    'preserves the frozen Frame and the next delta across live changes and retry',
+    async () => {
+      const capture = frameSource()
       const initial = jsonValue(capture().frame)
       expect((await committer.prepareRoom(room, { missingPrefix: false }))).toMatchObject({ kind: 'committed', stepNo: 0 })
 
       const response = room.session.devSetResources(0, { food: 5 })
-      const firstSnapshot = capture()
-      const firstFrame = jsonValue(firstSnapshot.frame)
+      const firstFrame = jsonValue(capture().frame)
       ;(await rejectStepOne())
       expect((await committer.commit(room, response, actionIntent, 0)))
         .toEqual({ kind: 'blocked', error: 'disk unavailable' })
@@ -135,11 +123,6 @@ describe('RoomCommitter Frame isolation', () => {
       expect((await persistence.loadReplayFrame(room.id))).toEqual(firstFrame)
       expect((await rawFrames())).toEqual([initial, firstFrame])
 
-      // Worker snapshots are cached externally; their mutable bodies must not own the head.
-      if (source === 'worker') {
-        firstSnapshot.frame.players[0]!.name = 'Changed cached snapshot'
-        firstSnapshot.frame.players[0]!.resources.food = 999
-      }
       const nextResponse = room.session.getState()
       const nextFrame = jsonValue(capture().frame)
       expect((await committer.commit(room, nextResponse, actionIntent, 0)))
@@ -149,10 +132,10 @@ describe('RoomCommitter Frame isolation', () => {
     },
   )
 
-  it.each(['native', 'worker'] as const)(
-    'freezes %s final scores before a failed commit is retried',
-    async source => {
-      const capture = frameSource(source)
+  it(
+    'freezes final scores before a failed commit is retried',
+    async () => {
+      const capture = frameSource()
       const initial = jsonValue(capture().frame)
       expect((await committer.prepareRoom(room, { missingPrefix: false }))).toMatchObject({ kind: 'committed', stepNo: 0 })
       room.session.state.gameOver = true

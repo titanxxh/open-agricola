@@ -18,7 +18,7 @@ function routeAccess(req: IncomingMessage): RouteAccess {
   if (isOAuthStartForm(req)) return 'oauth-form'
   if (safe(req) && (['/api/health', '/api/auth/browser-policy', '/api/whats-new', '/api/auth/registration-policy', '/api/workshop/sandbox-contract', '/api/community/wechat-qr', '/api/community/feishu-qr'].includes(path)
     || /^\/(?:replay-viewers|replay-assets|card-art)\//.test(path)
-    || path.startsWith('/api/v1/replays/') || path.startsWith('/api/workshop/public-cards/'))) return 'public'
+    || path.startsWith('/api/v1/replays/'))) return 'public'
   if (req.method === 'GET' && (/^\/api\/auth\/oauth\/(?:github|google)\/callback$/.test(path)
     || path === '/api/auth/verify-email' || path === '/api/v1/issue-submission-connection/github/callback')) return 'navigation'
   if (path.startsWith('/ops/')) return 'operations'

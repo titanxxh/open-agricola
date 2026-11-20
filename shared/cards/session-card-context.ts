@@ -14,7 +14,6 @@ import type { CardEffect } from './card-effects.ts'
 import type { CardListenerRegistration } from './card-listeners.ts'
 import { snapshotCardListener } from './listener-contract'
 import type { CardDefinition } from '../contract/cards'
-import type { CustomCodeManifest } from '../custom-code/types.ts'
 import type { CostModifier } from '../contract/types.ts'
 
 // ── Custom card data type (moved from custom-registry.ts) ───────────────────
@@ -25,9 +24,8 @@ export type CustomCardData = {
     modifier?: CostModifier
     modifiers?: CostModifier[]
   }
+  /** A native Card Source module; only the browser Worker evaluates it (ADR 0052). */
   effectCode?: string | null
-  compiledCode?: string | null
-  codeManifest?: CustomCodeManifest | null
   artUrl?: string | null
 }
 

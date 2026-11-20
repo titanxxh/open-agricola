@@ -383,12 +383,6 @@ describe('handleCreateRoom', () => {
     const previousRoomId = room.id
     const previousSession = room.session
     ;(await markRoomStarted(ctx))
-    const dispose = vi.fn()
-    room.customSessionExecutor = {
-      session: room.session,
-      execute: vi.fn(),
-      dispose,
-    } as never
     const failedResponse = {
       ...previousSession.getState(),
       ok: false,
@@ -406,7 +400,6 @@ describe('handleCreateRoom', () => {
     expect(room.id).toBe(previousRoomId)
     expect(room.session).toBe(previousSession)
     expect(deps.registry.get(previousRoomId)).toBe(room)
-    expect(dispose).not.toHaveBeenCalled()
     expect(sentMessagesOf(ctx)).toContainEqual({
       type: 'error',
       error: 'worker initialization failed',
@@ -497,16 +490,12 @@ describe('handleCreateRoom', () => {
     host.currentUserId = 'u1'
     await dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
     const room = host.currentRoom!
-    room.customSessionExecutor = {
-      session: room.session,
-      execute: vi.fn(async () => ({
-        ...room.session.getState(),
-        ok: false,
-        error: 'worker initialization failed',
-      })),
-      updatePlayerNames: vi.fn(async () => room.session.getState()),
-      dispose: vi.fn(),
-    } as never
+    const realGetState = room.session.getState.bind(room.session)
+    vi.spyOn(room.session, 'getState').mockImplementation(() => ({
+      ...realGetState(),
+      ok: false,
+      error: 'worker initialization failed',
+    }))
     const guest = newCtx(deps)
     guest.currentUserId = 'u2'
 
@@ -1162,48 +1151,6 @@ describe('custom room command queue', () => {
     } finally {
       getState.mockRestore()
     }
-  })
-
-  it('finishes queued room commands before the same connection changes rooms', async () => {
-    const deps = newDeps()
-    const ctx = newCtx(deps)
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
-    const source = ctx.currentRoom!
-    const work = createWorkSession({ seed: 1597, configure(state) {
-      state.players[0]!.name = 'host'
-      state.players[0]!.nameIsDefault = false
-    } })
-    try { source.session.loadState(work.state) } finally { work.dispose() }
-    await markRoomStarted(ctx)
-    expect(source.session.getState().interaction.stateId).toBe('idle')
-    const destinationHost = newCtx(deps)
-    await dispatch(destinationHost, { type: 'createRoom', maxPlayers: 2, name: 'other' })
-    const destination = destinationHost.currentRoom!
-    const response = source.session.getState()
-    let releaseFirst: (response: typeof response) => void = () => {}
-    const firstResponse = new Promise<typeof response>((resolve) => {
-      releaseFirst = resolve
-    })
-    const execute = vi.fn()
-      .mockImplementationOnce(() => firstResponse)
-      .mockImplementation(() => Promise.resolve(source.session.getState()))
-    source.customSessionExecutor = {
-      session: source.session,
-      serializedStateForPersistence: () => undefined,
-      execute,
-      dispose: vi.fn(),
-    } as never
-
-    const first = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'forest' }))
-    const second = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'clay-pit' }))
-    const join = Promise.resolve(dispatch(ctx, { type: 'joinRoom', roomId: destination.id }))
-
-    await vi.waitFor(() => expect(execute).toHaveBeenCalledTimes(1))
-    expect(ctx.currentRoom).toBe(source)
-    releaseFirst(response)
-    await Promise.all([first, second, join])
-    expect(execute).toHaveBeenCalledTimes(2)
-    expect(ctx.currentRoom).toBe(destination)
   })
 })
 

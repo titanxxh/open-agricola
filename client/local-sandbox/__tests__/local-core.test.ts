@@ -1,37 +1,36 @@
 import { describe, expect, it, vi } from 'vitest'
 import { handleLocalSandboxRequest, LocalSandboxCore } from '../worker-core.ts'
 import { LOCAL_SANDBOX_SCHEMA_VERSION, type LocalCardInput, type LocalGameConfig, type ViewerSpec } from '../protocol.ts'
-import {
-  invokeCustomCodeEffectLocal,
-  invokeCustomCodeListenerLocal,
-  validateAndCompileCustomCodeLocal,
-} from '../browser-executor.ts'
-import { compileCardCode } from '../../../shared/custom-code/compiler.ts'
 import '../../../shared/cards/B/B178_TagAlong'
 import { withClassicCardDefinitions } from '../../../shared/cards/classic-catalog'
 import { classicFixtureCards } from '../../../shared/cards/__tests__/__fixtures__/classic-definitions'
 
 const DEBUG_VIEWER: ViewerSpec = { visiblePlayerIds: [], mode: 'debug' }
 
-const LOCAL_CARD_SOURCE = `
+const LOCAL_CARD_SOURCE = `import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
 const CARD_ID = 'CUSTOM_LocalCard'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Local Card' })
-const CARD_IMPL = {
-  effect: {
-    id: CARD_ID,
-    onReturnHome: (_state: any, player: any) => {
-      if (!player.minorPlayed.includes(CARD_ID)) return
-      return gainLeaf(CARD_ID, { food: 2 })
+
+export const CUSTOM_LocalCard = defineMinorCard({
+  meta: { id: CARD_ID, name: 'Local Card', deck: 'community', number: 0, desc: ['Local sandbox card'] },
+  impl: {
+    effect: {
+      id: CARD_ID,
+      onReturnHome: (_state, player) => {
+        if (!player.minorPlayed.includes(CARD_ID)) return
+        return gainLeaf(CARD_ID, { food: 2 })
+      },
     },
+    listeners: [{
+      id: CARD_ID,
+      cardIds: [CARD_ID],
+      actions: ['collect'],
+      phases: ['after'],
+      handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
+    }],
   },
-  listeners: [{
-    id: CARD_ID,
-    cardIds: [CARD_ID],
-    actions: ['collect'],
-    phases: ['after'],
-    handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
-  }],
-}
+})
 `
 
 const localCard: LocalCardInput = {
@@ -101,6 +100,15 @@ describe('LocalSandboxCore', () => {
     const core = new LocalSandboxCore()
     expect(() => core.init({ cards: [badCard], playerCount: 2, seed: 42 }, DEBUG_VIEWER))
       .toThrow(/failed to compile/)
+  })
+
+  it('rejects a card in the retired CARD_DEF / CARD_IMPL format and asks for regeneration', () => {
+    const legacyCard: LocalCardInput = {
+      ...localCard,
+      source: "const CARD_ID = 'CUSTOM_LocalCard'\nconst CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Local Card' })\nconst CARD_IMPL = {}",
+    }
+    expect(() => new LocalSandboxCore().init({ cards: [legacyCard], playerCount: 2, seed: 42 }, DEBUG_VIEWER))
+      .toThrow(/retired CARD_DEF \/ CARD_IMPL sandbox format.*Regenerate/s)
   })
 
   it('dispatches dev commands and keeps persist in sync', () => {
@@ -210,119 +218,5 @@ describe('LocalSandboxCore', () => {
     expect(payload.ok).toBe(true)
     expect(payload.state.players[0]?.resources.food ?? 0).toBeLessThan(9)
     expect(payload.customCardDefs?.some((def) => def.cardJson.id === 'CUSTOM_LocalCard')).toBe(true)
-  })
-})
-
-describe('browser executor error handling', () => {
-  it('returns ok:false when card code throws instead of propagating', () => {
-    const compiled = validateAndCompileCustomCodeLocal(`
-const CARD_ID = 'CUSTOM_BoomCard'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Boom Card' })
-const CARD_IMPL = {
-  effect: {
-    id: CARD_ID,
-    onReturnHome: () => {
-      throw new Error('local boom')
-    },
-  },
-}
-    `, 'CUSTOM_BoomCard')
-    expect(compiled.valid).toBe(true)
-    if (!compiled.valid) return
-
-    const result = invokeCustomCodeEffectLocal({
-      compiledCode: compiled.compiledCode,
-      cardId: 'CUSTOM_BoomCard',
-      hook: 'onReturnHome',
-      state: { players: [] } as never,
-      player: { minorPlayed: [] } as never,
-    })
-    expect(result).toEqual({ ok: false, error: expect.stringContaining('local boom') })
-  })
-
-  it('rejects dynamically constructed costs without attribution at runtime', () => {
-    const source = `
-const CARD_ID = 'CUSTOM_DynamicCosts'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Dynamic Costs' })
-const CARD_IMPL = {
-  listeners: [{
-    cardIds: [CARD_ID],
-    actions: ['construct'],
-    phases: ['computeCosts'],
-    handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
-  }],
-}
-    `
-
-    expect(invokeCustomCodeListenerLocal({
-      compiledCode: compileCardCode(source),
-      cardId: 'CUSTOM_DynamicCosts',
-      registrationId: 'CUSTOM_DynamicCosts:listener:0',
-      context: {} as never,
-    })).toEqual({ ok: false, error: expect.stringContaining('costAttribution') })
-  })
-
-  it('runs card code under strict mode so `this` cannot reach worker globals', () => {
-    // `this.fetch` passes the AST validator (property access, not an identifier)
-    // but must resolve to nothing: strict mode makes the handler `this`
-    // undefined instead of binding it to the global scope.
-    const compiled = validateAndCompileCustomCodeLocal(`
-const CARD_ID = 'CUSTOM_ThisEscape'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'This Escape' })
-const CARD_IMPL = {
-  effect: {
-    id: CARD_ID,
-    onReturnHome: function () {
-      const g = this
-      return gainLeaf(CARD_ID, { food: (g && g.fetch) ? 999 : 1 })
-    },
-  },
-}
-    `, 'CUSTOM_ThisEscape')
-    expect(compiled.valid).toBe(true)
-    if (!compiled.valid) return
-
-    const result = invokeCustomCodeEffectLocal({
-      compiledCode: compiled.compiledCode,
-      cardId: 'CUSTOM_ThisEscape',
-      hook: 'onReturnHome',
-      state: {} as never,
-      player: {} as never,
-    })
-    expect(result).toEqual({
-      ok: true,
-      result: { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'CUSTOM_ThisEscape' },
-    })
-  })
-
-  it('warns when a hook runs over the server 100ms budget', () => {
-    const compiled = validateAndCompileCustomCodeLocal(`
-const CARD_ID = 'CUSTOM_SlowCard'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Slow Card' })
-const CARD_IMPL = { effect: { id: CARD_ID, onReturnHome: () => gainLeaf(CARD_ID, { food: 1 }) } }
-    `, 'CUSTOM_SlowCard')
-    expect(compiled.valid).toBe(true)
-    if (!compiled.valid) return
-
-    // Fake the clock so the invocation looks like it took 200ms.
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValueOnce(200)
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    const result = invokeCustomCodeEffectLocal({
-      compiledCode: compiled.compiledCode,
-      cardId: 'CUSTOM_SlowCard',
-      hook: 'onReturnHome',
-      state: {} as never,
-      player: {} as never,
-    })
-
-    expect(result).toEqual({
-      ok: true,
-      result: { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'CUSTOM_SlowCard' },
-    })
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('over the server 100ms budget'))
-
-    nowSpy.mockRestore()
-    warnSpy.mockRestore()
   })
 })

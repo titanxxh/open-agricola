@@ -33,6 +33,17 @@ const foodTests = (cardId: string, amount: number) => `test('onBuy food', () => 
   expect(response.state.players[0].resources.wood).to.equal(0);
   expect(response.state.players[0].resources.food).to.equal(${amount});
 });`
+/** A native Card Source (ADR 0052) whose onBuy returns the given flow. */
+const foodSource = (cardId: string, name: string, amount: number, flow: string) => `import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
+const CARD_ID = '${cardId}'
+
+export const ${cardId} = defineMinorCard({
+  meta: { id: CARD_ID, name: '${name}', deck: 'community', number: 0, cost: { wood: 2 }, desc: ['Gain ${amount} food.'] },
+  impl: { effect: { id: CARD_ID, onBuy: () => ${flow} } },
+})
+`
 async function respond(route: Route, delta: Record<string, unknown>, tools = false) {
   await route.fulfill({ contentType: 'text/event-stream', headers: { 'Access-Control-Allow-Origin': '*' }, body: [
     { id: 'synthetic-response', model: 'synthetic-selected-revision', choices: [{ index: 0, delta: { role: 'assistant', ...delta }, finish_reason: tools ? 'tool_calls' : 'stop' }] },
@@ -60,7 +71,8 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
     if (!response.ok || !data.id) throw new Error(JSON.stringify(data))
     return String(data.id)
   }, { cardId, name, modelKey })
-  const source = (amount: number, bad = false) => `const CARD_ID = '${cardId}'; const CARD_DEF = { cardType: 'minor', meta: { id: CARD_ID, name: '${name}', cost: { wood: 2 }, desc: ['Gain ${amount} food.'] } }; const CARD_IMPL = { effect: { onBuy: () => ${bad ? `({ type: 'seq', items: [gainLeaf(CARD_ID, { food: ${amount} })] })` : `gainLeaf(CARD_ID, { food: ${amount} })`} } };`
+  const source = (amount: number, bad = false) => foodSource(cardId, name, amount, bad
+    ? `({ type: 'seq', items: [gainLeaf(CARD_ID, { food: ${amount} })] })` : `gainLeaf(CARD_ID, { food: ${amount} })`)
   const inputs: Array<{ source: string | null; tests: string | null; card: unknown }> = []
   let posts = 0
   await page.route(modelUrl, async route => {
@@ -215,7 +227,7 @@ test('four browser tools preserve protocol through UT repair beyond eight model 
     : { truncated: false, tree: [{ path: referencePath, type: 'blob', sha: blob, size: Buffer.byteLength(referenceBody) }] } }))
   await page.route('https://raw.githubusercontent.com/**', route => route.fulfill({ body: referenceBody, contentType: 'text/plain', headers: { 'Access-Control-Allow-Origin': '*' } }))
   const cardId = `CUSTOM_BrowserLoop_${Date.now()}`
-  const source = (amount: number) => `const CARD_ID = '${cardId}'; const CARD_DEF = { cardType: 'minor', meta: { id: CARD_ID, name: 'Browser Loop', cost: { wood: 2 }, desc: ['Gain ${amount} food.'] } }; const CARD_IMPL = { effect: { onBuy: () => gainLeaf(CARD_ID, { food: ${amount} }) } };`
+  const source = (amount: number) => foodSource(cardId, 'Browser Loop', amount, `gainLeaf(CARD_ID, { food: ${amount} })`)
   let posts = 0
   let preservedProtocol = true
   await page.route(modelUrl, async route => {

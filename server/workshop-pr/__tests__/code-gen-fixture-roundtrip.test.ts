@@ -8,9 +8,14 @@ const FIXTURE_WCARD = {
   card_id: 'CUSTOM_FixtureHarvester',
   card_type: 'minor',
   author_name: 'fixture',
-  effect_code: `const CARD_ID = 'CUSTOM_FixtureHarvester'
-const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Fixture Harvester', deck: 'community', number: 0, desc: ['Each harvest, gain 1 <FOOD>. (Community deck fixture card; not a real card.)'], cost: { wood: 1 }, vp: 0 })
-const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => ({ type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID }) } }`,
+  effect_code: `import { defineMinorCard } from '../card-source'
+
+const CARD_ID = 'CUSTOM_FixtureHarvester'
+
+export const CUSTOM_FixtureHarvester = defineMinorCard({
+  meta: { id: CARD_ID, name: 'Fixture Harvester', deck: 'community', number: 0, desc: ['Each harvest, gain 1 <FOOD>. (Community deck fixture card; not a real card.)'], cost: { wood: 1 }, vp: 0 },
+  impl: { effect: { id: CARD_ID, onHarvest: () => ({ type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID }) } },
+})`,
   card_json: JSON.stringify({ name: 'Fixture Harvester' }),
 }
 

@@ -80,13 +80,4 @@ describe('Room Persistence Checkpoint', () => {
     checkpoint.shutdown()
     await expect(checkpoint.recordCreated(room('new'))).rejects.toThrow('no longer writable')
   })
-
-  it('archives final scores produced by the custom session worker', () => {
-    const finished = room('finished')
-    finished.startedAt = 10
-    finished.session.state.gameOver = true
-    const workerScores = finished.session.getState().scores!.map((score, index) => ({ ...score, total: 100 + index }))
-    finished.customSessionExecutor = { scoresForPersistence: () => workerScores } as never
-    expect(buildGameResult(finished, 20).players.map(player => player.score)).toEqual([100, 101])
-  })
 })

@@ -1,28 +1,21 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { validateAndCompileCustomCode } from '../custom-code/engine'
 import type { GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { testCardImpl } from './_helpers/test-card-impl'
 
 const CARD_ID = 'CUSTOM_TimingPayment'
 const sessions: GameSession[] = []
 
 const start = (implementation: string) => {
-  const result = validateAndCompileCustomCode(`
-const CARD_ID = '${CARD_ID}'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Timing and payment' })
-const CARD_IMPL = ${implementation}
-`, CARD_ID)
-  if (!result.valid) throw new Error(result.errors.join('\n'))
   const session = createWorkSession({
     seed: 42,
     customCards: [{
       cardType: 'minor',
       cardJson: { id: CARD_ID, name: 'Timing and payment', deck: 'CUSTOM', number: 0, desc: [] },
-      compiledCode: result.compiledCode,
-      codeManifest: result.manifest,
     }],
+    cardImpls: { [CARD_ID]: testCardImpl(CARD_ID, implementation) },
     configure: state => { state.players[0]!.minorPlayed = [CARD_ID] },
   })
   sessions.push(session)

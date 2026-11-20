@@ -60,7 +60,7 @@ Violating any invariant below is an architecture bug:
 - **Durable Room Commit:** a successful command that changes the public Frame or Private Session Cursor, or any response marked `durableTransition`, atomically writes Room snapshot and Replay Step before sending viewer-filtered state.
 - **Global Replay Steps:** simultaneous submissions still receive consecutive `stepNo`; automatic settlement belongs to the last triggering input and results do not depend on arrival order.
 - **Failures do not spread:** command errors reach only the caller; durable rejections still publish the committed version to peers as error-free snapshots. Persistence failure freezes the same Frame and blocks the Room instead of overwriting or advancing.
-- **Room limits:** one instance admits at most 30 ordinary Rooms with OPEN player connections or a live 30-second admission reservation. Offline saves and cached Rooms do not consume this online quota. The separate 15-Worker budget still counts retained executors; new admissions and one-for-one `newGame` replacements preserve both limits.
+- **Room limits:** one instance admits at most 30 ordinary Rooms with OPEN player connections or a live 30-second admission reservation. Offline saves and cached Rooms do not consume this online quota; new admissions and one-for-one `newGame` replacements preserve the limit.
 - **Immutable historical Viewer:** a Room freezes schema and Build. Completed playback uses a credentialless read-only Viewer and never executes historical rules code.
 - **Tests default to two players.** Prove rules at the backend boundary, never infer them from the DOM.
 
@@ -115,11 +115,11 @@ shared/        No React; shared by frontend, backend, and sandbox
 ├── cards/         Card Source by decks A–E, M, major and community; each card owns meta + impl
 ├── domain/        Domain aggregates: PlayerBoard, farmyard, pasture, scoring, ...
 ├── draft/         Asynchronous card selection
-├── custom-code/   Custom-card AST validation
+├── custom-code/   Workshop Card Source structural admission
 ├── i18n/          Locale keys
 └── utils/         Shared utilities
 
-server/        Node process: HTTP + WebSocket + persistence + custom-code isolation
+server/        Node process: HTTP + WebSocket + persistence; never executes Workshop code
 ├── index.ts             Composes HTTP, WebSocket, database, and static assets
 ├── connection/          WebSocket layer: ws-server, room-router, broadcaster
 ├── game/                Room, GameSession, Lobby, RoomRegistry
@@ -128,7 +128,6 @@ server/        Node process: HTTP + WebSocket + persistence + custom-code isolat
 ├── auth.ts              Site login and OAuth (GitHub, Google)
 ├── workshop.ts          Workshop and Sandbox backend
 ├── workshop-pr/         Workshop pull-request integration
-├── custom-code/         Isolated execution: engine, runtime, executor-worker
 ├── payload-validation.ts  Pure validation; never writes state
 └── db.ts                PostgreSQL connection
 

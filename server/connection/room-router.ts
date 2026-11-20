@@ -19,7 +19,7 @@ import { interactionRecipientPlayerId } from '../../shared/session/interaction-s
 import { randomUUID } from 'node:crypto'
 import { agreeToGameEnd, buildGameTermination, createGameEndProposal, hasUnanimousAgreement } from '../game/game-end'
 import type { GameEndProposal, GameTermination } from '../../shared/contract/protocol/game-termination'
-import type { SessionResponse } from '../game/authoritative-session.ts'
+import { GameSession, type SessionResponse } from '../game/authoritative-session.ts'
 import {
   fixedDevRoomRootId,
   isDevRoom,
@@ -33,29 +33,19 @@ import {
 } from '../game/room.ts'
 import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
-import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
-import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
 import { canAccessRoom, parseRoomAccess } from '../game/room-access'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import type {
   GameContextLifecycle,
 } from '../../shared/contract/protocol/game-context.ts'
-import {
-  loadLiveDraft,
-} from '../workshop-drafts.ts'
-import { resolveSoloWorkshopCards, workshopDraftToCustomCard } from '../game/workshop-room-cards'
-import { isLoadableLive } from '../workshop-status.ts'
+import { resolveSoloWorkshopSources } from '../game/workshop-room-cards'
 import type { ConnectionCtx } from './connection-ctx.ts'
 import { refreshConnectionSeat } from './connection-ctx.ts'
 import { connectionViewerMetadata, connectedSeatIndexes, controlledSeatIndexes, visiblePlayerIdsForConnection } from '../game/room-viewer'
 import {
   replayIntentFromCommand,
 } from '../game/room-committer.ts'
-import {
-  createIsolatedGameSession,
-  type CustomSessionMethod,
-} from '../game/custom-session-executor.ts'
 import { CLASSIC_EDITION_ENABLED, type ClassicPoolShortfall } from '../../shared/contract/card-edition'
 import { classicAdmissionRejection, type ClassicAdmissionRejection } from '../../shared/session/card-edition-admission'
 import { ClassicPoolInsufficientError } from '../../shared/session/classic-deal-pool'
@@ -103,83 +93,6 @@ export function parseDraftOptions(
   }
   return { ok: true, value: { draftMode: 'simultaneous', draftPoolSize: poolSize } }
 }
-
-const loadCustomCards = async (
-  cardDbIds: string[],
-  requestUserId?: string,
-  opts?: { liveOnly?: boolean },
-): Promise<Awaited<{ cards: CustomCardData[]; hasNotLive: boolean; loadedDbIds: string[] }>> => {
-  if (!cardDbIds.length) return { cards: [], hasNotLive: false, loadedDbIds: [] }
-  const db = getDb()
-  const result: CustomCardData[] = []
-  const loadedDbIds: string[] = []
-  let hasNotLive = false
-  for (const dbId of cardDbIds) {
-    const row = (await db.prepare(
-      'SELECT card_type, card_json, code_manifest, art_url, review_status, live, built_in, author_id FROM workshop_cards WHERE id = ?',
-    ).get(dbId)) as {
-      card_type: string
-      card_json: string
-      code_manifest: string | null
-      art_url: string | null
-      review_status: string
-      live: number
-      built_in: number
-      author_id: string
-    } | undefined
-    if (!row) continue
-    // A graduated card taken over by the built-in registry (#642) is no
-    // longer injected per-room: it lives in the community deck like any
-    // built-in card. Skip it without rejecting the room.
-    if (row.review_status === 'merged' && row.built_in === 1) continue
-    if (isLoadableLive(row)) {
-      try {
-        result.push(workshopDraftToCustomCard((await loadLiveDraft(db, dbId))))
-        loadedDbIds.push(dbId)
-      } catch {
-        continue
-      }
-      continue
-    }
-    if (opts?.liveOnly) {
-      if (requestUserId === row.author_id) hasNotLive = true
-      continue
-    }
-    const allowed = requestUserId === row.author_id
-    if (!allowed) continue
-    try {
-      const parsed = JSON.parse(row.card_json) as Record<string, unknown>
-      const effectCode = typeof parsed._code === 'string' ? parsed._code : null
-      const compiledCode = typeof parsed._compiled === 'string' ? parsed._compiled : null
-      result.push({
-        cardType: row.card_type as 'minor' | 'occupation',
-        // SAFETY: card_json stores the same card-definition metadata accepted
-        // by the Workshop authoring boundary. JSON parsing preserves that shape;
-        // this bridges the generic persistence DTO, without claiming validation.
-        cardJson: parsed as unknown as CustomCardData['cardJson'],
-        effectCode,
-        compiledCode,
-        codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
-        artUrl: row.art_url ?? null,
-      })
-      loadedDbIds.push(dbId)
-      hasNotLive = true
-    } catch { /* skip malformed */ }
-  }
-  return { cards: result, hasNotLive, loadedDbIds }
-}
-
-export const loadCustomCardsFromDb = async (
-  cardDbIds: string[],
-  requestUserId?: string,
-): Promise<Awaited<CustomCardData[]>> => (await loadCustomCards(cardDbIds, requestUserId, { liveOnly: true })).cards
-
-/** Same lookup, but keeps `hasNotLive` so callers can reject unreviewed cards. */
-export const loadLiveCustomCards = async (
-  cardDbIds: string[],
-  requestUserId?: string,
-): Promise<Awaited<{ cards: CustomCardData[]; hasNotLive: boolean; loadedDbIds: string[] }>> =>
-  (await loadCustomCards(cardDbIds, requestUserId, { liveOnly: true }))
 
 const generateRoomId = async (ctx: ConnectionCtx, devRoomRootId?: string | null): Promise<Awaited<string | null>> => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -320,7 +233,6 @@ const publishCommandResponse = async (
     : { ...responseWithoutError, ok: true }
   const requesterResponse = { ws: ctx.ws, response }
   if (response.state.gameOver && room.players.length === 0) {
-    room.customSessionExecutor?.dispose()
   }
   const replayIntent = replayIntentFromCommand(command)
   if (!ctx.committer || !ctx.committer.isRecording(room.id) || !replayIntent) {
@@ -487,12 +399,9 @@ type Handler<M extends ClientCommand = ClientCommand> = (
 
 const executeRoomSession = (
   room: Room,
-  method: CustomSessionMethod,
-  args: unknown[],
   local: () => SessionResponse,
 ): SessionResponse | Promise<SessionResponse> =>
-  measureRule(room.customSessionExecutor ? 'worker' : 'native', () =>
-    room.customSessionExecutor?.execute(method, args) ?? room.session.withCtx(local))
+  measureRule('native', () => room.session.withCtx(local))
 
 const useSessionResponse = (
   result: SessionResponse | Promise<SessionResponse>,
@@ -597,50 +506,31 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid game configuration', msg.requestId); return }
   const executionStamp = ctx.authority ? await new ExecutionAccess(ctx.authority.directory.db).capture(customCardDbIds, ctx.currentUserId ? [ctx.currentUserId] : []) : undefined
   const configuration = setup.soloHandMode ? soloCreationConfiguration(setup, customCardDbIds) : undefined
-  const soloCards = configuration ? await resolveSoloWorkshopCards(getDb(), configuration) : undefined
-  if (soloCards?.issues.length && configuration) {
+  const soloSources = configuration ? resolveSoloWorkshopSources(configuration) : undefined
+  if (soloSources?.issues.length && configuration) {
     sendCommandError(ctx, 'The selected card sources require adjustment', msg.requestId, 'creation_requires_adjustment')
-    if (ctx.activeCommand?.outcome) ctx.activeCommand.outcome.creationAdjustment = { configuration, issues: soloCards.issues }
+    if (ctx.activeCommand?.outcome) ctx.activeCommand.outcome.creationAdjustment = { configuration, issues: soloSources.issues }
     return
   }
-  const loadedCustomCards = soloCards
-    ? { cards: soloCards.cards, loadedDbIds: customCardDbIds, hasNotLive: false }
-    : await loadCustomCards(customCardDbIds, ctx.currentUserId, { liveOnly: true })
-  if (loadedCustomCards.hasNotLive) {
-    sendCommandError(ctx, 'cards must pass review approval and be published live before they can be used in a room; unreviewed cards are only playable in the workshop sandbox', msg.requestId)
-    return
-  }
-  const customCards = loadedCustomCards.cards
-  let created: ReturnType<typeof createIsolatedGameSession>
+  let session: GameSession
   try {
-    created = createIsolatedGameSession(
-      undefined,
-      customCards.length > 0 ? customCards : undefined,
-      buildInitialStateOptions(setup),
-    )
+    session = new GameSession(undefined, undefined, buildInitialStateOptions(setup))
   } catch (err) {
     commandOutcome('error')
     sendCreationError(ctx, err, msg.requestId)
-    return
-  }
-  if (created.executor && !created.executor.reserveWorkerSlot()) {
-    created.executor.dispose()
-    created.session.dispose()
-    sendCommandError(ctx, 'executable room capacity reached', msg.requestId)
     return
   }
   const room: Room = {
     id: roomId,
     owner: ctx.activeCommand?.owner,
     executionStamp,
-    session: created.session,
-    ...(created.executor ? { customSessionExecutor: created.executor } : {}),
+    session,
     players: [],
     seatOwners: [],
     maxPlayers,
     ...(setup.soloHandMode && configuration ? {
       soloHandMode: setup.soloHandMode,
-      creationConfiguration: { configuration, resolvedWorkshopSources: soloCards?.resolvedWorkshopSources ?? [] },
+      creationConfiguration: { configuration, resolvedWorkshopSources: soloSources?.resolvedWorkshopSources ?? [] },
     } : {}),
     ...(msg.sourceGameContextId && ctx.currentUserId ? { creationSource: { roomId: msg.sourceGameContextId, userId: ctx.currentUserId } } : {}),
     version: 0,
@@ -648,8 +538,8 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     ...(setup.hotseat ? { hotseat: true } : {}),
     createdBy: ctx.currentUserId,
     access: access.access,
-    customCardDbIds: loadedCustomCards.loadedDbIds,
-    customCards,
+    customCardDbIds: [],
+    customCards: [],
     enableParentCards: setup.enableParentCards,
     draftParents: setup.draftParents,
     draftMode: draftOptions.value?.draftMode,
@@ -671,15 +561,13 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     ? (msg as Record<string, unknown>).name as string
     : ''
   room.players.push({ ws: ctx.ws, playerIndex: creatorIndex, name, userId: ctx.currentUserId })
-  if (room.customSessionExecutor) await room.customSessionExecutor.updatePlayerNames([[creatorIndex, name]])
-  else room.session.updatePlayerName(creatorIndex, name)
+  room.session.updatePlayerName(creatorIndex, name)
   const startsImmediately = room.hotseat === true || maxPlayers === 1
   try {
     if (!startsImmediately) await ctx.checkpoint.recordCreated(room, ctx.activeCommand ? {
       receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId, roomVersion: 0, playerIndex: creatorIndex } },
     } : undefined)
   } catch (error) {
-    room.customSessionExecutor?.dispose()
     room.session.dispose()
     throw error
   }
@@ -719,14 +607,13 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   room.status = 'playing'
   room.startedAt ??= Date.now()
   return (await useSessionResponse(
-    executeRoomSession(room, 'getState', [], () => room.session.getState()),
+    executeRoomSession(room, () => room.session.getState()),
     async (resp) => {
       // An executable community card can fail or time out on this first call;
       // starting the game anyway would leave the client in a ready game backed
       // by a failed session, with the error never shown.
       if (!resp.ok) {
-        room.customSessionExecutor?.dispose()
-        room.session.dispose()
+            room.session.dispose()
         ctx.registry.delete(room.id)
         ctx.registry.clearActivity(room.id)
         sendCommandError(ctx, resp.error ?? 'unable to initialize game', msg.requestId)
@@ -738,14 +625,12 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
         })
         if (!creationCommitted) {
           await ctx.committer?.retireRoom(room.id)
-          room.customSessionExecutor?.dispose()
-          room.session.dispose()
+                room.session.dispose()
         }
       } catch (error) {
         if (!creationCommitted) {
           await ctx.committer?.retireRoom(room.id)
-          room.customSessionExecutor?.dispose()
-          room.session.dispose()
+                room.session.dispose()
         }
         throw error
       }
@@ -922,8 +807,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     ctx.currentPlayerIndex = previousPlayerIndex
     room.colorConfirmationPlayerIndex = previousColorConfirmationPlayerIndex
     if (!wasPlaying) {
-      if (room.customSessionExecutor) await room.customSessionExecutor.updatePlayerNames(previousNames)
-      else for (const [index, name] of previousNames) room.session.updatePlayerName(index, name)
+      for (const [index, name] of previousNames) room.session.updatePlayerName(index, name)
     }
     sendCommandError(ctx, error, msg.requestId)
   }
@@ -998,8 +882,6 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     if (starting) {
       const response = updatedResponse ?? executeRoomSession(
         room,
-        'getState',
-        [],
         () => room.session.getState(),
       )
       return (await useSessionResponse(response, async (resp) => {
@@ -1020,7 +902,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     }
     if (wasPlaying) {
       return useSessionResponse(
-        executeRoomSession(room, 'getState', [], () => room.session.getState()),
+        executeRoomSession(room, () => room.session.getState()),
         (resp) => ctx.broadcaster.sendStateTo(ctx.ws, room, resp, msg.requestId),
       )
     }
@@ -1029,16 +911,8 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   const names = starting
     ? room.players.map((player) => [player.playerIndex, player.name] as [number, string])
     : [[ctx.currentPlayerIndex, name] as [number, string]]
-  if (!room.customSessionExecutor) {
-    for (const [playerIndex, playerName] of names) room.session.updatePlayerName(playerIndex, playerName)
-    return finishJoin()
-  }
-  const updated = starting
-    ? room.customSessionExecutor.execute('updatePlayerNames', [names])
-    : room.customSessionExecutor.updatePlayerNames(names)
-  return updated instanceof Promise
-    ? updated.then((response) => finishJoin(starting ? response : undefined))
-    : finishJoin()
+  for (const [playerIndex, playerName] of names) room.session.updatePlayerName(playerIndex, playerName)
+  return finishJoin()
 }
 
 async function handleSetPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'setPlayerColor' }>): Promise<void> {
@@ -1062,10 +936,7 @@ async function handleSetPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientComma
   const colors: Parameters<Room['session']['updatePlayerColors']>[0] = [[ctx.currentPlayerIndex, msg.color]]
   if (colorIndex >= 0 && colorIndex !== ctx.currentPlayerIndex) colors.push([colorIndex, room.session.state.players[ctx.currentPlayerIndex]!.color])
   const update = async (next: typeof colors): Promise<void> => {
-    if (room.customSessionExecutor) {
-      const response = await room.customSessionExecutor.updatePlayerColors(next)
-      if (!response.ok) throw new Error(response.error ?? 'Unable to update colors')
-    } else room.session.updatePlayerColors(next)
+    room.session.updatePlayerColors(next)
   }
   try {
     const blocked = ctx.committer?.blockedError(room.id)
@@ -1098,7 +969,7 @@ async function handleConfirmPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientC
   try {
     const blocked = ctx.committer?.blockedError(room.id)
     if (blocked) throw new Error(blocked)
-    response = await executeRoomSession(room, 'getState', [], () => room.session.getState())
+    response = await executeRoomSession(room, () => room.session.getState())
     if (!response.ok) throw new Error(response.error ?? 'Unable to initialize game')
   } catch (error) {
     sendCommandError(ctx, error instanceof Error ? error.message : 'Could not start the game; please try again', msg.requestId, 'color_confirmation_failed')
@@ -1212,8 +1083,7 @@ async function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     sendCommandError(ctx, 'invalid history cursor', msg.requestId); return
   }
   try {
-    const canonical = room.customSessionExecutor?.serializedStateForPersistence()?.frame
-      ?? room.session.withCtx(() => serializeState(room.session.state, { actionHooks: room.session.actionHooks }))
+    const canonical = room.session.withCtx(() => serializeState(room.session.state, { actionHooks: room.session.actionHooks }))
     const page = buildRoomHistoryPage(withRoomParticipantNames(room, canonical), visiblePlayerIdsForConnection(room, ctx.ws), msg.cursor)
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, { type: 'historyPage', roomId: room.id, requestId: msg.requestId, page })
   } catch (error) {
@@ -1230,9 +1100,7 @@ async function handleFenceQuote(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     sendCommandError(ctx, 'Fence quote is stale', msg.requestId); return
   }
   try {
-    const quote = room.customSessionExecutor
-      ? await room.customSessionExecutor.query<FenceSelectionQuote>('quoteFenceSelection', [msg.playerIndex, msg.requestKey, msg.payload])
-      : room.session.quoteFenceSelection(msg.playerIndex, msg.requestKey, msg.payload)
+    const quote: FenceSelectionQuote = room.session.quoteFenceSelection(msg.playerIndex, msg.requestKey, msg.payload)
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, {
       type: 'fenceSelectionQuote', roomId: room.id, version: room.version, requestId: msg.requestId, quote,
     })
@@ -1250,7 +1118,7 @@ function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     return
   }
   return useSessionResponse(
-    executeRoomSession(room, 'getState', [], () => room.session.getState()),
+    executeRoomSession(room, () => room.session.getState()),
     (resp) => ctx.broadcaster.sendStateTo(
       ctx.ws,
       room,
@@ -1268,8 +1136,6 @@ function handleAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'a
   return useSessionResponse(
     executeRoomSession(
       room,
-      'takeAction',
-      [seat, msg.spaceId],
       () => room.session.takeAction(seat, msg.spaceId),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'action', seat),
@@ -1282,8 +1148,6 @@ function handleSpecialAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   return useSessionResponse(
     executeRoomSession(
       room,
-      'takeSpecialAction',
-      [seat, msg.cardId, msg.actionId, msg.payload],
       () => room.session.takeSpecialAction(seat, msg.cardId, msg.actionId, msg.payload),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'action', seat),
@@ -1296,8 +1160,6 @@ function handleChoice(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'c
   return useSessionResponse(
     executeRoomSession(
       room,
-      'resolveChoice',
-      [seat, msg.value, msg.payload],
       () => room.session.resolveChoice(seat, msg.value, msg.payload),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
@@ -1310,8 +1172,6 @@ function handleAnytime(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   return useSessionResponse(
     executeRoomSession(
       room,
-      'takeAnytimeAction',
-      [seat, msg.actionId],
       () => room.session.takeAnytimeAction(seat, msg.actionId),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'anytime', seat),
@@ -1325,8 +1185,6 @@ function handleOrdinaryDrawKeep(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   return useSessionResponse(
     executeRoomSession(
       room,
-      'resolveOrdinaryCardDrawChoice',
-      [seat, msg.choiceId, msg.keepCardId],
       () => room.session.resolveOrdinaryCardDrawChoice(seat, msg.choiceId, msg.keepCardId),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
@@ -1336,7 +1194,7 @@ function handleOrdinaryDrawKeep(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
 function handleRoundEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'roundEnd' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   return useSessionResponse(
-    executeRoomSession(room, 'performRoundEnd', [], () => room.session.performRoundEnd()),
+    executeRoomSession(room, () => room.session.performRoundEnd()),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'action'),
   )
 }
@@ -1352,8 +1210,6 @@ function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, {
   return useSessionResponse(
     executeRoomSession(
       room,
-      'commitSelectionChoice',
-      [seat, payload],
       () => room.session.commitSelectionChoice(seat, payload),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
@@ -1365,7 +1221,7 @@ function handleSoloHandSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
   const seat = msg.playerIndex
   return useSessionResponse(
-    executeRoomSession(room, 'submitSoloHandSelection', [seat, msg.selection],
+    executeRoomSession(room,
       () => room.session.submitSoloHandSelection(seat, msg.selection)),
     resp => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
   )
@@ -1378,8 +1234,6 @@ function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { ty
   return useSessionResponse(
     executeRoomSession(
       room,
-      'submitParentSelection',
-      [seat, msg.selection],
       () => room.session.submitParentSelection(seat, msg.selection),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
@@ -1391,7 +1245,7 @@ function handleUndoStep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   if (!assertMayUndo(ctx, room, msg.requestId)) return
   const seat = waitingSeat(room)
   return useSessionResponse(
-    executeRoomSession(room, 'undoStep', [], () => room.session.undoStep()),
+    executeRoomSession(room, () => room.session.undoStep()),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'undo', seat),
   )
 }
@@ -1401,7 +1255,7 @@ function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   if (!assertMayUndo(ctx, room, msg.requestId)) return
   const seat = waitingSeat(room)
   return useSessionResponse(
-    executeRoomSession(room, 'undoAction', [], () => room.session.undoAction()),
+    executeRoomSession(room, () => room.session.undoAction()),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'undo', seat),
   )
 }
@@ -1455,38 +1309,26 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   const previousRoomId = room.id
   const previousOwner = room.owner
   const previousVersion = room.version
-  // A rematch is a new game: reload through the current gate instead of
-  // reusing the embedded snapshot, so takeover (#642) and unpublish apply
-  // to the fresh room while the finished game stays untouched. The id list
-  // is refreshed alongside so a stale id cannot mark this room for a later
-  // takedown it does not deserve.
-  const enableCommunityDeck = room.session.state.enableCommunityDeck
+  // A rematch is a new game with only the deployed cards (ADR 0052); the
+  // finished game stays untouched.
   const soloConfiguration = room.creationConfiguration?.configuration
-  const soloCards = soloConfiguration ? await resolveSoloWorkshopCards(getDb(), soloConfiguration) : undefined
-  if (soloCards?.issues.length && soloConfiguration) {
+  const soloSources = soloConfiguration ? resolveSoloWorkshopSources(soloConfiguration) : undefined
+  if (soloSources?.issues.length && soloConfiguration) {
     sendCommandError(ctx, 'The selected card sources require adjustment', msg.requestId, 'creation_requires_adjustment')
-    if (ctx.activeCommand?.outcome) ctx.activeCommand.outcome.creationAdjustment = { configuration: soloConfiguration, issues: soloCards.issues }
+    if (ctx.activeCommand?.outcome) ctx.activeCommand.outcome.creationAdjustment = { configuration: soloConfiguration, issues: soloSources.issues }
     return
   }
-  const reloaded = soloCards && soloConfiguration
-    ? { cards: soloCards.cards, loadedDbIds: soloConfiguration.customCardIds, hasNotLive: false }
-    : (await loadCustomCards(
-    enableCommunityDeck ? room.customCardDbIds ?? [] : [],
-    room.createdBy,
-    { liveOnly: true },
-  ))
-  const customCards = reloaded.cards
   const options = rematchInitialStateOptions(room)
   const draftMode = room.draftMode ?? room.session.state.draftMode
   const draftPoolSize = room.draftPoolSize ?? room.session.state.draftPoolSize
   const { enableParentCards, enableThroughTheSeasons, enableFarmersOfTheMoor, enableMoorBalanceRules,
     allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening, cardEdition, classicDeckIds } = options
-  let created: ReturnType<typeof createIsolatedGameSession>
+  let session: GameSession
   try {
-    created = createIsolatedGameSession(
+    session = new GameSession(
       // Only a dev room may pick its Explicit Seed (ADR-0020).
       typeof msg.seed === 'number' && isDevRoom(room.id) ? msg.seed : undefined,
-      customCards.length > 0 ? customCards : undefined,
+      undefined,
       options,
     )
   } catch (err) {
@@ -1494,18 +1336,11 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     sendCreationError(ctx, err, msg.requestId)
     return
   }
-  if (created.executor && !created.executor.reserveWorkerSlot()) {
-    created.executor.dispose()
-    created.session.dispose()
-    sendCommandError(ctx, 'executable room capacity reached', msg.requestId)
-    return
-  }
   const nextRoomId = termination && room.endProposal?.intent === 'rematch'
     ? room.endProposal.nextRoomId
     : ctx.activeCommand?.request.resultRoomId ?? (await generateRoomId(ctx, fixedDevRoomRootId(previousRoomId)))
   if (!nextRoomId) {
-    created.executor?.dispose()
-    created.session.dispose()
+    session.dispose()
     sendCommandError(ctx, 'unable to allocate room id', msg.requestId)
     return
   }
@@ -1532,23 +1367,16 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   nextPlayers.sort((left, right) => left.playerIndex - right.playerIndex)
   nextOwners.sort((left, right) => left.playerIndex - right.playerIndex)
   const unusedColors = playerColorOptions.filter(color => ![...colorsBySeat.values()].includes(color))
-  const colors: Parameters<Room['session']['updatePlayerColors']>[0] = created.session.state.players.map((_, index) =>
+  const colors: Parameters<Room['session']['updatePlayerColors']>[0] = session.state.players.map((_, index) =>
     [index, colorsBySeat.get(index) ?? unusedColors.shift()!])
-  if (created.executor) await created.executor.updatePlayerColors(colors)
-  else created.session.updatePlayerColors(colors)
-  let response: SessionResponse | Promise<SessionResponse>
-  if (created.executor) {
-    response = created.executor.execute('updatePlayerNames', [names])
-  } else {
-    for (const [playerIndex, name] of names) created.session.updatePlayerName(playerIndex, name)
-    response = created.session.withCtx(() => created.session.getState())
-  }
+  session.updatePlayerColors(colors)
+  for (const [playerIndex, name] of names) session.updatePlayerName(playerIndex, name)
+  const response: SessionResponse = session.withCtx(() => session.getState())
   return (await useSessionResponse(
     response,
     async (resp) => {
       if (!resp.ok) {
-        created.executor?.dispose()
-        created.session.dispose()
+        session.dispose()
         sendCommandError(ctx, resp.error ?? 'unable to initialize game', msg.requestId)
         return
       }
@@ -1556,15 +1384,14 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         ...room,
         id: nextRoomId,
         owner: ctx.authority && previousOwner ? (await ctx.authority.directory.replacement(nextRoomId, previousRoomId, previousOwner, isDevRoom(nextRoomId))).owner : undefined,
-        session: created.session,
-        customSessionExecutor: created.executor,
+        session,
         players: nextPlayers,
         version: 0,
         endProposal: null,
         awaitingRematchPlayers: !!termination && nextPlayers.length < room.maxPlayers,
         creationSource: undefined,
-        ...(soloCards && soloConfiguration ? { creationConfiguration: {
-          configuration: soloConfiguration, resolvedWorkshopSources: soloCards.resolvedWorkshopSources,
+        ...(soloSources && soloConfiguration ? { creationConfiguration: {
+          configuration: soloConfiguration, resolvedWorkshopSources: soloSources.resolvedWorkshopSources,
         } } : {}),
         seatOwners: nextOwners,
         status: isDevRoom(nextRoomId) || room.hotseat === true || room.players.length >= room.maxPlayers ? 'playing' : 'waiting',
@@ -1572,7 +1399,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         enableParentCards, draftMode, draftPoolSize, enableThroughTheSeasons,
         enableFarmersOfTheMoor, enableMoorBalanceRules, allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening,
         ...(cardEdition === 'classic' ? { cardEdition, classicDeckIds } : {}),
-        customCardDbIds: reloaded.loadedDbIds, customCards,
+        customCardDbIds: [], customCards: [],
       }
       nextRoom.startedAt = nextRoom.status === 'playing' ? Date.now() : undefined
       ctx.committer!.lockNewRoom(nextRoom)
@@ -1624,7 +1451,7 @@ async function handleLoadGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   try { assertSupportedLoadedState(msg.state) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Unsupported game configuration', msg.requestId); return }
   return useSessionResponse(
-    executeRoomSession(room, 'loadState', [msg.state], () => room.session.loadState(msg.state)),
+    executeRoomSession(room, () => room.session.loadState(msg.state)),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'reconnect'),
   )
 }
@@ -1636,8 +1463,6 @@ function handleDevSetResources(ctx: ConnectionCtx, msg: Extract<ClientCommand, {
   return useSessionResponse(
     executeRoomSession(
       room,
-      'devSetResources',
-      [msg.playerIndex, msg.resources],
       () => room.session.devSetResources(msg.playerIndex, msg.resources),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'dev'),
@@ -1648,7 +1473,7 @@ function handleDevSetRound(ctx: ConnectionCtx, msg: Extract<ClientCommand, { typ
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
   return useSessionResponse(
-    executeRoomSession(room, 'devSetRound', [msg.round], () => room.session.devSetRound(msg.round)),
+    executeRoomSession(room, () => room.session.devSetRound(msg.round)),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'dev'),
   )
 }
@@ -1660,8 +1485,6 @@ function handleDevDrawCard(ctx: ConnectionCtx, msg: Extract<ClientCommand, { typ
   return useSessionResponse(
     executeRoomSession(
       room,
-      'devDrawCard',
-      [msg.playerIndex, msg.cardId],
       () => room.session.devDrawCard(msg.playerIndex, msg.cardId),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'dev'),
@@ -1674,8 +1497,6 @@ function handleDevPlayCard(ctx: ConnectionCtx, msg: Extract<ClientCommand, { typ
   return useSessionResponse(
     executeRoomSession(
       room,
-      'devPlayCard',
-      [msg.playerIndex, msg.cardId],
       () => room.session.devPlayCard(msg.playerIndex, msg.cardId),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'dev'),
@@ -1688,8 +1509,6 @@ function handleDevCreatePasture(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   return useSessionResponse(
     executeRoomSession(
       room,
-      'startDevFenceSelect',
-      [ctx.currentPlayerIndex],
       () => room.session.startDevFenceSelect(ctx.currentPlayerIndex),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'action'),
@@ -1703,8 +1522,6 @@ function handleDraftSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { typ
   return useSessionResponse(
     executeRoomSession(
       room,
-      'submitDraftPick',
-      [msg.playerId, msg.pick],
       () => room.session.submitDraftPick(msg.playerId, msg.pick),
     ),
     (resp) => publishCommandResponse(

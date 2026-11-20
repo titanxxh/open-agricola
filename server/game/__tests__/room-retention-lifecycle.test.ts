@@ -63,7 +63,6 @@ describe('room retention lifecycle', () => {
 
   afterEach(async () => {
     committer.shutdown()
-    for (const room of registry.iter()) room.customSessionExecutor?.dispose()
     for (const session of sessions) session.dispose()
     sessions.clear()
     objects.close()

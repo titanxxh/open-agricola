@@ -58,16 +58,8 @@ export type WorkshopVisibleMessage = {
 
 export type WorkshopSandboxContract = {
   format: 2
+  /** Identifies the deployed source; validation results are bound to it. */
   id: string
-  runtime: 'server-isolated-vm'
-  limits: { executionTimeoutMs: number; memoryLimitMb: number }
-  effects: readonly string[]
-  listeners: {
-    actions: readonly string[]
-    phases: readonly string[]
-    scopes: readonly string[]
-    /** Keys of the player objects in the deployed listener context; IDs live inside them. */
-    players: { actor: string; owner: string; effectRecipient: string }
-  }
-  actions: readonly string[]
+  /** Workshop code runs only as a Card Source module in the author's browser (ADR 0052). */
+  runtime: 'browser-card-source'
 }

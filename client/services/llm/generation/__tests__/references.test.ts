@@ -41,8 +41,6 @@ describe('project metadata and anonymous pinned source reads', () => {
     'client/local-sandbox/card-test-runtime.ts',
     'client/local-sandbox/card-tests.ts',
     'client/local-sandbox/card-tests.worker.ts',
-    'client/local-sandbox/browser-executor.ts',
-    'client/local-sandbox/browser-runtime.ts',
     'client/local-sandbox/__tests__/card-test-runtime.test.ts',
     'client/local-sandbox/__tests__/card-tests.test.ts',
   ])('reads a pinned public test or game API from %s', async path => {

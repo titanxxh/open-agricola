@@ -102,7 +102,7 @@ describe('workshop PR propose — session', () => {
     ).run(userToken, userId, now + 3_600_000, now))
 
     cardDbId = nanoid()
-    const sourceCode = `const CARD_DEF = { cardType: 'minor', meta: { id: 'CUSTOM_TestCard', deck: 'CUSTOM', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 } }\nconst CARD_IMPL = {}`
+    const sourceCode = `import { defineMinorCard } from '../card-source'\n\nexport const CUSTOM_TestCard = defineMinorCard({\n  meta: { id: 'CUSTOM_TestCard', deck: 'community', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 },\n  impl: {},\n})`
     const codeManifest = JSON.stringify({
       effectHooks: [],
       listeners: [],

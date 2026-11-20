@@ -3,8 +3,8 @@ import { t as translateMessage } from '../../../shared/i18n'
 /**
  * Workshop AI Card Designer.
  * Browser generation and reference tools live in client/services/llm/generation/.
- * The deployed contract owns capability names; docs/CUSTOM_CARD_SANDBOX.md
- * links their source and explains execution boundaries. UI guidance links there.
+ * Workshop code runs only in the browser sandbox; docs/CUSTOM_CARD_SANDBOX.md
+ * explains where it runs and what the server checks. UI guidance links there.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {

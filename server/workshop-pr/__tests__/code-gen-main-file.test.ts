@@ -23,7 +23,7 @@ export const catalogCardDefinitions = [
       card_id: 'CUSTOM_NewCard',
       card_type: 'minor',
       author_name: 'alice',
-      effect_code: `const CARD_ID = 'CUSTOM_NewCard'\nconst CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Card', deck: 'community', number: 0, desc: [], cost: {}, vp: 1 })\nconst CARD_IMPL = {}`,
+      effect_code: `import { defineMinorCard } from '../card-source'\n\nexport const CUSTOM_NewCard = defineMinorCard({\n  meta: { id: 'CUSTOM_NewCard', name: 'Card', deck: 'community', number: 0, desc: [], cost: {}, vp: 1 },\n  impl: {},\n})`,
       card_json: JSON.stringify({ name: 'Card' }),
     }
     const files = await generatePrFiles({
@@ -48,7 +48,7 @@ export const catalogCardDefinitions = [
       id: 'wc1',
       card_id: 'CUSTOM_X',
       card_type: 'minor',
-      effect_code: `const CARD_ID = 'CUSTOM_X'\nconst CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'X', deck: 'community', number: 0, desc: [], cost: {}, vp: 0 })\nconst CARD_IMPL = { effect: { id: CARD_ID } }`,
+      effect_code: `import { defineMinorCard } from '../card-source'\n\nexport const CUSTOM_X = defineMinorCard({\n  meta: { id: 'CUSTOM_X', name: 'X', deck: 'community', number: 0, desc: [], cost: {}, vp: 0 },\n  impl: { effect: { id: 'CUSTOM_X' } },\n})`,
     }
     const files = await generatePrFiles({
       wcard,
@@ -60,9 +60,8 @@ export const catalogCardDefinitions = [
     })
     const source = files.find((f) => f.path === 'shared/cards/community/CUSTOM_X.ts')!
     expect(source.content).toContain(`import { defineMinorCard } from '../card-source'`)
-    expect(source.content).toMatch(/const CARD_IMPL\b/)
     expect(source.content).toContain(`export const CUSTOM_X = defineMinorCard({`)
-    expect(source.content).toContain(`impl: cardImpl`)
-    expect(source.content).not.toContain('new MinorImprovement(')
+    expect(source.content).toContain(`impl: { effect: { id: 'CUSTOM_X' } }`)
+    expect(source.content).toContain('export const CUSTOM_X_impl = CUSTOM_X.impl')
   })
 })

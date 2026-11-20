@@ -1173,11 +1173,11 @@ Workshop 中组合自定义卡、配置测试局并运行独立试卡会话的�
 _Avoid_: 中文界面中的 Sandbox、Reset Sandbox、Custom Code Sandbox
 
 **Custom Code Sandbox**:
-已退役沙盒格式（`CARD_DEF` / `CARD_IMPL`）自定义卡代码的校验、编译和隔离执行链路，服务端通过 `server/custom-code/` 和 executor-backed runtime 注入卡牌能力；#1887 移除前供旧草稿使用。原生 Card Source 模块不经过它。
-_Avoid_: 直接执行用户源码
+工坊代码唯一的运行环境：作者浏览器中 opaque-origin sandboxed iframe 内的 Worker，加载原生 Card Source 模块（`client/local-sandbox/`）。服务端只做结构准入，从不执行工坊代码（ADR 0052）；已退役的 `CARD_DEF` / `CARD_IMPL` 格式及其服务端隔离执行链路已移除。
+_Avoid_: 服务端执行工坊代码
 
 **Workshop Capability Contract（工坊能力契约）**:
-一个部署承诺执行的自定义卡能力及其限制，只约束已退役沙盒格式的草稿（#1887 移除前）；原生 Card Source 模块不受能力契约限制（ADR 0052）。它可以小于原生卡牌能力；GitHub 上存在对应的原生实现不代表该能力可用。
+已退役（ADR 0052）：曾约束已退役沙盒格式草稿的能力清单。原生 Card Source 模块没有能力契约，可使用仓库中的任何机制，前提是遵守单卡闭环规则。
 _Avoid_: 沙盒契约、部署契约、执行契约、原生接口全集、仅用于提示词的允许名单
 
 **主 client bundle**:
@@ -1276,8 +1276,7 @@ _Avoid_: 永久放弃、全局出局名单
 - 进行局的私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输；结束局的 **Game Replay Archive** 可按座位视角或全开视角展示归档规则状态，但不保存 Private Event envelope。
 - **Game Replay Archive** 由 **Replay Step** 组织，用 **Replay Participant** 表达座位身份，并由 **Replay Perspective** 决定展示遮蔽；内容删除后原 `roomId` 只解析为 **Replay Tombstone**。
 - **Game Bug Reporter** 可以用自己的 **Issue Submission Connection** 提交，也可以明确选择 **Hosted Issue Identity**；两者都从同一 **Bug Report Draft** 和 **Bug Report Anchor** 创建公开 Issue，未完成局可用 **Reported Game Evidence** 暂时还原该 Anchor。
-- **Workshop** 生成或上传自定义卡，写成原生 Card Source 模块，只在作者浏览器的 opaque-origin Worker 中运行，服务端只检查结构、不执行；已退役沙盒格式的旧草稿仍由 **Custom Code Sandbox** 校验、编译并隔离执行。
-- **Custom Code Sandbox** 只接受 **Workshop Capability Contract** 内的能力；原生 **Card Impl** 不受该契约限制。
+- **Workshop** 生成或上传自定义卡，写成原生 Card Source 模块，只在 **Custom Code Sandbox** 中运行，服务端只检查结构、不执行；已退役沙盒格式的草稿已一次性转换，无法转换的需重新生成。
 - Workshop Card 只有在 PR 合入并随版本发布为社区卡后才进入正式对局；在此之前只在作者自己浏览器的 **Workshop Sandbox** 中运行（ADR 0052）。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
 - 规则正确性优先用 **Session Test**；前端视觉和多人连接行为再用 E2E。
@@ -1313,4 +1312,4 @@ _Avoid_: 永久放弃、全局出局名单
 - “player” 可能指 **PlayerState**、`playerIndex`、`playerId`、**RoomPlayer** 或登录 user；跨层传参时必须明确。
 - “可执行” 在不同层含义不同：行动入口可达性、支付可行性、pending option enabled、UI allowed command 都是不同判断。
 - “前端可见” 不代表“规则允许”；前端显示应以服务端 **InteractionState** 和 `allowedCommands` 为准。
-- “sandbox” 可能指浏览器内 `client/sandbox`，也可能指 server/custom-code 隔离执行；前者是调试 bundle，后者是自定义卡运行时隔离。
+- “sandbox” 可能指浏览器内 `client/sandbox` 调试 bundle，也可能指运行工坊代码的 `client/local-sandbox` opaque Worker；服务端不存在工坊代码沙盒。

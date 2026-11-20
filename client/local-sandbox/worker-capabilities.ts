@@ -8,8 +8,8 @@
  * Function-constructor escape. Returns the keys that could NOT be removed so the
  * caller can log them instead of assuming success.
  *
- * This is defense-in-depth, not a real isolate — the authoritative boundary for
- * third-party published cards remains the server isolated-vm executor.
+ * This is defense-in-depth: the security boundary for Workshop code is the
+ * opaque-origin iframe that hosts this Worker (ADR 0052).
  */
 export const DANGEROUS_WORKER_GLOBALS = [
   'fetch', 'XMLHttpRequest', 'WebSocket', 'importScripts', 'indexedDB',

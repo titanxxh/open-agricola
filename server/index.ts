@@ -34,7 +34,7 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import { listMyActiveRooms } from './lobby-my-rooms'
-import { handleGameRoute, disposeSandboxSessionsUsingCard, configureSandboxAuthority, disposeSandboxSessionsForUser, shutdownSandboxSessions } from './game-router.ts'
+import { handleGameRoute, configureSandboxAuthority, disposeSandboxSessionsForUser, shutdownSandboxSessions } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer } from './connection/ws-server.ts'
 import { initializeDatabase, getDb, cleanExpiredSessions } from './db.ts'
@@ -353,7 +353,6 @@ const processInvalidations = async (): Promise<void> => {
   invalidationRunning = true
   try {
     await invalidations.drain(instanceId, async operation => {
-      for (const cardId of operation.cardIds) disposeSandboxSessionsUsingCard(cardId)
       if (operation.kind === 'user') disposeSandboxSessionsForUser(operation.subjectId)
       await wssCtx!.applyInvalidation(operation)
     })

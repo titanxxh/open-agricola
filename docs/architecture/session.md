@@ -21,7 +21,7 @@ shared/session/
 
 ## GameCore Entry Points
 
-`GameCore` owns `state`, `engineStack`, step history with the action-start snapshot, and the end-game scoring cache. `GameSession` (`server/game/authoritative-session.ts`) is a thin wrapper that injects the isolated custom-card executor and builds viewer-filtered or debug payloads. Commands exposed to the server:
+`GameCore` owns `state`, `engineStack`, step history with the action-start snapshot, and the end-game scoring cache. `GameSession` (`server/game/authoritative-session.ts`) is a thin wrapper that builds viewer-filtered or debug payloads; it never executes Workshop code (ADR 0052). Commands exposed to the server:
 
 ```text
 takeAction(playerIndex, spaceId)
@@ -158,7 +158,7 @@ Tests: `server/__tests__/{exchange-batch-session,harvest-session,harvest-feed-co
 
 `card-edition-admission.ts` gates room creation, rematches and HTTP or browser sandbox creation. Admission defaults to `CLASSIC_EDITION_ENABLED` and tests can inject either value. The switch applies to new games. Existing games can load, continue, reconnect and replay with the switch off. Room metadata and opening facts retain the Card Edition and Classic Decks. Workshop stores the author's setup and checks the pool when the sandbox starts. Coverage is in `classic-edition-room.test.ts`, `privacy-http.test.ts`, `workshop-api.test.ts` and `client/local-sandbox/__tests__/local-core.test.ts`.
 
-The Workshop HTTP game uses `POST /api/game/reset-sandbox` to restart the active instance with its accepted setup and loaded card versions. A restart checks Card Edition admission and replaces the active game after initialization succeeds. See `sandbox-version-binding.test.ts`.
+The Workshop HTTP game uses `POST /api/game/reset-sandbox` to restart the active instance with its accepted setup. A restart checks Card Edition admission and replaces the active game after initialization succeeds. See `http-sandbox-instance.test.ts`.
 
 ## Snapshot data and executable-rule recovery
 

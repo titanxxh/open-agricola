@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { findInvalidCostAttributionLines } from '../../custom-code/ast-validator'
+import { findInvalidCostAttributionLines } from './cost-attribution-audit'
 
 type FindingType =
   | 'costOverride'
@@ -150,5 +150,53 @@ const scanCardAuthoredCostHacks = () => {
 describe('reference formatCost exact/free cost audit', () => {
   it('keeps card-authored exact costs on exactCost/policy paths', () => {
     expect(scanCardAuthoredCostHacks()).toEqual([])
+  })
+})
+
+describe('cost attribution audit', () => {
+  it('flags indirect compute-cost handler results', () => {
+    const lines = findInvalidCostAttributionLines(`
+      const COMPUTE_COSTS = 'computeCosts'
+      const discountHandler = () => {
+        const result = { costs: { wood: -1 } }
+        return result
+      }
+      const listener = {
+        phases: [COMPUTE_COSTS as ActionHookPhase],
+        handler: discountHandler,
+      }
+    `)
+
+    expect(lines).toHaveLength(1)
+  })
+
+  it('flags invalid cost attribution entries', () => {
+    const lines = findInvalidCostAttributionLines(`
+      const CARD_ID = 'D000_Test'
+      const listener = {
+        phases: ['computeCosts'],
+        handler: () => ({
+          costs: { wood: -1 },
+          costAttribution: [],
+        }),
+      }
+    `)
+
+    expect(lines).toHaveLength(1)
+  })
+
+  it('accepts one matching source entry', () => {
+    const lines = findInvalidCostAttributionLines(`
+      const CARD_ID = 'D000_Test'
+      const listener = {
+        phases: ['computeCosts'],
+        handler: () => ({
+          costs: { wood: -1 },
+          costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
+        }),
+      }
+    `)
+
+    expect(lines).toEqual([])
   })
 })

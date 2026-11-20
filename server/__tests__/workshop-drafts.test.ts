@@ -18,7 +18,6 @@ import {
   enterReview,
   unpublish,
   getHandoffReadiness,
-  loadLiveDraft,
   loadSandboxVersion,
   loadWorkspace,
   markSandboxPass,
@@ -70,8 +69,8 @@ const handoffDraft = (overrides: Partial<WorkshopDraft> = {}): WorkshopDraft => 
       modifiers: [],
       implemented: true,
     },
-    effectCode: 'const CARD_DEF = {}; const CARD_IMPL = {}',
-    compiledCode: '"use strict"; const CARD_DEF = {}; const CARD_IMPL = {};',
+    effectCode: 'export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl })',
+    compiledCode: '"use strict"; exports.CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl });',
     codeManifest: {
       effectHooks: [],
       listeners: [],
@@ -399,7 +398,7 @@ describe('workshop draft aggregate', () => {
     expect(recent).not.toContainEqual({ id: versionId })
     workspace = await restoreVersion(db, { cardId: workspace.id, authorId: 'author', baseRevision: workspace.revision, versionId })
     const pinned = await pinCurrentDraftVersion(db, { cardId: workspace.id, authorId: 'author', baseRevision: workspace.revision })
-    expect(pinned).toMatchObject({ versionId, cardJson: { id: 'CUSTOM_FieldKeeper', name: 'Field Keeper', card_type: 'occupation', _code: 'const CARD_DEF = {}; const CARD_IMPL = {}' } })
+    expect(pinned).toMatchObject({ versionId, cardJson: { id: 'CUSTOM_FieldKeeper', name: 'Field Keeper', card_type: 'occupation', _code: 'export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl })' } })
     await db.prepare("UPDATE workshop_submissions SET state='complete' WHERE id='submission'").run()
     workspace = await checkpointDraft(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision,draft:{...workspace.draft,artUrl:'/card-art/8.png'}})
     await pinCurrentDraftVersion(db,{cardId:workspace.id,authorId:'author',baseRevision:workspace.revision})
@@ -482,8 +481,8 @@ describe('workshop draft aggregate', () => {
 
     const validCandidate = {
       ...invalidCandidate,
-      sourceCode: 'const CARD_IMPL = {}',
-      compiledCode: '"use strict"; const CARD_IMPL = {};',
+      sourceCode: 'export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} })',
+      compiledCode: '"use strict"; exports.CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} });',
       codeManifest: { listeners: [] },
       cardJson: {
         ...baseDraft().cardJson,
@@ -497,7 +496,7 @@ describe('workshop draft aggregate', () => {
           },
         },
       },
-      ...browserArtifacts('const CARD_IMPL = {}'),
+      ...browserArtifacts('export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} })'),
     }
     for (const candidate of [
       { ...validCandidate, testing: undefined },
@@ -556,13 +555,13 @@ describe('workshop draft aggregate', () => {
         id: 'ability-localization',
         kind: 'ability',
         prompt: 'gain grain',
-        sourceCode: 'const CARD_IMPL = {}',
-        compiledCode: '"use strict"; const CARD_IMPL = {};',
+        sourceCode: 'export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} })',
+        compiledCode: '"use strict"; exports.CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} });',
         codeManifest: { listeners: [] },
         cardJson: {
           ...baseDraft().cardJson,
         },
-        ...browserArtifacts('const CARD_IMPL = {}'),
+        ...browserArtifacts('export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} })'),
         createdAt: 100,
       },
     }))
@@ -598,8 +597,8 @@ describe('workshop draft aggregate', () => {
           ...baseDraft().cardJson,
           name: 'Renamed Field Keeper',
         },
-        effectCode: 'const CARD_DEF = {}; const CARD_IMPL = {}',
-        compiledCode: '"use strict"; const CARD_DEF = {}; const CARD_IMPL = {};',
+        effectCode: 'export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl })',
+        compiledCode: '"use strict"; exports.CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl });',
         codeManifest: {
           effectHooks: [],
           listeners: [],
@@ -724,43 +723,6 @@ describe('workshop draft aggregate', () => {
       authorId: 'other',
       versionId: adopted.versionId,
     })).rejects.toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'forbidden' })))
-  })
-
-  it('loads live gameplay data from the pinned approved version', async () => {
-    const created = (await createCard(db, { authorId: 'author', draft: baseDraft() }))
-    const approved = (await approveCurrentDraft(db, { cardId: created.id, authorId: 'author' }))
-    ;(await publish(db, {
-      cardId: created.id,
-      authorId: 'author',
-      baseRevision: 1,
-    }))
-
-    expect((await loadLiveDraft(db, created.id))).toMatchObject({
-      name: 'Field Keeper',
-      artUrl: null,
-    })
-    expect((await loadWorkspace(db, created.id, 'author'))).toMatchObject({
-      revision: 1,
-      approvedVersionId: approved.versionId,
-    })
-
-    // offline edits fork the draft, void the approval and stop live loading
-    ;(await unpublish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 }))
-    ;(await checkpointDraft(db, {
-      cardId: created.id,
-      authorId: 'author',
-      baseRevision: 1,
-      draft: baseDraft({
-        name: 'Unpublished change',
-        cardJson: {
-          ...baseDraft().cardJson,
-          name: 'Unpublished change',
-        },
-        artUrl: '/card-art/unpublished.png',
-      }),
-    }))
-    ;(await expect(loadLiveDraft(db, created.id)).rejects
-      .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' })))
   })
 
   it('gates publishing on review approval and pins sandbox confirmation to the exact version', async () => {
@@ -1116,7 +1078,7 @@ describe('workshop draft aggregate', () => {
       .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' })))
   })
 
-  it('graduates a merged PR: live snapshot serves the release window, then built_in retires it', async () => {
+  it('graduates a merged PR and flags it built in once a release ships it', async () => {
     const created = (await createCard(db, { authorId: 'author', draft: baseDraft() }))
     ;(await enterReview(db, {
       cardId: created.id,
@@ -1131,21 +1093,16 @@ describe('workshop draft aggregate', () => {
     const merged = (await loadWorkspace(db, created.id, 'author'))
     expect(merged.reviewStatus).toBe('merged')
     expect(merged.live).toBe(true)
-    // release window: the approved snapshot keeps serving rooms
-    expect((await loadLiveDraft(db, created.id))).toMatchObject({ name: 'Field Keeper' })
     // merged cards cannot be unpublished or edited in the workshop
     ;(await expect(unpublish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })).rejects
       .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' })))
 
     // a release containing the card ships: built-in registry takes over
     expect((await markBuiltInMergedCards(db, ['CUSTOM_FieldKeeper']))).toEqual({ flagged: 1, unflagged: 0 })
-    ;(await expect(loadLiveDraft(db, created.id)).rejects
-      .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' })))
     // idempotent: second startup flags nothing new
     expect((await markBuiltInMergedCards(db, ['CUSTOM_FieldKeeper']))).toEqual({ flagged: 0, unflagged: 0 })
-    // rollback deployment without the card: fall back to the workshop snapshot
+    // rollback deployment without the card unflags it
     expect((await markBuiltInMergedCards(db, []))).toEqual({ flagged: 0, unflagged: 1 })
-    expect((await loadLiveDraft(db, created.id))).toMatchObject({ name: 'Field Keeper' })
   })
 
   it('treats merged cards as read-only in the workshop', async () => {
@@ -1227,9 +1184,9 @@ it('persists A and failed B privately, strips protocol, and preserves immutable 
   const makeCandidate = (id: string, valid: boolean) => ({
     id, kind: 'ability' as const, prompt: `request ${id}`, createdAt: 1,
     baseRevision: 1, stale: true,
-    sourceCode: 'const CARD_IMPL = {}', cardJson: baseDraft().cardJson,
-    ...browserArtifacts('const CARD_IMPL = {}'),
-    validation: { ...browserArtifacts('const CARD_IMPL = {}').validation, valid }, compiledCode: 'const CARD_IMPL = {};', codeManifest: { listeners: [] },
+    sourceCode: 'export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} })', cardJson: baseDraft().cardJson,
+    ...browserArtifacts('export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} })'),
+    validation: { ...browserArtifacts('export const CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} })').validation, valid }, compiledCode: 'exports.CUSTOM_FieldKeeper = defineOccupationCard({ meta, impl: {} });', codeManifest: { listeners: [] },
     provenance: { attemptId: id, inputFingerprint: 'a'.repeat(64), promptVersion: 'v1', toolVersion: 'v1',
       provider: 'deepseek', endpoint: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash',
       modelRequests: 2, referenceCalls: 1, elapsedMs: 10,

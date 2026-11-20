@@ -1,13 +1,17 @@
 import { expect, it } from 'vitest'
 import { runBrowserCardTestScript } from '../card-test-runtime.ts'
 
-it.each(['top-level', 'callback'])('reports card runtime failures from a %s Session', async scope => {
-  const source = `
+it.each(['top-level', 'callback'])('reports a card runtime failure from a %s Session', async scope => {
+  const source = `import { defineOccupationCard } from '../card-source'
+
 const CARD_ID = 'CUSTOM_RuntimeFailure'
-const CARD_DEF = { cardType: 'occupation', meta: { id: CARD_ID, name: 'Runtime failure', desc: [], cost: {} } }
-const CARD_IMPL = { listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
-  handler: () => { throw new Error('actual-card-runtime-probe') }
-}] }
+
+export const CUSTOM_RuntimeFailure = defineOccupationCard({
+  meta: { id: CARD_ID, name: 'Runtime failure', deck: 'community', number: 0, desc: [], cost: {} },
+  impl: { listeners: [{ id: 'runtime-failure', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
+    handler: () => { throw new Error('actual-card-runtime-probe') },
+  }] },
+})
 `
   const commands = `
 const session = createSession()
@@ -17,16 +21,19 @@ session.takeAction(0, 'forest')
   const tests = scope === 'top-level' ? commands + "test('callback completed',()=>{})"
     : `test('callback completed',()=>{${commands}})`
   const result = await runBrowserCardTestScript({ kind: 'run', id: 'runtime-failure', source, tests })
-  expect(result.outcome).toEqual({ kind: 'failed', failures: [expect.objectContaining({
-    name: 'Card runtime', error: expect.stringContaining('actual-card-runtime-probe'),
-  })] })
+  // A native card's exception reaches the test that ran the command, like a built-in card's.
+  expect(result.outcome).toEqual(scope === 'top-level'
+    ? { kind: 'error', message: expect.stringContaining('actual-card-runtime-probe') }
+    : { kind: 'failed', failures: [{ name: 'callback completed', error: expect.stringContaining('actual-card-runtime-probe') }] })
 })
 
 it('adds a failed GameCore command only to its own test assertion failures', async () => {
-  const source = `
-const CARD_ID = 'CUSTOM_CommandDiagnostic'
-const CARD_DEF = { cardType: 'minor', meta: { id: CARD_ID, name: 'Command diagnostic', desc: [] } }
-const CARD_IMPL = {}
+  const source = `import { defineMinorCard } from '../card-source'
+
+export const CUSTOM_CommandDiagnostic = defineMinorCard({
+  meta: { id: 'CUSTOM_CommandDiagnostic', name: 'Command diagnostic', deck: 'community', number: 0, desc: [] },
+  impl: {},
+})
 `
   const tests = `
 test('expected rejection passes', () => {

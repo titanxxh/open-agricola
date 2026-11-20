@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { generateCardSourceFile } from '../code-gen'
+import { convertWorkshopCard } from './legacy-card-source-helper'
 
-describe('generateCardSourceFile', () => {
+describe('convertLegacyCardSource', () => {
   it('emits Card Source with CardImpl type + only used helpers', () => {
     const wcard = {
       id: 'wc1',
@@ -13,17 +13,13 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Foo', deck: 'communi
 const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { food: 2 }) } }
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard, {
-      githubLogin: 'gh',
-      iso: '2026-05-09T00:00:00Z',
-    })
+    const out = convertWorkshopCard(wcard)
     expect(out).toContain(`import { defineMinorCard } from '../card-source'`)
     expect(out).toContain(`import type { CardImpl } from '../registry'`)
     expect(out).toContain(`import { gainLeaf } from '../helpers/pay-gain-node'`)
     expect(out).not.toContain(`import { payLeaf }`)
     expect(out).toContain(`const CARD_IMPL`)
     expect(out).toContain(`export const CUSTOM_Foo = defineMinorCard({`)
-    expect(out).toContain(`export const CUSTOM_Foo_impl = CUSTOM_Foo.impl`)
     expect(out).not.toContain(`new MinorImprovement(`)
     expect(out).not.toContain(`new Occupation(`)
   })
@@ -38,13 +34,9 @@ const CARD_ID = 'CUSTOM_Hut'
 const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Hut', deck: 'community', number: 0, desc: [], cost: { wood: 1 }, vp: 1 })
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard, {
-      githubLogin: 'gh',
-      iso: '2026-05-09T00:00:00Z',
-    })
+    const out = convertWorkshopCard(wcard)
     expect(out).toContain(`const CARD_IMPL = {}`)
     expect(out).toContain(`const CARD_ID = 'CUSTOM_Hut'`)
-    expect(out).toContain(`export const CUSTOM_Hut_impl = CUSTOM_Hut.impl`)
   })
 
   it('underscores unused listener handler params (TS6133 prevention)', () => {
@@ -67,7 +59,7 @@ const CARD_IMPL = {
 }
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
+    const out = convertWorkshopCard(wcard)
     expect(out).toMatch(/handler:\s*\(_context: any\)\s*=>/)
   })
 
@@ -106,7 +98,7 @@ const CARD_IMPL = {
 }
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
+    const out = convertWorkshopCard(wcard)
     expect(out).toContain(`const SPACES = ['forest', 'clay-pit']`)
     expect(out).toContain('function isTracked(context: any): any {')
     expect(out).toContain('function buildFlow(gained: any): any {')
@@ -132,7 +124,7 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Plain', deck: 'commu
 const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { food: 1 }) } }
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
+    const out = convertWorkshopCard(wcard)
     expect(out).not.toContain('eslint-disable')
   })
 })
