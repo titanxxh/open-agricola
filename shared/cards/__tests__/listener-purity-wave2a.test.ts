@@ -808,7 +808,7 @@ describe('listener purity wave 2a', () => {
 
     const result = listenerById(
       E051_WhaleOil_impl.listeners,
-      'E51-whale-oil-after-collect-fishing',
+      'E51-whale-oil-before-fishing',
     ).handler(ctx)
 
     expectCardStatesUnchanged(p, before, 'E51 owner')
