@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { FULL_TASK_IDS, TASK_FIXTURE_IMAGES, browserSpecWeights, chromiumLaneEnvironment, taskCommands, taskFixtureImages } from '../ci/verification-tasks'
+import { FULL_TASK_IDS, TASK_FIXTURE_IMAGES, browserSpecWeights, chromiumLaneEnvironment, fastWorkerEnvironment, taskCommands, taskFixtureImages } from '../ci/verification-tasks'
 
 const temporary: string[] = []
 afterEach(() => temporary.splice(0).forEach(cwd => rmSync(cwd, { recursive: true, force: true })))
@@ -81,15 +81,19 @@ describe('GitHub chromium task environment', () => {
     for (const id of ['fast', 'webkit', 'browser-sandbox']) expect(taskFixtureImages(root, id)).toEqual([])
   })
 
-  it('passes the runner lane count to chromium tasks only, outside the task command', () => {
+  it('passes the runner lane count to chromium tasks and the worker count to fast only, outside the task command', () => {
     expect(chromiumLaneEnvironment('chromium-3', { VERIFY_PARALLEL_LANES: '2' })).toEqual({ VERIFY_PARALLEL_LANES: '2' })
     expect(chromiumLaneEnvironment('chromium-3', {})).toEqual({})
     expect(chromiumLaneEnvironment('webkit', { VERIFY_PARALLEL_LANES: '2' })).toEqual({})
     expect(() => chromiumLaneEnvironment('chromium-9', {})).toThrow()
+    expect(fastWorkerEnvironment('fast', { VITEST_MAX_WORKERS: '4' })).toEqual({ VITEST_MAX_WORKERS: '4' })
+    expect(fastWorkerEnvironment('fast', {})).toEqual({})
+    for (const id of ['slow', 'chromium-1', 'quality']) expect(fastWorkerEnvironment(id, { VITEST_MAX_WORKERS: '4' })).toEqual({})
     for (const file of ['candidate-verification.yml', 'prerelease-candidate-verification.yml']) {
       const workflow = readFileSync(join(root, '.github/workflows', file), 'utf8')
       const execute = workflow.slice(workflow.indexOf('- name: Execute verification task'))
       expect(execute.slice(0, execute.indexOf('run:')), file).toContain("VERIFY_PARALLEL_LANES: '2'")
+      expect(execute.slice(0, execute.indexOf('run:')), file).toContain("VITEST_MAX_WORKERS: '4'")
       const pull = workflow.indexOf('- name: Pull task fixture images')
       expect(pull, file).toBeGreaterThan(workflow.indexOf('- name: Install browsers'))
       expect(pull, file).toBeLessThan(workflow.indexOf('- name: Execute verification task'))
