@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { FULL_TASK_IDS, browserSpecWeights, taskCommands } from '../ci/verification-tasks'
+import { FULL_TASK_IDS, TASK_FIXTURE_IMAGES, browserSpecWeights, chromiumLaneEnvironment, taskCommands, taskFixtureImages } from '../ci/verification-tasks'
 
 const temporary: string[] = []
 afterEach(() => temporary.splice(0).forEach(cwd => rmSync(cwd, { recursive: true, force: true })))
@@ -68,5 +68,33 @@ describe('complete catalog chromium tasks', () => {
       ['e2e-tests/c.spec.ts'],
       ['e2e-tests/d.spec.ts'],
     ])
+  })
+})
+
+describe('GitHub chromium task environment', () => {
+  it('pulls the dashboard images only for the chromium task that runs the dashboard spec', () => {
+    const dashboard = TASK_FIXTURE_IMAGES.filter(({ file }) => file === 'e2e-tests/operations-dashboard.spec.ts').map(({ image }) => image)
+    expect(dashboard).toHaveLength(2)
+    const pulls = chromiumTasks.map(id => taskFixtureImages(root, id))
+    expect(pulls.filter(images => images.length)).toEqual([dashboard])
+    expect(chromiumTasks[pulls.findIndex(images => images.length)]).toBe(chromiumTasks.find(id => plannedSpecs(root, id).includes('e2e-tests/operations-dashboard.spec.ts')))
+    for (const id of ['fast', 'webkit', 'browser-sandbox']) expect(taskFixtureImages(root, id)).toEqual([])
+  })
+
+  it('passes the runner lane count to chromium tasks only, outside the task command', () => {
+    expect(chromiumLaneEnvironment('chromium-3', { VERIFY_PARALLEL_LANES: '2' })).toEqual({ VERIFY_PARALLEL_LANES: '2' })
+    expect(chromiumLaneEnvironment('chromium-3', {})).toEqual({})
+    expect(chromiumLaneEnvironment('webkit', { VERIFY_PARALLEL_LANES: '2' })).toEqual({})
+    expect(() => chromiumLaneEnvironment('chromium-9', {})).toThrow()
+    for (const file of ['candidate-verification.yml', 'prerelease-candidate-verification.yml']) {
+      const workflow = readFileSync(join(root, '.github/workflows', file), 'utf8')
+      const execute = workflow.slice(workflow.indexOf('- name: Execute verification task'))
+      expect(execute.slice(0, execute.indexOf('run:')), file).toContain("VERIFY_PARALLEL_LANES: '2'")
+      const pull = workflow.indexOf('- name: Pull task fixture images')
+      expect(pull, file).toBeGreaterThan(workflow.indexOf('- name: Install browsers'))
+      expect(pull, file).toBeLessThan(workflow.indexOf('- name: Execute verification task'))
+      expect(workflow.slice(pull, workflow.indexOf('- name: Execute verification task')), file)
+        .toMatch(/if: startsWith\(matrix\.task, 'chromium-'\)[\s\S]*candidate-verification\.ts pull-fixture-images "\$VERIFICATION_TASK"/)
+    }
   })
 })

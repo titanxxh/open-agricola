@@ -145,11 +145,20 @@ jobs:
         env:
           CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
         run: node scripts/ci/prerelease-verification.ts source --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA"
+      - name: Pull task fixture images
+        if: startsWith(matrix.task, 'chromium-')
+        working-directory: policy
+        env:
+          CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
+          VERIFICATION_TASK: ${{ matrix.task }}
+        run: node scripts/ci/candidate-verification.ts pull-fixture-images "$VERIFICATION_TASK" --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA"
       - name: Execute verification task
         working-directory: policy
         env:
           CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
           VERIFICATION_TASK: ${{ matrix.task }}
+          # Two worktree lanes per chromium task (#1920, #1921); the task command and so the receipt stay the same.
+          VERIFY_PARALLEL_LANES: '2'
         run: node scripts/ci/prerelease-verification.ts run-task --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA" --task "$VERIFICATION_TASK"
       - name: Stop candidate descendants and collect private diagnostics
         if: always() && steps.isolation.outcome == 'success'
