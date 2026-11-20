@@ -173,6 +173,9 @@ let normalWorker: string
 let emergencyWorker: string
 
 test.beforeAll(async () => {
+  // Its own Pages and service worker builds compete for CPU with the other verify:parallel lane's vite build, and
+  // release-candidate runs do not retry, so the default 120 s timed out once (#1935).
+  test.setTimeout(300_000)
   const assetCheckout = process.env.E2E_PUBLIC_ASSET_DIR || process.env.PUBLIC_ASSET_VALIDATION_DIR
   if (!assetCheckout) throw new Error('Set E2E_PUBLIC_ASSET_DIR or PUBLIC_ASSET_VALIDATION_DIR to a clean, pinned public asset checkout')
   directory = mkdtempSync(join(tmpdir(), 'oa-public-asset-worker-'))
