@@ -279,9 +279,10 @@ export class GenerationAttempt {
         this.messages.push(turn.message)
         if (turn.calls.length) this.pendingCalls = { calls: turn.calls, next: 0 }
         else {
+          // The latest verdict wins: a revised needs-* verdict outranks artifacts written before it.
           const verdict = this.feasibility?.verdict
-          this.finish(this.lastCandidate ? isAbilityCandidateReady(this.lastCandidate) ? 'candidate' : 'failed-source'
-            : verdict === 'needs-info' || verdict === 'needs-platform' ? verdict : 'answer', turn.text)
+          this.finish(verdict === 'needs-info' || verdict === 'needs-platform' ? verdict
+            : this.lastCandidate ? isAbilityCandidateReady(this.lastCandidate) ? 'candidate' : 'failed-source' : 'answer', turn.text)
           return
         }
       } catch (error) {

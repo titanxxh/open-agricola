@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorkshopDraftContract } from '../../../../../shared/contract/workshop'
 import type { WorkshopSandboxContract } from '../../../../../shared/contract/workshop-generation'
-import { abilityArtifactFingerprint, isAbilityCandidateReady, sourceFingerprint } from '../../../../../shared/projections/workshop-generation'
+import { abilityArtifactFingerprint, isAbilityCandidateReady, projectGenerationResult, sourceFingerprint } from '../../../../../shared/projections/workshop-generation'
 import { GenerationAttempt, type AttemptPorts } from '../attempt'
 import { buildGenerationRequest } from '../request'
 import { ModelTurnError, type ModelTurn, type ToolCall, type WireMessage } from '../protocol'
@@ -269,5 +269,13 @@ describe('five-tool generation loop', () => {
     ])
     expect(final).toMatchObject({ result: { kind: 'answer' } })
     expect(final.feasibility).toBeUndefined()
+  })
+  it('lets a later needs-platform verdict outrank artifacts written before it', async () => {
+    const io = ports()
+    const report = { ...feasibility, verdict: 'needs-platform', summary: 'Testing revealed a missing hook.', gaps: ['No hook observes other players harvesting.'] }
+    sequence(io, turn([feasible(), write(), run()]), turn([feasible(report, 'revised')]), turn([], 'This card needs a platform change.'))
+    const final = await new GenerationAttempt(request(), io).start()
+    expect(final).toMatchObject({ feasibility: report, result: { kind: 'needs-platform', feasibility: report }, candidate: { sourceCode: source } })
+    expect(projectGenerationResult(final.result)).toMatchObject({ kind: 'needs-platform', feasibility: report })
   })
 })

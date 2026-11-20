@@ -19,9 +19,9 @@ type DraftRow = { id: string; card_id: string; card_type: string; card_json: str
 export type LegacyDraftConversion = { converted: string[]; flagged: string[] }
 
 /** Returns the converted source, or null when the draft must be regenerated. */
-export function convertLegacyDraftSource(source: string, cardId: string, cardType: string): string | null {
+export function convertLegacyDraftSource(source: string, cardId: string, cardType: string, locales?: Record<string, unknown> | null): string | null {
   try {
-    const converted = convertLegacyCardSource(source, cardId, cardType === 'occupation' ? 'occupation' : 'minor')
+    const converted = convertLegacyCardSource(source, cardId, cardType === 'occupation' ? 'occupation' : 'minor', { locales })
     return prepareNativeAbilityCode(converted, cardId).ok ? converted : null
   } catch {
     return null
@@ -41,7 +41,8 @@ export async function convertLegacyWorkshopDrafts(db: PostgresDatabase): Promise
     } catch { continue }
     const source = cardJson._code
     if (typeof source !== 'string' || !source.trim() || isNativeCardSource(source)) continue
-    const converted = convertLegacyDraftSource(source, row.card_id, row.card_type)
+    const locales = cardJson.locales && typeof cardJson.locales === 'object' && !Array.isArray(cardJson.locales) ? cardJson.locales as Record<string, unknown> : null
+    const converted = convertLegacyDraftSource(source, row.card_id, row.card_type, locales)
     const prepared = converted === null ? null : prepareNativeAbilityCode(converted, row.card_id)
     const next: Record<string, unknown> = { ...cardJson }
     delete next._compiled

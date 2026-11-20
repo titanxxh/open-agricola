@@ -92,3 +92,10 @@ it('drops the retired public card registry', async () => {
   expect(await db.prepare("SELECT count(*)::integer AS count FROM pg_proc WHERE pronamespace = current_schema()::regnamespace AND proname IN ('record_workshop_public_version','record_inserted_workshop_public_version')").get())
     .toEqual({ count: 0 })
 })
+
+it('carries the draft\'s saved translations into the converted module', () => {
+  const converted = convertLegacyDraftSource(LEGACY_SOURCE, 'CUSTOM_LegacyHarvester', 'minor', { zh: { name: '旧日收割者', desc: ['每次收获，获得1个<FOOD>。'] } })
+  expect(admitNativeCardSource(converted!, 'CUSTOM_LegacyHarvester')).toMatchObject({
+    valid: true, meta: { locales: { zh: { name: '旧日收割者', desc: ['每次收获，获得1个<FOOD>。'] } } },
+  })
+})

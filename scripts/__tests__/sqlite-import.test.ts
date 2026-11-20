@@ -111,3 +111,20 @@ it('retains an erased Workshop reference as an inaccessible tombstone without up
   expect(await db.prepare("SELECT art_url FROM workshop_cards WHERE id='workshop'").get()).toEqual({ art_url: '/card-art/saved.png' })
   expect(await db.prepare("SELECT blocked FROM stored_objects WHERE object_key='card-art/saved.png'").get()).toEqual({ blocked: true })
 })
+
+it('converts imported legacy Workshop drafts once, after the rows are verified as copied', async () => {
+  fixture = await importFixture()
+  const { source, db, resources, paths } = fixture
+  const legacy = `const CARD_ID = 'CUSTOM_saved'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Saved', deck: 'CUSTOM', number: 0, desc: ['Gain 1 <FOOD>.'], cost: {} })
+const CARD_IMPL = { effect: { id: CARD_ID, onBuy: () => gainLeaf(CARD_ID, { food: 1 }) } }`
+  source.prepare("UPDATE workshop_cards SET card_json = ? WHERE id = 'workshop'").run(JSON.stringify({ id: 'CUSTOM_saved', name: 'Saved', _code: legacy, locales: { zh: { name: '存档' } } }))
+  const report = await importSqlite(paths, db, resources)
+  expect(report.workshopDrafts).toEqual({ converted: ['workshop'], flagged: [] })
+  const row = await db.prepare("SELECT card_json, draft_revision FROM workshop_cards WHERE id='workshop'").get<{ card_json: string; draft_revision: number }>()
+  const code = (JSON.parse(row!.card_json) as { _code: string })._code
+  expect(code).toContain('export const CUSTOM_saved = defineMinorCard(')
+  expect(code).toContain('locales: { zh: { name: "存档" } }')
+  expect(code).not.toContain('CARD_DEF')
+  expect(await importSqlite(paths, db, resources)).toEqual(report)
+})
