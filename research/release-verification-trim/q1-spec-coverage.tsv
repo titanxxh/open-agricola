@@ -1,0 +1,78 @@
+spec	w	task	verifies	covered_elsewhere	rule_heavy
+platform-shell	89	c1	workshop/settings controls fit 320px, OAuth link styling, seasonal bg asset path, lobby horizon (all mocked APIs)	partly platform.spec (workshop page)	no; WEIGHT ANOMALY (old table 10)
+seasonal-settlement-logs	64	c2	season logs (breeding, heating waiver, free stable, accumulation, fence/plow/major payments, grants) on 2 WS clients + reload	server/__tests__/seasonal-{fence,plow,major}-payment-session, season-heating-log-session, season-accumulation-log-session, seasonal-grants-session, non-harvest-breeding-log-session; client/components/board/__tests__/{seasonal-payment-log,seasonal-plow-log,season-heating-log,season-accumulation-log,non-harvest-breeding-log}.test.tsx	yes (+log rendering)
+workshop-workspace-acceptance	55	c3	11 AI-card workspace scenarios (desktop primary) + exhausted submission countdown + pending-deletion guard	server workshop tests (workshop-drafts.test.ts)	no
+ws-dual-player	53	c4	2-client header/reaction, dev seat links 2..6p (20 navigations), own hand off-turn, legacy full flow+undo+reconnect, dev reset	frontend-browser-scenario-matrix @ws (2p/6p); room-driver specs	no; legacy smoke overlap
+operations-dashboard	52	c4	real Grafana+Prometheus containers render ops dashboards	server/__tests__/operations-accounts.test.ts, operations-openings.test.ts (queries not rendering)	no
+workshop-browser-card-tests	49	c3	browser card-test sandbox isolation, CSP, cancel and 20s timeout, in Chromium AND WebKit	none	no; fixed 2x20s waits
+encyclopedia	48	c2	catalog/detail URL state, back/forward, refresh, copy link, errors, x2 layouts	encyclopedia.requirements.json pins both layouts	no
+stale-chunk-recovery	47	c1	recovery UI when game chunk fails after one reload	none	no; WEIGHT ANOMALY (old 1)
+web-push	47	c3	push notification opens draft/inbox in Pages game (SW) + Pages build	server/__tests__/web-push-draft.test.ts, web-push-provider.test.ts	no
+application-loading	44	c4	Pages build: login without metadata, app/lang pack order, encyclopedia/sign-in wait for metadata	none (needs prod build)	no; in-spec prod build
+encyclopedia-entry	39	c2	lobby/tab entry, scroll/page restore, new tab, refresh x2 layouts	requirements file	no
+encyclopedia-in-game	39	c1	in-game encyclopedia panel in draft/parents/work, keeps farm draft across snapshots/disconnect, hotseat gate x desktop/phone	none	no
+listener-lifecycle-room	39	c4	Hat/Spear/Steam window, C094 Potter's Yard->Toolbox, feeding batch, Joinery/Plow Builder, Shed Builder across room reloads	space-reaction-settlement-session, B27_Toolbox-session, exchange-batch-session, E91_PlowBuilder-session, construction-facts-session, space-use-listener-lifecycle-session	YES (66 state vs 4 DOM asserts)
+wechat-community	39	c2	WeChat/Feishu group images refresh via deploy-operations.sh, header fit	scripts/__tests__/wechat-community.test.ts	no
+frontend-browser-scenario-matrix	33	c3	6 gameplay viewports, 4 workshop expansion variants, locale, no-emoji, WS 2p/6p, iOS(webkit)	ws-dual-player; none @extended here	no; viewport matrix
+platform	33	c1	auth/onboarding/recovery/logout-all/devMode guard, lobby, hotseat start, workshop+sandbox API calls	oauth-onboarding, hosted-password-login; 4 tests are API-only (server route tests)	partly API-only
+standard-solo-ui	33	c3	solo random start, choose-7 persistence, natural 14-round base solo + rematch/viewer, 3-expansion grouped hands	standard-solo-acceptance (rematch entries), server standard-solo-full-game-session	14-round test rule-heavy
+encyclopedia-faces	31	c4	Moor/terrain/season faces in gallery+detail, art fallback x2 layouts	requirements file	no
+oauth-onboarding	27	c2	OAuth from insecure LAN origin, provider registration modes incl. WebKit cross-site	server/oauth tests (inferred)	no
+occupation-preview	26	c1	occupation offer summary vs payment for 2/3 cards	occupation-action-preview-session	no; weight high vs content (old 7)
+replay-viewer	26	c2	replay names, perspectives/playback/anchors, mobile toggle, locale default	none	no
+bug-report-feedback	25	c3	account inbox, admin confirmation/read state, paging, info requests	server/__tests__/bug-report-feedback(-routes).test.ts	no
+room-animal-holders	25	c4	room animal assignment edit/reload/2-client sync; loose stable capacity x3 cards	room-animal-holders-session	partly
+server-maintenance	25	c1	maintenance page/overlay during outage and recovery	none	no; 2x real 15s retry
+workshop-generation	25	c3	browser tools protocol through UT repair (mocked LLM)	none	no
+hosted-password-login	24	c2	production frontend password session in webkit/chromium/firefox, prerelease isolation	none	no; builds Pages again
+hotseat-public-farms	24	c4	hotseat Moor drafts private, public farms read-only across reconnect/turns/harvest/reload	hotseat-setup-session (setup only)	no
+choice-previews	22	c1	choice previews (Rod Collection, Cubbyhole, Peat Sled, Scythe, Cut Peat, Farmstead order)	choice-previews-session; 2 cases pinned in scripts/release/requirements.json	partly
+beta-access-admin	20	c2	admin Beta qualification UI with restart	server/__tests__/beta-access-routes.test.ts	no; restarts app
+exchange-choice-routing	20	c3	Garden Designer restored choice, Butcher's Block skip/conversion routing on 2 clients	C099_GardenDesigner-session, M101_butchers-block-session	partly
+standard-solo-acceptance	20	c4	3-expansion choose-7 14-round game to scoring+rematch; backend restart restores Moor retention	standard-solo-* sessions	no; restarts backend+Vite; weight likely low (old 60)
+farm-select	19	c1	legacy plow/sow/room/stable/fence farm interactions	farm-interaction-focus	partly; 2x waitForTimeout(500)
+room-history-projection	19	c2	card disclosure refreshes Room history pages	room-history-window-session	no
+a040-clay-positions	18	c3	A040 clay positions payment/exchange/sync; moor clearing	A040_PottersYard-{session,position-session,action-facts-session}	YES
+farm-interaction-focus	18	c4	farm focus/targets for plow/fence/animals/Moor, fence touch targets	shared farm-interaction.test.ts	partly
+bug-report-fix-links	17	c1	admin duplicate/fix links, CAS drafts	server bug-report-fix-links.test.ts	no
+bug-report-historical-feedback	17	c3	historical feedback preview/backfill	server bug-report-historical-feedback.test.ts	no
+card-play-lifecycle	17	c2	card play tooltips, Studio Boat, C086, Pioneer reload	card-play-lifecycle-session	partly (16 state asserts)
+grain-distillery-scoring	17	c4	M108 scoring pair choice on 2 clients at 1920 and 375	M108_GrainDistillery-session	partly
+interface-localization-fields	17	c1	localized default names, workshop preview text, manual localization fields	client i18n tests (inferred)	no
+account-link	16	c3	OAuth binding SameSite/partitioned variants	server oauth tests (inferred)	no
+encyclopedia-pages	16	c2	Pages artifact encyclopedia, lazy chunk, art paging, failures	requirements file	no; Pages build
+improvement-focus	16	c4	improvement selection/supply focus, offer summary	none	no
+interface-localization	16	c1	localized names, draft stage faces, season logs, payments	client log tests	partly
+action-space-use	15	c3	space-before reward pays renovation; space-immediate before rule-after across reload	action-space-use-history-session	YES (0 DOM asserts)
+card-action-references	15	c2	encyclopedia action/Moor references, touch preview	none	no
+live-release-smoke	15	c4	release smoke script in chromium+webkit; login waiter	pinned in scripts/release/requirements.json	no
+touch-card-play	15	c1	touch card details/play, iPad no container units	none	no
+workshop-game-entry	15	c3	workshop game iframe entry guards	none	no
+moor-completion-window	14	c2	Moor + improvement-after share window (Almanac order)	moor-completion-window-session	YES
+room-invitations	14	c4	invited room search/admission, auth guard	server room-invitations.test.ts	no
+encyclopedia-filters	13	c1	filters/keyboard	requirements file	no
+encyclopedia-search	13	c2	search/IME/paging	requirements file; client encyclopedia-query tests	no
+game-context-recovery	13	c3	seat recovery without hidden info, waiting room, colors	none	no
+public-asset-worker	13	c4	SW asset caching, replay art, updates (also WebKit task)	WebKit task runs same 3 tests	no; Pages build
+seasonal-fence-log	13	c1	spring fence payment log 0/5	STRICT SUBSET of seasonal-settlement-logs fence tests + seasonal-fence-payment-session	yes
+bug-report-release-feedback	12	c2	release feedback messages	server bug-report-release-feedback.test.ts	no
+draft-opening-order	12	c3	4p draft around offline seat	none	no
+issue-893-rules	12	c4	D159 public sale with cooking and chosen buyer (UI)	D159_ReedSeller-session	partly
+offline-encyclopedia	12	c1	offline archive SW (also WebKit task)	WebKit task	no; Pages build
+action-space-icons	10	c4	action symbols/costs per player count	none	no
+bug-report	9	c4	pinned evidence, replay bug report, GitHub button, WS close diagnostics	server bug-report-routes.test.ts	no
+moor-granted-lifecycle	9	c4	granted Cut Peat -> Peat Ash Fertilizer	moor-granted-lifecycle-session	YES
+action-log-source	8	c4	bonus-vp log singular across reload/undo	action-log-source-session; client action-log-source.test.tsx	yes
+card-localization	7	c4	new JSON language download, Thresher/Hammer Crusher faces	C112_Thresher-session (rules)	no
+room-history-window	7	c4	room history paging and names after reconnect	room-history-window-session	partly
+action-replacement	5	c4	C140 replacement accept/decline	action-replacement-session	partly
+card-play-undo	5	c4	Undo Step restores minor payment/major supply request	none	no
+parrot-breeder	5	c4	Parrot Breeder copy target UI	C150_ParrotBreeder-session	partly
+mobile-farm-cards-layout	4	c4	mobile farm/card rows zoom	none	no
+garden-path-marker	3	c4	Garden Path token UI	M027_GardenPath sessions	no
+live-spectating	3	c4	spectating read-only	none	no
+crop-scoring	2	c4	crop scoring includes card fields	none	partly
+pinned-asset-host	2	c4	pinned asset host mapping	none	no
+local-sandbox	1	c4	browser-local sandbox	EXACT DUPLICATE: browser-sandbox task runs the same file	no
+section-navigation	1	c4	section shortcuts layout	none	no
+workshop-smoke	1	c4	workshop lazy sandbox bundle	workshop-game-entry, scenario-matrix @workshop	no
