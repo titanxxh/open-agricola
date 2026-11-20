@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { generateCardSourceFile, generateLanguagePatch } from '../code-gen'
+import { generateLanguagePatch } from '../code-gen'
+import { convertWorkshopCard } from './legacy-card-source-helper'
 
-describe('generateCardSourceFile', () => {
+describe('convertLegacyCardSource', () => {
   it('emits a minor Card Source file', () => {
     const wcard = {
       id: 'wc1',
@@ -14,17 +15,13 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Foo', deck: 'communi
 const CARD_IMPL = { effect: { id: CARD_ID } }
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard, {
-      githubLogin: 'alicegh',
-      iso: '2026-05-09T00:00:00Z',
-    })
+    const out = convertWorkshopCard(wcard)
     expect(out).toContain(`import { defineMinorCard } from '../card-source'`)
     expect(out).not.toContain(`import { defineOccupationCard }`)
     expect(out).toContain(`export const CUSTOM_Foo = defineMinorCard({`)
     expect(out).toContain(`const CARD_IMPL`)
     expect(out).toContain(`import type { CardImpl } from '../registry'`)
     expect(out).not.toContain(`gainLeaf`)
-    expect(out).toContain(`@alicegh`)
   })
 
   it('uses defineOccupationCard for occupation cards', () => {
@@ -38,10 +35,7 @@ const CARD_DEF = new Occupation({ id: CARD_ID, deck: 'community', number: 0, nam
 const CARD_IMPL = {}
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard as any, {
-      githubLogin: 'gh',
-      iso: '2026-05-09T00:00:00Z',
-    })
+    const out = convertWorkshopCard(wcard)
     expect(out).toContain(`import { defineOccupationCard } from '../card-source'`)
     expect(out).not.toContain(`import { defineMinorCard }`)
   })
@@ -66,10 +60,7 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Localised Card', dec
 const CARD_IMPL = {}
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard, {
-      githubLogin: 'gh',
-      iso: '2026-05-09T00:00:00Z',
-    })
+    const out = convertWorkshopCard(wcard)
     expect(generateLanguagePatch(wcard)).toEqual({ zh: { minorImprovements: { CUSTOM_LocalisedCard: { name: '本地化卡', description: '中文描述。', rules: '中文规则补充。' } } } })
     expect(out).not.toContain('本地化卡')
     expect(out).not.toContain('中文描述。')
@@ -104,10 +95,7 @@ const CARD_DEF = {
 const CARD_IMPL = {}
 `.trim(),
     }
-    const out = generateCardSourceFile(wcard, {
-      githubLogin: 'gh',
-      iso: '2026-05-09T00:00:00Z',
-    })
+    const out = convertWorkshopCard(wcard)
     expect(out).not.toContain('新名称')
     expect(out).not.toContain('新描述。')
     expect(out).not.toContain('旧名称')
@@ -116,7 +104,7 @@ const CARD_IMPL = {}
   })
 
   it('generates handoff source from factory-style card definitions', () => {
-    const out = generateCardSourceFile({
+    const out = convertWorkshopCard({
       id: 'wc-factory',
       card_id: 'CUSTOM_FactoryCard',
       card_type: 'minor',
@@ -136,9 +124,6 @@ const CARD_DEF = MinorImprovement({
 })
 const CARD_IMPL = {}
       `.trim(),
-    }, {
-      githubLogin: 'gh',
-      iso: '2026-05-09T00:00:00Z',
     })
 
     expect(out).toContain(`export const CUSTOM_FactoryCard = defineMinorCard({`)

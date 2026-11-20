@@ -90,7 +90,6 @@ export class RoomAuthority {
       console.log(`[ws-server] restored owned room ${room.id}`)
       return room
     } catch (error) {
-      room.customSessionExecutor?.dispose()
       room.session.dispose()
       throw error
     }

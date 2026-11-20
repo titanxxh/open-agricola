@@ -70,19 +70,22 @@ let sequence = 0
 const unique = (prefix: string) =>
   `${prefix}_${Date.now().toString(36)}_${(sequence++).toString(36)}`
 
+// A native Card Source (ADR 0052); the invalid one imports outside shared/, which admission rejects.
 const sourceFor = (cardId: string, name: string, invalid = false) => `
-const CARD_ID = '${cardId}'
-const CARD_DEF = {
-  cardType: 'minor',
+import { defineMinorCard } from '${invalid ? '../../../server/auth' : '../card-source'}'
+
+export const ${cardId} = defineMinorCard({
   meta: {
     id: '${cardId}',
     name: '${name}',
+    deck: 'community',
+    number: 0,
     desc: ['Acceptance test card'],
     cost: {},
     vp: 0,
   },
-}
-const CARD_IMPL = ${invalid ? '{ onPlay() { eval(\'invalid\') } }' : '{}'}
+  impl: {},
+})
 `.trim()
 
 const createAccount = async (
@@ -602,12 +605,14 @@ const scenarioAbilityCandidates = async ({
 }: ScenarioContext) => {
   const workspace = await createDraft(request, account)
   const validSource = `
-const CARD_ID = '${workspace.draft.cardId}'
-const CARD_DEF = {
-  cardType: 'minor',
+import { defineMinorCard } from '../card-source'
+
+export const ${workspace.draft.cardId} = defineMinorCard({
   meta: {
-    id: CARD_ID,
+    id: '${workspace.draft.cardId}',
     name: '${workspace.draft.name}',
+    deck: 'community',
+    number: 0,
     desc: ['Generated ability description'],
     cost: { wood: 2 },
     vp: 2,
@@ -618,8 +623,8 @@ const CARD_DEF = {
       },
     },
   },
-}
-const CARD_IMPL = {}
+  impl: {},
+})
 `.trim()
   const invalidSource = sourceFor(workspace.draft.cardId, workspace.draft.name, true)
   const model = await fakeChatService(page, call => call === 0 ? invalidSource : validSource)
@@ -698,7 +703,7 @@ const CARD_IMPL = {}
   })
   await adopt.click()
   await expect(page.locator('.aicw-candidate-section')).toBeHidden()
-  await expect(page.locator('.aicw-current-code')).toContainText('CARD_IMPL')
+  await expect(page.locator('.aicw-current-code')).toContainText('defineMinorCard')
   expect(checkpointAttempts).toBe(0)
   await page.unroute(draftPattern)
 
@@ -710,7 +715,7 @@ const CARD_IMPL = {}
   await expect(adopt).toBeDisabled()
 
   const saved = await loadWorkspace(request, account, workspace.id)
-  expect(saved.draft.effectCode).toContain('CARD_IMPL')
+  expect(saved.draft.effectCode).toContain('defineMinorCard')
   expect(saved.draft).toMatchObject({
     cardId: workspace.draft.cardId,
     cardType: 'minor',
@@ -832,7 +837,7 @@ const scenarioReopen = async ({
     text(variant.locale, '画面主题', 'Image subject'),
   )).toHaveValue(artSubject)
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
-  await expect(page.locator('.aicw-current-code')).toContainText('CARD_IMPL')
+  await expect(page.locator('.aicw-current-code')).toContainText('defineMinorCard')
   await expect(page.locator('.ai-chat-hint')).toBeVisible()
   expect((await loadWorkspace(request, account, workspace.id)).revision).toBe(savedRevision)
   expect((await withDatabase(async database => {

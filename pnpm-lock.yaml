@@ -30,9 +30,6 @@ importers:
       canvas:
         specifier: ^3.2.1
         version: 3.2.3
-      isolated-vm:
-        specifier: ^7.0.2
-        version: 7.0.2
       nanoid:
         specifier: ^6.0.2
         version: 6.0.2
@@ -1326,10 +1323,6 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  isolated-vm@7.0.2:
-    resolution: {integrity: sha512-Z1sYxpptGyGiKblG16EJEdP5x9/68C6AuqFFsewnrxlwSlrTLHKqtRMogOjcYZ0f8/cijMaRi+XwiHVQ1+uG+g==}
-    engines: {node: '>=24.0.0'}
-
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
 
@@ -1523,10 +1516,6 @@ packages:
   node-addon-api@8.9.2:
     resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
     engines: {node: ^18 || ^20 || >= 21}
-
-  node-gyp-build@4.8.4:
-    resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
-    hasBin: true
 
   node-releases@2.0.57:
     resolution: {integrity: sha512-kQK9LGGFiHtrWiNhZtA7Qbw17AQz+dmsEKODRIVTXA9+e5MS/2gZEBhYJt13GrAz5/IOZKddH/0Z3TP/Zgo+yw==}
@@ -3219,10 +3208,6 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  isolated-vm@7.0.2:
-    dependencies:
-      node-gyp-build: 4.8.4
-
   js-tokens@10.0.0: {}
 
   js-tokens@4.0.0: {}
@@ -3383,8 +3368,6 @@ snapshots:
   node-addon-api@7.1.1: {}
 
   node-addon-api@8.9.2: {}
-
-  node-gyp-build@4.8.4: {}
 
   node-releases@2.0.57: {}
 

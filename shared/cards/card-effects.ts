@@ -152,9 +152,9 @@ export const isHandCardEffectHook = (hook: string): hook is HandCardEffectHook =
   flowCardEffectHooks.includes(hook as FlowCardEffectHook)
 
 /**
- * Function-type fields on CardEffect addressable by the custom-code executor.
- * `cardEffectHooks` below is the actual sandbox allowlist; this wider union also
- * retains official-only fields used by shared invocation types.
+ * Function-type fields on CardEffect addressable by name. `cardEffectHooks`
+ * below lists the flow and query hooks; this wider union also retains fields
+ * used only by shared invocation types.
  *
  * Meta-fields such as `handHooks` are data, not functions, and are excluded.
  */

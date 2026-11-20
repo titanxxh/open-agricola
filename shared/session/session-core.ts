@@ -103,7 +103,6 @@ import {
 } from '../cards/custom-registry.ts'
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
 import { validateFarmChoice, type FarmChoiceType, type FarmChoiceValidation } from './farm-choice-validation.ts'
-import { assertSandboxListenerManifest } from '../custom-code/sandbox-listener-phases.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { withActiveRegistry } from '../cards/active-registry.ts'
 import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.ts'
@@ -550,9 +549,9 @@ export interface GameCoreOptions {
   /** Options forwarded to `createInitialState`. */
   initialStateOptions?: InitialStateOptions
   /**
-   * Optional extra registrar invoked during custom card registration. Server
-   * passes its isolated-vm executor wrapper here; sandbox / browser contexts
-   * leave it unset (defaults to a no-op).
+   * Optional registrar for a custom card's implementation. The browser Worker
+   * loads a native Card Source module here; the server leaves it unset and
+   * never executes Workshop code (ADR 0052), so only definitions register.
    */
   registerCustomCardImpl?: (data: CustomCardData) => void
   /**
@@ -847,16 +846,10 @@ export class GameCore {
   constructor(options: GameCoreOptions = {}) {
     ensureCatalogLookupsInstalled()
     const { stateOrSeed, customCards, initialStateOptions, registerCustomCardImpl } = options
-    // Reject incompatible executable snapshots before registration's warning-only
-    // fallback can leave a card with missing rules, in either runtime.
-    for (const card of customCards ?? []) {
-      if (card.compiledCode && card.codeManifest) assertSandboxListenerManifest(card.cardJson.id, card.codeManifest)
-    }
     const isFreshState = stateOrSeed === undefined || typeof stateOrSeed === 'number'
     this.parentSelectionSeed = initialStateOptions?.parentSelectionSeed
     this.registerCustomCardImpl = registerCustomCardImpl ?? (() => {
-      // No-op default: used in sandbox mode (browser) or tests that don't need
-      // the server-side executor-backed registrar.
+      // No-op default: the server registers definitions only.
     })
     this.registry = new ActionRegistry()
     actionDefinitions.forEach((a) => this.registry.register(a))

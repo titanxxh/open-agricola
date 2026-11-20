@@ -535,10 +535,6 @@ const ensureVersion = async (
           )
       )
       AND NOT EXISTS (
-        SELECT 1 FROM workshop_public_versions
-        WHERE version_id = workshop_card_versions.id
-      )
-      AND NOT EXISTS (
         SELECT 1 FROM workshop_submissions
         WHERE version_id = workshop_card_versions.id AND state IN ('pending','blocked')
       )
@@ -675,12 +671,12 @@ const staticValidation = (
           : null,
       )
       if (!sourceCardJson) {
-        errors.push('Ability source CARD_DEF is missing or invalid')
+        errors.push('Ability source card meta is missing or invalid')
       } else if (
         JSON.stringify(comparableCardDefinition(draft.cardJson))
         !== JSON.stringify(comparableCardDefinition(sourceCardJson))
       ) {
-        errors.push('Ability source CARD_DEF does not match saved card definition')
+        errors.push('Ability source card meta does not match saved card definition')
       }
     }
   }
@@ -755,23 +751,6 @@ export async function loadSandboxVersion(
 ): Promise<Awaited<WorkshopDraft>> {
   const current = (await loadWorkspace(db, input.cardId, input.authorId))
   return draftFromVersion(current, (await loadVersion(db, input.cardId, input.versionId)))
-}
-
-export async function loadLiveDraft(
-  db: Pick<Database, 'prepare'>,
-  cardId: string,
-): Promise<Awaited<WorkshopDraft>> {
-  const row = (await db.prepare(`
-    SELECT * FROM workshop_cards
-    WHERE id = ? AND live = 1 AND approved_version_id IS NOT NULL
-      AND (review_status = 'approved' OR (review_status = 'merged' AND built_in = 0))
-  `).get(cardId)) as WorkshopCardRow | undefined
-  if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
-  const current = rowToWorkspace(row)
-  return draftFromVersion(
-    current,
-    (await loadVersion(db, cardId, current.approvedVersionId!)),
-  )
 }
 
 export async function restoreVersion(
@@ -1329,7 +1308,6 @@ export async function adminTakedownCard(
       'SELECT review_status FROM workshop_cards WHERE id = ? FOR UPDATE',
     ).get(cardDbId)) as { review_status: string } | undefined
     if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
-    await db.prepare('UPDATE workshop_public_versions SET disabled_at = COALESCE(disabled_at, ?) WHERE card_id = ?').run(Date.now(), cardDbId)
     // Atomic with the card invalidation: delete every persisted room row
     // that embeds the card (exact JSON element match — LIKE would treat _
     // in nanoid ids as a wildcard). A crash can then never leave the card

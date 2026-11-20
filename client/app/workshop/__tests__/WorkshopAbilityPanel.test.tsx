@@ -39,7 +39,7 @@ beforeEach(() => {
   complete.mockResolvedValue(clarification)
   const ports: AttemptPorts = {
     model: { target: { provider: config.provider, model: config.model, endpoint: 'https://api.deepseek.com/v1/chat/completions' }, complete },
-    loadContract: async () => ({ format: 2, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: [], actions: [], listeners: { actions: [], phases: [], scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } } }),
+    loadContract: async () => ({ format: 2, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'browser-card-source' }),
     openReferences: async () => ({ commit: 'b'.repeat(40), reads: [], execute: async () => '' }),
     validate: vi.fn(),
     runTests: async () => ({ browserRuntimeId: 'runtime-ui', outcome: { kind: 'passed', count: 1 } }),
@@ -176,7 +176,7 @@ describe('Workshop ability request entry points', () => {
     rerender(<Harness modelConfig={modelConfig} />)
     expect(signal.aborted).toBe(true)
     // Even a transport that ignores abort must not start validation or repair.
-    await act(async () => { resolve({ ...clarification, text: '```ts\nconst CARD_DEF = {}; const CARD_IMPL = {};\n```' }) })
+    await act(async () => { resolve({ ...clarification, text: '```ts\nexport const CUSTOM_Test = defineMinorCard({ meta, impl: {} });\n```' }) })
     expect(screen.getByLabelText('能力候选源码')).toHaveValue('selected C')
     expect(seams.create.mock.results[0].value.validate).not.toHaveBeenCalled()
     expect(complete).toHaveBeenCalledTimes(1)

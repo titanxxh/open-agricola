@@ -1,10 +1,9 @@
 /**
- * Server-side `GameSession` — thin wrapper around the shared `GameCore` that
- * pre-injects `registerExecutorBackedCustomCard` so custom card code runs
- * through the isolated-vm executor. Server entrypoints (HTTP / WS handlers)
- * and 240+ session tests instantiate this class directly with a positional
- * `(stateOrSeed?, customCards?, initialStateOptions?)` API; pure shared-side
- * code uses `GameCore` directly.
+ * Server-side `GameSession` — thin wrapper around the shared `GameCore` with a
+ * positional `(stateOrSeed?, customCards?, initialStateOptions?)` API used by
+ * server entrypoints (HTTP / WS handlers) and session tests. The server never
+ * executes Workshop code (ADR 0052): custom cards given here register their
+ * definitions only. Pure shared-side code uses `GameCore` directly.
  */
 import type { GameState } from '../../shared/contract/types.ts'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
@@ -13,7 +12,6 @@ import type { InitialStateOptions } from '../../shared/session/state-bootstrap.t
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { GameCore, type SessionResponse as CoreSessionResponse, type StateWithCursor } from '../../shared/session/session-core.ts'
 import { buildSyncPayload, type HistoryNameProjection, type SyncPayloadMode } from '../../shared/session/sync-payload.ts'
-import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 
 export { type GameCoreOptions, type GameCoreOptions as GameSessionOptions } from '../../shared/session/session-core.ts'
 export type { SessionResponse } from '../../shared/session/session-core.ts'
@@ -29,7 +27,6 @@ export class GameSession extends GameCore {
       stateOrSeed,
       customCards,
       initialStateOptions,
-      registerCustomCardImpl: registerExecutorBackedCustomCard,
     })
   }
 
@@ -48,3 +45,13 @@ export class GameSession extends GameCore {
     return buildSyncPayload(this, resp, visiblePlayerIds, mode, serializedState, windowed, historyNameProjection)
   }
 }
+
+/** The sync payload for one response, as Rooms and the HTTP sandbox publish it. */
+export const buildSessionSyncPayload = (
+  session: GameSession,
+  response: CoreSessionResponse,
+  visiblePlayerIds: readonly string[],
+  mode: SyncPayloadMode = 'viewer',
+  windowed = false,
+  historyNameProjection: HistoryNameProjection = 'session',
+): GameSyncPayload => session.buildSyncPayload(response, visiblePlayerIds, mode, undefined, windowed, historyNameProjection)

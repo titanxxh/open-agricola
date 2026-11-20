@@ -10,37 +10,48 @@ import { getCardDefinition } from '../../shared/cards/catalog'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { GameSession } from '../game/authoritative-session'
-import { validateAndCompileCustomCode } from '../custom-code/engine'
-import { createIsolatedGameSession } from '../game/custom-session-executor'
+import { gainLeaf } from '../../shared/cards/helpers/pay-gain-node'
+import type { CardImpl } from '../../shared/cards/registry'
 import { handleLocalSandboxRequest, LocalSandboxCore } from '../../client/local-sandbox/worker-core'
 import { LOCAL_SANDBOX_SCHEMA_VERSION } from '../../client/local-sandbox/protocol'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession, loadTestCardImpls } from './_helpers/session-fixtures'
 
 const CARD_ID = 'CUSTOM_SessionRuleEnvironment'
-const customCard = (discount: number, reward: number): CustomCardData => {
-  const source = `
+type TestCard = { card: CustomCardData; impl: CardImpl }
+// The browser runs the Card Source module; server Sessions load the same rules as a native impl.
+const customCard = (discount: number, reward: number): TestCard => {
+  const modifier = { type: 'bonus', cardId: CARD_ID, appliesTo: ['occupation'], discount: { food: discount } } as const
+  const source = `import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
 const CARD_ID = '${CARD_ID}'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Session Rule Environment' })
-const CARD_IMPL = { listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
-  handler: () => ({ flow: { type: 'seq', children: [
-    { type: 'leaf', actionId: 'occupation', sourceCard: CARD_ID, params: { exactCost: { food: 3 } } },
-    gainLeaf(CARD_ID, { grain: ${reward} }),
-  ] } }) }] }
+
+export const ${CARD_ID} = defineMinorCard({
+  meta: { id: CARD_ID, name: 'Session Rule Environment', deck: 'community', number: 0, desc: [], modifier: ${JSON.stringify(modifier)} },
+  impl: { listeners: [{ id: 'session-rule-environment', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
+    handler: () => ({ flow: { type: 'seq', children: [
+      { type: 'leaf', actionId: 'occupation', sourceCard: CARD_ID, params: { exactCost: { food: 3 } } },
+      gainLeaf(CARD_ID, { grain: ${reward} }),
+    ] } }) }] },
+})
 `
-  const compiled = validateAndCompileCustomCode(source, CARD_ID)
-  if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
   return {
-    cardType: 'minor',
-    cardJson: { id: CARD_ID, name: 'Session Rule Environment', deck: 'CUSTOM', number: 0, desc: [],
-      modifier: { type: 'bonus', cardId: CARD_ID, appliesTo: ['occupation'], discount: { food: discount } } },
-    compiledCode: compiled.compiledCode,
-    codeManifest: compiled.manifest,
-    effectCode: source,
+    card: {
+      cardType: 'minor',
+      cardJson: { id: CARD_ID, name: 'Session Rule Environment', deck: 'CUSTOM', number: 0, desc: [], modifier },
+      effectCode: source,
+    },
+    impl: { listeners: [{ id: 'session-rule-environment', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
+      handler: () => ({ flow: { type: 'seq', children: [
+        { type: 'leaf', actionId: 'occupation', sourceCard: CARD_ID, params: { exactCost: { food: 3 } } },
+        gainLeaf(CARD_ID, { grain: reward }),
+      ] } }) }] },
   }
 }
 
-const configuredSession = (card: CustomCardData) => createWorkSession({
+const configuredSession = ({ card, impl }: TestCard) => createWorkSession({
   customCards: [card],
+  cardImpls: { [CARD_ID]: impl },
   configure: state => {
     state.players[0]!.minorPlayed = [CARD_ID]
     state.players[0]!.occupationHand = ['A102_Grocer', 'A118_Treegardener']
@@ -106,7 +117,7 @@ describe('Session card rule environment', () => {
     const source = configuredSession(card)
     const snapshot = JSON.parse(JSON.stringify(serializeSessionSnapshot(source.state, source)))
     source.dispose()
-    const restored = new GameSession(rehydrateState(snapshot), [card])
+    const restored = loadTestCardImpls(new GameSession(rehydrateState(snapshot), [card.card]), { [CARD_ID]: card.impl })
     expect(getActiveCardRegistry()).toBeNull()
     const offered = restored.takeAction(0, 'forest')
     expect(offered.ok, offered.error).toBe(true)
@@ -168,9 +179,9 @@ describe('Session card rule environment', () => {
     const original = configuredSession(card)
     const pending = original.takeAction(0, 'forest')
     expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice' } })
-    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(
+    const restored = loadTestCardImpls(new GameSession(rehydrateState(JSON.parse(JSON.stringify(
       serializeSessionSnapshot(pending.state, original),
-    ))), [card])
+    ))), [card.card]), { [CARD_ID]: card.impl })
     try {
       expect(restored.getState().interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice' } })
       const completed = restored.resolveChoice(0, 'A102_Grocer')
@@ -214,30 +225,6 @@ describe('Session card rule environment', () => {
     }
   })
 
-  it('rebuilds a server worker from retained rules and completes its pending payment', async () => {
-    const card = customCard(1, 2)
-    const original = configuredSession(card)
-    expect(original.takeAction(0, 'forest').ok).toBe(true)
-    const snapshot = JSON.parse(JSON.stringify(serializeSessionSnapshot(original.state, original)))
-    original.dispose()
-    const worker = createIsolatedGameSession(rehydrateState(snapshot), [card])
-    if (!worker.executor) throw new Error('Expected an executable Session worker')
-    try {
-      const completed = await worker.executor.execute('resolveChoice', [0, 'A102_Grocer'])
-      expect(completed.ok, completed.error).toBe(true)
-      expect(completed.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
-      expect(completed.state.events.filter(event => event.type === 'resource.moved' && event.resources.grain === 2))
-        .toHaveLength(1)
-      const duplicate = await worker.executor.execute('resolveChoice', [0, 'A102_Grocer'])
-      expect(duplicate.ok).toBe(false)
-      expect(duplicate.state.players[0]!.resources).toMatchObject({ food: 8, grain: 2, wood: 3 })
-      expect(getActiveCardRegistry()).toBeNull()
-    } finally {
-      worker.executor.dispose()
-      worker.session.dispose()
-    }
-  })
-
   it('restores the browser sandbox protocol without borrowing server card rules', () => {
     const card = customCard(1, 2)
     const original = configuredSession(card)
@@ -249,7 +236,7 @@ describe('Session card rule environment', () => {
     const restored = handleLocalSandboxRequest(browser, {
       kind: 'restore', id: 1, viewer,
       persisted: { schemaVersion: LOCAL_SANDBOX_SCHEMA_VERSION, serializedState,
-        config: { playerCount: 2, seed: 42, cards: [{ cardType: card.cardType, cardJson: card.cardJson, source: card.effectCode ?? null }] } },
+        config: { playerCount: 2, seed: 42, cards: [{ cardType: card.card.cardType, cardJson: card.card.cardJson, source: card.card.effectCode ?? null }] } },
     })
     if (restored.kind !== 'result' || !restored.ok || !('payload' in restored)) {
       throw new Error(`Browser restore failed: ${JSON.stringify(restored)}`)

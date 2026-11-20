@@ -17,7 +17,7 @@ case "$1" in
     cp -a --reflink=auto /packages/store .store
     pnpm install --prod=false --offline --frozen-lockfile --store-dir /app/.store --config.package-import-method=copy
     rm -rf .store
-    node -e 'require("canvas").createCanvas(1,1); require("isolated-vm"); new (require("better-sqlite3"))(":memory:").close()'
+    node -e 'require("canvas").createCanvas(1,1); new (require("better-sqlite3"))(":memory:").close()'
     ;;
   build)
     cd /app

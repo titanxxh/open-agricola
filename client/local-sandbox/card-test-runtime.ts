@@ -5,13 +5,10 @@ import ts from 'typescript'
 import { GameCore } from '../../shared/session/session-core.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { ensureCatalogLookupsInstalled } from '../../shared/cards/install-catalog-lookups.ts'
-import type { CardDefinition } from '../../shared/contract/cards.ts'
-import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { emptyResources } from '../../shared/contract/state-constants.ts'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player.ts'
-import { validateAndCompileCustomCodeLocal } from './browser-executor.ts'
 import { prepareLocalCustomCard, registerLocalCustomCard } from './local-custom-card.ts'
-import { isNativeCardSource, nativeCardId } from '../../shared/custom-code/card-source-admission.ts'
+import { isNativeCardSource, LEGACY_CARD_SOURCE_MESSAGE, nativeCardId } from '../../shared/custom-code/card-source-admission.ts'
 
 export type BrowserCardTestRequest = {
   kind: 'run'
@@ -22,33 +19,6 @@ export type BrowserCardTestRequest = {
 export type BrowserCardTestResult = { kind: 'result'; id: string; outcome: WorkshopBrowserTestOutcome }
 
 const errorText = (error: unknown): string => error instanceof Error ? error.message : String(error)
-const object = (value: unknown): Record<string, unknown> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected card metadata object')
-  return Object.fromEntries(Object.entries(value))
-}
-
-function parseCardDefinition(value: unknown, cardId: string): Pick<CustomCardData, 'cardType' | 'cardJson'> {
-  const definition = object(value)
-  if (definition.cardType !== 'minor' && definition.cardType !== 'occupation') throw new Error('Expected minor or occupation CARD_DEF')
-  const meta = object(definition.meta)
-  const { id, name, desc, prerequisite } = meta
-  if (id !== cardId || typeof name !== 'string' || !Array.isArray(desc) || !desc.every((item): item is string => typeof item === 'string')) {
-    throw new Error('CARD_DEF identity or required metadata is invalid')
-  }
-  let prerequisiteFields: Pick<CardDefinition, 'prerequisite' | 'occupationPrerequisites'> = {}
-  if (typeof prerequisite === 'string') prerequisiteFields = { prerequisite }
-  else if (prerequisite !== undefined) {
-    const parsed = object(prerequisite)
-    if (typeof parsed.occupation !== 'number' || !Number.isInteger(parsed.occupation) || parsed.occupation < 0) {
-      throw new Error('Expected a string or occupation-count prerequisite')
-    }
-    prerequisiteFields = { prerequisite: `${parsed.occupation} Occupations`, occupationPrerequisites: { min: parsed.occupation } }
-  }
-  // Keep the actual authored metadata; optional rule values still use the
-  // existing source admission and native consumers, as in the current sandbox.
-  const cardJson: CardDefinition = { ...meta, id, name: name.trim(), deck: 'CUSTOM', number: 0, desc, implemented: true, ...prerequisiteFields }
-  return { cardType: definition.cardType, cardJson }
-}
 
 function compileTests(source: string): string {
   const file = ts.createSourceFile('card.test.ts', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS)
@@ -101,23 +71,10 @@ export async function runBrowserCardTestScript(request: BrowserCardTestRequest, 
     }
   }
   try {
-    const sourceFile = ts.createSourceFile('card.ts', request.source, ts.ScriptTarget.ES2022, true)
     // A native Card Source names its card by its single export (ADR 0052).
-    const cardId = nativeCardId(request.source) ?? sourceFile.statements.flatMap(statement => ts.isVariableStatement(statement)
-      ? statement.declarationList.declarations.flatMap(declaration => ts.isIdentifier(declaration.name)
-        && declaration.name.text === 'CARD_ID' && declaration.initializer && ts.isStringLiteralLike(declaration.initializer)
-        ? [declaration.initializer.text] : []) : [])[0]
-    if (!cardId) throw new Error('Export the card as export const <CARD_ID> = defineMinorCard(...) or defineOccupationCard(...)')
-    let card: CustomCardData
-    if (isNativeCardSource(request.source)) card = prepareLocalCustomCard({ cardId, source: request.source })
-    else {
-      const compiled = validateAndCompileCustomCodeLocal(request.source, cardId)
-      if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
-      card = {
-        ...parseCardDefinition(compiled.cardDefinition, cardId),
-        effectCode: request.source, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest,
-      }
-    }
+    if (!isNativeCardSource(request.source)) throw new Error(LEGACY_CARD_SOURCE_MESSAGE)
+    const cardId = nativeCardId(request.source)!
+    const card = prepareLocalCustomCard({ cardId, source: request.source })
     const createSession = () => {
       ensureCatalogLookupsInstalled()
       const state = createInitialState(42, { playerCount: 2, ordinaryCardDeckSeed: 42, parentSelectionSeed: 42 })

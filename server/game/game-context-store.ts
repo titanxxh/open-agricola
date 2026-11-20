@@ -5,7 +5,7 @@ import { RoomRetentionStore } from './room-retention-store'
 import { persistedRoomAccessError } from './room-access'
 import { GameCreationStore } from './game-creation-store'
 import type { SoloCreationConfigurationResponse } from '../../shared/contract/game-creation'
-import { resolveSoloWorkshopCards } from './workshop-room-cards'
+import { resolveSoloWorkshopSources } from './workshop-room-cards'
 import type { GameTermination } from '../../shared/contract/protocol/game-termination'
 import type {
   CompletedGameContextDescriptor,
@@ -72,7 +72,7 @@ export class GameContextStore {
   async readCreationConfiguration(roomId: string, userId?: string): Promise<SoloCreationConfigurationResponse> {
     const source = await new GameCreationStore(this.db).completedSource(roomId, userId)
     if (!source.ok) return source
-    const resolved = await resolveSoloWorkshopCards(this.db, source.record.configuration)
+    const resolved = resolveSoloWorkshopSources(source.record.configuration)
     return { ok: true, configuration: source.record.configuration, issues: resolved.issues }
   }
   private readonly now: () => number

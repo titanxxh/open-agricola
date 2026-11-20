@@ -152,7 +152,7 @@ export async function buildValidatorImage(inputs: ValidatorInputs, runner: Runne
   // The storage validator depends on these native modules; the GitHub producer checks them the same way for amd64.
   docker(['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', '1000:1000',
     '--memory', '512m', '--memory-swap', '512m', '--cpus', '1', '--pids-limit', '64', '--entrypoint', 'node', imageId,
-    '-e', 'require("isolated-vm");require("canvas")'], 60_000)
+    '-e', 'require("canvas")'], 60_000)
   const receipt: ValidatorReceipt = { format: 1, kind: 'owner-validator-image', sourceSha: sha, producerSha: inputs.producerSha, channel, platform: VALIDATOR_PLATFORM,
     imageId, configDigest, archiveManifestDigest: archive.archiveManifestDigest, archiveSha256: archive.sha256, archiveBytes: archive.bytes,
     builderImage: CONTAINER_IMAGE_BUILDERS[VALIDATOR_PLATFORM], buildLogSha256: fileSha256(join(logs, `${buildPhase}.log`)),

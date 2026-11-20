@@ -133,7 +133,7 @@ export function verifyBuiltImage(): string {
   if (inspectPublishableImage(JSON.parse(command('docker', ['image', 'inspect', '--format', '{{json .}}', nativeImageId], { env })), request) !== nativeImageId) throw new Error('Native producer image changed')
   const frontend = imageObject(JSON.parse(command('docker', ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
     '--security-opt', 'no-new-privileges', '--user', '1000:1000', '--memory', '512m', '--memory-swap', '512m', '--cpus', '1', '--pids-limit', '64',
-    '--entrypoint', 'node', nativeImageId, '-e', 'require("isolated-vm");require("canvas");process.stdout.write(require("node:fs").readFileSync("/app/frontend-dist/frontend-build.json","utf8"))'], { env, timeout: 30_000 })))
+    '--entrypoint', 'node', nativeImageId, '-e', 'require("canvas");process.stdout.write(require("node:fs").readFileSync("/app/frontend-dist/frontend-build.json","utf8"))'], { env, timeout: 30_000 })))
   if (frontend.format !== 1 || frontend.gameBuildId !== request.sourceSha || frontend.releaseChannel !== request.channel
     || frontend.deploymentTarget !== `${request.channel}-hosted` || frontend.basePath !== '/open-agricola/') throw new Error('Built hosted frontend differs from the fixed source/channel')
   writeFileSync(join(root, 'verified-image.json'), JSON.stringify({ configDigest: imageId, nativeImageId, archiveManifestDigest: archive.archiveManifestDigest }), { flag: 'wx', mode: 0o600 })

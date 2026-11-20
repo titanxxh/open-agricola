@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto'
 import { DEFAULT_ROOM_RETENTION_DAYS } from '../../shared/contract/room-retention'
 import type { ExecutionStamp } from './execution-access'
-import { RoomCapacityError, type OwnerToken } from './room-directory'
+import type { OwnerToken } from './room-directory'
 import { nextInputWindow, type RoomInputWindow } from './command-input'
 import type { WebSocket } from 'ws'
 import { GameSession } from './authoritative-session.ts'
@@ -15,10 +15,6 @@ import { canAccessRoom } from './room-access'
 import type { GameCreationRecord, SoloHandMode } from '../../shared/contract/game-creation'
 
 import type { GameEndProposal } from '../../shared/contract/protocol/game-termination'
-import {
-  createIsolatedGameSession,
-  type CustomSessionExecutor,
-} from './custom-session-executor.ts'
 
 export type RoomPlayer = {
   ws: WebSocket
@@ -42,7 +38,6 @@ export type Room = {
   inputWindow?: RoomInputWindow | null
   id: string
   session: GameSession
-  customSessionExecutor?: CustomSessionExecutor
   players: RoomPlayer[]
   seatOwners?: RoomSeatOwner[]
   maxPlayers: number
@@ -381,9 +376,9 @@ const createSessionFromSnapshot = (
   snapshot: RoomSnapshot,
   customCards: CustomCardData[],
   onRehydrationFailure: () => void,
-): ReturnType<typeof createIsolatedGameSession> => {
+): GameSession => {
   if (snapshot.serialized === null) {
-    return createIsolatedGameSession(undefined, customCards.length > 0 ? customCards : undefined, {
+    return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
       ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
@@ -396,14 +391,14 @@ const createSessionFromSnapshot = (
     })
   }
   try {
-    return createIsolatedGameSession(
+    return new GameSession(
       rehydrateState(snapshot.serialized),
       customCards.length > 0 ? customCards : undefined,
     )
   } catch (err) {
     console.warn(`[room] rehydrate failed for ${snapshot.id}, starting fresh:`, err)
     onRehydrationFailure()
-    return createIsolatedGameSession(undefined, customCards.length > 0 ? customCards : undefined, {
+    return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
       ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
@@ -422,15 +417,9 @@ export const snapshotToRoom = (
   customCards: CustomCardData[] = snapshot.meta.customCards ?? [],
 ): Room => {
   let snapshotRehydrationFailed = false
-  const created = createSessionFromSnapshot(snapshot, customCards, () => {
+  const session = createSessionFromSnapshot(snapshot, customCards, () => {
     snapshotRehydrationFailed = true
   })
-  if (created.executor && !created.executor.reserveWorkerSlot()) {
-    created.executor.dispose()
-    created.session.dispose()
-    throw new RoomCapacityError('No executable Room worker slot is available')
-  }
-  const session = created.session
   return {
     id: snapshot.id,
     ...(snapshot.creationConfiguration ? { creationConfiguration: snapshot.creationConfiguration } : {}),
@@ -438,7 +427,6 @@ export const snapshotToRoom = (
     awaitingRematchPlayers: snapshot.meta.awaitingRematchPlayers === true,
     inputWindow: snapshot.meta.inputWindow ?? nextInputWindow(null, session.state, 'initial'),
     session,
-    ...(created.executor ? { customSessionExecutor: created.executor } : {}),
     players: [],
     seatOwners: snapshot.meta.players.map((owner) => ({ ...owner })),
     maxPlayers: snapshot.meta.maxPlayers,

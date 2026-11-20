@@ -2,12 +2,28 @@ import assert from 'node:assert/strict'
 import { GameSession, type SessionResponse } from '../../game/authoritative-session'
 import type { GameState, InteractionRequest } from '../../../shared/contract/types'
 import type { CustomCardData } from '../../../shared/cards/session-card-context'
+import { requireActiveCardRegistry } from '../../../shared/cards/active-registry'
+import type { CardImpl } from '../../../shared/cards/registry'
 import { createInitialState, type InitialStateOptions } from '../../../shared/session/state-bootstrap'
 import { stabilizeRandomHands } from './stabilize-random-hands'
 
 type FixtureOptions = {
   options?: InitialStateOptions
   customCards?: CustomCardData[]
+}
+
+/**
+ * Loads card implementations into one Session's registry, as the browser
+ * Worker does for a Workshop Card Source module. The server itself never loads
+ * Workshop code (ADR 0052); tests use this to drive engine paths with a card
+ * that is not in the catalog. Load again into a Session restored from a snapshot.
+ */
+export function loadTestCardImpls<T extends GameSession>(session: T, impls: Record<string, CardImpl>): T {
+  session.withCtx(() => {
+    const registry = requireActiveCardRegistry('loadTestCardImpls')
+    for (const [cardId, impl] of Object.entries(impls)) registry.loadImpl(cardId, impl)
+  })
+  return session
 }
 
 export type SessionFixtureExpectation = {
@@ -70,8 +86,8 @@ export function createOpeningSession({
 
 /** Loads an explicit work scenario. Opening hooks belong in createOpeningSession tests. */
 export function createWorkSession({
-  seed = 42, options, customCards, configure,
-}: FixtureOptions & { seed?: number; configure?: (state: GameState) => void } = {}): GameSession {
+  seed = 42, options, customCards, cardImpls, configure,
+}: FixtureOptions & { seed?: number; cardImpls?: Record<string, CardImpl>; configure?: (state: GameState) => void } = {}): GameSession {
   assert.ok(Number.isFinite(seed), 'Work fixtures require a finite seed')
   assert.ok(!options?.enableParentCards, 'Use createOpeningSession for parent setup')
   const state = createInitialState(seed, fixedOptions(options))
@@ -89,6 +105,7 @@ export function createWorkSession({
   const expectedHands = handsOf(state)
   const session = new GameSession(state, customCards)
   try {
+    if (cardImpls) loadTestCardImpls(session, cardImpls)
     // The public loader rebuilds modifiers and clears cursors before validation.
     session.loadState(state)
     assert.equal(session.state.players.length, options?.playerCount ?? 2)

@@ -12,7 +12,7 @@ export type TestRuleEnvironmentViolation = {
 }
 
 const scanRoots = ['shared', 'server', 'client', 'scripts', 'tests', 'e2e-tests']
-const sessionNames = new Set(['GameSession', 'GameCore', 'LocalSandboxCore', 'createWorkSession', 'createOpeningSession', 'createIsolatedGameSession'])
+const sessionNames = new Set(['GameSession', 'GameCore', 'LocalSandboxCore', 'createWorkSession', 'createOpeningSession'])
 const trackedNames = new Set([...sessionNames, 'installOfficialCardRegistry', 'setActiveCardRegistry', 'beforeEach', 'beforeAll', 'withActiveRegistry'])
 const isTest = (file: string): boolean => file.includes('/__tests__/') || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)
 

@@ -40,9 +40,9 @@ export function allowedReferencePath(path: string): boolean {
     // Architecture documents link ADRs for the decisions behind their rules.
     || /^docs\/adr\/\d{4}-[a-z0-9-]+\.md$/.test(path)
     || /^shared\/(cards|custom-code|actions|contract|domain|projections|session|engine)\/.+\.ts$/.test(path)
-    || /^client\/local-sandbox\/(?:card-test-runtime|card-tests|card-tests\.worker|browser-executor|browser-runtime)\.ts$/.test(path)
+    || /^client\/local-sandbox\/(?:card-test-runtime|card-tests|card-tests\.worker)\.ts$/.test(path)
     || /^client\/local-sandbox\/__tests__\/card-(?:test-runtime|tests)\.test\.ts$/.test(path)
-    || /^server\/(custom-code\/.*|__tests__\/.*|game\/authoritative-session)\.ts$/.test(path)
+    || /^server\/(__tests__\/.*|game\/authoritative-session)\.ts$/.test(path)
 }
 
 function kind(path: string): string {

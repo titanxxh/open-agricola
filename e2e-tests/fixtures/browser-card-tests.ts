@@ -1,19 +1,26 @@
 export const cardId = 'CUSTOM_BrowserTests'
 
-export const source = `
+const cardSource = (impl: string) => `import { defineOccupationCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+
 const CARD_ID = '${cardId}'
-const CARD_DEF = { cardType: 'occupation', meta: {
-  id: CARD_ID, name: 'Browser Boots', deck: 'CUSTOM', number: 0,
-  desc: ['After using Forest, gain 1 additional wood.'], cost: {}, vp: 0, implemented: true,
-} }
-const CARD_IMPL = { listeners: [{
-  cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
-  handler: context => {
-    if (context.space?.id !== 'forest') return
-    return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
+
+export const ${cardId} = defineOccupationCard({
+  meta: {
+    id: CARD_ID, name: 'Browser Boots', deck: 'community', number: 0,
+    desc: ['After using Forest, gain 1 additional wood.'], cost: {}, vp: 0,
   },
-}] }
+  impl: ${impl},
+})
 `
+
+export const source = cardSource(`{ listeners: [{
+    id: 'browser-boots-forest', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'],
+    handler: context => {
+      if (context.space?.id !== 'forest') return
+      return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
+    },
+  }] }`)
 
 const preparation = `
 function prepared() {
@@ -51,19 +58,17 @@ test('A new Session has no previous reward', () => {
 })
 `
 
-export const choiceSource = source.slice(0, source.indexOf('const CARD_IMPL')) + `
-const CARD_IMPL = {
-  effect: { resolveChoice: (_state, _player, choice) => {
-    if (choice === 'one' || choice === 'two') return gainLeaf(CARD_ID, { grain: choice === 'two' ? 2 : 1 })
-  } },
-  listeners: [{ cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], handler: context => {
-    if (context.space?.id !== 'forest') return
-    return { sourceCard: CARD_ID, flow: { type: 'leaf', actionId: 'emit-choice', sourceCard: CARD_ID,
-      params: { options: [{ value: 'one', labelKey: 'Take 1 grain' }, { value: 'two', labelKey: 'Take 2 grain' }],
-        promptKey: 'Pick a reward' } } }
-  } }],
-}
-`
+export const choiceSource = cardSource(`{
+    effect: { id: CARD_ID, resolveChoice: (_state, _player, choice) => {
+      if (choice === 'one' || choice === 'two') return gainLeaf(CARD_ID, { grain: choice === 'two' ? 2 : 1 })
+    } },
+    listeners: [{ id: 'browser-boots-choice', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], handler: context => {
+      if (context.space?.id !== 'forest') return
+      return { sourceCard: CARD_ID, flow: { type: 'leaf', actionId: 'emit-choice', sourceCard: CARD_ID,
+        params: { options: [{ value: 'one', labelKey: 'Take 1 grain' }, { value: 'two', labelKey: 'Take 2 grain' }],
+          promptKey: 'Pick a reward' } } }
+    } }],
+  }`)
 
 export const choiceTests = preparation + `
 test('A pending choice grants only the selected reward', () => {

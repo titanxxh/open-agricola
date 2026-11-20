@@ -27,7 +27,7 @@ test('real bot submission survives a lost browser response', async ({page,reques
   const headers = {...browserRequestHeaders(),Cookie:`${authCookieNames().session}=${session}`}
   const cardId = `CUSTOM_WorkshopAcceptance_${suffix}`
   const meta = {id:cardId,name:'Workshop delivery acceptance',deck:'CUSTOM',number:0,desc:['Temporary acceptance fixture. No card effect.'],cost:{},vp:0}
-  const create = await request.post(`${backend}/api/workshop/cards`,{headers,data:{card_id:cardId,card_type:'minor',name:meta.name,description:'Temporary Workshop App delivery verification for #1008. Do not merge.',card_json:{...meta,card_type:'minor',implemented:true,locales:{zh:{name:'工坊投稿验收',desc:['临时验收卡，无卡牌效果。']}}},effect_code:`const CARD_DEF = ${JSON.stringify({cardType:'minor',meta})}; const CARD_IMPL = {}`}})
+  const create = await request.post(`${backend}/api/workshop/cards`,{headers,data:{card_id:cardId,card_type:'minor',name:meta.name,description:'Temporary Workshop App delivery verification for #1008. Do not merge.',card_json:{...meta,card_type:'minor',implemented:true,locales:{zh:{name:'工坊投稿验收',desc:['临时验收卡，无卡牌效果。']}}},effect_code:`import { defineMinorCard } from '../card-source'\n\nexport const ${cardId} = defineMinorCard({ meta: ${JSON.stringify({...meta,deck:'community'})}, impl: {} })`}})
   expect(create.ok(),await create.text()).toBe(true)
   const {id} = await create.json()
   const workspace = (await (await request.get(`${backend}/api/workshop/cards/${id}/workspace`,{headers})).json()).workspace

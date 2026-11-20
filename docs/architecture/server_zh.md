@@ -53,7 +53,7 @@ server/game/
 - `roomId` 标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 保留开局选项，在同一事务提交新 Session/UUID 和旧局退役后才迁移连接。只有权威 `gameOver` 才归档结果；失败保留终局状态供重试。协商结束使用 `terminated`；过期、取消和清理不产生结果。得分保留小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
 - 托管 Room 使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认等待状态与座位，`GameContextStore` 统一裁定持久化期限，并保护在线连接、准入与未完成保存。管理员可配置离线保留期，默认等待 3 天、进行中 7 天。每次全员离线后固定截止时间，修改只影响下次离线周期；开发房不因闲置过期。`RoomAuthority` 将内存卸载与存档删除分开。缺失录制数据会阻断恢复。见 [ADR 0039](../adr/0039-runtime-room-retention-policy.md)。
 - 开发槽 `dev2`–`dev6` 映射到跨重启保持的永久对局身份；重开或重置会分配新身份，completed、expired 或 removed 的 context 从不复活。开发账号可以持有多个座位，开发恢复需要座位提示或唯一归属的座位；普通 Room 的座位由已认证的归属推导。客户端的 `devMode` 标志不授予任何开发权限。`room_players` 以 `(room_id, player_index)` 存储归属。
-- 候场命令 `setPlayerColor` 只修改发送者自己的座位。已入座和保留座位独占颜色；选择空位颜色时交换两处颜色。`GameSession.updatePlayerColors` 同步更新隔离 Worker。Room 队列串行处理竞争请求，checkpoint 把颜色与命令回执一同持久化后再广播；开局后锁定颜色。
+- 候场命令 `setPlayerColor` 只修改发送者自己的座位。已入座和保留座位独占颜色；选择空位颜色时交换两处颜色。`GameSession.updatePlayerColors` 应用颜色变更。Room 队列串行处理竞争请求，checkpoint 把颜色与命令回执一同持久化后再广播；开局后锁定颜色。
 - 普通 Room 等最后到达者发送 `confirmPlayerColor`，持久化的 `colorConfirmationPlayerIndex` 标识该玩家。Step 0 提交后才进入游戏。热座与开发 Room 自动开局，Room 状态是权威。测试见 `room-router.test.ts`、`room-invitations.spec.ts`。
 - `room-queue.ts` 按 Room 串行化授权、规则、异步提交与发布；移动连接会同时占用两个 Room 队列与连接队列。关闭时停止输入、排空已接受的工作并关闭连接池。
 - **分布式 Room**（[ADR 0022](../adr/0022-distributed-room-recovery.md)）：`RoomDirectory` 用 PostgreSQL 租约与单调 epoch 把每个 Room 分配给一个应用进程；提交与发布都校验 owner 与期望版本。`POST /api/rooms/locate` 返回由只读 `ingress.ts` 转发的 `/nodes/<instanceId>/ws` 路由。`CommandStore` 为每个命令预留内容指纹，并把回执与 Room 状态转换一同提交；重复的命令返回原回执。`InvalidationStore` 提交卡牌 / 用户屏障与按实例的任务，每次执行与发布都检查屏障；只有每个相关实例都确认或失去租约后操作才完成。
@@ -96,7 +96,7 @@ type RoomCommitResult =
 ```text
 ClientCommand
   → room-router：验证座位与 payload
-  → GameSession：内置卡同步产生 SessionResponse；恢复 Room 中的 Workshop 卡由会话 Worker 异步返回
+  → GameSession：在进程内同步产生 SessionResponse
   → RoomCommitter：序列化一次，原子写 Room snapshot + Replay Step
   → Broadcaster：提交成功后生成各座位遮蔽 envelope 并发送
 ```
@@ -106,31 +106,18 @@ ClientCommand
 - Replay Intent 由穷尽的协议 switch 白名单化；从不保存 `requestId`、token、站点 `userId` 或未校验 payload。
 - Replay 归档使用有界的权威状态差量（[ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)）。
 - 写入失败时冻结同一份 Frame 与 Intent，阻断 Room 并按退避重试；客户端等待，从不读取未提交状态。相同幂等 key 但 hash 不同会永久阻断并报警。
-- 单实例默认准入 30 个普通 Room。`APP_ROOM_CAPACITY`（1–30）与 `CUSTOM_SESSION_WORKER_CAPACITY`（0–15，默认 15）可降低上限；无效值阻止启动。`RoomDirectory` 对新建与首次恢复原子计算 OPEN 连接和 30 秒预留，包含缓存 Room。激活保留预留，直到正数在线 presence 消耗它。离线存档保留 owner，不占在线配额。Worker 限额计入保留的工坊 executor、恢复的 Room 与 HTTP 沙盒。满额 Room 可重连座位或通过 `newGame` 一换一替换。见 `room-directory.test.ts`、`session-capacity.test.ts` 与 `ws-server.test.ts`。
+- 单实例默认准入 30 个普通 Room。`APP_ROOM_CAPACITY`（1–30）可降低上限；无效值阻止启动。`RoomDirectory` 对新建与首次恢复原子计算 OPEN 连接和 30 秒预留，包含缓存 Room。激活保留预留，直到正数在线 presence 消耗它。离线存档保留 owner，不占在线配额。满额 Room 可重连座位或通过 `newGame` 一换一替换。见 `room-directory.test.ts`、`session-capacity.test.ts` 与 `ws-server.test.ts`。
 - Game Context 链接按生命周期解析（[ADR 0013](../adr/0013-lifecycle-routed-game-context-access.md)）：completed、expired、removed 以及公开 Replay 不需登录；活动描述、恢复、Bug Report、证据与维护者取证执行座位或管理员授权。错误使用 `{ ok:false, code, lifecycle?, message }`。
 - 完成的 Replay 公开保留，直到被删除（[ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)）。
 - Bug Report（[ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)）是可恢复的 PostgreSQL 草稿，带稳定 `submissionId`、尝试记录与原子 claim。生产 GitHub App 客户端与测试 fake 是这一 seam 的两个 adapter。
 
 测试：`server/game/__tests__/{room-committer,room-committer-private-cursor,replay-delta-shared-history}.test.ts`、`server/__tests__/{bug-report-routes,bug-report-store}.test.ts`、`e2e-tests/{replay-viewer,bug-report}.spec.ts`。
 
-## server/custom-code/ — 隔离执行
+## 工坊代码执行
 
-```text
-server/custom-code/
-├── runtime.ts           为共享 registrar 绑定隔离执行器
-├── engine.ts            共享校验及 manifest 提取的 isolated-vm 执行边界
-├── isolate-runner.ts    isolated-vm 隔离入口
-├── executor-worker.ts   Worker Thread 入口
-└── client.ts            主进程 → Worker Thread 同步调用客户端
-```
+服务端从不执行工坊代码（[ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md)）。Room 与 HTTP 沙盒始终在进程内运行使用部署卡牌的 `GameSession`；交给服务端 Session 的自定义卡只注册定义。`workshop-draft-validation.ts` 只检查 Card Source 模块的结构而不运行它，`workshop-sandbox-contract.ts` 标识校验所对应的部署源码。浏览器运行时见 [`docs/CUSTOM_CARD_SANDBOX_zh.md`](../CUSTOM_CARD_SANDBOX_zh.md)。
 
-- 在 #1887 之前只供退役格式草稿和恢复的带工坊卡 Room 使用。后端只保存 `compiled_code + code_manifest`。非内置的可执行工坊卡在其 Room 中，把每个 `GameSession` 命令放进专用 Worker（`CustomSessionExecutor`）执行；同一 Room 按 FIFO 执行直至 Durable Commit，不同 Room 并行；同一连接之后的 Room 或座位变更不能改变进行中命令的 Room 或 Replay 行动者。
-- 主线程只保留最后一次成功快照的非执行镜像，经不结算的恢复路径载入，因此从不重新探测续行。在 Worker 内，`client.ts` 同步调用 isolated-vm，因此 `Atomics.wait()` 从不阻塞 HTTP 或 WebSocket 事件循环。
-- 每个命令前在内存中建立检查点，保留 pending 状态与撤销历史。hook 超时或运行时警告会恢复它并保留诊断；Worker 崩溃或整体超时会从最后快照重建。
-- `built_in=1` 的卡使用内置实现，不创建 Worker。
-- shared 源码常量拥有能力名称，`workshop-sandbox-contract.ts` 以 format-2 名称数组提供这些名称、运行时标识和限制。执行边界见 [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md)。
-
-测试：`server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`。
+测试：`server/__tests__/{workshop-native-source,workshop-legacy-draft-migration}.test.ts`。
 
 ## HTTP 端点
 
@@ -184,13 +171,13 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 - 沙盒设置（`sandbox_settings`、`sandbox_cards`）持久化人数、牌组与变体开关；`POST /api/game/new-sandbox` 把它们传给 `createInitialState()`。
 - `workshop-status.ts` 将审核与 `live` 发布分开。绑定和发布要求打开、非草稿且基于 `main` 的 PR、固定 Draft Version 与有权限的精确 head 批准。不一致或 GitHub 对账失败进入 `stale·offline`；绑定后首次刷新暂时失败保留 `in_review` 供重试。完整转换以状态代码和工坊测试为准。
 - 已批准的 `main` 合入毕业为只读 `merged`；先观察到的合入等待有权限的精确 head 核对。其他 base 进入 `stale·offline`。`live` 只影响展示；`markBuiltInMergedCards` 在发版时让已合入卡成为内置卡。
-- 对局只加载部署版本中的卡（ADR 0052）：创建时拒绝任何 `customCardIds`，沙盒只接受作者自己的卡。已录制的带工坊卡的 Room 仍经执行器恢复。
+- 对局只加载部署版本中的卡（ADR 0052）：创建时拒绝任何 `customCardIds`，仍列出工坊卡的保留配置需要调整。工坊卡只在作者的浏览器沙盒中试玩。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。
-- `workshop-public-cards.ts` 提供当前审核上线版本的目录、固定公共输入和 30 秒状态。目录只投影批准定义，不交付草稿或编译产物。读取不写沙盒状态；输入以 SHA-256 绑定来源、版本、公开定义与源码及图片字节。发布记录保留曾上线版本，状态区分新建和固定输入继续执行；失败不续期，管理员下架禁用全部公共版本。消费环境负责校验、编译与到期暂停。
+- 能力源码是原生 Card Source 模块；已退役的 `CARD_DEF` / `CARD_IMPL` 格式以 `legacy_card_format` 拒绝。迁移 050 一次性转换了已存草稿。
 - 工坊草稿错误暴露 `shared/contract/workshop.ts` 中的类型化 `code`；在线编辑守卫以 HTTP 409 返回 `live_edit_blocked`。
 
-测试：`server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submissions}.test.ts`、`server/workshop-pr/__tests__/`。
+测试：`server/__tests__/{workshop-api,workshop-submissions}.test.ts`、`server/workshop-pr/__tests__/`。
 
 ## 数据库
 
@@ -218,7 +205,7 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 - PostgreSQL 保存平台数据与共享资源目录；私有 S3 保存 `card-art/`、`replay-viewers/<viewerBuildId>/`、`replay-assets/<sha256>` 与 `erasure/ledger.json`。`server/storage/` 负责暂存上传、引用、完整性检查与清理 claim；写入前先持久化上传意图，新上传有 24 小时未引用宽限期，同一对象只有一个 claim 者删除。
 - 在线备份（[ADR 0040](../adr/0040-online-daily-backup-preserves-game-availability.md)）不暂停游戏写入。`storage/backup-coordination.ts` 保护物理删除；`scripts/storage-archive.ts` 让 dump 与资源目录共用快照，并解除恢复出的旧路由租约。`scripts/backup-*` 管理期限、完整归档与临时资源清理。测试：`online-storage-archive.test.ts`。
 - 预发布归档策略（`scripts/prerelease/archive-policy.ts`、`docker.ts`）区分固定可信 main 工具镜像和来源安装身份。候选工具只取得所选输入的只读挂载和私有 scratch；宿主 report 与 seal 保留在 owner 私有目录。原生 PostgreSQL 临时文件不修改归档输入。测试：`backup-storage.test.ts`、`backup-scratch.test.ts`、`prerelease-operations.test.ts`。
-- Durable Room Commit 需要 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 与 `GAME_BUILD_ID`。创建 Room 时锁定两个 Build ID 与自定义卡运行时快照。Viewer Build ID 是其完整 manifest 的 SHA-256；版图美术、卡牌美术与字体来自 `public-assets.ref` 固定的素材站。Build 校验失败时创建 Room 失败，等待中的 Room 在 Step 0 存在之前拒绝对局写入。
+- Durable Room Commit 需要 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 与 `GAME_BUILD_ID`。创建 Room 时锁定两个 Build ID。Viewer Build ID 是其完整 manifest 的 SHA-256；版图美术、卡牌美术与字体来自 `public-assets.ref` 固定的素材站。Build 校验失败时创建 Room 失败，等待中的 Room 在 Step 0 存在之前拒绝对局写入。
 - 只允许回滚到支持所有活动 Room `schemaVersion` 的兼容录制构建。缺少 Viewer 或持久化不可写会让 readiness 降级。在线 Room 容量只拒绝新准入，离线保留存档不降低 readiness。
 - `operations/` 管理独立发布的监控 Compose project 和受限账户采集器。`deploy-operations.sh` 只固定发布运维源码并保留游戏容器身份；游戏部署只管理 app/Caddy。账户采集器统计现存账户及 UTC+8 自然日、滚动时间窗口的新增，不导入游戏初始化或运行迁移。
 - `server/game/persistence/opening-facts.ts` 在现有带 owner fencing 的 Room 事务内记录不可回退的开局、首次正式游戏和开局账号事实。活动房间及 Replay 过期后仍保留这些事实，结局继续来自 `game_contexts.lifecycle`。账号删除与内容下架清除新增身份关联。owner 安装的固定聚合函数读取标量事实和 `operations_current_openings`；独立 exporter 登录只有聚合执行权，没有原始表和列读取权。其无参数函数使用数据库控制的 Unix 分钟截止时间；带时间参数的重载仅供 owner 调用。`operations/database-access.ts` 负责此权限边界与幂等初始化，生产、本地监控和真实数据库夹具共用同一路径。完整覆盖从迁移起点开始，无法证明的历史首次正式游戏时间保持未知。测试入口：`opening-facts.test.ts`、`operations-openings.test.ts`、`operations-dashboard.spec.ts`。

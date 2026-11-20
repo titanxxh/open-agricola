@@ -58,7 +58,7 @@ async function readyCard(artUrl: string | null = null) {
   const draft: WorkshopDraft = {
     cardId: meta.id, cardType: 'minor', name: meta.name, description: 'A test card',
     cardJson: { ...meta, card_type: 'minor', implemented: true, locales: { zh: { name: '测试卡', desc: ['测试说明'] } } },
-    effectCode: `const CARD_DEF = ${JSON.stringify({cardType: 'minor', meta})}; const CARD_IMPL = {}`,
+    effectCode: `import { defineMinorCard } from '../card-source'\n\nexport const CUSTOM_TestCard = defineMinorCard({ meta: ${JSON.stringify({ ...meta, deck: 'community' })}, impl: {} })`,
     compiledCode: '"use strict";', codeManifest: { effectHooks: [], listeners: [], cardDefinition: { cardType: 'minor', meta } },
     artUrl, generation: { secretPrompt: 'never publish me' },
   }

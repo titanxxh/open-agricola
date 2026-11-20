@@ -1,20 +1,19 @@
 import { afterEach, expect, it } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { validateAndCompileCustomCode } from '../custom-code/engine'
+import { gainLeaf } from '../../shared/cards/helpers/pay-gain-node'
+import type { ActionFlow } from '../../shared/contract/types'
 import type { GameSession } from '../game/authoritative-session'
 
 const sessions: GameSession[] = [], cardId = 'CUSTOM_DevBuyFlow'
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
-function setup(flow: string) {
-  const source = `const CARD_ID='${cardId}';const CARD_DEF=MinorImprovement({id:CARD_ID,name:'Dev buy flow'});const CARD_IMPL={effect:{id:CARD_ID,onBuy:()=>(${flow})}}`
-  const compiled = validateAndCompileCustomCode(source, cardId)
-  if (!compiled.valid) throw new Error(compiled.errors.join('; '))
-  const session = createWorkSession({ seed: 42, customCards: [{ cardType: 'minor', cardJson: { id: cardId, name: 'Dev buy flow', deck: 'CUSTOM', number: 0, desc: [] },
-    compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }] })
+function setup(flow: ActionFlow) {
+  const session = createWorkSession({ seed: 42,
+    customCards: [{ cardType: 'minor', cardJson: { id: cardId, name: 'Dev buy flow', deck: 'CUSTOM', number: 0, desc: [] } }],
+    cardImpls: { [cardId]: { effect: { id: cardId, onBuy: () => flow } } } })
   sessions.push(session); return session
 }
 it('settles the onBuy flow of a card played with the public dev command', () => {
-  const session = setup('gainLeaf(CARD_ID,{food:2})'), before = session.getState().state.players[0]!.resources.food
+  const session = setup(gainLeaf(cardId, { food: 2 })), before = session.getState().state.players[0]!.resources.food
   const result = session.devPlayCard(0, cardId)
   expect(result.ok).toBe(true)
   expect(result.state.players).toHaveLength(2)
@@ -25,7 +24,7 @@ it('settles the onBuy flow of a card played with the public dev command', () => 
   expect(result.scores).toBeDefined()
 })
 it('keeps a dev onBuy choice on its owner and settles the chosen reward through the engine', () => {
-  const session = setup("{type:'xor',children:[gainLeaf(CARD_ID,{food:2}),gainLeaf(CARD_ID,{wood:1})]}")
+  const session = setup({ type: 'xor', children: [gainLeaf(cardId, { food: 2 }), gainLeaf(cardId, { wood: 1 })] })
   const before = session.getState().state.players[1]!.resources.food
   const opened = session.devPlayCard(1, cardId)
   expect(opened.ok).toBe(true)

@@ -35,6 +35,9 @@ export function nativeCardId(source: string): string | undefined {
   return exportedCards(ts.createSourceFile('card.ts', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS))[0]?.name
 }
 
+/** Shown for a source in the retired CARD_DEF / CARD_IMPL sandbox format, which nothing runs any more. */
+export const LEGACY_CARD_SOURCE_MESSAGE = 'This ability uses the retired CARD_DEF / CARD_IMPL sandbox format. Regenerate it as a Card Source module: export const <CARD_ID> = defineMinorCard({ meta, impl }) or defineOccupationCard({ meta, impl }).'
+
 /** True when the source declares an exported native card rather than the retired sandbox format. */
 export function isNativeCardSource(source: string): boolean {
   return nativeCardId(source) !== undefined

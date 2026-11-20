@@ -119,9 +119,9 @@ describe('workshop draft model', () => {
         id: 'ability-1',
         kind: 'ability',
         prompt: 'gain grain',
-        sourceCode: 'const CARD_IMPL = {}',
+        sourceCode: 'const impl = {}',
         cardJson: {},
-        ...testedArtifacts('const CARD_IMPL = {}'),
+        ...testedArtifacts('const impl = {}'),
         createdAt: 1,
         baseRevision: 1,
         stale: false,
@@ -130,11 +130,11 @@ describe('workshop draft model', () => {
     state = workshopDraftReducer(state, {
       type: 'abilityCandidateEdited',
       candidateId: 'ability-1',
-      sourceCode: 'const CARD_IMPL = { changed: true }',
+      sourceCode: 'const impl = { changed: true }',
     })
 
     expect(state.session.abilityCandidates.find(candidate => candidate.id === state.session.selectedAbilityCandidateId)).toMatchObject({
-      sourceCode: 'const CARD_IMPL = { changed: true }',
+      sourceCode: 'const impl = { changed: true }',
       validation: { valid: false, errors: [] },
     })
     expect(state.draft.effectCode).toBeNull()
@@ -142,9 +142,9 @@ describe('workshop draft model', () => {
       ability: {
         latestResult: {
           kind: 'failed-source',
-          failedCandidate: { sourceCode: 'const CARD_IMPL = { changed: true }', validation: { valid: false, errors: [] } },
+          failedCandidate: { sourceCode: 'const impl = { changed: true }', validation: { valid: false, errors: [] } },
         },
-        lastValid: { sourceCode: 'const CARD_IMPL = {}', validation: { valid: true } },
+        lastValid: { sourceCode: 'const impl = {}', validation: { valid: true } },
       },
     })
     expect(state.save.status).toBe('dirty')
@@ -158,9 +158,9 @@ describe('workshop draft model', () => {
         id: 'ability-1',
         kind: 'ability',
         prompt: 'gain grain',
-        sourceCode: 'const CARD_IMPL = {}',
+        sourceCode: 'const impl = {}',
         cardJson: {},
-        testing: { code: testedArtifacts('const CARD_IMPL = {}').testing.code },
+        testing: { code: testedArtifacts('const impl = {}').testing.code },
         validation: { valid: false, errors: [] },
         createdAt: 1,
         baseRevision: 1,
@@ -171,9 +171,9 @@ describe('workshop draft model', () => {
     state = workshopDraftReducer(state, {
       type: 'abilityCandidateValidated', validationId: 'validate',
       candidateId: 'ability-1',
-      sourceFingerprint: sourceFingerprint('const CARD_IMPL = {}'),
+      sourceFingerprint: sourceFingerprint('const impl = {}'),
       validation: { valid: true, errors: [] },
-      testing: testedArtifacts('const CARD_IMPL = {}').testing,
+      testing: testedArtifacts('const impl = {}').testing,
     })
 
     expect(state.session.abilityCandidates[0]?.validation.valid).toBe(true)
@@ -208,9 +208,9 @@ describe('workshop draft model', () => {
         id: 'ability-1',
         kind: 'ability',
         prompt: 'grain',
-        sourceCode: 'const CARD_IMPL = {}',
+        sourceCode: 'const impl = {}',
         cardJson: {},
-        ...testedArtifacts('const CARD_IMPL = {}'),
+        ...testedArtifacts('const impl = {}'),
         createdAt: 1,
         baseRevision: 1,
         stale: false,
@@ -297,9 +297,9 @@ describe('workshop draft model', () => {
           id: 'ability-latest',
           kind: 'ability',
           prompt: 'restored ability prompt',
-          sourceCode: 'const CARD_IMPL = { restored: true }',
+          sourceCode: 'const impl = { restored: true }',
           model: 'ability-model',
-          ...testedArtifacts('const CARD_IMPL = { restored: true }'),
+          ...testedArtifacts('const impl = { restored: true }'),
           createdAt: 11,
         },
       },
@@ -315,7 +315,7 @@ describe('workshop draft model', () => {
         }],
         abilityCandidates: [{
           id: 'ability-latest',
-          sourceCode: 'const CARD_IMPL = { restored: true }',
+          sourceCode: 'const impl = { restored: true }',
           baseRevision: 4,
           stale: false,
         }],

@@ -3,7 +3,7 @@ import '../../shared/cards/register-all'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { captureStateWithHistory } from '../../shared/session/history-streams'
-import { validateAndCompileCustomCode } from '../custom-code/engine'
+import type { CardImpl } from '../../shared/cards/registry'
 import type { CustomCardData } from '../../shared/cards/session-card-context'
 import { BASE_ANIMAL_KEYS } from '../../shared/contract/animals'
 
@@ -13,8 +13,8 @@ type Animal = 'sheep' | 'boar' | 'cattle'
 
 // #1158: actual four placements enter the ordinary harvest, with finite
 // workers unchanged and the two parents physically housed before breeding.
-function setup(animal: Animal = 'sheep', round = 4, onlyCooking = false, customCards: CustomCardData[] = [], outsideBreedCard?: 'C084_PerennialRye' | 'D167_PureBreeder') {
-  const session = createWorkSession({ seed: 115818, customCards, options: { playerCount: outsideBreedCard === 'D167_PureBreeder' ? 4 : 2 }, configure(state) {
+function setup(animal: Animal = 'sheep', round = 4, onlyCooking = false, customCards: CustomCardData[] = [], outsideBreedCard?: 'C084_PerennialRye' | 'D167_PureBreeder', cardImpls?: Record<string, CardImpl>) {
+  const session = createWorkSession({ seed: 115818, customCards, cardImpls, options: { playerCount: outsideBreedCard === 'D167_PureBreeder' ? 4 : 2 }, configure(state) {
     state.round = round
     for (const player of state.players) {
       player.minorHand = ['__test_placeholder__']
@@ -170,14 +170,9 @@ describe('ordinary harvest breeding forbids animal cooking', () => {
 
   it('ends the prohibition before an onEndHarvest animal gain is cooked', () => {
     const id = 'CUSTOM_AfterBreedSheep'
-    const compiled = validateAndCompileCustomCode(`
-const CARD_ID = '${id}'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'After Breed Sheep' })
-const CARD_IMPL = { effect: { id: CARD_ID, onEndHarvest: () => ({ type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { sheep: 1 } }) } }
-`, id)
-    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
-    const card: CustomCardData = { cardType: 'minor', cardJson: { id, name: 'After Breed Sheep', deck: 'CUSTOM', number: 0, desc: [] }, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }
-    const session = setup('sheep', 4, false, [card])
+    const card: CustomCardData = { cardType: 'minor', cardJson: { id, name: 'After Breed Sheep', deck: 'CUSTOM', number: 0, desc: [] } }
+    const impl: CardImpl = { effect: { id, onEndHarvest: () => ({ type: 'leaf', actionId: 'gain', sourceCard: id, params: { sheep: 1 } }) } }
+    const session = setup('sheep', 4, false, [card], undefined, { [id]: impl })
     advance(session)
     const afterBreed = ok(session.resolveChoice(0, 'confirm', { zones: [{ id: 'parents', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 }] }))
     expect(afterBreed.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
@@ -195,14 +190,9 @@ const CARD_IMPL = { effect: { id: CARD_ID, onEndHarvest: () => ({ type: 'leaf', 
 
   it('starts breeding only after the end-feeding animal gain is cooked and housed', () => {
     const id = 'CUSTOM_EndFeedingSheep'
-    const compiled = validateAndCompileCustomCode(`
-const CARD_ID = '${id}'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'End Feeding Sheep' })
-const CARD_IMPL = { effect: { id: CARD_ID, onEndHarvestFeedingPhase: () => ({ type: 'leaf', actionId: 'gain', sourceCard: CARD_ID, params: { sheep: 1 } }) } }
-`, id)
-    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
-    const card: CustomCardData = { cardType: 'minor', cardJson: { id, name: 'End Feeding Sheep', deck: 'CUSTOM', number: 0, desc: [] }, compiledCode: compiled.compiledCode, codeManifest: compiled.manifest }
-    const session = setup('sheep', 4, false, [card])
+    const card: CustomCardData = { cardType: 'minor', cardJson: { id, name: 'End Feeding Sheep', deck: 'CUSTOM', number: 0, desc: [] } }
+    const impl: CardImpl = { effect: { id, onEndHarvestFeedingPhase: () => ({ type: 'leaf', actionId: 'gain', sourceCard: id, params: { sheep: 1 } }) } }
+    const session = setup('sheep', 4, false, [card], undefined, { [id]: impl })
     const pending = advance(session)
     expect(pending.state.roundPhase).toBe('feeding')
     expect(pending.state.completedFeedingPhases).toBe(1)

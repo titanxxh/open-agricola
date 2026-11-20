@@ -2,7 +2,6 @@ import { performance } from 'node:perf_hooks'
 import { readFile } from 'node:fs/promises'
 import type { PostgresDatabase } from '../database/postgres'
 import { operationsMetrics as metrics } from './metrics'
-import { workerObservation } from '../game/custom-session-executor'
 
 type Runtime = { users: string[]; values: Record<string, number> }
 /** Scrapes share one bounded observation; collectors never traverse game snapshots. */
@@ -16,7 +15,7 @@ export function createCollector(db: PostgresDatabase, role: 'app' | 'ingress', r
     const utilization = performance.eventLoopUtilization(elu)
     elu = performance.eventLoopUtilization()
     metrics.data.set({ kind: 'event_loop_utilization' }, utilization.utilization)
-    for (const [kind, value] of Object.entries({ ...db.observation(), ...observation?.values, ...(role === 'app' ? workerObservation() : {}) })) metrics.data.set({ kind }, value)
+    for (const [kind, value] of Object.entries({ ...db.observation(), ...observation?.values })) metrics.data.set({ kind }, value)
     if (inflight) return inflight
     if (Date.now() - last < 60_000) return
     last = Date.now()

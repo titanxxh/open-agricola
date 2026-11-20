@@ -23,7 +23,7 @@ shared/session/
 
 ## GameCore 入口
 
-`GameCore` 持有 `state`、`engineStack`、带行动起点快照的步骤历史，以及终局计分缓存。`GameSession`（`server/game/authoritative-session.ts`）是薄包装，注入隔离的自定义卡执行器，并构造按视角过滤或调试用的 payload。对服务端暴露的命令：
+`GameCore` 持有 `state`、`engineStack`、带行动起点快照的步骤历史，以及终局计分缓存。`GameSession`（`server/game/authoritative-session.ts`）是薄包装，构造按视角过滤或调试用的 payload；它从不执行工坊代码（ADR 0052）。对服务端暴露的命令：
 
 ```text
 takeAction(playerIndex, spaceId)
@@ -160,7 +160,7 @@ type SessionResponse = {
 
 `card-edition-admission.ts` 负责建房、再来一局以及 HTTP 或浏览器沙盒的建局准入。准入默认使用 `CLASSIC_EDITION_ENABLED`，测试可以注入开或关。开关用于新局。关闭时已有对局仍可加载、继续、重连和回放。房间元数据和开局事实保留卡牌版本与旧版牌组。工坊保存作者的设置，在启动沙盒时检查卡池。测试见 `classic-edition-room.test.ts`、`privacy-http.test.ts`、`workshop-api.test.ts` 和 `client/local-sandbox/__tests__/local-core.test.ts`。
 
-工坊的 HTTP 对局通过 `POST /api/game/reset-sandbox` 重新开始当前对局，复用已接受的设置与已加载的卡牌版本。重开会检查卡牌版本准入，初始化成功后才替换当前对局。测试见 `sandbox-version-binding.test.ts`。
+工坊的 HTTP 对局通过 `POST /api/game/reset-sandbox` 重新开始当前对局，复用已接受的设置。重开会检查卡牌版本准入，初始化成功后才替换当前对局。测试见 `http-sandbox-instance.test.ts`。
 
 ## 快照数据与可执行规则恢复
 

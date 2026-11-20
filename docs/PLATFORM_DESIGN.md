@@ -179,7 +179,7 @@ The page retains raw tool protocol and provider reasoning/signatures only in mem
 
 Tests and reports remain private to candidates and the current draft. They do not enter public card JSON, submissions, Replay snapshots, immutable version provenance or its content hash. Restoring an old version clears tests and reports, requiring new tests and execution. Identical card content keeps its existing immutable version. The browser report is a client declaration, not server execution proof; adoption independently recompiles source and checks identity and revision. See `workshop-generation.test.ts`, `workshop-drafts.test.ts`, and `workshop-generation.spec.ts` for behavior.
 
-`GET /api/workshop/sandbox-contract` exposes the runtime identity, plus the capability names and isolation limits that still apply to drafts in the retired sandbox format; native Card Source modules are validated structurally (`shared/custom-code/card-source-admission.ts`) without running on the server. The model reads implementation details through the reference tools. Its identifier hashes deployed shared/executor source, the resolved dependency lockfile and runtime versions, independently of the GitHub reference commit. `POST /api/workshop/cards/validate-code` binds success and failure to that identifier and the submitted source fingerprint; an obsolete contract returns `sandbox_changed` so a new attempt is required. The main browser receives data only, never imports the rule runtime.
+`GET /api/workshop/sandbox-contract` exposes only the runtime identity (format 2, runtime `browser-card-source`); Card Source modules are validated structurally (`shared/custom-code/card-source-admission.ts`) without running on the server. The model reads implementation details through the reference tools. Its identifier hashes the deployed `shared/` source and the resolved dependency lockfile, independently of the GitHub reference commit. `POST /api/workshop/cards/validate-code` binds success and failure to that identifier and the submitted source fingerprint; an obsolete contract returns `sandbox_changed` so a new attempt is required. The main browser receives data only, never imports the rule runtime.
 
 #### C1.4 Quality and cost acceptance
 
@@ -201,7 +201,7 @@ The original single-file artifact remains on the separate `prototype/llm-tool-lo
 
 The compact prompt in [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts) defines the task, immutable card identity, trust boundary, and four tools: `search_references`, `read_reference`, `write_artifacts`, and `run_tests`. It asks for a native Card Source module (ADR 0052), starts the research at `docs/CARD_AUTHORING.md`, requires positive and negative tests, and embeds no capability list. The deployed contract only identifies the runtime for validation binding; runtime identity and reference commit remain separate.
 
-The model reads source, engine consumers, and direct or Session tests from GitHub at the attempt's fixed commit. [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) explains the execution boundaries of the retired sandbox format and links to the source allowlists and injected helpers. The site keeps no separate few-shot corpus or descriptive capability maps.
+The model reads source, engine consumers, and direct or Session tests from GitHub at the attempt's fixed commit. [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) explains where Workshop code runs and what the server checks. The site keeps no separate few-shot corpus or descriptive capability maps.
 
 `write_artifacts` writes the complete Card Source module and ordinary TypeScript behavior tests together. `run_tests` returns source-validation and browser-UT feedback for the model to inspect and repair. Source or test edits invalidate the matching report. The final response is ordinary text; source is obtained from tool-written artifacts. A clarification or unsupported request can finish without a candidate.
 
@@ -227,28 +227,9 @@ Workshop thumbnails, adopted/candidate previews and custom card faces resolve ma
 
 ### C5. Security validation for LLM-generated code
 
-The model emits a native Card Source module. The server checks only its structure (`shared/custom-code/card-source-admission.ts`) and never executes it; it runs only in the author's browser, in an opaque-origin iframe Worker with a no-network CSP (ADR 0052). Drafts in the retired `CARD_DEF` / `CARD_IMPL` sandbox format still use the path below until #1887 removes it.
+The model emits a native Card Source module. The server checks only its structure (`shared/custom-code/card-source-admission.ts`) and never executes it; it runs only in the author's browser, in an opaque-origin iframe Worker with a no-network CSP (ADR 0052). Browser origin isolation is the security boundary; source analysis is not. `shared/custom-code/compiler.ts` transpiles the admitted module, and the draft stores the source, the transpiled JavaScript and a manifest with the definition read from `meta` as validation evidence. [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) describes the runtime.
 
-1. **AST validation** in `shared/custom-code/ast-validator.ts` uses the TypeScript Compiler API and rejects:
-
-   - statement-level imports and exports, dynamic `import()`, `require()`, class declarations and expressions, `with`, and generator functions;
-   - bare identifiers `eval`, `Function`, `process`, `require`, `globalThis`, `global`, `window`, `document`, `__dirname`, `__filename`, `fetch`, `XMLHttpRequest`, `WebSocket`, `setTimeout`, `setInterval`, `setImmediate`, `clearTimeout`, `clearInterval`, `Deno`, `Bun`, `Proxy`, and `Reflect`;
-   - property access through `obj.X` or `obj['X']` for `constructor`, `__proto__`, `__defineGetter__`, `__defineSetter__`, `__lookupGetter__`, and `__lookupSetter__`;
-   - `CARD_IMPL.effect` keys outside `cardEffectHooks` and listener phases outside `actionHookPhases`.
-
-   AST validation produces friendly errors; isolated-vm with its separate V8 heap is the real security boundary.
-
-2. **Compilation** in `shared/custom-code/compiler.ts` uses `ts.transpileModule()` to create CommonJS JavaScript. Database column `card_json` holds all custom-code data: `CARD_DEF` metadata, TypeScript source, compiled JavaScript, and manifest. Early v1 through v3 schemas had separate `effect_dsl`, `effect_code`, and `compiled_code` columns from the abandoned V1 DSL; migration v7 dropped them.
-
-3. **Sandbox execution** in `server/custom-code/{engine, executor-worker, isolate-runner, runtime}.ts` uses:
-
-   - the `isolated-vm` package, a separate V8 heap rather than `node:vm`, with no prototype-chain escape, an 8 MB memory cap, and a 100 ms CPU timeout per execution;
-   - a Worker Thread in `executor-worker.ts`, so a V8 or native crash kills only the Worker and the main process recreates it;
-   - `SharedArrayBuffer + Atomics.wait` for synchronous waiting from the main thread, with a 5,000 ms overall timeout;
-   - exception handling that records a warning, returns `null`, and lets the game continue;
-   - pure read or leaf-building helpers from `injected-helpers.ts`: `gainLeaf`, `payLeaf`, `spaceHasPlayer`, `positionKey`, `getCardStack`, and `readCardExtraData`.
-
-An early design considered a declarative JSON-only V1 DSL. It was not adopted; the retired sandbox format uses LLM to TypeScript, AST allowlisting, and isolated-vm.
+The retired `CARD_DEF` / `CARD_IMPL` sandbox format, with its AST allowlist and server isolated-vm execution, has been removed. Validation rejects it with `legacy_card_format`; migration 050 converted stored drafts once, and a draft it could not convert needs a new Generation Attempt.
 
 ---
 
@@ -261,25 +242,19 @@ An early design considered a declarative JSON-only V1 DSL. It was not adopted; t
 ### D2. Loading custom cards into a game
 
 1. Games load only the cards in the deployed build (ADR 0052). A Workshop card reaches other players after its pull request merges and a release ships it as a community card, which the community-deck option deals. Room, solo and HTTP game creation reject any `customCardIds`, and the lobby offers no Workshop card selection. Author playtests run only in the browser sandbox with the author's own cards; HTTP `/api/game/new-sandbox` rejects Workshop cards.
-2. Only restoring a Room recorded with Workshop cards (none exist in production) still uses the retired path: `server/connection/ws-server.ts` loads `CustomCardData[]` from the snapshot or the database.
-3. The `GameSession` constructor registers definitions and runtime implementations into that game's `SessionCardContext`.
-4. `registerExecutorBackedCustomCard()` in `server/custom-code/runtime.ts` injects effect hooks and listeners from compiled output and manifest, delegating to Worker Thread plus isolated-vm through `invokeCustomCodeEffectSync` and `invokeCustomCodeListenerSync`.
-5. Add the custom-card IDs to the deal pool.
+2. Rooms and the HTTP sandbox always run an in-process `GameSession`. A retained Room snapshot or creation configuration may carry empty Workshop card fields; they still load. Custom cards given to a server Session register their definitions only, because the server never executes Workshop code.
+3. In the browser sandbox, `GameCore` registers each Workshop card's definition into that game's `SessionCardContext` and loads its Card Source `impl` into the game's card registry (`client/local-sandbox/local-custom-card.ts`).
+4. Add the custom-card IDs to the deal pool.
 
 ### D3. Sandbox isolation and fault tolerance
 
 Workshop embeds `workshop-game.html`, a game-only entry admitted before initialization only under a same-origin top-level Workshop parent. It accepts only the fixed browser sandbox mode, without Room, account or WebSocket routing. Nested or cross-origin parents and direct navigation receive a static standalone link. The main application still refuses all iframe initialization. Entry contracts and browser coverage are in [Client architecture](architecture/client.md).
 
-- Every custom-card effect and listener call is wrapped in `try/catch`.
-- On failure, record the error, skip the effect, and continue the game. The current sandbox session accumulates deduplicated runtime errors; the Workshop confirmation gate rereads them and rejects the erroneous version before submission.
-- On the server, the retired format's isolated-vm has a 100 ms CPU timeout per execution.
+- Workshop code runs in a fresh engine Worker inside an opaque-origin sandboxed iframe whose CSP blocks network access. A runaway card is stopped by the transport timeout, which restores the last snapshot.
+- A card error reaches the playtest or behavior test like a built-in card's error. The current sandbox session accumulates deduplicated card warnings; the Workshop confirmation gate rereads them and rejects the erroneous version before submission.
 - State snapshots can roll back through existing undo infrastructure.
 
-`GET /api/workshop/public-cards/v1/cards` discovers current live approved versions in pages of at most 20, ordered by Workshop Card ID in byte order. Its optional `after` cursor accepts one ID of 1–128 ASCII letters, digits, underscores or hyphens. The response includes `protocolVersion: 1`, `cards` and a nullable `nextCursor`. Entries contain the fixed source identity and only the approved definition's `cardId`, `name` and `cardType`. Author credentials do not expand this public set. A directory entry grants no execution permission; consumers still fetch its snapshot and status.
-
-Public source handoff uses `GET /api/workshop/public-cards/v1/cards/:id` for the current live approved version, including merged cards still publicly live. The returned input binds the Workshop authority, card/version IDs, public card JSON, source and verified image bytes. SHA-256 covers `canonicalJson(input)`; image bytes have their own SHA-256. Compiler output, private drafts and generation provenance are excluded. Consumers validate and compile against their own runtime and capability contract.
-
-`GET /api/workshop/public-cards/v1/cards/:id/versions/:versionId/status?sha256=<input-hash>` returns explicit creation/execution permissions. The publication registry admits only actual same-card public versions and protects them from normal five-version pruning. Upgrade backfill skips dangling or cross-card historical approval bindings; card-first controlled imports register only when the matching version arrives. Author offline/edit/update blocks new creation from the old version but preserves fixed execution. Administrator takedown disables all public versions of the card; deletion denies further execution. Missing/altered images and failed or expired source reads return no fresh status. `checkedAt` starts before source reads and `validUntil` is at most 30 seconds later; consumers must preserve that deadline and pause after expiry. Snapshot reads include the same initial status. These GET interfaces never write shared sandbox settings or confirmation results. Consumer sandbox execution is delivered separately from this source interface.
+The version-1 public Workshop card interface and its publication registry were removed with ADR 0052; they never had a public version.
 
 ### D4. Workshop UI structure
 
@@ -345,14 +320,8 @@ Every generated pull request contains:
 
 The generator creates no definition or export-shape smoke test. A simple immediate-resource effect uses a direct behavior test. Payment, choice or pending, delayed, cross-player, and multistep flows require a dedicated `GameSession` scenario written by the author, reviewer, or LLM.
 
-A native Card Source draft is already the module its PR adds; generation only drops `locales`, sets adopted artwork and adds the `_impl` export. For a draft in the retired sandbox format, necessary normalization prevents a sandbox-valid card from failing pull-request CI:
+A Card Source draft is already the module its PR adds; generation only drops `locales`, sets adopted artwork and adds the `_impl` export. A source in the retired sandbox format is rejected. The normalization that once turned such drafts into modules now lives only in the one-time draft migration (`server/workshop-pr/legacy-card-source.ts`).
 
-- Change `deck: 'CUSTOM'` to `deck: 'community'`.
-- Add the `CardImpl` context type to `CARD_IMPL`, preventing listener phase and action literals from widening to `string[]`.
-- Give a listener without `id` the stable `{cardId}-listener-{n}`.
-- Convert `prerequisite: { occupation: N }` into supported `prerequisite: 'N Occupations'` plus `occupationPrerequisites: { min: N }`.
-- Keep the top-level helper constants, functions, and types that `CARD_IMPL` reaches, in source order; drop unreachable helpers and top-level expression statements.
-- Emit untyped parameters as `any` and give top-level helper functions an `any` return, with a file-level `no-explicit-any` lint exemption, because sandbox code is untyped JavaScript checked at runtime.
 - Update `register-all.ts`; `pnpm run generate:register-all` generates base, major, and community metadata into `catalog.generated.ts` and `major/generated.ts`.
 
 ### D6. Card detail, version history, and editor hydration
@@ -385,7 +354,7 @@ Playtest failures are attributed to a fixed source only when the server confirms
 
 First ability generation and regeneration include current card context. `CARD_ID`, card type, and name remain fixed and are revalidated by the Workshop Card aggregate at adoption. Other definition fields, including description, cost, VP, and localization, may change with a candidate.
 
-Every ability-source validation writes the card definition snapshot into the server manifest: read statically from a native module's `meta`, or extracted in isolated-vm from a retired-format `CARD_DEF`. The publication static gate compares its deliverable fields bidirectionally with current `card_json`. PR handoff also requires validated source, preventing divergence among sandbox execution, published definition, and submitted source.
+Every ability-source validation writes the card definition snapshot, read statically from the module's `meta`, into the server manifest. The publication static gate compares its deliverable fields bidirectionally with current `card_json`. PR handoff also requires validated source, preventing divergence among sandbox execution, published definition, and submitted source.
 
 Ordinary editing creates checkpoints only on stage change, in-site navigation, or explicit save; it creates no Draft Version. Refresh and crash recovery use a synchronously written localStorage copy. If its revision matches, it recovers as unsynchronized. If the server revision advanced, the user chooses the complete server or complete local draft.
 
@@ -403,7 +372,7 @@ A Draft Version serializes only final card content and provenance for adopted ca
 | Password exposure | Hash with `crypto.scrypt`; never store plaintext |
 | Session hijacking | HTTPS in production plus HttpOnly, Secure, SameSite session cookies |
 | Brute force | Rate-limit login to five attempts per minute per IP |
-| Malicious card code | Native Card Source runs only in the author's browser, in an opaque-origin iframe Worker with a no-network CSP; the server never executes it. Retired format: AST allowlist blocking imports, exports, eval, process, fetch, timers, Proxy, Reflect, classes, and more; isolated-vm with a separate V8 heap; Worker Thread; 100 ms and 8 MB limits; rollbackable snapshots |
+| Malicious card code | Card Source runs only in the author's browser, in an opaque-origin iframe Worker with a no-network CSP; the server never executes it; other players receive a card only after pull-request review, CI and a release |
 | XSS through card text | React's default HTML escaping; never `dangerouslySetInnerHTML` |
 | Unauthenticated WebSocket | Prefer session-cookie validation; otherwise require an auth message within five seconds or disconnect |
 
@@ -444,7 +413,7 @@ A Draft Version serializes only final card content and provenance for adopted ca
 ### Phase 3: Workshop with data-driven cards
 
 - Add Workshop APIs.
-- Add `shared/cards/custom-registry.ts`, AST validation under `shared/custom-code/`, and isolated-vm execution under `server/custom-code/`.
+- Add `shared/cards/custom-registry.ts` and custom-card validation under `shared/custom-code/`; server execution was later removed (ADR 0052).
 - Create Workshop browse, edit, and sandbox UI.
 - Add likes and comments.
 
@@ -457,9 +426,7 @@ A Draft Version serializes only final card content and provenance for adopted ca
 
 ### Phase 5: Advanced card effects, merged into Phase 3
 
-- TypeScript AST validation in `shared/custom-code/ast-validator.ts`.
-- isolated-vm plus Worker Thread crash isolation.
-- Full support for `CARD_IMPL.effect` hooks and `CARD_IMPL.listeners`.
+- Full support for card effect hooks and listeners. The original sandbox format and its server execution were replaced by browser-only Card Source modules (ADR 0052).
 
 ---
 
@@ -469,7 +436,7 @@ A Draft Version serializes only final card content and provenance for adopted ca
 - WebSocket: `server/connection/{ws-server,room-router,broadcaster}.ts`.
 - Rooms and persistence: `server/game/{room,room-registry,room-committer,room-persistence-checkpoint}.ts` and `server/game/persistence/`.
 - Protocol: `shared/contract/protocol/ws.ts`.
-- Workshop and sandbox: `server/workshop.ts`, `server/game-router.ts`, `shared/cards/{custom-registry,catalog}.ts`, `shared/custom-code/`, and `server/custom-code/`.
+- Workshop and sandbox: `server/workshop.ts`, `server/workshop-draft-validation.ts`, `server/game-router.ts`, `shared/cards/{custom-registry,catalog}.ts`, `shared/custom-code/`, and `client/local-sandbox/`.
 - Frontend platform: `client/app/{LoginPage,LobbyPage,WorkshopPage,PageRouter}.tsx` and `client/contexts/AuthContext.tsx`.
 - Browser LLM: `client/services/llm/`.
 
@@ -523,7 +490,7 @@ Last updated 2026-10-06.
 | Card-art generation and upload | Gemini, OpenRouter, and AiHubMix image models, `POST /api/workshop/art`, and `/card-art/` static service |
 | Resource-icon parsing | `client/components/common/ResourceText.tsx` |
 | Authentication and Workshop unit tests | `server/__tests__/auth.test.ts`, `workshop-api.test.ts` |
-| TypeScript AST validation and isolated-vm sandbox (retired format) | `shared/custom-code/ast-validator.ts`, `server/custom-code/{compiler, engine, client, executor-worker, isolate-runner, runtime, injected-helpers}.ts` |
+| Browser-only Card Source runtime and structural admission (ADR 0052) | `shared/custom-code/{card-source-admission, compiler}.ts`, `client/local-sandbox/{opaque-worker, native-card-source, local-custom-card}.ts`, `server/workshop-draft-validation.ts` |
 | Card version history | `workshop_card_versions`, versions and restore APIs, and the WorkshopPage version panel |
 | Featured Workshop page | `workshop_cards.featured`, administrator toggle, and Featured tab |
 | Production deployment with Docker and GitHub Pages | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/deploy-pages.yml`, `client/config.ts` |

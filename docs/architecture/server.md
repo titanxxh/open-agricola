@@ -51,7 +51,7 @@ server/game/
 - `roomId` identifies one game ([ADR 0009](../adr/0009-room-id-identifies-one-game.md)). `newGame` retains options and atomically commits a fresh Session/UUID and old retirement before adopting connections. Only authoritative `gameOver` archives results; failure retains the final state for retry. Agreed endings use `terminated`; expiry, cancellation and cleanup produce no result. Scores preserve fractions ([persistence tests](../../server/game/persistence/__tests__/postgres-replay.test.ts)).
 - Hosted Rooms use PostgreSQL and mandatory recording. `RoomPersistenceCheckpoint` confirms waiting state and seats. `GameContextStore` owns persisted expiry; online connections, admissions and pending saves are protected. Administrator retention defaults to three days waiting and seven days playing. Each offline cycle freezes its deadline; updates affect the next cycle. Development games never idle-expire. `RoomAuthority` unloads idle caches separately from stored games. Missing recorded data blocks recovery. See [ADR 0039](../adr/0039-runtime-room-retention-policy.md).
 - Development slots `dev2`–`dev6` map to permanent game identities that survive restarts; rematch or reset assigns a fresh identity, and completed, expired or removed contexts never revive. A development account may hold several seats, and development resume needs a seat hint or a uniquely owned seat; ordinary Rooms derive the seat from authenticated ownership. A client-side `devMode` flag grants no development privilege. `room_players` stores ownership by `(room_id, player_index)`.
-- Waiting-room colors remain unique across occupied and reserved seats. `GameSession.updatePlayerColors` covers Workers; the Room queue and checkpoint commit each change before publication. Colors lock after start.
+- Waiting-room colors remain unique across occupied and reserved seats. `GameSession.updatePlayerColors` applies them; the Room queue and checkpoint commit each change before publication. Colors lock after start.
 - Ordinary Rooms wait for the final arrival to issue `confirmPlayerColor`; persisted `colorConfirmationPlayerIndex` identifies that player. Step 0 commits before gameplay. Hotseat and development Rooms start automatically. Room status is authoritative. Tests: `room-router.test.ts`, `room-invitations.spec.ts`.
 - `room-queue.ts` serializes authorization, rules, asynchronous commit and publication per Room; moving a connection reserves both Room queues and the connection queue. Shutdown stops input, drains accepted work and closes the pool.
 - **Distributed Rooms** ([ADR 0022](../adr/0022-distributed-room-recovery.md)): `RoomDirectory` assigns each Room to one application process with a PostgreSQL lease and monotonic epoch; commit and publication verify owner and expected version. `POST /api/rooms/locate` yields `/nodes/<instanceId>/ws`; `ingress.ts` forwards read-only. `CommandStore` reserves each command's content fingerprint and commits its receipt with the Room transition; a repeated command returns the original receipt. `InvalidationStore` commits card / user barriers and per-instance tasks that every execution and publication checks; an operation completes only when each required instance acknowledges or loses its lease.
@@ -94,8 +94,7 @@ type RoomCommitResult =
 ```text
 ClientCommand
   -> room-router: validate seat and payload
-  -> GameSession: built-in cards synchronously produce SessionResponse;
-     Workshop cards in restored Rooms return asynchronously from the session Worker
+  -> GameSession: in-process, synchronously produces SessionResponse
   -> RoomCommitter: serialize once and atomically write Room snapshot plus Replay Step
   -> Broadcaster: after commit, build viewer-filtered envelopes and send them
 ```
@@ -105,31 +104,18 @@ ClientCommand
 - Replay Intent is allowlisted by an exhaustive protocol switch; never store `requestId`, tokens, site `userId` or unvalidated payloads.
 - Replay archives use bounded authoritative state deltas ([ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)).
 - A write failure freezes the same Frame and Intent, blocks the Room and retries with backoff; clients wait and never read uncommitted state. The same idempotency key with a different hash blocks permanently and alerts.
-- Each instance defaults to 30 online ordinary Rooms. `APP_ROOM_CAPACITY` (1–30) and `CUSTOM_SESSION_WORKER_CAPACITY` (0–15, default 15) can lower limits; invalid values stop startup. `RoomDirectory` atomically checks OPEN connections and 30-second reservations on creation and first resume, including cached Rooms. Activation keeps its reservation until positive presence consumes it. Offline saves retain ownership without using online quota. Worker limits include retained Workshop executors, restored Rooms and HTTP sandboxes. Full Rooms may reconnect seats or replace themselves one-for-one with `newGame`. See `room-directory.test.ts`, `session-capacity.test.ts` and `ws-server.test.ts`.
+- Each instance defaults to 30 online ordinary Rooms. `APP_ROOM_CAPACITY` (1–30) can lower the limit; an invalid value stops startup. `RoomDirectory` atomically checks OPEN connections and 30-second reservations on creation and first resume, including cached Rooms. Activation keeps its reservation until positive presence consumes it. Offline saves retain ownership without using online quota. Full Rooms may reconnect seats or replace themselves one-for-one with `newGame`. See `room-directory.test.ts`, `session-capacity.test.ts` and `ws-server.test.ts`.
 - Game Context links resolve by lifecycle ([ADR 0013](../adr/0013-lifecycle-routed-game-context-access.md)): completed, expired and removed contexts and public Replay need no login; active descriptors, recovery, Bug Report, evidence and maintainer forensics enforce seat or administrator authorization. Errors use `{ ok:false, code, lifecycle?, message }`.
 - Completed Replay is public and retained until erasure ([ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)).
 - Bug Reports ([ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)) keep PostgreSQL drafts, stable `submissionId`, attempts, atomic claims, and GitHub App/test adapters.
 
 Tests: `server/game/__tests__/{room-committer,room-committer-private-cursor,replay-delta-shared-history}.test.ts`, `server/__tests__/{bug-report-routes,bug-report-store}.test.ts`, `e2e-tests/{replay-viewer,bug-report}.spec.ts`.
 
-## `server/custom-code/`: Isolated execution
+## Workshop code execution
 
-```text
-server/custom-code/
-├── runtime.ts           isolated executor binding for the shared registrar
-├── engine.ts            isolated-vm boundary for shared validation and manifest extraction
-├── isolate-runner.ts    isolated-vm entry
-├── executor-worker.ts   Worker Thread entry
-└── client.ts            synchronous main-process to Worker Thread client
-```
+The server never executes Workshop code ([ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md)). Rooms and the HTTP sandbox always run an in-process `GameSession` with the deployed cards; custom cards given to a server Session register their definitions only. `workshop-draft-validation.ts` checks a Card Source module's structure without running it, and `workshop-sandbox-contract.ts` identifies the deployed source that a validation belongs to. [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md) describes the browser runtime.
 
-- Used only by retired-format drafts and restored Rooms with Workshop cards until #1887. The backend stores only `compiled_code + code_manifest`. A non-built-in executable Workshop card runs every `GameSession` command of its Room in a dedicated Worker (`CustomSessionExecutor`); one Room runs FIFO through Durable Commit, different Rooms in parallel, and a later Room or seat change on the same connection cannot alter an in-flight command's Room or Replay actor.
-- The main thread keeps only a non-executing mirror of the last successful snapshot, restored through a non-settling path so it never re-probes continuations. Inside the Worker, `client.ts` calls isolated-vm synchronously, so `Atomics.wait()` never blocks the HTTP or WebSocket event loop.
-- Before each command an in-memory checkpoint preserves pending state and undo history. A hook timeout or runtime warning restores it and keeps the diagnostic; a Worker crash or overall timeout rebuilds from the last snapshot.
-- `built_in=1` cards use the built-in implementation without a Worker.
-- Shared source constants own capability names, and `workshop-sandbox-contract.ts` exposes their format-2 name arrays with runtime identity and limits. Execution boundaries are documented in [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md).
-
-Tests: `server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`.
+Tests: `server/__tests__/{workshop-native-source,workshop-legacy-draft-migration}.test.ts`.
 
 ## HTTP endpoints
 
@@ -183,13 +169,13 @@ Viewer entry HTML revalidates its response policy; content-addressed assets rema
 - `sandbox_settings` and `sandbox_cards` persist test setup for `POST /api/game/new-sandbox`.
 - `workshop-status.ts` separates review from publication. Binding/publishing require an open, non-draft `main` PR, a fixed Draft Version and authorized exact-head approval. Mismatch or failed reconciliation becomes `stale·offline`; transient initial refresh failure preserves `in_review` for retry.
 - Approved `main` merges become read-only `merged` after exact-head reconciliation; other bases become stale/offline. `live` only affects gallery display; `markBuiltInMergedCards` makes merged cards built-in at release.
-- Games load only deployed cards (ADR 0052): creation rejects any `customCardIds`, and the sandbox accepts only the author's own cards. Rooms recorded with Workshop cards still restore through the executor.
+- Games load only deployed cards (ADR 0052): creation rejects any `customCardIds`, and a retained configuration that still names a Workshop card needs adjustment. Workshop cards play only in the author's browser sandbox.
 - Author unpublish permits existing games; administrator takedown ends affected Rooms without scoring or Replay.
-- `workshop-public-cards.ts` owns the catalog of live approved versions, fixed source and image inputs and 30-second status. Catalog pages exclude drafts and compiler output. Reads never write sandbox state; consumers compile and suspend on expiry. [Platform design](../PLATFORM_DESIGN.md#d3-sandbox-isolation-and-fault-tolerance) defines lifecycle policy.
+- Ability source is a native Card Source module; the retired `CARD_DEF` / `CARD_IMPL` format is rejected with `legacy_card_format`. Migration 050 converted stored drafts once.
 - `workshop_submissions` freezes operation/version before GitHub writes. The repository-scoped App uses expected-head CAS, reconciles uncertain PR creation and pauses generated-file conflicts. See the [GitHub App runbook](../operations/github-oauth-app-setup.md).
 - Draft errors use `shared/contract/workshop.ts`; live edits return HTTP 409 `live_edit_blocked`.
 
-Tests: `server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submissions}.test.ts`, `server/workshop-pr/__tests__/`.
+Tests: `server/__tests__/{workshop-api,workshop-submissions}.test.ts`, `server/workshop-pr/__tests__/`.
 
 ## Database
 
@@ -217,7 +203,7 @@ Deployment commands and the metric catalog live in [`HOW_TO_DEPLOY.md`](../HOW_T
 - PostgreSQL stores platform data and the shared resource catalog; private S3 stores `card-art/`, `replay-viewers/<viewerBuildId>/`, `replay-assets/<sha256>` and `erasure/ledger.json`. `server/storage/` owns staged uploads, references, integrity checks and cleanup claims; upload intent is durable before writing, new uploads keep a 24-hour unreferenced grace period, and only one claimant deletes an object.
 - Online backup ([ADR 0040](../adr/0040-online-daily-backup-preserves-game-availability.md)) leaves game writes live. `storage/backup-coordination.ts` protects deletion; `scripts/storage-archive.ts` shares the dump/catalog snapshot and detaches restored leases. `scripts/backup-*` own deadlines, complete sets and scratch cleanup. Test: `online-storage-archive.test.ts`.
 - Prerelease archive policy (`scripts/prerelease/archive-policy.ts`, `docker.ts`) separates the trusted-main tool image from the installed build. Candidate tools receive selected read-only inputs and private scratch; reports and seals stay owner-private. PostgreSQL temporary files never modify archive inputs. Tests: `backup-storage.test.ts`, `backup-scratch.test.ts`, `prerelease-operations.test.ts`.
-- Durable Room Commit requires PostgreSQL, shared resources, `REPLAY_VIEWER_BUILD_ID` and `GAME_BUILD_ID`. Room creation freezes both Build IDs and the custom-card runtime snapshot. The Viewer Build ID is the SHA-256 of its complete manifest; board art, card art and fonts come from the asset site pinned by `public-assets.ref`. Room creation fails when Build validation fails, and a waiting Room rejects game writes until Step 0 exists.
+- Durable Room Commit requires PostgreSQL, shared resources, `REPLAY_VIEWER_BUILD_ID` and `GAME_BUILD_ID`. Room creation freezes both Build IDs. The Viewer Build ID is the SHA-256 of its complete manifest; board art, card art and fonts come from the asset site pinned by `public-assets.ref`. Room creation fails when Build validation fails, and a waiting Room rejects game writes until Step 0 exists.
 - Rollback is allowed only to a recorder-compatible build supporting every active Room `schemaVersion`. A missing Viewer or unwritable persistence degrades readiness. Online Room capacity rejects new admissions; retained offline saves do not reduce readiness.
 - `scripts/prerelease/{operations,storage-guard*,gateway}.ts` gates lifecycle and HTTP/WS. Header-pending sockets have no authority; classified streams stay revocable. See `HOW_TO_DEPLOY.md`.
 - `operations/` owns the independently deployed monitoring Compose project and restricted accounts exporter. `deploy-operations.sh` pins only operations source and preserves game container identity; game deployments manage app/Caddy only. The exporter counts existing accounts and UTC+8/day and rolling creation windows without importing game initialization or running migrations.

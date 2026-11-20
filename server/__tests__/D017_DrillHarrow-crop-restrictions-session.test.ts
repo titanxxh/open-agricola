@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
-import { validateAndCompileCustomCode } from '../custom-code/engine'
+import type { CardImpl } from '../../shared/cards/registry'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { playMinor, sessionOptions } from './_helpers/card-regression-session'
@@ -12,25 +12,17 @@ type Crop = 'grain' | 'vegetable'
 
 // A custom purchase supplies only the generic Sow context. The public Session
 // proves restricted admission and before-hooks without inventing an official card.
-function sowCard(allowedCrops: readonly Crop[]): CustomCardData {
+function sowCard(allowedCrops: readonly Crop[]): { card: CustomCardData; impl: CardImpl } {
   const id = `CUSTOM_DrillHarrowSow_${allowedCrops.join('_')}`
-  const compiled = validateAndCompileCustomCode(`
-const CARD_ID = '${id}'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Sow Crop Permission' })
-const CARD_IMPL = { effect: { id: CARD_ID,
-  onBuy: () => ({ type: 'leaf', actionId: 'sow', optional: true, sourceCard: CARD_ID })
-} }
-`, id)
-  if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
   return {
-    cardType: 'minor', cardJson: { id, name: 'Sow Crop Permission', deck: 'CUSTOM', number: 0, desc: [] },
-    compiledCode: compiled.compiledCode, codeManifest: compiled.manifest,
+    card: { cardType: 'minor', cardJson: { id, name: 'Sow Crop Permission', deck: 'CUSTOM', number: 0, desc: [] } },
+    impl: { effect: { id, onBuy: () => ({ type: 'leaf', actionId: 'sow', optional: true, sourceCard: id }) } },
   }
 }
 
 function setup(allowedCrops: readonly Crop[]) {
-  const card = sowCard(allowedCrops)
-  const session = createWorkSession({ seed: 1160, customCards: [card], configure(state) {
+  const { card, impl } = sowCard(allowedCrops)
+  const session = createWorkSession({ seed: 1160, customCards: [card], cardImpls: { [card.cardJson.id]: impl }, configure(state) {
     const owner = state.players[0]!
     owner.minorHand = [card.cardJson.id]
     owner.minorPlayed = [DRILL_HARROW]

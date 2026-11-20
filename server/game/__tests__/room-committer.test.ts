@@ -737,33 +737,6 @@ describe('RoomCommitter', () => {
     )
   })
 
-  it('persists the serialized frame produced by the custom session worker', async () => {
-    const room = makeRoom()
-    let serialized = serializeSessionSnapshot(room.session.state, room.session)
-    serialized.frame.players[0]!.pastureCapacities = { worker: 7 }
-    room.customSessionExecutor = {
-      serializedStateForPersistence: () => serialized,
-    } as NonNullable<Room['customSessionExecutor']>
-    const committer = createCommitter()
-
-    expect((await committer.prepareRoom(room, { missingPrefix: false }))).toMatchObject({
-      kind: 'committed',
-      stepNo: 0,
-    })
-    expect((await persistence.loadReplayFrame(room.id))?.players[0]!.pastureCapacities)
-      .toEqual({ worker: 7 })
-
-    const response = room.session.devSetResources(0, { food: 1 })
-    serialized = serializeSessionSnapshot(room.session.state, room.session)
-    serialized.frame.players[0]!.pastureCapacities = { worker: 8 }
-    expect((await committer.commit(room, response, actionIntent!, 0))).toMatchObject({
-      kind: 'committed',
-      stepNo: 1,
-    })
-    expect((await persistence.loadReplayFrame(room.id))?.players[0]!.pastureCapacities)
-      .toEqual({ worker: 8 })
-  })
-
   it('archives the authoritative score breakdown in the game-over frame', async () => {
     const room = makeRoom()
     const committer = createCommitter()
@@ -780,32 +753,6 @@ describe('RoomCommitter', () => {
     if (!replay.ok) return
     expect(replay.steps.at(-1)?.frame.scores)
       .toEqual(JSON.parse(JSON.stringify(response.scores)))
-  })
-
-  it('uses worker-produced scores in the durable result archive', async () => {
-    const room = makeRoom()
-    const serialized = serializeSessionSnapshot(room.session.state, room.session)
-    const workerScores = room.session.getState().scores!.map((score, index) => ({
-      ...score,
-      total: 100 + index,
-    }))
-    room.customSessionExecutor = {
-      serializedStateForPersistence: () => serialized,
-      scoresForPersistence: () => workerScores,
-    } as never
-    const committer = createCommitter()
-    ;(await committer.prepareRoom(room, { missingPrefix: false }))
-    room.session.state.gameOver = true
-    const response = { ...room.session.getState(), scores: workerScores }
-
-    expect((await committer.commit(room, response, actionIntent!, 0))).toMatchObject({
-      kind: 'committed',
-      stepNo: 1,
-    })
-    expect((await db.prepare(`
-      SELECT score FROM game_result_players
-      WHERE room_id = ? ORDER BY player_index
-    `).all(room.id))).toEqual([{ score: 100 }, { score: 101 }])
   })
 
   it.each(['/card-art/custom.webp', 'https://old-api.example:8443/card-art/custom.webp', 'https://api.example/agricola-api/card-art/custom.webp', '/agricola-api/card-art/custom.webp'])('copies custom card art into content-addressed replay storage: %s', async artUrl => {

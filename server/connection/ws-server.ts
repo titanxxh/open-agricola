@@ -31,7 +31,7 @@ import { createRoomPersistenceCheckpoint, type RoomPersistenceCheckpoint } from 
 import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
 import { controlledSeatIndexes } from '../game/room-viewer'
-import { dispatch, loadCustomCardsFromDb, finishConnection } from './room-router.ts'
+import { dispatch, finishConnection } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { websocketAdmission, websocketSessionToken } from '../request-auth'
 import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
@@ -141,11 +141,8 @@ const restoreRooms = async (
   ;(await committer?.cleanupReplayAssets())
   for (const snap of snapshots) {
     if (registry.has(snap.id)) continue
-    const customCards = snap.meta.customCards ?? (await loadCustomCardsFromDb(
-      snap.meta.customCardDbIds,
-      snap.meta.createdBy ?? undefined,
-    ))
-    const room = snapshotToRoom(snap, customCards)
+    // Games carry no Workshop cards (ADR 0052); an older row's empty card fields still load.
+    const room = snapshotToRoom(snap, snap.meta.customCards ?? [])
     let metaChanged = snap.meta.customCards === undefined
     if (room.status === 'waiting' && room.replayRecording !== true) {
       committer?.lockNewRoom(room)
@@ -323,9 +320,6 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
         })
       } else if (removal === 'empty') {
         deps.broadcaster.endSpectating(ctx.currentRoom, 'offline')
-        if (ctx.currentRoom.session.state.gameOver && ctx.currentRoom.customSessionExecutor) {
-          ctx.currentRoom.customSessionExecutor.dispose()
-        }
         const now = Math.max(disconnectedAt, deps.registry.lastActivityOf(ctx.currentRoom.id) ?? disconnectedAt)
         deps.registry.touchActivity(ctx.currentRoom.id, now)
         if (deps.authority) await deps.authority.retainOffline(ctx.currentRoom, now)
@@ -474,9 +468,8 @@ export async function createWsServer(
     if (operation.kind === 'user') closeUserConnections(operation.subjectId)
     for (const room of [...registry.iter()]) {
       if (!operation.roomIds.includes(room.id)) continue
-      // Release paused-command waiters and stop executable workers before
-      // entering their queue, then acknowledge only after all work has drained.
-      room.customSessionExecutor?.dispose()
+      // Release paused-command waiters before entering their queue, then
+      // acknowledge only after all work has drained.
       await committer.retireRoom(room.id)
       await enqueueRoomTask(room, async () => {
         try {

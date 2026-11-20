@@ -60,7 +60,7 @@ export async function validateStorage(db: PostgresDatabase, resources: ResourceS
         const result = await committer.prepareRoom(room, { missingPrefix: true })
         if (result.kind === 'blocked') throw new Error(`room recovery failed: ${id}: ${result.error}`)
         if (head) replayHeadCount++
-      } finally { room.customSessionExecutor?.dispose(); room.session.dispose() }
+      } finally { room.session.dispose() }
     }
   } finally { committer.shutdown() }
   const store = new ReplayStore(db)

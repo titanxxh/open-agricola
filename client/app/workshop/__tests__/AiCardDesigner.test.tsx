@@ -20,7 +20,7 @@ const existingCard: ApiCard = {
   name: '中世纪木槌',
   description: 'desc',
   art_url: null,
-  effect_code: 'const CARD_IMPL = {}',
+  effect_code: 'const impl = {}',
   card_json: {
     id: 'CUSTOM_MedievalMallet',
     name: '中世纪木槌',
@@ -837,7 +837,7 @@ describe('AiCardDesigner AI config header', () => {
       baseRevision: 2,
       draft: {
         cardId: 'CUSTOM_ChangedMallet',
-        effectCode: 'const CARD_IMPL = {}',
+        effectCode: 'const impl = {}',
         cardJson: {
           cost: { clay: 3 },
         },

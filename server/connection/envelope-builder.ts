@@ -5,7 +5,7 @@ import type {
   StateUpdateCause,
   StateUpdateEnvelope,
 } from '../../shared/contract/protocol/game.ts'
-import { buildSessionSyncPayload } from '../game/custom-session-executor.ts'
+import { buildSessionSyncPayload } from '../game/authoritative-session.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 import { connectedSeatIndexes } from '../game/room-viewer'
 

@@ -188,7 +188,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 测试及报告只属于候选与当前私有草稿，不进入公开 cardJson、投稿、Replay、不可变版本溯源或其 contentHash。恢复旧版本会清除测试和报告，必须重新生成并执行；相同卡牌内容仍复用已有不可变版本。浏览器报告只是客户端声明，不是服务端执行证明；采用时服务端独立重编译源码并检查身份与 revision。行为入口见 `workshop-generation.test.ts`、`workshop-drafts.test.ts` 和 `workshop-generation.spec.ts`。
 
-`GET /api/workshop/sandbox-contract` 提供运行时标识，以及仍适用于已退役沙盒格式草稿的能力名称和隔离限制；原生 Card Source 模块只做结构校验（`shared/custom-code/card-source-admission.ts`），不在服务端运行；模型通过资料工具读取实现细节。其标识来自部署中的 shared/executor 源码、锁文件中解析出的依赖版本及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
+`GET /api/workshop/sandbox-contract` 只提供运行时标识（format 2，运行时 `browser-card-source`）；Card Source 模块只做结构校验（`shared/custom-code/card-source-admission.ts`），不在服务端运行；模型通过资料工具读取实现细节。其标识来自部署中的 `shared/` 源码与锁文件中解析出的依赖版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
 
 #### C1.4 质量与成本验收
 
@@ -210,7 +210,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 精简提示词位于 [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts)，定义任务、不可变卡牌身份、信任边界与四个工具：`search_references`、`read_reference`、`write_artifacts` 和 `run_tests`。它要求输出原生 Card Source 模块（ADR 0052），从 `docs/CARD_AUTHORING.md` 开始研究，要求正向与反向测试，不嵌入能力清单。已部署的契约只用于标识运行时、绑定校验结果；运行时标识与资料 commit 分别记录。
 
-模型从本次尝试固定 commit 的 GitHub 资料读取源码、引擎消费者及直接行为或 Session 测试。[`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) 说明已退役沙盒格式的执行边界，并链接源码白名单和注入 helper。站点不另存少样本语料或能力描述 map。
+模型从本次尝试固定 commit 的 GitHub 资料读取源码、引擎消费者及直接行为或 Session 测试。[`CUSTOM_CARD_SANDBOX_zh.md`](CUSTOM_CARD_SANDBOX_zh.md) 说明工坊代码在哪里运行、服务端检查什么。站点不另存少样本语料或能力描述 map。
 
 `write_artifacts` 同时写入完整的 Card Source 模块与普通 TypeScript 行为测试。`run_tests` 返回源码校验和浏览器 UT 结果，模型据此检查和修复。修改源码或测试后，对应报告失效。最终回复为普通文本，源码来自工具写入的产物。澄清或不支持的请求可以不产生候选。
 
@@ -236,32 +236,9 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 ### C5. LLM 生成代码的安全验证
 
-LLM 输出原生 Card Source 模块。服务端只检查其结构（`shared/custom-code/card-source-admission.ts`），从不执行；它只在作者浏览器中运行，位于禁止联网 CSP 的 opaque-origin iframe Worker 内（ADR 0052）。已退役的 `CARD_DEF` / `CARD_IMPL` 沙盒格式草稿在 #1887 移除之前仍走下列路径：验证 → 编译 → 沙盒执行。
+LLM 输出原生 Card Source 模块。服务端只检查其结构（`shared/custom-code/card-source-admission.ts`），从不执行；它只在作者浏览器中运行，位于禁止联网 CSP 的 opaque-origin iframe Worker 内（ADR 0052）。安全边界是浏览器 origin 隔离，而不是源码分析。`shared/custom-code/compiler.ts` 转译通过准入的模块，草稿保存源码、转译后的 JavaScript 以及含 `meta` 定义的 manifest，作为校验证据。运行时见 [`CUSTOM_CARD_SANDBOX_zh.md`](CUSTOM_CARD_SANDBOX_zh.md)。
 
-**1. AST 验证** — `shared/custom-code/ast-validator.ts`
-
-用 TypeScript Compiler API 解析源码，AST 遍历拒绝以下构造：
-
-- **语句级**：`import` 声明、`export` 声明、动态 `import()`、`require()` 调用、class 声明 / 表达式、`with` 语句、generator 函数
-- **标识符黑名单**（裸引用）：`eval`、`Function`、`process`、`require`、`globalThis`、`global`、`window`、`document`、`__dirname`、`__filename`、`fetch`、`XMLHttpRequest`、`WebSocket`、`setTimeout`、`setInterval`、`setImmediate`、`clearTimeout`、`clearInterval`、`Deno`、`Bun`、`Proxy`、`Reflect`
-- **属性访问黑名单**（`obj.X` 或 `obj['X']`）：`constructor`、`__proto__`、`__defineGetter__`、`__defineSetter__`、`__lookupGetter__`、`__lookupSetter__`
-- **CARD_IMPL 白名单验证**：`CARD_IMPL.effect` 的 key 只允许 `cardEffectHooks` 中的 hook 名；`CARD_IMPL.listeners[].phases` 只允许 `actionHookPhases` 中的 phase 名
-
-**注**：AST 验证是用户友好的错误提示层；真正的安全边界是 isolated-vm（独立 V8 堆）。
-
-**2. 编译** — `shared/custom-code/compiler.ts`
-
-AST 验证通过后，`ts.transpileModule()` 将 TypeScript 编译为 CommonJS JS。数据库 `card_json` 列存所有自定义代码相关数据（CARD_DEF 元数据 + TypeScript 源码 + 编译后 JS + manifest）。早期 v1-v3 schema 有独立的 `effect_dsl` / `effect_code` / `compiled_code` 列（V1 DSL 设计遗留），migration v7 已全部 DROP，统一聚合到 `card_json`。
-
-**3. 沙盒执行** — `server/custom-code/{engine, executor-worker, isolate-runner, runtime}.ts`
-
-- **isolated-vm** (`isolated-vm` npm 包)：独立 V8 堆（非 `node:vm`），无原型链逃逸；内存上限 8 MB；单次执行 CPU 超时 **100 ms**
-- **Worker Thread**（`executor-worker.ts`）：isolated-vm 执行在独立 Worker Thread，若 V8/native 崩溃只杀 worker，主进程自动重生 worker 继续服务
-- 主线程通过 `SharedArrayBuffer + Atomics.wait` 同步等待（整体超时 5000 ms）
-- 异常：try/catch 包裹，记录警告、返回 `null`、游戏继续
-- 注入给沙盒的辅助 API（`injected-helpers.ts`）：`gainLeaf`、`payLeaf`、`spaceHasPlayer`、`positionKey`、`getCardStack`、`readCardExtraData`（纯只读 / 构建叶节点，无写状态能力）
-
-**历史备注**：项目早期设计曾考虑过 V1 声明式 JSON DSL（无代码执行），最终未采用；已退役的沙盒格式走 LLM → TypeScript → AST 白名单 + isolated-vm 沙盒路径。
+已退役的 `CARD_DEF` / `CARD_IMPL` 沙盒格式及其 AST 白名单与服务端 isolated-vm 执行均已移除。校验以 `legacy_card_format` 拒绝该格式；迁移 050 一次性转换了已存草稿，无法转换的草稿需要新的生成尝试。
 
 ---
 
@@ -278,25 +255,19 @@ registry。
 ### D2. 游戏中加载自定义卡牌
 
 1. 对局只加载部署版本中的卡（ADR 0052）。工坊卡要等 PR 合入并随版本发布为社区卡后才进入他人的对局，由 community deck 选项发牌。Room、单人和 HTTP 对局创建都拒绝任何 `customCardIds`，大厅不再提供工坊卡选择。作者试玩只在浏览器沙盒运行，且只用作者自己的卡；HTTP `/api/game/new-sandbox` 拒绝工坊卡
-2. 只有恢复录有工坊卡的 Room（生产中不存在）仍走退役路径：`server/connection/ws-server.ts` 从快照或数据库加载 `CustomCardData[]`
-3. `GameSession` 构造时把卡牌定义和运行时实现注册到本局 `SessionCardContext`
-4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从编译产物 + manifest 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
-5. 将自定义卡牌 ID 加入发牌池
+2. Room 与 HTTP 沙盒始终在进程内运行 `GameSession`。保留的 Room 快照或开局配置可能带有空的工坊卡字段，仍可加载。交给服务端 Session 的自定义卡只注册定义，因为服务端从不执行工坊代码
+3. 在浏览器沙盒中，`GameCore` 把每张工坊卡的定义注册到本局 `SessionCardContext`，并把其 Card Source `impl` 载入本局卡牌注册表（`client/local-sandbox/local-custom-card.ts`）
+4. 将自定义卡牌 ID 加入发牌池
 
 ### D3. 沙盒隔离与容错
 
 工坊嵌入只提供对局的 `workshop-game.html`，初始化前只允许同源顶层工坊父页面的直接子窗口。入口只接纳固定的浏览器沙盒模式，不提供 Room、账号或 WebSocket 路由。嵌套、跨源父窗口和直接打开均只显示独立打开应用的静态链接。主应用仍拒绝所有 iframe 初始化。入口契约与浏览器覆盖见[客户端架构](architecture/client_zh.md)。
 
-- 所有自定义卡牌效果/监听器调用包裹在 try/catch 中
-- 异常时：记录错误、跳过该效果、游戏继续；当前沙盒会话累计去重后的运行错误，工坊确认门禁提交前重新读取并拒绝带错版本
-- 服务端退役格式的 isolated-vm 单次执行 CPU 超时 100 ms
+- 工坊代码在禁止联网 CSP 的 opaque-origin sandboxed iframe 内的全新引擎 Worker 中运行；失控的卡由传输超时终止，并从最后一份快照恢复
+- 卡牌异常与内置卡一样到达试玩或行为测试；当前沙盒会话累计去重后的卡牌警告，工坊确认门禁提交前重新读取并拒绝带错版本
 - 状态快照可回滚（利用现有 undo 基础设施）
 
-`GET /api/workshop/public-cards/v1/cards` 按工坊卡牌 ID 字节序分页发现当前审核通过且已上线的版本，每页最多 20 项。可选 `after` 游标只接收一个由 1–128 个 ASCII 字母、数字、下划线或连字符组成的 ID。响应含 `protocolVersion: 1`、`cards` 和可为空的 `nextCursor`。条目仅含固定来源身份及批准定义中的 `cardId`、`name`、`cardType`，作者凭据不扩大公共集合。目录条目不授予执行权限，消费方仍须读取对应快照和状态。
-
-公共来源交接通过 `GET /api/workshop/public-cards/v1/cards/:id` 读取当前审核通过且已上线的版本，也包括仍公开上线的 merged 卡。输入绑定工坊来源、卡牌/版本 ID、公开定义、源码与经校验的图片字节。SHA-256 覆盖 `canonicalJson(input)`；图片另有字节 SHA-256。不交付编译产物、私有草稿或生成溯源，消费环境按自身能力契约校验和编译。
-
-`GET /api/workshop/public-cards/v1/cards/:id/versions/:versionId/status?sha256=<input-hash>` 明确返回新建和继续执行权限。发布记录只接纳实际存在且属于该卡的公共版本，并保护其不被普通五版本清理删除。升级回填跳过缺失或指向其他卡的历史批准绑定；受控导入先写卡牌时，等匹配版本到达后才登记。作者下线、编辑或更新阻止旧版本新建，允许既有固定输入继续执行；管理员下架禁用该卡全部公共版本，删除后拒绝继续执行。图片缺失、字节变化、来源读取失败或超时均不返回新鲜状态。`checkedAt` 从来源读取前开始，`validUntil` 最多延后 30 秒；消费者保留该期限，到期后暂停。快照读取附带相同初始状态。GET 接口不写共享沙盒设置或确认结果；消费侧沙盒执行由独立实施票交付。
+version-1 公开工坊卡接口及其发布登记表已随 ADR 0052 删除；它们从未产生过公开版本。
 
 ### D4. 工坊 UI 页面结构
 
@@ -364,14 +335,8 @@ WorkshopPage
 生成器不创建定义/导出形状 smoke test。简单即时资源效果使用直接行为测试；支付、选择 / pending、延迟、跨玩家和多步 flow 必须由作者、reviewer 或 LLM 编写专属 `GameSession` 场景。
 
 
-原生 Card Source 草稿本身就是 PR 新增的模块，生成时只去掉 `locales`、写入已采用美术并添加 `_impl` 导出。退役沙盒格式的草稿，生成器会做必要规范化，避免用户在沙盒中能跑但 PR CI 不通过：
+Card Source 草稿本身就是 PR 新增的模块，生成时只去掉 `locales`、写入已采用美术并添加 `_impl` 导出。退役沙盒格式的源码会被拒绝；曾把这类草稿转成模块的规范化逻辑现在只存在于一次性草稿迁移中（`server/workshop-pr/legacy-card-source.ts`）。
 
-- `deck: 'CUSTOM'` 会转换为 `deck: 'community'`。
-- `CARD_IMPL` 会补上 `CardImpl` 上下文类型，避免 listener phase/action 字面量退化成 `string[]`。
-- 缺失 `id` 的 listener 会补稳定 id：`{cardId}-listener-{n}`。
-- `prerequisite: { occupation: N }` 会转为仓库支持的 `prerequisite: 'N Occupations'` + `occupationPrerequisites: { min: N }`。
-- `CARD_IMPL` 引用到的顶层辅助常量、函数和类型按原顺序保留；引用不到的辅助和顶层表达式语句丢弃。
-- 未标注类型的参数一律输出为 `any`，顶层辅助函数返回值也标为 `any`，文件加 `no-explicit-any` 的 lint 豁免，因为沙盒代码是运行时校验的无类型 JavaScript。
 - 同步更新 `register-all.ts`；基础牌、major、community metadata 由 `pnpm run generate:register-all` 生成到 `catalog.generated.ts` / `major/generated.ts`。
 
 ### D6. 卡牌详情、版本历史和编辑回填
@@ -404,7 +369,7 @@ WorkshopPage
 
 能力首次生成和重发都会附带当前卡牌上下文；`CARD_ID`、卡牌类型和名称必须保持一致，采用时由 Workshop Card 聚合再次校验，效果描述、费用、VP 与本地化等其余定义字段仍可随候选更新。
 
-每次能力源码验证都会把卡牌定义快照写入服务端 manifest：原生模块从 `meta` 静态读取，退役格式由 isolated-vm 从 `CARD_DEF` 提取；发布静态门禁会双向比较该快照与当前 `card_json` 的可交付字段，PR handoff 还必须存在已验证源码，避免沙盒运行、已发布定义与最终提交源码不一致。
+每次能力源码验证都会把从模块 `meta` 静态读取的卡牌定义快照写入服务端 manifest；发布静态门禁会双向比较该快照与当前 `card_json` 的可交付字段，PR handoff 还必须存在已验证源码，避免沙盒运行、已发布定义与最终提交源码不一致。
 
 普通编辑只在切换阶段、站内离开或显式保存时创建检查点，不创建 Draft Version。刷新或崩溃恢复依赖同步写入的 localStorage 副本；同 revision 恢复为未同步状态，服务器 revision 已前进则要求用户选择整份服务器稿或整份本机稿。
 
@@ -423,7 +388,7 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 密码泄露          | `crypto.scrypt` 哈希，不存明文                      |
 | Session 劫持    | HTTPS（生产）+ HttpOnly / Secure / SameSite session cookie |
 | 暴力破解          | 登录 API 限流：5 次/分钟/IP                          |
-| 恶意卡牌代码        | 原生 Card Source 只在作者浏览器中、禁止联网 CSP 的 opaque-origin iframe Worker 内运行，服务端从不执行；退役格式：AST 白名单（拒绝 import/export/eval/process/fetch/setTimeout/Proxy/Reflect/class 等 20+ 标识符）+ isolated-vm（独立 V8 堆，非 node:vm）+ Worker Thread + 执行超时 100 ms / 内存上限 8 MB + 状态快照可回滚 |
+| 恶意卡牌代码        | Card Source 只在作者浏览器中、禁止联网 CSP 的 opaque-origin iframe Worker 内运行，服务端从不执行；其他玩家只能在 PR 审查、CI 与发版之后拿到该卡 |
 | XSS via 卡牌描述  | React 默认转义 HTML；不用 dangerouslySetInnerHTML   |
 | WebSocket 未认证 | 优先校验 session cookie；未认证连接需在 5 秒内发 auth 消息，否则断开 |
 
@@ -465,7 +430,7 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 ### Phase 3: 工坊（数据驱动卡牌）
 
 - 工坊 API 路由
-- `shared/cards/custom-registry.ts` + `server/custom-code/` AST 验证 + isolated-vm 沙盒执行
+- `shared/cards/custom-registry.ts` + `shared/custom-code/` 自定义卡校验；服务端执行后来已移除（ADR 0052）
 - `client/app/WorkshopPage.tsx` (浏览/编辑/沙盒)
 - 社交功能（点赞/评论）
 
@@ -478,9 +443,7 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 
 ### Phase 5: 高级卡牌效果（已合并到 Phase 3）
 
-- TypeScript AST 验证（`shared/custom-code/ast-validator.ts`）
-- isolated-vm 沙盒执行 + Worker Thread crash isolation
-- `CARD_IMPL.effect` hook + `CARD_IMPL.listeners` 全支持
+- 卡牌 effect hook 与 listener 全支持。最初的沙盒格式及其服务端执行已由只在浏览器运行的 Card Source 模块取代（ADR 0052）
 
 ---
 
@@ -490,7 +453,7 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 - WebSocket：`server/connection/{ws-server,room-router,broadcaster}.ts`
 - 房间 / 持久化：`server/game/{room,room-registry,room-committer,room-persistence-checkpoint}.ts`、`server/game/persistence/`
 - 协议：`shared/contract/protocol/ws.ts`
-- 工坊 / 沙盒：`server/workshop.ts`、`server/game-router.ts`、`shared/cards/{custom-registry,catalog}.ts`、`shared/custom-code/`、`server/custom-code/`
+- 工坊 / 沙盒：`server/workshop.ts`、`server/workshop-draft-validation.ts`、`server/game-router.ts`、`shared/cards/{custom-registry,catalog}.ts`、`shared/custom-code/`、`client/local-sandbox/`
 - 前端平台：`client/app/{LoginPage,LobbyPage,WorkshopPage,PageRouter}.tsx`、`client/contexts/AuthContext.tsx`
 - 浏览器 LLM：`client/services/llm/`
 
@@ -545,7 +508,7 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 卡牌美术生成 + 上传                    | Gemini / OpenRouter / AiHubMix 图片模型 + `POST /api/workshop/art` + `/card-art/` 静态服务                                           |
 | 资源图标解析                         | `client/components/common/ResourceText.tsx`                                                                                     |
 | auth/workshop 单元测试             | `server/__tests__/auth.test.ts`, `workshop-api.test.ts`                                                                      |
-| TypeScript AST 验证 + isolated-vm 沙盒（退役格式） | `shared/custom-code/ast-validator.ts`, `server/custom-code/{compiler, engine, client, executor-worker, isolate-runner, runtime, injected-helpers}.ts` |
+| 只在浏览器运行的 Card Source 与结构准入（ADR 0052） | `shared/custom-code/{card-source-admission, compiler}.ts`, `client/local-sandbox/{opaque-worker, native-card-source, local-custom-card}.ts`, `server/workshop-draft-validation.ts` |
 | 卡牌版本历史                         | `workshop_card_versions` 表, versions/restore API, WorkshopPage 版本面板                                                          |
 | 工坊精选页面                         | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页                                                                        |
 | 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/deploy-pages.yml`, `client/config.ts` |

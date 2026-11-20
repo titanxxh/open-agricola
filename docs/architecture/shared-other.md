@@ -37,15 +37,9 @@ Moor Balance Rules are a default-off creation choice, normalized by `contract/ga
 
 ## `shared/custom-code/`
 
-Workshop source is a native Card Source module ([ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md); [card authoring guide](../CARD_AUTHORING.md)). `card-source-admission.ts` checks its structure without executing it: one export named after the card, relative imports of shared engine modules and card helpers, and a statically read `meta`. The browser Worker loads it with `client/local-sandbox/native-card-source.ts`; the engine applies no capability contract to native results. Drafts in the retired sandbox format still pass through the contract below until #1887 removes it:
+Workshop source is a native Card Source module ([ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md); [card authoring guide](../CARD_AUTHORING.md)). `card-source-admission.ts` checks its structure without executing it: one export named after the card, relative imports of shared engine modules and card helpers, and a statically read `meta`. It also recognizes the retired `CARD_DEF` / `CARD_IMPL` sandbox format, which every path rejects with one message. `compiler.ts` transpiles an admitted module for the stored validation evidence. Only the author's browser Worker runs the module, through `client/local-sandbox/native-card-source.ts`; the engine applies no capability contract to it. The runtime is described in [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md).
 
-- `ast-validator.ts` validates custom-card TypeScript with an AST: approved imports only, no forbidden APIs, network or I/O; `effect` must be an object literal; listener phases and effect keys must be in the contract allowlist.
-- `validate-and-compile.ts` owns source admission, compilation and the manifest extraction script; server and browser supply only their execution boundary. `registrar.ts` registers the same hooks, metadata and listeners through the supplied executor. Neither adapter extends the capability contract.
-- `sandbox-listener-actions.ts` is the single action list shared by the deployed name contract, validator, and server and browser manifests; GitHub references cannot widen it.
-- `flow-admission.ts`, `contract-admission.ts` and `listener-result-validator.ts` reject, before the engine, any output outside the contract: unlisted actions, foreign-card nodes and listeners, unopened node fields, wrong-typed opened fields and parameters, undocumented parameters, query results of the wrong type and writes to another card's or player's animal zones. Native card flows are not checked.
-- Listener `costs` must come with matching `costAttribution`. Sandbox constraints are documented in [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md); runtime isolation lives in `server/custom-code/` ([server/custom-code/: Isolated execution](server.md#servercustom-code-isolated-execution)).
-
-Tests: `shared/custom-code/__tests__/`, `server/__tests__/workshop-contract-*-session.test.ts`.
+Tests: `shared/custom-code/__tests__/`, `server/__tests__/workshop-native-source.test.ts`.
 
 ## `shared/i18n/` and `shared/utils/`
 

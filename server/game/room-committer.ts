@@ -10,7 +10,6 @@ import { CommandError } from './command-store'
 import { RoomHistoryCorruptionError } from './persistence/room-history-store'
 import { ReplayResources, ReplayAssetValidationError } from '../storage/replay-resources'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
-import { captureStateWithHistory } from '../../shared/session/history-streams.ts'
 import {
   serializeSessionSnapshot,
   type PersistedSessionSnapshot,
@@ -197,15 +196,11 @@ const replayFrame = (
   serialized: PersistedSessionSnapshot
   frame: JsonValue
 } => {
-  const workerSnapshot = room.customSessionExecutor?.serializedStateForPersistence()
-  const serialized = workerSnapshot ?? serializeSessionSnapshot(room.session.state, room.session)
-  // Native serialization transfers a fresh, detached Frame. Worker snapshots
-  // remain cached outside the committer and still require an owned body copy.
-  const frame = workerSnapshot
-    ? captureStateWithHistory(scores === undefined ? serialized.frame : { ...serialized.frame, scores })
-    : scores === undefined
-      ? serialized.frame
-      : { ...serialized.frame, scores: JSON.parse(JSON.stringify(scores)) as SessionResponse['scores'] }
+  const serialized = serializeSessionSnapshot(room.session.state, room.session)
+  // Native serialization transfers a fresh, detached Frame.
+  const frame = scores === undefined
+    ? serialized.frame
+    : { ...serialized.frame, scores: JSON.parse(JSON.stringify(scores)) as SessionResponse['scores'] }
   return { serialized, frame: frame as unknown as JsonValue }
 }
 

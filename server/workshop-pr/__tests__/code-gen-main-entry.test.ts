@@ -7,7 +7,7 @@ describe('generatePrFiles', () => {
     card_id: 'CUSTOM_Foo',
     card_type: 'minor',
     card_json: JSON.stringify({ name: 'Foo Card', vp: 1 }),
-    effect_code: `const CARD_DEF = new MinorImprovement({ id: 'CUSTOM_Foo', deck: 'community', number: 0, name: 'Foo Card', desc: [], cost: {}, vp: 1 }); const CARD_IMPL = {}`,
+    effect_code: `import { defineMinorCard } from '../card-source'\n\nexport const CUSTOM_Foo = defineMinorCard({\n  meta: { id: 'CUSTOM_Foo', deck: 'community', number: 0, name: 'Foo Card', desc: [], cost: {}, vp: 1 },\n  impl: {},\n})`,
     art_url: null as string | null,
     author_name: 'alice',
     description: '',

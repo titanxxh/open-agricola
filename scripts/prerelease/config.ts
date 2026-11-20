@@ -70,7 +70,7 @@ export function parsePrereleaseTarget(value: unknown) {
   if (Object.hasOwn(budgetsInput, 'build')) throw new Error('On-host build configuration is no longer supported')
   const sessionsInput = object(budgetsInput.sessions)
   const budgets = { app: parseRuntimeLimits(budgetsInput.app), tools: parseRuntimeLimits(budgetsInput.tools),
-    sessions: { rooms: integer(sessionsInput.rooms, 1, 30), customWorkers: integer(sessionsInput.customWorkers, 0, 15) },
+    sessions: { rooms: integer(sessionsInput.rooms, 1, 30) },
     ...parseImageImportBudget(budgetsInput) }
   const network = match(input.network, /^open-agricola-prerelease-[a-z0-9-]+$/, 'Expected an exclusive prerelease dependency network')
   const proxyNetwork = input.proxyNetwork === undefined ? undefined : match(input.proxyNetwork, /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'Expected an external proxy network name')

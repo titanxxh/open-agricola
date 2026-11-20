@@ -13,8 +13,6 @@ export const workerFiles = new Set([
   'client/local-sandbox/worker-core.ts',
   'client/local-sandbox/card-tests.worker.ts',
   'client/local-sandbox/card-test-runtime.ts',
-  'client/local-sandbox/browser-runtime.ts',
-  'client/local-sandbox/browser-executor.ts',
   'client/local-sandbox/worker-crypto.ts',
   'client/local-sandbox/local-custom-card.ts',
   'client/local-sandbox/native-card-source.ts',

@@ -28,7 +28,7 @@ import type { CustomCardData } from '../../../shared/cards/session-card-context.
 import type { GameCreationRecord, SoloHandMode } from '../../../shared/contract/game-creation'
 import { parseGameCreationRecord } from '../creation-configuration'
 import { GameCreationStore, GameCreationError } from '../game-creation-store'
-import { resolveSoloWorkshopCards } from '../workshop-room-cards'
+import { resolveSoloWorkshopSources } from '../workshop-room-cards'
 import { OpeningFacts } from './opening-facts'
 
 type RoomRow = {
@@ -599,7 +599,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       if (await receiptAlreadyCommitted(commit.receipt)) return { kind: 'idempotent' }
       if (commit.header && commit.creationConfiguration) {
         const { configuration, resolvedWorkshopSources } = commit.creationConfiguration
-        const current = await resolveSoloWorkshopCards(db, configuration)
+        const current = resolveSoloWorkshopSources(configuration)
         if (current.issues.length) throw new GameCreationError('creation_requires_adjustment', 'The selected card sources require adjustment', { configuration, issues: current.issues })
         if (canonicalJson(current.resolvedWorkshopSources) !== canonicalJson(resolvedWorkshopSources)) {
           throw new GameCreationError('command_input_stale', 'Published card versions changed during creation; retry with the current versions')

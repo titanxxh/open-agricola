@@ -456,8 +456,7 @@ export const executeCardListener = (
     { kind: 'handler', registration, context: listenerContext },
     (invocationContext) => handler(invocationContext),
   )
-  // Retired-format Workshop cards are checked at their executor boundary; native
-  // cards, community ones included, return native results (ADR 0052).
+  // Every card, community and Workshop ones included, returns native results (ADR 0052).
   return result ?? undefined
 }
 
