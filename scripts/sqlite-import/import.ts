@@ -1,3 +1,4 @@
+import { convertLegacyWorkshopDrafts, type LegacyDraftConversion } from '../../server/database/050-native-workshop-drafts'
 import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, readdir, rm, stat, lstat } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
@@ -137,6 +138,8 @@ export async function importSqlite(paths: ImportPaths, db: PostgresDatabase, res
           await db.prepare(`SELECT setval(pg_get_serial_sequence(current_schema() || '.${table}', 'id'), COALESCE(MAX(id), 1), COUNT(*) > 0) FROM ${quote(table)}`).get()
         }
       }
+      // Rows are verified exactly as copied; migration 050 then ran on an empty target, so convert imported legacy drafts here.
+      const workshopDrafts = await convertLegacyWorkshopDrafts(db)
       const discardedRoomIds = await new PostgresRoomPersistence(db).discardUnrecordedActiveRooms()
       const erasure = await applyReplayRemovalLedger(db, { resources })
       for (const row of await db.prepare('SELECT room_id, custom_cards_json FROM game_replays').all<{ room_id: string; custom_cards_json: string }>()) {
@@ -144,7 +147,7 @@ export async function importSqlite(paths: ImportPaths, db: PostgresDatabase, res
         await resources.reference('replay', row.room_id, cards.flatMap(card => /^\/replay-assets\/[a-f0-9]{64}$/.test(card.artUrl ?? '') ? [card.artUrl!.slice(1)] : []))
       }
       const validation = await validateStorage(db, resources)
-      const report = { sourceHash: sourceHash!, sourceSchemaVersion: originalVersion, importedSchemaVersion: (source!.prepare('SELECT MAX(version) AS v FROM schema_version').get() as { v: number }).v, tables, stagedObjects, discardedRoomIds, erasure, validation }
+      const report = { sourceHash: sourceHash!, sourceSchemaVersion: originalVersion, importedSchemaVersion: (source!.prepare('SELECT MAX(version) AS v FROM schema_version').get() as { v: number }).v, tables, workshopDrafts, stagedObjects, discardedRoomIds, erasure, validation }
       await db.prepare("UPDATE data_imports SET status = 'validated', report_json = ?, updated_at = ? WHERE source_hash = ?").run(JSON.stringify(report), Date.now(), sourceHash)
       return report
     })()
@@ -153,4 +156,4 @@ export async function importSqlite(paths: ImportPaths, db: PostgresDatabase, res
     throw error
   } finally { source?.close(); await rm(directory, { recursive: true, force: true }) }
 }
-export type ImportReport = { sourceHash: string; sourceSchemaVersion: number; importedSchemaVersion: number; tables: Record<string, { rows: number; sha256: string }>; stagedObjects: number; discardedRoomIds: string[]; erasure: Awaited<ReturnType<typeof applyReplayRemovalLedger>>; validation: Awaited<ReturnType<typeof validateStorage>> }
+export type ImportReport = { sourceHash: string; sourceSchemaVersion: number; importedSchemaVersion: number; tables: Record<string, { rows: number; sha256: string }>; workshopDrafts: LegacyDraftConversion; stagedObjects: number; discardedRoomIds: string[]; erasure: Awaited<ReturnType<typeof applyReplayRemovalLedger>>; validation: Awaited<ReturnType<typeof validateStorage>> }

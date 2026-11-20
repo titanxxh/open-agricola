@@ -40,7 +40,7 @@ Rooms, solo and hotseat games and Replays use only the cards in the deployed bui
 Before ADR 0052, Workshop source declared `CARD_ID`, `CARD_DEF` and `CARD_IMPL` and ran against an allowlisted capability contract on the server. Nothing runs that format any more:
 
 - The server rejects it with HTTP 400 and code `legacy_card_format`; the browser sandbox reports the same message. The author regenerates the ability as a Card Source module.
-- The one-time migration [`050-native-workshop-drafts.ts`](../server/database/050-native-workshop-drafts.ts) converted stored drafts with the normalization pull-request generation used for that format ([`legacy-card-source.ts`](../server/workshop-pr/legacy-card-source.ts)). A draft it could not convert keeps its source text without validation evidence and needs a new Generation Attempt.
+- The one-time migration [`050-native-workshop-drafts.ts`](../server/database/050-native-workshop-drafts.ts) converted stored drafts with the normalization pull-request generation used for that format ([`legacy-card-source.ts`](../server/workshop-pr/legacy-card-source.ts)), writing the draft's saved translations into the module's `meta.locales`. The SQLite importer runs the same conversion on imported drafts. A draft it could not convert keeps its source text without validation evidence and needs a new Generation Attempt.
 
 ## 6. History
 

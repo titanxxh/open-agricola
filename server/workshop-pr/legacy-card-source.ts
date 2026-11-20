@@ -103,10 +103,23 @@ function getNumericObjectProperty(object: ts.ObjectLiteralExpression, key: strin
   return null
 }
 
+/** Synthesized nodes print from their values; nodes parsed from another file would print from the wrong text. */
+function jsonExpression(value: unknown): ts.Expression {
+  const { factory } = ts
+  if (value === null) return factory.createNull()
+  if (typeof value === 'string') return factory.createStringLiteral(value)
+  if (typeof value === 'number') return value < 0 ? factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, factory.createNumericLiteral(-value)) : factory.createNumericLiteral(value)
+  if (typeof value === 'boolean') return value ? factory.createTrue() : factory.createFalse()
+  if (Array.isArray(value)) return factory.createArrayLiteralExpression(value.map(jsonExpression))
+  if (typeof value === 'object') return factory.createObjectLiteralExpression(Object.entries(value as Record<string, unknown>)
+    .map(([key, entry]) => factory.createPropertyAssignment(/^[A-Za-z_$][\w$]*$/.test(key) ? key : factory.createStringLiteral(key), jsonExpression(entry))))
+  throw new Error('Translations must be JSON data')
+}
+
 function normalizeWorkshopEffectCode(
   source: string,
   cardId: string,
-  opts: { artUrl?: string | null } = {},
+  opts: { artUrl?: string | null; locales?: Record<string, unknown> | null } = {},
 ): string {
   const sf = ts.createSourceFile(
     `${cardId}.ts`,
@@ -117,6 +130,9 @@ function normalizeWorkshopEffectCode(
   )
 
   const artUrlToInject = opts.artUrl ?? null
+  // The draft's saved translations replace any stale copy inside the source.
+  const locales = opts.locales
+  const localesToInject = locales && Object.keys(locales).length ? () => jsonExpression(locales) : null
 
   const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
     const { factory } = context
@@ -131,6 +147,7 @@ function normalizeWorkshopEffectCode(
         }
         filtered.push(prop)
       }
+      if (localesToInject) filtered.push(factory.createPropertyAssignment('locales', localesToInject()))
       if (artUrlToInject) {
         filtered.push(
           factory.createPropertyAssignment(
@@ -666,8 +683,9 @@ function cardSourceFactory(cardType: string): string {
  * Workshop draft now holds (ADR 0052). Callers check the result with
  * `admitNativeCardSource`; the conversion throws when CARD_DEF is missing.
  */
-export function convertLegacyCardSource(source: string, cardId: string, cardType: 'minor' | 'occupation'): string {
-  const normalised = normalizeWorkshopEffectCode(source, cardId)
+export function convertLegacyCardSource(source: string, cardId: string, cardType: 'minor' | 'occupation', options: { locales?: Record<string, unknown> | null } = {}): string {
+  // The converted module is the draft's runtime source, so it carries the draft's translations in meta.
+  const normalised = normalizeWorkshopEffectCode(source, cardId, { locales: options.locales })
   const cardMetaSource = extractCardMetaSource(normalised)
   const cardImplSource = extractCardImplSource(normalised)
   const implFile = ts.createSourceFile('impl.ts',cardImplSource,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TS)

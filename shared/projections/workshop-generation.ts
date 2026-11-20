@@ -175,7 +175,8 @@ export function projectGenerationResult(value: unknown): GenerationResult | unde
   const kind = kinds.find(kind => kind === raw.kind)
   if (!kind || !text(raw.attemptId)) return undefined
   const provenance = projectGenerationProvenance(raw.provenance)
-  const failedCandidate = kind === 'failed-source' ? projectAbilityCandidate(raw.failedCandidate) : undefined
+  // A revised needs-* verdict keeps the artifacts written before it.
+  const failedCandidate = kind === 'failed-source' || kind === 'needs-info' || kind === 'needs-platform' ? projectAbilityCandidate(raw.failedCandidate) : undefined
   const feasibility = projectGenerationFeasibility(raw.feasibility)
   return {
     kind, attemptId: text(raw.attemptId, 200), createdAt: count(raw.createdAt), message: text(raw.message, 16000),

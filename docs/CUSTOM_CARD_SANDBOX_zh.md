@@ -40,7 +40,7 @@ Room、单人、热座对局和 Replay 只使用部署版本里的卡。工坊�
 ADR 0052 之前，工坊源码声明 `CARD_ID`、`CARD_DEF` 和 `CARD_IMPL`，在服务端按白名单能力契约运行。现在没有任何路径再运行这种格式：
 
 - 服务端以 HTTP 400 和 `legacy_card_format` 拒绝它，浏览器沙盒给出同样的提示。作者需要把能力重新生成为 Card Source 模块。
-- 一次性迁移 [`050-native-workshop-drafts.ts`](../server/database/050-native-workshop-drafts.ts) 用 PR 生成对该格式的规范化逻辑（[`legacy-card-source.ts`](../server/workshop-pr/legacy-card-source.ts)）转换了已存草稿。无法转换的草稿保留源码原文、不带校验证据，需要新的生成尝试。
+- 一次性迁移 [`050-native-workshop-drafts.ts`](../server/database/050-native-workshop-drafts.ts) 用 PR 生成对该格式的规范化逻辑（[`legacy-card-source.ts`](../server/workshop-pr/legacy-card-source.ts)）转换了已存草稿，并把草稿保存的译文写进模块的 `meta.locales`。SQLite 导入对导入的草稿执行同样的转换。无法转换的草稿保留源码原文、不带校验证据，需要新的生成尝试。
 
 ## 6. 历史
 

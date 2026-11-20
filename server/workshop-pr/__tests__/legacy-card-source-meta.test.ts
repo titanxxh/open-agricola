@@ -40,7 +40,7 @@ const CARD_IMPL = {}
     expect(out).not.toContain(`import { defineMinorCard }`)
   })
 
-  it('exports locales separately and keeps CARD_DEF free of translations', () => {
+  it('exports the language patch and keeps the draft translations in the converted meta', () => {
     const wcard = {
       id: 'wc-loc',
       card_id: 'CUSTOM_LocalisedCard',
@@ -62,14 +62,15 @@ const CARD_IMPL = {}
     }
     const out = convertWorkshopCard(wcard)
     expect(generateLanguagePatch(wcard)).toEqual({ zh: { minorImprovements: { CUSTOM_LocalisedCard: { name: '本地化卡', description: '中文描述。', rules: '中文规则补充。' } } } })
-    expect(out).not.toContain('本地化卡')
-    expect(out).not.toContain('中文描述。')
-    expect(out).not.toContain('中文规则补充。')
+    expect(out).toContain('本地化卡')
+    expect(out).not.toContain('CARD_DEF')
+    expect(out).toContain('中文描述。')
+    expect(out).toContain('中文规则补充。')
     expect(out).toContain(`deck: "community"`)
     expect(out).toContain(`impl: cardImpl`)
   })
 
-  it('strips embedded locales from object-literal Card Source metadata', () => {
+  it('replaces stale embedded locales with the draft\'s saved translations', () => {
     const wcard = {
       id: 'wc-loc-object',
       card_id: 'CUSTOM_ObjectLocalisedCard',
@@ -96,8 +97,8 @@ const CARD_IMPL = {}
 `.trim(),
     }
     const out = convertWorkshopCard(wcard)
-    expect(out).not.toContain('新名称')
-    expect(out).not.toContain('新描述。')
+    expect(out).toContain('新名称')
+    expect(out).toContain('新描述。')
     expect(out).not.toContain('旧名称')
     expect(out).not.toContain('旧描述。')
     expect(out).toContain(`deck: "community"`)
@@ -128,7 +129,6 @@ const CARD_IMPL = {}
 
     expect(out).toContain(`export const CUSTOM_FactoryCard = defineMinorCard({`)
     expect(out).toContain(`cost: { wood: 1 }`)
-    expect(out).not.toContain('工厂卡')
-    expect(out).not.toContain('工厂说明。')
+    expect(out).toContain('locales: { zh: { name: "工厂卡", desc: ["工厂说明。"] } }')
   })
 })
