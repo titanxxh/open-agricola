@@ -18,11 +18,11 @@ const beforeListener: CardListenerRegistration = {
   },
 }
 
-const afterListener: CardListenerRegistration = {
-  id: 'B94-stock-protector-after-fencing',
+const immediatelyAfterListener: CardListenerRegistration = {
+  id: 'B94-stock-protector-immediately-after-fencing',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['fence'],
+  phases: ['immediatelyAfter'],
+  actionSpaces: ['fencing'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
     if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) return
@@ -47,7 +47,7 @@ const isDoableListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [beforeListener, afterListener, isDoableListener],
+  listeners: [beforeListener, immediatelyAfterListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
