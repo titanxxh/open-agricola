@@ -69,9 +69,15 @@ const beforeFence = (session: GameSession) => {
 const beginOuter = (session: GameSession) => {
   beforeFence(session)
   const response = ok(session.commitSelectionChoice(0, { edges: OUTER }))
-  expect(wait(response).request.kind).toBe('select-trigger')
-  expect(wait(response).request.options?.filter(option => !option.disabled).map(option => option.value))
-    .toEqual(expect.arrayContaining([CARD, STOCK]))
+  // Stock Protector settles immediately after the Fencing use (#1889), alone and before
+  // Agricultural Fertilizers' ordinary reaction.
+  if (wait(response).request.kind === 'select-trigger') {
+    expect(wait(response).request.options?.map(option => option.value)).toEqual([STOCK, '__pass__'])
+  } else {
+    expect(wait(response).promptKey).toBe('ui.interactionStockProtectorPlace')
+    expect(wait(response).request.options?.some(option => option.sourceCard === CARD)).toBe(false)
+  }
+  expect(response.state.events.some(event => event.type === 'farm.sown')).toBe(false)
   return response
 }
 const beginStable = (session: GameSession, response: SessionResponse) => {
@@ -132,15 +138,13 @@ const restore = (session: GameSession) => {
 }
 
 describe('A073 committed host usage events', () => {
-  it.each(['nested-first', 'card-first'])('preserves one outer two-tile Sow with %s source order', order => {
+  it('preserves one outer two-tile Sow after the nested placement settles first', () => {
     const session = setup()
-    let outer = beginOuter(session)
+    const outer = beginOuter(session)
     expect(outer.state.players[0]!.resources).toMatchObject({ wood: 17, grain: 2 })
-    if (order === 'card-first') outer = sow(session, outer)
     beginStable(session, outer)
     const inner = ok(session.commitSelectionChoice(0, { stables: [{ row: 2, col: 3 }] }))
-    const returned = finishExpansion(session, inner)
-    const complete = order === 'nested-first' ? sow(session, returned) : returned
+    const complete = sow(session, finishExpansion(session, inner))
     assertSown(complete)
     expect(complete.state.events.filter(event => event.type === 'farm.fenceBuilt').map(event => event.newlyUsedTiles)).toEqual([
       [{ playerId: complete.state.players[0]!.id, row: 1, col: 1 }, { playerId: complete.state.players[0]!.id, row: 1, col: 2 }],
@@ -155,7 +159,9 @@ describe('A073 committed host usage events', () => {
 
   it('offers the same Sow when the extra placement is declined', () => {
     const session = setup()
-    const declined = choose(session, choose(session, beginOuter(session), STOCK), '__skip__')
+    const outer = beginOuter(session)
+    const stockPrompt = wait(outer).request.kind === 'select-trigger' ? choose(session, outer, STOCK) : outer
+    const declined = choose(session, stockPrompt, '__skip__')
     const complete = sow(session, declined)
     assertSown(complete, 17)
     expect(ok(confirmNextPlayer(session)).state.currentPlayerIndex).toBe(1)

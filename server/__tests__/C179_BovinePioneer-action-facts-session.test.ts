@@ -101,17 +101,21 @@ function startOuter(session: GameSession) {
   return response
 }
 
-function enterNested(session: GameSession, response: SessionResponse, rewardFirst = false) {
-  if (rewardFirst) response = houseCattle(session, choose(session, response, CARD))
-  response = choose(session, response, STOCK)
+// Stock Protector settles immediately after the Fencing use (#1889), alone and before
+// Bovine Pioneer's ordinary fence-after reward.
+function enterNested(session: GameSession, response: SessionResponse) {
+  expect(options(response).some(option => option.value === CARD)).toBe(false)
+  if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+    response = choose(session, response, STOCK)
+  }
   response = accept(session, response)
   response = choose(session, response, 'forest')
   response = accept(session, response)
   return before(session, response)
 }
 
-function startNested(session: GameSession, rewardFirst = false) {
-  return enterNested(session, startOuter(session), rewardFirst)
+function startNested(session: GameSession) {
+  return enterNested(session, startOuter(session))
 }
 
 function restore(session: GameSession) {
@@ -126,12 +130,12 @@ function restore(session: GameSession) {
 }
 
 describe('C179 committed enclosure facts', () => {
-  it.each([false, true])('rewards only the outer new pasture, reward first: %s', rewardFirst => {
+  it('rewards only the outer new pasture after the nested placement settles first', () => {
     const session = setup()
-    let response = startNested(session, rewardFirst)
+    let response = startNested(session)
     response = session.commitSelectionChoice(0, { edges: ['V-0-1'] })
     assert.equal(response.ok, true, response.error)
-    expect(response.state.players[0]!.resources.cattle).toBe(rewardFirst ? 1 : 0)
+    expect(response.state.players[0]!.resources.cattle).toBe(0)
     response = finish(session, response)
     expect(response.state.players[0]!.resources.cattle).toBe(1)
     expect(response.state.players[0]!.pastures).toHaveLength(2)
@@ -221,7 +225,9 @@ describe('C179 committed enclosure facts', () => {
     let session = setup()
     let response = startNested(session)
     response = session.commitSelectionChoice(0, { edges: ['V-0-1'] })
-    response = choose(session, response, CARD)
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      response = choose(session, response, CARD)
+    }
     session = restore(session)
     response = houseCattle(session, session.getState())
     response = session.undoStep()
