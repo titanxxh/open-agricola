@@ -95,7 +95,6 @@
 - `improvement-selection.ts` 将可用选项与应答者手牌、主要改良供应区求交，依次聚焦小发展候选、合法主要改良、操作控件。`PlayerFarmPanel.improvementSupply` 在手牌旁渲染唯一供应区，`GameContainerApi` 的请求级展开状态跨快照及响应式重挂载保留。测试：`improvement-focus.spec.ts`。
 - `FarmBoard` 将 Card Field 和动物控件放在网格旁。`farm-board-projection.ts` 保留权威槽位、共享 draft 回调及动物区 ID，含借用容纳者；opaque 选项继续使用目标选择器。网格与托盘共用焦点锚点，短横屏将两者放在固定控件上方；公开农场不暴露应答者 draft 或交互托盘。测试：`farm-card-slots-session.test.ts`、`farm-card-targets.spec.ts`。
 - 工坊默认使用后端 `POST /api/game/new-sandbox`，`exactVersionId` 仍走后端。`VITE_SANDBOX_EXECUTOR=browser` 选择 `LocalGameTransport` 和 Worker，在共享 `GameCore` 中运行本地校验的代码。十秒超时从最后 IndexedDB 快照（含 `engineStackCursor`）恢复并报告回滚，schema 不匹配时删除该槽。行为一致性：`server/__tests__/local-sandbox-parity.test.ts`。
-- pre 的 `PrereleaseWorkshopPage` 只接收公共输入，支持两种执行模式，并保留来源及编译拒因。`local-sandbox/public-access.ts` 复核来源，按绝对期限停止空闲展示和 Worker，并拦截在途响应。stash/IndexedDB 绑定 build/generation；恢复不保留权限。固定输入 Worker 在注册失败时拒绝整组选牌，只接收有界期限，不增加网络 API；iframe 经过 `PrereleaseBoundary`。测试：`public-access.test.ts`、`prerelease-session.spec.ts`。
 - `AuthContext` 是站点登录会话（密码、GitHub 或 Google），不保存 Issue 写入授权；`LocaleContext` 切换语言。
 
 ### 预发布入口

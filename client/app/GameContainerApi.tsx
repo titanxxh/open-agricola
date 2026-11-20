@@ -1,5 +1,3 @@
-import { PublicSandboxAccess, pausePublicSandbox, PUBLIC_SANDBOX_PAUSED_EVENT } from '../local-sandbox/public-access'
-import { isPrereleaseClient } from '../services/prerelease-runtime'
 import type { MarketplaceTransfer } from '../../shared/contract/marketplace'
 import { TeamWaitingRoom } from './TeamWaitingRoom'
 import { nextMultihandPlayerId, pendingMultihandInputs, type MultihandInput } from './multihand-seat'
@@ -216,8 +214,7 @@ const useTransportSetup = (
         if (persisted && window.confirm(t(locale, 'platform.localSandboxResume'))) {
           try {
             await transport.startFromPersisted(persisted)
-          } catch (error) {
-            if (isPrereleaseClient()) throw error
+          } catch {
             await store.clear()
             await transport.start()
           }
@@ -229,7 +226,6 @@ const useTransportSetup = (
         setLocalReady(true)
       } catch (err) {
         transport.destroy()
-        if (isPrereleaseClient()) pausePublicSandbox()
         console.error('[local-sandbox] failed to start:', err)
         window.alert(err instanceof Error ? err.message : String(err))
       }
@@ -406,7 +402,7 @@ export const GameContainerApi = () => {
   // Gate on the configured executor too, so flipping VITE_SANDBOX_EXECUTOR back
   // to 'server' is an effective kill switch: a reload of an already-open
   // localSandbox=1 tab (new bundle) no longer runs custom code in the browser.
-  const isLocalMode = currentUrlParams.get('localSandbox') === '1' && (isBrowserSandbox() || isPrereleaseClient())
+  const isLocalMode = currentUrlParams.get('localSandbox') === '1' && isBrowserSandbox()
   const isWsMode = !isLocalMode && (roomId !== null || currentUrlParams.get('transport') === 'ws')
   const isEmbedded = currentUrlParams.get('embedded') === '1'
   // Confirmation is scoped to this room and the seat holding the shared device.
@@ -417,16 +413,6 @@ export const GameContainerApi = () => {
   const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
   const { user } = useAuth()
-  const [publicSandboxPaused, setPublicSandboxPaused] = useState(false)
-  useEffect(() => {
-    if (!isPrereleaseClient() || isWsMode) return
-    const pause = () => setPublicSandboxPaused(true)
-    window.addEventListener(PUBLIC_SANDBOX_PAUSED_EVENT, pause)
-    const config = readLocalSandboxConfig(user?.id ?? 'anon')
-    const access = !isLocalMode && config?.publicInputs ? new PublicSandboxAccess(config.publicInputs) : undefined
-    if (access) void access.start().catch(pausePublicSandbox)
-    return () => { access?.stop(); window.removeEventListener(PUBLIC_SANDBOX_PAUSED_EVENT, pause) }
-  }, [isWsMode, isLocalMode, user?.id])
   const { connectedPlayerIndexes, transport, wsStatus, lastReadyStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, roomTeamError, changePlayerColor } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
@@ -1629,8 +1615,6 @@ export const GameContainerApi = () => {
       </div>
     )
   }
-
-  if (publicSandboxPaused) return <main role="alert"><p>{t(locale, 'platform.publicSandboxPaused')}</p><button type="button" onClick={() => window.location.reload()}>{t(locale, 'platform.retry')}</button></main>
 
   if (!hasGameView) {
     const fetchPhase =

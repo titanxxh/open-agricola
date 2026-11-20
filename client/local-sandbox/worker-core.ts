@@ -1,7 +1,3 @@
-import { parsePublicCardSnapshot, publicCardDefinition } from '../../shared/contract/public-card-input'
-import { ALL_CARD_IMPLS } from '../../shared/cards/register-all'
-import { getCardDefinition } from '../../shared/cards/catalog'
-import { assertPublicSandboxWorkerLease, type PublicSandboxWorkerLease } from '../../shared/contract/public-sandbox'
 import { parseCommitSelectionPayload } from '../../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../../shared/contract/protocol/farm-selection'
 /**
@@ -101,42 +97,15 @@ const toInitialStateOptions = (config: LocalGameConfig): InitialStateOptions => 
 export class LocalSandboxCore {
   private core: GameCore | null = null
   private config: LocalGameConfig | null = null
-  private admission?: PublicSandboxWorkerLease
-
-  admit(lease: PublicSandboxWorkerLease | undefined, config = this.config): void {
-    if (import.meta.env.VITE_RELEASE_CHANNEL !== 'prerelease' && !config?.publicInputs) return
-    assertPublicSandboxWorkerLease(lease, config?.publicInputs)
-    if (lease?.buildId !== import.meta.env.VITE_GAME_BUILD_ID && import.meta.env.VITE_RELEASE_CHANNEL === 'prerelease') throw new Error('prerelease_runtime_changed')
-    this.admission = lease
-  }
-  assertAdmission(): void {
-    if (import.meta.env.VITE_RELEASE_CHANNEL === 'prerelease' || this.config?.publicInputs) assertPublicSandboxWorkerLease(this.admission, this.config?.publicInputs)
-  }
-  private cards(config: LocalGameConfig): CustomCardData[] {
-    if (!config.publicInputs) {
-      if (import.meta.env.VITE_RELEASE_CHANNEL === 'prerelease') throw new Error('Fixed public inputs required')
-      return compileCards(config.cards)
-    }
-    if (config.cards.length) throw new Error('Arbitrary source is unavailable in prerelease')
-    const seen = new Set<string>()
-    return compileCards(config.publicInputs.snapshots.flatMap(value => {
-      const snapshot = parsePublicCardSnapshot(value, value.input.source.workshopCardId), definition = publicCardDefinition(snapshot)
-      if (seen.has(definition.cardJson.id)) throw new Error('Conflicting public card identities')
-      seen.add(definition.cardJson.id)
-      if (getCardDefinition(definition.cardJson.id) && ALL_CARD_IMPLS[definition.cardJson.id]) return []
-      return [{ ...definition, source: snapshot.input.effectCode }]
-    }))
-  }
 
   init(config: LocalGameConfig, viewer: ViewerSpec): LocalSandboxResult {
-    const customCards = this.cards(config)
+    const customCards = compileCards(config.cards)
     this.config = config
     const core = new GameCore({
       stateOrSeed: config.seed,
       customCards: customCards.length > 0 ? customCards : undefined,
       initialStateOptions: toInitialStateOptions(config),
       registerCustomCardImpl: registerBrowserBackedCustomCard,
-      customCardRegistration: config.publicInputs ? 'strict' : 'warn',
     })
     this.core = core
     return this.respond(core.withCtx(() => core.getState()), viewer)
@@ -148,20 +117,18 @@ export class LocalSandboxCore {
         `Persisted local game schema ${persisted.schemaVersion} does not match ${LOCAL_SANDBOX_SCHEMA_VERSION}`,
       )
     }
-    const customCards = this.cards(persisted.config)
+    const customCards = compileCards(persisted.config.cards)
     this.config = persisted.config
     const core = new GameCore({
       stateOrSeed: rehydrateState(persisted.serializedState),
       customCards: customCards.length > 0 ? customCards : undefined,
       registerCustomCardImpl: registerBrowserBackedCustomCard,
-      customCardRegistration: persisted.config.publicInputs ? 'strict' : 'warn',
     })
     this.core = core
     return this.respond(core.withCtx(() => core.getState()), viewer)
   }
 
   call(method: string, args: unknown[], viewer: ViewerSpec): LocalSandboxResult {
-    this.assertAdmission()
     const core = this.requireCore()
     // Run inside the session card context (like the server router's
     // session.withCtx) so custom-card effects/hooks resolve from
@@ -170,12 +137,10 @@ export class LocalSandboxCore {
   }
 
   quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): FenceSelectionQuote {
-    this.assertAdmission()
     return this.requireCore().quoteFenceSelection(playerIndex, requestKey, payload)
   }
 
   validateFarmChoice(type: FarmChoiceType, playerId: string, payload: Record<string, unknown>): FarmChoiceValidation {
-    this.assertAdmission()
     return this.requireCore().validateFarmChoice(type, playerId, payload)
   }
 
@@ -225,21 +190,19 @@ export class LocalSandboxCore {
   }
 
   private reinit(config: LocalGameConfig): SessionResponse {
-    const customCards = this.cards(config)
+    const customCards = compileCards(config.cards)
     this.config = config
     const core = new GameCore({
       stateOrSeed: config.seed,
       customCards: customCards.length > 0 ? customCards : undefined,
       initialStateOptions: toInitialStateOptions(config),
       registerCustomCardImpl: registerBrowserBackedCustomCard,
-      customCardRegistration: config.publicInputs ? 'strict' : 'warn',
     })
     this.core = core
     return core.withCtx(() => core.getState())
   }
 
   private respond(resp: SessionResponse, viewer: ViewerSpec): LocalSandboxResult {
-    this.assertAdmission()
     const core = this.requireCore()
     return {
       payload: buildSyncPayload(core, resp, viewer.visiblePlayerIds, viewer.mode),
@@ -267,19 +230,14 @@ export const handleLocalSandboxRequest = (
   request: LocalSandboxRequest,
 ): LocalSandboxResponse => {
   try {
-    core.admit(request.admission, request.kind === 'init' ? request.config : request.kind === 'restore' ? request.persisted.config : undefined)
     if (request.kind === 'call' && request.method === 'quoteFenceSelection') {
       const [playerIndex, requestKey, payload] = request.args
       if (typeof playerIndex !== 'number' || typeof requestKey !== 'string') throw new Error('Invalid fence quote request')
-      const raw = core.quoteFenceSelection(playerIndex, requestKey, parseFenceSelectionPayload(payload))
-      core.assertAdmission()
-      return { kind: 'result', id: request.id, ok: true, raw }
+      return { kind: 'result', id: request.id, ok: true, raw: core.quoteFenceSelection(playerIndex, requestKey, parseFenceSelectionPayload(payload)) }
     }
     if (request.kind === 'call' && request.method === 'validateFarmChoice') {
       const [type, playerId, payload] = request.args as [FarmChoiceType, string, Record<string, unknown>]
-      const raw = core.validateFarmChoice(type, playerId, payload)
-      core.assertAdmission()
-      return { kind: 'result', id: request.id, ok: true, raw }
+      return { kind: 'result', id: request.id, ok: true, raw: core.validateFarmChoice(type, playerId, payload) }
     }
     const result = request.kind === 'init'
       ? core.init(request.config, request.viewer)

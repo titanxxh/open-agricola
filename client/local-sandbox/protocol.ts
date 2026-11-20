@@ -1,4 +1,3 @@
-import type { PublicSandboxInputs, PublicSandboxWorkerLease } from '../../shared/contract/public-sandbox'
 /**
  * postMessage protocol between the main thread (`LocalGameTransport`) and the
  * local-sandbox engine worker. See wayfinder T1 (#606) for the design notes.
@@ -20,7 +19,6 @@ export type LocalCardInput = {
 }
 
 export type LocalGameConfig = {
-  publicInputs?: PublicSandboxInputs
   cards: LocalCardInput[]
   playerCount: number
   deckIds?: string[]
@@ -44,9 +42,9 @@ export type PersistedLocalGame = {
 }
 
 export type LocalSandboxRequest =
-  | { admission?: PublicSandboxWorkerLease; id: number; kind: 'init'; config: LocalGameConfig; viewer: ViewerSpec }
-  | { admission?: PublicSandboxWorkerLease; id: number; kind: 'restore'; persisted: PersistedLocalGame; viewer: ViewerSpec }
-  | { admission?: PublicSandboxWorkerLease; id: number; kind: 'call'; method: string; args: unknown[]; viewer: ViewerSpec }
+  | { id: number; kind: 'init'; config: LocalGameConfig; viewer: ViewerSpec }
+  | { id: number; kind: 'restore'; persisted: PersistedLocalGame; viewer: ViewerSpec }
+  | { id: number; kind: 'call'; method: string; args: unknown[]; viewer: ViewerSpec }
 
 export type LocalSandboxResponse =
   | { kind: 'ready' }
