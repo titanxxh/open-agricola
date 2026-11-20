@@ -60,8 +60,8 @@ it('runs once at startup: converts legacy drafts, flags the rest and leaves nati
   await insertDraft('empty', 'CUSTOM_NoAbility', { id: 'CUSTOM_NoAbility', name: 'No Ability' }, null)
   const before = { native: await row('native'), empty: await row('empty') }
 
-  // Rerun only 050-native-workshop-drafts (the 50th migration).
-  await db.prepare('DELETE FROM postgres_schema_migrations WHERE version=50').run()
+  // Version 50 is this code migration; prerelease records its own migrations above 9000.
+  await db.prepare("DELETE FROM postgres_schema_migrations WHERE version=50").run()
   await migratePostgres(db)
 
   const legacy = (await row('legacy'))!
