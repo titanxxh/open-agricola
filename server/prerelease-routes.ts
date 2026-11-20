@@ -148,6 +148,9 @@ export async function requirePrereleaseRequest(req: IncomingMessage, res: Server
   if (!admission.ok) { send(res, admission.status, { ok: false, code: admission.code }); return false }
   guardResponse(req, res)
   const blockedPath = new URL(req.url ?? '/', 'http://localhost').pathname
+  if (blockedPath === '/api/github/webhook' || blockedPath.startsWith('/api/workshop/')) {
+    send(res, 403, { ok: false, code: 'prerelease_readonly' }); return false
+  }
   if (blockedPath.startsWith('/api/auth/') || blockedPath.startsWith('/api/admin/') || blockedPath.startsWith('/api/prerelease/')
     || blockedPath.startsWith('/ops/') || blockedPath.startsWith('/api/v1/issue-submission-connection') || blockedPath.includes('/oauth/')
     || blockedPath.startsWith('/api/v1/replays/') && !(req.method === 'GET'
