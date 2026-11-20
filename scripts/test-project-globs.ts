@@ -55,6 +55,37 @@ export const FAST_SERVER_INCLUDE = [
 ]
 
 export const FAST_SCRIPTS_INCLUDE = ['scripts/**/__tests__/*.test.ts']
+// Heavy tooling tests that run release, deployment and CI CLIs end to end: each case builds a temporary repository,
+// installs gh/ssh/docker stubs and spawns tsx, git or bash there (or replays the real repository plan). Each file
+// takes at least 10 s on a GitHub runner, so they run in the slow task beside the card Session tests to keep the
+// fast task short (#1929). The list is explicit on purpose; new tooling tests stay in fast-scripts by default.
+export const SLOW_SCRIPTS_INCLUDE = [
+  'scripts/__tests__/backend-image-maintenance-bootstrap.test.ts',
+  'scripts/__tests__/backend-image-maintenance-compose-binding.test.ts',
+  'scripts/__tests__/backend-image-maintenance-delivery.test.ts',
+  'scripts/__tests__/backend-image-maintenance-owner-cutover.test.ts',
+  'scripts/__tests__/backend-image-maintenance-recovery.test.ts',
+  'scripts/__tests__/backend-image-maintenance-resume.test.ts',
+  'scripts/__tests__/backend-image-receiver.test.ts',
+  'scripts/__tests__/backup-storage.test.ts',
+  'scripts/__tests__/candidate-verification-cli.test.ts',
+  'scripts/__tests__/candidate-verification-isolation.test.ts',
+  'scripts/__tests__/candidate-verification-pages.test.ts',
+  'scripts/__tests__/candidate-verification-prerelease.test.ts',
+  'scripts/__tests__/prerelease-image-import.test.ts',
+  'scripts/__tests__/prerelease-operations.test.ts',
+  'scripts/__tests__/release-owner-local.test.ts',
+  'scripts/__tests__/release-publish.test.ts',
+  'scripts/__tests__/restart-local-processes.test.ts',
+  'scripts/__tests__/routine-verification-plan.test.ts',
+  'scripts/__tests__/routine-verification-replay.test.ts',
+  'scripts/__tests__/scenario-evidence.test.ts',
+  'scripts/__tests__/scoped-verification-cli.test.ts',
+  'scripts/__tests__/storage-archive.test.ts',
+  'scripts/__tests__/verification-requirements.test.ts',
+  'scripts/__tests__/verify-feedback-deployment.test.ts',
+]
+export const FAST_SCRIPTS_EXCLUDE = [...FAST_EXCLUDE, ...SLOW_SCRIPTS_INCLUDE]
 export const FAST_TESTS_INCLUDE = ['tests/**/*.test.ts']
 
 export type TestProjectGlob = {
@@ -80,7 +111,7 @@ export const FAST_PROJECT_GLOBS: TestProjectGlob[] = [
   {
     name: 'fast-scripts',
     include: FAST_SCRIPTS_INCLUDE,
-    exclude: FAST_EXCLUDE,
+    exclude: FAST_SCRIPTS_EXCLUDE,
   },
   {
     name: 'fast-tests',
@@ -88,3 +119,10 @@ export const FAST_PROJECT_GLOBS: TestProjectGlob[] = [
     exclude: FAST_EXCLUDE,
   },
 ]
+
+export const SLOW_PROJECT_GLOBS: TestProjectGlob[] = [
+  { name: 'slow', include: SLOW_INCLUDE, exclude: BASE_EXCLUDE },
+  { name: 'slow-scripts', include: SLOW_SCRIPTS_INCLUDE, exclude: BASE_EXCLUDE },
+]
+
+export const TEST_PROJECT_GLOBS: TestProjectGlob[] = [...FAST_PROJECT_GLOBS, ...SLOW_PROJECT_GLOBS]

@@ -5,7 +5,7 @@ import ts from 'typescript'
 import { CARD_REGISTRIES, readImportGraph, type ImportGraph } from './import-graph'
 import { FULL_TASK_IDS } from './verification-tasks'
 import { parseSource, sourceExtensions, walkSourceFiles } from '../source-files'
-import { BASE_EXCLUDE, FAST_PROJECT_GLOBS, SLOW_INCLUDE } from '../test-project-globs'
+import { TEST_PROJECT_GLOBS } from '../test-project-globs'
 
 export type RoutineChange =
   | { status: 'A' | 'M' | 'D'; path: string }
@@ -37,7 +37,7 @@ const REPLAY_BROWSER_SPECS: readonly RoutineBrowserEntry[] = [
   { file: 'e2e-tests/replay-viewer.spec.ts', grep: null },
 ]
 
-const projects = [...FAST_PROJECT_GLOBS, { name: 'slow', include: SLOW_INCLUDE, exclude: BASE_EXCLUDE }]
+const projects = TEST_PROJECT_GLOBS
 
 function withSetupDependents(root: string, graph: ImportGraph, inventory: ReadonlyMap<string, string>): ImportGraph {
   const config = join(root, 'vitest.config.ts')

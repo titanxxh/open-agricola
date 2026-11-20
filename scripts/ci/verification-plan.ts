@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { globSync } from 'glob'
-import { BASE_EXCLUDE, FAST_PROJECT_GLOBS, SLOW_INCLUDE } from '../test-project-globs'
+import { TEST_PROJECT_GLOBS } from '../test-project-globs'
 import { planRoutineVerification, type RoutineVerificationPlan } from './routine-verification-plan'
 
 export type VerificationIdentity = {
@@ -47,7 +47,7 @@ function normalizeChecks(checks: PlannedCheck[], fullTaskIds: readonly string[])
       browsers.set(key, selected)
     }
   }
-  const projectOrder = [...FAST_PROJECT_GLOBS.map(project => project.name), 'slow']
+  const projectOrder = TEST_PROJECT_GLOBS.map(project => project.name)
   const orderedProjects = [...projects].sort(([left], [right]) =>
     projectOrder.indexOf(left) - projectOrder.indexOf(right) || left.localeCompare(right))
   const browserChecks = [...browsers.values()].flatMap(check => {
@@ -135,7 +135,7 @@ export function readTestInventory(cwd: string): TestInventory {
     const stat = lstatSync(join(cwd, root), { throwIfNoEntry: false })
     if (!stat?.isDirectory()) throw new Error(`Missing test discovery root: ${root}`)
   }
-  const projects = [...FAST_PROJECT_GLOBS, { name: 'slow', include: SLOW_INCLUDE, exclude: BASE_EXCLUDE }]
+  const projects = TEST_PROJECT_GLOBS
     .map(project => ({
       name: project.name,
       files: new Set(globSync(project.include, { cwd, ignore: project.exclude, nodir: true, posix: true })),

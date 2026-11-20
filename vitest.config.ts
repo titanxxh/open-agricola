@@ -7,12 +7,14 @@ import {
   FAST_CARDS_INCLUDE,
   FAST_CLIENT_INCLUDE,
   FAST_EXCLUDE,
+  FAST_SCRIPTS_EXCLUDE,
   FAST_SCRIPTS_INCLUDE,
   FAST_SERVER_INCLUDE,
   FAST_SHARED_EXCLUDE,
   FAST_SHARED_INCLUDE,
   FAST_TESTS_INCLUDE,
   SLOW_INCLUDE,
+  SLOW_SCRIPTS_INCLUDE,
 } from './scripts/test-project-globs.ts'
 
 await prepareLanguagePacks()
@@ -96,7 +98,7 @@ export default mergeConfig(
           test: {
             name: 'fast-scripts',
             include: FAST_SCRIPTS_INCLUDE,
-            exclude: FAST_EXCLUDE,
+            exclude: FAST_SCRIPTS_EXCLUDE,
             // Tooling tests spawn real tsx, git and bash processes (each with its own 15-30 s process timeout); under a
             // full fast run on all cores a spawn alone can exceed Vitest's 5 s default, so the project gets their budget.
             testTimeout: 30_000,
@@ -126,6 +128,17 @@ export default mergeConfig(
               './shared/cards/__tests__/setup-listener-purity.ts',
             ],
             isolate: false,
+          },
+        },
+        {
+          extends: true,
+          test: {
+            // Heavy CLI tooling tests moved out of fast-scripts (see SLOW_SCRIPTS_INCLUDE); same budget and setup.
+            name: 'slow-scripts',
+            include: SLOW_SCRIPTS_INCLUDE,
+            exclude: BASE_EXCLUDE,
+            testTimeout: 30_000,
+            setupFiles: ['./tests/setup-language-packs.ts', ],
           },
         },
       ],

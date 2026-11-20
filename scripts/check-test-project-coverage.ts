@@ -4,8 +4,7 @@ import path from 'node:path'
 import { globSync } from 'glob'
 import {
   BASE_EXCLUDE,
-  SLOW_INCLUDE,
-  FAST_PROJECT_GLOBS,
+  TEST_PROJECT_GLOBS,
 } from './test-project-globs'
 
 const cwd = process.cwd()
@@ -32,7 +31,7 @@ const discovered = new Set(expand(['**/*.{test,spec}.{ts,tsx,js,jsx,mts,mjs,cts,
 const byProject = new Map<string, string[]>()
 const union = new Set<string>()
 
-for (const project of [...FAST_PROJECT_GLOBS, { name: 'slow', include: SLOW_INCLUDE, exclude: BASE_EXCLUDE }]) {
+for (const project of TEST_PROJECT_GLOBS) {
   for (const file of expand(project.include, project.exclude)) {
     union.add(file)
     byProject.set(file, [...(byProject.get(file) ?? []), project.name])
