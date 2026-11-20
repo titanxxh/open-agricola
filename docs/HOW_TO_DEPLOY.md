@@ -503,35 +503,6 @@ Create the external network separately. The actual host helper must support this
 
 An in-place attachment does not update Compose's stored configuration hash. The first later reconciliation can recreate shared dependencies, so schedule it in formal maintenance after draining application writers. `deploy-backend.sh` reuses prepared dependencies and never reconciles them; perform that dependency maintenance separately. Subsequent dependency recreation retains these declared networks and aliases; a standalone `docker network connect` does not provide that guarantee.
 
-#### First SQLite migration
-
-The importer accepts the current released SQLite schema (version 33). Older schema upgrade chains are retired; export from the current `main` build before switching storage. The source is opened read-only and retained until validation succeeds.
-
-Stop the old application before copying its data directory. Mount the source read-only and use an empty target. Never replace the old volume with an empty database. `legacy-data` below must contain the original database, card art, Replay assets, Viewers, and JSONL removal ledger.
-
-```bash
-docker compose -f docker-compose.prod.yml stop app
-mkdir -p legacy-data backups
-chmod 700 legacy-data backups
-docker cp "$(docker compose -f docker-compose.prod.yml ps -aq app):/app/data/." legacy-data/
-docker compose -f docker-compose.prod.yml run --rm --no-deps \
-  -v "$PWD/legacy-data:/legacy:ro" -v "$PWD/backups:/backup" app \
-  node --import tsx scripts/import-sqlite.ts /legacy /backup/sqlite-import.json --applications-stopped
-```
-
-Import verifies exact row values, recovery text, Replay bytes/hashes, Room-owned recovery, and resource references. It discards only proven unrecorded active games and never fabricates history. Accounts, Workshop data, recorded games, results, and referenced objects survive. A failure leaves a startup barrier: resolve the import instead of clearing unrelated data. A new empty installation skips this entire legacy sequence, including the target check below. Prepare a fresh PostgreSQL database and empty S3 namespace, then use the explicit fixed-image bootstrap in the Backend section. Do not run application migrations before its read-only empty-storage proof.
-
-```bash
-docker compose -f docker-compose.prod.yml run --rm --no-deps app \
-  node --import tsx scripts/storage-archive-cli.ts check-live "$(git rev-parse HEAD)" --applications-stopped
-mkdir -p data
-touch data/postgres-cutover.validated
-# Configure deploy/Caddyfile using the existing public backend domain first.
-docker compose -f docker-compose.prod.yml up -d --no-build --wait app caddy
-```
-
-Development uses the same `scripts/import-sqlite.ts`: load `data/dependencies.local`, point the importer at the read-only legacy directory, and then run `./restart-local.sh`. Keep the source until target-build validation finishes.
-
 The public API origin stays unchanged. Browsers discover the Room through that API before opening its `/nodes/<instanceId>/ws`; private application ports are not public endpoints. The default local Compose entry binds loopback. Caddy retains existing 443/8443 bindings and OAuth callback, cookie, and CORS configuration.
 
 Bug Report GitHub App, Workshop PR, and account OAuth remain optional integrations. Their environment reference and dedicated OAuth documentation retain permission/callback requirements. Migrating PostgreSQL/S3 does not require users to reconnect third-party accounts.

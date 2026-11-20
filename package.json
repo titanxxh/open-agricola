@@ -75,7 +75,6 @@
     "@aws-sdk/client-s3": "^3.1169.0",
     "@noble/hashes": "^2.4.0",
     "@prometheus-io/client": "0.16.1",
-    "better-sqlite3": "^13.2.0",
     "canvas": "^3.2.1",
     "nanoid": "^6.0.2",
     "pg": "^8.23.1",
@@ -94,7 +93,6 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.10",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/chai": "5.2.3",
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
@@ -118,7 +116,6 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "better-sqlite3",
       "canvas",
       "esbuild"
     ],

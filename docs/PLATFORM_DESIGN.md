@@ -20,7 +20,7 @@ Accounts, OAuth, Workshop, Bug Reports, Rooms, Game Contexts, Replays, results, 
 
 Artwork, content-addressed Replay assets, and immutable Viewers live in private S3. PostgreSQL owns staging, references, and GC claims. The independent S3 erasure ledger is merged with current external copies before restoration. Application-container files are not authoritative resource storage.
 
-Docker Compose provides PostgreSQL 18 and RustFS on one host without an external service account. SQLite is only a read-only, one-time input to `scripts/import-sqlite.ts`. Import preserves recorded games and unrelated data and discards only proven unrecorded active games. Failed import or target-build validation blocks application startup. See [deployment instructions](HOW_TO_DEPLOY.md) for migration and backup commands.
+Docker Compose provides PostgreSQL 18 and RustFS on one host without an external service account. A failed restore or target-build validation blocks application startup. See [deployment instructions](HOW_TO_DEPLOY.md) for migration and backup commands.
 
 ### A2. Authentication: server-side session tokens
 
@@ -384,8 +384,6 @@ A Draft Version serializes only final card content and provenance for adopted ca
 |---|---|---|
 | `pg` | PostgreSQL | Asynchronous queries and connection-scoped transactions |
 | `@aws-sdk/client-s3` | Private resources | S3 protocol for local and external services |
-| `better-sqlite3` | Legacy import | Read-only migration input only |
-| `@types/better-sqlite3` | Types | Development dependency |
 | `nanoid` | Short IDs | User, card, and Room IDs |
 
 `crypto.scrypt` and `crypto.randomUUID` are built into Node.js.

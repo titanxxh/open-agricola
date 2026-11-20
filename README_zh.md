@@ -37,7 +37,7 @@ https://open-agricola.titanxxh.com/
 
 ## Quick Start
 
-前置：Node.js 24.15+（不支持 Node 25 线，详见 `engines`）与 pnpm（项目 `package.json` 的 `packageManager` 字段已锁定 pnpm 版本）。`better-sqlite3` 等原生依赖按 Node ABI 编译，用更低版本启动会出现 `NODE_MODULE_VERSION` 不匹配。
+前置：Node.js 24.15+（不支持 Node 25 线，详见 `engines`）与 pnpm（项目 `package.json` 的 `packageManager` 字段已锁定 pnpm 版本）。`canvas` 等原生依赖按 Node ABI 编译，用更低版本启动会出现 `NODE_MODULE_VERSION` 不匹配。
 
 `canvas` 从源码编译，需要先装系统库与编译工具链，否则 `pnpm install` 会失败：
 

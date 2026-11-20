@@ -4,7 +4,6 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.storage-tools.tsbuildinfo"
   },
   "include": [
-    "scripts/import-sqlite.ts",
     "scripts/validate-backup.ts",
     "scripts/upload-replay-viewer.ts",
     "scripts/replay-removal.ts",

@@ -54,11 +54,11 @@ function executionFixture(change: 'card' | 'script-database' | 'script-pure' | '
   write('README.md', 'Guide\n')
   if (change === 'documentation') write('scripts/__tests__/docs-budget.test.ts', "import { readFileSync } from 'node:fs'\nconst bytes = readFileSync('README.md', 'utf8')\n")
   if (change.startsWith('script-')) {
-    const contents = change === 'script-database' ? "import { createDatabase } from './_helpers/import-fixture'\ncreateDatabase()\n"
+    const contents = change === 'script-database' ? "import { createDatabase } from './_helpers/storage-fixture'\ncreateDatabase()\n"
       : change === 'script-dynamic' ? 'await import(inputPath)\n' : 'const formatted = true\n'
     write('scripts/__tests__/script-consumer.test.ts', contents)
     if (change === 'script-database') {
-      write('scripts/__tests__/_helpers/import-fixture.ts', "import { createTestDatabase } from '../../../server/__tests__/_helpers/postgres'\nexport const createDatabase = createTestDatabase\n")
+      write('scripts/__tests__/_helpers/storage-fixture.ts', "import { createTestDatabase } from '../../../server/__tests__/_helpers/postgres'\nexport const createDatabase = createTestDatabase\n")
       write('server/__tests__/_helpers/postgres.ts', 'export const createTestDatabase = () => ({})\n')
     }
   }

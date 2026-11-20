@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import Sqlite from 'better-sqlite3'
 import { createTestDatabase } from '../../../server/__tests__/_helpers/postgres'
 import { releaseAll } from '../../../server/__tests__/_helpers/release-all'
 import { testStorageEnvironment } from '../../../server/__tests__/_helpers/objects'
@@ -13,38 +12,33 @@ import { PostgresRoomPersistence } from '../../../server/game/persistence/postgr
 import { RoomCommitter, replayIntentFromCommand } from '../../../server/game/room-committer'
 import { GameSession } from '../../../server/game/authoritative-session'
 import type { Room } from '../../../server/game/room'
-import { readFileSync } from 'node:fs'
 
-/** The encoder is unchanged from main's v2/frameDelta Room format; import copies its exact records. */
-export async function importFixture() {
-  const root = await mkdtemp(join(tmpdir(), 'agricola-import-test-'))
+/**
+ * A populated PostgreSQL + S3 store for backup and archive tests: one recorded
+ * two-player Room with its Replay and Viewer, an account with a session and seat,
+ * and a Workshop draft whose card art is a retained object.
+ */
+export async function storageFixture() {
+  const root = await mkdtemp(join(tmpdir(), 'agricola-storage-test-'))
   // Each resource registers its release as soon as it exists. close() runs them in
   // reverse order, and a failed setup releases whatever it had already acquired.
   const releases: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
   const close = () => releaseAll(releases.reverse())
   try {
-    const paths = { database: join(root, 'open-agricola.db'), cardArt: join(root, 'card-art'), replayAssets: join(root, 'replay-assets'), viewers: join(root, 'replay-viewers'), erasureLedger: join(root, 'replay-removals.jsonl') }
     const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
     releases.push(() => objects.close(), () => objects.clearPrefix())
-    const sourceDb = await createTestDatabase()
-    releases.push(() => sourceDb.close())
     const db = await createTestDatabase()
     releases.push(() => db.close())
     const resources = new ResourceStore(db, objects)
-    const sourceResources = new ResourceStore(sourceDb, objects)
+    const replayResources = new ReplayResources(resources)
     const html = Buffer.from('<main>Replay fixture</main>')
     const manifest = Buffer.from(JSON.stringify({ entrypoint: 'index.html', files: { 'index.html': objectHash(html) } }))
     const buildId = objectHash(manifest)
-    await mkdir(join(paths.viewers, buildId), { recursive: true })
-    await writeFile(join(paths.viewers, buildId, 'index.html'), html)
-    await writeFile(join(paths.viewers, buildId, 'manifest.json'), manifest)
-    await sourceResources.stage(`replay-viewers/${buildId}/index.html`, html, 'text/html')
-    await new ReplayResources(sourceResources).publishViewer(buildId, manifest)
-    const source = new Sqlite(paths.database)
-    releases.push(() => source.close())
-    source.exec(readFileSync(new URL('./sqlite-schema-v33.sql', import.meta.url), 'utf8'))
-    const persistence = new PostgresRoomPersistence(sourceDb)
-    const committer = new RoomCommitter({ persistence, resources: new ReplayResources(sourceResources), viewerBuildId: buildId, gameBuildId: 'test-main', viewerBuildExists: async id => !!await new ReplayResources(sourceResources).viewer(id) })
+    await resources.stage(`replay-viewers/${buildId}/index.html`, html, 'text/html')
+    await replayResources.publishViewer(buildId, manifest)
+    await db.prepare("INSERT INTO users(id, username, display_name, password_hash, created_at) VALUES ('u1', 'MigratedUser', 'User', 'password-hash', 1)").run()
+    await db.prepare("INSERT INTO sessions(token, user_id, expires_at, created_at) VALUES ('private-session', 'u1', ?, 1)").run(Date.now() + 86400000)
+    const committer = new RoomCommitter({ persistence: new PostgresRoomPersistence(db), resources: replayResources, viewerBuildId: buildId, gameBuildId: 'test-main', viewerBuildExists: async id => !!await replayResources.viewer(id) })
     const room: Room = { id: 'recorded', session: new GameSession(42, undefined, { playerCount: 2, enableParentCards: false }), players: [], seatOwners: [], maxPlayers: 2, version: 0, status: 'playing' }
     for (const player of room.session.state.players) { player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__'] }
     releases.push(() => committer.shutdown(), () => room.session.dispose())
@@ -59,24 +53,15 @@ export async function importFixture() {
       if (!response.ok) throw new Error(response.error)
       if ((await committer.commit(room, response, replayIntentFromCommand(command)!, playerIndex)).kind !== 'committed') throw new Error('Fixture action commit failed')
     }
-    for (const table of ['rooms', 'game_contexts', 'game_replays', 'game_replay_steps', 'room_history_nodes', 'room_recovery_nodes']) {
-      const columns = (source.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(column => column.name)
-      const rows = await sourceDb.prepare(`SELECT ${columns.join(', ')} FROM ${table}`).all()
-      const insert = source.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`)
-      for (const row of rows) insert.run(...columns.map(column => row[column]))
-    }
-    committer.shutdown(); room.session.dispose(); await sourceDb.close()
-    source.prepare("INSERT INTO users(id, username, display_name, password_hash, created_at) VALUES ('u1', 'MigratedUser', 'User', 'password-hash', 1)").run()
-    source.prepare("INSERT INTO sessions(token, user_id, expires_at, created_at) VALUES ('private-session', 'u1', ?, 1)").run(Date.now() + 86400000)
-    source.prepare("INSERT INTO room_players(room_id, user_id, player_index, joined_at) VALUES ('recorded', 'u1', 0, 1)").run()
-    await mkdir(paths.cardArt)
-    await writeFile(join(paths.cardArt, 'saved.png'), Buffer.from('saved artwork'))
-    source.prepare(`INSERT INTO workshop_cards(id, author_id, card_id, card_type, name, card_json, art_url, draft_generation_json, created_at, updated_at)
+    committer.shutdown(); room.session.dispose()
+    await db.prepare("INSERT INTO room_players(room_id, user_id, player_index, joined_at) VALUES ('recorded', 'u1', 0, 1)").run()
+    await resources.stage('card-art/saved.png', Buffer.from('saved artwork'), 'image/png')
+    await db.prepare(`INSERT INTO workshop_cards(id, author_id, card_id, card_type, name, card_json, art_url, draft_generation_json, created_at, updated_at)
       VALUES ('workshop', 'u1', 'CUSTOM_saved', 'minor', 'Saved', '{ "id": "CUSTOM_saved" }', '/card-art/saved.png', '{"art":{"history":[{"url":"/card-art/saved.png"}]}}', 1, 1)`).run()
-    return { root, paths, source, db, resources, buildId, close }
+    return { root, db, resources, buildId, close }
   } catch (error) {
     await close().catch((cleanupError: unknown) => {
-      throw new AggregateError([error, cleanupError], 'Import fixture setup and cleanup both failed')
+      throw new AggregateError([error, cleanupError], 'Storage fixture setup and cleanup both failed')
     })
     throw error
   }
