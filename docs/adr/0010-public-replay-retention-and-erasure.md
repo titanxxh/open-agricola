@@ -1,6 +1,6 @@
 # 10. Completed replays are public shared records with erasure tombstones
 
-- Status: Accepted (Workshop lines superseded by ADR 0052)
+- Status: Accepted (Workshop lines superseded by ADR 0052; permanent retention amended by [ADR 0053](0053-replays-are-retained-for-seven-days.md))
 - Date: 2026-07-26
 
 ## Context

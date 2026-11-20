@@ -20,7 +20,7 @@ type ContextRow = {
   room_id: string
   lifecycle: GameContextLifecycle
   phase: 'waiting' | 'playing' | null
-  replay_status: 'available' | 'legacy_no_replay' | null
+  replay_status: 'available' | 'legacy_no_replay' | 'expired' | null
   expires_at: number | null
   removal_reason: string | null
 }
@@ -241,16 +241,19 @@ export class GameContextStore {
       const players = await this.db.prepare(`SELECT player_index, display_name, name_is_default, agreed_at
         FROM game_termination_players WHERE room_id=? ORDER BY player_index`)
         .all<{ player_index: number; display_name: string; name_is_default: number; agreed_at: number }>(roomId)
+      const unavailable = { ok: false, code: 'replay_segment_unavailable', lifecycle: 'terminated', message: 'Terminated game archive is unavailable' } as const
+      if (!ending) return unavailable
+      const termination = { reason: ending.reason, intent: ending.intent, proposerIndex: ending.proposer_index,
+        startedAt: ending.started_at, endedAt: ending.ended_at, round: ending.round,
+        players: players.map(player => ({ playerIndex: player.player_index, displayName: player.display_name,
+          ...(player.name_is_default ? { nameIsDefault: true } : {}), agreedAt: player.agreed_at })) }
+      if (context.replay_status === 'expired') return { ok: true, roomId, lifecycle: 'terminated', replayStatus: 'expired', termination }
       const replay = await this.db.prepare(`SELECT r.schema_version, r.viewer_build_id, r.latest_step_no, r.missing_prefix,
         MIN(s.step_no) AS first_step_no FROM game_replays r JOIN game_replay_steps s USING(room_id)
         WHERE r.room_id=? GROUP BY r.room_id`).get<ReplayRow>(roomId)
-      if (!ending || !replay) return { ok: false, code: 'replay_segment_unavailable', lifecycle: 'terminated', message: 'Terminated game archive is unavailable' }
+      if (!replay) return unavailable
       return {
-        ok: true, roomId, lifecycle: 'terminated', replayStatus: 'available',
-        termination: { reason: ending.reason, intent: ending.intent, proposerIndex: ending.proposer_index,
-          startedAt: ending.started_at, endedAt: ending.ended_at, round: ending.round,
-          players: players.map(player => ({ playerIndex: player.player_index, displayName: player.display_name,
-            ...(player.name_is_default ? { nameIsDefault: true } : {}), agreedAt: player.agreed_at })) },
+        ok: true, roomId, lifecycle: 'terminated', replayStatus: 'available', termination,
         replay: { firstStepNo: replay.first_step_no, lastStepNo: replay.latest_step_no,
           missingPrefix: replay.missing_prefix === 1, schemaVersion: replay.schema_version, viewerBuildId: replay.viewer_build_id },
       }
@@ -331,8 +334,8 @@ export class GameContextStore {
       ok: true,
       roomId,
       lifecycle: 'completed',
-      replayStatus: context.replay_status === 'available'
-        ? 'available'
+      replayStatus: context.replay_status === 'available' || context.replay_status === 'expired'
+        ? context.replay_status
         : 'legacy_no_replay',
       result: {
         startedAt: result.started_at,

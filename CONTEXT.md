@@ -201,7 +201,7 @@ _Avoid_: Game Sync Snapshot、新局初始化、从当前规则重新计算历�
 _Avoid_: 可恢复房间快照、未完成房间、完整 GameState
 
 **Game Replay Archive**:
-正式录制上线后正常完赛或协商终止、并以 `roomId` 永久公开的逐步对局记录，可按任一座位视角或全开视角查看每个 Replay Step 的规则相关状态。协商终止的回放保留结束原因，不构成正常完赛或正式成绩。
+正式录制上线后正常完赛或协商终止、并以 `roomId` 公开的逐步对局记录，可按任一座位视角或全开视角查看每个 Replay Step 的规则相关状态；对局结束 7 天后回放内容被清理，只留 Game Result Archive（ADR 0053）。协商终止的回放保留结束原因，不构成正常完赛或正式成绩。
 它与 Game Result Archive 分离，不保存原始 Private Event payload、临时通知、生成溯源或可执行源码；上线前完成局只有 Game Result Archive。
 _Avoid_: 活动 Room 快照、Public Event timeline、Game Result Archive
 

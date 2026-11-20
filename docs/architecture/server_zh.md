@@ -108,7 +108,7 @@ ClientCommand
 - 写入失败时冻结同一份 Frame 与 Intent，阻断 Room 并按退避重试；客户端等待，从不读取未提交状态。相同幂等 key 但 hash 不同会永久阻断并报警。
 - 单实例默认准入 30 个普通 Room。`APP_ROOM_CAPACITY`（1–30）可降低上限；无效值阻止启动。`RoomDirectory` 对新建与首次恢复原子计算 OPEN 连接和 30 秒预留，包含缓存 Room。激活保留预留，直到正数在线 presence 消耗它。离线存档保留 owner，不占在线配额。满额 Room 可重连座位或通过 `newGame` 一换一替换。见 `room-directory.test.ts`、`session-capacity.test.ts` 与 `ws-server.test.ts`。
 - Game Context 链接按生命周期解析（[ADR 0013](../adr/0013-lifecycle-routed-game-context-access.md)）：completed、expired、removed 以及公开 Replay 不需登录；活动描述、恢复、Bug Report、证据与维护者取证执行座位或管理员授权。错误使用 `{ ok:false, code, lifecycle?, message }`。
-- 完成的 Replay 公开保留，直到被删除（[ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)）。
+- 完赛和协商终止的 Replay 在对局结束后公开保留 7 天，之后 `replay-retention.ts` 将其标为 `expired`，每小时清理删除回放内容，只保留 Bug Report 证据片段；成绩归档保留（[ADR 0053](../adr/0053-replays-are-retained-for-seven-days.md)）。删除流程见 [ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)。测试：`replay-retention.test.ts`。
 - Bug Report（[ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)）是可恢复的 PostgreSQL 草稿，带稳定 `submissionId`、尝试记录与原子 claim。生产 GitHub App 客户端与测试 fake 是这一 seam 的两个 adapter。
 
 测试：`server/game/__tests__/{room-committer,room-committer-private-cursor,replay-delta-shared-history}.test.ts`、`server/__tests__/{bug-report-routes,bug-report-store}.test.ts`、`e2e-tests/{replay-viewer,bug-report}.spec.ts`。

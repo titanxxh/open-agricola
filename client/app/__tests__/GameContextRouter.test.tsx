@@ -310,6 +310,29 @@ describe('GameContextRouter', () => {
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
   })
 
+  it('shows a terminated game past replay retention without loading a replay', async () => {
+    window.history.replaceState(null, '', '/?room=terminated-room')
+    stubResponse({
+      ok: true,
+      roomId: 'terminated-room',
+      lifecycle: 'terminated',
+      replayStatus: 'expired',
+      termination: {
+        reason: 'agreement', intent: 'end', proposerIndex: 0, startedAt: 1, endedAt: 2, round: 5,
+        players: [{ playerIndex: 0, displayName: 'Alice', agreedAt: 2 }, { playerIndex: 1, displayName: 'Bob', agreedAt: 2 }],
+      },
+    })
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByText('platform.gameEnd.terminated')).toBeVisible()
+    expect(screen.getByText('platform.gameContext.legacyNoReplay')).toBeVisible()
+    expect(screen.getByText('Alice')).toBeVisible()
+    expect(screen.getByText('Bob')).toBeVisible()
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => String(url)).filter(url => url.includes('/api/v1/replays/'))).toEqual([])
+    expect(screen.queryByText('active app')).not.toBeInTheDocument()
+  })
+
   it.each(['available', 'corrupt'] as const)(
     'verifies the pinned viewer and requires a perspective before mounting it (%s anchor)',
     async (anchorState) => {

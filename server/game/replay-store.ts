@@ -19,7 +19,7 @@ type StoreDatabase = Pick<Database, 'prepare'>
 
 type ReplayHeaderRow = {
   lifecycle: GameContextLifecycle
-  replay_status: 'available' | 'legacy_no_replay' | null
+  replay_status: 'available' | 'legacy_no_replay' | 'expired' | null
   status: 'recording' | 'completed' | null
   schema_version: number | null
   viewer_build_id: string | null
