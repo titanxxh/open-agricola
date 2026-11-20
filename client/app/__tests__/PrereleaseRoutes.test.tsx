@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { browserApiFetch } from '../../services/browser-api'
@@ -37,23 +37,12 @@ it.each(['settings', 'login', 'onboarding', 'reset-password', 'operations'])('of
   expectNoAccountManagement()
 })
 
-it('offers no independent account-management UI at the direct prerelease workshop URL', async () => {
+it('shows the read-only notice and no Workshop authoring at the direct prerelease workshop URL', () => {
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease')
   window.history.replaceState(null, '', '/?page=workshop')
-  let resolveCatalog: (response: Response) => void = () => { throw new Error('Catalog was not requested') }
-  const catalog = new Promise<Response>(resolve => { resolveCatalog = resolve })
-  vi.mocked(browserApiFetch).mockReturnValue(catalog)
   render(<PageRouter />)
-  expectNoAccountManagement()
-  expect(screen.getByRole('heading', { name: 'platform.publicSandboxTitle' })).toBeVisible()
-  expect(screen.getByRole('group', { name: 'platform.sandbox' })).toBeDisabled()
-
-  await act(async () => { resolveCatalog(Response.json({ protocolVersion: 1, cards: [], nextCursor: null })) })
-
-  expect(browserApiFetch).toHaveBeenCalledExactlyOnceWith('/api/workshop/public-sandbox/v1/cards', { cache: 'no-store' })
-  expect(screen.getByRole('group', { name: 'platform.sandbox' })).not.toBeDisabled()
-  expect(screen.queryByRole('alert')).toBeNull()
-  expect(screen.getByRole('combobox', { name: 'platform.sandboxExecutionMode' })).toHaveValue('server')
+  expect(screen.getByText('prerelease.readonlyError')).toBeVisible()
+  expect(browserApiFetch).not.toHaveBeenCalled()
   expectNoAccountManagement()
 })
 
