@@ -771,7 +771,9 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
             )
           )
           OR (
+            -- An archive past retention (ADR 0053) accepts no new report.
             context.lifecycle = 'completed'
+            AND context.replay_status = 'available'
             AND EXISTS (
               SELECT 1 FROM game_result_players
               WHERE room_id = context.room_id AND user_id = ?
@@ -779,6 +781,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
           )
           OR (
             context.lifecycle = 'terminated'
+            AND context.replay_status = 'available'
             AND EXISTS (
               SELECT 1 FROM game_termination_players
               WHERE room_id = context.room_id AND user_id = ?
@@ -996,7 +999,8 @@ try {
              AND checkpoint.step_no = anchor.checkpoint_step_no
              AND checkpoint.payload_kind = 'checkpoint'
             WHERE current_context.room_id = bug_reports.room_id
-              AND current_context.lifecycle IN ('active', 'completed', 'terminated')
+              AND (current_context.lifecycle = 'active'
+                OR (current_context.lifecycle IN ('completed', 'terminated') AND current_context.replay_status = 'available'))
               AND anchor.step_no = bug_reports.step_no
               AND anchor.frame_hash = bug_reports.frame_hash
               AND (
