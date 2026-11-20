@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "recipeTree": "ccf33197da17321bafc612f7dbd836f90d2e9ddf",
-  "image": "ghcr.io/titanxxh/open-agricola-images@sha256:bcf1602c60585ed58df012d482d7885da92b1905f08bbf0d0027c1b5b31a05e7",
-  "configDigest": "sha256:2e1b6888dbf2c5289e8bfc71f13237a72300fb023a865a5e9fa20d9e425faf1d"
+  "recipeTree": "afcce8bd90e2b29769eb690894cbf45583e5f962",
+  "image": "ghcr.io/titanxxh/open-agricola-images@sha256:4c0bd0aed4d312c7d0844db888bfe9831aa878a449e82ae22f18e18e046e3c25",
+  "configDigest": "sha256:138e64a14df6517c3dd5060fe927f68b7a45e6fe4eb795015ce8c69cf17fb3d0"
 }
