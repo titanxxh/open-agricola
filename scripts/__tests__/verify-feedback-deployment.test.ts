@@ -1,22 +1,23 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
+import { reusableTempRoots } from './_helpers/reusable-temp-roots'
 import { stableConfiguration } from '../ci/candidate-verification'
 import { canonicalOwnerLocalCommands, type OwnerLocalReceipt } from '../ci/owner-local-verification'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { createTestDatabase, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 
 const repository = resolve(import.meta.dirname, '../..')
-const roots: string[] = [], servers: Server[] = []
+const roots = reusableTempRoots('oa-feedback-deploy-'), servers: Server[] = []
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(server => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))))
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+  roots.reset()
 })
+afterAll(() => roots.dispose())
 
 type State = { sha: string; configuration: string; evidence: string; provenance: Record<string, unknown>;
   release: { tag_name: string; html_url: string; draft: boolean; prerelease: boolean; published_at: string };
@@ -24,7 +25,7 @@ type State = { sha: string; configuration: string; evidence: string; provenance:
   frontendStatus: number; frontendBody?: string; frontendBase: string; tagAfterRead?: string }
 
 async function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'oa-feedback-deploy-')); roots.push(root)
+  const root = roots.create()
   for (const directory of ['scripts/ci', 'scripts/release', 'server/bug-report', 'shared/contract', '.github/workflows', 'e2e-tests', 'bin']) mkdirSync(join(root, directory), { recursive: true })
   cpSync(join(repository, 'scripts/ci'), join(root, 'scripts/ci'), { recursive: true })
   cpSync(join(repository, 'scripts/release'), join(root, 'scripts/release'), { recursive: true })

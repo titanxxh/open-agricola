@@ -1,18 +1,19 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import { stableConfiguration } from '../ci/candidate-verification'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { prereleaseConfiguration } from '../ci/prerelease-verification'
 import { dockerFixtureEnvironment } from './_helpers/docker-fixture-environment'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
+import { reusableTempRoots } from './_helpers/reusable-temp-roots'
 
 const repository = resolve(import.meta.dirname, '../..')
-const roots: string[] = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+const roots = reusableTempRoots('oa-release-entry-')
+afterEach(() => roots.reset())
+afterAll(() => roots.dispose())
 
 type Evidence = 'passed' | 'missing' | 'failed'
 type GitHubState = {
@@ -31,8 +32,7 @@ type GitHubState = {
 }
 
 function fixture(prerelease = false) {
-  const root = mkdtempSync(join(tmpdir(), 'oa-release-entry-'))
-  roots.push(root)
+  const root = roots.create()
   mkdirSync(join(root, 'scripts'), { recursive: true })
   mkdirSync(join(root, '.github/workflows'), { recursive: true })
   cpSync(join(repository, 'scripts/ci'), join(root, 'scripts/ci'), { recursive: true })
