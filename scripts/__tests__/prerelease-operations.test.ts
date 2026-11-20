@@ -121,6 +121,17 @@ it('initializes only a maintenance gateway, atomically binding the explicit auth
   expect(parsePrereleaseTarget(value.config)).not.toHaveProperty('proxyNetwork')
 })
 
+it('keeps the fingerprint of a target sealed with the retired custom worker budget', () => {
+  const value = fixture()
+  const sealed = { ...value.config, budgets: { ...value.config.budgets, sessions: { rooms: 10, customWorkers: 1 } } }
+  const parsed = parsePrereleaseTarget(sealed)
+  // The sealed fingerprint hashed the parsed target with this budget in this key order.
+  expect(parsed.budgets.sessions).toEqual({ rooms: 10, customWorkers: 1 })
+  expect(Object.keys(parsed.budgets.sessions)).toEqual(['rooms', 'customWorkers'])
+  expect(targetFingerprint(parsed)).not.toBe(targetFingerprint(parsePrereleaseTarget(value.config)))
+  expect(() => parsePrereleaseTarget({ ...sealed, budgets: { ...sealed.budgets, sessions: { rooms: 10, customWorkers: 99 } } })).toThrow()
+})
+
 it('connects only the trusted gateway to the sealed proxy network for maintenance and installed candidates', () => {
   const value = fixture(), target = parsePrereleaseTarget({ ...value.config, proxyNetwork: 'open-agricola_default' })
   const maintenance = readRuntime(target), buildId = 'a'.repeat(40), image = `sha256:${'d'.repeat(64)}`
