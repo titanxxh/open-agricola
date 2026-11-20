@@ -560,7 +560,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
 
   if (setup.teamConfig) {
     if (!isPrerelease() || !ctx.currentUserId) {
-      room.customSessionExecutor?.dispose(); room.session.dispose()
+      room.session.dispose()
       sendCommandError(ctx, 'Team games require prerelease access', msg.requestId); return
     }
     const account = await getDb().prepare('SELECT display_name FROM users WHERE id=?').get<{ display_name: string }>(ctx.currentUserId)
@@ -571,7 +571,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
       await ctx.checkpoint.recordCreated(room, ctx.activeCommand ? {
         receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId, roomVersion: 0 } },
       } : undefined)
-    } catch (error) { room.customSessionExecutor?.dispose(); room.session.dispose(); throw error }
+    } catch (error) { room.session.dispose(); throw error }
     const previous = ctx.currentRoom
     ctx.currentRoom = room; ctx.currentPlayerIndex = -1; ctx.registry.set(room)
     await detachPreviousRoom(ctx, room, previous)
@@ -1020,9 +1020,8 @@ async function handleStartTeamGame(ctx: ConnectionCtx, msg: Extract<ClientComman
   }).sort((left, right) => left.playerIndex - right.playerIndex)
   room.status = 'playing'; room.startedAt = Date.now()
   try {
-    if (room.customSessionExecutor) await room.customSessionExecutor.updatePlayerNames(names)
-    else for (const [index, name] of names) room.session.updatePlayerName(index, name)
-    const resp = await executeRoomSession(room, 'getState', [], () => room.session.getState())
+    for (const [index, name] of names) room.session.updatePlayerName(index, name)
+    const resp = await executeRoomSession(room, () => room.session.getState())
     if (!resp.ok) throw new Error(resp.error ?? 'Unable to initialize Team game')
     await publishInitialState(ctx, room, resp, msg.requestId, async () => {
       for (const member of room.teamMembers ?? []) {
@@ -1487,8 +1486,8 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     if (connected) waitingTeamConnections.set(member.memberId, connected.ws)
   }
   const startsTeamImmediately = teamMembers?.every(member => waitingTeamConnections.has(member.memberId)) === true
-  if (teamMembers && startsTeamImmediately && created.session.state.team) {
-    const bindings = planTeamSeating(created.session.state.team, teamMembers, created.session.state.gameSeed)
+  if (teamMembers && startsTeamImmediately && session.state.team) {
+    const bindings = planTeamSeating(session.state.team, teamMembers, session.state.gameSeed)
     for (const member of teamMembers) {
       const ownBindings = bindings.filter(binding => binding.memberId === member.memberId)
       const originalColors = originalOwners.filter(owner => owner.userId === member.userId)
