@@ -53,6 +53,18 @@ describe('validateReplays', () => {
     expect(parallel.loads[0]).toBe('room-3')
   })
 
+  it('accepts the Bug Report evidence segment left after an archive passes retention', async () => {
+    const { header, rows } = replay('retained', 40)
+    const start = rows.findIndex(row => row.step_no > 0 && row.payload_kind === 'checkpoint')
+    expect(start).toBeGreaterThan(0)
+    const fragment = rows.slice(start, start + 2)
+    const retained = { ...header, replay_status: 'expired', latest_step_no: fragment.at(-1)!.step_no }
+
+    expect(await validateReplays([retained], async () => fragment, 1)).toEqual({ stepCount: 2, segmentCount: 1 })
+    await expect(validateReplays([{ ...retained, replay_status: 'available' }], async () => fragment, 1))
+      .rejects.toThrow('replay does not start at step 0: retained')
+  })
+
   it('reports a corrupt step with the same message in worker threads and on the calling thread', async () => {
     for (const concurrency of [1, 3]) {
       const corrupt = library([4, 20, 6, 9])

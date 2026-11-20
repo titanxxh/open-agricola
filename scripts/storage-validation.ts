@@ -6,7 +6,7 @@ import { PostgresRoomPersistence } from '../server/game/persistence/postgres-ada
 import { RoomCommitter } from '../server/game/room-committer'
 import { snapshotToRoom } from '../server/game/room'
 import { parseCustomCards, ReplayStore } from '../server/game/replay-store'
-import type { ReplayHeaderRow, ReplayStepRow } from './replay-integrity'
+import { isEvidenceFragment, type ReplayHeaderRow, type ReplayStepRow } from './replay-integrity'
 import { validateReplays } from './replay-validation-pool'
 
 export type StorageValidationOptions = {
@@ -31,8 +31,8 @@ async function countReplays(db: PostgresDatabase, headers: readonly ReplayHeader
       FROM game_replay_steps WHERE room_id = ?`).get<ReplayShape>(header.room_id)
     if (!shape || shape.steps === 0) throw new Error(`replay has no steps: ${header.room_id}`)
     if (shape.first_kind !== 'checkpoint') throw new Error(`invalid replay segment at ${header.room_id} step ${shape.first}`)
-    if (header.lifecycle !== 'expired' && shape.last! - shape.first! + 1 !== shape.steps) throw new Error(`replay step gap at ${header.room_id}`)
-    if (header.lifecycle !== 'expired' && header.missing_prefix !== 1 && shape.first !== 0) throw new Error(`replay does not start at step 0: ${header.room_id}`)
+    if (!isEvidenceFragment(header) && shape.last! - shape.first! + 1 !== shape.steps) throw new Error(`replay step gap at ${header.room_id}`)
+    if (!isEvidenceFragment(header) && header.missing_prefix !== 1 && shape.first !== 0) throw new Error(`replay does not start at step 0: ${header.room_id}`)
     if (shape.last !== header.latest_step_no) throw new Error(`replay head step mismatch: ${header.room_id}`)
     stepCount += shape.steps; segmentCount += shape.segments
   }
@@ -68,7 +68,7 @@ export async function validateStorage(db: PostgresDatabase, resources: ResourceS
     parseCustomCards(header.custom_cards_json)
     if (!await replayResources.viewer(header.viewer_build_id)) throw new Error(`replay viewer unavailable: ${header.room_id}: ${header.viewer_build_id}`)
     if (header.lifecycle === 'active' && (header.replay_status !== null || header.status !== 'recording')) throw new Error(`replay metadata invalid: ${header.room_id}`)
-    if (['completed', 'terminated'].includes(header.lifecycle) && !(await store.manifest(header.room_id)).ok) throw new Error(`replay metadata invalid: ${header.room_id}`)
+    if (['completed', 'terminated'].includes(header.lifecycle) && header.replay_status !== 'expired' && !(await store.manifest(header.room_id)).ok) throw new Error(`replay metadata invalid: ${header.room_id}`)
     if (header.lifecycle === 'terminated' && !(await new GameContextStore(db).resolve(header.room_id)).ok) throw new Error(`termination metadata invalid: ${header.room_id}`)
     const cards = JSON.parse(header.custom_cards_json) as Array<{ artUrl?: string }>
     for (const card of cards) {

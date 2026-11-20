@@ -71,11 +71,11 @@ it('executes the actual exported collector in a private PostgreSQL schema with r
   try {
     await client.query(`CREATE SCHEMA "${schema}"`)
     await client.query(`CREATE TABLE "${schema}".app_instances (instance_id text,generation text,status text,lease_until bigint);
-      CREATE TABLE "${schema}".game_contexts (room_id text,lifecycle text);
+      CREATE TABLE "${schema}".game_contexts (room_id text,lifecycle text,replay_status text);
       CREATE TABLE "${schema}".game_replays (room_id text,viewer_build_id text);`)
     await client.query(`INSERT INTO "${schema}".app_instances VALUES ('instance-one',$1,'ready',$2),('instance-two',$1,'ready',$2)`, [sha, Date.now() + 60_000])
-    await client.query(`INSERT INTO "${schema}".game_contexts VALUES ('ended','completed'),('playing','playing');
-      INSERT INTO "${schema}".game_replays VALUES ('ended','viewer'),('playing','hidden');`)
+    await client.query(`INSERT INTO "${schema}".game_contexts VALUES ('ended','completed','available'),('playing','playing',NULL),('retained','completed','expired');
+      INSERT INTO "${schema}".game_replays VALUES ('ended','viewer'),('playing','hidden'),('retained','evidence-only');`)
     const result = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', LIVE_INVENTORY_QUERY, sha], {
       cwd: repository, encoding: 'utf8', timeout: 30_000, env: { ...process.env, DATABASE_URL: connectionString,
         DATABASE_SCHEMA: schema, NODE_ENV: 'production', RELEASE_CHANNEL: 'stable', GAME_BUILD_ID: sha },
@@ -88,7 +88,7 @@ it('executes the actual exported collector in a private PostgreSQL schema with r
         { instance_id: 'instance-two', generation: sha, status: 'ready', lease_valid: true },
       ], contexts: [{ room_id: 'ended', lifecycle: 'completed' }], replays: [{ room_id: 'ended', viewer_build_id: 'viewer' }],
     })
-    expect((await client.query(`SELECT count(*)::int AS count FROM "${schema}".game_contexts`)).rows).toEqual([{ count: 2 }])
+    expect((await client.query(`SELECT count(*)::int AS count FROM "${schema}".game_contexts`)).rows).toEqual([{ count: 3 }])
   } finally {
     await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`)
     await client.end()

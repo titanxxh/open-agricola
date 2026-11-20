@@ -276,11 +276,27 @@ function PublicContext({
 }: {
   response: Exclude<GameContextResponse, { lifecycle: 'active' }>
 }) {
-  const { t } = useLocale()
+  const { locale, t } = useLocale()
   if (response.ok && response.lifecycle === 'completed') {
     return <CompletedContext context={response} />
   }
-  if (response.ok && response.lifecycle === 'terminated') return <ReplayShell context={response} />
+  if (response.ok && response.lifecycle === 'terminated') {
+    if (response.replayStatus === 'available') return <ReplayShell context={response} />
+    // Past retention (ADR 0053) only the termination record remains.
+    return statusPage(
+      t('platform.backToLobbyPlain'),
+      t('platform.gameContext.room', { id: response.roomId }),
+      t('platform.gameEnd.terminated'),
+      t('platform.gameContext.legacyNoReplay'),
+      <ul>
+        {response.termination.players.map((player) => (
+          <li key={player.playerIndex}>
+            {getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)}
+          </li>
+        ))}
+      </ul>,
+    )
+  }
   if (response.ok && response.lifecycle === 'expired') {
     const expired = statusPage(
       t('platform.backToLobbyPlain'),

@@ -2,14 +2,16 @@ import type { GameTermination } from './game-termination'
 
 export type GameContextLifecycle = 'active' | 'completed' | 'terminated' | 'expired' | 'removed'
 
+/** `expired`: the replay passed its seven-day retention (ADR 0053); the termination record stays. */
 export type TerminatedGameContextDescriptor = {
   ok: true
   roomId: string
   lifecycle: 'terminated'
-  replayStatus: 'available'
   termination: GameTermination
-  replay: NonNullable<CompletedGameContextDescriptor['replay']>
-}
+} & (
+  | { replayStatus: 'available'; replay: NonNullable<CompletedGameContextDescriptor['replay']> }
+  | { replayStatus: 'expired' }
+)
 
 export type ActiveGameContextDescriptor = {
   ok: true
@@ -26,7 +28,8 @@ export type CompletedGameContextDescriptor = {
   ok: true
   roomId: string
   lifecycle: 'completed'
-  replayStatus: 'available' | 'legacy_no_replay'
+  /** `expired`: the replay passed its seven-day retention (ADR 0053); the result stays. */
+  replayStatus: 'available' | 'legacy_no_replay' | 'expired'
   result: {
     startedAt: number
     finishedAt: number

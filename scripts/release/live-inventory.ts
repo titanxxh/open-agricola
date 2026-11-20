@@ -15,8 +15,8 @@ await db.exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
 await db.exec('SET LOCAL statement_timeout=8000');
 const instances=await db.prepare('SELECT instance_id,generation,status,lease_until>(extract(epoch FROM clock_timestamp())*1000)::bigint AS lease_valid FROM app_instances ORDER BY instance_id').all();
 if(instances.some(row=>row.status==='ready'&&row.lease_valid&&row.generation!==expected))throw Error('Mixed application generations');
-const contexts=await db.prepare("SELECT c.room_id,c.lifecycle FROM game_contexts c JOIN game_replays r ON r.room_id=c.room_id WHERE c.lifecycle IN ('completed','terminated') ORDER BY c.room_id LIMIT 100").all();
-const replays=await db.prepare("SELECT r.room_id,r.viewer_build_id FROM game_replays r JOIN game_contexts c ON c.room_id=r.room_id WHERE c.lifecycle IN ('completed','terminated') ORDER BY r.room_id LIMIT 100").all();
+const contexts=await db.prepare("SELECT c.room_id,c.lifecycle FROM game_contexts c JOIN game_replays r ON r.room_id=c.room_id WHERE c.lifecycle IN ('completed','terminated') AND c.replay_status='available' ORDER BY c.room_id LIMIT 100").all();
+const replays=await db.prepare("SELECT r.room_id,r.viewer_build_id FROM game_replays r JOIN game_contexts c ON c.room_id=r.room_id WHERE c.lifecycle IN ('completed','terminated') AND c.replay_status='available' ORDER BY r.room_id LIMIT 100").all();
 const transaction=await db.prepare("SELECT current_setting('transaction_read_only') AS read_only,current_setting('transaction_isolation') AS isolation").get();
 return {format:1,expectedBuild:expected,observedAt:new Date().toISOString(),transaction,instances,contexts,replays};})();
 console.log(JSON.stringify(result));}finally{await db.close();}`

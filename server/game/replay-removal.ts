@@ -32,7 +32,7 @@ type ReplayRemovalLedger = {
 type ReplayRow = {
   room_id: string
   lifecycle: 'active' | 'completed' | 'terminated' | 'expired' | 'removed'
-  replay_status: 'available' | 'legacy_no_replay' | null
+  replay_status: 'available' | 'legacy_no_replay' | 'expired' | null
   custom_cards_json: string | null
 }
 

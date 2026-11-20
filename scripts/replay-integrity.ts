@@ -1,6 +1,10 @@
 import { decodeReplayFrame, type JsonValue } from '../server/game/replay-codec'
 export type ReplayHeaderRow = { room_id: string; lifecycle: string; replay_status: string | null; status: string; latest_step_no: number; schema_version: number; viewer_build_id: string; missing_prefix: number; custom_cards_json: string }
 export type ReplayStepRow = { room_id: string; step_no: number; checkpoint_step_no: number; payload_kind: 'checkpoint' | 'delta'; payload_gzip: Buffer; frame_hash: string; intent_json: string }
+/** Expired games and archives past retention (ADR 0053) keep only Bug Report evidence segments, which may have gaps. */
+export const isEvidenceFragment = (header: Pick<ReplayHeaderRow, 'lifecycle' | 'replay_status'>): boolean =>
+  header.lifecycle === 'expired' || header.replay_status === 'expired'
+
 export const validateReplay = (
   header: ReplayHeaderRow,
   rows: Iterable<ReplayStepRow>,
@@ -13,7 +17,7 @@ export const validateReplay = (
   let firstStepNo: number | null = null
   for (const row of rows) {
     firstStepNo ??= row.step_no
-    if (header.lifecycle !== 'expired' && previousStepNo !== null && row.step_no !== previousStepNo + 1) {
+    if (!isEvidenceFragment(header) && previousStepNo !== null && row.step_no !== previousStepNo + 1) {
       throw new Error(`replay step gap at ${header.room_id} step ${row.step_no}`)
     }
     if (row.payload_kind === 'checkpoint') {
@@ -47,7 +51,7 @@ export const validateReplay = (
     stepCount += 1
   }
   if (stepCount === 0) throw new Error(`replay has no steps: ${header.room_id}`)
-  if (header.lifecycle !== 'expired' && header.missing_prefix !== 1 && firstStepNo !== 0) {
+  if (!isEvidenceFragment(header) && header.missing_prefix !== 1 && firstStepNo !== 0) {
     throw new Error(`replay does not start at step 0: ${header.room_id}`)
   }
   if (previousStepNo !== header.latest_step_no) {

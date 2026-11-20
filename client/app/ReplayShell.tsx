@@ -126,7 +126,7 @@ export function ReplayFrame({
 export function ReplayShell({
   context,
 }: {
-  context: CompletedGameContextDescriptor | TerminatedGameContextDescriptor
+  context: CompletedGameContextDescriptor | Extract<TerminatedGameContextDescriptor, { replayStatus: 'available' }>
 }) {
   const { locale, t } = useLocale()
   const [manifest, setManifest] = useState<ReplayManifest | null>(null)

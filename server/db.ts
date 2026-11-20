@@ -1,5 +1,6 @@
 import { PostgresDatabase } from './database/postgres'
 import { migratePostgres } from './database/migrations'
+import { expireReplayArchives, RETIRED_REPLAY_CONTEXTS } from './game/replay-retention'
 
 let database: PostgresDatabase | undefined
 
@@ -22,7 +23,10 @@ export async function assertStorageReady(db: PostgresDatabase): Promise<void> {
   }
 }
 
-/** Clean up expired sessions and replay evidence periodically. */
+/**
+ * Clean up expired sessions and replay evidence periodically. Expired games and
+ * replay archives past retention (ADR 0053) keep only Bug Report evidence segments.
+ */
 export async function cleanExpiredSessions(db = getDb()): Promise<void> {
   const now = Date.now()
   ;(await db.transaction(async () => {
@@ -30,11 +34,10 @@ export async function cleanExpiredSessions(db = getDb()): Promise<void> {
     ;(await db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now))
     ;(await db.prepare('DELETE FROM password_reset_tokens WHERE expires_at < ?').run(now))
     ;(await db.prepare('DELETE FROM bug_report_attempts WHERE expires_at < ?').run(now))
+    await expireReplayArchives(db, now)
     ;(await db.prepare(`
       DELETE FROM game_replay_steps
-      WHERE room_id IN (
-        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
-      )
+      WHERE room_id IN (${RETIRED_REPLAY_CONTEXTS})
         AND NOT EXISTS (
           SELECT 1
           FROM bug_reports AS report
@@ -54,9 +57,7 @@ export async function cleanExpiredSessions(db = getDb()): Promise<void> {
         FROM game_replay_steps
         WHERE room_id = game_replays.room_id
       )
-      WHERE room_id IN (
-        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
-      )
+      WHERE room_id IN (${RETIRED_REPLAY_CONTEXTS})
         AND EXISTS (
           SELECT 1 FROM game_replay_steps
           WHERE room_id = game_replays.room_id
@@ -64,9 +65,7 @@ export async function cleanExpiredSessions(db = getDb()): Promise<void> {
     `).run())
     ;(await db.prepare(`
       DELETE FROM game_replays
-      WHERE room_id IN (
-        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
-      )
+      WHERE room_id IN (${RETIRED_REPLAY_CONTEXTS})
         AND NOT EXISTS (
           SELECT 1 FROM game_replay_steps
           WHERE room_id = game_replays.room_id

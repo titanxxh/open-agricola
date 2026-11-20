@@ -247,10 +247,14 @@ const loadEvidenceFrame = async (
 ): Promise<Awaited<SerializedGameState>> => {
   const now = Date.now()
   const context = (await runtime.db.prepare(`
-    SELECT lifecycle FROM game_contexts WHERE room_id = ?
-  `).get(report.room_id)) as { lifecycle: string } | undefined
+    SELECT lifecycle, replay_status FROM game_contexts WHERE room_id = ?
+  `).get(report.room_id)) as { lifecycle: string; replay_status: string | null } | undefined
+  // A public archive serves its own anchors; anything else, including an archive
+  // past its retention (ADR 0053), keeps evidence only until the report's deadline.
+  const publicArchive = (context?.lifecycle === 'completed' || context?.lifecycle === 'terminated')
+    && context.replay_status === 'available'
   if (
-    context?.lifecycle !== 'completed' && context?.lifecycle !== 'terminated'
+    !publicArchive
     && (
       report.evidence_expires_at === null
       || report.evidence_expires_at <= now

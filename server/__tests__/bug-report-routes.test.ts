@@ -1141,7 +1141,7 @@ describe('bug report routes', () => {
     expect(json(inspected)).toMatchObject({ code: 'replay_segment_unavailable' })
 
     ;(await db.prepare(`
-      UPDATE game_contexts SET lifecycle = 'completed' WHERE room_id = 'active-room'
+      UPDATE game_contexts SET lifecycle = 'completed', replay_status = 'available' WHERE room_id = 'active-room'
     `).run())
     ;(await db.prepare(`
       DELETE FROM game_replay_steps WHERE room_id = 'active-room'
