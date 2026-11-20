@@ -363,6 +363,22 @@ describe('BugReportStore', () => {
     expect(Number(row?.evidence_expires_at) - Number(row?.submitted_at)).toBe(30 * 24 * 60 * 60 * 1000)
   })
 
+  it('accepts no new report on an archive past retention, even inside a retained evidence segment', async () => {
+    const roomId = (await insertContext('completed'))
+    const draft = (await store.createDraft({ userId: 'u1', roomId, phenomenon: 'The score changed', stepNo: 12, frameHash: COMPLETED_HASH }))
+    ;(await store.updateDraft(draft.submissionId, 'u1', { authorIdentity: 'hosted', confirmHosted: true }))
+    ;(await db.prepare("UPDATE game_contexts SET replay_status = 'expired' WHERE room_id = ?").run(roomId))
+
+    expect(await store.hasReplayAnchor('u1', roomId)).toBe(false)
+    await expectBugReportError(
+      async () => (await store.createDraft({ userId: 'u1', roomId, phenomenon: 'Another report', stepNo: 12, frameHash: COMPLETED_HASH })),
+      'bug_report_anchor_unavailable',
+      503,
+    )
+    await expectBugReportError(async () => (await store.queue(draft.submissionId, 'u1')), 'replay_segment_unavailable', 503)
+    expect((await store.getOwned(draft.submissionId, 'u1')).status).toBe('draft')
+  })
+
   it('revalidates a completed context before its first queue', async () => {
     const roomId = (await insertContext('completed'))
     const report = (await store.createDraft({
