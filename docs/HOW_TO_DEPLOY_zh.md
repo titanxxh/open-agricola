@@ -286,7 +286,7 @@ node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verificati
 ```bash
 cli=scripts/prerelease/live-acceptance/cli.mjs
 node --import tsx $cli run --config "$acceptance_config" --suite handoff      # 另有 boundary、multihand --guest B、team --players A,B,C,D、
-node --import tsx $cli bundle --config "$acceptance_config" --runs "$run_dirs" --output "$evidence_dir"   #   sandbox、viewer/continuity --room、deletion --labels D,E、readback
+node --import tsx $cli bundle --config "$acceptance_config" --runs "$run_dirs" --output "$evidence_dir"   #   viewer/continuity --room、deletion --labels D,E、readback
 node --import tsx $cli acceptance --config "$acceptance_config" --index "$evidence_dir/index.json" --formal-browser "$formal_browser_json" --output "$acceptance_json"
 ```
 
@@ -373,7 +373,7 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 - `acknowledgeBoundaryDiff`；
 - `rebind: "full"`。
 
-快速路径要求该验收不超过七天，且对应已安装的候选、镜像和代次。从其正式构建到新正式构建的身份边界 diff（`live-acceptance/rebind.mjs` 中的 `IDENTITY_BOUNDARY_PATHS`）必须为空，或等于 owner 确认的 SHA-256；diff 非空时窗口停止并打印哈希和审阅命令，直到 owner 确认或选择完整流程。快速路径跳过 D/E、multihand、team、sandbox、Viewer、continuity、deletion 和删除审计链，为每个浏览器的 A、B 授予 Beta，仍执行两条审计链、handoff、boundary、正式站浏览器证明和 readback。`bundle --carry` 把被跳过 case 的通过项写入新证据文件并标注 `carriedFrom`（acceptance 与证据哈希）；已运行的 case 仍以新结果为准，`open` 照常校验新文件。`previousRun` 保持为上一次完整窗口的 run。
+快速路径要求该验收不超过七天，且对应已安装的候选、镜像和代次。从其正式构建到新正式构建的身份边界 diff（`live-acceptance/rebind.mjs` 中的 `IDENTITY_BOUNDARY_PATHS`）必须为空，或等于 owner 确认的 SHA-256；diff 非空时窗口停止并打印哈希和审阅命令，直到 owner 确认或选择完整流程。快速路径跳过 D/E、multihand、team、Viewer、continuity、deletion 和删除审计链，为每个浏览器的 A、B 授予 Beta，仍执行两条审计链、handoff、boundary、正式站浏览器证明和 readback。`bundle --carry` 把被跳过 case 的通过项写入新证据文件并标注 `carriedFrom`（acceptance 与证据哈希）；已运行的 case 仍以新结果为准，`open` 照常校验新文件。`previousRun` 保持为上一次完整窗口的 run。
 
 每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，从固定可信 main 策略 SHA 在外部构建并导入。工具回执、不可变 image ID、revision 和 channel 均与 `control/` 中的目标缓存核对；缺缓存时拒绝，不构建也不停 app。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
 

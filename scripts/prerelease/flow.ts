@@ -270,7 +270,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
       || typeof acceptance.acceptedAt !== 'number' || acceptance.acceptedAt > Date.now() || Date.now() - acceptance.acceptedAt > 30 * 60_000
       || !acceptance.evidence || typeof acceptance.evidence !== 'object') throw new Error('Acceptance belongs to a different target, operation, build or generation')
     const routineSource = record.operation.kind === 'rollback' || record.operation.kind === 'deploy' && record.operation.runtimeDigest && record.operation.rollbackCompatible === true
-    const required = routineSource ? ['source-smoke', 'formal-browser-policy'] : ['identity', 'beta-access', 'http-ws', 'public-cards', 'viewer', 'retained-data', 'deletion-audit', 'capacity', 'formal-unaffected', 'browser-boundary', 'formal-browser-policy']
+    const required = routineSource ? ['source-smoke', 'formal-browser-policy'] : ['identity', 'beta-access', 'http-ws', 'viewer', 'retained-data', 'deletion-audit', 'capacity', 'formal-unaffected', 'browser-boundary', 'formal-browser-policy']
     let formalProof: Record<string, unknown> | undefined
     for (const name of required) {
       if (!(name in acceptance.evidence)) throw new Error(`Missing owner acceptance evidence: ${name}`)

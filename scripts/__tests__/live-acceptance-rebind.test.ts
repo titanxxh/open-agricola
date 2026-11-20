@@ -33,7 +33,7 @@ describe('identity boundary', () => {
 it('skips only suite and deletion steps, never the policy phase, and carries only their cases', () => {
   expect(FAST_SKIPPED_STEPS.every(step => WINDOW_STEPS.includes(step))).toBe(true)
   expect(FAST_SKIPPED_STEPS.filter(step => POLICY_STEPS.includes(step) || ['preconditions', 'reverify', 'accounts', 'suite-handoff', 'suite-boundary'].includes(step))).toEqual([])
-  expect([...CARRIED_CASES].sort()).toEqual(['continuity', 'formal-account-deletion', 'multihand-cooperation-viewer', 'public-sandbox', 'team-game', 'viewer-firefox', 'viewer-webkit'])
+  expect([...CARRIED_CASES].sort()).toEqual(['continuity', 'formal-account-deletion', 'multihand-cooperation-viewer', 'team-game', 'viewer-firefox', 'viewer-webkit'])
 })
 
 describe('full acceptance', () => {

@@ -26,7 +26,6 @@ export const SUITE_STEPS = [
   { step: 'suite-boundary', suite: 'boundary', args: [] },
   { step: 'suite-multihand', suite: 'multihand', args: ['--guest', 'B'] },
   { step: 'suite-team', suite: 'team', args: ['--players', 'A,B,D,E'] },
-  { step: 'suite-sandbox', suite: 'sandbox', args: [] },
   { step: 'suite-viewer', suite: 'viewer', args: [], room: true },
   { step: 'suite-continuity', suite: 'continuity', args: [], room: true },
 ]

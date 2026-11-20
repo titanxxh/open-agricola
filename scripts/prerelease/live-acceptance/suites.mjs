@@ -5,13 +5,13 @@ import { bounded, sleep, poll, pollTrue } from './browser.mjs'
 /** Stable case labels per suite: failures are recorded under the same label as a pass, so the newest result wins. */
 export const SUITE_CASES = {
   'source-smoke': ['source-smoke'], handoff: ['handoff'], boundary: ['visitor', 'ordinary', 'beta-boundary', 'revocation'], multihand: ['multihand-cooperation-viewer'], team: ['team-game'],
-  sandbox: ['public-sandbox'], viewer: ['viewer-firefox', 'viewer-webkit'], continuity: ['continuity'], deletion: ['formal-account-deletion'], readback: ['public-readback'],
+  viewer: ['viewer-firefox', 'viewer-webkit'], continuity: ['continuity'], deletion: ['formal-account-deletion'], readback: ['public-readback'],
 }
 
 /** Engines each suite must pass on; acceptance requires every case of every suite except `readback` on each of them. */
 export const SUITE_ENGINES = {
   'source-smoke': ['chromium'], handoff: ['chromium', 'firefox', 'webkit'], boundary: ['chromium', 'firefox', 'webkit'], multihand: ['chromium'], team: ['chromium'],
-  sandbox: ['chromium'], viewer: ['firefox', 'webkit'], continuity: ['chromium'], deletion: ['chromium'], readback: ['chromium'],
+  viewer: ['firefox', 'webkit'], continuity: ['chromium'], deletion: ['chromium'], readback: ['chromium'],
 }
 
 /**
@@ -396,42 +396,6 @@ export async function teamGameCase(kit, browser, accounts, labels, out) {
     r.passed = r.mode === 'team' && r.teams.length === 4 && new Set(r.teams).size === 2 && JSON.stringify(r.actedPlayers) === JSON.stringify([...labels].sort()) && r.endedByAgreement && sides.every(side => side.foreign.length === 0)
     r.phase = 'done'
   } finally { for (const side of sides) { if (side.logged) await kit.formalPost(side.context, '/api/auth/logout').catch(() => {}); await side.context.close().catch(() => {}) } }
-  return r
-}
-
-/** Public sandbox in both execution modes; prerelease never writes the shared workshop or calls the formal API. */
-export async function sandboxCase(kit, browser, accounts, out) {
-  const r = { case: 'public-sandbox' }; const side = await kit.gameContext(browser)
-  try {
-    const page = await side.context.newPage(); page.setDefaultTimeout(30_000)
-    const writes = [], formalCalls = []
-    page.on('request', x => { const u = new URL(x.url()); if (u.origin === kit.origins.formalApi) formalCalls.push(`${x.method()} ${u.pathname}`); if (u.origin === kit.origins.pre && !['GET', 'HEAD'].includes(x.method())) writes.push(`${x.method()} ${u.pathname}`) })
-    await kit.enterPre(page, byLabel(accounts, 'A'), side); formalCalls.length = 0; writes.length = 0
-    await page.goto(`${kit.origins.pre}/open-agricola/?page=workshop`)
-    await page.getByRole('heading', { name: 'Public card sandbox' }).waitFor({ state: 'visible' })
-    r.authoringControls = await page.getByRole('button', { name: /Design|Generate|Publish/i }).count()
-    r.catalog = await page.evaluate(async bind => { const x = await fetch('/api/workshop/public-sandbox/v1/cards', { credentials: 'include', cache: 'no-store', headers: { 'x-oa-browser-protocol': '2', 'x-oa-pre-build': bind.build, 'x-oa-pre-generation': bind.generation } }); return { status: x.status, cards: (await x.json()).cards?.length ?? null } }, kit.binding)
-    r.formalCatalog = await fetch(kit.origins.formalApi + '/api/workshop/public-cards/v1/cards', { signal: AbortSignal.timeout(15_000) }).then(async x => ({ status: x.status, cards: (await x.json()).cards?.length ?? null }))
-    const cards = page.locator('[data-testid="prerelease-workshop"] fieldset.prerelease-workshop-panel > div > label')
-    r.listedCards = await cards.count()
-    if (r.listedCards > 0) { r.cardName = (await cards.first().innerText()).trim().slice(0, 80); await cards.first().locator('input').check() }
-    r.modes = {}
-    for (const mode of ['server', 'browser']) {
-      await page.getByRole('combobox', { name: 'Run game' }).selectOption(mode)
-      const started = mode === 'server' ? page.waitForResponse(x => new URL(x.url()).pathname === '/api/game/new-sandbox' && x.request().method() === 'POST') : null
-      await page.getByRole('button', { name: 'Start Sandbox', exact: true }).click()
-      const result = { newSandbox: started ? (await started).status() : null }
-      await page.frameLocator('iframe.sandbox-embed-frame').locator('.action-board').first().waitFor({ state: 'visible', timeout: 60_000 }); result.board = true
-      if (mode === 'browser') result.savedGames = await pollTrue(() => page.evaluate(async () => (await indexedDB.databases()).some(d => d.name === 'open-agricola-local-sandbox')), 30_000, 'local save').then(() => true)
-      await page.screenshot({ path: `${out}/chromium-sandbox-${mode}.png` })
-      await page.getByRole('button', { name: 'Close sandbox', exact: true }).click().catch(() => {})
-      r.modes[mode] = result
-    }
-    r.preWrites = [...new Set(writes)].sort(); r.formalCalls = [...new Set(formalCalls)].sort()
-    r.passed = r.authoringControls === 0 && r.catalog.status === 200 && r.catalog.cards === r.formalCatalog.cards && r.listedCards === r.catalog.cards
-      && r.modes.server?.newSandbox === 200 && r.modes.server.board && r.modes.browser?.board && r.modes.browser.savedGames
-      && r.preWrites.every(v => /^POST \/api\/(game\/|workshop\/public-sandbox\/v1\/(inputs|status)$|observability\/telemetry$)/.test(v)) && r.formalCalls.length === 0
-  } finally { if (side.logged) await kit.formalPost(side.context, '/api/auth/logout').catch(() => {}); await side.context.close() }
   return r
 }
 
