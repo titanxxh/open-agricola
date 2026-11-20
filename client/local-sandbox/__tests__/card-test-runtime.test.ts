@@ -18,13 +18,17 @@ const session = createSession()
 session.devPlayCard(0, 'CUSTOM_RuntimeFailure')
 session.takeAction(0, 'forest')
 `
-  const tests = scope === 'top-level' ? commands + "test('callback completed',()=>{})"
-    : `test('callback completed',()=>{${commands}})`
+  // Both case kinds are present, so only the card failure is reported.
+  const tests = (scope === 'top-level' ? commands + "test('positive: callback completed',()=>{})"
+    : `test('positive: callback completed',()=>{${commands}})`) + "\ntest('negative: nothing to check',()=>{})"
   const result = await runBrowserCardTestScript({ kind: 'run', id: 'runtime-failure', source, tests })
   // A native card's exception reaches the test that ran the command, like a built-in card's.
   expect(result.outcome).toEqual(scope === 'top-level'
     ? { kind: 'error', message: expect.stringContaining('actual-card-runtime-probe') }
-    : { kind: 'failed', failures: [{ name: 'callback completed', error: expect.stringContaining('actual-card-runtime-probe') }] })
+    : { kind: 'failed', failures: [
+      { name: 'positive: callback completed', error: expect.stringContaining('actual-card-runtime-probe') },
+      { name: 'Test coverage', error: expect.stringContaining('"positive: ..."') },
+    ] })
 })
 
 it('adds a failed GameCore command only to its own test assertion failures', async () => {
@@ -36,7 +40,7 @@ export const CUSTOM_CommandDiagnostic = defineMinorCard({
 })
 `
   const tests = `
-test('expected rejection passes', () => {
+test('negative: expected rejection passes', () => {
   const response = createSession().performRoundEnd()
   expect(response.ok).to.equal(false)
   expect(response.error).to.equal('not all workers used')
@@ -46,6 +50,7 @@ test('forgot to finish work', () => {
   expect(response.state.round).to.equal(2)
 })
 test('unrelated assertion', () => { expect(0).to.equal(1) })
+test('positive: a clean Session starts in round 1', () => { expect(createSession().getState().state.round).to.equal(1) })
 `
   const result = await runBrowserCardTestScript({ kind: 'run', id: 'command-diagnostic', source, tests })
   expect(result.outcome).toEqual({ kind: 'failed', failures: [

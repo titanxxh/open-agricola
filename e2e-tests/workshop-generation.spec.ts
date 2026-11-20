@@ -15,8 +15,9 @@ const referenceBody = 'Sandbox example: use gainLeaf(CARD_ID, { food: 1 }).\n'
 const blob = createHash('sha1').update(`blob ${Buffer.byteLength(referenceBody)}\0`).update(referenceBody).digest('hex')
 const modelKey = 'browser-only-llm-credential-canary'
 const tool = (name: string, args: unknown, id = name, index = 0) => ({ index, id, type: 'function', function: { name, arguments: JSON.stringify(args) } })
-const artifacts = (source: string, tests: string) => [tool('write_artifacts', { source, tests }), tool('run_tests', {}, 'run_tests', 1)]
-const foodTests = (cardId: string, amount: number) => `test('onBuy food', () => {
+const feasible = { verdict: 'feasible', summary: 'onBuy gains food through gainLeaf.', evidence: [{ path: referencePath, finding: 'gainLeaf grants resources.' }], gaps: [], questions: [] }
+const artifacts = (source: string, tests: string) => [tool('report_feasibility', feasible), tool('write_artifacts', { source, tests }, 'write_artifacts', 1), tool('run_tests', {}, 'run_tests', 2)]
+const foodTests = (cardId: string, amount: number) => `test('positive: onBuy food', () => {
   const session = createSession();
   const state = session.getState().state;
   state.players[0].minorHand = ['${cardId}'];
@@ -32,6 +33,14 @@ const foodTests = (cardId: string, amount: number) => `test('onBuy food', () => 
   expect(response.state.players[0].minorPlayed).to.include('${cardId}');
   expect(response.state.players[0].resources.wood).to.equal(0);
   expect(response.state.players[0].resources.food).to.equal(${amount});
+});
+test('negative: the card in hand gives no food before it is bought', () => {
+  const session = createSession();
+  const state = session.getState().state;
+  state.players[0].minorHand = ['${cardId}'];
+  state.players[0].resources = { ...helpers.emptyResources };
+  session.loadState(state);
+  expect(session.getState().state.players[0].resources.food).to.equal(0);
 });`
 /** A native Card Source (ADR 0052) whose onBuy returns the given flow. */
 const foodSource = (cardId: string, name: string, amount: number, flow: string) => `import { defineMinorCard } from '../card-source'
@@ -79,7 +88,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
     const body = route.request().postDataJSON()
     posts += 1
     expect(body.tool_choice).toBe('auto')
-    expect(body.tools).toHaveLength(4)
+    expect(body.tools).toHaveLength(5)
     if (body.messages.at(-1).role === 'tool') return respond(route, { content: 'Review the written source and test report.' })
     const input = JSON.parse(body.messages[1].content)
     inputs.push(input)
@@ -102,7 +111,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   await expect(adopt).toBeEnabled()
   await expect(editor).toHaveValue(source(1))
   await expect(ut).toHaveValue(foodTests(cardId, 1))
-  await expect(page.locator('.aicw-ut-report')).toContainText('1')
+  await expect(page.locator('.aicw-ut-report')).toContainText('2')
   await page.locator('.aicw-ability-review').screenshot({ path: testInfo.outputPath(`candidate-ut-passed-${width}.png`) })
   await expect(page.locator('.aicw-current-code')).toHaveCount(0)
   await input.fill('Change the food reward to 2')
@@ -178,7 +187,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   await expect(page.locator('.aicw-current-code code')).toHaveText(source(2))
   const persisted = await page.evaluate(async id => (await (await fetch(`/api/workshop/cards/${id}/workspace`, { headers: { 'x-oa-browser-protocol': '2' } })).json()).workspace, id)
   expect(persisted.draft.effectCode).toBe(source(2))
-  expect(persisted.draft.generation.ability.adopted.testing).toMatchObject({ code: foodTests(cardId, 2), lastRun: { outcome: { kind: 'passed', count: 1 } } })
+  expect(persisted.draft.generation.ability.adopted.testing).toMatchObject({ code: foodTests(cardId, 2), lastRun: { outcome: { kind: 'passed', count: 2 } } })
   for (const field of ['provenance', 'provider', 'model']) expect(persisted.draft.generation.ability.adopted).not.toHaveProperty(field)
   expect(JSON.stringify(persisted.draft.generation)).not.toContain(modelKey)
   expect(JSON.stringify(persisted.draft.generation)).not.toContain('"messages"')
@@ -214,7 +223,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   await other.close()
 })
 
-test('four browser tools preserve protocol through UT repair beyond eight model requests', async ({ page }) => {
+test('five browser tools preserve protocol through UT repair beyond eight model requests', async ({ page }) => {
   test.setTimeout(90_000)
   const user = await createLocalUserForTests(`loop_${Date.now().toString(36)}`, 'loop-test-password')
   const cookie = await createSession(user.id)
@@ -234,7 +243,7 @@ test('four browser tools preserve protocol through UT repair beyond eight model 
     const body = route.request().postDataJSON()
     posts += 1
     expect(body.tool_choice).toBe('auto')
-    expect(body.tools.map((entry: { function: { name: string } }) => entry.function.name)).toEqual(['search_references', 'read_reference', 'write_artifacts', 'run_tests'])
+    expect(body.tools.map((entry: { function: { name: string } }) => entry.function.name)).toEqual(['search_references', 'read_reference', 'report_feasibility', 'write_artifacts', 'run_tests'])
     const prior = body.messages.findLastIndex((entry: { role: string }) => entry.role === 'assistant')
     if (prior >= 0) {
       const assistant = body.messages[prior]
@@ -244,8 +253,8 @@ test('four browser tools preserve protocol through UT repair beyond eight model 
         && replies.length === assistant.tool_calls.length
         && replies.every((entry: { role: string; tool_call_id: string }, index: number) => entry.role === 'tool' && entry.tool_call_id === assistant.tool_calls[index].id)
     }
-    if (posts === 3) expect(JSON.parse(body.messages.at(-1).content)).toMatchObject({ validation: { valid: true }, outcome: { kind: 'failed', failures: [{ name: 'onBuy food', error: expect.stringContaining('expected 1 to equal 2') }] } })
-    if (posts === 4) expect(JSON.parse(body.messages.at(-1).content)).toMatchObject({ validation: { valid: true }, outcome: { kind: 'passed', count: 1 } })
+    if (posts === 3) expect(JSON.parse(body.messages.at(-1).content)).toMatchObject({ validation: { valid: true }, outcome: { kind: 'failed', failures: [{ name: 'positive: onBuy food', error: expect.stringContaining('expected 1 to equal 2') }, { name: 'Test coverage', error: expect.stringContaining('"positive: ..."') }] } })
+    if (posts === 4) expect(JSON.parse(body.messages.at(-1).content)).toMatchObject({ validation: { valid: true }, outcome: { kind: 'passed', count: 2 } })
     if (posts === 9) return respond(route, { content: '' })
     const calls = posts === 2 ? artifacts(source(1), foodTests(cardId, 2)) : posts === 3 ? artifacts(source(2), foodTests(cardId, 2))
       : [tool('read_reference', { path: referencePath, startLine: 1, lineCount: 10 }, `reference-${posts}`)]
@@ -268,7 +277,7 @@ test('four browser tools preserve protocol through UT repair beyond eight model 
   expect(posts).toBe(9)
   expect(preservedProtocol).toBe(true)
   expect(evidence.completed).toMatchObject({ status: 'completed', referenceCommit, modelRequests: 9, referenceCalls: 6,
-    candidate: { sourceCode: source(2), cardJson: { id: cardId, cost: { wood: 2 } }, validation: { valid: true }, testing: { code: foodTests(cardId, 2), lastRun: { outcome: { kind: 'passed', count: 1 } } } }, result: { kind: 'candidate', message: '' },
+    candidate: { sourceCode: source(2), cardJson: { id: cardId, cost: { wood: 2 } }, validation: { valid: true }, testing: { code: foodTests(cardId, 2), lastRun: { outcome: { kind: 'passed', count: 2 } } } }, result: { kind: 'candidate', message: '' },
   })
   for (const secret of ['private-reasoning-canary', 'private-signature-canary', modelKey]) expect(JSON.stringify(evidence)).not.toContain(secret)
   expect(destinations.filter(item => item.containsModelKey).map(item => item.url)).toEqual(Array(9).fill(modelUrl))

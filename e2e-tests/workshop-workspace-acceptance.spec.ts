@@ -246,7 +246,7 @@ const adoptArt = async (
   },
 )))
 
-const setupAbilityTests = `test('An unplayed card does not change collection', () => { const session = createSession(); const state = session.getState().state; state.players[0].resources.wood = 0; state.actionSpaces.find(space => space.id === 'forest').resources.wood = 3; const response = session.takeAction(0, 'forest'); expect(response.ok).to.equal(true); expect(response.state.players[0].resources.wood).to.equal(3); });`
+const setupAbilityTests = `test('positive: a clean Session can take Forest', () => { expect(createSession().takeAction(0, 'forest').ok).to.equal(true); }); test('negative: an unplayed card does not change collection', () => { const session = createSession(); const state = session.getState().state; state.players[0].resources.wood = 0; state.actionSpaces.find(space => space.id === 'forest').resources.wood = 3; const response = session.takeAction(0, 'forest'); expect(response.ok).to.equal(true); expect(response.state.players[0].resources.wood).to.equal(3); });`
 
 const adoptAbility = async (
   request: APIRequestContext,
@@ -270,7 +270,7 @@ const adoptAbility = async (
         provider: 'fake-chat',
         model: 'deterministic-v1',
         validation: { valid: true, errors: [], sourceFingerprint: sourceFingerprint(sourceCode) },
-        testing: { code: setupAbilityTests, lastRun: { artifactFingerprint: abilityArtifactFingerprint(sourceCode, setupAbilityTests), browserRuntimeId: 'workspace-api-fixture', outcome: { kind: 'passed', count: 1 } } },
+        testing: { code: setupAbilityTests, lastRun: { artifactFingerprint: abilityArtifactFingerprint(sourceCode, setupAbilityTests), browserRuntimeId: 'workspace-api-fixture', outcome: { kind: 'passed', count: 2 } } },
         createdAt: Date.now(),
       },
     },
@@ -404,7 +404,7 @@ const fakeChatService = async (
     const request = route.request().postDataJSON()
     expect(request.tool_choice).toBe('auto')
     expect(request.tools.map((tool: { function: { name: string } }) => tool.function.name))
-      .toEqual(['search_references', 'read_reference', 'write_artifacts', 'run_tests'])
+      .toEqual(['search_references', 'read_reference', 'report_feasibility', 'write_artifacts', 'run_tests'])
     const last = request.messages.at(-1)
     let delta: Record<string, unknown>
     let finishReason = 'stop'
@@ -415,10 +415,13 @@ const fakeChatService = async (
       const source = response(artifactRequests++)
       if (!source) return route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'data: [DONE]\n\n' })
       delta = { tool_calls: [
-        { index: 0, id: `write-${artifactRequests}`, type: 'function', function: {
+        { index: 0, id: `feasibility-${artifactRequests}`, type: 'function', function: {
+          name: 'report_feasibility', arguments: JSON.stringify({ verdict: 'feasible', summary: 'Setup uses existing mechanisms.', evidence: [], gaps: [], questions: [] }),
+        } },
+        { index: 1, id: `write-${artifactRequests}`, type: 'function', function: {
           name: 'write_artifacts', arguments: JSON.stringify({ source, tests: setupAbilityTests }),
         } },
-        { index: 1, id: `test-${artifactRequests}`, type: 'function', function: { name: 'run_tests', arguments: '{}' } },
+        { index: 2, id: `test-${artifactRequests}`, type: 'function', function: { name: 'run_tests', arguments: '{}' } },
       ] }
       finishReason = 'tool_calls'
     }

@@ -85,7 +85,7 @@ for (const engine of ['chromium', 'webkit'] as const) {
         ['empty suite', source, '', 'error'],
         ['invalid test syntax', source, 'test(', 'error'],
         ['imports rejected', source, "import 'https://example.invalid/code.js'", 'error'],
-        ['async assertions', source, "test('async',async()=>{await Promise.resolve();expect(2+2).to.equal(4)})", 'passed'],
+        ['async assertions', source, "test('positive: async',async()=>{await Promise.resolve();expect(2+2).to.equal(4)})\ntest('negative: async',async()=>{await Promise.resolve();expect(2+2).to.not.equal(5)})", 'passed'],
       ] as const) {
         const result = await run(page, cardSource, tests)
         records.push({ name, result })
@@ -99,7 +99,8 @@ for (const engine of ['chromium', 'webkit'] as const) {
         await expect(page.locator('body')).toHaveAttribute('data-terminated', 'true')
       }
       const diagnostic = await run(page, source, `
-test('expected rejection', () => { expect(createSession().performRoundEnd().ok).to.equal(false) })
+test('negative: expected rejection', () => { expect(createSession().performRoundEnd().ok).to.equal(false) })
+test('positive: a clean Session can take Forest', () => { expect(createSession().takeAction(0, 'forest').ok).to.equal(true) })
 test('failed command', () => { expect(createSession().performRoundEnd().state.round).to.equal(2) })
 test('next assertion', () => { expect(0).to.equal(1) })
 `)

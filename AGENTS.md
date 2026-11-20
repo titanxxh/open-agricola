@@ -34,7 +34,7 @@ pnpm run lint               # ESLint（error 必须清零）
 pnpm run build              # tsc + vite build
 ```
 
-统一使用 Node.js 24.15+，版本范围为 `^24.15.0 || >=26.0.0`，不支持 Node 25。`isolated-vm`、`jsdom` 和原生依赖有版本及 ABI 要求；不要用更低版本启动应用。
+统一使用 Node.js 24.15+，版本范围为 `^24.15.0 || >=26.0.0`，不支持 Node 25。`jsdom` 和原生依赖有版本及 ABI 要求；不要用更低版本启动应用。
 
 </important>
 
