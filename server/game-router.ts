@@ -1,6 +1,3 @@
-import { prereleaseRequestBinding, prereleaseSessionToken } from './prerelease-access'
-import { getPrereleaseSessions } from './prerelease-sessions'
-import { getPrereleasePublicSandbox, PublicSandboxPaused, PublicSandboxScope, parsePublicSandboxIds, parsePublicSandboxReferences, readPublicSandboxBody } from './prerelease-public-sandbox'
 import { requestSessionToken } from './request-auth'
 import { CLASSIC_EDITION_ENABLED } from '../shared/contract/card-edition'
 import { classicAdmissionRejection, parseCardEditionChoice, type CardEditionChoice } from '../shared/session/card-edition-admission'
@@ -51,12 +48,6 @@ export const configureSandboxAuthority = (value: SandboxAuthority): void => { au
 const sessionStamps = new Map<string, ExecutionStamp>()
 const requests = new WeakMap<IncomingMessage, { stamp: ExecutionStamp; revision?: number }>()
 const responses = new WeakMap<ServerResponse, IncomingMessage>()
-const publicSessionScopes = new WeakMap<GameSession, PublicSandboxScope>()
-const publicRequestScopes = new WeakMap<IncomingMessage, PublicSandboxScope>()
-const assertSandboxRequestAccess = (req: IncomingMessage): void => {
-  publicRequestScopes.get(req)?.assert()
-  if (process.env.RELEASE_CHANNEL === 'prerelease' && !getPrereleaseSessions()?.cachedAuthorized(prereleaseSessionToken(req), prereleaseRequestBinding(req))) throw new PublicSandboxPaused('Prerelease access unavailable')
-}
 export const disposeSandboxSessionsForUser = (userId: string): void => {
   sessionExecutors.get(userId)?.dispose()
   userSessions.get(userId)?.dispose()
@@ -124,13 +115,7 @@ const getSessionForRequest = async (req: IncomingMessage): Promise<Awaited<GameS
     requests.set(req, { ...requests.get(req), stamp })
   }
   sessionLastAccess.set(key, Date.now())
-  const session = userSessions.get(key)!
-  if (process.env.RELEASE_CHANNEL === 'prerelease') {
-    const scope = publicSessionScopes.get(session) ?? new PublicSandboxScope([], [])
-    await scope.check()
-    publicRequestScopes.set(req, scope)
-  }
-  return session
+  return userSessions.get(key)!
 }
 
 class SandboxReplacementError extends Error {
@@ -264,8 +249,8 @@ const callAndRespond = async (
   const session = (await getSessionForRequest(req))
   const executor = sessionExecutors.get((await getSessionKey(req)))
   const resp = executor
-    ? await executor.execute(method, args, () => assertSandboxRequestAccess(req))
-    : session.withCtx(() => { assertSandboxRequestAccess(req); return fn(session) })
+    ? await executor.execute(method, args)
+    : session.withCtx(() => fn(session))
   if (method === 'loadState' && resp.ok) gameInstanceIds.delete(session)
   const viewerId = resolveViewerPlayerId(req, session)
   return { resp, result: respondWith(resp, session, viewerId), viewerId }
@@ -329,9 +314,9 @@ const rawJson = (res: ServerResponse, status: number, payload: unknown) => {
 const sendJson = async (res: ServerResponse, status: number, payload: unknown): Promise<void> => {
   const request = responses.get(res)
   const scope = request && requests.get(request)
-  const publish = () => { if (request) assertSandboxRequestAccess(request); rawJson(res, status, payload) }
-  if (authority && scope) await authority.publish(scope.stamp, publish)
-  else publish()
+  if (authority && scope) {
+    await authority.publish(scope.stamp, () => rawJson(res, status, payload))
+  } else rawJson(res, status, payload)
 }
 
 const respondWith = (
@@ -634,7 +619,7 @@ const handleAuthorizedGameRoute = async (
     const executor = sessionExecutors.get((await getSessionKey(req)))
     try {
       const actions = executor
-        ? await executor.query<{ spaceId: string; nameKey: string }[]>('getAvailableActions', [playerIndex], () => assertSandboxRequestAccess(req))
+        ? await executor.query<{ spaceId: string; nameKey: string }[]>('getAvailableActions', [playerIndex])
         : session.withCtx(() => session.getAvailableActions(playerIndex))
       await sendJson(res, 200, { ok: true, actions })
     } catch (error) {
@@ -684,7 +669,7 @@ const handleAuthorizedGameRoute = async (
       if (!await enforceSeatBinding(req, res, body.playerIndex)) return true
       const executor = sessionExecutors.get(await getSessionKey(req))
       const quote = executor
-        ? await executor.query<FenceSelectionQuote>('quoteFenceSelection', [body.playerIndex, body.requestKey, payload], () => assertSandboxRequestAccess(req))
+        ? await executor.query<FenceSelectionQuote>('quoteFenceSelection', [body.playerIndex, body.requestKey, payload])
         : session.quoteFenceSelection(body.playerIndex, body.requestKey, payload)
       await sendJson(res, 200, quote)
     } catch (error) {
@@ -722,7 +707,7 @@ const handleAuthorizedGameRoute = async (
     return true
   }
 
-  if (process.env.RELEASE_CHANNEL !== 'prerelease' && req.method === 'POST' && req.url === '/api/game/new') {
+  if (req.method === 'POST' && req.url === '/api/game/new') {
     const sessionKey = (await getSessionKey(req))
     let seed: number | undefined
     let raw: Record<string, unknown> = {}

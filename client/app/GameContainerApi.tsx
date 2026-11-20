@@ -1,5 +1,3 @@
-import { PublicSandboxAccess, pausePublicSandbox, PUBLIC_SANDBOX_PAUSED_EVENT } from '../local-sandbox/public-access'
-import { isPrereleaseClient } from '../services/prerelease-runtime'
 import type { MarketplaceTransfer } from '../../shared/contract/marketplace'
 import { TeamWaitingRoom } from './TeamWaitingRoom'
 import { nextMultihandPlayerId, pendingMultihandInputs, type MultihandInput } from './multihand-seat'
@@ -235,7 +233,6 @@ const useTransportSetup = (
         setLocalReady(true)
       } catch (err) {
         transport.destroy()
-        if (isPrereleaseClient()) pausePublicSandbox()
         console.error('[local-sandbox] failed to start:', err)
         const error = err instanceof Error ? err.message : String(err)
         sandboxStatus.failed(error)
@@ -425,16 +422,6 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
   const { user } = useAuth()
-  const [publicSandboxPaused, setPublicSandboxPaused] = useState(false)
-  useEffect(() => {
-    if (!isPrereleaseClient() || isWsMode) return
-    const pause = () => setPublicSandboxPaused(true)
-    window.addEventListener(PUBLIC_SANDBOX_PAUSED_EVENT, pause)
-    const config = readLocalSandboxConfig(user?.id ?? 'anon')
-    const access = !isLocalMode && config?.publicInputs ? new PublicSandboxAccess(config.publicInputs) : undefined
-    if (access) void access.start().catch(pausePublicSandbox)
-    return () => { access?.stop(); window.removeEventListener(PUBLIC_SANDBOX_PAUSED_EVENT, pause) }
-  }, [isWsMode, isLocalMode, user?.id])
   const { connectedPlayerIndexes, transport, wsStatus, lastReadyStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, roomTeamError, changePlayerColor } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
@@ -1690,8 +1677,6 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       </div>
     )
   }
-
-  if (publicSandboxPaused) return <main role="alert"><p>{t(locale, 'platform.publicSandboxPaused')}</p><button type="button" onClick={() => window.location.reload()}>{t(locale, 'platform.retry')}</button></main>
 
   if (!hasGameView) {
     const fetchPhase =

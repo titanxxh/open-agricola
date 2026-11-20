@@ -551,7 +551,6 @@ export interface GameCoreOptions {
   stateOrSeed?: GameState | number | StateWithCursor
   /** Workshop custom cards to register into a per-session context. */
   customCards?: CustomCardData[]
-  customCardRegistration?: 'strict' | 'warn'
   /** Options forwarded to `createInitialState`. */
   initialStateOptions?: InitialStateOptions
   /**
@@ -975,10 +974,6 @@ export class GameCore {
             this.registerCustomCardImpl(cardData)
           } catch (err) {
             const msg = `Failed to register card ${cardData.cardJson.id}: ${err instanceof Error ? err.message : String(err)}`
-            if (options.customCardRegistration === 'strict') {
-              this.dispose()
-              throw new Error(msg, { cause: err })
-            }
             console.warn(`[game-core] ${msg}`)
             this.cardWarnings.push(msg)
           }

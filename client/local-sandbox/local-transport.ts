@@ -1,5 +1,3 @@
-import { PublicSandboxAccess, pausePublicSandbox } from './public-access'
-import { getPrereleaseRuntime } from '../services/prerelease-runtime'
 import { assertPrereleaseAccess, getPrereleaseAccess, isPrereleaseClient, subscribePrereleaseAccess } from '../services/prerelease-runtime'
 /**
  * LocalGameTransport — `GameTransport` implementation backed by the
@@ -72,15 +70,11 @@ export class LocalGameTransport implements GameTransport {
   private inflight = false
 
   private readonly unsubscribePrerelease: () => void
-  private sourceAccess?: PublicSandboxAccess
   private readonly config: LocalGameConfig
   private readonly opts: LocalTransportOptions
 
   constructor(config: LocalGameConfig, opts: LocalTransportOptions = {}) {
-    const runtime = getPrereleaseRuntime()
-    if (isPrereleaseClient() && !config.publicInputs && (config.cards.length || !runtime)) throw new Error('Fixed public inputs required')
-    this.config = isPrereleaseClient() && !config.publicInputs && runtime
-      ? { ...config, publicInputs: { snapshots: [], buildId: runtime.buildId, generationId: runtime.generationId, contractId: '' } } : config
+    this.config = config
     this.opts = opts
     this.viewer = opts.viewer ?? { visiblePlayerIds: [], mode: 'viewer' }
     this.unsubscribePrerelease = subscribePrereleaseAccess(() => {
@@ -91,7 +85,6 @@ export class LocalGameTransport implements GameTransport {
   /** Spawn the worker and start a fresh game. */
   async start(): Promise<GameSyncPayload> {
     assertPrereleaseAccess()
-    await this.preparePublicAccess(this.config, true)
     await this.spawn()
     const response = await this.request({ kind: 'init', config: this.config, viewer: this.viewer })
     return this.accept(response)
@@ -100,7 +93,6 @@ export class LocalGameTransport implements GameTransport {
   /** Spawn the worker and resume a persisted game (IndexedDB resume, T4). */
   async startFromPersisted(persisted: PersistedLocalGame): Promise<GameSyncPayload> {
     assertPrereleaseAccess()
-    await this.preparePublicAccess(persisted.config)
     await this.spawn()
     const response = await this.request({ kind: 'restore', persisted, viewer: this.viewer })
     return this.accept(response)
@@ -136,7 +128,7 @@ export class LocalGameTransport implements GameTransport {
   performRoundEnd() { return this.call('performRoundEnd', []) }
   undoStep() { return this.call('undoStep', []) }
   undoAction() { return this.call('undoAction', []) }
-  async newGame(seed?: number) { await this.sourceAccess?.refresh(true); return this.call('newGame', [seed]) }
+  newGame(seed?: number) { return this.call('newGame', [seed]) }
   loadGame(state: unknown) { return this.call('loadGame', [state]) }
   devSetResources(playerIndex: number, resources: Record<string, number>) {
     return this.call('devSetResources', [playerIndex, resources])
@@ -154,7 +146,6 @@ export class LocalGameTransport implements GameTransport {
   async quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): Promise<FenceSelectionQuote> {
     const response = await this.request({ kind: 'call', method: 'quoteFenceSelection',
       args: [playerIndex, requestKey, payload], viewer: this.viewer })
-    assertPrereleaseAccess(); this.sourceAccess?.assert()
     return parseFenceSelectionQuote('raw' in response ? response.raw : undefined)
   }
 
@@ -165,7 +156,6 @@ export class LocalGameTransport implements GameTransport {
       args: [type as FarmChoiceType, playerId, payload],
       viewer: this.viewer,
     })
-    assertPrereleaseAccess(); this.sourceAccess?.assert()
     return ('raw' in response ? response.raw : { valid: false, error: 'invalid response' }) as ValidateResult
   }
 
@@ -176,7 +166,6 @@ export class LocalGameTransport implements GameTransport {
 
   destroy(): void {
     this.destroyed = true
-    this.sourceAccess?.stop()
     this.unsubscribePrerelease()
     this.rejectAllPending(new Error('transport destroyed'))
     this.listeners.clear()
@@ -202,7 +191,6 @@ export class LocalGameTransport implements GameTransport {
 
   private accept(response: LocalSandboxResponse & { ok: true }): GameSyncPayload {
     assertPrereleaseAccess()
-    this.sourceAccess?.assert()
     if (!('payload' in response)) {
       throw new Error('local sandbox returned no payload')
     }
@@ -256,7 +244,6 @@ export class LocalGameTransport implements GameTransport {
     this.pending.delete(message.id)
     clearTimeout(entry.timer)
     if (message.ok) {
-      try { assertPrereleaseAccess(); this.sourceAccess?.assert() } catch (error) { entry.reject(error instanceof Error ? error : new Error(String(error))); return }
       entry.resolve(message)
     } else {
       entry.reject(new Error(message.error))
@@ -268,7 +255,7 @@ export class LocalGameTransport implements GameTransport {
       | Omit<Extract<LocalSandboxRequest, { kind: 'restore' }>, 'id'>
       | Omit<Extract<LocalSandboxRequest, { kind: 'call' }>, 'id'>,
   ): Promise<LocalSandboxResponse & { ok: true }> {
-    try { assertPrereleaseAccess(); this.sourceAccess?.assert() } catch (error) { return Promise.reject(error) }
+    try { assertPrereleaseAccess() } catch (error) { return Promise.reject(error) }
     if (this.destroyed) return Promise.reject(new Error('transport destroyed'))
     if (this.recovering) return Promise.reject(new Error('local sandbox is recovering'))
     const worker = this.worker
@@ -279,17 +266,8 @@ export class LocalGameTransport implements GameTransport {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { void this.recoverFromTimeout(id) }, timeoutMs)
       this.pending.set(id, { resolve, reject, timer })
-      worker.postMessage({ ...request, id, ...(this.sourceAccess ? { admission: this.sourceAccess.lease() } : {}) } as LocalSandboxRequest)
+      worker.postMessage({ ...request, id } as LocalSandboxRequest)
     })
-  }
-
-  private async preparePublicAccess(config: LocalGameConfig, newGame = false): Promise<void> {
-    if (!isPrereleaseClient() && !config.publicInputs) return
-    if (!config.publicInputs) throw new Error('Fixed public inputs required')
-    this.sourceAccess?.stop()
-    const access = new PublicSandboxAccess(config.publicInputs, () => { this.destroy(); pausePublicSandbox() })
-    this.sourceAccess = access
-    await access.start(newGame)
   }
 
   private rejectAllPending(error: Error): void {
@@ -318,7 +296,6 @@ export class LocalGameTransport implements GameTransport {
       return
     }
     try {
-      await this.preparePublicAccess(persisted.config)
       await this.spawn()
       this.recovering = false
       const response = await this.request({ kind: 'restore', persisted, viewer: this.viewer })

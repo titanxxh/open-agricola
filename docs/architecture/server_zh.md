@@ -188,7 +188,7 @@ Viewer HTML 复验 CSP，不可变脚本仅允许 'self'。公开 Replay 允许�
 - 对局只加载部署版本中的卡（ADR 0052）：创建时拒绝任何 `customCardIds`，沙盒只接受作者自己的卡。已录制的带工坊卡的 Room 仍经执行器恢复。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。
-- `workshop-public-cards.ts` 只读提供目录、固定输入、图片及 30 秒状态。`prerelease-public-{cards,sandbox}.ts` 校验并编译；scope 经中央租约重绑原 ref，退休 lease 不复活。失败不续期、旧成功不覆拒绝；新局刷新，HTTP执行与下发前检查Beta。pre 错误拒绝整组，其他警告；其他工坊路由关闭。见 `prerelease-public-sandbox.test.ts`。
+- `workshop-public-cards.ts` 只读提供审核上线版本的目录、固定公共输入、图片及 30 秒状态，不交付草稿或编译产物，也不写沙盒状态；消费环境负责校验、编译与到期暂停。
 - 工坊草稿错误暴露 `shared/contract/workshop.ts` 中的类型化 `code`；在线编辑守卫以 HTTP 409 返回 `live_edit_blocked`。
 
 测试：`server/__tests__/{workshop-api,workshop-public-snapshots,workshop-submissions}.test.ts`、`server/workshop-pr/__tests__/`。
