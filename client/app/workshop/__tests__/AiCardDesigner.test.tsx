@@ -241,7 +241,7 @@ describe('AiCardDesigner AI config header', () => {
     const user = userEvent.setup()
     const writeText = vi.spyOn(navigator.clipboard, 'writeText')
 
-    const { container } = render(
+    const { container, unmount } = render(
       <LocaleProvider>
         <AiCardDesigner
           initialCard={existingCard}
@@ -254,6 +254,8 @@ describe('AiCardDesigner AI config header', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue(existingCard.card_id)).toBeInTheDocument()
     })
+    const scheduled = vi.spyOn(globalThis, 'setTimeout')
+    const cancelled = vi.spyOn(globalThis, 'clearTimeout')
     const cardIdRow = container.querySelector('.aicw-live-card-id')
     expect(cardIdRow).not.toBeNull()
     expect(within(cardIdRow as HTMLElement).getByText(existingCard.card_id)).toBeVisible()
@@ -263,6 +265,13 @@ describe('AiCardDesigner AI config header', () => {
     expect(writeText).toHaveBeenCalledWith(existingCard.card_id)
     expect(within(cardIdRow as HTMLElement).getByRole('button')).toHaveTextContent('已复制!')
     expect(within(cardIdRow as HTMLElement).getByRole('button')).toHaveAttribute('aria-live', 'polite')
+    const feedbackTimer = scheduled.mock.results[
+      scheduled.mock.calls.findIndex(([, delay]) => delay === 1500)
+    ]?.value
+    expect(feedbackTimer).toBeDefined()
+    expect(cancelled).not.toHaveBeenCalledWith(feedbackTimer)
+    unmount()
+    expect(cancelled).toHaveBeenCalledWith(feedbackTimer)
   })
 
   it('loads an author workspace directly from an editor card URL', async () => {
