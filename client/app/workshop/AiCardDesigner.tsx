@@ -1034,6 +1034,12 @@ export function AiCardDesigner({
   }, [saveSuccess])
 
   useEffect(() => {
+    if (!cardIdCopied) return
+    const timer = setTimeout(() => setCardIdCopied(false), 1500)
+    return () => clearTimeout(timer)
+  }, [cardIdCopied])
+
+  useEffect(() => {
     if (
       controllerError
       || controllerState?.save.status === 'offline'
@@ -1605,7 +1611,6 @@ export function AiCardDesigner({
     }
     if (!copied) return
     setCardIdCopied(true)
-    setTimeout(() => setCardIdCopied(false), 1500)
   }
   const liveCardMeta: CardMeta = {
     id: liveCardId,

@@ -57,7 +57,8 @@ it('uses fresh continuation authority after original work expiry without rewriti
   const preload = join(value.root, 'resume-clock.mjs')
   writeFileSync(preload, 'const now=Date.now;Date.now=()=>now()+3600000;')
   const env = { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}` }
-  const authorization = value.authorize({ authorizedAt: Date.now() + 3600000, expiresAt: Date.now() + 4200000 })
+  // One clock read: two reads can straddle a millisecond and stretch the lease past the 600000 ms work limit.
+  const shifted = Date.now() + 3600000, authorization = value.authorize({ authorizedAt: shifted, expiresAt: shifted + 600000 })
   const result = value.operation('resume', authorization, env)
   expect(result.status, result.stderr).toBe(0)
   expect(JSON.parse(result.stdout)).toMatchObject({ state: 'accepted', validatorExitCode: null })

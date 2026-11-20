@@ -15,6 +15,7 @@ function fixture(): string {
 }
 
 describe('routine browser environment', () => {
+  // Two real `pnpm exec tsx` processes plus two shell spawns: ~1.5 s idle, but over 30 s on a CPU-saturated full fast run.
   it('creates and cleans a TypeScript environment with extensionless imports through tsx', () => {
     const root = fixture()
     symlinkSync(resolve(import.meta.dirname, '../../node_modules'), join(root, 'node_modules'), 'dir')
@@ -32,7 +33,7 @@ if (operation === 'create') writeFileSync(join(session, 'test.env'), 'DATABASE_S
     expect(readFileSync(join(root, 'session/test.env'), 'utf8')).toContain('test_fixture')
     expect(isolatedBrowserCli(root, ['stop', 'session'])).toBe(0)
     expect(existsSync(join(root, 'session/test.env'))).toBe(false)
-  })
+  }, 120_000)
 
   it('cleans a failed startup and reports a failed stop while removing environment credentials', () => {
     const root = fixture()
