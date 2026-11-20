@@ -121,12 +121,22 @@ export function prereleaseConfiguration(cwd: string, sha: string, producer: stri
  * evidence from any producer reachable from protected main still counts, and the result names the current main
  * configuration it differs from. Only `open`/`verify-open` of the installed build request it; deploy, restore and
  * image production always require the current producer configuration.
+ *
+ * `producerSha` names the owner's trusted policy commit for a source update. Complete evidence produced under that
+ * commit's verification configuration also qualifies, so a later main change to the configuration cannot void the
+ * evidence the running policy accepts. The commit must be reachable from protected main.
  */
-export type PrereleaseVerificationOptions = { continuity?: boolean }
+export type PrereleaseVerificationOptions = { continuity?: boolean; producerSha?: string }
 
 export function checkPrereleaseVerification(cwd: string, repository: string, sha: string, options: PrereleaseVerificationOptions = {}) {
   const source = admitPrereleaseSnapshot(cwd, repository, sha)
   const policyConfiguration = verificationConfiguration(cwd, source.main)
+  const ownerPolicy = options.producerSha === undefined ? null : fullSha(options.producerSha)
+  if (ownerPolicy) {
+    assertRawCommit(cwd, repository, ownerPolicy)
+    if (!ancestor(cwd, ownerPolicy, source.main)) throw new Error('The owner policy commit is not reachable from protected main')
+  }
+  const ownerConfiguration = ownerPolicy ? verificationConfiguration(cwd, ownerPolicy) : policyConfiguration
   const continuity = (producerConfiguration: string) => producerConfiguration === policyConfiguration ? {} : { continuity: { mainSha: source.main, policyConfiguration } }
   const ownerLocal = checkPrereleaseOwnerLocalVerification({ cwd, repository, repositoryId: source.repositoryId, candidateSha: sha, producerSha: source.main,
     continuity: options.continuity === true,
@@ -152,7 +162,7 @@ export function checkPrereleaseVerification(cwd: string, repository: string, sha
     assertRawCommit(cwd, repository, producer)
     if (!ancestor(cwd, producer, source.main)) continue
     const producerConfiguration = verificationConfiguration(cwd, producer)
-    if (producerConfiguration !== policyConfiguration && options.continuity !== true) continue
+    if (producerConfiguration !== policyConfiguration && producerConfiguration !== ownerConfiguration && options.continuity !== true) continue
     if (typeof run.id !== 'number' || !Number.isSafeInteger(run.id) || run.id < 1) throw new Error('Invalid prerelease run identity')
     const group = groups.get(producerConfiguration) ?? { producerShas: [], evidence: [] }
     group.producerShas.push(producer)
@@ -165,10 +175,18 @@ export function checkPrereleaseVerification(cwd: string, repository: string, sha
     return { ...evaluateCandidateVerification({ repository, repositoryId: source.repositoryId, sha,
       configuration: configurationPair(candidateConfiguration, producerConfiguration), workflowId, channel: 'prerelease',
       producerShas: group.producerShas, execution: 'uid-rootless-v1',
-    }, group.evidence), channel: 'prerelease' as const, producerConfiguration, ownerLocal: undefined, ...continuity(producerConfiguration) }
+    }, group.evidence), channel: 'prerelease' as const, producerConfiguration, ownerLocal: undefined,
+    ...(producerConfiguration === ownerConfiguration ? {} : continuity(producerConfiguration)) }
   }
   const current = evaluate(policyConfiguration)
-  if (current.status === 'passed' || options.continuity !== true) return current
+  if (current.status === 'passed') return current
+  if (ownerConfiguration !== policyConfiguration) {
+    // A run still in progress under the owner policy keeps its run id, so a waiting caller does not request another.
+    const owner = evaluate(ownerConfiguration)
+    const started = (result: typeof current) => result.tasks.filter(task => task.runId !== null).length
+    if (owner.status === 'passed' || started(owner) > started(current)) return owner
+  }
+  if (options.continuity !== true) return current
   for (const producerConfiguration of groups.keys()) {
     if (producerConfiguration === policyConfiguration) continue
     const carried = evaluate(producerConfiguration)

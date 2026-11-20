@@ -128,7 +128,7 @@ owner 私有验收 JSON 包含 `format: 1`、`appUrl`、`apiUrl`、`expectedBuil
 
 **首次准备和更新运行时镜像。** 受保护的 main 上 `deploy/prerelease-runtime/` 变化时会自动构建。获取首个 pin 或单独更新基础镜像安全补丁时，也可执行 `gh workflow run prerelease-runtime.yml --ref main`。从成功的 run/attempt 下载 `prerelease-runtime.ref`，作为 `deploy/prerelease-runtime.ref` 提交到受保护的 main，把同一个 pin 同步进 pre，并让本机和后端 owner tools 切到已审阅的策略提交。Node、原生模块 ABI、系统库或安全补丁需要更换镜像时重复此流程。日常更新只在后端缺镜像时传输。后端在独立版本目录准备锁定的依赖、语言包、托管前端和 Replay Viewer，并用临时数据试启动。准备期间旧版持续服务。
 
-**验证和恢复。** 首次从应用镜像迁移及超出日常范围的改动都走完整候选验证和浏览器验收。普通卡牌或界面改动复用已安装 SHA 到新 SHA 的范围 CI。源码准备与日常在线备份完成后才关闭准入。重新开放前，Beta 玩家通过真实入口读取前后端 SHA，再次进入指定对局并收到 WebSocket 快照。兼容更新若切换失败，会恢复上一版源码、依赖目录及运行时镜像，重新验收后开放。若已执行不兼容迁移，则保持维护状态并记录对应备份。失败步骤在本次 `window/state.json`。完整验收若在不可重复执行的账号创建或删除步骤中断，核对账号后可加 `--confirm-step accounts` 或 `--confirm-step deletion` 续跑。需要发布有版本号的 GitHub beta Release 时，使用下节流程。
+**验证和恢复。** 首次从应用镜像迁移及超出日常范围的改动都走完整候选验证和浏览器验收。完整证据的 producer 验证配置与当前 main 或执行更新的 owner 策略提交一致即可，之后 main 修改验证配置不会使其失效。普通卡牌或界面改动复用已安装 SHA 到新 SHA 的范围 CI。源码准备与日常在线备份完成后才关闭准入。重新开放前，Beta 玩家通过真实入口读取前后端 SHA，再次进入指定对局并收到 WebSocket 快照。兼容更新若切换失败，会恢复上一版源码、依赖目录及运行时镜像，重新验收后开放。若已执行不兼容迁移，则保持维护状态并记录对应备份。失败步骤在本次 `window/state.json`。完整验收若在不可重复执行的账号创建或删除步骤中断，核对账号后可加 `--confirm-step accounts` 或 `--confirm-step deletion` 续跑。需要发布有版本号的 GitHub beta Release 时，使用下节流程。
 
 ## 发布固定预发布候选
 
