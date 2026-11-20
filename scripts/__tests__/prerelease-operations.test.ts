@@ -60,7 +60,21 @@ esac
     }
     return spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', ...args, '--config', path], { encoding: 'utf8', env, timeout: 15000 })
   }
-  return { root, config, save, invoke, env, bin, temporary, fail: join(temporary, 'fail'), calls: () => existsSync(join(temporary, 'calls')) ? readFileSync(join(temporary, 'calls'), 'utf8') : '' }
+  const offsiteScript = seedMachineBackupScripts(temporary, root)
+  return { root, config, save, invoke, env, bin, temporary, offsiteScript, fail: join(temporary, 'fail'), calls: () => existsSync(join(temporary, 'calls')) ? readFileSync(join(temporary, 'calls'), 'utf8') : '' }
+}
+
+/** Host-only backup scripts outside the policy tree, pinned by digest in the target's private `data/backup-scripts.json`. */
+function seedMachineBackupScripts(temporary: string, root: string) {
+  const ops = join(temporary, 'open-agricola-ops'), sha256: Record<string, string> = {}
+  mkdirSync(join(ops, 'deploy'), { recursive: true, mode: 0o755 })
+  for (const name of ['backup-offsite.sh', 'deploy/commit-backup-set.sh', 'deploy/offsite-retention.sh']) {
+    const bytes = Buffer.from(`#!/bin/bash\n# machine copy fixture: ${name}\n`)
+    writeFileSync(join(ops, name), bytes, { mode: 0o700 })
+    sha256[name] = createHash('sha256').update(bytes).digest('hex')
+  }
+  writeFileSync(join(root, 'data/backup-scripts.json'), JSON.stringify({ format: 1, directory: ops, sha256 }), { mode: 0o600 })
+  return join(ops, 'backup-offsite.sh')
 }
 
 function seedImportedImage(target: ReturnType<typeof parsePrereleaseTarget>, purpose: 'candidate' | 'trusted-policy', sourceSha: string, imageId: string) {
@@ -387,7 +401,7 @@ function startupRetryFixture(sourceInstalled = true, sameBuild = false, proxyNet
     targetId: target.targetId, completedAt: Date.now() }))
   writeFileSync(join(value.bin, 'bash'), `#!/bin/sh
 if [ "$1" = -euo ]; then exec /bin/bash "$@"; fi
-[ "$1" = '${process.cwd()}/backup-offsite.sh' ] || exit 88
+[ "$1" = '${value.offsiteScript}' ] || exit 88
 `, { mode: 0o700 })
   writeFileSync(join(value.bin, 'docker'), `#!/bin/sh
 set -e
@@ -849,7 +863,7 @@ fs.statSync=(path,...args)=>stat(typeof path==='string'&&path.startsWith('/sys/f
   const save = () => writeFileSync(statePath, JSON.stringify(state))
   save()
   writeFileSync(join(value.bin, 'bash'), `#!/bin/sh
-if [ "$1" = '${process.cwd()}/backup-offsite.sh' ]; then printf complete > '${completed}'; else exec /bin/bash "$@"; fi
+if [ "$1" = '${value.offsiteScript}' ]; then printf complete > '${completed}'; else exec /bin/bash "$@"; fi
 `, { mode: 0o700 })
   writeFileSync(join(value.bin, 'docker'), String.raw`#!${process.execPath}
 const fs=require('node:fs'), raw=process.argv.slice(2), args=raw[0]==='--host'?raw.slice(2):raw, line=args.join(' '), file=${JSON.stringify(statePath)};

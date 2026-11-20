@@ -345,7 +345,7 @@ Daily `backup` captures an installed source online, including an open gateway wi
 
 Candidate validation and migration receive only their selected archive, ledger or identity packet read-only. They cannot write the host backup root or the owner's private report/seal directory. Candidate scratch records use a separate private run directory; trusted cleanup retains the existing deadline and database/object ownership checks. Native PostgreSQL connection and restore-list files live in private temporary storage outside the input archive. Host report creation is exclusive and refuses links or a non-private parent.
 
-Pairing seals archive plus configuration checksums, source/target SHA, generation, fingerprint and actual isolated restore validation. Local and offsite copies have a seven-day cap; the independent erasure ledger is retained separately. Tools keep their explicit CPU/memory/PID limits, original deadline, run/environment labels and scoped cleanup. Upgrade the formal backup scripts before introducing pre jobs so legacy global reapers cannot affect pre tools. Run `budget-check` and daily `retention` through the CLI; retention also works after channel closure without app credentials or Docker. Install autonomous offsite `offsite-retention.sh <exclusive-pre-directory> 7` to retain the cap if the app host disappears.
+Pairing seals archive plus configuration checksums, source/target SHA, generation, fingerprint and actual isolated restore validation. Local and offsite copies have a seven-day cap; the independent erasure ledger is retained separately. Tools keep their explicit CPU/memory/PID limits, original deadline, run/environment labels and scoped cleanup. Upgrade the formal backup scripts before introducing pre jobs so legacy global reapers cannot affect pre tools. Run `budget-check` and daily `retention` through the CLI; retention also works after channel closure without app credentials or Docker. Install autonomous offsite `offsite-retention.sh <exclusive-pre-directory> 7` to retain the cap if the app host disappears. The offsite sync and retention scripts are host-only (see [Data Backup](#data-backup)). Pre runs them from the directory named in the owner-private `data/backup-scripts.json` (`{ format: 1, directory, sha256 }`, outside the sealed target, so updating a script never changes the fingerprint). Before each use it requires owner directories and regular owner files that only the owner can write, and the recorded SHA-256 of `backup-offsite.sh`, `deploy/commit-backup-set.sh` and `deploy/offsite-retention.sh`; any difference refuses the operation. After changing a host script, update its digest in that file.
 
 Compatible rollback uses `deploy` with the explicitly selected older verified SHA and the same backup/target-build/acceptance gates. If current retained data cannot pass that candidate, stay closed and choose reset or isolated recovery; an image switch cannot undo a schema or acknowledged writes. For reset, first obtain `close.json`, then run `reset --expected-current <SHA> --accept-loss <current-generation> --operation-id <UUID> --authority-receipt close.json`. It backs up/offsites the source, merges the latest independent ledger, verifies the stopped native DB/prefix purge, and emits a scoped `purge-<operation>.json` binding source build, generation and ledger hash. Call authority `retire` with `--purge <artifact>` and the same purge operation UUID. For final closure use `finish-close --authority-receipt <retire.json>`; only after the immutable retirement receipt exists may formal target configuration be removed. Retain source cleanup/status/ack availability until then. For reuse, prepare a new UUID with `--previous-generation <retired UUID>`, then `reinitialize --generation <new UUID> --retirement-receipt <retire.json> --authority-receipt <prepare.json>` and deploy afresh. Old retirement retries cannot close a newer generation.
 
@@ -1108,8 +1108,8 @@ Room retention is configured by administrators under **Settings → Operations d
 | `WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID` | — | App installation ID for the main repository |
 | `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | HMAC secret for `/api/github/webhook` |
 | `WORKSHOP_REFERENCE_GITHUB_TOKEN` | — | Optional project-owned read credential for public Workshop reference metadata; otherwise use the Workshop App read token. Backend only; never prefix with `VITE_` or supply an LLM key. |
-| `OFFSITE_BACKUP_TARGET` | — | SSH destination for scheduled offsite backups, such as `root@1.2.3.4`; read only by `backup-offsite.sh` |
-| `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | Remote backup directory; read only by `backup-offsite.sh` |
+| `OFFSITE_BACKUP_TARGET` | — | SSH destination for scheduled offsite backups, such as `root@1.2.3.4`; read only by the host backup script |
+| `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | Remote backup directory; read only by the host backup script |
 
 ### Bug Report Repository
 
@@ -1174,8 +1174,8 @@ An ordinary archive contains a native PostgreSQL custom-format dump, immutable S
 
 ```bash
 bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
-./backup-offsite.sh                 # Optional configured offsite copy
-./backup-offsite.sh ledger-only     # Refresh deletion facts without stopping applications
+/home/ubuntu/open-agricola-ops/backup-offsite.sh               # Host-only offsite copy
+/home/ubuntu/open-agricola-ops/backup-offsite.sh ledger-only   # Refresh deletion facts without stopping applications
 ```
 
 Stable daily and ordinary manual backups run online. They inspect the running application image and its resource-deletion protocol, then use that immutable protected-main image for capture and isolated restore validation. Deploy the complete generation supporting online backup before enabling these scripts. A legacy image or mixed generation fails backup without stopping or restarting applications.
@@ -1188,9 +1188,7 @@ Validation uses an isolated PostgreSQL database and S3 prefix. Its report identi
 
 Replay Step decoding dominates validation time and runs on one thread by default, so online backups never compete with players for more than one CPU. With applications stopped, the stable pre-deployment backup validation and `check-live` set `STORAGE_VALIDATION_CONCURRENCY=auto` to decode replays on every available CPU; a positive integer up to 64 selects an explicit worker count. The report is identical for every setting.
 
-Daily backup and deployment share `backups/.maintenance.lock`. Retention remains 7 local daily archives and 5 local pre-deploy archives; offsite retains 30 daily and 10 pre-deploy archives. All ordinary archives and corresponding configuration snapshots expire within 30 days. Keep the autonomous offsite cron for `deploy/offsite-retention.sh`; ledger copies are never ordinary archive-retention targets. Configure `OFFSITE_BACKUP_TARGET` and `OFFSITE_BACKUP_REMOTE_DIR`, then install `deploy/open-agricola-backup.cron` and its logrotate file. Manual local backups do not require an offsite host.
-
-The cron templates use the host's `Asia/Shanghai` timezone: daily backup at 04:00 and independent offsite retention at 05:30. Check `timedatectl show -p Timezone --value` on each host before installation. Ubuntu cron does not use `CRON_TZ` to select a task's scheduling timezone; adjust the schedule for any other host timezone.
+Daily backup and deployment share `backups/.maintenance.lock`. Retention remains 7 local daily archives and 5 local pre-deploy archives; stable sends only daily sets offsite. All ordinary archives and corresponding configuration snapshots expire within 30 days. Ledger copies are never ordinary archive-retention targets. The scheduled offsite script, its commit and retention helpers, and their cron and logrotate files live only on the host in `/home/ubuntu/open-agricola-ops`, outside this repository; its README documents modes (`full`, `capture`, `sync-only`, `ledger-only`), offsite selection, retention and schedules. It reads `BACKUP_POLICY_ROOT` for the repository's `scripts/backup-storage.sh`, `scripts/backup-process.sh` and `scripts/backup-files.mjs`. Manual local backups do not require an offsite host.
 
 Offsite ledger synchronization reads the remote copy, merges it into the current S3 CAS ledger, and exports the union. Old backups or local copies cannot erase newer deletion facts. Use `ledger-only` immediately after a removal.
 
@@ -1285,7 +1283,7 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-An asset removal may use an existing Tombstone Room whose ledger proves the reference. The violating hash becomes a permanent ledger rule: restoring an old backup automatically removes new references, and later rooms cannot archive the same content. The operation is idempotent. Ordinary whole-Replay removal deletes only assets no longer referenced by another Replay. On success, immediately run `./backup-offsite.sh ledger-only` to back up the latest independent ledger offsite.
+An asset removal may use an existing Tombstone Room whose ledger proves the reference. The violating hash becomes a permanent ledger rule: restoring an old backup automatically removes new references, and later rooms cannot archive the same content. The operation is idempotent. Ordinary whole-Replay removal deletes only assets no longer referenced by another Replay. On success, immediately run the host `backup-offsite.sh ledger-only` to back up the latest independent ledger offsite.
 
 ### Rotate Bug Report Token Keys
 

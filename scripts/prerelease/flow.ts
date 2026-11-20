@@ -11,6 +11,7 @@ import { compareIdentityRefs } from './identity-manifest'
 import { readFormalBrowserDeployment, verifyFormalBrowserAcceptance } from './browser-policy'
 import { executeImageCleanup, planImageCleanup } from './image-cleanup'
 import { readPreparedPrereleaseSource } from './source-preparation'
+import { machineBackupScripts } from './backup-scripts'
 
 export type OperationRequest = { action: string; expectedCurrent: string; rollbackCompatible?: boolean; buildId?: string; generation?: string; nextGeneration?: string;
   acceptLoss?: string; operationId?: string; acceptanceFile?: string; authorityFile?: string; retirementFile?: string; backupStem?: string; sourceTarget?: PrereleaseTarget;
@@ -71,7 +72,7 @@ function capture(target: PrereleaseTarget, record: RuntimeRecord, stem: string, 
   const env = backupEnvironment(target, record)
   if (!existsSync(report)) command('bash', [join(target.policyDirectory, 'scripts/backup-storage.sh'), stem, ...(online ? [] : ['--already-stopped'])], { env, timeout: 30 * 60 * 1000 })
   verifyBackup(target, stem, record.installed.buildId, destination)
-  command('bash', [join(target.policyDirectory, 'backup-offsite.sh'), 'sync-only'], { env, timeout: 30 * 60 * 1000 })
+  command('bash', [machineBackupScripts(target).offsite, 'sync-only'], { env, timeout: 30 * 60 * 1000 })
 }
 
 function deploymentImage(target: PrereleaseTarget, source: boolean, buildId: string, operation: RuntimeRecord['operation']) {
@@ -134,7 +135,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
       BACKUP_RETENTION_DAYS: '7', BACKUP_ENVIRONMENT: target.targetId, BACKUP_TARGET_FINGERPRINT: targetFingerprint(target),
     }) })
     command('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', target.offsite.host, 'bash', '-s', '--', target.offsite.directory, '7'],
-      { input: readFileSync(join(target.policyDirectory, 'deploy/offsite-retention.sh')), timeout: 60_000 })
+      { input: machineBackupScripts(target).retention, timeout: 60_000 })
     return { targetId: target.targetId, retentionDays: 7, mode: record.mode }
   }
   if (request.action === 'initialize') {
@@ -176,7 +177,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     verifyPermissions(target)
     trustedArchiveImage(target)
     writeRuntime(target, record)
-    command('bash', [join(target.policyDirectory, 'backup-offsite.sh')], { env: backupEnvironment(target, record), timeout: 30 * 60 * 1000 })
+    command('bash', [machineBackupScripts(target).offsite], { env: backupEnvironment(target, record), timeout: 30 * 60 * 1000 })
     return { channel: 'prerelease', targetId: target.targetId, mode: 'online', generation: record.generation }
   }
   if (request.action === 'budget-check') {
@@ -354,7 +355,7 @@ export async function runPrereleaseOperation(target: PrereleaseTarget, request: 
     if (operation.stage === 'backup') {
       verifyPermissions(target)
       policyTool(target, 'empty')
-      command('bash', [join(source.policyDirectory, 'backup-offsite.sh'), 'ledger-only'], { env: backupEnvironment(source, previous), timeout: 1800_000 })
+      command('bash', [machineBackupScripts(source).offsite, 'ledger-only'], { env: backupEnvironment(source, previous), timeout: 1800_000 })
       archiveTool(source, 'capture', ['ledger-export', '/backup/replay-removals.latest.json'])
       command('cp', ['--', join(backupRoot(source), 'replay-removals.latest.json'), join(backupRoot(target), 'replay-removals.latest.json')])
       prepareRestoreStaging(target, point, id, next)

@@ -82,9 +82,7 @@ describe('production deployment config', () => {
     expect(dockerfile).toContain('USER node')
     const compose = readFileSync('docker-compose.prod.yml', 'utf8')
     expect(compose.match(/user: "\$\{APP_UID:-1000\}:\$\{APP_GID:-1000\}"/g)).toHaveLength(2)
-    for (const file of ['backup-offsite.sh', 'scripts/backup-storage.sh']) {
-      expect(readFileSync(file, 'utf8')).toContain('export APP_UID="$(id -u)" APP_GID="$(id -g)"')
-    }
+    expect(readFileSync('scripts/backup-storage.sh', 'utf8')).toContain('export APP_UID="$(id -u)" APP_GID="$(id -g)"')
   })
 
   it('uses mandatory recording and shared dependencies in both container entry points', () => {
@@ -143,98 +141,10 @@ describe('production deployment config', () => {
     }
   })
 
-  it('keeps scheduled backup on the shared maintenance lock without waiting', () => {
-    const backup = readFileSync('backup-offsite.sh', 'utf8')
-    expect(backup).toContain('exec 9>backups/.maintenance.lock')
-    expect(backup).toContain("flock -n 9 || { echo 'Backup or deployment is already running; skip this schedule'; exit 0; }")
-  })
-
-  it('runs retention and offsite sync even when the daily backup fails', () => {
-    const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain('if [[ "$MODE" == full ]] && ! MAINTENANCE_LOCK_HELD=1 bash "$POLICY_ROOT/scripts/backup-storage.sh" "$BACKUP_STEM"; then')
-    const failureHandledAt = script.indexOf('if [[ "$MODE" == full ]] && ! MAINTENANCE_LOCK_HELD=1 bash "$POLICY_ROOT/scripts/backup-storage.sh" "$BACKUP_STEM"; then')
-    const localPruneAt = script.indexOf('backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" prune backups "${BACKUP_DAILY_COUNT:-7}" "${BACKUP_PRE_COUNT:-5}"')
-    const remotePruneAt = script.indexOf('"$OFFSITE_BACKUP_REMOTE_DIR" "${BACKUP_RETENTION_DAYS:-30}" < "$POLICY_ROOT/deploy/offsite-retention.sh"')
-    expect(localPruneAt).toBeGreaterThan(failureHandledAt)
-    expect(remotePruneAt).toBeGreaterThan(localPruneAt)
-    const rsyncFailureAt = script.indexOf('Offsite transfer failed')
-    expect(rsyncFailureAt).toBeGreaterThan(-1)
-    expect(remotePruneAt).toBeGreaterThan(rsyncFailureAt)
-  })
-
-  it('propagates shared-ledger sync failures to the cron exit status', () => {
-    const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain('sync_ledger || LEDGER_OK=0')
-    expect(script).toContain('"$LEDGER_OK" != 1')
-  })
-
-  it('unions independent S3 erasure facts before copying them offsite', () => {
-    const script = readFileSync('backup-offsite.sh', 'utf8')
-    const mergeAt = script.indexOf('backup_container ledger-merge')
-    const exportAt = script.indexOf('backup_container ledger-export')
-    const uploadAt = script.indexOf('rsync -a -e')
-    expect(mergeAt).toBeGreaterThan(-1)
-    expect(exportAt).toBeGreaterThan(mergeAt)
-    expect(uploadAt).toBeGreaterThan(exportAt)
-    expect(script).not.toContain('REPLAY_REMOVAL_LEDGER_PATH')
-  })
-
-  it('enforces the offsite 30-day cap autonomously on the replica host', () => {
-    const retention = readFileSync('deploy/offsite-retention.sh', 'utf8')
-    const cron = readFileSync('deploy/open-agricola-offsite-retention.cron', 'utf8')
-    expect(retention).toContain('RETENTION_DAYS="${2:-30}"')
-    expect(retention).toContain('RETENTION_DAYS >= 1 && RETENTION_DAYS <= 30')
-    expect(retention).toContain('MAX_AGE_MINUTES=$((RETENTION_DAYS * 24 * 60))')
-    expect(retention).toContain('find . -maxdepth 1 -name \'*.tgz\' -mmin "+$MAX_AGE_MINUTES"')
-    expect(retention).toContain('rm -f "$OLD" "$STEM.manifest.json" "env-$STEM"')
-    expect(cron).not.toMatch(/^CRON_TZ=/m)
-    expect(cron).toContain('30 5 * * * root /root/offsite-retention.sh')
-    expect(cron).toContain('/root/offsite-retention.sh')
-  })
-
   it('keeps the independent erasure ledger outside ordinary archive synchronization', () => {
-    const script = readFileSync('backup-offsite.sh', 'utf8')
     const files = readFileSync('scripts/backup-files.mjs', 'utf8')
     expect(files).not.toContain('replay-removals.latest.json')
-    expect(script).toContain('backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" list backups')
-    expect(script).toContain('POLICY_ROOT="${BACKUP_POLICY_ROOT:-$(cd "$(dirname "$0")" && pwd)}"')
-    expect(script).toContain('cd "${BACKUP_WORKING_DIRECTORY:-$POLICY_ROOT}"')
     expect(files).toContain('Number(process.env.BACKUP_RETENTION_DAYS ?? 30)')
-    expect(script).toContain('ledger-only')
     expect(readFileSync('scripts/backup-storage.sh', 'utf8')).toContain('ledger-export /backup/replay-removals.latest.json')
-  })
-
-  it('uses the native archive helper for scheduled backups', () => {
-    expect(readFileSync('backup-offsite.sh', 'utf8')).toContain('bash "$POLICY_ROOT/scripts/backup-storage.sh" "$BACKUP_STEM"')
-  })
-
-  it('keeps the offsite retention independent from local pruning and within the 30-day cap', () => {
-    const script = readFileSync('backup-offsite.sh', 'utf8')
-    const retention = readFileSync('deploy/offsite-retention.sh', 'utf8')
-    const rsyncStart = script.indexOf('backup_rsync -az')
-    expect(rsyncStart).toBeGreaterThan(-1)
-    const rsyncEnd = script.indexOf('&& backup_rsync -a', rsyncStart)
-    expect(rsyncEnd).toBeGreaterThan(rsyncStart)
-    const rsyncCommand = script.slice(rsyncStart, rsyncEnd)
-    expect(rsyncCommand).not.toContain('--delete')
-    expect(rsyncCommand).toContain('--files-from=')
-    expect(script).toContain('backup_command node "$POLICY_ROOT/scripts/backup-files.mjs" prune backups "${BACKUP_DAILY_COUNT:-7}" "${BACKUP_PRE_COUNT:-5}"')
-    expect(retention).toContain('RETENTION_DAYS="${2:-30}"')
-    expect(retention).toContain('RETENTION_DAYS >= 1 && RETENTION_DAYS <= 30')
-    expect(retention).toContain('MAX_AGE_MINUTES=$((RETENTION_DAYS * 24 * 60))')
-    expect(retention).toContain('DAILY_KEEP=30; PRE_KEEP=10')
-    expect(retention).toContain('committed daily- | sort -nr | tail -n "+$((DAILY_KEEP + 1))"')
-    expect(retention).toContain('committed pre- | sort -nr | tail -n "+$((PRE_KEEP + 1))"')
-  })
-
-  it('schedules the offsite backup at 04:00 in the host timezone with log rotation', () => {
-    const cron = readFileSync('deploy/open-agricola-backup.cron', 'utf8')
-    const logrotate = readFileSync('deploy/open-agricola-backup.logrotate', 'utf8')
-    expect(cron).not.toMatch(/^CRON_TZ=/m)
-    expect(cron).toContain('0 4 * * * ubuntu /home/ubuntu/open-agricola/backup-offsite.sh')
-    expect(cron).toContain('/home/ubuntu/open-agricola/logs/backup.log')
-    expect(logrotate).toContain('/home/ubuntu/open-agricola/logs/backup.log')
-    expect(logrotate).toContain('su ubuntu ubuntu')
-    expect(logrotate).toContain('create 600 ubuntu ubuntu')
   })
 })

@@ -379,7 +379,7 @@ node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$a
 
 候选验证和迁移只取得所选归档、账本或身份 packet 的只读挂载，不能写宿主备份根目录或 owner 私有的 report/seal 目录。候选 scratch 记录保存在独立私有 run 目录，可信清理仍核对原期限及数据库/对象归属。原生 PostgreSQL 连接文件和恢复列表写入归档输入之外的私有临时目录。宿主独占创建 report，拒绝链接或非私有父目录。
 
-配对清单绑定归档/配置哈希和大小、源/目标 SHA、代次、指纹及实际隔离恢复验证。本地和离站副本最多保留七天，独立删除账本另行保留。工具保留原 CPU/内存/PID 限额、原 deadline、run/environment 标签和定域清理。引入 pre 任务前必须升级正式备份脚本，防止旧全局 reaper 清理 pre 工具。通过 CLI 定时执行 budget-check 和每日 retention；retention 在关闭通道后无需 app 凭据或 Docker 仍可执行。离站另装 `offsite-retention.sh <独占pre目录> 7`，确保 app 宿主失联仍遵守期限。
+配对清单绑定归档/配置哈希和大小、源/目标 SHA、代次、指纹及实际隔离恢复验证。本地和离站副本最多保留七天，独立删除账本另行保留。工具保留原 CPU/内存/PID 限额、原 deadline、run/environment 标签和定域清理。引入 pre 任务前必须升级正式备份脚本，防止旧全局 reaper 清理 pre 工具。通过 CLI 定时执行 budget-check 和每日 retention；retention 在关闭通道后无需 app 凭据或 Docker 仍可执行。离站另装 `offsite-retention.sh <独占pre目录> 7`，确保 app 宿主失联仍遵守期限。异机同步和保留脚本只放在主机上（见[数据备份](#数据备份)）。pre 从 owner 私有的 `data/backup-scripts.json`（`{ format: 1, directory, sha256 }`，不在封存 target 内，更新脚本不改变指纹）所指目录运行它们；每次使用前要求目录和文件均属 owner 且只有 owner 可写，并核对 `backup-offsite.sh`、`deploy/commit-backup-set.sh`、`deploy/offsite-retention.sh` 的 SHA-256，任一不符即拒绝操作。修改主机脚本后，同步更新该文件中的摘要。
 
 兼容回退仍用 deploy，明确选择经过验证的旧 SHA，并重新经过备份、目标数据验证和验收。当前保留数据不能通过时留在维护态，选择 reset 或隔离恢复；换镜像不能撤销 schema 或已确认写入。reset 前取得 close 回执，运行 `reset --expected-current <SHA> --accept-loss <当前代次> --operation-id <UUID> --authority-receipt close.json`。它先备份并离站同步、合并最新独立删除账本，再验证停写后的真实库/prefix 清空，输出绑定源 build/代次/账本哈希的 `purge-<操作>.json`。authority retire 使用 `--purge <产物>` 及同一 purge 操作 UUID。最终关闭再执行 `finish-close --authority-receipt <retire.json>`；只有不可变 retirement 回执存在后才能移除正式 target 配置，在此之前保留 source cleanup/status/ack。复用资源时先以 `--previous-generation <旧UUID>` prepare 新 UUID，再 `reinitialize --generation <新UUID> --retirement-receipt <retire.json> --authority-receipt <prepare.json>`，重新部署。旧 retire 重试不会关闭新代次。
 
@@ -1160,8 +1160,8 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID` | — | App 在主仓库的 installation ID |
 | `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | `/api/github/webhook` HMAC secret |
 | `WORKSHOP_REFERENCE_GITHUB_TOKEN` | — | 可选的项目 GitHub 只读凭据，用于公开工坊资料元数据；未设置时使用 Workshop App 的只读 token。仅后端使用，禁止加 `VITE_` 前缀或填入 LLM key。 |
-| `OFFSITE_BACKUP_TARGET` | — | 定时异机备份的 ssh 目标（如 `root@1.2.3.4`）；仅 `backup-offsite.sh` 读取，不进应用容器 |
-| `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | 异机上的备份存放目录；仅 `backup-offsite.sh` 读取 |
+| `OFFSITE_BACKUP_TARGET` | — | 定时异机备份的 ssh 目标（如 `root@1.2.3.4`）；仅主机备份脚本读取，不进应用容器 |
+| `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | 异机上的备份存放目录；仅主机备份脚本读取 |
 
 ### Bug Report 仓库
 
@@ -1226,8 +1226,8 @@ Game Bug Reports 交付到公开的 `titanxxh/open-agricola` 仓库。将独立 
 
 ```bash
 bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
-./backup-offsite.sh                 # Optional configured offsite copy
-./backup-offsite.sh ledger-only     # Refresh deletion facts without stopping applications
+/home/ubuntu/open-agricola-ops/backup-offsite.sh               # Host-only offsite copy
+/home/ubuntu/open-agricola-ops/backup-offsite.sh ledger-only   # Refresh deletion facts without stopping applications
 ```
 
 正式站的每日和普通手动备份在线执行。脚本检查运行中应用镜像及其资源删除协议，再使用该不可变的受保护 main 镜像完成捕获和隔离恢复验证。启用这些脚本前，先部署支持在线备份的完整应用代际。旧镜像或混合代际会使备份失败，不会停止或重启应用。
@@ -1240,9 +1240,7 @@ bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
 
 回放步骤解码占校验时间的绝大部分，默认单线程执行，因此在线备份最多与玩家争用一个 CPU。应用停止时，正式环境的发布前备份校验和 `check-live` 设置 `STORAGE_VALIDATION_CONCURRENCY=auto`，用全部可用 CPU 并行解码回放；也可以设为不超过 64 的正整数，指定 worker 数。任一设置得到的报告完全相同。
 
-每日备份与部署共用 `backups/.maintenance.lock`。保留策略仍是本地 daily 7 份、pre 5 份，异机 daily 30 份、pre 10 份，所有普通归档及其配置快照最多 30 天。保留 `deploy/offsite-retention.sh` 的异机独立 cron，删除 ledger 不受归档清理影响。配置 `OFFSITE_BACKUP_TARGET` 和 `OFFSITE_BACKUP_REMOTE_DIR` 后安装仓库 `deploy/open-agricola-backup.cron` 与 logrotate 配置；无异机时仍可执行本机手动备份。
-
-cron 模板按宿主机的 `Asia/Shanghai` 时区调度：每日 04:00 备份，05:30 执行异机独立保留清理。安装前在两台主机分别运行 `timedatectl show -p Timezone --value` 核对。Ubuntu cron 不使用 `CRON_TZ` 选择单个任务的调度时区；其他宿主机时区需要相应调整表达式。
+每日备份与部署共用 `backups/.maintenance.lock`。保留策略仍是本地 daily 7 份、pre 5 份，正式环境只把 daily 送异机，所有普通归档及其配置快照最多 30 天。删除 ledger 不受归档清理影响。定时异机脚本及其提交、保留辅助脚本和 cron、logrotate 配置只放在主机 `/home/ubuntu/open-agricola-ops`，不在本仓库；其 README 说明模式（`full`、`capture`、`sync-only`、`ledger-only`）、异机选择、保留和调度。它通过 `BACKUP_POLICY_ROOT` 读取本仓库的 `scripts/backup-storage.sh`、`scripts/backup-process.sh` 和 `scripts/backup-files.mjs`。无异机时仍可执行本机手动备份。
 
 异机 ledger 同步先读远端副本，合并到当前 S3 的 CAS ledger，再导出其并集。旧普通备份、旧本地副本都不能抹掉较新的删除事实。立即删除后的异机同步仍使用 `ledger-only`。
 
@@ -1337,7 +1335,7 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-资产下架可使用 ledger 已证明引用关系的既有 Tombstone Room 作为入口。违规 Hash 会作为永久规则写入 ledger：旧备份恢复时自动下架新增引用，后续 Room 也不能重新归档同一内容。操作幂等；普通整局下架只删除不再被其他 Replay 引用的资源。成功后立即执行 `./backup-offsite.sh ledger-only` 异机备份最新 `replay-removals.jsonl`。
+资产下架可使用 ledger 已证明引用关系的既有 Tombstone Room 作为入口。违规 Hash 会作为永久规则写入 ledger：旧备份恢复时自动下架新增引用，后续 Room 也不能重新归档同一内容。操作幂等；普通整局下架只删除不再被其他 Replay 引用的资源。成功后立即执行主机上的 `backup-offsite.sh ledger-only` 异机备份最新 `replay-removals.jsonl`。
 
 ### Bug Report token 密钥轮换
 
