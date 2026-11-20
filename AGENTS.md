@@ -23,7 +23,7 @@ pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0
 ./restart-local.sh --intranet   # 改绑局域网 IP（eth0/en0），供同网段其他机器访问
 pnpm test                   # vitest 全量（fast + slow）
 pnpm test:fast              # 本机完整 fast project；范围 CI 按计划选择
-pnpm test:slow              # 只跑 slow project（单卡 session 测试）
+pnpm test:slow              # 只跑 slow 与 slow-scripts project（单卡 session 测试、重型 CLI 工具测试）
 pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
 pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不启动应用
 pnpm verify prepush         # 可选本机完整 fast 门禁，含边界扫描、工具类型与 lint，记录实际范围
