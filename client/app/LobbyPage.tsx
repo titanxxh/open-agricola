@@ -1,7 +1,6 @@
 import { isPrereleaseClient } from '../services/prerelease-runtime'
 import { TeamSetupFields, TeamConfigurationSummary } from './TeamSetupFields'
 import type { TeamConfiguration } from '../../shared/contract/team'
-import { browserApiFetch } from '../services/browser-api'
 import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useId, useState, type MouseEvent } from 'react'
 import { lobbyNeedsTurnTab, useTurnTabTitle } from './use-turn-tab-title'
