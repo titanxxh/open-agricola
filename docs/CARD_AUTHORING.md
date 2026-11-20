@@ -15,6 +15,8 @@ The card **needs a platform change** when it needs any of those core changes, or
 
 The card **needs more information** when the printed text leaves the timing, the choosing player or an edge case open, and the rules in §3 do not settle it. Ask one precise question.
 
+In the Workshop, record this verdict with `report_feasibility` before writing artifacts; a `needs-platform` verdict lets the author prefill a GitHub issue with your evidence and gaps.
+
 Absence of evidence is not evidence of absence. Before declaring a gap, search the card text pattern in §4, the hook list in `shared/cards/card-effects.ts`, the subscription contract in `shared/cards/listener-contract.ts`, and a similar existing card.
 
 ## 2. Card Source shape
@@ -189,7 +191,7 @@ Tests: `E160_KelpGatherer-session.test.ts` (with `confirmPlayerSwitch`) and `A13
 
 ## 5. Session tests
 
-Every card test covers at least one **positive** scenario, where the effect fires and changes state, and one **negative** scenario, where it must not fire: the card is not in play, another player triggers it, the player declines, or the cost cannot be paid. [CARD_TEST_TEMPLATE](CARD_TEST_TEMPLATE.md) lists what to record and assert.
+Every card test covers at least one **positive** scenario, where the effect fires and changes state, and one **negative** scenario, where it must not fire: the card is not in play, another player triggers it, the player declines, or the cost cannot be paid. [CARD_TEST_TEMPLATE](CARD_TEST_TEMPLATE.md) lists what to record and assert. Workshop browser tests name each case `positive: …` or `negative: …`; a run passes only with at least one passing test of each kind.
 
 **Repository Session tests** (`server/__tests__/*-session.test.ts`):
 

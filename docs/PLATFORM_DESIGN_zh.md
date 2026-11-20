@@ -170,7 +170,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 未命中缓存的元数据读取在取得项目凭据前消耗 PostgreSQL 共享额度：每个已认证用户每分钟 20 次、每小时 120 次，全站每分钟 100 次、每小时 1,000 次。用户额度拒绝不消耗全站额度。GitHub 冷却期限也由多个后端实例共享，返回 `429` 与 `Retry-After`；每个进程另限制最多 3 个上游读取并发。目录接口仅接受过去一小时内成功读取 main 时确认过的 commit，在返回缓存前也检查。main 成功后重试目录仍沿用原 SHA。已经初始化的资料会话持有自己的目录，一小时授权窗口过后仍可继续读取同 SHA 的源码正文，不重新解析 main。
 
-模型使用四个工具：`search_references`、`read_reference`、`write_artifacts({source, tests})` 和 `run_tests()`，按模型返回顺序执行。写入替换整组源码与测试并使报告失效；测试先由服务端校验源码（原生 Card Source 模块只校验结构），再用浏览器 Worker 执行作者编写的 TypeScript / Chai 行为测试。诊断作为工具结果返回，由模型决定修复与重跑。最后的文字不再提供源码，不设固定修复次数、预留末轮或特殊续跑 JSON。
+模型使用五个工具：`search_references`、`read_reference`、`report_feasibility`、`write_artifacts({source, tests})` 和 `run_tests()`，按模型返回顺序执行。`report_feasibility` 记录预研后的判断（`feasible`、`needs-info` 或 `needs-platform`），附依据、缺口和问题；只有 `feasible` 才解锁 `write_artifacts`。写入替换整组源码与测试并使报告失效；测试先由服务端校验源码（原生 Card Source 模块只校验结构），再用浏览器 Worker 执行作者编写的 TypeScript / Chai 行为测试。诊断作为工具结果返回，由模型决定修复与重跑。最后的文字不再提供源码，不设固定修复次数、预留末轮或特殊续跑 JSON。
 
 同时最多一个模型 POST；失败后必须显式重试，沿用资料 commit 和累计统计。取消保留已写产物。资料的文件、行数、响应大小及 blob hash 检查继续保留，不另设资料调用次数额度。provider 推理、签名和 tool ID 只在页面协议内存中保留。流限制仍为累计 SSE 32 MiB、单事件与解码消息各 2 MiB。
 
@@ -182,7 +182,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 已确认的[请求/结果契约](https://github.com/titanxxh/open-agricola/issues/1034)规定：追加需求以当前选中的能力候选为基线，没有选中候选时使用已采用草稿；错误修复绑定实际报错的固定版本源码与卡牌身份。固化响应直接提供已存储的不可变版本快照，即使内容去重复用了最近五条历史之外的旧版本，也能读取该快照。身份必须从固定版本读取；字段缺失，或当前卡牌 ID、类型、名称发生变化时，在创建模型连接前拒绝修复，提示作者重新固化并试玩当前版本。各入口共用请求构造，明确卡牌身份、用户目标、源码与输入指纹，以及相关可见对话。修复请求只在 `input.source` 保留一份实际试玩源码；intent 仅保留错误和版本元数据。新请求读取最新资料 commit；模型通过工具修复和显式继续仍在同一次尝试内。实际沙盒试玩报错后，只有作者点击 **AI 修复**才开始新尝试。
 
-**Generation Result（生成结果）**包含候选、保留的失败产物、普通回答，或故障/中断说明。采用必须同时满足源码校验与至少一项浏览器测试通过；报告须匹配当前源码、测试和实际浏览器 Worker。修改任一文本会使报告失效，修改源码还会使静态校验失效。没有产物就没有候选；后续失败保留上一份通过双门禁的候选，过期异步结果不能覆盖新编辑。
+**Generation Result（生成结果）**包含候选、保留的失败产物、普通回答、`needs-info` 或 `needs-platform` 判断，或故障/中断说明。`needs-platform` 结果展示依据和缺口，并提供预填 GitHub issue 的链接，由作者用自己的账号提交（[`platform-issue.ts`](../client/app/workshop/platform-issue.ts)）。采用必须同时满足源码校验与浏览器测试通过；浏览器测试只有在至少各有一条通过的 `positive: …` 和 `negative: …` 用例时才算通过；报告须匹配当前源码、测试和实际浏览器 Worker。修改任一文本会使报告失效，修改源码还会使静态校验失效。没有产物就没有候选；后续失败保留上一份通过双门禁的候选，过期异步结果不能覆盖新编辑。
 
 页面仅在内存保留原始工具协议、provider 推理和签名。同浏览器恢复只保留可见对话与编辑状态，未完成工作标为已中断，不自动续跑。私有服务端草稿保存当前已采用测试、最近通过双门禁的候选及最近结果，报告和溯源均有界。共享投影 `shared/projections/workshop-generation.ts` 负责这些字段白名单。
 
@@ -208,7 +208,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 ### C2. 系统提示词与参考资料
 
-精简提示词位于 [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts)，定义任务、不可变卡牌身份、信任边界与四个工具：`search_references`、`read_reference`、`write_artifacts` 和 `run_tests`。它要求输出原生 Card Source 模块（ADR 0052），从 `docs/CARD_AUTHORING.md` 开始研究，要求正向与反向测试，不嵌入能力清单。已部署的契约只用于标识运行时、绑定校验结果；运行时标识与资料 commit 分别记录。
+精简提示词位于 [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts)，定义任务、不可变卡牌身份、信任边界与五个工具：`search_references`、`read_reference`、`report_feasibility`、`write_artifacts` 和 `run_tests`。它要求输出原生 Card Source 模块（ADR 0052），从 `docs/CARD_AUTHORING.md` 开始研究，写产物前先给出可行性判断，测试名使用 `positive:` / `negative:` 前缀，不嵌入能力清单。已部署的契约只用于标识运行时、绑定校验结果；运行时标识与资料 commit 分别记录。
 
 模型从本次尝试固定 commit 的 GitHub 资料读取源码、引擎消费者及直接行为或 Session 测试。[`CUSTOM_CARD_SANDBOX_zh.md`](CUSTOM_CARD_SANDBOX_zh.md) 说明工坊代码在哪里运行、服务端检查什么。站点不另存少样本语料或能力描述 map。
 

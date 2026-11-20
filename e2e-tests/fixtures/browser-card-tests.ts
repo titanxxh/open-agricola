@@ -37,14 +37,14 @@ function prepared() {
 `
 
 export const passingTests = preparation + `
-test('Forest gains exactly 4 wood and clears the space', () => {
+test('positive: Forest gains exactly 4 wood and clears the space', () => {
   const { session } = prepared()
   const result = session.takeAction(0, 'forest')
   expect(result.ok, result.error).to.equal(true)
   expect(result.state.players[0].resources.wood).to.equal(4)
   expect(result.state.actionSpaces.find(space => space.id === 'forest').resources.wood).to.equal(0)
 })
-test('Fishing does not trigger the wood bonus', () => {
+test('negative: Fishing does not trigger the wood bonus', () => {
   const { session, state } = prepared()
   state.actionSpaces.find(space => space.id === 'fishing').resources.food = 2
   const result = session.takeAction(0, 'fishing')
@@ -52,7 +52,7 @@ test('Fishing does not trigger the wood bonus', () => {
   expect(result.state.players[0].resources.wood).to.equal(0)
   expect(result.state.players[0].resources.food).to.equal(2)
 })
-test('A new Session has no previous reward', () => {
+test('negative: a new Session has no previous reward', () => {
   const { player } = prepared()
   expect(player.resources.wood).to.equal(0)
 })
@@ -71,7 +71,15 @@ export const choiceSource = cardSource(`{
   }`)
 
 export const choiceTests = preparation + `
-test('A pending choice grants only the selected reward', () => {
+test('negative: Fishing asks for no reward choice', () => {
+  const { session, state } = prepared()
+  state.actionSpaces.find(space => space.id === 'fishing').resources.food = 2
+  const result = session.takeAction(0, 'fishing')
+  expect(result.ok, result.error).to.equal(true)
+  expect(result.interaction.request?.kind).to.not.equal('choice')
+  expect(result.state.players[0].resources.grain).to.equal(0)
+})
+test('positive: a pending choice grants only the selected reward', () => {
   const { session } = prepared()
   const pending = session.takeAction(0, 'forest')
   expect(pending.ok, pending.error).to.equal(true)
@@ -94,7 +102,7 @@ test('A forged ready cannot turn a failed assertion green', () => {
 `
 
 export const isolationTests = (url: string) => `
-test('Real worker global has an opaque origin', () => {
+test('positive: the real worker global has an opaque origin', () => {
   const real = Function('return globalThis')()
   expect(real.origin).to.equal('null')
   expect(real.document).to.equal(undefined)
@@ -103,7 +111,7 @@ test('Real worker global has an opaque origin', () => {
   expect(real.Worker).to.equal(undefined)
   expect(real.SharedWorker).to.equal(undefined)
 })
-test('Opaque worker cannot open origin storage', async () => {
+test('negative: the opaque worker cannot open origin storage', async () => {
   const real = Function('return globalThis')()
   let blocked = false
   try {
@@ -112,7 +120,7 @@ test('Opaque worker cannot open origin storage', async () => {
   } catch { blocked = true }
   expect(blocked).to.equal(true)
 })
-test('CSP blocks a real credentialed network attempt', async () => {
+test('negative: CSP blocks a real credentialed network attempt', async () => {
   const real = Function('return globalThis')()
   expect(typeof real.fetch).to.equal('function')
   let blocked = false
@@ -120,7 +128,7 @@ test('CSP blocks a real credentialed network attempt', async () => {
   catch { blocked = true }
   expect(blocked).to.equal(true)
 })
-test('CSP blocks importScripts', () => {
+test('negative: CSP blocks importScripts', () => {
   let blocked = false
   try { Function('return globalThis')().importScripts(${JSON.stringify(url)}) }
   catch { blocked = true }
