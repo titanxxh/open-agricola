@@ -8,6 +8,20 @@ vi.setConfig({ testTimeout: 15_000 })
 
 afterEach(removeBackendImageMaintenanceRoots)
 
+// The archive-preservation and keep-maintenance cases share their live and up-identity failures: each failure runs
+// maintenance once, records what both cases assert, and the later case reads that record.
+const failedRuns = new Map<string, ReturnType<typeof observeFailedRun>>()
+function observeFailedRun(failure: string) {
+  const value = fixture(failure), archiveBefore = readFileSync(value.archivePath), result = value.invoke()
+  return { status: result.status, archiveBefore, archiveAfter: readFileSync(value.archivePath), requestRetained: existsSync(value.requestPath),
+    imageRetained: existsSync(join(value.stage, 'image.json')), restarted: value.calls().some(call => call.args[0] === 'start'), started: value.current().started }
+}
+const failedRun = (failure: string) => {
+  const observed = failedRuns.get(failure) ?? observeFailedRun(failure)
+  failedRuns.set(failure, observed)
+  return observed
+}
+
 it('delivers an imported immutable image with source capture, target restore validation and no host build', () => {
   const value = fixture(), result = value.invoke()
   expect(result.status, result.stderr).toBe(0)
@@ -55,11 +69,11 @@ it('removes only the accepted operation archive after successful maintenance and
 })
 
 it.each(['backup', 'live', 'up-identity'])('preserves the uploaded archive and diagnostic records after %s failure', failure => {
-  const value = fixture(failure), bytes = readFileSync(value.archivePath), result = value.invoke()
-  expect(result.status).not.toBe(0)
-  expect(readFileSync(value.archivePath)).toEqual(bytes)
-  expect(existsSync(value.requestPath)).toBe(true)
-  expect(existsSync(join(value.stage, 'image.json'))).toBe(true)
+  const run = failedRun(failure)
+  expect(run.status).not.toBe(0)
+  expect(run.archiveAfter).toEqual(run.archiveBefore)
+  expect(run.requestRetained).toBe(true)
+  expect(run.imageRetained).toBe(true)
 })
 
 it('reports archive cleanup failure after acceptance without recursively deleting evidence or stopping the accepted app', () => {
@@ -121,10 +135,10 @@ it('does not inherit unrelated backup service, environment or image overrides', 
 })
 
 it.each(['drain', 'live', 'up', 'up-identity', 'backup-stopped', 'source-changed'])('keeps maintenance after %s instead of restarting the old executable', failure => {
-  const value = fixture(failure), result = value.invoke()
-  expect(result.status).not.toBe(0)
-  expect(value.calls().some(call => call.args[0] === 'start')).toBe(false)
-  expect(value.current().started).toBe(false)
+  const run = failedRun(failure)
+  expect(run.status).not.toBe(0)
+  expect(run.restarted).toBe(false)
+  expect(run.started).toBe(false)
 })
 
 it('gives the named live validator the bounded remaining work budget rather than two minutes', () => {

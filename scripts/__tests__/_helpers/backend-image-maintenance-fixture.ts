@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { dockerFixtureEnvironment } from './docker-fixture-environment'
 import { createBackendImageFixture } from './backend-image-fixture'
@@ -11,13 +12,57 @@ const repository = resolve(import.meta.dirname, '../../..'), roots: string[] = [
 /** Each test file registers this in afterEach; it removes every fixture root created since the last call. */
 export const removeBackendImageMaintenanceRoots = () => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) }
 
+type BackendImageFixture = ReturnType<typeof createBackendImageFixture>
+const caddyDigest = `caddy@sha256:${'d'.repeat(64)}`
+const oldId = '1'.repeat(64), caddyId = '2'.repeat(64), newId = '3'.repeat(64), sourceBuild = '7'.repeat(40), sourceImage = `sha256:${'8'.repeat(64)}`, caddyImage = `sha256:${'9'.repeat(64)}`
+const data = { DATABASE_URL: 'postgres://private-fixture/formal', S3_ENDPOINT: 'http://objects:9000', S3_BUCKET: 'formal', S3_PREFIX: '', S3_REGION: 'fixture', S3_FORCE_PATH_STYLE: 'true', S3_ACCESS_KEY_ID: 'private-fixture-key', S3_SECRET_ACCESS_KEY: 'private-fixture-secret' }
+const originalEnvFor = (bootstrap: boolean) => `# owner configuration\nACCOUNT_REGISTRATION_POLICY=invite_only\nPUBLIC_API_BASE=https://api.example.test\nPRIVATE_SENTINEL='keep exactly this value'\n${bootstrap ? '' : `BACKEND_IMAGE=${sourceImage}\nCADDY_IMAGE=${caddyImage}\n`}`
+const maintenancePaths = (value: BackendImageFixture) => ({ policy: join(value.stage, 'policy'), statePath: join(value.root, 'maintenance.json'), callsPath: join(value.root, 'maintenance-calls.jsonl') })
+
+/**
+ * Every case of one installation kind starts from the same received, policy-installed files, so they are built once per
+ * file and worker, kept as a snapshot, and restored at the same absolute path for each case because the stubs embed it.
+ * Only the failure-specific maintenance state is written per case. The request expires five minutes after it is
+ * created, so a template older than two minutes is rebuilt.
+ */
+type Template = { base: string; work: string; snapshot: string; request: BackendImageFixture['request']; createdAt: number }
+const templates = new Map<boolean, Template>(), TEMPLATE_LIFETIME_MS = 120_000
+process.once('exit', () => { for (const template of templates.values()) rmSync(template.base, { recursive: true, force: true }) })
+
+function templateFor(bootstrap: boolean): Template {
+  const current = templates.get(bootstrap)
+  if (current && Date.now() - current.createdAt < TEMPLATE_LIFETIME_MS) return current
+  if (current) rmSync(current.base, { recursive: true, force: true })
+  const base = mkdtempSync(join(tmpdir(), 'oa-formal-image-template-')), work = join(base, 'fixture'), snapshot = join(base, 'snapshot')
+  mkdirSync(work, { mode: 0o700 })
+  const createdAt = Date.now(), value = createBackendImageFixture('amd64', 'c'.repeat(40), { root: work })
+  installMaintenanceFixture(value, bootstrap)
+  // `cp -a` keeps the owner-private modes the receiver and maintenance checks require.
+  execFileSync('cp', ['-a', work, snapshot])
+  rmSync(work, { recursive: true, force: true })
+  const template = { base, work, snapshot, request: value.request, createdAt }
+  templates.set(bootstrap, template)
+  return template
+}
+
 export function backendImageMaintenanceFixture(failure = '', bootstrap = false) {
-  const value = createBackendImageFixture(); roots.push(value.root)
-  const caddyDigest = `caddy@sha256:${'d'.repeat(64)}`
+  const template = templateFor(bootstrap)
+  rmSync(template.work, { recursive: true, force: true })
+  execFileSync('cp', ['-a', template.snapshot, template.work]); roots.push(template.work)
+  const value = createBackendImageFixture('amd64', 'c'.repeat(40), { root: template.work, restored: { operationId: template.request.operationId, request: structuredClone(template.request) } })
+  const { policy, statePath, callsPath } = maintenancePaths(value)
+  const state = { failure, bootstrap: bootstrap || failure === 'missing-app', caddyStarted: !bootstrap, projectVolume: false, proofRemoved: false, livePresent: false, liveRemoved: false, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
+  writeFileSync(statePath, JSON.stringify(state))
+  const originalEnv = originalEnvFor(bootstrap)
+  return bindMaintenanceFixture(value, policy, statePath, callsPath, originalEnv)
+}
+
+/** Receives the image and installs the trusted policy, owner configuration and maintenance stubs; all failure-independent. */
+function installMaintenanceFixture(value: BackendImageFixture, bootstrap: boolean) {
   if (bootstrap) writeFileSync(value.requestPath, JSON.stringify({ ...value.request, installation: { kind: 'bootstrap', caddyImage: caddyDigest } }))
   const imported = value.invoke()
   if (imported.status !== 0) throw new Error(imported.stderr)
-  const policy = join(value.stage, 'policy')
+  const { policy, statePath, callsPath } = maintenancePaths(value)
   mkdirSync(join(policy, 'scripts'), { recursive: true })
   for (const name of ['ci', 'release']) cpSync(join(repository, 'scripts', name), join(policy, 'scripts', name), { recursive: true })
   for (const name of ['image-intake.ts', 'backup-storage.sh', 'backup-process.sh', 'backup-files.mjs']) cpSync(join(repository, 'scripts', name), join(policy, 'scripts', name))
@@ -26,13 +71,7 @@ export function backendImageMaintenanceFixture(failure = '', bootstrap = false) 
   cpSync(join(repository, 'docker-compose.prod.yml'), join(value.directory, 'docker-compose.prod.yml'))
   writeFileSync(join(value.directory, 'data/dependencies.compose.env'), 'DATABASE_URL=private-fixture\n')
   writeFileSync(join(value.directory, 'data/postgres-cutover.validated'), '')
-  const oldId = '1'.repeat(64), caddyId = '2'.repeat(64), newId = '3'.repeat(64), sourceBuild = '7'.repeat(40), sourceImage = `sha256:${'8'.repeat(64)}`, caddyImage = `sha256:${'9'.repeat(64)}`
-  const originalEnv = `# owner configuration\nACCOUNT_REGISTRATION_POLICY=invite_only\nPUBLIC_API_BASE=https://api.example.test\nPRIVATE_SENTINEL='keep exactly this value'\n${bootstrap ? '' : `BACKEND_IMAGE=${sourceImage}\nCADDY_IMAGE=${caddyImage}\n`}`
-  writeFileSync(join(value.directory, '.env'), originalEnv)
-  const data = { DATABASE_URL: 'postgres://private-fixture/formal', S3_ENDPOINT: 'http://objects:9000', S3_BUCKET: 'formal', S3_PREFIX: '', S3_REGION: 'fixture', S3_FORCE_PATH_STYLE: 'true', S3_ACCESS_KEY_ID: 'private-fixture-key', S3_SECRET_ACCESS_KEY: 'private-fixture-secret' }
-  const state = { failure, bootstrap: bootstrap || failure === 'missing-app', caddyStarted: !bootstrap, projectVolume: false, proofRemoved: false, livePresent: false, liveRemoved: false, head: sourceBuild, running: failure !== 'backup-stopped', started: false, sourceBuild, sourceImage, caddyImage }
-  const statePath = join(value.root, 'maintenance.json'), callsPath = join(value.root, 'maintenance-calls.jsonl')
-  writeFileSync(statePath, JSON.stringify(state))
+  writeFileSync(join(value.directory, '.env'), originalEnvFor(bootstrap))
   const tree: string[] = []
   const collect = (directory: string, relative = '') => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -99,6 +138,9 @@ else if(a[0]==='compose'){
  }else throw Error('Unexpected compose: '+a.join(' '));
 }else throw Error('Unexpected docker: '+a.join(' '));
 `, { mode: 0o700 })
+}
+
+function bindMaintenanceFixture(value: BackendImageFixture, policy: string, statePath: string, callsPath: string, originalEnv: string) {
   const invoke = (expectedSha = value.request.sourceSha, extraEnv: NodeJS.ProcessEnv = {}) => spawnSync(process.execPath,
     [join(policy, 'scripts/release/backend-image-maintenance.ts'), 'maintain', value.requestPath, value.directory, expectedSha, value.request.producerSha],
     { env: dockerFixtureEnvironment({ CI: '', GITHUB_ACTIONS: '', PATH: `${value.bin}:${process.env.PATH}`, ...extraEnv }), encoding: 'utf8', timeout: 30_000 })

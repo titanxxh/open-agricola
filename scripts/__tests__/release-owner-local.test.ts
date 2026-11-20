@@ -1,19 +1,20 @@
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter, join, resolve } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { canonicalOwnerLocalCommands, rebindPrereleaseOwnerLocalReceipt, type OwnerLocalReceipt } from '../ci/owner-local-verification'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
+import { reusableTempRoots } from './_helpers/reusable-temp-roots'
 
 const repositoryRoot = resolve(import.meta.dirname, '../..')
 const tsxLoader = import.meta.resolve('tsx')
 // These release-tool cases drive git and CLI subprocesses; several take ~5 s locally, so low-core CI needs a file-local test budget.
 vi.setConfig({ testTimeout: 30_000 })
-const roots: string[] = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+const roots = reusableTempRoots('oa-release-owner-local-')
+afterEach(() => roots.reset())
+afterAll(() => roots.dispose())
 
 type Actor = { id: number; login: string; type: string }
 type Asset = { id: number; name: string; size: number; state: string; uploader: Actor; browser_download_url: string; created_at: string }
@@ -29,7 +30,7 @@ type FixtureState = { sha: string; version: string; owner: Actor; user: Actor; r
 type Event = { endpoint: string; method: string; body?: { context?: string; state?: string; draft?: boolean; sha?: string } }
 
 function fixture(rebound = false, channel: 'stable' | 'prerelease' = 'stable') {
-  const root = mkdtempSync(join(tmpdir(), 'oa-release-owner-local-')); roots.push(root)
+  const root = roots.create()
   mkdirSync(join(root, 'scripts'), { recursive: true }); mkdirSync(join(root, '.github/workflows'), { recursive: true })
   cpSync(join(repositoryRoot, 'scripts/ci'), join(root, 'scripts/ci'), { recursive: true })
   cpSync(join(repositoryRoot, 'scripts/release'), join(root, 'scripts/release'), { recursive: true })

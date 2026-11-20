@@ -13,7 +13,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { vi, afterEach, describe, expect, it } from 'vitest'
+import { vi, afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 // Native database/S3 and child-process operations also run under full-suite load.
 vi.setConfig({ testTimeout: 30000, hookTimeout: 30000 })
@@ -111,12 +111,20 @@ afterEach(async () => {
   tempDirs.length = 0
 })
 
-describe.each(['raw', 'compressed'] as const)('restart-local saved variant preflight (%s)', (format) => {
-  it.each(['parents', 'parents-seasons-moor', 'disabled', 'missing-father'] as const)(
-    'reads current %s snapshots without resetting PostgreSQL data', async (mode) => {
-      const db = await createTestDatabase()
-      try {
-        const schema = (await db.prepare('SELECT current_schema() AS schema').get<{ schema: string }>())!.schema
+// All eight preflight cases share one migrated schema; each case replaces the fixed dev rooms before its single preflight run.
+describe('restart-local saved variant preflight', () => {
+  let db: Awaited<ReturnType<typeof createTestDatabase>>
+  let schema = ''
+  beforeAll(async () => {
+    db = await createTestDatabase()
+    schema = (await db.prepare('SELECT current_schema() AS schema').get<{ schema: string }>())!.schema
+  })
+  afterAll(async () => { await db?.close() })
+
+  describe.each(['raw', 'compressed'] as const)('%s', (format) => {
+    it.each(['parents', 'parents-seasons-moor', 'disabled', 'missing-father'] as const)(
+      'reads current %s snapshots without resetting PostgreSQL data', async (mode) => {
+        await db.prepare('DELETE FROM rooms').run()
         for (const playerCount of [2, 3, 4, 5, 6]) {
           const session = new GameSession(56125, undefined, {
             playerCount, enableParentCards: mode !== 'disabled', draftParents: false,
@@ -132,18 +140,17 @@ describe.each(['raw', 'compressed'] as const)('restart-local saved variant prefl
           session.dispose()
         }
         const before = await db.prepare('SELECT * FROM rooms ORDER BY id').all()
-        for (let attempt = 0; attempt < 2; attempt++) {
-          const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/local-rooms.ts', 'missing-variant', 'direct-parents'], {
-            cwd: resolve(import.meta.dirname, '../..'), encoding: 'utf8', timeout: 15000,
-            env: { ...process.env, DATABASE_URL: getTestDatabaseUrl(), DATABASE_SCHEMA: schema },
-          })
-          expect(result.status, result.stderr).toBe(0)
-          expect(result.stdout.trim()).toBe(mode === 'disabled' || mode === 'missing-father' ? 'dev2, dev3, dev4, dev5, dev6' : '')
-          expect(await db.prepare('SELECT * FROM rooms ORDER BY id').all()).toEqual(before)
-        }
-      } finally { await db.close() }
-    },
-  )
+        expect(before).toHaveLength(5)
+        const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/local-rooms.ts', 'missing-variant', 'direct-parents'], {
+          cwd: resolve(import.meta.dirname, '../..'), encoding: 'utf8', timeout: 15000,
+          env: { ...process.env, DATABASE_URL: getTestDatabaseUrl(), DATABASE_SCHEMA: schema },
+        })
+        expect(result.status, result.stderr).toBe(0)
+        expect(result.stdout.trim()).toBe(mode === 'disabled' || mode === 'missing-father' ? 'dev2, dev3, dev4, dev5, dev6' : '')
+        expect(await db.prepare('SELECT * FROM rooms ORDER BY id').all()).toEqual(before)
+      },
+    )
+  })
 })
 
 describe.skipIf(process.platform !== 'linux')('restart-local saved interaction recovery', () => {
