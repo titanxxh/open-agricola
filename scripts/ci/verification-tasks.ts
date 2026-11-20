@@ -121,6 +121,30 @@ function chromiumCommands(cwd: string, shard: number, weights: BrowserSpecWeight
   return selected.length ? [{ command: 'pnpm', args: ['verify:parallel', ...selected] }] : []
 }
 
+/**
+ * Docker Hub images that tasks start themselves. Preparation pulls them with network retries, so a registry stall
+ * cannot fail a task midway; a test checks that each literal still appears in its file.
+ */
+export const TASK_FIXTURE_IMAGES = [
+  { image: 'ubuntu:26.04@sha256:065aa8626841f16057b78b027b464cd59c4fac36c204c72dcbf48d66f5fa8a96', file: 'scripts/__tests__/candidate-verification-isolation.test.ts' },
+  { image: 'prom/prometheus:v3.15.0', file: 'e2e-tests/operations-dashboard.spec.ts' },
+  { image: 'grafana/grafana:13.2.3', file: 'e2e-tests/operations-dashboard.spec.ts' },
+] as const
+
+/**
+ * Fixture images the planned commands of `task` need: those whose file the task runs. GitHub tasks pull them before
+ * the timed run (the owner-local harness pulls all of them during preparation).
+ */
+export function taskFixtureImages(cwd: string, task: string, weights: BrowserSpecWeights | null = browserSpecWeights()): string[] {
+  const files = new Set(taskCommands(cwd, task, weights).flatMap(command => command.args))
+  return [...new Set(TASK_FIXTURE_IMAGES.filter(({ file }) => files.has(file)).map(({ image }) => image))]
+}
+
+/** A chromium task's `VERIFY_PARALLEL_LANES` from the runner environment; a lane count never enters the task command. */
+export function chromiumLaneEnvironment(task: string, env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  return verificationTask(task).id.startsWith('chromium-') && env.VERIFY_PARALLEL_LANES ? { VERIFY_PARALLEL_LANES: env.VERIFY_PARALLEL_LANES } : {}
+}
+
 /** `weights` defaults to this catalog's table; pass an earlier producer's table (or null) to reproduce its plan. */
 export function taskCommands(cwd: string, input: string, weights: BrowserSpecWeights | null = browserSpecWeights()): VerificationCommand[] {
   const task = verificationTask(input)

@@ -14,7 +14,9 @@ import { fileURLToPath } from 'node:url'
 import { candidateCommand, collectCandidateDiagnostics, verifyCandidateSources, type CandidateExecution } from './candidate-isolation.ts'
 import { assertCandidateCheckout } from './candidate-verification.ts'
 import { canonicalOwnerLocalCommands, rebindOwnerLocalReceipt, rebindPrereleaseOwnerLocalReceipt } from './owner-local-verification.ts'
-import { FULL_TASK_IDS, fullSha, verificationConfiguration, verificationTask, type FullTaskId, type VerificationCommand } from './verification-tasks.ts'
+import { FULL_TASK_IDS, fullSha, TASK_FIXTURE_IMAGES, verificationConfiguration, verificationTask, type FullTaskId, type VerificationCommand } from './verification-tasks.ts'
+
+export { TASK_FIXTURE_IMAGES }
 import { github, ownerMachine, RELEASE_REPOSITORY } from '../release/candidate.ts'
 
 export type LocalChannel = 'stable' | 'prerelease'
@@ -42,15 +44,6 @@ export const CANDIDATE_TMPDIR = '/home/oa-candidate/tmp'
 const CANDIDATE_PUBLIC_ASSETS = '/home/oa-candidate/public-assets'
 const COMMAND_TIMEOUT_MS = 60 * 60_000
 export const NETWORK_ATTEMPTS = 3
-/**
- * Docker Hub images that tasks start themselves. Preparation pulls them with network retries, so a registry stall
- * cannot fail a task midway; a test checks that each literal still appears in its file.
- */
-export const TASK_FIXTURE_IMAGES = [
-  { image: 'ubuntu:26.04@sha256:065aa8626841f16057b78b027b464cd59c4fac36c204c72dcbf48d66f5fa8a96', file: 'scripts/__tests__/candidate-verification-isolation.test.ts' },
-  { image: 'prom/prometheus:v3.15.0', file: 'e2e-tests/operations-dashboard.spec.ts' },
-  { image: 'grafana/grafana:13.2.3', file: 'e2e-tests/operations-dashboard.spec.ts' },
-] as const
 /** The isolation test's ACL fixture: `acl` installed once during preparation instead of by apt inside a timed task. */
 export const ACL_FIXTURE_IMAGE = 'oa-candidate-acl-fixture:ubuntu-26.04-065aa862'
 export function aclFixtureBuild(): string {

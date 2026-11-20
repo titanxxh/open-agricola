@@ -143,11 +143,20 @@ jobs:
       - name: Install browsers
         if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
         run: node policy/scripts/ci/candidate-isolation.ts browsers
+      - name: Pull task fixture images
+        if: startsWith(matrix.task, 'chromium-')
+        working-directory: policy
+        env:
+          CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
+          VERIFICATION_TASK: ${{ matrix.task }}
+        run: node scripts/ci/candidate-verification.ts pull-fixture-images "$VERIFICATION_TASK" --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA"
       - name: Execute verification task
         working-directory: policy
         env:
           CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
           VERIFICATION_TASK: ${{ matrix.task }}
+          # Two worktree lanes per chromium task (#1920, #1921); the task command and so the receipt stay the same.
+          VERIFY_PARALLEL_LANES: '2'
         run: node scripts/ci/candidate-verification.ts formal-run-task "$VERIFICATION_TASK" --candidate-directory ../candidate --sha "$CANDIDATE_SHA" --producer "$GITHUB_SHA"
       - name: Stop candidate descendants and collect private diagnostics
         if: always() && steps.isolation.outcome == 'success'

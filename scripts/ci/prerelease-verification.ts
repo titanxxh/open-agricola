@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertCandidateCheckout, assertMainProtection, assertRawCommit, evaluateCandidateVerification, mainCommit, parseGitHubJsonLines, PRERELEASE_CANDIDATE_WORKFLOW, repositoryName, runCandidateTask } from './candidate-verification.ts'
 import { checkPrereleaseOwnerLocalVerification } from './owner-local-verification.ts'
-import { fullSha, FULL_TASK_IDS, selectedTasks, verificationConfiguration } from './verification-tasks.ts'
+import { chromiumLaneEnvironment, fullSha, FULL_TASK_IDS, selectedTasks, verificationConfiguration } from './verification-tasks.ts'
 import { commitRef, ensureCommitRef, github, ownerMachine } from '../release/candidate.ts'
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -242,7 +242,7 @@ export function runPrereleaseCandidateTask(cwd: string, id: string, sha: string,
       const execution = candidateExecution()
       return executeCandidate(execution, command === 'pnpm' ? resolve(execution.node, '../pnpm') : command,
         productionBuild ? ['run', 'build:hosted-frontend'] : argv, `task-${sequence++}`,
-        { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'prerelease', RELEASE_CHANNEL: productionBuild ? 'prerelease' : 'stable' })
+        { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'prerelease', RELEASE_CHANNEL: productionBuild ? 'prerelease' : 'stable', ...chromiumLaneEnvironment(id) })
     }
     const result = spawnSync(command, productionBuild ? ['run', 'build:hosted-frontend'] : argv, { cwd: directory, env, stdio: 'inherit' })
     if (result.error) throw result.error

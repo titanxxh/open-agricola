@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
+import { chromiumLaneEnvironment, FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, taskFixtureImages, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
 import { checkOwnerLocalVerification, type OwnerLocalProof } from './owner-local-verification.ts'
 
 export const CANDIDATE_WORKFLOW = '.github/workflows/candidate-verification.yml'
@@ -417,6 +417,17 @@ function options(input: string[]) {
   }
 }
 
+const FIXTURE_PULL_ATTEMPTS = 3
+function pullFixtureImages(execution: ReturnType<typeof candidateExecution>, images: readonly string[]): void {
+  for (const [index, image] of images.entries()) {
+    for (let attempt = 0; ; attempt++) {
+      if (executeCandidate(execution, 'docker', ['pull', '--quiet', image], `fixture-image-${index + 1}${attempt ? `-a${attempt}` : ''}`) === 0) break
+      if (attempt + 1 >= FIXTURE_PULL_ATTEMPTS) throw new Error(`Fixture image pull failed: ${image}`)
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10_000)
+    }
+  }
+}
+
 function trustedStableProducer(producer: string): void {
   fullSha(producer)
   assertCandidateCheckout(resolve(import.meta.dirname, '../..'), producer, producer)
@@ -426,8 +437,18 @@ function trustedStableProducer(producer: string): void {
 
 export function candidateVerificationCli(cwd: string, input: string[]): number {
   const [mode, ...remaining] = input
-  const id = mode === 'run-task' || mode === 'formal-run-task' ? remaining.shift() : null
+  const id = mode === 'run-task' || mode === 'formal-run-task' || mode === 'pull-fixture-images' ? remaining.shift() : null
   const option = options(remaining)
+  if (mode === 'pull-fixture-images') {
+    // The candidate's rootless Docker daemon pulls the public images the task's planned files start, with the trusted
+    // Docker CLI and download retries, so a registry stall cannot fail or slow the timed task.
+    if (!id) throw new Error('Missing task')
+    const candidate = resolve(cwd, option('--candidate-directory'))
+    assertCandidateCheckout(candidate, fullSha(option('--sha')), fullSha(option('--producer')))
+    const images = taskFixtureImages(candidate, id)
+    if (images.length) pullFixtureImages(candidateExecution(), images)
+    printVerificationOutput(JSON.stringify({ task: id, images })); return 0
+  }
   const sha = fullSha(option('--sha'))
   if (mode === 'formal-manifest' || mode === 'formal-source' || mode === 'formal-run-task') {
     const producer = fullSha(option('--producer'))
@@ -446,7 +467,7 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
     const execution = candidateExecution(); let sequence = 0
     runCandidateTask(candidate, id, sha, (command, args) => executeCandidate(execution,
       command === 'pnpm' ? resolve(execution.node, '../pnpm') : command, args, `task-${sequence++}`,
-      { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'stable', RELEASE_CHANNEL: 'stable' }), producer)
+      { GAME_BUILD_ID: sha, VERIFICATION_CHANNEL: 'stable', RELEASE_CHANNEL: 'stable', ...chromiumLaneEnvironment(id) }), producer)
     trustedStableProducer(producer); return 0
   }
   if (mode === 'source') {
@@ -481,7 +502,7 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
     printVerificationOutput(JSON.stringify(requestCandidateVerification(cwd, option('--repository'), sha, option('--ref'), option('--tasks', 'all'))))
     return 0
   }
-  throw new Error('Usage: candidate-verification.ts manifest|source|run-task|check|request --sha <full SHA> [options]')
+  throw new Error('Usage: candidate-verification.ts manifest|source|run-task|pull-fixture-images|check|request --sha <full SHA> [options]')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
