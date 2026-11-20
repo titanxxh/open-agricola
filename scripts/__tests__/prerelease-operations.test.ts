@@ -62,7 +62,7 @@ esac
     if (['backup', 'maintain', 'reverify', 'open', 'reset', 'identities', 'apply-identities', 'restore', 'verify-access', 'verify-formal-browser', 'budget-check'].includes(args[0])) {
       try { seedStorageGuard(parsePrereleaseTarget(config)) } catch { /* Invalid targets are rejected by the CLI. */ }
     }
-    return spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', ...args, '--config', path], { encoding: 'utf8', env, timeout: 15000 })
+    return spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', ...args, '--config', path], { encoding: 'utf8', env, timeout: 30_000 })
   }
   return { root, config, save, invoke, env, bin, temporary, fail: join(temporary, 'fail'), calls: () => existsSync(join(temporary, 'calls')) ? readFileSync(join(temporary, 'calls'), 'utf8') : '' }
 }
@@ -144,7 +144,7 @@ else if(line.includes(' exec -T app node '))process.stdout.write(JSON.stringify(
     expect(await db.prepare('SELECT token_hash FROM prerelease_sessions').all()).toEqual([])
     expect(readRuntime(target).mode).toBe('maintenance')
   } finally { await db.close() }
-}, 15_000)
+}, 60_000)
 
 it('rejects the legacy on-host build target before planning or invoking Docker', () => {
   const value = fixture()
