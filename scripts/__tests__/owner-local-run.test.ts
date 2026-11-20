@@ -24,16 +24,28 @@ function inputs(channel: 'stable' | 'prerelease'): Inputs {
   return { channel, sha, producerSha: producer, output, jobs: 4, repository: 'titanxxh/open-agricola', repositoryId: 123, tree: 'e'.repeat(40),
     configuration: 'a'.repeat(64), producerConfiguration: 'b'.repeat(64), commands, ownerUid: 1000,
     node: { path: '/opt/oa-owner-local/node/bin/node', version: 'v24.19.0', sha256: 'f'.repeat(64) }, dockerVersion: '29.6.2',
-    policyFiles: { 'scripts/ci/owner-local-run.ts': '1'.repeat(64) }, servicePorts: { postgres: 41001, objects: 41002 }, retries: 1, testWorkers: 6, publicAssets: assets, profile: false, browserJobs: 2, ownerHome: '/home/owner', lanes: 3, cpuBudget: 20 }
+    policyFiles: { 'scripts/ci/owner-local-run.ts': '1'.repeat(64) }, servicePorts: { postgres: 41001, objects: 41002 }, retries: 1, testWorkers: 6, publicAssets: assets, profile: false, browserJobs: 2, ownerHome: '/home/owner', lanes: 3, cpuBudget: 20, imageCache: join(output, 'images') }
+}
+
+/** A fake daemon's answers: every image resolves to the digest it names, or to a fixed digest of its tag. */
+const imageDigest = (image: string) => /@(sha256:[0-9a-f]{64})$/.exec(image)?.[1] ?? `sha256:${sha256(image)}`
+function fakeDockerOutput(command: string, args: string[], phase: string, io?: { stdout?: string }): string {
+  if (command === 'docker' && args[0] === 'image' && args[1] === 'inspect') return `["${args.at(-1)!.replace(/[:@].*$/, '')}@${imageDigest(args.at(-1)!)}"]\n`
+  if (command === 'docker' && args[0] === 'save' && io?.stdout) {
+    const layout = mkdtempSync(join(tmpdir(), 'oa-save-')); roots.push(layout)
+    writeFileSync(join(layout, 'index.json'), JSON.stringify({ manifests: [{ digest: imageDigest(args[1]) }] }))
+    execFileSync('tar', ['-cf', io.stdout, '-C', layout, 'index.json'])
+  }
+  return `log ${phase}\n`
 }
 
 /** Records every call; each candidate command writes its log and exits with the configured code. */
 function fakeRunner(value: Inputs, { exit = {} as Record<string, number>, changed = [] as string[], startFails = false } = {}) {
   const calls: string[] = [], running = { now: 0, max: 0 }
   const runner: Runner = {
-    async candidate(execution, command, args, phase, environment, properties) {
+    async candidate(execution, command, args, phase, environment, properties, _timeline, io) {
       calls.push(`candidate ${phase} ${execution.work} ${command} ${args.join(' ')} ${JSON.stringify(environment)} ${properties.join(',')}`)
-      writeFileSync(join(execution.privateDirectory, `${phase}.log`), `log ${phase}\n`, { flag: 'wx' })
+      writeFileSync(join(execution.privateDirectory, `${phase}.log`), fakeDockerOutput(command, args, phase, io), { flag: 'wx' })
       running.now++; running.max = Math.max(running.max, running.now)
       await new Promise(done => setTimeout(done, 1))
       running.now--
@@ -167,16 +179,17 @@ describe('isolated owner-local run', () => {
     const stopAt = fake.calls.findIndex(call => call.startsWith('isolation stop'))
     expect(fake.calls.slice(stopAt).filter(call => call.startsWith('verify')).length).toBe(FULL_TASK_IDS.length)
     expect(fake.calls.slice(0, stopAt).some(call => call.startsWith('verify'))).toBe(false)
-    expect(fake.calls.filter(call => call.startsWith('candidate ')).slice(0, 3).map(call => call.split(' ')[1])).toEqual(['smoke-image', 'smoke', `install-${TASK_ORDER[0]}`])
-    // The smoke's pinned image is pulled first by the trusted Docker CLI, so a registry stall can retry.
-    expect(fake.calls.find(call => call.startsWith('candidate smoke-image '))).toContain(` docker pull --quiet ${isolationSmokeImage()} `)
-    expect(fake.calls.some(call => call.startsWith('candidate services ') && call.includes('scripts/local-services.mjs --test'))).toBe(true)
-    // Images that tasks start themselves are pulled, and the ACL fixture built, before the services and every task.
+    // Every image comes first, before the smoke and any candidate code: the smoke's pinned image, then the images
+    // tasks start themselves, pulled by the trusted Docker CLI so a registry stall can retry, and saved to the cache.
     const phases = fake.calls.filter(call => call.startsWith('candidate ')).map(call => call.split(' ')[1])
-    const prepared = ['browsers', ...TASK_FIXTURE_IMAGES.map((_, index) => `fixture-image-${index + 1}`), 'acl-fixture-image', 'services'].map(phase => phases.indexOf(phase))
+    expect(phases.slice(phases.indexOf('smoke'), phases.indexOf('smoke') + 2)).toEqual(['smoke', `install-${TASK_ORDER[0]}`])
+    expect(phases.slice(0, phases.indexOf('smoke'))).toEqual([isolationSmokeImage(), ...TASK_FIXTURE_IMAGES.map(({ image }) => image)].flatMap((_, index) => [`image-${index + 1}`, `image-${index + 1}-digest`, `image-${index + 1}-save`]))
+    for (const [index, image] of [isolationSmokeImage(), ...TASK_FIXTURE_IMAGES.map(({ image }) => image)].entries()) expect(fake.calls.find(call => call.startsWith(`candidate image-${index + 1} `))).toContain(` docker pull --quiet ${image} `)
+    expect(fake.calls.some(call => call.startsWith('candidate services ') && call.includes('scripts/local-services.mjs --test'))).toBe(true)
+    // The ACL fixture is built before the services, and both before every task.
+    const prepared = ['browsers', 'acl-fixture-image', 'services'].map(phase => phases.indexOf(phase))
     expect(prepared.every((index, i) => index > (prepared[i - 1] ?? -1))).toBe(true)
     expect(prepared.at(-1)).toBeLessThan(phases.findIndex(phase => phase.startsWith('task-')))
-    for (const [index, { image }] of TASK_FIXTURE_IMAGES.entries()) expect(fake.calls.find(call => call.startsWith(`candidate fixture-image-${index + 1} `))).toContain(` docker pull --quiet ${image} `)
     // Every candidate command, preparation included, uses the run's own service ports.
     const candidateCalls = fake.calls.filter(call => call.startsWith('candidate '))
     expect(candidateCalls.every(call => call.includes(`"LOCAL_POSTGRES_PORT":"41001","LOCAL_S3_PORT":"41002","LOCAL_POSTGRES_ARGS":"${HARNESS_POSTGRES_ARGS}","TMPDIR":"/home/oa-candidate/tmp","PUBLIC_ASSET_VALIDATION_DIR":"/home/oa-candidate/public-assets","E2E_PUBLIC_ASSET_DIR":"/home/oa-candidate/public-assets","VITEST_MAX_WORKERS":"6"`) && call.includes(' PrivateTmp=yes,InaccessiblePaths=/home/owner'))).toBe(true)
@@ -248,19 +261,39 @@ describe('isolated owner-local run', () => {
 
   it('retries the smoke image pull but never reruns the smoke itself', async () => {
     const slept: number[] = [], sleep = async (ms: number) => { slept.push(ms) }
-    const value = inputs('stable'), fake = fakeRunner(value, { exit: { 'smoke-image': 1 } })
+    const value = inputs('stable'), fake = fakeRunner(value, { exit: { 'image-1': 1 } })
     const result = await runIsolated(value, fake.runner, Date.now, sleep)
     if ('failed' in result) throw new Error(result.failed.join('; '))
-    expect(fake.calls.filter(call => /^candidate smoke/.test(call)).map(call => call.split(' ')[1])).toEqual(['smoke-image', 'smoke-image-a1', 'smoke'])
+    expect(fake.calls.filter(call => /^candidate (image-1(-a\d)?|smoke) /.test(call)).map(call => call.split(' ')[1])).toEqual(['image-1', 'image-1-a1', 'smoke'])
     const once = inputs('stable'), failed = fakeRunner(once, { exit: { smoke: 1 } })
     expect(await runIsolated(once, failed.runner, Date.now, sleep)).toEqual({ failed: ['Candidate smoke failed (exit 1)'] })
     expect(failed.calls.filter(call => call.startsWith('candidate smoke ')).length).toBe(1)
+    expect(slept).toEqual([5_000])
     expect(isolationSmokeImage()).toMatch(/^postgres:[\w.-]+@sha256:[0-9a-f]{64}$/)
     // Fixture images stay the ones their tasks start; the ACL fixture builds on the isolation test's pinned Ubuntu.
     for (const { image, file } of TASK_FIXTURE_IMAGES) expect(readFileSync(resolve(import.meta.dirname, '../..', file), 'utf8'), file).toContain(`'${image}'`)
     expect(aclFixtureBuild()).toContain(`'FROM ${TASK_FIXTURE_IMAGES[0].image}'`)
     expect(aclFixtureBuild()).toContain(`docker build --quiet -t ${ACL_FIXTURE_IMAGE} -`)
     expect(readFileSync(resolve(import.meta.dirname, '../../docker-compose.local.yml'), 'utf8')).toContain('command: postgres -c max_locks_per_transaction=1024 ${LOCAL_POSTGRES_ARGS:-}')
+  })
+
+  it('loads every image of a later run from the owner cache and adds the candidate\'s pinned service images', async () => {
+    const first = inputs('stable')
+    const rustfs = `rustfs/rustfs:1.0.1@sha256:${'1'.repeat(64)}`
+    writeFileSync(join(first.output, 'source', 'docker-compose.local.yml'), `services:\n  postgres:\n    image: ${isolationSmokeImage()}\n  objects:\n    image: ${rustfs}\n  other:\n    image: busybox:1.37\n`)
+    const images = [isolationSmokeImage(), ...TASK_FIXTURE_IMAGES.map(({ image }) => image), rustfs]
+    const cold = fakeRunner(first)
+    if ('failed' in await runIsolated(first, cold.runner)) throw new Error('cold run failed')
+    expect(cold.calls.flatMap(call => / docker pull --quiet (\S+) /.exec(call)?.[1] ?? [])).toEqual(images)
+    const second = { ...inputs('stable'), imageCache: first.imageCache }
+    writeFileSync(join(second.output, 'source', 'docker-compose.local.yml'), readFileSync(join(first.output, 'source', 'docker-compose.local.yml')))
+    const warm = fakeRunner(second)
+    const result = await runIsolated(second, warm.runner)
+    if ('failed' in result) throw new Error(result.failed.join('; '))
+    expect(warm.calls.some(call => / docker pull /.test(call))).toBe(false)
+    const phases = warm.calls.filter(call => call.startsWith('candidate ')).map(call => call.split(' ')[1])
+    expect(phases.slice(0, phases.indexOf('smoke'))).toEqual(images.flatMap((_, index) => [`image-${index + 1}-load`, `image-${index + 1}-tag`, `image-${index + 1}-check`]))
+    expect(JSON.parse(readFileSync(result.evidence, 'utf8')).prerequisites.preparation[0]).toMatchObject({ phase: 'image-1-load', exitCode: 0 })
   })
 
   it('tears down after a failed preparation or a partly failed start', async () => {
