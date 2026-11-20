@@ -139,6 +139,28 @@ it('obtains image authority from a successful main attempt and its digest-verifi
   const value = buildArtifactFixture()
   expect(value.verify()).toMatchObject(value.receipt)
 })
+/** Points protected main at a descendant whose package.json differs, which changes the verification configuration. */
+function advanceMainConfiguration(value: ReturnType<typeof buildArtifactFixture>) {
+  const git = (args: string[], input?: string, env: NodeJS.ProcessEnv = process.env) => execFileSync('git', args, { cwd: value.cwd, input, encoding: 'utf8', env }).trim()
+  const index = join(value.root, 'advance.index'), env = { ...process.env, GIT_INDEX_FILE: index }
+  git(['read-tree', value.sha], undefined, env)
+  const blob = git(['hash-object', '-w', '--stdin'], '{"changed":"verification configuration"}\n')
+  git(['update-index', '--cacheinfo', `100644,${blob},package.json`], undefined, env)
+  const tree = git(['write-tree'], undefined, env)
+  const main = git(['-c', 'user.name=Image fixture', '-c', 'user.email=fixture@example.invalid', 'commit-tree', tree, '-p', value.sha], 'Main changes package.json\n')
+  value.api['repos/titanxxh/open-agricola/git/ref/heads/main'] = { ref: 'refs/heads/main', object: { type: 'commit', sha: main } }
+  value.save()
+  return main
+}
+it('keeps the owner policy trusted-policy image importable after main changes its verification configuration', () => {
+  const value = buildArtifactFixture()
+  advanceMainConfiguration(value)
+  expect(value.verify).toThrow(/not compatible protected main/)
+  expect(verifyContainerImageBuild({ cwd: value.cwd, runId: 42, runAttempt: 2, artifactId: 99, ownerPolicy: value.sha })).toMatchObject(value.receipt)
+  // Another policy commit does not lift the check.
+  expect(() => verifyContainerImageBuild({ cwd: value.cwd, runId: 42, runAttempt: 2, artifactId: 99, ownerPolicy: 'f'.repeat(40) })).toThrow(/not compatible protected main/)
+})
+
 it.each(['run', 'attempt', 'producer', 'repository', 'artifact source', 'artifact digest', 'artifact time', 'extra files'])('rejects a forged image %s', failure => {
   const value = buildArtifactFixture()
   if (failure === 'run') value.run.conclusion = 'failure'

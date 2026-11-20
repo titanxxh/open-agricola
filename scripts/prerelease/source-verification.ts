@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
-import { checkPrereleaseVerification, fixPrereleaseCandidate, prereleaseCandidateRef, requestPrereleaseVerification } from '../ci/prerelease-verification'
+import { checkPrereleaseVerification, fixPrereleaseCandidate, prereleaseCandidateRef, requestPrereleaseVerification, RUN_IN_PROGRESS } from '../ci/prerelease-verification'
 import { assertRawCommit } from '../ci/candidate-verification'
 import { fullSha } from '../ci/verification-tasks'
 import { commitRef, github, RELEASE_REPOSITORY } from '../release/candidate'
@@ -100,7 +100,7 @@ async function requireFullVerification(cwd: string, sha: string, producer: strin
     for (const task of result.tasks) {
       if (task.status === 'passed') continue
       if (task.runId === null) { missing.push(task.id); continue }
-      if (task.reason === 'Candidate run has not completed') continue
+      if (task.reason === RUN_IN_PROGRESS) continue
       if (!statusByRun.has(task.runId)) statusByRun.set(task.runId, object(github(RELEASE_REPOSITORY, `actions/runs/${task.runId}`)).status)
       if (statusByRun.get(task.runId) === 'completed') throw new Error(`Complete verification blocked by ${task.id}: ${task.reason} (${task.url})`)
     }

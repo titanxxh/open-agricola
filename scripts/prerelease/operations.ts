@@ -282,8 +282,9 @@ async function ownerImport(target: ReturnType<typeof parsePrereleaseTarget>, val
     if (!raw || !/^[1-9][0-9]*$/.test(raw) || !Number.isSafeInteger(value)) throw new Error('Image import requires explicit build run, attempt and artifact IDs')
     return value
   }
-  const receipt = verifyContainerImageBuild({ cwd: policyRoot, runId: number('--build-run'), runAttempt: number('--build-attempt'), artifactId: number('--artifact-id') })
   const producerSha = policySha(policyRoot)
+  const receipt = verifyContainerImageBuild({ cwd: policyRoot, runId: number('--build-run'), runAttempt: number('--build-attempt'), artifactId: number('--artifact-id'),
+    ownerPolicy: producerSha })
   assertExpectedContainerImage(receipt, { purpose, sourceSha, producerSha })
   const directory = mkdtempSync(join(tmpdir(), 'oa-owner-image-import-'))
   try {

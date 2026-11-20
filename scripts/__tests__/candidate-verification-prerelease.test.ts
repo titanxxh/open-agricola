@@ -238,7 +238,7 @@ describe('owner policy producer for source updates', () => {
     const { jobs } = passingRun(value, value.main, 71)
     const runs = value.api[`repos/${value.repository}/actions/workflows/200/runs?event=workflow_dispatch&per_page=100`] as { id: number; status: string }[]
     runs.find(run => run.id === 71)!.status = 'in_progress'
-    jobs[1].status = 'in_progress'; jobs[1].conclusion = null as unknown as string
+    jobs[1].status = 'in_progress'; jobs[1].conclusion = null as unknown as string; jobs[1].completed_at = null as unknown as string
     value.save()
     advanceMain(value, 'tsconfig.storage-tools.json')
     expect(checkPrereleaseVerification(value.cwd, value.repository, value.sha).tasks.every(task => task.runId === null)).toBe(true)
@@ -246,6 +246,19 @@ describe('owner policy producer for source updates', () => {
     expect(owner.status).toBe('blocked')
     expect(owner.tasks.some(task => task.runId === 71)).toBe(true)
     expect(owner.tasks.filter(task => task.runId === null)).toEqual([])
+  })
+
+  it('falls back to the current configuration when owner-policy evidence lacks a task without a run', () => {
+    const value = fixture()
+    const { jobs } = passingRun(value, value.main, 73)
+    const listing = value.api[`repos/${value.repository}/actions/runs/73/jobs?filter=all&per_page=100`] as { id: number }[]
+    value.api[`repos/${value.repository}/actions/runs/73/jobs?filter=all&per_page=100`] = listing.filter(job => job.id !== jobs[2].id)
+    value.save()
+    advanceMain(value, 'tsconfig.storage-tools.json')
+    const result = checkPrereleaseVerification(value.cwd, value.repository, value.sha, { producerSha: value.main })
+    expect(result.status).toBe('blocked')
+    // Every task is missing under the current configuration, so a waiting update requests a complete current run.
+    expect(result.tasks.every(task => task.runId === null)).toBe(true)
   })
 
   it('refuses an owner policy commit outside protected main', () => {

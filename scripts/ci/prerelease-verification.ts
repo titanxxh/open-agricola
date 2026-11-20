@@ -128,6 +128,9 @@ export function prereleaseConfiguration(cwd: string, sha: string, producer: stri
  */
 export type PrereleaseVerificationOptions = { continuity?: boolean; producerSha?: string }
 
+/** The reason a task carries while its run is still executing; callers wait instead of requesting another run. */
+export const RUN_IN_PROGRESS = 'Candidate run has not completed'
+
 export function checkPrereleaseVerification(cwd: string, repository: string, sha: string, options: PrereleaseVerificationOptions = {}) {
   const source = admitPrereleaseSnapshot(cwd, repository, sha)
   const policyConfiguration = verificationConfiguration(cwd, source.main)
@@ -181,10 +184,11 @@ export function checkPrereleaseVerification(cwd: string, repository: string, sha
   const current = evaluate(policyConfiguration)
   if (current.status === 'passed') return current
   if (ownerConfiguration !== policyConfiguration) {
-    // A run still in progress under the owner policy keeps its run id, so a waiting caller does not request another.
+    // Owner-policy evidence is used only when it is complete, or when every unfinished task already has a run in
+    // progress, so a waiting caller does not request another. Partial owner evidence falls back to the current
+    // configuration, whose missing tasks a caller then requests in full against current main.
     const owner = evaluate(ownerConfiguration)
-    const started = (result: typeof current) => result.tasks.filter(task => task.runId !== null).length
-    if (owner.status === 'passed' || started(owner) > started(current)) return owner
+    if (owner.status === 'passed' || owner.tasks.every(task => task.status === 'passed' || task.reason === RUN_IN_PROGRESS)) return owner
   }
   if (options.continuity !== true) return current
   for (const producerConfiguration of groups.keys()) {
