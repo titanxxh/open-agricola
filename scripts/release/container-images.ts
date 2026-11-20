@@ -117,13 +117,20 @@ export function assertExpectedContainerImage(receipt: ContainerImageReceipt, exp
   if (receipt.purpose !== expected.purpose || receipt.sourceSha !== expected.sourceSha || receipt.producerSha !== expected.producerSha) throw new Error('Imported image differs from the fixed source or policy')
 }
 
-function trustedProducer(cwd: string, producer: string): { repositoryId: number; main: string } {
+/**
+ * `ownerPolicy` is the owner checkout's policy commit, which host owner-tools also run. Its own trusted-policy image
+ * stays importable after main changes the verification configuration or image tooling; it must still be reachable
+ * from protected main. Every other producer must remain compatible with current main.
+ */
+function trustedProducer(cwd: string, producer: string, ownerPolicy?: string): { repositoryId: number; main: string } {
   fullSha(producer)
   const repository = record(github(RELEASE_REPOSITORY, '')), main = mainCommit(RELEASE_REPOSITORY)
   if (repository.full_name !== RELEASE_REPOSITORY || repository.default_branch !== 'main') throw new Error('Unexpected producer repository')
   assertMainProtection(RELEASE_REPOSITORY)
   assertRawCommit(cwd, RELEASE_REPOSITORY, main); assertRawCommit(cwd, RELEASE_REPOSITORY, producer)
-  if (spawnSync('git', ['merge-base', '--is-ancestor', producer, main], { cwd, stdio: 'ignore' }).status !== 0
+  const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', producer, main], { cwd, stdio: 'ignore' }).status === 0
+  if (ancestor && ownerPolicy !== undefined && producer === fullSha(ownerPolicy)) return { repositoryId: integer(repository.id), main }
+  if (!ancestor
     || verificationConfiguration(cwd, producer) !== verificationConfiguration(cwd, main)
     || spawnSync('git', ['diff', '--quiet', producer, main, '--', CONTAINER_IMAGE_WORKFLOW, ':(glob)scripts/release/container-images*.ts',
       ':(glob)scripts/release/backend-*', 'scripts/image-intake.ts', 'deploy-backend.sh', 'docker-compose.prod.yml',
@@ -133,10 +140,10 @@ function trustedProducer(cwd: string, producer: string): { repositoryId: number;
   return { repositoryId: integer(repository.id), main }
 }
 
-export function containerImageVerification({ cwd, purpose, sourceSha, producerSha }: {
-  cwd: string; purpose: ContainerImagePurpose; sourceSha: string; producerSha: string
+export function containerImageVerification({ cwd, purpose, sourceSha, producerSha, ownerPolicy }: {
+  cwd: string; purpose: ContainerImagePurpose; sourceSha: string; producerSha: string; ownerPolicy?: string
 }): ImageVerification {
-  fullSha(sourceSha); trustedProducer(cwd, producerSha)
+  fullSha(sourceSha); trustedProducer(cwd, producerSha, purpose === 'trusted-policy' ? ownerPolicy : undefined)
   if (purpose === 'trusted-policy') {
     if (sourceSha !== producerSha) throw new Error('Trusted policy source must equal the main producer')
     return { kind: 'main-policy', configuration: verificationConfiguration(cwd, producerSha) }
@@ -159,8 +166,8 @@ export function containerImageVerification({ cwd, purpose, sourceSha, producerSh
 const verifiedImage = Symbol('GitHub verified container image')
 export type VerifiedContainerImageReceipt = ContainerImageReceipt & { readonly [verifiedImage]: true }
 
-export function verifyContainerImageBuild({ cwd, runId, runAttempt, artifactId }: {
-  cwd: string; runId: number; runAttempt: number; artifactId: number
+export function verifyContainerImageBuild({ cwd, runId, runAttempt, artifactId, ownerPolicy }: {
+  cwd: string; runId: number; runAttempt: number; artifactId: number; ownerPolicy?: string
 }): VerifiedContainerImageReceipt {
   ownerMachine(); integer(runId); integer(runAttempt); integer(artifactId)
   const workflow = record(github(RELEASE_REPOSITORY, 'actions/workflows/container-image-build.yml'))
@@ -168,7 +175,7 @@ export function verifyContainerImageBuild({ cwd, runId, runAttempt, artifactId }
   if (workflow.path !== CONTAINER_IMAGE_WORKFLOW || run.id !== runId || run.run_attempt !== runAttempt
     || run.workflow_id !== integer(workflow.id) || run.path !== CONTAINER_IMAGE_WORKFLOW || run.event !== 'workflow_dispatch'
     || run.head_branch !== 'main' || run.status !== 'completed' || run.conclusion !== 'success') throw new Error('Expected a successful fixed main image workflow attempt')
-  const producer = fullSha(text(run.head_sha)), authority = trustedProducer(cwd, producer)
+  const producer = fullSha(text(run.head_sha)), authority = trustedProducer(cwd, producer, ownerPolicy)
   for (const value of [run.repository, run.head_repository]) {
     const repository = record(value)
     if (repository.id !== authority.repositoryId || repository.full_name !== RELEASE_REPOSITORY) throw new Error('Image workflow repository identity differs')
@@ -191,7 +198,9 @@ export function verifyContainerImageBuild({ cwd, runId, runAttempt, artifactId }
     const receipt = parseContainerImageReceipt(JSON.parse(execFileSync('unzip', ['-p', path, CONTAINER_IMAGE_RECEIPT_FILE],
       { encoding: 'utf8', maxBuffer: 128 * 1024, timeout: 5000 })))
     if (receipt.repositoryId !== authority.repositoryId || receipt.producerSha !== producer || receipt.build.runId !== runId || receipt.build.runAttempt !== runAttempt) throw new Error('Image receipt differs from its native GitHub provenance')
-    const verification = containerImageVerification({ cwd, purpose: receipt.purpose, sourceSha: receipt.sourceSha, producerSha: producer })
+    // Only the owner policy's own trusted-policy image skips current-main compatibility; containerImageVerification
+    // rechecks every other purpose against current main.
+    const verification = containerImageVerification({ cwd, purpose: receipt.purpose, sourceSha: receipt.sourceSha, producerSha: producer, ownerPolicy })
     if (JSON.stringify(verification) !== JSON.stringify(receipt.verification)) throw new Error('Image verification is incomplete, stale or incompatible')
     return { ...receipt, [verifiedImage]: true }
   } finally { rmSync(directory, { force: true, recursive: true }) }
