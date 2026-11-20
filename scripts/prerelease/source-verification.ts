@@ -90,10 +90,10 @@ function routinePlanMatches(id: number, attempt: number, binding: Binding) {
   } finally { rmSync(directory, { recursive: true, force: true }) }
 }
 
-async function requireFullVerification(cwd: string, sha: string, deadline: number) {
+async function requireFullVerification(cwd: string, sha: string, producer: string, deadline: number) {
   let requested = false
   while (Date.now() < deadline) {
-    const result = checkPrereleaseVerification(cwd, RELEASE_REPOSITORY, sha)
+    const result = checkPrereleaseVerification(cwd, RELEASE_REPOSITORY, sha, { producerSha: producer })
     if (result.status === 'passed') return
     const missing = []
     const statusByRun = new Map<number, unknown>()
@@ -123,7 +123,7 @@ export async function verifySourceUpdate(cwd: string, binding: Binding, forceFul
     throw new Error('Source verification policy must be the checked-out commit on protected main')
   const deadline = Date.now() + 2 * 60 * 60_000
   if (forceFull || !routinePolicyMatches(cwd, binding, authority.main)) {
-    await requireFullVerification(cwd, sha, deadline)
+    await requireFullVerification(cwd, sha, producer, deadline)
     return { kind: 'prerelease-source', ...binding, scope: 'full', runId: null, attempt: null }
   }
   const workflow = object(github(RELEASE_REPOSITORY, 'actions/workflows/ci.yml'))

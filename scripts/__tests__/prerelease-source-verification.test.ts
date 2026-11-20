@@ -146,6 +146,8 @@ it('also requires the current protected verification policy when the installed o
     sha: f.binding.sha, configuration: 'abc', producerConfiguration: 'abc', ownerLocal: undefined, tasks: [] })
   expect(await verifySourceUpdate(f.cwd, f.binding)).toMatchObject({ scope: 'full' })
   expect(github).not.toHaveBeenCalled()
+  // Evidence produced under the installed owner policy still qualifies after main changes its configuration.
+  expect(checkPrereleaseVerification).toHaveBeenCalledWith(f.cwd, RELEASE_REPOSITORY, f.binding.sha, { producerSha: f.binding.producer })
 })
 
 it('requests only missing full tasks and stops on their first completed unsuccessful result', async () => {

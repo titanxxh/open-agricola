@@ -220,6 +220,46 @@ describe('installed receipt continuity', () => {
   })
 })
 
+describe('owner policy producer for source updates', () => {
+  it('keeps evidence produced under the owner policy after main changes its verification configuration', () => {
+    const value = fixture()
+    passingRun(value, value.main, 70)
+    advanceMain(value, 'tsconfig.storage-tools.json')
+    expect(checkPrereleaseVerification(value.cwd, value.repository, value.sha).status).toBe('blocked')
+    const owner = checkPrereleaseVerification(value.cwd, value.repository, value.sha, { producerSha: value.main })
+    expect(owner.status).toBe('passed')
+    expect(owner.producerConfiguration).toBe(verificationConfiguration(value.cwd, value.main))
+    expect(owner).not.toHaveProperty('continuity')
+    expect(owner.tasks.every(task => task.status === 'passed' && task.runId === 70)).toBe(true)
+  })
+
+  it('reports a run still in progress under the owner policy so a waiting update does not request another', () => {
+    const value = fixture()
+    const { jobs } = passingRun(value, value.main, 71)
+    const runs = value.api[`repos/${value.repository}/actions/workflows/200/runs?event=workflow_dispatch&per_page=100`] as { id: number; status: string }[]
+    runs.find(run => run.id === 71)!.status = 'in_progress'
+    jobs[1].status = 'in_progress'; jobs[1].conclusion = null as unknown as string
+    value.save()
+    advanceMain(value, 'tsconfig.storage-tools.json')
+    expect(checkPrereleaseVerification(value.cwd, value.repository, value.sha).tasks.every(task => task.runId === null)).toBe(true)
+    const owner = checkPrereleaseVerification(value.cwd, value.repository, value.sha, { producerSha: value.main })
+    expect(owner.status).toBe('blocked')
+    expect(owner.tasks.some(task => task.runId === 71)).toBe(true)
+    expect(owner.tasks.filter(task => task.runId === null)).toEqual([])
+  })
+
+  it('refuses an owner policy commit outside protected main', () => {
+    const value = fixture()
+    value.git('checkout', '-q', '-b', 'side', value.main)
+    writeFileSync(join(value.cwd, 'package.json'), '{"side":true}')
+    value.git('add', '.'); value.git('commit', '-m', 'unmerged policy')
+    const side = value.git('rev-parse', 'HEAD')
+    value.git('checkout', '-q', 'prerelease')
+    passingRun(value, side, 72)
+    expect(() => checkPrereleaseVerification(value.cwd, value.repository, value.sha, { producerSha: side })).toThrow(/not reachable from protected main/)
+  })
+})
+
 function synchronizationFixture() {
   const value = fixture()
   const remote = mkdtempSync(join(tmpdir(), 'oa-prerelease-remote-'))
