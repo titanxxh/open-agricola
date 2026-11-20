@@ -348,7 +348,10 @@ describe('B015 / E074 fence contributions', () => {
     expect(response.state.players[0]!.cardStates[ASH]?.counters?.fences).toBe(3)
     session = restore(session)
     response = session.getState()
-    if (!stockFirst) response = choose(session, response, ASH)
+    // Stock Protector settles immediately after the Fencing use (#1889), so Ash Trees'
+    // ordinary after reaction waits; stockFirst still orders the before window.
+    expect(response.interaction.stateId === 'wait'
+      && response.interaction.request.options?.some(option => option.value === ASH)).toBe(false)
     response = choose(session, response, STOCK)
     response = acceptBench(session, response)
     response = choose(session, response, 'forest')

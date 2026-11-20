@@ -73,11 +73,13 @@ const fencePrompt = (session: GameSession, response: SessionResponse) => {
   expect(wait(current).request.kind).toBe('farm-select')
   return current
 }
+// Stock Protector settles immediately after the Fencing use (#1889), alone and before
+// Asparagus Gift's ordinary fence-after reaction.
 const beginOuter = (session: GameSession) => {
   fencePrompt(session, ok(session.takeAction(0, 'fencing')))
   const response = ok(session.commitSelectionChoice(0, { edges: OUTER }))
   expect(wait(response).request.kind).toBe('select-trigger')
-  expect(wait(response).request.options?.filter(option => !option.disabled).map(option => option.value)).toEqual(expect.arrayContaining([CARD, STOCK]))
+  expect(wait(response).request.options?.map(option => option.value)).toEqual([STOCK, '__pass__'])
   return response
 }
 const beginInner = (session: GameSession, response: SessionResponse) => {
@@ -117,14 +119,10 @@ const assertNestedComplete = (response: SessionResponse) => {
 }
 
 describe('A068 committed host fence events', () => {
-  it.each(['nested-first', 'card-first'])('retains the outer four-fence reward with %s source order', order => {
+  it('retains the outer four-fence reward after the nested placement settles first', () => {
     const session = setup()
-    let outer = beginOuter(session)
+    const outer = beginOuter(session)
     expect(outer.state.players[0]!.resources).toMatchObject({ vegetable: 0, wood: 18 })
-    if (order === 'card-first') {
-      outer = choose(session, outer, CARD)
-      expect(outer.state.players[0]!.resources.vegetable).toBe(1)
-    }
     beginInner(session, outer)
     const inner = ok(session.commitSelectionChoice(0, { edges: INNER }))
     const complete = settle(session, inner)
@@ -200,19 +198,21 @@ describe('A068 committed host fence events', () => {
     expect(ok(confirmNextPlayer(session)).state.currentPlayerIndex).toBe(1)
   })
 
-  it('undoes the outer reward and grants it once when that source is selected again', () => {
+  it('undoes the outer reward with the inner fence step and grants it once on replay', () => {
     const session = setup()
     beginInner(session, beginOuter(session))
     const complete = settle(session, ok(session.commitSelectionChoice(0, { edges: INNER })))
     assertNestedComplete(complete)
+    // The outer reward is the only source left after the nested placement, so it settles
+    // in the same step as the inner fence commit (#1889) and one undo step removes both.
     const undone = ok(session.undoStep())
-    expect(wait(undone).request.kind).toBe('select-trigger')
-    expect(undone.state.players[0]!.resources).toMatchObject({ wood: 19, vegetable: 0 })
-    expect(undone.state.players[0]!.fenceSegments).toHaveLength(7)
+    expect(wait(undone).request.kind).toBe('farm-select')
+    expect(undone.state.players[0]!.resources).toMatchObject({ wood: 21, vegetable: 0 })
+    expect(undone.state.players[0]!.fenceSegments).toHaveLength(4)
     expect(builds(undone).map(event => event.newFenceEdges)).toEqual([OUTER])
     expect(rewards(undone)).toHaveLength(0)
     expect(rewardLogs(undone)).toHaveLength(0)
-    const redone = settle(session, undone)
+    const redone = settle(session, ok(session.commitSelectionChoice(0, { edges: INNER })))
     assertNestedComplete(redone)
     expect(ok(confirmNextPlayer(session)).state.currentPlayerIndex).toBe(1)
   })
