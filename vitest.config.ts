@@ -90,6 +90,7 @@ export default mergeConfig(
             setupFiles: ['./tests/setup-language-packs.ts',
               './shared/cards/__tests__/setup-register-all.ts',
               './shared/cards/__tests__/setup-listener-purity.ts',
+              './server/__tests__/_helpers/setup-test-schema-reuse.ts',
             ],
           },
         },
