@@ -59,6 +59,9 @@ export const FAST_SCRIPTS_INCLUDE = ['scripts/**/__tests__/*.test.ts']
 // installs gh/ssh/docker stubs and spawns tsx, git or bash there (or replays the real repository plan). Each file
 // takes at least 10 s on a GitHub runner, so they run in the slow task beside the card Session tests to keep the
 // fast task short (#1929). The list is explicit on purpose; new tooling tests stay in fast-scripts by default.
+// Four mid-sized ones (candidate-verification-pages, scoped-verification-cli, restart-local-processes and
+// verify-feedback-deployment, about 420 test-seconds together) stay in fast-scripts so that the fast and slow tasks
+// finish together on GitHub: run 44844324816 had fast at 476 s and slow at 763 s of Vitest time (#1925).
 export const SLOW_SCRIPTS_INCLUDE = [
   'scripts/__tests__/backend-image-maintenance-bootstrap.test.ts',
   'scripts/__tests__/backend-image-maintenance-compose-binding.test.ts',
@@ -70,20 +73,16 @@ export const SLOW_SCRIPTS_INCLUDE = [
   'scripts/__tests__/backup-storage.test.ts',
   'scripts/__tests__/candidate-verification-cli.test.ts',
   'scripts/__tests__/candidate-verification-isolation.test.ts',
-  'scripts/__tests__/candidate-verification-pages.test.ts',
   'scripts/__tests__/candidate-verification-prerelease.test.ts',
   'scripts/__tests__/prerelease-image-import.test.ts',
   'scripts/__tests__/prerelease-operations.test.ts',
   'scripts/__tests__/release-owner-local.test.ts',
   'scripts/__tests__/release-publish.test.ts',
-  'scripts/__tests__/restart-local-processes.test.ts',
   'scripts/__tests__/routine-verification-plan.test.ts',
   'scripts/__tests__/routine-verification-replay.test.ts',
   'scripts/__tests__/scenario-evidence.test.ts',
-  'scripts/__tests__/scoped-verification-cli.test.ts',
   'scripts/__tests__/storage-archive.test.ts',
   'scripts/__tests__/verification-requirements.test.ts',
-  'scripts/__tests__/verify-feedback-deployment.test.ts',
 ]
 export const FAST_SCRIPTS_EXCLUDE = [...FAST_EXCLUDE, ...SLOW_SCRIPTS_INCLUDE]
 export const FAST_TESTS_INCLUDE = ['tests/**/*.test.ts']
