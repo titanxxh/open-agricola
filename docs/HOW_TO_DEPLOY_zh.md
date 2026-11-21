@@ -522,7 +522,7 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 缓存按 URL 和 SHA-256 跨应用版本复用已校验素材。未命中时用不带凭证的 CORS 请求重新验证。哈希不符的字节仍可供页面使用，Worker 跳过写入。常规激活等待受控页面退出，只清理自身缓存的旧条目。
 
-同一 Worker 还以缓存优先方式提供应用的内容寻址文件：打包产物 `assets/*`、带哈希的语言包和 `cards-manifest.<sha256>.json`。构建时嵌入每个文件的 SHA-256，只写入哈希相符的 200 响应。文档、`/sw.js`、无哈希的 manifest 和 API 始终走网络，发布仍通过新的 `index.html` 切换客户端。激活时删除新构建未列出的条目。
+同一 Worker 还以缓存优先方式提供应用的内容寻址文件：打包产物 `assets/*`、带哈希的语言包、`cards-manifest.<sha256>.json` 以及百科带哈希的目录和搜索文件。构建时嵌入每个文件的 SHA-256，只写入哈希相符的 200 响应。文档、`/sw.js`、无哈希的 manifest 和 API 始终走网络，发布仍通过新的 `index.html` 切换客户端。激活时删除新构建未列出的条目。
 
 ### 暂停单项 Service Worker 功能
 

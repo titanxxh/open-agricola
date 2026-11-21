@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { build, type Plugin, type Rolldown } from 'vite'
 import { parseLanguageManifest, parseLanguagePack } from '../shared/i18n/index.ts'
 import { browserBoundaryPlugin } from './browser-boundary-plugin.ts'
@@ -96,6 +96,16 @@ export function appShellDigests(bundle: Rolldown.OutputBundle, publicDir: string
   }
   for (const name of readdirSync(publicDir)) {
     if (/^cards-manifest\.[a-f0-9]{64}\.json$/.test(name)) add(name)
+  }
+  // The encyclopedia's catalog and search files are content-named too; its manifest names the current pair.
+  const encyclopedia = path.join(publicDir, 'card-encyclopedia/manifest.json')
+  if (existsSync(encyclopedia)) {
+    const manifest: unknown = JSON.parse(readFileSync(encyclopedia, 'utf8'))
+    for (const part of ['catalog', 'search'] as const) {
+      const file = manifest && typeof manifest === 'object' && part in manifest ? (manifest as Record<string, { file?: unknown }>)[part]?.file : undefined
+      if (typeof file !== 'string' || !/^[a-z]+\.[a-f0-9]{16}\.json$/.test(file)) throw new Error(`Invalid encyclopedia ${part} file for the Pages Worker`)
+      add(`card-encyclopedia/${file}`)
+    }
   }
   return digests
 }
