@@ -21,7 +21,7 @@ const publicAssets = await loadPublicAssetConfig({
   includeDigests: pagesWorker && PUBLIC_ASSET_CACHE_ENABLED,
 })
 const browserDataDefines = process.argv.includes('build') && process.env.VITEST !== 'true'
-  ? loadBrowserDataDefines(import.meta.dirname)
+  ? loadBrowserDataDefines(import.meta.dirname, { languageList: true })
   : {}
 
 const servePublicAssets = (assetRoot: string, missingIsNotFound: boolean) => {
