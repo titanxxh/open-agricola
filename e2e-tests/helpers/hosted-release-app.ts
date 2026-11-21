@@ -37,11 +37,9 @@ export async function startHostedReleaseApp({ backendUrl, frontendOrigin, direct
   } catch (error) { await app.close(); throw error }
 }
 
-export async function startReleaseAppProxy({ backendUrl, frontendOrigin, serveFrontend, port = 0 }: {
+export async function startReleaseAppProxy({ backendUrl, frontendOrigin, serveFrontend }: {
   backendUrl: string
   frontendOrigin: string
-  /** Loopback port to listen on; 0 picks a free one. */
-  port?: number
   serveFrontend(request: IncomingMessage, response: ServerResponse): boolean | Promise<boolean>
 }) {
   const backend = new URL(backendUrl), trustedOrigin = new URL(frontendOrigin)
@@ -139,7 +137,7 @@ export async function startReleaseAppProxy({ backendUrl, frontendOrigin, serveFr
     for (const socket of sockets) socket.destroy()
     await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done()))
   })()
-  await new Promise<void>((done, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', done) })
+  await new Promise<void>((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
   try {
     const address = server.address()
     if (!address || typeof address === 'string') throw new Error('Hosted release adapter requires a TCP port')

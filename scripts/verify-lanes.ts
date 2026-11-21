@@ -13,6 +13,8 @@ import { browserSpecWeights, weightedAssignment } from './ci/verification-tasks.
 
 export const MAX_LANES = 8
 export const HOSTED_FRONTEND_SOURCE = 'VERIFY_HOSTED_FRONTEND_SOURCE'
+/** Directory where a task's lanes share one Pages build (e2e-tests/helpers/pages-frontend.ts). */
+export const PAGES_FRONTEND_CACHE = 'VERIFY_PAGES_FRONTEND_CACHE'
 const MARKER = 'output/verification/hosted-frontend-build.json'
 const SPEC = /\.(?:spec|test)\.[cm]?[jt]sx?$/
 // Playwright and verify options that consume the following argument.
