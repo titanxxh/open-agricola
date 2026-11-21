@@ -1270,6 +1270,7 @@ describe('dependency routine verification plan', () => {
     expect(farm.browserFiles).toEqual(board)
     expect(main.fullTrigger).toBe(false)
     expect(main.browserFiles).toEqual([
+      { file: 'e2e-tests/app-shell-worker.spec.ts', grep: null },
       { file: 'e2e-tests/application-loading.spec.ts', grep: null },
       { file: 'e2e-tests/public-asset-worker.spec.ts', grep: null },
     ])
