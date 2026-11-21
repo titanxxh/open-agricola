@@ -307,9 +307,13 @@ it('requires a project GitHub identity instead of falling back to anonymous meta
   vi.stubEnv('WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY', '')
   const upstream = vi.fn<typeof fetch>()
   vi.stubGlobal('fetch', upstream)
+  // The App client is memoized for the process once its credentials exist; load a fresh module so an
+  // App built by another test in this file cannot stand in for the missing identity.
+  vi.resetModules()
+  const fresh = await import('../workshop.ts')
   try {
     const response = mockRes()
-    await handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response)
+    await fresh.handleWorkshopRoute(mockReq('GET', '/api/workshop/references/main', null, 'tok-alice'), response, reviewRuntime)
     expect(response.statusCode).toBe(503)
     expect(upstream).not.toHaveBeenCalled()
   } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals() }
@@ -1442,21 +1446,14 @@ export const CUSTOM_PinnedPublic = defineMinorCard({
       }, 'tok-alice')
     })
 
-    it('toggles like on', async () => {
-      const req = mockReq('POST', `/api/workshop/cards/${cardDbId}/like`, null, 'tok-bob')
-      const res = mockRes()
-      await handleWorkshopRoute(req, res)
-      const d = JSON.parse(res.body)
-      expect(d.ok).toBe(true)
-      expect(d.liked).toBe(true)
-    })
-
-    it('toggles like off', async () => {
-      const req = mockReq('POST', `/api/workshop/cards/${cardDbId}/like`, null, 'tok-bob')
-      const res = mockRes()
-      await handleWorkshopRoute(req, res)
-      const d = JSON.parse(res.body)
-      expect(d.liked).toBe(false)
+    it('toggles like on and off', async () => {
+      for (const liked of [true, false]) {
+        const res = mockRes()
+        await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/like`, null, 'tok-bob'), res)
+        const d = JSON.parse(res.body)
+        expect(d.ok).toBe(true)
+        expect(d.liked).toBe(liked)
+      }
     })
 
     it('requires auth', async () => {
@@ -1478,21 +1475,16 @@ export const CUSTOM_PinnedPublic = defineMinorCard({
       }, 'tok-alice')
     })
 
-    it('adds a comment', async () => {
-      const req = mockReq('POST', `/api/workshop/cards/${cardDbId}/comments`, { body: 'Great card!' }, 'tok-bob')
-      const res = mockRes()
-      await handleWorkshopRoute(req, res)
-      expect(JSON.parse(res.body).ok).toBe(true)
-    })
+    it('adds a comment and lists it', async () => {
+      const added = mockRes()
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/comments`, { body: 'Great card!' }, 'tok-bob'), added)
+      expect(JSON.parse(added.body).ok).toBe(true)
 
-    it('lists comments', async () => {
-      const req = mockReq('GET', `/api/workshop/cards/${cardDbId}/comments`)
       const res = mockRes()
-      await handleWorkshopRoute(req, res)
+      await handleWorkshopRoute(mockReq('GET', `/api/workshop/cards/${cardDbId}/comments`), res)
       const d = JSON.parse(res.body)
       expect(d.ok).toBe(true)
-      expect(d.comments.length).toBeGreaterThan(0)
-      expect(d.comments[0].body).toBe('Great card!')
+      expect(d.comments.map((comment: { body: string }) => comment.body)).toEqual(['Great card!'])
     })
 
     it('rejects empty comment', async () => {
@@ -1516,7 +1508,10 @@ export const CUSTOM_PinnedPublic = defineMinorCard({
     })
 
     it('returns default sandbox settings when none saved', async () => {
-      const req = mockReq('GET', '/api/workshop/sandbox', null, 'tok-alice')
+      // Other sandbox tests save Alice's settings, so read as a user who never saved any.
+      await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at, last_login_at) VALUES (?,?,?,?,?,?)').run('u-sandbox-default', 'sandbox_default', 'Sandbox Default', 'hash', NOW, null)
+      await db.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at, auth_policy_version) VALUES (?,?,?,?, 2)').run('tok-sandbox-default', 'u-sandbox-default', NOW + 86400000, NOW)
+      const req = mockReq('GET', '/api/workshop/sandbox', null, 'tok-sandbox-default')
       const res = mockRes()
       await handleWorkshopRoute(req, res)
       const data = JSON.parse(res.body)
@@ -1614,6 +1609,9 @@ export const CUSTOM_PinnedPublic = defineMinorCard({
     })
 
     it("accepts only the user's own cards: unmerged code runs only in its author's browser (ADR 0052)", async () => {
+      const bobSandbox = () => db.prepare("SELECT workshop_card_id AS id FROM sandbox_cards WHERE user_id = 'u2' ORDER BY workshop_card_id").all<{ id: string }>()
+      const before = await bobSandbox()
+      expect(before.map(row => row.id)).not.toContain(cardDbId)
       const res = mockRes()
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_ids: [cardDbId] }, 'tok-bob'), res)
       expect(res.statusCode).toBe(400)
@@ -1621,10 +1619,10 @@ export const CUSTOM_PinnedPublic = defineMinorCard({
       const single = mockRes()
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', { workshop_card_id: cardDbId }, 'tok-bob'), single)
       expect(single.statusCode).toBe(400)
-      expect(await db.prepare("SELECT COUNT(*) AS c FROM sandbox_cards WHERE user_id = 'u2'").get()).toEqual({ c: 0 })
+      expect(await bobSandbox()).toEqual(before)
       const getRes = mockRes()
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob'), getRes)
-      expect(JSON.parse(getRes.body).cards).toEqual([])
+      expect(JSON.parse(getRes.body).cards.map((card: { id: string }) => card.id).sort()).toEqual(before.map(row => row.id).sort())
     })
 
     it('drops entries for other authors\' cards from the quota when adding one card', async () => {

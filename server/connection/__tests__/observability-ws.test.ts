@@ -25,6 +25,9 @@ let backend: Awaited<ReturnType<typeof createWsServer>>
 let recording: Awaited<ReturnType<typeof recordingResources>>
 let base: string
 let peer: WebSocket | undefined
+const scrapeMetrics = async () => (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer ws-scrape-token' } })).text()
+/** What the shared viewer's join returned; every other test reuses that joined viewer, whatever order they run in. */
+const joined = { before: '', after: '', sizes: [] as number[], texts: [] as string[], rounds: [] as number[] }
 beforeAll(async () => {
   vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
   vi.stubEnv('PUBLIC_APP_ORIGIN', BROWSER_TEST_ORIGIN)
@@ -40,6 +43,23 @@ beforeAll(async () => {
   }
   room.session.devSetRound(8)
   room.session.updatePlayerName(0, '农夫🧑‍🌾')
+  joined.before = await scrapeMetrics()
+  peer = new WebSocket(base.replace('http:', 'ws:') + '/ws')
+  await new Promise<void>((resolve, reject) => {
+    peer!.on('error', reject)
+    peer!.on('message', raw => {
+      const text = raw.toString()
+      const event = JSON.parse(text)
+      if (event.type !== 'stateUpdate') return
+      joined.rounds.push(event.payload.state.round)
+      joined.sizes.push(raw instanceof Buffer ? raw.length : Buffer.concat(raw as Buffer[]).length)
+      joined.texts.push(text)
+      if (event.requestId === 'round-eight') resolve()
+    })
+    peer!.once('open', () => peer!.send(JSON.stringify({ type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 0, requestId: 'round-eight' })))
+  })
+  peer.removeAllListeners('message')
+  joined.after = await scrapeMetrics()
 })
 afterAll(async () => {
   if (peer) peer.terminate()
@@ -50,31 +70,13 @@ afterAll(async () => {
   vi.unstubAllEnvs()
 })
 
-it('measures real returned UTF-8 envelopes using the round displayed by each message', async () => {
-  const scrape = async () => (await fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer ws-scrape-token' } })).text()
+it('measures real returned UTF-8 envelopes using the round displayed by each message', () => {
   const statistic = (text: string, suffix: string) => text.split('\n')
     .filter(line => line.startsWith('agricola_ws_outgoing_message_size_bytes_' + suffix + '{') && line.includes('round="8"') && line.includes('message_type="state"'))
     .reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf(' ') + 1)), 0)
-  const before = await scrape()
-  const sizes: number[] = []
-  const texts: string[] = []
-  peer = new WebSocket(base.replace('http:', 'ws:') + '/ws')
-  const reply = new Promise<void>((resolve, reject) => {
-    peer!.on('error', reject)
-    peer!.on('message', raw => {
-      const text = raw.toString()
-      const event = JSON.parse(text)
-      if (event.type !== 'stateUpdate') return
-      expect(event.payload.state.round).toBe(8)
-      sizes.push(raw instanceof Buffer ? raw.length : Buffer.concat(raw as Buffer[]).length)
-      texts.push(text)
-      if (event.requestId === 'round-eight') resolve()
-    })
-    peer!.once('open', () => peer!.send(JSON.stringify({ type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex: 0, requestId: 'round-eight' })))
-  })
-  await reply
-  peer!.removeAllListeners('message')
-  const after = await scrape()
+  const { before, after, sizes, texts, rounds } = joined
+  expect(rounds.length).toBeGreaterThan(0)
+  expect(rounds.every(round => round === 8)).toBe(true)
   expect(statistic(after, 'count') - statistic(before, 'count')).toBe(sizes.length)
   expect(statistic(after, 'sum') - statistic(before, 'sum')).toBe(sizes.reduce((sum, size) => sum + size, 0))
   expect(sizes[0]).toBeGreaterThan(texts[0]!.length)

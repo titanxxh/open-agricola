@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { PostgresDatabase } from '../database/postgres'
 import { CONCURRENT_MIGRATION_LOCKS, DATABASE_EXTENSIONS, migratePostgres, migrationLockScope } from '../database/migrations'
 import { databaseMaintenance, getTestDatabaseUrl } from './_helpers/postgres'
@@ -40,34 +40,41 @@ describe('migration lock scope', () => {
 })
 
 describe('migration locks in a private database', () => {
-  // A private database keeps these deliberate lock waits away from every other test's migrations.
-  const name = `migration_lock_${randomUUID().replaceAll('-', '')}`
+  // A private database keeps these deliberate lock waits away from every other test's migrations. Each test
+  // gets its own, so whether the extensions are installed never depends on which test ran first.
   const admin = databaseMaintenance()
-  const url = new URL(getTestDatabaseUrl())
-  url.pathname = `/${name}`
-  const connectionString = url.toString()
-  const open: PostgresDatabase[] = []
-  const database = (schema?: string) => { const db = new PostgresDatabase({ connectionString, schema, max: 2 }); open.push(db); return db }
-  const schemaA = 'tenant_a', schemaB = 'tenant_b'
+  let name = ''
+  let open: PostgresDatabase[] = []
+  const database = (schema?: string) => {
+    const url = new URL(getTestDatabaseUrl())
+    url.pathname = `/${name}`
+    const db = new PostgresDatabase({ connectionString: url.toString(), schema, max: 2 })
+    open.push(db)
+    return db
+  }
+  const schemaA = 'tenant_a', schemaB = 'tenant_b', bootstrap = 'bootstrap'
   let concurrent = false
+  /** Installs the database extensions through a schema the test does not otherwise use. */
+  const installExtensions = () => migratePostgres(database(bootstrap))
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    name = `migration_lock_${randomUUID().replaceAll('-', '')}`
+    open = []
     await admin.exec(`CREATE DATABASE "${name}"`)
     const setup = database()
-    await setup.exec(`CREATE SCHEMA ${schemaA}`)
-    await setup.exec(`CREATE SCHEMA ${schemaB}`)
+    for (const schema of [schemaA, schemaB, bootstrap]) await setup.exec(`CREATE SCHEMA ${schema}`)
     const row = await setup.prepare("SELECT current_setting('max_locks_per_transaction')::integer AS locks").get<{ locks: number }>()
     concurrent = row!.locks >= CONCURRENT_MIGRATION_LOCKS
     // Verification always starts the local service from docker-compose.local.yml.
     if (process.env.CI) expect(concurrent).toBe(true)
   }, 300_000)
 
-  afterAll(async () => {
-    try {
-      for (const db of open) await db.close()
-      await admin.exec(`DROP DATABASE IF EXISTS "${name}"`)
-    } finally { await admin.close() }
+  afterEach(async () => {
+    for (const db of open) await db.close()
+    await admin.exec(`DROP DATABASE IF EXISTS "${name}"`)
   }, 300_000)
+
+  afterAll(async () => { await admin.close() })
 
   /** Runs `work` while `holder` keeps whatever `hold` acquired in an open transaction. */
   async function whileHolding<Result>(holder: PostgresDatabase, hold: () => Promise<unknown>, work: () => Promise<Result>): Promise<Result> {
@@ -96,6 +103,7 @@ describe('migration locks in a private database', () => {
   }, 60_000)
 
   it('migrates another schema during an open migration and still excludes the same schema', async () => {
+    await installExtensions()
     const holder = database(schemaA), sameSchema = database(schemaA), otherSchema = database(schemaB)
     await whileHolding(holder, () => migratePostgres(holder), async () => {
       await expect(tryMigrate(sameSchema)).rejects.toMatchObject(blocked)
@@ -109,6 +117,7 @@ describe('migration locks in a private database', () => {
   }, 60_000)
 
   it('keeps the database-wide lock for the default schema and against an instance that still uses it', async () => {
+    await installExtensions()
     const holder = database(), defaultSchema = database(), scoped = database(schemaB)
     // The default schema requests the exclusive lock, so even a shared holder makes it wait.
     await whileHolding(holder, () => holder.exec('SELECT pg_advisory_xact_lock_shared(962)'), async () => {

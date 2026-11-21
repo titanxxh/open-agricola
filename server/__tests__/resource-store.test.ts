@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'vitest'
 import { createTestDatabase } from './_helpers/postgres'
 import { testStorageEnvironment } from './_helpers/objects'
 import { S3ObjectStore } from '../storage/s3-store'
@@ -9,12 +9,15 @@ import { ResourceStore } from '../storage/resource-store'
 let resources: ResourceStore
 let peer: ResourceStore
 let now = Date.now()
-beforeAll(async () => {
+// Every test gets its own database and object prefix: collector counts must not see another test's objects.
+beforeEach(async () => {
+  now = Date.now()
   const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
   resources = new ResourceStore(await createTestDatabase(), objects, () => now)
   peer = new ResourceStore(resources.db, objects, () => now)
+  await resources.db.prepare("INSERT INTO users(id, username, display_name, password_hash, created_at) VALUES ('author', 'author', 'Author', 'hash', 1)").run()
 })
-afterAll(async () => { await resources.objects.clearPrefix(); resources.objects.close(); await resources.db.close() })
+afterEach(async () => { await resources.objects.clearPrefix(); resources.objects.close(); await resources.db.close() })
 
 it('protects durable preparations and published references across collectors', async () => {
   await resources.stage('replay-assets/retained', Buffer.from('same'), 'image/png')
@@ -49,7 +52,6 @@ it('keeps the erasure barrier independent of a restored database and merges conc
 
 it('retains saved nested Workshop candidates until the draft releases them', async () => {
   await resources.stage('card-art/candidate.png', Buffer.from('candidate'), 'image/png')
-  await resources.db.prepare("INSERT INTO users(id, username, display_name, password_hash, created_at) VALUES ('author', 'author', 'Author', 'hash', 1)").run()
   await resources.db.prepare(`INSERT INTO workshop_cards(id, author_id, card_id, card_type, name, card_json, draft_generation_json, created_at, updated_at)
     VALUES ('card', 'author', 'CUSTOM_candidate', 'minor', 'Candidate', '{}', ?, 1, 1)`).run(JSON.stringify({ art: { history: [{ resultUrl: '/card-art/candidate.png', referenceImages: ['/card-art/candidate.png'] }] } }))
   now += 2 * 24 * 60 * 60 * 1000

@@ -108,7 +108,8 @@ describe('shared/session/serialization', () => {
 
     it('preserves resources and takenBy from serialized data', () => {
     const registry = createOfficialCardRegistry()
-      const modified = { ...state }
+      // Copy the spaces this test changes: the shared state's action spaces must stay untaken for the other tests.
+      const modified = { ...state, actionSpaces: state.actionSpaces.map(space => ({ ...space, resources: { ...space.resources } })) }
       const space = modified.actionSpaces.find((s) => s.gainPerRound.wood)
       if (space) {
         space.resources.wood = 99
