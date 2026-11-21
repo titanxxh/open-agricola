@@ -1,4 +1,5 @@
-// @covers scripts/release/owner-local.ts scripts/release/publish.ts
+// @covers scripts/ci/candidate-verification.ts scripts/ci/prerelease-verification.ts scripts/release/owner-local.ts
+// @covers scripts/release/publish.ts
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'

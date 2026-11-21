@@ -1,4 +1,4 @@
-// @covers scripts/observability.mjs
+// @covers deploy-operations.sh operations/deploy.mjs scripts/observability.mjs
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

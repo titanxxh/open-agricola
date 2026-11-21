@@ -250,11 +250,13 @@ function sourcePaths(root: string): string[] {
   return walkSourceFiles(root, sourceExtensions, true, 'skip-non-source').map(file => normalize(relative(root, file)))
 }
 
-function readCoverIndex(root: string, specs: readonly string[], files: readonly string[]): { declarations: Map<string, string[]>; warnings: string[] } {
+function readCoverIndex(root: string, specs: readonly string[], files: readonly string[]): { declarations: Map<string, string[]>; declared: Map<string, string[]>; warnings: string[] } {
   const declarations = new Map<string, string[]>()
+  const declared = new Map<string, string[]>()
   const warnings: string[] = []
   for (const file of specs) {
     const prefixes = coverPrefixes(readFileSync(join(root, file), 'utf8'))
+    if (prefixes.length) declared.set(file, prefixes)
     const valid: string[] = []
     for (const prefix of prefixes) {
       if (files.some(candidate => prefixMatches(prefix, candidate))) valid.push(prefix)
@@ -262,10 +264,11 @@ function readCoverIndex(root: string, specs: readonly string[], files: readonly 
     }
     if (valid.length) declarations.set(file, valid)
   }
-  return { declarations, warnings }
+  return { declarations, declared, warnings }
 }
 
-// A Vitest file or test helper whose declaration matches selects itself and the tests that import it.
+// A Vitest file or test helper whose declaration matches selects itself and the tests that import it. Selection uses
+// every declared prefix, so deleting or renaming a declared script still selects its tests while the prefix warns.
 function vitestCoverSelection(
   graph: ImportGraph,
   declarations: ReadonlyMap<string, string[]>,
@@ -424,7 +427,7 @@ export function planRoutineVerification(input: {
           for (const file of readSelection(readGraph, output.path, tests, output.directory)) readers.add(file)
         }
         for (const file of readers) selected.add(file)
-        const declared = vitestCoverSelection(graph, vitestCovers.declarations, path, tests)
+        const declared = vitestCoverSelection(graph, vitestCovers.declared, path, tests)
         for (const file of declared) selected.add(file)
         selectionReasons.push(`${path}: ${dependentTests} Vitest files through runtime imports; ${cards.size} through registry keys or direct registry imports; ${readers.size} through direct reads; ${declared.size} through @covers`)
       }
