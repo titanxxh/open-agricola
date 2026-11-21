@@ -88,25 +88,11 @@ GitHub 浏览器任务（日常浏览器分区与候选的 chromium、sandbox、
 
 ## 发布工具演练与必需浏览器用例
 
-`pnpm release:rehearse` 是发布验收工具的本地入口：先运行现有 prepush，再构建 Hosted 前端、通过 `restart-local.sh` 启动隔离 PostgreSQL/S3 应用，运行正式账号登录、两种单人配置、选牌、刷新与新上下文恢复、素材解码和数据库持久化核验，最后检查必需用例证据。它只创建和清理隔离测试命名空间，不部署服务或发布版本。`scripts/release/` 中的工具接受 ESLint、测试和 `check:verification-types` 严格类型检查；类型门禁同时接入 prepush 与 `check:architecture`，工具类型项目独立于生产 Docker 构建。
-
-```bash
-pnpm release:rehearse
-pnpm verify status --requirements scripts/release/requirements.json
-
-# 调试时可只跑指定用例；最终范围仍由 requirements 决定
-pnpm verify e2e-tests/release-rehearsal.spec.ts --browser=chromium --requirements scripts/release/requirements.json
-```
+`pnpm release:rehearse` 是发布验收工具的本地演练入口，在隔离的 PostgreSQL/S3 应用中运行正式账号登录、单人配置、选牌、恢复、素材解码和持久化核验，并检查 `scripts/release/requirements.json` 声明的必需用例。它属于 owner 操作，步骤见 [Owner 运维](../HOW_TO_DEPLOY.md#owner-operations)；本机演练结果不替代 GitHub 证据或上线后的检查。在 #1978 删除之前，公开仓库的 `scripts/release/` 仍接受 ESLint、测试和 `check:verification-types` 严格类型检查；类型门禁接入 prepush 与 `check:architecture`，工具类型项目独立于生产 Docker 构建。
 
 卡牌百科验收用 `pnpm verify:encyclopedia` 走同一条链：prepush、百科 Chromium spec（含根路径 Pages 产物）、`encyclopedia.spec.ts` 的 `@webkit` 矩阵，最后 `pnpm verify status --requirements e2e-tests/encyclopedia.requirements.json`。新增或改名百科用例时同步该 requirements 文件。
 
 reviewer 在 requirements 文件中声明必需 case 的仓库相对 `file`、完整 `titlePath`（describe 层级和 test 标题）、`project` 和 `browser`；不支持把文件名当成全部用例已执行。实际执行证据在 `output/verification/e2e-runs/<runId>/` 中不可覆盖地保存。相同源码指纹、相同 requirements 内容 hash 的运行可累计；缺失、过滤掉、跳过、预期失败、flaky、后续失败或缺少 reporter 结果都不能满足必需用例。`status --requirements` 还要求当前 prepush 成功。未传 requirements 时，原有 `verify` 和 `status` 契约保持不变。
-
-本机需要代理时设置 `RELEASE_SMOKE_PROXY`；该环境变量计入验证指纹。依赖与语言、素材来源继续使用现有隔离环境及 pin 校验。可选代理不关闭 TLS 校验，也不证明目标生产域名可用。
-
-正式单人开局、选牌和持久化测试只在上述本机隔离演练中运行。浏览器流程拒绝前端或 API 指向非回环地址；原远端 `release:smoke` 命令已移除。上线验收不创建正式对局，也不向已有对局发送游戏操作。上线后核对生产 TLS/cookie、登录退出、前后端与 Pages 构建身份、静态资源、工坊和回放读取、备份恢复以及旧对局保留。
-
-本机演练在同一输出目录的 `progress.json` 中绑定目标、build 和账号摘要，已创建的局在重试时复用。创建结果不确定时保留命令身份并阻止再次创建，先核实原回执。浏览器失败首轮即写 `failure.json`，清理失败另写 `cleanup-failure.json`，保留首个故障；`diagnostics.json` 记录有界的文档、连接、协议类型和请求状态，不保存认证头、Cookie、查询参数、完整消息或手牌。演练通过现有数据库适配器和 codec 在只读事务内核验持久化。本机演练结果不替代上线后的检查。
 
 ## 全卡订阅审计
 
@@ -270,10 +256,9 @@ set -a
 source .env
 set +a
 gh workflow run deploy-pages-broker.yml --ref main -f candidate_sha=<full-sha>
-./deploy-backend.sh root@your-game.duckdns.org <fixed-sha> /root/open-agricola \
-  --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
-  --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
 ```
+
+后端交付在 owner 本机用私有工具执行，见 [Owner 运维](../HOW_TO_DEPLOY.md#owner-operations)。
 
 ## 引用
 

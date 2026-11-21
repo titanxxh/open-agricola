@@ -56,40 +56,15 @@ Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已
 
 ## 本机标准发版
 
-若新请求 header 尚未被线上后端接受，先完成[后端优先的版本重叠流程](#supported-browser-and-backend-overlap)，再发布 Release。`pnpm release` 验证通过后会自动发布，不会等待后端部署。
-
-在 owner 控制的本机准备 Node.js 24.15+（不支持 Node 25）、锁定依赖和已认证的 `gh` CLI，再运行标准发版命令：
-
-```bash
-pnpm install --frozen-lockfile
-pnpm release vX.Y.Z --ref main
-```
+本节的 owner 操作步骤已迁入私有仓库，见 [Owner 运维](#owner-operations)。发版依赖的规则留在这里。
 
 正式候选必须是所选仓库受保护 `main` 上某个已合入 PR 的最终集成快照。门禁明确解析 `refs/heads/main`，同名 tag 不能改变选择；同时核对原生仓库/PR 身份与原始 Git 对象可达性。未合入或中间快照在 dispatch、发布、安装候选和 SSH 前被拒绝。main 前进后，合格的旧最终快照仍可使用。独立固定的受保护 main producer P 为候选 C 定义编排；P 的原生 main 身份提供策略授权，双方源码配置哈希仅标识兼容执行。原生治理信任已授权的 override 权限，不证明历史策略；该新增准入策略见 ADR 0037。
 
-命令只解析一次 C 并打印完整 SHA。`verification/candidates/<SHA>` 固定保留为候选源码 lease；已有引用指向其他提交时拒绝且不强制更新。必需任务缺失或失败时，在 main P 上请求 `candidate-verification.yml`。查找原生 run 名称 `stable / <C> / <tasks>` 及其 `Stable manifest` 绑定：仓库 ID、stable 通道、C、C/P 双方配置及 P。run head 是 P，候选 payload 仍是 C。兼容的完整证据可复用，但新的 P/C 尝试未完成、失败或配置不兼容时不能退回历史旧绿。历史回执资格由 [CI 检查](operations/ci-checks.md) 的可信 cutoff 限定。
-
-完整证据通过后，命令才创建版本 tag 和 Release。即使验证期间 `main` 移动，Release 目标仍是固定的 SHA。已有 tag 或 Release 指向其他 SHA 时拒绝；同一 SHA 的已发布 Release 直接复用，不重写 tag，也不重复创建 Release。
-
-某次运行中断后，用打印出的候选 SHA 重试：
-
-```bash
-pnpm release vX.Y.Z --ref <full-sha>
-```
-
-fork 仓库可传入 `--repository owner/name`，并在该仓库配置候选验证 workflow。默认仓库为 `titanxxh/open-agricola`。`--poll-seconds` 默认 15 秒，`--timeout-seconds` 默认 7200 秒。超时或任务失败时不发布。修改源码后，按需选择新的候选和版本。
-
-标准命令在发布前核验 GitHub run 和 job 证据。通过网页或裸 `gh release create` 创建的 Release 可能尚无这些证据，Pages 与后端部署会各自拒绝未验证的候选。本机 `pnpm release:rehearse` 记录不能替代 GitHub 证据。
+只有固定候选的完整验证证据通过后，才能创建版本 tag 和 Release；即使 `main` 移动，Release 目标仍是该 SHA。已有 tag 或 Release 指向其他 SHA 时拒绝。通过网页或裸 `gh release create` 创建的 Release 可能尚无这些证据，Pages 与后端部署会各自拒绝未验证的候选。本机 `pnpm release:rehearse` 记录不能替代 GitHub 证据。
 
 ### 授权完整本机候选验证
 
-正式版本与 pre 版本默认在 owner 本机验证固定候选（ADR 0046），GitHub 候选 workflow 作为回退。仓库原生 User owner 提交同一完整十任务候选计划的回执：
-
-```bash
-sudo bash scripts/ci/owner-local-provision.sh <node-install-dir>      # 每台 owner 机器执行一次
-pnpm exec tsx scripts/ci/owner-local-run.ts --channel stable --sha <final-main-sha> --output /owner/runs/<新目录>
-pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/runs/<新目录>/verification.json
-```
+正式版本与 pre 版本默认在 owner 本机验证固定候选（ADR 0046），GitHub 候选 workflow 作为回退。仓库原生 User owner 提交同一完整十任务候选计划的回执。准备、recorder 和发布命令属于 owner 操作，见 [Owner 运维](#owner-operations)。
 
 `scripts/ci/owner-local-run.ts` 是 recorder，须在受信任的 protected-main checkout 中运行，其干净的 HEAD 即 producer。
 - **一次性准备**：安装与已装引擎同版本的 rootless Docker 组件、用户命名空间工具，并在 `/opt/oa-owner-local` 放置 root 所有的可信 Node 工具链副本和可信 Playwright 浏览器缓存；不会升级 Docker。Playwright 升级后需重新执行。
@@ -102,24 +77,9 @@ pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/runs/<新
 
 回执必须包含的内容、owner status 怎样选择或撤回本机证明，以及 Pages、后端交付和镜像生产怎样复核，见[发布证据契约](#release-evidence-contract)。
 
-publisher 核对当前认证用户与仓库 owner 的原生用户 ID，准备固定候选 draft，仅上传 `owner-local-verification.json`，再创建独立 `owner-local-verification` commit status。描述绑定回执 SHA-256，target 只能是本仓正式 Release asset。发布前读回 status creator、Release author、asset uploader 和实际字节。相同命令与回执可恢复本工具准备的同一 draft；普通发布路径继续拒绝 draft。
-
-发布 PATCH 响应丢失时，publisher 通过现有候选门禁与原生 Release ID 做一次有界只读核验。已发布且证明一致时直接成功，不重复写入。读回不可用或证据冲突时仍报失败，重试固定候选前先查状态。
-
 ### 查询交付状态与验收现场
 
-`pnpm release:status --config /owner/status.json` 分别查询 Release、镜像构建、后端操作、Pages 和已保存浏览器验收。私有 JSON 必需字段为 `repository`、`version`、`candidateSha`、`apiOrigin`、`appOrigin`。可选 `image` 含 `runId`、`runAttempt`、`artifactId`，可选 `backend` 含 `host`、`directory`、`operationId`；`acceptanceFile` 指向已保存的 `release:accept` 结果。每阶段输出 `verified`、`absent`、`pending`、`conflict` 或 `unavailable`，并注明 `native`、`live` 或 `saved` 证据。缺输入时保持 unavailable；网络失败不会授权再次写入。保存的验收保留原完成时间并标记 saved，运行期探针另行展示。其候选 SHA 与报告记录的实际受测 `appOrigin`、`apiOrigin` 必须和所选环境严格一致；其他环境的报告或缺少这两个 origin 的旧报告均返回 `conflict`。
-
-线上浏览器验收使用已有账号、该账号已参与的普通局和保留的已结束 Replay。先通过只读 repeatable-read 事务采集所需元数据，不扫描对局或回放 payload：
-
-```bash
-pnpm release:inventory --host <host> --directory <deploy-dir> \
-  --expected-build <full-sha> --output /owner/live-inventory.json
-pnpm release:accept --config /owner/live-acceptance.json
-pnpm release:accept --config /owner/live-acceptance.json --execute
-```
-
-owner 私有验收 JSON 包含 `format: 1`、`appUrl`、`apiUrl`、`expectedBuild`、`credentialsFile`、`inventoryFile`、`artifactDirectory`、`outputDirectory`。使用根路径 HTTPS 应用/API URL、固定 SHA、新鲜清单与已校验 Pages 产物目录。专用 0600 凭据文件仅含 `MY_TEST_USER_ID` 和 `MY_TEST_PASSWORD`，配置只存路径。每次尝试使用新的私有输出目录。规划模式只校验配置，不读取凭据；执行要求清单在十分钟内，覆盖 Chromium/WebKit、双实例路由、已有普通局及刷新恢复、Replay、可见素材、移动布局和当前 session 退出。所有 frame 拒绝游戏写入和其他房间 join，只允许已选参与者房间的 locate 与 join/resume 请求。首失败与清理失败分别留证。会创建和操作测试局的 `release:rehearse` 仍限定回环环境，并覆盖这些浏览器保护回归。
+本节的 owner 操作步骤已迁入私有仓库，见 [Owner 运维](#owner-operations)。线上浏览器验收本身是 `e2e-tests/helpers/live-smoke-cli.ts`：不写入对局，只允许已选参与者房间的 locate 与 join/resume 请求。
 
 ## 更新正在运行的 pre
 
@@ -170,40 +130,7 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 
 ## 核验生产修复并重试站内信
 
-正式 Release 发布且前后端部署完成后，在 owner 控制的本机运行：
-
-```bash
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts vX.Y.Z \
-  --host <host> --remote-dir <deploy-dir> \
-  --frontend https://open-agricola.titanxxh.com/ \
-  --receipt /path/to/private/feedback-vX.Y.Z.json
-```
-
-工具读取固定仓库的正式 Release 与准确 tag SHA，通过现有 `checkCandidateVerification` 核对同 SHA 的完整原生 GitHub 证据或 owner 显式授权的完整本机验证，再读取实际服务的 `frontend-build.json`。它复用 owner SSH，读取运行中 Compose app 容器的 `GAME_BUILD_ID`、健康状态和实时 readiness 响应。所有构建身份必须等于 Release SHA。非根路径前端还需传 `--base-path /expected/path/`，且 `--frontend` 必须使用完全相同的路径。
-
-调用运行中容器内的 `BugReportFeedbackService` 前，工具先保存 mode-600 私有回执。回执保留原操作 ID、不可变核验证据和逐个 SHA 校验的完整原始 Git 祖先集合。原生证明保留真实 run/job ID；owner-local 证明保留原生 owner/status/Release/asset ID 及回执摘要，run/job ID 必须为 null，URL 绑定准确正式 Release asset。格式错误或混合证明直接拒绝，不降级为原生证明；既有原生回执仍可读取。登记 owner-local 证明后，应用回退仍须保留兼容读取器；不得删除操作、已发消息或已读状态来迁就只支持原生证明的旧后端。本机仓库必须完整且不是 shallow clone。祖先遍历忽略 replace refs 和 grafts，晚到的确认结论或修复关联可复用该证据，无需再次部署。只有全部必需合入提交及每个 PR 的实际合入末提交均在集合中，修复才满足上线条件。反馈服务同时处理账号删除隔离，并按账号和稳定根修复去重。
-
-JSON 结果分别报告 `release`、`deployment`、`verification` 和 `notification`。服务结果中的 `sentMessages` 记录本次新增信件数，`pendingFixes` 列出尚缺必需提交的根修复；这些修复继续等待后续核验。`deployment: "observed"` 表示读取了已有部署。工具不会创建 Release、dispatch 验证、部署前后端、更新 What's New 或扩大 Bug Report App 权限。Release 不合格、验证不全、前端不可读、后端停止或未就绪、构建不一致、tag 移动时均在通知前停止。通知失败退出码为 2，成功的部署观测与原回执仍然保留。
-
-SSH 响应丢失或数据库失败后，用原回执只重试通知：
-
-```bash
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts \
-  --host <host> --remote-dir <deploy-dir> \
-  --retry /path/to/private/feedback-vX.Y.Z.json
-```
-
-查看持久化的待处理操作，包括晚到结论或修复关联排队的补齐操作；也可在没有本地回执时按 ID 重试：
-
-```bash
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --status operations
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --retry-operation <operation-id>
-```
-
-回执绑定核验时的 SSH host 和远端目录。重试未传目标时使用原目标，显式传入不一致目标会在 SSH 前被拒绝。两种验证类型的重试都保留原操作身份和已存证据，不重新选择可变授权，不重复创建 Release、请求候选验证、部署或读取生产构建；新的核验仍通过当前候选门禁。保留回执至操作完成。重复核验、重试和晚到重复关联不会为同账号同根修复再发一封信。已有消息和已读时间保持不变。
-
-
-登记修复关联时，维护者必须填写具体修复摘要，说明改变了什么；空白或仅“已修复”等状态词会被拒绝。摘要与完整 PR/提交集合共同形成根修复修订。新上线信将摘要原文固定在消息中，根修复后来修订也不改写旧信或重复发信。升级前没有摘要的根修复返回 `missing_fix_summary`，补充摘要后可复用已有正式核验证据，无需重新部署；历史已发空摘要消息保留原貌。
+本节的 owner 操作步骤已迁入私有仓库，见 [Owner 运维](#owner-operations)。命令对已发布 SHA 复用 `checkCandidateVerification`，并通过运行中容器内的 `BugReportFeedbackService` 记录结果。
 
 ## 预览并执行十二条历史报告反馈
 
@@ -228,7 +155,7 @@ ssh <host> \
 
 执行跳过已有处理历史，不覆盖后来的结论；先确认，再发送上线反馈。复用日常账号/根修复唯一键，持久 reconciliation 限定已审阅对象和准确修复版本。`newMessages` 是本次已提交的 `insertedTriages` 与 `releasedMessages` 之和，不计并发发送者的信件。`errors` 列出部分失败，`reconciliation.operations` 保留持久操作 ID 和待核验或通知失败详情。四条历史修复提供已审阅的具体摘要；已有根修复的维护者摘要优先，预览与实际信件均显示该原文。历史首次包含版本来自审计，与首次核验生产版本及观测时间分开。
 
-中断后重新预览，再用同一审阅输入执行 `--execute`。已发送信件和已读状态保持不变。通知事务仍 pending 时，在 owner 本机运行 `pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --remote-dir <deploy-dir> --retry-operation OPERATION_ID`，将 `OPERATION_ID` 替换为保存的操作 ID，仅重试该通知操作。持久对象/修复校验阻止重试更换接收人或发送不同修复。遇到 `historical_subject_changed` 时重新审阅预览，不绕过校验，也不重做 Release 或部署。齐备的隔离 fixture 首次产生 16 封，重跑新增 0；实际操作逐项报告跳过，包括默认缺少 #1595 说明。
+中断后重新预览，再用同一审阅输入执行 `--execute`。已发送信件和已读状态保持不变。通知事务仍 pending 时，在 owner 本机用反馈命令的 `--retry-operation` 模式按保存的操作 ID 只重试该通知操作（见 [Owner 运维](#owner-operations)）。持久对象/修复校验阻止重试更换接收人或发送不同修复。遇到 `historical_subject_changed` 时重新审阅预览，不绕过校验，也不重做 Release 或部署。齐备的隔离 fixture 首次产生 16 封，重跑新增 0；实际操作逐项报告跳过，包括默认缺少 #1595 说明。
 
 ## 一、部署后端
 
@@ -504,7 +431,7 @@ CORS_ORIGIN=https://open-agricola.titanxxh.com
 3. 发布匹配的根路径 Pages 前端，并通过既有备份、目标恢复校验和部署流程应用上述 API 配置。保留上一份已验证镜像及配置，供回退使用。
 4. 比较 Pages host 实际 HTML、JS/CSS、语言包和卡牌 manifest 字节与目标构建。验证严格 WebKit 与 Chromium 下的登录、刷新、持久 profile 浏览器重开、工坊、routed WS 和原 Room 恢复，再登出。Linux WebKit 覆盖不能替代实体 Safari/iPhone 验收。
 
-上线验收不创建正式对局，也不向已有 Room 发送游戏操作。开局、起始交互和持久化测试只通过本机隔离的 `pnpm release:rehearse` 执行，见 [CI 检查](operations/ci-checks.md#发布工具演练与必需浏览器用例)。
+上线验收不创建正式对局，也不向已有 Room 发送游戏操作。开局、起始交互和持久化测试只通过本机隔离的 `pnpm release:rehearse` 执行，它是 owner 操作，见 [Owner 运维](#owner-operations)。
 
 `pnpm run build:pages-frontend` 将根路径 `/` 的构建写入 `dist-pages/`，显式使用 `VITE_API_BASE` 与可选 `VITE_WS_BASE`。`frontend-build.json` 记录 `{ format: 1, gameBuildId, basePath }`，标识须匹配所选后端。社区卡默认启用，仍允许显式 `VITE_ENABLE_COMMUNITY_DECK` 覆盖；工坊沙盒始终在浏览器中运行。
 
@@ -543,11 +470,7 @@ CORS_ORIGIN=https://open-agricola.titanxxh.com
 
 ### 触发部署
 
-使用[本机标准发版命令](#本机标准发版)，先固定候选并完成验证，再创建 Release：
-
-```bash
-pnpm release vX.Y.Z --ref main
-```
+使用[本机标准发版](#本机标准发版)，先固定候选并完成验证，再创建 Release；命令见 [Owner 运维](#owner-operations)。
 
 Release 指向的提交包含 `.github/workflows/pages-release-request.yml` 时，发布后启动 **Pages Release Request**。该 workflow 只记录请求。它成功完成后，通过 `workflow_run` 启动 `.github/workflows/deploy-pages-broker.yml`；[该事件从默认分支执行 broker](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)。
 
@@ -672,13 +595,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
     pnpm exec tsx scripts/ci/candidate-verification.ts check --repository titanxxh/open-agricola --sha <full-sha>
     ```
 
-2. 在 owner 本机部署同一固定后端候选。后端门禁不要求已有已发布的 Release：
-
-    ```bash
-    ./deploy-backend.sh <host> <full-sha> <deploy-dir> \
-      --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
-      --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
-    ```
+2. 在 owner 本机用固定镜像的[后端交付](#后端)部署同一固定后端候选（见 [Owner 运维](#owner-operations)）。后端门禁不要求已有已发布的 Release。
 
 3. 按现有部署流程核对后端构建标识、保留数据检查和健康状态。发布 Pages 前，确认公共 API 对以下预检返回204，并允许能力 header。将两个 origin 占位符替换为实际地址：
 
@@ -689,11 +606,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
       -H 'Access-Control-Request-Headers: X-Open-Agricola-Client-Capabilities'
     ```
 
-4. 发布同一固定候选。标准发版命令复用完整验证，已发布的 Release 会请求 Pages 部署：
-
-    ```bash
-    pnpm release vX.Y.Z --ref <full-sha>
-    ```
+4. 用标准发版命令按完整 SHA 发布同一固定候选。它复用完整验证，已发布的 Release 会请求 Pages 部署。
 
 除已有 `VITE_API_BASE` 外，仓库 variable `PUBLIC_APP_ORIGIN` 应配置正式 Pages 的 HTTPS origin。main broker 在构建前，以及部署 job 完成 environment 等待后，读取公开的 `/api/auth/browser-policy` 与 `/api/health`。后端必须健康，构建标识等于固定候选，浏览器协议及应用/API 来源均匹配。请求不带凭据、不跟随重定向，并限制响应体积和耗时。公开探针只覆盖实际响应的应用，不能替代 owner 对保留数据与全部实例的验证。
 
@@ -701,7 +614,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
 
 ### 后端
 
-从 owner 控制的本机、可信 producer `P` 的干净 checkout 运行标准入口。需 Node.js 24.15+（不支持25）、已认证的 `gh`、本机 Unix Docker daemon（classic image store，导出含 OCI index）、SSH 和 SCP。正式主机需要同版本 Node、Docker Compose、用户级 systemd/cgroup v2 和已有依赖/已验证 PostgreSQL cutover；无需安装应用依赖。
+owner 在本机运行标准入口，并绑定可信 producer `P` 的干净 checkout。需 Node.js 24.15+（不支持25）、已认证的 `gh`、本机 Unix Docker daemon（classic image store，导出含 OCI index）、SSH 和 SCP。正式主机需要同版本 Node、Docker Compose、用户级 systemd/cgroup v2 和已有依赖/已验证 PostgreSQL cutover；无需安装应用依赖。
 
 1. 固定已合入的正式源码 `F` 并完成其全部候选验证。在可信 main `P` 上请求镜像，等待成功：
 
@@ -709,13 +622,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
     gh workflow run container-image-build.yml --ref main -f purpose=formal-candidate -f source_sha=<F>
     ```
 
-2. 从该次成功 run/attempt 取得唯一 receipt artifact ID。使用既有私有 GHCR 包、owner 本机0600凭据文件和独立0600资源预算：
-
-    ```bash
-    ./deploy-backend.sh <host> <F> <deploy-dir> \
-      --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
-      --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
-    ```
+2. 从该次成功 run/attempt 取得唯一 receipt artifact ID，用 owner 入口 `deploy-backend.sh` 交付，使用既有私有 GHCR 包、owner 本机0600凭据文件和独立0600资源预算。命令属于 owner 操作，见 [Owner 运维](#owner-operations)。
 
     预算仅授予临时导入与空存储证明资源，不授予镜像或目标权限。结构如下；数值须由 owner 根据实时余量选择，示例不是主机容量认证：
 
@@ -737,7 +644,7 @@ receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可�
 
 默认由 owner 本机校验停机切换（ADR 0045）。停机前，`deploy-backend.sh` 尽力刷新最新一份本机备份，作为 rsync 基准。控制器随后探测源镜像与目标镜像中的 `scripts/storage-capabilities.ts`。源镜像能导出目录格式 dump、目标镜像支持 `check-live --counted` 时，部署前备份以目录格式导出，并在操作目录写出 `owner-request.json`。主机等待期间同时打包归档。本机以该基准拉取捕获，校验摘要后在临时本地服务中还原，用下文候选版本的校验镜像做完整校验。随后本机写回 `owner-report.json`。只有报告绑定了请求 nonce、源构建、候选 SHA 与镜像、校验镜像及其平台、捕获时间与 dump 摘要时，主机才封存备份。之后执行迁移、应用当前删除事实、运行计数式 live 检查，并要求七项计数与报告一致。
 
-owner 机器是 aarch64，无法在 Docker 中运行部署用的 linux/amd64 镜像，因此本机校验使用同源的 linux/arm64 **校验镜像**（#1817）。在受信任的 protected-main checkout 中运行 `pnpm exec tsx scripts/release/validator-image.ts build --sha <F>`：它持有 owner-local 锁，在本机记录器的候选隔离中构建（一次性 UID 61000、独立 rootless Docker、不带任何凭据），使用 GitHub 镜像构建的同一 BuildKit 脚本，只换平台。拆除隔离后，owner 核对归档并载入本机 Docker，检查 arm64 身份、源码标签、通道、托管前端和原生模块，再把私有回执写到 `~/.local/state/open-agricola/validator-images/<F>-<channel>.json`；`show --sha <F>` 会重新核对。`deploy-backend.sh` 在导出镜像之前复用或构建它（ADR 0047）；拿不到时，发布在接触后端之前就停止，并提示改用 `--full-maintenance`。
+owner 机器是 aarch64，无法在 Docker 中运行部署用的 linux/amd64 镜像，因此本机校验使用同源的 linux/arm64 **校验镜像**（#1817）。owner 的校验镜像工具从受信任的 protected-main producer 构建它：它持有 owner-local 锁，在本机记录器的候选隔离中构建（一次性 UID 61000、独立 rootless Docker、不带任何凭据），使用 GitHub 镜像构建的同一 BuildKit 脚本，只换平台。拆除隔离后，owner 核对归档并载入本机 Docker，检查 arm64 身份、源码标签、通道、托管前端和原生模块，再把私有回执写到 `~/.local/state/open-agricola/validator-images/<F>-<channel>.json`；`show --sha <F>` 会重新核对。`deploy-backend.sh` 在导出镜像之前复用或构建它（ADR 0047）；拿不到时，发布在接触后端之前就停止，并提示改用 `--full-maintenance`。
 
 失败报告、绑定不符或 15 分钟内未收到报告时，备份在迁移前终止，原样重启源。镜像缺少能力、指定 `--full-maintenance` 或空安装时，仍由主机校验；`validation-mode.json` 记录所选方式及原因。主机进程在等待中自身退出时保持停机。从暂存 policy 运行 `backend-image-maintenance.ts restore-source <request> <directory> <F> <P>`，它会获取维护锁，仅当 live 迁移尚未开始、镜像选择器仍指向源、且源保持原有身份并干净停止时，才会重启源。
 
@@ -745,12 +652,7 @@ owner 机器是 aarch64，无法在 Docker 中运行部署用的 linux/amd64 镜
 
 owner SSH 使用约两分钟的 keepalive。若会话仍在维护中断开，后端继续执行，`deploy-backend.sh` 不再直接失败，而是每 30 秒跟进一次 status：只有原生 accepted 后才报告成功；操作变为 `resumable` 时执行一次续跑；遇到 `blocked`/`unknown`，或后端超过 owner 截止时间仍不可达时，停止并给出对应的 status 命令。
 
-从同一 clean exact producer checkout 查询中断操作，再决定续跑：
-
-```bash
-./deploy-backend.sh status <host> <full-candidate-sha> <remote-dir> --operation-id <UUID>
-./deploy-backend.sh resume <host> <full-candidate-sha> <remote-dir> --operation-id <UUID>
-```
+先用 owner 入口的 `status` 模式查询中断操作，再用 `resume` 决定续跑，两者都绑定同一 clean exact producer（见 [Owner 运维](#owner-operations)）。
 
 status 不需要 GitHub 或 registry 访问，不改原 request、admission 或 progress。临时原生 checkpoint probe 使用只读数据库事务，只清理自己的容器。输出含 `state`、`phase`、`nextAction` 和 `validatorExitCode`；原进程退出码未知时保留 `null`。维护锁或 validator 仍活跃时返回 `running` 和 `wait`。
 
@@ -762,7 +664,7 @@ resume 在原锁内接受独立的新鲜十分钟授权，清理另有有限预�
 
 验收成功并完成备份轮换后，maintenance 只删除当次操作上传的 `image.tar`。request、import/source 回执和解析后的 maintenance Compose 保留为私有审计记录；此前失败保留 archive 供诊断。验收后的 unlink 失败会明确报告清理失败，并保留已验收 app 运行，不递归删除操作目录。
 
-仅全新安装可使用显式 bootstrap。先单独准备依赖和连接配置，保持应用 PostgreSQL 数据库与 S3 namespace 为空。cutover 标记记录独立准备完成，不能替代后续空存储证明。不要先运行旧迁移说明中的 `check-live`。在独立主机准备阶段预置 owner 选定的不可变 Caddy digest，再将相同 digest 加到本机交付命令：
+仅全新安装可使用显式 bootstrap。先单独准备依赖和连接配置，保持应用 PostgreSQL 数据库与 S3 namespace 为空。cutover 标记记录独立准备完成，不能替代后续空存储证明。不要先运行旧迁移说明中的 `check-live`。在独立主机准备阶段预置 owner 选定的不可变 Caddy digest，再把相同 digest 作为 `--bootstrap-caddy-image` 传给本机交付命令：
 
 ```bash
 # 独立依赖/连接准备后，不运行应用迁移：
@@ -770,8 +672,6 @@ mkdir -p data
 touch data/postgres-cutover.validated
 # 预置明确选择的 Linux AMD64 Caddy digest。
 docker pull --platform linux/amd64 caddy@sha256:<approved-manifest-sha256>
-# owner 本机在上述固定镜像命令后添加：
-# --bootstrap-caddy-image caddy@sha256:<approved-manifest-sha256>
 ```
 
 默认路径仍是既有部署升级。显式 bootstrap 要求不存在 app/Caddy 容器或保留的项目 volume、既有镜像选择器、部署记录、备份/ledger 或本地旧数据。同一维护锁内，固定目标镜像的 `check-empty` 只读查询所有非系统 schema 的 PostgreSQL relation，并列出 S3 namespace，不写表或 ledger。应用 S3 身份须有列举权限；未知响应、权限错误、任意数据库 relation 或对象（包括空删除 ledger）都会拒绝。旧候选没有该命令也会拒绝。证明使用直接创建的只读临时容器，仅接依赖网络和选定私有数据环境，沿用临时资源限额及内存临时目录，不挂载 host 或项目 volume；失败时也按返回的 container ID 清理。空证明前不执行 `docker compose run`，因此临时证明失败不会创建保留的项目 volume。预置 Caddy 的 digest、原生 image ID、Linux AMD64 平台须匹配，交付中不 pull 或 build。仅同一 digest 的官方 `caddy@sha256:...` 与 `docker.io/library/caddy@sha256:...` 等价名称可接受，其他 registry 或仓库拒绝。仅空证明成功后才复用 `check-live` 初始化和目标验证，随后核对 app/Caddy 实际身份并原子发布选择器。bootstrap 失败保持关闭，排空新启动的服务。既有数据升级仍执行旧 source 捕获、新 target 恢复验证，不能因为容器不存在就当成新数据。初始化失败后须明确设计既有数据恢复，不自动重试 bootstrap。
@@ -993,19 +893,7 @@ bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
 
 #### 本机备份
 
-owner 本机在 `~/oa-backup/<UTC 捕获时间>/` 下保留自己的副本（ADR 0045）。主机的每日备份、主机上的验证和异机同步保持不变。
-
-```bash
-node --import tsx scripts/owner-backup.ts run --host <host>   # 拉取、验证、清理
-node --import tsx scripts/owner-backup.ts validate --snapshot ~/oa-backup/<stamp>
-node --import tsx scripts/owner-backup.ts prune
-```
-
-`run` 请主机的 `scripts/owner-sync-capture.sh capture` 在维护锁下做一次在线、快照一致的捕获。捕获使用运行中的镜像，包含目录格式的未压缩 dump、对象和当前删除记录，不含任何配置。本机以上一份副本为基准用 rsync 拉取，逐项校验摘要后通知主机释放。主机最多保留一份 owner 捕获：下一次捕获会替换遗留的那份，每日清理会删除超过 30 天的。遇到每日备份持锁时，每隔十分钟重试，共三次。
-
-验证在内部 Docker 网络上的临时 PostgreSQL 与 RustFS 容器中还原副本，合并拉回的删除记录，再用主机当时运行的构建对应的校验镜像执行 `storage-archive-cli.ts validate`，使用全部 CPU；该镜像会被复用或现场构建，拿不到时不写报告。报告写入 `validation.json`。超过 30 天的副本一律删除，包括最新的一份。副本可按下面的流程恢复，以其 `capture/` 目录作为归档。
-
-捕获要求运行中的镜像与主机检出都包含 `owner-sync-capture.sh`；镜像较旧时 dump 仍为 custom 格式，可以验证，但每次全量传输。按 `deploy/owner-backup/` 文件头的说明安装每日定时器：每天按其 unit 中设定的时间运行一次，机器关机错过时开机补跑。
+owner 本机保留在线捕获的自有副本（ADR 0045）；主机的每日备份、主机上的验证和异机同步保持不变。主机侧是 `scripts/owner-sync-capture.sh capture`：在维护锁下做一次在线、快照一致的捕获，使用运行中的镜像，包含目录格式 dump、对象和当前删除记录，不含任何配置。主机最多保留一份 owner 捕获。副本可按下面的流程恢复，以其 `capture/` 目录作为归档。owner 操作步骤已迁入私有仓库，见 [Owner 运维](#owner-operations)。
 
 #### 恢复或切换外部服务
 
@@ -1112,13 +1000,7 @@ Grafana 关闭预装插件自动更新（`plugins.preinstall_auto_update=false`�
 
 `./restart-local.sh` 先启动后端，等待数据库初始化后的监听就绪，再初始化并启动 Prometheus、Grafana、Node Exporter 和账户采集器；`--instances 2` 验证两个应用 slot。Grafana 使用选定的本地后端绑定地址（包括 `--intranet`），不受 `.env` 中生产 `PUBLIC_API_BASE` 影响；Prometheus 采集该绑定地址，监控服务端口仍仅监听 loopback。关联 worktree 显式传递共享数据目录，继续使用主 checkout 的观测数据。本地监控也初始化同一个受限登录；密码以 0600 权限保存在 `data/observability/accounts-password`，owner URL 仅传给一次性初始化进程。本地监听仅绑定 **127.0.0.1**：Prometheus 19090、Grafana 13000、Node Exporter 19100、账户采集器19201。`OBSERVABILITY_ENABLED=false ./restart-local.sh` 跳过监控启动，不删除已有数据。运行密钥、配置及 TSDB/Grafana 数据位于主 checkout 的忽略目录 `data/observability/`。metrics bearer secret 在 `data/local-services.env` 生成，以 0600 权限复制，不交给浏览器。
 
-生产监控使用独立 Compose project 和 owner 本机部署入口：
-
-```bash
-./deploy-operations.sh <ssh-host> [ref] [operations-dir] [game-dir]
-```
-
-默认值为 owner 的部署（`<host>`、`main`、`<operations-dir>`、`<deploy-dir>`）。该命令只发布指定提交的 `operations/`，构建轻量账户采集器，启动 Prometheus、Grafana、Node Exporter 和账户采集器。不创建 GitHub Release、不构建游戏镜像、不运行游戏迁移、不停止应用。每次部署核对游戏容器 ID、镜像和启动时间保持不变。`deploy-backend.sh` 只管理 app/Caddy，并跳过监控配置生成。
+生产监控使用独立 Compose project 和 owner 本机部署入口 `deploy-operations.sh`，操作步骤见 [Owner 运维](#owner-operations)。该命令只发布指定提交的 `operations/`，构建轻量账户采集器，启动 Prometheus、Grafana、Node Exporter 和账户采集器。不创建 GitHub Release、不构建游戏镜像、不运行游戏迁移、不停止应用。每次部署核对游戏容器 ID、镜像和启动时间保持不变。`deploy-backend.sh` 只管理 app/Caddy，并跳过监控配置生成。
 
 首次部署先停止旧监控容器，再复用现有 TSDB、Grafana 数据目录和采集密钥；启动失败时重新启动旧容器。后续失败恢复上一个运维版本。版本化源码和私有配置保存在 `<operations-dir>/releases/<sha>/`，仅成功后写入 `deployed-build-id`。回滚时仅可选择支持聚合函数的运维提交，并以同一命令重新部署。权限收紧后，旧的原始查询采集器无法工作；监控切换失败也保留聚合权限，应使用支持聚合函数的版本恢复。应先完成首次独立运维部署，再部署新版游戏，因为游戏部署会清理旧监控容器。移除容器时保留 `data/observability/{prometheus,grafana}`。
 
@@ -1187,18 +1069,7 @@ Prometheus 每 15 秒 scrape（超时 5 秒），每 15 秒发现有效应用租
 
 顶部提供独立的微信和飞书按钮。每次打开弹窗时，从 API 域名读取各自的 `/api/community/wechat-qr` 或 `/api/community/feishu-qr` 图片。首次安装需要应用代码和 `docker-compose.prod.yml` 中只读挂载的 `data/community`。后续换图无需 Release、Pages 构建、游戏镜像构建、应用重启或运维重新部署。
 
-从已安装依赖的工作树使用维护者控制的入口：
-
-```bash
-./deploy-operations.sh --wechat-qr <host> /absolute/path/wechat-group.png
-./deploy-operations.sh --feishu-qr <host> /absolute/path/feishu-group.png
-# 自定义游戏目录：
-./deploy-operations.sh --feishu-qr <host> /absolute/path/feishu-group.jpg <deploy-dir>
-# 本地应用，使用其 COMMUNITY_DATA_DIR 或 SHARED_DATA_DIR/community：
-./deploy-operations.sh --feishu-qr --local /absolute/path/feishu-group.png /absolute/path/data/community
-```
-
-两个子命令共用 `operations/update-community-qr.mjs`，校验 PNG 或 JPEG，保留原始字节，通过 SSH 更新 `<game-dir>/data/community/wechat-qr` 或 `feishu-qr`。图片和替换锁各自独立，更新其中一个群不会覆盖另一个群的图片。图片最大 5 MiB，宽高分别为 200–4096 像素。本地工作树需要 `pnpm install --frozen-lockfile` 安装现有图片解码器；远端使用 Bash、`flock`、`sha256sum` 和普通文件权限。部署账户须拥有该目录，与其他游戏数据保持一致。远端先校验传输哈希，再通过原子重命名替换；校验失败或传输中断时保留旧图。成功输出包含 `wechatQrSha256` 或 `feishuQrSha256`、宽和高。再次使用相应子命令传入旧图片，即可恢复该群的旧图。
+owner 用维护入口 `deploy-operations.sh --wechat-qr|--feishu-qr` 换图，可发往主机或本地应用的社区目录，见 [Owner 运维](#owner-operations)。两个子命令共用 `operations/update-community-qr.mjs`，校验 PNG 或 JPEG，保留原始字节，通过 SSH 更新 `<game-dir>/data/community/wechat-qr` 或 `feishu-qr`。图片和替换锁各自独立，更新其中一个群不会覆盖另一个群的图片。图片最大 5 MiB，宽高分别为 200–4096 像素。本地工作树需要 `pnpm install --frozen-lockfile` 安装现有图片解码器；远端使用 Bash、`flock`、`sha256sum` 和普通文件权限。部署账户须拥有该目录，与其他游戏数据保持一致。远端先校验传输哈希，再通过原子重命名替换；校验失败或传输中断时保留旧图。成功输出包含 `wechatQrSha256` 或 `feishuQrSha256`、宽和高。再次使用相应子命令传入旧图片，即可恢复该群的旧图。
 
 公开接口只允许 GET/HEAD，成功和错误响应均带 `Cache-Control: no-store`。未配置图片时返回 404，图片不可读时返回 503，弹窗提供重试。每次打开弹窗也使用新的请求 URL。没有公开上传接口。更新应用时保留 `data/community`，另存各群最新原图供恢复；数据库/S3 归档备份不包含该宿主机目录。本地 `restart-local.sh` 默认将 `COMMUNITY_DATA_DIR` 设为 `$SHARED_DATA_DIR/community`。
 
@@ -1224,12 +1095,6 @@ Prometheus 每 15 秒 scrape（超时 5 秒），每 15 秒发现有效应用租
 
 版本按从新到旧排列，日期自上而下不得递增。`version` 是唯一标签，最多 32 个字符。每个版本 1–30 条说明；每条说明以 `zh`、`en` 等语言 id 映射到不超过 500 个字符的单行文本。弹窗依次使用玩家当前语言、英文、首个已写语言。文件最多保留 200 个版本、256 KiB，接口只返回前 5 个。
 
-```bash
-./deploy-operations.sh --whats-new <host> /absolute/path/whats-new.json [game-dir]
-# 本地应用，使用其 COMMUNITY_DATA_DIR 或 SHARED_DATA_DIR/community：
-./deploy-operations.sh --whats-new --local /absolute/path/whats-new.json /absolute/path/data/community
-```
-
-`scripts/update-whats-new.ts` 上传前用服务端同一解析器校验文件，再沿用二维码的哈希校验与原子替换。无效文件会报出具体字段（如 `releases[1].date`）并被拒绝，线上说明保持不变。成功输出包含 `whatsNewSha256`、版本数和最新版本。保留源文件；重新发布旧副本即可恢复旧说明。
+owner 用 `deploy-operations.sh --whats-new` 发布文件，可发往主机或本地应用，见 [Owner 运维](#owner-operations)。`scripts/update-whats-new.ts` 上传前用服务端同一解析器校验文件，再沿用二维码的哈希校验与原子替换。无效文件会报出具体字段（如 `releases[1].date`）并被拒绝，线上说明保持不变。成功输出包含 `whatsNewSha256`、版本数和最新版本。保留源文件；重新发布旧副本即可恢复旧说明。
 
 接口只允许 GET/HEAD，并返回 `Cache-Control: no-store`。文件缺失返回 404，手工改坏返回 503，两种情况都隐藏按钮。浏览器每次加载页面读取一次。红点标记玩家上次打开之后的新版本，记录保存在各自浏览器；首次访问只把最新版本计为未读。
