@@ -123,37 +123,7 @@ owner 私有验收 JSON 包含 `format: 1`、`appUrl`、`apiUrl`、`expectedBuil
 
 ## 更新正在运行的 pre
 
-在干净的 owner 策略工作树执行以下命令。本机和后端 owner tools 须使用同一受保护策略提交。
-
-```bash
-./deploy-prerelease.sh update
-```
-
-命令会固定当前 `prerelease` 分支的 SHA。用 `--sha <完整 SHA>` 可选择已准入的提交。中途中断后再执行同一命令，会继续原来的更新。成功时输出已安装的 SHA、验收目录，以及正式站确认关闭准入到 pre 确认重开的时间。目标已在运行所选源码版本时直接返回。
-
-将下列配置保存到 `~/.config/open-agricola/pre-update.json`，权限设为 0600，也可用 `--config` 或 `OA_PRE_UPDATE_CONFIG` 指定。路径使用绝对路径，回执交换路径须在本机与后端都可用。
-
-```json
-{
-  "format": 1,
-  "acceptanceConfig": "/home/owner/.config/oa/pre-acceptance.json",
-  "stateDirectory": "/home/owner/.local/state/oa/pre-updates",
-  "exchangeRoot": "/var/tmp/oa-pre-exchange",
-  "sourcePreparation": { "memoryMiB": 416, "cpus": 1, "pids": 128, "swapMiB": 960 },
-  "routineAccounts": "/home/owner/.config/oa/pre-participant.json",
-  "acceptanceRoom": "00000000-0000-4000-8000-000000000001",
-  "previousRun": "/home/owner/.local/state/oa/last-full-browser-run",
-  "authFile": "/home/owner/.config/oa/ghcr-read.json"
-}
-```
-
-`acceptanceConfig` 使用已有的私有浏览器验收配置。完整验收从中读取 A–E 账号文件、SSH 目标、存储守护配置和 owner cookie。每次更新的证据单独保存。把示例房间 UUID 换成专用 Beta 账号正在参与的对局。`routineAccounts` 是私有 JSON，`accounts` 数组中只有该账号的 `id`、`username` 和 `password`。完整验收会撤销临时测试账号的 Beta 权限，因此日常账号需独立。`previousRun` 指向首次连续性检查使用的完整浏览器运行目录，其中须有已归档的队伍房间。此后自动取上次成功的完整运行。`authFile` 为 owner 的 GHCR 只读凭据，后端缺少所需运行时镜像时才使用。
-
-可选的 `sourcePreparation` 对象设置临时构建容器的 `memoryMiB`、`cpus`、`pids`，以及额外可用的 `swapMiB`（默认 0）。省略时使用目标的工具配额。用冷构建测量原生编译、前端打包和隔离试启动所需的容量。每个阶段开始前，后端核对在线应用的内存余量、预留内存、可用 swap 和磁盘。容量不足会在旧版持续服务时退出，可修改私有配置中的构建配额后重试。若准备中的候选需要替换，旧版本仍开放且后端没有待办操作时，可显式传入另一个 SHA。
-
-**首次准备和更新运行时镜像。** 受保护的 main 上 `deploy/prerelease-runtime/` 变化时会自动构建。获取首个 pin 或单独更新基础镜像安全补丁时，也可执行 `gh workflow run prerelease-runtime.yml --ref main`。从成功的 run/attempt 下载 `prerelease-runtime.ref`，作为 `deploy/prerelease-runtime.ref` 提交到受保护的 main，把同一个 pin 同步进 pre，并让本机和后端 owner tools 切到已审阅的策略提交。Node、原生模块 ABI、系统库或安全补丁需要更换镜像时重复此流程。日常更新只在后端缺镜像时传输。后端在独立版本目录准备锁定的依赖、语言包、托管前端和 Replay Viewer，并用临时数据试启动。准备期间旧版持续服务。
-
-**验证和恢复。** 首次从应用镜像迁移及超出日常范围的改动都走完整候选验证和浏览器验收。完整证据的 producer 验证配置与当前 main 或执行更新的 owner 策略提交一致即可，之后 main 修改验证配置不会使其失效。普通卡牌或界面改动复用已安装 SHA 到新 SHA 的范围 CI。源码准备与日常在线备份完成后才关闭准入。重新开放前，Beta 玩家通过真实入口读取前后端 SHA，再次进入指定对局并收到 WebSocket 快照。兼容更新若切换失败，会恢复上一版源码、依赖目录及运行时镜像，重新验收后开放。若已执行不兼容迁移，则保持维护状态并记录对应备份。失败步骤在本次 `window/state.json`。完整验收若在不可重复执行的账号创建或删除步骤中断，核对账号后可加 `--confirm-step accounts` 或 `--confirm-step deletion` 续跑。需要发布有版本号的 GitHub beta Release 时，使用下节流程。
+本节的 owner 操作步骤已迁入私有仓库，见 [Owner 运维](#owner-operations)。
 
 ## 发布固定预发布候选
 
@@ -178,36 +148,11 @@ pre start 先建立 host-only HttpOnly verifier/state Cookie，再前往正式�
 
 各 SHA 均为完整提交身份。清单提交位于功能提交之后，`integratedSha` 指向实际集成功能提交。独立功能保留来源，以便只晋升选定功能。依赖必须指向清单中已有功能且不能成环；候选须继承 main 基线且无 merge commit。
 
-owner 同步 main 时以 `rebase.updateRefs=false` 准备并审阅 rebase 结果，再更新清单基线与集成提交。owner 在同步前用 recorder 在本机验证该精确 head，并适用 owner 的 ruleset bypass，因此无需等待 GitHub 检查。未做本机验证时，同步前须取得该精确 head 由 `pull_request` 或 `push` 事件产生的成功 `verify`。即使通过，GitHub 也不会用 `workflow_dispatch` 的检查满足原生 required-status 规则，见 [GitHub 必需检查事件说明](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated)。按当前 workflow 触发条件，从同步分支向当前 main 建立 draft 对比 PR，明确标注仅作同步审阅，等待检查通过。不要将此 PR 合入 main。然后执行：
-
-```bash
-pnpm exec tsx scripts/ci/prerelease-verification.ts sync --repository titanxxh/open-agricola --sha <new-pre-sha> --expected-old <old-pre-sha> --main-sha <current-main-sha>
-```
-
-命令只以显式旧 SHA lease 更新 `refs/heads/prerelease`。远端已变化或功能来源集合发生增减时拒绝；新增和移除功能须经过可审阅 PR。命令不更新 main、固定候选引用或 tag。读回新引用、等待此次 prerelease push CI 后，关闭 draft 对比 PR，不执行合入。同步产生新 SHA 后须重新取得候选验证。
-
-owner 本机发布与恢复命令为：
-
-```bash
-pnpm release vX.Y.Z-beta.N --channel prerelease --ref prerelease
-# 失败后沿用已打印的固定候选，即使 prerelease 已前进：
-pnpm release vX.Y.Z-beta.N --channel prerelease --ref <fixed-pre-sha>
-```
-
-owner 明确采用完整本机候选验收时，先完成原生集成并固定候选，再使用已交付的 protected-main 可信 publisher。完整回执须由另行审阅的隔离本机 harness 产生；候选执行不得取得 owner 凭据、HOME、发布状态或宿主 Docker socket。受测候选 checkout 必须干净；回执、隔离证据与日志保留在两个 checkout 之外的私有 owner 目录：
-
-```bash
-pnpm exec tsx scripts/ci/prerelease-verification.ts select --repository titanxxh/open-agricola --sha "$pre_sha"
-pnpm exec tsx scripts/ci/owner-local-run.ts --channel prerelease --sha "$pre_sha" --output "$private_owner_directory"
-pnpm release vX.Y.Z-beta.N --channel prerelease --ref "$pre_sha" \
-  --local-verification "$private_owner_directory/pre-verification.json"
-```
-
-这是仅处理数据的发布接口，不是候选执行器：它不安装候选依赖，也不运行候选命令。回执由 `scripts/ci/owner-local-run.ts --channel prerelease --sha "$pre_sha"` 产生（见[授权完整本机候选验证](#authorize-complete-owner-local-verification)）。输入回执必须覆盖全部十项 canonical pre 任务、真实成功退出码及保留日志的 SHA256，失败或不完整结果不能放行。选择与发布重验当前 pre SHA、不可变引用、原生保护、manifest 来源和干净的 protected-main producer。普通回归沿用 stable 运行期默认值，生产 hosted build 使用 prerelease；源码变化或 producer 配置不兼容时重新验收。不得用旧的不隔离 runner 生成此回执。
+同步集成分支、发布候选和完整本机候选验证的 owner 步骤见 [Owner 运维](#owner-operations)。同步使用公开的 `scripts/ci/prerelease-verification.ts sync`，它只以显式旧 SHA lease 更新 `refs/heads/prerelease`，功能来源集合发生增减时拒绝。选择和发布使用 protected-main producer 检出中的门禁。
 
 pre 回执格式和 pre 证明规则属于[发布证据契约](#release-evidence-contract)。
 
-N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当前 main 为基线。命令固定 `verification/prerelease/<SHA>`，读取有效原生引用保护，然后在 main 派发 `prerelease-candidate-verification.yml`。回执绑定原生仓库 ID、prerelease 通道、候选 SHA、候选与可信策略配置以及 main producer 提交。producer 必须仍可从受保护 main 到达。兼容任务可分别补跑；缺失、失败、取消、跳过或配置不符均阻断。集成分支移动后仍可使用原固定候选。
+N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当前 main 为基线。选择固定 `verification/prerelease/<SHA>`，读取有效原生引用保护，然后在 main 派发 `prerelease-candidate-verification.yml`。回执绑定原生仓库 ID、prerelease 通道、候选 SHA、候选与可信策略配置以及 main producer 提交。producer 必须仍可从受保护 main 到达。兼容任务可分别补跑；缺失、失败、取消、跳过或配置不符均阻断。集成分支移动后仍可使用原固定候选。
 
 所有必需任务通过后创建固定 tag 及原生 GitHub prerelease，并设置 latest=false。匹配的已有发布可复用；tag、SHA 或原生通道不符时拒绝。正式通道继续要求实际已合入 main 的最终 PR 快照，且版本只接受 vX.Y.Z；预发布回执不能授权正式发布。
 
@@ -217,237 +162,11 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 
 ### 操作隔离的预发布目标
 
-预发布 app、网关、镜像检查与工具容器的 memory/swap 合并上限等于 memory 上限，实测预算不允许额外 swap。共享 Docker daemon 不在这些容器限额内。
+本节的 owner 操作步骤已迁入私有仓库，见 [Owner 运维](#owner-operations)。
 
-`budgets.sessions.rooms` 是必须封存的准入上限（ADR 0052 之前封存的 target 保留已不使用的 `budgets.sessions.customWorkers`，以保持封存指纹有效），owner Compose 据此设置 `APP_ROOM_CAPACITY`（1–30）。示例 10 不代表容量验收，最终值须由原生负载实测确定。离线保留的普通对局不占在线准入配额。未配置该环境变量时，应用仍默认 30。ADR 0052 之前封存的 `budgets.sessions.customWorkers` 会被忽略。
-
-使用可信 main checkout、Node 24.15+、Docker Compose、GNU `timeout`/`flock`/`tar` 及按 pin 准备的语言包。owner 入口为 `deploy-prerelease.sh`；GitHub Actions 不持有 SSH 或正式凭据。从 `deploy/prerelease-target.example.json`、`prerelease-app.env.example`、`prerelease-tools.env.example` 建立私有配置，替换全部示例值。目标指纹绑定数据库 host/port/name/role、对象 endpoint/bucket/prefix/key ID、project、目录、origin、依赖网络与可选代理网络、离站身份、导入镜像来源和预算。env 仅接受模板使用的小型凭据白名单；正式 GitHub App、OAuth、邮件、管理员 Cookie 等均拒绝。可写目录、挂载及其现存子项不能有软链或特殊文件。
-
-owner #1662 负责独立源库、只读备份 role、独立一次性验证库/role、私有 bucket、app 的 `live/` 与工具的 `test/` 权限、依赖网络、1–40 的连接数限制（验证 role 至少为 4：恢复校验在保持连接池连接的同时，`pg_restore` 还要再开一个连接）、存储 quota、离站账户/目录以及实测 runtime、备份和镜像导入余量。撤销 PUBLIC CONNECT，使三个 pre role 均不能连接正式库、验证 role 不能连接源库。app 对象凭据必须不能读取正式 bucket 或验证 scratch；工具只获得源数据读取及自己的 scratch 操作权限。安装前真实权限探测不通过则阻断。`budget-check` 要求 owner storage guard 提供新鲜 healthy 观察。受监督的 guard 测量存储，并在失联或超限时锁存关闭准入及停止 pre writer，安装步骤见下文。它补充原生 quota，不提供宿主物理硬上限。
-
-owner 导出镜像要求 Docker classic image store，且 `docker image save` 产物须包含已验证的单平台 OCI 索引。缺少 `index.json` 时在本机拒绝，不开始传输；升级 owner Docker 后重试。containerd 可能保留归档中的压缩层，因此在 registry login 或 pull 前即拒绝。使用已有该存储的 owner 机器，不要为此切换现有 daemon 的 image store。producer 与 receiver 均支持两种存储。回执 `imageId` 表示 config digest，`manifestDigest` 表示注册表 manifest；目标绑定缓存另外保存 `archiveManifestDigest` 与实际 Docker handle `nativeImageId`，每次使用重新核对存储及 pending handle。
-
-正式候选、预发布候选和 trusted-policy 镜像均由 GitHub 托管 `ubuntu-latest` 上的 `container-image-build.yml` 为固定 source/producer SHA 构建，平台固定 `linux/amd64`。宿主不构建镜像，归档工具缓存未命中也不回退构建。发布使用仅允许 main 的 `prerelease-image-publish` environment，以及 owner 配置的 `GHCR_PRIVATE_PACKAGE_ID`、`GHCR_PUBLISH_USER` 和 `GHCR_PUBLISH_TOKEN`；该 token 是专用 classic PAT，只用于所需的 `write:packages` / `read:packages`，不复用通用 owner token，也不要求逐次 reviewer。首次创建包须读回 private 状态与原生 ID，owner 保存 ACL 审计并固定该 ID 供后续执行。独立 private GHCR 包不得继承公开仓库权限，也不得授权本仓 Actions 或 Codespaces；owner 首次配置须审计权限。producer 核验包身份、private 状态及匿名/本仓 token 访问被拒；受限 builder 删除后，专用发布 token 才交给可信发布代码。公开 workflow artifact 仅含回执，不上传镜像、层或构建缓存。准入与配置要求见 [CI 检查](operations/ci-checks.md)。
-
-`purpose=formal-candidate` 固定 stable 通道并要求同 SHA 的完整正式候选回执。`purpose=candidate` 仍仅用于预发布，`trusted-policy` 仍仅用于归档工具。正式镜像不能导入预发布 target，工具回执也不授予应用部署权限。
-
-接收端 owner 账号需要 Linux cgroup v2、已委派的 memory/CPU/PID 控制器、可用的 user systemd manager/bus，以及支持内存和 swap 限额的 `systemd-run --user`。这些前置条件由 owner 单独配置；导入器不会启用服务或修改共享 daemon。Format 2 必须明确填写 `budgets.import.intake`（`memoryMiB`、`cpus`、`pids`），并独立纳入 target fingerprint。示例为 384 MiB、1 CPU、64 PID；采用前须实测真实接收端。缺少限额直接拒绝，不从准入余量推导。准入余量至少覆盖 intake 内存上限；daemon 另需多少余量仍须实测。
-
-实际 `import-image` 将持锁接收端放入专用 transient user service，应用上述限额、禁止 swap、20 分钟期限和 5 秒终止宽限期。service 持有独立进程组与 target 锁，通过 stdin 接收同一有界 envelope，并在复制或校验快照前读回原生 cgroup 限额。取得锁后 envelope 仍须未过期。service 启动或限额核对失败时拒绝继续，结束和失败的 unit 均回收。intake 限额包含归属于该 cgroup 的文件缓存；已由其他 cgroup 计费的缓存页不会追溯转入读取者。它限制接收端与 Docker 客户端，共享 dockerd/containerd 的解包仍在 unit 外，必须单独观察。
-
-镜像导入、存储/归档工具、镜像检查容器和 app 启动前分别检查容量。额度包含 gateway 完整的 64 MiB、当前阶段完整限额、实际运行或即将启动的 app 限额，以及 `reserveMemoryMiB`。仅对正在运行的 app，从 app 预留中扣除经原生 cgroup v2 `memory.stat` 验证的匿名驻留字节；文件缓存、内核内存、gateway 和共享服务均不抵扣。采样前后必须核对本地 Unix Docker daemon、完整本目标容器 ID、镜像、PID/启动时间、cgroup 身份、原生内存上限及零 swap 上限/用量；读不到、格式错误或发生变化均阻断。匿名内存与主机可用内存分别采用两次读数中的较小值。支持的 Linux Node 上 `os.freemem()` 使用已估算可回收缓存的 `MemAvailable`。这仍是瞬时准入估计，不是内存预留或实测峰值，独立观察和停止规则仍须执行。导入另用 `budgets.import.memoryHeadroomMiB`；这是准入阈值，不能限制共享 Docker daemon。最终额度依实际 runtime、worker、共享服务、备份和导入测量确定，不能照搬示例或语法下限。准入前只回收属于本环境、run 标签有效且有效截止时间已过期的工具，并读回确认；未过期或标签无效工具保留并阻断。清理失败不停止 app。owner 调度仍须避免不同 target 的重任务重叠。
-
-owner 可在安排扩容期间明确暂缓完整负载验收。部署证据须记录临时 app、工具、并发限额，以及未完成的运行、Worker、备份和导入测量。保留原生内存、CPU、PID 限额、容器零 swap、宿主内存余量下限、OOM 停止、正式服务健康检查、存储隔离和 quota。全机后台 swap 或 PSI 增量本身不证明候选超出容量，记录为告警。重操作串行执行，备份安排在低峰。不将临时限额写成实测容量，不删除历史失败，不跳过镜像来源、认证或候选验证。扩容后先补容量验收，再提高并发。
-
-导入只允许未安装或维护中的 target，且实际 app 已停止；它不会代为停 app，已有安装须先明确执行 `maintain`。在线备份不会为获取余量停 app，缺少已验证 trusted-policy 镜像时直接给出导入提示。`budgets.import.maxArchiveMiB` 限制未压缩传输归档的字节数。暂存和加载前读回本地 Linux AMD64 daemon 平台与 Docker 数据目录，核对实际文件系统设备：共用设备需 reserve 加四份归档大小，分离设备则暂存/快照盘需 reserve 加两份、Docker 盘需 reserve 加两份。接收端持有 target 锁时，将上传文件复制成独占私有快照，对同一个独立 inode 校验并加载；并发 SCP 无法改变已检查的输入，正常完成和异常返回均清理快照。进程被强制终止可能留下私有快照；确认 intake unit 已停止后，只在 target 锁内检查并删除该精确的 target 自有文件。重试总是创建全新快照，绝不加载遗留快照。遗留文件仍计入 target 磁盘用量。校验通过一次有界顺序读取同时计算完整归档和各成员的哈希，元数据另做有界读取。进程缓冲区有界不代表文件系统缓存有界；导入测量必须包含快照复制和计入 cgroup 的文件缓存。这是保守余量，不是解包大小保证或 quota。`docker load` 在共享 daemon 中执行，中断客户端可能留下镜像字节；失败不更新 runtime 或就绪缓存。磁盘检查只补充 owner 存储限额。
-
-若 Caddy 在容器内运行，将可选 `proxyNetwork` 设为它现有的入口网络，例如 `open-agricola_default`，并安装 `deploy/prerelease.Caddyfile.example` 的固定路由。只有可信网关加入该外部网络，使用从 origin 派生的别名和容器端口 `5176`。Caddy 路由使用 `plan` 输出的 `proxyUpstream`；Caddy 容器里的 `127.0.0.1` 指向 Caddy 自己。候选 app 继续只接自己的 default/依赖网络，工具只接依赖网络。网关只连接候选 default 网络的 `<targetId>-app:5175` 别名，不使用共享的 `app` 服务名。替换恢复时内部别名随 target 改变，外部网关别名保持不变。选择入口网络，不能选择正式存储网络。解析器拒绝将 pre 依赖/default 网络或 Docker 内置网络作为代理网络。Compose 重建会保留网关网络和别名。替换恢复保留 origin 和别名，只有源网关退役并停止后才启动新网关。若 Caddy 直接运行在宿主上，省略 `proxyNetwork` 并转发到 `127.0.0.1:<target.port>`；两种模式均保留 loopback 绑定。初装前确定这一密封拓扑。
-
-目标清单使用 format 2，必须声明 `imageSource=owner-imported-ghcr`；旧 `builder` 与 `budgets.build` 字段被拒绝，不迁移旧 target。使用 HEAD 等于镜像 producer SHA 的可信 owner checkout，接收端 policy checkout 也须相同。owner 核验完整 GitHub build run、attempt、receipt artifact 及候选验证后，以 mode-0600 的 `{ "username": "...", "token": "..." }` JSON 凭据拉取固定 GHCR digest 并导出无 tag 归档。认证只留 owner 本机；SSH 只传目标绑定 envelope 和归档。接收端验证字节、唯一 config/image ID、平台、labels 和实际 hosted frontend 后才写镜像缓存，不启动镜像、不改网关或 installed/admission 记录。
-
-```bash
-./deploy-prerelease.sh import-image --config "$pre_config" --ssh "$pre_host" --expected-current "$pre_current" --purpose trusted-policy --sha "$policy_sha" --build-run "$policy_image_run" --build-attempt "$policy_image_attempt" --artifact-id "$policy_image_artifact" --auth-file "$ghcr_read_auth" --operation-id "$policy_import_op"
-./deploy-prerelease.sh import-image --config "$pre_config" --ssh "$pre_host" --expected-current "$pre_current" --purpose candidate --sha "$pre_sha" --build-run "$candidate_image_run" --build-attempt "$candidate_image_attempt" --artifact-id "$candidate_image_artifact" --auth-file "$ghcr_read_auth" --operation-id "$candidate_import_op"
-```
-
-首次安装前 current 使用 `empty`。传输或 load 中断后，`control/` 私有 journal 保留原操作和 image ID；重试必须复用，不能用同源码的重构建镜像替换。trusted-policy 的 `stable` 仅标识工具，不能授权正式或预发布 app 部署。候选部署仍需独立完整 prerelease 验证。policy 变化后，消费前须具备对应导入工具镜像和候选 producer 绑定。
-
-后续部署或 policy 变更后，已导入的镜像仍留在主机 Docker 存储中。在可信 owner checkout 中先审阅计划，再删除不再使用的镜像：
-
-```bash
-./deploy-prerelease.sh image-cleanup-plan --config "$pre_config" --ssh "$pre_host" --expected-current "$pre_current"
-./deploy-prerelease.sh image-cleanup --config "$pre_config" --ssh "$pre_host" --expected-current "$pre_current"
-```
-
-两者都在操作锁内运行，只考虑本 target 的已验证导入记录 `control/image-<purpose>-<source>-<policy>.json`。保留当前 policy 的 trusted-policy 镜像、已安装候选、挂起操作涉及的全部镜像，以及任何容器（含已停止容器）引用的镜像。执行时若有挂起操作则拒绝；在锁内重新规划，不带强制删除镜像，只把已删除镜像的记录移到 `control/retired-images/`。镜像加载持有同一把锁，因此导入失败留下的归档不会阻挡清理；它会列在 `stagedImports` 中，留给重试使用。其他 target 的记录只报告、不改动；正式镜像从不在候选之列。之后需要已删除镜像的操作会失败即关闭，直到重新导入该镜像。
-
-每个 owner 操作都会带上 owner checkout 的 HEAD；主机发现策略 SHA 与自身 owner-tools 的 HEAD 不同就拒绝该操作（`Owner envelope is expired or bound to a different policy/target`）。在线备份同样需要已导入的、对应该 HEAD 的 trusted-policy 镜像。只要该镜像的 producer 就是 owner checkout 的 HEAD 且仍可从受保护 main 到达，即使 main 之后改了验证配置或镜像工具，owner 也可以导入它；其他镜像仍须与当前 main 兼容。涉及策略变更的维护窗口按以下顺序进行：先把主机 owner-tools 目录切到新的 main SHA（不停任何服务），再从同一 SHA 的 owner checkout 执行 `maintain`，然后导入该 SHA 的 trusted-policy 镜像和由它构建的候选镜像，最后 `deploy`。第一步与第三步要在同一个窗口内完成：新 trusted-policy 镜像导入之前，下一次定时备份会失败。运行中的 gateway 与 storage guard 沿用启动时加载的内容：gateway 挂载 `scripts/prerelease/gateway.ts`、`browser-policy.ts`、`storage-guard-state.ts` 和 `shared/contract/browser-auth.ts`，guard 运行 `scripts/prerelease/storage-guard-cli.ts` 及其导入的模块。新 SHA 改动其中任何一项时，需在窗口内重启对应服务。已安装候选不变时，跳过候选导入和 `deploy`：导入 trusted-policy 镜像后执行 `reverify` 并重新开放。此时 `open` 通过已安装候选回执沿用（见下文）接受该候选此前的完整验证。脚本化的 `window` 通过 `policy` 配置块执行这一顺序。
-
-正式生命周期 API 尚未部署时，先记录一个 UUID，再启动维护网关。先准备两个私有凭据文件和固定语言包；`plan` 即使带 `--ssh` 也验证本机路径，因此要在持有这些文件的宿主执行。固定实际运行采用的限额。owner 可明确批准在完整容量验收前使用保守临时限额；交付证据须记录该决定和待补测量，初装后仍执行同一限额：
-
-```bash
-./deploy-prerelease.sh plan --config "$pre_config"
-./deploy-prerelease.sh initialize --config "$pre_config" --expected-current empty --generation "$pre_generation"
-./deploy-prerelease.sh status --config "$pre_config" --expected-current empty
-```
-
-此阶段不需要正式回执，只启动 64 MiB 网关，不检查完整候选容量或原生存储权限。公网 HTTPS 必须显示固定语言包的双语维护页；#1662 资源准备期间正式 `PRERELEASE_ENTRY_ENABLED=false`。#1668 正式安装时，完成 target 配置后才为私有验收启用该 flag；代次准入和公网网关仍分别保持关闭，直到显式门禁通过。日常关闭/开放使用生命周期动作，无需重启正式 app。loopback 网关端口和依赖网络不能绕过 owner 控制的代理/宿主暴露。后续动作必须提供 `--expected-current <完整已装SHA|empty>`；deploy/reset/restore 重试保持相同操作 UUID。原子状态在 `<target>/control/gate.json`，失败保留维护态和阶段。所有 pre 定时任务通过 owner CLI 串行执行，不直接调用旧 shell 入口。除 `plan` 外的操作远程执行可加 `--ssh <owner-host>`；接收 checkout 必须有相同策略 SHA，回执/证据文件路径位于执行主机。文件另外传输，正式 Cookie 绝不进入候选目录。
-
-网关只接纳规范的 `/ws` 和 `/nodes/<instance-id>/ws` WebSocket 目标；instance ID 仅含字母、数字和连字符，查询参数原样转发。按实例路由的升级请求与直接升级请求使用相同的 Host、Origin、正式策略租约及 owner 权限检查。
-
-升级在迁移前记录来源镜像 digest。未验收的 startup 重试只在来源容器已于固定 Compose project 内干净停止时识别该精确镜像，绝不重启来源。来源身份缺失、镜像或 project 不同、来源仍在运行或未干净停止时，继续保持维护关闭。
-
-正式 authority 安装后，在可信 owner 机器使用 `scripts/prerelease/authority.ts`。`--cookie-file` 是所有候选挂载之外、0600 的正式管理员会话文件。工具只向固定正式 HTTPS API 和 Origin 发请求，不跟随重定向。每个 authority 动作使用自己稳定的 `--operation-id` UUID 及 `--output <private.json>`。首次 prepare 的 `--previous-generation null`，以后填已验证 retire 的代次。先登记规划代次，再关闭新交接/兑换：
-
-```bash
-node --import tsx scripts/prerelease/authority.ts prepare --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$prepare_op" --previous-generation null --output prepare.json
-node --import tsx scripts/prerelease/authority.ts close --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$close_op" --output close.json
-./deploy-prerelease.sh deploy --config "$pre_config" --expected-current "$pre_current" --sha "$pre_sha" --generation "$pre_generation" --operation-id "$pre_op" --authority-receipt close.json
-```
-
-deploy 独立检查固定 SHA、同通道的完整原生 workflow 或 owner-local 回执，在修改准入或数据前，解析已验证导入的候选与 trusted-policy 镜像，核对前端元数据及 OCI revision/channel，固定候选不可变 image ID。随后关闭网关、优雅停写并等待已确认提交、完成配对变更前备份和隔离恢复验证、检查源/工具权限、用候选迁移并验证保留数据、核对实际启动身份：以目标 Host 经候选公开入口读取 health 与 `/api/app-location`，前端元数据从镜像的 `FRONTEND_ROOT` 读取，因为准入门禁覆盖所有下发资源。最后停在 `acceptance`，公网仍关闭。迁移后不自动重启旧镜像。修复原因后恢复同一操作；干净 drain 失败需先调查。close 回执超过十分钟时重新执行独立 close 动作，部署 UUID 不变。日常操作不重载 Caddy、不重启正式 app 或共享存储。
-
-候选必须提供真实 SQL view `prerelease_retained_identity_refs(user_id,source_grant_id)`，覆盖全部外部主体，包括仅存于房间/历史中的引用，并实现 `scripts/prerelease/identity-audit.ts apply <packet.json>`。adapter 删除/匿名化已删除主体，将每个保留活跃引用映射到返回的当前代次 `associationId`，不恢复会话或登录权。该持久化/清理实现由 #1663/#1667 负责；main 没有空 stub，缺 view/adapter 阻断开放。owner 读取真实行，拒绝遗漏、null 或无来源绑定，按二进制/C 顺序对 ASCII pair 去重排序并哈希共享 canonical JSON。正式 associate 校验旧来源，创建无 source、已撤销的关联，确保恢复后仍接收未来删除。
-
-```bash
-./deploy-prerelease.sh identities --config "$pre_config" --expected-current "$pre_sha"
-node --import tsx scripts/prerelease/authority.ts associate --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$associate_op" --manifest "$identity_manifest" --output associations.json
-./deploy-prerelease.sh apply-identities --config "$pre_config" --expected-current "$pre_sha" --associations associations.json
-node --import tsx scripts/prerelease/authority.ts audit-complete --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$audit_op" --verification "$native_verification" --output audit.json
-node --import tsx scripts/prerelease/authority.ts activate --config "$pre_config" --cookie-file "$pre_cookie" --generation "$pre_generation" --operation-id "$activate_op" --audit audit.json --output activate.json
-```
-
-使用 identities/apply-identities 打印的实际产物路径。空安装也必须有真实空 view 并完成 `[]` 审计。completion 和 activate 重查当前正式账户/删除事实；activate 必须在 completion 后 30 秒内完成。close 使旧审计失效。文件存在不代表完成真实恢复或清理。
-
-#1668 在公网维护期间，用私有 owner 浏览器验收：
-
-```bash
-./deploy-prerelease.sh verify-access --config "$pre_config" --expected-current "$pre_sha"
-node --import tsx scripts/prerelease/owner-browser.ts "$pre_config" "$verification_token_file" "$private_owner_profile"
-```
-
-可重复的验收用 `scripts/prerelease/live-acceptance/cli.mjs`，在真实的 Chromium、Firefox、WebKit 中执行同一组检查。它的 owner 私有配置（mode 0600）给出 `targetConfig`、`ssh`、已安装的 `candidate` 及其镜像 `candidateReceipt`、`formalBuild`、标为 A–C 的账号文件（A 为 Beta，B 为第二个 Beta 座位，C 为普通账号）与可选的 D–E、可选的 `engineAccounts`（为 `firefox` 和 `webkit` 各指定一份独立的 A–C 账号文件）、正式站 `ownerCookie`、主机上的 `guardConfig` 路径和私有 `outputRoot`。每次 `run` 都刷新 status，在维护模式下签发私有入口 token，并读取健康周期与当前 app 实例：
-
-```bash
-cli=scripts/prerelease/live-acceptance/cli.mjs
-node --import tsx $cli run --config "$acceptance_config" --suite handoff      # 另有 boundary、multihand --guest B、team --players A,B,C,D、
-node --import tsx $cli bundle --config "$acceptance_config" --runs "$run_dirs" --output "$evidence_dir"   #   viewer/continuity --room、deletion --labels D,E、readback
-node --import tsx $cli acceptance --config "$acceptance_config" --index "$evidence_dir/index.json" --formal-browser "$formal_browser_json" --output "$acceptance_json"
-```
-
-配置了 `engineAccounts` 时，`handoff` 和 `boundary` 的三个浏览器同时运行，各用自己的 kit 和 A–C：revocation 会登出 A 的全部会话并收回 A 的 Beta。单浏览器重跑使用该浏览器自己的账号。未配置时各浏览器依次使用共享账号，Viewer 套件始终依次运行。正式站登录共享按 IP 计算的认证限流（每 60 秒 10 次，注册和密码重置也计入），因此一个窗口内的每次登录（包括 logout-all）都从 run 目录中的 `login-ledger.json` 取额度：跨浏览器和进程，任意滚动 60 秒最多 8 次。收到 429 时所有登录暂停一个完整窗口后重试。`run --case <label>[,<label>]` 只重跑某个套件中指定的 case，例如 `--suite boundary --engine webkit --case revocation`；未知标签在任何远程步骤之前即报错。`bundle` 按 case 与浏览器保留最新结果，重跑只替换它自己的 case。只有当某项证据依赖的每个 case 在其套件要求的每个浏览器上都有通过的最新结果时，该项才通过；从未运行或最新结果失败的 case 都会阻断。维护模式的运行还须在结束时证明公共入口仍为关闭；否则该次运行的所有 case 都不计入，直到入口关闭状态下的重跑替换它们。失败的 case 保留局部结果及其到达的阶段。socket 断开只观察探针页在动作前一刻报告为打开的 socket，并按页面时钟计时。未收到任何响应的准备类请求会重试一次并记入 `networkRetries`；已收到的状态码从不重试。结果只含账号标签、状态码与耗时；打包时出现任何标识、用户名或密码都会被拒绝。浏览器用例每个 case 使用新浏览器，且不在开启请求拦截时测量凭据：被拦截的 credentialless frame 会被报告带有实际并未发送的 Cookie。一次性账号以 `deletion` 套件和完整身份审计收尾。`open` 之前把证据文件复制到主机的相同路径。
-
-pre 可以使用 `https://pre.titanxxh.com`，保留正式 Pages/API 地址；必须与两者使用不同 hostname，换端口不能代替主机隔离。仅维护页的 bootstrap 可以早于正式升级。服务候选代码，包括私有 owner 验收，要求运行中的正式浏览器认证策略为 version 2。先部署匹配的正式前后端保护并完成旧会话迁移。owner 生命周期 CLI 只接受新的 `__Host-oa-session` Cookie 文件并发送浏览器协议头；迁移后重新登录取得 owner Cookie。
-
-网关只接受声明的 `__Host-oa-pre-session`、`__Host-oa-pre-handoff` 候选 Cookie，要求 Secure、HttpOnly、Path=/、SameSite=Lax 且没有 Domain。它移除其他候选 Cookie、Clear-Site-Data、入站 Authorization 和未声明的身份头；owner 验收 Cookie 不传给候选。HTTP 拒绝其他 Origin 及没有精确 pre Origin 的不安全方法；WS 要求精确 pre Origin 和 `/ws`。候选身份和房间权限仍由 app 负责。迁移、捕获和存储策略工具只取得数据凭据，不取得 target identity service key。同父域仍共享部分浏览器容量限制，不能承诺独立站点级的 Cookie 可用性隔离。
-
-有效的私有验收窗口内，匿名 GET 还可读取固定 hash 下的 Viewer 程序，包括带展示 query 的入口 HTML；网关转发前剥离该 query。携带 Cookie、认证或客户端绑定头的请求不能使用此例外。程序不含归档数据，也不授予数据读取权；正常获准的程序导航在转发前也剥离 Cookie 与客户端绑定，覆盖不支持 credentialless 的浏览器。target/build/代次、存储健康和正式策略租约仍须有效，窗口缺失或过期时保持维护关闭。
-
-新 TCP 连接在 Node 原有的请求头/请求超时内等待 HTTP 头，此时没有转发权限。HTTP 与 WebSocket handler 在转发前分别分类并鉴权；权限巡检只撤销已分类连接，不提前断开待接收请求头的连接，全局关闭仍销毁两者。
-
-helper 将本地 token POST 到固定 HTTPS 网关，不放进 URL。网关的十分钟 Secure/HttpOnly/host-only Cookie 绑定 build/代次，在转发 HTTP/WS 给候选前剥离；普通浏览器仍为 503。私有浏览器执行正常正式登录和真实 pre 准入，profile 不能挂载给候选。只有候选实现完整流程后，现场才能取得身份/Beta、HTTP/WS、公开卡、Viewer、保留对局/撤回、删除、容量和正式不受影响的真实证据。复制 `deploy/prerelease-acceptance.example.json`，填写精确操作/build/image/代次/指纹、当前毫秒时间 `acceptedAt`、非空证据文件路径和 SHA256；验收三十分钟过期。
-
-增加实际部署的正式前端/API 与同父域浏览器测试的 `browser-boundary` 证据，并采集独立的 `formal-browser-policy` 产物：
-
-```bash
-./deploy-prerelease.sh verify-formal-browser --config "$pre_config" --expected-current "$pre_sha"
-```
-
-把打印的路径与 SHA256 写入 acceptance evidence。产物绑定 pre target/build/generation/operation、实际正式策略及 Pages 的 build marker、HTML 和模块入口字节。open 不带凭据、不跟随重定向，重新读取这些 HTTPS 地址，拒绝已变更或过期的证据。源码、配置开关或已合入 main 不能代替实际部署核对。
-
-浏览器验收后关闭 authority、执行 maintain，再恢复同一 deploy 操作使候选在关闭状态重启。该过程撤销私有入口并 drain 已确认命令。重新扫描/应用身份，紧接着完成新 audit/activate，再开放：
-
-```bash
-./deploy-prerelease.sh open --config "$pre_config" --expected-current "$pre_sha" --sha "$pre_sha" --authority-receipt activate.json --audit audit.json --verification "$native_verification" --acceptance acceptance.json
-```
-
-open 重扫 native view，核对 completion/activation 绑定、证据哈希及运行身份，仅原子开放该已验收候选；health 不会自动开放。正式入口 flag 仍由 owner 独立激活，也不能绕过代次准入和维护态。最终审计链之前，可以运行 `./deploy-prerelease.sh verify-open --config "$pre_config" --sha "$pre_sha" --output <新的私有文件>`，在本机完成 GitHub 候选回执校验，不连接主机。之后 `open --verified-receipt <文件>` 只在本机复核一次就使用这份回执，因此 activate 到 open 的 30 秒时限内只剩下发往主机的请求。该文件必须为 owner 私有，绑定候选、策略 SHA 和 target，并且生成不超过十分钟。主机只检查回执的结构，不检查生成时间。不带这个参数时，open 仍按原方式校验。
-
-可信网关每十秒读取固定的正式策略接口，确认期限不超过请求开始后三十秒。能力缺失、不兼容或过期时，关闭候选 HTTP/WS 及已有连接。验收时记录正式镜像返回的身份边界指纹。镜像构建器根据固定 Git 源码计算身份和准入模块、其运行时依赖、HTTP/WS 和页面路由、数据库迁移以及正式部署配置的哈希。遇到无法解析的动态模块加载时，标记仅对该提交有效。正式 API 将指纹与运行构建和已配置的 pre 来源绑定。新正式版本边界相同时，已开放的 pre 继续提供服务。指纹缺失或变化会阻止跨构建准入。旧回执在下次验收前继续核对原正式 SHA。无需重建、迁移或替换 pre 数据代次，先取得新 authority close 回执再执行：
-
-```bash
-./deploy-prerelease.sh reverify --config "$pre_config" --expected-current "$pre_sha" --operation-id "$pre_op" --authority-receipt close.json
-./deploy-prerelease.sh verify-formal-browser --config "$pre_config" --expected-current "$pre_sha"
-```
-
-使用新的操作 UUID。reverify 关闭公网、撤销私有 owner 入口，保留已安装 app 并创建 acceptance 操作；重试使用同一 UUID。重新执行私有浏览器验收、上述原生身份 audit/activate，绑定新操作生成 acceptance 文件后 open。该过程不重装 pre、不重置对局。已安装构建的 `open` 与 `verify-open` 接受已安装候选回执沿用（ADR 0046）：main 改动验证配置后，仍可接受 protected main 可达的较早 producer 产出的完整证据，回执用 `continuity` 标明这一差异。deploy、restore 和镜像构建始终要求当前 producer 配置，主机拒绝把沿用回执用于这些操作；`--strict-producer true` 让 `open` 也要求当前配置。计划回滚到没有新认证保护的正式版本时，必须先关闭 pre ingress 与正式 handoff，再回滚；不能以三十秒能力确认窗口容忍不安全回滚。
-
-正式部署被接受后，在 HEAD 等于主机 owner-tools SHA 的 checkout 中（配置带 `policy` 块时为新策略 SHA），用一条 owner 命令完成整个窗口：
-
-```bash
-node --import tsx scripts/prerelease/live-acceptance/cli.mjs window --config "$acceptance_config" --window "$window_config" [--resume true] [--confirm-step accounts|deletion]
-```
-
-私有 window 配置写明：窗口 ID、pre 数据代次、正式站前后两个 SHA、上一窗口的 run（用于读取已归档的 team 对局）、本窗口的 run 与状态目录、owner 与主机上绝对路径相同的交换目录，以及可选的 owner notes。命令先确认正式 API、Pages 和健康检查都已切到新 SHA，然后依次完成以下步骤：
-- close 加 reverify；
-- 创建一次性账号 D/E 并授予 Beta；
-- 审计链；
-- 各验收套件；
-- 删除 D/E，执行删除后的审计链，并核对数据行为零；
-- 根据以上事实生成 owner notes，打包证据，证明正式站浏览器策略，把证据复制到主机并核对哈希；
-- 在最终审计链开始前写好并复制 acceptance，并完成 `verify-open`；audit-complete 与 activate 之间不做任何事；activate 后三十秒内执行 `open --verified-receipt`；
-- readback、收回 Beta、全部登出、归档回执。
-
-在正式容器内运行的辅助脚本位于 `scripts/prerelease/owner-accounts/`。
-
-可选的 `policy` 配置块包含 `from`、`to`、`to` 的 trusted-policy 镜像构建 `image.run`/`attempt`/`artifact`，以及私有 GHCR 读取凭据 `authFile`。有这个块时，窗口会多出策略阶段：
-- 在前置检查之前把主机 owner-tools 从 `from` 切到 `to`；`i18n.ref` 有变化时重建主机语言包；
-- 执行 close 和 `maintain`（会停掉 app），再用同一个保留的操作 ID 导入 trusted-policy 镜像；之后由审计链中的 `apply-identities` 重新启动 app；
-- 依赖或 storage guard 代码有变化时，切换后停下并给出需要在主机上执行的命令；执行后把 `dependenciesInstalled` 或 `guardRestarted` 设为 true，再 resume。
-
-策略 SHA 一确定就构建 trusted-policy 镜像，此时 pre 仍在开放。
-
-可选的 `install` 配置块在同一窗口内安装新候选，包含：已安装的 `from`；新候选 `to`（验收配置须已指向它及其镜像 `candidateReceipt`）；策略 SHA 构建的 `to` 候选镜像 `image.run`/`attempt`/`artifact`；以及 `authFile`。
-- 改动主机之前，先确认验收配置指向 `to`；
-- 即使没有 policy 块也执行 close 和 `maintain`，再用同一个保留的操作 ID 导入候选镜像；
-- 用 close 加 `deploy` 取代 reverify：变更前备份、迁移和启动校验，之后 gate 停在该 deploy 操作的 `acceptance` 阶段，最后的 `open` 绑定这个操作；
-- deploy 完成之前，主机操作以 `from` 为 expected-current（挂起的 deploy 同样接受）；resume 沿用 deploy 操作 ID，并重新 close。
-
-安装窗口总是走完整路径，且可以不换正式版（`formalFrom` 等于 `formalBuild`）；owner notes 记录 deploy、操作 ID 和备份 stem，而不是 reverify 说明。候选的 producer 比主机 owner-tools 新时，同时加上 `policy` 块。
-
-每一步都记录在 `state.json`，并有对应日志。遇到第一个失败即停止，并打印下一步命令（例如单个 case 的重跑命令），不会自动重试。`--resume true` 的行为：
-- 重新检查前置条件；
-- 沿用同一个 reverify 操作 ID，但重新做 close；
-- 审计链整条重跑；
-- suite 只有在已有通过证据时才标记为完成。
-
-创建账号和删除账号不可重入：中断后只能加 `--confirm-step` 继续，命令会先核对正式站账号。open 前若正式站浏览器证明已超过 25 分钟，会重新生成。如果响应丢失时主机其实已经按本窗口的 acceptance 完成 open，`--resume` 会在刷新任何证明或证据之前直接记录 open，不重放审计链；如果主机已 open 但绑定的是其他 acceptance，则停止。
-
-**快速重新绑定（fast rebind）。** 前置检查只决定一次路径，连同原因记入 `state.json`、`rebind.json` 和 `browser-boundary` 的 owner notes；resume 时若会得出不同路径则停止。window 配置的可选字段：
-- `fullAcceptance`：上一次完整窗口归档的 `receipts/acceptance.json`，证据在 `receipts/evidence/`；
-- `acknowledgeBoundaryDiff`；
-- `rebind: "full"`。
-
-快速路径要求该验收不超过七天，且对应已安装的候选、镜像和代次。从其正式构建到新正式构建的身份边界 diff（`live-acceptance/rebind.mjs` 中的 `IDENTITY_BOUNDARY_PATHS`）必须为空，或等于 owner 确认的 SHA-256；diff 非空时窗口停止并打印哈希和审阅命令，直到 owner 确认或选择完整流程。快速路径跳过 D/E、multihand、team、Viewer、continuity、deletion 和删除审计链，为每个浏览器的 A、B 授予 Beta，仍执行两条审计链、handoff、boundary、正式站浏览器证明和 readback。`bundle --carry` 把被跳过 case 的通过项写入新证据文件并标注 `carriedFrom`（acceptance 与证据哈希）；已运行的 case 仍以新结果为准，`open` 照常校验新文件。`previousRun` 保持为上一次完整窗口的 run。
-
-每日 backup 在线捕获已安装的来源，包括网关开放且没有待处理操作的状态，绝不停 app。捕获与账本操作使用独立的 stable 工具镜像，从固定可信 main 策略 SHA 在外部构建并导入。工具回执、不可变 image ID、revision 和 channel 均与 `control/` 中的目标缓存核对；缺缓存时拒绝，不构建也不停 app。工具来源与归档来源分开记录：配对清单取实际来源安装的 SHA 和原捕获时间，不使用工具镜像 SHA 或候选提供的元数据。无需增加 target 配置；缺少可信 owner 上下文时拒绝执行。
-
-候选验证和迁移只取得所选归档、账本或身份 packet 的只读挂载，不能写宿主备份根目录或 owner 私有的 report/seal 目录。候选 scratch 记录保存在独立私有 run 目录，可信清理仍核对原期限及数据库/对象归属。原生 PostgreSQL 连接文件和恢复列表写入归档输入之外的私有临时目录。宿主独占创建 report，拒绝链接或非私有父目录。
-
-配对清单绑定归档/配置哈希和大小、源/目标 SHA、代次、指纹及实际隔离恢复验证。本地和离站副本最多保留七天，独立删除账本另行保留。工具保留原 CPU/内存/PID 限额、原 deadline、run/environment 标签和定域清理。引入 pre 任务前必须升级正式备份脚本，防止旧全局 reaper 清理 pre 工具。通过 CLI 定时执行 budget-check 和每日 retention；retention 在关闭通道后无需 app 凭据或 Docker 仍可执行。离站另装 `offsite-retention.sh <独占pre目录> 7`，确保 app 宿主失联仍遵守期限。异机同步和保留脚本只放在主机上（见[数据备份](#数据备份)）。pre 从 owner 私有的 `data/backup-scripts.json`（`{ format: 1, directory, sha256 }`，不在封存 target 内，更新脚本不改变指纹）所指目录运行它们；每次使用前要求目录和文件均属 owner 且只有 owner 可写，并核对 `backup-offsite.sh`、`deploy/commit-backup-set.sh`、`deploy/offsite-retention.sh` 的 SHA-256，任一不符即拒绝操作。修改主机脚本后，同步更新该文件中的摘要。
-
-兼容回退仍用 deploy，明确选择经过验证的旧 SHA，并重新经过备份、目标数据验证和验收。当前保留数据不能通过时留在维护态，选择 reset 或隔离恢复；换镜像不能撤销 schema 或已确认写入。reset 前取得 close 回执，运行 `reset --expected-current <SHA> --accept-loss <当前代次> --operation-id <UUID> --authority-receipt close.json`。它先备份并离站同步、合并最新独立删除账本，再验证停写后的真实库/prefix 清空，输出绑定源 build/代次/账本哈希的 `purge-<操作>.json`。authority retire 使用 `--purge <产物>` 及同一 purge 操作 UUID。最终关闭再执行 `finish-close --authority-receipt <retire.json>`；只有不可变 retirement 回执存在后才能移除正式 target 配置，在此之前保留 source cleanup/status/ack。复用资源时先以 `--previous-generation <旧UUID>` prepare 新 UUID，再 `reinitialize --generation <新UUID> --retirement-receipt <retire.json> --authority-receipt <prepare.json>`，重新部署。旧 retire 重试不会关闭新代次。
-
-用源码恢复到替代目标时，先选定通过完整验证的恢复 SHA。在 source-runtime-transfer 命令中指定替代目标配置，传入该 SHA 的运行时镜像，然后执行 `./deploy-prerelease.sh prepare-restore-source --config <replacement.json> --ssh <host> --sha <recovery-sha> --expected-current empty`。接着执行 `restore-source`，替代目标、源目标、代次和明确接受数据损失的参数与下文 `restore` 相同。最后仍需完成旧代次退役、新代次激活及完整开放验收。
-
-恢复时 owner 显式选择 `--backup <stem> --backup-generation <UUID>`，以 `--accept-loss <源当前代次>` 接受恢复点之后进度丢失。使用 `restore --config <全新replacement.json> --source-config <old.json> --expected-current empty --expected-source-current <old-SHA> --sha <已验证目标SHA> --generation <新UUID> --operation-id <UUID> --authority-receipt <old-close.json> ...`。replacement 的目录/project、源/验证库、role、bucket 必须独立，固定公网 origin/port 相同。工具先校验配对文件及七天期限，再安全解包纯数据，绝不安装归档凭据；使用当前独立账本，实际隔离验证目标并真实恢复。重试只清理尚未验收的 replacement，保留旧 source。关闭状态启动成功后，对旧 target purge/retire/finish-close，再 prepare replacement 代次，执行 `activate-recovery --source-config <old.json> --expected-current <new-SHA> --expected-source-current <old-SHA> --retirement-receipt <retire.json>`，只切换固定维护网关。完成全套真实身份审计和验收才开放。不能清理全宿主或复用正式资源。七天归档期限届满后，owner 仅可删除清单中的已退休 project 资源，保留 retirement 回执及独立删除账本。
-
-
-恢复解包目录是可重新生成的缓存。解包前，owner 在独立保留期文件中固定操作、代次、target 指纹、归档哈希和原捕获时间。原生临时文件和重试不能刷新七天期限。startup 检查点持久化后清除缓存，startup 和 acceptance 重试会重复执行幂等清理。retention 只在固定 target 的备份目录内清理过期或缺少证明的缓存，保留尚有效的重试、其他 target 指纹及独立删除账本。
 #### 安装 owner 存储保护
 
-导入镜像或启动候选 writer 前，按实际 owner 账号、Node 24 路径及可信 checkout 安装 `deploy/open-agricola-prerelease-storage-guard.service`。宿主需要 `setsid`、`flock`、`systemd-notify`、`du`、`stat` 和 owner Docker 权限。离站专用账号须允许有时限的只读 `sh -s` 探测，使用 `realpath`、`du`、`stat`；保持原有独占目录与七天自治清理。安装前先验证此能力。
-
-在候选目录之外准备 owner 所有、mode 0600 的 JSON 配置。`scripts/prerelease/storage-guard-native.ts` 验证以下字段；全部限额须为实测后的正整数，没有可直接部署的默认值：
-
-- `format: 1`，`fingerprint` 为完整目标指纹。
-- `databaseJournal`、`objectJournal` 指向已有私有 provisioning 凭据 journal。数据库 cluster ID、role/database 所有权 marker、精确 role/key ID 和对象 policy 哈希须读回一致。对象 policy 哈希沿用原始 provisioning 格式：递归按规范 JSON 排序数组项、排序对象键，并省略对象中的 null 或缺失字段。因此响应中的排序变化可接受，但 grant、resource 或 condition 的变化仍会被拒绝；不能通过重写凭据 journal 放行哈希不匹配。`rootEnvironmentFile` 是包含 `LOCAL_S3_ACCESS_KEY`、`LOCAL_S3_SECRET_KEY` 的 owner 私有环境文件。这些文件不能进入 app 或工具挂载。
-- `postgresContainer` 是共享 PostgreSQL 完整 container ID，`postgresAdmin` 是其 owner SQL role，`objectEndpoint` 是 owner 可达的精确 RustFS origin。保护器不停止两个共享服务。
-- `filesystems` 列出 PostgreSQL、RustFS、Docker 实际 backing filesystem 上 owner 可读取的 mount root，包括独立的镜像 staging 文件系统。保护器还检查 target 目录，并按 device 去重。用 `docker inspect`、`docker info` 及 device ID 读回证明 mount root 覆盖这些实际存储路径。
-- `tempFileLimitBytes` 是三个 pre role 已配置的正数 `temp_file_limit`。每次采样均验证设置。它限制每个 backend 的隐式临时文件，不限制数据库总量、显式临时表或共享 WAL。
-- `limits` 包含 `sourceDatabaseBytes`、`validationDatabaseBytes`、`bucketBytes`、`multipartBytes`、`localBytes`、`offsiteBytes`、`hostFreeBytes`、`hostFreeInodes`、`offsiteFreeBytes`、`offsiteFreeInodes`、`operationReserveBytes`。用量值为停止阈值，free 值为保留余量。reserve 是允许的最大一次操作所需新增本地及离站空间。取数包括七份每日备份、validation scratch 和失败传输峰值。将相同正数 `bucketBytes` 安装为 RustFS 整桶原生 quota，并验证实际拒写。quota 覆盖已完成对象逻辑大小；multipart 分片另行测量。
-- `intervalMs`、`probeTimeoutMs`、`leaseMs` 记录已验证的采样时限。`intervalMs + probeTimeoutMs` 须小于 `leaseMs`，后者最多 120 秒。`watch` 还要求 systemd 提供实际的正安全整数 `WATCHDOG_USEC`；缺失或格式非法时，在加锁和采集前失败。`intervalMs + probeTimeoutMs + 10000` 必须严格小于换算为毫秒的 watchdog 时限。10 秒余量包含最长 3 秒的通知及本地处理/I/O 开销。模板 watchdog 为 90 秒时，15/30/90 秒的配置可接受，80/30/120 秒会被拒绝。单次 `once` 和紧急 `trip` 不要求 watchdog 信息。完整采样必须在探测 deadline 内结束；原生停止耗时也须容纳于监督器预算。
-
-unit 从可信 checkout 加载 `scripts/typescript-runtime.mjs`，加锁子进程沿用同一预加载；安装引用它的 unit 之前先更新 checkout。unit 允许 64 个 task，因为 systemd 也将 Node loader 和编译器线程计入 task。调整额度时须测量无缓存的 CLI 启动；32 个 task 的上限可能在首次采样前就导致失败。
-
-启用 service 前先运行单次探测：
-
-```bash
-node --import ./scripts/typescript-runtime.mjs scripts/prerelease/storage-guard-cli.ts once "$pre_config" "$pre_storage_config"
-sudo systemctl daemon-reload
-sudo systemctl enable --now open-agricola-prerelease-storage-guard.service
-./deploy-prerelease.sh budget-check --config "$pre_config" --expected-current "$pre_current"
-```
-
-`control/storage-guard.json` 与 `gate.json` 分开。网关及写入命令要求新鲜 healthy 记录；缺失、过期或 latched 均关闭准入，包括私有验证和已有 WebSocket。操作余量不足时拒绝新任务，健康 app 继续运行。用量超限或 free 低于阈值时，先尝试写入永久 latch，再停止。探测失败时，若上一健康租约已过期则同样锁存；租约内既不续租也不锁存，租约到期即关闭准入，下一轮重试。重试与锁存记录只写固定的探测错误类别。latch 或回执写盘失败不会跳过独立停止动作；结果分别报告写盘失败与停止失败。进程内 latch 保持到能够持久化，探测恢复也不能清除。保护器不等待 `.operation.lock`：终止精确登记的 owner 命令 session，给予所属 app 容器 20 秒 drain，停止 scoped 工具，仍在运行的所属容器执行 kill。随后对三个 pre role 验证 `NOLOGIN` 及会话清空，对两个所属对象账号禁用并读回状态。一个边界失败不会阻止其他停止动作，后续循环分别重试。锁存后的循环先重试停止，再通过 owner 凭据刷新诊断观察；pre LOGIN 和 key 已禁用时仍可采样，新的诊断不会清除 latch。正式 app、共享 PostgreSQL/RustFS、正式 role 和 bucket 不属于停止选择器。
-
-Healthy 记录以探测完成时间作为 `observedAt` 并续期 lease，另保留 `observationStartedAt` 标明采样区间；原生探测 deadline 仍从采集开始计时。cycle 保留探测开始时验证的 UUID，开始时旧 lease 已过期仍会锁存。
-
-受监督循环只在完整 cycle 后刷新 watchdog。进程退出或 watchdog 超时由 unit 的 `ExecStopPost` 执行 trip；重启保留 latch。125 秒重启等待超过最长 120 秒 healthy lease：control 文件系统阻止所有 latch 写入时，旧 heartbeat 会先过期，监督器再重试。trip 无法获得 control 锁时仍尝试 scoped 原生停止，报告失败并通过 lease 过期关闭网关准入。常规 CLI 继续使用现有操作 lease，并运行在专用进程 session 中，长期备份不会阻止保护。Docker 导入存储与共享 WAL 由文件系统余量和导入预算保护，不能称为单库物理硬 quota。采样和停止存在延迟，越过阈值后仍可能增长；这仍属于已批准的共享故障域。
-
-完成安装前，在低额度隔离原生夹具验证实际超额拒写、pre role/key 拒绝、multipart 检测、优雅停止与强制停止耗时、探测失联及 watchdog 死亡、并行备份被中断，以及正式 HTTP/WS 和哨兵数据不变。命令 harness 测试不能替代原生验收。私下保留 latch、停止失败项、时间序列和完整配置指纹。
-
-恢复须由 owner 手工执行。保持公共入口关闭并保留 latch 证据，停止 guard service，检查失败项及精确操作 journal，修复容量或连接，保留所需可恢复备份，并验证已接受提交和 retained storage。一致性与原生 policy/quota 验证通过后，依据原始 owner journal 显式重新启用且仅启用三个 pre role 与两个 pre 对象账号。将 latch 归档到 control 之外，运行 `once` 后重启 service。新鲜 healthy 开始新的 `healthyCycle` UUID，连续健康采样沿用该值；公共验收及私有验证 token 必须与它一致。恢复后旧回执和 token 仍不能准入。将当前 guard cycle 写入 acceptance 文件，并重新执行 `verify-access` 签发 token。旧 runtime 仍能由 `maintain`/`reverify` 读取，但未绑定周期的验收不能开放入口。再次完成已有 authority close/audit/acceptance/open 流程后才允许用户进入。不能只删除 latch 来重启候选，timer 不能自动恢复 LOGIN、对象权限或公共入口。
+本节的 owner 操作步骤已迁入私有仓库，见 [Owner 运维](#owner-operations)。
 
 ## 核验生产修复并重试站内信
 
