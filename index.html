@@ -53,7 +53,7 @@
           document.documentElement.style.setProperty("--bg-monthly", 'url("' + href + '")');
           var l = document.createElement("link");
           l.rel = "preload"; l.as = "image"; l.href = href;
-          l.setAttribute("fetchpriority", "high");
+          // Default priority: on a cold start the entry scripts and language pack must not wait behind the image.
           document.head.appendChild(l);
         }
       })();
