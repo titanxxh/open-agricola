@@ -632,7 +632,7 @@ owner 在本机运行标准入口，并绑定可信 producer `P` 的干净 check
 
 默认 host/ref/directory 为 owner 的部署（`<host>`、`main`、`<deploy-dir>`），但五个镜像/资源参数必需，缺失时不回退为构建。命令拒绝在 CI 中运行。首次 SSH 前，入口固定 `F`、核对同 SHA 完整正式验证、原生 workflow/attempt/artifact 和 `formal-candidate/stable` 来源，再以 owner 私有凭据 digest pull、检查实际镜像并导出无 tag 的固定 archive。凭据和 Docker auth 不传服务器。
 
-服务器只从 `P` 提取可信控制文件。owner 先发送小型私有请求；大 archive 上传前，`preflight` 按已知字节数和配置的 reserve 检查实际 staging 与 Docker 数据文件系统。两类 SCP 输入均保留私有文件权限。archive 传输失败时，只能凭同一操作的私有 preflight 证明，在 30 分钟内请求清理该 stage 的 `image.tar`。过期 client stamp 仅可用于这次清理，不能执行应用操作；已有 intake、已接收 image 或 maintenance 证据会阻断清理。request 与诊断记录保留；清理失败与原传输错误一起报告。
+每次操作在主机上暂存两份 archive：控制器从 `P` 导入的公开文件，以及 owner 私有工具版本中的控制器本身，后者取自 owner 推送的主机 mirror。主机按各自的树核对两份文件，拒绝运行其他组合（见 [Owner 运维](#owner-operations)）。owner 先发送小型私有请求；大 archive 上传前，`preflight` 按已知字节数和配置的 reserve 检查实际 staging 与 Docker 数据文件系统。两类 SCP 输入均保留私有文件权限。archive 传输失败时，只能凭同一操作的私有 preflight 证明，在 30 分钟内请求清理该 stage 的 `image.tar`。过期 client stamp 仅可用于这次清理，不能执行应用操作；已有 intake、已接收 image 或 maintenance 证据会阻断清理。request 与诊断记录保留；清理失败与原传输错误一起报告。
 
 intake 和 maintenance 各自在排队前接纳一次 fresh、不可变请求，随后最多等待共享备份锁 30 分钟。owner 仍签发五分钟 stamp；receiver 使用有界十分钟未来上限容忍时钟偏差，并在接纳时拒绝过期输入。server 记录原 stamp、完整 binding 与 queue deadline。刷新 stamp 不能续期已接纳阶段，没有原 admission 的过期请求不能执行。排队在停 app 前，且不占 intake unit 的工作时间。实际 intake 保持 20 分钟 unit 上限、零额外 swap 与原资源限额；maintenance 用单调时钟限定最多 40 分钟工作，清理另有最多五分钟。owner SSH 包络为 intake 56 分钟、maintenance 76 分钟，包含最大排队与边界余量。失败 stage 保留供检查；重试使用新操作，不延长旧 admission。
 
@@ -646,7 +646,7 @@ receiver 接收导入前仍复查内存/磁盘余量、完整 archive、不可�
 
 owner 机器是 aarch64，无法在 Docker 中运行部署用的 linux/amd64 镜像，因此本机校验使用同源的 linux/arm64 **校验镜像**（#1817）。owner 的校验镜像工具从受信任的 protected-main producer 构建它：它持有 owner-local 锁，在本机记录器的候选隔离中构建（一次性 UID 61000、独立 rootless Docker、不带任何凭据），使用 GitHub 镜像构建的同一 BuildKit 脚本，只换平台。拆除隔离后，owner 核对归档并载入本机 Docker，检查 arm64 身份、源码标签、通道、托管前端和原生模块，再把私有回执写到 `~/.local/state/open-agricola/validator-images/<F>-<channel>.json`；`show --sha <F>` 会重新核对。`deploy-backend.sh` 在导出镜像之前复用或构建它（ADR 0047）；拿不到时，发布在接触后端之前就停止，并提示改用 `--full-maintenance`。
 
-失败报告、绑定不符或 15 分钟内未收到报告时，备份在迁移前终止，原样重启源。镜像缺少能力、指定 `--full-maintenance` 或空安装时，仍由主机校验；`validation-mode.json` 记录所选方式及原因。主机进程在等待中自身退出时保持停机。从暂存 policy 运行 `backend-image-maintenance.ts restore-source <request> <directory> <F> <P>`，它会获取维护锁，仅当 live 迁移尚未开始、镜像选择器仍指向源、且源保持原有身份并干净停止时，才会重启源。
+失败报告、绑定不符或 15 分钟内未收到报告时，备份在迁移前终止，原样重启源。镜像缺少能力、指定 `--full-maintenance` 或空安装时，仍由主机校验；`validation-mode.json` 记录所选方式及原因。主机进程在等待中自身退出时保持停机。从本次操作暂存的控制器运行 `backend-image-maintenance.ts restore-source <request> <directory> <F> <P>`，它会获取维护锁，仅当 live 迁移尚未开始、镜像选择器仍指向源、且源保持原有身份并干净停止时，才会重启源。
 
 只有停机前正在运行、此次干净停止且身份未变化的旧容器，才会在 live migration 前的备份失败后恢复。OOM、未干净排空或开始 live migration 后的失败保持维护，不把旧程序接到可能已变化的 schema。`data_imports` 屏障和容器健康检查继续生效。私有操作目录保存导入、source 身份和 resolved Compose；后者含环境凭据，勿公开。
 
@@ -656,7 +656,7 @@ owner SSH 使用约两分钟的 keepalive。若会话仍在维护中断开，后
 
 status 不需要 GitHub 或 registry 访问，不改原 request、admission 或 progress。临时原生 checkpoint probe 使用只读数据库事务，只清理自己的容器。输出含 `state`、`phase`、`nextAction` 和 `validatorExitCode`；原进程退出码未知时保留 `null`。维护锁或 validator 仍活跃时返回 `running` 和 `wait`。
 
-resume 在原锁内接受独立的新鲜十分钟授权，清理另有有限预算。它重新核对 staged producer 字节、原生镜像、数据配置、封存存储证据，以及精确目标构建已提交的完整验证报告和时间。启动前有活跃 writer、失败 import、foreign writer 或证据改变都会阻断。只续已验证、启动和接受后缀，原 request/admission 字节不变，不再次上传、备份或执行 live validation。Compose 已替换旧容器时，精确同操作的干净停止目标仍可续跑。已接受操作只补缺失接受步骤或清理自己的 archive，不重建容器。没有封存 progress 的早期操作需要调查，unknown 不授予启动资格。
+resume 在原锁内接受独立的新鲜十分钟授权，清理另有有限预算。它重新核对暂存的 producer 与控制器字节、原生镜像、数据配置、封存存储证据，以及精确目标构建已提交的完整验证报告和时间。启动前有活跃 writer、失败 import、foreign writer 或证据改变都会阻断。只续已验证、启动和接受后缀，原 request/admission 字节不变，不再次上传、备份或执行 live validation。Compose 已替换旧容器时，精确同操作的干净停止目标仍可续跑。已接受操作只补缺失接受步骤或清理自己的 archive，不重建容器。没有封存 progress 的早期操作需要调查，unknown 不授予启动资格。
 
 锁被占用时，`status` 成功报告 running，`resume` 则以非零状态退出。owner 只有确认同一操作与 binding 已接受后才报告续跑成功。续跑时间戳允许最多 60 秒时钟偏差，每次实际工作仍最多十分钟。
 
@@ -678,7 +678,7 @@ docker pull --platform linux/amd64 caddy@sha256:<approved-manifest-sha256>
 
 ### 清理正式应用旧镜像
 
-正式部署验收通过后，先用 owner 维护入口查看服务器当前库存。工具通过 SSH 流式执行当前 checkout 中的代码，默认只生成只读计划：
+正式部署验收通过后，先用 owner 维护入口查看服务器当前库存。主机从私有工具的 mirror 取出清理代码运行（见 [Owner 运维](#owner-operations)），默认只生成只读计划：
 
 ```bash
 ./cleanup-backend-images.sh <host> <deploy-dir> > image-cleanup-plan.json
