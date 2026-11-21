@@ -50,40 +50,15 @@ Pages, backend delivery and private image production independently read this pub
 
 ## Standard owner-machine release
 
-For a new request header that the deployed backend does not accept, complete the [backend-first overlap procedure](#supported-browser-and-backend-overlap) before publishing. `pnpm release` publishes automatically after verification; it does not wait for a backend deployment.
-
-Run the standard release command on an owner-controlled machine with Node.js 24.15+ excluding Node 25, locked dependencies, and an authenticated `gh` CLI:
-
-```bash
-pnpm install --frozen-lockfile
-pnpm release vX.Y.Z --ref main
-```
+The owner procedures for this section now live in the private repository; see [Owner operations](#owner-operations). The rules the release relies on stay here.
 
 Formal candidates must be a merged PR's final integration snapshot on the selected repository's protected `main`. The guard resolves `refs/heads/main` explicitly, including when a tag is named `main`, and checks native repository/PR identities plus raw Git reachability. Unmerged or intermediate snapshots fail before dispatch, publication, candidate install, or SSH. Eligible older final snapshots remain valid after main advances. The separate fixed protected-main producer P defines orchestration for candidate C; its native main identity grants policy authority, while the two source configuration hashes identify compatible execution. Native governance includes authorized override authority and proves no historical policy. This eligibility policy is recorded in ADR 0037.
 
-The command resolves C once and prints its full SHA. `verification/candidates/<SHA>` stays pinned as a candidate-source lease; an existing ref with another target is rejected and is never force-updated. Missing or failed tasks are requested from `candidate-verification.yml` on main P. Find the native run named `stable / <C> / <tasks>` and its `Stable manifest` binding: repository ID, stable channel, C, both C/P configurations and P. The run head is P; the candidate payload remains C. Compatible complete evidence can be reused, but an incomplete, failed or configuration-incompatible new P/C attempt cannot fall back to historical green. Historical receipt eligibility is limited by the trusted cutoff in [CI checks](operations/ci-checks.md).
-
-Only after the complete evidence passes does the command create the version tag and Release. The Release target is the fixed SHA even if `main` moves during verification. An existing tag or Release for another SHA is rejected. A matching published Release is reused without rewriting its tag or creating another Release.
-
-If an attempt stops, retry the printed candidate explicitly:
-
-```bash
-pnpm release vX.Y.Z --ref <full-sha>
-```
-
-Use `--repository owner/name` for a fork with its own candidate-verification workflow and the same protected-main final-PR eligibility policy. The default repository is `titanxxh/open-agricola`. `--poll-seconds` defaults to 15 and `--timeout-seconds` to 7200. A timeout or failed task leaves publication blocked. After fixing the source, select a new candidate and version as needed.
-
-The standard command checks GitHub run and job evidence before publication. A Release created through the website or bare `gh release create` can exist without this evidence. Pages and backend deployment independently reject an unverified candidate. Local `pnpm release:rehearse` results do not replace GitHub evidence.
+Only complete verification evidence for the fixed candidate allows the version tag and Release; the Release target is that SHA even if `main` moves. An existing tag or Release for another SHA is rejected. A Release created through the website or bare `gh release create` can exist without this evidence; Pages and backend deployment independently reject an unverified candidate. Local `pnpm release:rehearse` results do not replace GitHub evidence.
 
 ### Authorize complete owner-local verification
 
-Formal and pre releases verify their fixed candidate on the owner machine by default (ADR 0046); the GitHub candidate workflows remain the fallback. The native repository User owner publishes a receipt from the same complete ten-task candidate plan:
-
-```bash
-sudo bash scripts/ci/owner-local-provision.sh <node-install-dir>      # once per owner machine
-pnpm exec tsx scripts/ci/owner-local-run.ts --channel stable --sha <final-main-sha> --output /owner/runs/<new-dir>
-pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/runs/<new-dir>/verification.json
-```
+Formal and pre releases verify their fixed candidate on the owner machine by default (ADR 0046); the GitHub candidate workflows remain the fallback. The native repository User owner publishes a receipt from the same complete ten-task candidate plan. The provisioning, recorder and publication commands are owner procedures; see [Owner operations](#owner-operations).
 
 `scripts/ci/owner-local-run.ts` is the recorder. Run it from the trusted protected-main checkout; its clean HEAD is the producer.
 - **Provisioning.** Provisioning installs the rootless Docker extras matching the installed engine, the user-namespace tools, a root-owned copy of the trusted Node toolchain and a trusted Playwright browser cache under `/opt/oa-owner-local`; it never upgrades Docker. Rerun it after a Playwright upgrade.
@@ -96,24 +71,9 @@ pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/runs/<new
 
 What the receipt must contain, how the owner status selects or withdraws it and how Pages, backend delivery and image production recheck it are defined in the [Release evidence contract](#release-evidence-contract).
 
-The publisher checks the authenticated owner's native user ID, prepares an exact-candidate draft, uploads only `owner-local-verification.json`, and creates the independent `owner-local-verification` commit status. Its description binds the receipt SHA-256; its target is the same repository's formal Release asset. The publisher reads back status creator, Release author, asset uploader and uploaded bytes before publishing. Retry with the same command and receipt to resume this tool's matching draft. The ordinary release path continues to reject drafts.
-
-If the publication PATCH loses its response, the publisher makes one bounded read-only reconciliation through the existing candidate gate and native Release ID. A matching published proof succeeds without repeating the write. An unavailable or conflicting readback remains a failure; inspect status before retrying the fixed candidate.
-
 ### Observe delivery and accept the live site
 
-`pnpm release:status --config /owner/status.json` reads five independent stages: Release, image build, backend operation, Pages and saved browser acceptance. The private JSON requires `repository`, `version`, `candidateSha`, `apiOrigin` and `appOrigin`. Optional `image` contains `runId`, `runAttempt`, `artifactId`; optional `backend` contains `host`, `directory`, `operationId`; `acceptanceFile` points to a saved `release:accept` result. Each stage reports `verified`, `absent`, `pending`, `conflict` or `unavailable` with `native`, `live` or `saved` evidence. A missing input stays unavailable. Transport failure does not authorize another write. Saved acceptance carries its original completion time; it is labelled `saved`, while runtime probes are separate observations. Its candidate and recorded tested `appOrigin` and `apiOrigin` must exactly match the selection; reports from another environment or older reports without these origins return `conflict`.
-
-The live browser entry uses the existing account, its participant game and a retained completed Replay. First collect only the needed metadata through a read-only repeatable-read transaction, without scanning game or replay payloads:
-
-```bash
-pnpm release:inventory --host <host> --directory <deploy-dir> \
-  --expected-build <full-sha> --output /owner/live-inventory.json
-pnpm release:accept --config /owner/live-acceptance.json
-pnpm release:accept --config /owner/live-acceptance.json --execute
-```
-
-The owner-private acceptance JSON has `format: 1`, `appUrl`, `apiUrl`, `expectedBuild`, `credentialsFile`, `inventoryFile`, `artifactDirectory` and `outputDirectory`. Use root HTTPS app/API URLs, the fixed SHA, the fresh inventory and the verified Pages artifact directory. A dedicated mode-0600 credentials file contains only `MY_TEST_USER_ID` and `MY_TEST_PASSWORD`; configuration stores its path. Choose a new private output directory for each attempt. Planning validates configuration without reading credentials. Execution requires inventory younger than ten minutes and checks Chromium/WebKit, both routed instances, an existing ordinary game, reload recovery, Replay, visible assets, mobile layout and current-session logout. All frames reject game writes and other-room joins; only the selected participant room's locate and join/resume requests are permitted. Primary and cleanup failures remain separate evidence. The isolated game-writing `release:rehearse` entry keeps its loopback restriction and now exercises these browser guards too.
+The owner procedures for this section now live in the private repository; see [Owner operations](#owner-operations). The live browser acceptance itself is `e2e-tests/helpers/live-smoke-cli.ts`; it never writes games and permits only the selected participant room's locate and join/resume requests.
 
 ## Update the running prerelease
 
@@ -164,40 +124,7 @@ The owner procedures for this section now live in the private repository; see [O
 
 ## Confirm production fixes and retry inbox delivery
 
-After publishing the formal Release and deploying its frontend and backend, run this command on the owner-controlled machine:
-
-```bash
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts vX.Y.Z \
-  --host <host> --remote-dir <deploy-dir> \
-  --frontend https://open-agricola.titanxxh.com/ \
-  --receipt /path/to/private/feedback-vX.Y.Z.json
-```
-
-The command reads the fixed-project formal Release and exact tag SHA, reuses `checkCandidateVerification` for complete same-SHA native GitHub evidence or explicitly owner-authorized local verification, and observes served `frontend-build.json`. Over the existing owner SSH connection it reads the running Compose app container's `GAME_BUILD_ID`, health, and live readiness response. Every build must match the Release SHA. A non-root frontend must also pass `--base-path /expected/path/` and use that exact path in `--frontend`.
-
-The tool saves a private mode-600 receipt before calling `BugReportFeedbackService` inside the running container. The receipt contains the original operation ID, immutable verification evidence, and the full SHA-checked raw Git ancestry closure. Native proofs retain real run/job IDs. Owner-local proofs retain the native owner/status/Release/asset IDs and receipt digest, with null run/job IDs and the exact formal Release asset URL. Malformed or mixed proof is rejected rather than downgraded to native evidence; existing native receipts remain readable. After owner-local evidence is recorded, an application rollback must retain a compatible proof reader; do not delete operations, sent messages or read state to accommodate a native-only backend. Use a complete non-shallow local repository. The closure ignores replace refs and grafts, allowing later confirmed reports or fix associations to reconcile against retained proof without another deployment. A fix qualifies only when all required merged commits and each PR's actual merge tip are in that closure. The feedback service also fences account deletion and deduplicates each account and stable root fix.
-
-The JSON result reports `release`, `deployment`, `verification`, and `notification` separately. The service result records `sentMessages` and lists `pendingFixes` with missing commits. Those fixes remain pending for later verification. `deployment: "observed"` means the tool observed the existing deployment. The command never publishes a Release, dispatches verification, deploys either application, updates What's New, or changes Bug Report App permissions. A blocked Release, incomplete verification, missing frontend, stopped or unready backend, build mismatch, or changed tag stops before notification. A notification failure exits with code 2 and retains the successful observation plus the original receipt.
-
-To retry the same notification after a lost SSH response or database failure, use the saved receipt:
-
-```bash
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts \
-  --host <host> --remote-dir <deploy-dir> \
-  --retry /path/to/private/feedback-vX.Y.Z.json
-```
-
-To inspect persisted pending operations, including reconciliation queued by a later assessment or fix link, or to retry one operation without the local receipt:
-
-```bash
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --status operations
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --retry-operation <operation-id>
-```
-
-The receipt binds the observed SSH host and remote directory. Retry uses that saved target when flags are omitted and rejects conflicting target flags before SSH. Retry preserves the operation identity and stored proof for either verification type. It does not reselect mutable authorization or repeat Release creation, candidate dispatch, deployment, or production observation; new verification still passes the current candidate gate. Keep the receipt until the operation is completed. Repeated verification, retry, and late duplicate links do not send another message for the same account and root fix. Existing messages and their read timestamps remain unchanged.
-
-
-When associating a fix, enter a specific fix summary that describes the change. Blank text or a status such as "fixed" is rejected. The summary and complete PR/commit set form one root revision. A new release message snapshots the original summary; later revisions neither rewrite sent text nor duplicate delivery. Older roots without a summary return `missing_fix_summary`. Supply a reviewed summary to reuse retained formal production proof without redeployment. Previously sent messages with empty summaries remain unchanged.
+The owner procedures for this section now live in the private repository; see [Owner operations](#owner-operations). The command reuses `checkCandidateVerification` for the released SHA and records the result through `BugReportFeedbackService` inside the running container.
 
 ## Preview and apply the twelve historical report responses
 
@@ -222,7 +149,7 @@ If an original mapping is absent, an optional `imports` entry requires `issueNum
 
 Execution skips any existing triage history and never rewrites a later assessment. It confirms before releasing, uses the normal account/root uniqueness, and confines its durable reconciliation intents to reviewed subjects and exact fix versions. `newMessages` equals this call's committed `insertedTriages` plus `releasedMessages`; concurrent senders are not counted. `errors` lists partial failures. `reconciliation.operations` contains durable operation IDs and any pending proof or notification failures. The four historical fixes supply reviewed concrete summaries. An existing maintainer summary takes precedence and appears in both preview and message. Historical first-included tags are audit metadata, separate from the first verified production version and observation time.
 
-After interruption, rerun preview and the same reviewed input with `--execute`. Successful messages and read state remain unchanged. For a pending notification transaction, run `pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --remote-dir <deploy-dir> --retry-operation OPERATION_ID` on the owner machine, replacing `OPERATION_ID` with the saved ID. This retries only that notification operation. Retained subject/fix fences prevent retries from changing recipients or sending a different fix. Resolve `historical_subject_changed` by reviewing a fresh preview; do not override the fence. No release or deployment needs to be repeated. A fully eligible isolated fixture produces 16 messages and then zero on rerun; real executions report actual skips, including the default missing #1595 explanation.
+After interruption, rerun preview and the same reviewed input with `--execute`. Successful messages and read state remain unchanged. For a pending notification transaction, retry that saved operation ID with the feedback command's `--retry-operation` mode on the owner machine (see [Owner operations](#owner-operations)). This retries only that notification operation. Retained subject/fix fences prevent retries from changing recipients or sending a different fix. Resolve `historical_subject_changed` by reviewing a fresh preview; do not override the fence. No release or deployment needs to be repeated. A fully eligible isolated fixture produces 16 messages and then zero on rerun; real executions report actual skips, including the default missing #1595 explanation.
 
 ## 1. Deploy the Backend
 
@@ -482,7 +409,7 @@ CORS_ORIGIN=https://open-agricola.titanxxh.com
 3. Publish the matching root-path Pages frontend and apply the API environment above through the ordinary backup, target-restore validation and deployment procedure. Keep the previous validated image and configuration available for rollback.
 4. Verify actual HTML, JS/CSS, language-pack and card-manifest bytes from the Pages host against the selected build. Check strict WebKit and Chromium login, reload, browser-profile restart, Workshop, routed WS and retained Room recovery, then logout. Linux WebKit coverage does not replace physical Safari/iPhone acceptance.
 
-Production acceptance must not create formal games or send gameplay commands to retained Rooms. Run game-creation, opening and persistence tests only through the isolated local `pnpm release:rehearse` workflow described in [CI checks](operations/ci-checks.md#发布工具演练与必需浏览器用例).
+Production acceptance must not create formal games or send gameplay commands to retained Rooms. Run game-creation, opening and persistence tests only through the isolated local `pnpm release:rehearse` workflow, an owner procedure described in [Owner operations](#owner-operations).
 
 `pnpm run build:pages-frontend` writes `dist-pages/` with base path `/`, explicit `VITE_API_BASE` and optional `VITE_WS_BASE`. It records `{ format: 1, gameBuildId, basePath }` in `frontend-build.json`; the build identity must match the selected backend. Community cards default to enabled, with an explicit `VITE_ENABLE_COMMUNITY_DECK` override retained; the Workshop sandbox always runs in the browser.
 
@@ -521,11 +448,7 @@ Under **Settings → Secrets and variables → Actions → Variables**, add:
 
 ### Trigger a Deployment
 
-Use the [standard owner-machine release command](#standard-owner-machine-release) to verify the fixed candidate before creating its Release:
-
-```bash
-pnpm release vX.Y.Z --ref main
-```
+Use the [standard owner-machine release](#standard-owner-machine-release) to verify the fixed candidate before creating its Release; the command is in [Owner operations](#owner-operations).
 
 Publishing a Release for a commit containing `.github/workflows/pages-release-request.yml` starts **Pages Release Request**. This workflow only records the request. Its successful completion starts `.github/workflows/deploy-pages-broker.yml` through `workflow_run`; [that event executes the broker from the default branch](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
 
@@ -650,13 +573,7 @@ For this upgrade, use the existing independent verification and deployment entri
     pnpm exec tsx scripts/ci/candidate-verification.ts check --repository titanxxh/open-agricola --sha <full-sha>
     ```
 
-2. Deploy that exact backend candidate from the owner machine. The backend gate does not require a published Release:
-
-    ```bash
-    ./deploy-backend.sh <host> <full-sha> <deploy-dir> \
-      --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
-      --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
-    ```
+2. Deploy that exact backend candidate from the owner machine with the fixed-image [backend delivery](#backend) ([Owner operations](#owner-operations)). The backend gate does not require a published Release.
 
 3. Verify the backend build identity, retained-data checks and health through the existing deployment procedure. Before publishing Pages, confirm that the public API answers this preflight with 204 and allows the capability header. Replace both origin placeholders with the deployed origins:
 
@@ -667,11 +584,7 @@ For this upgrade, use the existing independent verification and deployment entri
       -H 'Access-Control-Request-Headers: X-Open-Agricola-Client-Capabilities'
     ```
 
-4. Publish the same fixed candidate. The standard release command reuses its complete verification and the published Release requests Pages deployment:
-
-    ```bash
-    pnpm release vX.Y.Z --ref <full-sha>
-    ```
+4. Publish the same fixed candidate with the standard release command for that full SHA. It reuses the complete verification, and the published Release requests Pages deployment.
 
 Configure repository variable `PUBLIC_APP_ORIGIN` with the production Pages HTTPS origin, alongside the existing `VITE_API_BASE`. The main broker reads the public `/api/auth/browser-policy` and `/api/health` endpoints before building and again after the deployment job's environment wait. It requires the exact candidate build, current browser protocol and matching configured app/API origins. Requests omit credentials, reject redirects, and bound both response size and time. Public probes cover the observed application; they do not replace owner validation of retained data or every application instance.
 
@@ -679,7 +592,7 @@ Wait for the Pages workflow and verify the served frontend build identity. Autom
 
 ### Backend
 
-Run the standard entry from the clean checkout of trusted image producer `P` on the owner machine. It needs Node.js 24.15+ (excluding25), authenticated `gh`, a local Unix Docker daemon with the classic image store and OCI-index exports, SSH and SCP. The formal host needs Node, Docker Compose, user systemd/cgroup v2, prepared dependencies and a validated PostgreSQL cutover. Application dependencies are not installed there.
+The owner runs the standard entry on the owner machine, bound to a clean checkout of trusted image producer `P`. It needs Node.js 24.15+ (excluding25), authenticated `gh`, a local Unix Docker daemon with the classic image store and OCI-index exports, SSH and SCP. The formal host needs Node, Docker Compose, user systemd/cgroup v2, prepared dependencies and a validated PostgreSQL cutover. Application dependencies are not installed there.
 
 1. Fix eligible merged formal source `F` and complete all of its candidate verification. Request the image on trusted main `P`, then wait for success:
 
@@ -687,13 +600,7 @@ Run the standard entry from the clean checkout of trusted image producer `P` on 
     gh workflow run container-image-build.yml --ref main -f purpose=formal-candidate -f source_sha=<F>
     ```
 
-2. Select the sole receipt artifact ID from that successful run/attempt. Use the existing private GHCR package, an owner-local mode-0600 credential file and a separate mode-0600 resource budget:
-
-    ```bash
-    ./deploy-backend.sh <host> <F> <deploy-dir> \
-      --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
-      --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
-    ```
+2. Select the sole receipt artifact ID from that successful run/attempt and deliver it with the owner entry `deploy-backend.sh`, using the existing private GHCR package, an owner-local mode-0600 credential file and a separate mode-0600 resource budget. The command is an owner procedure; see [Owner operations](#owner-operations).
 
     The budget grants transient intake and empty-proof resources only, independently of image and target authority. The owner selects values against current headroom; this example does not certify host capacity:
 
@@ -715,7 +622,7 @@ Live target validation uses the remaining monotonic maintenance budget, capped a
 
 By default the owner machine validates the cutover (ADR 0045). Before the stop, `deploy-backend.sh` refreshes the newest Owner-local Backup as rsync basis, best effort. The controller then probes the source and target images for `scripts/storage-capabilities.ts`. When the source can export a directory dump and the target can run `check-live --counted`, the pre-deployment backup exports in directory form and publishes `owner-request.json` in the operation directory. The host packages the archive while it waits. The owner machine pulls the capture against that basis, verifies its digests, restores it into throwaway local services and runs the full validation in the candidate's validator image below. It then writes `owner-report.json`. The host seals the backup only when the report binds the request nonce, the source build, the candidate SHA and image, the validator image and platform, and the capture time and dump digest. It then migrates, applies current deletion facts, runs the counted live check and requires its seven counts to equal the report.
 
-The owner machine is aarch64 and cannot run the deployed linux/amd64 image in Docker, so owner-side validation uses a same-source linux/arm64 **validator image** (#1817). From the trusted protected-main checkout, `pnpm exec tsx scripts/release/validator-image.ts build --sha <F>` builds it under the owner-local lock in the recorder's candidate isolation (disposable UID 61000 with its own rootless Docker, no credentials), with the GitHub producer's BuildKit script and only the platform changed. After teardown the owner checks the archive, loads it into local Docker, checks the arm64 identity, source label, channel, hosted frontend and native modules, and writes a private receipt to `~/.local/state/open-agricola/validator-images/<F>-<channel>.json`; `show --sha <F>` re-inspects it. `deploy-backend.sh` reuses or builds it before the export (ADR 0047); without it the release stops before any backend contact and names `--full-maintenance`.
+The owner machine is aarch64 and cannot run the deployed linux/amd64 image in Docker, so owner-side validation uses a same-source linux/arm64 **validator image** (#1817). The owner's validator image tool builds it from the trusted protected-main producer under the owner-local lock in the recorder's candidate isolation (disposable UID 61000 with its own rootless Docker, no credentials), with the GitHub producer's BuildKit script and only the platform changed. After teardown the owner checks the archive, loads it into local Docker, checks the arm64 identity, source label, channel, hosted frontend and native modules, and writes a private receipt to `~/.local/state/open-agricola/validator-images/<F>-<channel>.json`; `show --sha <F>` re-inspects it. `deploy-backend.sh` reuses or builds it before the export (ADR 0047); without it the release stops before any backend contact and names `--full-maintenance`.
 
 A failure report, a mismatched binding or no report within 15 minutes ends the backup before migration, and the unchanged source restarts. A missing capability, `--full-maintenance` or an empty installation keeps host validation; `validation-mode.json` records the choice and reason. If the host process itself dies while waiting, maintenance stays stopped. `backend-image-maintenance.ts restore-source <request> <directory> <F> <P>`, run from the staged policy, takes the maintenance lock and restarts the source only when no live migration began, the image selector still names the source and the source keeps its identity and clean stop.
 
@@ -723,12 +630,7 @@ Only a source that was running at entry, drained cleanly by this operation and r
 
 Owner SSH uses a two-minute keepalive. If the session still ends during maintenance, the backend keeps working and `deploy-backend.sh` follows its status every 30 seconds instead of failing: it reports success only after native acceptance, runs one continuation when the operation becomes `resumable`, and stops with the exact status command on `blocked`/`unknown` or when the backend stays unreachable past the owner deadline.
 
-From the same clean exact producer checkout, inspect an interrupted operation before continuing it:
-
-```bash
-./deploy-backend.sh status <host> <full-candidate-sha> <remote-dir> --operation-id <UUID>
-./deploy-backend.sh resume <host> <full-candidate-sha> <remote-dir> --operation-id <UUID>
-```
+Inspect an interrupted operation with the owner entry's `status` mode before continuing it with `resume`, both bound to the same clean exact producer (see [Owner operations](#owner-operations)).
 
 Status reads the admitted operation without GitHub or registry access and leaves its request, admission and progress unchanged. Its temporary native checkpoint probe uses a read-only database transaction and removes only its own container. Output includes `state`, `phase`, `nextAction` and `validatorExitCode`; an unavailable original process exit remains `null`. An active maintenance lock or validator reports `running` with `wait`.
 
@@ -740,7 +642,7 @@ Successful delivery records `data/deployed-build-id` and the audit evidence `dat
 
 After successful acceptance and backup rotation, maintenance removes only that operation's uploaded `image.tar`. Its request, import/source receipts and resolved maintenance Compose remain private audit records. Earlier failures preserve the archive for diagnosis. If unlinking the archive fails after acceptance, the command reports that cleanup failure and leaves the accepted app running; it never recursively deletes the operation directory.
 
-For a new installation only, prepare dependencies and connection configuration separately, leaving the application database and object namespace empty. The cutover marker records that independent preparation; it does not replace the required empty-storage proof. Do not run the legacy `check-live` step first. Preload an owner-selected immutable Caddy digest on the host during that separate preparation, then add the same digest to the owner delivery command:
+For a new installation only, prepare dependencies and connection configuration separately, leaving the application database and object namespace empty. The cutover marker records that independent preparation; it does not replace the required empty-storage proof. Do not run the legacy `check-live` step first. Preload an owner-selected immutable Caddy digest on the host during that separate preparation, then pass the same digest to the owner delivery command as `--bootstrap-caddy-image`:
 
 ```bash
 # After independent dependency/connection preparation, without app migrations:
@@ -748,8 +650,6 @@ mkdir -p data
 touch data/postgres-cutover.validated
 # Preload an explicitly chosen Linux AMD64 Caddy digest.
 docker pull --platform linux/amd64 caddy@sha256:<approved-manifest-sha256>
-# On the owner machine, add to the fixed-image command above:
-# --bootstrap-caddy-image caddy@sha256:<approved-manifest-sha256>
 ```
 
 The default is an existing-deployment upgrade. Explicit bootstrap requires no app/Caddy containers or retained project volumes, prior image selectors, deployment records, backup/ledger or legacy local data. Under the same maintenance lock, the fixed target image's `check-empty` command queries PostgreSQL relations across all non-system schemas and lists the S3 namespace with no writes. The application S3 identity needs listing permission; unknown responses, permission errors, any database relation or object including an empty deletion ledger reject bootstrap. Older targets without this command also reject it. The proof uses one directly created read-only container with only the dependency network and selected private data environment, the existing transient resource caps and temporary memory storage. It mounts no host or project volumes and is removed by its returned container ID even on failure. No `docker compose run` occurs before the empty proof, so a transient proof failure cannot create a retained project volume. Caddy's preloaded digest, native image ID and Linux AMD64 platform are checked without a pull or build. The equivalent official `caddy@sha256:...` and `docker.io/library/caddy@sha256:...` spellings are accepted only for the same digest; another registry or repository is rejected. Only a successful empty proof permits existing `check-live` initialization and target validation, followed by exact app/Caddy identity checks and atomic selector publication. A failed bootstrap stays closed and drains newly started services. Existing-data upgrades still require source capture and target restore validation; missing containers never authorize treating retained data as new. Recovery after a failed initialization requires an explicit existing-data recovery plan, not an automatic bootstrap retry.
@@ -969,19 +869,7 @@ Offsite ledger synchronization reads the remote copy, merges it into the current
 
 #### Owner-local backup
 
-The owner machine keeps its own copies under `~/oa-backup/<UTC capture time>/` (ADR 0045). The host's daily backup, its validation and offsite sync are unchanged.
-
-```bash
-node --import tsx scripts/owner-backup.ts run --host <host>   # pull, validate, prune
-node --import tsx scripts/owner-backup.ts validate --snapshot ~/oa-backup/<stamp>
-node --import tsx scripts/owner-backup.ts prune
-```
-
-`run` asks the host's `scripts/owner-sync-capture.sh capture` for one online, snapshot-consistent capture under the maintenance lock. The capture uses the running image, a directory-format uncompressed dump, the objects and the current deletion ledger, and contains no configuration. The owner machine pulls it with rsync, using the previous copy as basis, verifies every digest and then has the host release it. The host keeps at most one owner capture; the next capture supersedes a stale one and daily pruning removes one older than 30 days. A lock held by the daily backup is retried three times, ten minutes apart.
-
-Validation restores the copy into throwaway PostgreSQL and RustFS containers on an internal Docker network, merges the copied ledger and runs `storage-archive-cli.ts validate` in the validator image of the build the host was running, with every CPU; it reuses or builds that image, and without it writes no report. The report is written to `validation.json`. Copies older than 30 days are deleted, the newest included. A copy restores through the procedure below, with its `capture/` directory as the archive.
-
-The capture needs a running image and host checkout that include `owner-sync-capture.sh`; with an older image the dump stays custom-format, which validates but transfers in full. Install the daily timer from `deploy/owner-backup/` as its header describes; it runs once a day at the time set in its unit and catches up after the machine was off.
+The owner machine keeps its own copies of online captures (ADR 0045); the host's daily backup, its validation and offsite sync are unchanged. The host side is `scripts/owner-sync-capture.sh capture`: an online, snapshot-consistent capture under the maintenance lock, using the running image, a directory-format dump, the objects and the current deletion ledger, with no configuration. The host keeps at most one owner capture. A copy restores through the procedure below, with its `capture/` directory as the archive. The owner procedures now live in the private repository; see [Owner operations](#owner-operations).
 
 #### Restore or switch to external services
 
@@ -1080,18 +968,7 @@ When `VITE_API_BASE` is unset, it defaults to the empty string for same-origin u
 
 The header has separate WeChat and Feishu buttons. Each dialog opening reads its own image from `/api/community/wechat-qr` or `/api/community/feishu-qr` on the API origin. Initial installation requires the application code and the read-only `data/community` mount in `docker-compose.prod.yml`. Later image changes need no Release, Pages rebuild, game image build, application restart or operations redeployment.
 
-Use the owner-controlled maintenance entry from a checkout with dependencies installed:
-
-```bash
-./deploy-operations.sh --wechat-qr <host> /absolute/path/wechat-group.png
-./deploy-operations.sh --feishu-qr <host> /absolute/path/feishu-group.png
-# Custom game directory:
-./deploy-operations.sh --feishu-qr <host> /absolute/path/feishu-group.jpg <deploy-dir>
-# Local application, using its COMMUNITY_DATA_DIR or SHARED_DATA_DIR/community:
-./deploy-operations.sh --feishu-qr --local /absolute/path/feishu-group.png /absolute/path/data/community
-```
-
-Both flags use `operations/update-community-qr.mjs` to validate a PNG or JPEG, preserve the original bytes and update `<game-dir>/data/community/wechat-qr` or `feishu-qr` over SSH. The files and replacement locks are separate, so updating one group does not replace the other. Images must be at most 5 MiB and 200–4096 pixels on each side. The local checkout requires `pnpm install --frozen-lockfile` for the existing image decoder; the remote host uses Bash, `flock`, `sha256sum` and normal filesystem permissions. The deployment account must own the community directory, as it does the other game data. The remote command verifies the transfer checksum before atomically renaming the file; validation or interrupted-transfer failures preserve the previous image. Successful output includes `wechatQrSha256` or `feishuQrSha256`, width and height. Repeating the matching command with an earlier image restores that group's previous image.
+The owner updates an image with the maintenance entry `deploy-operations.sh --wechat-qr|--feishu-qr`, remotely or for a local application's community directory; see [Owner operations](#owner-operations). Both flags use `operations/update-community-qr.mjs` to validate a PNG or JPEG, preserve the original bytes and update `<game-dir>/data/community/wechat-qr` or `feishu-qr` over SSH. The files and replacement locks are separate, so updating one group does not replace the other. Images must be at most 5 MiB and 200–4096 pixels on each side. The local checkout requires `pnpm install --frozen-lockfile` for the existing image decoder; the remote host uses Bash, `flock`, `sha256sum` and normal filesystem permissions. The deployment account must own the community directory, as it does the other game data. The remote command verifies the transfer checksum before atomically renaming the file; validation or interrupted-transfer failures preserve the previous image. Successful output includes `wechatQrSha256` or `feishuQrSha256`, width and height. Repeating the matching command with an earlier image restores that group's previous image.
 
 The public endpoints permit only GET/HEAD and return `Cache-Control: no-store`, including on errors. Missing images return 404, unreadable images return 503, and the dialog offers a retry. Each dialog opening also uses a fresh request URL. There is no public upload endpoint. Keep `data/community` when updating the application, and retain a copy of each latest original image for recovery; database/S3 archive backups do not include this host directory. For a local application, `restart-local.sh` defaults `COMMUNITY_DATA_DIR` to `$SHARED_DATA_DIR/community`.
 
@@ -1117,13 +994,7 @@ The header's What's New button lists the five newest player-facing releases from
 
 List releases newest first; dates may not increase down the list. `version` is a unique label of at most 32 characters. Each release has 1–30 notes. Each note maps language ids such as `zh` and `en` to one line of at most 500 characters. The dialog shows the viewer's language, then English, then the first language written. The file may keep up to 200 releases and 256 KiB; only the first five are served.
 
-```bash
-./deploy-operations.sh --whats-new <host> /absolute/path/whats-new.json [game-dir]
-# Local application, using its COMMUNITY_DATA_DIR or SHARED_DATA_DIR/community:
-./deploy-operations.sh --whats-new --local /absolute/path/whats-new.json /absolute/path/data/community
-```
-
-`scripts/update-whats-new.ts` validates the file with the server's parser before upload, then uses the same checksum-verified atomic replacement as the QR images. An invalid file is rejected with the offending field, such as `releases[1].date`, and the live notes stay unchanged. Successful output includes `whatsNewSha256`, the release count and the latest version. Keep the source file; republishing an earlier copy restores the earlier notes.
+The owner publishes the file with `deploy-operations.sh --whats-new`, remotely or for a local application; see [Owner operations](#owner-operations). `scripts/update-whats-new.ts` validates the file with the server's parser before upload, then uses the same checksum-verified atomic replacement as the QR images. An invalid file is rejected with the offending field, such as `releases[1].date`, and the live notes stay unchanged. Successful output includes `whatsNewSha256`, the release count and the latest version. Keep the source file; republishing an earlier copy restores the earlier notes.
 
 The endpoint permits only GET/HEAD and returns `Cache-Control: no-store`. A missing file returns 404 and an invalid hand-edited file returns 503; the button stays hidden in both cases. The browser loads the notes once per page load. A red dot marks releases above the last one the viewer opened, which is stored per browser; on a first visit only the newest release counts as unread.
 
@@ -1139,13 +1010,7 @@ Local monitoring checks that a host-network container can reach a temporary host
 
 `./restart-local.sh` starts the backend first, waits for its listener after database initialization, and then provisions and starts local Prometheus, Grafana, Node Exporter and the accounts exporter. Use `--instances 2` for both application slots. Grafana uses the selected local backend bind address (including `--intranet`), independently of any production `PUBLIC_API_BASE` in `.env`; Prometheus scrapes that bind address and monitoring ports remain loopback-only. Linked worktrees explicitly pass the shared data directory to monitoring startup, retaining the main checkout's observations. Local monitoring provisions the same restricted login; its password is kept in `data/observability/accounts-password` with mode 0600, and the owner URL is passed only to the one-shot provisioner. Local monitoring listeners bind **127.0.0.1 only**: Prometheus 19090, Grafana 13000 and Node Exporter 19100, and accounts exporter 19201. `OBSERVABILITY_ENABLED=false ./restart-local.sh` skips their startup; it does not delete observations. Runtime secrets/configuration and persistent TSDB/Grafana data live in the main checkout's ignored `data/observability/`. The metrics bearer secret is generated in `data/local-services.env`, copied mode 0600, and never sent to browsers.
 
-Production monitoring has its own Compose project and owner-controlled deployment entry:
-
-```bash
-./deploy-operations.sh <ssh-host> [ref] [operations-dir] [game-dir]
-```
-
-Defaults are the owner's deployment (`<host>`, `main`, `<operations-dir>`, `<deploy-dir>`). The command publishes only the pinned commit's `operations/` directory, builds the small accounts exporter, and starts Prometheus, Grafana, Node Exporter and that exporter. It creates no GitHub Release, builds no game image, runs no game migration and does not stop the application. Each deployment checks that the application container ID, image and start time remain unchanged. `deploy-backend.sh` manages only app/Caddy and skips monitoring configuration generation.
+Production monitoring has its own Compose project and owner-controlled deployment entry, `deploy-operations.sh`; its procedure is in [Owner operations](#owner-operations). The command publishes only the pinned commit's `operations/` directory, builds the small accounts exporter, and starts Prometheus, Grafana, Node Exporter and that exporter. It creates no GitHub Release, builds no game image, runs no game migration and does not stop the application. Each deployment checks that the application container ID, image and start time remain unchanged. `deploy-backend.sh` manages only app/Caddy and skips monitoring configuration generation.
 
 The first operations deployment stops the legacy monitoring containers before reusing their TSDB and Grafana directories. It retains the metrics secret and all observations, and restarts the legacy containers if startup fails. Later failures restore the previous operations release. Versioned source and private per-release configuration live under `<operations-dir>/releases/<sha>/`; `deployed-build-id` records only a successful deployment. To roll back, run the same command with an earlier aggregate-capable operations commit. Raw-query exporters cannot collect after this permission upgrade. A failed monitoring cutover retains aggregate-only database permissions; recover with a release that supports the aggregate functions. Run this first independent deployment before the next game deployment, whose orphan cleanup removes legacy monitoring containers. Keep the persistent `data/observability/{prometheus,grafana}` directories when removing old containers.
 
