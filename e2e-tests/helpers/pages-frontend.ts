@@ -50,6 +50,9 @@ export function buildPagesFrontend(apiOrigin = PAGES_API_ORIGIN): PagesBuild {
   cpSync(base.directory, directory, { recursive: true })
   const replacements: [string, string][] = [[base.apiOrigin, origin], [socketOrigin(base.apiOrigin), socketOrigin(origin)]]
   let replaced = 0
+  // The Pages Worker embeds each hashed file's SHA-256, so rewritten files keep matching digests in `sw.js`.
+  const digests: [string, string][] = []
+  const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
   const rewrite = (folder: string) => {
     for (const name of readdirSync(folder, { withFileTypes: true })) {
       const path = join(folder, name.name)
@@ -60,11 +63,18 @@ export function buildPagesFrontend(apiOrigin = PAGES_API_ORIGIN): PagesBuild {
       for (const [from, to] of replacements) next = next.replaceAll(from, to)
       if (next === text) continue
       writeFileSync(path, next)
+      digests.push([sha256(text), sha256(next)])
       replaced++
     }
   }
   rewrite(directory)
   if (!replaced) throw new Error(`The Pages build does not contain its API origin ${base.apiOrigin}`)
+  const worker = join(directory, 'sw.js')
+  if (existsSync(worker)) {
+    let source = readFileSync(worker, 'utf8')
+    for (const [from, to] of digests) source = source.replaceAll(from, to)
+    writeFileSync(worker, source)
+  }
   const artifact = { directory, gameBuildId: base.gameBuildId, apiOrigin: origin }
   builds.set(origin, artifact)
   return artifact

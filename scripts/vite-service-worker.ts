@@ -1,12 +1,14 @@
 import path from 'node:path'
-import { readFileSync } from 'node:fs'
-import { build, type Plugin } from 'vite'
+import { createHash } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
+import { build, type Plugin, type Rolldown } from 'vite'
 import { parseLanguageManifest, parseLanguagePack } from '../shared/i18n/index.ts'
 import { browserBoundaryPlugin } from './browser-boundary-plugin.ts'
 import { buildOfflineEncyclopedia } from './card-encyclopedia/offline-artifacts.ts'
 import type { PublicAssetConfig } from './public-assets.ts'
 
 export const PUBLIC_ASSET_CACHE_ENABLED = true
+export const APP_SHELL_CACHE_ENABLED = true
 export const ROOM_OFFLINE_RETRY_ENABLED = true
 export const OFFLINE_ENCYCLOPEDIA_ENABLED = true
 export const SERVICE_WORKER_EMERGENCY_TAKEOVER = false
@@ -18,6 +20,8 @@ const virtualId = `\0${virtualEntry}`
 
 type WorkerFeatures = {
   assets: boolean
+  /** This build's content-addressed files and their SHA-256; omitted to leave them to the HTTP cache. */
+  appShell?: Readonly<Record<string, string>>
   roomOffline: boolean
   offlineEncyclopedia: boolean
   emergencyTakeover: boolean
@@ -40,11 +44,13 @@ function roomOfflineCopy(locale: 'en' | 'zh') {
 }
 
 export function serviceWorkerPlugin(config: PublicAssetConfig): Plugin {
+  let encyclopediaFallback = ''
   return {
     name: 'main-site-service-worker',
     apply: 'build',
+    enforce: 'post',
     async buildStart() {
-      let encyclopediaFallback = ''
+      encyclopediaFallback = ''
       if (OFFLINE_ENCYCLOPEDIA_ENABLED) {
         const { packs } = buildOfflineEncyclopedia(root)
         const directory = path.join(root, 'output/offline-encyclopedia')
@@ -56,16 +62,42 @@ export function serviceWorkerPlugin(config: PublicAssetConfig): Plugin {
           this.emitFile({ type: 'asset', fileName: `offline-encyclopedia/${name}`, source })
         }
       }
-
+    },
+    // The Worker lists the finished bundle's hashed files, so it is built after every plugin has rewritten them.
+    generateBundle: { order: 'post', async handler(_options, bundle) {
       const source = await buildServiceWorker(config, encyclopediaFallback, {
         assets: PUBLIC_ASSET_CACHE_ENABLED,
+        appShell: APP_SHELL_CACHE_ENABLED ? appShellDigests(bundle, path.join(root, 'public')) : undefined,
         roomOffline: ROOM_OFFLINE_RETRY_ENABLED,
         offlineEncyclopedia: OFFLINE_ENCYCLOPEDIA_ENABLED,
         emergencyTakeover: SERVICE_WORKER_EMERGENCY_TAKEOVER,
       })
       this.emitFile({ type: 'asset', fileName, source })
-    },
+    } },
   }
+}
+
+const sha256 = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+/**
+ * Bundled `assets/*` files carry a content hash in their names, and so do the published language packs and the
+ * cards manifest copied from `public/`. Unhashed public files (`i18n/manifest.json`, `cards-manifest.json`) are
+ * left out because their bytes change under the same name.
+ */
+export function appShellDigests(bundle: Rolldown.OutputBundle, publicDir: string): Record<string, string> {
+  const digests: Record<string, string> = {}
+  for (const output of Object.values(bundle)) {
+    if (!output.fileName.startsWith('assets/')) continue
+    digests[output.fileName] = sha256(output.type === 'chunk' ? output.code : output.source)
+  }
+  const add = (relative: string) => { digests[relative] = sha256(readFileSync(path.join(publicDir, relative))) }
+  for (const name of readdirSync(path.join(publicDir, 'i18n'))) {
+    if (/^[a-z0-9-]+\.[a-f0-9]{16}\.json$/.test(name)) add(`i18n/${name}`)
+  }
+  for (const name of readdirSync(publicDir)) {
+    if (/^cards-manifest\.[a-f0-9]{64}\.json$/.test(name)) add(name)
+  }
+  return digests
 }
 
 export async function buildServiceWorker(config: AssetWorkerConfig, encyclopediaFallback: string, features: WorkerFeatures) {
@@ -112,6 +144,9 @@ function workerSource(config: AssetWorkerConfig, encyclopediaFallback: string, f
   if (features.assets) {
     const { baseUrl, digests } = config
     add('installPublicAssetWorker', 'public-assets/cache.worker.ts', { baseUrl, digests })
+  }
+  if (features.appShell) {
+    add('installAppShellCache', 'service-worker/app-shell.worker.ts', features.appShell)
   }
   if (features.roomOffline) {
     add('installRoomOffline', 'service-worker/room-offline.worker.ts', { en: roomOfflineCopy('en'), zh: roomOfflineCopy('zh') })

@@ -808,6 +808,8 @@ The stable Pages build reads `asset-digests.json` from the same asset publicatio
 
 Cache hits reuse verified assets by URL and SHA-256 across app builds. A miss revalidates through credentialless CORS. The page can use mismatched bytes but the Worker leaves them out of its cache. Normal activation waits for controlled pages to close and removes obsolete entries from its own cache.
 
+The same Worker serves the app's content-addressed files cache-first: bundled `assets/*`, the hashed language packs and `cards-manifest.<sha256>.json`. The build embeds each file's SHA-256, and only matching 200 responses are stored. The document, `/sw.js`, unhashed manifests and the API always use the network, so a release still switches clients through the new `index.html`. Activation drops entries the new build does not list.
+
 ### Pause a Service Worker feature
 
 Edit the individual switch in `scripts/vite-service-worker.ts` and publish a stable Pages candidate through the normal release gates.
@@ -815,6 +817,7 @@ Edit the individual switch in `scripts/vite-service-worker.ts` and publish a sta
 | Switch | Effect when disabled |
 |---|---|
 | `PUBLIC_ASSET_CACHE_ENABLED` | Images and fonts use ordinary HTTP requests. |
+| `APP_SHELL_CACHE_ENABLED` | Hashed scripts, styles, language packs and the cards manifest use the HTTP cache. |
 | `ROOM_OFFLINE_RETRY_ENABLED` | Room document requests use ordinary browser navigation. |
 | `OFFLINE_ENCYCLOPEDIA_ENABLED` | Pages hides downloads and pauses offline reading. Saved copies stay in the browser. |
 
