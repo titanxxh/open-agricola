@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { cpSync, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { cpSync, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { allocateTestPort } from './test-ports.ts'
-import { HOSTED_FRONTEND_SOURCE, hostedFrontendCommand, laneArguments, laneCount, MAX_LANES } from './verify-lanes.ts'
+import { HOSTED_FRONTEND_SOURCE, hostedFrontendCommand, PAGES_FRONTEND_CACHE, laneArguments, laneCount, MAX_LANES } from './verify-lanes.ts'
 import { caseKey, readBrowserRunRequest, readBrowserRunResult, requirementsArgument } from './verification-requirements.ts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -173,6 +173,7 @@ async function main() {
   const update = () => save(summaryPath, summary)
   update()
   const env = { ...process.env }
+  const pagesCache = join(root, 'output/verification/pages-frontend', runId)
   for (const key of ['BACKEND_PORT', 'FRONTEND_PORT', 'APP_BASE_PORT', 'FRONTEND_URL', 'BACKEND_URL', 'SHARED_DATA_DIR',
     'LOCAL_ENV_FILE', 'OWNED_PROCESSES_FILE', 'REPLAY_VIEWER_ROOT', 'OPEN_AGRICOLA_VERIFICATION_RUN']) delete env[key]
   try {
@@ -201,6 +202,8 @@ async function main() {
     const marked = await command('pnpm', ['exec', 'tsx', 'scripts/verify-lanes.ts', 'write-marker'], root, env, join(output, 'hosted-frontend.log'), 'build')
     if (marked.exitCode !== 0) throw new Error('Hosted frontend build marker failed; see hosted-frontend.log')
     env[HOSTED_FRONTEND_SOURCE] = root
+    // The first lane that needs the Pages artifact builds it here under a lock and the others reuse it (#1955).
+    env[PAGES_FRONTEND_CACHE] = pagesCache
     const taken = new Set()
     for (let index = 1; index <= laneArgs.length; index++) {
       if (interrupted) throw new Error(`Interrupted by ${interrupted}`)
@@ -262,6 +265,7 @@ async function main() {
     }
   } catch (error) { summary.status = 'failed'; summary.errors.push(error.message) }
   finally {
+    rmSync(pagesCache, { recursive: true, force: true })
     summary.interrupted = interrupted
     summary.completedAt = new Date().toISOString()
     update()
