@@ -26,6 +26,16 @@ describe('independent language packages', () => {
     expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/i18n/manifest.json', `/i18n/${manifest.languages[0].file}`])
   })
 
+  it('uses the language list carried by the build and requests only the pack', async () => {
+    vi.stubEnv('VITE_LANGUAGE_MANIFEST', JSON.stringify(manifest))
+    const fetch = vi.fn(async () => new Response(raw))
+    vi.stubGlobal('fetch', fetch)
+    const { loadLanguagePack, getLanguageManifest } = await import('../language-pack')
+    await loadLanguagePack('fr')
+    expect(getLanguageManifest()?.defaultLocale).toBe('fr')
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([`/i18n/${manifest.languages[0].file}`])
+  })
+
   it('rejects a corrupt package and permits a successful retry', async () => {
     let corrupt = true
     vi.stubGlobal('fetch', vi.fn(async (url: string) => url.endsWith('manifest.json')

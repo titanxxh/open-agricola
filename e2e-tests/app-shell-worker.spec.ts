@@ -1,5 +1,6 @@
 // @covers client/service-worker/app-shell.worker.ts
 // @covers scripts/vite-service-worker.ts
+// @covers scripts/browser-data.ts client/services/language-pack.ts
 import { expect, test, type Page } from '@playwright/test'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -86,6 +87,8 @@ const STORE_TIMEOUT = { timeout: 30_000 }
 
 test('a repeat visit loads the hashed app shell and startup data from the Worker @webkit', async ({ page }) => {
   await controlledEncyclopedia(page)
+  // The build carries the language list, so startup goes straight to the pack.
+  expect(requests).not.toContain('/i18n/manifest.json')
   const shell = [...new Set(requests.filter(path => path.startsWith('/assets/') && /\.(js|css)$/.test(path)))]
   expect(shell.length).toBeGreaterThan(0)
   expect(startupData()).toHaveLength(2)
@@ -94,8 +97,9 @@ test('a repeat visit loads the hashed app shell and startup data from the Worker
   requests.length = 0
   await page.reload(documentLoad)
   await encyclopediaReady(page)
-  // The document and the unhashed language manifest still come from the origin; hashed files do not.
+  // The document still comes from the origin; hashed files and the language list do not.
   expect(requests).toContain('/')
+  expect(requests).not.toContain('/i18n/manifest.json')
   expect(requests.filter(path => path.startsWith('/assets/') && /\.(js|css)$/.test(path))).toEqual([])
   expect(requests.filter(path => STARTUP_DATA.test(path))).toEqual([])
 })

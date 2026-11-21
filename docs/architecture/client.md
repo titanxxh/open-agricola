@@ -29,7 +29,7 @@ Harvest needs use server `harvestRequirements`. UI: `harvest-requirements.spec.t
 
 Bootstrap loads App, PageRouter and the selected language in parallel. Public Game Context routing sits outside auth. `AuthProvider`, login and recovery do not wait for `CardMetadataBoundary`, which gates synchronous lookups in the encyclopedia and signed-in app. Tests: `application-loading.spec.ts`, `application-bootstrap.test.ts`, `hosted-password-login.spec.ts`.
 
-`scripts/browser-data.ts` supplies card identity to main and new Replay builds. The loader verifies SHA-256-named metadata and language packs before use. Cached errors or bad hashes allow one fresh request. Development metadata and locale discovery revalidate. The brand build emits Vite content filenames. Tests: card-meta, language-pack, browser-data and `BrandMark.test.tsx`.
+`scripts/browser-data.ts` supplies card identity to main and new Replay builds. The loader verifies SHA-256-named metadata and language packs before use. Cached errors or bad hashes allow one fresh request. Builds embed the locale list; dev metadata revalidates. The brand build emits Vite content filenames. Tests: card-meta, language-pack, browser-data and `BrandMark.test.tsx`.
 
 Stable Pages `/sw.js` verifies public assets, caches the hashed app shell, offers offline room retry, reads the saved encyclopedia from IndexedDB, and routes notification clicks. `InboxProvider` marks the authorized message read after display. [Worker operations](../HOW_TO_DEPLOY.md#pause-a-service-worker-feature)
 
