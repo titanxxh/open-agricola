@@ -8,12 +8,14 @@ afterEach(() => {
 
 describe('stale chunk recovery', () => {
   it('reloads once and lets a repeated preload error reach the error boundary', () => {
+    const listeners = new Map<string, EventListener>()
     let listener: EventListener | undefined
     const values = new Map<string, string>()
     const reload = vi.fn()
     vi.spyOn(Date, 'now').mockReturnValue(100_000)
     vi.stubGlobal('window', {
       addEventListener: vi.fn((type: string, next: EventListener) => {
+        listeners.set(type, next)
         if (type === 'vite:preloadError') listener = next
       }),
       location: { reload },
@@ -33,6 +35,29 @@ describe('stale chunk recovery', () => {
     const second = new Event('vite:preloadError', { cancelable: true })
     listener?.(second)
     expect(second.defaultPrevented).toBe(false)
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+  it('leaves loads cancelled by an outgoing navigation alone', () => {
+    const listeners = new Map<string, EventListener>()
+    const reload = vi.fn()
+    vi.stubGlobal('window', {
+      addEventListener: vi.fn((type: string, next: EventListener) => { listeners.set(type, next) }),
+      location: { reload },
+      sessionStorage: { getItem: () => null, setItem: vi.fn() },
+    })
+
+    installStaleChunkRecovery()
+    listeners.get('beforeunload')?.(new Event('beforeunload'))
+    const cancelled = new Event('vite:preloadError', { cancelable: true })
+    listeners.get('vite:preloadError')?.(cancelled)
+    expect(cancelled.defaultPrevented).toBe(false)
+    expect(reload).not.toHaveBeenCalled()
+
+    // A page restored from the back/forward cache recovers again.
+    listeners.get('pageshow')?.(new Event('pageshow'))
+    const stale = new Event('vite:preloadError', { cancelable: true })
+    listeners.get('vite:preloadError')?.(stale)
+    expect(stale.defaultPrevented).toBe(true)
     expect(reload).toHaveBeenCalledTimes(1)
   })
 })
