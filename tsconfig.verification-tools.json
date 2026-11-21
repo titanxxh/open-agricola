@@ -40,7 +40,8 @@
     "scripts/__tests__/hosted-release-app.test.ts",
     "scripts/__tests__/release-*.test.ts",
     "scripts/__tests__/live-smoke*.test.ts",
-    "scripts/__tests__/verify-feedback-deployment.test.ts",
+    "scripts/__tests__/verify-feedback-deployment*.test.ts",
+    "scripts/__tests__/docker-compose-prod-binding.test.ts",
     "server/__tests__/bug-report-historical-feedback.test.ts",
     "e2e-tests/bug-report-admin.spec.ts",
     "server/__tests__/bug-report-historical-deletion.test.ts"

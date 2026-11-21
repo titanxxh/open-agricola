@@ -15,6 +15,7 @@ import {
   FAST_TESTS_INCLUDE,
   SLOW_INCLUDE,
   SLOW_SCRIPTS_INCLUDE,
+  TOOLING_INCLUDE,
 } from './scripts/test-project-globs.ts'
 
 await prepareLanguagePacks()
@@ -142,9 +143,21 @@ export default mergeConfig(
         {
           extends: true,
           test: {
-            // Heavy CLI tooling tests moved out of fast-scripts (see SLOW_SCRIPTS_INCLUDE); same budget and setup.
+            // PostgreSQL-heavy storage tests moved out of fast-scripts (see SLOW_SCRIPTS_INCLUDE); same budget and setup.
             name: 'slow-scripts',
             include: SLOW_SCRIPTS_INCLUDE,
+            exclude: BASE_EXCLUDE,
+            testTimeout: 30_000,
+            setupFiles: ['./tests/setup-language-packs.ts', ],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            // Release, deployment, CI-planning and local-development tooling tests, outside release verification
+            // (see TOOLING_INCLUDE; run with `pnpm test:tooling`). Same budget and setup as fast-scripts.
+            name: 'tooling',
+            include: TOOLING_INCLUDE,
             exclude: BASE_EXCLUDE,
             testTimeout: 30_000,
             setupFiles: ['./tests/setup-language-packs.ts', ],

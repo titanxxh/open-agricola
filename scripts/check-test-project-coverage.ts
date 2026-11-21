@@ -45,7 +45,7 @@ const duplicates = [...byProject.entries()]
   .sort(([a], [b]) => a.localeCompare(b))
 
 if (missing.length === 0 && extra.length === 0 && duplicates.length === 0) {
-  console.log(`[check:test-project-coverage] ok (${discovered.size} test files across fast and slow)`)
+  console.log(`[check:test-project-coverage] ok (${discovered.size} test files across all Vitest projects)`)
   process.exit(0)
 }
 
