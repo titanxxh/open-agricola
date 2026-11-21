@@ -1,154 +1,19 @@
 // @covers scripts/release/verify-feedback-deployment.ts server/bug-report/feedback-owner-cli.ts
-import { execFileSync, spawn } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { createHash } from 'node:crypto'
-import { createServer, type Server } from 'node:http'
-import { delimiter, join, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
-import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
-import { reusableTempRoots } from './_helpers/reusable-temp-roots'
-import { stableConfiguration } from '../ci/candidate-verification'
-import { canonicalOwnerLocalCommands, type OwnerLocalReceipt } from '../ci/owner-local-verification'
-import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
-import { createTestDatabase, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
+import { FULL_TASK_IDS } from '../ci/verification-tasks'
+import { disposeFeedbackDeploymentFixtures, feedbackDeploymentFixture, ownerLocalFeedbackDeploymentFixture,
+  resetFeedbackDeploymentFixtures, type FeedbackDeploymentState } from './_helpers/feedback-deployment-fixture'
 
-const repository = resolve(import.meta.dirname, '../..')
-const roots = reusableTempRoots('oa-feedback-deploy-'), servers: Server[] = []
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map(server => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))))
-  roots.reset()
-})
-afterAll(() => roots.dispose())
-
-type State = { sha: string; configuration: string; evidence: string; provenance: Record<string, unknown>;
-  release: { tag_name: string; html_url: string; draft: boolean; prerelease: boolean; published_at: string };
-  tag: string; backendSha: string; frontendSha: string; running: boolean; ready: boolean; notification: 'completed' | 'pending' | 'offline';
-  frontendStatus: number; frontendBody?: string; frontendBase: string; tagAfterRead?: string }
-
-async function fixture() {
-  const root = roots.create()
-  for (const directory of ['scripts/ci', 'scripts/release', 'server/bug-report', 'shared/contract', '.github/workflows', 'e2e-tests', 'bin']) mkdirSync(join(root, directory), { recursive: true })
-  cpSync(join(repository, 'scripts/ci'), join(root, 'scripts/ci'), { recursive: true })
-  cpSync(join(repository, 'scripts/release'), join(root, 'scripts/release'), { recursive: true })
-  cpSync(join(repository, 'server/bug-report/deployment-proof.ts'), join(root, 'server/bug-report/deployment-proof.ts'))
-  cpSync(join(repository, 'shared/contract/bug-report-feedback.ts'), join(root, 'shared/contract/bug-report-feedback.ts'))
-  cpSync(join(repository, '.github/workflows/candidate-verification.yml'), join(root, '.github/workflows/candidate-verification.yml'))
-  writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { 'check:architecture': 'pnpm run lint' } }))
-  writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
-  writeFileSync(join(root, 'e2e-tests', 'fixture.spec.ts'), '// fixture\n')
-  writeFileSync(join(root, '.gitignore'), 'bin/\nstate.json\nevents.jsonl\nreceipt.json\n')
-  const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-  git('init', '-b', 'main'); git('config', 'user.name', 'Feedback test'); git('config', 'user.email', 'feedback@example.test')
-  git('config', `url.file://${join(root, 'unavailable-origin')}.insteadOf`, 'https://github.com/titanxxh/open-agricola.git')
-  git('add', '--all', '--', '.', ':(exclude)docs/superpowers/**'); git('commit', '-m', 'fix fixture')
-  const fixSha = git('rev-parse', 'HEAD')
-  git('commit', '--allow-empty', '-m', 'production fixture')
-  const sha = git('rev-parse', 'HEAD')
-  const state: State = { sha, configuration: '', evidence: 'passed', provenance: finalSnapshotMetadata(sha),
-    release: { tag_name: 'v9.9.9', html_url: 'https://github.com/titanxxh/open-agricola/releases/tag/v9.9.9', draft: false, prerelease: false, published_at: '2026-10-30T00:00:00Z' },
-    tag: sha, backendSha: sha, frontendSha: sha, running: true, ready: true, notification: 'completed', frontendStatus: 200, frontendBase: '/' }
-  const save = () => writeFileSync(join(root, 'state.json'), JSON.stringify(state))
-  save()
-  const eventFile = join(root, 'events.jsonl')
-  const env: NodeJS.ProcessEnv = { ...process.env, CI: '', GITHUB_ACTIONS: '', GITHUB_SHA: '', GITHUB_OUTPUT: '',
-    PATH: [join(root, 'bin'), join(repository, 'node_modules/.bin'), process.env.PATH].join(delimiter), FEEDBACK_TEST_ROOT: root }
-  const invoke = (script: string, args: string[]) => new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
-    const child = spawn(join(repository, 'node_modules/.bin/tsx'), [join(root, script), ...args], { cwd: root, env })
-    let stdout = '', stderr = ''
-    child.stdout.on('data', data => { stdout += data }); child.stderr.on('data', data => { stderr += data })
-    child.on('error', reject); child.on('close', status => resolve({ status, stdout, stderr }))
-  })
-  state.configuration = stableConfiguration(root, sha, sha); save()
-  const prefix = `#!${process.execPath}
-const fs = require('node:fs'); const path = require('node:path'); const root = process.env.FEEDBACK_TEST_ROOT;
-const state = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8')); const args = process.argv.slice(2);
-const event = value => fs.appendFileSync(path.join(root, 'events.jsonl'), JSON.stringify(value) + '\\n');
-const output = value => process.stdout.write(JSON.stringify(value) + '\\n');
-`
-  writeFileSync(join(root, 'bin/gh'), prefix + `
-if(args[0] !== 'api' || args.includes('POST')) throw Error('Unexpected GitHub write');
-const endpoint = args[1].replace('repos/titanxxh/open-agricola/', ''); event({ kind: 'github', endpoint });
-const tasks = ['quality','fast','slow','build','chromium-1','chromium-2','chromium-3','chromium-4','browser-sandbox','webkit'];
-const step = name => ({name,status:'completed',conclusion:'success'});
-if (args.includes('Accept: application/octet-stream')) { const value = state.provenance[args[1]]; if(typeof value !== 'string') throw Error('Missing receipt bytes'); process.stdout.write(value); }
-else if (Object.hasOwn(state.provenance, args[1])) { const value = state.provenance[args[1]]; if(Array.isArray(value) && args.includes('--paginate')) value.forEach(output); else output(value); }
-else if(endpoint === 'releases/tags/v9.9.9') output(state.release);
-else if(endpoint === 'git/ref/tags/v9.9.9') { output({ref:'refs/tags/v9.9.9',object:{type:'commit',sha:state.tag}}); if(state.tagAfterRead){state.tag=state.tagAfterRead;fs.writeFileSync(path.join(root,'state.json'),JSON.stringify(state));} }
-else if(endpoint === 'commits/' + state.sha || endpoint === 'commits/' + state.tag) output({sha:endpoint.slice(8)});
-else if(endpoint === 'actions/workflows/candidate-verification.yml') output({id:100,path:'.github/workflows/candidate-verification.yml'});
-else if(endpoint.startsWith('actions/workflows/100/runs?')) { if(state.evidence !== 'missing') output({id:1,workflow_id:100,path:'.github/workflows/candidate-verification.yml',event:'workflow_dispatch',head_sha:state.sha,head_branch:'main',display_title:'stable / ' + state.sha + ' / all',repository:{id:1164782262,full_name:'titanxxh/open-agricola'},head_repository:{id:1164782262},status:'completed',run_attempt:1,updated_at:'2026-10-30T00:15:00Z',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1'}); }
-else if(endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
-  output({id:1,run_id:1,run_attempt:1,name:'candidate-manifest',status:'completed',conclusion:'success',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1/jobs/1',started_at:'2026-10-30T00:00:00Z',completed_at:'2026-10-30T00:01:00Z',steps:[step('Generate candidate manifest'),step('Stable manifest / 1164782262 / stable / ' + state.sha + ' / ' + state.configuration + ' / ' + state.sha + ' / ' + tasks.join(','))]});
-  tasks.filter(task => !(state.evidence === 'partial' && task === 'slow')).forEach((task,index) => output({id:index+2,run_id:1,run_attempt:1,name:'candidate / ' + task + ' / ' + state.configuration,status:'completed',conclusion:state.evidence === 'failed' && task === 'webkit' ? 'failure' : 'success',html_url:'https://github.com/titanxxh/open-agricola/actions/runs/1/jobs/' + (index+2),started_at:'2026-10-30T00:05:00Z',completed_at:'2026-10-30T00:10:00Z',steps:['Checkout candidate','Install dependencies','Verify candidate checkout','Execute verification task','Install browsers','Prepare candidate isolation','Prove native candidate isolation','Stop candidate descendants and collect private diagnostics'].map(step)}));
-} else throw Error('Unexpected GitHub endpoint: ' + endpoint);
-`)
-  writeFileSync(join(root, 'bin/ssh'), prefix + `
-event({kind:'ssh',args}); const input = fs.readFileSync(0,'utf8');
-if(args.some(arg => arg.includes('docker inspect'))) { output({containerId:'container-verified',gameBuildId:state.backendSha,running:state.running,healthy:state.ready}); output({gameBuildId:state.backendSha,ready:state.ready}); }
-else if(args.some(arg => arg.includes('feedback-owner-cli.ts'))) {
-  if(args.some(arg => arg.endsWith(' status'))) { output([]); process.exit(0); }
-  event({kind:'notification',input:JSON.parse(input)});
-  if(state.notification === 'offline') { process.stderr.write('connection lost'); process.exit(255); }
-  const request = JSON.parse(input); output({operationId:request.operationId,kind:'deployment',status:state.notification,error:state.notification==='pending'?'database_unavailable':null,createdAt:1,completedAt:state.notification==='completed'?2:null});
-} else throw Error('Unexpected SSH command');
-`)
-  for (const name of ['gh', 'ssh']) chmodSync(join(root, 'bin', name), 0o755)
-  const server = createServer((req, res) => {
-    writeFileSync(eventFile, JSON.stringify({kind:'http',url:req.url}) + '\n', {flag:'a'})
-    res.writeHead(state.frontendStatus, { 'content-type': 'application/json' })
-    res.end(state.frontendBody ?? JSON.stringify({format:1,gameBuildId:state.frontendSha,basePath:state.frontendBase}))
-  }); servers.push(server)
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address(); if (!address || typeof address === 'string') throw new Error('No frontend listener')
-  const frontend = `http://127.0.0.1:${address.port}/`
-  const events = (): Array<{ kind: string; endpoint?: string; input?: unknown; args?: string[] }> => existsSync(eventFile)
-    ? readFileSync(eventFile,'utf8').trim().split('\n').map(line => JSON.parse(line)) : []
-  const confirm = (...args: string[]) => invoke('scripts/release/verify-feedback-deployment.ts', ['v9.9.9','--host','owner-test','--remote-dir','/srv/open-agricola','--frontend',frontend,'--receipt',join(root,'receipt.json'),...args])
-  return {root,sha,fixSha,state,save,env,git,events,confirm,invoke}
-}
-
-async function ownerLocalFixture() {
-  const value = await fixture()
-  const repository = 'titanxxh/open-agricola'
-  const owner = { id: 7, login: 'titanxxh', type: 'User' }
-  const started = Date.now() - 300_000
-  const at = (seconds: number) => new Date(started + seconds * 1000).toISOString()
-  const commands = canonicalOwnerLocalCommands(value.root, value.sha)
-  const receipt: OwnerLocalReceipt = {
-    format: 1, kind: 'owner-local-verification', repository, repositoryId: 1164782262,
-    testedSha: value.sha, candidateSha: value.sha, tree: value.git('rev-parse', 'HEAD^{tree}'),
-    configuration: verificationConfiguration(value.root, value.sha), producerConfiguration: verificationConfiguration(value.root, value.sha),
-    startedAt: at(0), completedAt: at(60),
-    environment: { node: process.version, platform: process.platform, arch: process.arch, nodeExecutable: process.execPath },
-    tasks: FULL_TASK_IDS.map(id => ({ id, startedAt: at(0), completedAt: at(60),
-      commands: commands[id].map(command => ({ ...command, exitCode: 0, logSha256: 'a'.repeat(64) })) })),
-  }
-  const url = `https://github.com/${repository}/releases/download/v9.9.9/owner-local-verification.json`
-  const asset = { id: 12, name: 'owner-local-verification.json', size: 0, state: 'uploaded', uploader: owner,
-    browser_download_url: url, created_at: at(62) }
-  const status = { id: 10, context: 'owner-local-verification', state: 'success', creator: owner,
-    created_at: at(63), target_url: url, description: '' }
-  const release = { ...value.state.release, id: 11, author: owner, assets: [asset], created_at: at(61), published_at: at(64) }
-  Object.assign(value.state.provenance, {
-    [`repos/${repository}`]: { id: 1164782262, full_name: repository, default_branch: 'main', owner },
-    [`repos/${repository}/commits/${value.sha}/statuses?per_page=100`]: [status],
-    [`repos/${repository}/releases/tags/v9.9.9`]: release,
-  })
-  value.state.evidence = 'missing'
-  const saveReceipt = () => {
-    const bytes = JSON.stringify(receipt) + '\n'
-    asset.size = Buffer.byteLength(bytes)
-    status.description = `owner-local sha256:${createHash('sha256').update(bytes).digest('hex')}`
-    value.state.provenance[`repos/${repository}/releases/assets/12`] = bytes
-    value.save()
-  }
-  saveReceipt()
-  return { ...value, receipt, owner, asset, status, release, saveReceipt }
-}
+// The PostgreSQL owner-process cases run feedback-owner-cli.ts from the candidate's app container in production, so
+// they stay in release verification: verify-feedback-deployment-postgres.test.ts.
+afterEach(resetFeedbackDeploymentFixtures)
+afterAll(disposeFeedbackDeploymentFixtures)
 
 describe('owner verified feedback deployment', () => {
   it('retains actual owner-local authorization and null Actions identities after the common native gate', async () => {
-    const value = await ownerLocalFixture()
+    const value = await ownerLocalFeedbackDeploymentFixture()
     const result = await value.confirm()
     expect(result.status, result.stderr).toBe(0)
     expect(JSON.parse(result.stdout)).toMatchObject({ verification: 'passed', notification: { status: 'completed' } })
@@ -165,7 +30,7 @@ describe('owner verified feedback deployment', () => {
 
   it.each(['foreign status', 'withdrawn owner status', 'foreign release author', 'foreign asset uploader', 'digest mismatch',
     'missing canonical task', 'failed local command', 'configuration mismatch'] as const)('blocks owner-local %s before observing or writing feedback', async failure => {
-    const value = await ownerLocalFixture()
+    const value = await ownerLocalFeedbackDeploymentFixture()
     if (failure === 'foreign status') value.status.creator = { ...value.owner, id: 8 }
     if (failure === 'withdrawn owner status') value.status.state = 'failure'
     if (failure === 'foreign release author') value.release.author = { ...value.owner, id: 8 }
@@ -182,7 +47,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it.each(['frontend mismatch', 'backend mismatch', 'unready backend'] as const)('still blocks owner-local %s before notification', async failure => {
-    const value = await ownerLocalFixture()
+    const value = await ownerLocalFeedbackDeploymentFixture()
     if (failure === 'frontend mismatch') value.state.frontendSha = 'b'.repeat(40)
     if (failure === 'backend mismatch') value.state.backendSha = 'b'.repeat(40)
     if (failure === 'unready backend') value.state.ready = false
@@ -194,7 +59,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it('retries an owner-local receipt without reselecting proof or changing its operation, evidence or target', async () => {
-    const value = await ownerLocalFixture()
+    const value = await ownerLocalFeedbackDeploymentFixture()
     value.state.notification = 'offline'; value.save()
     const first = await value.confirm()
     expect(first.status, first.stderr).toBe(2)
@@ -211,7 +76,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it('observes a formal complete release and records its exact full ancestry without publishing or deploying', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     const result = await value.confirm()
     expect(result.status, result.stderr).toBe(0)
     expect(JSON.parse(result.stdout)).toMatchObject({release:'verified',deployment:'observed',verification:'passed',notification:{status:'completed'}})
@@ -221,7 +86,7 @@ describe('owner verified feedback deployment', () => {
     expect(readFileSync(join(value.root,'receipt.json'),'utf8')).toContain(value.sha)
   })
   it('refuses a tag moved while observing production before saving or notifying', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     value.state.tagAfterRead = value.fixSha; value.save()
     const result = await value.confirm()
     expect(result.status).toBe(1)
@@ -231,7 +96,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it('retains original verified observation and operation identity when notification retry loses SSH', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     value.state.notification = 'offline'; value.save()
     const first = await value.confirm()
     expect(first.status).toBe(2)
@@ -245,24 +110,24 @@ describe('owner verified feedback deployment', () => {
   })
 
   it.each([
-    ['draft', (state: State) => { state.release.draft = true }],
-    ['prerelease', (state: State) => { state.release.prerelease = true }],
-    ['foreign Release', (state: State) => { state.release.html_url = 'https://github.com/foreign/project/releases/tag/v9.9.9' }],
-    ['unpublished Release', (state: State) => { state.release.published_at = '' }],
-    ['unmerged candidate', (state: State) => { state.provenance[`repos/titanxxh/open-agricola/commits/${state.sha}/pulls?per_page=100`] = [] }],
-    ['missing candidate verification', (state: State) => { state.evidence = 'missing' }],
-    ['failed candidate verification', (state: State) => { state.evidence = 'failed' }],
-    ['partial candidate verification', (state: State) => { state.evidence = 'partial' }],
-    ['frontend-only deployment', (state: State) => { state.backendSha = 'b'.repeat(40) }],
-    ['backend-only deployment', (state: State) => { state.frontendSha = 'b'.repeat(40) }],
-    ['no frontend', (state: State) => { state.frontendStatus = 404 }],
-    ['stopped backend', (state: State) => { state.running = false }],
-    ['unready backend', (state: State) => { state.ready = false }],
-    ['frontend base mismatch', (state: State) => { state.frontendBase = '/wrong/' }],
-    ['browser-only build flag', (state: State) => { state.frontendBody = '{"verified":true,"released":true}' }],
-    ['oversized frontend metadata', (state: State) => { state.frontendBody = ' '.repeat(5000) }],
-  ] satisfies Array<[string, (state: State) => void]>)('blocks %s before any feedback write', async (_name, change) => {
-    const value = await fixture()
+    ['draft', (state: FeedbackDeploymentState) => { state.release.draft = true }],
+    ['prerelease', (state: FeedbackDeploymentState) => { state.release.prerelease = true }],
+    ['foreign Release', (state: FeedbackDeploymentState) => { state.release.html_url = 'https://github.com/foreign/project/releases/tag/v9.9.9' }],
+    ['unpublished Release', (state: FeedbackDeploymentState) => { state.release.published_at = '' }],
+    ['unmerged candidate', (state: FeedbackDeploymentState) => { state.provenance[`repos/titanxxh/open-agricola/commits/${state.sha}/pulls?per_page=100`] = [] }],
+    ['missing candidate verification', (state: FeedbackDeploymentState) => { state.evidence = 'missing' }],
+    ['failed candidate verification', (state: FeedbackDeploymentState) => { state.evidence = 'failed' }],
+    ['partial candidate verification', (state: FeedbackDeploymentState) => { state.evidence = 'partial' }],
+    ['frontend-only deployment', (state: FeedbackDeploymentState) => { state.backendSha = 'b'.repeat(40) }],
+    ['backend-only deployment', (state: FeedbackDeploymentState) => { state.frontendSha = 'b'.repeat(40) }],
+    ['no frontend', (state: FeedbackDeploymentState) => { state.frontendStatus = 404 }],
+    ['stopped backend', (state: FeedbackDeploymentState) => { state.running = false }],
+    ['unready backend', (state: FeedbackDeploymentState) => { state.ready = false }],
+    ['frontend base mismatch', (state: FeedbackDeploymentState) => { state.frontendBase = '/wrong/' }],
+    ['browser-only build flag', (state: FeedbackDeploymentState) => { state.frontendBody = '{"verified":true,"released":true}' }],
+    ['oversized frontend metadata', (state: FeedbackDeploymentState) => { state.frontendBody = ' '.repeat(5000) }],
+  ] satisfies Array<[string, (state: FeedbackDeploymentState) => void]>)('blocks %s before any feedback write', async (_name, change) => {
+    const value = await feedbackDeploymentFixture()
     change(value.state); value.save()
     const result = await value.confirm()
     expect(result.status).toBe(1)
@@ -271,7 +136,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it('retries the original receipt successfully while release and production adapters are unavailable', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     value.state.notification = 'pending'; value.save()
     const first = await value.confirm()
     expect(first.status).toBe(2)
@@ -288,7 +153,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it('inspects and retries persisted operations without release, frontend or deployment reads', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     const status = await value.invoke('scripts/release/verify-feedback-deployment.ts', ['--host', 'owner-test', '--status', 'operations'])
     expect(status.status, status.stderr).toBe(0)
     expect(JSON.parse(status.stdout)).toEqual({ operations: [] })
@@ -299,7 +164,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it('refuses owner verification in CI before opening any external connection', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     value.env.CI = 'true'
     const result = await value.confirm()
     expect(result.status).toBe(1)
@@ -308,7 +173,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it('rejects a shallow ancestry proof and ignores grafted parent truncation', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     mkdirSync(join(value.root, '.git/info'), { recursive: true })
     writeFileSync(join(value.root, '.git/info/grafts'), value.sha + '\n')
     const grafted = await value.confirm()
@@ -323,41 +188,8 @@ describe('owner verified feedback deployment', () => {
     expect(value.events().filter(event => event.kind === 'notification')).toHaveLength(before)
   })
 
-  it.each(['native', 'owner-local'] as const)('records and retries the original %s operation through the actual PostgreSQL owner process', async kind => {
-    const value = kind === 'owner-local' ? await ownerLocalFixture() : await fixture()
-    expect((await value.confirm()).status).toBe(0)
-    const receipt: unknown = JSON.parse(readFileSync(join(value.root, 'receipt.json'), 'utf8'))
-    if (!receipt || typeof receipt !== 'object' || !('operationId' in receipt)) throw new Error('No operation identity')
-    const db = await createTestDatabase()
-    try {
-      const schema = await db.prepare('SELECT current_schema() AS name').get<{name: string}>()
-      if (!schema?.name.startsWith('test_')) throw new Error('Expected isolated PostgreSQL schema')
-      const run = (args: string[], data?: unknown) => new Promise<{status:number|null;stdout:string;stderr:string}>((resolve, reject) => {
-        const child = spawn(join(repository, 'node_modules/.bin/tsx'), [join(repository, 'server/bug-report/feedback-owner-cli.ts'), ...args], {
-          cwd: repository, env: {...process.env, CI:'', GITHUB_ACTIONS:'', DATABASE_URL:getTestDatabaseUrl(), DATABASE_SCHEMA:schema.name},
-        })
-        let stdout='', stderr=''
-        child.stdout.on('data', chunk => {stdout+=chunk}); child.stderr.on('data', chunk => {stderr+=chunk})
-        child.on('error', reject); child.on('close', status => resolve({status,stdout,stderr}))
-        child.stdin.end(data === undefined ? '' : JSON.stringify(data))
-      })
-      const first = await run(['record'], receipt)
-      expect(first.status, first.stderr).toBe(0)
-      expect(JSON.parse(first.stdout)).toMatchObject({operationId:receipt.operationId,kind:'deployment',status:'completed',error:null})
-      const listed = await run(['status'])
-      expect(listed.status, listed.stderr).toBe(0)
-      expect(JSON.parse(listed.stdout)).toEqual([JSON.parse(first.stdout)])
-      const retried = await run(['retry'], {operationId:receipt.operationId})
-      expect(retried.status, retried.stderr).toBe(0)
-      expect(JSON.parse(retried.stdout)).toMatchObject({operationId:receipt.operationId,status:'completed',error:null})
-      const replayed = await run(['record'], receipt)
-      expect(replayed.status, replayed.stderr).toBe(0)
-      expect(JSON.parse(replayed.stdout)).toMatchObject({operationId:receipt.operationId,status:'completed'})
-    } finally {await db.close()}
-  })
-
   it('reports a persisted notification retry transport failure without changing deployment status', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     value.state.notification = 'offline'; value.save()
     const retry = await value.invoke('scripts/release/verify-feedback-deployment.ts', ['--host', 'owner-test', '--retry-operation', 'assessment:known-operation'])
     expect(retry.status).toBe(2)
@@ -369,7 +201,7 @@ describe('owner verified feedback deployment', () => {
     ['--host', 'another-owner-host'],
     ['--remote-dir', '/srv/another-game'],
   ])('rejects a receipt retry with conflicting %s before any SSH', async (flag, conflicting) => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     value.state.notification = 'offline'; value.save()
     expect((await value.confirm()).status).toBe(2)
     const before = value.events().length
@@ -381,7 +213,7 @@ describe('owner verified feedback deployment', () => {
   })
 
   it('reuses the saved host and directory when receipt retry omits target flags', async () => {
-    const value = await fixture()
+    const value = await feedbackDeploymentFixture()
     value.state.notification = 'offline'; value.save()
     expect((await value.confirm()).status).toBe(2)
     const receiptPath = join(value.root, 'receipt.json')
@@ -396,5 +228,4 @@ describe('owner verified feedback deployment', () => {
     expect(events[0].args?.at(-2)).toBe('owner-test')
     expect(events[0].args?.at(-1)).toContain("cd -- '/srv/open-agricola'")
   })
-
 })

@@ -6,6 +6,8 @@ import { backendImageMaintenanceFixture as fixture, nativeCompose, removeBackend
 
 // These integration cases launch multiple helper processes; low-core CI needs a file-local test budget.
 vi.setConfig({ testTimeout: 15_000 })
+// The Compose-only checks of the candidate's docker-compose.prod.yml stay in release verification:
+// docker-compose-prod-binding.test.ts.
 
 afterEach(removeBackendImageMaintenanceRoots)
 
@@ -20,14 +22,6 @@ it('pins subsequent documented Compose run/up to the installed image with defaul
   expect(readFileSync(join(value.directory, '.env'), 'utf8')).toBe(value.originalEnv.replace(value.sourceImage, value.imageId))
   expect(statSync(join(value.directory, '.env')).mode & 0o777).toBe(0o600)
   expect(JSON.parse(readFileSync(join(value.directory, 'data/deployed-image.json'), 'utf8')).nativeImageId).toBe(value.imageId)
-})
-
-it('rejects ordinary Compose maintenance without the installed image binding instead of selecting a legacy tag', () => {
-  const value = fixture()
-  writeFileSync(join(value.directory, '.env'), value.originalEnv.replace(`BACKEND_IMAGE=${value.sourceImage}\n`, ''))
-  const result = nativeCompose(value.directory)
-  expect(result.status).not.toBe(0)
-  expect(result.stderr).toContain('BACKEND_IMAGE')
 })
 
 it.each(['fetch', 'backup', 'report-target'])('preserves the previous binding for %s before live migration', failure => {

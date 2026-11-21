@@ -122,7 +122,7 @@ describe('required routine verification gate', () => {
     }
   })
 
-  it('allows full fallback only with the complete catalog and every scoped slot skipped', () => {
+  it('allows full fallback only with the complete catalog and every browser slot skipped', () => {
     const tasks = 'quality,fast,slow,build,chromium-1,chromium-2,chromium-3,chromium-4,browser-sandbox,webkit'
     const needs = evidence([])
     needs.plan.outputs.mode = 'full'
@@ -132,8 +132,23 @@ describe('required routine verification gate', () => {
     needs.plan.outputs.catalog_tasks = 'quality,fast'
     expect(() => assertRoutineGate({ sha, needs })).toThrow('every canonical task')
     needs.plan.outputs.catalog_tasks = tasks
-    needs.plan.outputs.partitions = JSON.stringify(manifest())
+    needs.plan.outputs.partitions = JSON.stringify(manifest(['units-1', 'browser-1']))
     expect(() => assertRoutineGate({ sha, needs })).toThrow('every canonical task')
+  })
+
+  it('requires the tooling unit partitions of a full plan to succeed beside the complete catalog', () => {
+    const tasks = 'quality,fast,slow,build,chromium-1,chromium-2,chromium-3,chromium-4,browser-sandbox,webkit'
+    const units = ['units-1', 'units-2', 'units-3']
+    const needs = evidence(units)
+    needs.plan.outputs.mode = 'full'
+    needs.plan.outputs.catalog_tasks = tasks
+    needs.catalog = { result: 'success', outputs: { verified_tasks: tasks, verified_sha: sha } }
+    expect(assertRoutineGate({ sha, needs }).mode).toBe('full')
+    needs['units-2'].result = 'failure'
+    expect(() => assertRoutineGate({ sha, needs })).toThrow('Selected units-2 partition')
+    needs['units-2'].result = 'success'
+    needs.catalog.result = 'skipped'
+    expect(() => assertRoutineGate({ sha, needs })).toThrow('catalog tasks did not all succeed')
   })
 
   it('accepts a scoped plan that selects nothing when every job is skipped', () => {

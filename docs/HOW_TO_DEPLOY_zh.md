@@ -72,7 +72,7 @@ pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/runs/<新
 - **产出**：只有完全成功时才写出 `verification.json`（stable format 1）或 `pre-verification.json`（pre format 2），以及 `execution-evidence.json`。证据绑定 sandbox、工具链、准备阶段日志、每一次尝试、记录的命令、源码完整性、资源限制与 teardown 日志。日志每行带有距该命令开始的秒数。recorder 会按 publisher 的规则复核回执。`--profile` 额外记录输出时间线用于耗时分析，不写回执。
 - **约束**：同一台机器同时只能有一次运行，由 `/tmp/oa-owner-local-verification.lock` 串行化；中断时仍会 teardown。输出目录须保持私有，其中还有日志和诊断。
 
-回执记录每条实际 `runCandidateTask` 命令、退出码与日志 SHA-256，以及执行时间、Node、平台、架构、受测提交、原始源码树和候选/producer 验证配置。完整十任务及其 canonical 命令必须全部通过。日常 affected 检查或单独 `release:rehearse` 不满足此路径。rebase 后仅当完整原始树和验证配置与受测源码相同时，publisher 才能重绑 `candidateSha`；保留 `testedSha`，不把本机命令记为 GitHub job。
+回执记录每条实际 `runCandidateTask` 命令、退出码与日志 SHA-256，以及执行时间、Node、平台、架构、受测提交、原始源码树和候选/producer 验证配置。完整十任务及其 canonical 命令必须全部通过。其中 `fast` 和 `slow` 任务运行 `pnpm test:fast` 与 `pnpm test:slow`，不含 `tooling` Vitest project：这些发布、部署与 CI 工具由受信 producer 而不是候选运行，由 PR 的 Routine 覆盖（见[测试架构](architecture/testing_zh.md)）。日常 affected 检查或单独 `release:rehearse` 不满足此路径。rebase 后仅当完整原始树和验证配置与受测源码相同时，publisher 才能重绑 `candidateSha`；保留 `testedSha`，不把本机命令记为 GitHub job。
 
 publisher 核对当前认证用户与仓库 owner 的原生用户 ID，准备固定候选 draft，仅上传 `owner-local-verification.json`，再创建独立 `owner-local-verification` commit status。描述绑定回执 SHA-256，target 只能是本仓正式 Release asset。发布前读回 status creator、Release author、asset uploader 和实际字节。相同命令与回执可恢复本工具准备的同一 draft；普通发布路径继续拒绝 draft。
 

@@ -55,14 +55,23 @@ export const FAST_SERVER_INCLUDE = [
 ]
 
 export const FAST_SCRIPTS_INCLUDE = ['scripts/**/__tests__/*.test.ts']
-// Heavy tooling tests that run release, deployment and CI CLIs end to end: each case builds a temporary repository,
-// installs gh/ssh/docker stubs and spawns tsx, git or bash there (or replays the real repository plan). Each file
-// takes at least 10 s on a GitHub runner, so they run in the slow task beside the card Session tests to keep the
-// fast task short (#1929). The list is explicit on purpose; new tooling tests stay in fast-scripts by default.
-// Four mid-sized ones (candidate-verification-pages, scoped-verification-cli, restart-local-processes and
-// verify-feedback-deployment, about 420 test-seconds together) stay in fast-scripts so that the fast and slow tasks
-// finish together on GitHub: run 44844324816 had fast at 476 s and slow at 763 s of Vitest time (#1925).
+// Two PostgreSQL-heavy storage tests run in the slow task beside the card Session tests, so the fast task stays short
+// (#1929). Both stay in release verification because the candidate's own code runs them in production: the
+// candidate image runs `storage-archive-cli`, and backups run from the checkout switched to the candidate (#1950).
 export const SLOW_SCRIPTS_INCLUDE = [
+  'scripts/__tests__/backup-storage.test.ts',
+  'scripts/__tests__/storage-archive.test.ts',
+]
+
+// Release, deployment, CI-planning and local-development tooling tests (#1950, #1952). Release verification
+// (`test:fast`, `test:slow`) does not run them: at release time the trusted producer on main runs this tooling, not
+// the candidate, and the candidate's copy only runs once it has become the producer after its own PR Routine. Routine
+// runs the files that its dependencies or `@covers` select, and the whole project whenever it falls back to the
+// complete catalog. Tests whose code the candidate itself runs in production stay in fast-scripts or slow-scripts.
+export const TOOLING_INCLUDE = [
+  // Release, deployment and backup.
+  'scripts/__tests__/backend-image-cleanup.test.ts',
+  'scripts/__tests__/backend-image-cli.test.ts',
   'scripts/__tests__/backend-image-maintenance-bootstrap.test.ts',
   'scripts/__tests__/backend-image-maintenance-compose-binding.test.ts',
   'scripts/__tests__/backend-image-maintenance-delivery.test.ts',
@@ -70,21 +79,55 @@ export const SLOW_SCRIPTS_INCLUDE = [
   'scripts/__tests__/backend-image-maintenance-recovery.test.ts',
   'scripts/__tests__/backend-image-maintenance-resume.test.ts',
   'scripts/__tests__/backend-image-receiver.test.ts',
-  'scripts/__tests__/backup-storage.test.ts',
-  'scripts/__tests__/candidate-verification-cli.test.ts',
-  'scripts/__tests__/candidate-verification-isolation.test.ts',
-  'scripts/__tests__/candidate-verification-prerelease.test.ts',
-  'scripts/__tests__/prerelease-image-import.test.ts',
-  'scripts/__tests__/prerelease-operations.test.ts',
+  'scripts/__tests__/backend-image-validator.test.ts',
+  'scripts/__tests__/backup-files.test.ts',
+  'scripts/__tests__/container-images-archive.test.ts',
+  'scripts/__tests__/container-images.test.ts',
+  'scripts/__tests__/live-acceptance-login-budget.test.ts',
+  'scripts/__tests__/live-acceptance-rebind.test.ts',
+  'scripts/__tests__/live-acceptance-source-recovery.test.ts',
+  'scripts/__tests__/live-acceptance-source-update.test.ts',
+  'scripts/__tests__/live-acceptance-window.test.ts',
+  'scripts/__tests__/live-acceptance.test.ts',
+  'scripts/__tests__/live-smoke-inventory.test.ts',
+  'scripts/__tests__/live-smoke.test.ts',
+  'scripts/__tests__/operations-deployment.test.ts',
+  'scripts/__tests__/owner-backup.test.ts',
+  'scripts/__tests__/owner-cutover.test.ts',
+  'scripts/__tests__/prerelease-*.test.ts',
   'scripts/__tests__/release-owner-local.test.ts',
   'scripts/__tests__/release-publish.test.ts',
-  'scripts/__tests__/routine-verification-plan.test.ts',
-  'scripts/__tests__/routine-verification-replay.test.ts',
-  'scripts/__tests__/scenario-evidence.test.ts',
-  'scripts/__tests__/storage-archive.test.ts',
+  'scripts/__tests__/release-session-cleanup.test.ts',
+  'scripts/__tests__/release-smoke.test.ts',
+  'scripts/__tests__/release-status.test.ts',
+  'scripts/__tests__/validator-image.test.ts',
+  'scripts/__tests__/verify-feedback-deployment.test.ts',
+  // Candidate verification and CI planning.
+  'scripts/__tests__/browser-extended-matrix.test.ts',
+  'scripts/__tests__/candidate-verification-*.test.ts',
+  'scripts/__tests__/candidate-verification.test.ts',
+  'scripts/__tests__/catalog-chromium-balance.test.ts',
+  'scripts/__tests__/isolated-browser.test.ts',
+  'scripts/__tests__/owner-local-image-cache.test.ts',
+  'scripts/__tests__/owner-local-run.test.ts',
+  'scripts/__tests__/routine-verification-*.test.ts',
+  'scripts/__tests__/scoped-verification-*.test.ts',
+  'scripts/__tests__/scoped-verification.test.ts',
+  'scripts/__tests__/test-consumers.test.ts',
+  'scripts/__tests__/verification-plan.test.ts',
   'scripts/__tests__/verification-requirements.test.ts',
+  'scripts/__tests__/verification.test.ts',
+  'scripts/__tests__/verify-affected.test.ts',
+  'scripts/__tests__/verify-lanes.test.ts',
+  'scripts/__tests__/verify-parallel.test.ts',
+  'scripts/__tests__/vitest-results.test.ts',
+  // Local development and test helpers.
+  'scripts/__tests__/invalid-databases.test.ts',
+  'scripts/__tests__/local-services.test.ts',
+  'scripts/__tests__/restart-local-*.test.ts',
+  'scripts/__tests__/scenario-evidence.test.ts',
 ]
-export const FAST_SCRIPTS_EXCLUDE = [...FAST_EXCLUDE, ...SLOW_SCRIPTS_INCLUDE]
+export const FAST_SCRIPTS_EXCLUDE = [...FAST_EXCLUDE, ...SLOW_SCRIPTS_INCLUDE, ...TOOLING_INCLUDE]
 export const FAST_TESTS_INCLUDE = ['tests/**/*.test.ts']
 
 export type TestProjectGlob = {
@@ -124,4 +167,9 @@ export const SLOW_PROJECT_GLOBS: TestProjectGlob[] = [
   { name: 'slow-scripts', include: SLOW_SCRIPTS_INCLUDE, exclude: BASE_EXCLUDE },
 ]
 
-export const TEST_PROJECT_GLOBS: TestProjectGlob[] = [...FAST_PROJECT_GLOBS, ...SLOW_PROJECT_GLOBS]
+/** Run by `pnpm test:tooling` and by Routine only; neither `test:fast` nor `test:slow` includes it. */
+export const TOOLING_PROJECT_GLOBS: TestProjectGlob[] = [
+  { name: 'tooling', include: TOOLING_INCLUDE, exclude: BASE_EXCLUDE },
+]
+
+export const TEST_PROJECT_GLOBS: TestProjectGlob[] = [...FAST_PROJECT_GLOBS, ...SLOW_PROJECT_GLOBS, ...TOOLING_PROJECT_GLOBS]

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { globSync } from 'glob'
-import { TEST_PROJECT_GLOBS } from '../test-project-globs'
+import { TEST_PROJECT_GLOBS, TOOLING_PROJECT_GLOBS } from '../test-project-globs'
 import { planRoutineVerification, type RoutineVerificationPlan } from './routine-verification-plan'
 
 export type VerificationIdentity = {
@@ -106,6 +106,17 @@ function routineChecks(routine: RoutineVerificationPlan, inventory: TestInventor
       grep: entry.grep,
     })),
   ]
+}
+
+/**
+ * The complete catalog (`FULL_TASK_IDS`) is release verification, which leaves out the tooling projects (#1952). A full
+ * Routine, whether triggered or a planner fallback, runs every file of those projects as well, beside the catalog.
+ */
+function toolingChecks(inventory: TestInventory): PlannedCheck[] {
+  return TOOLING_PROJECT_GLOBS.flatMap(({ name }) => {
+    const files = inventory.vitest.filter(test => test.project === name).map(test => test.file).sort()
+    return files.length ? [{ kind: 'vitest' as const, project: name, files }] : []
+  })
 }
 
 const inventoryCache = new Map<string, TestInventory>()
@@ -227,7 +238,7 @@ export function createRepositoryPlan(input: {
     expansionReasons: full ? [...routine.warnings] : [],
     wideningReasons: full ? [] : [...routine.warnings],
     checks: full
-      ? input.fullTaskIds.map(taskId => ({ kind: 'catalog', taskId }))
+      ? normalizeChecks([...toolingChecks(inventory), ...input.fullTaskIds.map((taskId): PlannedCheck => ({ kind: 'catalog', taskId }))], input.fullTaskIds)
       : normalizeChecks(routineChecks(routine, inventory), input.fullTaskIds),
   }
   assertPlanCurrent(input.cwd, plan)
