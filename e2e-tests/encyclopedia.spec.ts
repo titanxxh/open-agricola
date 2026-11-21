@@ -266,12 +266,14 @@ for (const layout of LAYOUTS) {
     })
 
     test('E1 retries after the catalog fails to load', async () => {
-      let failures = 1
-      await page.route('**/card-encyclopedia/manifest.json*', route => (failures-- > 0 ? route.abort('failed') : route.continue()))
+      // Startup prefetches the catalog and the page loads it again, so the outage lasts until the reader retries.
+      let available = false
+      await page.route('**/card-encyclopedia/manifest.json*', route => (available ? route.continue() : route.abort('failed')))
       await page.goto(CATALOG)
 
       const alert = page.getByRole('alert')
       await expect(alert).toContainText("Couldn't load the encyclopedia")
+      available = true
       await alert.getByRole('button', { name: 'Retry' }).click()
 
       await expectCatalog(page)
