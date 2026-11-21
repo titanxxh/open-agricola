@@ -3,13 +3,20 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-import { checkPrereleaseVerification, fixPrereleaseCandidate, requestPrereleaseVerification } from '../ci/prerelease-verification'
+import { checkPrereleaseVerification } from '../ci/prerelease-acceptance'
+import { fixPrereleaseCandidate } from '../ci/prerelease-admission'
+import { requestPrereleaseVerification } from '../ci/prerelease-execution'
 import { commitRef, github, RELEASE_REPOSITORY } from '../ci/release-github'
 import { readSourceProof, routineSourcePaths, verifySourceUpdate } from '../prerelease/source-verification'
 
-vi.mock('../ci/prerelease-verification', async importOriginal => ({
-  ...await importOriginal<typeof import('../ci/prerelease-verification')>(),
-  fixPrereleaseCandidate: vi.fn(), checkPrereleaseVerification: vi.fn(), requestPrereleaseVerification: vi.fn(),
+vi.mock('../ci/prerelease-acceptance', async importOriginal => ({
+  ...await importOriginal<typeof import('../ci/prerelease-acceptance')>(), checkPrereleaseVerification: vi.fn(),
+}))
+vi.mock('../ci/prerelease-admission', async importOriginal => ({
+  ...await importOriginal<typeof import('../ci/prerelease-admission')>(), fixPrereleaseCandidate: vi.fn(),
+}))
+vi.mock('../ci/prerelease-execution', async importOriginal => ({
+  ...await importOriginal<typeof import('../ci/prerelease-execution')>(), requestPrereleaseVerification: vi.fn(),
 }))
 vi.mock('../ci/release-github', async importOriginal => ({
   ...await importOriginal<typeof import('../ci/release-github')>(), github: vi.fn(), commitRef: vi.fn(),

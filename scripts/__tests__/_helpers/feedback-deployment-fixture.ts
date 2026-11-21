@@ -6,8 +6,9 @@ import { createServer, type Server } from 'node:http'
 import { delimiter, join, resolve } from 'node:path'
 import { finalSnapshotMetadata } from './candidate-provenance'
 import { reusableTempRoots } from './reusable-temp-roots'
-import { stableConfiguration } from '../../ci/candidate-verification'
-import { canonicalOwnerLocalCommands, type OwnerLocalReceipt } from '../../ci/owner-local-verification'
+import { stableConfiguration } from '../../ci/candidate-format'
+import { canonicalOwnerLocalCommands } from '../../ci/owner-local-execution'
+import { type OwnerLocalReceipt } from '../../ci/owner-local-format'
 import { FULL_TASK_IDS, verificationConfiguration } from '../../ci/verification-tasks'
 
 // Shared by verify-feedback-deployment*.test.ts: a temporary repository with gh/ssh stubs and a frontend listener that

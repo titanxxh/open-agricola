@@ -105,7 +105,6 @@ export const TOOLING_INCLUDE = [
   // Candidate verification and CI planning.
   'scripts/__tests__/browser-extended-matrix.test.ts',
   'scripts/__tests__/candidate-verification-*.test.ts',
-  'scripts/__tests__/candidate-verification.test.ts',
   'scripts/__tests__/catalog-chromium-balance.test.ts',
   'scripts/__tests__/isolated-browser.test.ts',
   'scripts/__tests__/owner-local-image-cache.test.ts',

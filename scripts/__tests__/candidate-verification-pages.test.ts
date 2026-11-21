@@ -4,7 +4,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { stableConfiguration } from '../ci/candidate-verification'
+import { stableConfiguration } from '../ci/candidate-format'
 import { candidateRepository, finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
