@@ -29,6 +29,8 @@ else{console.error('Fixture native unavailable PRIVATE_TOKEN_SENTINEL');process.
   writeFileSync(join(bin, 'git'), `#!${process.execPath}\n${common}if(a.includes('rev-parse'))console.log(${JSON.stringify(producer)});else if(!a.includes('status'))process.exit(91);\n`, { mode: 0o700 })
   writeFileSync(join(bin, 'ssh'), `#!${process.execPath}\n${common}if(!a.at(-1).includes("'status'")||a.at(-1).includes("'resume'"))process.exit(92);out({kind:'backend-image-operation',operationId:${JSON.stringify(operationId)},sourceSha:${JSON.stringify(sha)},producerSha:${JSON.stringify(producer)},bindingSha256:'d'.repeat(64),state:s.backend,phase:s.backend==='accepted'?'accepted':'validating',nextAction:s.backend==='accepted'?'none':'wait',validatorExitCode:null});\n`, { mode: 0o700 })
   const server = createServer((req, res) => {
+    // Dropping the socket fails the connection without freeing the port for another test's server to take.
+    if (state.public === 'connection') { req.socket.destroy(); return }
     if (state.public === 'redirect') { res.writeHead(302, { Location: 'https://never-follow.invalid/' }).end(); return }
     if (state.public === 'missing') { res.writeHead(404).end(); return }
     res.setHeader('Content-Type', 'application/json')
@@ -97,8 +99,7 @@ it.each(['running', 'resumable', 'blocked', 'unknown'])('observes backend %s wit
 })
 
 it.each(['conflict', 'redirect', 'missing', 'connection'])('does not treat public %s as current live readiness', async mode => {
-  const value = await fixture(); value.state.public = mode
-  if (mode === 'connection') await value.closeServer()
+  const value = await fixture(); value.state.public = mode; value.save()
   const result = await value.run()
   expect(JSON.parse(result.stdout).stages.pages.state).toBe(mode === 'conflict' ? 'conflict' : mode === 'missing' ? 'absent' : 'unavailable')
 })
