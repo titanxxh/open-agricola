@@ -24,6 +24,34 @@ flowchart LR
 
 GitHub Pages 在 `https://open-agricola.titanxxh.com/` 提供生产前端，API 保持 `https://openagapi.titanxxh.com`。两个 HTTPS 子域同站但跨源，保留仅属于 API host 的 HttpOnly 会话，不依赖第三方 Cookie。后端镜像另外包含可选的同源自托管前端。公共卡图和字体仍来自独立素材站。见 ADR 0035。
 
+<a id="owner-operations"></a>
+
+## Owner 运维
+
+Owner 运维指 owner 在本机用私有工具执行的发布、部署和备份。它们的 runbook 正在迁往私有仓库 [open-agricola-ops](https://github.com/titanxxh/open-agricola-ops)，外部读者无法访问。尚未迁走的步骤仍在下文。所有 owner 工具仍通过干净 protected-main 检出中的公开门禁使用[发布证据契约](#release-evidence-contract)。
+
+本文命令用占位符表示 owner 主机信息：`<host>` 是正式后端的 SSH 目标，`<deploy-dir>` 是其部署检出，`<operations-dir>` 是监控目录，`<host-ops-dir>` 是主机上定时异机备份脚本所在目录。
+
+<a id="release-evidence-contract"></a>
+
+## 发布证据契约
+
+发布证据契约判断一个固定候选能否发布和部署，由本仓库的代码强制执行：`scripts/ci/` 下的候选门禁、回执格式和镜像回执校验，从 protected-main producer 的干净检出运行。owner 工具只调用这些门禁，不能放宽它们。产生和发布证据的 owner 操作见 [Owner 运维](#owner-operations)。
+
+### 本机回执
+
+回执记录每条实际 `runCandidateTask` 命令、退出码与日志 SHA-256，以及执行时间、Node、平台、架构、受测提交、原始源码树和候选/producer 验证配置。完整十任务及其 canonical 命令必须全部通过。其中 `fast` 和 `slow` 任务运行 `pnpm test:fast` 与 `pnpm test:slow`，不含 `tooling` Vitest project：这些发布、部署与 CI 工具由受信 producer 而不是候选运行，由 PR 的 Routine 覆盖（见[测试架构](architecture/testing_zh.md)）。日常 affected 检查或单独 `release:rehearse` 不满足此路径。rebase 后仅当完整原始树和验证配置与受测源码相同时，publisher 才能重绑 `candidateSha`；保留 `testedSha`，不把本机命令记为 GitHub job。
+
+pre owner-local 必须使用 format 2 回执及 `execution: { kind: "docker-isolated", evidenceSha256: "<64 lowercase hex>" }`。owner 在候选之外收集的证据绑定实际 sandbox、前置服务源码闭包、命令、源码完整性、资源限制及 teardown，原始证据与日志一并不可变保留。已撤回的 format-1 pre 回执拒绝；stable format 1 不变。pre proof 的 `executionEvidenceSha256` 随镜像与接收端复核传递，并使用独立的原生 owner `owner-local-prerelease-verification` status；固定 beta Release 必须为 `prerelease=true`、`latest=false`。stable 与 pre 证明不能互相授权。公共 pre checker 重验固定源码、完整计划、双方配置、producer 祖先关系、原生 owner、tag 和绑定摘要的 asset ID/实际字节。完整同树 rebase 保留实际受测 SHA；源码树或 producer 配置不兼容时重新执行。owner、接收端 deploy/open/restore 和 candidate 镜像生产保留真实 typed 本机证明，不虚构 Actions ID。本机授权缺失或撤销时仍可用原生 workflow 回退；owner 最新 success 的证明无效时阻断。原生 PR/ref 规则、同步 lease、真实私有镜像生产/import 和目标验收仍为独立门禁；候选内工具不能自授权，必须先把 producer 正当交付到 protected main。
+
+### owner status 选择或撤回本机证明
+
+只有原生 owner 创建的 status 能选择本机证明，其他用户的同名 context 不能选择或撤销它。owner 最新 pending、failure 或 error 撤销本机授权，不复活较旧成功；随后继续普通原生 GitHub 证据路径。owner 最新 success 的证明若格式或内容无效，仍阻断，不静默回退。
+
+### 后续阶段复核证明
+
+Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已发布证明，重新核对原生身份、未变更 tag、原始树、双方配置、命令、时间和回执摘要。不接受任意 URL、其他用户 status、不完整任务或虚构 Actions ID。GitHub 仍实际构建私有镜像与 Pages；镜像和 Pages 的 workflow 中只有 `container-image-build.yml` 和 `deploy-pages-broker.yml` 调用该门禁，构建 pre 运行时镜像的 `prerelease-runtime.yml` 不读取候选证据，只用到 `scripts/ci/container-images.ts` 中的 registry 常量。镜像来源、私有 registry、owner 传输和运行期门禁保持必需。独立 Bug Report 部署反馈命令也复用该门禁，保留 owner-local 权威依据而不虚构 Actions job。登记前须先部署支持此反馈证明类型的后端；命令本身不会升级应用。
+
 ---
 
 ## 本机标准发版
@@ -72,15 +100,11 @@ pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/runs/<新
 - **产出**：只有完全成功时才写出 `verification.json`（stable format 1）或 `pre-verification.json`（pre format 2），以及 `execution-evidence.json`。证据绑定 sandbox、工具链、准备阶段日志、每一次尝试、记录的命令、源码完整性、资源限制与 teardown 日志。日志每行带有距该命令开始的秒数。recorder 会按 publisher 的规则复核回执。`--profile` 额外记录输出时间线用于耗时分析，不写回执。
 - **约束**：同一台机器同时只能有一次运行，由 `/tmp/oa-owner-local-verification.lock` 串行化；中断时仍会 teardown。输出目录须保持私有，其中还有日志和诊断。
 
-回执记录每条实际 `runCandidateTask` 命令、退出码与日志 SHA-256，以及执行时间、Node、平台、架构、受测提交、原始源码树和候选/producer 验证配置。完整十任务及其 canonical 命令必须全部通过。其中 `fast` 和 `slow` 任务运行 `pnpm test:fast` 与 `pnpm test:slow`，不含 `tooling` Vitest project：这些发布、部署与 CI 工具由受信 producer 而不是候选运行，由 PR 的 Routine 覆盖（见[测试架构](architecture/testing_zh.md)）。日常 affected 检查或单独 `release:rehearse` 不满足此路径。rebase 后仅当完整原始树和验证配置与受测源码相同时，publisher 才能重绑 `candidateSha`；保留 `testedSha`，不把本机命令记为 GitHub job。
+回执必须包含的内容、owner status 怎样选择或撤回本机证明，以及 Pages、后端交付和镜像生产怎样复核，见[发布证据契约](#release-evidence-contract)。
 
 publisher 核对当前认证用户与仓库 owner 的原生用户 ID，准备固定候选 draft，仅上传 `owner-local-verification.json`，再创建独立 `owner-local-verification` commit status。描述绑定回执 SHA-256，target 只能是本仓正式 Release asset。发布前读回 status creator、Release author、asset uploader 和实际字节。相同命令与回执可恢复本工具准备的同一 draft；普通发布路径继续拒绝 draft。
 
 发布 PATCH 响应丢失时，publisher 通过现有候选门禁与原生 Release ID 做一次有界只读核验。已发布且证明一致时直接成功，不重复写入。读回不可用或证据冲突时仍报失败，重试固定候选前先查状态。
-
-只有原生 owner 创建的 status 能选择本机证明，其他用户的同名 context 不能选择或撤销它。owner 最新 pending、failure 或 error 撤销本机授权，不复活较旧成功；随后继续普通原生 GitHub 证据路径。owner 最新 success 的证明若格式或内容无效，仍阻断，不静默回退。
-
-Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已发布证明，重新核对原生身份、未变更 tag、原始树、双方配置、命令、时间和回执摘要。不接受任意 URL、其他用户 status、不完整任务或虚构 Actions ID。GitHub 仍实际构建私有镜像与 Pages；镜像来源、私有 registry、owner 传输和运行期门禁保持必需。独立 Bug Report 部署反馈命令也复用该门禁，保留 owner-local 权威依据而不虚构 Actions job。登记前须先部署支持此反馈证明类型的后端；命令本身不会升级应用。
 
 ### 查询交付状态与验收现场
 
@@ -89,7 +113,7 @@ Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已
 线上浏览器验收使用已有账号、该账号已参与的普通局和保留的已结束 Replay。先通过只读 repeatable-read 事务采集所需元数据，不扫描对局或回放 payload：
 
 ```bash
-pnpm release:inventory --host ubuntu@ten-kr --directory /home/ubuntu/open-agricola \
+pnpm release:inventory --host <host> --directory <deploy-dir> \
   --expected-build <full-sha> --output /owner/live-inventory.json
 pnpm release:accept --config /owner/live-acceptance.json
 pnpm release:accept --config /owner/live-acceptance.json --execute
@@ -181,7 +205,7 @@ pnpm release vX.Y.Z-beta.N --channel prerelease --ref "$pre_sha" \
 
 这是仅处理数据的发布接口，不是候选执行器：它不安装候选依赖，也不运行候选命令。回执由 `scripts/ci/owner-local-run.ts --channel prerelease --sha "$pre_sha"` 产生（见[授权完整本机候选验证](#authorize-complete-owner-local-verification)）。输入回执必须覆盖全部十项 canonical pre 任务、真实成功退出码及保留日志的 SHA256，失败或不完整结果不能放行。选择与发布重验当前 pre SHA、不可变引用、原生保护、manifest 来源和干净的 protected-main producer。普通回归沿用 stable 运行期默认值，生产 hosted build 使用 prerelease；源码变化或 producer 配置不兼容时重新验收。不得用旧的不隔离 runner 生成此回执。
 
-pre owner-local 必须使用 format 2 回执及 `execution: { kind: "docker-isolated", evidenceSha256: "<64 lowercase hex>" }`。owner 在候选之外收集的证据绑定实际 sandbox、前置服务源码闭包、命令、源码完整性、资源限制及 teardown，原始证据与日志一并不可变保留。已撤回的 format-1 pre 回执拒绝；stable format 1 不变。pre proof 的 `executionEvidenceSha256` 随镜像与接收端复核传递，并使用独立的原生 owner `owner-local-prerelease-verification` status；固定 beta Release 必须为 `prerelease=true`、`latest=false`。stable 与 pre 证明不能互相授权。公共 pre checker 重验固定源码、完整计划、双方配置、producer 祖先关系、原生 owner、tag 和绑定摘要的 asset ID/实际字节。完整同树 rebase 保留实际受测 SHA；源码树或 producer 配置不兼容时重新执行。owner、接收端 deploy/open/restore 和 candidate 镜像生产保留真实 typed 本机证明，不虚构 Actions ID。本机授权缺失或撤销时仍可用原生 workflow 回退；owner 最新 success 的证明无效时阻断。原生 PR/ref 规则、同步 lease、真实私有镜像生产/import 和目标验收仍为独立门禁；候选内工具不能自授权，必须先把 producer 正当交付到 protected main。
+pre 回执格式和 pre 证明规则属于[发布证据契约](#release-evidence-contract)。
 
 N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当前 main 为基线。命令固定 `verification/prerelease/<SHA>`，读取有效原生引用保护，然后在 main 派发 `prerelease-candidate-verification.yml`。回执绑定原生仓库 ID、prerelease 通道、候选 SHA、候选与可信策略配置以及 main producer 提交。producer 必须仍可从受保护 main 到达。兼容任务可分别补跑；缺失、失败、取消、跳过或配置不符均阻断。集成分支移动后仍可使用原固定候选。
 
@@ -431,7 +455,7 @@ Healthy 记录以探测完成时间作为 `observedAt` 并续期 lease，另保�
 
 ```bash
 pnpm exec tsx scripts/release/verify-feedback-deployment.ts vX.Y.Z \
-  --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola \
+  --host <host> --remote-dir <deploy-dir> \
   --frontend https://open-agricola.titanxxh.com/ \
   --receipt /path/to/private/feedback-vX.Y.Z.json
 ```
@@ -446,15 +470,15 @@ SSH 响应丢失或数据库失败后，用原回执只重试通知：
 
 ```bash
 pnpm exec tsx scripts/release/verify-feedback-deployment.ts \
-  --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola \
+  --host <host> --remote-dir <deploy-dir> \
   --retry /path/to/private/feedback-vX.Y.Z.json
 ```
 
 查看持久化的待处理操作，包括晚到结论或修复关联排队的补齐操作；也可在没有本地回执时按 ID 重试：
 
 ```bash
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --status operations
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --retry-operation <operation-id>
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --status operations
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --retry-operation <operation-id>
 ```
 
 回执绑定核验时的 SSH host 和远端目录。重试未传目标时使用原目标，显式传入不一致目标会在 SSH 前被拒绝。两种验证类型的重试都保留原操作身份和已存证据，不重新选择可变授权，不重复创建 Release、请求候选验证、部署或读取生产构建；新的核验仍通过当前候选门禁。保留回执至操作完成。重复核验、重试和晚到重复关联不会为同账号同根修复再发一封信。已有消息和已读时间保持不变。
@@ -470,11 +494,11 @@ pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr
 
 ```bash
 umask 077
-ssh ubuntu@ten-kr \
-  'cd /home/ubuntu/open-agricola && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts' \
+ssh <host> \
+  'cd <deploy-dir> && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts' \
   < /private/reviewed-feedback.json > /private/feedback-preview.json
-ssh ubuntu@ten-kr \
-  'cd /home/ubuntu/open-agricola && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts --execute --actor=ADMINISTRATOR_SITE_ID' \
+ssh <host> \
+  'cd <deploy-dir> && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts --execute --actor=ADMINISTRATOR_SITE_ID' \
   < /private/reviewed-feedback.json > /private/feedback-result.json
 ```
 
@@ -485,7 +509,7 @@ ssh ubuntu@ten-kr \
 
 执行跳过已有处理历史，不覆盖后来的结论；先确认，再发送上线反馈。复用日常账号/根修复唯一键，持久 reconciliation 限定已审阅对象和准确修复版本。`newMessages` 是本次已提交的 `insertedTriages` 与 `releasedMessages` 之和，不计并发发送者的信件。`errors` 列出部分失败，`reconciliation.operations` 保留持久操作 ID 和待核验或通知失败详情。四条历史修复提供已审阅的具体摘要；已有根修复的维护者摘要优先，预览与实际信件均显示该原文。历史首次包含版本来自审计，与首次核验生产版本及观测时间分开。
 
-中断后重新预览，再用同一审阅输入执行 `--execute`。已发送信件和已读状态保持不变。通知事务仍 pending 时，在 owner 本机运行 `pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola --retry-operation OPERATION_ID`，将 `OPERATION_ID` 替换为保存的操作 ID，仅重试该通知操作。持久对象/修复校验阻止重试更换接收人或发送不同修复。遇到 `historical_subject_changed` 时重新审阅预览，不绕过校验，也不重做 Release 或部署。齐备的隔离 fixture 首次产生 16 封，重跑新增 0；实际操作逐项报告跳过，包括默认缺少 #1595 说明。
+中断后重新预览，再用同一审阅输入执行 `--execute`。已发送信件和已读状态保持不变。通知事务仍 pending 时，在 owner 本机运行 `pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --remote-dir <deploy-dir> --retry-operation OPERATION_ID`，将 `OPERATION_ID` 替换为保存的操作 ID，仅重试该通知操作。持久对象/修复校验阻止重试更换接收人或发送不同修复。遇到 `historical_subject_changed` 时重新审阅预览，不绕过校验，也不重做 Release 或部署。齐备的隔离 fixture 首次产生 16 封，重跑新增 0；实际操作逐项报告跳过，包括默认缺少 #1595 说明。
 
 ## 一、部署后端
 
@@ -932,7 +956,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
 2. 在 owner 本机部署同一固定后端候选。后端门禁不要求已有已发布的 Release：
 
     ```bash
-    ./deploy-backend.sh ubuntu@ten-kr <full-sha> /home/ubuntu/open-agricola \
+    ./deploy-backend.sh <host> <full-sha> <deploy-dir> \
       --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
       --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
     ```
@@ -969,7 +993,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
 2. 从该次成功 run/attempt 取得唯一 receipt artifact ID。使用既有私有 GHCR 包、owner 本机0600凭据文件和独立0600资源预算：
 
     ```bash
-    ./deploy-backend.sh ubuntu@ten-kr <F> /home/ubuntu/open-agricola \
+    ./deploy-backend.sh <host> <F> <deploy-dir> \
       --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
       --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
     ```
@@ -980,7 +1004,7 @@ HTTP 游戏请求携带 `X-Open-Agricola-Client-Capabilities`。CORS 预检不�
     {"format":1,"import":{"maxArchiveMiB":2048,"memoryHeadroomMiB":512,"intake":{"memoryMiB":384,"cpus":1,"pids":64}},"diskMiB":8192,"reserveMemoryMiB":512}
     ```
 
-默认 host/ref/directory 仍为 `ubuntu@ten-kr`、`main`、`/home/ubuntu/open-agricola`，但五个镜像/资源参数必需，缺失时不回退为构建。命令拒绝在 CI 中运行。首次 SSH 前，入口固定 `F`、核对同 SHA 完整正式验证、原生 workflow/attempt/artifact 和 `formal-candidate/stable` 来源，再以 owner 私有凭据 digest pull、检查实际镜像并导出无 tag 的固定 archive。凭据和 Docker auth 不传服务器。
+默认 host/ref/directory 为 owner 的部署（`<host>`、`main`、`<deploy-dir>`），但五个镜像/资源参数必需，缺失时不回退为构建。命令拒绝在 CI 中运行。首次 SSH 前，入口固定 `F`、核对同 SHA 完整正式验证、原生 workflow/attempt/artifact 和 `formal-candidate/stable` 来源，再以 owner 私有凭据 digest pull、检查实际镜像并导出无 tag 的固定 archive。凭据和 Docker auth 不传服务器。
 
 服务器只从 `P` 提取可信控制文件。owner 先发送小型私有请求；大 archive 上传前，`preflight` 按已知字节数和配置的 reserve 检查实际 staging 与 Docker 数据文件系统。两类 SCP 输入均保留私有文件权限。archive 传输失败时，只能凭同一操作的私有 preflight 证明，在 30 分钟内请求清理该 stage 的 `image.tar`。过期 client stamp 仅可用于这次清理，不能执行应用操作；已有 intake、已接收 image 或 maintenance 证据会阻断清理。request 与诊断记录保留；清理失败与原传输错误一起报告。
 
@@ -1038,13 +1062,13 @@ docker pull --platform linux/amd64 caddy@sha256:<approved-manifest-sha256>
 正式部署验收通过后，先用 owner 维护入口查看服务器当前库存。工具通过 SSH 流式执行当前 checkout 中的代码，默认只生成只读计划：
 
 ```bash
-./cleanup-backend-images.sh ubuntu@ten-kr /home/ubuntu/open-agricola > image-cleanup-plan.json
+./cleanup-backend-images.sh <host> <deploy-dir> > image-cleanup-plan.json
 ```
 
 核对全部 `remove` 项，再固定已验收的完整 build SHA 执行：
 
 ```bash
-./cleanup-backend-images.sh ubuntu@ten-kr /home/ubuntu/open-agricola \
+./cleanup-backend-images.sh <host> <deploy-dir> \
   --execute --expected-build <accepted-full-sha>
 ```
 
@@ -1230,8 +1254,8 @@ Game Bug Reports 交付到公开的 `titanxxh/open-agricola` 仓库。将独立 
 
 ```bash
 bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
-/home/ubuntu/open-agricola-ops/backup-offsite.sh               # Host-only offsite copy
-/home/ubuntu/open-agricola-ops/backup-offsite.sh ledger-only   # Refresh deletion facts without stopping applications
+<host-ops-dir>/backup-offsite.sh               # Host-only offsite copy
+<host-ops-dir>/backup-offsite.sh ledger-only   # Refresh deletion facts without stopping applications
 ```
 
 正式站的每日和普通手动备份在线执行。脚本检查运行中应用镜像及其资源删除协议，再使用该不可变的受保护 main 镜像完成捕获和隔离恢复验证。启用这些脚本前，先部署支持在线备份的完整应用代际。旧镜像或混合代际会使备份失败，不会停止或重启应用。
@@ -1244,7 +1268,7 @@ bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
 
 回放步骤解码占校验时间的绝大部分，默认单线程执行，因此在线备份最多与玩家争用一个 CPU。应用停止时，正式环境的发布前备份校验和 `check-live` 设置 `STORAGE_VALIDATION_CONCURRENCY=auto`，用全部可用 CPU 并行解码回放；也可以设为不超过 64 的正整数，指定 worker 数。任一设置得到的报告完全相同。
 
-每日备份与部署共用 `backups/.maintenance.lock`。保留策略仍是本地 daily 7 份、pre 5 份，正式环境只把 daily 送异机，所有普通归档及其配置快照最多 30 天。删除 ledger 不受归档清理影响。定时异机脚本及其提交、保留辅助脚本和 cron、logrotate 配置只放在主机 `/home/ubuntu/open-agricola-ops`，不在本仓库；其 README 说明模式（`full`、`capture`、`sync-only`、`ledger-only`）、异机选择、保留和调度。它通过 `BACKUP_POLICY_ROOT` 读取本仓库的 `scripts/backup-storage.sh`、`scripts/backup-process.sh` 和 `scripts/backup-files.mjs`。无异机时仍可执行本机手动备份。
+每日备份与部署共用 `backups/.maintenance.lock`。保留策略仍是本地 daily 7 份、pre 5 份，正式环境只把 daily 送异机，所有普通归档及其配置快照最多 30 天。删除 ledger 不受归档清理影响。定时异机脚本及其提交、保留辅助脚本和 cron、logrotate 配置只放在主机 `<host-ops-dir>`，不在本仓库；其 README 说明模式（`full`、`capture`、`sync-only`、`ledger-only`）、异机选择、保留和调度。它通过 `BACKUP_POLICY_ROOT` 读取本仓库的 `scripts/backup-storage.sh`、`scripts/backup-process.sh` 和 `scripts/backup-files.mjs`。无异机时仍可执行本机手动备份。
 
 异机 ledger 同步先读远端副本，合并到当前 S3 的 CAS ledger，再导出其并集。旧普通备份、旧本地副本都不能抹掉较新的删除事实。立即删除后的异机同步仍使用 `ledger-only`。
 
@@ -1253,7 +1277,7 @@ bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
 owner 本机在 `~/oa-backup/<UTC 捕获时间>/` 下保留自己的副本（ADR 0045）。主机的每日备份、主机上的验证和异机同步保持不变。
 
 ```bash
-node --import tsx scripts/owner-backup.ts run --host ubuntu@<formal-host>   # 拉取、验证、清理
+node --import tsx scripts/owner-backup.ts run --host <host>   # 拉取、验证、清理
 node --import tsx scripts/owner-backup.ts validate --snapshot ~/oa-backup/<stamp>
 node --import tsx scripts/owner-backup.ts prune
 ```
@@ -1262,7 +1286,7 @@ node --import tsx scripts/owner-backup.ts prune
 
 验证在内部 Docker 网络上的临时 PostgreSQL 与 RustFS 容器中还原副本，合并拉回的删除记录，再用主机当时运行的构建对应的校验镜像执行 `storage-archive-cli.ts validate`，使用全部 CPU；该镜像会被复用或现场构建，拿不到时不写报告。报告写入 `validation.json`。超过 30 天的副本一律删除，包括最新的一份。副本可按下面的流程恢复，以其 `capture/` 目录作为归档。
 
-捕获要求运行中的镜像与主机检出都包含 `owner-sync-capture.sh`；镜像较旧时 dump 仍为 custom 格式，可以验证，但每次全量传输。按 `deploy/owner-backup/` 文件头的说明安装每日定时器：北京时间 04:30 运行，机器关机错过时开机补跑。
+捕获要求运行中的镜像与主机检出都包含 `owner-sync-capture.sh`；镜像较旧时 dump 仍为 custom 格式，可以验证，但每次全量传输。按 `deploy/owner-backup/` 文件头的说明安装每日定时器：每天按其 unit 中设定的时间运行一次，机器关机错过时开机补跑。
 
 #### 恢复或切换外部服务
 
@@ -1375,7 +1399,7 @@ Grafana 关闭预装插件自动更新（`plugins.preinstall_auto_update=false`�
 ./deploy-operations.sh <ssh-host> [ref] [operations-dir] [game-dir]
 ```
 
-默认值为 `ubuntu@ten-kr`、`main`、`/home/ubuntu/open-agricola-operations` 和 `/home/ubuntu/open-agricola`。该命令只发布指定提交的 `operations/`，构建轻量账户采集器，启动 Prometheus、Grafana、Node Exporter 和账户采集器。不创建 GitHub Release、不构建游戏镜像、不运行游戏迁移、不停止应用。每次部署核对游戏容器 ID、镜像和启动时间保持不变。`deploy-backend.sh` 只管理 app/Caddy，并跳过监控配置生成。
+默认值为 owner 的部署（`<host>`、`main`、`<operations-dir>`、`<deploy-dir>`）。该命令只发布指定提交的 `operations/`，构建轻量账户采集器，启动 Prometheus、Grafana、Node Exporter 和账户采集器。不创建 GitHub Release、不构建游戏镜像、不运行游戏迁移、不停止应用。每次部署核对游戏容器 ID、镜像和启动时间保持不变。`deploy-backend.sh` 只管理 app/Caddy，并跳过监控配置生成。
 
 首次部署先停止旧监控容器，再复用现有 TSDB、Grafana 数据目录和采集密钥；启动失败时重新启动旧容器。后续失败恢复上一个运维版本。版本化源码和私有配置保存在 `<operations-dir>/releases/<sha>/`，仅成功后写入 `deployed-build-id`。回滚时仅可选择支持聚合函数的运维提交，并以同一命令重新部署。权限收紧后，旧的原始查询采集器无法工作；监控切换失败也保留聚合权限，应使用支持聚合函数的版本恢复。应先完成首次独立运维部署，再部署新版游戏，因为游戏部署会清理旧监控容器。移除容器时保留 `data/observability/{prometheus,grafana}`。
 
@@ -1447,10 +1471,10 @@ Prometheus 每 15 秒 scrape（超时 5 秒），每 15 秒发现有效应用租
 从已安装依赖的工作树使用维护者控制的入口：
 
 ```bash
-./deploy-operations.sh --wechat-qr ubuntu@ten-kr /absolute/path/wechat-group.png
-./deploy-operations.sh --feishu-qr ubuntu@ten-kr /absolute/path/feishu-group.png
+./deploy-operations.sh --wechat-qr <host> /absolute/path/wechat-group.png
+./deploy-operations.sh --feishu-qr <host> /absolute/path/feishu-group.png
 # 自定义游戏目录：
-./deploy-operations.sh --feishu-qr ubuntu@ten-kr /absolute/path/feishu-group.jpg /home/ubuntu/open-agricola
+./deploy-operations.sh --feishu-qr <host> /absolute/path/feishu-group.jpg <deploy-dir>
 # 本地应用，使用其 COMMUNITY_DATA_DIR 或 SHARED_DATA_DIR/community：
 ./deploy-operations.sh --feishu-qr --local /absolute/path/feishu-group.png /absolute/path/data/community
 ```
@@ -1482,7 +1506,7 @@ Prometheus 每 15 秒 scrape（超时 5 秒），每 15 秒发现有效应用租
 版本按从新到旧排列，日期自上而下不得递增。`version` 是唯一标签，最多 32 个字符。每个版本 1–30 条说明；每条说明以 `zh`、`en` 等语言 id 映射到不超过 500 个字符的单行文本。弹窗依次使用玩家当前语言、英文、首个已写语言。文件最多保留 200 个版本、256 KiB，接口只返回前 5 个。
 
 ```bash
-./deploy-operations.sh --whats-new ubuntu@ten-kr /absolute/path/whats-new.json [game-dir]
+./deploy-operations.sh --whats-new <host> /absolute/path/whats-new.json [game-dir]
 # 本地应用，使用其 COMMUNITY_DATA_DIR 或 SHARED_DATA_DIR/community：
 ./deploy-operations.sh --whats-new --local /absolute/path/whats-new.json /absolute/path/data/community
 ```

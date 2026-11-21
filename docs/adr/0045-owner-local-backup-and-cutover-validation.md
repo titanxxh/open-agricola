@@ -9,7 +9,7 @@ A formal backend release stopped the API for 28–32 minutes (v0.12.10, v0.12.12
 
 ## Decision
 
-- **Owner-local Backup.** Every day after the host's 04:00 backup (Asia/Shanghai), the owner machine asks the host for one online capture and pulls it into `~/oa-backup/<UTC capture time>/`.
+- **Owner-local Backup.** Every day after the host's daily backup, the owner machine asks the host for one online capture and pulls it into `~/oa-backup/<UTC capture time>/`.
   - The capture is snapshot-consistent and uses the existing online capture protection. It contains an uncompressed directory-format dump, the content-addressed objects and the current deletion ledger.
   - rsync uses the previous copy as its basis, so it transfers only what changed.
   - The host keeps at most one transient owner capture. A pull removes it, the next capture supersedes it, and daily pruning removes a stale one.

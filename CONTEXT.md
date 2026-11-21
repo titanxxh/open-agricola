@@ -84,6 +84,18 @@ _Avoid_: 独立的身份计数器、仅换镜像、复用已退役代次
 owner 从原生 `prerelease_retained_identity_refs` 读取所有保留身份，包括仅被对局或历史引用的主体；用已知来源关联重绑、清理已删除主体，并对实际复扫清单和最新正式删除事实形成开放回执。它不恢复登录权限。
 _Avoid_: 健康检查、只验证产物存在、复制旧会话、由候选服务 key 授权
 
+**Producer**:
+open-agricola protected main 上的一个提交。它的门禁、回执格式和执行器构成候选验证的信任锚；owner 工具通过一个干净、HEAD 等于 protected main 的 producer 检出调用这些门禁。ops 仓库的版本不属于 producer，也不写进回执。
+_Avoid_: 候选自身、ops 仓库提交、任意本地 checkout
+
+**Release Evidence Contract（发布证据契约）**:
+判断一个固定候选能否发布和部署的规则，由公开仓库的门禁强制执行，包括回执内容、owner status 对本机证明的选择与撤回，以及 Pages、后端和镜像的独立复核。
+_Avoid_: 私有工具里的检查、本机定向检查结果、发布 runbook
+
+**Owner Operations（owner 运维）**:
+owner 在本机用私有工具执行的发布、部署和备份操作。它们的 runbook 不在公开仓库；工具只通过 producer 检出调用公开门禁，不能放宽发布证据契约。
+_Avoid_: 公开 CI、自托管指南、候选验证
+
 **Installed Receipt Continuity（已安装候选回执沿用）**:
 main 改动验证配置后，重新开放同一个已安装候选时，接受 protected main 仍可达的较早 producer 的完整验证证据，回执以 `continuity` 标明差异。只用于已安装构建的 open，不用于 deploy、restore 或镜像构建。
 _Avoid_: 跳过验证、沿用其他候选的回执、在主机上保存回执副本
