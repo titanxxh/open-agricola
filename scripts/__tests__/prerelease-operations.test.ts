@@ -1,3 +1,4 @@
+// @covers scripts/prerelease/operations.ts
 import { seedStorageGuard } from './prerelease-storage-guard-fixture'
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, renameSync, symlinkSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'

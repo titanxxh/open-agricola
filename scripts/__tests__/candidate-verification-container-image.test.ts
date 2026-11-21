@@ -1,3 +1,4 @@
+// @covers scripts/ci/container-image-build.ts
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { delimiter, join, resolve } from 'node:path'

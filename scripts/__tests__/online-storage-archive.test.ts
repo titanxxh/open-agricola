@@ -1,3 +1,4 @@
+// @covers scripts/backup-files.mjs
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, readFile, readdir, writeFile, rm } from 'node:fs/promises'

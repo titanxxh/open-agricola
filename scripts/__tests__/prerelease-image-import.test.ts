@@ -1,3 +1,4 @@
+// @covers scripts/prerelease/operations.ts
 import { seedStorageGuard } from './prerelease-storage-guard-fixture'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'

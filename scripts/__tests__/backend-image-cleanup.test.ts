@@ -1,3 +1,5 @@
+// @covers cleanup-backend-images.sh scripts/release/backend-image-cleanup.ts
+// @covers scripts/release/backend-image-receiver.ts
 import { spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'

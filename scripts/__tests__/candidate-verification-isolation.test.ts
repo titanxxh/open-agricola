@@ -1,3 +1,5 @@
+// @covers scripts/ci/candidate-user-environment.sh scripts/ci/candidate-verification.ts
+// @covers scripts/ci/checkout-public-assets.sh scripts/local-services.mjs
 import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, linkSync, truncateSync } from 'node:fs'
 import { tmpdir } from 'node:os'

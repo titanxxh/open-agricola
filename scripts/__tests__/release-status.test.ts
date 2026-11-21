@@ -1,3 +1,4 @@
+// @covers scripts/release/status.ts
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'

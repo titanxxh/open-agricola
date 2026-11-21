@@ -1,3 +1,4 @@
+// @covers scripts/verify-parallel.mjs
 import { spawn } from 'node:child_process'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

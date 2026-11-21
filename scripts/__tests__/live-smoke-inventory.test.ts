@@ -1,3 +1,4 @@
+// @covers scripts/release/live-inventory.ts
 import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { Client } from 'pg'

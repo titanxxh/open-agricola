@@ -12,6 +12,7 @@ const architectureChecks = [
   'pnpm run check:test-project-coverage',
   'pnpm run check:test-rule-environments',
   'pnpm run check:test-state-copies',
+  'pnpm run check:test-covers',
   'pnpm run check:direct-session-log',
   'pnpm run check:effects-file-list',
   'pnpm run check:generated-cards-sync',

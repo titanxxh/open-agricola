@@ -912,6 +912,50 @@ describe('dependency routine verification plan', () => {
     expect(edited.browserFiles).toEqual([{ file: 'e2e-tests/board.spec.ts', grep: null }])
   })
 
+  it('selects a Vitest file whose covers declaration matches a script it runs in a child process', () => {
+    const root = writeTree({
+      'scripts/release/publish.ts': 'export const publish = 1\n',
+      'deploy-backend.sh': 'exit 0\n',
+      'scripts/__tests__/release-publish.test.ts': '// @covers scripts/release/publish.ts deploy-backend.sh\nexport const used = 1\n',
+      'scripts/__tests__/other.test.ts': '// @covers scripts/other/\nexport const other = 1\n',
+      'scripts/other/tool.ts': 'export const tool = 1\n',
+    })
+
+    const script = planRoutineVerification({ root, changes: [{ status: 'M', path: 'scripts/release/publish.ts' }] })
+    const shell = planRoutineVerification({ root, changes: [{ status: 'M', path: 'deploy-backend.sh' }] })
+
+    expect(script.vitestFiles).toEqual(['scripts/__tests__/release-publish.test.ts'])
+    expect(shell.vitestFiles).toEqual(['scripts/__tests__/release-publish.test.ts'])
+    expect(shell.browserFiles).toEqual([])
+    expect(script.selectionReasons).toContain('scripts/release/publish.ts: 0 Vitest files through runtime imports; 0 through registry keys or direct registry imports; 0 through direct reads; 1 through @covers')
+  })
+
+  it('selects the tests that import a helper whose covers declaration matches', () => {
+    const root = writeTree({
+      'scripts/release/maintenance.ts': 'export const maintenance = 1\n',
+      'scripts/__tests__/_helpers/fixture.ts': '// @covers scripts/release/maintenance.ts\nexport const fixture = 1\n',
+      'scripts/__tests__/first.test.ts': "import { fixture } from './_helpers/fixture'\nexport const used = fixture\n",
+      'scripts/__tests__/second.test.ts': "import { fixture } from './_helpers/fixture'\nexport const used = fixture\n",
+      'scripts/__tests__/unrelated.test.ts': 'export const unrelated = 1\n',
+    })
+
+    const plan = planRoutineVerification({ root, changes: [{ status: 'M', path: 'scripts/release/maintenance.ts' }] })
+
+    expect(plan.vitestFiles).toEqual(['scripts/__tests__/first.test.ts', 'scripts/__tests__/second.test.ts'])
+  })
+
+  it('warns about a Vitest covers prefix that matches no file', () => {
+    const root = writeTree({
+      'scripts/tool.ts': 'export const tool = 1\n',
+      'scripts/__tests__/tool.test.ts': '// @covers scripts/missing.sh\nexport const used = 1\n',
+    })
+
+    const plan = planRoutineVerification({ root, changes: [{ status: 'M', path: 'scripts/tool.ts' }] })
+
+    expect(plan.vitestFiles).toEqual([])
+    expect(plan.warnings).toEqual(["scripts/__tests__/tool.test.ts: @covers prefix 'scripts/missing.sh' matches no file"])
+  })
+
   it('warns about a covers prefix that matches no file and does not widen selection', () => {
     const root = writeTree({
       'client/components/board/tile.ts': 'export const tile = 1\n',
