@@ -8,14 +8,14 @@ import '../../client/styles/card-sprite.css'
 import { loadCardsManifest } from '../../client/services/card-meta'
 import { ReplayViewer } from './ReplayViewer'
 import './styles.css'
-import { loadLanguageManifest, loadLanguagePack } from '../../client/services/language-pack'
+import { loadFullLanguage, loadLanguageManifest } from '../../client/services/language-pack'
 
 const root = createRoot(document.getElementById('root')!)
 
 void loadLanguageManifest().then(async manifest => {
   const requested = new URLSearchParams(location.search).get('locale')
   const locale = manifest.languages.find(language => language.id === requested)?.id ?? manifest.defaultLocale
-  await loadLanguagePack(locale)
+  await loadFullLanguage(locale)
   return locale
 }).then(async locale => {
   await loadCardsManifest()

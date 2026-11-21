@@ -10,8 +10,10 @@ function fixture(text: string) {
   const root = mkdtempSync(join(tmpdir(), 'agricola-action-refs-'))
   temporary.push(root)
   mkdirSync(join(root, 'public/i18n'), { recursive: true })
-  writeFileSync(join(root, 'public/i18n/manifest.json'), JSON.stringify({ languages: [{ id: 'en', file: 'en.json' }] }))
-  writeFileSync(join(root, 'public/i18n/en.json'), JSON.stringify({ messages: { 'cardFaces.Fixture.description': text } }))
+  writeFileSync(join(root, 'public/i18n/manifest.json'), JSON.stringify({ languages: [{ id: 'en', core: { file: 'en.json' }, cards: { file: 'en-cards.json' } }] }))
+  writeFileSync(join(root, 'public/i18n/en.json'), JSON.stringify({ messages: { 'ui.title': 'Farm' } }))
+  // Card faces carry the references, and they live in the Card Text Pack.
+  writeFileSync(join(root, 'public/i18n/en-cards.json'), JSON.stringify({ messages: { 'cardFaces.Fixture.description': text } }))
   return root
 }
 

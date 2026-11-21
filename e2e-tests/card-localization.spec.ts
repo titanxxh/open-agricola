@@ -6,16 +6,23 @@ import { BACKEND_URL, FRONTEND_URL, getJson, postJson } from './fixtures'
 test('discovers a new JSON-only language and downloads just that language', async ({ page, request }) => {
   const list = await (await request.get(`${FRONTEND_URL}/i18n/manifest.json`)).json()
   const english = list.languages.find((language: { id: string }) => language.id === 'en')
-  const base = await (await request.get(`${FRONTEND_URL}/i18n/${english.file}`)).json()
-  const raw = JSON.stringify({ ...base, locale: 'fr', messages: {
-    ...base.messages, 'cardFaces.C112_Thresher.name': 'Batteur', 'ui.languageSelectLabel': 'Choisir la langue',
-  } })
-  const sha256 = createHash('sha256').update(raw).digest('hex')
-  const file = `fr.${sha256.slice(0, 16)}.json`
+  const read = async (file: string) => (await request.get(`${FRONTEND_URL}/i18n/${file}`)).json()
+  const part = (stem: string, base: { messages: Record<string, string> }, messages: Record<string, string>) => {
+    const raw = JSON.stringify({ ...base, locale: 'fr', messages: { ...base.messages, ...messages } })
+    const sha256 = createHash('sha256').update(raw).digest('hex')
+    return { raw, file: `${stem}.${sha256.slice(0, 16)}.json`, sha256 }
+  }
+  const core = part('fr', await read(english.core.file), { 'ui.languageSelectLabel': 'Choisir la langue' })
+  const cards = part('fr-cards', await read(english.cards.file), { 'cardFaces.C112_Thresher.name': 'Batteur' })
   await page.route('**/i18n/manifest.json', route => route.fulfill({ json: {
-    ...list, languages: [...list.languages, { id: 'fr', name: 'Français', file, sha256, sourceSha256: sha256 }],
+    ...list, languages: [...list.languages, {
+      id: 'fr', name: 'Français', core: { file: core.file, sha256: core.sha256 }, cards: { file: cards.file, sha256: cards.sha256 },
+      sourceSha256: core.sha256,
+    }],
   } }))
-  await page.route(`**/i18n/${file}`, route => route.fulfill({ body: raw, contentType: 'application/json' }))
+  for (const { file, raw } of [core, cards]) {
+    await page.route(`**/i18n/${file}`, route => route.fulfill({ body: raw, contentType: 'application/json' }))
+  }
   const downloads: string[] = []
   page.on('request', request => {
     if (/\/i18n\/(?!manifest)[^/]+\.json$/.test(request.url())) downloads.push(request.url())
@@ -35,7 +42,7 @@ test('discovers a new JSON-only language and downloads just that language', asyn
   await expect(page.locator('[data-id="C112_Thresher"] .card-title').first()).toHaveText('Batteur')
   const switcher = page.getByRole('button', { name: 'Choisir la langue' })
   await expect(switcher).toContainText('Français')
-  expect(downloads).toEqual([`${FRONTEND_URL}/i18n/${file}`])
+  expect(downloads.sort()).toEqual([`${FRONTEND_URL}/i18n/${core.file}`, `${FRONTEND_URL}/i18n/${cards.file}`].sort())
 })
 
 for (const locale of ['en'] as const) {

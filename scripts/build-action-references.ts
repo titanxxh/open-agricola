@@ -21,14 +21,15 @@ export function buildActionReferences(root: string): ActionReferenceCatalog {
   const spaceIds = new Set(spaces.map(space => space.id))
   const moorIds = new Set(catalog.moorCards.flatMap(card => card.actions))
   const manifest = JSON.parse(readFileSync(resolve(root, 'public/i18n/manifest.json'), 'utf8'))
-  for (const language of manifest.languages) {
-    const pack = JSON.parse(readFileSync(resolve(root, 'public/i18n', language.file), 'utf8'))
+  const files: string[] = manifest.languages.flatMap((language: { core: { file: string }; cards: { file: string } }) => [language.core.file, language.cards.file])
+  for (const file of files) {
+    const pack = JSON.parse(readFileSync(resolve(root, 'public/i18n', file), 'utf8'))
     for (const [key, value] of Object.entries(pack.messages)) {
       if (typeof value !== 'string') continue
       for (const reference of actionReferences(value)) {
         const allowed = reference.kind === 'space' ? spaceIds : moorIds
         for (const id of reference.ids) {
-          if (!allowed.has(id)) throw new Error(`Invalid action reference ${language.id}:${key}: ${reference.kind}:${id}`)
+          if (!allowed.has(id)) throw new Error(`Invalid action reference ${file}:${key}: ${reference.kind}:${id}`)
         }
       }
     }

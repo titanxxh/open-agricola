@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext'
 import { LocaleProvider, useLocale } from '../contexts/LocaleContext'
 import { getBrowserReloadRequired, subscribeBrowserReload } from '../services/browser-api'
 import { loadCardsManifest } from '../services/card-meta'
-import { loadLanguageManifest, loadLanguagePack } from '../services/language-pack'
+import { loadFullLanguage, loadLanguageManifest } from '../services/language-pack'
 import '../index.css'
 import '../App.css'
 import '../styles/card-sprite.css'
@@ -36,7 +36,7 @@ export async function initializeWorkshopGame(root: HTMLElement): Promise<void> {
   let saved: string | null = null
   try { saved = localStorage.getItem('open-agricola-locale-v2') } catch { /* storage may be disabled */ }
   const locale = manifest.languages.find(language => language.id === saved)?.id ?? manifest.defaultLocale
-  await Promise.all([loadLanguagePack(locale), loadCardsManifest()])
+  await Promise.all([loadFullLanguage(locale), loadCardsManifest()])
   createRoot(root).render(
     <StrictMode>
       <AppErrorBoundary fallback={<StandaloneLink />}>

@@ -1,6 +1,6 @@
 // @covers client/service-worker/app-shell.worker.ts
 // @covers scripts/vite-service-worker.ts
-// @covers scripts/browser-data.ts client/services/language-pack.ts
+// @covers scripts/browser-data.ts client/services/language-pack.ts client/app/CardTextBoundary.tsx
 import { expect, test, type Page } from '@playwright/test'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -16,6 +16,8 @@ let siteDirectory: string
 let site: Awaited<ReturnType<typeof servePagesFrontend>>
 const requests: string[] = []
 const tampered = new Set<string>()
+let releaseCardText: (() => void) | undefined
+let cardTextHeld: Promise<void> | undefined
 
 test.describe.configure({ mode: 'serial', timeout: 180_000 })
 test.skip(({ browserName }) => browserName === 'firefox', 'This release verifies Chromium and WebKit')
@@ -32,8 +34,12 @@ test.beforeAll(async () => {
     let bytes: Buffer
     try { bytes = readFileSync(join(siteDirectory, path)) } catch { return false }
     if (tampered.has(path)) bytes = Buffer.concat([bytes, Buffer.from('\n/* altered in transit */\n')])
-    response.writeHead(200, { 'Content-Type': CONTENT_TYPES[extname(path)] ?? 'application/octet-stream', 'Cache-Control': 'no-store' })
-    response.end(bytes)
+    const send = () => {
+      response.writeHead(200, { 'Content-Type': CONTENT_TYPES[extname(path)] ?? 'application/octet-stream', 'Cache-Control': 'no-store' })
+      response.end(bytes)
+    }
+    if (cardTextHeld && /^\/i18n\/[a-z-]+-cards\.[a-f0-9]{16}\.json$/.test(path)) void cardTextHeld.then(send)
+    else send()
     return true
   })
   cpSync(buildPagesFrontend(site.origin).directory, siteDirectory, { recursive: true })
@@ -42,6 +48,8 @@ test.beforeAll(async () => {
 test.afterEach(() => {
   requests.length = 0
   tampered.clear()
+  releaseCardText?.()
+  cardTextHeld = undefined
 })
 
 test.afterAll(async () => {
@@ -116,4 +124,34 @@ test('bytes that do not match the build are served but never cached @webkit', as
   await page.reload(documentLoad)
   await encyclopediaReady(page)
   expect(requests).toContain(stylesheet)
+})
+
+test('startup renders without card text, while the encyclopedia waits for it @webkit', async ({ page }) => {
+  const manifest = JSON.parse(readFileSync(join(siteDirectory, 'i18n/manifest.json'), 'utf8'))
+  const zh = manifest.languages.find((language: { id: string }) => language.id === 'zh')
+  const cardText = JSON.parse(readFileSync(join(siteDirectory, 'i18n', zh.cards.file), 'utf8')).messages
+  const baseboards: string = cardText['cardFaces.A004_Baseboards.name']
+  expect(Object.keys(JSON.parse(readFileSync(join(siteDirectory, 'i18n', zh.core.file), 'utf8')).messages)
+    .filter(key => key.startsWith('cardFaces.'))).toEqual([])
+  cardTextHeld = new Promise(resolve => { releaseCardText = resolve })
+
+  await page.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'zh') })
+  await page.goto(`${site.origin}/?bg=none`, documentLoad)
+  await expect(page.locator('#initial-load')).toHaveCount(0)
+  expect(requests).toContain(`/i18n/${zh.cards.file}`)
+
+  requests.length = 0
+  await page.goto(`${site.origin}/?page=encyclopedia&bg=none`, documentLoad)
+  // Card metadata arrives, yet the encyclopedia does not mount or fetch its data while card text is held.
+  await expect.poll(() => page.evaluate(() =>
+    performance.getEntriesByType('resource').some(entry => entry.name.includes('/cards-manifest.')))).toBe(true)
+  await page.waitForTimeout(1_500)
+  await expect(page.getByText('加载卡牌数据…')).toBeVisible()
+  expect(requests.filter(path => path.startsWith('/card-encyclopedia/'))).toEqual([])
+  await expect(page.getByRole('searchbox')).toHaveCount(0)
+
+  releaseCardText?.()
+  const search = page.getByRole('searchbox')
+  await search.fill('a004')
+  await expect(page.getByRole('button', { name: new RegExp(baseboards) }).first()).toBeVisible()
 })

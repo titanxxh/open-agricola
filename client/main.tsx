@@ -4,7 +4,7 @@ import './index.css'
 import './styles/card-sprite.css'
 import { forgetEncyclopediaBrowseOnReload } from './app/encyclopedia/encyclopedia-session-reset'
 import { installStaleChunkRecovery } from './app/stale-chunk-recovery'
-import { loadLanguageManifest, loadLanguagePack } from './services/language-pack'
+import { loadCardTextPack, loadLanguageManifest, loadLanguagePack } from './services/language-pack'
 import { startApplication } from './app/application-bootstrap'
 
 const container = document.getElementById('root')
@@ -15,6 +15,8 @@ async function loadInitialLanguage() {
   let saved: string | null = null
   try { saved = localStorage.getItem('open-agricola-locale-v2') } catch { /* storage may be disabled */ }
   const locale = manifest.languages.find(language => language.id === saved)?.id ?? manifest.defaultLocale
+  // Card text starts downloading now, but only screens that show cards wait for it.
+  void loadCardTextPack(locale).catch(() => {})
   await loadLanguagePack(locale)
 }
 

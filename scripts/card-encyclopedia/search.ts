@@ -9,7 +9,7 @@ import type {
   EncyclopediaTextField,
   EncyclopediaTextStatus,
 } from '../../shared/contract/card-encyclopedia'
-import { formatMessage, parseLanguageManifest, parseLanguagePack } from '../../shared/i18n'
+import { combineLanguageParts, formatMessage, parseLanguageManifest } from '../../shared/i18n'
 import { resolveEncyclopediaText } from '../../shared/projections/card-encyclopedia-text'
 import {
   CARD_TEXT_SEARCH_ALIASES,
@@ -36,7 +36,8 @@ const CARD_FACE_KEY = /^cardFaces\.([^.]+)\.(name|description|rules|prerequisite
 export const loadEncyclopediaLanguages = (root = resolve('.')): EncyclopediaLanguage[] => {
   const manifest = parseLanguageManifest(JSON.parse(readFileSync(resolve(root, 'public/i18n/manifest.json'), 'utf8')))
   return manifest.languages.map((language) => {
-    const pack = parseLanguagePack(JSON.parse(readFileSync(resolve(root, 'public/i18n', language.file), 'utf8')))
+    const read = (file: string): unknown => JSON.parse(readFileSync(resolve(root, 'public/i18n', file), 'utf8'))
+    const pack = combineLanguageParts(read(language.core.file), read(language.cards.file))
     const source: unknown = JSON.parse(readFileSync(resolve(root, 'output/i18n/locales', `${language.id}.json`), 'utf8'))
     return { id: language.id, messages: pack.messages, ownKeys: new Set(flattenDictionary(source).keys()) }
   })

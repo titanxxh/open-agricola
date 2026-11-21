@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { glob } from 'glob'
 import { extractReferencesFromFiles, type StaticRef, type DynamicRef } from './i18n/extract-references'
 import { prepareLanguagePacks } from './prepare-language-packs'
+import { combineLanguageParts, parseLanguageManifest } from '../shared/i18n'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -87,9 +88,10 @@ async function main() {
   ).flat().filter((f) => !EXCLUDE_PATTERNS.some((p) => p.test(f)))
 
   const refs = extractReferencesFromFiles(files)
-  const manifest = JSON.parse(fs.readFileSync(path.resolve(REPO_ROOT, 'public/i18n/manifest.json'), 'utf8')) as import('../shared/i18n').LanguageManifest
+  const manifest = parseLanguageManifest(JSON.parse(fs.readFileSync(path.resolve(REPO_ROOT, 'public/i18n/manifest.json'), 'utf8')))
   const dictionaries = new Map(manifest.languages.map(language => {
-    const pack = JSON.parse(fs.readFileSync(path.resolve(REPO_ROOT, 'public/i18n', language.file), 'utf8')) as import('../shared/i18n').LanguagePack
+    const read = (file: string): unknown => JSON.parse(fs.readFileSync(path.resolve(REPO_ROOT, 'public/i18n', file), 'utf8'))
+    const pack = combineLanguageParts(read(language.core.file), read(language.cards.file))
     return [language.id, new Map(Object.entries(pack.messages))] as const
   }))
   const result = computeAuditResult(refs.static, dictionaries)

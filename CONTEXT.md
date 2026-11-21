@@ -1188,6 +1188,14 @@ _Avoid_: `shared/session`、`shared/engine`、`shared/cards` impl
 浏览器内离线 hot-seat / workshop sandbox，可直接运行完整 shared engine。
 _Avoid_: 线上多人主链路
 
+**Core Language Pack（核心语言包）**:
+一种语言中除卡牌文本以外的全部运行时文案（UI、平台、行动、日志等），应用启动只等待它（ADR 0054）。
+_Avoid_: 用“语言包”单指这一个文件
+
+**Card Text Pack（卡牌文本包）**:
+一种语言的卡面、卡名与父母牌文本；与核心语言包合起来才是该语言的完整文案，只有展示卡牌的页面等待它（ADR 0054）。
+_Avoid_: 卡牌 manifest（那是 `cards-manifest` 卡牌元数据）
+
 **Session Test**:
 后端边界测试，直接实例化 `GameSession` 并断言 `state`、`pending`、`interaction`、`log`、`scores`。
 _Avoid_: 用 DOM 断言规则正确性

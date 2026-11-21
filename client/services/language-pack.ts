@@ -1,10 +1,10 @@
-import { hasLanguagePack, parseLanguageManifest, registerLanguagePack, type LanguageManifest, type Locale } from '../../shared/i18n'
+import { hasCardTextPack, hasLanguagePack, parseLanguageManifest, registerLanguagePack, type LanguageManifest, type LanguagePart, type Locale } from '../../shared/i18n'
 import { fetchVerifiedResource } from './fetch-verified-resource'
 
 let manifest: Promise<LanguageManifest> | undefined
 let loadedManifest: LanguageManifest | undefined
 export const getLanguageManifest = () => loadedManifest
-const pending = new Map<Locale, Promise<void>>()
+const pending = new Map<string, Promise<void>>()
 const base = `${import.meta.env.BASE_URL}i18n/`
 
 export function loadLanguageManifest(): Promise<LanguageManifest> {
@@ -21,21 +21,35 @@ export function loadLanguageManifest(): Promise<LanguageManifest> {
   return manifest
 }
 
-export async function loadLanguagePack(locale: Locale): Promise<void> {
-  if (hasLanguagePack(locale)) return
-  const existing = pending.get(locale)
+async function loadPart(locale: Locale, part: LanguagePart): Promise<void> {
+  if (part === 'core' ? hasLanguagePack(locale) : hasCardTextPack(locale)) return
+  const key = `${part}:${locale}`
+  const existing = pending.get(key)
   if (existing) return existing
   const request = (async () => {
     const list = await loadLanguageManifest()
     const language = list.languages.find(item => item.id === locale)
     if (!language) throw new Error(`Unknown language: ${locale}`)
-    const response = await fetchVerifiedResource(`${base}${language.file}`, language.sha256)
+    const { file, sha256 } = language[part]
+    const response = await fetchVerifiedResource(`${base}${file}`, sha256)
     if (!response.ok) throw new Error(`Language unavailable (${response.status})`)
     const raw = await response.text()
     const value: unknown = JSON.parse(raw)
     if (!value || typeof value !== 'object' || !('locale' in value) || value.locale !== locale) throw new Error('Language identity mismatch')
-    registerLanguagePack(value)
+    registerLanguagePack(value, part)
   })()
-  pending.set(locale, request)
-  try { await request } finally { pending.delete(locale) }
+  pending.set(key, request)
+  try { await request } finally { pending.delete(key) }
+}
+
+/** The Core Language Pack: everything startup and card-free screens translate. */
+export const loadLanguagePack = (locale: Locale): Promise<void> => loadPart(locale, 'core')
+
+/** The Card Text Pack: card faces and names, awaited only by screens that show cards. */
+export const loadCardTextPack = (locale: Locale): Promise<void> => loadPart(locale, 'cards')
+
+export const hasFullLanguage = (locale: Locale): boolean => hasLanguagePack(locale) && hasCardTextPack(locale)
+
+export async function loadFullLanguage(locale: Locale): Promise<void> {
+  await Promise.all([loadLanguagePack(locale), loadCardTextPack(locale)])
 }
