@@ -1,3 +1,4 @@
+// @covers scripts/release/backend-image-maintenance.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'

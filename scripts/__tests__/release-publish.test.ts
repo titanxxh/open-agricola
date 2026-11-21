@@ -1,3 +1,5 @@
+// @covers deploy-backend.sh scripts/ci/candidate-verification.ts scripts/release/backend-image-maintenance.ts
+// @covers scripts/release/backend-image.ts scripts/release/publish.ts
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'

@@ -6,6 +6,7 @@ import { CARD_REGISTRIES, readImportGraph, type ImportGraph } from './import-gra
 import { FULL_TASK_IDS } from './verification-tasks'
 import { parseSource, sourceExtensions, walkSourceFiles } from '../source-files'
 import { TEST_PROJECT_GLOBS } from '../test-project-globs'
+import { coverPrefixes, isBrowserSpec, isVitestSource, prefixMatches, repositoryFiles } from './test-covers'
 
 export type RoutineChange =
   | { status: 'A' | 'M' | 'D'; path: string }
@@ -239,52 +240,14 @@ function widenIncomplete(
 
 const normalize = (file: string) => file.split(/[\\/]/).join('/')
 
-function isSpec(file: string): boolean {
-  return /^e2e-tests\/.+\.spec\.[cm]?[jt]sx?$/.test(file)
-}
-
-function prefixMatches(prefix: string, path: string): boolean {
-  if (path === prefix) return true
-  const directory = prefix.endsWith('/') ? prefix : `${prefix}/`
-  return path.startsWith(directory)
-}
+const isSpec = isBrowserSpec
 
 function exceedsThird(matched: number, total: number): boolean {
   return matched * 3 > total
 }
 
-function coverPrefixes(text: string): string[] {
-  const prefixes: string[] = []
-  let inBlock = false
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (inBlock) {
-      if (trimmed.includes('*/')) inBlock = false
-      continue
-    }
-    if (trimmed === '') continue
-    if (trimmed.startsWith('/*')) {
-      if (!trimmed.includes('*/')) inBlock = true
-      continue
-    }
-    if (!trimmed.startsWith('//')) break
-    const match = trimmed.match(/^\/\/\s*@covers\b(.*)$/)
-    if (match?.[1]) prefixes.push(...match[1].trim().split(/\s+/).filter(Boolean))
-  }
-  return prefixes
-}
-
 function sourcePaths(root: string): string[] {
   return walkSourceFiles(root, sourceExtensions, true, 'skip-non-source').map(file => normalize(relative(root, file)))
-}
-
-function repositoryFiles(root: string): string[] {
-  return globSync('**/*', {
-    cwd: root,
-    nodir: true,
-    posix: true,
-    ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/.build/**', '**/coverage/**', '**/playwright-report/**', '**/test-results/**'],
-  })
 }
 
 function readCoverIndex(root: string, specs: readonly string[], files: readonly string[]): { declarations: Map<string, string[]>; warnings: string[] } {
@@ -300,6 +263,21 @@ function readCoverIndex(root: string, specs: readonly string[], files: readonly 
     if (valid.length) declarations.set(file, valid)
   }
   return { declarations, warnings }
+}
+
+// A Vitest file or test helper whose declaration matches selects itself and the tests that import it.
+function vitestCoverSelection(
+  graph: ImportGraph,
+  declarations: ReadonlyMap<string, string[]>,
+  path: string,
+  tests: ReadonlySet<string>,
+): Set<string> {
+  const selected = new Set<string>()
+  for (const [file, prefixes] of declarations) {
+    if (!prefixes.some(prefix => prefixMatches(prefix, path))) continue
+    for (const dependent of reachableDependents(graph, file)) if (tests.has(dependent)) selected.add(dependent)
+  }
+  return selected
 }
 
 function sortBrowsers(entries: readonly RoutineBrowserEntry[]): RoutineBrowserEntry[] {
@@ -400,6 +378,7 @@ const preparedByRoot = new Map<string, {
   inventory: ReadonlyMap<string, string>
   files: string[]
   covers: ReturnType<typeof readCoverIndex>
+  vitestCovers: ReturnType<typeof readCoverIndex>
 }>()
 
 function prepare(root: string, fingerprint?: string) {
@@ -409,8 +388,11 @@ function prepare(root: string, fingerprint?: string) {
   const inventory = vitestInventory(root)
   const graph = withSetupDependents(root, readGraph, inventory)
   const files = sourcePaths(root)
-  const covers = readCoverIndex(root, files.filter(isSpec), repositoryFiles(root))
-  const prepared = { graph, readGraph, inventory, files, covers, fingerprint: fingerprint ?? '' }
+  const repository = repositoryFiles(root)
+  const covers = readCoverIndex(root, files.filter(isSpec), repository)
+  const vitestSources = [...new Set([...inventory.keys(), ...files.filter(isVitestSource)])].sort()
+  const vitestCovers = readCoverIndex(root, vitestSources, repository)
+  const prepared = { graph, readGraph, inventory, files, covers, vitestCovers, fingerprint: fingerprint ?? '' }
   if (fingerprint) preparedByRoot.set(root, prepared)
   return prepared
 }
@@ -423,7 +405,7 @@ export function planRoutineVerification(input: {
   try {
     const triggers = fullTriggerWarnings(input.changes)
     if (triggers.length) return completeCatalog(triggers)
-    const { graph, readGraph, inventory, files, covers } = prepare(input.root, input.sourceFingerprint)
+    const { graph, readGraph, inventory, files, covers, vitestCovers } = prepare(input.root, input.sourceFingerprint)
     const tests = new Set(inventory.keys())
     const selected = new Set<string>()
     const relevant = new Set<string>()
@@ -442,7 +424,9 @@ export function planRoutineVerification(input: {
           for (const file of readSelection(readGraph, output.path, tests, output.directory)) readers.add(file)
         }
         for (const file of readers) selected.add(file)
-        selectionReasons.push(`${path}: ${dependentTests} Vitest files through runtime imports; ${cards.size} through registry keys or direct registry imports; ${readers.size} through direct reads`)
+        const declared = vitestCoverSelection(graph, vitestCovers.declarations, path, tests)
+        for (const file of declared) selected.add(file)
+        selectionReasons.push(`${path}: ${dependentTests} Vitest files through runtime imports; ${cards.size} through registry keys or direct registry imports; ${readers.size} through direct reads; ${declared.size} through @covers`)
       }
     }
     const widened = widenIncomplete(graph, inventory, selected, relevant)
@@ -459,7 +443,7 @@ export function planRoutineVerification(input: {
       vitestFiles: [...selected].sort(),
       catalogTasks: documentationOnly(input.changes) ? [] : ['quality', 'build'],
       browserFiles: sortBrowsers([...browsers, ...widened.browserFiles]),
-      warnings: [...widened.warnings, ...covers.warnings].sort(),
+      warnings: [...widened.warnings, ...covers.warnings, ...vitestCovers.warnings].sort(),
       fullTrigger: false,
       selectionReasons: selectionReasons.sort(),
     }

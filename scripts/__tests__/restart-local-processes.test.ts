@@ -1,3 +1,4 @@
+// @covers restart-local.sh scripts/local-rooms.ts scripts/local-services.mjs scripts/test-environment.ts
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer as createNetServer } from 'node:net'

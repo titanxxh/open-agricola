@@ -1,3 +1,4 @@
+// @covers scripts/release/verify-feedback-deployment.ts server/bug-report/feedback-owner-cli.ts
 import { execFileSync, spawn } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'

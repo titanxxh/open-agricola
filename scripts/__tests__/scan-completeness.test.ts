@@ -1,3 +1,4 @@
+// @covers scripts/check-bundle-size.ts scripts/check-test-project-coverage.ts
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'

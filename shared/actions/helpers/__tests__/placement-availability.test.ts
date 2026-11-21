@@ -1,3 +1,4 @@
+// @covers shared/actions/effects/place-farmer.ts
 import { execFileSync } from 'node:child_process'
 import { describe, it, expect, afterEach } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'

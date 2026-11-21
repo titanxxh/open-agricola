@@ -1,3 +1,4 @@
+// @covers scripts/aihubmix-smoke-test.ts
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'

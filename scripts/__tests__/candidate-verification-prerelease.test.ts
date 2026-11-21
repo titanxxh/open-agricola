@@ -1,3 +1,4 @@
+// @covers scripts/build-frontend.ts
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

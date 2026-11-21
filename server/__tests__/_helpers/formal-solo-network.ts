@@ -1,3 +1,4 @@
+// @covers server/index.ts
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer } from 'node:net'

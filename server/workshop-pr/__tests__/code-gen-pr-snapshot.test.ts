@@ -1,3 +1,4 @@
+// @covers scripts/generate-register-all.ts
 import { describe, it, expect } from 'vitest'
 import {
   mkdtempSync,

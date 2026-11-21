@@ -1,3 +1,4 @@
+// @covers docker-compose.prod.yml
 import { readFileSync, renameSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
