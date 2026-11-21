@@ -1,7 +1,7 @@
 // @covers client/service-worker/app-shell.worker.ts
 // @covers scripts/vite-service-worker.ts
 // @covers scripts/browser-data.ts client/services/language-pack.ts client/app/CardTextBoundary.tsx
-// @covers client/main.tsx client/app/startup-prefetch.ts client/app/platform-page.ts
+// @covers client/main.tsx client/app/startup-prefetch.ts client/app/platform-page.ts client/services/app-shell-warm.ts
 import { expect, test, type Page } from '@playwright/test'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -49,7 +49,14 @@ test.beforeAll(async () => {
   cpSync(buildPagesFrontend(site.origin).directory, siteDirectory, { recursive: true })
 })
 
-test.afterEach(() => {
+test.afterEach(async ({ context }) => {
+  // A Worker keeps warming in the background; close it and let its last requests land before the next test logs any.
+  await context.close()
+  for (let seen = -1, quiet = 0; quiet < 10 && seen !== Infinity;) {
+    await new Promise(resolve => setTimeout(resolve, 100))
+    quiet = requests.length === seen ? quiet + 1 : 0
+    seen = requests.length
+  }
   requests.length = 0
   tampered.clear()
   releaseCardText?.()
@@ -89,6 +96,10 @@ async function controlledEncyclopedia(page: Page) {
 // The search box appears once the lazy encyclopedia chunks and its data have loaded.
 const encyclopediaReady = (page: Page) => expect(page.getByRole('searchbox')).toBeVisible()
 
+const loadedShell = (page: Page) => page.evaluate(() => [...new Set(performance.getEntriesByType('resource')
+  .map(entry => new URL(entry.name)).filter(url => url.origin === location.origin && /^\/assets\/.+\.(js|css)$/.test(url.pathname))
+  .map(url => url.pathname))])
+
 const cachedPaths = (page: Page) => page.evaluate(async name =>
   (await (await caches.open(name)).keys()).map(request => new URL(request.url).pathname).sort(), CACHE_NAME)
 
@@ -103,7 +114,8 @@ test('a repeat visit loads the hashed app shell and startup data from the Worker
   await controlledEncyclopedia(page)
   // The build carries the language list, so startup goes straight to the pack.
   expect(requests).not.toContain('/i18n/manifest.json')
-  const shell = [...new Set(requests.filter(path => path.startsWith('/assets/') && /\.(js|css)$/.test(path)))]
+  // The Worker may already hold these from the first visit, so read what the page loaded from the page itself.
+  const shell = await loadedShell(page)
   expect(shell.length).toBeGreaterThan(0)
   expect(startupData()).toHaveLength(2)
   await expect.poll(() => uncached(page, [...shell, ...startupData()]), STORE_TIMEOUT).toEqual([])
@@ -200,6 +212,28 @@ test('the lobby downloads card text only after its first screen is up @webkit', 
   releaseCore?.()
   await expect(page.locator('#initial-load')).toHaveCount(0)
   await expect.poll(() => requests).toContain(packs.cards)
-  expect(gameChunk(requests)).toBe(false)
+  // The Worker may fetch the game screen in the background; the lobby itself never loads it.
+  expect(gameChunk(await page.evaluate(() => performance.getEntriesByType('resource').map(entry => new URL(entry.name).pathname)))).toBe(false)
+})
+
+test('the first visit leaves the next one served by the Worker, game screen included @webkit', async ({ page, context }) => {
+  await page.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'zh') })
+  // This visit is not controlled: the Worker installs while it runs.
+  await page.goto(`${site.origin}/?page=encyclopedia&bg=none`, documentLoad)
+  await encyclopediaReady(page)
+  expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull()
+  const shell = [...new Set(requests.filter(path => path.startsWith('/assets/') && /\.(js|css)$/.test(path)))]
+  const sw = readFileSync(join(siteDirectory, 'sw.js'), 'utf8')
+  const game = sw.match(/assets\/GameContainerApi-[\w-]+\.js/)?.[0]
+  if (!game) throw new Error('The Worker lists no game screen chunk to warm')
+  await expect.poll(() => uncached(page, [...shell, ...startupData(), `/${game}`]), STORE_TIMEOUT).toEqual([])
+
+  requests.length = 0
+  const next = await context.newPage()
+  await next.goto(`${site.origin}/?page=encyclopedia&bg=none`, documentLoad)
+  await encyclopediaReady(next)
+  expect(await next.evaluate(() => navigator.serviceWorker.controller?.scriptURL)).toBe(`${site.origin}/sw.js`)
+  expect(requests.filter(path => path.startsWith('/assets/') && /\.(js|css)$/.test(path))).toEqual([])
+  expect(requests.filter(path => STARTUP_DATA.test(path))).toEqual([])
 })
 
