@@ -1042,3 +1042,29 @@ it('opens from a verify-open receipt without GitHub and refuses a stale one or a
   expect(value.invoke('verify-open', '--sha', candidate).stderr).toContain('verify-open requires --sha')
   expect(value.calls()).not.toContain('gh ')
 })
+
+it('refuses the ops tools\' format 2 envelopes and never advances an operation they started (titanxxh/open-agricola#1976)', () => {
+  const value = fixture(), target = parsePrereleaseTarget(value.config), policy = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const receive = (envelope: Record<string, unknown>, mode = 'receive') => spawnSync(process.execPath, ['--import', 'tsx', 'scripts/prerelease/operations.ts', mode], {
+    input: JSON.stringify({ format: 1, policySha: policy, expiresAt: Date.now() + 300000, fingerprint: targetFingerprint(target), target: value.config,
+      request: { action: 'status', expectedCurrent: 'installed' }, receipt: null, ...envelope }),
+    encoding: 'utf8', timeout: 15000, env: { ...value.env, SSH_CONNECTION: 'owner fixture', PRERELEASE_LOCK_SCOPE: targetFingerprint(target) } })
+  for (const envelope of [{ format: 2, opsSha: 'a'.repeat(40) }, { opsSha: 'a'.repeat(40) }]) {
+    const result = receive(envelope)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('not format 1; operations of the ops prerelease tools must continue with those tools')
+  }
+  expect(value.calls()).toBe('')
+  const generation = 'bb4d6c82-676f-4dcc-a570-52377b3b32f5', image = `sha256:${'d'.repeat(64)}`, candidate = 'c'.repeat(40)
+  const operation = { id: 'db4d6c82-676f-4dcc-a570-52377b3b32f5', kind: 'reverify', buildId: candidate, image, sourceBuildId: candidate, sourceImage: null,
+    stage: 'acceptance', backupStem: null, generation, tools: { opsSha: 'a'.repeat(40), policySha: policy } }
+  mkdirSync(join(value.root, 'control'), { recursive: true })
+  writeFileSync(join(value.root, 'control/gate.json'), JSON.stringify({ format: 1, channel: 'prerelease', targetId: target.targetId, fingerprint: targetFingerprint(target),
+    generation, mode: 'maintenance', buildId: candidate, installed: { buildId: candidate, image, installedAt: 1 }, operation, acceptance: null }))
+  const status = receive({}, '_locked')
+  expect(status.stderr).toBe('')
+  expect(JSON.parse(status.stdout).operation).toMatchObject({ id: operation.id })
+  const advance = receive({ request: { action: 'maintain', expectedCurrent: candidate } }, '_locked')
+  expect(advance.status).toBe(1)
+  expect(advance.stderr).toContain('The pending prerelease operation was started by the ops tools')
+})

@@ -14,7 +14,7 @@ import { parsePrereleaseOwnerLocalProof } from '../ci/owner-local-format.ts'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 import { ownerMachine, RELEASE_REPOSITORY } from '../ci/release-github'
 import { runPrereleaseOperation, type OperationRequest } from './flow'
-import { controlDirectory, gatewayAlias, readRuntime } from './runtime'
+import { controlDirectory, gatewayAlias, readRuntime, recordPath } from './runtime'
 import { parseImageImportRequest, runImageImport } from './image-import'
 import { assertExpectedContainerImage, verifyContainerImageBuild } from '../ci/container-images.ts'
 import { prepareContainerImageArchive } from '../release/container-images-owner.ts'
@@ -117,6 +117,17 @@ function parseRequest(value: unknown): OperationRequest {
     backupGeneration: optional('backupGeneration'), expectedSourceCurrent: optional('expectedSourceCurrent'), sourceTarget: input.sourceTarget === undefined ? undefined : parsePrereleaseTarget(input.sourceTarget) }
 }
 
+/** A pending operation that the ops host side advanced carries `tools`; only those tools may continue it. */
+function refuseOpsOperation(target: ReturnType<typeof parsePrereleaseTarget>): void {
+  let record: unknown
+  try { record = JSON.parse(readFileSync(recordPath(target), 'utf8')) }
+  catch (error) { if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return; throw error }
+  const operation = record && typeof record === 'object' && 'operation' in record ? record.operation : null
+  if (operation && typeof operation === 'object' && 'tools' in operation) {
+    throw new Error('The pending prerelease operation was started by the ops tools; continue or abandon it with them')
+  }
+}
+
 function prepareSource(target: ReturnType<typeof parsePrereleaseTarget>, sha: string, budgetInput: unknown) {
   const budget = budgetInput === undefined ? undefined : parseSourceBudget(budgetInput)
   assertStorageAdmission(target, targetFingerprint(target), 'operation')
@@ -137,6 +148,8 @@ export async function operations(args: string[]): Promise<void> {
   if (args[0] === 'receive' || args[0] === '_locked') {
     ownerMachine()
     const input = await inputEnvelope()
+    // Format 2 envelopes (with `opsSha`) belong to the host side in open-agricola-ops; these tools only take format 1.
+    if ((input.format ?? 1) !== 1 || input.opsSha !== undefined) throw new Error('Owner envelope is not format 1; operations of the ops prerelease tools must continue with those tools')
     const target = parsePrereleaseTarget(input.target)
     const imageImport = ['prepare-image-import', 'import-image'].includes(String(object(input.request).action))
     const request = imageImport ? parseImageImportRequest(input.request) : parseRequest(input.request)
@@ -149,6 +162,7 @@ export async function operations(args: string[]): Promise<void> {
     if ('buildId' in request && (request.action === 'deploy' || request.action === 'open' || request.action === 'restore')) admitReceipt(input.receipt, request.buildId, request.action)
     if ('buildId' in request && ['prepare-restore-source', 'restore-source'].includes(request.action)) admitReceipt(input.receipt, request.buildId, 'restore')
     if (args[0] === 'receive') { process.stdout.write(locked(target, input)); return }
+    if (request.action !== 'status') refuseOpsOperation(target)
     if (!('transfer' in request)) {
       if (request.action === 'prepare-restore-source') {
         const current = readRuntime(target)
