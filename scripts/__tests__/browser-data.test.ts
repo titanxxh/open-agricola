@@ -31,10 +31,7 @@ describe('browser metadata build identity', () => {
     const { root, raw, sha256 } = fixture()
     const defines = loadBrowserDataDefines(root)
 
-    expect(defines).toEqual({
-      'import.meta.env.VITE_CARDS_MANIFEST_SHA256': JSON.stringify(sha256),
-      'import.meta.env.VITE_LANGUAGE_MANIFEST': JSON.stringify(languages),
-    })
+    expect(defines).toEqual({ 'import.meta.env.VITE_CARDS_MANIFEST_SHA256': JSON.stringify(sha256) })
     const emittedHash: string = JSON.parse(defines['import.meta.env.VITE_CARDS_MANIFEST_SHA256'])
     const emitted = readFileSync(join(root, `public/cards-manifest.${emittedHash}.json`), 'utf8')
     expect(emitted).toBe(raw)
@@ -53,15 +50,21 @@ describe('browser metadata build identity', () => {
     expect(() => loadBrowserDataDefines(root)).toThrow('Cards manifest content mismatch')
   })
 
-  it('carries the pinned language list so startup does not request it', () => {
+  it('carries the pinned language list for the main site so startup does not request it', () => {
     const { root } = fixture()
-    const embedded: string = JSON.parse(loadBrowserDataDefines(root)['import.meta.env.VITE_LANGUAGE_MANIFEST'])
-    expect(JSON.parse(embedded).languages[0].file).toBe(`zh.${packSha256.slice(0, 16)}.json`)
+    const embedded: string = JSON.parse(loadBrowserDataDefines(root, { languageList: true })['import.meta.env.VITE_LANGUAGE_MANIFEST'])
+    expect(embedded).toBe(languages)
+  })
+
+  it('leaves a Replay Viewer package to read the language list it publishes', () => {
+    const { root } = fixture()
+    writeFileSync(join(root, 'public/i18n/manifest.json'), 'not read\n')
+    expect(loadBrowserDataDefines(root)).not.toHaveProperty(['import.meta.env.VITE_LANGUAGE_MANIFEST'])
   })
 
   it('refuses a language list the client could not parse', () => {
     const { root } = fixture()
     writeFileSync(join(root, 'public/i18n/manifest.json'), '{"version":1,"languages":[]}\n')
-    expect(() => loadBrowserDataDefines(root)).toThrow()
+    expect(() => loadBrowserDataDefines(root, { languageList: true })).toThrow()
   })
 })

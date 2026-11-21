@@ -117,7 +117,9 @@ for (const layout of [DESKTOP, MOBILE]) {
       expect(catalogData.map(({ path }) => path.replace(/\.[a-f0-9]{16}\.json$/, '.json')).sort())
         .toEqual(expect.arrayContaining(['/card-encyclopedia/catalog.json', '/card-encyclopedia/manifest.json', '/card-encyclopedia/search.json']))
       const languages = from(({ path }) => path.startsWith('/i18n/'))
-      expect(languages.map(({ path }) => path)).toEqual(expect.arrayContaining(['/i18n/manifest.json', expect.stringMatching(/^\/i18n\/en\.[a-f0-9]{16}\.json$/)]))
+      // The Pages build carries the language list, so only the pack itself is read.
+      expect(languages.map(({ path }) => path)).toEqual(expect.arrayContaining([expect.stringMatching(/^\/i18n\/en\.[a-f0-9]{16}\.json$/)]))
+      expect(languages.map(({ path }) => path)).not.toContain('/i18n/manifest.json')
       const art = from(({ origin }) => origin === ASSET_ORIGIN)
       expect(art.map(({ path }) => path)).toContain('/open-agricola-assets/assets/revised/deckA/A004.png')
       for (const source of [...catalogData, ...languages]) expect(source).toMatchObject({ origin: site.origin, status: 200 })
