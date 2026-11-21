@@ -113,7 +113,7 @@ function image(cwd: string, selected: Config): Stage {
   if (run.id !== runId || run.run_attempt !== runAttempt) throw new ObservationError('conflict', 'image-run-mismatch')
   if (run.status !== 'completed') return { state: 'pending', evidence: 'native', reason: 'image-build-incomplete' }
   if (run.conclusion !== 'success') throw new ObservationError('conflict', 'image-build-not-successful')
-  const script = `import {verifyContainerImageBuild} from ${JSON.stringify(new URL('./container-images.ts', import.meta.url).href)};const selected=JSON.parse(process.argv[1]);process.stdout.write(JSON.stringify(verifyContainerImageBuild(selected)));`
+  const script = `import {verifyContainerImageBuild} from ${JSON.stringify(new URL('../ci/container-images.ts', import.meta.url).href)};const selected=JSON.parse(process.argv[1]);process.stdout.write(JSON.stringify(verifyContainerImageBuild(selected)));`
   const result = command(cwd, process.execPath, ['--input-type=module', '-e', script, JSON.stringify({ cwd, runId, runAttempt, artifactId })])
   if (result.error || result.status !== 0) throw new ObservationError('unavailable', 'image-proof-unavailable')
   const receipt = object(JSON.parse(result.stdout))

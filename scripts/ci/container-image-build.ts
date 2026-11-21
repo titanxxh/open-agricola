@@ -6,9 +6,9 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertCandidateCheckout } from './candidate-verification.ts'
 import { candidateExecution, executeCandidate, printVerificationOutput, stopCandidateExecution } from './candidate-isolation.ts'
-import { CONTAINER_IMAGE_REGISTRY, CONTAINER_IMAGE_RECEIPT_FILE, CONTAINER_IMAGE_WORKFLOW, containerImageVerification, parseContainerImageReceipt } from '../release/container-images.ts'
+import { CONTAINER_IMAGE_REGISTRY, CONTAINER_IMAGE_RECEIPT_FILE, CONTAINER_IMAGE_WORKFLOW, containerImageVerification, parseContainerImageReceipt } from './container-images.ts'
 import { checkPrivateRegistry, assertPrivateReadDenials, publishedRegistryManifest } from './container-image-build-registry.ts'
-import { nativeContainerImageId, validateContainerImageArchive } from '../release/container-images-archive.ts'
+import { nativeContainerImageId, validateContainerImageArchive } from './container-images-archive.ts'
 
 const repository = 'titanxxh/open-agricola'
 const workflow = CONTAINER_IMAGE_WORKFLOW

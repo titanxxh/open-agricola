@@ -6,8 +6,8 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertNativeImageIntake, imageIntakeProperties, parseImageImportBudget } from '../image-intake.ts'
 import { fullSha } from '../ci/verification-tasks.ts'
-import { assertExpectedContainerImage, parseContainerImageTransfer } from './container-images.ts'
-import { inspectLoadedContainerImage, loadContainerImageArchive, nativeContainerImageId } from './container-images-archive.ts'
+import { assertExpectedContainerImage, parseContainerImageTransfer } from '../ci/container-images.ts'
+import { inspectLoadedContainerImage, loadContainerImageArchive, nativeContainerImageId } from '../ci/container-images-archive.ts'
 
 export const BACKEND_IMAGE_QUEUE_WAIT_MS = 30 * 60_000
 export const BACKEND_IMAGE_INTAKE_WORK_MS = 20 * 60_000

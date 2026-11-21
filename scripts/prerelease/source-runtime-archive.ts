@@ -5,7 +5,7 @@ import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { execFileSync } from 'node:child_process'
 import type { RuntimePin } from './source-runtime.ts'
-import { CONTAINER_IMAGE_REGISTRY } from '../release/container-images.ts'
+import { CONTAINER_IMAGE_REGISTRY } from '../ci/container-images.ts'
 
 const repository = CONTAINER_IMAGE_REGISTRY.slice('ghcr.io/'.length)
 const registry = 'https://ghcr.io/v2/' + repository

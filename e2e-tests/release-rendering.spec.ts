@@ -1,7 +1,7 @@
 // @covers scripts/release/
 import { createServer } from 'node:http'
 import { expect, test } from '@playwright/test'
-import { verifyVisibleReleaseAssets } from '../scripts/release/render'
+import { verifyVisibleReleaseAssets } from './helpers/render'
 
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
 

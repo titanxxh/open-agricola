@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 // ADR 0047: a cutover with Owner-local Validation obtains the arm64 validator image before export and backend contact.
 const order: string[] = []
 vi.mock('../release/backend-candidate.ts', () => ({ backendCandidate: (_cwd: string, refs: string[]) => refs[0] }))
-vi.mock('../release/container-images.ts', () => ({
+vi.mock('../ci/container-images.ts', () => ({
   verifyContainerImageBuild: () => ({ producerSha: 'b'.repeat(40), imageId: `sha256:${'c'.repeat(64)}` }),
   assertExpectedContainerImage: () => undefined,
 }))

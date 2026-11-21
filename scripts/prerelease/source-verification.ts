@@ -6,7 +6,7 @@ import { setTimeout } from 'node:timers/promises'
 import { checkPrereleaseVerification, fixPrereleaseCandidate, prereleaseCandidateRef, requestPrereleaseVerification, RUN_IN_PROGRESS } from '../ci/prerelease-verification'
 import { assertRawCommit } from '../ci/candidate-verification'
 import { fullSha } from '../ci/verification-tasks'
-import { commitRef, github, RELEASE_REPOSITORY } from '../release/candidate'
+import { commitRef, github, RELEASE_REPOSITORY } from '../ci/release-github'
 
 type Binding = { sha: string; from: string; producer: string }
 export type SourceProof = Binding & { kind: 'prerelease-source'; scope: 'routine' | 'full'; runId: number | null; attempt: number | null }

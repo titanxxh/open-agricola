@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { verifyPublishEnvironment } from './container-image-build.ts'
 import { assertPrivateReadDenials, checkPrivateRegistry, publishedRegistryManifest } from './container-image-build-registry.ts'
-import { CONTAINER_IMAGE_REGISTRY } from '../release/container-images.ts'
+import { CONTAINER_IMAGE_REGISTRY } from './container-images.ts'
 
 if (process.env.GITHUB_ACTIONS !== 'true' || process.env.GITHUB_REPOSITORY !== 'titanxxh/open-agricola' ||
     process.env.GITHUB_REF !== 'refs/heads/main' || !['push', 'workflow_dispatch'].includes(process.env.GITHUB_EVENT_NAME ?? '') || !process.env.RUNNER_TEMP) {

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { nativeContainerImageId } from '../release/container-images-archive.ts'
-import { CONTAINER_IMAGE_REGISTRY } from '../release/container-images.ts'
+import { nativeContainerImageId } from '../ci/container-images-archive.ts'
+import { CONTAINER_IMAGE_REGISTRY } from '../ci/container-images.ts'
 
 const digest = (value: unknown): value is string => typeof value === 'string' && /^sha256:[a-f0-9]{64}$/.test(value)
 export const runtimePinPath = 'deploy/prerelease-runtime.ref'

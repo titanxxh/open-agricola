@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { request } from '@playwright/test'
 import { expect, it } from 'vitest'
 import { clearOwnReleaseSession } from '../../e2e-tests/helpers/release-browser'
-import { createFailureRecorder } from '../release/smoke'
+import { createFailureRecorder } from '../../e2e-tests/helpers/smoke'
 
 it.each([false, true])('cleans only the current issued session and retains the first failure when logout fails=%s', async failLogout => {
   const sessions = new Set(['other-retained-session']), observed: string[] = []

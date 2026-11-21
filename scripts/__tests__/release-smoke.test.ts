@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { createFailureRecorder, parseSmokeTarget } from '../release/smoke'
+import { createFailureRecorder, parseSmokeTarget } from '../../e2e-tests/helpers/smoke'
 
 it.each([
   'http://localhost:5175', 'http://127.0.0.1:5175', 'http://[::1]:5175',

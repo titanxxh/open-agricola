@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { parseContainerImageReceipt, containerImageVerification, verifyContainerImageBuild, CONTAINER_IMAGE_WORKFLOW, containerImageArtifactName } from '../release/container-images'
+import { parseContainerImageReceipt, containerImageVerification, verifyContainerImageBuild, CONTAINER_IMAGE_WORKFLOW, containerImageArtifactName } from '../ci/container-images'
 
 const policyReceipt = () => ({
   format: 1, repository: 'titanxxh/open-agricola', repositoryId: 123,

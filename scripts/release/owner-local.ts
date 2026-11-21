@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { admitFinalSnapshot, assertCandidateCheckout, checkCandidateVerification, mainCommit } from '../ci/candidate-verification.ts'
 import { OWNER_LOCAL_ASSET, OWNER_LOCAL_CONTEXT, PRERELEASE_OWNER_LOCAL_CONTEXT, ownerLocalRepository, rebindOwnerLocalReceipt, rebindPrereleaseOwnerLocalReceipt } from '../ci/owner-local-verification.ts'
 import { admitPrereleaseSnapshot, checkPrereleaseVerification, fixPrereleaseCandidate } from '../ci/prerelease-verification.ts'
-import { commitRef, ensureCommitRef, github } from './candidate.ts'
+import { commitRef, ensureCommitRef, github } from '../ci/release-github.ts'
 
 const object = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid owner-local release metadata')

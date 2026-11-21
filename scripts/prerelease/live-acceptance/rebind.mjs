@@ -7,7 +7,7 @@ import { basename, dirname, join } from 'node:path'
 import { privateJson } from './context.mjs'
 import { SUITE_CASES } from './suites.mjs'
 
-import { IDENTITY_BOUNDARY_PATHS } from '../identity-boundary-paths.ts'
+import { IDENTITY_BOUNDARY_PATHS } from '../../ci/identity-boundary-paths.ts'
 export { IDENTITY_BOUNDARY_PATHS }
 
 /** Steps the fast path marks done without running; their evidence comes from the last full acceptance. */

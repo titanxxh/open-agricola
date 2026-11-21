@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, statSync } from 'node:fs'
 import { resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertOwnerPath, parsePrereleaseTarget } from './config'
-import { ownerMachine } from '../release/candidate'
+import { ownerMachine } from '../ci/release-github'
 
 /** This grants only private ingress. The candidate still applies real identity/Beta admission. */
 export async function configureOwnerVerification(context: BrowserContext, origin: string, tokenFile: string, onRetry?: (error: unknown) => void): Promise<void> {

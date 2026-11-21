@@ -33,7 +33,7 @@
     "verify": "tsx scripts/verify.ts",
     "verify:parallel": "node scripts/verify-parallel.mjs",
     "release": "tsx scripts/release/publish.ts",
-    "release:accept": "tsx scripts/release/live-smoke-cli.ts",
+    "release:accept": "tsx e2e-tests/helpers/live-smoke-cli.ts",
     "release:inventory": "tsx scripts/release/live-inventory.ts",
     "release:status": "tsx scripts/release/status.ts",
     "release:rehearse": "pnpm verify prepush && pnpm verify e2e-tests/release-rehearsal.spec.ts e2e-tests/release-diagnostics.spec.ts e2e-tests/release-rendering.spec.ts e2e-tests/live-release-smoke.spec.ts e2e-tests/choice-previews.spec.ts --browser=chromium --requirements scripts/release/requirements.json && pnpm verify status --requirements scripts/release/requirements.json",

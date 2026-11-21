@@ -20,8 +20,8 @@ import {
   isolationSmokeImage, nativeRunner, NETWORK_ATTEMPTS, OWNER_LOCAL_NODE, PREPARATION_RETRY_DELAY_MS, trustedPublicAssets, type PhaseRecord, type Runner,
 } from '../ci/owner-local-run.ts'
 import { fullSha } from '../ci/verification-tasks.ts'
-import { inspectLoadedContainerImage, nativeContainerImageId, validateContainerImageArchive } from './container-images-archive.ts'
-import { ownerMachine } from './candidate.ts'
+import { inspectLoadedContainerImage, nativeContainerImageId, validateContainerImageArchive } from '../ci/container-images-archive.ts'
+import { ownerMachine } from '../ci/release-github.ts'
 
 export const VALIDATOR_PLATFORM = 'linux/arm64'
 export type ValidatorChannel = 'stable' | 'prerelease'

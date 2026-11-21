@@ -8,7 +8,7 @@ import { exportRuntimeArchive } from '../prerelease/source-runtime-archive.ts'
 import { approvedRuntimePin, installedRuntime, parseRuntimePin, runtimePinPath } from '../prerelease/source-runtime.ts'
 import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config.ts'
 import { preparePrereleaseSource, readPreparedPrereleaseSource, sourceReleaseDirectory } from '../prerelease/source-preparation.ts'
-import { CONTAINER_IMAGE_REGISTRY } from '../release/container-images.ts'
+import { CONTAINER_IMAGE_REGISTRY } from '../ci/container-images.ts'
 
 const temps: string[] = []
 const temp = () => {

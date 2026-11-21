@@ -175,7 +175,7 @@ else if (Object.hasOwn(state.provenance, endpoint)) {
     cwd: root, env, encoding: 'utf8', timeout: 30_000,
   })
   const image = () => spawnSync(process.execPath, ['--import', tsxLoader, '--input-type=module', '--eval',
-    `import { containerImageVerification } from ${JSON.stringify(join(root, 'scripts/release/container-images.ts'))};
+    `import { containerImageVerification } from ${JSON.stringify(join(root, 'scripts/ci/container-images.ts'))};
     console.log(JSON.stringify(containerImageVerification({ cwd: ${JSON.stringify(root)}, purpose: 'candidate', sourceSha: ${JSON.stringify(sha)}, producerSha: ${JSON.stringify(mainSha)} })));`],
     { cwd: root, env, encoding: 'utf8', timeout: 30_000 })
   const events = (): Event[] => existsSync(join(root, 'events.jsonl')) ? readFileSync(join(root, 'events.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : []
