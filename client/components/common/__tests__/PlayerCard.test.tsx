@@ -584,14 +584,15 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
 describe('PlayerCard supplemental rules', () => {
   it('uses the global translation for major-improvement rules', () => {
     const original = getLanguagePack('zh')!
-    registerLanguagePack({ ...original, messages: { ...original.messages, 'cardFaces.Major_Fireplace1.rules': '主改良规则翻译' } })
+    // Card faces belong to the Card Text Pack, so the override replaces that part.
+    registerLanguagePack({ ...original, messages: { ...original.messages, 'cardFaces.Major_Fireplace1.rules': '主改良规则翻译' } }, 'cards')
     try {
       const html = renderToStaticMarkup(
         <PlayerCard locale="zh" cardId="Major_Fireplace1" cardType="major" />,
       )
       expect(html).toContain('主改良规则翻译')
     } finally {
-      registerLanguagePack(original)
+      registerLanguagePack(original, 'cards')
     }
   })
 })

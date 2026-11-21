@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../shared/i18n'
 import { hasLanguagePack, t as translate } from '../../shared/i18n'
-import { getLanguageManifest, loadLanguagePack } from '../services/language-pack'
+import { getLanguageManifest, hasFullLanguage, loadFullLanguage } from '../services/language-pack'
 import { applyWebsiteBackground, millisecondsUntilNextUtc8Midnight } from '../utils/seasonalBackground'
 
 const LOCALE_STORAGE_KEY = 'open-agricola-locale-v2'
@@ -36,8 +36,8 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setLocaleState(l)
       try { window.localStorage.setItem(LOCALE_STORAGE_KEY, l) } catch { /* ignore */ }
     }
-    if (hasLanguagePack(l)) commit()
-    else void loadLanguagePack(l).then(commit).catch(() => {
+    if (hasFullLanguage(l)) commit()
+    else void loadFullLanguage(l).then(commit).catch(() => {
       if (switchVersion.current === version) setLanguageError(true)
     })
   }, [])

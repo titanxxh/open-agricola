@@ -13,6 +13,7 @@ import { MobileTabBar } from '../components/common/MobileTabBar'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { AppShellLoadScreen } from './AppShellLoadScreen'
 import { CardMetadataBoundary } from './CardMetadataBoundary'
+import { CardTextBoundary } from './CardTextBoundary'
 import { getGameLoadProgress } from './game-load-progress'
 import { isHotseatSetupQuery } from './game-setup-query'
 import { SandboxAppLazy } from '../sandbox'
@@ -83,9 +84,11 @@ export function PageRouter() {
   if (page === 'encyclopedia') {
     return (
       <CardMetadataBoundary>
-        <Suspense fallback={<AppShellLoadScreen />}>
-          <EncyclopediaPageLazy />
-        </Suspense>
+        <CardTextBoundary>
+          <Suspense fallback={<AppShellLoadScreen />}>
+            <EncyclopediaPageLazy />
+          </Suspense>
+        </CardTextBoundary>
         <MobileTabBar current="encyclopedia" onNavigate={(t) => setPage(t)} />
       </CardMetadataBoundary>
     )
@@ -113,16 +116,20 @@ export function PageRouter() {
   switch (page) {
     case 'game':
       pageNode = (
-        <Suspense fallback={<AppShellLoadScreen />}>
-          <GameContainerApiLazy />
-        </Suspense>
+        <CardTextBoundary>
+          <Suspense fallback={<AppShellLoadScreen />}>
+            <GameContainerApiLazy />
+          </Suspense>
+        </CardTextBoundary>
       )
       break
     case 'workshop':
       pageNode = (
-        <Suspense fallback={<AppShellLoadScreen />}>
-          <SandboxAppLazy />
-        </Suspense>
+        <CardTextBoundary>
+          <Suspense fallback={<AppShellLoadScreen />}>
+            <SandboxAppLazy />
+          </Suspense>
+        </CardTextBoundary>
       )
       break
     case 'operations':

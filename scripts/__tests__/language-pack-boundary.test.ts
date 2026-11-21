@@ -46,6 +46,17 @@ describe('external language package boundary', () => {
     expect(missingCardFaces(ids, manifest.languages.map(language => language.id), locale => getLanguagePack(locale)?.messages)).toEqual([])
   })
 
+  it('keeps card text out of the Core Language Pack that startup waits for', () => {
+    const manifest: LanguageManifest = JSON.parse(readFileSync('public/i18n/manifest.json', 'utf8'))
+    const cardGroups = new Set(['cardFaces', 'occupations', 'minorImprovements', 'improvements', 'cards', 'parentFaces'])
+    for (const language of manifest.languages) {
+      const group = (key: string) => key.slice(0, key.indexOf('.'))
+      const keys = (file: string) => Object.keys(JSON.parse(readFileSync(`public/i18n/${file}`, 'utf8')).messages)
+      expect(keys(language.core.file).filter(key => cardGroups.has(group(key))), language.id).toEqual([])
+      expect(keys(language.cards.file).filter(key => !cardGroups.has(group(key))), language.id).toEqual([])
+    }
+  })
+
   it('lets only the English package omit classic faces', () => {
     const faces = (id: string) => Object.fromEntries(FACE_FIELDS.map(field => [`cardFaces.${id}.${field}`, field]))
     const packs: Record<string, Record<string, unknown>> = { en: faces('A001_Shelter'), zh: faces('A001_Shelter'), fr: {} }

@@ -52,12 +52,14 @@ export async function prepareLanguagePacks(root = resolve('.')) {
   const output = resolve(root, 'public/i18n')
   mkdirSync(output, { recursive: true })
   for (const language of manifest.languages) {
-    if (!/^[a-z]{2,3}(?:-[a-z0-9]+)*$/.test(language.id) || !/^[a-z0-9.-]+\.json$/.test(language.file)) throw new Error('Invalid language path')
-    const pack = await read(`packs/${language.file}`, language.sha256)
-    if (sha256(pack) !== language.sha256) throw new Error(`Language checksum mismatch: ${language.id}`)
-    const parsed = parseLanguagePack(JSON.parse(pack))
-    if (parsed.locale !== language.id) throw new Error('Language identity mismatch')
-    publishCache(resolve(output, language.file), pack)
+    for (const { file, sha256: checksum } of [language.core, language.cards]) {
+      if (!/^[a-z]{2,3}(?:-[a-z0-9]+)*$/.test(language.id) || !/^[a-z0-9.-]+\.json$/.test(file)) throw new Error('Invalid language path')
+      const pack = await read(`packs/${file}`, checksum)
+      if (sha256(pack) !== checksum) throw new Error(`Language checksum mismatch: ${language.id}`)
+      const parsed = parseLanguagePack(JSON.parse(pack))
+      if (parsed.locale !== language.id) throw new Error('Language identity mismatch')
+      publishCache(resolve(output, file), pack)
+    }
     // Authoring data is an ignored build cache for translation checks, never imported by the app.
     const sourcePath = resolve(root, `output/i18n/locales/${language.id}.json`)
     mkdirSync(dirname(sourcePath), { recursive: true })
@@ -66,14 +68,14 @@ export async function prepareLanguagePacks(root = resolve('.')) {
     publishCache(sourcePath, source)
   }
   publishCache(resolve(output, 'manifest.json'), raw)
-  const files = new Set(manifest.languages.map(language => language.file))
+  const files = new Set(manifest.languages.flatMap(language => [language.core.file, language.cards.file]))
   for (const file of readdirSync(output)) {
     if (/^[a-z0-9-]+\.[a-f0-9]{16}\.json$/.test(file) && !files.has(file)) {
       try { unlinkSync(resolve(output, file)) }
       catch (error) { if (!isMissingFile(error)) throw error }
     }
   }
-  console.log(`[prepare-language-packs] verified ${manifest.languages.length} packs from ${ref.repository}@${ref.revision.slice(0, 12)}`)
+  console.log(`[prepare-language-packs] verified ${manifest.languages.length} languages from ${ref.repository}@${ref.revision.slice(0, 12)}`)
   return manifest
 }
 

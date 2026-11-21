@@ -63,7 +63,7 @@ async function walkRepresentativePath(page: Page, layout: Layout) {
 }
 
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
-type LanguageRef = { id: string; file: string; sha256: string }
+type LanguageRef = { id: string; core: { file: string; sha256: string }; cards: { file: string; sha256: string } }
 
 /** Serves Chinese data in which one card text is still the English original, the way the build marks a fallback. */
 async function serveEnglishFallback(page: Page, entryKey: string, messageKey: string) {
@@ -73,15 +73,16 @@ async function serveEnglishFallback(page: Page, entryKey: string, messageKey: st
     return response.json()
   }
   const languages: { languages: LanguageRef[] } = await read('/i18n/manifest.json')
-  const english = await read(`/i18n/${languages.languages.find(language => language.id === 'en')!.file}`)
+  // Card faces live in the Card Text Pack.
+  const english = await read(`/i18n/${languages.languages.find(language => language.id === 'en')!.cards.file}`)
   const chineseRef = languages.languages.find(language => language.id === 'zh')!
-  const chinese = await read(`/i18n/${chineseRef.file}`)
+  const chinese = await read(`/i18n/${chineseRef.cards.file}`)
   chinese.messages[messageKey] = english.messages[messageKey]
   const chineseText = JSON.stringify(chinese)
-  chineseRef.sha256 = sha256(chineseText)
-  chineseRef.file = `zh.${chineseRef.sha256.slice(0, 16)}.json`
+  const chineseSha256 = sha256(chineseText)
+  chineseRef.cards = { file: `zh-cards.${chineseSha256.slice(0, 16)}.json`, sha256: chineseSha256 }
   await page.route('**/i18n/manifest.json*', route => route.fulfill({ json: languages }))
-  await page.route(`**/i18n/${chineseRef.file}`, route => route.fulfill({ body: chineseText, contentType: 'application/json' }))
+  await page.route(`**/i18n/${chineseRef.cards.file}`, route => route.fulfill({ body: chineseText, contentType: 'application/json' }))
 
   const manifest = await read('/card-encyclopedia/manifest.json')
   const search = await read(`/card-encyclopedia/${manifest.search.file}`)

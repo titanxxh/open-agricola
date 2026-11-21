@@ -20,28 +20,32 @@ function fixture(message = 'Ferme') {
   const source = JSON.stringify({ $name: 'Français', ui: { title: message } })
   const pack = JSON.stringify({ version: 1, locale: 'fr', messages: { 'ui.title': message } })
   const file = `fr.${digest(pack).slice(0, 16)}.json`
-  const manifest = JSON.stringify({ version: 1, defaultLocale: 'fr', languages: [{
-    id: 'fr', name: 'Français', file, sha256: digest(pack), sourceSha256: digest(source),
+  const cards = JSON.stringify({ version: 1, locale: 'fr', messages: { 'cardFaces.C112_Thresher.name': 'Batteur' } })
+  const cardsFile = `fr-cards.${digest(cards).slice(0, 16)}.json`
+  const manifest = JSON.stringify({ version: 2, defaultLocale: 'fr', languages: [{
+    id: 'fr', name: 'Français', core: { file, sha256: digest(pack) }, cards: { file: cardsFile, sha256: digest(cards) }, sourceSha256: digest(source),
   }] })
   for (const [path, text] of Object.entries({
     'i18n.ref': JSON.stringify({ repository: 'owner/languages', revision: 'a'.repeat(40), manifestSha256: digest(manifest) }),
-    'public/i18n/manifest.json': manifest, [`public/i18n/${file}`]: pack, 'output/i18n/locales/fr.json': source,
+    'public/i18n/manifest.json': manifest, [`public/i18n/${file}`]: pack, [`public/i18n/${cardsFile}`]: cards,
+    'output/i18n/locales/fr.json': source,
   })) {
     const target = join(root, path)
     mkdirSync(dirname(target), { recursive: true })
     writeFileSync(target, text)
   }
   vi.stubEnv('AGRICOLA_I18N_DIR', '')
-  return { root, file, pack, source, manifest }
+  return { root, file, pack, cardsFile, cards, source, manifest }
 }
 
 describe('pinned language package preparation', () => {
   it('uses the verified cache without making a network request', async () => {
-    const { root, file, pack } = fixture()
+    const { root, file, pack, cardsFile, cards } = fixture()
     const fetch = vi.fn().mockRejectedValue(new Error('offline'))
     vi.stubGlobal('fetch', fetch)
     expect((await prepareLanguagePacks(root)).defaultLocale).toBe('fr')
     expect(readFileSync(join(root, 'public/i18n', file), 'utf8')).toBe(pack)
+    expect(readFileSync(join(root, 'public/i18n', cardsFile), 'utf8')).toBe(cards)
     expect(fetch).not.toHaveBeenCalled()
   })
 
@@ -56,10 +60,11 @@ describe('pinned language package preparation', () => {
   })
 
   it('preserves complete bytes for existing and new readers across cache repair and preparation', async () => {
-    const { root, file, pack, source, manifest } = fixture()
+    const { root, file, pack, cardsFile, cards, source, manifest } = fixture()
     const files = new Map([
       ['packs/manifest.json', { target: join(root, 'public/i18n/manifest.json'), text: manifest }],
       [`packs/${file}`, { target: join(root, 'public/i18n', file), text: pack }],
+      [`packs/${cardsFile}`, { target: join(root, 'public/i18n', cardsFile), text: cards }],
       ['locales/fr.json', { target: join(root, 'output/i18n/locales/fr.json'), text: source }],
     ])
     const fetch = vi.fn((url: string) => {
@@ -107,7 +112,7 @@ describe('pinned language package preparation', () => {
         })))
       }
       await prepareLanguagePacks(root)
-      expect(fetch).toHaveBeenCalledTimes(6)
+      expect(fetch).toHaveBeenCalledTimes(8)
     } finally {
       await reader.terminate()
     }

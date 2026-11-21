@@ -48,9 +48,9 @@ Moor Balance Rules 是默认关闭的开局选项，由 `contract/game-variants.
 
 卡牌描述用 `__space:id[,id]|文字__` 或 `__moor:id[,id]|文字__` 明确记录引用目标。显示名称参与翻译，目标身份不翻译；普通规则动作保留普通强调。语言仓库负责引用维护、迁移及 BGA 导入时的目标保留。`shared/contract/action-reference.ts` 解析标记，搜索投影只保留显示名称；游戏目录构建检查官方目标身份是否存在。
 
-`shared/i18n/` 负责同步翻译/catalog API 与语言包校验；`PromptKey` 位于 `shared/contract/prompt-keys.ts`。译文与 BGA 导入工具由独立的 [open-agricola-i18n](https://github.com/titanxxh/open-agricola-i18n) 仓库维护，每种语言只有一个源 JSON 和一个完整运行时 JSON。`i18n.ref` 固定提交与清单哈希；`scripts/prepare-language-packs.ts` 校验语言包/源文件后写入被 Git 忽略的构建缓存。`AGRICOLA_I18N_DIR` 可提供内容与引用一致的本地语言仓库。
+`shared/i18n/` 负责同步翻译/catalog API 与语言包校验；`PromptKey` 位于 `shared/contract/prompt-keys.ts`。译文与 BGA 导入工具由独立的 [open-agricola-i18n](https://github.com/titanxxh/open-agricola-i18n) 仓库维护，每种语言一个源 JSON、两个运行时 JSON：核心语言包与卡牌文本包，由 manifest version 2 分别列出 SHA-256（ADR 0054）。`i18n.ref` 固定提交与清单哈希；`scripts/prepare-language-packs.ts` 校验语言包/源文件后写入被 Git 忽略的构建缓存。`AGRICOLA_I18N_DIR` 可提供内容与引用一致的本地语言仓库。
 
-`client/services/language-pack.ts` 从清单发现语言，只下载当前语言的完整包，校验身份和哈希后才注册；切换成功后才提交 locale。官方卡面、父母牌、UI、提示和日志共用 catalog。工坊/房间/回放的自定义卡按传入卡牌归一化，不修改全局词典。英文补齐与旧 key 归一化发生在语言仓库构建时。每个已发布语言包都含全部当前卡面；唯一例外是英文包可缺旧版卡面，其文字即旧版源码英文（ADR 0049）。工坊 PR 生成会从待提交的 Card Source 移除译文，在投稿描述中另附初始语言补丁；草稿更新后需重新导出补丁，并在合入前固定匹配的语言包版本。测试：`scripts/__tests__/language-pack-boundary.test.ts`、`client/services/__tests__/language-pack.test.ts`、`e2e-tests/card-localization.spec.ts`。
+`client/services/language-pack.ts` 读取构建内嵌的语言清单（开发环境请求 manifest），只下载当前语言，逐个校验各部分的身份和哈希后注册；翻译读取已注册部分的并集。启动只等待核心语言包，同时开始下载卡牌文本包；`client/app/CardTextBoundary.tsx` 让对局、工坊和百科路由等它到达。两部分都加载成功后才提交 locale 切换。官方卡面、父母牌、UI、提示和日志共用 catalog。工坊/房间/回放的自定义卡按传入卡牌归一化，不修改全局词典。英文补齐与旧 key 归一化发生在语言仓库构建时。每个已发布的卡牌文本包都含全部当前卡面；唯一例外是英文包可缺旧版卡面，其文字即旧版源码英文（ADR 0049）。工坊 PR 生成会从待提交的 Card Source 移除译文，在投稿描述中另附初始语言补丁；草稿更新后需重新导出补丁，并在合入前固定匹配的语言包版本。测试：`scripts/__tests__/language-pack-boundary.test.ts`、`client/services/__tests__/language-pack.test.ts`、`e2e-tests/card-localization.spec.ts`。
 
 `shared/utils/` 存放不含业务规则的通用 helper；`rng.ts` 负责指定种子的生成器与 HMAC-SHA256 宽种子流。
 

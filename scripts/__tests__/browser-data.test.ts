@@ -9,9 +9,10 @@ const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
 const packSha256 = 'a'.repeat(64)
-const languages = `${JSON.stringify({ version: 1, defaultLocale: 'zh', languages: [
-  { id: 'zh', name: '简体中文', file: `zh.${packSha256.slice(0, 16)}.json`, sha256: packSha256, sourceSha256: packSha256 },
-] }, null, 2)}\n`
+const languages = `${JSON.stringify({ version: 2, defaultLocale: 'zh', languages: [{
+  id: 'zh', name: '简体中文', core: { file: `zh.${packSha256.slice(0, 16)}.json`, sha256: packSha256 },
+  cards: { file: `zh-cards.${packSha256.slice(0, 16)}.json`, sha256: packSha256 }, sourceSha256: packSha256,
+}] }, null, 2)}\n`
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'agricola-browser-data-'))
@@ -54,6 +55,7 @@ describe('browser metadata build identity', () => {
     const { root } = fixture()
     const embedded: string = JSON.parse(loadBrowserDataDefines(root, { languageList: true })['import.meta.env.VITE_LANGUAGE_MANIFEST'])
     expect(embedded).toBe(languages)
+    expect(JSON.parse(embedded).languages[0].core.file).toBe(`zh.${packSha256.slice(0, 16)}.json`)
   })
 
   it('leaves a Replay Viewer package to read the language list it publishes', () => {
@@ -64,7 +66,7 @@ describe('browser metadata build identity', () => {
 
   it('refuses a language list the client could not parse', () => {
     const { root } = fixture()
-    writeFileSync(join(root, 'public/i18n/manifest.json'), '{"version":1,"languages":[]}\n')
+    writeFileSync(join(root, 'public/i18n/manifest.json'), '{"version":2,"languages":[]}\n')
     expect(() => loadBrowserDataDefines(root, { languageList: true })).toThrow()
   })
 })

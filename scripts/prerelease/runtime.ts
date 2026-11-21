@@ -149,7 +149,9 @@ function maintenanceMessages(target: PrereleaseTarget) {
   if (!Array.isArray(manifest.languages)) throw new Error('Invalid language manifest')
   const locales: Record<string, { title: string; body: string; back: string }> = {}
   for (const locale of ['en', 'zh']) {
-    const entry = manifest.languages.map(object).find(entry => entry.id === locale)
+    const language = manifest.languages.map(object).find(entry => entry.id === locale)
+    // A v2 list keeps the maintenance copy in the Core Language Pack; an older policy pin lists one file.
+    const entry = language && ('core' in language ? object(language.core) : language)
     if (!entry || typeof entry.file !== 'string' || !/^[a-z]{2}\.[a-f0-9]+\.json$/.test(entry.file)) throw new Error('Missing maintenance language pack')
     const bytes = readFileSync(join(target.policyDirectory, 'public/i18n', entry.file))
     if (createHash('sha256').update(bytes).digest('hex') !== entry.sha256) throw new Error('Altered maintenance language pack')

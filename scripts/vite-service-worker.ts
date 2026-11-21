@@ -32,8 +32,8 @@ function roomOfflineCopy(locale: 'en' | 'zh') {
   const directory = path.join(root, 'public/i18n')
   const manifest = parseLanguageManifest(JSON.parse(readFileSync(path.join(directory, 'manifest.json'), 'utf8')))
   const entry = manifest.languages.find(language => language.id === locale)
-  if (!entry || !/^[a-z0-9.-]+\.json$/.test(entry.file)) throw new Error(`Missing Worker language pack: ${locale}`)
-  const pack = parseLanguagePack(JSON.parse(readFileSync(path.join(directory, entry.file), 'utf8')))
+  if (!entry || !/^[a-z0-9.-]+\.json$/.test(entry.core.file)) throw new Error(`Missing Worker language pack: ${locale}`)
+  const pack = parseLanguagePack(JSON.parse(readFileSync(path.join(directory, entry.core.file), 'utf8')))
   if (pack.locale !== locale) throw new Error(`Worker language pack identity mismatch: ${locale}`)
   const message = (key: string) => {
     const value = pack.messages[key]
