@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { FULL_TASK_IDS, verificationConfiguration } from '../ci/verification-tasks'
-import { canonicalOwnerLocalCommands, checkOwnerLocalVerification, rebindOwnerLocalReceipt } from '../ci/owner-local-verification'
+import { checkOwnerLocalVerification } from '../ci/owner-local-acceptance'
+import { rebindOwnerLocalReceipt } from '../ci/owner-local-admission'
+import { canonicalOwnerLocalCommands } from '../ci/owner-local-execution'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })

@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkCandidateVerification } from '../ci/candidate-verification.ts'
+import { checkCandidateVerification } from '../ci/candidate-acceptance.ts'
 import { ownerMachine, RELEASE_REPOSITORY } from '../ci/release-github.ts'
 import { candidateSha } from './candidate.ts'
 

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { canonicalOwnerLocalCommands } from '../ci/owner-local-verification'
+import { canonicalOwnerLocalCommands } from '../ci/owner-local-execution'
 import { browserSpecWeightsAt, verificationConfiguration, weightedAssignment } from '../ci/verification-tasks'
 import { testPortRange } from '../test-ports'
 import { HOSTED_FRONTEND_SOURCE, hostedFrontendCommand, hostedFrontendMismatch, hostedFrontendStep, laneArguments, laneCount, splitFileArgs, viteDotenv, writeHostedFrontendMarker } from '../verify-lanes'

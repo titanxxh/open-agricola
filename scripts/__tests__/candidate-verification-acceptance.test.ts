@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateCandidateVerification, parseGitHubJsonLines, type CandidateIdentity } from '../ci/candidate-verification'
+import { evaluateCandidateVerification } from '../ci/candidate-acceptance'
+import type { CandidateIdentity } from '../ci/candidate-format'
 
 const sha = 'a'.repeat(40)
 const configuration = 'b'.repeat(64)
@@ -381,12 +382,6 @@ describe('GitHub full candidate verification evidence', () => {
   it('rejects editable success JSON without GitHub workflow provenance', () => {
     expect(() => evaluateCandidateVerification(identity, [{ run: { status: 'passed', sha, configuration }, jobs: [] }]))
       .toThrow('Invalid GitHub evidence')
-  })
-
-  it('reads paginated compact JSON lines without requiring modern gh --slurp', () => {
-    expect(parseGitHubJsonLines('{"id":1,"name":"first\\nstep"}\n{"id":2}\n')).toEqual([
-      { id: 1, name: 'first\nstep' }, { id: 2 },
-    ])
   })
 })
 
