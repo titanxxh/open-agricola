@@ -27,7 +27,18 @@ A native card is one module, `shared/cards/<Deck>/<Id>_<Name>.ts` (community car
 
 ## 3. Choose the timing
 
-Card text, official rulings and recorded project interpretations decide the timing. Reference implementations do not ([ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md), [ADR 0031](adr/0031-explicit-action-space-use-subscriptions.md)). ADR 0033 lists the default phase for text without printed timing.
+Card text, official rulings and recorded project interpretations decide the timing. Reference implementations do not ([ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md), [ADR 0031](adr/0031-explicit-action-space-use-subscriptions.md)). "Each time" alone selects no phase: the trigger and its dependence on the result do.
+
+First check whether the text describes a reaction at all. These "each time" texts use another mechanism and need no listener phase:
+
+| Card text | Mechanism | Examples |
+|---|---|---|
+| "instead", or declining an action to get something else | a `computeReplace` listener returning `decline` with an `alternativeFlow`, decided before the action runs | `A097_Freshman`, `B026_AgrarianFences`, `B103_FieldMerchant`, `D138_PetLover` |
+| A discount, "do not have to pay", "replace X with Y" in a cost | a cost modifier or `computeCosts` (§4.6) | `A014_CarpentersHammer`, `A088_HedgeKeeper`, `B095_MasterBricklayer`, `E060_WorkingGloves` |
+| A point of the round or harvest: goods placed in preparation, a space revealed, people returning, harvesting, newborn animals | a stage hook on `impl.effect` (§4.3) | `A049_NestSite`, `C021_HeartofStone`, `C097_SeedResearcher`, `A106_SlurrySpreader`, `E133_ChampionBreeder` |
+| A state rather than an event, such as "both … are occupied" | an availability condition on a card action space or an anytime ability (§4.9) | `A162_ForestTallyman`, `D178_SubstituteTeacher`, `E014_WoodSaw` |
+
+Otherwise choose the subscription from the trigger:
 
 | Card text | Subscription |
 |---|---|
@@ -35,11 +46,21 @@ Card text, official rulings and recorded project interpretations decide the timi
 | "Each time you place a person" (not a move) | `actions: ['place-farmer']` with `requiresNewPlacement: true` |
 | "Each time you take the X action" (plow, sow, bake, build …) | `actions: ['x']` |
 | "Each time you get goods from an action space" | an acquisition: `actions: ['collect', 'gain']`, `phases: ['after']`, filtered by `hasActionSpaceAcquisition` |
-| An extra benefit for using a space that does not depend on that use's result, or a reward that pays for this same use | `before` |
-| Depends on this use's result and settles right after it | `immediatelyAfter` |
-| Any other "after" effect | `after` |
-| At a point of the round or harvest | a stage hook on `impl.effect` (§4.3) |
 
+Then choose the phase. These are the defaults from ADR 0033:
+
+| Card text | Subscription | Phase |
+|---|---|---|
+| Printed "immediately before" or "before" | as printed | `before` |
+| Printed "immediately after" | as printed | `immediatelyAfter` |
+| Printed "each time after" or "after" | as printed | `after` |
+| An extra benefit for using a space (also get, can buy, can exchange) that does not depend on that use's result | `actionSpaces` | `before` |
+| Taking at least N goods from an accumulation space | `collect`, an acquisition | `after` |
+| A rule action performed by the owner, another player or any player: plowing, building, renovating, fencing, sowing, family growth or exchanging for food | that rule action, with the matching `scope` | `after` |
+| An extra benefit for taking a Moor Special Action | `moor-action` | `before` |
+
+- A `before` reward is usable within the same action, so it can pay for or feed into that use.
+- Without printed timing, use `immediatelyAfter` only when the effect depends on this use's result and must settle before ordinary `after` reactions.
 - Several sources in one window are ordered by the player, and each choice re-reads current state. Add no fixed order and no `during` phase.
 - A `before` reward never makes an empty accumulation space enterable, and a card adds no `isDoable` override to force that.
 
