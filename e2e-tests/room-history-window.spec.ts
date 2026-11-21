@@ -99,17 +99,17 @@ test('real Room history loads earlier groups, preserves cancellation markers and
   for (const page of pages) await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
   expect([...seats.values()].sort()).toEqual([0, 1])
   pages.sort((left, right) => seats.get(left)! - seats.get(right)!)
-  for (let index = 0; index < 28; index++) {
-    const current = await resolveRoomWorkPrompts({
-      snapshot: actor => snapshot(pages[actor]!),
-      command: (actor, body) => command(pages[actor]!, body, p1),
-    })
+  // Wait for the other seat's broadcast as well: the next actor and its free spaces must come from the
+  // latest state on both pages, never from a page that has not yet seen the previous placement (#1946).
+  const roomCommand = (actor: number, body: Record<string, unknown>) => command(pages[actor]!, body, pages[1 - actor]!)
+  const placeWorker = async () => {
+    const current = await resolveRoomWorkPrompts({ snapshot: actor => snapshot(pages[actor]!), command: roomCommand })
     const actor = current.state.currentPlayerIndex
-    const actorState = await snapshot(pages[actor]!)
-    const spaceId = ['forest', 'reed-bank', 'fishing', 'day-laborer'].find(id => actorState.actionAvailability?.[id])
-    expect(spaceId).toBeTruthy()
-    await command(pages[actor]!, { type: 'action', spaceId }, p1)
+    const spaceId = ['forest', 'reed-bank', 'fishing', 'day-laborer'].find(id => current.actionAvailability?.[id])
+    expect(spaceId, JSON.stringify({ round: current.state.round, roundPhase: current.state.roundPhase, actor, availability: current.actionAvailability })).toBeTruthy()
+    await roomCommand(actor, { type: 'action', spaceId })
   }
+  for (let index = 0; index < 28; index++) await placeWorker()
   const live = await snapshot(p1)
   expect(live.historyWindow!.operationGroupIds).toHaveLength(20)
   expect(live.historyWindow!.nextCursor).toBeTruthy()
@@ -129,17 +129,7 @@ test('real Room history loads earlier groups, preserves cancellation markers and
     return { id: row.getAttribute('data-testid')!, offsetY: row.getBoundingClientRect().top - viewport.top }
   })
   // Another player advances through a round boundary while p1 reads old entries.
-  for (let index = 0; index < 4; index++) {
-    const current = await resolveRoomWorkPrompts({
-      snapshot: actor => snapshot(pages[actor]!),
-      command: (actor, next) => command(pages[actor]!, next, p1),
-    })
-    const actor = current.state.currentPlayerIndex
-    const actorState = await snapshot(pages[actor]!)
-    const spaceId = ['forest', 'reed-bank', 'fishing', 'day-laborer'].find(id => actorState.actionAvailability?.[id])
-    expect(spaceId).toBeTruthy()
-    await command(pages[actor]!, { type: 'action', spaceId }, p1)
-  }
+  for (let index = 0; index < 4; index++) await placeWorker()
   await expect(p1.getByTestId('room-history-controls').getByRole('button')).toHaveCount(0)
   await expect(p1.getByRole('status').filter({ hasText: 'History updated' })).toHaveCount(0)
   const anchor = p1.getByTestId(reading.id)

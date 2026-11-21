@@ -1,6 +1,6 @@
 import { createServer, request } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { createTestDatabase, getTestDatabaseUrl } from './_helpers/postgres'
 import { PostgresDatabase } from '../database/postgres'
 import { createOperationsHandler } from '../observability/http'
@@ -36,8 +36,6 @@ const server = createServer((req, res) => {
 })
 let base = ''
 beforeAll(async () => {
-  vi.stubEnv('ADMIN_USERS', 'ops-admin')
-  vi.stubEnv('OBSERVABILITY_METRICS_TOKEN', 'scrape-test-token')
   for (const username of ['ops-admin', 'ordinary-user']) {
     await db.prepare('INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)')
       .run(username, username, username, 'unused-test-password', Date.now())
@@ -46,16 +44,21 @@ beforeAll(async () => {
   }
   await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
   await new Promise<void>(done => grafana.listen(0, '127.0.0.1', done))
-  vi.stubEnv('GRAFANA_URL', `http://127.0.0.1:${(grafana.address() as AddressInfo).port}`)
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+})
+// Tests change these variables; every test starts from the same environment whatever ran before it.
+beforeEach(() => {
+  vi.stubEnv('ADMIN_USERS', 'ops-admin')
+  vi.stubEnv('OBSERVABILITY_METRICS_TOKEN', 'scrape-test-token')
+  vi.stubEnv('GRAFANA_URL', `http://127.0.0.1:${(grafana.address() as AddressInfo).port}`)
   vi.stubEnv('PUBLIC_API_BASE', base)
   vi.stubEnv('PUBLIC_APP_ORIGIN', base)
 })
+afterEach(() => { vi.unstubAllEnvs() })
 afterAll(async () => {
   await new Promise<void>(done => server.close(() => done()))
   await new Promise<void>(done => grafana.close(() => done()))
   await db.close()
-  vi.unstubAllEnvs()
 })
 
 it('uses a one-time handoff, strips site credentials and checks current privileges on every Grafana request', async () => {

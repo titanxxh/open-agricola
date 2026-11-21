@@ -1,4 +1,4 @@
-import { getTestDatabaseUrl } from './_helpers/postgres'
+import { createTestDatabase, getTestDatabaseUrl } from './_helpers/postgres'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { PostgresDatabase } from '../database/postgres'
@@ -70,13 +70,19 @@ it('initializes the platform once under concurrent startup and enforces case-ins
 
 it('retains participant identity and expires a discarded active Game Context', async () => {
   const now = 1_800_000_000_000
-  await db.prepare('INSERT INTO rooms (id, created_by, created_at, updated_at) VALUES (?, ?, ?, ?)').run('discarded', 'identity-one', now, now)
-  await db.prepare("INSERT INTO game_contexts (room_id, lifecycle, created_at, updated_at) VALUES (?, 'active', ?, ?)").run('discarded', now, now)
-  await db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)').run('discarded', 'identity-one', 0, now)
-  await db.prepare('DELETE FROM rooms WHERE id = ?').run('discarded')
-  expect(await db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id = ?').get('discarded')).toEqual({ lifecycle: 'expired' })
-  expect(await db.prepare('SELECT user_id, player_index FROM game_context_participants WHERE room_id = ?').get('discarded'))
-    .toEqual({ user_id: 'identity-one', player_index: 0 })
+  // Its own migrated schema keeps the concurrent-startup test above on a schema nobody migrated yet.
+  const db = await createTestDatabase()
+  try {
+    await db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run('participant', 'participant', 'Participant', 'test-hash', now)
+    await db.prepare('INSERT INTO rooms (id, created_by, created_at, updated_at) VALUES (?, ?, ?, ?)').run('discarded', 'participant', now, now)
+    await db.prepare("INSERT INTO game_contexts (room_id, lifecycle, created_at, updated_at) VALUES (?, 'active', ?, ?)").run('discarded', now, now)
+    await db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)').run('discarded', 'participant', 0, now)
+    await db.prepare('DELETE FROM rooms WHERE id = ?').run('discarded')
+    expect(await db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id = ?').get('discarded')).toEqual({ lifecycle: 'expired' })
+    expect(await db.prepare('SELECT user_id, player_index FROM game_context_participants WHERE room_id = ?').get('discarded'))
+      .toEqual({ user_id: 'participant', player_index: 0 })
+  } finally { await db.close() }
 })
 
 it('isolates concurrent nested rollback scopes while keeping successful siblings', async () => {
