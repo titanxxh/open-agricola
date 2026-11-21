@@ -16,6 +16,7 @@ import { CardMetadataBoundary } from './CardMetadataBoundary'
 import { CardTextBoundary } from './CardTextBoundary'
 import { getGameLoadProgress } from './game-load-progress'
 import { isHotseatSetupQuery } from './game-setup-query'
+import { platformPageFromSearch } from './platform-page'
 import { SandboxAppLazy } from '../sandbox'
 import { setPage, type PlatformPage } from '../utils/platform-page-url'
 import '../App.css'
@@ -31,14 +32,7 @@ const GameContainerApiLazy = lazy(() =>
 )
 
 function getPage(): PlatformPage {
-  const params = new URLSearchParams(window.location.search)
-  const page = params.get('page')
-  if (page === 'prerelease-handoff') return page
-  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding' || page === 'reset-password' || page === 'operations' || page === 'encyclopedia') return page
-  if (params.get('context')) return 'game'
-  if (params.get('room') || params.get('transport') === 'ws') return 'game'
-  if (isHotseatSetupQuery(window.location.search)) return 'game'
-  return 'lobby'
+  return platformPageFromSearch(window.location.search, isHotseatSetupQuery)
 }
 
 export function PageRouter() {

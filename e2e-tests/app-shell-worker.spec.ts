@@ -1,6 +1,7 @@
 // @covers client/service-worker/app-shell.worker.ts
 // @covers scripts/vite-service-worker.ts
 // @covers scripts/browser-data.ts client/services/language-pack.ts client/app/CardTextBoundary.tsx
+// @covers client/main.tsx client/app/startup-prefetch.ts client/app/platform-page.ts
 import { expect, test, type Page } from '@playwright/test'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -18,6 +19,8 @@ const requests: string[] = []
 const tampered = new Set<string>()
 let releaseCardText: (() => void) | undefined
 let cardTextHeld: Promise<void> | undefined
+let releaseCore: (() => void) | undefined
+let coreHeld: Promise<void> | undefined
 
 test.describe.configure({ mode: 'serial', timeout: 180_000 })
 test.skip(({ browserName }) => browserName === 'firefox', 'This release verifies Chromium and WebKit')
@@ -39,6 +42,7 @@ test.beforeAll(async () => {
       response.end(bytes)
     }
     if (cardTextHeld && /^\/i18n\/[a-z-]+-cards\.[a-f0-9]{16}\.json$/.test(path)) void cardTextHeld.then(send)
+    else if (coreHeld && /^\/i18n\/[a-z-]+\.[a-f0-9]{16}\.json$/.test(path)) void coreHeld.then(send)
     else send()
     return true
   })
@@ -50,6 +54,8 @@ test.afterEach(() => {
   tampered.clear()
   releaseCardText?.()
   cardTextHeld = undefined
+  releaseCore?.()
+  coreHeld = undefined
 })
 
 test.afterAll(async () => {
@@ -138,16 +144,16 @@ test('startup renders without card text, while the encyclopedia waits for it @we
   await page.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'zh') })
   await page.goto(`${site.origin}/?bg=none`, documentLoad)
   await expect(page.locator('#initial-load')).toHaveCount(0)
-  expect(requests).toContain(`/i18n/${zh.cards.file}`)
+  await expect.poll(() => requests).toContain(`/i18n/${zh.cards.file}`)
 
   requests.length = 0
   await page.goto(`${site.origin}/?page=encyclopedia&bg=none`, documentLoad)
-  // Card metadata arrives, yet the encyclopedia does not mount or fetch its data while card text is held.
+  // Card metadata and the encyclopedia's own data download meanwhile, yet the page does not mount while card text is held.
   await expect.poll(() => page.evaluate(() =>
     performance.getEntriesByType('resource').some(entry => entry.name.includes('/cards-manifest.')))).toBe(true)
+  await expect.poll(() => requests.some(path => /^\/card-encyclopedia\/search\.[a-f0-9]{16}\.json$/.test(path))).toBe(true)
   await page.waitForTimeout(1_500)
   await expect(page.getByText('加载卡牌数据…')).toBeVisible()
-  expect(requests.filter(path => path.startsWith('/card-encyclopedia/'))).toEqual([])
   await expect(page.getByRole('searchbox')).toHaveCount(0)
 
   releaseCardText?.()
@@ -155,3 +161,45 @@ test('startup renders without card text, while the encyclopedia waits for it @we
   await search.fill('a004')
   await expect(page.getByRole('button', { name: new RegExp(baseboards) }).first()).toBeVisible()
 })
+
+function chinesePacks() {
+  const manifest = JSON.parse(readFileSync(join(siteDirectory, 'i18n/manifest.json'), 'utf8'))
+  const zh = manifest.languages.find((language: { id: string }) => language.id === 'zh')
+  return { core: `/i18n/${zh.core.file}`, cards: `/i18n/${zh.cards.file}` }
+}
+const gameChunk = (paths: readonly string[]) => paths.some(path => /^\/assets\/GameContainerApi-[\w-]+\.js$/.test(path))
+const cardsManifest = (paths: readonly string[]) => paths.some(path => /^\/cards-manifest\.[a-f0-9]{64}\.json$/.test(path))
+
+test('a room link fetches card data and the game screen as soon as the core pack is in @webkit', async ({ page }) => {
+  const packs = chinesePacks()
+  coreHeld = new Promise(resolve => { releaseCore = resolve })
+  await page.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'zh') })
+  await page.goto(`${site.origin}/?context=00000000-0000-4000-8000-000000000000&bg=none`, documentLoad)
+  await expect.poll(() => requests).toContain(packs.core)
+  await page.waitForTimeout(1_000)
+  // Nothing competes with the core pack the first screen waits for.
+  expect(requests).not.toContain(packs.cards)
+  expect(cardsManifest(requests)).toBe(false)
+  expect(gameChunk(requests)).toBe(false)
+
+  releaseCore?.()
+  // Card text, card metadata and the game chunk start together instead of one after another behind the app.
+  await expect.poll(() => [requests.includes(packs.cards), cardsManifest(requests), gameChunk(requests)]).toEqual([true, true, true])
+})
+
+test('the lobby downloads card text only after its first screen is up @webkit', async ({ page }) => {
+  const packs = chinesePacks()
+  coreHeld = new Promise(resolve => { releaseCore = resolve })
+  await page.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'zh') })
+  await page.goto(`${site.origin}/?bg=none`, documentLoad)
+  await expect.poll(() => requests).toContain(packs.core)
+  await page.waitForTimeout(1_000)
+  expect(requests).not.toContain(packs.cards)
+  await expect(page.locator('#initial-load')).toHaveCount(1)
+
+  releaseCore?.()
+  await expect(page.locator('#initial-load')).toHaveCount(0)
+  await expect.poll(() => requests).toContain(packs.cards)
+  expect(gameChunk(requests)).toBe(false)
+})
+
