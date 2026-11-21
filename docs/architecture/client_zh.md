@@ -33,7 +33,7 @@
 
 `scripts/browser-data.ts` 为主应用与新 Replay 构建提供卡牌身份。加载器在使用前验证以 SHA-256 命名的元数据和语言包。缓存错误或哈希不符时允许一次新请求。开发元数据和语言发现会重新验证。品牌素材使用 Vite 内容文件名。测试：card-meta、language-pack、browser-data 及 `BrandMark.test.tsx`。
 
-正式 Pages 的 `/sw.js` 校验公共素材、提供断网回房重试、读取 IndexedDB 中的离线百科并转交通知点击。`InboxProvider` 在消息通过鉴权并显示后标为已读。[Worker 运维](../HOW_TO_DEPLOY_zh.md#暂停单项-service-worker-功能)
+正式 Pages 的 `/sw.js` 校验公共素材、缓存带哈希的应用壳、提供断网回房重试、读取 IndexedDB 中的离线百科并转交通知点击。`InboxProvider` 在消息通过鉴权并显示后标为已读。[Worker 运维](../HOW_TO_DEPLOY_zh.md#暂停单项-service-worker-功能)
 
 `workshop-game/bootstrap.ts` 只接纳应用 base 下 `workshop-game.html` 的固定 HTTP／浏览器沙盒参数。父窗口必须是同源、顶层且带 `page=workshop` 的主页面；直接打开、嵌套、跨源及意外模式均保持静态。准入后 `initialize.tsx` 只挂载 Locale、Auth 和 `GameContainerApi`；未登录时提供独立打开应用的链接，不渲染账号路由。自托管主 HTML 保留 `frame-ancestors 'none'`，只有独立对局 HTML 允许 `'self'`；Pages 同样执行 JavaScript 准入检查。覆盖：`bootstrap.test.ts`、`workshop-game-entry.spec.ts`、`frontend-hosting.test.ts`。
 

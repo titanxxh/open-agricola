@@ -1,7 +1,7 @@
 {
  "format": 1,
  "unit": "seconds",
- "source": "mean of two two-lane chromium measurements on GitHub candidate rehearsal (ubuntu-latest, 4 vCPU, one runner per task, VERIFY_PARALLEL_LANES=2) with the timing reporter of #1935, 2026-11-20: run 44788183554 (main 288740710, previous table) and run 44790870965 (this table's first version); per lane, seconds from a spec's first test start to the next spec's first test start in its Playwright JSON report (the last spec runs to the report's end), averaged per spec and rounded up; public-asset-worker keeps run 44788183554 alone because its beforeAll timed out in run 44790870965",
+ "source": "mean of two two-lane chromium measurements on GitHub candidate rehearsal (ubuntu-latest, 4 vCPU, one runner per task, VERIFY_PARALLEL_LANES=2) with the timing reporter of #1935, 2026-11-20: run 44788183554 (main 288740710, previous table) and run 44790870965 (this table's first version); per lane, seconds from a spec's first test start to the next spec's first test start in its Playwright JSON report (the last spec runs to the report's end), averaged per spec and rounded up; public-asset-worker keeps run 44788183554 alone because its beforeAll timed out in run 44790870965; app-shell-worker is a local two-test estimate (one Pages build) until the next measurement",
  "files": {
   "e2e-tests/D180_PartTimeWorker.spec.ts": 7,
   "e2e-tests/E148_Lazybones.spec.ts": 5,
@@ -14,6 +14,7 @@
   "e2e-tests/action-space-use.spec.ts": 1,
   "e2e-tests/animal-reorg-prefill.spec.ts": 31,
   "e2e-tests/apiary-sow-budget.spec.ts": 4,
+  "e2e-tests/app-shell-worker.spec.ts": 50,
   "e2e-tests/application-loading.spec.ts": 111,
   "e2e-tests/beta-access-admin.spec.ts": 31,
   "e2e-tests/bga-preparation-order.spec.ts": 23,
