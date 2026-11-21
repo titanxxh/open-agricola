@@ -33,7 +33,7 @@ test.beforeAll(async () => {
   site = await servePagesFrontend(siteDirectory, undefined, (request, response) => {
     const path = new URL(request.url ?? '/', 'http://pages.invalid').pathname
     if (request.method === 'GET') requests.push(path)
-    if (!/^\/(assets\/|i18n\/|cards-manifest\.)/.test(path)) return false
+    if (!/^\/(assets\/|i18n\/|cards-manifest\.|card-encyclopedia\/)/.test(path)) return false
     let bytes: Buffer
     try { bytes = readFileSync(join(siteDirectory, path)) } catch { return false }
     if (tampered.has(path)) bytes = Buffer.concat([bytes, Buffer.from('\n/* altered in transit */\n')])
@@ -70,11 +70,12 @@ test.afterAll(async () => {
   if (directory) rmSync(directory, { recursive: true, force: true })
 })
 
-const STARTUP_DATA = /^\/(i18n\/zh\.[a-f0-9]{16}\.json|cards-manifest\.[a-f0-9]{64}\.json)$/
+const STARTUP_DATA = /^\/(i18n\/zh\.[a-f0-9]{16}\.json|cards-manifest\.[a-f0-9]{64}\.json|card-encyclopedia\/(catalog|search)\.[a-f0-9]{16}\.json)$/
 
-/** The Chinese language pack and the cards manifest: the content-addressed data files the encyclopedia loads. */
+/** The Chinese language pack, the cards manifest and the encyclopedia data: the content-addressed files the encyclopedia loads. */
 function startupData(): string[] {
-  const files = [...readdirSync(join(siteDirectory, 'i18n')).map(name => `/i18n/${name}`), ...readdirSync(siteDirectory).map(name => `/${name}`)]
+  const files = [...readdirSync(join(siteDirectory, 'i18n')).map(name => `/i18n/${name}`), ...readdirSync(siteDirectory).map(name => `/${name}`),
+    ...readdirSync(join(siteDirectory, 'card-encyclopedia')).map(name => `/card-encyclopedia/${name}`)]
   return files.filter(path => STARTUP_DATA.test(path)).sort()
 }
 
@@ -117,7 +118,7 @@ test('a repeat visit loads the hashed app shell and startup data from the Worker
   // The Worker may already hold these from the first visit, so read what the page loaded from the page itself.
   const shell = await loadedShell(page)
   expect(shell.length).toBeGreaterThan(0)
-  expect(startupData()).toHaveLength(2)
+  expect(startupData()).toHaveLength(4)
   await expect.poll(() => uncached(page, [...shell, ...startupData()]), STORE_TIMEOUT).toEqual([])
 
   requests.length = 0
