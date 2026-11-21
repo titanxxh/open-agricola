@@ -923,10 +923,22 @@ describe('dependency routine verification plan', () => {
 
     const script = planRoutineVerification({ root, changes: [{ status: 'M', path: 'scripts/release/publish.ts' }] })
     const shell = planRoutineVerification({ root, changes: [{ status: 'M', path: 'deploy-backend.sh' }] })
+    const removed = writeTree({
+      'scripts/__tests__/release-publish.test.ts': '// @covers scripts/release/publish.ts\nexport const used = 1\n',
+      'scripts/release/next.ts': 'export const next = 1\n',
+    })
+    const deleted = planRoutineVerification({ root: removed, changes: [{ status: 'D', path: 'scripts/release/publish.ts' }] })
+    const renamed = planRoutineVerification({
+      root: removed,
+      changes: [{ status: 'R', previousPath: 'scripts/release/publish.ts', path: 'scripts/release/next.ts' }],
+    })
 
     expect(script.vitestFiles).toEqual(['scripts/__tests__/release-publish.test.ts'])
     expect(shell.vitestFiles).toEqual(['scripts/__tests__/release-publish.test.ts'])
     expect(shell.browserFiles).toEqual([])
+    expect(deleted.vitestFiles).toEqual(['scripts/__tests__/release-publish.test.ts'])
+    expect(deleted.warnings).toEqual(["scripts/__tests__/release-publish.test.ts: @covers prefix 'scripts/release/publish.ts' matches no file"])
+    expect(renamed.vitestFiles).toEqual(['scripts/__tests__/release-publish.test.ts'])
     expect(script.selectionReasons).toContain('scripts/release/publish.ts: 0 Vitest files through runtime imports; 0 through registry keys or direct registry imports; 0 through direct reads; 1 through @covers')
   })
 

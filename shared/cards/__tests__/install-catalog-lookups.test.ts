@@ -1,3 +1,5 @@
+// @covers server/game/authoritative-session.ts shared/cards/catalog.ts shared/cards/install-catalog-lookups.ts
+// @covers shared/cards/registry-display.ts
 import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 

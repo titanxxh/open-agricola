@@ -102,6 +102,25 @@ describe('check-test-covers', () => {
     ])
   })
 
+  it('keeps every script a reused wrapper receives', () => {
+    const root = repository({
+      'scripts/__tests__/reused.test.ts': [
+        "import { spawnSync } from 'node:child_process'",
+        "import { join } from 'node:path'",
+        "const repository = join(import.meta.dirname, '../..')",
+        "const invoke = (script: string) => spawnSync(process.execPath, [join(repository, script)])",
+        "invoke('scripts/release/publish.ts')",
+        "invoke('scripts/release/publish.ts')",
+        "invoke('scripts/check-thing.ts')",
+      ].join('\n'),
+    })
+
+    expect(scripts(root)).toEqual([
+      'scripts/__tests__/reused.test.ts:4 scripts/release/publish.ts',
+      'scripts/__tests__/reused.test.ts:4 scripts/check-thing.ts',
+    ])
+  })
+
   it('does not resolve a bare file name in an unknown working directory against the repository', () => {
     const root = repository({
       'scripts/__tests__/fixture.test.ts': [

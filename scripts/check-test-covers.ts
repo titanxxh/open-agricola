@@ -17,6 +17,7 @@ const INTERPRETERS = new Set(['node', 'bash', 'sh', 'zsh', 'env', 'tsx', 'npx', 
 const SCRIPT = /\.(?:[cm]?ts|mjs|sh)$/
 const UNKNOWN = '\u0000'
 const ANCHOR = '\u0001'
+const MAX_ALTERNATIVES = 64
 
 const unwrap = (expression: ts.Expression): ts.Expression => {
   while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
@@ -62,7 +63,15 @@ function evaluator(source: ts.SourceFile, file: string) {
   }
   collect(source)
   const directory = path.posix.dirname(file)
-  const single = (values: string[]): string => values.length === 1 ? values[0]! : UNKNOWN
+  // Every combination of the known alternatives, deduplicated; an expression with no known value is UNKNOWN.
+  const combine = (lists: string[][]): string[][] => {
+    let result: string[][] = [[]]
+    for (const list of lists) {
+      const values = list.length ? [...new Set(list)] : [UNKNOWN]
+      result = result.flatMap(prefix => values.map(value => [...prefix, value])).slice(0, MAX_ALTERNATIVES)
+    }
+    return result
+  }
   const joined = (parts: string[], resolve: boolean): string => {
     let result = ''
     for (const part of parts) {
@@ -97,24 +106,26 @@ function evaluator(source: ts.SourceFile, file: string) {
     }
     if (ts.isConditionalExpression(expression)) return [...evaluate(expression.whenTrue, seen), ...evaluate(expression.whenFalse, seen)]
     if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-      return [single(evaluate(expression.left, seen)) + single(evaluate(expression.right, seen))]
+      return combine([evaluate(expression.left, seen), evaluate(expression.right, seen)]).map(parts => parts.join(''))
     }
     if (ts.isTemplateExpression(expression)) {
-      return [expression.templateSpans.reduce((text, span) => text + single(evaluate(span.expression, seen)) + span.literal.text, expression.head.text)]
+      const spans = expression.templateSpans
+      return combine(spans.map(span => evaluate(span.expression, seen)))
+        .map(values => spans.reduce((text, span, index) => text + values[index] + span.literal.text, expression.head.text))
     }
     if (ts.isArrayLiteralExpression(expression)) {
       return expression.elements.flatMap(element => evaluate(ts.isSpreadElement(element) ? element.expression : element, seen))
     }
     if (ts.isNewExpression(expression) && calleeName(expression.expression) === 'URL' && expression.arguments?.length === 2) {
-      const [relative, base] = expression.arguments.map(argument => single(evaluate(argument, seen)))
-      return [joined([base!.endsWith('/') ? base! : path.posix.dirname(base!), relative!], true)]
+      return combine(expression.arguments.map(argument => evaluate(argument, seen)))
+        .map(([relative, base]) => joined([base!.endsWith('/') ? base! : path.posix.dirname(base!), relative!], true))
     }
     if (ts.isCallExpression(expression)) {
       const name = calleeName(expression.expression)
-      const args = expression.arguments.map(argument => single(evaluate(argument, seen)))
-      if (name === 'join' || name === 'resolve') return [joined(args, name === 'resolve')]
-      if (name === 'dirname' && args.length === 1) return [path.posix.dirname(args[0]!)]
-      if ((name === 'fileURLToPath' || name === 'pathToFileURL') && args.length === 1) return [args[0]!]
+      const alternatives = combine(expression.arguments.map(argument => evaluate(argument, seen)))
+      if (name === 'join' || name === 'resolve') return alternatives.map(args => joined(args, name === 'resolve'))
+      if (name === 'dirname' && expression.arguments.length === 1) return alternatives.map(([value]) => path.posix.dirname(value!))
+      if ((name === 'fileURLToPath' || name === 'pathToFileURL') && expression.arguments.length === 1) return alternatives.map(([value]) => value!)
     }
     return []
   }
@@ -168,8 +179,7 @@ function packageScripts(root: string): Record<string, string> {
 }
 
 // Returns the strings that name what the call executes, or nothing when the command is external (git, docker, …).
-function executed(command: string[], args: string[], scripts: Record<string, string>): string[] {
-  const head = command.length === 1 ? command[0]! : UNKNOWN
+function executed(head: string, args: string[], scripts: Record<string, string>): string[] {
   const program = head.split(/[\\/]/).pop() ?? ''
   if (SCRIPT.test(head)) return [head, ...args]
   if (program === 'pnpm') {
@@ -220,17 +230,17 @@ export function findTestCoversViolations(root: string): TestCoversViolation[] {
             && SPAWNERS.has(callee.name.text) ? callee.name.text : undefined
         const [first, second] = node.arguments
         if (spawner && first) {
-          let command = evaluate(first)
-          let args = second && !SHELL_COMMAND.has(spawner) ? evaluate(second) : []
-          if (SHELL_COMMAND.has(spawner)) {
-            const tokens = (command.length === 1 ? command[0]! : UNKNOWN).trim().split(/\s+/)
-            command = tokens.slice(0, 1)
-            args = tokens.slice(1)
-          }
+          // Each known command alternative is checked on its own; an unknown command has no alternatives.
+          const runs: [string, string[]][] = SHELL_COMMAND.has(spawner)
+            ? [...new Set(evaluate(first))].map(text => {
+              const tokens = text.trim().split(/\s+/)
+              return [tokens[0] ?? '', tokens.slice(1)]
+            })
+            : [...new Set(evaluate(first))].map(head => [head, second ? evaluate(second) : []])
           const groups = new Map<string, string[]>()
           const cwd = workingDirectory(node)
           const base = cwd === undefined ? undefined : cwd.slice(ANCHOR.length)
-          for (const value of executed(command, args, scripts)) {
+          for (const value of runs.flatMap(([head, args]) => executed(head, args, scripts))) {
             const candidates = scriptCandidates(value, base, files, byName)
             if (candidates.length) groups.set(candidates.join(' '), candidates)
           }
