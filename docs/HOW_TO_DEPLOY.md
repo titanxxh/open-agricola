@@ -22,6 +22,30 @@ flowchart LR
 
 GitHub Pages serves the production frontend at `https://open-agricola.titanxxh.com/`. Its API remains at `https://openagapi.titanxxh.com`; these HTTPS subdomains are same-site but cross-origin, retaining API host-only HttpOnly sessions without third-party cookies. The backend image also includes an optional same-origin frontend for self-hosting. Public artwork and fonts continue to use the separate asset site. See ADR 0035.
 
+## Owner operations
+
+Owner Operations are the releases, deployments and backups the owner runs on their own machine with private tools. Their runbooks are moving to the private [open-agricola-ops](https://github.com/titanxxh/open-agricola-ops) repository, which external readers cannot open. The procedures that have not moved yet remain below. Every owner tool still reaches the [Release evidence contract](#release-evidence-contract) through the public gates of a clean protected-main checkout.
+
+Commands in this guide use placeholders for owner host details: `<host>` is the SSH target of the formal backend, `<deploy-dir>` its deployment checkout, `<operations-dir>` its monitoring directory and `<host-ops-dir>` the host directory of the scheduled offsite backup scripts.
+
+## Release evidence contract
+
+The Release Evidence Contract decides whether a fixed candidate may be published and deployed. Code in this repository enforces it: the candidate gates under `scripts/ci/`, their receipt formats and the image receipt checks run from a clean checkout of the protected-main producer. Owner tools only call these gates; they cannot widen them. The owner procedures that produce and publish the evidence are listed in [Owner operations](#owner-operations).
+
+### Owner-local receipt
+
+The receipt records every actual `runCandidateTask` command, its exit code and log SHA-256, execution times, Node/platform/architecture, tested commit, raw source tree and candidate/producer verification configurations. All ten tasks and their canonical commands must pass. Their `fast` and `slow` tasks run `pnpm test:fast` and `pnpm test:slow`, which leave out the `tooling` Vitest project: the trusted producer, not the candidate, runs that release, deployment and CI tooling, and PR Routine covers it ([testing architecture](architecture/testing.md)). Routine affected checks and `release:rehearse` alone do not satisfy this path. The publisher may rebind only `candidateSha` after a rebase whose entire raw tree and verification configuration equal the tested source. It retains `testedSha` and never represents local commands as GitHub jobs.
+
+Pre owner-local requires receipt format 2 with `execution: { kind: "docker-isolated", evidenceSha256: "<64 lowercase hex>" }`. The owner-collected evidence binds the actual sandbox, prerequisite source closure, commands, source integrity, resource limits and teardown; retain its immutable bytes with the logs. Withdrawn format-1 pre receipts are rejected. Stable receipt format 1 is unchanged. The pre proof carries `executionEvidenceSha256` through image and receiver validation, and uses the native owner's distinct `owner-local-prerelease-verification` status. Its exact beta Release must have `prerelease=true` and `latest=false`. Stable proof cannot authorize pre, or pre proof stable. The common pre checker revalidates the fixed source, full plan, both configurations, producer ancestry, native owner, tag and digest-bound asset ID/bytes. Same-tree rebase retains the actual tested SHA; a changed tree or incompatible producer requires new execution. The owner and receiving deploy/open/restore paths and candidate image producer preserve the typed local proof with no invented Actions IDs. Absent or withdrawn local authority retains native workflow fallback; malformed latest owner success blocks. Native PR/ref rules, protected synchronization leases, real private image production/import and target acceptance remain required. Candidate-local tool changes cannot authorize themselves; deliver this producer through protected main first.
+
+### Owner status selects or withdraws local proof
+
+Only the native owner's statuses select local proof; another actor's matching context cannot select or withdraw it. The owner's latest pending, failure or error status withdraws the local authorization without reviving an older success. Verification then uses the ordinary native GitHub evidence path. A malformed latest owner-success proof still blocks rather than silently falling back.
+
+### Later stages recheck the proof
+
+Pages, backend delivery and private image production independently read this published proof through the common candidate gate. They recheck native identities, the unchanged tag, raw tree, both configurations, commands, times and receipt digest. They never accept arbitrary receipt URLs, another user's status, partial task results or invented Actions IDs. GitHub still performs the real private image and Pages builds; of the image and Pages workflows, only `container-image-build.yml` and `deploy-pages-broker.yml` call the gate. `prerelease-runtime.yml` builds the pre runtime image without reading candidate evidence and uses only the registry constants from `scripts/ci/container-images.ts`. Image provenance, private registry checks, owner transport and runtime guards remain required. The separate Bug Report deployment-feedback command also uses this gate and retains owner-local authority without inventing Actions jobs. Install a backend that supports this feedback-proof type before recording it; the command never upgrades the application itself.
+
 ---
 
 ## Standard owner-machine release
@@ -70,15 +94,11 @@ pnpm release vX.Y.Z --ref <final-main-sha> --local-verification /owner/runs/<new
 - **Output.** Only a fully successful run writes `verification.json` (stable format 1) or `pre-verification.json` (pre format 2), with `execution-evidence.json`. The evidence binds the sandbox, toolchain, preparation logs, every attempt, the recorded commands, source integrity, limits and teardown logs. Log lines carry the seconds since their command started. The recorder rechecks the receipt as the publisher will. `--profile` also records output timelines for timing analysis and writes no receipt.
 - **Constraints.** One run per machine: `/tmp/oa-owner-local-verification.lock` serializes runs. An interrupted run still tears down. Keep each output directory private; it also holds logs and diagnostics.
 
-The receipt records every actual `runCandidateTask` command, its exit code and log SHA-256, execution times, Node/platform/architecture, tested commit, raw source tree and candidate/producer verification configurations. All ten tasks and their canonical commands must pass. Their `fast` and `slow` tasks run `pnpm test:fast` and `pnpm test:slow`, which leave out the `tooling` Vitest project: the trusted producer, not the candidate, runs that release, deployment and CI tooling, and PR Routine covers it ([testing architecture](architecture/testing.md)). Routine affected checks and `release:rehearse` alone do not satisfy this path. The publisher may rebind only `candidateSha` after a rebase whose entire raw tree and verification configuration equal the tested source. It retains `testedSha` and never represents local commands as GitHub jobs.
+What the receipt must contain, how the owner status selects or withdraws it and how Pages, backend delivery and image production recheck it are defined in the [Release evidence contract](#release-evidence-contract).
 
 The publisher checks the authenticated owner's native user ID, prepares an exact-candidate draft, uploads only `owner-local-verification.json`, and creates the independent `owner-local-verification` commit status. Its description binds the receipt SHA-256; its target is the same repository's formal Release asset. The publisher reads back status creator, Release author, asset uploader and uploaded bytes before publishing. Retry with the same command and receipt to resume this tool's matching draft. The ordinary release path continues to reject drafts.
 
 If the publication PATCH loses its response, the publisher makes one bounded read-only reconciliation through the existing candidate gate and native Release ID. A matching published proof succeeds without repeating the write. An unavailable or conflicting readback remains a failure; inspect status before retrying the fixed candidate.
-
-Only the native owner's statuses select local proof; another actor's matching context cannot select or withdraw it. The owner's latest pending, failure or error status withdraws the local authorization without reviving an older success. Verification then uses the ordinary native GitHub evidence path. A malformed latest owner-success proof still blocks rather than silently falling back.
-
-Pages, backend delivery and private image production independently read this published proof through the common candidate gate. They recheck native identities, the unchanged tag, raw tree, both configurations, commands, times and receipt digest. They never accept arbitrary receipt URLs, another user's status, partial task results or invented Actions IDs. GitHub still performs the real private image and Pages builds. Image provenance, private registry checks, owner transport and runtime guards remain required. The separate Bug Report deployment-feedback command also uses this gate and retains owner-local authority without inventing Actions jobs. Install a backend that supports this feedback-proof type before recording it; the command never upgrades the application itself.
 
 ### Observe delivery and accept the live site
 
@@ -87,7 +107,7 @@ Pages, backend delivery and private image production independently read this pub
 The live browser entry uses the existing account, its participant game and a retained completed Replay. First collect only the needed metadata through a read-only repeatable-read transaction, without scanning game or replay payloads:
 
 ```bash
-pnpm release:inventory --host ubuntu@ten-kr --directory /home/ubuntu/open-agricola \
+pnpm release:inventory --host <host> --directory <deploy-dir> \
   --expected-build <full-sha> --output /owner/live-inventory.json
 pnpm release:accept --config /owner/live-acceptance.json
 pnpm release:accept --config /owner/live-acceptance.json --execute
@@ -179,7 +199,7 @@ pnpm release vX.Y.Z-beta.N --channel prerelease --ref "$pre_sha" \
 
 This is a data-only publication interface, not a candidate executor: it never installs candidate dependencies or runs candidate commands. Produce the receipt with `scripts/ci/owner-local-run.ts --channel prerelease --sha "$pre_sha"` (see [Authorize complete owner-local verification](#authorize-complete-owner-local-verification)). The supplied receipt must describe all ten canonical pre tasks, actual successful command exits and SHA256 hashes of retained logs; failed or incomplete work cannot qualify. Selection and publication recheck the current pre SHA, immutable reference, native protections, manifest provenance and clean protected-main producer. Ordinary tests retain stable runtime defaults; the hosted production build uses prerelease. Changed source or incompatible producer configuration requires new qualification. Do not use an unisolated legacy runner to create this receipt.
 
-Pre owner-local requires receipt format 2 with `execution: { kind: "docker-isolated", evidenceSha256: "<64 lowercase hex>" }`. The owner-collected evidence binds the actual sandbox, prerequisite source closure, commands, source integrity, resource limits and teardown; retain its immutable bytes with the logs. Withdrawn format-1 pre receipts are rejected. Stable receipt format 1 is unchanged. The pre proof carries `executionEvidenceSha256` through image and receiver validation, and uses the native owner's distinct `owner-local-prerelease-verification` status. Its exact beta Release must have `prerelease=true` and `latest=false`. Stable proof cannot authorize pre, or pre proof stable. The common pre checker revalidates the fixed source, full plan, both configurations, producer ancestry, native owner, tag and digest-bound asset ID/bytes. Same-tree rebase retains the actual tested SHA; a changed tree or incompatible producer requires new execution. The owner and receiving deploy/open/restore paths and candidate image producer preserve the typed local proof with no invented Actions IDs. Absent or withdrawn local authority retains native workflow fallback; malformed latest owner success blocks. Native PR/ref rules, protected synchronization leases, real private image production/import and target acceptance remain required. Candidate-local tool changes cannot authorize themselves; deliver this producer through protected main first.
+The pre receipt format and the pre proof rules are part of the [Release evidence contract](#release-evidence-contract).
 
 `N` starts at 1. The initial selection must match the actual integration ref and current main baseline. The command fixes `verification/prerelease/<SHA>`, checks effective native reference protection, and dispatches `prerelease-candidate-verification.yml` on `main`. The receipt binds the repository ID, prerelease channel, candidate SHA, candidate and trusted-policy configuration, and the main producer commit. The producer must remain reachable from protected main. Compatible tasks can be retried independently; missing, failed, cancelled, skipped, or incompatible tasks block publication. A fixed candidate remains usable after the integration branch moves.
 
@@ -397,7 +417,7 @@ After publishing the formal Release and deploying its frontend and backend, run 
 
 ```bash
 pnpm exec tsx scripts/release/verify-feedback-deployment.ts vX.Y.Z \
-  --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola \
+  --host <host> --remote-dir <deploy-dir> \
   --frontend https://open-agricola.titanxxh.com/ \
   --receipt /path/to/private/feedback-vX.Y.Z.json
 ```
@@ -412,15 +432,15 @@ To retry the same notification after a lost SSH response or database failure, us
 
 ```bash
 pnpm exec tsx scripts/release/verify-feedback-deployment.ts \
-  --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola \
+  --host <host> --remote-dir <deploy-dir> \
   --retry /path/to/private/feedback-vX.Y.Z.json
 ```
 
 To inspect persisted pending operations, including reconciliation queued by a later assessment or fix link, or to retry one operation without the local receipt:
 
 ```bash
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --status operations
-pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --retry-operation <operation-id>
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --status operations
+pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --retry-operation <operation-id>
 ```
 
 The receipt binds the observed SSH host and remote directory. Retry uses that saved target when flags are omitted and rejects conflicting target flags before SSH. Retry preserves the operation identity and stored proof for either verification type. It does not reselect mutable authorization or repeat Release creation, candidate dispatch, deployment, or production observation; new verification still passes the current candidate gate. Keep the receipt until the operation is completed. Repeated verification, retry, and late duplicate links do not send another message for the same account and root fix. Existing messages and their read timestamps remain unchanged.
@@ -436,11 +456,11 @@ Prepare a private reviewed JSON file. An empty `{}` uses existing report mapping
 
 ```bash
 umask 077
-ssh ubuntu@ten-kr \
-  'cd /home/ubuntu/open-agricola && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts' \
+ssh <host> \
+  'cd <deploy-dir> && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts' \
   < /private/reviewed-feedback.json > /private/feedback-preview.json
-ssh ubuntu@ten-kr \
-  'cd /home/ubuntu/open-agricola && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts --execute --actor=ADMINISTRATOR_SITE_ID' \
+ssh <host> \
+  'cd <deploy-dir> && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts --execute --actor=ADMINISTRATOR_SITE_ID' \
   < /private/reviewed-feedback.json > /private/feedback-result.json
 ```
 
@@ -451,7 +471,7 @@ If an original mapping is absent, an optional `imports` entry requires `issueNum
 
 Execution skips any existing triage history and never rewrites a later assessment. It confirms before releasing, uses the normal account/root uniqueness, and confines its durable reconciliation intents to reviewed subjects and exact fix versions. `newMessages` equals this call's committed `insertedTriages` plus `releasedMessages`; concurrent senders are not counted. `errors` lists partial failures. `reconciliation.operations` contains durable operation IDs and any pending proof or notification failures. The four historical fixes supply reviewed concrete summaries. An existing maintainer summary takes precedence and appears in both preview and message. Historical first-included tags are audit metadata, separate from the first verified production version and observation time.
 
-After interruption, rerun preview and the same reviewed input with `--execute`. Successful messages and read state remain unchanged. For a pending notification transaction, run `pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host ubuntu@ten-kr --remote-dir /home/ubuntu/open-agricola --retry-operation OPERATION_ID` on the owner machine, replacing `OPERATION_ID` with the saved ID. This retries only that notification operation. Retained subject/fix fences prevent retries from changing recipients or sending a different fix. Resolve `historical_subject_changed` by reviewing a fresh preview; do not override the fence. No release or deployment needs to be repeated. A fully eligible isolated fixture produces 16 messages and then zero on rerun; real executions report actual skips, including the default missing #1595 explanation.
+After interruption, rerun preview and the same reviewed input with `--execute`. Successful messages and read state remain unchanged. For a pending notification transaction, run `pnpm exec tsx scripts/release/verify-feedback-deployment.ts --host <host> --remote-dir <deploy-dir> --retry-operation OPERATION_ID` on the owner machine, replacing `OPERATION_ID` with the saved ID. This retries only that notification operation. Retained subject/fix fences prevent retries from changing recipients or sending a different fix. Resolve `historical_subject_changed` by reviewing a fresh preview; do not override the fence. No release or deployment needs to be repeated. A fully eligible isolated fixture produces 16 messages and then zero on rerun; real executions report actual skips, including the default missing #1595 explanation.
 
 ## 1. Deploy the Backend
 
@@ -882,7 +902,7 @@ For this upgrade, use the existing independent verification and deployment entri
 2. Deploy that exact backend candidate from the owner machine. The backend gate does not require a published Release:
 
     ```bash
-    ./deploy-backend.sh ubuntu@ten-kr <full-sha> /home/ubuntu/open-agricola \
+    ./deploy-backend.sh <host> <full-sha> <deploy-dir> \
       --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
       --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
     ```
@@ -919,7 +939,7 @@ Run the standard entry from the clean checkout of trusted image producer `P` on 
 2. Select the sole receipt artifact ID from that successful run/attempt. Use the existing private GHCR package, an owner-local mode-0600 credential file and a separate mode-0600 resource budget:
 
     ```bash
-    ./deploy-backend.sh ubuntu@ten-kr <F> /home/ubuntu/open-agricola \
+    ./deploy-backend.sh <host> <F> <deploy-dir> \
       --build-run <run> --build-attempt <attempt> --artifact-id <artifact> \
       --auth-file /owner/private-ghcr.json --import-budget /owner/private-import-budget.json
     ```
@@ -930,7 +950,7 @@ Run the standard entry from the clean checkout of trusted image producer `P` on 
     {"format":1,"import":{"maxArchiveMiB":2048,"memoryHeadroomMiB":512,"intake":{"memoryMiB":384,"cpus":1,"pids":64}},"diskMiB":8192,"reserveMemoryMiB":512}
     ```
 
-Host/ref/directory defaults remain `ubuntu@ten-kr`, `main` and `/home/ubuntu/open-agricola`. All five image/resource flags are mandatory; missing inputs never fall back to building. CI execution is rejected. Before the first SSH, the entry fixes `F`, checks its complete same-SHA formal verification and native workflow/attempt/artifact provenance, and requires `formal-candidate/stable`. Owner-only credentials pull by digest, inspect the actual image and export a fixed tag-free archive. Credentials and Docker auth never reach the server.
+Host/ref/directory default to the owner's deployment (`<host>`, `main`, `<deploy-dir>`). All five image/resource flags are mandatory; missing inputs never fall back to building. CI execution is rejected. Before the first SSH, the entry fixes `F`, checks its complete same-SHA formal verification and native workflow/attempt/artifact provenance, and requires `formal-candidate/stable`. Owner-only credentials pull by digest, inspect the actual image and export a fixed tag-free archive. Credentials and Docker auth never reach the server.
 
 The server extracts trusted controller files only from `P`. The owner sends the small private request first. Before any archive upload, `preflight` checks the actual staging and Docker data filesystems against known archive bytes and the configured reserve. Both SCP inputs preserve private file modes. A failed archive transfer requests cleanup of only that operation's `image.tar`, using the matching private preflight proof within 30 minutes. Cleanup accepts an expired client stamp for this teardown only; active intake, accepted image or maintenance evidence blocks it. It preserves the request and diagnostic records. A cleanup failure is reported with the original transfer error.
 
@@ -988,13 +1008,13 @@ The default is an existing-deployment upgrade. Explicit bootstrap requires no ap
 After accepting the formal deployment, run the owner maintenance entry to review the server's current inventory. It streams the checked-out tool over SSH and defaults to a read-only plan:
 
 ```bash
-./cleanup-backend-images.sh ubuntu@ten-kr /home/ubuntu/open-agricola > image-cleanup-plan.json
+./cleanup-backend-images.sh <host> <deploy-dir> > image-cleanup-plan.json
 ```
 
 Review every `remove` entry, then execute against the accepted full build SHA:
 
 ```bash
-./cleanup-backend-images.sh ubuntu@ten-kr /home/ubuntu/open-agricola \
+./cleanup-backend-images.sh <host> <deploy-dir> \
   --execute --expected-build <accepted-full-sha>
 ```
 
@@ -1178,8 +1198,8 @@ An ordinary archive contains a native PostgreSQL custom-format dump, immutable S
 
 ```bash
 bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
-/home/ubuntu/open-agricola-ops/backup-offsite.sh               # Host-only offsite copy
-/home/ubuntu/open-agricola-ops/backup-offsite.sh ledger-only   # Refresh deletion facts without stopping applications
+<host-ops-dir>/backup-offsite.sh               # Host-only offsite copy
+<host-ops-dir>/backup-offsite.sh ledger-only   # Refresh deletion facts without stopping applications
 ```
 
 Stable daily and ordinary manual backups run online. They inspect the running application image and its resource-deletion protocol, then use that immutable protected-main image for capture and isolated restore validation. Deploy the complete generation supporting online backup before enabling these scripts. A legacy image or mixed generation fails backup without stopping or restarting applications.
@@ -1192,7 +1212,7 @@ Validation uses an isolated PostgreSQL database and S3 prefix. Its report identi
 
 Replay Step decoding dominates validation time and runs on one thread by default, so online backups never compete with players for more than one CPU. With applications stopped, the stable pre-deployment backup validation and `check-live` set `STORAGE_VALIDATION_CONCURRENCY=auto` to decode replays on every available CPU; a positive integer up to 64 selects an explicit worker count. The report is identical for every setting.
 
-Daily backup and deployment share `backups/.maintenance.lock`. Retention remains 7 local daily archives and 5 local pre-deploy archives; stable sends only daily sets offsite. All ordinary archives and corresponding configuration snapshots expire within 30 days. Ledger copies are never ordinary archive-retention targets. The scheduled offsite script, its commit and retention helpers, and their cron and logrotate files live only on the host in `/home/ubuntu/open-agricola-ops`, outside this repository; its README documents modes (`full`, `capture`, `sync-only`, `ledger-only`), offsite selection, retention and schedules. It reads `BACKUP_POLICY_ROOT` for the repository's `scripts/backup-storage.sh`, `scripts/backup-process.sh` and `scripts/backup-files.mjs`. Manual local backups do not require an offsite host.
+Daily backup and deployment share `backups/.maintenance.lock`. Retention remains 7 local daily archives and 5 local pre-deploy archives; stable sends only daily sets offsite. All ordinary archives and corresponding configuration snapshots expire within 30 days. Ledger copies are never ordinary archive-retention targets. The scheduled offsite script, its commit and retention helpers, and their cron and logrotate files live only on the host in `<host-ops-dir>`, outside this repository; its README documents modes (`full`, `capture`, `sync-only`, `ledger-only`), offsite selection, retention and schedules. It reads `BACKUP_POLICY_ROOT` for the repository's `scripts/backup-storage.sh`, `scripts/backup-process.sh` and `scripts/backup-files.mjs`. Manual local backups do not require an offsite host.
 
 Offsite ledger synchronization reads the remote copy, merges it into the current S3 CAS ledger, and exports the union. Old backups or local copies cannot erase newer deletion facts. Use `ledger-only` immediately after a removal.
 
@@ -1201,7 +1221,7 @@ Offsite ledger synchronization reads the remote copy, merges it into the current
 The owner machine keeps its own copies under `~/oa-backup/<UTC capture time>/` (ADR 0045). The host's daily backup, its validation and offsite sync are unchanged.
 
 ```bash
-node --import tsx scripts/owner-backup.ts run --host ubuntu@<formal-host>   # pull, validate, prune
+node --import tsx scripts/owner-backup.ts run --host <host>   # pull, validate, prune
 node --import tsx scripts/owner-backup.ts validate --snapshot ~/oa-backup/<stamp>
 node --import tsx scripts/owner-backup.ts prune
 ```
@@ -1210,7 +1230,7 @@ node --import tsx scripts/owner-backup.ts prune
 
 Validation restores the copy into throwaway PostgreSQL and RustFS containers on an internal Docker network, merges the copied ledger and runs `storage-archive-cli.ts validate` in the validator image of the build the host was running, with every CPU; it reuses or builds that image, and without it writes no report. The report is written to `validation.json`. Copies older than 30 days are deleted, the newest included. A copy restores through the procedure below, with its `capture/` directory as the archive.
 
-The capture needs a running image and host checkout that include `owner-sync-capture.sh`; with an older image the dump stays custom-format, which validates but transfers in full. Install the daily timer from `deploy/owner-backup/` as its header describes; it runs at 04:30 Asia/Shanghai and catches up after the machine was off.
+The capture needs a running image and host checkout that include `owner-sync-capture.sh`; with an older image the dump stays custom-format, which validates but transfers in full. Install the daily timer from `deploy/owner-backup/` as its header describes; it runs once a day at the time set in its unit and catches up after the machine was off.
 
 #### Restore or switch to external services
 
@@ -1312,10 +1332,10 @@ The header has separate WeChat and Feishu buttons. Each dialog opening reads its
 Use the owner-controlled maintenance entry from a checkout with dependencies installed:
 
 ```bash
-./deploy-operations.sh --wechat-qr ubuntu@ten-kr /absolute/path/wechat-group.png
-./deploy-operations.sh --feishu-qr ubuntu@ten-kr /absolute/path/feishu-group.png
+./deploy-operations.sh --wechat-qr <host> /absolute/path/wechat-group.png
+./deploy-operations.sh --feishu-qr <host> /absolute/path/feishu-group.png
 # Custom game directory:
-./deploy-operations.sh --feishu-qr ubuntu@ten-kr /absolute/path/feishu-group.jpg /home/ubuntu/open-agricola
+./deploy-operations.sh --feishu-qr <host> /absolute/path/feishu-group.jpg <deploy-dir>
 # Local application, using its COMMUNITY_DATA_DIR or SHARED_DATA_DIR/community:
 ./deploy-operations.sh --feishu-qr --local /absolute/path/feishu-group.png /absolute/path/data/community
 ```
@@ -1347,7 +1367,7 @@ The header's What's New button lists the five newest player-facing releases from
 List releases newest first; dates may not increase down the list. `version` is a unique label of at most 32 characters. Each release has 1–30 notes. Each note maps language ids such as `zh` and `en` to one line of at most 500 characters. The dialog shows the viewer's language, then English, then the first language written. The file may keep up to 200 releases and 256 KiB; only the first five are served.
 
 ```bash
-./deploy-operations.sh --whats-new ubuntu@ten-kr /absolute/path/whats-new.json [game-dir]
+./deploy-operations.sh --whats-new <host> /absolute/path/whats-new.json [game-dir]
 # Local application, using its COMMUNITY_DATA_DIR or SHARED_DATA_DIR/community:
 ./deploy-operations.sh --whats-new --local /absolute/path/whats-new.json /absolute/path/data/community
 ```
@@ -1374,7 +1394,7 @@ Production monitoring has its own Compose project and owner-controlled deploymen
 ./deploy-operations.sh <ssh-host> [ref] [operations-dir] [game-dir]
 ```
 
-Defaults are `ubuntu@ten-kr`, `main`, `/home/ubuntu/open-agricola-operations` and `/home/ubuntu/open-agricola`. The command publishes only the pinned commit's `operations/` directory, builds the small accounts exporter, and starts Prometheus, Grafana, Node Exporter and that exporter. It creates no GitHub Release, builds no game image, runs no game migration and does not stop the application. Each deployment checks that the application container ID, image and start time remain unchanged. `deploy-backend.sh` manages only app/Caddy and skips monitoring configuration generation.
+Defaults are the owner's deployment (`<host>`, `main`, `<operations-dir>`, `<deploy-dir>`). The command publishes only the pinned commit's `operations/` directory, builds the small accounts exporter, and starts Prometheus, Grafana, Node Exporter and that exporter. It creates no GitHub Release, builds no game image, runs no game migration and does not stop the application. Each deployment checks that the application container ID, image and start time remain unchanged. `deploy-backend.sh` manages only app/Caddy and skips monitoring configuration generation.
 
 The first operations deployment stops the legacy monitoring containers before reusing their TSDB and Grafana directories. It retains the metrics secret and all observations, and restarts the legacy containers if startup fails. Later failures restore the previous operations release. Versioned source and private per-release configuration live under `<operations-dir>/releases/<sha>/`; `deployed-build-id` records only a successful deployment. To roll back, run the same command with an earlier aggregate-capable operations commit. Raw-query exporters cannot collect after this permission upgrade. A failed monitoring cutover retains aggregate-only database permissions; recover with a release that supports the aggregate functions. Run this first independent deployment before the next game deployment, whose orphan cleanup removes legacy monitoring containers. Keep the persistent `data/observability/{prometheus,grafana}` directories when removing old containers.
 
