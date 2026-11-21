@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout } from 'node:timers/promises'
 import { checkPrereleaseVerification, fixPrereleaseCandidate, requestPrereleaseVerification } from '../ci/prerelease-verification'
 import { checkCandidateVerification, requestCandidateVerification } from '../ci/candidate-verification'
-import { candidateSha, commitRef, ensureCommitRef, optionalGithub, ownerMachine, RELEASE_REPOSITORY } from './candidate'
+import { commitRef, ensureCommitRef, optionalGithub, ownerMachine, RELEASE_REPOSITORY } from '../ci/release-github'
+import { candidateSha } from './candidate'
 import { publishOwnerLocalRelease } from './owner-local.ts'
 
 function releaseOptions(input: string[]): { version: string; channel: 'stable' | 'prerelease'; repository: string; ref: string; pollMs: number; timeoutMs: number; localVerification: string | undefined } {

@@ -18,7 +18,7 @@ import { composeImages, imageCacheDirectory, prepareImages } from './owner-local
 import { FULL_TASK_IDS, fullSha, TASK_FIXTURE_IMAGES, verificationConfiguration, verificationTask, type FullTaskId, type VerificationCommand } from './verification-tasks.ts'
 
 export { TASK_FIXTURE_IMAGES }
-import { github, ownerMachine, RELEASE_REPOSITORY } from '../release/candidate.ts'
+import { github, ownerMachine, RELEASE_REPOSITORY } from './release-github.ts'
 
 export type LocalChannel = 'stable' | 'prerelease'
 export type CommandRecord = VerificationCommand & { exitCode: number; logSha256: string }

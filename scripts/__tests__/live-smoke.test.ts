@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { afterEach, expect, it, vi } from 'vitest'
-import { liveSmokeBrowserGuard, LIVE_READ_COMMANDS, permitsLiveSmokeRequest } from '../release/live-smoke-guard'
-import { liveDiagnosticMetadata, parseLiveSmokeConfig, readPrivateAcceptanceFile } from '../release/live-smoke'
-import { liveSmokeCli } from '../release/live-smoke-cli'
+import { liveSmokeBrowserGuard, LIVE_READ_COMMANDS, permitsLiveSmokeRequest } from '../../e2e-tests/helpers/live-smoke-guard'
+import { liveDiagnosticMetadata, parseLiveSmokeConfig, readPrivateAcceptanceFile } from '../../e2e-tests/helpers/live-smoke'
+import { liveSmokeCli } from '../../e2e-tests/helpers/live-smoke-cli'
 
 const apiOrigin = 'https://api.agricola.test', roomId = 'retained-participant-room'
 const roots: string[] = []

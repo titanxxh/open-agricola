@@ -3,9 +3,9 @@ import { createWriteStream, lstatSync, mkdirSync, mkdtempSync, readFileSync, ren
 import { dirname, join, resolve } from 'node:path'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { ownerMachine } from './candidate.ts'
-import { assertVerifiedContainerImageReceipt, parseContainerImageReceipt, type ContainerImageTransfer, type VerifiedContainerImageReceipt } from './container-images.ts'
-import { inspectLoadedContainerImage, nativeContainerImageId, validateContainerImageArchive } from './container-images-archive.ts'
+import { ownerMachine } from '../ci/release-github.ts'
+import { assertVerifiedContainerImageReceipt, parseContainerImageReceipt, type ContainerImageTransfer, type VerifiedContainerImageReceipt } from '../ci/container-images.ts'
+import { inspectLoadedContainerImage, nativeContainerImageId, validateContainerImageArchive } from '../ci/container-images-archive.ts'
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid owner image input')

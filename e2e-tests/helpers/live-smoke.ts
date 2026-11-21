@@ -7,11 +7,12 @@ import { chromium, webkit, expect, request, type APIRequestContext, type Browser
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION, BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { GAME_CLIENT_CAPABILITIES } from '../../shared/contract/client-capabilities'
 import { isSameSite } from '../../server/http-origin'
-import { clearOwnReleaseSession, installReleaseLocale, signOutReleaseSession, submitReleaseLogin } from '../../e2e-tests/helpers/release-browser'
-import { observeReleasePage, type ReleaseDiagnosticSnapshot, type ReleasePageDiagnostics } from '../../e2e-tests/helpers/release-diagnostics'
+import { clearOwnReleaseSession, installReleaseLocale, signOutReleaseSession, submitReleaseLogin } from './release-browser'
+import { observeReleasePage, type ReleaseDiagnosticSnapshot, type ReleasePageDiagnostics } from './release-diagnostics'
 import { createFailureRecorder, writeEvidence, type SmokeCredentials } from './smoke'
 import { verifyVisibleReleaseAssets } from './render'
 import { installLiveSmokeGuard } from './live-smoke-guard'
+import { ownLaunchOptions } from './pinned-asset-host'
 
 export type LiveSmokeConfig = {
   format: 1; appUrl: string; apiUrl: string; expectedBuild: string;
@@ -154,9 +155,9 @@ export async function runLiveReleaseSmoke(config: LiveSmokeConfig, options: { pr
     assert.ok(!entry.startsWith('/') && !entry.split('/').includes('..') && /^[A-Za-z0-9_./-]+$/.test(entry))
     const entryResponse = await bootstrap.get(`${config.apiUrl}/replay-viewers/${replay.viewerBuildId}/${entry}`, { maxRedirects: 0 })
     assert.equal(entryResponse.status(), 200); assert.equal(hash(await entryResponse.body()), object(viewerDescriptor.files)[entry])
-    for (const [engine, browserType] of [['chromium', chromium], ['webkit', webkit]] satisfies Array<[string, typeof chromium]>) {
+    for (const [engine, browserType] of [['chromium', chromium], ['webkit', webkit]] satisfies Array<['chromium' | 'webkit', typeof chromium]>) {
       stage = `${engine}:launch`
-      const browser = await browserType.launch({ headless: true, proxy: options.proxy })
+      const browser = await browserType.launch({ ...ownLaunchOptions(engine), headless: true, proxy: options.proxy })
       let context: BrowserContext | undefined
       let activeGuard: Awaited<ReturnType<typeof installLiveSmokeGuard>> | undefined
       const proof: BrowserProof = { engine, login: false, logout: false, cookie: false, lobby: false, routedInstances: 0,

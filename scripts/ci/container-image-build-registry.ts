@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { CONTAINER_IMAGE_REGISTRY } from '../release/container-images.ts'
+import { CONTAINER_IMAGE_REGISTRY } from './container-images.ts'
 
 const packageName = CONTAINER_IMAGE_REGISTRY.slice('ghcr.io/titanxxh/'.length)
 const packageEndpoint = `https://api.github.com/user/packages/container/${packageName}`

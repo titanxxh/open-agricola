@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
-import { RELEASE_REPOSITORY } from '../release/candidate'
+import { RELEASE_REPOSITORY } from '../ci/release-github'
 import { VERIFIED_OPEN_MAX_AGE_MS, admitReceipt, readVerifiedOpenReceipt, verifyOpen } from '../prerelease/operations'
 
 const roots: string[] = []

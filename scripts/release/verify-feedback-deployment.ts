@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { parseDeploymentProof, type DeploymentProof } from '../../server/bug-report/deployment-proof'
 import { checkCandidateVerification } from '../ci/candidate-verification'
 import { fullSha } from '../ci/verification-tasks'
-import { candidateSha, commitRef, github, ownerMachine, RELEASE_REPOSITORY } from './candidate'
+import { commitRef, github, ownerMachine, RELEASE_REPOSITORY } from '../ci/release-github'
+import { candidateSha } from './candidate'
 
 const object = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid owner feedback evidence')

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { assertScopedPaths, loadPrereleaseEnvironment, parsePrereleaseTarget, targetFingerprint } from './config'
 import { readRuntime } from './runtime'
 import { archiveTool, type ToolBudget } from './docker'
-import { ownerMachine } from '../release/candidate'
+import { ownerMachine } from '../ci/release-github'
 
 /** Host adapter for owner-scheduled backups; candidate images cannot supply it. */
 export function runBackupArchive(args: string[], env: NodeJS.ProcessEnv = process.env): string {

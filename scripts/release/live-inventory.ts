@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, lstatSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ownerMachine } from './candidate.ts'
+import { ownerMachine } from '../ci/release-github.ts'
 import { fullSha } from '../ci/verification-tasks.ts'
 
 export const LIVE_INVENTORY_QUERY = `import {PostgresDatabase} from './server/database/postgres.ts';

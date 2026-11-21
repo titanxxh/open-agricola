@@ -4,15 +4,15 @@ import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { checkPrereleaseVerification, fixPrereleaseCandidate, requestPrereleaseVerification } from '../ci/prerelease-verification'
-import { commitRef, github, RELEASE_REPOSITORY } from '../release/candidate'
+import { commitRef, github, RELEASE_REPOSITORY } from '../ci/release-github'
 import { readSourceProof, routineSourcePaths, verifySourceUpdate } from '../prerelease/source-verification'
 
 vi.mock('../ci/prerelease-verification', async importOriginal => ({
   ...await importOriginal<typeof import('../ci/prerelease-verification')>(),
   fixPrereleaseCandidate: vi.fn(), checkPrereleaseVerification: vi.fn(), requestPrereleaseVerification: vi.fn(),
 }))
-vi.mock('../release/candidate', async importOriginal => ({
-  ...await importOriginal<typeof import('../release/candidate')>(), github: vi.fn(), commitRef: vi.fn(),
+vi.mock('../ci/release-github', async importOriginal => ({
+  ...await importOriginal<typeof import('../ci/release-github')>(), github: vi.fn(), commitRef: vi.fn(),
 }))
 vi.mock('node:timers/promises', async importOriginal => ({
   ...await importOriginal<typeof import('node:timers/promises')>(), setTimeout: vi.fn(),

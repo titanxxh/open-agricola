@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isolatedImageBuildScript } from '../ci/container-image-build'
 import type { Runner } from '../ci/owner-local-run'
-import { validateContainerImageArchive } from '../release/container-images-archive'
+import { validateContainerImageArchive } from '../ci/container-images-archive'
 import { buildValidatorImage, prepareValidatorContext, validatorReceipt, validatorReceiptPath, type DockerCommand, type ValidatorInputs } from '../release/validator-image'
 
 const sha = 'a'.repeat(40), producer = 'b'.repeat(40)

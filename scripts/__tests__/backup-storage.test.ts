@@ -8,7 +8,7 @@ import { expect, it } from 'vitest'
 import { parsePrereleaseTarget, targetFingerprint } from '../prerelease/config'
 import { atomicJson, readRuntime, writeRuntime } from '../prerelease/runtime'
 import { importedImagePath } from '../prerelease/docker'
-import type { ContainerImageTransfer } from '../release/container-images'
+import type { ContainerImageTransfer } from '../ci/container-images'
 import { readPairedPrereleaseBackup } from '../prerelease/backup'
 import { seedStorageGuard } from './prerelease-storage-guard-fixture'
 

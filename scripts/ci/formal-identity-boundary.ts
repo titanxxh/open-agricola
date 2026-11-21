@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { posix } from 'node:path'
-import { IDENTITY_BOUNDARY_PATHS } from '../prerelease/identity-boundary-paths.ts'
+import { IDENTITY_BOUNDARY_PATHS } from './identity-boundary-paths.ts'
 import { fullSha } from './verification-tasks.ts'
 
 // The HTTP, WS and page routers wire the identity modules into a large application. Bind the wiring itself;

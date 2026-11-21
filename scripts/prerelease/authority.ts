@@ -5,7 +5,7 @@ import { resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { atomicJson } from './runtime'
 import { canonicalJson } from '../../shared/contract/authoritative-command'
-import { ownerMachine } from '../release/candidate'
+import { ownerMachine } from '../ci/release-github'
 import { assertOwnerPath, parsePrereleaseTarget, targetFingerprint, type PrereleaseTarget } from './config'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION } from '../../shared/contract/browser-auth'
 

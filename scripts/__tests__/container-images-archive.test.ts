@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
-import { parseContainerImageReceipt } from '../release/container-images'
-import { loadContainerImageArchive, validateContainerImageArchive } from '../release/container-images-archive'
+import { parseContainerImageReceipt } from '../ci/container-images'
+import { loadContainerImageArchive, validateContainerImageArchive } from '../ci/container-images-archive'
 
 const roots: string[] = []
 afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })

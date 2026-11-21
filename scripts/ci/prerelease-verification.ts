@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { assertCandidateCheckout, assertMainProtection, assertRawCommit, evaluateCandidateVerification, mainCommit, parseGitHubJsonLines, PRERELEASE_CANDIDATE_WORKFLOW, repositoryName, runCandidateTask } from './candidate-verification.ts'
 import { checkPrereleaseOwnerLocalVerification } from './owner-local-verification.ts'
 import { chromiumLaneEnvironment, fastWorkerEnvironment, fullSha, FULL_TASK_IDS, selectedTasks, verificationConfiguration } from './verification-tasks.ts'
-import { commitRef, ensureCommitRef, github, ownerMachine } from '../release/candidate.ts'
+import { commitRef, ensureCommitRef, github, ownerMachine } from './release-github.ts'
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const object = (value: unknown): Record<string, unknown> => {

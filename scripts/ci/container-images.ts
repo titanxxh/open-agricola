@@ -3,11 +3,11 @@ import { createHash } from 'node:crypto'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { assertMainProtection, assertRawCommit, checkCandidateVerification, mainCommit } from '../ci/candidate-verification.ts'
-import { checkPrereleaseVerification } from '../ci/prerelease-verification.ts'
-import { FULL_TASK_IDS, fullSha, verificationConfiguration, type FullTaskId } from '../ci/verification-tasks.ts'
-import { github, ownerMachine, RELEASE_REPOSITORY } from './candidate.ts'
-import { parseOwnerLocalProof, parsePrereleaseOwnerLocalProof, type OwnerLocalProof, type PrereleaseOwnerLocalProof } from '../ci/owner-local-verification.ts'
+import { assertMainProtection, assertRawCommit, checkCandidateVerification, mainCommit } from './candidate-verification.ts'
+import { checkPrereleaseVerification } from './prerelease-verification.ts'
+import { FULL_TASK_IDS, fullSha, verificationConfiguration, type FullTaskId } from './verification-tasks.ts'
+import { github, ownerMachine, RELEASE_REPOSITORY } from './release-github.ts'
+import { parseOwnerLocalProof, parsePrereleaseOwnerLocalProof, type OwnerLocalProof, type PrereleaseOwnerLocalProof } from './owner-local-verification.ts'
 
 export const CONTAINER_IMAGE_WORKFLOW = '.github/workflows/container-image-build.yml'
 export const CONTAINER_IMAGE_REGISTRY = 'ghcr.io/titanxxh/open-agricola-images'
@@ -132,7 +132,7 @@ function trustedProducer(cwd: string, producer: string, ownerPolicy?: string): {
   if (ancestor && ownerPolicy !== undefined && producer === fullSha(ownerPolicy)) return { repositoryId: integer(repository.id), main }
   if (!ancestor
     || verificationConfiguration(cwd, producer) !== verificationConfiguration(cwd, main)
-    || spawnSync('git', ['diff', '--quiet', producer, main, '--', CONTAINER_IMAGE_WORKFLOW, ':(glob)scripts/release/container-images*.ts',
+    || spawnSync('git', ['diff', '--quiet', producer, main, '--', CONTAINER_IMAGE_WORKFLOW, ':(glob)scripts/ci/container-images*.ts', ':(glob)scripts/release/container-images*.ts',
       ':(glob)scripts/release/backend-*', 'scripts/image-intake.ts', 'deploy-backend.sh', 'docker-compose.prod.yml',
       'scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs'], { cwd, stdio: 'ignore' }).status !== 0) {
     throw new Error('Image producer is not compatible protected main')
