@@ -20,8 +20,8 @@ const virtualId = `\0${virtualEntry}`
 
 type WorkerFeatures = {
   assets: boolean
-  /** This build's content-addressed files and their SHA-256; omitted to leave them to the HTTP cache. */
-  appShell?: Readonly<Record<string, string>>
+  /** This build's content-addressed files with their SHA-256 and background warm set; omitted to leave them to the HTTP cache. */
+  appShell?: Readonly<{ digests: Readonly<Record<string, string>>; warm: readonly string[] }>
   roomOffline: boolean
   offlineEncyclopedia: boolean
   emergencyTakeover: boolean
@@ -67,7 +67,9 @@ export function serviceWorkerPlugin(config: PublicAssetConfig): Plugin {
     generateBundle: { order: 'post', async handler(_options, bundle) {
       const source = await buildServiceWorker(config, encyclopediaFallback, {
         assets: PUBLIC_ASSET_CACHE_ENABLED,
-        appShell: APP_SHELL_CACHE_ENABLED ? appShellDigests(bundle, path.join(root, 'public')) : undefined,
+        appShell: APP_SHELL_CACHE_ENABLED
+          ? { digests: appShellDigests(bundle, path.join(root, 'public')), warm: screenFiles(bundle, 'client/app/GameContainerApi.tsx') }
+          : undefined,
         roomOffline: ROOM_OFFLINE_RETRY_ENABLED,
         offlineEncyclopedia: OFFLINE_ENCYCLOPEDIA_ENABLED,
         emergencyTakeover: SERVICE_WORKER_EMERGENCY_TAKEOVER,
@@ -84,6 +86,24 @@ const sha256 = (bytes: string | Uint8Array) => createHash('sha256').update(bytes
  * cards manifest copied from `public/`. Unhashed public files (`i18n/manifest.json`, `cards-manifest.json`) are
  * left out because their bytes change under the same name.
  */
+/** The chunk whose entry module is `entry`, with every chunk and stylesheet it loads, as site-relative paths. */
+export function screenFiles(bundle: Rolldown.OutputBundle, entry: string): string[] {
+  const chunks = new Map<string, Rolldown.OutputChunk>()
+  for (const output of Object.values(bundle)) if (output.type === 'chunk') chunks.set(output.fileName, output)
+  const start = [...chunks.values()].find(chunk => chunk.facadeModuleId?.split(path.sep).join('/').endsWith(entry))
+  if (!start) throw new Error(`The Pages Worker cannot find the ${entry} chunk to warm`)
+  const files = new Set<string>()
+  const visit = (chunk: Rolldown.OutputChunk) => {
+    if (files.has(chunk.fileName)) return
+    files.add(chunk.fileName)
+    const css = (chunk as Rolldown.OutputChunk & { viteMetadata?: { importedCss?: Set<string> } }).viteMetadata?.importedCss
+    for (const file of css ?? []) files.add(file)
+    for (const name of chunk.imports) { const next = chunks.get(name); if (next) visit(next) }
+  }
+  visit(start)
+  return [...files].sort()
+}
+
 export function appShellDigests(bundle: Rolldown.OutputBundle, publicDir: string): Record<string, string> {
   const digests: Record<string, string> = {}
   for (const output of Object.values(bundle)) {
