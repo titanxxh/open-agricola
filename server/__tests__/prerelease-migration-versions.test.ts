@@ -32,30 +32,30 @@ async function recreateLegacyPrereleaseDatabase(target: PostgresDatabase) {
 describe('prerelease migration versions', () => {
   it('numbers prerelease-only migrations after main on a new database', async () => {
     db = await createTestDatabase()
-    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 9047, 9048, 9050])
+    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 51, 9047, 9048, 9050])
     expect(await mainSchema(db)).toEqual({ web_push: true, card_edition: true })
   })
 
   it('moves the legacy prerelease versions so the main 047-050 migrations run once', async () => {
     db = await createTestDatabase()
     await recreateLegacyPrereleaseDatabase(db)
-    expect(await versions(db)).toEqual([46, 47, 48, 50])
+    expect(await versions(db)).toEqual([46, 47, 48, 50, 51])
     expect(await mainSchema(db)).toEqual({ web_push: false, card_edition: false })
 
     await migratePostgres(db)
-    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 9047, 9048, 9050])
+    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 51, 9047, 9048, 9050])
     expect(await mainSchema(db)).toEqual({ web_push: true, card_edition: true })
     expect(await db.prepare("SELECT to_regclass('prerelease_external_identities') IS NOT NULL AS present").get<{ present: boolean }>())
       .toEqual({ present: true })
 
     await migratePostgres(db)
-    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 9047, 9048, 9050])
+    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 51, 9047, 9048, 9050])
   })
 
   it('refuses a prerelease database whose versions 47 and 48 cannot be told apart', async () => {
     db = await createTestDatabase()
     await db.exec('DELETE FROM postgres_schema_migrations WHERE version IN (9047, 9048, 9050)')
     await expect(migratePostgres(db)).rejects.toThrow('Prerelease migration versions 47-50 are ambiguous')
-    expect(await versions(db)).toEqual([46, 47, 48, 49, 50])
+    expect(await versions(db)).toEqual([46, 47, 48, 49, 50, 51])
   })
 })

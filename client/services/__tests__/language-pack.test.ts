@@ -36,7 +36,7 @@ describe('independent language packages', () => {
     expect(t('fr', 'ui.title')).toBe('Ferme')
     expect(fetchMock.mock.calls).toEqual([
       ['/i18n/manifest.json', { cache: 'no-cache' }],
-      [`/i18n/${manifest.languages[0].file}`, { cache: 'force-cache' }],
+      [`/i18n/${coreFile}`, { cache: 'force-cache' }],
     ])
   })
 
