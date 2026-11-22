@@ -146,6 +146,1689 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM001_Amazon",
+    "name": "Amazon",
+    "deck": "CWM",
+    "number": 1,
+    "desc": [
+      "Whenever you use the Fishing accumulation space in round 7, 9, 11, or 13, you also get 1 animal of your choice."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM001.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM002_AnimalBuyer",
+    "name": "Animal Buyer",
+    "deck": "CWM",
+    "number": 2,
+    "desc": [
+      "After the field phase of each harvest, you may buy up to 2 animals in one purchase. Each sheep, wild boar, or cattle costs 2, 3, or 4 food, respectively."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM002.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM003_ApplePicker",
+    "name": "Apple Picker",
+    "deck": "CWM",
+    "number": 3,
+    "desc": [
+      "Whenever you use Grain Seeds or Vegetable Seeds, you also get 1 wood and 1 food."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM003.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM005_BeeKeeper",
+    "name": "Beekeeper",
+    "deck": "CWM",
+    "number": 5,
+    "desc": [
+      "Immediately build a stable for free and lay it on its side. It loses its normal function but still scores as a stable. During each harvest feeding phase, you get 1 food."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM005.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM006_Borrower",
+    "name": "Borrower",
+    "deck": "CWM",
+    "number": 6,
+    "desc": [
+      "Immediately get 7 food and 2 begging cards. At any time, you may pay 3 food to discard one begging card received from this card or from failing to feed your family."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM006.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM008_BreadCarrier",
+    "name": "Bread Carrier",
+    "deck": "CWM",
+    "number": 8,
+    "desc": [
+      "Once only, when any player builds an oven, place 1 food on each remaining round space. At the start of those rounds, you get the food."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM008.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM009_Chemist",
+    "name": "Chemist",
+    "deck": "CWM",
+    "number": 9,
+    "desc": [
+      "Whenever you receive wood from a building-resource accumulation space, you may place 1 clay from your supply on a different building-resource accumulation space to get 2 food."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM009.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM010_CloisterDweller",
+    "name": "Cloister Dweller",
+    "deck": "CWM",
+    "number": 10,
+    "desc": [
+      "At the end of the game, get 1 bonus point for each column of three farmyard spaces consisting entirely of rooms, entirely of fields, or entirely of one pasture."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM010.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM011_Contractor",
+    "name": "Contractor",
+    "deck": "CWM",
+    "number": 11,
+    "desc": [
+      "When building rooms, renovating, or playing an improvement, you may substitute 1 food for 1 building resource. You may substitute up to 2 resources per room-building action, or 1 resource per renovation or improvement."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM011.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM012_CovetousFarmer",
+    "name": "Covetous Farmer",
+    "deck": "CWM",
+    "number": 12,
+    "desc": [
+      "Once per round during your turn, you may get 1 building resource that you have none of and every other player has at least one of."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM012.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM013_Cowboy",
+    "name": "Cowboy",
+    "deck": "CWM",
+    "number": 13,
+    "desc": [
+      "You may use an occupied Sheep, Wild Boar, or Cattle Market accumulation space to get 1 animal of that type. You may keep up to 2 animals of one type on one unused farmyard space; that space still counts as unused."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM013.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM015_DebrisDealer",
+    "name": "Debris Dealer",
+    "deck": "CWM",
+    "number": 15,
+    "desc": [
+      "Whenever you renovate your clay house, you get 2 clay. If you live in a clay or stone house, each other player's renovation from wood or clay gives you 2 wood or 2 clay, respectively."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM015.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM016_Diplomat",
+    "name": "Diplomat",
+    "deck": "CWM",
+    "number": 16,
+    "desc": [
+      "In round 14, you may use an action space occupied by another player once. If you played this card in round 7 or earlier, you may do so twice instead."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM016.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM019_FamilyPlanner",
+    "name": "Family Planner",
+    "deck": "CWM",
+    "number": 19,
+    "desc": [
+      "Add 4, 7, and 10 to the current round. Place one family member from your supply on each corresponding round space. At the start of those rounds, return that member to your supply and you may take a Family Growth with Room action."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM019.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM021_FenceDealer",
+    "name": "Fence Dealer",
+    "deck": "CWM",
+    "number": 21,
+    "desc": [
+      "You may build only 12 fences. Each wood you pay for fences builds 2 fences."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM021.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM022_FoodConnoisseur",
+    "name": "Food Connoisseur",
+    "deck": "CWM",
+    "number": 22,
+    "desc": [
+      "Stack 1 clay, 1 vegetable, 1 stone, 1 grain, 1 wood, and 1 reed on this card, from bottom to top. Whenever you use Day Laborer, Fishing, or Traveling Players, take the top good."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM022.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM023_ForestFarmer",
+    "name": "Forest Farmer",
+    "deck": "CWM",
+    "number": 23,
+    "desc": [
+      "Place 3 arrow markers on this card. Once per round, after the work phase and before returning home, you may pay 1 wood and discard a marker to move one of your people from Farmland or Cultivation to an unoccupied action space and use it."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM023.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM024_GemHunter",
+    "name": "Gem Hunter",
+    "deck": "CWM",
+    "number": 24,
+    "desc": [
+      "Whenever you receive clay from an accumulation space, you also get 1 stone. In round 9 or earlier, if that space has at least 3 clay, you must leave 1 clay there to get that stone."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM024.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM026_HedgeMaster",
+    "name": "Hedge Master",
+    "deck": "CWM",
+    "number": 26,
+    "desc": [
+      "Whenever you build at least 1 fence, you get 1 bonus point. When you play this card, you may immediately take a Build Fences action."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM026.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM027_Heiress",
+    "name": "Heiress",
+    "deck": "CWM",
+    "number": 27,
+    "desc": [
+      "At the start of round 6, 10, and 13, if you live in a wooden, clay, or stone house, respectively, you may build 1 room at its normal cost, reduced by 1 clay for a clay room or 2 stone for a stone room."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM027.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM028_Herdsman",
+    "name": "Herdsman",
+    "deck": "CWM",
+    "number": 28,
+    "desc": [
+      "Whenever you use Day Laborer, you also get 1 sheep. From round 6 onwards, you may take 1 wild boar instead."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM028.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM029_HillFarmer",
+    "name": "Hill Farmer",
+    "deck": "CWM",
+    "number": 29,
+    "desc": [
+      "Whenever you build at least 1 fence or plow at least 1 field, you get 2 or 1 food if you have exactly 2 or 3 rooms, respectively."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM029.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM030_Hoarder",
+    "name": "Hoarder",
+    "deck": "CWM",
+    "number": 30,
+    "desc": [
+      "Each harvest, you may place at most 1 building resource on this card. At the end of the game, get 1, 2, 3, or 5 bonus points for having at least 1, 2, 3, or 4 different building-resource types on this card."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM030.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM031_HumbleFarmboy",
+    "name": "Humble Farmboy",
+    "deck": "CWM",
+    "number": 31,
+    "desc": [
+      "Immediately get 1, 2, 3, or 4 wood if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the fewest played cards gets 3 bonus points."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM031.png",
+    "kind": "occupation"
+  },
+  {
+    "exchanges": [
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "CWM032_Hunter:sheep",
+        "triggers": []
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "CWM032_Hunter:boar",
+        "triggers": []
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "sourceId": "CWM032_Hunter:cattle",
+        "triggers": []
+      }
+    ],
+    "id": "CWM032_Hunter",
+    "name": "Hunter",
+    "deck": "CWM",
+    "number": 32,
+    "desc": [
+      "Whenever you acquire animals outside a harvest breeding phase, you may immediately convert any of them to food: 2 per sheep, 3 per wild boar, and 4 per cattle."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "4+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM032.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM033_LadyinWaiting",
+    "name": "Lady in Waiting",
+    "deck": "CWM",
+    "number": 33,
+    "desc": [
+      "If you play this card during stage 1, place a family member from your supply on round 12. At the start of round 12, you may pay 2 food to bring that person into play without needing room. The person can work that round."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM033.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM034_LivestockKeeper",
+    "name": "Livestock Keeper",
+    "deck": "CWM",
+    "number": 34,
+    "desc": [
+      "Immediately get 1 wild boar, or 1 cattle if you already have a wild boar. During each harvest breeding phase, you may pay 1 food for one animal type to breed an additional offspring."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM034.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM035_Mailman",
+    "name": "Mailman",
+    "deck": "CWM",
+    "number": 35,
+    "desc": [
+      "Place 2 wood, 2 clay, 1 reed, and 1 stone on four different revealed action spaces, occupied or not. The next player to use each space may pay you 1 food to take its resources. You need not pay yourself."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM035.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM037_MasterStableman",
+    "name": "Master Stableman",
+    "deck": "CWM",
+    "number": 37,
+    "desc": [
+      "Immediately before receiving at least 2 animals from an animal accumulation space, you may build up to 2 stables for 1 wood each. Animals received through card effects do not count."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM037.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM038_Minimalist",
+    "name": "Minimalist",
+    "deck": "CWM",
+    "number": 38,
+    "desc": [
+      "At the end of the game, get 9, 6, 4, or 2 bonus points if you have exactly 0, 1, 2, or 3 improvements in front of you, respectively."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM038.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM040_Permaculturist",
+    "name": "Permaculturist",
+    "deck": "CWM",
+    "number": 40,
+    "desc": [
+      "You may sow grain on unused farmyard spaces without adjacency to existing fields. Sown spaces count as used, but are not fields. You may remove their grain at any time and must remove it before scoring. Effects that sow additional grain fields do not apply to these spaces."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM040.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM041_Politician",
+    "name": "Politician",
+    "deck": "CWM",
+    "number": 41,
+    "desc": [
+      "Immediately get 1 stone. Up to twice per round, at any time, you may exchange 1 reed for 1 stone or 1 stone for 1 reed."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM041.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM042_Remodeler",
+    "name": "Remodeler",
+    "deck": "CWM",
+    "number": 42,
+    "desc": [
+      "Immediately before renovating your wooden house, you may return one built stable to your supply and build 1 wooden room for free."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM042.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM043_ResourceLender",
+    "name": "Resource Lender",
+    "deck": "CWM",
+    "number": 43,
+    "desc": [
+      "Whenever you receive building resources from an action space, you may add 1 resource of a type received, then distribute all those building resources, in any order, one per remaining round space. At the start of those rounds, you get the corresponding resource."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM043.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM044_SiloGirl",
+    "name": "Silo Girl",
+    "deck": "CWM",
+    "number": 44,
+    "desc": [
+      "As soon as you live in a stone house, place 1 grain on each remaining even-numbered round space and 1 vegetable on each remaining odd-numbered round space. At the start of those rounds, you get the crop."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM044.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM045_StableDeliveryman",
+    "name": "Stable Deliveryman",
+    "deck": "CWM",
+    "number": 45,
+    "desc": [
+      "Add 3, 5, 7, and 9 to the current round. Place up to one stable from your supply on each corresponding round space. At the start of those rounds, you may pay 1 wood to build that stable, otherwise return it to your supply."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM045.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM046_StoneCurator",
+    "name": "Stone Curator",
+    "deck": "CWM",
+    "number": 46,
+    "desc": [
+      "Whenever you use a stone accumulation space, you also get 1 food. At the end of the game, get 1 bonus point per 2 stone rooms and per 2 improvements whose printed cost includes stone."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM046.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM047_StorehouseMinder",
+    "name": "Storehouse Minder",
+    "deck": "CWM",
+    "number": 47,
+    "desc": [
+      "When played, you may put 1 to 4 different building resources from your supply on this card. At the start of each harvest, choose up to 2 types already on it and add one of each from the supply. At the start of each round, you may take all resources of one type from this card."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM047.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM049_SunriseAdmirer",
+    "name": "Sunrise Admirer",
+    "deck": "CWM",
+    "number": 49,
+    "desc": [
+      "At the start of each of the next 3 rounds, you may pay 2 food to plow an unused space in the easternmost farmyard column, opposite your starting rooms. Normal field adjacency applies. If you decline, discard this card."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM049.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM051_TavernKeeper",
+    "name": "Tavern Keeper",
+    "deck": "CWM",
+    "number": 51,
+    "desc": [
+      "At the start of each harvest, if you have at least one empty room, you get 1 grain and 1 food. Each empty room is worth 1 bonus point at the end of the game."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "4+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM051.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM052_TileMaker",
+    "name": "Tile Maker",
+    "deck": "CWM",
+    "number": 52,
+    "desc": [
+      "Immediately get 1, 2, 3, or 4 clay if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the most clay rooms gets 2 bonus points."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "4+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM052.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM053_VillageFool",
+    "name": "Village Fool",
+    "deck": "CWM",
+    "number": 53,
+    "desc": [
+      "At the start of each round, you may place one hand card face down under this card; it cannot be used again. At the end of the game, each card under this one scores 1 bonus point, except the third, fifth, seventh, and ninth cards."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "4+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM053.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM054_WheelbarrowPusher",
+    "name": "Wheelbarrow Pusher",
+    "deck": "CWM",
+    "number": 54,
+    "desc": [
+      "Whenever you receive exactly 1 building resource from an accumulation space, you also get either 1 building resource of your choice or 1 food. In games with 4 or more players, get both instead."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "4+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM054.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM055_WoodWorker",
+    "name": "Wood Worker",
+    "deck": "CWM",
+    "number": 55,
+    "desc": [
+      "After using an action space, you may place 1 food from your supply on it to get 1 wood. The next player to use that space takes the food."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "4+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM055.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM056_Almshouse",
+    "name": "Almshouse",
+    "deck": "CWM",
+    "number": 56,
+    "desc": [
+      "After each harvest feeding phase, you may discard 1 begging card received in any harvest for failing to feed your family."
+    ],
+    "cost": {
+      "reed": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM056.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM058_AppleTree",
+    "name": "Apple Tree",
+    "deck": "CWM",
+    "number": 58,
+    "desc": [
+      "Put 1 wood from the supply on an empty farmyard field. That field counts as sown. During each harvest field phase, you get 1 food. The prerequisite requires an actual farmyard field tile."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 1,
+    "prerequisite": "1 empty farmyard field",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM058.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM059_Apprenticeship",
+    "name": "Apprenticeship",
+    "deck": "CWM",
+    "number": 59,
+    "desc": [
+      "If you have fewer occupations than every other player, you may immediately play one occupation for free. Afterwards, pass this card to the next player, who adds it to their hand."
+    ],
+    "cost": {
+      "food": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": true,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM059.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM061_BackDoor",
+    "name": "Back Door",
+    "deck": "CWM",
+    "number": 61,
+    "desc": [
+      "Immediately place another person on Family Growth with Room and a Minor Improvement, even if it is occupied. Afterwards, pass this card to the next player, who adds it to their hand."
+    ],
+    "cost": {
+      "reed": 1
+    },
+    "vp": 1,
+    "prerequisite": "Family Growth with Room revealed",
+    "passing": true,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM061.png",
+    "kind": "minor"
+  },
+  {
+    "blocksHouseAnimalZones": true,
+    "id": "CWM063_Birdcage",
+    "name": "Birdcage",
+    "deck": "CWM",
+    "number": 63,
+    "desc": [
+      "At the end of each harvest, you may pay 1 food for 1 bonus point. Your house can no longer hold animals, even through card effects."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM063.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM065_BoundaryStones",
+    "name": "Boundary Stones",
+    "deck": "CWM",
+    "number": 65,
+    "desc": [
+      "At the end of the game, count farmyard field tiles with exactly one orthogonally adjacent field tile. Having 2, 3, 4, or at least 5 such fields gives you 1, 2, 3, or 5 bonus points, respectively."
+    ],
+    "cost": {
+      "stone": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM065.png",
+    "kind": "minor"
+  },
+  {
+    "isCookery": true,
+    "id": "CWM066_Brazier",
+    "name": "Brazier",
+    "deck": "CWM",
+    "number": 66,
+    "desc": [
+      "During each harvest feeding phase, you may convert at most one good to food: 1 vegetable for 3 food, 1 sheep for 2 food, 1 wild boar for 3 food, or 1 cattle for 4 food."
+    ],
+    "cost": {
+      "wood": 1,
+      "clay": 1
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM066.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM067_BuriedTreasure",
+    "name": "Buried Treasure",
+    "deck": "CWM",
+    "number": 67,
+    "desc": [
+      "Whenever you use Farmland or Cultivation, you also get 1 stone."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "2 occupations",
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM067.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM069_ChangingPlans",
+    "name": "Changing Plans",
+    "deck": "CWM",
+    "number": 69,
+    "desc": [
+      "Immediately return up to 2 built stables to your supply. For each stable returned, you may plow 1 field. Afterwards, pass this card to the next player, who adds it to their hand."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "1 built stable",
+    "passing": true,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM069.png",
+    "kind": "minor"
+  },
+  {
+    "providesOccupation": true,
+    "alsoCountsAs": [
+      "occupation"
+    ],
+    "id": "CWM070_ClockworkMan",
+    "name": "Clockwork Man",
+    "deck": "CWM",
+    "number": 70,
+    "desc": [
+      "This counts as both one occupation and one minor improvement for prerequisites, effects, counts, and scoring, but is only one card. It does not increase later occupation costs or trigger effects for playing an occupation card, such as Bookshelf or Lamp Oil."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM070.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM072_Crib",
+    "name": "Crib",
+    "deck": "CWM",
+    "number": 72,
+    "desc": [
+      "At the end of each work phase, if you took a Family Growth action that round, you may either get 2 food or pay 2 food for 1 bonus point."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM072.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM073_DiamondMine",
+    "name": "Diamond Mine",
+    "deck": "CWM",
+    "number": 73,
+    "desc": [
+      "Place 1 stone on each of the next 2 round spaces. At the start of those rounds, you get the stone."
+    ],
+    "cost": {},
+    "vp": 1,
+    "prerequisite": "3 occupations",
+    "occupationPrerequisites": {
+      "min": 3
+    },
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM073.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM074_Donkey",
+    "name": "Donkey",
+    "deck": "CWM",
+    "number": 74,
+    "desc": [
+      "One of your pastures can no longer hold animals. Whenever you use Farmland or Cultivation, you may plow 1 additional field."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "1 pasture",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM074.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM076_DrainedPond",
+    "name": "Drained Pond",
+    "deck": "CWM",
+    "number": 76,
+    "desc": [
+      "Place a field tile on the round space 4 rounds after the current round. At the start of that round, you may pay 1 food to plow that field."
+    ],
+    "cost": {
+      "reed": 1
+    },
+    "vp": 1,
+    "prerequisite": "2 occupations",
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM076.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM078_FarmSchool",
+    "name": "Farm School",
+    "deck": "CWM",
+    "number": 78,
+    "desc": [
+      "During each harvest field phase, if you harvested at least 2 goods, you may pay 2 food to play an occupation. Goods harvested from card fields count; extra field phases supplied by cards do not."
+    ],
+    "cost": {
+      "wood": 1,
+      "reed": 1
+    },
+    "vp": 1,
+    "prerequisite": "2 occupations",
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM078.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM079_FestivalHall",
+    "name": "Festival Hall",
+    "deck": "CWM",
+    "number": 79,
+    "desc": [
+      "After each harvest field phase, you may convert at most 1 grain into 2 food and 1 building resource of your choice. Card fields count toward the prerequisite; extra field phases supplied by cards do not trigger this effect."
+    ],
+    "cost": {
+      "wood": 1,
+      "clay": 1
+    },
+    "vp": 1,
+    "prerequisite": "2 grain fields",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM079.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM082_FlowerPots",
+    "name": "Flower Pots",
+    "deck": "CWM",
+    "number": 82,
+    "desc": [
+      "If played in round 6 or earlier, place 1 vegetable on round 8. At the start of round 8, you get it."
+    ],
+    "cost": {
+      "clay": 1
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM082.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM084_FriendlyPastures",
+    "name": "Friendly Pastures",
+    "deck": "CWM",
+    "number": 84,
+    "desc": [
+      "Each of your pastures containing a stable may hold different animal types together. Its total capacity is unchanged."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM084.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM085_Fruitcake",
+    "name": "Fruitcake",
+    "deck": "CWM",
+    "number": 85,
+    "desc": [
+      "During the next harvest feeding phase only, each of your family members, including newborns, requires 1 less food."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 0,
+    "prerequisite": "2 occupations",
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM085.png",
+    "kind": "minor"
+  },
+  {
+    "returnCards": [
+      "Major_Pottery"
+    ],
+    "alsoCountsAs": [
+      "major"
+    ],
+    "potteryIdentity": true,
+    "exchanges": [
+      {
+        "from": {
+          "clay": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "triggers": [
+          "harvest"
+        ],
+        "max": 1
+      }
+    ],
+    "id": "CWM086_GlassblowersShop",
+    "name": "Glassblower's Shop",
+    "deck": "CWM",
+    "number": 86,
+    "desc": [
+      "Each harvest, you may convert at most 1 clay into 3 food. At the end of the game, having at least 2, 4, or 5 clay gives 1, 2, or 3 bonus points. The same clay cannot also score for Pottery. This card counts as both a major and a minor improvement, but only one improvement."
+    ],
+    "cost": {
+      "clay": 1,
+      "stone": 1
+    },
+    "vp": 3,
+    "prerequisite": "Return Pottery",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM086.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM087_GoldMedal",
+    "name": "Gold Medal",
+    "deck": "CWM",
+    "number": 87,
+    "desc": [
+      "Choose grain, vegetables, sheep, wild boar, cattle, fields, pastures, or fenced stables when you play this card. At the end of the game, every player tied for the highest normal score in that category gets 2 bonus points. Ignore other cards' bonus points."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "Round 7 or earlier",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM087.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM088_GrainElevator",
+    "name": "Grain Elevator",
+    "deck": "CWM",
+    "number": 88,
+    "desc": [
+      "At the start of each round, add 1 grain from the supply unless the number of grain on this card equals the player count. When you use Grain Seeds, take all grain here. When another player uses it, discard all grain here."
+    ],
+    "cost": {
+      "stone": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM088.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM089_HomeGarden",
+    "name": "Home Garden",
+    "deck": "CWM",
+    "number": 89,
+    "desc": [
+      "Whenever you renovate, place 1 food on each of the next 3 round spaces. You also do this when playing this card if you renovated earlier in the current turn. At the start of those rounds, you get the food."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM089.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM092_Keys",
+    "name": "Keys",
+    "deck": "CWM",
+    "number": 92,
+    "desc": [
+      "You may use Farm Expansion when occupied by another player, but not when occupied by yourself. This does not apply to the 5-player Build 1 Room action space."
+    ],
+    "cost": {
+      "stone": 1
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM092.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM093_Kindling",
+    "name": "Kindling",
+    "deck": "CWM",
+    "number": 93,
+    "desc": [
+      "Fireplaces and Cooking Hearths count as minor improvements for you and cost 1 clay less."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM093.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM094_LampOil",
+    "name": "Lamp Oil",
+    "deck": "CWM",
+    "number": 94,
+    "desc": [
+      "Immediately before you play an occupation card, you get 1 food. Its prerequisite requires 2 animals of any types, excluding animals kept on cards."
+    ],
+    "cost": {
+      "wood": 2,
+      "clay": 2
+    },
+    "vp": 2,
+    "prerequisite": "2 animals outside cards",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM094.png",
+    "kind": "minor"
+  },
+  {
+    "exchanges": [
+      {
+        "from": {
+          "wood": 1
+        },
+        "to": {
+          "stone": 1
+        },
+        "triggers": [
+          "harvest"
+        ],
+        "max": 1
+      }
+    ],
+    "id": "CWM095_MountainCave",
+    "name": "Mountain Cave",
+    "deck": "CWM",
+    "number": 95,
+    "desc": [
+      "Each harvest, you may convert at most 1 wood into 1 stone."
+    ],
+    "cost": {
+      "food": 1
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM095.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM096_OakCask",
+    "name": "Oak Cask",
+    "deck": "CWM",
+    "number": 96,
+    "desc": [
+      "Immediately place 1 food from the supply on this card. During each harvest field phase, if any food remains here, add 1 food. You may take its food at any time."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM096.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM097_OpenGate",
+    "name": "Open Gate",
+    "deck": "CWM",
+    "number": 97,
+    "desc": [
+      "Before each harvest feeding phase, you may pay at most 1 sheep for 1 bonus point."
+    ],
+    "cost": {
+      "stone": 1
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM097.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM098_PettingZoo",
+    "name": "Petting Zoo",
+    "deck": "CWM",
+    "number": 98,
+    "desc": [
+      "At the end of the game, if you have all three animal types outside cards, get 1 bonus point for having at least 2 sheep and 1 bonus point for having at least 2 wild boar. You may receive both."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM098.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM100_PlumPatch",
+    "name": "Plum Patch",
+    "deck": "CWM",
+    "number": 100,
+    "desc": [
+      "Count your sown fields and place 1 food on each of that many subsequent round spaces. At the start of those rounds, you get the food. Card fields count for both the prerequisite and this count; each sown card counts as one field."
+    ],
+    "cost": {},
+    "vp": 1,
+    "prerequisite": "1 grain field and 1 vegetable field",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM100.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM101_PrizewinningSheep",
+    "name": "Prizewinning Sheep",
+    "deck": "CWM",
+    "number": 101,
+    "desc": [
+      "Immediately get 1 building resource of your choice. Afterwards, pass this card to the next player, who adds it to their hand."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "1 sheep",
+    "passing": true,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM101.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM103_Raspberries",
+    "name": "Raspberries",
+    "deck": "CWM",
+    "number": 103,
+    "desc": [
+      "Place 1 food from the supply on each of up to 3 unused farmyard spaces. When a marked space becomes used, you get its food. The food markers do not themselves make spaces used."
+    ],
+    "cost": {
+      "clay": 1
+    },
+    "vp": 1,
+    "prerequisite": "2 occupations",
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM103.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM106_Ruins",
+    "name": "Ruins",
+    "deck": "CWM",
+    "number": 106,
+    "desc": [
+      "Immediately place 4 stone on this card. During each harvest field phase, take 1 stone from it."
+    ],
+    "cost": {
+      "stone": 4
+    },
+    "vp": 3,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM106.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM107_SlapdashRenovation",
+    "name": "Slapdash Renovation",
+    "deck": "CWM",
+    "number": 107,
+    "desc": [
+      "After you use an action space providing renovation, return that person home at the end of that turn and place them again on a later turn. Renovations or action spaces supplied by cards do not qualify."
+    ],
+    "cost": {
+      "clay": 1,
+      "stone": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM107.png",
+    "kind": "minor"
+  },
+  {
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1,
+          "vegetable": 1
+        },
+        "to": {
+          "food": 5
+        },
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1,
+          "sheep": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1,
+          "boar": 1
+        },
+        "to": {
+          "food": 5
+        },
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1,
+          "cattle": 1
+        },
+        "to": {
+          "food": 6
+        },
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
+    "id": "CWM108_Steamer",
+    "name": "Steamer",
+    "deck": "CWM",
+    "number": 108,
+    "desc": [
+      "At any time, you may convert 1 grain together with 1 vegetable, sheep, wild boar, or cattle into 5, 4, 5, or 6 food, respectively."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM108.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM111_UndisturbedPond",
+    "name": "Undisturbed Pond",
+    "deck": "CWM",
+    "number": 111,
+    "desc": [
+      "Count the full rounds already completed. Place 1 food on each of that many subsequent round spaces. At the start of those rounds, you get the food."
+    ],
+    "cost": {},
+    "vp": 1,
+    "prerequisite": "No occupations",
+    "occupationPrerequisites": {
+      "max": 0
+    },
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM111.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM113_WildBreeding",
+    "name": "Wild Breeding",
+    "deck": "CWM",
+    "number": 113,
+    "desc": [
+      "Add 1 animal to each animal accumulation space containing at least 2 animals. If you have housing capacity, you may take at most one of the newly added animals. Afterwards, pass this card to the next player, who adds it to their hand."
+    ],
+    "cost": {
+      "reed": 1
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "passing": true,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM113.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM114_WineCloset",
+    "name": "Wine Closet",
+    "deck": "CWM",
+    "number": 114,
+    "desc": [
+      "Immediately get 1 vegetable. Once per round, you may place 1 vegetable on a future round space. If it is at least 5 rounds ahead, add a second vegetable from the supply. At the start of that round, each vegetable there must become either 2 food or 1 bonus point."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM114.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM115_WormBait",
+    "name": "Worm Bait",
+    "deck": "CWM",
+    "number": 115,
+    "desc": [
+      "Whenever you use Farmland, put 2 food from the supply on this card. Whenever you use Fishing, take all its food. At the start of each harvest, return 1 food from this card."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM115.png",
+    "kind": "minor"
+  },
+  {
     "id": "CZ314_Keg",
     "name": "Keg",
     "deck": "CZ",
