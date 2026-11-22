@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { flCard, flSession, flOptions, chooseBranch, takeFlAnytime, confirmTurns } from './_helpers/classic-fl'
 import { playImprovement, playOccupation, choose, bonusScore } from './_helpers/card-play-lifecycle'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { resolveNonSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { computeHarvestFeedingRequirement } from '../../shared/actions/helpers/harvest-feeding-requirement'
@@ -163,6 +164,98 @@ describe('FL: individual card triggers and exclusions', () => {
       ).toBe(5)
     },
   )
+
+  it('Rubenesque Woman: the second person can use the bonus to pay Fishing Net', () => {
+    const card = flCard(43).id
+    const net = 'C051_FishingNet'
+    const researcher = 'C154_TwinResearcher'
+    const session = keep(flSession((state) => {
+      state.players[0]!.occupationPlayed = [card, researcher]
+      state.players[1]!.minorPlayed = [net]
+      state.players[0]!.resources.food = 1
+      state.players[1]!.resources.food = 0
+      state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food = 2
+      state.actionSpaces.find((space) => space.id === 'traveling-players')!.resources.food = 2
+    }))
+    confirmTurns(session, session.takeAction(0, 'grain-seeds'))
+    confirmTurns(session, session.takeAction(1, 'forest'))
+    confirmTurns(session, session.takeAction(2, 'reed-bank'))
+    confirmTurns(session, session.takeAction(3, 'clay-pit'))
+
+    const offered = session.takeAction(0, 'fishing')
+    expect(offered.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0,
+      request: { kind: 'select-trigger', options: expect.arrayContaining([
+        expect.objectContaining({ sourceCard: researcher }),
+        expect.objectContaining({ sourceCard: card }),
+      ]) },
+    })
+    const pointOffer = resolveTriggerIfPresent(session, offered, researcher)
+    expect(pointOffer.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: researcher })
+    const afterPoint = chooseBranch(session, pointOffer)
+    expect(afterPoint.state.players[0]!.resources.food).toBe(0)
+    const response = accept(session, resolveTriggerIfPresent(session, afterPoint, card))
+
+    const actor = response.state.players[0]!
+    const owner = response.state.players[1]!
+    expect(response.state.actionSpaces.find((space) => space.id === 'fishing')?.resources.food).toBe(0)
+    expect(response.state.actionSpaces.find((space) => space.id === 'traveling-players')?.resources.food).toBe(2)
+    expect(actor.resources.food).toBe(2)
+    expect(owner.resources.food).toBe(1)
+    expect(bonusScore(response, researcher)).toBe(1)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+
+    const { events } = response.state
+    const pointPayment = events.find((event) =>
+      event.type === 'resource.paid' && event.sourceCardId === researcher && event.resources.food === 1,
+    )
+    const bonus = events.find((event) => event.type === 'resource.moved' && event.sourceCardId === card)
+    const fee = events.find((event) => event.type === 'resource.moved' && event.sourceCardId === net)
+    const collection = events.find((event) =>
+      event.type === 'resource.moved' && event.from.kind === 'actionSpace' && event.from.spaceId === 'fishing',
+    )
+    expect(bonus).toMatchObject({ resources: { food: 1 }, to: { kind: 'player', playerId: actor.id } })
+    expect(fee).toMatchObject({ resources: { food: 1 }, to: { kind: 'player', playerId: owner.id } })
+    expect(collection).toMatchObject({ resources: { food: 2 }, to: { kind: 'player', playerId: actor.id } })
+    expect(pointPayment!.seq).toBeLessThan(bonus!.seq)
+    expect(bonus!.seq).toBeLessThan(fee!.seq)
+    expect(fee!.seq).toBeLessThan(collection!.seq)
+  })
+
+  it.each([true, false])('Rubenesque Woman: a person relocated from Archway keeps their ordinal (first=%s)', (first) => {
+    const card = flCard(43).id
+    const archway = 'D051_Archway'
+    const session = keep(createWorkSession({
+      seed: 6051,
+      options: { playerCount: 2 },
+      configure: (state) => {
+        state.round = 10
+        state.currentPlayerIndex = 1
+        state.players[0]!.minorPlayed = [archway]
+        state.players[1]!.occupationPlayed = [card]
+        for (const player of state.players) player.resources.food = 20
+        state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 3
+      },
+    }))
+    confirmTurns(session, session.takeAction(1, first ? archway : 'grain-seeds'))
+    confirmTurns(session, session.takeAction(0, 'day-laborer'))
+    confirmTurns(session, session.takeAction(1, first ? 'grain-seeds' : archway))
+    let response = confirmTurns(session, session.takeAction(0, 'clay-pit'))
+    response = resolveTriggerIfPresent(session, response, archway)
+    response = resolveNonSkipChoice(session, response)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 1, promptKey: 'ui.interactionMoveFarmerToSpace',
+    })
+    const workerId = response.state.actionSpaces.find((space) => space.id === archway)!.takenBy[0]!.workerId
+    response = choose(session, response, 'forest')
+    expect(response.state.players[1]!.resources.wood).toBe(first ? 3 : 4)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'worker.placed', viaCardId: archway, workerId, spaceId: 'forest',
+    }))
+    expect(response.state.events.filter((event) =>
+      event.type === 'resource.moved' && event.sourceCardId === card && event.resources.wood === 1,
+    )).toHaveLength(first ? 0 : 1)
+  })
 
   it.each([0, 1])('Returnee: player %i uses the marked space next round', (actor) => {
     const session = keep(
