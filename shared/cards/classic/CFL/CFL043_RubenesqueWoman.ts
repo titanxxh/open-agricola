@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 import { registerHarvestFeedingRequirementModifier } from '../../../actions/helpers/harvest-feeding-requirement'
 import { gainLeaf } from '../../helpers/pay-gain-node'
-import { getSpaceUsePersonPlacementOrdinal } from '../../helpers/round-placement'
+import { getRoundPersonPlacementDetails, getSpaceUsePersonPlacementOrdinal } from '../../helpers/round-placement'
 import type { Resource } from '../../../contract/types'
 
 const CARD_ID = 'CFL043_RubenesqueWoman'
@@ -14,11 +14,16 @@ const cardImpl = {
       id: CARD_ID + '-second-person',
       cardIds: [CARD_ID],
       actionSpaces: 'all',
-      phases: ['after'],
-      requiresNewPlacement: true,
-      handler: (context) => {
-        if (getSpaceUsePersonPlacementOrdinal(context.player, context.actionContext) !== 2) return
-        const resource = Object.entries(context.space?.gainPerRound ?? {}).find(
+      phases: ['before'],
+      handler: ({ player, space, actionSpaceUse, actionContext }) => {
+        const relocatedWorkerId = actionContext?.viaCardJump === true
+          ? actionContext.workerId
+          : actionContext?.moveFarmerWorkerId ?? actionContext?.placedWorkerId ?? actionContext?.workerId
+        const ordinal = actionSpaceUse?.personUse?.placementOrdinal ?? (actionSpaceUse?.newPlacement
+          ? getRoundPersonPlacementDetails(player).length + 1
+          : getSpaceUsePersonPlacementOrdinal(player, { workerId: relocatedWorkerId }))
+        if (ordinal !== 2) return
+        const resource = Object.entries(space?.gainPerRound ?? {}).find(
           ([, value]) => (value ?? 0) > 0,
         )?.[0] as keyof Resource | undefined
         if (resource) return { flow: gainLeaf(CARD_ID, { [resource]: 1 }) }
