@@ -1,13 +1,18 @@
 import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 import { workersAvailable } from '../../../domain/player'
+import { openRoundForSpace } from '../../../actions/helpers/placement-availability'
+import { familyGrowthAction } from '../../../actions/effects/family-growth'
 
 const CARD_ID = 'CWM061_BackDoor'
 
 const cardImpl = {
   prerequisiteCheck: (player, state) =>
     !!state &&
-    state.actionSpaces.some((space) => space.id === 'wish-children') &&
+    // Setup creates every round space; only a revealed one can take a person, and the
+    // placement must be able to grow the family there.
+    state.actionSpaces.some((space) => space.id === 'wish-children' && openRoundForSpace(state, space) <= state.round) &&
+    familyGrowthAction.canBeExecutedByPlayer(state, player) &&
     workersAvailable(state, player) >= 1,
   effect: {
     id: CARD_ID,
