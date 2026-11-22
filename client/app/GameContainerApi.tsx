@@ -66,7 +66,7 @@ import { SameConfigurationRematch } from './solo/SameConfigurationRematch'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
 import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
 import { useAnimalReorgDraftPresentation } from './animal-reorg-draft-presentation'
-import { ExchangeOverlayPresentation } from './exchange-overlay-presentation'
+import { ExchangeOverlayPresentation, HarvestShortfallDialog } from './exchange-overlay-presentation'
 import { useExchangeDraftPresentation } from './exchange-draft-presentation'
 import { useReserveCookingDraftPresentation } from './reserve-cooking-draft-presentation'
 import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
@@ -1170,9 +1170,14 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const isBakeExchange = exchangeDraft.bake.isActive
   const isAnytimeExchange = exchangeDraft.anytime.isActive
   const harvestFeedSelections = exchangeDraft.harvest.selections
+  const heating = exchangeDraft.harvest.heating
   const harvestFeedConfirmDisabled = isInteractionSubmitDraftRejected({
     value: 'confirm',
     feedSelections: harvestFeedSelections,
+  })
+  const heatingConfirmDisabled = isInteractionSubmitDraftRejected({
+    value: 'confirm',
+    heatingPayment: { fuelUsed: heating?.fuelUsed ?? 0, selections: harvestFeedSelections },
   })
   const bakeExchangeChoice = exchangeDraft.bake.choice
   const anytimeExchangeChoice = exchangeDraft.anytime.choice
@@ -1191,6 +1196,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
 
   const draftRequestKey = useRef<string | null>(null)
   const animalReorgRoom = useRef<string | null>(null)
+  const [showHarvestShortfall, setShowHarvestShortfall] = useState(false)
   const handleSnapshot = useCallback((payload: GameSyncPayload, roomId?: string) => {
     if (roomId) {
       if (animalReorgRoom.current && animalReorgRoom.current !== roomId) resetAnimalReorgDraft()
@@ -1198,6 +1204,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       setRoomInUrl(roomId)
     }
     applySnapshot(payload)
+    setShowHarvestShortfall(false)
     applySnapshotPublicEventCancellations(payload)
     syncAnimalReorgFromInteraction(payload.interaction, payload.state)
     if (payload.ok) {
@@ -1224,8 +1231,27 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     if (!wsTransport) return
     return wsTransport.onPersistenceStatus(setPersistencePaused)
   }, [wsTransport])
-  const confirmHarvestFeed = useCallback(() => {
-    if (!isInteractive) return
+  const harvestShortfallMessage = heating && heating.fuelUsed < heating.required
+    ? t(locale, 'ui.harvestHeatingShortfallWarning', {
+      missing: heating.required - heating.fuelUsed,
+      sick: heating.sickWorkers,
+    })
+    : harvestPending && exchangeDraft.harvest.begging > 0
+      ? t(locale, 'ui.harvestFeedShortfallWarning', {
+        missing: exchangeDraft.harvest.begging,
+        begging: exchangeDraft.harvest.begging,
+      })
+      : null
+  const harvestConfirmDisabled = heating ? heatingConfirmDisabled : harvestFeedConfirmDisabled
+  const submitHarvestSettlement = () => {
+    if (!isInteractive || harvestConfirmDisabled) return
+    if (heating) {
+      runInteractionSubmitCommand(buildInteractionSubmitCommand(interaction, {
+        value: 'confirm',
+        heatingPayment: { fuelUsed: heating.fuelUsed, selections: harvestFeedSelections },
+      }))
+      return
+    }
     if (interactionPresentationPlan.kind !== 'harvest-feed') return
     const submitCommand = buildInteractionSubmitCommand(interaction, {
       value: 'confirm',
@@ -1235,15 +1261,15 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     void transport
       .confirmFeed(interactionPresentationPlan.playerIndex, harvestFeedSelections)
       .catch((e) => console.error(e))
-  }, [interaction, interactionPresentationPlan, transport, isInteractive, harvestFeedSelections, runInteractionSubmitCommand])
-  const confirmHeating = useCallback(() => {
-    if (!isInteractive || interactionPresentationPlan.kind !== 'heating' || !exchangeDraft.harvest.heating) return
-    const command = buildInteractionSubmitCommand(interaction, {
-      value: 'confirm',
-      heatingPayment: { fuelUsed: exchangeDraft.harvest.heating.fuelUsed, selections: exchangeDraft.harvest.selections },
-    })
-    runInteractionSubmitCommand(command)
-  }, [interaction, interactionPresentationPlan, isInteractive, runInteractionSubmitCommand, exchangeDraft.harvest])
+  }
+  const confirmHarvestSettlement = () => {
+    if (!isInteractive || harvestConfirmDisabled) return
+    if (harvestShortfallMessage) {
+      setShowHarvestShortfall(true)
+      return
+    }
+    submitHarvestSettlement()
+  }
 
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
   const specialTerrainSelectableSet = useMemo(() => {
@@ -2046,8 +2072,8 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     resolveChoice,
     confirmNextPlayer,
     confirmPlayerSwitch,
-    confirmHarvestFeed,
-    confirmHeating,
+    confirmHarvestFeed: confirmHarvestSettlement,
+    confirmHeating: confirmHarvestSettlement,
     undoStep,
     undoAction,
     showScoring,
@@ -2203,9 +2229,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
           pendingChoice={pendingChoice}
           harvestPending={harvestPending}
           heatingPending={heatingPending}
-          heatingConfirmDisabled={isInteractionSubmitDraftRejected({ value: 'confirm', heatingPayment: {
-            fuelUsed: exchangeDraft.harvest.heating?.fuelUsed ?? 0, selections: exchangeDraft.harvest.selections,
-          } })}
+          heatingConfirmDisabled={heatingConfirmDisabled}
           harvestFeedConfirmDisabled={harvestFeedConfirmDisabled}
           draft={exchangeDraft}
           reserveCooking={reserveCooking.overlay ? {
@@ -2219,10 +2243,21 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
             confirmBakeExchange,
             confirmAnytimeExchange,
             cancelAnytimeExchange,
-            confirmHarvestFeed,
-            confirmHeating,
+            confirmHarvestFeed: confirmHarvestSettlement,
+            confirmHeating: confirmHarvestSettlement,
           }}
         />
+        {showHarvestShortfall && isInteractive && !harvestConfirmDisabled && harvestShortfallMessage ? (
+          <HarvestShortfallDialog
+            locale={locale}
+            message={harvestShortfallMessage}
+            onBack={() => setShowHarvestShortfall(false)}
+            onContinue={() => {
+              setShowHarvestShortfall(false)
+              submitHarvestSettlement()
+            }}
+          />
+        ) : null}
       </div>
       {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring}
         showDraftHistory={state.gameOver && (state.players.length > 1 || !!state.soloHandSelection?.kept)}

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
 import { emptyResources } from '../../shared/contract/state-constants'
 import type { Locale } from '../../shared/i18n'
@@ -142,6 +142,49 @@ const ExchangeModal = ({
     </div>
   </div>
 )
+
+export function HarvestShortfallDialog({ locale, message, onBack, onContinue }: {
+  locale: Locale
+  message: string
+  onBack: () => void
+  onContinue: () => void
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
+  const messageId = useId()
+
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current
+    dialog?.showModal()
+    return () => { if (dialog?.open) dialog.close() }
+  }, [])
+
+  return (
+    <dialog
+      ref={dialogRef}
+      role="alertdialog"
+      className="harvest-shortfall-dialog"
+      aria-labelledby={titleId}
+      aria-describedby={messageId}
+      onCancel={event => { event.preventDefault(); onBack() }}
+    >
+      <header className="exchange-header">
+        <h2 id={titleId} className="exchange-title">{t(locale, 'ui.harvestShortfallTitle')}</h2>
+      </header>
+      <div className="exchange-content">
+        <p id={messageId}>{message}</p>
+        <div className="exchange-actions">
+          <button type="button" className="exchange-cancel" onClick={onBack}>
+            {t(locale, 'ui.harvestShortfallBack')}
+          </button>
+          <button type="button" className="exchange-confirm" onClick={onContinue}>
+            {t(locale, 'ui.interactionContinue')}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  )
+}
 
 const ResourceExchangeRow = ({
   locale,
