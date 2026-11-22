@@ -1,13 +1,13 @@
 {
   "format": 1,
   "repository": "titanxxh/open-agricola",
-  "baselineMainSha": "ae6f3e8be4df73ea1ff28a4932560b39b7cf41ac",
+  "baselineMainSha": "8cc65fa6218dbd20cf969afb1a10f39455e9cd9f",
   "features": [
     {
       "id": "pre-identity",
       "dependsOn": [],
       "sourceSha": "087e71b429fb2316972ab57db65369f8d928a619",
-      "integratedSha": "859853a6f2d7ec76dc7a35620a1ef1cdc9f62f6d"
+      "integratedSha": "aa3ee6f1c0a7b1cdb06afbab44d9a4b91eaa45b8"
     },
     {
       "id": "pre-lifecycle",
@@ -15,7 +15,7 @@
         "pre-identity"
       ],
       "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
-      "integratedSha": "7ad8a2fcc444eeb57dbe90a5f4999488923092df"
+      "integratedSha": "2b37eb774374ec66d943df50fa7d55bccf6e19e0"
     },
     {
       "id": "private-replay",
@@ -24,7 +24,7 @@
         "pre-lifecycle"
       ],
       "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
-      "integratedSha": "7ad8a2fcc444eeb57dbe90a5f4999488923092df"
+      "integratedSha": "2b37eb774374ec66d943df50fa7d55bccf6e19e0"
     },
     {
       "id": "team-cooperation",
@@ -32,13 +32,13 @@
         "pre-identity"
       ],
       "sourceSha": "de07e4f5ff291d0d65bd7f9507d52ba15e213ea5",
-      "integratedSha": "f68ddf49af1421fb4c19d8bf0f9617538810c0f7"
+      "integratedSha": "bddb556f9eb8225504831589b18420c6c3b4cb9c"
     },
     {
       "id": "classic-edition",
       "dependsOn": [],
       "sourceSha": "dc2fd8567b884e0cfb1b9ebbc07cad83809b4eb9",
-      "integratedSha": "8fcc79eae3eb97b756add6a95d501ba4d8ab39f9"
+      "integratedSha": "3e3377c7f4f9e6ae99e1c8612335644c9ac7f025"
     }
   ]
 }
