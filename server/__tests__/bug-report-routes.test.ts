@@ -1124,7 +1124,7 @@ describe('bug report routes', () => {
     await db.prepare('UPDATE game_replay_steps SET payload_gzip=?,frame_hash=? WHERE room_id=?').run(encoded.payloadGzip, encoded.frameHash, 'active-room')
     await db.prepare('UPDATE bug_reports SET frame_hash=? WHERE submission_id=?').run(encoded.frameHash, submissionId)
     const endedAt = Date.now()
-    await db.prepare("UPDATE game_contexts SET lifecycle='completed',phase=NULL WHERE room_id='active-room'").run()
+    await db.prepare("UPDATE game_contexts SET lifecycle='completed',phase=NULL,replay_status='available' WHERE room_id='active-room'").run()
     await db.prepare("UPDATE game_replays SET completed_at=? WHERE room_id='active-room'").run(endedAt)
     vi.stubEnv('RELEASE_CHANNEL', 'prerelease')
     let now = endedAt + PRERELEASE_ARCHIVE_RETENTION_MS - 1
