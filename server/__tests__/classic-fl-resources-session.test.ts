@@ -3,14 +3,17 @@ import type { GameState } from '../../shared/contract/types'
 import { CFL005_Brabant } from '../../shared/cards/classic/CFL/CFL005_Brabant'
 import { CFL012_Cart } from '../../shared/cards/classic/CFL/CFL012_Cart'
 import { CFL018_Oce } from '../../shared/cards/classic/CFL/CFL018_Oce'
+import { CFL030_WildBoarHunt } from '../../shared/cards/classic/CFL/CFL030_WildBoarHunt'
 import { CFL033_Sculptor } from '../../shared/cards/classic/CFL/CFL033_Sculptor'
 import { CFL041_FryCook } from '../../shared/cards/classic/CFL/CFL041_FryCook'
 import { CFL048_Botanist } from '../../shared/cards/classic/CFL/CFL048_Botanist'
 import { CFL061_BlacklegChicken } from '../../shared/cards/classic/CFL/CFL061_BlacklegChicken'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import { computeHarvestFeedingRequirement } from '../../shared/actions/helpers/harvest-feeding-requirement'
-import { flSession } from './_helpers/classic-fl'
-import { playImprovement, bonusScore } from './_helpers/card-play-lifecycle'
+import { confirmTurns, flOptions, flSession } from './_helpers/classic-fl'
+import { choose, playImprovement, bonusScore } from './_helpers/card-play-lifecycle'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { resolveNonSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { GameSession } from '../game/authoritative-session'
 
 const sessions: GameSession[] = []
@@ -88,6 +91,60 @@ describe('FL: resource triggers, restrictions, and scoring', () => {
       ).toBe(laterPerson ? 0 : 6)
     },
   )
+
+  it.each([
+    { cardId: CFL012_Cart.id, target: 'forest', archwayFirst: true, allowed: false },
+    { cardId: CFL012_Cart.id, target: 'forest', archwayFirst: false, allowed: true },
+    { cardId: CFL030_WildBoarHunt.id, target: 'pig-market', archwayFirst: true, allowed: true },
+    { cardId: CFL030_WildBoarHunt.id, target: 'pig-market', archwayFirst: false, allowed: false },
+  ])('$cardId: Archway preserves the original placement ordinal (first=$archwayFirst)', ({
+    cardId, target, archwayFirst, allowed,
+  }) => {
+    const archway = 'D051_Archway'
+    const session = createWorkSession({
+      seed: 6051,
+      options: { playerCount: 2 },
+      configure: (state) => {
+        state.round = 10
+        state.currentPlayerIndex = 1
+        state.players.forEach((player) => { player.resources.food = 20 })
+        state.players[0]!.minorPlayed = [archway, cardId]
+        state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 6
+        state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = 1
+        const pigMarketSlot = state.roundActionOrder.indexOf('pig-market')
+        if (pigMarketSlot >= state.round)
+          [state.roundActionOrder[pigMarketSlot], state.roundActionOrder[0]] = [state.roundActionOrder[0]!, 'pig-market']
+      },
+    })
+    sessions.push(session)
+    confirmTurns(session, session.takeAction(1, archwayFirst ? archway : 'grain-seeds'))
+    confirmTurns(session, session.takeAction(0, 'day-laborer'))
+    confirmTurns(session, session.takeAction(1, archwayFirst ? 'grain-seeds' : archway))
+    let response = confirmTurns(session, session.takeAction(0, 'clay-pit'))
+    response = resolveTriggerIfPresent(session, response, archway)
+    response = resolveNonSkipChoice(session, response)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 1, promptKey: 'ui.interactionMoveFarmerToSpace',
+    })
+    const worker = response.state.actionSpaces.find((space) => space.id === archway)!.takenBy[0]!
+    expect(flOptions(response).some((option) => option.value === target)).toBe(allowed)
+
+    if (!allowed) {
+      const rejected = session.resolveChoice(1, target)
+      expect(rejected.ok).toBe(false)
+      expect(rejected.state.actionSpaces.find((space) => space.id === archway)!.takenBy).toEqual([worker])
+      response = choose(session, response, 'fishing')
+    } else {
+      response = choose(session, response, target)
+    }
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'worker.placed', viaCardId: archway, workerId: worker.workerId, spaceId: allowed ? target : 'fishing',
+    }))
+    expect(response.state.players[1]!.resources).toMatchObject({
+      wood: allowed && target === 'forest' ? 6 : 0,
+      boar: allowed && target === 'pig-market' ? 1 : 0,
+    })
+  })
 
   it('Blackleg Chicken: pays two food once, stores it, and cannot withdraw exhausted food', () => {
     const session = setup((state) => {

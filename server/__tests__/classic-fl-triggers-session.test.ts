@@ -315,6 +315,72 @@ describe('FL: individual card triggers and exclusions', () => {
     expect(response.state.players.map((player) => player.resources.food)).toEqual([0, 2, 0, 0])
   })
 
+  it('North Sea Fisherman: an opponent can use the bonus to pay Fishing Net before collecting', () => {
+    const fisherman = flCard(51).id
+    const net = 'C051_FishingNet'
+    const researcher = 'C154_TwinResearcher'
+    const session = keep(flSession((state) => {
+      const actor = state.players[0]!
+      const owner = state.players[1]!
+      actor.occupationPlayed = [researcher]
+      owner.occupationPlayed = [fisherman]
+      owner.minorPlayed = [net]
+      for (const player of state.players) player.resources.food = player.id === actor.id ? 1 : 0
+      state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food = 2
+      state.actionSpaces.find((space) => space.id === 'traveling-players')!.resources.food = 2
+    }))
+
+    const offer = session.takeAction(0, 'fishing')
+    expect(offer.ok, offer.error).toBe(true)
+    expect(offer.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: researcher })
+    expect(offer.state.players[0]!.resources.food).toBe(1)
+    const beforeDonation = accept(session, chooseBranch(session, offer))
+    expect(beforeDonation.state.players[0]!.resources.food).toBe(0)
+    expect(beforeDonation.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 1,
+      request: { kind: 'select-trigger', options: expect.arrayContaining([
+        expect.objectContaining({ sourceCard: fisherman }),
+        expect.objectContaining({ sourceCard: net, disabled: true }),
+      ]) },
+    })
+    const beforeFee = accept(session, choose(session, beforeDonation, fisherman))
+    expect(beforeFee.state.players[0]!.resources.food).toBe(1)
+    expect(beforeFee.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 1,
+      request: { kind: 'select-trigger', options: expect.arrayContaining([
+        expect.objectContaining({ sourceCard: net }),
+      ]) },
+    })
+    const response = accept(session, choose(session, beforeFee, net))
+
+    const actor = response.state.players[0]!
+    const owner = response.state.players[1]!
+    expect(response.state.actionSpaces.find((space) => space.id === 'fishing')?.resources.food).toBe(0)
+    expect(response.state.actionSpaces.find((space) => space.id === 'traveling-players')?.resources.food).toBe(2)
+    expect(response.state.players.map((player) => player.resources.food)).toEqual([2, 1, 0, 0])
+    expect(owner.cardStates[net]?.extraData?.pendingDeposits).toBe(1)
+    expect(bonusScore(response, researcher)).toBe(1)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+
+    const { events } = response.state
+    const pointPayment = events.find((event) =>
+      event.type === 'resource.paid' && event.sourceCardId === researcher && event.resources.food === 1,
+    )
+    const donation = events.find((event) => event.type === 'resource.moved' && event.sourceCardId === fisherman)
+    const fee = events.find((event) => event.type === 'resource.moved' && event.sourceCardId === net)
+    const collection = events.find((event) =>
+      event.type === 'resource.moved' && event.from.kind === 'actionSpace' && event.from.spaceId === 'fishing',
+    )
+    expect(donation).toMatchObject({ resources: { food: 1 }, to: { kind: 'player', playerId: actor.id } })
+    expect(fee).toMatchObject({
+      resources: { food: 1 }, from: { kind: 'player', playerId: actor.id }, to: { kind: 'player', playerId: owner.id },
+    })
+    expect(collection).toMatchObject({ resources: { food: 2 }, to: { kind: 'player', playerId: actor.id } })
+    expect(pointPayment!.seq).toBeLessThan(donation!.seq)
+    expect(donation!.seq).toBeLessThan(fee!.seq)
+    expect(fee!.seq).toBeLessThan(collection!.seq)
+  })
+
   it('North Sea Fisherman: Fishing food pays for an improvement on the newly revealed space', () => {
     const session = northSeaFishermanSession(2, true)
     const fisherman = flCard(51).id

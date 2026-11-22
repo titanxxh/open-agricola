@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
-import { getRoundPersonPlacementOrder } from '../../helpers/round-placement'
+import { getRoundPersonPlacementDetails, getSpaceUsePersonPlacementOrdinal } from '../../helpers/round-placement'
 
 const CARD_ID = 'CFL012_Cart'
 
@@ -12,10 +12,18 @@ const cardImpl = {
       actionSpaces: 'all',
       phases: ['isDoable'],
       scope: 'opponent',
-      handler: (context) => {
-        const actor = context.triggerPlayer ?? context.player
-        if (getRoundPersonPlacementOrder(actor).length !== 0 || !context.space) return
-        const resources = context.space.resources
+      handler: ({ player, triggerPlayer, actionSpaceUse, actionContext, space }) => {
+        if (!space) return
+        const actor = triggerPlayer ?? player
+        const isRelocation = actionSpaceUse?.newPlacement === false || actionContext?.viaCardJump === true
+        const ordinal = actionSpaceUse?.personUse?.placementOrdinal ?? (isRelocation
+          ? getSpaceUsePersonPlacementOrdinal(actor, {
+              workerId: actionContext?.moveFarmerWorkerId ?? actionContext?.workerId,
+              placedWorkerId: actionContext?.placedWorkerId,
+            })
+          : getRoundPersonPlacementDetails(actor).length + 1)
+        if (ordinal !== 1) return
+        const resources = space.resources
         if (
           (resources.wood ?? 0) >= 6 ||
           (resources.clay ?? 0) >= 5 ||
