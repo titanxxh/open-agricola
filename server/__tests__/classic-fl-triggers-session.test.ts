@@ -28,6 +28,28 @@ function accept(session: GameSession, response: SessionResponse): SessionRespons
   throw new Error('Unexpected choice loop')
 }
 
+function northSeaFishermanSession(fishingFood: number, revealedThisRound: boolean): GameSession {
+  return keep(createWorkSession({
+    seed: 6100,
+    options: { playerCount: 2 },
+    configure: (state) => {
+      state.round = 2
+      state.availableMajorImprovements = []
+      const owner = state.players[0]!
+      owner.occupationPlayed = [flCard(51).id]
+      owner.minorHand = [flCard(61).id]
+      owner.resources.food = 0
+      state.players[1]!.resources.food = 3
+      const roundIndex = revealedThisRound ? 1 : 0
+      const oldIndex = state.roundActionOrder.indexOf('major-improvement')
+      state.roundActionOrder[oldIndex] = state.roundActionOrder[roundIndex]!
+      state.roundActionOrder[roundIndex] = 'major-improvement'
+      state.actionSpaces.find((space) => space.id === 'major-improvement')!.roundAvailable = roundIndex + 1
+      state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food = fishingFood
+    },
+  }))
+}
+
 describe('FL: individual card triggers and exclusions', () => {
   it('Belgian Shepherd: offers unused-space sheep housing and blocks house pets', () => {
     const session = keep(
@@ -291,6 +313,59 @@ describe('FL: individual card triggers and exclusions', () => {
     )
     const response = session.takeAction(1, 'fishing')
     expect(response.state.players.map((player) => player.resources.food)).toEqual([0, 2, 0, 0])
+  })
+
+  it('North Sea Fisherman: Fishing food pays for an improvement on the newly revealed space', () => {
+    const session = northSeaFishermanSession(2, true)
+    const fisherman = flCard(51).id
+    const chicken = flCard(61).id
+    const available = session.getActionAvailability(0)['major-improvement']
+    const offered = session.takeAction(0, 'major-improvement')
+    expect(offered.ok, offered.error).toBe(true)
+    expect(available).toBe(true)
+    expect(offered.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: fisherman })
+    expect(offered.state.players[0]!.resources.food).toBe(0)
+    expect(offered.state.players[0]!.minorHand).toContain(chicken)
+    expect(offered.state.actionSpaces.find((space) => space.id === 'fishing')?.resources.food).toBe(2)
+
+    const result = accept(session, chooseBranch(session, offered))
+    expect(result.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(result.state.players.map((player) => player.resources.food)).toEqual([0, 3])
+    expect(result.state.players[0]!.minorPlayed).toContain(chicken)
+    expect(result.state.players[0]!.cardStates[chicken]?.counters?.food).toBe(2)
+    expect(result.state.actionSpaces.find((space) => space.id === 'fishing')?.resources.food).toBe(0)
+    const taken = result.state.events.find((event) =>
+      event.type === 'resource.moved' && event.from.kind === 'actionSpace' &&
+      event.from.spaceId === 'fishing' && event.resources.food === 2,
+    )
+    const paid = result.state.events.find((event) =>
+      event.type === 'resource.paid' && event.resources.food === 2,
+    )
+    const played = result.state.events.find((event) => event.type === 'card.played' && event.cardId === chicken)
+    expect(taken).toMatchObject({ reason: 'collect', to: { kind: 'player', playerId: result.state.players[0]!.id } })
+    expect(played).toMatchObject({ payment: expect.objectContaining({ resources: { food: 2 } }) })
+    expect(taken!.seq).toBeLessThan(paid!.seq)
+    expect(paid!.seq).toBeLessThan(played!.seq)
+    expect(result.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.playMinorImprovement',
+      params: expect.objectContaining({ improvements: chicken, costResources: { food: 2 } }),
+    }))
+    expect(bonusScore(result, chicken)).toBe(0)
+  })
+
+  it.each([
+    { label: 'Fishing is empty', fishingFood: 0, revealedThisRound: true },
+    { label: 'Major Improvement was revealed earlier', fishingFood: 2, revealedThisRound: false },
+  ])('North Sea Fisherman: cannot fund an improvement when $label', ({ fishingFood, revealedThisRound }) => {
+    const session = northSeaFishermanSession(fishingFood, revealedThisRound)
+    expect(session.getActionAvailability(0)['major-improvement']).toBe(false)
+    const response = session.takeAction(0, 'major-improvement')
+    expect(response.ok).toBe(false)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.players[0]!.minorHand).toContain(flCard(61).id)
+    expect(response.state.actionSpaces.find((space) => space.id === 'fishing')?.resources.food).toBe(fishingFood)
+    expect(response.state.actionSpaces.find((space) => space.id === 'major-improvement')?.takenBy).toEqual([])
   })
 
   it.each(['sheep', 'cattle'] as const)(

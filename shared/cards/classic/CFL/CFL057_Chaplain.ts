@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
-import { workersAvailable } from '../../../domain/player'
+import { peopleLeftToPlace } from '../../../actions/guest-turns'
 
 const CARD_ID = 'CFL057_Chaplain'
 
@@ -14,7 +14,7 @@ const cardImpl = {
       scope: 'opponent',
       handler: (context) => {
         const owner = context.ownerPlayer ?? context.player
-        if (workersAvailable(context.state, owner) > 0)
+        if (peopleLeftToPlace(context.state, owner, context.actionHooks) > 0)
           return {
             flow: {
               type: 'leaf',
