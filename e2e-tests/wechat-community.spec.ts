@@ -45,7 +45,7 @@ for (const community of communities) {
         context.fillText('TEST IMAGE B', 30, 30)
         const replacement = testInfo.outputPath('test-image-b.png')
         writeFileSync(replacement, canvas.toBuffer('image/png'))
-        const update = (path: string) => execFileSync('bash', ['deploy-operations.sh', community.flag, '--local', path, directory])
+        const update = (path: string) => execFileSync(process.execPath, ['operations/update-community-qr.mjs', community.flag.slice(2, -3), '--local', path, directory])
         update(original)
         await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
         await page.goto('/?page=login&bg=none')

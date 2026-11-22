@@ -24,7 +24,7 @@ GitHub Pages serves the production frontend at `https://open-agricola.titanxxh.c
 
 ## Owner operations
 
-Owner Operations are the releases, deployments and backups the owner runs on their own machine with private tools. Their runbooks are moving to the private [open-agricola-ops](https://github.com/titanxxh/open-agricola-ops) repository, which external readers cannot open. The procedures that have not moved yet remain below. Every owner tool still reaches the [Release evidence contract](#release-evidence-contract) through the public gates of a clean protected-main checkout.
+Owner Operations are the releases, deployments and backups the owner runs on their own machine with private tools. The tools and their runbooks live in the private [open-agricola-ops](https://github.com/titanxxh/open-agricola-ops) repository, which external readers cannot open; this repository keeps the contracts they enforce and the backup scripts the host runs from the deployed checkout. Every owner tool still reaches the [Release evidence contract](#release-evidence-contract) through the public gates of a clean protected-main checkout.
 
 Commands in this guide use placeholders for owner host details: `<host>` is the SSH target of the formal backend, `<deploy-dir>` its deployment checkout, `<operations-dir>` its monitoring directory and `<host-ops-dir>` the host directory of the scheduled offsite backup scripts.
 
@@ -34,7 +34,7 @@ The Release Evidence Contract decides whether a fixed candidate may be published
 
 ### Owner-local receipt
 
-The receipt records every actual `runCandidateTask` command, its exit code and log SHA-256, execution times, Node/platform/architecture, tested commit, raw source tree and candidate/producer verification configurations. All ten tasks and their canonical commands must pass. Their `fast` and `slow` tasks run `pnpm test:fast` and `pnpm test:slow`, which leave out the `tooling` Vitest project: the trusted producer, not the candidate, runs that release, deployment and CI tooling, and PR Routine covers it ([testing architecture](architecture/testing.md)). Routine affected checks and `release:rehearse` alone do not satisfy this path. The publisher may rebind only `candidateSha` after a rebase whose entire raw tree and verification configuration equal the tested source. It retains `testedSha` and never represents local commands as GitHub jobs.
+The receipt records every actual `runCandidateTask` command, its exit code and log SHA-256, execution times, Node/platform/architecture, tested commit, raw source tree and candidate/producer verification configurations. All ten tasks and their canonical commands must pass. Their `fast` and `slow` tasks run `pnpm test:fast` and `pnpm test:slow`, which leave out the `tooling` Vitest project: the trusted producer, not the candidate, runs that release, deployment and CI tooling, and PR Routine covers it ([testing architecture](architecture/testing.md)). Routine affected checks and the owner's release rehearsal alone do not satisfy this path. The publisher may rebind only `candidateSha` after a rebase whose entire raw tree and verification configuration equal the tested source. It retains `testedSha` and never represents local commands as GitHub jobs.
 
 Pre owner-local requires receipt format 2 with `execution: { kind: "docker-isolated", evidenceSha256: "<64 lowercase hex>" }`. The owner-collected evidence binds the actual sandbox, prerequisite source closure, commands, source integrity, resource limits and teardown; retain its immutable bytes with the logs. Withdrawn format-1 pre receipts are rejected. Stable receipt format 1 is unchanged. The pre proof carries `executionEvidenceSha256` through image and receiver validation, and uses the native owner's distinct `owner-local-prerelease-verification` status. Its exact beta Release must have `prerelease=true` and `latest=false`. Stable proof cannot authorize pre, or pre proof stable. The common pre checker revalidates the fixed source, full plan, both configurations, producer ancestry, native owner, tag and digest-bound asset ID/bytes. Same-tree rebase retains the actual tested SHA; a changed tree or incompatible producer requires new execution. The owner and receiving deploy/open/restore paths and candidate image producer preserve the typed local proof with no invented Actions IDs. Absent or withdrawn local authority retains native workflow fallback; malformed latest owner success blocks. Native PR/ref rules, protected synchronization leases, real private image production/import and target acceptance remain required. Candidate-local tool changes cannot authorize themselves; deliver this producer through protected main first.
 
@@ -54,7 +54,7 @@ The owner procedures for this section now live in the private repository; see [O
 
 Formal candidates must be a merged PR's final integration snapshot on the selected repository's protected `main`. The guard resolves `refs/heads/main` explicitly, including when a tag is named `main`, and checks native repository/PR identities plus raw Git reachability. Unmerged or intermediate snapshots fail before dispatch, publication, candidate install, or SSH. Eligible older final snapshots remain valid after main advances. The separate fixed protected-main producer P defines orchestration for candidate C; its native main identity grants policy authority, while the two source configuration hashes identify compatible execution. Native governance includes authorized override authority and proves no historical policy. This eligibility policy is recorded in ADR 0037.
 
-Only complete verification evidence for the fixed candidate allows the version tag and Release; the Release target is that SHA even if `main` moves. An existing tag or Release for another SHA is rejected. A Release created through the website or bare `gh release create` can exist without this evidence; Pages and backend deployment independently reject an unverified candidate. Local `pnpm release:rehearse` results do not replace GitHub evidence.
+Only complete verification evidence for the fixed candidate allows the version tag and Release; the Release target is that SHA even if `main` moves. An existing tag or Release for another SHA is rejected. A Release created through the website or bare `gh release create` can exist without this evidence; Pages and backend deployment independently reject an unverified candidate. The owner's local release rehearsal does not replace GitHub evidence.
 
 ### Authorize complete owner-local verification
 
@@ -125,31 +125,6 @@ The owner procedures for this section now live in the private repository; see [O
 ## Confirm production fixes and retry inbox delivery
 
 The owner procedures for this section now live in the private repository; see [Owner operations](#owner-operations). The command reuses `checkCandidateVerification` for the released SHA and records the result through `BugReportFeedbackService` inside the running container.
-
-## Preview and apply the twelve historical report responses
-
-Run this separately from release, deployment, migration, or startup. From the owner machine, use the existing SSH connection to execute inside the running app container and its migrated database environment. Check the host and directory, and replace `ADMINISTRATOR_SITE_ID` with the current administrator's exact site ID. Keep reviewed input and output files on the owner machine. The owner command never migrates, deploys, creates issues, or changes GitHub reports. First retain formal production proof with the preceding verification procedure; without a containing verified deployment, triage can proceed but release messages remain pending.
-
-Prepare a private reviewed JSON file. An empty `{}` uses existing report mappings and skips #1595 because its maintainer explanation is missing. Supply `explanation1595` only after reviewing a specific non-defect or experience-suggestion reason. Bare labels such as "invalid" or "improvement suggestion" are insufficient. The fixed allowlist is #1464, #1465, #1479, #1490, #1504, #1564, #1574, #1586, #1591, #1595, #1622, and #1637.
-
-```bash
-umask 077
-ssh <host> \
-  'cd <deploy-dir> && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts' \
-  < /private/reviewed-feedback.json > /private/feedback-preview.json
-ssh <host> \
-  'cd <deploy-dir> && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts --execute --actor=ADMINISTRATOR_SITE_ID' \
-  < /private/reviewed-feedback.json > /private/feedback-result.json
-```
-
-
-Protect the input, preview, and result with mode 600 because they can contain site identities. Preview is the default. It starts a PostgreSQL read-only transaction and displays every recipient mapping, full assessment and release text, missing items, merged fix evidence, release provenance, dedup result, and skip reason. Review all rows before explicit execution. Never treat `projectedMessages` as a delivery receipt.
-
-If an original mapping is absent, an optional `imports` entry requires `issueNumber`, the original marker's `submissionId`, reviewed `reporterSiteId`, existing `roomId`, SHA-256 `bodySha256` of the exact public issue body, and a nonempty `auditReference`. Compare these facts with the reviewed #1652 audit and original fixed-project issue. Keep this file outside Git. The import creates only a notification subject but retains the existing account-deletion obligation to anonymize its public GitHub site ID. The same App verifies the exact issue, unique marker, and mapping version before clearing local identity after all public anonymization succeeds. External failure or conflicting evidence keeps deletion pending; trusted deleted-issue events retain tombstone semantics. Editable public seats or Anchors grant no native report, Replay, forensics, retention, or Room access. Existing anonymous, deleting, ambiguous, or conflicting mappings cannot be repaired from old issue text. Missing context or conflicting public evidence skips that row.
-
-Execution skips any existing triage history and never rewrites a later assessment. It confirms before releasing, uses the normal account/root uniqueness, and confines its durable reconciliation intents to reviewed subjects and exact fix versions. `newMessages` equals this call's committed `insertedTriages` plus `releasedMessages`; concurrent senders are not counted. `errors` lists partial failures. `reconciliation.operations` contains durable operation IDs and any pending proof or notification failures. The four historical fixes supply reviewed concrete summaries. An existing maintainer summary takes precedence and appears in both preview and message. Historical first-included tags are audit metadata, separate from the first verified production version and observation time.
-
-After interruption, rerun preview and the same reviewed input with `--execute`. Successful messages and read state remain unchanged. For a pending notification transaction, retry that saved operation ID with the feedback command's `--retry-operation` mode on the owner machine (see [Owner operations](#owner-operations)). This retries only that notification operation. Retained subject/fix fences prevent retries from changing recipients or sending a different fix. Resolve `historical_subject_changed` by reviewing a fresh preview; do not override the fence. No release or deployment needs to be repeated. A fully eligible isolated fixture produces 16 messages and then zero on rerun; real executions report actual skips, including the default missing #1595 explanation.
 
 ## 1. Deploy the Backend
 
@@ -409,7 +384,7 @@ CORS_ORIGIN=https://open-agricola.titanxxh.com
 3. Publish the matching root-path Pages frontend and apply the API environment above through the ordinary backup, target-restore validation and deployment procedure. Keep the previous validated image and configuration available for rollback.
 4. Verify actual HTML, JS/CSS, language-pack and card-manifest bytes from the Pages host against the selected build. Check strict WebKit and Chromium login, reload, browser-profile restart, Workshop, routed WS and retained Room recovery, then logout. Linux WebKit coverage does not replace physical Safari/iPhone acceptance.
 
-Production acceptance must not create formal games or send gameplay commands to retained Rooms. Run game-creation, opening and persistence tests only through the isolated local `pnpm release:rehearse` workflow, an owner procedure described in [Owner operations](#owner-operations).
+Production acceptance must not create formal games or send gameplay commands to retained Rooms. Run game-creation, opening and persistence tests only through the owner's isolated local release rehearsal; see [Owner operations](#owner-operations).
 
 `pnpm run build:pages-frontend` writes `dist-pages/` with base path `/`, explicit `VITE_API_BASE` and optional `VITE_WS_BASE`. It records `{ format: 1, gameBuildId, basePath }` in `frontend-build.json`; the build identity must match the selected backend. Community cards default to enabled, with an explicit `VITE_ENABLE_COMMUNITY_DECK` override retained; the Workshop sandbox always runs in the browser.
 

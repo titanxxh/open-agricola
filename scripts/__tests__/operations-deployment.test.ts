@@ -1,4 +1,6 @@
-// @covers deploy-operations.sh operations/deploy.mjs scripts/observability.mjs
+// @covers operations/deploy.mjs scripts/observability.mjs
+// The owner entry that ships the operations source to the host is tested in the owner repository; `archive` here
+// reproduces its host side: a git archive with umask 0022, unpacked and deployed under the owner's umask 077.
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -34,8 +36,9 @@ else if(args.includes('up') && process.env.OPS_TEST_FAIL==='1') process.exit(1);
   chmodSync(join(bin, 'docker'), 0o755)
   writeFileSync(join(bin, 'ssh'), `#!${process.execPath}\nconst {spawnSync}=require('node:child_process');\nconst r=spawnSync('bash',['-c',process.argv.slice(3).join(' ')],{stdio:'inherit'});\nprocess.exit(r.status??1);\n`)
   chmodSync(join(bin, 'ssh'), 0o755)
+  if (archive) mkdirSync(release, { recursive: true })
   const result = spawnSync(archive ? 'bash' : process.execPath, archive
-    ? [join(repository, 'deploy-operations.sh'), 'fixture-host', 'HEAD', root, game]
+    ? ['-c', 'umask 077; git -c tar.umask=0022 archive --format=tar "$4" operations | tar -xpf - -C "$1" && exec node "$1/operations/deploy.mjs" "$2" "$3" "$4"', 'deploy', release, root, game, build]
     : [join(release, 'operations/deploy.mjs'), root, game, build], {
     cwd: repository, encoding: 'utf8', env: { ...process.env, PATH: bin + ':' + process.env.PATH, OPS_TEST_CALLS: calls, OPS_TEST_FAIL: fail ? '1' : '0', COMPOSE_PROJECT_NAME: 'open-agricola' },
   })

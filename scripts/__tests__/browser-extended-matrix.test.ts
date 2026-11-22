@@ -44,7 +44,7 @@ describe('extended browser matrix variants', () => {
   })
 
   it('never marks a case that a requirements file names', () => {
-    for (const path of ['scripts/release/requirements.json', 'e2e-tests/encyclopedia.requirements.json']) {
+    for (const path of ['e2e-tests/encyclopedia.requirements.json']) {
       const cases: { file: string; titlePath: string[] }[] = JSON.parse(readFileSync(join(root, path), 'utf8')).cases
       for (const required of cases) {
         const spec = specs.find(candidate => candidate.file === required.file)

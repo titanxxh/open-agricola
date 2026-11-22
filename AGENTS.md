@@ -24,7 +24,7 @@ pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0
 pnpm test                   # vitest 全量（fast + slow）
 pnpm test:fast              # 本机完整 fast project；范围 CI 按计划选择；不含 tooling
 pnpm test:slow              # 只跑 slow 与 slow-scripts project（单卡 session 测试、PG 重型存储测试）；不含 tooling
-pnpm test:tooling           # 只跑 tooling project（发布、部署、CI 与本地开发工具测试），不属于发布验证
+pnpm test:tooling           # 只跑 tooling project（候选验证、CI、镜像回执与本地开发工具测试），不属于发布验证
 pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
 pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不启动应用
 pnpm verify prepush         # 可选本机完整 fast 门禁，含边界扫描、工具类型与 lint，记录实际范围
@@ -159,7 +159,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 2. 本机复现应用行为、UI 或 WS 时，先通过 `./restart-local.sh` 重启，再用浏览器、Playwright 或命令行检查。`pnpm verify <file.spec.ts>` 在隔离环境调用该入口。本机结果写明实际范围；`pnpm verify prepush` 是可选的完整 fast 门禁，不是 push 的前置条件。
 3. PR 与 main 使用同一 canonical plan 执行受影响检查，由 `verify` 汇总；选择范围与证据规则以 `docs/operations/ci-checks.md` 为准。
 4. 源码或 rebase 改变文件内容后，按实际变化重新取得当前源码的验证证据。`pnpm verify status` 仅核对本机记录及其实际范围，不自动跳过检查。
-5. 发布证据的唯一契约在 `docs/HOW_TO_DEPLOY.md` 的 [Release evidence contract](docs/HOW_TO_DEPLOY.md#release-evidence-contract)：默认使用完整原生 GitHub 回执；owner 明确授权时可使用该节规定的完整 owner-local 通路。本机定向检查或 `release:rehearse` 不能充当完整候选证明，本机命令也不能冒充 GitHub jobs。镜像、Pages 的真实构建与部署门禁仍独立执行。
+5. 发布证据的唯一契约在 `docs/HOW_TO_DEPLOY.md` 的 [Release evidence contract](docs/HOW_TO_DEPLOY.md#release-evidence-contract)：默认使用完整原生 GitHub 回执；owner 明确授权时可使用该节规定的完整 owner-local 通路。本机定向检查或 owner 的发布演练不能充当完整候选证明，本机命令也不能冒充 GitHub jobs。镜像、Pages 的真实构建与部署门禁仍独立执行。
 
 </important>
 
@@ -179,7 +179,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 ## Deployment
 
-发布、部署和备份由 owner 在本机用私有仓库 `titanxxh/open-agricola-ops` 的工具执行，见该仓库的 AGENTS.md 和 `docs/HOW_TO_DEPLOY.md` 的 [Owner operations](docs/HOW_TO_DEPLOY.md#owner-operations)。本仓库负责候选验证、门禁，以及镜像和 Pages 的 workflow。GitHub Actions 固定使用 `ubuntu-latest`，额度不足直接失败，不使用 self-hosted runner。
+发布、部署和备份由 owner 在本机用私有仓库 `titanxxh/open-agricola-ops` 的工具执行，见该仓库的 AGENTS.md 和 `docs/HOW_TO_DEPLOY.md` 的 [Owner operations](docs/HOW_TO_DEPLOY.md#owner-operations)；本仓库不再有这些工具的代码。本仓库负责候选验证、门禁，镜像和 Pages 的 workflow，以及主机从已部署检出运行的备份脚本。GitHub Actions 固定使用 `ubuntu-latest`，额度不足直接失败，不使用 self-hosted runner。
 
 </important>
 

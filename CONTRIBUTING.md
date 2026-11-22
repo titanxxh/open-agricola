@@ -54,7 +54,7 @@ PR and main CI use the same scope rules and always evaluate the required `verify
 
 Session fixtures distinguish real startup from prepared work scenarios; see [the card testing template](docs/CARD_TEST_TEMPLATE.md#52-preparing-state). Verification records, test-service setup, and full local CI are described in [CI operations](docs/operations/ci-checks.md). Records help identify stale results and never skip checks automatically.
 
-`./restart-local.sh` is the only shell script contributors need. `deploy-backend.sh` is maintainer-only: it operates the owner's production host and is not part of any contribution workflow. Host backup and offsite scripts are not in this repository.
+`./restart-local.sh` is the only shell script contributors need. Release and deployment tools are maintainer-only and live in the owner's private repository; they are not part of any contribution workflow. Host backup and offsite scripts are not in this repository.
 
 ## Architecture Boundaries
 

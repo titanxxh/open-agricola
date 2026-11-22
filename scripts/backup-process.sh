@@ -117,7 +117,10 @@ backup_container() {
   if [[ "$BACKUP_ENVIRONMENT" != stable ]]; then
     [[ "${BACKUP_TOOL_MEMORY_MIB:-}" =~ ^[0-9]+$ && "${BACKUP_TOOL_PIDS:-}" =~ ^[0-9]+$ && "${BACKUP_TOOL_CPUS:-}" =~ ^[0-9]+([.][0-9]+)?$ ]] || { echo 'Missing prerelease backup limits'; return 1; }
     [[ "$BACKUP_TOOL_SERVICE" == tools && "$BACKUP_CAPTURE_SERVICE" == capture ]] || { echo 'Prerelease backups require isolated bounded tool services'; return 1; }
-    backup_command "$POLICY_ROOT/node_modules/.bin/tsx" "$POLICY_ROOT/scripts/prerelease/archive-policy.ts" "$@"
+    # The owner's host tools supply the prerelease archive adapter (#1978); a candidate checkout cannot. It is called as
+    # `<adapter> <policy root> archive-policy <storage-archive arguments>` and admits only the scoped operations.
+    [[ "${BACKUP_ARCHIVE_POLICY:-}" == /* && -f "$BACKUP_ARCHIVE_POLICY" && -x "$BACKUP_ARCHIVE_POLICY" ]] || { echo 'Prerelease backup requires the owner archive adapter'; return 1; }
+    backup_command "$BACKUP_ARCHIVE_POLICY" "$POLICY_ROOT" archive-policy "$@"
     return
   fi
   backup_command "${COMPOSE[@]}" run --rm --no-deps -T --name "$name" \

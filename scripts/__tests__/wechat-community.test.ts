@@ -1,4 +1,4 @@
-// @covers deploy-operations.sh
+// @covers operations/update-community-qr.mjs
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -37,7 +37,7 @@ process.exit(result.status??1);
   chmodSync(join(bin, 'ssh'), 0o755)
   const game = join(root, "game's files")
   const directory = join(game, 'data/community')
-  const update = (image: string, truncate = false) => spawnSync('bash', [join(repository, 'deploy-operations.sh'), flag, 'fixture-host', image, game], {
+  const update = (image: string, truncate = false) => spawnSync(process.execPath, [join(repository, 'operations/update-community-qr.mjs'), flag.slice(2, -3), 'fixture-host', image, game], {
     encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, TRUNCATE_QR: truncate ? '1' : '0' },
   })
   const image = (name: string, color: string, format: 'image/png' | 'image/jpeg' = 'image/png') => {
@@ -105,7 +105,7 @@ it('updates Feishu without replacing the WeChat image in the shared community di
   const wechat = image('wechat', '#fff')
   const feishu = image('feishu', '#08f')
   expect(update(wechat).status).toBe(0)
-  const result = spawnSync('bash', [join(repository, 'deploy-operations.sh'), '--feishu-qr', '--local', feishu, directory], { encoding: 'utf8' })
+  const result = spawnSync(process.execPath, [join(repository, 'operations/update-community-qr.mjs'), 'feishu', '--local', feishu, directory], { encoding: 'utf8' })
   expect(result.status, result.stderr).toBe(0)
   expect(readFileSync(join(directory, 'wechat-qr'))).toEqual(readFileSync(wechat))
   expect(readFileSync(join(directory, 'feishu-qr'))).toEqual(readFileSync(feishu))

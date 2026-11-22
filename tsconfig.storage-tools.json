@@ -12,7 +12,6 @@
     "scripts/storage-archive.ts",
     "scripts/storage-archive-cli.ts",
     "scripts/replay-validation-worker.ts",
-    "scripts/owner-backup.ts",
     "scripts/container-entry.ts",
     "scripts/update-whats-new.ts",
     "scripts/bench/room-performance.ts",

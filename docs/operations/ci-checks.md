@@ -86,11 +86,11 @@ Linux 浏览器验收默认使用 `LIBGL_ALWAYS_SOFTWARE=1` 和 `WEBKIT_SKIA_ENA
 
 GitHub 浏览器任务（日常浏览器分区与候选的 chromium、sandbox、WebKit 任务）先用 `scripts/ci/checkout-public-assets.sh` 浅抓取固定版本素材仓，并设置 `E2E_PUBLIC_ASSET_DIR` 与 `PUBLIC_ASSET_VALIDATION_DIR`，卡图不再依赖 Pages，见[部署文档](../HOW_TO_DEPLOY.md)。若本机已有 `public-assets.ref` 对应的完整素材仓，可用 `PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prepush` 或同环境下的 `pnpm verify <spec>` 避免构建时联网取素材元数据。入口核对素材仓 HEAD、干净的 `assets/` 和全部必需文件，构建继续生成 Pages URL。该环境设置计入验证指纹；本地素材验证不证明线上 Pages 状态。默认 CI 仍执行远端元数据检查，细节见 `docs/HOW_TO_DEPLOY.md`。同一台机器并行运行多个浏览器任务时，图片站会对卡图请求返回 HTTP 429；此时再加 `E2E_PUBLIC_ASSET_DIR=<同一 checkout>`，仅主站开发服务器改为从该 checkout 提供全部素材（`CI` 下同样生效），构建忽略该变量，不可变 Viewer 运行时仍访问 Pages。它同样计入验证指纹。
 
-## 发布工具演练与必需浏览器用例
+## 必需浏览器用例
 
-`pnpm release:rehearse` 是发布验收工具的本地演练入口，在隔离的 PostgreSQL/S3 应用中运行正式账号登录、单人配置、选牌、恢复、素材解码和持久化核验，并检查 `scripts/release/requirements.json` 声明的必需用例。它属于 owner 操作，步骤见 [Owner 运维](../HOW_TO_DEPLOY.md#owner-operations)；本机演练结果不替代 GitHub 证据或上线后的检查。在 #1978 删除之前，公开仓库的 `scripts/release/` 仍接受 ESLint、测试和 `check:verification-types` 严格类型检查；类型门禁接入 prepush 与 `check:architecture`，工具类型项目独立于生产 Docker 构建。
+owner 的发布演练在私有仓库执行，见 [Owner 运维](../HOW_TO_DEPLOY.md#owner-operations)；本机演练结果不替代 GitHub 证据或上线后的检查。
 
-卡牌百科验收用 `pnpm verify:encyclopedia` 走同一条链：prepush、百科 Chromium spec（含根路径 Pages 产物）、`encyclopedia.spec.ts` 的 `@webkit` 矩阵，最后 `pnpm verify status --requirements e2e-tests/encyclopedia.requirements.json`。新增或改名百科用例时同步该 requirements 文件。
+卡牌百科验收用 `pnpm verify:encyclopedia`，依次运行 prepush、百科 Chromium spec（含根路径 Pages 产物）、`encyclopedia.spec.ts` 的 `@webkit` 矩阵，最后 `pnpm verify status --requirements e2e-tests/encyclopedia.requirements.json`。新增或改名百科用例时同步该 requirements 文件。
 
 reviewer 在 requirements 文件中声明必需 case 的仓库相对 `file`、完整 `titlePath`（describe 层级和 test 标题）、`project` 和 `browser`；不支持把文件名当成全部用例已执行。实际执行证据在 `output/verification/e2e-runs/<runId>/` 中不可覆盖地保存。相同源码指纹、相同 requirements 内容 hash 的运行可累计；缺失、过滤掉、跳过、预期失败、flaky、后续失败或缺少 reporter 结果都不能满足必需用例。`status --requirements` 还要求当前 prepush 成功。未传 requirements 时，原有 `verify` 和 `status` 契约保持不变。
 
@@ -160,10 +160,9 @@ check 读取 GitHub run、job 和 step 元数据。同一 SHA 与配置的兼容
 
 `ci.yml` runs the same routine plan for main and prerelease push/PR events. Pushes never publish or deploy. `prerelease-candidate-verification.yml` accepts manual requests only on main and runs the same complete catalog against a fixed pre SHA. The main producer and candidate have separate checkouts, with no persisted checkout credentials. Candidate execution has no formal write or deployment permissions. `VERIFICATION_CHANNEL=prerelease` identifies its evidence, while ordinary regression commands use `RELEASE_CHANNEL=stable`. Pre-specific fixtures opt into prerelease. The production build task explicitly runs the normal typed hosted build with `RELEASE_CHANNEL=prerelease`; stable Pages fixtures pin stable themselves.
 
-Use the owner command to select and publish, or inspect and retry its fixed reference:
+The owner tools select and publish the candidate (see [owner operations](../HOW_TO_DEPLOY.md#owner-operations)); the gate CLI inspects and retries its fixed reference:
 
 ```bash
-pnpm release vX.Y.Z-beta.N --channel prerelease --ref prerelease
 pnpm exec tsx scripts/ci/prerelease-verification.ts check --repository titanxxh/open-agricola --sha <fixed-pre-sha>
 pnpm exec tsx scripts/ci/prerelease-verification.ts request --repository titanxxh/open-agricola --sha <fixed-pre-sha> --tasks <failed-task-ids>
 ```
@@ -265,11 +264,9 @@ gh workflow run deploy-pages-broker.yml --ref main -f candidate_sha=<full-sha>
 - GitHub Actions 页面：https://github.com/titanxxh/open-agricola/actions
 - 仓库 token 管理：仓库 → Settings → Actions → Variables
 
-### Prerelease operations rehearsal
+### Prerelease backup scripts
 
-Run `pnpm verify focus scripts/__tests__/prerelease-operations.test.ts`, `prerelease-gateway.test.ts`, `prerelease-authority.test.ts`, and `prerelease-identity-audit.test.ts` individually in that directory, plus `backup-storage.test.ts`, `online-storage-archive.test.ts`, and `backup-scratch.test.ts`. The operations tests run the actual CLI/lock/files with a Docker command harness; gateway HTTP/WS and authority HTTPS tests use real local sockets. The online archive test seals/verifies/extracts actual PostgreSQL/S3 bytes and restores with a newer independent deletion ledger. These scopes do not prove a native external image build/import or real pre identity persistence.
-
-`pnpm verify e2e-tests/prerelease-owner-verification.spec.ts --browser=chromium` restarts an isolated app through the standard entry and proves the private Secure/HttpOnly gateway cookie in Chromium while public requests remain503. The scoped TLS fixture proves the gateway transport; live candidate identity, Beta, game and capacity acceptance remains owner #1668. A missing pre identity view/cleanup adapter or required verified image blocks opening. See [owner operations](../HOW_TO_DEPLOY.md#owner-operations) for the exact native resource and acceptance gates; keep simulated and native evidence separate.
+Run `pnpm verify focus` on `backup-storage.test.ts`, `online-storage-archive.test.ts` and `backup-scratch.test.ts`. The host runs these scripts from the deployed checkout; a prerelease backup hands each storage-archive step to the owner's archive adapter (`BACKUP_ARCHIVE_POLICY`), which these tests replace with a recording stub. The online archive test seals and extracts actual PostgreSQL/S3 bytes and restores with a newer independent deletion ledger. The pre host side, its gateway and the adapter itself are tested in the owner repository; see [owner operations](../HOW_TO_DEPLOY.md#owner-operations).
 
 ### Private container image production
 
@@ -287,4 +284,4 @@ Only after all candidate execution has stopped does trusted code validate the bo
 
 `pnpm verify focus scripts/__tests__/candidate-verification-container-image.test.ts` covers producer admission, package privacy and workflow credential boundaries using API/command fixtures. Those checks do not certify a real GitHub BuildKit execution, private GHCR ACL or successful publication; the native build/push/digest-pull/import receipts are separate delivery evidence.
 
-Formal image delivery is rehearsed through the native owner entry, receiver and maintenance command harnesses in the private ops repository (the public copies in `release-publish.test.ts`, `backend-image-receiver.test.ts` and `backend-image-maintenance-*.test.ts` remain until the public tools are removed), plus actual Vite compilation in `container-image-frontend.test.ts`. The maintenance harness runs real locks, backup scripts, tar and manifest hashing, while external Docker/Git commands supply controlled inventories. It proves fixed-image ordering and refusal/rollback behavior, not native daemon/cgroup or live-host acceptance. Run the archive, provenance and existing backup suites for changes to these seams; #1668 retains the actual GitHub/GHCR/import/maintenance/browser evidence.
+Formal image delivery is rehearsed through the native owner entry, receiver and maintenance command harnesses in the private ops repository, plus actual Vite compilation in `container-image-frontend.test.ts`. The maintenance harness runs real locks, backup scripts, tar and manifest hashing, while external Docker/Git commands supply controlled inventories. It proves fixed-image ordering and refusal/rollback behavior, not native daemon/cgroup or live-host acceptance. Run the archive, provenance and existing backup suites for changes to these seams; #1668 retains the actual GitHub/GHCR/import/maintenance/browser evidence.

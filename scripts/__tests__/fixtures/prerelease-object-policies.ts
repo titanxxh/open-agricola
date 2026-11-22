@@ -1,3 +1,4 @@
+// No test here imports it any more; the owner repository's tests import it from their producer checkout (#1978).
 // Public policy documents and journal hashes from the original #1662 provisioning.
 export const provisionedObjectPolicies = {
   "app": {

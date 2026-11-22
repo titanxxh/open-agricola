@@ -1,4 +1,4 @@
-// @covers scripts/release/
+// @covers e2e-tests/helpers/smoke.ts e2e-tests/helpers/durability.ts e2e-tests/helpers/hosted-release-app.ts
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { expect } from '@playwright/test'

@@ -1,4 +1,4 @@
-// @covers scripts/release/
+// @covers e2e-tests/helpers/live-smoke.ts e2e-tests/helpers/live-smoke-guard.ts
 // @covers e2e-tests/helpers/release-browser.ts
 import { createServer } from 'node:http'
 import { createHash } from 'node:crypto'

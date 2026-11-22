@@ -9,9 +9,9 @@
 `frontend-hosting.ts` 托管 `/open-agricola/` 及构建元数据。同站外部前端只重定向旧应用入口，保留公开 Room/Replay 参数并清除凭据 fragment；API 命名空间保留原归属。启动核对 SHA、通道、目标与 GAME_BUILD_ID、RELEASE_CHANNEL，旧描述只允许正式通道；正式 Compose 固定 stable。`auth-cookies.ts` 通过 `http-origin.ts` 使用 PSL 判断站点，保持 host-only HttpOnly Cookie，不依赖 CHIPS。测试见 `auth-cookies.test.ts`、`frontend-hosting.test.ts`、`hosted-password-login.spec.ts`，决策见 ADR 0035。
 
 
-`community-qr.ts` 提供公开只读的微信和飞书群图片接口，每次请求读取通过原子替换更新的宿主机文件，响应禁用缓存。`deploy-operations.sh --wechat-qr` 或 `--feishu-qr` 调用 `operations/update-community-qr.mjs` 校验原图并经维护者 SSH 发布；应用只读挂载持久的社区目录。测试见 `wechat-community.test.ts` 和 `wechat-community.spec.ts`。
+`community-qr.ts` 提供公开只读的微信和飞书群图片接口，每次请求读取通过原子替换更新的宿主机文件，响应禁用缓存。owner 的运维入口调用 `operations/update-community-qr.mjs` 校验原图并经维护者 SSH 发布；应用只读挂载持久的社区目录。测试见 `wechat-community.test.ts` 和 `wechat-community.spec.ts`。
 
-`whats-new.ts` 从同一社区目录提供维护者手写的最新版本说明，每次请求重新读取 `whats-new.json`，并用 `shared/contract/whats-new.ts` 校验。`deploy-operations.sh --whats-new` 调用 `scripts/update-whats-new.ts`，上传前使用同一解析器，再经 SSH 原子替换。测试见 `whats-new.test.ts` 和 `whats-new.spec.ts`。
+`whats-new.ts` 从同一社区目录提供维护者手写的最新版本说明，每次请求重新读取 `whats-new.json`，并用 `shared/contract/whats-new.ts` 校验。owner 的运维入口调用 `scripts/update-whats-new.ts`，上传前使用同一解析器，再经 SSH 原子替换。测试见 `whats-new.test.ts` 和 `whats-new.spec.ts`。
 
 
 ## server/connection/ — WebSocket 入口
@@ -204,10 +204,10 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 
 - PostgreSQL 保存平台数据与共享资源目录；私有 S3 保存 `card-art/`、`replay-viewers/<viewerBuildId>/`、`replay-assets/<sha256>` 与 `erasure/ledger.json`。`server/storage/` 负责暂存上传、引用、完整性检查与清理 claim；写入前先持久化上传意图，新上传有 24 小时未引用宽限期，同一对象只有一个 claim 者删除。
 - 在线备份（[ADR 0040](../adr/0040-online-daily-backup-preserves-game-availability.md)）不暂停游戏写入。`storage/backup-coordination.ts` 保护物理删除；`scripts/storage-archive.ts` 让 dump 与资源目录共用快照，并解除恢复出的旧路由租约。`scripts/backup-*` 管理期限、完整归档与临时资源清理。测试：`online-storage-archive.test.ts`。
-- 预发布归档策略（`scripts/prerelease/archive-policy.ts`、`docker.ts`）区分固定可信 main 工具镜像和来源安装身份。候选工具只取得所选输入的只读挂载和私有 scratch；宿主 report 与 seal 保留在 owner 私有目录。原生 PostgreSQL 临时文件不修改归档输入。测试：`backup-storage.test.ts`、`backup-scratch.test.ts`、`prerelease-operations.test.ts`。
+- 预发布备份把每个 storage-archive 步骤交给 owner 的归档适配器（`BACKUP_ARCHIVE_POLICY`，在 owner 仓库），由它区分固定可信 main 工具镜像和来源安装身份；没有适配器时脚本拒绝执行。候选工具只取得所选输入的只读挂载和私有 scratch；宿主 report 与 seal 保留在 owner 私有目录。原生 PostgreSQL 临时文件不修改归档输入。测试：`backup-storage.test.ts`、`backup-scratch.test.ts`。
 - Durable Room Commit 需要 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 与 `GAME_BUILD_ID`。创建 Room 时锁定两个 Build ID。Viewer Build ID 是其完整 manifest 的 SHA-256；版图美术、卡牌美术与字体来自 `public-assets.ref` 固定的素材站。Build 校验失败时创建 Room 失败，等待中的 Room 在 Step 0 存在之前拒绝对局写入。
 - 只允许回滚到支持所有活动 Room `schemaVersion` 的兼容录制构建。缺少 Viewer 或持久化不可写会让 readiness 降级。在线 Room 容量只拒绝新准入，离线保留存档不降低 readiness。
-- `operations/` 管理独立发布的监控 Compose project 和受限账户采集器。`deploy-operations.sh` 只固定发布运维源码并保留游戏容器身份；游戏部署只管理 app/Caddy。账户采集器统计现存账户及 UTC+8 自然日、滚动时间窗口的新增，不导入游戏初始化或运行迁移。
+- `operations/` 管理独立发布的监控 Compose project 和受限账户采集器。owner 的运维入口只固定发布运维源码并保留游戏容器身份；游戏部署只管理 app/Caddy。账户采集器统计现存账户及 UTC+8 自然日、滚动时间窗口的新增，不导入游戏初始化或运行迁移。
 - `server/game/persistence/opening-facts.ts` 在现有带 owner fencing 的 Room 事务内记录不可回退的开局、首次正式游戏和开局账号事实。活动房间及 Replay 过期后仍保留这些事实，结局继续来自 `game_contexts.lifecycle`。账号删除与内容下架清除新增身份关联。owner 安装的固定聚合函数读取标量事实和 `operations_current_openings`；独立 exporter 登录只有聚合执行权，没有原始表和列读取权。其无参数函数使用数据库控制的 Unix 分钟截止时间；带时间参数的重载仅供 owner 调用。`operations/database-access.ts` 负责此权限边界与幂等初始化，生产、本地监控和真实数据库夹具共用同一路径。完整覆盖从迁移起点开始，无法证明的历史首次正式游戏时间保持未知。测试入口：`opening-facts.test.ts`、`operations-openings.test.ts`、`operations-dashboard.spec.ts`。
 - `server/observability/` 负责有界数值指标、采集、管理员网关与总览健康状态，从不写规则状态。指标不带 Room、账号、命令、卡牌、payload 或异常身份，指标失败不会改变对局结果。命令耗时覆盖从分发到本地发布；投影、编码与发送是独立阶段。
 - 私有 Prometheus 采集器通过 bearer 认证的 ingress 发现实例；ingress 负责全局 Room 聚合与在线用户。Grafana 只在 `/ops/` 后读取聚合数据，每次请求都通过一次性交接 cookie 检查当前站点会话与 `ADMIN_USERS`。
@@ -220,4 +220,4 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 
 `game-setup-options.ts` 在分配房间或替换状态之前拒绝已移出业务的配置。已移出命令按未知命令失败，不改变 Room 版本或 Replay。通用客户端能力声明、socket WeakMap、HTTP header 和 CORS 支持继续保留。测试：`experimental-feature-transport.test.ts` 和 `auth-routes.test.ts`。
 
-`scripts/prerelease/{operations,storage-guard*,gateway}.ts` 负责生命周期及 HTTP/WS 门禁。请求头未到齐的连接没有权限，已分类流持续受撤权约束；只有网关加入代理网络。操作见 `HOW_TO_DEPLOY.md`。
+pre 的生命周期、存储 guard 和网关是 owner 仓库中的工具，网关从本仓库的 `scripts/prerelease/browser-policy.ts`（正式身份边界的输入）加载正式浏览器策略，负责 HTTP/WS 门禁。请求头未到齐的连接没有权限，已分类流持续受撤权约束；只有网关加入代理网络。操作见 `HOW_TO_DEPLOY.md`。

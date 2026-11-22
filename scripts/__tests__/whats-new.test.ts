@@ -1,4 +1,4 @@
-// @covers deploy-operations.sh
+// @covers scripts/update-whats-new.ts
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -44,7 +44,7 @@ process.exit(result.status??1);
     writeFileSync(path, typeof value === 'string' ? value : JSON.stringify(value, null, 2))
     return path
   }
-  const update = (path: string, truncate = false) => spawnSync('bash', [join(repository, 'deploy-operations.sh'), '--whats-new', 'fixture-host', path, game], {
+  const update = (path: string, truncate = false) => spawnSync(process.execPath, [join(repository, 'scripts/update-whats-new.ts'), 'fixture-host', path, game], {
     encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, TRUNCATE: truncate ? '1' : '0' },
   })
   return { root, directory, notes, update }

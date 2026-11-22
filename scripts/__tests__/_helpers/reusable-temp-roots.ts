@@ -1,3 +1,4 @@
+// No test here imports it any more; the owner repository's tests import it from their producer checkout (#1978).
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

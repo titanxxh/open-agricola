@@ -1,4 +1,4 @@
-// @covers scripts/release/
+// @covers e2e-tests/helpers/render.ts
 import { createServer } from 'node:http'
 import { expect, test } from '@playwright/test'
 import { verifyVisibleReleaseAssets } from './helpers/render'

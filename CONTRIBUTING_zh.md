@@ -56,7 +56,7 @@ PR 与 main CI 使用同一范围规则，并始终评估必需的 `verify` 检�
 
 Session 夹具区分真实开局和预设工作阶段场景，见[卡牌测试模板](docs/CARD_TEST_TEMPLATE_zh.md#52-状态准备方式)。验证记录、测试依赖准备与本机全量 CI 见 [CI 操作文档](docs/operations/ci-checks.md)。记录用于识别过期结果，不会自动跳过检查。
 
-贡献者只需要 `./restart-local.sh` 这一个 shell 脚本。`deploy-backend.sh` 是维护者专用的，用于运维 owner 的生产机，不属于任何贡献流程。主机备份和异机同步脚本不在本仓库中。
+贡献者只需要 `./restart-local.sh` 这一个 shell 脚本。发布和部署工具是维护者专用的，放在 owner 的私有仓库，不属于任何贡献流程。主机备份和异机同步脚本不在本仓库中。
 
 ## 架构边界（必读）
 
