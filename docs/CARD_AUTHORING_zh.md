@@ -313,7 +313,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 | 一张烹饪类改良 | `meta.isCookery: true` 加 `exchanges` | `A060_OrientalFireplace` |
 | 卡上或农场上的公开标记 | `presentation`；需要计算的标记用 `effect.getStatePresentation` | `CWM050_TapestryWeaver` |
 | 显示在卡上的文字 | `set-infobox` 的 `special-effect` leaf | `A173_ClayThief` |
-| 卡自己的状态变化，而没有标准 leaf 能表达 | `shared/actions/helpers/ad-hoc-action-registry.ts` 里的 `registerAdHocAction`，id 以 `card_` 开头；资源仍然通过标准 leaf 移动（Card contract） | `A040_PottersYard` |
+| 卡自己的状态变化，而没有标准 leaf 能表达 | 卡牌私有行动：`shared/actions/helpers/ad-hoc-action-registry.ts` 里的 `registerAdHocAction`，id 以 `card_` 开头；资源仍然通过标准 leaf 移动（[actions：effect 与内部行动](architecture/actions_zh.md#effect-与内部行动)） | `A040_PottersYard`、`E073_Scythe` |
 
 ## 5. Session 测试
 
