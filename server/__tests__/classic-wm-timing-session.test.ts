@@ -15,7 +15,17 @@ const anytimeOf = (session: GameSession, n: number) =>
   session.getState().interaction.anytimeActions.find((a) => a.sourceCard === id(n))
 const almshouseDiscards = (r: SessionResponse) =>
   r.state.events.filter((e) => e.type === 'resource.paid' && e.sourceCardId === id(56)).length
-/** Harvest of round 4 with only `food` for the owner; everyone else is fed. */
+/** The owner's optional Almshouse prompt after feeding: one discard choice plus `__skip__`. */
+const almshouseDiscard = (r: SessionResponse) => {
+  expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard, JSON.stringify(r.interaction)).toBe(id(56))
+  if (r.interaction.stateId === 'wait') expect(r.interaction.playerIndex).toBe(0)
+  const options = sessionOptions(r).filter((o) => !o.disabled)
+  expect(options.map((o) => o.value)).toContain('__skip__')
+  const discard = options.filter((o) => o.value !== '__skip__')
+  expect(discard).toHaveLength(1)
+  return discard[0]!.value
+}
+/** Harvest of round 4 with only `food` for the owner; everyone else is fed. Stops at any real choice. */
 const harvest = (session: GameSession, food: number) => {
   const state = session.state
   state.round = 4
@@ -64,14 +74,28 @@ const remodeler = (clay: number) => wmSession([42], (state) => {
 })
 
 describe('WM timing, identity and limits in four-player sessions', () => {
-  it('Almshouse discards a later feeding begging card even after Borrower markers were repaid first', () => {
+  it('Almshouse lets the owner discard a later feeding begging card after Borrower markers were repaid first', () => {
     const session = borrowerRepaid()
-    const r = harvest(session, 3)
+    const offer = harvest(session, 3)
+    expect(p0(offer).resources.begging).toBe(2)
+    const r = wmChoose(session, offer, almshouseDiscard(offer))
     expect(almshouseDiscards(r)).toBe(1)
     expect(p0(r).resources.begging).toBe(1)
+    expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard).not.toBe(id(56))
   })
-  it('Almshouse never discards a begging card that Borrower issued', () => {
+  it('Almshouse keeps the feeding begging card when the owner skips the discard', () => {
+    const session = borrowerRepaid()
+    const offer = harvest(session, 3)
+    almshouseDiscard(offer)
+    const r = wmChoose(session, offer, '__skip__')
+    expect(almshouseDiscards(r)).toBe(0)
+    expect(p0(r).resources.begging).toBe(2)
+    expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard).not.toBe(id(56))
+  })
+  it('Almshouse never offers to discard a begging card that Borrower issued', () => {
     const r = harvest(borrowerRepaid(), 40)
+    expect(r.state.round).toBe(5)
+    expect(r.state.roundPhase).toBe('work')
     expect(almshouseDiscards(r)).toBe(0)
     expect(p0(r).resources.begging).toBe(1)
   })
