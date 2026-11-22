@@ -84,6 +84,9 @@ const reachCrossPlayerFeed = async (page: Page, names: string[]) => {
       && actor !== payload.state.currentPlayerIndex) return payload
     if (payload.interaction.stateId === 'wait' && payload.interaction.request.kind === 'feed') {
       await page.locator('.exchange-overlay .exchange-confirm').click()
+      if (payload.interaction.request.remaining > payload.state.players[actor]!.resources.food) {
+        await page.getByRole('alertdialog', { name: 'Resource shortage' }).getByRole('button', { name: 'Continue', exact: true }).click()
+      }
     } else if (await page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true }).isVisible()) {
       await page.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true }).click()
     } else {

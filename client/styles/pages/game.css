@@ -5317,6 +5317,26 @@
   background: #93a68a;
   cursor: not-allowed;
 }
+.harvest-shortfall-dialog {
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: #fffaf0;
+  color: var(--color-text-secondary);
+}
+.harvest-shortfall-dialog::backdrop {
+  background: rgb(18 32 18 / 45%);
+}
+.harvest-shortfall-dialog h2,
+.harvest-shortfall-dialog p {
+  margin: 0;
+}
+.harvest-shortfall-dialog .exchange-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 @media (max-width: 1100px) {
   .game-layout {
       grid-template-columns: 1fr;
