@@ -310,6 +310,87 @@ describe('FL: compound actions and cross-player timing', () => {
     },
   )
 
+  it.each([
+    { timing: 'before', afterGrowth: false },
+    { timing: 'after', afterGrowth: true },
+  ])('School Dropout: a Large-Scale Farmer relocation $timing growth', ({ afterGrowth }) => {
+    const schoolDropout = flCard(45).id
+    const largeScaleFarmer = 'B150_LargeScaleFarmer'
+    const session = keep(flSession((state) => {
+      state.round = 7
+      const player = state.players[0]!
+      player.occupationPlayed = [schoolDropout, largeScaleFarmer]
+      player.rooms = 4
+      player.roomTiles = createDefaultRoomTiles(4)
+      setActiveWorkerCount(player, 3)
+      Object.assign(player.resources, { wood: 2, clay: 2, food: 1 })
+      state.players.forEach((other, index) => {
+        other.minorHand = ['__test_placeholder__']
+        other.occupationHand = ['__test_placeholder__']
+        if (index !== 0) {
+          other.resources.food = 20
+          setWorkersAtHome(state, other, 0)
+        }
+      })
+      reveal(state, 'wish-children')
+      reveal(state, 'major-improvement')
+    }))
+    const grow = () => {
+      const response = confirmTurns(session, accept(session, session.takeAction(0, 'wish-children')))
+      expect(response.state.players[0]!.workers.filter((worker) => worker.isNewborn)).toHaveLength(1)
+      expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.familyGrowth' }))
+    }
+
+    if (afterGrowth) grow()
+    let response = session.takeAction(0, 'farm-expansion')
+    expect(response.ok, response.error).toBe(true)
+    const placement = response.state.actionSpaces.find((space) => space.id === 'farm-expansion')!.takenBy[0]!
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice') {
+      const stable = flOptions(response).find((option) => option.labelKey === 'actions.stables.name')
+      if (!stable) throw new Error('Expected the Build Stables choice')
+      response = choose(session, response, stable.value)
+    }
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+    response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+    expect(response.ok, response.error).toBe(true)
+    const jump = flOptions(response).find((option) => option.sourceCard === largeScaleFarmer)
+    if (!jump) throw new Error('Expected the Large-Scale Farmer relocation')
+    response = choose(session, response, jump.value)
+    if (!response.state.players[0]!.improvements.includes('Major_Fireplace1'))
+      response = choose(session, response, 'Major_Fireplace1')
+    expect(response.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, food: 0 })
+    expect(response.state.actionSpaces.find((space) => space.id === 'farm-expansion')!.takenBy).toEqual([])
+    expect(response.state.actionSpaces.find((space) => space.id === 'major-improvement')!.takenBy).toContainEqual(placement)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.paid', sourceCardId: largeScaleFarmer, resources: { food: 1 },
+    }))
+    confirmTurns(session, response)
+    if (!afterGrowth) grow()
+
+    response = confirmTurns(session, session.takeAction(0, 'grain-seeds'))
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+    if (afterGrowth) {
+      expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'feed' } })
+      expect(response.state.events).not.toContainEqual(expect.objectContaining({
+        type: 'worker.promoted', sourceCardId: schoolDropout,
+      }))
+      response = autoAdvanceRoundEnd(session, { initialResponse: response })
+      expect(response.state.round).toBe(8)
+    } else {
+      expect(response.state.round).toBe(7)
+      const use = flOptions(response).find((option) =>
+        option.sourceCard === schoolDropout && option.labelKey !== 'ui.interactionDecline',
+      )
+      if (!use) throw new Error(`Expected the School Dropout extra turn: ${JSON.stringify(response.interaction)}`)
+      response = choose(session, response, use.value)
+      response = choose(session, response, 'forest')
+      expect(response.state.players[0]!.workers.some((worker) => worker.isNewborn)).toBe(false)
+      expect(response.state.players[0]!.resources.wood).toBe(3)
+    }
+    expect(bonusScore(response, schoolDropout)).toBe(0)
+  })
+
   it('Pillar Biter: after an opponent fences, the owner builds four fences for three wood', () => {
     let session = keep(
       flSession((state) => {

@@ -10,7 +10,7 @@ const cardImpl = {
       id: CARD_ID + '-new-space',
       cardIds: [CARD_ID],
       actionSpaces: 'all',
-      phases: ['after'],
+      phases: ['before'],
       handler: ({ state, space }) => {
         if (space?.id !== state.roundActionOrder[state.round - 1]) return
         const food = state.actionSpaces.find((entry) => entry.id === 'fishing')?.resources.food ?? 0

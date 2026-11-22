@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
-import { getRoundPersonPlacementOrder } from '../../helpers/round-placement'
+import { getRoundPersonPlacementDetails, getRoundPlacementDetails } from '../../helpers/round-placement'
 import { readCardExtraData, isCardFlagged } from '../../helpers/card-state'
 import type { GameState, PlayerState, ActionFlow } from '../../../contract/types'
 import { findFirstNewborn } from '../../../domain/player'
@@ -17,10 +17,19 @@ const eligible = (state: GameState, player: PlayerState) => {
   if (state.roundPhase !== 'work' || isCardFlagged(player, CARD_ID) || !findFirstNewborn(player))
     return false
   if (readCardExtraData<number>(player, CARD_ID, 'growthRound') !== state.round) return false
-  const ordinal = readCardExtraData<number>(player, CARD_ID, 'growthOrdinal') ?? 0
-  return !getRoundPersonPlacementOrder(player)
-    .slice(ordinal)
-    .some((id) => state.roundActionOrder.includes(id))
+  let placementsBeforeGrowth = readCardExtraData<number>(player, CARD_ID, 'growthOrdinal') ?? 0
+  const subsequentPeople = new Set<string>()
+  for (const { spaceId, workerId, relocation } of getRoundPlacementDetails(player)) {
+    if (!relocation) {
+      if (placementsBeforeGrowth > 0) {
+        placementsBeforeGrowth -= 1
+        continue
+      }
+      subsequentPeople.add(workerId)
+    }
+    if (subsequentPeople.has(workerId) && state.roundActionOrder.includes(spaceId)) return false
+  }
+  return true
 }
 
 const cardImpl = {
@@ -77,7 +86,7 @@ const cardImpl = {
                     params: {
                       kind: 'set-extra-data',
                       key: 'growthOrdinal',
-                      value: getRoundPersonPlacementOrder(player).length,
+                      value: getRoundPersonPlacementDetails(player).length,
                     },
                   },
                   {
