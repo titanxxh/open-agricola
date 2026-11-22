@@ -8,6 +8,7 @@ import { countUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 import { readCardExtraData } from '../helpers/card-state'
+import { payLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'D132_HideFarmer'
 const MARK_SPACES_ACTION_ID = `card_${CARD_ID}_markSpaces`
@@ -76,9 +77,10 @@ const markSpacesAction: ActionDefinition = {
         recoverable: true,
       }
     }
-    player.resources.food = food - n
     setHiddenSpaces(player, n)
-    return { type: 'ok', resourcesPaid: n > 0 ? { food: n } : {} }
+    return n > 0
+      ? { type: 'flow', flow: payLeaf({ cardId: CARD_ID, cost: { food: n } }) }
+      : { type: 'ok' }
   },
 }
 

@@ -1,46 +1,39 @@
 import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
-import { registerAdHocAction } from '../../../actions/helpers/ad-hoc-action-registry'
 import { canAccommodateAllAnimals } from '../../../domain/animal-zones'
 import type { ActionFlow } from '../../../contract/types'
 
 const CARD_ID = 'CWM113_WildBreeding'
+const ANIMALS = ['sheep', 'boar', 'cattle'] as const
 
-const ADD = 'card_' + CARD_ID + '_breed'
-registerAdHocAction({
-  id: ADD,
-  nameKey: 'actions.breed.name',
-  descriptionKey: 'actions.breed.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, eventSink }) => {
-    const choices: ActionFlow[] = []
-    for (const space of state.actionSpaces)
-      for (const animal of ['sheep', 'boar', 'cattle'] as const) {
-        if ((space.gainPerRound[animal] ?? 0) <= 0 || (space.resources[animal] ?? 0) < 2) continue
-        space.resources[animal] += 1
-        eventSink?.emit<'resource.accumulated'>({
-          type: 'resource.accumulated',
-          resources: { [animal]: 1 },
-          to: { kind: 'actionSpace', spaceId: space.id },
-          sourceCardId: CARD_ID,
-        })
-        if (canAccommodateAllAnimals(state, player, [animal]))
-          choices.push({
-            type: 'leaf',
-            actionId: 'collect',
-            sourceCard: CARD_ID,
-            actionContext: { spaceId: space.id, resource: animal, amount: 1 },
-          })
-      }
-    return choices.length
-      ? { type: 'flow', flow: { type: 'xor', optional: true, children: choices } }
-      : { type: 'ok' }
-  },
-})
 const cardImpl = {
-  effect: { id: CARD_ID, onBuy: () => ({ type: 'leaf', actionId: ADD, sourceCard: CARD_ID }) },
+  effect: {
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      const bred = state.actionSpaces.flatMap((space) => ANIMALS
+        .filter((animal) => (space.gainPerRound[animal] ?? 0) > 0 && (space.resources[animal] ?? 0) >= 2)
+        .map((animal) => ({ spaceId: space.id, animal })))
+      if (!bred.length) return
+      const add = bred.map(({ spaceId, animal }): ActionFlow => ({
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'add-resource-to-space', spaceId, resource: animal, amount: 1 },
+      }))
+      const take = bred
+        .filter(({ animal }) => canAccommodateAllAnimals(state, player, [animal]))
+        .map(({ spaceId, animal }): ActionFlow => ({
+          type: 'leaf',
+          actionId: 'collect',
+          sourceCard: CARD_ID,
+          actionContext: { spaceId, resource: animal, amount: 1 },
+        }))
+      return {
+        type: 'seq',
+        children: take.length ? [...add, { type: 'xor', optional: true, sourceCard: CARD_ID, children: take }] : add,
+      }
+    },
+  },
 } satisfies CardImpl
 
 export const CWM113_WildBreeding = defineMinorCard({
