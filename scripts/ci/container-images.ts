@@ -119,6 +119,15 @@ export function assertExpectedContainerImage(receipt: ContainerImageReceipt, exp
 }
 
 /**
+ * Public files an image and its consumers must share with protected main: the image workflow and receipt code, the
+ * intake limits, the production Compose file and the backup scripts the host runs from the deployed checkout. The
+ * owner's release and host tools are no longer in this repository (#1978); their binding to the producer is the
+ * owner repository's producer checkout and contract tests (#1964 item 3).
+ */
+const TRUSTED_PRODUCER_PATHS = [CONTAINER_IMAGE_WORKFLOW, ':(glob)scripts/ci/container-images*.ts', 'scripts/image-intake.ts', 'docker-compose.prod.yml',
+  'scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs']
+
+/**
  * `ownerPolicy` is the owner checkout's policy commit, which host owner-tools also run. Its own trusted-policy image
  * stays importable after main changes the verification configuration or image tooling; it must still be reachable
  * from protected main. Every other producer must remain compatible with current main.
@@ -133,9 +142,7 @@ function trustedProducer(cwd: string, producer: string, ownerPolicy?: string): {
   if (ancestor && ownerPolicy !== undefined && producer === fullSha(ownerPolicy)) return { repositoryId: integer(repository.id), main }
   if (!ancestor
     || verificationConfiguration(cwd, producer) !== verificationConfiguration(cwd, main)
-    || spawnSync('git', ['diff', '--quiet', producer, main, '--', CONTAINER_IMAGE_WORKFLOW, ':(glob)scripts/ci/container-images*.ts', ':(glob)scripts/release/container-images*.ts',
-      ':(glob)scripts/release/backend-*', 'scripts/image-intake.ts', 'deploy-backend.sh', 'docker-compose.prod.yml',
-      'scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs'], { cwd, stdio: 'ignore' }).status !== 0) {
+    || spawnSync('git', ['diff', '--quiet', producer, main, '--', ...TRUSTED_PRODUCER_PATHS], { cwd, stdio: 'ignore' }).status !== 0) {
     throw new Error('Image producer is not compatible protected main')
   }
   return { repositoryId: integer(repository.id), main }

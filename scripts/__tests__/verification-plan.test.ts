@@ -137,26 +137,26 @@ describe('repository verification scope', () => {
 
   it('runs the whole tooling project beside the complete catalog and only selected tooling tests otherwise', () => {
     const { cwd } = repository()
-    write(cwd, 'scripts/release/status.ts', 'export const status = 1\n')
-    write(cwd, 'scripts/__tests__/release-status.test.ts', "// @covers scripts/release/status.ts\nimport '../release/status'\n")
+    write(cwd, 'scripts/backup-files.mjs', 'export const files = 1\n')
+    write(cwd, 'scripts/__tests__/backup-files.test.ts', "// @covers scripts/backup-files.mjs\nimport '../backup-files.mjs'\n")
     write(cwd, 'scripts/__tests__/restart-local-preview.test.ts', '// local development helper\n')
     write(cwd, 'scripts/__tests__/docker-compose-prod-binding.test.ts', '// release verification\n')
     commit(cwd, 'add tooling tests')
 
     const scopedBase = git(cwd, 'rev-parse', 'HEAD')
-    write(cwd, 'scripts/release/status.ts', 'export const status = 2\n')
-    commit(cwd, 'change one release tool')
+    write(cwd, 'scripts/backup-files.mjs', 'export const files = 2\n')
+    commit(cwd, 'change one backup tool')
     const scoped = createRepositoryPlan({ cwd, base: scopedBase, fullTaskIds: ['quality', 'fast', 'build'] })
     expect(scoped.mode).toBe('scoped')
     expect(scoped.inventory.vitest).toContainEqual({ file: 'scripts/__tests__/docker-compose-prod-binding.test.ts', project: 'fast-scripts' })
-    expect(scoped.checks).toContainEqual({ kind: 'vitest', project: 'tooling', files: ['scripts/__tests__/release-status.test.ts'] })
+    expect(scoped.checks).toContainEqual({ kind: 'vitest', project: 'tooling', files: ['scripts/__tests__/backup-files.test.ts'] })
 
     write(cwd, 'scripts/ci/planner-input.ts', 'export const changed = true\n')
     commit(cwd, 'change CI planning')
     const full = createRepositoryPlan({ cwd, base: scopedBase, fullTaskIds: ['quality', 'fast', 'build'] })
     expect(full.mode).toBe('full')
     expect(full.checks).toEqual([
-      { kind: 'vitest', project: 'tooling', files: ['scripts/__tests__/release-status.test.ts', 'scripts/__tests__/restart-local-preview.test.ts'] },
+      { kind: 'vitest', project: 'tooling', files: ['scripts/__tests__/backup-files.test.ts', 'scripts/__tests__/restart-local-preview.test.ts'] },
       { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'fast' }, { kind: 'catalog', taskId: 'build' },
     ])
   })

@@ -186,6 +186,7 @@ const configurationPath = (file: string): boolean =>
   || /^scripts\/verification[^/]*\.ts$/.test(file)
   || /^scripts\/verify[^/]*\.(?:ts|sh)$/.test(file)
   || file === 'scripts/test-project-globs.ts'
+  // Removed with the release tools (#1978); still an input of earlier commits, so their hashes recompute unchanged.
   || file === 'scripts/release/requirements.json'
   || ['package.json', 'pnpm-lock.yaml', 'vitest.config.ts', 'playwright.config.ts', 'vite.config.ts'].includes(file)
   || /^tsconfig[^/]*\.json$/.test(file)

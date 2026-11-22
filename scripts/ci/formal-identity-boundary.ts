@@ -6,6 +6,8 @@ import { fullSha } from './verification-tasks.ts'
 
 // The HTTP, WS and page routers wire the identity modules into a large application. Bind the wiring itself;
 // traverse the identity modules below, so unrelated game handlers and page implementations can ship independently.
+// A listed file counts only where the tree has it: deploy-backend.sh left with the owner tools (#1978), which changes
+// the boundary of later commits once, while earlier commits still recompute the boundary they were accepted with.
 const wiring = [
   'server/index.ts', 'server/connection/ws-server.ts', 'client/main.tsx', 'client/App.tsx', 'client/app/PageRouter.tsx',
   'Dockerfile', 'docker-compose.prod.yml', 'docker-compose.yml', 'deploy-backend.sh', 'deploy/Caddyfile.example',

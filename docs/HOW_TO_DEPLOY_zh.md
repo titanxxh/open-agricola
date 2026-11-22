@@ -28,7 +28,7 @@ GitHub Pages 在 `https://open-agricola.titanxxh.com/` 提供生产前端，API 
 
 ## Owner 运维
 
-Owner 运维指 owner 在本机用私有工具执行的发布、部署和备份。它们的 runbook 正在迁往私有仓库 [open-agricola-ops](https://github.com/titanxxh/open-agricola-ops)，外部读者无法访问。尚未迁走的步骤仍在下文。所有 owner 工具仍通过干净 protected-main 检出中的公开门禁使用[发布证据契约](#release-evidence-contract)。
+Owner 运维指 owner 在本机用私有工具执行的发布、部署和备份。这些工具及其 runbook 在私有仓库 [open-agricola-ops](https://github.com/titanxxh/open-agricola-ops)，外部读者无法访问；本仓库保留它们遵循的契约，以及主机从已部署检出运行的备份脚本。所有 owner 工具仍通过干净 protected-main 检出中的公开门禁使用[发布证据契约](#release-evidence-contract)。
 
 本文命令用占位符表示 owner 主机信息：`<host>` 是正式后端的 SSH 目标，`<deploy-dir>` 是其部署检出，`<operations-dir>` 是监控目录，`<host-ops-dir>` 是主机上定时异机备份脚本所在目录。
 
@@ -40,7 +40,7 @@ Owner 运维指 owner 在本机用私有工具执行的发布、部署和备份�
 
 ### 本机回执
 
-回执记录每条实际 `runCandidateTask` 命令、退出码与日志 SHA-256，以及执行时间、Node、平台、架构、受测提交、原始源码树和候选/producer 验证配置。完整十任务及其 canonical 命令必须全部通过。其中 `fast` 和 `slow` 任务运行 `pnpm test:fast` 与 `pnpm test:slow`，不含 `tooling` Vitest project：这些发布、部署与 CI 工具由受信 producer 而不是候选运行，由 PR 的 Routine 覆盖（见[测试架构](architecture/testing_zh.md)）。日常 affected 检查或单独 `release:rehearse` 不满足此路径。rebase 后仅当完整原始树和验证配置与受测源码相同时，publisher 才能重绑 `candidateSha`；保留 `testedSha`，不把本机命令记为 GitHub job。
+回执记录每条实际 `runCandidateTask` 命令、退出码与日志 SHA-256，以及执行时间、Node、平台、架构、受测提交、原始源码树和候选/producer 验证配置。完整十任务及其 canonical 命令必须全部通过。其中 `fast` 和 `slow` 任务运行 `pnpm test:fast` 与 `pnpm test:slow`，不含 `tooling` Vitest project：这些发布、部署与 CI 工具由受信 producer 而不是候选运行，由 PR 的 Routine 覆盖（见[测试架构](architecture/testing_zh.md)）。日常 affected 检查或单独的 owner 发布演练不满足此路径。rebase 后仅当完整原始树和验证配置与受测源码相同时，publisher 才能重绑 `candidateSha`；保留 `testedSha`，不把本机命令记为 GitHub job。
 
 pre owner-local 必须使用 format 2 回执及 `execution: { kind: "docker-isolated", evidenceSha256: "<64 lowercase hex>" }`。owner 在候选之外收集的证据绑定实际 sandbox、前置服务源码闭包、命令、源码完整性、资源限制及 teardown，原始证据与日志一并不可变保留。已撤回的 format-1 pre 回执拒绝；stable format 1 不变。pre proof 的 `executionEvidenceSha256` 随镜像与接收端复核传递，并使用独立的原生 owner `owner-local-prerelease-verification` status；固定 beta Release 必须为 `prerelease=true`、`latest=false`。stable 与 pre 证明不能互相授权。公共 pre checker 重验固定源码、完整计划、双方配置、producer 祖先关系、原生 owner、tag 和绑定摘要的 asset ID/实际字节。完整同树 rebase 保留实际受测 SHA；源码树或 producer 配置不兼容时重新执行。owner、接收端 deploy/open/restore 和 candidate 镜像生产保留真实 typed 本机证明，不虚构 Actions ID。本机授权缺失或撤销时仍可用原生 workflow 回退；owner 最新 success 的证明无效时阻断。原生 PR/ref 规则、同步 lease、真实私有镜像生产/import 和目标验收仍为独立门禁；候选内工具不能自授权，必须先把 producer 正当交付到 protected main。
 
@@ -60,7 +60,7 @@ Pages、后端交付和私有镜像生产通过公共候选门禁各自读取已
 
 正式候选必须是所选仓库受保护 `main` 上某个已合入 PR 的最终集成快照。门禁明确解析 `refs/heads/main`，同名 tag 不能改变选择；同时核对原生仓库/PR 身份与原始 Git 对象可达性。未合入或中间快照在 dispatch、发布、安装候选和 SSH 前被拒绝。main 前进后，合格的旧最终快照仍可使用。独立固定的受保护 main producer P 为候选 C 定义编排；P 的原生 main 身份提供策略授权，双方源码配置哈希仅标识兼容执行。原生治理信任已授权的 override 权限，不证明历史策略；该新增准入策略见 ADR 0037。
 
-只有固定候选的完整验证证据通过后，才能创建版本 tag 和 Release；即使 `main` 移动，Release 目标仍是该 SHA。已有 tag 或 Release 指向其他 SHA 时拒绝。通过网页或裸 `gh release create` 创建的 Release 可能尚无这些证据，Pages 与后端部署会各自拒绝未验证的候选。本机 `pnpm release:rehearse` 记录不能替代 GitHub 证据。
+只有固定候选的完整验证证据通过后，才能创建版本 tag 和 Release；即使 `main` 移动，Release 目标仍是该 SHA。已有 tag 或 Release 指向其他 SHA 时拒绝。通过网页或裸 `gh release create` 创建的 Release 可能尚无这些证据，Pages 与后端部署会各自拒绝未验证的候选。owner 本机的发布演练不能替代 GitHub 证据。
 
 ### 授权完整本机候选验证
 
@@ -131,31 +131,6 @@ N 从 1 开始。首次选择要求候选等于真实集成 ref 且清单以当�
 ## 核验生产修复并重试站内信
 
 本节的 owner 操作步骤已迁入私有仓库，见 [Owner 运维](#owner-operations)。命令对已发布 SHA 复用 `checkCandidateVerification`，并通过运行中容器内的 `BugReportFeedbackService` 记录结果。
-
-## 预览并执行十二条历史报告反馈
-
-此操作独立于发布、部署、迁移和启动。从 owner 本机通过既有 SSH 连接在运行中的 app 容器执行，使用其数据库环境及已完成的迁移。核对主机和目录，并将 `ADMINISTRATOR_SITE_ID` 替换为当前管理员的准确站点 ID。审阅输入和输出文件都留在本机。owner 命令不会迁移、部署、新建 issue 或改写 GitHub 报告。先按上一节保留正式生产核验证据；没有包含修复的已核验部署时，可发送处理结论，上线通知继续等待。
-
-准备私有且经过审阅的 JSON 文件。空对象 `{}` 使用已有报告映射，并因缺少维护者说明跳过 #1595。只有审阅过具体的非缺陷或体验建议理由后，才提供 `explanation1595`；仅写“无效”或“体验建议”不够。固定 allowlist 为 #1464、#1465、#1479、#1490、#1504、#1564、#1574、#1586、#1591、#1595、#1622、#1637。
-
-```bash
-umask 077
-ssh <host> \
-  'cd <deploy-dir> && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts' \
-  < /private/reviewed-feedback.json > /private/feedback-preview.json
-ssh <host> \
-  'cd <deploy-dir> && docker compose --env-file .env -f docker-compose.prod.yml exec -T app node --import tsx server/bug-report/historical-feedback-cli.ts --execute --actor=ADMINISTRATOR_SITE_ID' \
-  < /private/reviewed-feedback.json > /private/feedback-result.json
-```
-
-
-输入、预览和结果可能包含站点身份，使用 mode 600 保存。默认只预览。预览先开启 PostgreSQL 只读事务，再逐项显示接收映射、完整结论及上线文案、缺失项、合入修复证据、版本来源、去重结果和跳过原因。逐项审阅后再显式执行。`projectedMessages` 不是发送回执。
-
-原映射确实缺失时，可提供 `imports` 条目，字段为 `issueNumber`、原 marker 的 `submissionId`、审阅过的 `reporterSiteId`、已有 `roomId`、原公开 issue 完整正文的 SHA-256 `bodySha256`，以及非空 `auditReference`。与已审阅的 #1652 审计和固定项目的原 issue 核对，并将文件保留在 Git 外。导入只创建通知对象，但仍承担原有 GitHub 公开站点 ID 的账号删除匿名化义务。既有 App 核对准确 issue、唯一 marker 和映射版本，完成全部公开匿名化后才清除本地映射；远端失败或证据冲突时保留删除等待状态，可信删除事件沿用既有 tombstone 语义。可编辑的公开座位或 Anchor 不会授予原生报告、Replay、取证、保留或 Room 权限。已有匿名化、删除中、歧义或冲突映射不能靠旧 issue 正文恢复。缺少 Game Context 或公开证据冲突时逐项跳过。
-
-执行跳过已有处理历史，不覆盖后来的结论；先确认，再发送上线反馈。复用日常账号/根修复唯一键，持久 reconciliation 限定已审阅对象和准确修复版本。`newMessages` 是本次已提交的 `insertedTriages` 与 `releasedMessages` 之和，不计并发发送者的信件。`errors` 列出部分失败，`reconciliation.operations` 保留持久操作 ID 和待核验或通知失败详情。四条历史修复提供已审阅的具体摘要；已有根修复的维护者摘要优先，预览与实际信件均显示该原文。历史首次包含版本来自审计，与首次核验生产版本及观测时间分开。
-
-中断后重新预览，再用同一审阅输入执行 `--execute`。已发送信件和已读状态保持不变。通知事务仍 pending 时，在 owner 本机用反馈命令的 `--retry-operation` 模式按保存的操作 ID 只重试该通知操作（见 [Owner 运维](#owner-operations)）。持久对象/修复校验阻止重试更换接收人或发送不同修复。遇到 `historical_subject_changed` 时重新审阅预览，不绕过校验，也不重做 Release 或部署。齐备的隔离 fixture 首次产生 16 封，重跑新增 0；实际操作逐项报告跳过，包括默认缺少 #1595 说明。
 
 ## 一、部署后端
 
@@ -431,7 +406,7 @@ CORS_ORIGIN=https://open-agricola.titanxxh.com
 3. 发布匹配的根路径 Pages 前端，并通过既有备份、目标恢复校验和部署流程应用上述 API 配置。保留上一份已验证镜像及配置，供回退使用。
 4. 比较 Pages host 实际 HTML、JS/CSS、语言包和卡牌 manifest 字节与目标构建。验证严格 WebKit 与 Chromium 下的登录、刷新、持久 profile 浏览器重开、工坊、routed WS 和原 Room 恢复，再登出。Linux WebKit 覆盖不能替代实体 Safari/iPhone 验收。
 
-上线验收不创建正式对局，也不向已有 Room 发送游戏操作。开局、起始交互和持久化测试只通过本机隔离的 `pnpm release:rehearse` 执行，它是 owner 操作，见 [Owner 运维](#owner-operations)。
+上线验收不创建正式对局，也不向已有 Room 发送游戏操作。开局、起始交互和持久化测试只通过 owner 本机隔离的发布演练执行，见 [Owner 运维](#owner-operations)。
 
 `pnpm run build:pages-frontend` 将根路径 `/` 的构建写入 `dist-pages/`，显式使用 `VITE_API_BASE` 与可选 `VITE_WS_BASE`。`frontend-build.json` 记录 `{ format: 1, gameBuildId, basePath }`，标识须匹配所选后端。社区卡默认启用，仍允许显式 `VITE_ENABLE_COMMUNITY_DECK` 覆盖；工坊沙盒始终在浏览器中运行。
 

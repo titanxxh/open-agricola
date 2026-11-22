@@ -1,4 +1,4 @@
-// @covers scripts/release/
+// @covers e2e-tests/helpers/release-diagnostics.ts
 import { expect, test } from '@playwright/test'
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'

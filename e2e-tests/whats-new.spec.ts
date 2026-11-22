@@ -27,7 +27,7 @@ const releasesUpTo = (latest: number) => Array.from({ length: latest + 1 }, (_, 
 function publish(testInfo: TestInfo, latest: number) {
   const path = testInfo.outputPath(`whats-new-${latest}.json`)
   writeFileSync(path, JSON.stringify({ releases: releasesUpTo(latest) }, null, 2))
-  execFileSync('bash', ['deploy-operations.sh', '--whats-new', '--local', path, communityDirectory()])
+  execFileSync(process.execPath, ['scripts/update-whats-new.ts', '--local', path, communityDirectory()])
 }
 
 /** Header buttons may sit below the fold on phones; only horizontal overflow is a layout fault. */

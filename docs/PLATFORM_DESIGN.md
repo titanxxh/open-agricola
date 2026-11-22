@@ -491,7 +491,7 @@ Last updated 2026-10-06.
 | Browser-only Card Source runtime and structural admission (ADR 0052) | `shared/custom-code/{card-source-admission, compiler}.ts`, `client/local-sandbox/{opaque-worker, native-card-source, local-custom-card}.ts`, `server/workshop-draft-validation.ts` |
 | Card version history | `workshop_card_versions`, versions and restore APIs, and the WorkshopPage version panel |
 | Featured Workshop page | `workshop_cards.featured`, administrator toggle, and Featured tab |
-| Production deployment with Docker and GitHub Pages | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/deploy-pages.yml`, `client/config.ts` |
+| Production deployment with Docker and GitHub Pages | `Dockerfile`, `docker-compose.prod.yml`, `.github/workflows/container-image-build.yml`, `.github/workflows/deploy-pages.yml`, `client/config.ts` |
 | Beta access management | Settings grants/revokes account qualification through `GET/PUT/DELETE /api/admin/beta-access`; administrators qualify through `ADMIN_USERS`, and changes apply at the next creation/discovery check without changing existing Rooms. |
 | Administrator role | `server/auth.ts` `isAdmin()`, `ADMIN_USERS` |
 | Administrator APIs | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `GET /api/admin/users`; PRD #634 removed the self-certified status toggle |

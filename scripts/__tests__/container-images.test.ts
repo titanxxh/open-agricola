@@ -3,7 +3,6 @@ import { stableConfiguration } from '../ci/candidate-format'
 import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 import { checkPrereleaseVerification } from '../ci/prerelease-acceptance'
 import { prereleaseConfiguration } from '../ci/prerelease-format'
-import { prepareContainerImageArchive } from '../release/container-images-owner'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs'
@@ -184,103 +183,6 @@ it.each(['run', 'attempt', 'producer', 'repository', 'artifact source', 'artifac
   value.save();expect(value.verify).toThrow()
 })
 
-it.each(['complete', 'missing OCI index', 'bounded export', 'failed pull', 'remote daemon', 'containerd owner', 'different DOCKER_HOST', 'matching DOCKER_HOST', 'custom config local', 'custom config remote', 'context override local', 'context override remote', 'context changes after pull'])('prepares a private owner image archive: %s', async outcome => {
-  const cwd = resolve(import.meta.dirname, '../..'), sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim()
-  const config = JSON.stringify({ os: 'linux', architecture: 'amd64', config: { Labels: { 'org.opencontainers.image.revision': sourceSha, 'io.open-agricola.release-channel': 'stable' } }, rootfs: { type: 'layers', diff_ids: [] } })
-  const imageId = `sha256:${createHash('sha256').update(config).digest('hex')}`, value = buildArtifactFixture({ imageId })
-  const payload = join(value.root, 'payload');mkdirSync(payload)
-  writeFileSync(join(payload, 'config.json'), config);writeFileSync(join(payload, 'manifest.json'), JSON.stringify([{ Config: 'config.json', RepoTags: null, Layers: [] }]))
-  if (outcome !== 'missing OCI index') {
-    const blobs = join(payload, 'blobs/sha256'); mkdirSync(blobs, { recursive: true })
-    writeFileSync(join(blobs, imageId.slice(7)), config)
-    const manifest = JSON.stringify({ schemaVersion: 2, mediaType: 'application/vnd.oci.image.manifest.v1+json',
-      config: { mediaType: 'application/vnd.oci.image.config.v1+json', digest: imageId, size: Buffer.byteLength(config) }, layers: [] })
-    const digest = createHash('sha256').update(manifest).digest('hex'); writeFileSync(join(blobs, digest), manifest)
-    writeFileSync(join(payload, 'index.json'), JSON.stringify({ schemaVersion: 2, manifests: [{
-      mediaType: 'application/vnd.oci.image.manifest.v1+json', digest: `sha256:${digest}`, size: Buffer.byteLength(manifest),
-    }] }))
-  }
-  const archive = join(value.root, 'source.tar');execFileSync('tar', ['-cf', archive, '-C', payload, 'config.json', 'manifest.json',
-    ...(outcome === 'missing OCI index' ? [] : ['index.json', 'blobs'])])
-  const sshLog = join(value.root, 'unexpected-ssh')
-  writeFileSync(join(value.bin, 'ssh'), `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(sshLog)},'unexpected transfer');process.exit(1);\n`, { mode: 0o700 })
-  const authFile = join(value.root, 'auth.json'), log = join(value.root, 'docker.jsonl')
-  writeFileSync(authFile, JSON.stringify({ username: 'fixture-owner', token: 'fixture-private-registry-token' }), { mode: 0o600 })
-  const receipt = value.verify()
-  const contextDirectory = join(value.root, 'docker-config'), transportLog = join(value.root, 'transport.jsonl')
-  mkdirSync(contextDirectory)
-  const custom = outcome.startsWith('custom config') || outcome.startsWith('context ')
-  const remoteContext = outcome === 'custom config remote' || outcome === 'context override local'
-  writeFileSync(join(contextDirectory, 'config.json'), JSON.stringify({ currentContext: remoteContext ? 'remote-custom' : 'local-custom' }), { mode: 0o600 })
-  vi.stubEnv('DOCKER_HOST', outcome === 'different DOCKER_HOST' ? 'unix:///run/user/1000/other.sock' : outcome === 'matching DOCKER_HOST' ? 'unix:///var/run/docker.sock' : '')
-  vi.stubEnv('DOCKER_CONFIG', custom ? contextDirectory : '')
-  vi.stubEnv('DOCKER_CONTEXT', outcome === 'context override local' ? 'local-custom' : outcome === 'context override remote' ? 'remote-custom' : '')
-  const rejectedContext = outcome === 'custom config remote' || outcome === 'context override remote' || outcome === 'different DOCKER_HOST'
-  const metadata = { format: 1, gameBuildId: sourceSha, basePath: '/open-agricola/', releaseChannel: 'stable', deploymentTarget: 'stable-hosted' }
-  writeFileSync(join(value.bin, 'docker'), `#!${process.execPath}
-const fs=require('node:fs');const a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(log)},JSON.stringify(a)+'\\n');
-const cmd=a[0]==='--config'?a.slice(4):a;
-const custom=process.env.DOCKER_CONFIG===${JSON.stringify(contextDirectory)}, selected=process.env.DOCKER_CONTEXT||(custom?JSON.parse(fs.readFileSync(${JSON.stringify(join(contextDirectory, 'config.json'))},'utf8')).currentContext:'default');
-const socket=a.includes('--host')?a[a.indexOf('--host')+1]:selected==='default'?'unix:///var/run/docker.sock':custom?(selected==='local-custom'?'unix:///run/user/1000/owner-test.sock':'ssh://formal-host'):'unknown-context';
-fs.appendFileSync(${JSON.stringify(transportLog)},JSON.stringify({args:a,socket,config:process.env.DOCKER_CONFIG??'',context:process.env.DOCKER_CONTEXT??''})+'\\n');
-if(socket==='unknown-context')process.exit(62);
-if(a[0]==='context')console.log(JSON.stringify([{Endpoints:{docker:{Host:socket}}}]));
-else if(socket.startsWith('ssh:'))process.exit(61);
-else if(cmd[0]==='info')console.log(JSON.stringify(${JSON.stringify(outcome === 'containerd owner' ? [['driver-type','io.containerd.snapshotter.v1']] : [])}));
-else if(cmd[0]==='login'){if(fs.readFileSync(0,'utf8').trim()!=='fixture-private-registry-token')process.exit(2);fs.writeFileSync(a[1]+'/config.json','private auth');}
-else if(cmd[0]==='pull'){if(${JSON.stringify(outcome)}==='context changes after pull')fs.writeFileSync(${JSON.stringify(join(contextDirectory, 'config.json'))},JSON.stringify({currentContext:'remote-custom'}));process.exit(0);}
-else if(cmd[0]==='image'&&cmd[1]==='save')process.stdout.write(fs.readFileSync(${JSON.stringify(archive)}));
-else if(cmd[0]==='image'&&cmd[1]==='inspect')console.log(JSON.stringify([{Id:${JSON.stringify(imageId)},Os:'linux',Architecture:'amd64',Config:JSON.parse(${JSON.stringify(config)}).config,RepoDigests:[${JSON.stringify(receipt.registryRepository+'@'+receipt.manifestDigest)}]}]));
-else if(cmd[0]==='create')console.log('f'.repeat(64));
-else if(cmd[0]==='cp')fs.writeFileSync(cmd.at(-1),${JSON.stringify(JSON.stringify(metadata))});
-else if(cmd[0]!=='rm')process.exit(3);
-`, { mode: 0o700 })
-  const docker = join(value.bin, 'docker')
-  if (outcome === 'failed pull') writeFileSync(docker, readFileSync(docker, 'utf8').replace("else if(cmd[0]==='pull'){", "else if(cmd[0]==='pull'){process.exit(19);"))
-  if (outcome === 'remote daemon') writeFileSync(docker, readFileSync(docker, 'utf8').replace('unix:///var/run/docker.sock', 'ssh://formal-host'))
-  if (['missing OCI index', 'bounded export', 'failed pull', 'remote daemon', 'containerd owner'].includes(outcome) || rejectedContext) {
-    await expect(prepareContainerImageArchive({ receipt, authFile, directory: value.root, maxBytes: outcome === 'bounded export' ? 64 : 1024 * 1024 })).rejects.toThrow(outcome === 'missing OCI index' ? /OCI index.*upgrade.*Docker/i : undefined)
-    const commands: string[][] = readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line))
-    const login = commands.find(args => args.includes('login'))
-    if (outcome === 'remote daemon' || rejectedContext) {
-      expect(login).toBeUndefined()
-      expect(commands).toEqual([['context', 'inspect']])
-    }
-    if (outcome === 'containerd owner') {
-      expect(login).toBeUndefined()
-      expect(commands).toHaveLength(2)
-      expect(commands[1].slice(4)).toEqual(['info', '--format', '{{json .DriverStatus}}'])
-    }
-    if (outcome === 'missing OCI index') {
-      expect(commands.some(args => args.includes('save'))).toBe(true)
-      expect(existsSync(sshLog)).toBe(false)
-      for (const directory of readdirSync(value.root).filter(name => name.startsWith('image-'))) expect(existsSync(join(value.root, directory, 'image.tar'))).toBe(false)
-    }
-    if (login) expect(existsSync(login[1])).toBe(false)
-    for (const directory of readdirSync(value.root).filter(name => name.startsWith('image-'))) expect(existsSync(join(value.root, directory, 'transfer.json'))).toBe(false)
-    expect(readFileSync(log, 'utf8')).not.toContain('fixture-private-registry-token')
-    return
-  }
-  const result = await prepareContainerImageArchive({ receipt, authFile, directory: value.root, maxBytes: 1024 * 1024 })
-  expect(result.transfer.receipt).toMatchObject(value.receipt)
-  const transports: { args: string[]; socket: string; config: string; context: string }[] = readFileSync(transportLog, 'utf8').trim().split('\n').map(line => JSON.parse(line))
-  const expectedSocket = custom ? 'unix:///run/user/1000/owner-test.sock' : 'unix:///var/run/docker.sock'
-  expect(transports.every(entry => entry.socket === expectedSocket)).toBe(true)
-  for (const entry of transports.filter(entry => entry.args[0] !== 'context')) {
-    expect(entry.args.slice(2, 4)).toEqual(['--host', expectedSocket])
-    expect(entry.config).toBe('')
-    expect(entry.context).toBe('')
-  }
-  expect(result.transfer.archive.bytes).toBe(readFileSync(archive).length)
-  const calls: string[][] = readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line))
-  expect(calls.find(args => args.includes('pull'))?.at(-1)).toBe(`${receipt.registryRepository}@${receipt.manifestDigest}`)
-  expect(calls.find(args => args.includes('save'))?.at(-1)).toBe(imageId)
-  expect(readFileSync(log, 'utf8')).not.toContain('fixture-private-registry-token')
-  const login = calls.find(args => args.includes('login'));expect(login).toBeDefined()
-  if (!login) throw new Error('Missing login fixture')
-  expect(() => readFileSync(join(login[1], 'config.json'))).toThrow()
-})
-
 it('requires the current complete prerelease verification and binds every native task attempt', () => {
   const value = githubFixture(), clone = join(value.root, 'checkout')
   execFileSync('git', ['clone', '--shared', '--no-checkout', value.cwd, clone], { stdio: 'ignore' })
@@ -337,7 +239,7 @@ function stableImageFixture() {
   roots.push(cwd)
   const configurationPaths = [
     '.github/workflows/candidate-verification.yml', '.github/workflows/prerelease-candidate-verification.yml',
-    '.github/workflows/candidate-rehearsal.yml', 'scripts/ci', 'scripts/release/requirements.json',
+    '.github/workflows/candidate-rehearsal.yml', 'scripts/ci',
     'package.json', 'pnpm-lock.yaml', 'vitest.config.ts', 'playwright.config.ts', 'vite.config.ts',
     ...readdirSync(join(source, 'scripts')).filter(name => /^(?:verification[^/]*\.ts|verify[^/]*\.(?:ts|sh)|test-project-globs\.ts)$/.test(name)).map(name => `scripts/${name}`),
     ...readdirSync(source).filter(name => /^tsconfig[^/]*\.json$/.test(name)),
