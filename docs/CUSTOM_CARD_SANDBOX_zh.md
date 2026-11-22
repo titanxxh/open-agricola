@@ -2,7 +2,7 @@
 
 [English](CUSTOM_CARD_SANDBOX.md) | [中文](CUSTOM_CARD_SANDBOX_zh.md)
 
-以下为英文规范文档的中文翻译。本文说明工坊卡代码在哪里运行、服务端检查什么（[ADR 0052](adr/0052-workshop-code-runs-only-in-the-browser.md)）。写卡方法见[写卡指南](CARD_AUTHORING.md)，机制见[架构索引](ARCHITECTURE_zh.md)。
+以下为英文规范文档的中文翻译。本文说明工坊卡代码在哪里运行、服务端检查什么（[ADR 0052](adr/0052-workshop-code-runs-only-in-the-browser.md)）。写卡方法见[写卡指南](CARD_AUTHORING_zh.md)，机制见[架构索引](ARCHITECTURE_zh.md)。
 
 维护工坊生成 prompt（`client/services/llm/generation/`）、工坊编辑器、浏览器沙盒（`client/local-sandbox/`）、服务端校验或本地模型验收（`docs/test/llm-card-gen.md`）时阅读本文。
 

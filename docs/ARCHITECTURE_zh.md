@@ -10,7 +10,7 @@
 
 | 任务 | 阅读 |
 |---|---|
-| 实现或修改一张卡，或判断它是否需要共享机制 | [写卡指南](CARD_AUTHORING.md)：每张卡都要遵守的 Card contract、卡面句式对应的机制、范例卡与范例 Session 测试，以及可行性判断规则；再读 [CARD_TEST_TEMPLATE](CARD_TEST_TEMPLATE_zh.md) 写测试。 |
+| 实现或修改一张卡，或判断它是否需要共享机制 | [写卡指南](CARD_AUTHORING_zh.md)：每张卡都要遵守的 Card contract、卡面句式对应的机制、范例卡与范例 Session 测试，以及可行性判断规则；再读 [CARD_TEST_TEMPLATE](CARD_TEST_TEMPLATE_zh.md) 写测试。 |
 | 修改共享机制：engine、session、actions、hooks、payment、协议 | 下表中的 module 文档，再读其链接的 ADR。 |
 
 ## Module 地图
