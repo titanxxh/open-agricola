@@ -508,7 +508,6 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 | `PUBLIC_ASSET_CACHE_ENABLED` | 图片和字体恢复普通 HTTP 请求。 |
 | `APP_SHELL_CACHE_ENABLED` | 带哈希的脚本、样式、语言包和卡牌 manifest 改用 HTTP 缓存。 |
 | `ROOM_OFFLINE_RETRY_ENABLED` | 回房文档请求恢复普通浏览器导航。 |
-| `OFFLINE_ENCYCLOPEDIA_ENABLED` | Pages 隐藏下载入口并暂停离线阅读。浏览器保留已下载副本。 |
 
 保持 `/sw.js` 地址和根作用域。需要紧急接管时，在同一候选将 `SERVICE_WORKER_EMERGENCY_TAKEOVER` 设为 `true`。在线浏览器发现并安装该版本后会激活新 Worker，已打开的页面无需刷新，WebSocket 无需重连。后续常规发布将开关恢复为 `false`。已安装的 Worker 需要在 `/sw.js` 收到有效的替换脚本。
 

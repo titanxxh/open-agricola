@@ -4,7 +4,6 @@ import { LocaleSwitcher } from '../../components/common/LocaleSwitcher'
 import { useLocale } from '../../contexts/LocaleContext'
 import { EncyclopediaBrowser } from './EncyclopediaBrowser'
 import { EncyclopediaLoadError } from './EncyclopediaLoadError'
-import { OfflineEncyclopediaControls } from './OfflineEncyclopediaControls'
 import { encyclopediaBrowseStore } from './encyclopedia-browse-store'
 import { useEncyclopediaUrlNavigation } from './encyclopedia-navigation'
 import { useCardEncyclopedia } from './useCardEncyclopedia'
@@ -46,9 +45,6 @@ export function EncyclopediaPage() {
       <main className="encyclopedia-page__main">
         <h1 className="encyclopedia-page__title">{t('ui.encyclopedia.title')}</h1>
         <p className="encyclopedia-page__description">{t('ui.encyclopedia.description')}</p>
-        {import.meta.env.VITE_OFFLINE_ENCYCLOPEDIA === '1' && 'serviceWorker' in navigator && 'indexedDB' in window && (
-          <OfflineEncyclopediaControls />
-        )}
         {load.status === 'ready'
           ? <EncyclopediaBrowser encyclopedia={load.encyclopedia} navigation={navigation} locale={locale} />
           : load.status === 'error'

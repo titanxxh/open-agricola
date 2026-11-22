@@ -187,8 +187,7 @@ test.beforeAll(async () => {
   workerPath = join(siteDirectory, 'sw.js')
   normalWorker = readFileSync(workerPath, 'utf8')
   emergencyWorker = await buildServiceWorker({ baseUrl: PUBLISH_URL },
-    readFileSync(join(siteDirectory, 'offline-encyclopedia/index.html'), 'utf8'),
-    { assets: false, roomOffline: true, offlineEncyclopedia: true, emergencyTakeover: true })
+    { assets: false, roomOffline: true, emergencyTakeover: true })
   assets = await startAssetOrigin(resolve(assetCheckout), directory)
 })
 
@@ -402,14 +401,6 @@ test('normal and emergency updates keep an open game playable on its original co
     expect(assets.requests.filter(path => path === IMAGE)).toEqual([IMAGE])
     await page.locator('iframe[name="asset-embed"]').evaluate(frame => frame.remove())
 
-    const encyclopedia = await context.newPage()
-    await encyclopedia.goto(`${site.origin}/?page=encyclopedia`)
-    await encyclopedia.evaluate(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-    await encyclopedia.reload()
-    await encyclopedia.getByRole('button', { name: 'Save for offline reading' }).click()
-    await expect(encyclopedia.getByText(/^English · Version [a-f0-9]{12} · Saved/)).toBeVisible()
-    await encyclopedia.close()
-
     const resumedGame = observeGame(page)
     await page.goto(roomUrl)
     await expect(page.locator('.game-layout')).toBeVisible()
@@ -433,10 +424,6 @@ test('normal and emergency updates keep an open game playable on its original co
     assets.requests.length = 0
     await loadAssets(await context.newPage(), site.origin, IMAGE_DIMENSIONS)
     expect(assets.requests.filter(path => path === IMAGE)).toEqual([IMAGE])
-    await context.setOffline(true)
-    const bookmark = await context.newPage()
-    await bookmark.goto(`${site.origin}/offline-encyclopedia/`)
-    await expect(bookmark.getByRole('searchbox', { name: 'Search cards by number, name, or text' })).toBeVisible()
   } finally {
     writeFileSync(workerPath, normalWorker)
     await context.close()

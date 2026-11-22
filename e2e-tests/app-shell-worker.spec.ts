@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { extname, join } from 'node:path'
+import { galleryEntries } from './helpers/encyclopedia'
 import { buildPagesFrontend, servePagesFrontend } from './helpers/pages-frontend'
 
 const CACHE_NAME = 'open-agricola-app-shell-v1'
@@ -110,6 +111,18 @@ const uncached = async (page: Page, paths: readonly string[]) => {
   return paths.filter(path => !cached.has(path))
 }
 const STORE_TIMEOUT = { timeout: 30_000 }
+
+test('the online encyclopedia works and the retired download and bookmark return 404 @webkit', async ({ page }) => {
+  await controlledEncyclopedia(page)
+  await expect(page.locator('.encyclopedia-offline')).toHaveCount(0)
+  await page.getByRole('searchbox').fill('a004')
+  await expect(galleryEntries(page)).toHaveCount(1)
+
+  const archive = await page.request.get(`${site.origin}/offline-encyclopedia/manifest.json`)
+  expect(archive.status()).toBe(404)
+  const bookmark = await page.goto(`${site.origin}/offline-encyclopedia/`, documentLoad)
+  expect(bookmark?.status()).toBe(404)
+})
 
 test('a repeat visit loads the hashed app shell and startup data from the Worker @webkit', async ({ page }) => {
   await controlledEncyclopedia(page)

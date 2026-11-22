@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { browserCardTestsPlugin } from './scripts/vite-browser-card-tests.ts'
-import { serviceWorkerPlugin, OFFLINE_ENCYCLOPEDIA_ENABLED, PUBLIC_ASSET_CACHE_ENABLED } from './scripts/vite-service-worker.ts'
+import { serviceWorkerPlugin, PUBLIC_ASSET_CACHE_ENABLED } from './scripts/vite-service-worker.ts'
 import { loadBrowserDataDefines } from './scripts/browser-data.ts'
 import {
   isViteDevServerCli,
@@ -122,6 +122,5 @@ export default defineConfig({
     'import.meta.env.VITE_RELEASE_CHANNEL': JSON.stringify(process.env.RELEASE_CHANNEL ?? 'stable'),
     'import.meta.env.VITE_PUBLIC_ASSET_BASE_URL': JSON.stringify(publicAssets.baseUrl),
     'import.meta.env.VITE_STABLE_PAGES_WORKER': JSON.stringify(pagesWorker ? '1' : '0'),
-    'import.meta.env.VITE_OFFLINE_ENCYCLOPEDIA': JSON.stringify(pagesWorker && OFFLINE_ENCYCLOPEDIA_ENABLED ? '1' : '0'),
   },
 })
