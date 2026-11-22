@@ -6,6 +6,7 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 import { PostgresDatabase } from '../server/database/postgres'
 import { BACKEND_URL, browserRequestHeaders } from './fixtures'
 import { authenticateSolo } from './helpers/standard-solo-acceptance'
+import { animationsSettled } from './helpers/encyclopedia'
 import { matrixVariant } from './helpers/extended'
 
 function communityDirectory() {
@@ -63,6 +64,8 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
       const read = page.getByRole('button', { name: "What's new", exact: true })
       await expect(unread).toBeVisible()
       await expect(unread.locator('.whats-new-button__dot')).toBeVisible()
+      // The login card slides in; two boxes read during the slide come from different frames.
+      await animationsSettled(page)
       const feishu = await page.getByRole('button', { name: 'Feishu player group', exact: true }).boundingBox()
       const own = await unread.boundingBox()
       if (!feishu || !own) throw new Error('Missing header icons')
