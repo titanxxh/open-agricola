@@ -101,7 +101,7 @@ Reference targets follow the English source meaning, independently of their tran
 
 ### Prerelease entry
 
-`PrereleaseBoundary` gates Context/private metadata; `AuthContext` projects its verified identity. Pinned language/banner keep environment/build and formal return after reload; Settings/Workshop keep Lobby links, no account management. HTTP/WS/workers bind build/generation and absolute deadlines; new cookies never revive tabs. Checks serialize; leases include transit. Sign-out ends admission before I/O. Confirmed denial needs a new page. Callbacks clear fragments; retries keep the bound exchange in memory.
+`PrereleaseBoundary` gates Context/private metadata; `AuthContext` projects its verified identity. Pinned language/banner keep environment/build and formal return after reload; Settings/Workshop keep Lobby links, no account admin. HTTP/WS/workers bind build/generation and absolute deadlines; new cookies never revive tabs. Checks serialize; leases include transit. Sign-out ends admission before I/O. Confirmed denial needs a new page. Callbacks clear fragments; retries keep the bound exchange in memory.
 
 `app/PrereleaseEntry.tsx` is a Lobby/Settings Beta badge reading Beta and fresh authority; absent config stays unavailable. It opens only configured HTTPS with `noopener noreferrer`; focus refresh discards pre-denial replies.
 
