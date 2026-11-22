@@ -14,10 +14,8 @@ registerAdHocAction({
   descriptionKey: `cards.${CARD_ID}.name`,
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    state.players.some(
-      (other) => other.id !== player.id && other.resources.food > player.resources.food,
-    ) && state.ordinaryCardDecks.occupation.length > 0,
+  // Once the occupation has been played, no transfer is a valid outcome.
+  canBeExecutedByPlayer: () => true,
   execute: ({ state, player }) => {
     const options = state.players
       .filter((other) => other.id !== player.id && other.resources.food > player.resources.food)

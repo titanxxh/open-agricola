@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { flCard, flSession, chooseBranch, takeFlAnytime, confirmTurns } from './_helpers/classic-fl'
+import { flCard, flSession, flOptions, chooseBranch, takeFlAnytime, confirmTurns } from './_helpers/classic-fl'
 import { playImprovement, playOccupation, choose, bonusScore } from './_helpers/card-play-lifecycle'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { computeHarvestFeedingRequirement } from '../../shared/actions/helpers/harvest-feeding-requirement'
@@ -178,23 +179,104 @@ describe('FL: individual card triggers and exclusions', () => {
     expect(bonusScore(session.getState(), flCard(46).id)).toBe(1)
   })
 
-  it('Farm Lawyer: transfers itself, gains the food difference, and consumes a face-down occupation', () => {
+  it.each([
+    { opponentFood: 3, deck: ['A099_FellowGrazer'] },
+    { opponentFood: 4, deck: [] },
+  ])('Farm Lawyer: completes the free occupation without a valid transfer ($opponentFood food, deck $deck)', ({
+    opponentFood, deck,
+  }) => {
+    const cardId = flCard(47).id
     const session = keep(
-      flSession((state) => {
-        state.players[0]!.occupationHand = [flCard(47).id]
-        state.players[0]!.resources.food = 0
-        state.players[1]!.resources.food = 7
-        state.ordinaryCardDecks.occupation = ['A099_FellowGrazer']
+      createWorkSession({
+        seed: 6100,
+        configure: (state) => {
+          state.players[0]!.occupationHand = [cardId]
+          state.players[0]!.resources.food = 3
+          state.players[1]!.resources.food = opponentFood
+          state.ordinaryCardDecks.occupation = [...deck]
+        },
       }),
     )
-    let response = playOccupation(session, flCard(47).id)
-    response = choose(session, response, response.state.players[1]!.id)
-    expect(response.state.players[0]!.resources.food).toBe(7)
-    expect(response.state.players[0]!.occupationPlayed).not.toContain(flCard(47).id)
-    expect(response.state.players[1]!.occupationHand).toContain(flCard(47).id)
+    const before = session.getState()
+    const response = confirmTurns(session, playOccupation(session, cardId))
+    expect(response.interaction).toMatchObject({
+      stateId: 'idle',
+      allowedCommands: expect.arrayContaining(['takeAction']),
+    })
+    expect(response.state.currentPlayerIndex).toBe(1)
+    expect(response.state.players[0]!.occupationPlayed).toEqual([cardId])
+    expect(response.state.players[0]!.resources.food).toBe(3)
+    expect(response.state.players[1]!.resources.food).toBe(opponentFood)
+    expect(response.state.players[1]!.occupationHand).toEqual(before.state.players[1]!.occupationHand)
+    expect(response.state.players[0]!.extraOccupationsFromCards).toEqual([])
+    expect(response.state.players[0]!.cardStates[cardId]?.extraData?.faceDownOccupations).toBeUndefined()
+    expect(response.state.ordinaryCardDecks.occupation).toEqual(deck)
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.playOccupation',
+      params: expect.objectContaining({ occupations: cardId, costResources: {} }),
+    }))
+    expect(response.state.log).not.toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId }),
+    }))
+    expect(bonusScore(response, cardId)).toBe(0)
+  })
+
+  it('Farm Lawyer: qualifies the opponent after payment, transfers itself, and draws a face-down occupation', () => {
+    const cardId = flCard(47).id
+    const session = keep(
+      createWorkSession({
+        seed: 6100,
+        configure: (state) => {
+          state.players[0]!.occupationPlayed = ['A098_StableArchitect']
+          state.players[0]!.occupationHand = [cardId]
+          state.players[0]!.resources.food = 3
+          state.players[1]!.resources.food = 3
+          state.ordinaryCardDecks.occupation = ['A099_FellowGrazer']
+        },
+      }),
+    )
+    const response = confirmTurns(session, playOccupation(session, cardId))
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.currentPlayerIndex).toBe(1)
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.playOccupation',
+      params: expect.objectContaining({ occupations: cardId, costResources: { food: 1 } }),
+    }))
+    expect(response.state.players.map((player) => player.resources.food)).toEqual([3, 3])
+    expect(response.state.players[0]!.occupationPlayed).toEqual(['A098_StableArchitect'])
+    expect(response.state.players[1]!.occupationHand).toContain(cardId)
     expect(response.state.players[0]!.extraOccupationsFromCards).toHaveLength(1)
     expect(response.state.players[0]!.extraOccupationsFromCards[0]).not.toContain('A099_FellowGrazer')
     expect(response.state.ordinaryCardDecks.occupation).toEqual([])
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId, gain: { food: 1 } }),
+    }))
+    expect(bonusScore(response, cardId)).toBe(0)
+  })
+
+  it('Farm Lawyer: lets the player choose between opponents with more food', () => {
+    const cardId = flCard(47).id
+    const session = keep(
+      flSession((state) => {
+        state.players[0]!.occupationHand = [cardId]
+        state.players[0]!.resources.food = 1
+        state.players[1]!.resources.food = 7
+        state.players[2]!.resources.food = 4
+        state.players[3]!.resources.food = 1
+        state.ordinaryCardDecks.occupation = ['A099_FellowGrazer']
+      }),
+    )
+    let response = playOccupation(session, cardId)
+    expect(flOptions(response).map(({ value }) => value)).toEqual([
+      response.state.players[1]!.id,
+      response.state.players[2]!.id,
+    ])
+    response = choose(session, response, response.state.players[1]!.id)
+    expect(response.state.players[0]!.resources.food).toBe(7)
+    expect(response.state.players[1]!.occupationHand).toContain(cardId)
+    expect(response.state.players[2]!.occupationHand).not.toContain(cardId)
   })
 
   it('North Sea Fisherman: another player on Fishing receives the additional food', () => {

@@ -2,12 +2,16 @@ import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 import { gainLeaf } from '../../helpers/pay-gain-node'
 import { getLogicalFields } from '../../helpers/card-field'
+import { readCardExtraData, writeCardExtraData } from '../../helpers/card-state'
 import { registerAdHocAction } from '../../../actions/helpers/ad-hoc-action-registry'
-import { reap } from '../../../actions/effects/reap'
+import { registerHarvestCountModifier } from '../../../actions/helpers/harvest-count-registry'
 
 const CARD_ID = 'CFL029_BirdTrap'
 
 const HARVEST = 'card_CFL029_BirdTrap_harvest'
+const SELECTED_HARVEST_FIELD = 'selectedHarvestField'
+type HarvestSelection = { round: number; fieldId: string }
+
 registerAdHocAction({
   id: HARVEST,
   nameKey: 'actions.reap.name',
@@ -30,25 +34,23 @@ registerAdHocAction({
         })),
     },
   }),
-  resolveChoice: ({ state, player, eventSink, actionHooks }, choice) => {
-    const fields = getLogicalFields(player)
-    if (!fields.some((field) => field.id === choice && field.stacks.length > 0))
+  resolveChoice: ({ state, player }, choice) => {
+    if (!getLogicalFields(player).some((field) => field.id === choice && field.stacks.length > 0))
       return { type: 'fail', errorKey: 'log.actionFail' }
-    const harvestCounts = Object.fromEntries(
-      fields.map((field) => [
-        `${field.row}-${field.col}`,
-        { count: field.id === choice ? 1 : 0, sources: [CARD_ID] },
-      ]),
-    )
-    const result = reap(
-      state,
-      player,
-      eventSink,
-      { harvestCounts, sourceCard: CARD_ID, trigger: { phase: 'harvest', cardId: CARD_ID } },
-      actionHooks,
-    )
-    return result.reactionFlow ? { type: 'flow', flow: result.reactionFlow } : result
+    writeCardExtraData(player, CARD_ID, SELECTED_HARVEST_FIELD, {
+      round: state.round,
+      fieldId: choice,
+    } satisfies HarvestSelection)
+    return { type: 'ok' }
   },
+})
+
+registerHarvestCountModifier(CARD_ID, ({ state, player, logicalField }) => {
+  if (state.roundPhase !== 'field' || !player.minorPlayed.includes(CARD_ID) || !logicalField)
+    return
+  const selection = readCardExtraData<HarvestSelection>(player, CARD_ID, SELECTED_HARVEST_FIELD)
+  if (selection?.round === state.round && selection.fieldId === logicalField.id)
+    return { delta: 1, sources: [CARD_ID] }
 })
 
 const cardImpl = {
@@ -65,6 +67,15 @@ const cardImpl = {
         { type: 'leaf', actionId: HARVEST, sourceCard: CARD_ID, optional: true },
       ],
     }),
+    onEndHarvestFieldPhase: (_state, player) => {
+      if (!readCardExtraData<HarvestSelection>(player, CARD_ID, SELECTED_HARVEST_FIELD)) return
+      return {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: SELECTED_HARVEST_FIELD, value: undefined },
+      }
+    },
   },
 } satisfies CardImpl
 

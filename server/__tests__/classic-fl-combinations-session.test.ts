@@ -13,8 +13,10 @@ import {
   setActiveWorkerCount,
   workersAvailable,
 } from '../../shared/domain/player'
+import { createDefaultRoomTiles } from '../../shared/domain/farmyard-geometry'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import { autoAdvanceRoundEnd } from './_helpers/round-end'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 const sessions: GameSession[] = []
 const keep = (session: GameSession) => {
@@ -40,6 +42,26 @@ function accept(session: GameSession, response: SessionResponse): SessionRespons
     response = chooseBranch(session, response)
   }
   throw new Error('Choice loop')
+}
+
+function loversTrystSession(rooms: number, occupationCount: number, adults = 2): GameSession {
+  return keep(createWorkSession({
+    seed: 6100,
+    options: { playerCount: 2 },
+    configure: (state) => {
+      const [actor, opponent] = state.players
+      actor!.minorHand = [flCard(24).id]
+      actor!.occupationHand = ['__test_placeholder__']
+      actor!.occupationPlayed = ['A099_FellowGrazer', 'A100_Curator'].slice(0, occupationCount)
+      actor!.rooms = rooms
+      actor!.roomTiles = createDefaultRoomTiles(rooms)
+      setActiveWorkerCount(actor!, adults)
+      actor!.startPlayer = false
+      opponent!.minorHand = ['__test_placeholder__']
+      opponent!.occupationHand = ['__test_placeholder__']
+      opponent!.startPlayer = true
+    },
+  }))
 }
 
 describe('FL: compound actions and cross-player timing', () => {
@@ -142,27 +164,73 @@ describe('FL: compound actions and cross-player timing', () => {
   })
 
   it('Lovers Tryst: replacement grows the family without transferring the starting-player marker', () => {
-    const session = keep(
-      flSession((state) => {
-        state.players[0]!.minorHand = [flCard(24).id]
-        state.players[0]!.occupationPlayed = ['A099_FellowGrazer', 'A100_Curator']
-        state.players[0]!.rooms = 3
-        state.players[0]!.roomTiles.push({ row: 0, col: 0 })
-        state.players.forEach((p, index) => {
-          p.startPlayer = index === 1
-        })
-      }),
-    )
+    const session = loversTrystSession(3, 2)
+    const cardId = flCard(24).id
     let response = session.takeAction(0, 'meeting-place')
-    if (response.interaction.stateId !== 'wait') throw new Error('Expected replacement')
-    const option = flOptions(response)?.find((option) => option.sourceCard === flCard(24).id)
-    expect(option).toBeDefined()
-    response = choose(session, response, option!.value)
-    response = accept(session, response)
-    expect(response.state.players[1]!.startPlayer).toBe(true)
-    expect(response.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(3)
-    expect(response.state.players[1]!.minorHand).toContain(flCard(24).id)
+    const option = flOptions(response).find((candidate) => candidate.sourceCard === cardId)
+    if (!option) throw new Error('Expected Lovers Tryst replacement')
+    response = choose(session, response, option.value)
+    response = choose(session, response, cardId)
+    const [actor, opponent] = response.state.players
+    expect(opponent!.startPlayer).toBe(true)
+    expect(actor!.workers.filter((worker) => worker.isActive)).toHaveLength(3)
+    const newborn = actor!.workers.find((worker) => worker.isNewborn)
+    expect(newborn).toBeDefined()
+    expect(actor!.minorHand).not.toContain(cardId)
+    expect(opponent!.minorHand).toContain(cardId)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'card.passed', cardId, fromPlayerId: actor!.id, toPlayerId: opponent!.id,
+    }))
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'worker.placed', workerId: newborn!.id,
+    }))
     expect(response.state.events.some((event) => event.type === 'startPlayer.changed')).toBe(false)
+    expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.familyGrowth', playerId: actor!.id }))
+    expect(response.state.log).not.toContainEqual(expect.objectContaining({ key: 'log.startPlayer' }))
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(bonusScore(response, cardId)).toBe(0)
+  })
+
+  it.each([
+    { missing: 'a spare room', rooms: 2, adults: 2 },
+    { missing: 'a family member in supply', rooms: 6, adults: 5 },
+  ])('Lovers Tryst: without $missing, it plays and passes normally through Meeting Place', ({ rooms, adults }) => {
+    const session = loversTrystSession(rooms, 2, adults)
+    const cardId = flCard(24).id
+    let response = session.takeAction(0, 'meeting-place')
+    expect(response.ok, response.error).toBe(true)
+    expect(flOptions(response)).not.toContainEqual(expect.objectContaining({ sourceCard: cardId }))
+    response = accept(session, response)
+    const [actor, opponent] = response.state.players
+    expect(actor!.startPlayer).toBe(true)
+    expect(actor!.workers.filter((worker) => worker.isActive)).toHaveLength(adults)
+    expect(actor!.minorHand).not.toContain(cardId)
+    expect(opponent!.minorHand).toContain(cardId)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'startPlayer.changed', playerId: actor!.id,
+    }))
+    expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.startPlayer', playerId: actor!.id }))
+    expect(response.state.log).not.toContainEqual(expect.objectContaining({ key: 'log.familyGrowth' }))
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(bonusScore(response, cardId)).toBe(0)
+  })
+
+  it('Lovers Tryst: a spare room alone does not make the card playable', () => {
+    const session = loversTrystSession(3, 1)
+    const cardId = flCard(24).id
+    const response = session.takeAction(0, 'meeting-place')
+    const [actor, opponent] = response.state.players
+    expect(response.ok, response.error).toBe(true)
+    expect(actor!.startPlayer).toBe(true)
+    expect(actor!.workers.filter((worker) => worker.isActive)).toHaveLength(2)
+    expect(actor!.minorHand).toContain(cardId)
+    expect(opponent!.minorHand).not.toContain(cardId)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'startPlayer.changed', playerId: actor!.id,
+    }))
+    expect(response.state.log).not.toContainEqual(expect.objectContaining({ key: 'log.cardPassed' }))
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(bonusScore(response, cardId)).toBe(0)
   })
 
   it.each([false, true])('Wild Boar Hunt: an opponent’s later person is rejected=%s', (later) => {
