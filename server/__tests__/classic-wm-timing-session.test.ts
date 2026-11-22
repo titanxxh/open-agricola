@@ -61,7 +61,6 @@ const remodeler = (clay: number) => wmSession([42], (state) => {
   state.players[0]!.stableTiles = [{ row: 0, col: 1 }]
   Object.assign(state.players[0]!.resources, { clay, reed: 1 })
 })
-const offersSelection = (r: SessionResponse) => sessionOptions(r).some((o) => o.labelKey === 'actions.selection.name')
 
 describe('WM timing, identity and limits in four-player sessions', () => {
   it('Almshouse discards a later feeding begging card even after Borrower markers were repaid first', () => {
@@ -127,11 +126,16 @@ describe('WM timing, identity and limits in four-player sessions', () => {
     const r = wmPayment(session, wmOk(session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })))
     expect([p0(r).rooms, p0(r).houseType]).toEqual([3, 'clay'])
   })
-  it('Remodeler is not offered when the renovation would become unaffordable with the extra room', () => {
+  it('Remodeler with too little clay for the larger renovation blocks until undo, as ADR 0015 designs', () => {
     const session = remodeler(2)
-    const r = wmOk(session.takeAction(0, 'house-redevelopment'))
-    expect(offersSelection(r)).toBe(false)
-    expect([p0(r).rooms, p0(r).houseType, p0(r).stableTiles.length]).toEqual([2, 'clay', 1])
+    wmAction(session, wmOk(session.takeAction(0, 'house-redevelopment')), 'actions.selection.name')
+    wmOk(session.commitSelectionChoice(0, { positions: ['0-1'] }))
+    const blocked = wmOk(session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] }))
+    expect(blocked.interaction.stateId === 'wait' ? blocked.interaction.request.kind : undefined).toBe('engine-blocked')
+    expect([p0(blocked).rooms, p0(blocked).houseType]).toEqual([3, 'wood'])
+    const undone = wmOk(session.undoAction())
+    expect(undone.interaction.stateId).toBe('idle')
+    expect([p0(undone).rooms, p0(undone).houseType, p0(undone).stableTiles.length, p0(undone).resources.clay]).toEqual([2, 'wood', 1, 2])
   })
   it('Heiress builds at most one room at the start of round 6 in a wooden house', () => {
     const session = wmSession([27], (state) => { Object.assign(state.players[0]!.resources, { wood: 10, reed: 4 }) })
