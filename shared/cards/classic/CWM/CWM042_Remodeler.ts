@@ -3,7 +3,6 @@ import type { CardImpl } from '../../registry'
 import { registerSelectionEffect } from '../../../actions/helpers/selection-effect-registry'
 import { listReturnableStableTiles, returnStableAtTile } from '../../helpers/stable-removal'
 import { parsePositionKey } from '../../../domain/farm'
-import { canRenovate } from '../../../actions/effects/renovation'
 
 const CARD_ID = 'CWM042_Remodeler'
 
@@ -27,8 +26,7 @@ const cardImpl = {
       phases: ['before'],
       handler: ({ player }) => {
         const tiles = listReturnableStableTiles(player)
-        // The free room raises the renovation cost; offer it only when that renovation stays affordable.
-        return player.houseType === 'wood' && tiles.length && canRenovate({ ...player, rooms: player.rooms + 1 })
+        return player.houseType === 'wood' && tiles.length
           ? {
               sourceCard: CARD_ID,
               flow: {
