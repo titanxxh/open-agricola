@@ -57,7 +57,7 @@
 | 卡面文字 | 机制 | 范例 |
 |---|---|---|
 | "instead"，或放弃一个行动以换取别的东西 | `computeReplace` listener 返回带 `alternativeFlow` 的 `decline`，在行动执行前决定 | `A097_Freshman`、`B026_AgrarianFences`、`B103_FieldMerchant`、`D138_PetLover` |
-| 费用里的折扣、"do not have to pay"、"replace X with Y" | 成本 modifier 或 `computeCosts`（§4.6） | `A014_CarpentersHammer`、`A088_HedgeKeeper`、`B095_MasterBricklayer`、`E060_WorkingGloves` |
+| 费用里的折扣、"do not have to pay"、"replace X with Y" | 成本 modifier 或 `computeCosts`（§4.14） | `A014_CarpentersHammer`、`A088_HedgeKeeper`、`B095_MasterBricklayer`、`E060_WorkingGloves` |
 | 轮次或收获里的某个时间点：准备阶段放置资源、翻开行动格、家庭成员回家、收割、动物出生 | `impl.effect` 上的阶段 hook（§4.3） | `A049_NestSite`、`C021_HeartofStone`、`C097_SeedResearcher`、`A106_SlurrySpreader`、`E133_ChampionBreeder` |
 | 一个状态而不是事件，例如 "both … are occupied" | 卡牌行动格上的可用条件，或一个随时能力（§4.9） | `A162_ForestTallyman`、`D178_SubstituteTeacher`、`E014_WoodSaw` |
 
@@ -183,8 +183,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 | 卡面文字 | 机制 | 范例 |
 |---|---|---|
 | 牧场能容纳更多动物 | `effect.computePastureCapacityModifiers` 返回 `{ sourceCard, kind: 'additive', apply }` | `A012_DrinkingTrough` |
-| 房间、翻修、围栏、马厩或犁地更便宜 | `impl.modifiers`（带 `appliesTo` 的 trade、bonus 或免除费用 modifier） | `A016_RammedClay`、`A088_HedgeKeeper`、`A143_Stonecutter` |
-| 改良更便宜 | `actions: ['improvement'], phases: ['computeCosts']` 配合 `deriveCardCostCandidate` | `A143_Stonecutter` |
+| 任何东西更便宜、更贵或改用别的资源支付 | 支付管线（§4.14） | `A088_HedgeKeeper`、`A143_Stonecutter` |
 | 收割产量更多 | `registerHarvestCountModifier`；它不过滤归属，所以要检查卡已打出 | `E073_Scythe` |
 | 喂养所需更少 | `registerHarvestFeedingRequirementModifier`（只对已打出的卡） | `E159_OldMiser` |
 | 繁殖门槛 | `effect.computeBreedThreshold`；取最小值 | `E084_DollysMother` |
@@ -234,6 +233,87 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 - **还剩几个人、最后一个人、所有人都已放置：** 读取 `actions/guest-turns.ts` 里的 `peopleLeftToPlace()`，不能只看 `workersAvailable()`：待放置的 Guest 也是还没放置的人（`E131_MarketMaster`、`M057_Taps`）。
 - **"Place another person"：** 以 `peopleLeftToPlace() > 0` 为条件，返回一个 `place-farmer` leaf，`sourceCard` 是这张卡；卡上的人则用 `spend-worker`。放置本身会让玩家选家庭成员或待放置的 Guest（`C042_RavenousHunger`、`D103_CanalBoatman`）。没有家庭成员可用时，用 `computeAllowedPlacementSpaces` 计算约束要传 `ignoreWorkerAvailability`。
 - 测试：`guest-mixed-edition-session.test.ts`。
+
+### 4.14 费用与支付
+
+所有费用都走同一条支付管线（[payment](architecture/payment_zh.md)）。卡通过声明 modifier 或回应 `computeCosts` 来改变费用，再由管线枚举各种支付方式；卡自己从不直接扣资源。`appliesTo` 和 `costType` 的取值是 `construct`、`renovation`、`fencing`、`stables`、`plow`、`occupation`、`major-improvement` 或 `minor-improvement`。
+
+| 卡面文字 | 机制 | 范例 |
+|---|---|---|
+| 建房、翻修、围栏、建马厩或犁地时 "Pay X instead of Y"、"N of them are free" | `impl.modifiers`，`type: 'trade'`，带 `appliesTo`、`from`、`to` 和 `max`；`scope: 'unit'` 按每间房、每段围栏或每个马厩生效，`'action'` 每次行动生效一次 | `A088_HedgeKeeper`、`A016_RammedClay`、`CWM011_Contractor` |
+| "You no longer need X" | `impl.modifiers`，`type: 'remove-resource'` | `C014_StrawThatchedRoof` |
+| 房间价格取决于房屋类型，或每间房的折扣 | `actions: ['construct'], phases: ['computeCosts']` 返回 `trades`，用 `helpers/construct-cost.ts` 构造（`constructUnitPriceTrade`、`constructUnitDiscountTrade`、`constructedRoomMaterial`） | `B126_Carpenter`、`CWM027_Heiress` |
+| 翻修折扣 | `actions: ['renovate-house'], phases: ['computeCosts']` 返回 `bonuses`，用 `helpers/renovation-cost.ts` 构造（`sourcedMandatoryBonus`、`sourcedMandatoryBonusChoices`、`selectedRenovationTarget`） | `D081_RoofLadder`、`B128_Plumber` |
+| 围栏、犁地或其他行动上的固定折扣或加价 | `computeCosts` 返回 `costs` 增量，并同时返回等额的 `costAttribution`；静态门禁会拒绝只有 `costs` 没有它的写法 | `C016_FieldFences`、`C037_DwellingMound` |
+| 改良或职业更便宜，或改付别的东西 | `actions: ['improvement']` 或 `['occupation']`，`phases: ['computeCosts']`，配合 `deriveCardCostCandidate`，用 `PaymentSolver.discountCardCostCandidate` 构造 | `A143_Stonecutter`、`E060_WorkingGloves` |
+| 卡自身的费用取决于对局状态 | `impl.getBaseCosts` | `B036_Bottles` |
+| 卡面印着几种费用可选 | `meta.altCosts` | `A004_Baseboards` |
+| "You can use goods from … to pay" | 行动格上的资源：`computeCosts` 返回 `paymentResourceProviders`；卡上的资源：带 `choiceAffectsState` 的 `bonuses` 选项，再加一个订阅 `pay` 的 `after` listener 把用掉的资源移走 | `B155_ArtTeacher`、`E123_ResourceHoarder` |
+| "Each time you pay …"、"each time another player pays …" | `actions: ['pay'], phases: ['after']`；上下文里的 `costType` 表示支付目的，`helpers/event-provenance.ts` 里的 `sumActualPaidResource` / `sumResourcePaid` 读取数量 | `E122_Cottar`、`D171_SeniorTeacher` |
+| 计分时按持有的资源给分，且每个资源只能为一张卡计分 | `effect.computeCostedBonus` 返回 `{ cost, score }` 档位 | `Major_Pottery`、`CWM086_GlassblowersShop` |
+
+测试：`A123_FrameBuilder-construct-session.test.ts`、`E60_WorkingGloves-session.test.ts`、`workshop-timing-payment-session.test.ts`。
+
+### 4.15 授予一个行动
+
+卡通过返回某个规则行动的 leaf 来授予它：`plow`、`sow`、`construct`、`stables`、`fence`、`renovate-house`、`family-growth`、`bake-bread`、`improvement` 或 `occupation`。这个 leaf 只执行该行动，不会使用平时提供它的行动格（[actions：effect 与内部行动](architecture/actions_zh.md#effect-与内部行动)）。
+
+- **价格：** `exactCost: {}` 表示免费，`exactCost: { food: 1 }` 固定价格。农场类行动从 `actionContext` 读取（`C149_ResourceRecycler`、`A001_Shelter`）；`occupation` 从 `params` 读取（`C028_TeachersDesk`）。
+- **限制：** `construct` 用 `maxRooms`，`stables` 用 `max`，`improvement` 用 `types` 和 `params.allowedPurchases`（`A027_OvenSite`），`fence` 用 `fencePolicy`（`B002_MiniPasture`；[actions：围栏策略](architecture/actions_zh.md#围栏段与-policy)），不需要房间的 `family-growth` 用 `skipRoomCheck`（`B127_Seducer`）。
+- **是否算作该行动：** `actionContext.trueAction: false` 表示这个效果不算作执行了该具名行动，所以 "each time you take the X action" 的反应不会触发。卡面授予的就是具名行动本身时不要设置它（[session：Turn Scope](architecture/session_zh.md#turn-scope-与行动执行作用域)）。
+- **把人放到行动格上：** `place-farmer-on-space` 把另一个人放到固定的行动格（`CWM061_BackDoor`）；`helpers/jump-leaf.ts` 里的 `jumpLeaf` 移动一个已放置的人（`A129_Swagman`）；`recall-placed-worker` 把一个人收回（`D094_HenpeckedHusband`）。
+
+### 4.16 选择与农场选取
+
+- **多个效果选一个：** `xor` flow；给每个子节点设置 `choiceLabelKey`，让各选项的文字不同（`B026_AgrarianFences`）。
+- **一组值的菜单：** `emit-choice` leaf，`params.options: [{ value, labelKey, labelParams }]`；`requiresExplicitChoice: true` 表示只剩一个选项时也要询问。答案交给 `effect.resolveChoice(state, player, choice)`，它可以返回下一个 flow，包括再一个 `emit-choice`（`B003_Moonshine`、`CWM114_WineCloset`、`CWM045_StableDeliveryman`）。
+- **农场格子：** `selection` leaf，`actionContext: { selectionKind: 'farm-position', selectionEffect, minSelections, maxSelections, selectableTiles }`，再用 `shared/actions/helpers/selection-effect-registry.ts` 里的 `registerSelectionEffect` / `registerSelectionValidator` 定义选中后做什么、哪些选法合法（`A070_LiftingMachine`、`CWM103_Raspberries`）。测试里用 `commitSelectionChoice(i, { positions: ['row-col'] })` 作答。
+
+### 4.17 让一个行动可以执行或不能执行
+
+| 卡面文字 | 机制 | 范例 |
+|---|---|---|
+| "You can no longer use …" | `phases: ['isDoable']` 加 `globalQuery: true`，当 `context.actionId` 是该行动格时返回 `{ doable: false }` | `D050_ForeignAid`、`CWM020_FarmSchoolGraduate` |
+| "You can take action X even without …" | 订阅该行动的 `phases: ['isDoable']`，只在 `context.doable` 为 false 且卡能补上所缺的东西时返回 `{ doable: true }` | `A065_SeedPellets`、`D014_HammerCrusher` |
+| "You can use an occupied space"，以及其他额外的放置目标 | `actions: ['place-farmer'], phases: ['computeArgs']` 返回 `extraOptions`，其 value 以 `OCCUPIED_SPACE_CHOICE_PREFIX` 开头 | `A025_Bassinet`、`CWM016_Diplomat` |
+| "You can also buy … there" | 订阅 `improvement` 的 `phases: ['computeChoiceCandidates']`，返回 `extraOptions` | `C027_Blueprint` |
+
+### 4.18 读取已经发生的事
+
+| 卡需要知道 | 读取 | 范例 |
+|---|---|---|
+| 本次行动建了哪些房间或马厩 | `helpers/construction-events.ts`（`getRoomsBuiltThisAction`、`getActionRoomConstructions`、`getActionStableConstructions`） | `A093_BedMaker`、`CWM060_Attic` |
+| 本次行动建了哪些围栏、新围住哪些格子 | `helpers/fence-events.ts`（`hasOrdinaryFenceBuiltEvent`、`countNewFenceEdges`、`getActionNewlyEnclosedPastureTiles`） | `CWM026_HedgeMaster` |
+| 哪些农场格变成了已使用 | `events: ['farm.spacesUsed']` 配合 `helpers/farmyard-events.ts` 里的 `getActionNewlyUsedTiles` | `A040_PottersYard`、`CWM103_Raspberries` |
+| 本 Turn 更早时建过什么 | `helpers/action-snapshot.ts` | `A074_StableTree` |
+| 这是本轮第几个人使用该行动格 | `getSpaceUsePersonPlacementOrdinal`，以及 `helpers/round-placement.ts` 里的其他查询 | `A163_BuildingExpert` |
+| 玩家场上的卡，按类型或能力查 | `helpers/card-type.ts`（`collectCardsAs`、`playerHasCardCapability`）；触发时冻结的数量用 `helpers/trigger-snapshot.ts` | `B133_VillagePeasant`、`B049_Scales` |
+| 某个行动格是不是 Lessons 格 | `helpers/lessons-spaces.ts` 里的 `isLessonsSpaceId` | `D171_SeniorTeacher` |
+| 卡自己的计数器、flag 和数据 | `helpers/card-state.ts`（`readCardExtraData`、`isCardFlagged`） | `D122_ClayCarrier` |
+| 已使用和未使用的农场格 | `shared/domain/farmyard-usage.ts` 里的 `getUsedFarmyardTileKeys`；卡从不自己数格子 | `B038_FutureBuildingSite`、`CWM103_Raspberries` |
+| 玩家能否安置自己的动物 | `shared/domain/animal-zones.ts` 里的 `canAccommodateAllAnimals` 和 `computeAnimalZones` | `D036_BreedRegistry` |
+| 本次行动或整个事务的事件，以及是谁触发了反应 | `context.actionEvents`、`context.transactionEvents`、`context.eventQuery`；`context.triggerPlayer ?? context.player` | `D171_SeniorTeacher`、`A132_Publican` |
+
+### 4.19 较少用到的 seam
+
+| 卡需要 | Seam | 范例 |
+|---|---|---|
+| 本轮多一个回合或多一个人 | `effect.contributeExtraTurn`，排在玩家自己的人之前时加 `extraTurnBeforeWorkers`；安排在之后某一轮的用 `timedRules` | `E093_Motivator`、`A022_Telegram` |
+| 一个 Guest | `helpers/guest-flow.ts` 里的 `grantGuestLeaf` / `grantImmediateGuestLeaf` | `CZ314_Keg`、`CI073_Guest` |
+| 多个玩家都可能得到的分数 | `effect.computeSharedPostScore` 返回 `{ playerId, score }` 条目 | `A135_AnimalReeve`、`CWM087_GoldMedal` |
+| 限制卡上的区域能留哪些动物 | `effect.getInvalidAnimals` | `B011_Feedyard` |
+| 在其他格子播种，或播种数量不同 | `effect.onComputeSowableFields` 配合 `onSowExtraField`；`effect.modifySowAmount` | `B072_LoveforAgriculture`、`E071_CowPatty` |
+| 玩家可能想留到收获再用的资源 | `effect.preHarvestGoodsWanted` | `A061_WinnowingFan` |
+| 由共享规则汇总的只读事实，例如预留的棋子或分数调整 | `effect.getRuleContributions` | `E159_OldMiser`、`CWM021_FenceDealer` |
+| 改写由卡自己的行动发起的请求 | `effect.projectInteractionRequest` | `C127_Lover` |
+| 卡上的一摞资源 | `push-to-card-stack` / `pop-card-stack` leaf，配合 `presentation: { stack: true }` | `CWM022_FoodConnoisseur` |
+| 把资源放回行动格 | `helpers/pay-gain-node.ts` 里的 `returnToSpaceThenGainFlow` | `A164_WoodWorker` |
+| 退回一个已建的马厩 | `helpers/stable-removal.ts` | `CWM069_ChangingPlans` |
+| 卡改变了动物可以待的地方之后重新安置动物 | `reorganize` leaf | `CWM074_Donkey`、`E083_ShepherdsWhistle` |
+| 一张烹饪类改良 | `meta.isCookery: true` 加 `exchanges` | `A060_OrientalFireplace` |
+| 卡上或农场上的公开标记 | `presentation`；需要计算的标记用 `effect.getStatePresentation` | `CWM050_TapestryWeaver` |
+| 显示在卡上的文字 | `set-infobox` 的 `special-effect` leaf | `A173_ClayThief` |
+| 卡自己的状态变化，而没有标准 leaf 能表达 | `shared/actions/helpers/ad-hoc-action-registry.ts` 里的 `registerAdHocAction`，id 以 `card_` 开头；资源仍然通过标准 leaf 移动（Card contract） | `A040_PottersYard` |
 
 ## 5. Session 测试
 
