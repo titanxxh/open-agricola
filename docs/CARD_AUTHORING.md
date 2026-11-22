@@ -311,7 +311,7 @@ A card grants a rule action by returning that action's leaf: `plow`, `sow`, `con
 | A cooking improvement | `meta.isCookery: true` with `exchanges` | `A060_OrientalFireplace` |
 | Public markers on the card or the farm | `presentation`, or `effect.getStatePresentation` for computed markers | `CWM050_TapestryWeaver` |
 | Text shown on the card | a `set-infobox` `special-effect` leaf | `A173_ClayThief` |
-| A state change of the card's own that no standard leaf expresses | `registerAdHocAction` in `shared/actions/helpers/ad-hoc-action-registry.ts`, with an id that starts with `card_`; goods still move through the standard leaves (Card contract) | `A040_PottersYard` |
+| A state change of the card's own that no standard leaf expresses | a card-private action: `registerAdHocAction` in `shared/actions/helpers/ad-hoc-action-registry.ts`, with an id that starts with `card_`; goods still move through the standard leaves ([actions: effects and internal actions](architecture/actions.md#effects-and-internal-actions)) | `A040_PottersYard`, `E073_Scythe` |
 
 ## 5. Session tests
 

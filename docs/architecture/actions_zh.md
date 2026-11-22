@@ -65,6 +65,7 @@ type ActionDefinition = {
 - `shared/actions/index.ts` 只导入顶层基础 effect 和 `effects/internal/` 来构造 `actionDefinitionLookup`。`scripts/check-effects-file-list.ts` 是顶层 effect 文件的唯一白名单，`shared/actions/effects/__tests__/architecture-guard.test.ts` 复用它。
 - 每个行动一个文件。effect 文件不堆叠多卡逻辑：宿主行动子步骤用 `internalChildren`，内部 effect 放 `effects/internal/`，纯 helper 放 `shared/actions/helpers/`。
 - listener 需要的状态修改若没有现成 leaf，就新增可复用的内部行动，不在 handler 里直接改（[Listener 纯度](hooks_zh.md#listener-纯度)）。
+- **卡牌私有行动。** 卡需要的状态修改若没有标准 leaf 能表达，就用 `registerAdHocAction()`（`helpers/ad-hoc-action-registry.ts`）注册自己的 `ActionDefinition`，并返回带该 id 的 leaf。id 以 `card_` 开头并带上卡牌 ID；前缀不对或 id 重复都会抛错。`getActionDefinition()` 在内置查找之后回退到这个注册表，每个 `GameCore` 也会把所有卡牌私有行动注册进自己的 `ActionRegistry`。行动体和任何 leaf 一样运行在实时状态上：写卡自己的状态、通过农场操作修改农场、调整人或占位、发起一个请求，或返回由标准 leaf 组成的 flow。资源进出玩家供应和行动格仍然走下面的标准 leaf，因为资源 listener 和统计订阅的是它们。第二张卡需要同样的修改时，把它提升为 `effects/internal/` 下的内部行动（[cards](cards_zh.md#命名能力与边界)）。
 
 通用内部行动及其契约：
 
