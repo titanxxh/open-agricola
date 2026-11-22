@@ -1456,26 +1456,6 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
-    "id": "CWM084_FriendlyPastures",
-    "name": "Friendly Pastures",
-    "deck": "CWM",
-    "number": 84,
-    "desc": [
-      "Each of your pastures containing a <STABLE> may hold different animal types together. Its total capacity is unchanged."
-    ],
-    "cost": {
-      "wood": 2
-    },
-    "vp": 1,
-    "prerequisite": "",
-    "players": "1+",
-    "passing": false,
-    "extraVp": false,
-    "implemented": true,
-    "artUrl": "/assets/classic/CWM/CWM084.png",
-    "kind": "minor"
-  },
-  {
     "id": "CWM085_Fruitcake",
     "name": "Fruitcake",
     "deck": "CWM",

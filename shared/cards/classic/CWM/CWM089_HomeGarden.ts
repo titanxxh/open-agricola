@@ -2,6 +2,7 @@ import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 import { futureMeeplesNode } from '../../../actions/effects/internal/future-meeples'
 import { createEventQuery } from '../../../events/query'
+import { readTurnScopeToken } from '../../helpers/turn-token'
 import type { GameState, PlayerState } from '../../../contract/types'
 
 const CARD_ID = 'CWM089_HomeGarden'
@@ -17,15 +18,18 @@ const schedule = (state: GameState, player: PlayerState) => ({
   }),
   sourceCard: CARD_ID,
 })
+/** A renovation since the player's latest own placement, i.e. earlier in the current Turn. */
+const renovatedThisTurn = (state: GameState, player: PlayerState) => {
+  if (readTurnScopeToken(player) === undefined) return false
+  const events = state.events
+  let start = events.length - 1
+  while (start >= 0 && !(events[start]!.type === 'worker.placed' && events[start]!.actorPlayerId === player.id)) start--
+  return start >= 0 && events.slice(start + 1).some((e) => e.type === 'farm.renovated' && e.playerId === player.id)
+}
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBuy: (state, player) =>
-      createEventQuery(state.events)
-        .filter('farm.renovated')
-        .some((e) => e.playerId === player.id && e.round === state.round)
-        ? schedule(state, player)
-        : undefined,
+    onBuy: (state, player) => (renovatedThisTurn(state, player) ? schedule(state, player) : undefined),
   },
   listeners: [
     {

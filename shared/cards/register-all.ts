@@ -618,7 +618,6 @@ import { CWM079_FestivalHall } from './classic/CWM/CWM079_FestivalHall'
 import { CWM080_FishHook } from './classic/CWM/CWM080_FishHook'
 import { CWM082_FlowerPots } from './classic/CWM/CWM082_FlowerPots'
 import { CWM083_FreeRangeChickens } from './classic/CWM/CWM083_FreeRangeChickens'
-import { CWM084_FriendlyPastures } from './classic/CWM/CWM084_FriendlyPastures'
 import { CWM085_Fruitcake } from './classic/CWM/CWM085_Fruitcake'
 import { CWM086_GlassblowersShop } from './classic/CWM/CWM086_GlassblowersShop'
 import { CWM087_GoldMedal } from './classic/CWM/CWM087_GoldMedal'
@@ -1736,7 +1735,6 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM080_FishHook': CWM080_FishHook.impl,
   'CWM082_FlowerPots': CWM082_FlowerPots.impl,
   'CWM083_FreeRangeChickens': CWM083_FreeRangeChickens.impl,
-  'CWM084_FriendlyPastures': CWM084_FriendlyPastures.impl,
   'CWM085_Fruitcake': CWM085_Fruitcake.impl,
   'CWM086_GlassblowersShop': CWM086_GlassblowersShop.impl,
   'CWM087_GoldMedal': CWM087_GoldMedal.impl,

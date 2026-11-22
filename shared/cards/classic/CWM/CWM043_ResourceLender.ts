@@ -82,7 +82,7 @@ const cardImpl = {
     {
       id: CARD_ID + '-lend',
       cardIds: [CARD_ID],
-      actions: ['collect', 'receive', 'exchange'],
+      actions: ['collect', 'gain', 'receive', 'exchange'],
       phases: ['after'],
       handler: (context) => {
         if (context.state.round >= 14) return

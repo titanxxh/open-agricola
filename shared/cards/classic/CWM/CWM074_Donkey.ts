@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 import { readCardExtraData, writeCardExtraData } from '../../helpers/card-state'
+import { positionKey } from '../../../domain/farm'
 
 const CARD_ID = 'CWM074_Donkey'
 
@@ -22,13 +23,15 @@ const cardImpl = {
       },
     }),
     resolveChoice: (_state, player, choice) => {
-      if (!player.pastures.some((p) => p.id === choice)) return
-      writeCardExtraData(player, CARD_ID, 'pasture', choice)
+      const chosen = player.pastures.find((p) => p.id === choice)
+      if (!chosen?.tiles[0]) return
+      // Pasture IDs are renumbered when fences change; a fenced tile stays in one pasture.
+      writeCardExtraData(player, CARD_ID, 'pastureTile', positionKey(chosen.tiles[0]))
       return { type: 'leaf', actionId: 'reorganize', sourceCard: CARD_ID }
     },
     onComputeAnimalZones: (player, zones) => {
-      const pastureId = readCardExtraData(player, CARD_ID, 'pasture')
-      const pasture = player.pastures.find((p) => p.id === pastureId)
+      const tile = readCardExtraData<string>(player, CARD_ID, 'pastureTile')
+      const pasture = player.pastures.find((p) => p.tiles.some((t) => positionKey(t) === tile))
       if (!pasture) return
       for (const zone of zones)
         if (zone.zoneType === 'pasture' && zone.pastureIndex === player.pastures.indexOf(pasture))
