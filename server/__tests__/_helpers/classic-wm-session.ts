@@ -23,10 +23,12 @@ import { CWM013_Cowboy } from '../../../shared/cards/classic/CWM/CWM013_Cowboy'
 import { CWM015_DebrisDealer } from '../../../shared/cards/classic/CWM/CWM015_DebrisDealer'
 import { CWM016_Diplomat } from '../../../shared/cards/classic/CWM/CWM016_Diplomat'
 import { CWM019_FamilyPlanner } from '../../../shared/cards/classic/CWM/CWM019_FamilyPlanner'
+import { CWM020_FarmSchoolGraduate } from '../../../shared/cards/classic/CWM/CWM020_FarmSchoolGraduate'
 import { CWM021_FenceDealer } from '../../../shared/cards/classic/CWM/CWM021_FenceDealer'
 import { CWM022_FoodConnoisseur } from '../../../shared/cards/classic/CWM/CWM022_FoodConnoisseur'
 import { CWM023_ForestFarmer } from '../../../shared/cards/classic/CWM/CWM023_ForestFarmer'
 import { CWM024_GemHunter } from '../../../shared/cards/classic/CWM/CWM024_GemHunter'
+import { CWM025_Godfather } from '../../../shared/cards/classic/CWM/CWM025_Godfather'
 import { CWM026_HedgeMaster } from '../../../shared/cards/classic/CWM/CWM026_HedgeMaster'
 import { CWM027_Heiress } from '../../../shared/cards/classic/CWM/CWM027_Heiress'
 import { CWM028_Herdsman } from '../../../shared/cards/classic/CWM/CWM028_Herdsman'
@@ -48,6 +50,7 @@ import { CWM045_StableDeliveryman } from '../../../shared/cards/classic/CWM/CWM0
 import { CWM046_StoneCurator } from '../../../shared/cards/classic/CWM/CWM046_StoneCurator'
 import { CWM047_StorehouseMinder } from '../../../shared/cards/classic/CWM/CWM047_StorehouseMinder'
 import { CWM049_SunriseAdmirer } from '../../../shared/cards/classic/CWM/CWM049_SunriseAdmirer'
+import { CWM050_TapestryWeaver } from '../../../shared/cards/classic/CWM/CWM050_TapestryWeaver'
 import { CWM051_TavernKeeper } from '../../../shared/cards/classic/CWM/CWM051_TavernKeeper'
 import { CWM052_TileMaker } from '../../../shared/cards/classic/CWM/CWM052_TileMaker'
 import { CWM053_VillageFool } from '../../../shared/cards/classic/CWM/CWM053_VillageFool'
@@ -56,20 +59,25 @@ import { CWM055_WoodWorker } from '../../../shared/cards/classic/CWM/CWM055_Wood
 import { CWM056_Almshouse } from '../../../shared/cards/classic/CWM/CWM056_Almshouse'
 import { CWM058_AppleTree } from '../../../shared/cards/classic/CWM/CWM058_AppleTree'
 import { CWM059_Apprenticeship } from '../../../shared/cards/classic/CWM/CWM059_Apprenticeship'
+import { CWM060_Attic } from '../../../shared/cards/classic/CWM/CWM060_Attic'
 import { CWM061_BackDoor } from '../../../shared/cards/classic/CWM/CWM061_BackDoor'
 import { CWM063_Birdcage } from '../../../shared/cards/classic/CWM/CWM063_Birdcage'
+import { CWM064_Bonre } from '../../../shared/cards/classic/CWM/CWM064_Bonre'
 import { CWM065_BoundaryStones } from '../../../shared/cards/classic/CWM/CWM065_BoundaryStones'
 import { CWM066_Brazier } from '../../../shared/cards/classic/CWM/CWM066_Brazier'
 import { CWM067_BuriedTreasure } from '../../../shared/cards/classic/CWM/CWM067_BuriedTreasure'
 import { CWM069_ChangingPlans } from '../../../shared/cards/classic/CWM/CWM069_ChangingPlans'
 import { CWM070_ClockworkMan } from '../../../shared/cards/classic/CWM/CWM070_ClockworkMan'
+import { CWM071_Cookies } from '../../../shared/cards/classic/CWM/CWM071_Cookies'
 import { CWM072_Crib } from '../../../shared/cards/classic/CWM/CWM072_Crib'
 import { CWM073_DiamondMine } from '../../../shared/cards/classic/CWM/CWM073_DiamondMine'
 import { CWM074_Donkey } from '../../../shared/cards/classic/CWM/CWM074_Donkey'
 import { CWM076_DrainedPond } from '../../../shared/cards/classic/CWM/CWM076_DrainedPond'
 import { CWM078_FarmSchool } from '../../../shared/cards/classic/CWM/CWM078_FarmSchool'
 import { CWM079_FestivalHall } from '../../../shared/cards/classic/CWM/CWM079_FestivalHall'
+import { CWM080_FishHook } from '../../../shared/cards/classic/CWM/CWM080_FishHook'
 import { CWM082_FlowerPots } from '../../../shared/cards/classic/CWM/CWM082_FlowerPots'
+import { CWM083_FreeRangeChickens } from '../../../shared/cards/classic/CWM/CWM083_FreeRangeChickens'
 import { CWM084_FriendlyPastures } from '../../../shared/cards/classic/CWM/CWM084_FriendlyPastures'
 import { CWM085_Fruitcake } from '../../../shared/cards/classic/CWM/CWM085_Fruitcake'
 import { CWM086_GlassblowersShop } from '../../../shared/cards/classic/CWM/CWM086_GlassblowersShop'
@@ -109,10 +117,12 @@ const sources: CardSource[] = [
   CWM015_DebrisDealer,
   CWM016_Diplomat,
   CWM019_FamilyPlanner,
+  CWM020_FarmSchoolGraduate,
   CWM021_FenceDealer,
   CWM022_FoodConnoisseur,
   CWM023_ForestFarmer,
   CWM024_GemHunter,
+  CWM025_Godfather,
   CWM026_HedgeMaster,
   CWM027_Heiress,
   CWM028_Herdsman,
@@ -134,6 +144,7 @@ const sources: CardSource[] = [
   CWM046_StoneCurator,
   CWM047_StorehouseMinder,
   CWM049_SunriseAdmirer,
+  CWM050_TapestryWeaver,
   CWM051_TavernKeeper,
   CWM052_TileMaker,
   CWM053_VillageFool,
@@ -142,20 +153,25 @@ const sources: CardSource[] = [
   CWM056_Almshouse,
   CWM058_AppleTree,
   CWM059_Apprenticeship,
+  CWM060_Attic,
   CWM061_BackDoor,
   CWM063_Birdcage,
+  CWM064_Bonre,
   CWM065_BoundaryStones,
   CWM066_Brazier,
   CWM067_BuriedTreasure,
   CWM069_ChangingPlans,
   CWM070_ClockworkMan,
+  CWM071_Cookies,
   CWM072_Crib,
   CWM073_DiamondMine,
   CWM074_Donkey,
   CWM076_DrainedPond,
   CWM078_FarmSchool,
   CWM079_FestivalHall,
+  CWM080_FishHook,
   CWM082_FlowerPots,
+  CWM083_FreeRangeChickens,
   CWM084_FriendlyPastures,
   CWM085_Fruitcake,
   CWM086_GlassblowersShop,
