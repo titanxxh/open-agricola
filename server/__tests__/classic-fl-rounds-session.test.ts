@@ -5,7 +5,8 @@ import { getClassicCardKind } from '../../shared/cards/classic-catalog'
 import { flCard, flSession, chooseBranch } from './_helpers/classic-fl'
 import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { bonusScore } from './_helpers/card-play-lifecycle'
+import { bonusScore, choose, restoreSession } from './_helpers/card-play-lifecycle'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
@@ -121,6 +122,72 @@ describe('FL: real round and harvest pipelines', () => {
     const response = finish(session)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 2, food: 17 })
     expect(response.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(1)
+  })
+
+  it.each([true, false])('Bird Trap: the harvest receipt and Labourer include the optional crop when accepted=%s', (accept) => {
+    const birdTrap = flCard(29).id
+    const labourer = 'C120_AgriculturalLabourer'
+    let session = createWorkSession({
+      seed: 6100,
+      options: { playerCount: 2 },
+      configure: (state) => {
+        state.round = 4
+        const [owner, opponent] = state.players
+        setWorkersAtHome(state, owner!, 0)
+        setWorkersAtHome(state, opponent!, 0)
+        owner!.minorPlayed = [birdTrap]
+        owner!.occupationPlayed = [labourer]
+        owner!.cardStates[labourer] = { counters: { clay: 3 } }
+        owner!.fields = [
+          { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+          { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 2 }] },
+        ]
+        Object.assign(owner!.resources, { clay: 0, food: 20, grain: 0, vegetable: 0 })
+        Object.assign(opponent!.resources, { food: 0, grain: 1 })
+      },
+    })
+    sessions.push(session)
+
+    const offered = session.performRoundEnd()
+    expect(offered.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0 })
+    expect(offered.state.players[0]!.resources).toMatchObject({ clay: 0, food: 21, grain: 0 })
+    expect(offered.state.players[0]!.stats.harvestedGrain).toBe(0)
+
+    let feeding
+    if (accept) {
+      const selecting = chooseBranch(session, offered)
+      expect(selecting.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'choice' } })
+      session = restoreSession(session)
+      sessions.push(session)
+      feeding = choose(session, session.getState(), 'farmyard:0:1')
+    } else {
+      feeding = choose(session, offered, '__skip__')
+    }
+
+    expect(feeding.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'feed' } })
+    const owner = feeding.state.players[0]!
+    const amount = accept ? 2 : 1
+    expect(owner.resources).toMatchObject({ clay: amount, food: 17, grain: amount, vegetable: 1 })
+    expect(owner.stats.harvestedGrain).toBe(amount)
+    expect(owner.cardStates[labourer]?.counters?.clay).toBe(3 - amount)
+    expect(owner.cardStates[birdTrap]?.extraData?.selectedHarvestField).toBeUndefined()
+    expect(feeding.state.harvestReapSummary?.[owner.id]).toMatchObject({
+      resources: { grain: amount, vegetable: 1 },
+      grainFields: 1,
+      harvestedCrops: [
+        { row: 0, col: 1, crop: 'grain', amount, sources: accept ? ['base', birdTrap] : ['base'] },
+        { row: 0, col: 2, crop: 'vegetable', amount: 1, sources: ['base'] },
+      ],
+    })
+    expect(feeding.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: labourer, gain: { clay: amount } }),
+    }))
+    expect(feeding.state.players[1]!.stats.harvestedGrain).toBe(0)
+
+    const finished = autoAdvanceRoundEnd(session, { initialResponse: feeding })
+    expect(finished.interaction.stateId).toBe('idle')
+    expect(finished.state.round).toBe(5)
   })
 
   it.each([3, 6])('Old Master: %i forest wood determines the round-three reward', (forest) => {

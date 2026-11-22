@@ -1,7 +1,11 @@
+import { familyGrowthAction } from '../../../actions/effects/family-growth'
+import { improvementAction } from '../../../actions/effects/improvement'
 import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 
 const CARD_ID = 'CFL024_LoversTryst'
+const PURCHASE_PARAMS = { types: ['minor'], allowedPurchases: [CARD_ID] }
+const PURCHASE_CONTEXT = { purchaseActionCardId: 'meeting-place' }
 
 const cardImpl = {
   listeners: [
@@ -15,7 +19,14 @@ const cardImpl = {
         if (
           !context.player.minorHand.includes(CARD_ID) ||
           context.state.players.length < 2 ||
-          context.actionContext?.checkedReplaceAction === true
+          context.actionContext?.checkedReplaceAction === true ||
+          !familyGrowthAction.canBeExecutedByPlayer(context.state, context.player) ||
+          !improvementAction.canBeExecutedByPlayer(context.state, context.player, {
+            sourceCard: CARD_ID,
+            params: PURCHASE_PARAMS,
+            actionContext: PURCHASE_CONTEXT,
+            actionHooks: context.actionHooks,
+          })
         )
           return
         return {
@@ -29,8 +40,8 @@ const cardImpl = {
                 type: 'leaf',
                 actionId: 'improvement',
                 sourceCard: CARD_ID,
-                params: { types: ['minor'], allowedPurchases: [CARD_ID] },
-                actionContext: { purchaseActionCardId: 'meeting-place' },
+                params: PURCHASE_PARAMS,
+                actionContext: PURCHASE_CONTEXT,
               },
               { type: 'leaf', actionId: 'family-growth', sourceCard: CARD_ID },
             ],
