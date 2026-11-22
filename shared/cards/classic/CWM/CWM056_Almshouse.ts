@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../../card-source'
 import type { GameState, PlayerState } from '../../../contract/types'
 import type { CardImpl } from '../../registry'
-import { payLeaf } from '../../helpers/pay-gain-node'
+import { payGainFlow } from '../../helpers/pay-gain-node'
 
 const CARD_ID = 'CWM056_Almshouse'
 
@@ -19,7 +19,7 @@ const cardImpl = {
     id: CARD_ID,
     onEndHarvestFeedingPhase: (state, player) =>
       player.resources.begging > 0 && feedingBeggingRemaining(state, player) > 0
-        ? payLeaf({ cardId: CARD_ID, cost: { begging: 1 } })
+        ? payGainFlow({ cardId: CARD_ID, cost: { begging: 1 } })
         : undefined,
   },
 } satisfies CardImpl
