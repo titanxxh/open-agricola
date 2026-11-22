@@ -8,7 +8,7 @@
 
 | Task | Read |
 |---|---|
-| Implement or change one card, or decide whether it needs a shared mechanism | [Card authoring guide](CARD_AUTHORING.md): card-text patterns mapped to mechanisms, example cards and example Session tests, plus the feasibility rule. Then [CARD_TEST_TEMPLATE](CARD_TEST_TEMPLATE.md) for the test. |
+| Implement or change one card, or decide whether it needs a shared mechanism | [Card authoring guide](CARD_AUTHORING.md): the Card contract every card keeps, card-text patterns mapped to mechanisms, example cards and example Session tests, plus the feasibility rule. Then [CARD_TEST_TEMPLATE](CARD_TEST_TEMPLATE.md) for the test. |
 | Change a shared mechanism: engine, session, actions, hooks, payment, protocol | The module document below, then the ADRs it links. |
 
 ## Module map
