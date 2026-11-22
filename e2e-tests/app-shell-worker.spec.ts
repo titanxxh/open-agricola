@@ -183,21 +183,17 @@ function chinesePacks() {
 const gameChunk = (paths: readonly string[]) => paths.some(path => /^\/assets\/GameContainerApi-[\w-]+\.js$/.test(path))
 const cardsManifest = (paths: readonly string[]) => paths.some(path => /^\/cards-manifest\.[a-f0-9]{64}\.json$/.test(path))
 
-test('a room link fetches card data and the game screen as soon as the core pack is in @webkit', async ({ page }) => {
+test('a room link starts card data and the game screen at startup, beside the core pack @webkit', async ({ page }) => {
   const packs = chinesePacks()
   coreHeld = new Promise(resolve => { releaseCore = resolve })
   await page.addInitScript(() => { localStorage.setItem('open-agricola-locale-v2', 'zh') })
   await page.goto(`${site.origin}/?context=00000000-0000-4000-8000-000000000000&bg=none`, documentLoad)
-  await expect.poll(() => requests).toContain(packs.core)
-  await page.waitForTimeout(1_000)
-  // Nothing competes with the core pack the first screen waits for.
-  expect(requests).not.toContain(packs.cards)
-  expect(cardsManifest(requests)).toBe(false)
-  expect(gameChunk(requests)).toBe(false)
-
+  // The board needs all of these, so they download while the core pack is still on its way.
+  await expect.poll(() => [requests.includes(packs.core), requests.includes(packs.cards), cardsManifest(requests), gameChunk(requests)])
+    .toEqual([true, true, true, true])
+  await expect(page.locator('#initial-load')).toHaveCount(1)
   releaseCore?.()
-  // Card text, card metadata and the game chunk start together instead of one after another behind the app.
-  await expect.poll(() => [requests.includes(packs.cards), cardsManifest(requests), gameChunk(requests)]).toEqual([true, true, true])
+  await expect(page.locator('#initial-load')).toHaveCount(0)
 })
 
 test('the lobby downloads card text only after its first screen is up @webkit', async ({ page }) => {

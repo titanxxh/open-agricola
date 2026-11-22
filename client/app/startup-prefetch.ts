@@ -11,8 +11,9 @@ const CARD_PAGES: ReadonlySet<PlatformPage> = new Set(['game', 'workshop', 'ency
 export const showsCards = (page: PlatformPage): boolean => CARD_PAGES.has(page)
 
 /**
- * A screen that shows cards waits for card text, card metadata and its own chunk. Starting them together once the
- * Core Language Pack is in keeps them off the first render's bandwidth without leaving them to start one after another.
+ * A screen that shows cards waits for card text, card metadata and its own chunk, so they start at startup beside the
+ * Core Language Pack. On a slow link the total bytes decide that wait, and holding them back until the core pack is in
+ * only leaves the link half used while it downloads (measured on a room link: about 5 s slower).
  * Each loader keeps its own pending request, so the screen reuses these downloads; a failure is retried by the screen.
  */
 export function prefetchCardScreen(page: PlatformPage, loaders: StartupLoaders): void {

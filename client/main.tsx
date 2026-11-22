@@ -30,7 +30,7 @@ void startApplication(container, async () => {
   const core = loadLanguagePack(locale)
   const cardText = () => loadCardTextPack(locale)
   if (showsCards(page)) {
-    void core.then(() => prefetchCardScreen(page, {
+    prefetchCardScreen(page, {
       cardText,
       cardsManifest: () => import('./services/card-meta').then(module => module.loadCardsManifest()),
       screen: {
@@ -40,7 +40,7 @@ void startApplication(container, async () => {
           import('./services/card-encyclopedia').then(module => module.loadCardEncyclopedia()),
         ]),
       },
-    }), () => {})
+    })
   }
   const [{ default: App }] = await Promise.all([app, core])
   createRoot(container).render(<StrictMode><App /></StrictMode>)
