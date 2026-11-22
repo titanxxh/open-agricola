@@ -17,6 +17,7 @@ registerSelectionEffect(SELECT, ({ player, positions }) => {
       type: 'leaf',
       actionId: 'plow',
       sourceCard: CARD_ID,
+      optional: true,
     })),
   }
 })

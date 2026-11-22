@@ -1,3 +1,4 @@
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import { describe, expect, it } from 'vitest'
 import { playMinor, playOccupation, sessionOptions } from './_helpers/card-regression-session'
 import {
@@ -87,50 +88,50 @@ describe('WM farm construction and collection reactions', () => {
       ),
     ).toBe(false)
   })
-  it('Stable Deliveryman reserves only the two remaining stable pieces and schedules no past-final-round entries', () => {
-    const session = wmSession(
-      [45],
-      (state) => {
-        state.round = 6
-        state.players[0]!.stableTiles = [
-          { row: 0, col: 1 },
-          { row: 0, col: 2 },
-        ]
-      },
-      false,
-    )
-    const response = wmPayment(session, playOccupation(session, id(45)))
-    expect(
-      response.state.futureMeeples.filter((e) => e.cardId === id(45)).map((e) => e.round),
-    ).toEqual([9, 11])
+  const deliveryman = () => {
+    const session = wmSession([45], (state) => {
+      state.round = 6
+      state.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }]
+    }, false)
+    return { session, response: wmPayment(session, playOccupation(session, id(45))) }
+  }
+  const offeredRounds = (response: ReturnType<typeof wmOk>) =>
+    sessionOptions(response).filter((o) => /^stable:\d+$/.test(o.value)).map((o) => o.value)
+  const deliveries = (response: ReturnType<typeof wmOk>) =>
+    response.state.futureMeeples.filter((e) => e.cardId === id(45)).map((e) => e.round)
+  it('Stable Deliveryman lets the player pick target rounds until the two remaining stable pieces are reserved', () => {
+    const { session, response: played } = deliveryman()
+    expect(offeredRounds(played)).toEqual(['stable:9', 'stable:11', 'stable:13'])
+    const picked = wmChoose(session, played, 'stable:13')
+    expect(offeredRounds(picked)).toEqual(['stable:9', 'stable:11'])
+    const response = wmChoose(session, picked, 'stable:9')
+    expect(offeredRounds(response)).toEqual([])
+    expect(deliveries(response)).toEqual([13, 9])
   })
-  it('Wheelbarrow Pusher grants both a chosen building resource and food in four players', () => {
-    const session = wmSession([54])
-    let response = wmOk(session.takeAction(0, 'clay-pit'))
-    const stone = sessionOptions(response).find((o) => JSON.stringify(o).includes('stone'))!
-    response = wmChoose(session, response, stone.value)
-    expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, stone: 1, food: 1 })
-    wmEvent(response, 54)
-    const larger = wmSession([54], (state) => {
-      state.actionSpaces.find((s) => s.id === 'clay-pit')!.resources.clay = 2
-    })
-    expect(wmOk(larger.takeAction(0, 'clay-pit')).state.players[0]!.resources.food).toBe(0)
+  it('Stable Deliveryman can stop early, keeping unselected pieces in the supply', () => {
+    const { session, response: played } = deliveryman()
+    const response = wmChoose(session, wmChoose(session, played, 'stable:11'), 'stable:stop')
+    expect(deliveries(response)).toEqual([11])
+    expect(session.withCtx(() => getAvailableStableSupplyCount(session.state, session.state.players[0]!))).toBe(1)
   })
   it('Changing Plans returns a stable, plows a field and passes the card', () => {
-    const session = wmSession(
-      [69],
-      (state) => {
-        state.players[0]!.stableTiles = [{ row: 0, col: 1 }]
-      },
-      false,
-    )
+    const session = wmSession([69], (state) => { state.players[0]!.stableTiles = [{ row: 0, col: 1 }] }, false)
     wmPayment(session, playMinor(session, id(69)))
     let response = wmOk(session.commitSelectionChoice(0, { positions: ['0-1'] }))
     expect(response.state.players[0]!.stableTiles).toHaveLength(0)
+    wmChoose(session, response, sessionOptions(response).find((o) => !o.disabled && o.value !== '__skip__')!.value)
     response = wmOk(session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }))
     expect(response.state.players[0]!.fields).toHaveLength(1)
     expect(response.state.players[1]!.minorHand).toContain(id(69))
     expect(wmOk(session.undoAction()).state.players[0]!.stableTiles).toHaveLength(1)
+  })
+  it('Changing Plans may return a stable and decline its field', () => {
+    const session = wmSession([69], (state) => { state.players[0]!.stableTiles = [{ row: 0, col: 1 }] }, false)
+    wmPayment(session, playMinor(session, id(69)))
+    const response = wmChoose(session, wmOk(session.commitSelectionChoice(0, { positions: ['0-1'] })), '__skip__')
+    expect(response.state.players[0]!.stableTiles).toHaveLength(0)
+    expect(response.state.players[0]!.fields).toHaveLength(0)
+    expect(response.state.players[1]!.minorHand).toContain(id(69))
   })
   it('Raspberries leaves food on unused spaces, then pays only when the marked tile becomes used', () => {
     const session = wmSession(

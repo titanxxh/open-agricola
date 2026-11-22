@@ -1,34 +1,9 @@
 import { defineOccupationCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 import { returnToSpaceThenGainFlow } from '../../helpers/pay-gain-node'
-import { registerAdHocAction } from '../../../actions/helpers/ad-hoc-action-registry'
 
 const CARD_ID = 'CWM055_WoodWorker'
 
-const TAKE = 'card_' + CARD_ID + '_take_food'
-registerAdHocAction({
-  id: TAKE,
-  nameKey: 'actions.collect.name',
-  descriptionKey: 'actions.collect.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, actionContext, eventSink }) => {
-    const space = state.actionSpaces.find((s) => s.id === actionContext?.targetSpaceId)
-    const food = space?.resources.food ?? 0
-    if (!space || food <= 0) return { type: 'ok' }
-    space.resources.food = 0
-    player.resources.food += food
-    eventSink?.emit<'resource.moved'>({
-      type: 'resource.moved',
-      resources: { food },
-      from: { kind: 'actionSpace', spaceId: space.id },
-      to: { kind: 'player', playerId: player.id },
-      reason: 'collect',
-    })
-    return { type: 'ok', resourcesGained: { food } }
-  },
-})
 const cardImpl = {
   listeners: [
     {
@@ -55,10 +30,11 @@ const cardImpl = {
               sourceCard: CARD_ID,
               flow: {
                 type: 'leaf',
-                actionId: TAKE,
+                // A standard collect, so acquisition reactions see food taken from this space.
+                actionId: 'collect',
                 sourceCard: CARD_ID,
                 targetPlayerId: player.id,
-                actionContext: { targetSpaceId: space.id },
+                actionContext: { spaceId: space.id, resourceTypes: ['food'] },
               },
             },
     },

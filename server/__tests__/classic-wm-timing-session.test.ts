@@ -4,7 +4,7 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { GameState } from '../../shared/contract/types'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { playMinor, playOccupation, sessionOptions } from './_helpers/card-regression-session'
-import { wmChoose, wmId as id, wmOk, wmPayment, wmSession } from './_helpers/classic-wm-session'
+import { wmAction, wmChoose, wmEndRound, wmId as id, wmOk, wmPayment, wmSession } from './_helpers/classic-wm-session'
 
 // Plan: new four-player work games with explicit hands and zero resources.
 // Each case pins a timing or identity rule: which receipt or Turn a card reads,
@@ -56,7 +56,14 @@ const homeGarden = () =>
   }, false)
 const scheduled = (r: SessionResponse) => r.state.futureMeeples.filter((m) => m.cardId === id(89)).map((m) => m.round)
 
-describe('WM timing and identity rules in four-player sessions', () => {
+const remodeler = (clay: number) => wmSession([42], (state) => {
+  state.roundActionOrder[0] = 'house-redevelopment'
+  state.players[0]!.stableTiles = [{ row: 0, col: 1 }]
+  Object.assign(state.players[0]!.resources, { clay, reed: 1 })
+})
+const offersSelection = (r: SessionResponse) => sessionOptions(r).some((o) => o.labelKey === 'actions.selection.name')
+
+describe('WM timing, identity and limits in four-player sessions', () => {
   it('Almshouse discards a later feeding begging card even after Borrower markers were repaid first', () => {
     const session = borrowerRepaid()
     const r = harvest(session, 3)
@@ -111,5 +118,41 @@ describe('WM timing and identity rules in four-player sessions', () => {
     expect(r.interaction.sourceCard).toBe(id(43))
     expect(sessionOptions(r).filter((o) => o.value !== '__skip__').map((o) => o.labelKey).sort())
       .toEqual(['resources.reed', 'resources.stone'])
+  })
+  it('Remodeler builds exactly one free room after returning its stable', () => {
+    const session = remodeler(3)
+    wmAction(session, wmOk(session.takeAction(0, 'house-redevelopment')), 'actions.selection.name')
+    wmOk(session.commitSelectionChoice(0, { positions: ['0-1'] }))
+    expect(session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }, { row: 0, col: 1 }] }).ok).toBe(false)
+    const r = wmPayment(session, wmOk(session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })))
+    expect([p0(r).rooms, p0(r).houseType]).toEqual([3, 'clay'])
+  })
+  it('Remodeler is not offered when the renovation would become unaffordable with the extra room', () => {
+    const session = remodeler(2)
+    const r = wmOk(session.takeAction(0, 'house-redevelopment'))
+    expect(offersSelection(r)).toBe(false)
+    expect([p0(r).rooms, p0(r).houseType, p0(r).stableTiles.length]).toEqual([2, 'clay', 1])
+  })
+  it('Heiress builds at most one room at the start of round 6 in a wooden house', () => {
+    const session = wmSession([27], (state) => { Object.assign(state.players[0]!.resources, { wood: 10, reed: 4 }) })
+    const start = wmEndRound(session, 5)
+    expect([start.state.round, start.interaction.sourceCard]).toEqual([6, id(27)])
+    wmChoose(session, start, sessionOptions(start).find((o) => !o.disabled && o.value !== '__skip__')!.value)
+    expect(session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }, { row: 0, col: 1 }] }).ok).toBe(false)
+    const r = wmPayment(session, wmOk(session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })))
+    expect(p0(r).rooms).toBe(3)
+    expect(p0(r).resources).toMatchObject({ wood: 5, reed: 2 })
+  })
+  it('Wood Worker food taken by the next user is an action-space acquisition for that player', () => {
+    const withFood = (food: number) => {
+      const session = wmSession([55], (state) => {
+        state.players[1]!.occupationPlayed.push('E118_KindlingGatherer')
+        state.actionSpaces.find((s) => s.id === 'grain-seeds')!.resources.food = food
+        state.currentPlayerIndex = 1
+      })
+      return wmOk(session.takeAction(1, 'grain-seeds'))
+    }
+    expect(withFood(1).state.players[1]!.resources).toMatchObject({ grain: 1, food: 1, wood: 1 })
+    expect(withFood(0).state.players[1]!.resources).toMatchObject({ grain: 1, food: 0, wood: 0 })
   })
 })
