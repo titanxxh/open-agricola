@@ -1,7 +1,9 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { posix } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { REFERENCE_LIMITS, allowedReferencePath } from '../../client/services/llm/generation/references'
 import { catalogCardDefinitions } from '../../shared/cards/catalog.generated'
+import { classicCardDefinitions } from '../../shared/cards/classic-catalog.generated'
 import { majorCardDefinitionsList } from '../../shared/cards/major/generated'
 import { PARENT_CARD_IDS } from '../../shared/parents/ids'
 
@@ -41,3 +43,59 @@ describe('documentation budgets', () => {
     for (const path of [...INDEXES, ...modules]) expect(readFileSync(path, 'utf8').match(CARD_ID) ?? [], path).toEqual([])
   })
 })
+
+const AUTHORING = 'docs/CARD_AUTHORING.md'
+const REVIEW_RULES = 'shared/cards/AGENTS.md'
+const authoring = readFileSync(AUTHORING, 'utf8')
+const contractStart = authoring.indexOf('## Card contract')
+const contract = authoring.slice(contractStart, authoring.indexOf('\n## ', contractStart + 1))
+const rules = contract.split('\n').filter(line => line.startsWith('- **'))
+const ruleNames = rules.map(line => line.match(/^- \*\*(.+?)\.\*\*/)?.[1] ?? '')
+const links = [...contract.matchAll(/\]\(([^)#]+)(?:#([^)]+))?\)/g)].map(match => ({ path: posix.join('docs', match[1]!), anchor: match[2] }))
+const sourcePaths = [...contract.matchAll(/`((?:shared|scripts|server|client)\/[\w./-]+\.ts)`/g)].map(match => match[1]!)
+const headingSlugs = (path: string) => readFileSync(path, 'utf8').split('\n').filter(line => /^#{1,6} /.test(line))
+  .map(line => line.replace(/^#+ /, '').toLowerCase().replace(/[^\p{L}\p{N} _-]/gu, '').replace(/ /g, '-'))
+const knownCardIds = new Set([...cardIds, ...classicCardDefinitions.map(card => card.id)])
+
+describe('Card contract', () => {
+  it('sits before the numbered sections, where the first Workshop read reaches it', () => {
+    expect(contractStart).toBeGreaterThan(0)
+    expect(contractStart).toBeLessThan(authoring.indexOf('## 1. '))
+    expect(authoring.slice(0, contractStart + contract.length).split('\n').length).toBeLessThanOrEqual(REFERENCE_LIMITS.readLines)
+  })
+
+  it('names each rule once and gives every rule a source the agent can open', () => {
+    expect(rules.length).toBeGreaterThan(0)
+    expect(ruleNames.every(Boolean)).toBe(true)
+    expect(new Set(ruleNames).size).toBe(ruleNames.length)
+    for (const rule of rules) expect(/\]\([^)]+\)|`(?:shared|scripts)\/[\w./-]+\.ts`/.test(rule), rule.slice(0, 40)).toBe(true)
+  })
+
+  it('links only documents the Workshop generator can read, at headings that exist', () => {
+    expect(links.length).toBeGreaterThan(0)
+    for (const { path, anchor } of links) {
+      expect(existsSync(path), path).toBe(true)
+      expect(allowedReferencePath(path), path).toBe(true)
+      if (anchor) expect(headingSlugs(path), `${path}#${anchor}`).toContain(anchor)
+    }
+  })
+
+  it('names only source files and cards that exist', () => {
+    for (const path of sourcePaths) expect(existsSync(path), path).toBe(true)
+    // A card ID followed by `-` is a test file name such as `A42_ForestLakeHut-session.test.ts`.
+    const named = authoring.match(/\b(?:[A-Z]{1,4}\d{2,3}|CUSTOM)_[A-Z][A-Za-z]+\b(?!-)/g) ?? []
+    expect(named.length).toBeGreaterThan(0)
+    for (const id of named) expect(knownCardIds.has(id), id).toBe(true)
+  })
+
+  it('is what the card review rules point at, by rule names that exist', () => {
+    const review = readFileSync(REVIEW_RULES, 'utf8')
+    expect(review).toContain('## Code Review Rules')
+    expect(review).toContain('Card contract')
+    expect(review).toContain(AUTHORING)
+    const cited = [...review.matchAll(/\b([A-Z][a-z]+(?: [a-z]+)?) rule\b/g)].map(match => match[1]!)
+    expect(cited.length).toBeGreaterThan(0)
+    for (const name of cited) expect(ruleNames, name).toContain(name)
+  })
+})
+
