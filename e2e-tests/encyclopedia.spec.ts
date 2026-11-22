@@ -62,6 +62,22 @@ async function walkRepresentativePath(page: Page, layout: Layout) {
   await expectNoHorizontalOverflow(page)
 }
 
+/**
+ * Leaves a stylesheet loading for as long as the page lives, as the lobby's donation widget does on a slow network.
+ * WebKit hands focus back from a closed modal only once the page's style is up to date, and focus() skips that
+ * update while a stylesheet is loading (#2004).
+ */
+async function keepStylesheetLoading(page: Page) {
+  await page.route('**/never-loads.css', () => {})
+  // Added after the load event, which a loading stylesheet would hold back.
+  await page.addInitScript(() => addEventListener('load', () => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = '/never-loads.css'
+    document.head.append(link)
+  }))
+}
+
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
 type LanguageRef = { id: string; core: { file: string; sha256: string }; cards: { file: string; sha256: string } }
 
@@ -352,7 +368,10 @@ for (const layout of [MOBILE, LANDSCAPE]) {
     test('M1 walks from the lobby through search, filters and a detail and back @webkit', async ({ browser, browserName }) => {
       test.skip(browserName !== 'webkit', 'Runs in the WebKit matrix')
       const { context, page } = await newVisitor(browser, layout, { signedIn: true })
-      try { await walkRepresentativePath(page, layout) } finally { await context.close() }
+      try {
+        await keepStylesheetLoading(page)
+        await walkRepresentativePath(page, layout)
+      } finally { await context.close() }
     })
   })
 }
