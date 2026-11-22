@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import type { GameState } from '../../shared/contract/types'
+import type { GameState, GuestPlacementScope } from '../../shared/contract/types'
 import { flOptions, flCard, flSession, chooseBranch, confirmTurns } from './_helpers/classic-fl'
 import {
   playImprovement,
@@ -14,9 +14,11 @@ import {
   workersAvailable,
 } from '../../shared/domain/player'
 import { createDefaultRoomTiles } from '../../shared/domain/farmyard-geometry'
+import { grantGuest } from '../../shared/domain/guests'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
 
 const sessions: GameSession[] = []
 const keep = (session: GameSession) => {
@@ -62,6 +64,35 @@ function loversTrystSession(rooms: number, occupationCount: number, adults = 2):
       opponent!.startPlayer = true
     },
   }))
+}
+
+function playStuckCartWithGuests(...scopes: (GuestPlacementScope | undefined)[]) {
+  const cart = flCard(10).id
+  const bakery = flCard(26).id
+  const session = keep(createWorkSession({
+    seed: 6100,
+    options: { playerCount: 2 },
+    configure: (state) => {
+      state.currentPlayerIndex = 1
+      const owner = state.players[0]!
+      owner.minorHand = [cart]
+      owner.minorPlayed = [bakery]
+      owner.resources.wood = 1
+      const firstSpace = state.actionSpaces.find((space) => space.id === 'day-laborer')!
+      firstSpace.takenBy.push({ playerId: owner.id, workerId: '1' })
+      recordRoundPlacement(owner, firstSpace.id, '1')
+      state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 3
+      for (const where of scopes) grantGuest(owner, { sourceCardId: bakery, round: state.round, where })
+    },
+  }))
+  expect(workersAvailable(session.state, session.state.players[0]!)).toBe(1)
+  const ownerTurn = confirmTurns(session, session.takeAction(1, 'reed-bank'))
+  expect(ownerTurn.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0 })
+  let offered = chooseBranch(session, takeNormalWorkerTurn(session, 'meeting-place'))
+  if (flOptions(offered).some((option) => option.value === cart))
+    offered = choose(session, offered, cart)
+  expect(workersAvailable(offered.state, offered.state.players[0]!)).toBe(0)
+  return { session, offered, cart, bakery }
 }
 
 describe('FL: compound actions and cross-player timing', () => {
@@ -115,6 +146,46 @@ describe('FL: compound actions and cross-player timing', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 1 })
     expect(workersAvailable(response.state, response.state.players[0]!)).toBe(0)
     expect(response.state.players[1]!.minorHand).toContain(flCard(10).id)
+  })
+
+  it('Stuck Cart: the second family member plays it and immediately sends a remaining Guest', () => {
+    const { session, offered, cart, bakery } = playStuckCartWithGuests(undefined)
+    expect(offered.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, sourceCard: cart, promptKey: 'ui.interactionPlaceFarmerExtra',
+    })
+    const placed = choose(session, offered, 'forest')
+    const owner = placed.state.players[0]!
+    expect(owner.resources.wood).toBe(3)
+    expect(owner.guests).toEqual([{ id: 'guest:1', sourceCardId: bakery, round: 1, dispatched: true }])
+    expect(placed.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([
+      { playerId: owner.id, workerId: 'guest:1', guest: true },
+    ])
+    expect(owner.minorPlayed).not.toContain(cart)
+    expect(placed.state.players[1]!.minorHand).toContain(cart)
+    expect(placed.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.guestDispatched', playerId: owner.id,
+    }))
+    expect(bonusScore(placed, cart)).toBe(0)
+    const handoff = confirmTurns(session, placed)
+    expect(handoff.interaction.stateId).toBe('idle')
+    expect(handoff.state.currentPlayerIndex).toBe(1)
+  })
+
+  it('Stuck Cart: finishes after the first Guest occupies the only legal space for both', () => {
+    const where = { kind: 'spaces', spaceIds: ['forest'] } satisfies GuestPlacementScope
+    const { session, offered, cart } = playStuckCartWithGuests(where, where)
+    const guestChoices = flOptions(offered)
+    expect(guestChoices.map((option) => option.labelParams?.guestId)).toEqual(['guest:1', 'guest:2'])
+    const targets = choose(session, offered, guestChoices[0]!.value)
+    expect(flOptions(targets).map((option) => option.value)).toEqual(['forest'])
+    const placed = choose(session, targets, 'forest')
+    expect(placed.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    const handoff = confirmTurns(session, placed)
+    expect(handoff.state.currentPlayerIndex).toBe(1)
+    expect(handoff.state.players[0]!.guests?.map(({ id, dispatched }) => [id, dispatched])).toEqual([
+      ['guest:1', true], ['guest:2', undefined],
+    ])
+    expect(handoff.state.players[1]!.minorHand).toContain(cart)
   })
 
   it('Towhead: Family Growth moves to slot six and is exclusive to its owner in round five', () => {

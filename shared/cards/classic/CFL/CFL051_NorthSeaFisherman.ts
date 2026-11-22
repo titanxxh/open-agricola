@@ -32,7 +32,7 @@ const cardImpl = {
       id: CARD_ID + '-opponent-fishing',
       cardIds: [CARD_ID],
       actionSpaces: ['fishing'],
-      phases: ['after'],
+      phases: ['before'],
       scope: 'opponent',
       handler: (context) => ({
         flow: {
