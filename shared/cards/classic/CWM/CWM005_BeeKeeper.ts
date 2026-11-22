@@ -4,6 +4,7 @@ import { readCardExtraData, writeCardExtraData } from '../../helpers/card-state'
 import { gainLeaf } from '../../helpers/pay-gain-node'
 import { registerAdHocAction } from '../../../actions/helpers/ad-hoc-action-registry'
 import { positionKey } from '../../../domain/farm'
+import type { GameState, PlayerState } from '../../../contract/types'
 
 const CARD_ID = 'CWM005_BeeKeeper'
 
@@ -15,13 +16,27 @@ registerAdHocAction({
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player }) => {
+  execute: ({ state, player }) => {
     const previous = readCardExtraData<string[]>(player, CARD_ID, 'previousStables') ?? []
     const built = player.stableTiles.find((tile) => !previous.includes(positionKey(tile)))
-    if (built) writeCardExtraData(player, CARD_ID, 'beehive', positionKey(built))
+    if (built) {
+      writeCardExtraData(player, CARD_ID, 'beehive', positionKey(built))
+      writeCardExtraData(player, CARD_ID, 'beehiveSeq', state.events.at(-1)?.seq ?? 0)
+    }
     return { type: 'ok' }
   },
 })
+/** The beehive stable while it stands; returning it (and any rebuild there) ends the marker. */
+const beehive = (state: GameState, player: PlayerState): string | undefined => {
+  const key = readCardExtraData<string>(player, CARD_ID, 'beehive')
+  if (!key || !player.stableTiles.some((tile) => positionKey(tile) === key)) return
+  // Events reach the log after the marking step, so the first build at this tile after
+  // the mark is the beehive itself; a second one means it was returned and rebuilt.
+  const since = readCardExtraData<number>(player, CARD_ID, 'beehiveSeq') ?? 0
+  const builds = state.events.filter((e) => e.type === 'farm.stableBuilt' && e.seq > since &&
+    e.stables.some((s) => s.playerId === player.id && positionKey(s) === key)).length
+  return builds > 1 ? undefined : key
+}
 const cardImpl = {
   effect: {
     id: CARD_ID,
@@ -40,18 +55,18 @@ const cardImpl = {
         ],
       }
     },
-    onComputeAnimalZones: (player, zones) => {
-      const key = readCardExtraData(player, CARD_ID, 'beehive')
-      for (const zone of zones) if (zone.id === 'stable:' + key) zone.blocked = true
+    onComputeAnimalZones: (player, zones, state) => {
+      const key = beehive(state, player)
+      if (key) for (const zone of zones) if (zone.id === 'stable:' + key) zone.blocked = true
     },
-    computePastureCapacityModifiers: (player) => [
+    computePastureCapacityModifiers: (player, state) => [
       {
         sourceCard: CARD_ID,
         kind: 'replacement',
-        appliesTo: (context) =>
-          context.pasture.tiles.some(
-            (tile) => positionKey(tile) === readCardExtraData(player, CARD_ID, 'beehive'),
-          ),
+        appliesTo: (context) => {
+          const key = beehive(state, player)
+          return !!key && context.pasture.tiles.some((tile) => positionKey(tile) === key)
+        },
         apply: (capacity) => capacity / 2,
       },
     ],

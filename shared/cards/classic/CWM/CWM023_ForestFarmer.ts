@@ -3,7 +3,7 @@ import type { CardImpl } from '../../registry'
 import { readCardExtraData } from '../../helpers/card-state'
 import { payGainActionFlow } from '../../helpers/pay-gain-node'
 import { jumpLeaf } from '../../helpers/jump-leaf'
-import { computeAllowedPlacementSpaces } from '../../../actions/helpers/placement-availability'
+import { canPlaceWorkerOnSpace, computeAllowedPlacementSpaces } from '../../../actions/helpers/placement-availability'
 
 const CARD_ID = 'CWM023_ForestFarmer'
 
@@ -25,11 +25,16 @@ const cardImpl = {
       const workers = state.actionSpaces
         .filter((space) => ['farmland', 'cultivation'].includes(space.id))
         .flatMap((space) => space.takenBy.filter((worker) => worker.playerId === player.id))
-      const targets = computeAllowedPlacementSpaces(state, player, {
+      const check = {
         actionHooks: context?.actionHooks,
         ignoreWorkerAvailability: true,
         actionSpaceUse: { newPlacement: false },
-      }).filter((target) => !target.allowOccupied)
+      }
+      // The destination must stay usable after paying this card's 1 wood.
+      const targets = computeAllowedPlacementSpaces(state, player, check).filter((target) => {
+        const space = state.actionSpaces.find((s) => s.id === target.spaceId)
+        return !target.allowOccupied && !!space && canPlaceWorkerOnSpace(state, player, space, { ...check, reserve: { wood: 1 } })
+      })
       if (!workers.length || !targets.length) return
       return {
         type: 'xor',

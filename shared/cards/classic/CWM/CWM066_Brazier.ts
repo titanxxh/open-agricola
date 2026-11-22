@@ -1,23 +1,31 @@
 import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
-import { payGainActionFlow } from '../../helpers/pay-gain-node'
+import { createSingleHarvestExchange } from '../../helpers/stage-effects'
+import type { ActionFlow } from '../../../contract/types'
 
 const CARD_ID = 'CWM066_Brazier'
+
+const RECIPES = [['vegetable', 3], ['sheep', 2], ['boar', 3], ['cattle', 4]] as const
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onStartHarvestFeedingPhase: () => ({
-      type: 'xor',
-      optional: true,
-      children: (['vegetable', 'sheep', 'boar', 'cattle'] as const).map((resource, i) =>
-        payGainActionFlow({
-          cardId: CARD_ID,
-          cost: { [resource]: 1 },
-          gain: { food: [3, 2, 3, 4][i]! },
-        }),
-      ),
-    }),
+    // Standard exchanges, so exchange reactions (e.g. CI097_Slaughterhouse) see the conversion.
+    onStartHarvestFeedingPhase: (state, player) => {
+      const children = RECIPES.flatMap(([good, food]) => {
+        const leaf = createSingleHarvestExchange(CARD_ID, () => ({
+          from: { [good]: 1 }, to: { food }, max: 1, sourceId: CARD_ID, triggers: ['harvest'],
+        }))(state, player)
+        return leaf
+          ? [{
+              ...leaf,
+              optional: false,
+              choiceLabelKey: `resources.${good}`,
+            } as ActionFlow]
+          : []
+      })
+      return children.length ? { type: 'xor', optional: true, children } : undefined
+    },
   },
 } satisfies CardImpl
 
