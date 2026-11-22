@@ -46,7 +46,7 @@ describe('documentation budgets', () => {
 
 const AUTHORING = 'docs/CARD_AUTHORING.md'
 const AUTHORING_ZH = 'docs/CARD_AUTHORING_zh.md'
-const REVIEW_RULES = 'shared/cards/AGENTS.md'
+const REVIEW_RULES = 'AGENTS.md'
 const authoring = readFileSync(AUTHORING, 'utf8')
 const contractStart = authoring.indexOf('## Card contract')
 const contract = authoring.slice(contractStart, authoring.indexOf('\n## ', contractStart + 1))
@@ -92,11 +92,14 @@ describe('Card contract', () => {
   })
 
   it('is what the card review rules point at, by rule names that exist', () => {
-    const review = readFileSync(REVIEW_RULES, 'utf8')
-    expect(review).toContain('## Code Review Rules')
+    // Codex's GitHub review looks for this exact heading in AGENTS.md.
+    const agents = readFileSync(REVIEW_RULES, 'utf8')
+    const start = agents.indexOf('\n## Code Review Rules\n')
+    expect(start).toBeGreaterThan(0)
+    const review = agents.slice(start, agents.indexOf('\n## ', start + 1))
     expect(review).toContain('Card contract')
     expect(review).toContain(AUTHORING)
-    const cited = [...review.matchAll(/\b([A-Z][a-z]+(?: [a-z]+)?) rule\b/g)].map(match => match[1]!)
+    const cited = [...review.matchAll(/([A-Z][a-z]+(?: [a-z]+)?) 规则/g)].map(match => match[1]!)
     expect(cited.length).toBeGreaterThan(0)
     for (const name of cited) expect(ruleNames, name).toContain(name)
   })
