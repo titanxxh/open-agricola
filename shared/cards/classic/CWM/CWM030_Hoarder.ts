@@ -40,7 +40,7 @@ export const CWM030_Hoarder = defineOccupationCard({
     name: "Hoarder",
     deck: 'CWM',
     number: 30,
-    desc: ["Each harvest, you may place at most 1 building resource on this card. At the end of the game, get 1, 2, 3, or 5 bonus points for having at least 1, 2, 3, or 4 different building-resource types on this card."],
+    desc: ["Each harvest, you may place at most 1 building resource on this card. At the end of the game, get 1, 2, 3, or 5 bonus <SCORE> for having at least 1, 2, 3, or 4 different building-resource types on this card."],
     cost: {},
     vp: 0,
     prerequisite: "",

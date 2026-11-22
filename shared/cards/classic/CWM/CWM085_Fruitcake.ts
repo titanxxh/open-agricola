@@ -26,7 +26,7 @@ export const CWM085_Fruitcake = defineMinorCard({
     name: "Fruitcake",
     deck: 'CWM',
     number: 85,
-    desc: ["During the next harvest feeding phase only, each of your family members, including newborns, requires 1 less food."],
+    desc: ["During the next harvest feeding phase only, each of your family members, including newborns, requires 1 less <FOOD>."],
     cost: {
       wood: 1,
     },

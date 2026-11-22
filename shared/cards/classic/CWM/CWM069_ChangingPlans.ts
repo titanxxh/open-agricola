@@ -45,7 +45,7 @@ export const CWM069_ChangingPlans = defineMinorCard({
     name: "Changing Plans",
     deck: 'CWM',
     number: 69,
-    desc: ["Immediately return up to 2 built stables to your supply. For each stable returned, you may plow 1 field. Afterwards, pass this card to the next player, who adds it to their hand."],
+    desc: ["Immediately return up to 2 built <STABLE> to your supply. For each <STABLE> returned, you may plow 1 <FIELD>. Afterwards, pass this card to the next player, who adds it to their hand."],
     cost: {},
     vp: 0,
     prerequisite: "1 built stable",

@@ -25,7 +25,7 @@ export const CWM065_BoundaryStones = defineMinorCard({
     name: "Boundary Stones",
     deck: 'CWM',
     number: 65,
-    desc: ["At the end of the game, count farmyard field tiles with exactly one orthogonally adjacent field tile. Having 2, 3, 4, or at least 5 such fields gives you 1, 2, 3, or 5 bonus points, respectively."],
+    desc: ["At the end of the game, count farmyard <FIELD> tiles with exactly one orthogonally adjacent <FIELD> tile. Having 2, 3, 4, or at least 5 such <FIELD> gives you 1, 2, 3, or 5 bonus <SCORE>, respectively."],
     cost: {
       stone: 1,
     },

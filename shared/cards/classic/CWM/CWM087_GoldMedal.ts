@@ -59,7 +59,7 @@ export const CWM087_GoldMedal = defineMinorCard({
     name: "Gold Medal",
     deck: 'CWM',
     number: 87,
-    desc: ["Choose grain, vegetables, sheep, wild boar, cattle, fields, pastures, or fenced stables when you play this card. At the end of the game, every player tied for the highest normal score in that category gets 2 bonus points. Ignore other cards' bonus points."],
+    desc: ["Choose <GRAIN>, <VEGETABLE>, <SHEEP>, <BOAR>, <CATTLE>, <FIELD>, pastures, or fenced <STABLE> when you play this card. At the end of the game, every player tied for the highest normal score in that category gets 2 bonus <SCORE>. Ignore other cards' bonus <SCORE>."],
     cost: {},
     vp: 0,
     prerequisite: "Round 7 or earlier",

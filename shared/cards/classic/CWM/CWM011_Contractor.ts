@@ -38,7 +38,7 @@ export const CWM011_Contractor = defineOccupationCard({
     name: "Contractor",
     deck: 'CWM',
     number: 11,
-    desc: ["When building rooms, renovating, or playing an improvement, you may substitute 1 food for 1 building resource. You may substitute up to 2 resources per room-building action, or 1 resource per renovation or improvement."],
+    desc: ["When building rooms, renovating, or playing an improvement, you may substitute 1 <FOOD> for 1 building resource. You may substitute up to 2 resources per room-building action, or 1 resource per renovation or improvement."],
     cost: {},
     vp: 0,
     prerequisite: "",

@@ -33,7 +33,7 @@ export const CWM029_HillFarmer = defineOccupationCard({
     name: "Hill Farmer",
     deck: 'CWM',
     number: 29,
-    desc: ["Whenever you build at least 1 fence or plow at least 1 field, you get 2 or 1 food if you have exactly 2 or 3 rooms, respectively."],
+    desc: ["Whenever you build at least 1 <FENCE> or plow at least 1 <FIELD>, you get 2 or 1 <FOOD> if you have exactly 2 or 3 rooms, respectively."],
     cost: {},
     vp: 0,
     prerequisite: "",

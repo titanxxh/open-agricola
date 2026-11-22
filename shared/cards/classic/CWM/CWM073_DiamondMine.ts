@@ -24,7 +24,7 @@ export const CWM073_DiamondMine = defineMinorCard({
     name: "Diamond Mine",
     deck: 'CWM',
     number: 73,
-    desc: ["Place 1 stone on each of the next 2 round spaces. At the start of those rounds, you get the stone."],
+    desc: ["Place 1 <STONE> on each of the next 2 round spaces. At the start of those rounds, you get the <STONE>."],
     cost: {},
     vp: 1,
     prerequisite: "3 occupations",

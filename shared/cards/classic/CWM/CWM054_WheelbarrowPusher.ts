@@ -50,7 +50,7 @@ export const CWM054_WheelbarrowPusher = defineOccupationCard({
     name: "Wheelbarrow Pusher",
     deck: 'CWM',
     number: 54,
-    desc: ["Whenever you receive exactly 1 building resource from an accumulation space, you also get either 1 building resource of your choice or 1 food. In games with 4 or more players, get both instead."],
+    desc: ["Whenever you receive exactly 1 building resource from an accumulation space, you also get either 1 building resource of your choice or 1 <FOOD>. In games with 4 or more players, get both instead."],
     cost: {},
     vp: 0,
     prerequisite: "",

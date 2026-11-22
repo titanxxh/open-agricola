@@ -52,7 +52,7 @@ export const CWM044_SiloGirl = defineOccupationCard({
     name: "Silo Girl",
     deck: 'CWM',
     number: 44,
-    desc: ["As soon as you live in a stone house, place 1 grain on each remaining even-numbered round space and 1 vegetable on each remaining odd-numbered round space. At the start of those rounds, you get the crop."],
+    desc: ["As soon as you live in a stone house, place 1 <GRAIN> on each remaining even-numbered round space and 1 <VEGETABLE> on each remaining odd-numbered round space. At the start of those rounds, you get the crop."],
     cost: {},
     vp: 0,
     prerequisite: "",

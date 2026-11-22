@@ -65,7 +65,7 @@ export const CWM032_Hunter = defineOccupationCard({
     name: "Hunter",
     deck: 'CWM',
     number: 32,
-    desc: ["Whenever you acquire animals outside a harvest breeding phase, you may immediately convert any of them to food: 2 per sheep, 3 per wild boar, and 4 per cattle."],
+    desc: ["Whenever you acquire animals outside a harvest breeding phase, you may immediately convert any of them to <FOOD>: 2 per <SHEEP>, 3 per <BOAR>, and 4 per <CATTLE>."],
     cost: {},
     vp: 0,
     prerequisite: "",

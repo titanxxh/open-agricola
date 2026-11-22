@@ -20,7 +20,7 @@ export const CWM098_PettingZoo = defineMinorCard({
     name: "Petting Zoo",
     deck: 'CWM',
     number: 98,
-    desc: ["At the end of the game, if you have all three animal types outside cards, get 1 bonus point for having at least 2 sheep and 1 bonus point for having at least 2 wild boar. You may receive both."],
+    desc: ["At the end of the game, if you have all three animal types outside cards, get 1 bonus <SCORE> for having at least 2 <SHEEP> and 1 bonus <SCORE> for having at least 2 <BOAR>. You may receive both."],
     cost: {
       wood: 2,
     },

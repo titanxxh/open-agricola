@@ -20,7 +20,7 @@ export const CWM051_TavernKeeper = defineOccupationCard({
     name: "Tavern Keeper",
     deck: 'CWM',
     number: 51,
-    desc: ["At the start of each harvest, if you have at least one empty room, you get 1 grain and 1 food. Each empty room is worth 1 bonus point at the end of the game."],
+    desc: ["At the start of each harvest, if you have at least one empty room, you get 1 <GRAIN> and 1 <FOOD>. Each empty room is worth 1 bonus <SCORE> at the end of the game."],
     cost: {},
     vp: 0,
     prerequisite: "",

@@ -69,7 +69,7 @@ export const CWM006_Borrower = defineOccupationCard({
     name: "Borrower",
     deck: 'CWM',
     number: 6,
-    desc: ["Immediately get 7 food and 2 begging cards. At any time, you may pay 3 food to discard one begging card received from this card or from failing to feed your family."],
+    desc: ["Immediately get 7 <FOOD> and 2 begging cards. At any time, you may pay 3 <FOOD> to discard one begging card received from this card or from failing to feed your family."],
     cost: {},
     vp: 0,
     prerequisite: "",

@@ -26,7 +26,7 @@ export const CWM086_GlassblowersShop = defineMinorCard({
     name: "Glassblower's Shop",
     deck: 'CWM',
     number: 86,
-    desc: ["Each harvest, you may convert at most 1 clay into 3 food. At the end of the game, having at least 2, 4, or 5 clay gives 1, 2, or 3 bonus points. The same clay cannot also score for Pottery. This card counts as both a major and a minor improvement, but only one improvement."],
+    desc: ["Each harvest, you may convert at most 1 <CLAY> into 3 <FOOD>. At the end of the game, having at least 2, 4, or 5 <CLAY> gives 1, 2, or 3 bonus <SCORE>. The same <CLAY> cannot also score for Pottery. This card counts as both a major and a minor improvement, but only one improvement."],
     cost: {
       clay: 1,
       stone: 1,

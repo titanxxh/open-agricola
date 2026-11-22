@@ -33,7 +33,7 @@ export const CWM045_StableDeliveryman = defineOccupationCard({
     name: "Stable Deliveryman",
     deck: 'CWM',
     number: 45,
-    desc: ["Add 3, 5, 7, and 9 to the current round. Place up to one stable from your supply on each corresponding round space. At the start of those rounds, you may pay 1 wood to build that stable, otherwise return it to your supply."],
+    desc: ["Add 3, 5, 7, and 9 to the current round. Place up to one <STABLE> from your supply on each corresponding round space. At the start of those rounds, you may pay 1 <WOOD> to build that <STABLE>, otherwise return it to your supply."],
     cost: {},
     vp: 0,
     prerequisite: "",

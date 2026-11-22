@@ -99,7 +99,7 @@ export const CWM013_Cowboy = defineOccupationCard({
     name: "Cowboy",
     deck: 'CWM',
     number: 13,
-    desc: ["You may use an occupied Sheep, Wild Boar, or Cattle Market accumulation space to get 1 animal of that type. You may keep up to 2 animals of one type on one unused farmyard space; that space still counts as unused."],
+    desc: ["You may use an occupied __Sheep Market__, __Pig Market__, or __Cattle Market__ accumulation space to get 1 animal of that type. You may keep up to 2 animals of one type on one unused farmyard space; that space still counts as unused."],
     cost: {},
     vp: 0,
     prerequisite: "",

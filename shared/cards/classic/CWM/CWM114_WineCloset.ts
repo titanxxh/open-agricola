@@ -106,7 +106,7 @@ export const CWM114_WineCloset = defineMinorCard({
     name: "Wine Closet",
     deck: 'CWM',
     number: 114,
-    desc: ["Immediately get 1 vegetable. Once per round, you may place 1 vegetable on a future round space. If it is at least 5 rounds ahead, add a second vegetable from the supply. At the start of that round, each vegetable there must become either 2 food or 1 bonus point."],
+    desc: ["Immediately get 1 <VEGETABLE>. Once per round, you may place 1 <VEGETABLE> on a future round space. If it is at least 5 rounds ahead, add a second <VEGETABLE> from the supply. At the start of that round, each <VEGETABLE> there must become either 2 <FOOD> or 1 bonus <SCORE>."],
     cost: {},
     vp: 0,
     prerequisite: "",

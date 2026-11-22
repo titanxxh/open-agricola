@@ -39,7 +39,7 @@ export const CWM046_StoneCurator = defineOccupationCard({
     name: "Stone Curator",
     deck: 'CWM',
     number: 46,
-    desc: ["Whenever you use a stone accumulation space, you also get 1 food. At the end of the game, get 1 bonus point per 2 stone rooms and per 2 improvements whose printed cost includes stone."],
+    desc: ["Whenever you use a <STONE> accumulation space, you also get 1 <FOOD>. At the end of the game, get 1 bonus <SCORE> per 2 stone rooms and per 2 improvements whose printed cost includes <STONE>."],
     cost: {},
     vp: 0,
     prerequisite: "",

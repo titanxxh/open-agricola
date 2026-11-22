@@ -17,7 +17,7 @@ export const CWM038_Minimalist = defineOccupationCard({
     name: "Minimalist",
     deck: 'CWM',
     number: 38,
-    desc: ["At the end of the game, get 9, 6, 4, or 2 bonus points if you have exactly 0, 1, 2, or 3 improvements in front of you, respectively."],
+    desc: ["At the end of the game, get 9, 6, 4, or 2 bonus <SCORE> if you have exactly 0, 1, 2, or 3 improvements in front of you, respectively."],
     cost: {},
     vp: 0,
     prerequisite: "",

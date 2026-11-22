@@ -28,7 +28,7 @@ export const CWM094_LampOil = defineMinorCard({
     name: "Lamp Oil",
     deck: 'CWM',
     number: 94,
-    desc: ["Immediately before you play an occupation card, you get 1 food. Its prerequisite requires 2 animals of any types, excluding animals kept on cards."],
+    desc: ["Immediately before you play an occupation card, you get 1 <FOOD>. Its prerequisite requires 2 animals of any types, excluding animals kept on cards."],
     cost: {
       wood: 2,
       clay: 2,

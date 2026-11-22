@@ -26,7 +26,7 @@ export const CWM061_BackDoor = defineMinorCard({
     name: "Back Door",
     deck: 'CWM',
     number: 61,
-    desc: ["Immediately place another person on Family Growth with Room and a Minor Improvement, even if it is occupied. Afterwards, pass this card to the next player, who adds it to their hand."],
+    desc: ["Immediately place another person on the __Wish for Children__ action space, even if it is occupied. Afterwards, pass this card to the next player, who adds it to their hand."],
     cost: {
       reed: 1,
     },

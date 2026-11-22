@@ -18,7 +18,7 @@ export const CWM097_OpenGate = defineMinorCard({
     name: "Open Gate",
     deck: 'CWM',
     number: 97,
-    desc: ["Before each harvest feeding phase, you may pay at most 1 sheep for 1 bonus point."],
+    desc: ["Before each harvest feeding phase, you may pay at most 1 <SHEEP> for 1 bonus <SCORE>."],
     cost: {
       stone: 1,
     },

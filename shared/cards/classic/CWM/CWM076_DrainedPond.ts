@@ -32,7 +32,7 @@ export const CWM076_DrainedPond = defineMinorCard({
     name: "Drained Pond",
     deck: 'CWM',
     number: 76,
-    desc: ["Place a field tile on the round space 4 rounds after the current round. At the start of that round, you may pay 1 food to plow that field."],
+    desc: ["Place a <FIELD> tile on the round space 4 rounds after the current round. At the start of that round, you may pay 1 <FOOD> to plow that <FIELD>."],
     cost: {
       reed: 1,
     },

@@ -22,7 +22,7 @@ export const CWM067_BuriedTreasure = defineMinorCard({
     name: "Buried Treasure",
     deck: 'CWM',
     number: 67,
-    desc: ["Whenever you use Farmland or Cultivation, you also get 1 stone."],
+    desc: ["Whenever you use __Farmland__ or __Cultivation__, you also get 1 <STONE>."],
     cost: {},
     vp: 0,
     prerequisite: "2 occupations",

@@ -29,7 +29,7 @@ export const CWM066_Brazier = defineMinorCard({
     name: "Brazier",
     deck: 'CWM',
     number: 66,
-    desc: ["During each harvest feeding phase, you may convert at most one good to food: 1 vegetable for 3 food, 1 sheep for 2 food, 1 wild boar for 3 food, or 1 cattle for 4 food."],
+    desc: ["During each harvest feeding phase, you may convert at most one good to <FOOD>: 1 <VEGETABLE> for 3 <FOOD>, 1 <SHEEP> for 2 <FOOD>, 1 <BOAR> for 3 <FOOD>, or 1 <CATTLE> for 4 <FOOD>."],
     cost: {
       wood: 1,
       clay: 1,

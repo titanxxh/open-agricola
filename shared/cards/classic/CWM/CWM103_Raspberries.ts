@@ -82,7 +82,7 @@ export const CWM103_Raspberries = defineMinorCard({
     name: "Raspberries",
     deck: 'CWM',
     number: 103,
-    desc: ["Place 1 food from the supply on each of up to 3 unused farmyard spaces. When a marked space becomes used, you get its food. The food markers do not themselves make spaces used."],
+    desc: ["Place 1 <FOOD> from the supply on each of up to 3 unused farmyard spaces. When a marked space becomes used, you get its <FOOD>. The <FOOD> markers do not themselves make spaces used."],
     cost: {
       clay: 1,
     },

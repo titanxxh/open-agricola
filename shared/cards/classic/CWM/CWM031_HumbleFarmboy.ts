@@ -29,7 +29,7 @@ export const CWM031_HumbleFarmboy = defineOccupationCard({
     name: "Humble Farmboy",
     deck: 'CWM',
     number: 31,
-    desc: ["Immediately get 1, 2, 3, or 4 wood if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the fewest played cards gets 3 bonus points."],
+    desc: ["Immediately get 1, 2, 3, or 4 <WOOD> if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the fewest played cards gets 3 bonus <SCORE>."],
     cost: {},
     vp: 0,
     prerequisite: "",

@@ -33,7 +33,7 @@ export const CWM072_Crib = defineMinorCard({
     name: "Crib",
     deck: 'CWM',
     number: 72,
-    desc: ["At the end of each work phase, if you took a Family Growth action that round, you may either get 2 food or pay 2 food for 1 bonus point."],
+    desc: ["At the end of each work phase, if you took a __Family Growth__ action that round, you may either get 2 <FOOD> or pay 2 <FOOD> for 1 bonus <SCORE>."],
     cost: {
       wood: 1,
     },

@@ -37,7 +37,7 @@ export const CWM022_FoodConnoisseur = defineOccupationCard({
     name: "Food Connoisseur",
     deck: 'CWM',
     number: 22,
-    desc: ["Stack 1 clay, 1 vegetable, 1 stone, 1 grain, 1 wood, and 1 reed on this card, from bottom to top. Whenever you use Day Laborer, Fishing, or Traveling Players, take the top good."],
+    desc: ["Stack 1 <CLAY>, 1 <VEGETABLE>, 1 <STONE>, 1 <GRAIN>, 1 <WOOD>, and 1 <REED> on this card, from bottom to top. Whenever you use __Day Laborer__, __Fishing__, or __Traveling Players__, take the top good."],
     cost: {},
     vp: 0,
     prerequisite: "",

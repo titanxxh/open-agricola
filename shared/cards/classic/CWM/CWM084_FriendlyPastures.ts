@@ -27,7 +27,7 @@ export const CWM084_FriendlyPastures = defineMinorCard({
     name: "Friendly Pastures",
     deck: 'CWM',
     number: 84,
-    desc: ["Each of your pastures containing a stable may hold different animal types together. Its total capacity is unchanged."],
+    desc: ["Each of your pastures containing a <STABLE> may hold different animal types together. Its total capacity is unchanged."],
     cost: {
       wood: 2,
     },

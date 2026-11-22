@@ -37,7 +37,7 @@ export const CWM100_PlumPatch = defineMinorCard({
     name: "Plum Patch",
     deck: 'CWM',
     number: 100,
-    desc: ["Count your sown fields and place 1 food on each of that many subsequent round spaces. At the start of those rounds, you get the food. Card fields count for both the prerequisite and this count; each sown card counts as one field."],
+    desc: ["Count your sown <FIELD> and place 1 <FOOD> on each of that many subsequent round spaces. At the start of those rounds, you get the <FOOD>. Card <FIELD> count for both the prerequisite and this count; each sown card counts as one <FIELD>."],
     cost: {},
     vp: 1,
     prerequisite: "1 grain field and 1 vegetable field",

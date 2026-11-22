@@ -13,7 +13,7 @@ export const CWM095_MountainCave = defineMinorCard({
     name: "Mountain Cave",
     deck: 'CWM',
     number: 95,
-    desc: ["Each harvest, you may convert at most 1 wood into 1 stone."],
+    desc: ["Each harvest, you may convert at most 1 <WOOD> into 1 <STONE>."],
     cost: {
       food: 1,
     },

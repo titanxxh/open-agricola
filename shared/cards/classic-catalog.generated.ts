@@ -151,7 +151,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 1,
     "desc": [
-      "Whenever you use the Fishing accumulation space in round 7, 9, 11, or 13, you also get 1 animal of your choice."
+      "Whenever you use the __Fishing__ accumulation space in round 7, 9, 11, or 13, you also get 1 animal of your choice."
     ],
     "cost": {},
     "vp": 0,
@@ -169,7 +169,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 2,
     "desc": [
-      "After the field phase of each harvest, you may buy up to 2 animals in one purchase. Each sheep, wild boar, or cattle costs 2, 3, or 4 food, respectively."
+      "After the field phase of each harvest, you may buy up to 2 animals in one purchase. Each <SHEEP>, <BOAR>, or <CATTLE> costs 2, 3, or 4 <FOOD>, respectively."
     ],
     "cost": {},
     "vp": 0,
@@ -187,7 +187,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 3,
     "desc": [
-      "Whenever you use Grain Seeds or Vegetable Seeds, you also get 1 wood and 1 food."
+      "Whenever you use __Grain Seeds__ or __Vegetable Seeds__, you also get 1 <WOOD> and 1 <FOOD>."
     ],
     "cost": {},
     "vp": 0,
@@ -205,7 +205,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 5,
     "desc": [
-      "Immediately build a stable for free and lay it on its side. It loses its normal function but still scores as a stable. During each harvest feeding phase, you get 1 food."
+      "Immediately build a <STABLE> for free and lay it on its side. It loses its normal function but still scores as a <STABLE>. During each harvest feeding phase, you get 1 <FOOD>."
     ],
     "cost": {},
     "vp": 0,
@@ -223,7 +223,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 6,
     "desc": [
-      "Immediately get 7 food and 2 begging cards. At any time, you may pay 3 food to discard one begging card received from this card or from failing to feed your family."
+      "Immediately get 7 <FOOD> and 2 begging cards. At any time, you may pay 3 <FOOD> to discard one begging card received from this card or from failing to feed your family."
     ],
     "cost": {},
     "vp": 0,
@@ -241,7 +241,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 8,
     "desc": [
-      "Once only, when any player builds an oven, place 1 food on each remaining round space. At the start of those rounds, you get the food."
+      "Once only, when any player builds an oven, place 1 <FOOD> on each remaining round space. At the start of those rounds, you get the <FOOD>."
     ],
     "cost": {},
     "vp": 0,
@@ -259,7 +259,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 9,
     "desc": [
-      "Whenever you receive wood from a building-resource accumulation space, you may place 1 clay from your supply on a different building-resource accumulation space to get 2 food."
+      "Whenever you receive <WOOD> from a building-resource accumulation space, you may place 1 <CLAY> from your supply on a different building-resource accumulation space to get 2 <FOOD>."
     ],
     "cost": {},
     "vp": 0,
@@ -277,7 +277,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 10,
     "desc": [
-      "At the end of the game, get 1 bonus point for each column of three farmyard spaces consisting entirely of rooms, entirely of fields, or entirely of one pasture."
+      "At the end of the game, get 1 bonus <SCORE> for each column of three farmyard spaces consisting entirely of rooms, entirely of <FIELD>, or entirely of one pasture."
     ],
     "cost": {},
     "vp": 0,
@@ -295,7 +295,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 11,
     "desc": [
-      "When building rooms, renovating, or playing an improvement, you may substitute 1 food for 1 building resource. You may substitute up to 2 resources per room-building action, or 1 resource per renovation or improvement."
+      "When building rooms, renovating, or playing an improvement, you may substitute 1 <FOOD> for 1 building resource. You may substitute up to 2 resources per room-building action, or 1 resource per renovation or improvement."
     ],
     "cost": {},
     "vp": 0,
@@ -331,7 +331,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 13,
     "desc": [
-      "You may use an occupied Sheep, Wild Boar, or Cattle Market accumulation space to get 1 animal of that type. You may keep up to 2 animals of one type on one unused farmyard space; that space still counts as unused."
+      "You may use an occupied __Sheep Market__, __Pig Market__, or __Cattle Market__ accumulation space to get 1 animal of that type. You may keep up to 2 animals of one type on one unused farmyard space; that space still counts as unused."
     ],
     "cost": {},
     "vp": 0,
@@ -349,7 +349,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 15,
     "desc": [
-      "Whenever you renovate your clay house, you get 2 clay. If you live in a clay or stone house, each other player's renovation from wood or clay gives you 2 wood or 2 clay, respectively."
+      "Whenever you renovate your clay house, you get 2 <CLAY>. If you live in a clay house or stone house, each other player's renovation from <WOOD> or <CLAY> gives you 2 <WOOD> or 2 <CLAY>, respectively."
     ],
     "cost": {},
     "vp": 0,
@@ -385,7 +385,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 19,
     "desc": [
-      "Add 4, 7, and 10 to the current round. Place one family member from your supply on each corresponding round space. At the start of those rounds, return that member to your supply and you may take a Family Growth with Room action."
+      "Add 4, 7, and 10 to the current round. Place one family member from your supply on each corresponding round space. At the start of those rounds, return that member to your supply and you may take a __Family Growth with Room Only__ action."
     ],
     "cost": {},
     "vp": 0,
@@ -403,7 +403,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 21,
     "desc": [
-      "You may build only 12 fences. Each wood you pay for fences builds 2 fences."
+      "You may build only 12 <FENCE>. Each <WOOD> you pay for <FENCE> builds 2 <FENCE>."
     ],
     "cost": {},
     "vp": 0,
@@ -421,7 +421,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 22,
     "desc": [
-      "Stack 1 clay, 1 vegetable, 1 stone, 1 grain, 1 wood, and 1 reed on this card, from bottom to top. Whenever you use Day Laborer, Fishing, or Traveling Players, take the top good."
+      "Stack 1 <CLAY>, 1 <VEGETABLE>, 1 <STONE>, 1 <GRAIN>, 1 <WOOD>, and 1 <REED> on this card, from bottom to top. Whenever you use __Day Laborer__, __Fishing__, or __Traveling Players__, take the top good."
     ],
     "cost": {},
     "vp": 0,
@@ -439,7 +439,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 23,
     "desc": [
-      "Place 3 arrow markers on this card. Once per round, after the work phase and before returning home, you may pay 1 wood and discard a marker to move one of your people from Farmland or Cultivation to an unoccupied action space and use it."
+      "Place 3 arrow markers on this card. Once per round, after the work phase and before returning home, you may pay 1 <WOOD> and discard a marker to move one of your people from __Farmland__ or __Cultivation__ to an unoccupied action space and use it."
     ],
     "cost": {},
     "vp": 0,
@@ -457,7 +457,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 24,
     "desc": [
-      "Whenever you receive clay from an accumulation space, you also get 1 stone. In round 9 or earlier, if that space has at least 3 clay, you must leave 1 clay there to get that stone."
+      "Whenever you receive <CLAY> from an accumulation space, you also get 1 <STONE>. In round 9 or earlier, if that space has at least 3 <CLAY>, you must leave 1 <CLAY> there to get that <STONE>."
     ],
     "cost": {},
     "vp": 0,
@@ -475,7 +475,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 26,
     "desc": [
-      "Whenever you build at least 1 fence, you get 1 bonus point. When you play this card, you may immediately take a Build Fences action."
+      "Whenever you build at least 1 <FENCE>, you get 1 bonus <SCORE>. When you play this card, you may immediately take a __Build Fences__ action."
     ],
     "cost": {},
     "vp": 0,
@@ -493,7 +493,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 27,
     "desc": [
-      "At the start of round 6, 10, and 13, if you live in a wooden, clay, or stone house, respectively, you may build 1 room at its normal cost, reduced by 1 clay for a clay room or 2 stone for a stone room."
+      "At the start of round 6, 10, and 13, if you live in a wooden house, clay house, or stone house, respectively, you may build 1 room at its normal cost, reduced by 1 <CLAY> for a clay room or 2 <STONE> for a stone room."
     ],
     "cost": {},
     "vp": 0,
@@ -511,7 +511,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 28,
     "desc": [
-      "Whenever you use Day Laborer, you also get 1 sheep. From round 6 onwards, you may take 1 wild boar instead."
+      "Whenever you use __Day Laborer__, you also get 1 <SHEEP>. From round 6 onwards, you may take 1 <BOAR> instead."
     ],
     "cost": {},
     "vp": 0,
@@ -529,7 +529,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 29,
     "desc": [
-      "Whenever you build at least 1 fence or plow at least 1 field, you get 2 or 1 food if you have exactly 2 or 3 rooms, respectively."
+      "Whenever you build at least 1 <FENCE> or plow at least 1 <FIELD>, you get 2 or 1 <FOOD> if you have exactly 2 or 3 rooms, respectively."
     ],
     "cost": {},
     "vp": 0,
@@ -547,7 +547,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 30,
     "desc": [
-      "Each harvest, you may place at most 1 building resource on this card. At the end of the game, get 1, 2, 3, or 5 bonus points for having at least 1, 2, 3, or 4 different building-resource types on this card."
+      "Each harvest, you may place at most 1 building resource on this card. At the end of the game, get 1, 2, 3, or 5 bonus <SCORE> for having at least 1, 2, 3, or 4 different building-resource types on this card."
     ],
     "cost": {},
     "vp": 0,
@@ -565,7 +565,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 31,
     "desc": [
-      "Immediately get 1, 2, 3, or 4 wood if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the fewest played cards gets 3 bonus points."
+      "Immediately get 1, 2, 3, or 4 <WOOD> if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the fewest played cards gets 3 bonus <SCORE>."
     ],
     "cost": {},
     "vp": 0,
@@ -615,7 +615,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 32,
     "desc": [
-      "Whenever you acquire animals outside a harvest breeding phase, you may immediately convert any of them to food: 2 per sheep, 3 per wild boar, and 4 per cattle."
+      "Whenever you acquire animals outside a harvest breeding phase, you may immediately convert any of them to <FOOD>: 2 per <SHEEP>, 3 per <BOAR>, and 4 per <CATTLE>."
     ],
     "cost": {},
     "vp": 0,
@@ -633,7 +633,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 33,
     "desc": [
-      "If you play this card during stage 1, place a family member from your supply on round 12. At the start of round 12, you may pay 2 food to bring that person into play without needing room. The person can work that round."
+      "If you play this card during stage 1, place a family member from your supply on round 12. At the start of round 12, you may pay 2 <FOOD> to bring that person into play without needing room. The person can work that round."
     ],
     "cost": {},
     "vp": 0,
@@ -651,7 +651,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 34,
     "desc": [
-      "Immediately get 1 wild boar, or 1 cattle if you already have a wild boar. During each harvest breeding phase, you may pay 1 food for one animal type to breed an additional offspring."
+      "Immediately get 1 <BOAR>, or 1 <CATTLE> if you already have a <BOAR>. During each harvest breeding phase, you may pay 1 <FOOD> for one animal type to breed an additional offspring."
     ],
     "cost": {},
     "vp": 0,
@@ -669,7 +669,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 35,
     "desc": [
-      "Place 2 wood, 2 clay, 1 reed, and 1 stone on four different revealed action spaces, occupied or not. The next player to use each space may pay you 1 food to take its resources. You need not pay yourself."
+      "Place 2 <WOOD>, 2 <CLAY>, 1 <REED>, and 1 <STONE> on four different revealed action spaces, occupied or not. The next player to use each space may pay you 1 <FOOD> to take its resources. You need not pay yourself."
     ],
     "cost": {},
     "vp": 0,
@@ -687,7 +687,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 37,
     "desc": [
-      "Immediately before receiving at least 2 animals from an animal accumulation space, you may build up to 2 stables for 1 wood each. Animals received through card effects do not count."
+      "Immediately before receiving at least 2 animals from an animal accumulation space, you may build up to 2 <STABLE> for 1 <WOOD> each. Animals received through card effects do not count."
     ],
     "cost": {},
     "vp": 0,
@@ -705,7 +705,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 38,
     "desc": [
-      "At the end of the game, get 9, 6, 4, or 2 bonus points if you have exactly 0, 1, 2, or 3 improvements in front of you, respectively."
+      "At the end of the game, get 9, 6, 4, or 2 bonus <SCORE> if you have exactly 0, 1, 2, or 3 improvements in front of you, respectively."
     ],
     "cost": {},
     "vp": 0,
@@ -723,7 +723,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 40,
     "desc": [
-      "You may sow grain on unused farmyard spaces without adjacency to existing fields. Sown spaces count as used, but are not fields. You may remove their grain at any time and must remove it before scoring. Effects that sow additional grain fields do not apply to these spaces."
+      "You may sow <GRAIN> on unused farmyard spaces without adjacency to existing <FIELD>. Sown spaces count as used, but are not <FIELD>. You may remove their <GRAIN> at any time and must remove it before scoring. Effects that sow additional <GRAIN> <FIELD> do not apply to these spaces."
     ],
     "cost": {},
     "vp": 0,
@@ -741,7 +741,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 41,
     "desc": [
-      "Immediately get 1 stone. Up to twice per round, at any time, you may exchange 1 reed for 1 stone or 1 stone for 1 reed."
+      "Immediately get 1 <STONE>. Up to twice per round, at any time, you may exchange 1 <REED> for 1 <STONE> or 1 <STONE> for 1 <REED>."
     ],
     "cost": {},
     "vp": 0,
@@ -759,7 +759,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 42,
     "desc": [
-      "Immediately before renovating your wooden house, you may return one built stable to your supply and build 1 wooden room for free."
+      "Immediately before renovating your wooden house, you may return one built <STABLE> to your supply and build 1 wooden room for free."
     ],
     "cost": {},
     "vp": 0,
@@ -795,7 +795,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 44,
     "desc": [
-      "As soon as you live in a stone house, place 1 grain on each remaining even-numbered round space and 1 vegetable on each remaining odd-numbered round space. At the start of those rounds, you get the crop."
+      "As soon as you live in a stone house, place 1 <GRAIN> on each remaining even-numbered round space and 1 <VEGETABLE> on each remaining odd-numbered round space. At the start of those rounds, you get the crop."
     ],
     "cost": {},
     "vp": 0,
@@ -813,7 +813,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 45,
     "desc": [
-      "Add 3, 5, 7, and 9 to the current round. Place up to one stable from your supply on each corresponding round space. At the start of those rounds, you may pay 1 wood to build that stable, otherwise return it to your supply."
+      "Add 3, 5, 7, and 9 to the current round. Place up to one <STABLE> from your supply on each corresponding round space. At the start of those rounds, you may pay 1 <WOOD> to build that <STABLE>, otherwise return it to your supply."
     ],
     "cost": {},
     "vp": 0,
@@ -831,7 +831,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 46,
     "desc": [
-      "Whenever you use a stone accumulation space, you also get 1 food. At the end of the game, get 1 bonus point per 2 stone rooms and per 2 improvements whose printed cost includes stone."
+      "Whenever you use a <STONE> accumulation space, you also get 1 <FOOD>. At the end of the game, get 1 bonus <SCORE> per 2 stone rooms and per 2 improvements whose printed cost includes <STONE>."
     ],
     "cost": {},
     "vp": 0,
@@ -867,7 +867,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 49,
     "desc": [
-      "At the start of each of the next 3 rounds, you may pay 2 food to plow an unused space in the easternmost farmyard column, opposite your starting rooms. Normal field adjacency applies. If you decline, discard this card."
+      "At the start of each of the next 3 rounds, you may pay 2 <FOOD> to plow an unused space in the easternmost farmyard column, opposite your starting rooms. Normal <FIELD> adjacency applies. If you decline, discard this card."
     ],
     "cost": {},
     "vp": 0,
@@ -885,7 +885,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 51,
     "desc": [
-      "At the start of each harvest, if you have at least one empty room, you get 1 grain and 1 food. Each empty room is worth 1 bonus point at the end of the game."
+      "At the start of each harvest, if you have at least one empty room, you get 1 <GRAIN> and 1 <FOOD>. Each empty room is worth 1 bonus <SCORE> at the end of the game."
     ],
     "cost": {},
     "vp": 0,
@@ -903,7 +903,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 52,
     "desc": [
-      "Immediately get 1, 2, 3, or 4 clay if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the most clay rooms gets 2 bonus points."
+      "Immediately get 1, 2, 3, or 4 <CLAY> if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the most clay rooms gets 2 bonus <SCORE>."
     ],
     "cost": {},
     "vp": 0,
@@ -921,7 +921,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 53,
     "desc": [
-      "At the start of each round, you may place one hand card face down under this card; it cannot be used again. At the end of the game, each card under this one scores 1 bonus point, except the third, fifth, seventh, and ninth cards."
+      "At the start of each round, you may place one hand card face down under this card; it cannot be used again. At the end of the game, each card under this one scores 1 bonus <SCORE>, except the third, fifth, seventh, and ninth cards."
     ],
     "cost": {},
     "vp": 0,
@@ -939,7 +939,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 54,
     "desc": [
-      "Whenever you receive exactly 1 building resource from an accumulation space, you also get either 1 building resource of your choice or 1 food. In games with 4 or more players, get both instead."
+      "Whenever you receive exactly 1 building resource from an accumulation space, you also get either 1 building resource of your choice or 1 <FOOD>. In games with 4 or more players, get both instead."
     ],
     "cost": {},
     "vp": 0,
@@ -957,7 +957,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 55,
     "desc": [
-      "After using an action space, you may place 1 food from your supply on it to get 1 wood. The next player to use that space takes the food."
+      "After using an action space, you may place 1 <FOOD> from your supply on it to get 1 <WOOD>. The next player to use that space takes the <FOOD>."
     ],
     "cost": {},
     "vp": 0,
@@ -994,7 +994,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 58,
     "desc": [
-      "Put 1 wood from the supply on an empty farmyard field. That field counts as sown. During each harvest field phase, you get 1 food. The prerequisite requires an actual farmyard field tile."
+      "Put 1 <WOOD> from the supply on an empty farmyard <FIELD>. That <FIELD> counts as sown. During each harvest field phase, you get 1 <FOOD>. The prerequisite requires an actual farmyard <FIELD> tile."
     ],
     "cost": {
       "wood": 1
@@ -1032,7 +1032,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 61,
     "desc": [
-      "Immediately place another person on Family Growth with Room and a Minor Improvement, even if it is occupied. Afterwards, pass this card to the next player, who adds it to their hand."
+      "Immediately place another person on the __Wish for Children__ action space, even if it is occupied. Afterwards, pass this card to the next player, who adds it to their hand."
     ],
     "cost": {
       "reed": 1
@@ -1052,7 +1052,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 63,
     "desc": [
-      "At the end of each harvest, you may pay 1 food for 1 bonus point. Your house can no longer hold animals, even through card effects."
+      "At the end of each harvest, you may pay 1 <FOOD> for 1 bonus <SCORE>. Your house can no longer hold animals, even through card effects."
     ],
     "cost": {
       "wood": 2
@@ -1071,7 +1071,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 65,
     "desc": [
-      "At the end of the game, count farmyard field tiles with exactly one orthogonally adjacent field tile. Having 2, 3, 4, or at least 5 such fields gives you 1, 2, 3, or 5 bonus points, respectively."
+      "At the end of the game, count farmyard <FIELD> tiles with exactly one orthogonally adjacent <FIELD> tile. Having 2, 3, 4, or at least 5 such <FIELD> gives you 1, 2, 3, or 5 bonus <SCORE>, respectively."
     ],
     "cost": {
       "stone": 1
@@ -1091,7 +1091,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 66,
     "desc": [
-      "During each harvest feeding phase, you may convert at most one good to food: 1 vegetable for 3 food, 1 sheep for 2 food, 1 wild boar for 3 food, or 1 cattle for 4 food."
+      "During each harvest feeding phase, you may convert at most one good to <FOOD>: 1 <VEGETABLE> for 3 <FOOD>, 1 <SHEEP> for 2 <FOOD>, 1 <BOAR> for 3 <FOOD>, or 1 <CATTLE> for 4 <FOOD>."
     ],
     "cost": {
       "wood": 1,
@@ -1111,7 +1111,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 67,
     "desc": [
-      "Whenever you use Farmland or Cultivation, you also get 1 stone."
+      "Whenever you use __Farmland__ or __Cultivation__, you also get 1 <STONE>."
     ],
     "cost": {},
     "vp": 0,
@@ -1131,7 +1131,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 69,
     "desc": [
-      "Immediately return up to 2 built stables to your supply. For each stable returned, you may plow 1 field. Afterwards, pass this card to the next player, who adds it to their hand."
+      "Immediately return up to 2 built <STABLE> to your supply. For each <STABLE> returned, you may plow 1 <FIELD>. Afterwards, pass this card to the next player, who adds it to their hand."
     ],
     "cost": {},
     "vp": 0,
@@ -1169,7 +1169,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 72,
     "desc": [
-      "At the end of each work phase, if you took a Family Growth action that round, you may either get 2 food or pay 2 food for 1 bonus point."
+      "At the end of each work phase, if you took a __Family Growth__ action that round, you may either get 2 <FOOD> or pay 2 <FOOD> for 1 bonus <SCORE>."
     ],
     "cost": {
       "wood": 1
@@ -1188,7 +1188,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 73,
     "desc": [
-      "Place 1 stone on each of the next 2 round spaces. At the start of those rounds, you get the stone."
+      "Place 1 <STONE> on each of the next 2 round spaces. At the start of those rounds, you get the <STONE>."
     ],
     "cost": {},
     "vp": 1,
@@ -1208,7 +1208,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 74,
     "desc": [
-      "One of your pastures can no longer hold animals. Whenever you use Farmland or Cultivation, you may plow 1 additional field."
+      "One of your pastures can no longer hold animals. Whenever you use __Farmland__ or __Cultivation__, you may plow 1 additional <FIELD>."
     ],
     "cost": {},
     "vp": 0,
@@ -1226,7 +1226,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 76,
     "desc": [
-      "Place a field tile on the round space 4 rounds after the current round. At the start of that round, you may pay 1 food to plow that field."
+      "Place a <FIELD> tile on the round space 4 rounds after the current round. At the start of that round, you may pay 1 <FOOD> to plow that <FIELD>."
     ],
     "cost": {
       "reed": 1
@@ -1248,7 +1248,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 78,
     "desc": [
-      "During each harvest field phase, if you harvested at least 2 goods, you may pay 2 food to play an occupation. Goods harvested from card fields count; extra field phases supplied by cards do not."
+      "During each harvest field phase, if you harvested at least 2 goods, you may pay 2 <FOOD> to play an occupation. Goods harvested from card <FIELD> count; an extra field phase supplied by a card does not."
     ],
     "cost": {
       "wood": 1,
@@ -1271,7 +1271,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 79,
     "desc": [
-      "After each harvest field phase, you may convert at most 1 grain into 2 food and 1 building resource of your choice. Card fields count toward the prerequisite; extra field phases supplied by cards do not trigger this effect."
+      "After each harvest field phase, you may convert at most 1 <GRAIN> into 2 <FOOD> and 1 building resource of your choice. Card <FIELD> count toward the prerequisite; an extra field phase supplied by a card does not trigger this effect."
     ],
     "cost": {
       "wood": 1,
@@ -1291,7 +1291,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 82,
     "desc": [
-      "If played in round 6 or earlier, place 1 vegetable on round 8. At the start of round 8, you get it."
+      "If played in round 6 or earlier, place 1 <VEGETABLE> on round 8. At the start of round 8, you get it."
     ],
     "cost": {
       "clay": 1
@@ -1310,7 +1310,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 84,
     "desc": [
-      "Each of your pastures containing a stable may hold different animal types together. Its total capacity is unchanged."
+      "Each of your pastures containing a <STABLE> may hold different animal types together. Its total capacity is unchanged."
     ],
     "cost": {
       "wood": 2
@@ -1330,7 +1330,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 85,
     "desc": [
-      "During the next harvest feeding phase only, each of your family members, including newborns, requires 1 less food."
+      "During the next harvest feeding phase only, each of your family members, including newborns, requires 1 less <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -1373,7 +1373,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 86,
     "desc": [
-      "Each harvest, you may convert at most 1 clay into 3 food. At the end of the game, having at least 2, 4, or 5 clay gives 1, 2, or 3 bonus points. The same clay cannot also score for Pottery. This card counts as both a major and a minor improvement, but only one improvement."
+      "Each harvest, you may convert at most 1 <CLAY> into 3 <FOOD>. At the end of the game, having at least 2, 4, or 5 <CLAY> gives 1, 2, or 3 bonus <SCORE>. The same <CLAY> cannot also score for Pottery. This card counts as both a major and a minor improvement, but only one improvement."
     ],
     "cost": {
       "clay": 1,
@@ -1393,7 +1393,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 87,
     "desc": [
-      "Choose grain, vegetables, sheep, wild boar, cattle, fields, pastures, or fenced stables when you play this card. At the end of the game, every player tied for the highest normal score in that category gets 2 bonus points. Ignore other cards' bonus points."
+      "Choose <GRAIN>, <VEGETABLE>, <SHEEP>, <BOAR>, <CATTLE>, <FIELD>, pastures, or fenced <STABLE> when you play this card. At the end of the game, every player tied for the highest normal score in that category gets 2 bonus <SCORE>. Ignore other cards' bonus <SCORE>."
     ],
     "cost": {},
     "vp": 0,
@@ -1410,7 +1410,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 88,
     "desc": [
-      "At the start of each round, add 1 grain from the supply unless the number of grain on this card equals the player count. When you use Grain Seeds, take all grain here. When another player uses it, discard all grain here."
+      "At the start of each round, add 1 <GRAIN> from the supply unless the number of <GRAIN> on this card equals the player count. When you use __Grain Seeds__, take all <GRAIN> here. When another player uses it, discard all <GRAIN> here."
     ],
     "cost": {
       "stone": 1
@@ -1429,7 +1429,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 89,
     "desc": [
-      "Whenever you renovate, place 1 food on each of the next 3 round spaces. You also do this when playing this card if you renovated earlier in the current turn. At the start of those rounds, you get the food."
+      "Whenever you renovate, place 1 <FOOD> on each of the next 3 round spaces. You also do this when playing this card if you renovated earlier in the current turn. At the start of those rounds, you get the <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -1448,7 +1448,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 92,
     "desc": [
-      "You may use Farm Expansion when occupied by another player, but not when occupied by yourself. This does not apply to the 5-player Build 1 Room action space."
+      "You may use __Farm Expansion__ when occupied by another player, but not when occupied by yourself. This does not apply to the 5-player Build 1 Room action space."
     ],
     "cost": {
       "stone": 1
@@ -1467,7 +1467,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 93,
     "desc": [
-      "Fireplaces and Cooking Hearths count as minor improvements for you and cost 1 clay less."
+      "Fireplaces and Cooking Hearths count as minor improvements for you and cost 1 <CLAY> less."
     ],
     "cost": {
       "wood": 1
@@ -1486,7 +1486,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 94,
     "desc": [
-      "Immediately before you play an occupation card, you get 1 food. Its prerequisite requires 2 animals of any types, excluding animals kept on cards."
+      "Immediately before you play an occupation card, you get 1 <FOOD>. Its prerequisite requires 2 animals of any types, excluding animals kept on cards."
     ],
     "cost": {
       "wood": 2,
@@ -1520,7 +1520,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 95,
     "desc": [
-      "Each harvest, you may convert at most 1 wood into 1 stone."
+      "Each harvest, you may convert at most 1 <WOOD> into 1 <STONE>."
     ],
     "cost": {
       "food": 1
@@ -1539,7 +1539,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 96,
     "desc": [
-      "Immediately place 1 food from the supply on this card. During each harvest field phase, if any food remains here, add 1 food. You may take its food at any time."
+      "Immediately place 1 <FOOD> from the supply on this card. During each harvest field phase, if any <FOOD> remains here, add 1 <FOOD>. You may take its <FOOD> at any time."
     ],
     "cost": {
       "wood": 1
@@ -1558,7 +1558,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 97,
     "desc": [
-      "Before each harvest feeding phase, you may pay at most 1 sheep for 1 bonus point."
+      "Before each harvest feeding phase, you may pay at most 1 <SHEEP> for 1 bonus <SCORE>."
     ],
     "cost": {
       "stone": 1
@@ -1577,7 +1577,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 98,
     "desc": [
-      "At the end of the game, if you have all three animal types outside cards, get 1 bonus point for having at least 2 sheep and 1 bonus point for having at least 2 wild boar. You may receive both."
+      "At the end of the game, if you have all three animal types outside cards, get 1 bonus <SCORE> for having at least 2 <SHEEP> and 1 bonus <SCORE> for having at least 2 <BOAR>. You may receive both."
     ],
     "cost": {
       "wood": 2
@@ -1596,7 +1596,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 100,
     "desc": [
-      "Count your sown fields and place 1 food on each of that many subsequent round spaces. At the start of those rounds, you get the food. Card fields count for both the prerequisite and this count; each sown card counts as one field."
+      "Count your sown <FIELD> and place 1 <FOOD> on each of that many subsequent round spaces. At the start of those rounds, you get the <FOOD>. Card <FIELD> count for both the prerequisite and this count; each sown card counts as one <FIELD>."
     ],
     "cost": {},
     "vp": 1,
@@ -1630,7 +1630,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 103,
     "desc": [
-      "Place 1 food from the supply on each of up to 3 unused farmyard spaces. When a marked space becomes used, you get its food. The food markers do not themselves make spaces used."
+      "Place 1 <FOOD> from the supply on each of up to 3 unused farmyard spaces. When a marked space becomes used, you get its <FOOD>. The <FOOD> markers do not themselves make spaces used."
     ],
     "cost": {
       "clay": 1
@@ -1652,7 +1652,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 106,
     "desc": [
-      "Immediately place 4 stone on this card. During each harvest field phase, take 1 stone from it."
+      "Immediately place 4 <STONE> on this card. During each harvest field phase, take 1 <STONE> from it."
     ],
     "cost": {
       "stone": 4
@@ -1741,7 +1741,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 108,
     "desc": [
-      "At any time, you may convert 1 grain together with 1 vegetable, sheep, wild boar, or cattle into 5, 4, 5, or 6 food, respectively."
+      "At any time, you may convert 1 <GRAIN> together with 1 <VEGETABLE>, <SHEEP>, <BOAR>, or <CATTLE> into 5, 4, 5, or 6 <FOOD>, respectively."
     ],
     "cost": {
       "wood": 1
@@ -1760,7 +1760,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 111,
     "desc": [
-      "Count the full rounds already completed. Place 1 food on each of that many subsequent round spaces. At the start of those rounds, you get the food."
+      "Count the full rounds already completed. Place 1 <FOOD> on each of that many subsequent round spaces. At the start of those rounds, you get the <FOOD>."
     ],
     "cost": {},
     "vp": 1,
@@ -1799,7 +1799,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 114,
     "desc": [
-      "Immediately get 1 vegetable. Once per round, you may place 1 vegetable on a future round space. If it is at least 5 rounds ahead, add a second vegetable from the supply. At the start of that round, each vegetable there must become either 2 food or 1 bonus point."
+      "Immediately get 1 <VEGETABLE>. Once per round, you may place 1 <VEGETABLE> on a future round space. If it is at least 5 rounds ahead, add a second <VEGETABLE> from the supply. At the start of that round, each <VEGETABLE> there must become either 2 <FOOD> or 1 bonus <SCORE>."
     ],
     "cost": {},
     "vp": 0,
@@ -1817,7 +1817,7 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "deck": "CWM",
     "number": 115,
     "desc": [
-      "Whenever you use Farmland, put 2 food from the supply on this card. Whenever you use Fishing, take all its food. At the start of each harvest, return 1 food from this card."
+      "Whenever you use __Farmland__, put 2 <FOOD> from the supply on this card. Whenever you use __Fishing__, take all its <FOOD>. At the start of each harvest, return 1 <FOOD> from this card."
     ],
     "cost": {},
     "vp": 0,
