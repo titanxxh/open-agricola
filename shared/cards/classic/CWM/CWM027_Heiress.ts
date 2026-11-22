@@ -22,7 +22,7 @@ const cardImpl = {
             actionId: 'construct',
             optional: true,
             sourceCard: CARD_ID,
-            actionContext: { max: 1, targetFarmPolicy: 'own' },
+            actionContext: { maxRooms: 1, targetFarmPolicy: 'own' },
           }
         : undefined,
   },
