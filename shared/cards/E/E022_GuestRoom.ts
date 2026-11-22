@@ -5,6 +5,7 @@ import { hasInactiveWorkerInSupply } from '../../domain/player'
 import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
 import type { ActionDefinition, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { payLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E022_GuestRoom'
 const FOOD_ACTION = `card_${CARD_ID}_food`
@@ -47,11 +48,11 @@ const foodAction: ActionDefinition = {
       Object.entries(counts).some(([resource, amount]) => resource !== 'food' && amount !== 0)) {
       return { type: 'fail', errorKey: 'log.actionFail', recoverable: true }
     }
-    player.resources.food -= count
+    if (count === 0) return { type: 'ok' }
     pushToCardStack(player, CARD_ID, Array.from({ length: count }, () => 'food'))
     updateInfobox(player)
-    if (count > 0) eventSink?.emit<'card.stackChanged'>({ type: 'card.stackChanged', cardId: CARD_ID, targetPlayerId: player.id, resources: { food: count }, delta: count, reason: 'store' })
-    return { type: 'ok' }
+    eventSink?.emit<'card.stackChanged'>({ type: 'card.stackChanged', cardId: CARD_ID, targetPlayerId: player.id, resources: { food: count }, delta: count, reason: 'store' })
+    return { type: 'flow', flow: payLeaf({ cardId: CARD_ID, cost: { food: count } }) }
   },
 }
 

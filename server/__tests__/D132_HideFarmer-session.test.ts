@@ -220,6 +220,8 @@ describe('D132_HideFarmer session', () => {
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.hiddenSpaces).toBe(2)
+    expect(resp.state.events.filter(event => event.type === 'resource.paid' && event.sourceCardId === CARD_ID))
+      .toEqual([expect.objectContaining({ resources: { food: 2 }, to: { kind: 'supply' } })])
     expect(getCategory(session, resp, 0, 'empty')?.quantity).toBe(1)
     expect(getCategory(session, resp, 0, 'empty')?.total).toBe(-1)
     expect(getCategory(session, resp, 0, 'cardBonusVp')).toBeUndefined()

@@ -75,6 +75,12 @@ describe('E022 Guest Room supply placements', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0, reed: 0 })
     expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual(['food', 'food', 'food'])
+    const isFoodPaid = (event: (typeof response.state.events)[number]) =>
+      event.type === 'resource.paid' && event.sourceCardId === CARD_ID && (event.resources.food ?? 0) > 0
+    expect(response.state.events.filter(isFoodPaid))
+      .toEqual([expect.objectContaining({ resources: { food: 3 }, to: { kind: 'supply' } })])
+    expect(response.state.events.filter((event) => event.type === 'card.stackChanged' && event.cardId === CARD_ID && event.reason === 'store'))
+      .toEqual([expect.objectContaining({ resources: { food: 3 }, delta: 3 })])
     expect(response.state.players[0]!.minorPlayed.filter((id) => id === CARD_ID)).toHaveLength(1)
   })
 
