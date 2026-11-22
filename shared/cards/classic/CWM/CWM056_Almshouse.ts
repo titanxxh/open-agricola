@@ -5,13 +5,14 @@ import { payLeaf } from '../../helpers/pay-gain-node'
 
 const CARD_ID = 'CWM056_Almshouse'
 
-/** Begging cards received for feeding, minus those already discarded. */
+/** Begging cards received for feeding and not yet discarded, read in order: a discard
+ * before any feeding marker exists removes a card-issued marker, not a later feeding one. */
 const feedingBeggingRemaining = (state: GameState, player: PlayerState): number =>
-  Math.max(0, state.events.reduce((count, event) => {
+  state.events.reduce((count, event) => {
     if (event.type !== 'resource.paid' || event.actorPlayerId !== player.id) return count
     const amount = event.resources.begging ?? 0
-    return count + (event.paymentFor === 'feeding' ? amount : -amount)
-  }, 0))
+    return Math.max(0, count + (event.paymentFor === 'feeding' ? amount : -amount))
+  }, 0)
 
 const cardImpl = {
   effect: {

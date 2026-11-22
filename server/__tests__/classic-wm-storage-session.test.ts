@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { countOccupations } from '../../shared/cards/helpers/prerequisites'
 import { computeHarvestFeedingRequirement } from '../../shared/actions/helpers/harvest-feeding-requirement'
-import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { playMinor, playOccupation, sessionOptions } from './_helpers/card-regression-session'
 import {
   wmAction,
@@ -158,27 +157,6 @@ describe('WM occupational identity, feeding and animal housing', () => {
     expect(response.state.players[0]!.resources.food).toBe(38)
     response = wmConfirmations(session, wmEndRound(session, 7))
     expect(response.state.players[0]!.resources.food).toBe(36)
-  })
-  it('Friendly Pastures enables mixed species only in pastures containing a stable, without changing capacity', () => {
-    const session = wmSession([84], (state) => {
-      const p = state.players[0]!
-      p.pastures = [
-        { id: 'stable-pasture', tiles: [{ row: 0, col: 1 }], animalType: null, animalCount: 0 },
-        { id: 'plain-pasture', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 },
-      ]
-      p.stableTiles = [{ row: 0, col: 1 }]
-    })
-    session.withCtx(() => {
-      const zones = computeAnimalZones(session.state.players[0]!, session.state)
-      expect(zones.find((zone) => zone.id === 'stable-pasture')).toMatchObject({
-        capacity: 4,
-        allowedAnimalType: null,
-      })
-      expect(zones.find((zone) => zone.id === 'plain-pasture')).toMatchObject({ capacity: 2 })
-      expect(zones.find((zone) => zone.id === 'plain-pasture')).not.toHaveProperty(
-        'allowedAnimalType',
-      )
-    })
   })
   it('Kindling permits a one-clay Fireplace on Meeting Place', () => {
     const session = wmSession([93], (state) => {

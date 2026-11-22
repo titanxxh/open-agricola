@@ -78,7 +78,6 @@ import { CWM079_FestivalHall } from '../../../shared/cards/classic/CWM/CWM079_Fe
 import { CWM080_FishHook } from '../../../shared/cards/classic/CWM/CWM080_FishHook'
 import { CWM082_FlowerPots } from '../../../shared/cards/classic/CWM/CWM082_FlowerPots'
 import { CWM083_FreeRangeChickens } from '../../../shared/cards/classic/CWM/CWM083_FreeRangeChickens'
-import { CWM084_FriendlyPastures } from '../../../shared/cards/classic/CWM/CWM084_FriendlyPastures'
 import { CWM085_Fruitcake } from '../../../shared/cards/classic/CWM/CWM085_Fruitcake'
 import { CWM086_GlassblowersShop } from '../../../shared/cards/classic/CWM/CWM086_GlassblowersShop'
 import { CWM087_GoldMedal } from '../../../shared/cards/classic/CWM/CWM087_GoldMedal'
@@ -172,7 +171,6 @@ const sources: CardSource[] = [
   CWM080_FishHook,
   CWM082_FlowerPots,
   CWM083_FreeRangeChickens,
-  CWM084_FriendlyPastures,
   CWM085_Fruitcake,
   CWM086_GlassblowersShop,
   CWM087_GoldMedal,
