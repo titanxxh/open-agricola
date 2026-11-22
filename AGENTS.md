@@ -159,7 +159,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 2. 本机复现应用行为、UI 或 WS 时，先通过 `./restart-local.sh` 重启，再用浏览器、Playwright 或命令行检查。`pnpm verify <file.spec.ts>` 在隔离环境调用该入口。本机结果写明实际范围；`pnpm verify prepush` 是可选的完整 fast 门禁，不是 push 的前置条件。
 3. PR 与 main 使用同一 canonical plan 执行受影响检查，由 `verify` 汇总；选择范围与证据规则以 `docs/operations/ci-checks.md` 为准。
 4. 源码或 rebase 改变文件内容后，按实际变化重新取得当前源码的验证证据。`pnpm verify status` 仅核对本机记录及其实际范围，不自动跳过检查。
-5. 发布证据的唯一契约在 `docs/HOW_TO_DEPLOY.md` 的 [Release evidence contract](docs/HOW_TO_DEPLOY.md#release-evidence-contract)：默认使用完整原生 GitHub 回执；owner 明确授权时可使用该节规定的完整 owner-local 通路。本机定向检查或 owner 的发布演练不能充当完整候选证明，本机命令也不能冒充 GitHub jobs。镜像、Pages 的真实构建与部署门禁仍独立执行。
+5. 发布证据的唯一契约在 `docs/HOW_TO_DEPLOY.md` 的 [Release evidence contract](docs/HOW_TO_DEPLOY.md#release-evidence-contract)：正式版和 pre 默认使用该节规定的完整 owner-local 回执（ADR 0046），完整原生 GitHub 回执是备用通路。本机定向检查或 owner 的发布演练不能充当完整候选证明，本机命令也不能冒充 GitHub jobs。镜像、Pages 的真实构建与部署门禁仍独立执行。
 
 </important>
 
