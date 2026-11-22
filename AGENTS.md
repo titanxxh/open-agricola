@@ -128,7 +128,6 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 | `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单 |
 | `docs/ARCHITECTURE.md`、`docs/architecture/*.md` | 通用扩展点或模块职责、不变量、seam 变化时，更新对应模块文档；索引只保留设计不变量、拓扑、分层与模块表 |
 | `docs/CARD_AUTHORING.md` | 新增或改变卡牌可复用的机制、范例卡或可行性规则；工坊 agent 也读它。模块文档或 ADR 新增限制卡牌写法的不变量时，在其 Card contract 加一条并链接出处 |
-| `shared/cards/AGENTS.md` | 卡牌评审规则变化时；Codex 评审读取其中的 `## Code Review Rules` |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略或卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 对应议题变化 |
 
@@ -181,6 +180,20 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 ## Deployment
 
 发布、部署和备份由 owner 在本机用私有仓库 `titanxxh/open-agricola-ops` 的工具执行，见该仓库的 AGENTS.md 和 `docs/HOW_TO_DEPLOY.md` 的 [Owner operations](docs/HOW_TO_DEPLOY.md#owner-operations)；本仓库不再有这些工具的代码。本仓库负责候选验证、门禁，镜像和 Pages 的 workflow，以及主机从已部署检出运行的备份脚本。GitHub Actions 固定使用 `ubuntu-latest`，额度不足直接失败，不使用 self-hosted runner。
+
+</important>
+
+<important if="评审 PR、diff 或他人的改动">
+
+## Code Review Rules
+
+本节标题固定为英文：Codex 的 GitHub 评审按这个标题查找评审规则。
+
+### 卡牌改动
+
+- 逐张、逐条按 `docs/CARD_AUTHORING.md` 开头的 Card contract 评审改动的卡。违反任何一条按 P1 上报，写明规则名和一个具体的 Session 场景：准备、命令、错误结果。
+- 玩家已接受的选择让后面的必选步骤付不起，随后进入 `engine-blocked` 并等待 `undoStep` / `undoAction`，这是 Card contract 的 Admission 规则下的设计结果（ADR 0015、`D014_HammerCrusher`）。卡漏查自己的前提、目标或费用而进入 `engine-blocked` 时才上报。
+- `shared/cards/helpers/` 下不改核心路径的新文件属于卡牌改动。为单张卡改核心路径，按 Closure 规则上报。
 
 </important>
 
