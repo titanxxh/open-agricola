@@ -488,7 +488,6 @@ Edit the individual switch in `scripts/vite-service-worker.ts` and publish a sta
 | `PUBLIC_ASSET_CACHE_ENABLED` | Images and fonts use ordinary HTTP requests. |
 | `APP_SHELL_CACHE_ENABLED` | Hashed scripts, styles, language packs and the cards manifest use the HTTP cache. |
 | `ROOM_OFFLINE_RETRY_ENABLED` | Room document requests use ordinary browser navigation. |
-| `OFFLINE_ENCYCLOPEDIA_ENABLED` | Pages hides downloads and pauses offline reading. Saved copies stay in the browser. |
 
 Keep the same `/sw.js` URL and root scope. For emergency replacement, set `SERVICE_WORKER_EMERGENCY_TAKEOVER` to `true` in the same candidate. Once an online browser discovers and installs that build, the new Worker activates without reloading open pages or restarting their WebSockets. Reset the switch to `false` for subsequent normal releases. An installed Worker needs a valid replacement script at `/sw.js`.
 

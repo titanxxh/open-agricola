@@ -79,7 +79,6 @@
   "e2e-tests/moor-granted-lifecycle.spec.ts": 1,
   "e2e-tests/oauth-onboarding.spec.ts": 86,
   "e2e-tests/occupation-preview.spec.ts": 10,
-  "e2e-tests/offline-encyclopedia.spec.ts": 95,
   "e2e-tests/online-interaction-completion.spec.ts": 10,
   "e2e-tests/operations-dashboard.spec.ts": 57,
   "e2e-tests/paper-maker-exchange.spec.ts": 15,
