@@ -539,8 +539,47 @@ import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C179_BovinePioneer } from './C/C179_BovinePioneer'
 import { C180_Trapper } from './C/C180_Trapper'
 import { CE203_Shepherd } from './classic/CE/CE203_Shepherd'
+import { CFL002_BeguineCourtyard } from './classic/CFL/CFL002_BeguineCourtyard'
+import { CFL003_BelgianShepherd } from './classic/CFL/CFL003_BelgianShepherd'
+import { CFL005_Brabant } from './classic/CFL/CFL005_Brabant'
+import { CFL007_DiamondTradingPost } from './classic/CFL/CFL007_DiamondTradingPost'
+import { CFL009_EbonyShoe } from './classic/CFL/CFL009_EbonyShoe'
+import { CFL010_StuckCart } from './classic/CFL/CFL010_StuckCart'
+import { CFL011_Towhead } from './classic/CFL/CFL011_Towhead'
+import { CFL012_Cart } from './classic/CFL/CFL012_Cart'
+import { CFL014_JeneverDistillery } from './classic/CFL/CFL014_JeneverDistillery'
+import { CFL015_CourtyardGarden } from './classic/CFL/CFL015_CourtyardGarden'
+import { CFL018_Oce } from './classic/CFL/CFL018_Oce'
+import { CFL020_LoveGarden } from './classic/CFL/CFL020_LoveGarden'
+import { CFL021_LionsMound } from './classic/CFL/CFL021_LionsMound'
+import { CFL024_LoversTryst } from './classic/CFL/CFL024_LoversTryst'
 import { CFL026_SpeculoosBakery } from './classic/CFL/CFL026_SpeculoosBakery'
+import { CFL027_TrappistBeer } from './classic/CFL/CFL027_TrappistBeer'
+import { CFL028_HashwithFries } from './classic/CFL/CFL028_HashwithFries'
+import { CFL029_BirdTrap } from './classic/CFL/CFL029_BirdTrap'
+import { CFL030_WildBoarHunt } from './classic/CFL/CFL030_WildBoarHunt'
+import { CFL031_OldMaster } from './classic/CFL/CFL031_OldMaster'
+import { CFL033_Sculptor } from './classic/CFL/CFL033_Sculptor'
+import { CFL035_Freemason } from './classic/CFL/CFL035_Freemason'
+import { CFL038_ShepherdwithFlock } from './classic/CFL/CFL038_ShepherdwithFlock'
+import { CFL039_Cosmographer } from './classic/CFL/CFL039_Cosmographer'
 import { CFL040_Anatomist } from './classic/CFL/CFL040_Anatomist'
+import { CFL041_FryCook } from './classic/CFL/CFL041_FryCook'
+import { CFL042_Rainmaker } from './classic/CFL/CFL042_Rainmaker'
+import { CFL043_RubenesqueWoman } from './classic/CFL/CFL043_RubenesqueWoman'
+import { CFL044_Returnee } from './classic/CFL/CFL044_Returnee'
+import { CFL045_SchoolDropout } from './classic/CFL/CFL045_SchoolDropout'
+import { CFL046_StableArchitect } from './classic/CFL/CFL046_StableArchitect'
+import { CFL047_FarmLawyer } from './classic/CFL/CFL047_FarmLawyer'
+import { CFL048_Botanist } from './classic/CFL/CFL048_Botanist'
+import { CFL050_MeatSupplier } from './classic/CFL/CFL050_MeatSupplier'
+import { CFL051_NorthSeaFisherman } from './classic/CFL/CFL051_NorthSeaFisherman'
+import { CFL053_CafeSinger } from './classic/CFL/CFL053_CafeSinger'
+import { CFL054_ChansonSinger } from './classic/CFL/CFL054_ChansonSinger'
+import { CFL057_Chaplain } from './classic/CFL/CFL057_Chaplain'
+import { CFL059_PillarBiter } from './classic/CFL/CFL059_PillarBiter'
+import { CFL060_VirtuousHero } from './classic/CFL/CFL060_VirtuousHero'
+import { CFL061_BlacklegChicken } from './classic/CFL/CFL061_BlacklegChicken'
 import { CG062_AnimalFarm } from './classic/CG/CG062_AnimalFarm'
 import { CI073_Guest } from './classic/CI/CI073_Guest'
 import { CI097_Slaughterhouse } from './classic/CI/CI097_Slaughterhouse'
@@ -1656,8 +1695,47 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C179_BovinePioneer': C179_BovinePioneer.impl,
   'C180_Trapper': C180_Trapper.impl,
   'CE203_Shepherd': CE203_Shepherd.impl,
+  'CFL002_BeguineCourtyard': CFL002_BeguineCourtyard.impl,
+  'CFL003_BelgianShepherd': CFL003_BelgianShepherd.impl,
+  'CFL005_Brabant': CFL005_Brabant.impl,
+  'CFL007_DiamondTradingPost': CFL007_DiamondTradingPost.impl,
+  'CFL009_EbonyShoe': CFL009_EbonyShoe.impl,
+  'CFL010_StuckCart': CFL010_StuckCart.impl,
+  'CFL011_Towhead': CFL011_Towhead.impl,
+  'CFL012_Cart': CFL012_Cart.impl,
+  'CFL014_JeneverDistillery': CFL014_JeneverDistillery.impl,
+  'CFL015_CourtyardGarden': CFL015_CourtyardGarden.impl,
+  'CFL018_Oce': CFL018_Oce.impl,
+  'CFL020_LoveGarden': CFL020_LoveGarden.impl,
+  'CFL021_LionsMound': CFL021_LionsMound.impl,
+  'CFL024_LoversTryst': CFL024_LoversTryst.impl,
   'CFL026_SpeculoosBakery': CFL026_SpeculoosBakery.impl,
+  'CFL027_TrappistBeer': CFL027_TrappistBeer.impl,
+  'CFL028_HashwithFries': CFL028_HashwithFries.impl,
+  'CFL029_BirdTrap': CFL029_BirdTrap.impl,
+  'CFL030_WildBoarHunt': CFL030_WildBoarHunt.impl,
+  'CFL031_OldMaster': CFL031_OldMaster.impl,
+  'CFL033_Sculptor': CFL033_Sculptor.impl,
+  'CFL035_Freemason': CFL035_Freemason.impl,
+  'CFL038_ShepherdwithFlock': CFL038_ShepherdwithFlock.impl,
+  'CFL039_Cosmographer': CFL039_Cosmographer.impl,
   'CFL040_Anatomist': CFL040_Anatomist.impl,
+  'CFL041_FryCook': CFL041_FryCook.impl,
+  'CFL042_Rainmaker': CFL042_Rainmaker.impl,
+  'CFL043_RubenesqueWoman': CFL043_RubenesqueWoman.impl,
+  'CFL044_Returnee': CFL044_Returnee.impl,
+  'CFL045_SchoolDropout': CFL045_SchoolDropout.impl,
+  'CFL046_StableArchitect': CFL046_StableArchitect.impl,
+  'CFL047_FarmLawyer': CFL047_FarmLawyer.impl,
+  'CFL048_Botanist': CFL048_Botanist.impl,
+  'CFL050_MeatSupplier': CFL050_MeatSupplier.impl,
+  'CFL051_NorthSeaFisherman': CFL051_NorthSeaFisherman.impl,
+  'CFL053_CafeSinger': CFL053_CafeSinger.impl,
+  'CFL054_ChansonSinger': CFL054_ChansonSinger.impl,
+  'CFL057_Chaplain': CFL057_Chaplain.impl,
+  'CFL059_PillarBiter': CFL059_PillarBiter.impl,
+  'CFL060_VirtuousHero': CFL060_VirtuousHero.impl,
+  'CFL061_BlacklegChicken': CFL061_BlacklegChicken.impl,
   'CG062_AnimalFarm': CG062_AnimalFarm.impl,
   'CI073_Guest': CI073_Guest.impl,
   'CI097_Slaughterhouse': CI097_Slaughterhouse.impl,

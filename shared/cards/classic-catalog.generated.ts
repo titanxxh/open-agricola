@@ -17,6 +17,275 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CFL002_BeguineCourtyard",
+    "name": "Beguine Courtyard",
+    "deck": "CFL",
+    "number": 2,
+    "cost": {
+      "stone": 2,
+      "clay": 2
+    },
+    "vp": 1,
+    "desc": [
+      "Once your house contains the five rooms of a C shape (all three spaces of the left column and the top and bottom spaces of the next column), immediately move all family members still in your supply into your house as adults. They can act this round."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL002.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL003_BelgianShepherd",
+    "name": "Belgian Shepherd",
+    "deck": "CFL",
+    "number": 3,
+    "vp": 1,
+    "desc": [
+      "You can keep up to 2 <SHEEP> on at most one unused farmyard space. That space still counts as unused. You can no longer keep animals in your house."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL003.png",
+    "blocksHouseAnimalZones": true,
+    "animalHolder": true,
+    "prerequisite": "1 sheep",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL005_Brabant",
+    "name": "Brabant",
+    "deck": "CFL",
+    "number": 5,
+    "extraVp": true,
+    "desc": [
+      "During scoring, if you have no animals of exactly 2 or 3 types, you get 5 bonus <SCORE>. You still lose the usual points for missing animal types."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL005.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL007_DiamondTradingPost",
+    "name": "Diamond Trading Post",
+    "deck": "CFL",
+    "number": 7,
+    "cost": {
+      "wood": 3,
+      "clay": 3
+    },
+    "vp": 1,
+    "occupationPrerequisites": {
+      "min": 3
+    },
+    "desc": [
+      "Place 3 <STONE> from the general supply on this card. You may take them at any time. At the start of a harvest, if you have more <STONE> in your supply than on this card, you may place 1 of them here to get 2 <SHEEP>, then 2 <PIG>, then 2 <CATTLE> on successive uses."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL007.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL009_EbonyShoe",
+    "name": "Ebony Shoe",
+    "deck": "CFL",
+    "number": 9,
+    "cost": {
+      "wood": 1
+    },
+    "extraVp": true,
+    "desc": [
+      "When you play this card, if at least 1/3/6/9 rounds remain, you get 1/2/3/4 <CLAY>. The next player to use all their farmyard spaces gets 3 bonus <SCORE>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL009.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL010_StuckCart",
+    "name": "Stuck Cart",
+    "deck": "CFL",
+    "number": 10,
+    "cost": {
+      "wood": 1
+    },
+    "vp": 1,
+    "passing": true,
+    "desc": [
+      "Immediately place all your remaining family members, one after another. Then pass this card to the player on your left."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL010.png",
+    "prerequisite": "2 placed family members",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL011_Towhead",
+    "name": "Towhead",
+    "deck": "CFL",
+    "number": 11,
+    "cost": {
+      "wood": 1
+    },
+    "vp": 0,
+    "desc": [
+      "Put the Family Growth with room action card on round 6. In round 5, you alone may also use it before its normal reveal. Play this card no later than round 4."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL011.png",
+    "maxRound": 4,
+    "kind": "minor"
+  },
+  {
+    "id": "CFL012_Cart",
+    "name": "Cart",
+    "deck": "CFL",
+    "number": 12,
+    "cost": {
+      "wood": 3
+    },
+    "desc": [
+      "Only you may use a space with at least 6 <WOOD>, 5 <CLAY>, 4 <REED>, or 3 <STONE> with your first person of a round. Other players may use it with a later person."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL012.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL014_JeneverDistillery",
+    "name": "Jenever Distillery",
+    "deck": "CFL",
+    "number": 14,
+    "cost": {
+      "clay": 3,
+      "stone": 1
+    },
+    "vp": 1,
+    "desc": [
+      "When you play this card, place 1–4 <WOOD> from your supply on it. You may take any of this <WOOD> back at any time. In each harvest field phase, you get 1 <FOOD> for each <WOOD> still here."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL014.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL015_CourtyardGarden",
+    "name": "Courtyard Garden",
+    "deck": "CFL",
+    "number": 15,
+    "cost": {
+      "wood": 3,
+      "stone": 1
+    },
+    "extraVp": true,
+    "desc": [
+      "During scoring, if you live in a stone house, you get 2 bonus <SCORE> for each unused farmyard space orthogonally adjacent to your house. You still lose points for unused spaces."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL015.png",
+    "prerequisite": "Wood house",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL018_Oce",
+    "name": "Office",
+    "deck": "CFL",
+    "number": 18,
+    "cost": {
+      "clay": 4,
+      "wood": 3,
+      "reed": 2
+    },
+    "vp": 1,
+    "desc": [
+      "At any time, you can exchange 1 <CLAY> for 1 <STONE>, 1 <GRAIN> for 1 <VEGETABLE>, or 1 <PIG> for 1 <CATTLE>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL018.png",
+    "exchanges": [
+      {
+        "from": {
+          "clay": 1
+        },
+        "to": {
+          "stone": 1
+        },
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "vegetable": 1
+        },
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "cattle": 1
+        },
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
+    "kind": "minor"
+  },
+  {
+    "id": "CFL020_LoveGarden",
+    "name": "Love Garden",
+    "deck": "CFL",
+    "number": 20,
+    "cost": {
+      "food": 2
+    },
+    "desc": [
+      "At the end of each work phase, if all revealed __Family Growth__ and __Build Rooms__ action spaces are occupied, you may take a __Family Growth__ action with room."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL020.png",
+    "prerequisite": "A revealed Family Growth action space",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL021_LionsMound",
+    "name": "Lions Mound",
+    "deck": "CFL",
+    "number": 21,
+    "cost": {
+      "clay": 5
+    },
+    "vp": 1,
+    "extraVp": true,
+    "desc": [
+      "You may play this card from round 13/11/9/7/4 in a 1/2/3/4/5-player game. At the end of each work phase, if you occupy a round space and no opponent occupies an earlier round space, you get 1 bonus <SCORE>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL021.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL024_LoversTryst",
+    "name": "Lovers Tryst",
+    "deck": "CFL",
+    "number": 24,
+    "passing": true,
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "desc": [
+      "When you use Meeting Place to play this card, you may leave the starting-player marker where it is and take a Family Growth action requiring room instead. Then pass this card to the player on your left."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL024.png",
+    "kind": "minor"
+  },
+  {
     "id": "CFL026_SpeculoosBakery",
     "name": "Speculoos Bakery",
     "deck": "CFL",
@@ -34,6 +303,132 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CFL027_TrappistBeer",
+    "name": "Trappist Beer",
+    "deck": "CFL",
+    "number": 27,
+    "desc": [
+      "At the start of each harvest, you may pay 1 <GRAIN> to skip the entire harvest, including feeding your family."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL027.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL028_HashwithFries",
+    "name": "Hash with Fries",
+    "deck": "CFL",
+    "number": 28,
+    "passing": true,
+    "extraVp": true,
+    "desc": [
+      "Immediately, you can exchange 1 <GRAIN>, 1 <VEGETABLE>, and 1 <CATTLE> for 5 <FOOD> and 3 bonus <SCORE>. Then pass this card to the player on your left."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL028.png",
+    "prerequisite": "1 grain, 1 vegetable, and 1 cattle",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL029_BirdTrap",
+    "name": "Bird Trap",
+    "deck": "CFL",
+    "number": 29,
+    "cost": {
+      "wood": 2
+    },
+    "desc": [
+      "In the field phase of each harvest, you get 1 <FOOD> and may harvest one additional crop from one of your <FIELD>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL029.png",
+    "prerequisite": "1 grain field",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL030_WildBoarHunt",
+    "name": "Wild Boar Hunt",
+    "deck": "CFL",
+    "number": 30,
+    "vp": 1,
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "desc": [
+      "In each even-numbered round, place 1 additional <PIG> on the __Pig Market__. Other players can use that space only with their first person of a round."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL030.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL031_OldMaster",
+    "name": "Old Master",
+    "deck": "CFL",
+    "number": 31,
+    "players": "1+",
+    "desc": [
+      "At the start of the work phases of rounds 3–7, you get 1 <WOOD>. If at least 6 <WOOD> are on the __Forest__ accumulation space, you get 1 <STONE> instead."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL031.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL033_Sculptor",
+    "name": "Sculptor",
+    "deck": "CFL",
+    "number": 33,
+    "players": "1+",
+    "desc": [
+      "Whenever you take only <CLAY> and/or <STONE> from an accumulation space, you get 1 <FOOD>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL033.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL035_Freemason",
+    "name": "Freemason",
+    "deck": "CFL",
+    "number": 35,
+    "players": "1+",
+    "desc": [
+      "At the start of each work phase, if your clay house or stone house has exactly 2 rooms, you get 2 <CLAY>/<STONE>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL035.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL038_ShepherdwithFlock",
+    "name": "Shepherd with Flock",
+    "deck": "CFL",
+    "number": 38,
+    "players": "1+",
+    "desc": [
+      "This card is an action space for you only. When you use it, you get as many <SHEEP> as you already have, up to the number of unused spaces in your farmyard."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL038.png",
+    "playerActionCardType": "occupation",
+    "kind": "playerAction"
+  },
+  {
+    "id": "CFL039_Cosmographer",
+    "name": "Cosmographer",
+    "deck": "CFL",
+    "number": 39,
+    "players": "1+",
+    "extraVp": true,
+    "desc": [
+      "Immediately place 1 <REED> and 1 <STONE> from the general supply on two different unused farmyard spaces. They still count as unused. You may take either resource at any time. At scoring, the <REED> scores 2 bonus <SCORE> if it shares a space or pasture with <SHEEP>, and the <STONE> scores 2 bonus <SCORE> if it shares one with <PIG>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL039.png",
+    "kind": "occupation"
+  },
+  {
     "id": "CFL040_Anatomist",
     "name": "Anatomist",
     "deck": "CFL",
@@ -43,6 +438,219 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     ],
     "players": "1+",
     "kind": "occupation"
+  },
+  {
+    "id": "CFL041_FryCook",
+    "name": "Fry Cook",
+    "deck": "CFL",
+    "number": 41,
+    "players": "1+",
+    "desc": [
+      "During each feeding phase, two of your adults require 1 less <FOOD> each. Each of your other adults requires 1 more <FOOD>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL041.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL042_Rainmaker",
+    "name": "Rainmaker",
+    "deck": "CFL",
+    "number": 42,
+    "players": "1+",
+    "desc": [
+      "Whenever you play or build an improvement, you may add 1 crop of the corresponding type to one of your planted <FIELD>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL042.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL043_RubenesqueWoman",
+    "name": "Rubenesque Woman",
+    "deck": "CFL",
+    "number": 43,
+    "players": "1+",
+    "desc": [
+      "Whenever your second person in a round uses an accumulation space, you get 1 additional good of its type. During each harvest, you require 1 additional <FOOD>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL043.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL044_Returnee",
+    "name": "Returnee",
+    "deck": "CFL",
+    "number": 44,
+    "players": "1+",
+    "desc": [
+      "At the end of each work phase, put 1 <GRAIN> from the general supply on the action space you used last. In the next round, if you use that space, take that <GRAIN> first; otherwise discard it."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL044.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL045_SchoolDropout",
+    "name": "School Dropout",
+    "deck": "CFL",
+    "number": 45,
+    "players": "1+",
+    "desc": [
+      "If you take a Family Growth action during a work phase and none of your subsequent people use a round 1–14 action space, after your other people you may immediately use the newborn as an adult, including on a round space."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL045.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL046_StableArchitect",
+    "name": "Stable Architect",
+    "deck": "CFL",
+    "number": 46,
+    "players": "1+",
+    "extraVp": true,
+    "desc": [
+      "During scoring, you get 1 bonus <SCORE> for each unfenced <STABLE> in your farmyard."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL046.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL047_FarmLawyer",
+    "name": "Farm Lawyer",
+    "deck": "CFL",
+    "number": 47,
+    "players": "1+",
+    "desc": [
+      "Immediately choose an opponent who has more <FOOD> than you and gain the difference from the general supply. Pass this occupation to their hand. Draw an occupation face down in front of you; it counts as played but has no effect."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL047.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL048_Botanist",
+    "name": "Botanist",
+    "deck": "CFL",
+    "number": 48,
+    "players": "1+",
+    "desc": [
+      "Whenever another player takes exactly 3 <WOOD> from a <WOOD> accumulation space, you get 1 <FOOD>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL048.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL050_MeatSupplier",
+    "name": "Meat Supplier",
+    "deck": "CFL",
+    "number": 50,
+    "players": "1+",
+    "extraVp": true,
+    "desc": [
+      "At the start of each harvest, you may pay 1 <PIG> or 1 <CATTLE> to get 1 bonus <SCORE>. If you do, each other player gets 1 <FOOD>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL050.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL051_NorthSeaFisherman",
+    "name": "North Sea Fisherman",
+    "deck": "CFL",
+    "number": 51,
+    "players": "1+",
+    "desc": [
+      "Whenever you use the action space revealed this round, you may take all <FOOD> on Fishing. Whenever another player uses Fishing, that player gets 1 additional <FOOD>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL051.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL053_CafeSinger",
+    "name": "Cafe Singer",
+    "deck": "CFL",
+    "number": 53,
+    "players": "4+",
+    "desc": [
+      "Whenever you use the __Traveling Players__ action space, you may exchange 1 <SHEEP> for 1 <VEGETABLE>, or 1 <CATTLE> for 2 <VEGETABLE>."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL053.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL054_ChansonSinger",
+    "name": "Chanson Singer",
+    "deck": "CFL",
+    "number": 54,
+    "players": "1+",
+    "desc": [
+      "Whenever you use Traveling Players, you may leave 1/2/3/4 <FOOD> there to get 1 <WOOD>/1 <WOOD> and 1 <CLAY>/1 <WOOD>, 1 <CLAY>, and 1 <REED>/1 of each building resource."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL054.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL057_Chaplain",
+    "name": "Chaplain",
+    "deck": "CFL",
+    "number": 57,
+    "players": "1+",
+    "desc": [
+      "Whenever another player takes a Family Growth action, you may immediately place one of your remaining people."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL057.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL059_PillarBiter",
+    "name": "Pillar Biter",
+    "deck": "CFL",
+    "number": 59,
+    "players": "3+",
+    "desc": [
+      "Whenever another player builds at least 1 <FENCE>, you may pay 2 <WOOD> to build exactly 3 <FENCE>, or 3 <WOOD> to build exactly 4 <FENCE>. The normal fencing rules apply."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL059.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL060_VirtuousHero",
+    "name": "Virtuous Hero",
+    "deck": "CFL",
+    "number": 60,
+    "players": "3+",
+    "desc": [
+      "If no opponent holds one of your <FENCE>, you may give each opponent a <FENCE> from your supply. When an opponent holding one takes a resource other than <FOOD> from an accumulation space, you may retrieve it to get 1 <FOOD>; that player gets 1 additional resource of the collected type."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL060.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL061_BlacklegChicken",
+    "name": "Blackleg Chicken",
+    "deck": "CFL",
+    "number": 61,
+    "cost": {
+      "food": 2
+    },
+    "extraVp": true,
+    "desc": [
+      "Place the 2 <FOOD> paid for this card on it. At the start of each harvest, if at least 2 <FOOD> remain here, add 1 <FOOD>. You may take this <FOOD> at any time. During scoring, you get 2 bonus <SCORE> if at least 4 <FOOD> remain."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL061.png",
+    "kind": "minor"
   },
   {
     "id": "CG062_AnimalFarm",
