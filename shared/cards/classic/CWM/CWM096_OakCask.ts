@@ -1,34 +1,11 @@
 import { defineMinorCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
+import { cardResourceWithdrawal } from '../../helpers/card-resource-withdrawal'
 
 const CARD_ID = 'CWM096_OakCask'
 
 const cardImpl = {
-  listeners: [
-    {
-      id: CARD_ID + '-withdraw-food',
-      cardIds: [CARD_ID],
-      actions: ['anytime'],
-      phases: ['anytime'],
-      handler: ({ player }) => {
-        const amount = player.cardStates[CARD_ID]?.counters?.food ?? 0
-        if (amount <= 0) return
-        return {
-          sourceCard: CARD_ID,
-          labelKey: `cards.${CARD_ID}.name`,
-          flow: {
-            type: 'xor',
-            children: Array.from({ length: amount }, (_, i) => ({
-              type: 'leaf',
-              actionId: 'take-from-card',
-              sourceCard: CARD_ID,
-              params: { food: i + 1 },
-            })),
-          },
-        }
-      },
-    },
-  ],
+  listeners: [cardResourceWithdrawal(CARD_ID, 'food')],
   effect: {
     id: CARD_ID,
     onBuy: () => ({

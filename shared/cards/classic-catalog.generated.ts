@@ -398,6 +398,24 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CWM020_FarmSchoolGraduate",
+    "name": "Farm School Graduate",
+    "deck": "CWM",
+    "number": 20,
+    "desc": [
+      "This must be your first occupation. Afterwards, you may no longer use __Lessons__ action spaces. At the start of each harvest, you may pay 2 <FOOD> to play an occupation."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM020.png",
+    "kind": "occupation"
+  },
+  {
     "id": "CWM021_FenceDealer",
     "name": "Fence Dealer",
     "deck": "CWM",
@@ -467,6 +485,24 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM024.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM025_Godfather",
+    "name": "Godfather",
+    "deck": "CWM",
+    "number": 25,
+    "desc": [
+      "Immediately before you use an action space orthogonally adjacent to an occupied __Wish for Children__ or __Urgent Wish for Children__ action space, you get 1 <GRAIN>."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM025.png",
     "kind": "occupation"
   },
   {
@@ -880,6 +916,24 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CWM050_TapestryWeaver",
+    "name": "Tapestry Weaver",
+    "deck": "CWM",
+    "number": 50,
+    "desc": [
+      "At the start of each harvest field phase, if you have at least 3 <SHEEP>, place 1 <FOOD> from the supply on a room without such a <FOOD> marker. Each marker is worth 1 bonus <SCORE> at the end of the game."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "4+",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM050.png",
+    "kind": "occupation"
+  },
+  {
     "id": "CWM051_TavernKeeper",
     "name": "Tavern Keeper",
     "deck": "CWM",
@@ -1027,6 +1081,23 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM060_Attic",
+    "name": "Attic",
+    "deck": "CWM",
+    "number": 60,
+    "desc": [
+      "Whenever you build rooms, you may place 1 <WOOD> from your supply on each new room. Each such <WOOD> is worth 1 bonus <SCORE> at the end of the game."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM060.png",
+    "kind": "minor"
+  },
+  {
     "id": "CWM061_BackDoor",
     "name": "Back Door",
     "deck": "CWM",
@@ -1063,6 +1134,25 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": true,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM063.png",
+    "kind": "minor"
+  },
+  {
+    "isCookery": true,
+    "id": "CWM064_Bonre",
+    "name": "Bonfire",
+    "deck": "CWM",
+    "number": 64,
+    "desc": [
+      "Place 1 <WOOD> from the supply on an unused farmyard space. At any time, return the <WOOD> to convert animals to <FOOD> for the rest of that round: 1 per <SHEEP>, 2 per <BOAR>, or 3 per <CATTLE>."
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "1+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM064.png",
     "kind": "minor"
   },
   {
@@ -1161,6 +1251,26 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM070.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM071_Cookies",
+    "name": "Cookies",
+    "deck": "CWM",
+    "number": 71,
+    "desc": [
+      "Whenever you bake bread, for each <GRAIN> converted you may place 1 <FOOD> from your supply on a room without such a marker. That <FOOD> can no longer be used and is worth 1 bonus <SCORE> at the end of the game."
+    ],
+    "cost": {},
+    "vp": 1,
+    "prerequisite": "1 occupation",
+    "occupationPrerequisites": {
+      "min": 1
+    },
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM071.png",
     "kind": "minor"
   },
   {
@@ -1286,6 +1396,28 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM080_FishHook",
+    "name": "Fish Hook",
+    "deck": "CWM",
+    "number": 80,
+    "desc": [
+      "Whenever you use an action space orthogonally adjacent to __Fishing__, you may immediately take 1 <FOOD> from the __Fishing__ accumulation space."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 1,
+    "prerequisite": "2 occupations",
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM080.png",
+    "kind": "minor"
+  },
+  {
     "id": "CWM082_FlowerPots",
     "name": "Flower Pots",
     "deck": "CWM",
@@ -1302,6 +1434,25 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM082.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM083_FreeRangeChickens",
+    "name": "Free Range Chickens",
+    "deck": "CWM",
+    "number": 83,
+    "desc": [
+      "At the start of each round, if you have at least one <GRAIN> <FIELD>, place 1 <FOOD> from the supply on this card. You may take its <FOOD> at any time. At the end of the game, at least 3 or 6 <FOOD> remaining here gives 1 or 2 bonus <SCORE>. Card <FIELD> count as <GRAIN> <FIELD>."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 0,
+    "prerequisite": "1 grain field",
+    "passing": false,
+    "extraVp": true,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM083.png",
     "kind": "minor"
   },
   {

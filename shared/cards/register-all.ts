@@ -563,10 +563,12 @@ import { CWM013_Cowboy } from './classic/CWM/CWM013_Cowboy'
 import { CWM015_DebrisDealer } from './classic/CWM/CWM015_DebrisDealer'
 import { CWM016_Diplomat } from './classic/CWM/CWM016_Diplomat'
 import { CWM019_FamilyPlanner } from './classic/CWM/CWM019_FamilyPlanner'
+import { CWM020_FarmSchoolGraduate } from './classic/CWM/CWM020_FarmSchoolGraduate'
 import { CWM021_FenceDealer } from './classic/CWM/CWM021_FenceDealer'
 import { CWM022_FoodConnoisseur } from './classic/CWM/CWM022_FoodConnoisseur'
 import { CWM023_ForestFarmer } from './classic/CWM/CWM023_ForestFarmer'
 import { CWM024_GemHunter } from './classic/CWM/CWM024_GemHunter'
+import { CWM025_Godfather } from './classic/CWM/CWM025_Godfather'
 import { CWM026_HedgeMaster } from './classic/CWM/CWM026_HedgeMaster'
 import { CWM027_Heiress } from './classic/CWM/CWM027_Heiress'
 import { CWM028_Herdsman } from './classic/CWM/CWM028_Herdsman'
@@ -588,6 +590,7 @@ import { CWM045_StableDeliveryman } from './classic/CWM/CWM045_StableDeliveryman
 import { CWM046_StoneCurator } from './classic/CWM/CWM046_StoneCurator'
 import { CWM047_StorehouseMinder } from './classic/CWM/CWM047_StorehouseMinder'
 import { CWM049_SunriseAdmirer } from './classic/CWM/CWM049_SunriseAdmirer'
+import { CWM050_TapestryWeaver } from './classic/CWM/CWM050_TapestryWeaver'
 import { CWM051_TavernKeeper } from './classic/CWM/CWM051_TavernKeeper'
 import { CWM052_TileMaker } from './classic/CWM/CWM052_TileMaker'
 import { CWM053_VillageFool } from './classic/CWM/CWM053_VillageFool'
@@ -596,20 +599,25 @@ import { CWM055_WoodWorker } from './classic/CWM/CWM055_WoodWorker'
 import { CWM056_Almshouse } from './classic/CWM/CWM056_Almshouse'
 import { CWM058_AppleTree } from './classic/CWM/CWM058_AppleTree'
 import { CWM059_Apprenticeship } from './classic/CWM/CWM059_Apprenticeship'
+import { CWM060_Attic } from './classic/CWM/CWM060_Attic'
 import { CWM061_BackDoor } from './classic/CWM/CWM061_BackDoor'
 import { CWM063_Birdcage } from './classic/CWM/CWM063_Birdcage'
+import { CWM064_Bonre } from './classic/CWM/CWM064_Bonre'
 import { CWM065_BoundaryStones } from './classic/CWM/CWM065_BoundaryStones'
 import { CWM066_Brazier } from './classic/CWM/CWM066_Brazier'
 import { CWM067_BuriedTreasure } from './classic/CWM/CWM067_BuriedTreasure'
 import { CWM069_ChangingPlans } from './classic/CWM/CWM069_ChangingPlans'
 import { CWM070_ClockworkMan } from './classic/CWM/CWM070_ClockworkMan'
+import { CWM071_Cookies } from './classic/CWM/CWM071_Cookies'
 import { CWM072_Crib } from './classic/CWM/CWM072_Crib'
 import { CWM073_DiamondMine } from './classic/CWM/CWM073_DiamondMine'
 import { CWM074_Donkey } from './classic/CWM/CWM074_Donkey'
 import { CWM076_DrainedPond } from './classic/CWM/CWM076_DrainedPond'
 import { CWM078_FarmSchool } from './classic/CWM/CWM078_FarmSchool'
 import { CWM079_FestivalHall } from './classic/CWM/CWM079_FestivalHall'
+import { CWM080_FishHook } from './classic/CWM/CWM080_FishHook'
 import { CWM082_FlowerPots } from './classic/CWM/CWM082_FlowerPots'
+import { CWM083_FreeRangeChickens } from './classic/CWM/CWM083_FreeRangeChickens'
 import { CWM084_FriendlyPastures } from './classic/CWM/CWM084_FriendlyPastures'
 import { CWM085_Fruitcake } from './classic/CWM/CWM085_Fruitcake'
 import { CWM086_GlassblowersShop } from './classic/CWM/CWM086_GlassblowersShop'
@@ -1673,10 +1681,12 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM015_DebrisDealer': CWM015_DebrisDealer.impl,
   'CWM016_Diplomat': CWM016_Diplomat.impl,
   'CWM019_FamilyPlanner': CWM019_FamilyPlanner.impl,
+  'CWM020_FarmSchoolGraduate': CWM020_FarmSchoolGraduate.impl,
   'CWM021_FenceDealer': CWM021_FenceDealer.impl,
   'CWM022_FoodConnoisseur': CWM022_FoodConnoisseur.impl,
   'CWM023_ForestFarmer': CWM023_ForestFarmer.impl,
   'CWM024_GemHunter': CWM024_GemHunter.impl,
+  'CWM025_Godfather': CWM025_Godfather.impl,
   'CWM026_HedgeMaster': CWM026_HedgeMaster.impl,
   'CWM027_Heiress': CWM027_Heiress.impl,
   'CWM028_Herdsman': CWM028_Herdsman.impl,
@@ -1698,6 +1708,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM046_StoneCurator': CWM046_StoneCurator.impl,
   'CWM047_StorehouseMinder': CWM047_StorehouseMinder.impl,
   'CWM049_SunriseAdmirer': CWM049_SunriseAdmirer.impl,
+  'CWM050_TapestryWeaver': CWM050_TapestryWeaver.impl,
   'CWM051_TavernKeeper': CWM051_TavernKeeper.impl,
   'CWM052_TileMaker': CWM052_TileMaker.impl,
   'CWM053_VillageFool': CWM053_VillageFool.impl,
@@ -1706,20 +1717,25 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM056_Almshouse': CWM056_Almshouse.impl,
   'CWM058_AppleTree': CWM058_AppleTree.impl,
   'CWM059_Apprenticeship': CWM059_Apprenticeship.impl,
+  'CWM060_Attic': CWM060_Attic.impl,
   'CWM061_BackDoor': CWM061_BackDoor.impl,
   'CWM063_Birdcage': CWM063_Birdcage.impl,
+  'CWM064_Bonre': CWM064_Bonre.impl,
   'CWM065_BoundaryStones': CWM065_BoundaryStones.impl,
   'CWM066_Brazier': CWM066_Brazier.impl,
   'CWM067_BuriedTreasure': CWM067_BuriedTreasure.impl,
   'CWM069_ChangingPlans': CWM069_ChangingPlans.impl,
   'CWM070_ClockworkMan': CWM070_ClockworkMan.impl,
+  'CWM071_Cookies': CWM071_Cookies.impl,
   'CWM072_Crib': CWM072_Crib.impl,
   'CWM073_DiamondMine': CWM073_DiamondMine.impl,
   'CWM074_Donkey': CWM074_Donkey.impl,
   'CWM076_DrainedPond': CWM076_DrainedPond.impl,
   'CWM078_FarmSchool': CWM078_FarmSchool.impl,
   'CWM079_FestivalHall': CWM079_FestivalHall.impl,
+  'CWM080_FishHook': CWM080_FishHook.impl,
   'CWM082_FlowerPots': CWM082_FlowerPots.impl,
+  'CWM083_FreeRangeChickens': CWM083_FreeRangeChickens.impl,
   'CWM084_FriendlyPastures': CWM084_FriendlyPastures.impl,
   'CWM085_Fruitcake': CWM085_Fruitcake.impl,
   'CWM086_GlassblowersShop': CWM086_GlassblowersShop.impl,

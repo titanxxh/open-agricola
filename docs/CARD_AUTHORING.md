@@ -97,6 +97,7 @@ Leaf helpers live in `shared/cards/helpers/pay-gain-node.ts`:
 - Examples: `A042_ForestLakeHut` (`before`, with `'all'` and a space check) and `C051_FishingNet` (explicit `actionSpaces`).
 - "After you use" uses `phases: ['after']` (`D101_SugarBaker`).
 - "Each time you get food from an action space" is an acquisition: `E118_KindlingGatherer`, with `hasActionSpaceAcquisition` in `helpers/event-provenance.ts`.
+- "Adjacent to space X" on the printed classic board uses `getClassicAdjacentSpaceIds` in `helpers/classic-board-topology.ts`, independent of the UI layout (`CWM080_FishHook`, `CWM025_Godfather`).
 - Test: `A42_ForestLakeHut-session.test.ts`; empty-space admission in `empty-accumulation-admission-session.test.ts`.
 
 ### 4.2 When played, and Card Definition fields
@@ -200,7 +201,8 @@ Tests: `E160_KelpGatherer-session.test.ts` (with `confirmPlayerSwitch`) and `A13
 
 ### 4.12 Goods, animals or crops on the card
 
-- **Goods:** a `store-on-card` leaf, read back with `getStoredResource` and `take-from-card` (`E052_Cubbyhole`).
+- **Goods:** a `store-on-card` leaf, read back with `getStoredResource` and `take-from-card` (`E052_Cubbyhole`). "Take its goods at any time" is `cardResourceWithdrawal` in `helpers/card-resource-withdrawal.ts` (`CWM096_OakCask`).
+- **Goods on the farmyard:** a token on an unused space is `farmTokenSelection` in `helpers/farm-token-selection.ts` (`CWM064_Bonre`); one marker per room is `roomFoodMarkers` in `helpers/room-food-markers.ts` (`CWM071_Cookies`).
 - **Animals:** `meta.animalHolder: true` with `effect.onComputeAnimalZones` adding a `card:<id>` zone (`B012_Stockyard`).
 - **Crops:** a Card Field (`B068_Beanfield`; [cards](architecture/cards.md#card-fields-and-the-logical-field-seam)).
 
