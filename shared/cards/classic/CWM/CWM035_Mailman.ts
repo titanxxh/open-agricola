@@ -133,7 +133,7 @@ export const CWM035_Mailman = defineOccupationCard({
     name: "Mailman",
     deck: 'CWM',
     number: 35,
-    desc: ["Place 2 wood, 2 clay, 1 reed, and 1 stone on four different revealed action spaces, occupied or not. The next player to use each space may pay you 1 food to take its resources. You need not pay yourself."],
+    desc: ["Place 2 <WOOD>, 2 <CLAY>, 1 <REED>, and 1 <STONE> on four different revealed action spaces, occupied or not. The next player to use each space may pay you 1 <FOOD> to take its resources. You need not pay yourself."],
     cost: {},
     vp: 0,
     prerequisite: "",

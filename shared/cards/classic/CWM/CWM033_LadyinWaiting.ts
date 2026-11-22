@@ -82,7 +82,7 @@ export const CWM033_LadyinWaiting = defineOccupationCard({
     name: "Lady in Waiting",
     deck: 'CWM',
     number: 33,
-    desc: ["If you play this card during stage 1, place a family member from your supply on round 12. At the start of round 12, you may pay 2 food to bring that person into play without needing room. The person can work that round."],
+    desc: ["If you play this card during stage 1, place a family member from your supply on round 12. At the start of round 12, you may pay 2 <FOOD> to bring that person into play without needing room. The person can work that round."],
     cost: {},
     vp: 0,
     prerequisite: "",

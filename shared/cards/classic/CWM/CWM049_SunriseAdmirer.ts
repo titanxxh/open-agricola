@@ -67,7 +67,7 @@ export const CWM049_SunriseAdmirer = defineOccupationCard({
     name: "Sunrise Admirer",
     deck: 'CWM',
     number: 49,
-    desc: ["At the start of each of the next 3 rounds, you may pay 2 food to plow an unused space in the easternmost farmyard column, opposite your starting rooms. Normal field adjacency applies. If you decline, discard this card."],
+    desc: ["At the start of each of the next 3 rounds, you may pay 2 <FOOD> to plow an unused space in the easternmost farmyard column, opposite your starting rooms. Normal <FIELD> adjacency applies. If you decline, discard this card."],
     cost: {},
     vp: 0,
     prerequisite: "",

@@ -33,7 +33,7 @@ export const CWM001_Amazon = defineOccupationCard({
     name: "Amazon",
     deck: 'CWM',
     number: 1,
-    desc: ["Whenever you use the Fishing accumulation space in round 7, 9, 11, or 13, you also get 1 animal of your choice."],
+    desc: ["Whenever you use the __Fishing__ accumulation space in round 7, 9, 11, or 13, you also get 1 animal of your choice."],
     cost: {},
     vp: 0,
     prerequisite: "",

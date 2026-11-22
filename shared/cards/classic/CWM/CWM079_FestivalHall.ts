@@ -30,7 +30,7 @@ export const CWM079_FestivalHall = defineMinorCard({
     name: "Festival Hall",
     deck: 'CWM',
     number: 79,
-    desc: ["After each harvest field phase, you may convert at most 1 grain into 2 food and 1 building resource of your choice. Card fields count toward the prerequisite; extra field phases supplied by cards do not trigger this effect."],
+    desc: ["After each harvest field phase, you may convert at most 1 <GRAIN> into 2 <FOOD> and 1 building resource of your choice. Card <FIELD> count toward the prerequisite; an extra field phase supplied by a card does not trigger this effect."],
     cost: {
       wood: 1,
       clay: 1,

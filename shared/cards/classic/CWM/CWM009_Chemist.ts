@@ -56,7 +56,7 @@ export const CWM009_Chemist = defineOccupationCard({
     name: "Chemist",
     deck: 'CWM',
     number: 9,
-    desc: ["Whenever you receive wood from a building-resource accumulation space, you may place 1 clay from your supply on a different building-resource accumulation space to get 2 food."],
+    desc: ["Whenever you receive <WOOD> from a building-resource accumulation space, you may place 1 <CLAY> from your supply on a different building-resource accumulation space to get 2 <FOOD>."],
     cost: {},
     vp: 0,
     prerequisite: "",

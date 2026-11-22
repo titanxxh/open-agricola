@@ -18,7 +18,7 @@ export const CWM108_Steamer = defineMinorCard({
     name: "Steamer",
     deck: 'CWM',
     number: 108,
-    desc: ["At any time, you may convert 1 grain together with 1 vegetable, sheep, wild boar, or cattle into 5, 4, 5, or 6 food, respectively."],
+    desc: ["At any time, you may convert 1 <GRAIN> together with 1 <VEGETABLE>, <SHEEP>, <BOAR>, or <CATTLE> into 5, 4, 5, or 6 <FOOD>, respectively."],
     cost: {
       wood: 1,
     },

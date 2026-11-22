@@ -36,7 +36,7 @@ export const CWM092_Keys = defineMinorCard({
     name: "Keys",
     deck: 'CWM',
     number: 92,
-    desc: ["You may use Farm Expansion when occupied by another player, but not when occupied by yourself. This does not apply to the 5-player Build 1 Room action space."],
+    desc: ["You may use __Farm Expansion__ when occupied by another player, but not when occupied by yourself. This does not apply to the 5-player Build 1 Room action space."],
     cost: {
       stone: 1,
     },

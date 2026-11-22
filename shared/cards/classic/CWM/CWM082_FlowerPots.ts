@@ -22,7 +22,7 @@ export const CWM082_FlowerPots = defineMinorCard({
     name: "Flower Pots",
     deck: 'CWM',
     number: 82,
-    desc: ["If played in round 6 or earlier, place 1 vegetable on round 8. At the start of round 8, you get it."],
+    desc: ["If played in round 6 or earlier, place 1 <VEGETABLE> on round 8. At the start of round 8, you get it."],
     cost: {
       clay: 1,
     },

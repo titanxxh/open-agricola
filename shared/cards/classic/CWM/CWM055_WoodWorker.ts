@@ -71,7 +71,7 @@ export const CWM055_WoodWorker = defineOccupationCard({
     name: "Wood Worker",
     deck: 'CWM',
     number: 55,
-    desc: ["After using an action space, you may place 1 food from your supply on it to get 1 wood. The next player to use that space takes the food."],
+    desc: ["After using an action space, you may place 1 <FOOD> from your supply on it to get 1 <WOOD>. The next player to use that space takes the <FOOD>."],
     cost: {},
     vp: 0,
     prerequisite: "",

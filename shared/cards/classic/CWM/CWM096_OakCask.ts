@@ -50,7 +50,7 @@ export const CWM096_OakCask = defineMinorCard({
     name: "Oak Cask",
     deck: 'CWM',
     number: 96,
-    desc: ["Immediately place 1 food from the supply on this card. During each harvest field phase, if any food remains here, add 1 food. You may take its food at any time."],
+    desc: ["Immediately place 1 <FOOD> from the supply on this card. During each harvest field phase, if any <FOOD> remains here, add 1 <FOOD>. You may take its <FOOD> at any time."],
     cost: {
       wood: 1,
     },

@@ -64,7 +64,7 @@ export const CWM053_VillageFool = defineOccupationCard({
     name: "Village Fool",
     deck: 'CWM',
     number: 53,
-    desc: ["At the start of each round, you may place one hand card face down under this card; it cannot be used again. At the end of the game, each card under this one scores 1 bonus point, except the third, fifth, seventh, and ninth cards."],
+    desc: ["At the start of each round, you may place one hand card face down under this card; it cannot be used again. At the end of the game, each card under this one scores 1 bonus <SCORE>, except the third, fifth, seventh, and ninth cards."],
     cost: {},
     vp: 0,
     prerequisite: "",

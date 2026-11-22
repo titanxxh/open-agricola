@@ -74,7 +74,7 @@ export const CWM034_LivestockKeeper = defineOccupationCard({
     name: "Livestock Keeper",
     deck: 'CWM',
     number: 34,
-    desc: ["Immediately get 1 wild boar, or 1 cattle if you already have a wild boar. During each harvest breeding phase, you may pay 1 food for one animal type to breed an additional offspring."],
+    desc: ["Immediately get 1 <BOAR>, or 1 <CATTLE> if you already have a <BOAR>. During each harvest breeding phase, you may pay 1 <FOOD> for one animal type to breed an additional offspring."],
     cost: {},
     vp: 0,
     prerequisite: "",

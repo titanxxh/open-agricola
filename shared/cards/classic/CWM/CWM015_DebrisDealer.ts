@@ -40,7 +40,7 @@ export const CWM015_DebrisDealer = defineOccupationCard({
     name: "Debris Dealer",
     deck: 'CWM',
     number: 15,
-    desc: ["Whenever you renovate your clay house, you get 2 clay. If you live in a clay or stone house, each other player's renovation from wood or clay gives you 2 wood or 2 clay, respectively."],
+    desc: ["Whenever you renovate your clay house, you get 2 <CLAY>. If you live in a clay house or stone house, each other player's renovation from <WOOD> or <CLAY> gives you 2 <WOOD> or 2 <CLAY>, respectively."],
     cost: {},
     vp: 0,
     prerequisite: "",

@@ -37,7 +37,7 @@ export const CWM037_MasterStableman = defineOccupationCard({
     name: "Master Stableman",
     deck: 'CWM',
     number: 37,
-    desc: ["Immediately before receiving at least 2 animals from an animal accumulation space, you may build up to 2 stables for 1 wood each. Animals received through card effects do not count."],
+    desc: ["Immediately before receiving at least 2 animals from an animal accumulation space, you may build up to 2 <STABLE> for 1 <WOOD> each. Animals received through card effects do not count."],
     cost: {},
     vp: 0,
     prerequisite: "",

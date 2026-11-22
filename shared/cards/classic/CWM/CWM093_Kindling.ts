@@ -47,7 +47,7 @@ export const CWM093_Kindling = defineMinorCard({
     name: "Kindling",
     deck: 'CWM',
     number: 93,
-    desc: ["Fireplaces and Cooking Hearths count as minor improvements for you and cost 1 clay less."],
+    desc: ["Fireplaces and Cooking Hearths count as minor improvements for you and cost 1 <CLAY> less."],
     cost: {
       wood: 1,
     },

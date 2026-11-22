@@ -65,7 +65,7 @@ export const CWM005_BeeKeeper = defineOccupationCard({
     name: "Beekeeper",
     deck: 'CWM',
     number: 5,
-    desc: ["Immediately build a stable for free and lay it on its side. It loses its normal function but still scores as a stable. During each harvest feeding phase, you get 1 food."],
+    desc: ["Immediately build a <STABLE> for free and lay it on its side. It loses its normal function but still scores as a <STABLE>. During each harvest feeding phase, you get 1 <FOOD>."],
     cost: {},
     vp: 0,
     prerequisite: "",

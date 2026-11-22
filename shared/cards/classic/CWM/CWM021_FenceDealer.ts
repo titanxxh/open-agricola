@@ -28,7 +28,7 @@ export const CWM021_FenceDealer = defineOccupationCard({
     name: "Fence Dealer",
     deck: 'CWM',
     number: 21,
-    desc: ["You may build only 12 fences. Each wood you pay for fences builds 2 fences."],
+    desc: ["You may build only 12 <FENCE>. Each <WOOD> you pay for <FENCE> builds 2 <FENCE>."],
     cost: {},
     vp: 0,
     prerequisite: "",

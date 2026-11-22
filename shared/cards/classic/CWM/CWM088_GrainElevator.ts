@@ -46,7 +46,7 @@ export const CWM088_GrainElevator = defineMinorCard({
     name: "Grain Elevator",
     deck: 'CWM',
     number: 88,
-    desc: ["At the start of each round, add 1 grain from the supply unless the number of grain on this card equals the player count. When you use Grain Seeds, take all grain here. When another player uses it, discard all grain here."],
+    desc: ["At the start of each round, add 1 <GRAIN> from the supply unless the number of <GRAIN> on this card equals the player count. When you use __Grain Seeds__, take all <GRAIN> here. When another player uses it, discard all <GRAIN> here."],
     cost: {
       stone: 1,
     },

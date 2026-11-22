@@ -31,7 +31,7 @@ export const CWM010_CloisterDweller = defineOccupationCard({
     name: "Cloister Dweller",
     deck: 'CWM',
     number: 10,
-    desc: ["At the end of the game, get 1 bonus point for each column of three farmyard spaces consisting entirely of rooms, entirely of fields, or entirely of one pasture."],
+    desc: ["At the end of the game, get 1 bonus <SCORE> for each column of three farmyard spaces consisting entirely of rooms, entirely of <FIELD>, or entirely of one pasture."],
     cost: {},
     vp: 0,
     prerequisite: "",

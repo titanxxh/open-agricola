@@ -72,7 +72,7 @@ export const CWM023_ForestFarmer = defineOccupationCard({
     name: "Forest Farmer",
     deck: 'CWM',
     number: 23,
-    desc: ["Place 3 arrow markers on this card. Once per round, after the work phase and before returning home, you may pay 1 wood and discard a marker to move one of your people from Farmland or Cultivation to an unoccupied action space and use it."],
+    desc: ["Place 3 arrow markers on this card. Once per round, after the work phase and before returning home, you may pay 1 <WOOD> and discard a marker to move one of your people from __Farmland__ or __Cultivation__ to an unoccupied action space and use it."],
     cost: {},
     vp: 0,
     prerequisite: "",

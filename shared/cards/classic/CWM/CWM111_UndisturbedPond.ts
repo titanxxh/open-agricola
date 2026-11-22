@@ -24,7 +24,7 @@ export const CWM111_UndisturbedPond = defineMinorCard({
     name: "Undisturbed Pond",
     deck: 'CWM',
     number: 111,
-    desc: ["Count the full rounds already completed. Place 1 food on each of that many subsequent round spaces. At the start of those rounds, you get the food."],
+    desc: ["Count the full rounds already completed. Place 1 <FOOD> on each of that many subsequent round spaces. At the start of those rounds, you get the <FOOD>."],
     cost: {},
     vp: 1,
     prerequisite: "No occupations",

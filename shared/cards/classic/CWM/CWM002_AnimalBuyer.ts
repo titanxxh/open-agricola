@@ -26,7 +26,7 @@ export const CWM002_AnimalBuyer = defineOccupationCard({
     name: "Animal Buyer",
     deck: 'CWM',
     number: 2,
-    desc: ["After the field phase of each harvest, you may buy up to 2 animals in one purchase. Each sheep, wild boar, or cattle costs 2, 3, or 4 food, respectively."],
+    desc: ["After the field phase of each harvest, you may buy up to 2 animals in one purchase. Each <SHEEP>, <BOAR>, or <CATTLE> costs 2, 3, or 4 <FOOD>, respectively."],
     cost: {},
     vp: 0,
     prerequisite: "",

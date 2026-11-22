@@ -56,7 +56,7 @@ export const CWM115_WormBait = defineMinorCard({
     name: "Worm Bait",
     deck: 'CWM',
     number: 115,
-    desc: ["Whenever you use Farmland, put 2 food from the supply on this card. Whenever you use Fishing, take all its food. At the start of each harvest, return 1 food from this card."],
+    desc: ["Whenever you use __Farmland__, put 2 <FOOD> from the supply on this card. Whenever you use __Fishing__, take all its <FOOD>. At the start of each harvest, return 1 <FOOD> from this card."],
     cost: {},
     vp: 0,
     prerequisite: "",

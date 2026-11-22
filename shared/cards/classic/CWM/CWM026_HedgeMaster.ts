@@ -30,7 +30,7 @@ export const CWM026_HedgeMaster = defineOccupationCard({
     name: "Hedge Master",
     deck: 'CWM',
     number: 26,
-    desc: ["Whenever you build at least 1 fence, you get 1 bonus point. When you play this card, you may immediately take a Build Fences action."],
+    desc: ["Whenever you build at least 1 <FENCE>, you get 1 bonus <SCORE>. When you play this card, you may immediately take a __Build Fences__ action."],
     cost: {},
     vp: 0,
     prerequisite: "",

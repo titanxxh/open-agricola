@@ -19,7 +19,7 @@ export const CWM063_Birdcage = defineMinorCard({
     name: "Birdcage",
     deck: 'CWM',
     number: 63,
-    desc: ["At the end of each harvest, you may pay 1 food for 1 bonus point. Your house can no longer hold animals, even through card effects."],
+    desc: ["At the end of each harvest, you may pay 1 <FOOD> for 1 bonus <SCORE>. Your house can no longer hold animals, even through card effects."],
     cost: {
       wood: 2,
     },

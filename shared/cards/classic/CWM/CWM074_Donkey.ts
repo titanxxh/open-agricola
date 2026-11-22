@@ -55,7 +55,7 @@ export const CWM074_Donkey = defineMinorCard({
     name: "Donkey",
     deck: 'CWM',
     number: 74,
-    desc: ["One of your pastures can no longer hold animals. Whenever you use Farmland or Cultivation, you may plow 1 additional field."],
+    desc: ["One of your pastures can no longer hold animals. Whenever you use __Farmland__ or __Cultivation__, you may plow 1 additional <FIELD>."],
     cost: {},
     vp: 0,
     prerequisite: "1 pasture",

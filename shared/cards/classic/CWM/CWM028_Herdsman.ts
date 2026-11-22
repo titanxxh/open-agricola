@@ -31,7 +31,7 @@ export const CWM028_Herdsman = defineOccupationCard({
     name: "Herdsman",
     deck: 'CWM',
     number: 28,
-    desc: ["Whenever you use Day Laborer, you also get 1 sheep. From round 6 onwards, you may take 1 wild boar instead."],
+    desc: ["Whenever you use __Day Laborer__, you also get 1 <SHEEP>. From round 6 onwards, you may take 1 <BOAR> instead."],
     cost: {},
     vp: 0,
     prerequisite: "",

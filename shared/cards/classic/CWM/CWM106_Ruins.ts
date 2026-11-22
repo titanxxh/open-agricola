@@ -25,7 +25,7 @@ export const CWM106_Ruins = defineMinorCard({
     name: "Ruins",
     deck: 'CWM',
     number: 106,
-    desc: ["Immediately place 4 stone on this card. During each harvest field phase, take 1 stone from it."],
+    desc: ["Immediately place 4 <STONE> on this card. During each harvest field phase, take 1 <STONE> from it."],
     cost: {
       stone: 4,
     },

@@ -22,7 +22,7 @@ export const CWM003_ApplePicker = defineOccupationCard({
     name: "Apple Picker",
     deck: 'CWM',
     number: 3,
-    desc: ["Whenever you use Grain Seeds or Vegetable Seeds, you also get 1 wood and 1 food."],
+    desc: ["Whenever you use __Grain Seeds__ or __Vegetable Seeds__, you also get 1 <WOOD> and 1 <FOOD>."],
     cost: {},
     vp: 0,
     prerequisite: "",

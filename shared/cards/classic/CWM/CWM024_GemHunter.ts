@@ -40,7 +40,7 @@ export const CWM024_GemHunter = defineOccupationCard({
     name: "Gem Hunter",
     deck: 'CWM',
     number: 24,
-    desc: ["Whenever you receive clay from an accumulation space, you also get 1 stone. In round 9 or earlier, if that space has at least 3 clay, you must leave 1 clay there to get that stone."],
+    desc: ["Whenever you receive <CLAY> from an accumulation space, you also get 1 <STONE>. In round 9 or earlier, if that space has at least 3 <CLAY>, you must leave 1 <CLAY> there to get that <STONE>."],
     cost: {},
     vp: 0,
     prerequisite: "",

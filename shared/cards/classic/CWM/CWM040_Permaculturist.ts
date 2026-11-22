@@ -109,7 +109,7 @@ export const CWM040_Permaculturist = defineOccupationCard({
     name: "Permaculturist",
     deck: 'CWM',
     number: 40,
-    desc: ["You may sow grain on unused farmyard spaces without adjacency to existing fields. Sown spaces count as used, but are not fields. You may remove their grain at any time and must remove it before scoring. Effects that sow additional grain fields do not apply to these spaces."],
+    desc: ["You may sow <GRAIN> on unused farmyard spaces without adjacency to existing <FIELD>. Sown spaces count as used, but are not <FIELD>. You may remove their <GRAIN> at any time and must remove it before scoring. Effects that sow additional <GRAIN> <FIELD> do not apply to these spaces."],
     cost: {},
     vp: 0,
     prerequisite: "",

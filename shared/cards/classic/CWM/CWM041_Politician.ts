@@ -61,7 +61,7 @@ export const CWM041_Politician = defineOccupationCard({
     name: "Politician",
     deck: 'CWM',
     number: 41,
-    desc: ["Immediately get 1 stone. Up to twice per round, at any time, you may exchange 1 reed for 1 stone or 1 stone for 1 reed."],
+    desc: ["Immediately get 1 <STONE>. Up to twice per round, at any time, you may exchange 1 <REED> for 1 <STONE> or 1 <STONE> for 1 <REED>."],
     cost: {},
     vp: 0,
     prerequisite: "",

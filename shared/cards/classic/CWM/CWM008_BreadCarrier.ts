@@ -72,7 +72,7 @@ export const CWM008_BreadCarrier = defineOccupationCard({
     name: "Bread Carrier",
     deck: 'CWM',
     number: 8,
-    desc: ["Once only, when any player builds an oven, place 1 food on each remaining round space. At the start of those rounds, you get the food."],
+    desc: ["Once only, when any player builds an oven, place 1 <FOOD> on each remaining round space. At the start of those rounds, you get the <FOOD>."],
     cost: {},
     vp: 0,
     prerequisite: "",

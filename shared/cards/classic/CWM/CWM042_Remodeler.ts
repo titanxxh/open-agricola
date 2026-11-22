@@ -55,7 +55,7 @@ export const CWM042_Remodeler = defineOccupationCard({
     name: "Remodeler",
     deck: 'CWM',
     number: 42,
-    desc: ["Immediately before renovating your wooden house, you may return one built stable to your supply and build 1 wooden room for free."],
+    desc: ["Immediately before renovating your wooden house, you may return one built <STABLE> to your supply and build 1 wooden room for free."],
     cost: {},
     vp: 0,
     prerequisite: "",

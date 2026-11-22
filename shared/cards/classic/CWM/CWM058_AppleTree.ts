@@ -55,7 +55,7 @@ export const CWM058_AppleTree = defineMinorCard({
     name: "Apple Tree",
     deck: 'CWM',
     number: 58,
-    desc: ["Put 1 wood from the supply on an empty farmyard field. That field counts as sown. During each harvest field phase, you get 1 food. The prerequisite requires an actual farmyard field tile."],
+    desc: ["Put 1 <WOOD> from the supply on an empty farmyard <FIELD>. That <FIELD> counts as sown. During each harvest field phase, you get 1 <FOOD>. The prerequisite requires an actual farmyard <FIELD> tile."],
     cost: {
       wood: 1,
     },

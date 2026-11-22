@@ -28,7 +28,7 @@ export const CWM078_FarmSchool = defineMinorCard({
     name: "Farm School",
     deck: 'CWM',
     number: 78,
-    desc: ["During each harvest field phase, if you harvested at least 2 goods, you may pay 2 food to play an occupation. Goods harvested from card fields count; extra field phases supplied by cards do not."],
+    desc: ["During each harvest field phase, if you harvested at least 2 goods, you may pay 2 <FOOD> to play an occupation. Goods harvested from card <FIELD> count; an extra field phase supplied by a card does not."],
     cost: {
       wood: 1,
       reed: 1,

@@ -52,7 +52,7 @@ export const CWM027_Heiress = defineOccupationCard({
     name: "Heiress",
     deck: 'CWM',
     number: 27,
-    desc: ["At the start of round 6, 10, and 13, if you live in a wooden, clay, or stone house, respectively, you may build 1 room at its normal cost, reduced by 1 clay for a clay room or 2 stone for a stone room."],
+    desc: ["At the start of round 6, 10, and 13, if you live in a wooden house, clay house, or stone house, respectively, you may build 1 room at its normal cost, reduced by 1 <CLAY> for a clay room or 2 <STONE> for a stone room."],
     cost: {},
     vp: 0,
     prerequisite: "",

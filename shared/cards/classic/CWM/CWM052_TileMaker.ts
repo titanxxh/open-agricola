@@ -27,7 +27,7 @@ export const CWM052_TileMaker = defineOccupationCard({
     name: "Tile Maker",
     deck: 'CWM',
     number: 52,
-    desc: ["Immediately get 1, 2, 3, or 4 clay if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the most clay rooms gets 2 bonus points."],
+    desc: ["Immediately get 1, 2, 3, or 4 <CLAY> if at least 1, 3, 6, or 9 full rounds remain. At the end of the game, every player tied for the most clay rooms gets 2 bonus <SCORE>."],
     cost: {},
     vp: 0,
     prerequisite: "",

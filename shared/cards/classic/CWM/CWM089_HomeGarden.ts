@@ -49,7 +49,7 @@ export const CWM089_HomeGarden = defineMinorCard({
     name: "Home Garden",
     deck: 'CWM',
     number: 89,
-    desc: ["Whenever you renovate, place 1 food on each of the next 3 round spaces. You also do this when playing this card if you renovated earlier in the current turn. At the start of those rounds, you get the food."],
+    desc: ["Whenever you renovate, place 1 <FOOD> on each of the next 3 round spaces. You also do this when playing this card if you renovated earlier in the current turn. At the start of those rounds, you get the <FOOD>."],
     cost: {
       wood: 1,
     },

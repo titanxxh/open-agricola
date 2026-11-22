@@ -68,7 +68,7 @@ export const CWM019_FamilyPlanner = defineOccupationCard({
     name: "Family Planner",
     deck: 'CWM',
     number: 19,
-    desc: ["Add 4, 7, and 10 to the current round. Place one family member from your supply on each corresponding round space. At the start of those rounds, return that member to your supply and you may take a Family Growth with Room action."],
+    desc: ["Add 4, 7, and 10 to the current round. Place one family member from your supply on each corresponding round space. At the start of those rounds, return that member to your supply and you may take a __Family Growth with Room Only__ action."],
     cost: {},
     vp: 0,
     prerequisite: "",
