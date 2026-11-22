@@ -55,7 +55,7 @@ First check whether the text describes a reaction at all. These "each time" text
 | Card text | Mechanism | Examples |
 |---|---|---|
 | "instead", or declining an action to get something else | a `computeReplace` listener returning `decline` with an `alternativeFlow`, decided before the action runs | `A097_Freshman`, `B026_AgrarianFences`, `B103_FieldMerchant`, `D138_PetLover` |
-| A discount, "do not have to pay", "replace X with Y" in a cost | a cost modifier or `computeCosts` (§4.6) | `A014_CarpentersHammer`, `A088_HedgeKeeper`, `B095_MasterBricklayer`, `E060_WorkingGloves` |
+| A discount, "do not have to pay", "replace X with Y" in a cost | a cost modifier or `computeCosts` (§4.14) | `A014_CarpentersHammer`, `A088_HedgeKeeper`, `B095_MasterBricklayer`, `E060_WorkingGloves` |
 | A point of the round or harvest: goods placed in preparation, a space revealed, people returning, harvesting, newborn animals | a stage hook on `impl.effect` (§4.3) | `A049_NestSite`, `C021_HeartofStone`, `C097_SeedResearcher`, `A106_SlurrySpreader`, `E133_ChampionBreeder` |
 | A state rather than an event, such as "both … are occupied" | an availability condition on a card action space or an anytime ability (§4.9) | `A162_ForestTallyman`, `D178_SubstituteTeacher`, `E014_WoodSaw` |
 
@@ -181,8 +181,7 @@ Tests: `E160_KelpGatherer-session.test.ts` (with `confirmPlayerSwitch`) and `A13
 | Card text | Mechanism | Example |
 |---|---|---|
 | Pastures hold more animals | `effect.computePastureCapacityModifiers` returning `{ sourceCard, kind: 'additive', apply }` | `A012_DrinkingTrough` |
-| Rooms, renovation, fences, stables or plowing cost less | `impl.modifiers` (trade, bonus or cost-removal modifier with `appliesTo`) | `A016_RammedClay`, `A088_HedgeKeeper`, `A143_Stonecutter` |
-| Improvements cost less | `actions: ['improvement'], phases: ['computeCosts']` with `deriveCardCostCandidate` | `A143_Stonecutter` |
+| Anything costs less, more or something else | the payment pipeline (§4.14) | `A088_HedgeKeeper`, `A143_Stonecutter` |
 | Harvest yields more | `registerHarvestCountModifier`; it does not filter ownership, so check the card is played | `E073_Scythe` |
 | Feeding costs less | `registerHarvestFeedingRequirementModifier` (played-only) | `E159_OldMiser` |
 | Breeding threshold | `effect.computeBreedThreshold`; the smallest wins | `E084_DollysMother` |
@@ -232,6 +231,87 @@ Tests: `E160_KelpGatherer-session.test.ts` (with `confirmPlayerSwitch`) and `A13
 - **People left, last person, all people placed:** read `peopleLeftToPlace()` from `actions/guest-turns.ts`, never `workersAvailable()` alone: a pending Guest is a person left to place (`E131_MarketMaster`, `M057_Taps`).
 - **"Place another person":** gate on `peopleLeftToPlace() > 0` and return a `place-farmer` leaf with the card as `sourceCard`, or `spend-worker` for a person on the card. The placement itself offers a family member or a pending Guest (`C042_RavenousHunger`, `D103_CanalBoatman`). Constraints computed with `computeAllowedPlacementSpaces` pass `ignoreWorkerAvailability` when no family member is left.
 - Test: `guest-mixed-edition-session.test.ts`.
+
+### 4.14 Costs and payment
+
+Every cost runs through one payment pipeline ([payment](architecture/payment.md)). A card changes a cost by declaring a modifier or answering `computeCosts`; the pipeline then enumerates the payments, so the card never subtracts resources itself. `appliesTo` and `costType` take `construct`, `renovation`, `fencing`, `stables`, `plow`, `occupation`, `major-improvement` or `minor-improvement`.
+
+| Card text | Mechanism | Example |
+|---|---|---|
+| "Pay X instead of Y", "N of them are free" when building, renovating, fencing, building stables or plowing | `impl.modifiers` with `type: 'trade'`, `appliesTo`, `from`, `to` and `max`; `scope: 'unit'` applies per room, fence or stable, `'action'` once per action | `A088_HedgeKeeper`, `A016_RammedClay`, `CWM011_Contractor` |
+| "You no longer need X" | `impl.modifiers` with `type: 'remove-resource'` | `C014_StrawThatchedRoof` |
+| A room price that depends on the house, or a discount per room | `actions: ['construct'], phases: ['computeCosts']` returning `trades` built by `helpers/construct-cost.ts` (`constructUnitPriceTrade`, `constructUnitDiscountTrade`, `constructedRoomMaterial`) | `B126_Carpenter`, `CWM027_Heiress` |
+| A renovation discount | `actions: ['renovate-house'], phases: ['computeCosts']` returning `bonuses` built by `helpers/renovation-cost.ts` (`sourcedMandatoryBonus`, `sourcedMandatoryBonusChoices`, `selectedRenovationTarget`) | `D081_RoofLadder`, `B128_Plumber` |
+| A flat discount or surcharge on fencing, plowing or another action | `computeCosts` returning a `costs` delta together with `costAttribution` for the same amount; a static gate rejects `costs` without it | `C016_FieldFences`, `C037_DwellingMound` |
+| Improvements or occupations cost less, or cost something else | `actions: ['improvement']` or `['occupation']`, `phases: ['computeCosts']` with `deriveCardCostCandidate`, built with `PaymentSolver.discountCardCostCandidate` | `A143_Stonecutter`, `E060_WorkingGloves` |
+| The card's own cost depends on the game state | `impl.getBaseCosts` | `B036_Bottles` |
+| A printed choice between costs | `meta.altCosts` | `A004_Baseboards` |
+| "You can use goods from … to pay" | goods on an Action Space: `computeCosts` returning `paymentResourceProviders`; goods on the card: a `bonuses` choice with `choiceAffectsState` plus an `after` listener on `pay` that removes what was used | `B155_ArtTeacher`, `E123_ResourceHoarder` |
+| "Each time you pay …", "each time another player pays …" | `actions: ['pay'], phases: ['after']`; the context's `costType` names the purpose, and `sumActualPaidResource` / `sumResourcePaid` in `helpers/event-provenance.ts` read the amounts | `E122_Cottar`, `D171_SeniorTeacher` |
+| Points for goods held at scoring, where each good counts for one card only | `effect.computeCostedBonus` returning `{ cost, score }` levels | `Major_Pottery`, `CWM086_GlassblowersShop` |
+
+Tests: `A123_FrameBuilder-construct-session.test.ts`, `E60_WorkingGloves-session.test.ts`, `workshop-timing-payment-session.test.ts`.
+
+### 4.15 Granting an action
+
+A card grants a rule action by returning that action's leaf: `plow`, `sow`, `construct`, `stables`, `fence`, `renovate-house`, `family-growth`, `bake-bread`, `improvement` or `occupation`. The leaf runs that action only; it does not use the Action Space that normally offers it ([actions: effects and internal actions](architecture/actions.md#effects-and-internal-actions)).
+
+- **Price:** `exactCost: {}` makes it free and `exactCost: { food: 1 }` fixes the price. Farm actions read it from `actionContext` (`C149_ResourceRecycler`, `A001_Shelter`); `occupation` reads it from `params` (`C028_TeachersDesk`).
+- **Limits:** `maxRooms` for `construct`, `max` for `stables`, `types` and `params.allowedPurchases` for `improvement` (`A027_OvenSite`), `fencePolicy` for `fence` (`B002_MiniPasture`; [actions: fence policy](architecture/actions.md#fence-segments-and-policy)), `skipRoomCheck` for `family-growth` without room (`B127_Seducer`).
+- **Counting as the action:** `actionContext.trueAction: false` says the effect does not count as taking the named action, so "each time you take the X action" reactions stay silent. Leave it out when the card text grants the named action itself ([session: Turn Scope](architecture/session.md#turn-scope-and-action-execution-scope)).
+- **A person on a space:** `place-farmer-on-space` places another person on a fixed space (`CWM061_BackDoor`); `jumpLeaf` in `helpers/jump-leaf.ts` moves a placed person (`A129_Swagman`); `recall-placed-worker` takes one back (`D094_HenpeckedHusband`).
+
+### 4.16 Choices and farm selections
+
+- **One of several effects:** an `xor` flow; give each child a `choiceLabelKey` so the options read differently (`B026_AgrarianFences`).
+- **A menu of values:** an `emit-choice` leaf with `params.options: [{ value, labelKey, labelParams }]`; `requiresExplicitChoice: true` asks even when one option remains. The answer arrives in `effect.resolveChoice(state, player, choice)`, which may return the next flow, including another `emit-choice` (`B003_Moonshine`, `CWM114_WineCloset`, `CWM045_StableDeliveryman`).
+- **Farmyard tiles:** a `selection` leaf with `actionContext: { selectionKind: 'farm-position', selectionEffect, minSelections, maxSelections, selectableTiles }`, and `registerSelectionEffect` / `registerSelectionValidator` from `shared/actions/helpers/selection-effect-registry.ts` for what the pick does and which picks are legal (`A070_LiftingMachine`, `CWM103_Raspberries`). Tests answer with `commitSelectionChoice(i, { positions: ['row-col'] })`.
+
+### 4.17 Making an action possible or forbidden
+
+| Card text | Mechanism | Example |
+|---|---|---|
+| "You can no longer use …" | `phases: ['isDoable']` with `globalQuery: true`, returning `{ doable: false }` when `context.actionId` names the space | `D050_ForeignAid`, `CWM020_FarmSchoolGraduate` |
+| "You can take action X even without …" | `phases: ['isDoable']` on that action, returning `{ doable: true }` only when `context.doable` is false and the card supplies what is missing | `A065_SeedPellets`, `D014_HammerCrusher` |
+| "You can use an occupied space", other extra placement targets | `actions: ['place-farmer'], phases: ['computeArgs']` returning `extraOptions` whose value starts with `OCCUPIED_SPACE_CHOICE_PREFIX` | `A025_Bassinet`, `CWM016_Diplomat` |
+| "You can also buy … there" | `phases: ['computeChoiceCandidates']` on `improvement`, returning `extraOptions` | `C027_Blueprint` |
+
+### 4.18 Reading what happened
+
+| The card needs | Read | Example |
+|---|---|---|
+| Rooms or stables this action built | `helpers/construction-events.ts` (`getRoomsBuiltThisAction`, `getActionRoomConstructions`, `getActionStableConstructions`) | `A093_BedMaker`, `CWM060_Attic` |
+| Fences this action built, tiles newly fenced | `helpers/fence-events.ts` (`hasOrdinaryFenceBuiltEvent`, `countNewFenceEdges`, `getActionNewlyEnclosedPastureTiles`) | `CWM026_HedgeMaster` |
+| Farmyard spaces that became used | `events: ['farm.spacesUsed']` with `getActionNewlyUsedTiles` in `helpers/farmyard-events.ts` | `A040_PottersYard`, `CWM103_Raspberries` |
+| What was built earlier in this Turn | `helpers/action-snapshot.ts` | `A074_StableTree` |
+| Which person of the round uses the space | `getSpaceUsePersonPlacementOrdinal` and the other queries in `helpers/round-placement.ts` | `A163_BuildingExpert` |
+| Cards a player has in play, by type or capability | `helpers/card-type.ts` (`collectCardsAs`, `playerHasCardCapability`); counts frozen at the trigger use `helpers/trigger-snapshot.ts` | `B133_VillagePeasant`, `B049_Scales` |
+| Whether a space is a Lessons space | `isLessonsSpaceId` in `helpers/lessons-spaces.ts` | `D171_SeniorTeacher` |
+| The card's own counters, flags and data | `helpers/card-state.ts` (`readCardExtraData`, `isCardFlagged`) | `D122_ClayCarrier` |
+| Used and unused farmyard spaces | `getUsedFarmyardTileKeys` in `shared/domain/farmyard-usage.ts`; a card never counts the grid by hand | `B038_FutureBuildingSite`, `CWM103_Raspberries` |
+| Whether the player can house their animals | `canAccommodateAllAnimals` and `computeAnimalZones` in `shared/domain/animal-zones.ts` | `D036_BreedRegistry` |
+| Events of this action or of the whole transaction, and who triggered the reaction | `context.actionEvents`, `context.transactionEvents`, `context.eventQuery`; `context.triggerPlayer ?? context.player` | `D171_SeniorTeacher`, `A132_Publican` |
+
+### 4.19 Less common seams
+
+| The card needs | Seam | Example |
+|---|---|---|
+| An extra turn or person this round | `effect.contributeExtraTurn`, with `extraTurnBeforeWorkers` when it comes before the player's own people; `timedRules` for one scheduled in a later round | `E093_Motivator`, `A022_Telegram` |
+| A Guest | `grantGuestLeaf` / `grantImmediateGuestLeaf` in `helpers/guest-flow.ts` | `CZ314_Keg`, `CI073_Guest` |
+| Points that several players can earn | `effect.computeSharedPostScore` returning `{ playerId, score }` entries | `A135_AnimalReeve`, `CWM087_GoldMedal` |
+| A limit on which animals a card zone keeps | `effect.getInvalidAnimals` | `B011_Feedyard` |
+| Sowing on other tiles, or a different amount | `effect.onComputeSowableFields` with `onSowExtraField`; `effect.modifySowAmount` | `B072_LoveforAgriculture`, `E071_CowPatty` |
+| Goods the player may want to keep until the harvest | `effect.preHarvestGoodsWanted` | `A061_WinnowingFan` |
+| A read-only fact that shared rules add up, such as reserved pieces or a score adjustment | `effect.getRuleContributions` | `E159_OldMiser`, `CWM021_FenceDealer` |
+| Rewriting a request the card's own action raised | `effect.projectInteractionRequest` | `C127_Lover` |
+| A stack of goods on the card | `push-to-card-stack` / `pop-card-stack` leaves with `presentation: { stack: true }` | `CWM022_FoodConnoisseur` |
+| Putting goods back on an Action Space | `returnToSpaceThenGainFlow` in `helpers/pay-gain-node.ts` | `A164_WoodWorker` |
+| Returning a built stable | `helpers/stable-removal.ts` | `CWM069_ChangingPlans` |
+| Rehousing animals after the card changes where they may live | a `reorganize` leaf | `CWM074_Donkey`, `E083_ShepherdsWhistle` |
+| A cooking improvement | `meta.isCookery: true` with `exchanges` | `A060_OrientalFireplace` |
+| Public markers on the card or the farm | `presentation`, or `effect.getStatePresentation` for computed markers | `CWM050_TapestryWeaver` |
+| Text shown on the card | a `set-infobox` `special-effect` leaf | `A173_ClayThief` |
+| A state change of the card's own that no standard leaf expresses | `registerAdHocAction` in `shared/actions/helpers/ad-hoc-action-registry.ts`, with an id that starts with `card_`; goods still move through the standard leaves (Card contract) | `A040_PottersYard` |
 
 ## 5. Session tests
 
