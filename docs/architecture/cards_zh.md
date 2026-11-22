@@ -4,7 +4,7 @@
 
 > 本文件是中文翻译镜像；[cards.md](cards.md) 是唯一权威版本。
 
-本 module 负责每张卡的唯一源文件，以及卡牌接入的通用 seam：hook 与 listener（[hooks](hooks_zh.md)）、局部状态、Card Field 和能力 metadata。卡牌能力留在它自己的文件里闭环。实现一张卡时先读[写卡指南](../CARD_AUTHORING.md)，它把卡面文字对应到这些 seam，并给出范例卡与测试。
+本 module 负责每张卡的唯一源文件，以及卡牌接入的通用 seam：hook 与 listener（[hooks](hooks_zh.md)）、局部状态、Card Field 和能力 metadata。卡牌能力留在它自己的文件里闭环。实现一张卡时先读[写卡指南](../CARD_AUTHORING_zh.md)，它把卡面文字对应到这些 seam，并给出范例卡与测试。
 
 ## Card Source 与投影
 

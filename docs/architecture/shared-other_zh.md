@@ -40,7 +40,7 @@ Moor Balance Rules 是默认关闭的开局选项，由 `contract/game-variants.
 
 ## `shared/custom-code/`
 
-工坊源码是原生 Card Source 模块（[ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md)；[写卡指南](../CARD_AUTHORING.md)）。`card-source-admission.ts` 只检查结构、不执行代码：导出一个以卡牌 ID 命名的卡，import 只能是指向共享引擎模块与卡牌 helper 的相对路径，并静态读取 `meta`。它也识别已退役的 `CARD_DEF` / `CARD_IMPL` 沙盒格式，所有路径都以同一条提示拒绝该格式。`compiler.ts` 转译通过准入的模块，作为保存的校验证据。只有作者浏览器里的 Worker 经 `client/local-sandbox/native-card-source.ts` 运行该模块；引擎不对它施加能力契约。运行时见 [`docs/CUSTOM_CARD_SANDBOX_zh.md`](../CUSTOM_CARD_SANDBOX_zh.md)。
+工坊源码是原生 Card Source 模块（[ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md)；[写卡指南](../CARD_AUTHORING_zh.md)）。`card-source-admission.ts` 只检查结构、不执行代码：导出一个以卡牌 ID 命名的卡，import 只能是指向共享引擎模块与卡牌 helper 的相对路径，并静态读取 `meta`。它也识别已退役的 `CARD_DEF` / `CARD_IMPL` 沙盒格式，所有路径都以同一条提示拒绝该格式。`compiler.ts` 转译通过准入的模块，作为保存的校验证据。只有作者浏览器里的 Worker 经 `client/local-sandbox/native-card-source.ts` 运行该模块；引擎不对它施加能力契约。运行时见 [`docs/CUSTOM_CARD_SANDBOX_zh.md`](../CUSTOM_CARD_SANDBOX_zh.md)。
 
 测试：`shared/custom-code/__tests__/`、`server/__tests__/workshop-native-source.test.ts`。
 

@@ -32,7 +32,7 @@
 - 会引入等待交互、follow-up action、额外选择、延迟效果的卡
 - `shared/cards/community/` 下的社区卡：它们是原生 Card Source 模块，测试方式相同
 
-卡牌所需机制与范例测试见[写卡指南](CARD_AUTHORING.md)。不适用于：
+卡牌所需机制与范例测试见[写卡指南](CARD_AUTHORING_zh.md)。不适用于：
 
 - 纯样式改动
 - 纯文案翻译改动

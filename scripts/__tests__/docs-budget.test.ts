@@ -45,6 +45,7 @@ describe('documentation budgets', () => {
 })
 
 const AUTHORING = 'docs/CARD_AUTHORING.md'
+const AUTHORING_ZH = 'docs/CARD_AUTHORING_zh.md'
 const REVIEW_RULES = 'shared/cards/AGENTS.md'
 const authoring = readFileSync(AUTHORING, 'utf8')
 const contractStart = authoring.indexOf('## Card contract')
@@ -56,6 +57,9 @@ const sourcePaths = [...contract.matchAll(/`((?:shared|scripts|server|client)\/[
 const headingSlugs = (path: string) => readFileSync(path, 'utf8').split('\n').filter(line => /^#{1,6} /.test(line))
   .map(line => line.replace(/^#+ /, '').toLowerCase().replace(/[^\p{L}\p{N} _-]/gu, '').replace(/ /g, '-'))
 const knownCardIds = new Set([...cardIds, ...classicCardDefinitions.map(card => card.id)])
+// A card ID followed by `-` is a test file name such as `A42_ForestLakeHut-session.test.ts`.
+const namedCards = (text: string) => text.match(/\b(?:[A-Z]{1,4}\d{2,3}|CUSTOM)_[A-Z][A-Za-z]+\b(?!-)/g) ?? []
+const headings = (text: string) => text.split('\n').filter(line => /^#{2,6} /.test(line)).map(line => line.match(/^#+/)![0])
 
 describe('Card contract', () => {
   it('sits before the numbered sections, where the first Workshop read reaches it', () => {
@@ -82,8 +86,7 @@ describe('Card contract', () => {
 
   it('names only source files and cards that exist', () => {
     for (const path of sourcePaths) expect(existsSync(path), path).toBe(true)
-    // A card ID followed by `-` is a test file name such as `A42_ForestLakeHut-session.test.ts`.
-    const named = authoring.match(/\b(?:[A-Z]{1,4}\d{2,3}|CUSTOM)_[A-Z][A-Za-z]+\b(?!-)/g) ?? []
+    const named = namedCards(authoring)
     expect(named.length).toBeGreaterThan(0)
     for (const id of named) expect(knownCardIds.has(id), id).toBe(true)
   })
@@ -97,5 +100,18 @@ describe('Card contract', () => {
     expect(cited.length).toBeGreaterThan(0)
     for (const name of cited) expect(ruleNames, name).toContain(name)
   })
-})
 
+  it('has a Chinese mirror with the same sections, rules, cards and working links', () => {
+    const mirror = readFileSync(AUTHORING_ZH, 'utf8')
+    expect(headings(mirror)).toEqual(headings(authoring))
+    const mirrorRules = mirror.split('\n').filter(line => line.startsWith('- **')).map(line => line.match(/^- \*\*([A-Za-z ]+?)[（.]/)?.[1])
+    expect(mirrorRules.slice(0, ruleNames.length)).toEqual(ruleNames)
+    expect(namedCards(mirror).sort()).toEqual(namedCards(authoring).sort())
+    const mirrorLinks = [...mirror.matchAll(/\]\(([^)#]+)(?:#([^)]+))?\)/g)].map(match => ({ path: posix.join('docs', match[1]!), anchor: match[2] }))
+    expect(mirrorLinks.length).toBeGreaterThanOrEqual(links.length)
+    for (const { path, anchor } of mirrorLinks) {
+      expect(existsSync(path), path).toBe(true)
+      if (anchor) expect(headingSlugs(path), `${path}#${anchor}`).toContain(anchor)
+    }
+  })
+})

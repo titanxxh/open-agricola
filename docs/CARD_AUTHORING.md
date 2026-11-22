@@ -1,5 +1,7 @@
 # Card Authoring Guide
 
+[English](CARD_AUTHORING.md) | [中文](CARD_AUTHORING_zh.md)
+
 Use this guide to implement one card: keep the Card contract, map the printed text to an existing mechanism, copy the closest example card, and copy that card's Session test. Repository agents and the Workshop model both read it. Each section names example cards and tests; read them for the exact field names. The [architecture index](ARCHITECTURE.md) and its module documents explain the mechanisms. This guide only points from card text to them.
 
 ## Card contract
