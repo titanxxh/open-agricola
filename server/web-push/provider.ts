@@ -10,7 +10,10 @@ function pushEndpoint(value: string): URL | null {
   const url = URL.parse(value)
   if (!url || url.href !== value || url.protocol !== 'https:' || url.port || url.username || url.password || url.hash
     || url.pathname === '/' || url.href.length > 2_048) return null
+  // Chrome hands out FCM endpoints on fcm.googleapis.com and, for newer subscriptions, on Google push hosts such as
+  // jmt17.google.com; both keep the /fcm/send/ path.
   if ((url.hostname === 'fcm.googleapis.com' && /^\/(?:fcm\/send|wp)\//.test(url.pathname))
+    || (/^[a-z0-9-]+\.google\.com$/.test(url.hostname) && /^\/fcm\/send\//.test(url.pathname))
     || (url.hostname === 'updates.push.services.mozilla.com' && /^\/(?:wpush|push)\/v[0-9]+\//.test(url.pathname))
     || /^[a-z0-9-]+\.push\.apple\.com$/.test(url.hostname)
     || /^[a-z0-9-]+\.notify\.windows\.com$/.test(url.hostname)) return url
