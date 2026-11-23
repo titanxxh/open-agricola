@@ -1,7 +1,7 @@
 import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import {
   PRERELEASE_BUILD_HEADER, PRERELEASE_GENERATION_HEADER, PRERELEASE_BUILD_PROTOCOL_PREFIX,
-  PRERELEASE_GENERATION_PROTOCOL_PREFIX, normalizePrereleaseReturnPath, type PrereleaseRuntime, type PrereleaseSessionResponse,
+  PRERELEASE_GENERATION_PROTOCOL_PREFIX, isPrereleaseClosedRoute, normalizePrereleaseReturnPath, type PrereleaseRuntime, type PrereleaseSessionResponse,
 } from '../../shared/contract/prerelease-runtime'
 import { HOSTED_APP_PATH } from '../../shared/contract/protocol/app-location'
 import { browserProtocolFetch } from './browser-protocol'
@@ -106,8 +106,9 @@ export function assertPrereleaseResponseAllowed(input: string | URL): void {
 }
 export function bindPrereleaseRequest(input: string | URL, headers: Headers): void {
   if (!isPrereleaseClient()) return
-  if (!runtime) throw new Error('prerelease_auth_required')
   const url = new URL(input, window.location.origin)
+  if (isPrereleaseClosedRoute(url.pathname)) throw new Error('prerelease_readonly')
+  if (!runtime) throw new Error('prerelease_auth_required')
   if (url.origin !== runtime.appOrigin) throw new Error('prerelease_runtime_changed')
   if (!sessionRoute(url.pathname)) assertPrereleaseAccess()
   if (access.kind === 'blocked' && access.code === 'prerelease_runtime_changed') throw new Error(access.code)

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse, OutgoingHttpHeaders, OutgoingHttpHeader } from 'node:http'
 import { HOSTED_APP_PATH } from '../shared/contract/protocol/app-location'
-import { normalizePrereleaseReturnPath, type PrereleaseHandoffSessionResponse, type PrereleaseRuntimeResponse, type PrereleaseSessionResponse } from '../shared/contract/prerelease-runtime'
+import { isPrereleaseClosedRoute, normalizePrereleaseReturnPath, type PrereleaseHandoffSessionResponse, type PrereleaseRuntimeResponse, type PrereleaseSessionResponse } from '../shared/contract/prerelease-runtime'
 import { PRERELEASE_HANDOFF_COOKIE, readCookie, serializePrereleaseCookie } from './auth-cookies'
 import { isPrerelease, prereleaseBindingAdmission, prereleaseRequestAdmission, prereleaseRequestBinding, prereleaseSessionToken, type PrereleaseAdmission } from './prerelease-access'
 import { getPrereleaseSessions, readPrereleaseRuntime } from './prerelease-sessions'
@@ -152,7 +152,7 @@ export async function requirePrereleaseRequest(req: IncomingMessage, res: Server
     send(res, 403, { ok: false, code: 'prerelease_readonly' }); return false
   }
   if (blockedPath.startsWith('/api/auth/') || blockedPath.startsWith('/api/admin/') || blockedPath.startsWith('/api/prerelease/')
-    || blockedPath.startsWith('/ops/') || blockedPath.startsWith('/api/v1/issue-submission-connection') || blockedPath.includes('/oauth/')
+    || blockedPath.startsWith('/ops/') || isPrereleaseClosedRoute(blockedPath) || blockedPath.includes('/oauth/')
     || blockedPath.startsWith('/api/v1/replays/') && !(req.method === 'GET'
       && /^\/api\/v1\/replays\/[A-Za-z0-9-]{1,128}\/(?:manifest|segments\/(?:0|[1-9]\d*)|anchors\/(?:0|[1-9]\d*)|assets\/[a-f0-9]{64})$/.test(blockedPath))
     || blockedPath.startsWith('/replay-assets/')) {

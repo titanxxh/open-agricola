@@ -125,9 +125,9 @@ it('admits a current bound session and rejects a cookie retained by an old tab o
   expect(crossed.status).toBe(401)
 })
 
-it('blocks local account management, Workshop and unscoped Viewer data for qualified sessions', async () => {
+it('blocks local account management, Workshop, formal-only features and unscoped Viewer data for qualified sessions', async () => {
   for (const path of ['/api/workshop/cards', '/api/workshop/art', '/api/workshop/public-cards/v1/cards', '/api/github/webhook', '/api/auth/register', '/api/auth/change-password', '/api/auth/oauth/github/start', '/api/admin/beta-access', '/api/prerelease/handoffs',
-    '/api/v1/replays/room/raw', '/api/v1/replays/room/manifest/extra', '/replay-assets/' + 'b'.repeat(64)]) {
+    '/api/v1/issue-submission-connection', '/api/v1/issue-submission-connection/github/start', '/api/whats-new', '/api/v1/replays/room/raw', '/api/v1/replays/room/manifest/extra', '/replay-assets/' + 'b'.repeat(64)]) {
     const response = await fetch(origin + path, { headers: headers() })
     expect(response.status, path).toBe(403)
     expect(await response.json()).toEqual({ ok: false, code: 'prerelease_readonly' })
