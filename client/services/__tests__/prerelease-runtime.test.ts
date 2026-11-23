@@ -68,6 +68,32 @@ it('does not reveal a late private response or revive an older successful refres
   expect(pre.getPrereleaseAccess()).toEqual({ kind: 'blocked', code: 'prerelease_access_expired' })
 })
 
+it('refuses the formal-only Issue submission and What\'s New routes without a request while access stays active', async () => {
+  vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', build)
+  const fetchMock = vi.fn().mockResolvedValueOnce(Response.json(runtime)).mockResolvedValue(Response.json({ ok: true }))
+  vi.stubGlobal('fetch', fetchMock)
+  const pre = await import('../prerelease-runtime')
+  await pre.loadPrereleaseRuntime(); pre.acceptPrereleaseSession(session)
+  const { browserApiFetch } = await import('../browser-api')
+  const { resourceFetch } = await import('../resource-fetch')
+  await expect(browserApiFetch('/api/v1/issue-submission-connection?roomId=room-1')).rejects.toThrow('prerelease_readonly')
+  await expect(browserApiFetch('/api/v1/issue-submission-connection/github/start', { method: 'POST' })).rejects.toThrow('prerelease_readonly')
+  await expect(resourceFetch('/api/whats-new')).rejects.toThrow('prerelease_readonly')
+  expect(fetchMock).toHaveBeenCalledOnce()
+  expect(pre.getPrereleaseAccess().kind).toBe('active')
+  await browserApiFetch('/api/v1/game-contexts/room-1/bug-reports')
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+})
+
+it('leaves the formal-only routes to the stable client', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(Response.json({ ok: true })); vi.stubGlobal('fetch', fetchMock)
+  const { browserApiFetch } = await import('../browser-api')
+  const { resourceFetch } = await import('../resource-fetch')
+  await browserApiFetch('/api/v1/issue-submission-connection?roomId=room-1')
+  await resourceFetch('/api/whats-new')
+  expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual(['/api/v1/issue-submission-connection?roomId=room-1', '/api/whats-new'])
+})
+
 it('refuses a different compiled app build before an account request can start', async () => {
   vi.stubEnv('VITE_RELEASE_CHANNEL', 'prerelease'); vi.stubEnv('VITE_GAME_BUILD_ID', 'b'.repeat(40))
   const fetchMock = vi.fn().mockResolvedValue(Response.json(runtime)); vi.stubGlobal('fetch', fetchMock)

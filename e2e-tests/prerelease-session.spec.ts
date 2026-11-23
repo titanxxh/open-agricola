@@ -96,6 +96,14 @@ function observeGameSocket(page: Page) {
   return { states, joins, latest: () => states.at(-1) }
 }
 
+/** Pre offers no Issue submission or What's New (#2032); its Lobby and games never request them. */
+function observeClosedFeatureRequests(requested: string[], context: BrowserContext) {
+  context.on('request', request => {
+    const { pathname } = new URL(request.url())
+    if (pathname.startsWith('/api/v1/issue-submission-connection') || pathname === '/api/whats-new') requested.push(pathname)
+  })
+}
+
 // Each fixture owns one private temporary directory (logs, certificates, app data). A passing test removes it;
 // a failed test keeps it so the retained launcher and app logs remain available for diagnosis.
 const fixtureDirectories: string[] = []
@@ -601,8 +609,11 @@ test('real prerelease Multihand binds two seats per principal and survives brows
   let other: Awaited<ReturnType<typeof environment.createParticipant>> | undefined
   let failure: { error: unknown } | undefined
   try {
+    const closedFeatureRequests: string[] = []
+    observeClosedFeatureRequests(closedFeatureRequests, environment.context)
     const host = await environment.enter(environment.context)
     other = await environment.createParticipant()
+    observeClosedFeatureRequests(closedFeatureRequests, other.context)
     const guest = await environment.enter(other.context, other.user)
     const hostWire = observeGameSocket(host), guestWire = observeGameSocket(guest)
     await host.getByRole('button', { name: 'Multihand game', exact: true }).click()
@@ -697,6 +708,7 @@ test('real prerelease Multihand binds two seats per principal and survives brows
     await returned.goto(roomUrl)
     await expect.poll(() => returnedWire.joins.at(-1)?.controlledPlayerIndexes).toEqual([0, 2])
     await expect(returned.locator('.multihand-seat-controls')).toBeVisible()
+    expect(closedFeatureRequests).toEqual([])
   } catch (error) { failure = { error } }
   try {
     await releaseAll([

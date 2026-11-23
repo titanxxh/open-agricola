@@ -35,6 +35,13 @@ export type PrereleaseAccessErrorCode =
 
 export type PrereleaseHandoffSessionResponse = PrereleaseSessionResponse & { returnPath: string }
 
+/**
+ * Formal-only features pre does not offer: GitHub Issue submission and the owner's What's New notes.
+ * The pre server refuses these routes as `prerelease_readonly`; the pre client refuses them before any request.
+ */
+export const PRERELEASE_CLOSED_ROUTES = ['/api/v1/issue-submission-connection', '/api/whats-new'] as const
+export const isPrereleaseClosedRoute = (path: string): boolean => PRERELEASE_CLOSED_ROUTES.some(route => path.startsWith(route))
+
 /** Handoff may preserve a product locator, never a redirect or credential fragment. */
 export function normalizePrereleaseReturnPath(value: string): string | undefined {
   if (value.length > 2048 || !value.startsWith('/open-agricola/') || (value.includes('\\') || [...value].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))) return undefined
