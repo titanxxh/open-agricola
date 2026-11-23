@@ -31,13 +31,12 @@ const offer = (response: SessionResponse) => {
   return option
 }
 
+/** The optional improvement reads as that one optional action, not as a one-step sequence. */
 const describedImprovement = (response: SessionResponse) => {
   const description = offer(response).descriptionPreview
-  expect(description).toMatchObject({ kind: 'group', operator: 'sequence', optional: true })
-  if (description?.kind !== 'group' || description.parts[0]?.kind !== 'action') {
-    throw new Error('Expected an improvement inside its optional sequence')
-  }
-  return description.parts[0]
+  expect(description).toMatchObject({ kind: 'action', optional: true })
+  if (description?.kind !== 'action') throw new Error('Expected the optional improvement action')
+  return description
 }
 
 describe('improvement descriptions limit candidate-card expansion', () => {
@@ -57,7 +56,7 @@ describe('improvement descriptions limit candidate-card expansion', () => {
     let response = session.takeAction(0, 'meeting-place')
     const option = offer(response)
     expect(option.descriptionPreview).toMatchObject({
-      kind: 'group', optional: true, parts: [{ kind: 'action', effectPreview: { kind: 'cardSelection', types: ['minor'] } }],
+      kind: 'action', optional: true, effectPreview: { kind: 'cardSelection', types: ['minor'] },
     })
     const before = JSON.stringify(session.state)
     for (let read = 0; read < 3; read++) {

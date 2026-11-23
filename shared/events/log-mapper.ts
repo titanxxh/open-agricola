@@ -265,7 +265,15 @@ const actionDetailLog = (
   },
 })
 
+/**
+ * A placement reads as the Action Space it lands on. A wrapper that placed the person, such as
+ * `place-farmer` in a Guest turn, is no space; a placement off the board (`home`) keeps its source.
+ */
+const placementActionId = (ctx: EventLogMapperContext, event: WorkerPlacedEvent): string | undefined =>
+  ctx.actionNames?.[event.spaceId] ? event.spaceId : event.sourceActionId
+
 const containingActionId = (
+  ctx: EventLogMapperContext,
   events: readonly GameEvent[],
   event: GameEvent,
   fallback: string | undefined,
@@ -277,7 +285,7 @@ const containingActionId = (
       candidate.actorPlayerId === event.actorPlayerId,
     )
     .sort((left, right) => right.seq - left.seq)[0]
-  return placed?.sourceActionId ?? fallback
+  return (placed && placementActionId(ctx, placed)) ?? fallback
 }
 
 const relatedCardEffectCosts = (
@@ -368,7 +376,7 @@ const mapResourceMoved = (
     ctx,
     event.to.playerId,
     event.from.kind === 'actionSpace'
-      ? containingActionId(events, event, event.from.spaceId)
+      ? containingActionId(ctx, events, event, event.from.spaceId)
       : event.sourceActionId ?? event.reason,
     {
       gains: gain,
@@ -392,7 +400,7 @@ const mapWorkerPlaced = (event: WorkerPlacedEvent, ctx: EventLogMapperContext): 
     playerId: event.actorPlayerId,
     params: {
       player: playerName(ctx, event.actorPlayerId),
-      action: actionName(ctx, event.sourceActionId ?? event.spaceId),
+      action: actionName(ctx, placementActionId(ctx, event) ?? event.spaceId),
     },
   }
 }
@@ -790,7 +798,7 @@ const mapStableBuilt = (
   actionDetailLog(
     ctx,
     event.actorPlayerId,
-    containingActionId(events, event, event.sourceActionId ?? 'stables'),
+    containingActionId(ctx, events, event, event.sourceActionId ?? 'stables'),
     {
       costs: positiveResources(payment?.resources ?? {}),
       effects: { buildStables: event.stables.length },

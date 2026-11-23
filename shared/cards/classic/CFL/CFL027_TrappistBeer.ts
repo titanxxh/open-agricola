@@ -9,8 +9,8 @@ const CARD_ID = 'CFL027_TrappistBeer'
 const SKIP_ACTION = 'card_CFL027_TrappistBeer_skip'
 registerAdHocAction({
   id: SKIP_ACTION,
-  nameKey: 'ui.interactionUseAbility',
-  descriptionKey: 'ui.interactionUseAbility',
+  nameKey: 'ui.timedOperations.skip-harvest',
+  descriptionKey: 'ui.timedOperations.skip-harvest',
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,

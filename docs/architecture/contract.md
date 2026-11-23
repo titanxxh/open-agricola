@@ -244,6 +244,8 @@ Choice Preview derives from shared executable rule plans ([ADR 0024](../adr/0024
 - `descriptionPreview` recursively describes the flow (`ChoiceDescriptionPreview`): sequence, exclusive and inclusive choices, parallel order, optionality and actor. `Engine.describe()` reads the executable flow without advancing; `Engine.describeFlow()` describes a standalone plan; opaque native actions expose a pure `ActionDefinition.flowFactory` that execution also calls. Base descriptions omit player modifiers and keep every conditional case; deferred quantities keep their formula until due.
 - Improvement and occupation previews expand at most two final candidate-card options. More candidates use a `cardSelection` summary, preserving card types and restrictions. Its `types` permits major/minor combinations or occupation alone. The actual card-selection and payment requests retain their complete options and previews; payment alternatives do not count toward this limit. The producers in `shared/actions/effects/{improvement,occupation}.ts` apply the shared limit from `helpers/card-choice.ts`, including nested previews. Occupation previews with at most two candidates still merge identical payment previews.
 - Visible option text comes from `descriptionPreview` and `effectPreview`; `choiceLabelKey` is only for semantic overrides. `special-effect` supplies semantic descriptions from `params.kind`, and display-only synchronization is omitted.
+- A one-part group reads as that part and keeps the group's optionality. A stage activation (`activate-card-effect`) is named by its card and describes the plan its hook returns, previewed on a detached copy as trigger selection does.
+- Trigger-selection options carry `sourceCard` only for children that come from a card. A child without a card, such as an injected exchange, is omitted when it cannot start. The client prefixes the card name to a trigger option labelled by what it does (`Receive`). Test: `classic-round-start-trigger-session.test.ts`.
 - A preview describes declared effects; it does not promise that future conditions will hold. Consecutive identical future entries combine; others stay visible in order.
 - Current interaction choices use the Interaction Player and the authoritative payment solver, including quantity limits and alternative payment sources.
 - Farm-cell choices carry `ActionChoiceOption.target` (actor, logical field, positions, Card Field slots) and `targetCard`; the client renders these and submits the opaque value.
@@ -256,6 +258,8 @@ Tests: `shared/actions/__tests__/future-schedule-preview.test.ts`, `server/__tes
 `LogEntry { key, params, playerId? }` carries an i18n key plus parameters, rendered for the active locale. Bootstrap entries may carry stable `playerId` so seat display-name changes refresh by identity.
 
 An action without a name that follows the `card_<CardId>_<action>` convention renders as its card's effect, including rows already recorded; a card triggered by its own action does not repeat it. Public event cues name cards and Action Spaces instead of ids. Tests: `ActionLog.test.tsx`, `card-action-id.test.ts`, `public-event-presentation.test.ts`.
+
+A placement and the goods it collects are named by the Action Space the person lands on, not by a wrapper action such as `place-farmer`. A synthetic sub-flow (`__subflow:*`, for example a Guest turn) adds no Session action-detail row; its leaves log from their own events. Tests: `log-mapper.test.ts`, `classic-guest-session.test.ts`.
 
 
 ## Beta qualification
