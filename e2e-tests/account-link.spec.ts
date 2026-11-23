@@ -124,7 +124,8 @@ for (const provider of ['github', 'google'] as const) {
         await page.goto(`${appOrigin}/?page=settings`)
         await page.getByRole('button', { name: provider === 'github' ? '绑定 GitHub' : '绑定 Google' }).click()
         if (cancelled) {
-          await expect(page.getByRole('alert')).toContainText('授权已取消')
+          // The harness stubs only the binding routes, so other settings sections may raise their own alerts.
+          await expect(page.getByRole('alert').filter({ hasText: '授权已取消' })).toBeVisible()
           expect(await findIdentity(provider, subject)).toBeNull()
           expect(exchanges).toBe(0)
         } else {
