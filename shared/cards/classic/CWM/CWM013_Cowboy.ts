@@ -66,25 +66,17 @@ const cardImpl = {
       }),
     },
     {
-      id: CARD_ID + '-doable',
-      cardIds: [CARD_ID],
-      actions: ['collect'],
-      phases: ['isDoable'],
-      handler: (context) =>
-        animals[context.space.id] && context.space.takenBy.length > 0
-          ? { doable: true }
-          : undefined,
-    },
-    {
+      // Whoever occupies the market, a use that finds another person there gets 1 animal instead
+      // of the pile; the person making this use is the placed or moved one, absent while admitting.
       id: CARD_ID + '-animal',
       cardIds: [CARD_ID],
-      actions: ['collect'],
+      actionSpaces: Object.keys(animals),
       phases: ['computeReplace'],
-      handler: (context) => {
+      handler: ({ space, player, actionSpaceUse, actionContext }) => {
+        const person = actionSpaceUse?.personUse?.workerId ?? actionContext?.workerId
         if (
-          !animals[context.space.id] ||
-          context.space.takenBy.length < 2 ||
-          context.actionContext?.checkedReplaceAction
+          actionContext?.checkedReplaceAction ||
+          !space.takenBy.some((ref) => ref.playerId !== player.id || ref.workerId !== person)
         )
           return
         return { actionId: TAKE, sourceCard: CARD_ID }

@@ -2584,6 +2584,17 @@
   border: 1px solid #222;
   z-index: 13;
 }
+/* Mixed goods on one space: one pile per kind, side by side, each with its own badge. */
+.resource-holder-group {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  z-index: 12;
+}
+.resource-holder-group > .resource-holder {
+  position: relative;
+}
 .resource-holder .res-icon {
   margin: -0.6em auto 0;
 }

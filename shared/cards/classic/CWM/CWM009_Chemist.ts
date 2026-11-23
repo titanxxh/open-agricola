@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../../card-source'
 import type { CardImpl } from '../../registry'
 import { gainLeaf } from '../../helpers/pay-gain-node'
 import { sumResourceMovedToPlayer } from '../../helpers/event-provenance'
+import { openRoundForSpace } from '../../../actions/helpers/placement-availability'
 
 const CARD_ID = 'CWM009_Chemist'
 
@@ -20,8 +21,12 @@ const cardImpl = {
           sumResourceMovedToPlayer(actionEvents ?? [], 'wood', player.id) < 1
         )
           return
+        // Setup creates every round space; only a revealed one is on the board.
         const targets = state.actionSpaces.filter(
-          (s) => s.id !== space.id && building.some((k) => (s.gainPerRound[k] ?? 0) > 0),
+          (s) =>
+            s.id !== space.id &&
+            openRoundForSpace(state, s) <= state.round &&
+            building.some((k) => (s.gainPerRound[k] ?? 0) > 0),
         )
         if (!targets.length) return
         return {
