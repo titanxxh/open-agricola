@@ -2,15 +2,12 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { Worker } from 'node:worker_threads'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { CreateBucketCommand, DeleteBucketCommand, DeleteObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import WebSocket, { WebSocketServer } from 'ws'
 import { afterEach, expect, it, vi } from 'vitest'
 import { databaseMaintenance, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 import { testStorageEnvironment } from '../../server/__tests__/_helpers/objects'
-import { scopedObjectAccount } from '../../server/__tests__/_helpers/scoped-object-account'
 import { releaseQueue } from '../../server/__tests__/_helpers/release-all'
 import { PostgresDatabase } from '../../server/database/postgres'
 import { migratePostgres } from '../../server/database/migrations'
@@ -24,8 +21,6 @@ import { RoomDirectory } from '../../server/game/room-directory'
 import { BROWSER_AUTH_HEADER, BROWSER_AUTH_VERSION, BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { PRERELEASE_BUILD_PROTOCOL_PREFIX, PRERELEASE_GENERATION_PROTOCOL_PREFIX } from '../../shared/contract/prerelease-runtime'
 import { canonicalJson } from '../../shared/contract/authoritative-command'
-import { parsePrereleaseTarget } from '../prerelease/config'
-import { operatePrereleaseStorage } from '../prerelease/storage'
 
 vi.setConfig({ testTimeout: 120000, hookTimeout: 180000 })
 const cleanup = releaseQueue()
@@ -55,8 +50,6 @@ it('purges real isolated storage before owner retirement and rejects old HTTP, W
     return { db, url }
   }
   const formal = await createDatabase(formalName), pre = await createDatabase(preName, appRole)
-  const root = await mkdtemp(join(tmpdir(), 'oa-pre-native-lifecycle-'))
-  cleanup.register(() => rm(root, { recursive: true, force: true }))
   const objectEnv = testStorageEnvironment()
   const rootClient = new S3Client({ endpoint: objectEnv.S3_ENDPOINT, region: objectEnv.S3_REGION, forcePathStyle: true,
     credentials: { accessKeyId: objectEnv.S3_ACCESS_KEY_ID!, secretAccessKey: objectEnv.S3_SECRET_ACCESS_KEY! } })
@@ -75,22 +68,19 @@ it('purges real isolated storage before owner retirement and rejects old HTTP, W
   const formalObjects = S3ObjectStore.fromEnv({ ...objectEnv, S3_BUCKET: formalBucket }, '')
   cleanup.register(() => preObjects.close())
   cleanup.register(() => formalObjects.close())
-  const account = await scopedObjectAccount(objectEnv, preBucket, 'live/')
-  cleanup.register(account.release)
-  const appUrl = new URL(pre.url); appUrl.username = appRole; appUrl.password = password
   const template: unknown = JSON.parse(await readFile('deploy/prerelease-target.example.json', 'utf8'))
-  if (!template || typeof template !== 'object') throw new Error('Missing target template')
-  const target = parsePrereleaseTarget({ ...template, directory: join(root, 'open-agricola-prerelease-main'),
-    database: { name: preName, appRole, backupRole, host: appUrl.hostname, port: Number(appUrl.port || 5432) },
-    validationDatabase: { name: `${preName}_validation`, role: `${preName}_validator`, host: appUrl.hostname, port: Number(appUrl.port || 5432) },
-    objects: { bucket: preBucket, prefix: 'live/', appKeyId: account.env.S3_ACCESS_KEY_ID, backupKeyId: 'unused-test-backup-key', endpoint: objectEnv.S3_ENDPOINT },
-    formal: { project: 'open-agricola', directory: join(root, 'formal'), appOrigin: 'https://formal.example.test', apiOrigin: 'https://formal-api.example.test',
-      database: formalName, bucket: formalBucket, offsiteDirectory: join(root, 'formal-backups') } })
-  const ledgerPath = join(root, 'current-ledger.json')
-  await writeFile(ledgerPath, JSON.stringify({ version: 1, batches: [] }), { mode: 0o600 })
-  const storageEnv = { ...account.env, RELEASE_CHANNEL: 'prerelease', DATABASE_URL: appUrl.toString(), DATABASE_SCHEMA: 'public',
-    APPLICATIONS_STOPPED: '1', CURRENT_ERASURE_LEDGER: ledgerPath, PRERELEASE_SOURCE_BUILD_ID: 'a'.repeat(40), PRERELEASE_OPERATION_ID: randomUUID() }
-  expect(await operatePrereleaseStorage(target, 'inspect', storageEnv)).toMatchObject({ formalDatabaseDenied: true, formalBucketDenied: true })
+  if (!template || typeof template !== 'object' || !('targetId' in template) || typeof template.targetId !== 'string') throw new Error('Missing target template')
+  const target = { targetId: template.targetId, origin: '', formal: { appOrigin: 'https://formal.example.test', apiOrigin: 'https://formal-api.example.test' } }
+  // The owner storage tool moved to titanxxh/open-agricola-ops (src/prerelease/storage.ts, #1978). Its stopped-generation
+  // reset keeps the independent erasure ledger and empties the generation's native database schema and object prefix.
+  const purgeStoppedGeneration = async (generationId: string) => {
+    const listing = await rootClient.send(new ListObjectsV2Command({ Bucket: preBucket, Prefix: 'live/' }))
+    if (listing.IsTruncated) throw new Error('Unexpected native fixture object count')
+    for (const entry of listing.Contents ?? []) if (entry.Key && entry.Key !== 'live/erasure/ledger.json') await rootClient.send(new DeleteObjectCommand({ Bucket: preBucket, Key: entry.Key }))
+    const storage = new PostgresDatabase({ connectionString: pre.url.toString(), max: 1 })
+    try { await storage.exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT USAGE ON SCHEMA public TO "${backupRole}"`) } finally { await storage.close() }
+    return { format: 1, channel: 'prerelease', targetId: target.targetId, generationId, database: preName, bucket: preBucket, prefix: 'live/' }
+  }
 
   await formal.db.prepare(`INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES ('same-formal-id','formal_farmer','Formal sentinel','private-hash',1)`).run()
   await formal.db.prepare(`INSERT INTO sessions(token,user_id,created_at,expires_at,auth_policy_version) VALUES ('formal-source','same-formal-id',1,?,2)`).run(Date.now() + 86_400_000)
@@ -187,8 +177,6 @@ it('purges real isolated storage before owner retirement and rejects old HTTP, W
   await ledger.append({ version: 1, entries: [{ version: 1, roomId: 'expired-before-reset', reason: 'removed',
     removedAt: Date.now(), assetHashes: [], eraseResult: true }], assetTakedowns: [] })
   const independentLedger = await preObjects.get('erasure/ledger.json')
-  await writeFile(ledgerPath, JSON.stringify({ version: 1, batches: await ledger.read() }), { mode: 0o600 })
-  await expect(operatePrereleaseStorage(target, 'reset', { ...storageEnv, PRERELEASE_OLD_GENERATION: generation1 })).rejects.toThrow('Stop every prerelease writer')
   await lifecycle.apply({ action: 'close', generationId: generation1, operationId: randomUUID(), targetOrigin: origin }, origin)
   const oldSocketClosed = once(ws, 'close')
   service.close()
@@ -198,7 +186,7 @@ it('purges real isolated storage before owner retirement and rejects old HTTP, W
   expect((await preObjects.get('private-archive'))?.body.toString()).toBe('old generation archive')
   await pre.db.prepare("UPDATE app_instances SET status='stopped',lease_until=0").run()
   await pre.db.close()
-  const purge = await operatePrereleaseStorage(target, 'reset', { ...storageEnv, PRERELEASE_OLD_GENERATION: generation1 })
+  const purge = await purgeStoppedGeneration(generation1)
   expect(purge).toMatchObject({ generationId: generation1, database: preName, bucket: preBucket, prefix: 'live/' })
   pre.db = new PostgresDatabase({ connectionString: pre.url.toString(), max: 2 })
   cleanup.register(() => pre.db.close())
