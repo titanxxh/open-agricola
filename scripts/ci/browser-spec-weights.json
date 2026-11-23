@@ -1,7 +1,7 @@
 {
  "format": 1,
  "unit": "seconds",
- "source": "mean of four two-lane chromium measurements on GitHub (ubuntu-latest, 4 vCPU, one runner per task, VERIFY_PARALLEL_LANES=2), 2026-11-21 and 2026-11-22: formal candidate verification runs 44862679764 (main b2638e9a1) and 45028192672 (main 5e9a133a0), and rehearsal runs 45040755821 and 45040760793 (main f9dba2276); per lane, seconds from a spec's first test start to the next spec's first test start in its Playwright JSON report (the last spec runs to the report's end), averaged per spec and rounded up; heating-exchange, extended before the rehearsal runs, uses those two alone, and app-shell-worker and public-asset-worker, edited after all four (#2008), add 3 s and subtract 1 s for the tests that changed, as timed in CI run 45039968134. A task builds the Pages frontend once (#1955): the first of its Pages specs to start runs the build, and one that starts in the other lane meanwhile waits for it. The seven Pages specs (app-shell-worker, application-loading, encyclopedia-pages, hosted-password-login, public-asset-worker, room-offline-retry, web-push) are therefore listed without the build and the wait, and the build, counted as 102 s (74 to 129 s in the sixteen measured builds, mean 99 s), is added to the three that run it in this table's own plan: app-shell-worker, application-loading, encyclopedia-pages",
+ "source": "mean of four two-lane chromium measurements on GitHub (ubuntu-latest, 4 vCPU, one runner per task, VERIFY_PARALLEL_LANES=2), 2026-11-21 and 2026-11-22: formal candidate verification runs 44862679764 (main b2638e9a1) and 45028192672 (main 5e9a133a0), and rehearsal runs 45040755821 and 45040760793 (main f9dba2276); per lane, seconds from a spec's first test start to the next spec's first test start in its Playwright JSON report (the last spec runs to the report's end), averaged per spec and rounded up; heating-exchange, extended before the rehearsal runs, uses those two alone, and app-shell-worker and public-asset-worker, edited after all four (#2008), add 3 s and subtract 1 s for the tests that changed, as timed in CI run 45039968134. A task builds the Pages frontend once (#1955): the first of its Pages specs to start runs the build, and one that starts in the other lane meanwhile waits for it. The seven Pages specs (app-shell-worker, application-loading, encyclopedia-pages, hosted-password-login, public-asset-worker, room-offline-retry, web-push) are therefore listed without the build and the wait, and the build, counted as 102 s (74 to 129 s in the sixteen measured builds, mean 99 s), is added to the three that run it in this table's own plan: app-shell-worker, application-loading, encyclopedia-pages. classic-display-names (#2036), added later and not yet measured on GitHub, takes the 4 s of classic-card-face, the comparable classic display spec (both ran under 3 s locally)",
  "files": {
   "e2e-tests/D180_PartTimeWorker.spec.ts": 8,
   "e2e-tests/E148_Lazybones.spec.ts": 4,
@@ -28,6 +28,7 @@
   "e2e-tests/card-state-presentation.spec.ts": 7,
   "e2e-tests/choice-previews.spec.ts": 35,
   "e2e-tests/classic-card-face.spec.ts": 4,
+  "e2e-tests/classic-display-names.spec.ts": 4,
   "e2e-tests/classic-guest.spec.ts": 7,
   "e2e-tests/crop-scoring.spec.ts": 5,
   "e2e-tests/desktop-table-layout.spec.ts": 14,

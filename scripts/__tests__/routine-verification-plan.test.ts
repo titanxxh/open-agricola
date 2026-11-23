@@ -1227,6 +1227,7 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/apiary-sow-budget.spec.ts',
       'e2e-tests/card-cost-icons.spec.ts',
       'e2e-tests/card-state-presentation.spec.ts',
+      'e2e-tests/classic-display-names.spec.ts',
       'e2e-tests/classic-guest.spec.ts',
       'e2e-tests/crop-scoring.spec.ts',
       'e2e-tests/encyclopedia-in-game.spec.ts',
