@@ -1,5 +1,6 @@
 // @covers client/app/encyclopedia/
 // @covers client/encyclopedia-static/ scripts/vite-encyclopedia.ts scripts/build-frontend.ts
+// @covers scripts/build-pages-encyclopedia.ts
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
