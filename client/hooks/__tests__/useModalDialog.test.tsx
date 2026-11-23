@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { useModalDialog } from '../useModalDialog'
@@ -12,6 +12,7 @@ beforeAll(() => {
   HTMLDialogElement.prototype.close = close
 })
 afterEach(() => {
+  cleanup()
   showModal.mockClear()
   close.mockClear()
 })
@@ -52,5 +53,52 @@ describe('useModalDialog', () => {
 
     expect(getByRole('dialog', { hidden: true })).toHaveAttribute('open')
     expect(showModal.mock.calls.length - close.mock.calls.length).toBe(1)
+  })
+
+  describe('hands focus back to the element that had it when the dialog opened', () => {
+    function Page({ open }: { open: boolean }) {
+      return (
+        <>
+          <button type="button">Opener</button>
+          <button type="button">Elsewhere</button>
+          {open && <Modal />}
+        </>
+      )
+    }
+    const button = (name: string) => screen.getByRole('button', { name, hidden: true })
+    function openFrom(opener: string) {
+      const view = render(<Page open={false} />)
+      button(opener).focus()
+      view.rerender(<Page open />)
+      // showModal() moves focus into the dialog.
+      button('Close').focus()
+      return view
+    }
+
+    it('when focus is still inside the closed dialog', () => {
+      const { rerender } = openFrom('Opener')
+      rerender(<Page open={false} />)
+      expect(button('Opener')).toHaveFocus()
+    })
+
+    it('when closing dropped focus onto the body, as WebKit does while a stylesheet loads', () => {
+      const { rerender } = openFrom('Opener')
+      close.mockImplementationOnce(function (this: HTMLDialogElement) {
+        this.removeAttribute('open')
+        ;(document.activeElement as HTMLElement | null)?.blur()
+      })
+      rerender(<Page open={false} />)
+      expect(button('Opener')).toHaveFocus()
+    })
+
+    it('but not over focus its owner already moved outside the dialog', () => {
+      const { rerender } = openFrom('Opener')
+      close.mockImplementationOnce(function (this: HTMLDialogElement) {
+        this.removeAttribute('open')
+        button('Elsewhere').focus()
+      })
+      rerender(<Page open={false} />)
+      expect(button('Elsewhere')).toHaveFocus()
+    })
   })
 })

@@ -13,7 +13,7 @@ import {
 } from './encyclopedia-filters'
 import type { EncyclopediaItem } from './encyclopedia-item'
 import { encyclopediaGroupLabel, encyclopediaTypeLabel } from './encyclopedia-labels'
-import { useModalDialog } from './useModalDialog'
+import { useModalDialog } from '../../hooks/useModalDialog'
 
 export type EncyclopediaFiltersProps = {
   store: EncyclopediaBrowseStore

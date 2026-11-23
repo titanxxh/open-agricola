@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { API_BASE } from '../../config'
 import { useLocale } from '../../contexts/LocaleContext'
+import { useModalDialog } from '../../hooks/useModalDialog'
 import { GitHubRepoLink } from './GitHubRepoLink'
 import { WhatsNewButton } from './WhatsNew'
 import feishuIcon from './feishu-icon.svg'
@@ -20,16 +21,10 @@ function CommunityGroupDialog({ platform, onClose }: { platform: CommunityPlatfo
     imageAlt: t('ui.feishuCommunity.imageAlt'), loading: t('ui.feishuCommunity.loading'),
     unavailable: t('ui.feishuCommunity.unavailable'), retry: t('ui.feishuCommunity.retry'),
   }
-  const dialog = useRef<HTMLDialogElement>(null)
+  const dialog = useModalDialog()
   const titleId = useId()
   const [requestId, setRequestId] = useState(Date.now)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-
-  useEffect(() => {
-    const element = dialog.current
-    element?.showModal()
-    return () => element?.close()
-  }, [])
 
   return createPortal(
     <dialog ref={dialog} className="community-group-dialog" aria-labelledby={titleId}

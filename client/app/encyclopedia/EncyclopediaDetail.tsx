@@ -10,7 +10,7 @@ import type { EncyclopediaItem } from './encyclopedia-item'
 import { encyclopediaGroupLabel, encyclopediaPointsApply, encyclopediaTypeLabel } from './encyclopedia-labels'
 import { encyclopediaFieldText } from './encyclopedia-text'
 import { encyclopediaShareUrl } from './encyclopedia-url'
-import { useModalDialog } from './useModalDialog'
+import { useModalDialog } from '../../hooks/useModalDialog'
 
 type DetailProps = {
   entryKey: string

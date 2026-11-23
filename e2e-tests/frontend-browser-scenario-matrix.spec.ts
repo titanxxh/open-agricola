@@ -12,6 +12,9 @@ import {
   type Page,
 } from '@playwright/test'
 import { browserRequestHeaders, BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { moorHarvestFixture, startHarvest } from './helpers/harvest-room'
+import { keepStylesheetLoading } from './helpers/modal-focus'
+import { joinRoomClients, roomDriver } from './room-command-driver'
 
 type LocaleScenario = {
   locale: 'en'
@@ -422,6 +425,69 @@ test.describe('iOS Safari browser smoke @webkit @ios-safari', () => {
     await expect.poll(() =>
       page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
     ).toBeLessThanOrEqual(1)
+  })
+})
+
+// WebKit drops the focus a closing modal hands back while a stylesheet is loading (#2004, #2012). Every dialog opened
+// with showModal() must still return focus to its opener, whether Escape or one of its own buttons closes it.
+test.describe('modal dialogs hand focus back while a stylesheet loads @webkit', () => {
+  const closeTwice = async (opener: Locator, dialog: Locator, closeButton: Locator, open = () => opener.click()) => {
+    for (const close of [() => opener.page().keyboard.press('Escape'), () => closeButton.click()]) {
+      await open()
+      await expect(dialog).toBeVisible()
+      await close()
+      await expect(dialog).toHaveCount(0)
+      await expect(opener).toBeFocused()
+    }
+  }
+
+  test('lobby: What\'s New, the player group and the inbox', async ({ page, request }) => {
+    await page.route('**/api/whats-new', route => route.fulfill({ json: { releases: [
+      { version: 'v0.12.1', date: '2026-11-02', items: [{ zh: '修复', en: 'A fix' }] },
+    ] } }))
+    // The donation widget's own third-party files can hold back the load event; the stylesheet below stands in for them.
+    await page.route('https://storage.ko-fi.com/**', route => route.abort())
+    await keepStylesheetLoading(page)
+    await setLocale(page, ENGLISH.locale)
+    await authenticateWorkshop(page, request)
+    await page.goto(`${FRONTEND_URL}/`)
+
+    const whatsNew = page.locator('.whats-new-button')
+    const whatsNewDialog = page.getByRole('dialog', { name: "What's new" })
+    await closeTwice(whatsNew, whatsNewDialog, whatsNewDialog.getByRole('button', { name: ENGLISH.close, exact: true }))
+    const group = page.getByRole('button', { name: 'WeChat player group', exact: true })
+    const groupDialog = page.getByRole('dialog', { name: 'Join the WeChat player group' })
+    await closeTwice(group, groupDialog, groupDialog.getByRole('button', { name: ENGLISH.close, exact: true }))
+    const inbox = page.getByRole('button', { name: 'Inbox', exact: true })
+    const inboxDialog = page.getByRole('dialog', { name: 'Inbox', exact: true })
+    await closeTwice(inbox, inboxDialog, inboxDialog.getByRole('button', { name: ENGLISH.close, exact: true }))
+  })
+
+  test('game: card details on touch', async ({ browser }) => {
+    const context = await browser.newContext(IPHONE_13)
+    try {
+      const page = await context.newPage()
+      await keepStylesheetLoading(page)
+      await openStandaloneSandbox(page, ENGLISH)
+      const card = page.locator('.hand-cards [data-card-anchor]').first()
+      await card.scrollIntoViewIfNeeded()
+      const dialog = page.getByRole('dialog', { name: 'Card details' })
+      await closeTwice(card, dialog, dialog.getByRole('button', { name: ENGLISH.close, exact: true }), () => card.tap())
+    } finally { await context.close() }
+  })
+
+  test('game: the harvest shortfall warning', async ({ browser, request }) => {
+    const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
+    try {
+      await keepStylesheetLoading(pages[0])
+      await joinRoomClients(pages, request)
+      const driver = roomDriver(pages)
+      await driver.command(0, { type: 'loadGame', state: moorHarvestFixture({ food: 2, grain: 1, fuel: 1 }) })
+      await startHarvest(pages, driver, 'feed')
+      const confirm = pages[0].locator('.exchange-overlay').getByRole('button', { name: 'Confirm', exact: true })
+      const warning = pages[0].getByRole('alertdialog', { name: 'Resource shortage' })
+      await closeTwice(confirm, warning, warning.getByRole('button', { name: 'Back to exchange', exact: true }))
+    } finally { await Promise.allSettled(pages.map(page => page.close())) }
   })
 })
 
