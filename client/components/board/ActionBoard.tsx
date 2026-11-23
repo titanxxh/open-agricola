@@ -553,15 +553,24 @@ export const ActionBoard = ({
   ) => {
     const items = buildActionResourceItems(space)
     if (!items.length) return null
-    const totalCount = items.reduce((sum, item) => sum + item.amount, 0)
     const offset: React.CSSProperties = space ? resourceOffsets[space.id]
       ?? (isRound ? { bottom: 6, right: 30 } : {})
       : (isRound ? { bottom: 6, right: 30 } : {})
-    return (
-      <div className="resource-holder" data-n={totalCount} style={offset}>
-        {renderResourceIcons(items)}
+    // Each kind of good keeps its own pile and count, so mixed goods never hide one another.
+    const holders = items.map((item) => (
+      <div
+        key={item.resource}
+        className="resource-holder"
+        data-resource={item.resource}
+        data-n={item.amount}
+        style={items.length === 1 ? offset : undefined}
+      >
+        {renderResourceIcons([item])}
       </div>
-    )
+    ))
+    return items.length === 1
+      ? holders[0]
+      : <div className="resource-holder-group" style={offset}>{holders}</div>
   }
 
   const renderFutureMeepleHolder = (

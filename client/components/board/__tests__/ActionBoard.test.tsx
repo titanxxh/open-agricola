@@ -746,6 +746,39 @@ describe('ActionBoard', () => {
     expect(holder?.querySelector('.future-meeple-holder')).not.toBe(holder?.querySelector('.resource-holder'))
   })
 
+  it('gives each kind of good on a space its own pile and count', () => {
+    const player = createPlayer('p1', 'PlayerA', 'red')
+    const quarry = createAction('western-quarry', 'actions.western-quarry.name')
+    quarry.resources.clay = 1
+    quarry.resources.stone = 2
+    const forest = createAction('forest', 'actions.forest.name')
+    forest.resources.wood = 3
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+
+    const { container } = render(
+      <ActionBoard locale="en" baseActions={[forest]} roundSlots={[{ round: 5, action: quarry }]}
+        currentPlayer={player} players={[player]} futureMeeples={[]}
+        canTakeAction={() => true} takeAction={() => {}} currentRound={5} devMode={false} />,
+    )
+
+    const mixed = container.querySelector('[data-action-id="western-quarry"]')!
+    const piles = [...mixed.querySelectorAll('.resource-holder-group > .resource-holder')]
+    expect(piles.map((pile) => [pile.getAttribute('data-resource'), pile.getAttribute('data-n')]))
+      .toEqual([['clay', '1'], ['stone', '2']])
+    expect(piles[0]!.querySelectorAll('.res-icon-clay')).toHaveLength(1)
+    expect(piles[0]!.querySelectorAll('.res-icon-stone')).toHaveLength(0)
+    expect(piles[1]!.querySelectorAll('.res-icon-stone')).toHaveLength(2)
+
+    const single = container.querySelector('[data-action-id="forest"]')!
+    expect(single.querySelector('.resource-holder-group')).toBeNull()
+    const pile = single.querySelector('.resource-holder')!
+    expect([pile.getAttribute('data-resource'), pile.getAttribute('data-n')]).toEqual(['wood', '3'])
+    expect(pile.querySelectorAll('.res-icon-wood')).toHaveLength(3)
+  })
+
   it('shows future meeple resources on unrevealed round placeholders', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')

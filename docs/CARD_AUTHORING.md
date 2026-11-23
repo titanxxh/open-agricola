@@ -273,7 +273,7 @@ A card grants a rule action by returning that action's leaf: `plow`, `sow`, `con
 |---|---|---|
 | "You can no longer use …" | `phases: ['isDoable']` with `globalQuery: true`, returning `{ doable: false }` when `context.actionId` names the space | `D050_ForeignAid`, `CWM020_FarmSchoolGraduate` |
 | "You can take action X even without …" | `phases: ['isDoable']` on that action, returning `{ doable: true }` only when `context.doable` is false and the card supplies what is missing | `A065_SeedPellets`, `D014_HammerCrusher` |
-| "You can use an occupied space", other extra placement targets | `actions: ['place-farmer'], phases: ['computeArgs']` returning `extraOptions` whose value starts with `OCCUPIED_SPACE_CHOICE_PREFIX` | `A025_Bassinet`, `CWM016_Diplomat` |
+| "You can use an occupied space", other extra placement targets | `actions: ['place-farmer'], phases: ['computeArgs']` returning `extraOptions` whose value starts with `OCCUPIED_SPACE_CHOICE_PREFIX`. An accumulation space its occupant emptied stays closed to `isDoable`; a different reward there is a `computeReplace` on that space, which tells the arriving person by `actionSpaceUse.personUse` | `A025_Bassinet`, `CWM016_Diplomat`, `CWM013_Cowboy` |
 | "You can also buy … there" | `phases: ['computeChoiceCandidates']` on `improvement`, returning `extraOptions` | `C027_Blueprint` |
 
 ### 4.18 Reading what happened

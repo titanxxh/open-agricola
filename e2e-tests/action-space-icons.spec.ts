@@ -76,3 +76,43 @@ for (const scenario of [
     }
   })
 }
+
+test('mixed goods on a revealed round space keep one pile and count per kind', async ({ page, request }) => {
+  // Tall enough that the bottom interaction bar does not cover the round-card rows.
+  await page.setViewportSize({ width: 1440, height: 1600 })
+  expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {
+    seed: 6069, playerCount: 2, customCardIds: [],
+  })).ok).toBe(true)
+  const { state }: { state: GameState } = await getJson(request, `${BACKEND_URL}/api/game/state`)
+  // The Western Quarry is a stage-2 card, revealed by round 7.
+  state.round = 7
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+  const quarry = state.actionSpaces.find(space => space.id === 'western-quarry')!
+  quarry.resources.clay = 1
+  quarry.resources.stone = 1
+  expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
+  await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
+
+  const piles = page.locator('.action-board [data-action-id="western-quarry"] .resource-holder-group > .resource-holder')
+  await expect(piles).toHaveCount(2)
+  await expect(piles.nth(0)).toHaveAttribute('data-resource', 'clay')
+  await expect(piles.nth(0)).toHaveAttribute('data-n', '1')
+  await expect(piles.nth(1)).toHaveAttribute('data-resource', 'stone')
+  await expect(piles.nth(1)).toHaveAttribute('data-n', '1')
+  await expect(piles.nth(0).locator('.res-icon-clay')).toBeVisible()
+  await expect(piles.nth(1).locator('.res-icon-stone')).toBeVisible()
+  const [clay, stone] = await Promise.all([piles.nth(0).boundingBox(), piles.nth(1).boundingBox()])
+  expect(clay && stone).toBeTruthy()
+  expect(clay!.x + clay!.width <= stone!.x || stone!.x + stone!.width <= clay!.x).toBe(true)
+  for (const pile of [piles.nth(0), piles.nth(1)]) {
+    const shownOnTop = await pile.evaluate(element => {
+      const box = element.getBoundingClientRect()
+      return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2))
+    })
+    expect(shownOnTop).toBe(true)
+  }
+  await page.locator('.action-board [data-action-id="western-quarry"]').screenshot({ path: 'output/playwright/action-space-mixed-goods.png' })
+})

@@ -275,7 +275,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 |---|---|---|
 | "You can no longer use …" | `phases: ['isDoable']` 加 `globalQuery: true`，当 `context.actionId` 是该行动格时返回 `{ doable: false }` | `D050_ForeignAid`、`CWM020_FarmSchoolGraduate` |
 | "You can take action X even without …" | 订阅该行动的 `phases: ['isDoable']`，只在 `context.doable` 为 false 且卡能补上所缺的东西时返回 `{ doable: true }` | `A065_SeedPellets`、`D014_HammerCrusher` |
-| "You can use an occupied space"，以及其他额外的放置目标 | `actions: ['place-farmer'], phases: ['computeArgs']` 返回 `extraOptions`，其 value 以 `OCCUPIED_SPACE_CHOICE_PREFIX` 开头 | `A025_Bassinet`、`CWM016_Diplomat` |
+| "You can use an occupied space"，以及其他额外的放置目标 | `actions: ['place-farmer'], phases: ['computeArgs']` 返回 `extraOptions`，其 value 以 `OCCUPIED_SPACE_CHOICE_PREFIX` 开头。被占用者拿空的累积格不能靠 `isDoable` 重新开放；要在那里给出别的收益，在该格上用 `computeReplace`，并以 `actionSpaceUse.personUse` 区分这次进入的人 | `A025_Bassinet`、`CWM016_Diplomat`、`CWM013_Cowboy` |
 | "You can also buy … there" | 订阅 `improvement` 的 `phases: ['computeChoiceCandidates']`，返回 `extraOptions` | `C027_Blueprint` |
 
 ### 4.18 读取已经发生的事
