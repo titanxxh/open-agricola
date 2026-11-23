@@ -6,12 +6,9 @@ import { mkdir, readFile, readdir, writeFile, stat, lstat, mkdtemp, rm, chmod } 
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { PostgresDatabase } from '../server/database/postgres'
-import { ResourceStore } from '../server/storage/resource-store'
 import { ErasureLedger, type ErasureBatch } from '../server/storage/erasure-ledger'
 import { objectHash, S3ObjectStore } from '../server/storage/s3-store'
-import { applyReplayRemovalLedger, validateBatch } from '../server/game/replay-removal'
-import { validateStorage, type StorageValidationOptions } from './storage-validation'
-import { migratePostgres } from '../server/database/migrations'
+import { validateBatch } from '../server/storage/replay-removal-ledger'
 import { withResourceCapture, type CapturedResource } from '../server/storage/backup-coordination'
 
 export const POSTGRES_IMAGE = 'postgres:18-bookworm@sha256:3725f4e2499eef5134592b3b4ab79a543ed7f8e533b05b5b637af926630f6650'
@@ -49,7 +46,7 @@ async function directoryDumpFiles(path: string): Promise<DumpFile[]> {
 }
 
 /** Checks the dump named by the manifest and returns the path pg_restore reads inside /archive. */
-async function verifiedDump(root: string, manifest: StorageArchive): Promise<string> {
+export async function verifiedDump(root: string, manifest: StorageArchive): Promise<string> {
   if (manifest.version === 1) {
     const actual = await digest(join(root, 'database.dump'))
     if (actual.sha256 !== manifest.database.sha256 || actual.size !== manifest.database.size) throw new Error('Database archive integrity failure')
@@ -70,7 +67,7 @@ async function digest(path: string): Promise<{ sha256: string; size: number }> {
   return { sha256: hash.digest('hex'), size: (await stat(path)).size }
 }
 
-async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, root: string, args: string[], signal?: AbortSignal, deadlineEpochMs?: number, listFile?: string): Promise<string> {
+export async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, root: string, args: string[], signal?: AbortSignal, deadlineEpochMs?: number, listFile?: string): Promise<string> {
   signal?.throwIfAborted()
   const local = process.env.PG_CLIENT_MODE === 'local'
   const url = new URL(connectionString)
@@ -234,64 +231,4 @@ export async function assertEmptyStorage(db: PostgresDatabase, objects: S3Object
     WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%'
       AND c.relkind IN ('r','p','v','m','S','f') LIMIT 1`).get()) throw new Error('Bootstrap requires an empty target database')
   await objects.assertEmpty()
-}
-
-/** Restore into an EMPTY database. Caller supplies current, independent erasure facts. */
-export async function restoreStorageArchive(connectionString: string, db: PostgresDatabase, objects: S3ObjectStore, root: string, currentErasureFacts: ErasureBatch[], signal?: AbortSignal, validation: StorageValidationOptions = {}) {
-  signal?.throwIfAborted()
-  const manifest = JSON.parse(await readFile(join(root, 'archive.json'), 'utf8')) as StorageArchive
-  if (![1, 2].includes(manifest.version) || !/^[a-z_][a-z0-9_]*$/.test(manifest.schema) || !Array.isArray(manifest.objects)) throw new Error('Invalid storage archive manifest')
-  if (await db.prepare("SELECT 1 FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') LIMIT 1").get()) throw new Error('Restore requires an empty target database')
-  const dumpPath = await verifiedDump(root, manifest)
-  const barrier = `restore:${manifest.database.sha256}`
-  // The target stays detached from ingress until validation succeeds. The
-  // durable barrier also prevents accidental startup after a failed restore.
-  const record = async (status: 'importing' | 'validated' | 'failed', report: unknown = null) => {
-    await db.prepare(`INSERT INTO data_imports(source_hash,status,report_json,updated_at) VALUES (?,?,?,?)
-      ON CONFLICT(source_hash) DO UPDATE SET status=excluded.status,report_json=excluded.report_json,updated_at=excluded.updated_at`)
-      .run(barrier, status, report === null ? null : JSON.stringify(report), Date.now())
-  }
-  const restoreDirectory = await mkdtemp(join(tmpdir(), 'agricola-restore-'))
-  const restoreList = join(restoreDirectory, 'restore.list')
-  try {
-    // Apply the CURRENT ledger before placing any historical bytes in the target.
-    await mergeLedger(objects, currentErasureFacts)
-    const ledger = new ErasureLedger(objects)
-    for (const item of manifest.objects) {
-      signal?.throwIfAborted()
-      if (!/^[a-f0-9]{64}$/.test(item.sha256) || !Number.isSafeInteger(item.size) || item.size < 0
-        || typeof item.key !== 'string' || !/^(card-art|replay-assets|replay-viewers)\//.test(item.key)) throw new Error('Invalid object archive identity')
-      if (await ledger.isHashRemoved(item.sha256)) continue
-      const body = await readFile(join(root, 'objects', item.sha256))
-      if (objectHash(body) !== item.sha256 || body.length !== item.size) throw new Error(`Object archive integrity failure: ${item.key}`)
-      await objects.putImmutable(item.key, body, item.contentType)
-    }
-    // pg_dump --schema omits extension definitions; citext lives in public for
-    // every application schema. Use the PostgreSQL client's native restore.
-    await db.exec('CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public')
-    const listing = await pgTool('pg_restore', connectionString, root, ['--list', dumpPath], signal)
-    // public already exists and owns citext in a fresh target database. Omit
-    // only its schema-creation entry, keeping every application object.
-    await writeFile(restoreList, listing.split('\n').filter(line => !/^\d+; \d+ \d+ SCHEMA - public /.test(line)).join('\n'), { mode: 0o600 })
-    await pgTool('pg_restore', connectionString, root, ['--use-list=/archive-restore.list', '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl', dumpPath], signal, undefined, restoreList)
-    await migratePostgres(db)
-    // Restored routing leases belong to source processes. Detach them without
-    // changing Room recovery, permanent identities or ownership fencing epochs.
-    await db.transaction(async () => {
-      await db.exec("UPDATE app_instances SET status='stopped', lease_until=0")
-      await db.exec('UPDATE room_ownership SET lease_until=0, admission_until=0')
-    })()
-    await record('importing')
-    const resources = new ResourceStore(db, objects)
-    await applyReplayRemovalLedger(db, { resources })
-    const report = await validateStorage(db, resources, validation)
-    await record('validated', report)
-    return { manifest, validation: report }
-  } catch (error) {
-    // Native restore is transactional. If it failed before schema creation,
-    // initialize the empty target only to leave a permanent startup barrier.
-    await migratePostgres(db)
-    await record('failed', { error: error instanceof Error ? error.message : 'Restore validation failed' })
-    throw error
-  } finally { await rm(restoreDirectory, { recursive: true, force: true }) }
 }

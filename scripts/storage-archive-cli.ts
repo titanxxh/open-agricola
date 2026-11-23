@@ -1,35 +1,17 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PostgresDatabase } from '../server/database/postgres'
 import { S3ObjectStore } from '../server/storage/s3-store'
 import { ErasureLedger } from '../server/storage/erasure-ledger'
-import { ResourceStore } from '../server/storage/resource-store'
-import { migratePostgres } from '../server/database/migrations'
-import { applyReplayRemovalLedger } from '../server/game/replay-removal'
-import { validateStorage } from './storage-validation'
-import { storageValidationConcurrency } from './replay-validation-pool'
-import { assertEmptyStorage, decodeLedger, exportStorageArchive, mergeLedger, restoreStorageArchive, type StorageArchive } from './storage-archive'
-import { cleanupBackupScratch, withBackupScratch } from './backup-scratch'
+import { storageValidationConcurrency } from './storage-validation-concurrency'
+import { assertEmptyStorage, decodeLedger, exportStorageArchive, mergeLedger } from './storage-archive'
+import { cleanupBackupScratch } from './backup-scratch'
 
-/** Target-build validation never connects an application to historical data. */
-export async function validateArchiveInIsolation(root: string, env: NodeJS.ProcessEnv = process.env, signal?: AbortSignal) {
-  if (!env.DATABASE_URL) throw new Error('DATABASE_URL is required')
-  const concurrency = storageValidationConcurrency(env.STORAGE_VALIDATION_CONCURRENCY)
-  const manifest = JSON.parse(await readFile(join(root, 'archive.json'), 'utf8')) as StorageArchive
-  const sourceObjects = S3ObjectStore.fromEnv(env, env.S3_PREFIX ?? '', signal)
-  try {
-    return await withBackupScratch({ directory: env.BACKUP_SCRATCH_DIRECTORY || dirname(resolve(root)), env,
-      schema: manifest.schema, deadlineEpochMs: Number(env.BACKUP_DEADLINE_EPOCH_MS || Date.now() + 30 * 60 * 1000),
-      signal: signal ?? new AbortController().signal }, async target => {
-      const ledger = await new ErasureLedger(sourceObjects).read()
-      const { validation } = await restoreStorageArchive(target.connectionString, target.db, target.objects, root, ledger, target.signal, { concurrency })
-      return { formatVersion: 2, sourceBuildId: manifest.sourceBuildId, targetBuildId: env.GAME_BUILD_ID ?? 'development',
-        createdAt: manifest.createdAt, validatedAt: new Date().toISOString(),
-        database: { sha256: manifest.database.sha256, size: manifest.database.size, ...(manifest.database.format ? { format: manifest.database.format } : {}) }, ...validation }
-    })
-  } finally { sourceObjects.close() }
-}
+// `validate`, `restore` and `check-live` decode replays with the rule engine.
+// Loading it only for them keeps the export, ledger and scratch commands'
+// static import closure free of game code; a guard test pins that (#2024).
+const engineCommands = () => import('./storage-restore')
 
 export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const [command, path, flag] = args
@@ -54,6 +36,7 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       console.log(JSON.stringify({ cleaned: await cleanupBackupScratch(resolve(path), env, Date.now(), controller.signal) })); return
     }
     if (command === 'validate') {
+      const { validateArchiveInIsolation } = await engineCommands()
       console.log(JSON.stringify(await validateArchiveInIsolation(resolve(path), env, controller.signal), null, 2)); return
     }
     objects = S3ObjectStore.fromEnv(env, env.S3_PREFIX ?? '', controller.signal)
@@ -81,23 +64,10 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       console.log(JSON.stringify({ formatVersion: 1, targetBuildId: path, database: 'empty', objects: 'empty' })); return
     }
     if (command === 'check-live') {
-      const existing = await db.prepare("SELECT to_regclass('app_instances') AS instances").get<{ instances: string | null }>()
-      if (existing?.instances && await db.prepare("SELECT 1 FROM app_instances WHERE status!='stopped' AND lease_until>(extract(epoch FROM clock_timestamp())*1000)::bigint LIMIT 1").get()) throw new Error('Stop all applications before validating the target build')
-      await migratePostgres(db)
-      const barrier = `target-build:${path}`
-      await db.prepare(`INSERT INTO data_imports(source_hash,status,updated_at) VALUES (?,'importing',?)
-        ON CONFLICT(source_hash) DO UPDATE SET status='importing',updated_at=excluded.updated_at`).run(barrier, Date.now())
-      try {
-        const resources = new ResourceStore(db, objects)
-        await applyReplayRemovalLedger(db, { resources })
-        // --counted: an Owner-local Validation already decoded these exact bytes with this target image.
-        const validation = await validateStorage(db, resources, { concurrency: validationConcurrency, replaySteps: args.includes('--counted') ? 'count' : 'decode' })
-        await db.prepare("UPDATE data_imports SET status='validated',report_json=?,updated_at=? WHERE source_hash=?").run(JSON.stringify(validation), Date.now(), barrier)
-        console.log(JSON.stringify(validation, null, 2)); return
-      } catch (error) {
-        await db.prepare("UPDATE data_imports SET status='failed',updated_at=? WHERE source_hash=?").run(Date.now(), barrier)
-        throw error
-      }
+      const { validateLiveStorage } = await engineCommands()
+      // --counted: an Owner-local Validation already decoded these exact bytes with this target image.
+      const validation = await validateLiveStorage(db, objects, path, { concurrency: validationConcurrency, replaySteps: args.includes('--counted') ? 'count' : 'decode' })
+      console.log(JSON.stringify(validation, null, 2)); return
     }
     if (command === 'export') {
       await exportStorageArchive({ connectionString: env.DATABASE_URL, db, objects, root: resolve(path), databaseFormat,
@@ -108,6 +78,7 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       // is empty. Ordinary archives intentionally cannot supply this input.
       if (!env.CURRENT_ERASURE_LEDGER) throw new Error('CURRENT_ERASURE_LEDGER must point to the latest independent ledger copy')
       const ledger = decodeLedger(await readFile(env.CURRENT_ERASURE_LEDGER, 'utf8'))
+      const { restoreStorageArchive } = await engineCommands()
       console.log(JSON.stringify(await restoreStorageArchive(env.DATABASE_URL, db, objects, resolve(path), ledger, controller.signal,
         { concurrency: validationConcurrency }), null, 2))
     }

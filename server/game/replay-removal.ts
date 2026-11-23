@@ -1,28 +1,15 @@
 import type { ResourceStore } from '../storage/resource-store'
 import type { PostgresDatabase as Database } from '../database/postgres'
-
-export type ReplayRemovalReason = 'removed' | 'moderation' | 'legal'
-
-type ReplayRemovalLedgerEntry = {
-  version: 1
-  roomId: string
-  reason: ReplayRemovalReason
-  removedAt: number
-  assetHashes: string[]
-  eraseResult: boolean
-}
-
-type ReplayAssetTakedown = {
-  hash: string
-  reason: ReplayRemovalReason
-  removedAt: number
-}
-
-type ReplayRemovalLedgerBatch = {
-  version: 1
-  entries: ReplayRemovalLedgerEntry[]
-  assetTakedowns: ReplayAssetTakedown[]
-}
+import {
+  ASSET_HASH,
+  REMOVAL_REASONS,
+  ROOM_ID,
+  validateBatch,
+  type ReplayAssetTakedown,
+  type ReplayRemovalLedgerBatch,
+  type ReplayRemovalLedgerEntry,
+  type ReplayRemovalReason,
+} from '../storage/replay-removal-ledger'
 
 type ReplayRemovalLedger = {
   entries: ReplayRemovalLedgerEntry[]
@@ -61,14 +48,7 @@ export type ReplayRemovalLedgerResult = {
   assetTakedownHashes: string[]
 }
 
-const ROOM_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/
-const ASSET_HASH = /^[a-f0-9]{64}$/
 const ASSET_URL = /^\/replay-assets\/([a-f0-9]{64})$/
-const REMOVAL_REASONS = new Set<ReplayRemovalReason>([
-  'removed',
-  'moderation',
-  'legal',
-])
 
 const replayAssetHashes = (raw: string | null): string[] => {
   if (raw === null) return []
@@ -131,80 +111,6 @@ const referencedAssetHashes = async (
     rowHashes.forEach((hash) => hashes.add(hash))
   }
   return hashes
-}
-
-export const validateEntry = (value: unknown): ReplayRemovalLedgerEntry => {
-  if (!value || typeof value !== 'object') {
-    throw new Error('invalid replay removal ledger entry')
-  }
-  const entry = value as Partial<ReplayRemovalLedgerEntry>
-  if (
-    entry.version !== 1
-    || typeof entry.roomId !== 'string'
-    || entry.roomId.length > 128
-    || !ROOM_ID.test(entry.roomId)
-    || typeof entry.reason !== 'string'
-    || !REMOVAL_REASONS.has(entry.reason as ReplayRemovalReason)
-    || !Number.isSafeInteger(entry.removedAt)
-    || (entry.removedAt as number) < 0
-    || !Array.isArray(entry.assetHashes)
-    || entry.assetHashes.some((hash) => (
-      typeof hash !== 'string' || !ASSET_HASH.test(hash)
-    ))
-    || typeof entry.eraseResult !== 'boolean'
-  ) {
-    throw new Error('invalid replay removal ledger entry')
-  }
-  return {
-    version: 1,
-    roomId: entry.roomId,
-    reason: entry.reason as ReplayRemovalReason,
-    removedAt: entry.removedAt as number,
-    assetHashes: [...new Set(entry.assetHashes)].sort(),
-    eraseResult: entry.eraseResult,
-  }
-}
-
-const validateAssetTakedown = (value: unknown): ReplayAssetTakedown => {
-  if (!value || typeof value !== 'object') {
-    throw new Error('invalid replay asset takedown')
-  }
-  const rule = value as Partial<ReplayAssetTakedown>
-  if (
-    typeof rule.hash !== 'string'
-    || !ASSET_HASH.test(rule.hash)
-    || typeof rule.reason !== 'string'
-    || !REMOVAL_REASONS.has(rule.reason as ReplayRemovalReason)
-    || !Number.isSafeInteger(rule.removedAt)
-    || (rule.removedAt as number) < 0
-  ) {
-    throw new Error('invalid replay asset takedown')
-  }
-  return {
-    hash: rule.hash,
-    reason: rule.reason as ReplayRemovalReason,
-    removedAt: rule.removedAt as number,
-  }
-}
-
-export const validateBatch = (value: unknown): ReplayRemovalLedgerBatch => {
-  if (!value || typeof value !== 'object') {
-    throw new Error('invalid replay removal ledger batch')
-  }
-  const batch = value as Partial<ReplayRemovalLedgerBatch>
-  if (
-    batch.version !== 1
-    || !Array.isArray(batch.entries)
-    || !Array.isArray(batch.assetTakedowns)
-    || (batch.entries.length === 0 && batch.assetTakedowns.length === 0)
-  ) {
-    throw new Error('invalid replay removal ledger batch')
-  }
-  return {
-    version: 1,
-    entries: batch.entries.map(validateEntry),
-    assetTakedowns: batch.assetTakedowns.map(validateAssetTakedown),
-  }
 }
 
 const readLedger = async (resources: ResourceStore): Promise<ReplayRemovalLedger> => {

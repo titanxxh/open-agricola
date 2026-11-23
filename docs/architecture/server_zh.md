@@ -203,7 +203,8 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 部署命令与指标目录见 [`HOW_TO_DEPLOY.md`](../HOW_TO_DEPLOY.md)。
 
 - PostgreSQL 保存平台数据与共享资源目录；私有 S3 保存 `card-art/`、`replay-viewers/<viewerBuildId>/`、`replay-assets/<sha256>` 与 `erasure/ledger.json`。`server/storage/` 负责暂存上传、引用、完整性检查与清理 claim；写入前先持久化上传意图，新上传有 24 小时未引用宽限期，同一对象只有一个 claim 者删除。
-- 在线备份（[ADR 0040](../adr/0040-online-daily-backup-preserves-game-availability.md)）不暂停游戏写入。`storage/backup-coordination.ts` 保护物理删除；`scripts/storage-archive.ts` 让 dump 与资源目录共用快照，并解除恢复出的旧路由租约。`scripts/backup-*` 管理期限、完整归档与临时资源清理。测试：`online-storage-archive.test.ts`。
+- 在线备份（[ADR 0040](../adr/0040-online-daily-backup-preserves-game-availability.md)）不暂停游戏写入。`storage/backup-coordination.ts` 保护物理删除；`scripts/storage-archive.ts` 让 dump 与资源目录共用快照；`scripts/storage-restore.ts` 负责恢复、解除恢复出的旧路由租约并校验。`scripts/backup-*` 管理期限、完整归档与临时资源清理。测试：`online-storage-archive.test.ts`。
+- 归档 CLI 的 `export`、`export-online`、`ledger-export`、`ledger-merge` 与 `cleanup-scratch` 不加载规则或对局代码，trusted-policy 工具镜像因此能按工具内容复用（#2024）。只有 `validate`、`restore`、`check-live` 懒加载 `scripts/storage-restore.ts`；账本记录校验在 `server/storage/replay-removal-ledger.ts`。`scripts/storage-tool-closure.ts` 计算静态闭包并声明运行时读取的文件。测试：`storage-tool-closure.test.ts`。
 - 预发布备份把每个 storage-archive 步骤交给 owner 的归档适配器（`BACKUP_ARCHIVE_POLICY`，在 owner 仓库），由它区分固定可信 main 工具镜像和来源安装身份；没有适配器时脚本拒绝执行。候选工具只取得所选输入的只读挂载和私有 scratch；宿主 report 与 seal 保留在 owner 私有目录。原生 PostgreSQL 临时文件不修改归档输入。测试：`backup-storage.test.ts`、`backup-scratch.test.ts`。
 - Durable Room Commit 需要 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 与 `GAME_BUILD_ID`。创建 Room 时锁定两个 Build ID。Viewer Build ID 是其完整 manifest 的 SHA-256；版图美术、卡牌美术与字体来自 `public-assets.ref` 固定的素材站。Build 校验失败时创建 Room 失败，等待中的 Room 在 Step 0 存在之前拒绝对局写入。
 - 只允许回滚到支持所有活动 Room `schemaVersion` 的兼容录制构建。缺少 Viewer 或持久化不可写会让 readiness 降级。在线 Room 容量只拒绝新准入，离线保留存档不降低 readiness。

@@ -8,10 +8,10 @@ import { vi, afterEach, beforeEach, expect, it } from 'vitest'
 // Keep all byte-integrity assertions; allow the complete restore sequence to finish.
 vi.setConfig({ testTimeout: 120000, hookTimeout: 180000 })
 import { storageFixture } from './_helpers/storage-fixture'
-import { directoryDumpDigest, exportStorageArchive, restoreStorageArchive } from '../storage-archive'
+import { directoryDumpDigest, exportStorageArchive } from '../storage-archive'
+import { restoreStorageArchive, validateArchiveInIsolation } from '../storage-restore'
 import { validateStorage } from '../storage-validation'
 import { ResourceStore } from '../../server/storage/resource-store'
-import { validateArchiveInIsolation } from '../storage-archive-cli'
 import { databaseMaintenance, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
 import { releaseAll, releaseQueue } from '../../server/__tests__/_helpers/release-all'
 import { testStorageEnvironment } from '../../server/__tests__/_helpers/objects'
