@@ -11,6 +11,8 @@ class ThreeExpansionGame {
   felled = 0
   retained = false
   autumn = false
+  // Food spent on parent rewards since the round ledger last read it.
+  parentFood = 0
   readonly heating: Array<{ round: number; required: number; wood: number }> = []
   readonly ledger: unknown[] = []
   constructor(readonly driver: SoloBrowserDriver, readonly mother: string) {}
@@ -77,8 +79,13 @@ class ThreeExpansionGame {
         && (this.mother === 'PR01' && request.farm.farmType === 'stable' || this.mother === 'PR02' && request.farm.farmType === 'plow')) {
         const tile = request.farm.selectableTiles[0]
         if (!tile) throw new Error(`No native parent reward target: ${JSON.stringify(interaction)}`)
+        // Through the Seasons charges 1 food for every plow in Winter, including the PR02 round-12 field.
+        const food = this.mother === 'PR02' && d.state.throughTheSeasons!.currentSeason === 'winter' ? 1 : 0
+        const before = d.state.players[0]!.resources.food
         await d.page.locator(`[data-farm-tile-player="p1"][data-farm-tile-key="${tile.row}-${tile.col}"]`).click()
         await d.ui('confirm-parent-farm-reward', () => d.page.getByRole('button', { name: this.mother === 'PR01' ? 'Confirm stables' : 'Confirm plow', exact: true }).click())
+        expect(d.state.players[0]!.resources.food).toBe(before - food)
+        this.parentFood += food
       } else if (request.kind === 'select-trigger' && interaction.spaceId === '__stage:onRoundStart') {
         for (const option of request.options.filter(option => !option.disabled)) {
           if (option.sourceCard !== this.mother && option.value !== '__pass__' && option.labelKey !== 'actions.exchange.name') throw new Error(`Unknown opening trigger: ${JSON.stringify(option)}`)
@@ -165,6 +172,9 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
       await d.confirm()
       await game.settle()
       if ([4, 7, 9, 11, 13, 14].includes(round)) food -= 6
+      // settle() may already have resolved the next round's opening parent reward.
+      food -= game.parentFood
+      game.parentFood = 0
       expect(d.state.players[0]!.resources.food).toBe(food)
       expect(d.state.players[0]!.resources.begging).toBe(0)
       expect(d.state.players[0]!.sickWorkerIds).toEqual([])
