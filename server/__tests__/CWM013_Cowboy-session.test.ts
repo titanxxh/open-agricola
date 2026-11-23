@@ -13,6 +13,9 @@ import {
   undoRuleSnapshot,
 } from './_helpers/session-assertions'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { resolveNonSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
+import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
+import '../../shared/cards/D/D051_Archway'
 
 const COWBOY = 'CWM013_Cowboy'
 const PLACEHOLDER = '__test_placeholder__'
@@ -23,6 +26,7 @@ const MARKETS = [
 ] as const
 type Animal = (typeof MARKETS)[number]['animal']
 const GUEST = { id: 'guest:1', sourceCardId: 'CI073_Guest', round: 12 }
+const ARCHWAY = 'D051_Archway'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
@@ -229,6 +233,39 @@ describe('CWM013 Cowboy uses an occupied market for one animal', () => {
     expect(roundEnd.state.players[0]!.guests ?? []).toEqual([])
     expect(familySize(roundEnd.state.players[0]!)).toBe(2)
     expect(workersAtHome(roundEnd.state, roundEnd.state.players[0]!).map((worker) => worker.id)).toEqual(['1', '2'])
+  })
+})
+
+describe('CWM013 Cowboy with a person moved onto a market', () => {
+  it.each([
+    ['an unoccupied market collects the whole pile', false, 3],
+    ['a market the opponent emptied gets one sheep', true, 1],
+  ] as const)('S6 a person D051_Archway moves onto %s', (_name, occupied, gained) => {
+    const session = setup((state) => {
+      state.players[0]!.minorPlayed = [ARCHWAY]
+      state.actionSpaces.push(...createPlayerActionSpaces(state))
+      setAnimals(state, 'sheep-market', 'sheep', 3)
+    }, 0)
+    settle(session, session.takeAction(0, ARCHWAY))
+    settle(session, session.takeAction(1, occupied ? 'sheep-market' : 'forest'))
+    settle(session, session.takeAction(0, 'day-laborer'))
+    let response = settle(session, session.takeAction(1, 'clay-pit'))
+    if (response.interaction.stateId !== 'wait') response = session.performRoundEnd()
+    response = resolveNonSkipChoice(session, resolveTriggerIfPresent(session, response, ARCHWAY))
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, promptKey: 'ui.interactionMoveFarmerToSpace' })
+
+    const moved = ok(session.resolveChoice(0, 'sheep-market'))
+    expect(moved.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
+    expect(space(moved, ARCHWAY).takenBy).toEqual([])
+    expect(space(moved, 'sheep-market').takenBy).toEqual([
+      ...(occupied ? [{ playerId: 'p2', workerId: '1' }] : []),
+      { playerId: 'p1', workerId: '1' },
+    ])
+    expect(moved.state.players[0]!.resources.sheep).toBe(gained)
+    expect(space(moved, 'sheep-market').resources.sheep).toBe(0)
+    expect(cowboyLogs(moved).length > 0).toBe(occupied)
+
+    expect(assigned(settle(session, moved)).sheep).toBe(gained)
   })
 })
 
