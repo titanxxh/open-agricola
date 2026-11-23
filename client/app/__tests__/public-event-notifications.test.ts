@@ -226,7 +226,7 @@ describe('public event notifications', () => {
       'future',
       'action',
     ])
-    expect(notifications[0]?.message).toBe('卡牌标记：B021_HayloftBarn：+2 food')
+    expect(notifications[0]?.message).toBe('卡牌标记：干草棚：+2 food')
   })
 
   it('keeps noisy lifecycle and low-level card state events notification-silent', () => {
@@ -582,9 +582,9 @@ describe('public event notifications', () => {
     } satisfies GameEvent
 
     expect(collectPublicEventNotifications([actionAccumulated, resourceSpace, resourceCard], 'en')).toEqual([
-      expect.objectContaining({ id: 'evt', kind: 'resource', message: expect.stringContaining('forest') }),
-      expect.objectContaining({ id: 'evt-2', kind: 'resource', message: expect.stringContaining('fishing') }),
-      expect.objectContaining({ id: 'evt-3', kind: 'resource', message: expect.stringContaining('B048_ForestStone') }),
+      expect.objectContaining({ id: 'evt', kind: 'resource', message: 'Action accumulated: Forest + 2 Wood' }),
+      expect.objectContaining({ id: 'evt-2', kind: 'resource', message: 'Resource accumulated: Fishing + 1 Food' }),
+      expect.objectContaining({ id: 'evt-3', kind: 'resource', message: 'Resource accumulated: Forest Stone + 2 Food' }),
     ])
     expect(collectPublicEventHighlightTargets([actionAccumulated, resourceSpace, resourceCard]).actionIds).toEqual([
       'forest',

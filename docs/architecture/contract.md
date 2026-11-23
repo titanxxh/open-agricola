@@ -255,6 +255,8 @@ Tests: `shared/actions/__tests__/future-schedule-preview.test.ts`, `server/__tes
 
 `LogEntry { key, params, playerId? }` carries an i18n key plus parameters, rendered for the active locale. Bootstrap entries may carry stable `playerId` so seat display-name changes refresh by identity.
 
+An action without a name that follows the `card_<CardId>_<action>` convention renders as its card's effect, including rows already recorded; a card triggered by its own action does not repeat it. Public event cues name cards and Action Spaces instead of ids. Tests: `ActionLog.test.tsx`, `card-action-id.test.ts`, `public-event-presentation.test.ts`.
+
 
 ## Beta qualification
 

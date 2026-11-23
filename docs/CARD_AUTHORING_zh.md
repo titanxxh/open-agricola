@@ -11,7 +11,7 @@
 每张卡都遵守下面每一条规则。交付一张卡之前逐条核对，评审一张卡时再核对一遍。每条规则写的是卡该怎么做；链接指向定义该机制的 module 文档或 ADR，列出的卡是代码范例。
 
 - **Closure（闭环）。** 卡符合 §1 的可行性定义：一个闭环的文件，不改核心路径，不新增 hook 点、phase、action 或引擎节点。它通过能力和带类型的 metadata 访问其他卡。见 [cards：边界](architecture/cards_zh.md#命名能力与边界)。门禁：`pnpm run check:card-impl-boundaries` 拒绝卡读取另一张卡的 ID，`pnpm run check:card-state-boundaries` 拒绝核心代码读取单张卡的状态。
-- **Local state（局部状态）。** 计数器、标记和 flag 持久化在 `player.cardStates[cardId]`，在 `presentation` 声明公开之前都是内部状态。见 [cards：局部状态](architecture/cards_zh.md#cardstates-中的局部状态)。
+- **Local state（局部状态）。** 计数器、标记和 flag 持久化在 `player.cardStates[cardId]`，在 `presentation` 声明公开之前都是内部状态。公开的计数器 key 不是资源时，语言源里要有 `ui.cardCounters.<key>` 标签。见 [cards：局部状态](architecture/cards_zh.md#cardstates-中的局部状态)。门禁：`client/components/board/__tests__/card-counter-label.test.ts`。
 - **Purity（纯度）。** listener handler 读取状态，返回 flow、成本或选项。每一次修改，包括写卡自己的状态，都是一个返回的 leaf。见 [hooks：listener 纯度](architecture/hooks_zh.md#listener-纯度)。门禁：每个测试 project 里的 listener 纯度守卫。
 - **Timing（时机）。** 订阅和 phase 按卡面文字，照 §3 的表格选择（[ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)）。
 - **Admission（准入）。** 提供选项之前，卡检查自己能控制的东西：卡面前提，以及现在必须可用的目标，例如已翻开的行动格或能够开始的授予行动（`CWM061_BackDoor`），还有卡自己的费用，用 `reserve` 传入，让目标按付费之后的资源判断（`CWM023_ForestFarmer`、`C150_ParrotBreeder`）。后续的宿主步骤归引擎管，引擎只检查当前一步：玩家已接受的选择让后面某个必选步骤付不起时，Session 显示 `engine-blocked`，直到 `undoStep` / `undoAction`（`D014_HammerCrusher`、`CWM042_Remodeler`）。见 [hooks：当前步骤准入](architecture/hooks_zh.md#当前步骤准入与-blocked-恢复)、[ADR 0015](adr/0015-provisional-cross-player-continuation-resolution.md)，以及 [cards：helper](architecture/cards_zh.md#sharedcardshelpers-中的-helper) 里的 `reserved-resources.ts`。

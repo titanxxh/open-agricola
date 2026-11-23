@@ -69,6 +69,7 @@ import { useAnimalReorgDraftPresentation } from './animal-reorg-draft-presentati
 import { ExchangeOverlayPresentation, HarvestShortfallDialog } from './exchange-overlay-presentation'
 import { useExchangeDraftPresentation } from './exchange-draft-presentation'
 import { useReserveCookingDraftPresentation } from './reserve-cooking-draft-presentation'
+import { exchangeSourceLabel } from './exchange-source-label'
 import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
 import { checkServerAvailability, isServerUnavailableCode, onServerRecovered, useServerAvailability } from '../services/server-availability'
@@ -1149,14 +1150,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const selectableMajorIds =
     improvementSelection?.majorIds ?? new Set<string>()
 
-  const cardLabel = useCallback((id: string) => {
-    if (id === '__basic__') return t(locale, 'ui.harvestFeedBasicSource')
-    const improvementName = t(locale, `improvements.${id}.name`)
-    if (improvementName !== `improvements.${id}.name`) {
-      return improvementName.replace(/\s*[（(].*$/, '')
-    }
-    return getCardMeta(id)?.name ?? id
-  }, [locale])
+  const cardLabel = useCallback((id: string) => exchangeSourceLabel(locale, id), [locale])
 
   const exchangeDraft = useExchangeDraftPresentation({
     state,

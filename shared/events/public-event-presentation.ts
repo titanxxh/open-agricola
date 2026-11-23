@@ -1,7 +1,7 @@
 import type { GameEvent, ResourceLocation } from '../contract/events'
 import { resourceKeyList } from '../contract/state-constants'
 import type { Resource } from '../contract/types'
-import { t, type Locale } from '../i18n'
+import { cardText, t, type Locale } from '../i18n'
 
 export type PublicEventNotification = {
   id: string
@@ -67,14 +67,25 @@ const resourceText = (resources: Partial<Resource>, locale: Locale): string =>
     .map((key) => `${resources[key]} ${t(locale, `resources.${key}`)}`)
     .join(t(locale, 'ui.publicEvents.resourceSeparator'))
 
+/** Public cues name cards and action spaces as players see them, never by internal id. */
+const cardName = (locale: Locale, cardId: string): string => cardText(locale, cardId).name
+
+const actionName = (locale: Locale, actionId: string): string => {
+  for (const key of [`actions.${actionId}.name`, `moor.specialActions.${actionId}`]) {
+    const name = t(locale, key)
+    if (name !== key) return name
+  }
+  return actionId
+}
+
 const accumulationTargetText = (event: Extract<GameEvent, { type: 'resource.accumulated' }>, locale: Locale): string => {
-  if (event.to.kind === 'actionSpace') return event.to.spaceId
-  if (event.to.kind === 'card') return event.to.cardId
+  if (event.to.kind === 'actionSpace') return actionName(locale, event.to.spaceId)
+  if (event.to.kind === 'card') return cardName(locale, event.to.cardId)
   return t(locale, 'ui.publicEvents.roundTarget', { round: event.to.round })
 }
 
-const actionLabel = (event: GameEvent): string =>
-  'actionId' in event ? event.actionId : event.sourceActionId ?? ''
+const actionLabel = (event: GameEvent, locale: Locale): string =>
+  actionName(locale, 'actionId' in event ? event.actionId : event.sourceActionId ?? '')
 
 export const emptyPublicEventHighlightTargets = (): PublicEventHighlightTargets => ({
   actionIds: [],
@@ -152,7 +163,7 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'resource',
-      message: t(locale, 'ui.publicEvents.actionAccumulated', { action: event.spaceId, resources: resourceText(resources, locale) }),
+      message: t(locale, 'ui.publicEvents.actionAccumulated', { action: actionName(locale, event.spaceId), resources: resourceText(resources, locale) }),
     }
   }
   if (event.type === 'resource.accumulated') {
@@ -170,11 +181,11 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'action',
-      message: t(locale, 'ui.publicEvents.actionRevealed', { action: event.actionId }),
+      message: t(locale, 'ui.publicEvents.actionRevealed', { action: actionName(locale, event.actionId) }),
     }
   }
   if (event.type === 'action.exclusiveUseSet' || event.type === 'action.exclusiveUseCleared') {
-    const action = actionLabel(event)
+    const action = actionLabel(event, locale)
     return {
       id: event.id,
       kind: 'action',
@@ -185,21 +196,21 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'future',
-      message: t(locale, 'ui.publicEvents.futureWorkerQueued', { card: event.cardId }),
+      message: t(locale, 'ui.publicEvents.futureWorkerQueued', { card: cardName(locale, event.cardId) }),
     }
   }
   if (event.type === 'futureMeeple.removed') {
     return {
       id: event.id,
       kind: 'future',
-      message: t(locale, 'ui.publicEvents.futureWorkerRemoved', { card: event.cardId }),
+      message: t(locale, 'ui.publicEvents.futureWorkerRemoved', { card: cardName(locale, event.cardId) }),
     }
   }
   if (event.type === 'futureMeeple.resolved') {
     return {
       id: event.id,
       kind: 'future',
-      message: t(locale, 'ui.publicEvents.futureWorkerResolved', { card: event.cardId }),
+      message: t(locale, 'ui.publicEvents.futureWorkerResolved', { card: cardName(locale, event.cardId) }),
     }
   }
   if (event.type === 'worker.promoted') {
@@ -213,7 +224,7 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'card',
-      message: t(locale, 'ui.publicEvents.cardNote', { card: event.cardId, text: event.text }),
+      message: t(locale, 'ui.publicEvents.cardNote', { card: cardName(locale, event.cardId), text: event.text }),
     }
   }
   if (event.type === 'card.stackChanged') {
@@ -223,21 +234,21 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'card',
-      message: t(locale, 'ui.publicEvents.cardResources', { card: event.cardId, sign, resources: resourceText(resources, locale) }),
+      message: t(locale, 'ui.publicEvents.cardResources', { card: cardName(locale, event.cardId), sign, resources: resourceText(resources, locale) }),
     }
   }
   if (event.type === 'card.swappedWithBoard') {
     return {
       id: event.id,
       kind: 'card',
-      message: t(locale, 'ui.publicEvents.cardSwapped', { from: event.fromPlayerCardId, to: event.toPlayerCardId }),
+      message: t(locale, 'ui.publicEvents.cardSwapped', { from: cardName(locale, event.fromPlayerCardId), to: cardName(locale, event.toPlayerCardId) }),
     }
   }
   if (event.type === 'card.returnedToBoard') {
     return {
       id: event.id,
       kind: 'card',
-      message: t(locale, 'ui.publicEvents.cardReturned', { card: event.cardId }),
+      message: t(locale, 'ui.publicEvents.cardReturned', { card: cardName(locale, event.cardId) }),
     }
   }
   if (event.type === 'farm.fenceBuilt') {

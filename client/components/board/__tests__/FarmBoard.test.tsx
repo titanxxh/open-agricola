@@ -1742,6 +1742,30 @@ describe('FarmBoard', () => {
     expect(html).toContain('resource-chip-count">2</span>')
   })
 
+  it('labels card-declared counters instead of showing their raw keys', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.occupationPlayed = ['CWM023_ForestFarmer', 'CWM019_FamilyPlanner']
+    player.cardStates = {
+      CWM023_ForestFarmer: { counters: { uses: 3 } },
+      CWM019_FamilyPlanner: { extraData: { schedule: [{ round: 8, workerId: '3' }, { round: 11, workerId: '4' }] } },
+    }
+
+    for (const locale of ['zh', 'en'] as const) {
+      const html = renderToStaticMarkup(
+        <FarmBoard
+          {...createFarmBoardProps(player, {
+            playedCards: ['occupation:CWM023_ForestFarmer', 'occupation:CWM019_FamilyPlanner'],
+            locale,
+          })}
+        />,
+      )
+      expect(html).not.toContain('resources.uses')
+      expect(html).not.toContain('resources.reserved')
+      expect(html).toContain(t(locale, 'ui.cardCounters.uses', { count: 3 }))
+      expect(html).toContain(t(locale, 'ui.cardCounters.reserved', { count: 2 }))
+    }
+  })
+
   it('marks the current turn independently of the viewed farm', () => {
     const viewed = createPlayer('p1', 'Ada', 'red')
     const turn = createPlayer('p2', 'Bea', 'blue')

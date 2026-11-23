@@ -6,7 +6,7 @@ import type { GameEvent } from '../../../../shared/contract/events'
 import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
 import { buildActionLogTimelineRows } from '../../../app/action-log-timeline'
 import { ActionLog } from '../ActionLog'
-import { registerLanguagePack } from '../../../../shared/i18n'
+import { registerLanguagePack, t } from '../../../../shared/i18n'
 
 it('renders the same localized Guest rows and portraits from the snapshot or replay timeline', () => {
   const locale = 'guest-log-fixture'
@@ -545,6 +545,22 @@ describe('ActionLog', () => {
     expect(text).toContain('已拒绝')
     expect(text).not.toContain('actions.forest.name')
     expect(text).not.toContain('replacement')
+  })
+
+  it.each(['zh', 'en'] as const)('names unnamed card actions by their card in %s, including retained rows', locale => {
+    const cosmographer = locale === 'zh' ? '宇宙学家' : 'Cosmographer'
+    const trappist = locale === 'zh' ? '修道院啤酒' : 'Trappist Beer'
+    const { container } = render(<ActionLog locale={locale} currentRound={4} log={[
+      // Rows as retained classic games already recorded them, with the raw ad-hoc action id.
+      { key: 'log.cardTriggered', params: { cardId: 'CFL039_Cosmographer', triggerAction: 'card_CFL039_Cosmographer_place' } },
+      { key: 'log.cardTriggered', params: { cardId: 'CFL061_BlacklegChicken', triggerAction: 'card_CFL027_TrappistBeer_skip' } },
+      { key: 'log.actionDetail', params: { player: 'Alice', action: 'card_CFL027_TrappistBeer_skip', detailParts: { costs: { grain: 1 } } } },
+    ]} />)
+    const rows = [...container.querySelectorAll('li')].map(row => row.textContent ?? '')
+    expect(rows.join('\n')).not.toMatch(/card_CFL0/)
+    expect(rows.find(row => row.includes(cosmographer))).not.toMatch(/[(（]/)
+    expect(rows.some(row => row.includes(t(locale, 'log.cardEffectAction', { card: trappist })))).toBe(true)
+    expect(rows.filter(row => row.includes(t(locale, 'log.cardEffectAction', { card: trappist })))).toHaveLength(2)
   })
 
   it('renders seasonal payments and internal trigger actions in Chinese', () => {
