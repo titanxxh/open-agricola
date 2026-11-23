@@ -2,10 +2,27 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { CLASSIC_EDITION_ENABLED } from '../shared/contract/card-edition'
 import { classicCardDefinitions } from '../shared/cards/classic-catalog.generated'
+import { buildEncyclopediaEntries } from '../scripts/card-encyclopedia/catalog'
+import { buildSearchDocuments, loadEncyclopediaLanguages } from '../scripts/card-encyclopedia/search'
+import { loadEncyclopediaSources } from '../scripts/card-encyclopedia/sources'
+import { EMPTY_ENCYCLOPEDIA_FILTERS, filterEncyclopedia, type EncyclopediaFilters } from '../client/app/encyclopedia/encyclopedia-filters'
 import {
   CATALOG, DESKTOP, expectNoHorizontalOverflow, expectResults, filterOption as option, filterPanel, filterSidebar as sidebar,
   galleryEntries, galleryNames, LANDSCAPE, MOBILE, NARROW, newVisitor, resultsHeading, selectedFilters, tabTo,
 } from './helpers/encyclopedia'
+
+/** Classic entries that a filter adds when the classic editions are on (prerelease, ADR 0049), as gallery names. */
+const classicItems = CLASSIC_EDITION_ENABLED ? (() => {
+  const entries = buildEncyclopediaEntries(loadEncyclopediaSources(true))
+  const documents = buildSearchDocuments(entries, loadEncyclopediaLanguages())
+  return entries.flatMap((entry, index) => entry.group === 'classic' && documents[index] ? [{ entry, document: documents[index] }] : [])
+})() : []
+const classicResults = (filters: Partial<EncyclopediaFilters>) =>
+  filterEncyclopedia(classicItems, { ...EMPTY_ENCYCLOPEDIA_FILTERS, ...filters }).map(({ entry, document }) => {
+    const name = document.locales.en.name?.text
+    if (!name) throw new Error(`Missing English name for ${entry.sourceId}`)
+    return `View ${name}`
+  })
 
 async function openCatalog(page: Page) {
   await page.goto(CATALOG)
@@ -101,11 +118,12 @@ test.describe(DESKTOP.name, () => {
 
     await panel.getByRole('button', { name: 'Clear filters' }).click()
     await option(panel, 'Upgrade by returning a card').check()
-    await expectResults(page, 11)
+    const classicUpgrades = classicResults({ cost: { resources: [], upgradeReturn: true } })
+    await expectResults(page, 11 + classicUpgrades.length)
     expect(await galleryNames(page)).toEqual([
       'View Oriental Fireplace', 'View Earth Oven', 'View Oven Installation', 'View Open Grill', 'View Horse Butchery',
       'View Living History Museum', 'View Cooking Hearth', 'View Cooking Hearth', 'View Cooking Hearth',
-      'View Cookhouse', 'View Cookhouse',
+      'View Cookhouse', 'View Cookhouse', ...classicUpgrades,
     ])
 
     await panel.getByRole('button', { name: 'Clear filters' }).click()
@@ -138,7 +156,7 @@ test.describe(DESKTOP.name, () => {
     expect(await galleryNames(page)).toEqual(['View Mother PR01'])
     await minimum.fill('-1')
     await maximum.fill('0')
-    await expectResults(page, 14)
+    await expectResults(page, 14 + classicResults({ points: { min: -1, max: 0, unlisted: false } }).length)
     await option(panel, 'Father').check()
     await expectResults(page, 0)
     await option(panel, 'No fixed points listed').check()
@@ -314,14 +332,15 @@ test.describe(LANDSCAPE.name, () => {
 
     await option(panel, 'Marked with bonus points').check()
 
-    await expect(confirm).toHaveText('Show results (138)')
+    const bonusResults = 138 + classicResults({ extraVp: true }).length
+    await expect(confirm).toHaveText(`Show results (${bonusResults})`)
     await expect(close).toBeInViewport({ ratio: 1 })
     await expect(confirm).toBeInViewport({ ratio: 1 })
     await page.screenshot({ path: test.info().outputPath('landscape-filter-panel.png') })
 
     await confirm.click()
 
-    await expectResults(page, 138)
+    await expectResults(page, bonusResults)
     await expect(page.getByRole('button', { name: 'Filters (1)' })).toBeFocused()
     await expectNoHorizontalOverflow(page)
   })

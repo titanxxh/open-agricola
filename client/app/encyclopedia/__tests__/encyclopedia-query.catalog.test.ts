@@ -4,7 +4,8 @@ import { buildSearchDocuments, loadEncyclopediaLanguages } from '../../../../scr
 import { loadEncyclopediaSources } from '../../../../scripts/card-encyclopedia/sources'
 import { queryEncyclopedia } from '../encyclopedia-query'
 
-const entries = buildEncyclopediaEntries(loadEncyclopediaSources())
+// These expectations describe the catalog without the classic editions, which prerelease turns on (ADR 0049).
+const entries = buildEncyclopediaEntries(loadEncyclopediaSources(false))
 const documents = buildSearchDocuments(entries, loadEncyclopediaLanguages())
 const items = entries.map((entry, index) => ({ entry, document: documents[index] }))
 

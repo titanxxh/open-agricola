@@ -50,7 +50,7 @@ it('applies newer prerelease expiry facts to an actual older PostgreSQL and obje
   const archiveRoot = join(root, 'archive'), controller = new AbortController()
   const archive = await exportStorageArchive({ connectionString: getTestDatabaseUrl(), db, objects, root: archiveRoot,
     sourceBuildId: 'a'.repeat(40), mode: 'maintenance', signal: controller.signal })
-  const originalDump = fileHash(join(archiveRoot, 'database.dump'))
+  const originalDump = await fileHash(join(archiveRoot, 'database.dump'))
   expect(await db.prepare('SELECT display_name,score FROM game_result_players').all()).toEqual([{ display_name: 'Private archived name', score: 42 }])
   expect(await expirePrereleaseReplay(db, { roomId: 'expiry-backup-room', resources,
     now: () => 1000 + PRERELEASE_ARCHIVE_RETENTION_MS })).toBe(true)
@@ -71,7 +71,7 @@ it('applies newer prerelease expiry facts to an actual older PostgreSQL and obje
   expect((await restoredObjects.get('card-art/retained-sentinel.png'))?.body).toEqual(sentinel)
   expect((await objects.get('card-art/retained-sentinel.png'))?.body).toEqual(sentinel)
   expect((await objects.get('erasure/ledger.json'))?.body).toEqual(ledger?.body)
-  expect(fileHash(join(archiveRoot, 'database.dump'))).toBe(originalDump)
+  expect(await fileHash(join(archiveRoot, 'database.dump'))).toBe(originalDump)
 })
 
 it('restores one two-player recovery point while real game commands, uploads and collection continue', async () => {
