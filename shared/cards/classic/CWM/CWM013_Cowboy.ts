@@ -67,13 +67,16 @@ const cardImpl = {
     },
     {
       // Whoever occupies the market, a use that finds another person there gets 1 animal instead
-      // of the pile; the person making this use is the placed or moved one, absent while admitting.
+      // of the pile. The person making this use is the placed one (`personUse`) or the moved one
+      // (a move or jump names it in `actionContext`); while admitting, it is not on the space yet.
       id: CARD_ID + '-animal',
       cardIds: [CARD_ID],
       actionSpaces: Object.keys(animals),
       phases: ['computeReplace'],
       handler: ({ space, player, actionSpaceUse, actionContext }) => {
-        const person = actionSpaceUse?.personUse?.workerId ?? actionContext?.workerId
+        const person = actionSpaceUse?.personUse?.workerId ?? (actionContext?.viaCardJump === true
+          ? actionContext.workerId
+          : actionContext?.moveFarmerWorkerId ?? actionContext?.placedWorkerId ?? actionContext?.workerId)
         if (
           actionContext?.checkedReplaceAction ||
           !space.takenBy.some((ref) => ref.playerId !== player.id || ref.workerId !== person)
