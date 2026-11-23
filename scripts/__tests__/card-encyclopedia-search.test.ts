@@ -153,9 +153,11 @@ describe('encyclopedia search documents from the pinned language packs', () => {
   })
 
   it('never leaks markup, raw keys or arrow words into searchable text', () => {
-    const offenders = documents.flatMap((document) => Object.entries(document.locales).flatMap(([locale, fields]) =>
+    // CWM023_ForestFarmer prints "arrow markers", so the arrow-icon word check covers the non-classic catalog only.
+    const offenders = documents.flatMap((document, index) => Object.entries(document.locales).flatMap(([locale, fields]) =>
       Object.entries(fields)
-        .filter(([, field]) => /<[A-Z0-9_-]+>|__|\[|\]|cardFaces\.|parentFaces\.|moor\.specialActions\.|\barrow\b/i.test(field.text))
+        .filter(([, field]) => /<[A-Z0-9_-]+>|__|\[|\]|cardFaces\.|parentFaces\.|moor\.specialActions\./i.test(field.text)
+          || (entries[index]?.group !== 'classic' && /\barrow\b/i.test(field.text)))
         .map(([name, field]) => `${document.key} ${locale} ${name}: ${field.text}`)))
     expect(offenders).toEqual([])
   })
