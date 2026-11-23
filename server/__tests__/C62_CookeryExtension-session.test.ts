@@ -29,7 +29,7 @@ const seedC62 = (state: ReturnType<GameSession['getState']>['state'], playerId =
   player.minorPlayed = [...(player.minorPlayed ?? []), C62]
   player.cardStates = {
     ...(player.cardStates ?? {}),
-    [C62]: { extraData: { usedCookeryIds: [] } },
+    [C62]: { extraData: {} },
   }
 }
 
@@ -72,7 +72,7 @@ describe('C62 CookeryExtension', () => {
     session.loadState(state)
     const p1 = state.players[0]!
 
-    p1.cardStates![C62]!.extraData!.usedCookeryIds = [FIREPLACE1]
+    p1.cardStates![C62]!.extraData![`usedCookeryIds:${state.round}`] = [FIREPLACE1]
 
     const trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
     const derivedFromFireplace = trades.filter(
@@ -93,7 +93,7 @@ describe('C62 CookeryExtension', () => {
     expect(trades.some((t) => t.sourceId === `${C62}::${FIREPLACE1}`)).toBe(true)
     expect(trades.some((t) => t.sourceId === `${C62}::${COOKING_HEARTH1}`)).toBe(true)
 
-    p1.cardStates![C62]!.extraData!.usedCookeryIds = [FIREPLACE1]
+    p1.cardStates![C62]!.extraData![`usedCookeryIds:${state.round}`] = [FIREPLACE1]
     trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
     expect(trades.some((t) => t.sourceId === `${C62}::${FIREPLACE1}`)).toBe(false)
     expect(trades.some((t) => t.sourceId === `${C62}::${COOKING_HEARTH1}`)).toBe(true)
@@ -124,19 +124,18 @@ describe('C62 CookeryExtension', () => {
     expect(bakeBread.some((t) => t.sourceId?.startsWith(`${C62}::`))).toBe(false)
   })
 
-  it('onStartHarvest resets usedCookeryIds', async () => {
+  it('starts each harvest with every cookery unused', () => {
     const { session, state } = setupTwoPlayer()
     seedC62(state)
     seedCookery(state, FIREPLACE1)
     session.loadState(state)
     const p1 = state.players[0]!
-    p1.cardStates![C62]!.extraData!.usedCookeryIds = [FIREPLACE1]
+    // A cookery used in an earlier harvest is available again in this one.
+    p1.cardStates![C62]!.extraData![`usedCookeryIds:${state.round - 3}`] = [FIREPLACE1]
 
-    const impl = (
-      await import('../../shared/cards/C/C062_CookeryExtension')
-    ).C062_CookeryExtension_impl
-    session.withCtx(() => impl.effect!.onStartHarvest!(state, p1))
-    expect(p1.cardStates![C62]!.extraData!.usedCookeryIds).toEqual([])
+    const trades = session.withCtx(() => getExchangesInWindow(p1, 'harvest', state))
+      .filter((trade) => trade.sourceId === `${C62}::${FIREPLACE1}`)
+    expect(trades.length).toBeGreaterThan(0)
   })
 
   it('produces no derived trades when player has no cookery cards', () => {
@@ -239,7 +238,7 @@ describe('C62 + harvest feed integration', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 0, food: 2, begging: 0 })
-    expect(response.state.players[0]!.cardStates?.[C62]?.extraData?.usedCookeryIds).toEqual([FIREPLACE1])
+    expect(response.state.players[0]!.cardStates?.[C62]?.extraData?.['usedCookeryIds:4']).toEqual([FIREPLACE1])
     expect(response.state.events).toContainEqual(expect.objectContaining({
       type: 'harvest.feedConverted', source: `${C62}::${FIREPLACE1}`,
       cost: { vegetable: 1 }, food: { food: 4 },
@@ -410,7 +409,7 @@ describe('ae-negative-39-native', () => {
   function cook(s: GameSession) { const r = anytime(s, 'exchange'); assert.ok(r.interaction.stateId === 'wait'); return r; }
   afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); pause = undefined; });
   it("C062 N1 real purchase and harvest vegetable exchange double each cookery once", () => { const s = make('C062_CookeryExtension', st => { ownMajor(st, 'Major_Fireplace1'); ownMajor(st, 'Major_Fireplace2'); Object.assign(st.players[0]!.resources, { clay: 2, vegetable: 2 }); }, false, 4), b = purchase(s, 'C062_CookeryExtension'), p = harvest(s), es = catalog(p).filter(e => e.sourceId.startsWith('C062_CookeryExtension::') && e.from.vegetable === 1); assert.equal(es.length, 2); assert.ok(es.every(e => e.to.food === 4 && e.max === 1)); const r = feed(s, es.map(e => row(e))); resource(r, { food: 104, vegetable: 0, begging: 0 }); save('C062-N1', { b, p, r }); });
-  it("C062 N2 one cookery cannot double two recipes while legal single retry feeds the family", () => { const s = make('C062_CookeryExtension', st => { ownMajor(st, 'Major_Fireplace1'); st.players[0]!.resources.vegetable = 2; }, true, 4), p = harvest(s), e = catalog(p).find(e => e.sourceId === 'C062_CookeryExtension::Major_Fireplace1' && e.from.vegetable === 1); assert.ok(e); const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { selections: [row(e), row(e)] })), r = feed(s, [row(e)]); resource(r, { food: 100, vegetable: 1, begging: 0 }); assert.deepEqual(r.state.players[0]!.cardStates.C062_CookeryExtension?.extraData?.usedCookeryIds, ['Major_Fireplace1']); save('C062-N2', { p, bad, r }); });
+  it("C062 N2 one cookery cannot double two recipes while legal single retry feeds the family", () => { const s = make('C062_CookeryExtension', st => { ownMajor(st, 'Major_Fireplace1'); st.players[0]!.resources.vegetable = 2; }, true, 4), p = harvest(s), e = catalog(p).find(e => e.sourceId === 'C062_CookeryExtension::Major_Fireplace1' && e.from.vegetable === 1); assert.ok(e); const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { selections: [row(e), row(e)] })), r = feed(s, [row(e)]); resource(r, { food: 100, vegetable: 1, begging: 0 }); assert.deepEqual(r.state.players[0]!.cardStates.C062_CookeryExtension?.extraData?.['usedCookeryIds:4'], ['Major_Fireplace1']); save('C062-N2', { p, bad, r }); });
   it("C062 N3 held card no cookery grain and nonharvest windows exclude doubled recipes", () => { for (const mode of ['hand', 'cookery', 'grain']) {
       const s = make('C062_CookeryExtension', st => { if (mode !== 'cookery')
           ownMajor(st, 'Major_Fireplace1'); Object.assign(st.players[0]!.resources, { food: 0, vegetable: mode === 'grain' ? 0 : 1, grain: mode === 'grain' ? 1 : 0 }); }, mode !== 'hand', 4), p = harvest(s);

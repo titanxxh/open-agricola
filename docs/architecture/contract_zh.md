@@ -137,6 +137,8 @@ type ClientCommand = (
 
 `setPlayerColor { color }` 是需认证、记入命令账本的候场命令，不接受客户端指定座位。它只修改调用者颜色，持久化后才发布，不生成 Replay Step。
 
+`setPlayerPreferences { playerIndex, preferences }` 在进行中的对局里修改一个座位的设置（[ADR 0055](../adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）。与 `commitSelection` 一样，只能指定连接所控制的座位。它是一个 Replay Step（`cause: 'preferences'`），但不进入撤销历史，撤销也不会把它改回去；HTTP 沙盒使用 `POST /api/game/preferences`。
+
 `confirmPlayerColor` 无 payload，只有 `roomJoined` 与 `roomWaiting` 中 `colorConfirmationPlayerIndex` 指定的座位可用它启动已满员的普通 Room。服务端提交初始 Frame 与确认回执后才发布。先到的座位可在候场时继续选色，但不能替最后入场者确认。
 
 候场事件携带权威玩家状态中的 `playerColors`；名单包含 `connected`，玩家断线后仍显示其保留座位和姓名。

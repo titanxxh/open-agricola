@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
 import type { GameState } from '../../shared/contract/types'
@@ -235,11 +240,10 @@ describe('simultaneous immediate family-growth sources', () => {
     expect(options(response).filter(option => option.value !== '__pass__').map(option => option.sourceCard)).toEqual(expect.arrayContaining([first, second]))
     expect(options(response).some(option => option.sourceCard === AFTER)).toBe(false)
     expect(options(response).find(option => option.value === '__pass__')?.disabled).toBe(true)
-    for (const card of [first, second]) {
-      const selected = options(response).find(option => option.sourceCard === card)
-      expect(selected, JSON.stringify(response.interaction)).toBeDefined()
-      response = choose(session, response, selected!.value)
-    }
+    const selected = options(response).find(option => option.sourceCard === first)
+    expect(selected, JSON.stringify(response.interaction)).toBeDefined()
+    // The second source is then the last mandatory one and runs without asking.
+    response = choose(session, response, selected!.value)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 2, fuel: 1 })
     expect(response.state.players[0]!.cardStates.M089_BirthingHouse?.counters?.bonusVp).toBe(1)
     expectAfter(response)

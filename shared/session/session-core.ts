@@ -5,6 +5,7 @@ import { quoteFenceSelection } from '../actions/effects/fencing'
 import { voluntaryDiscardAvailability } from '../actions/effects/discard-goods'
 import { hasLegalPlaceFarmerTargets } from '../actions/effects/place-farmer'
 import { reconcileOrdinaryHousePet } from '../domain/animal-zones'
+import { parsePlayerPreferences } from '../domain/player-preferences'
 import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import type { AnytimeActivationFlow } from '../contract/anytime-activation'
 import { commitRoomConstruction } from '../domain/room-construction'
@@ -423,13 +424,16 @@ const serializableCheckpoint = (checkpoint: SessionCommandCheckpoint): SessionCo
   return saved
 }
 
-const preservePlayerDisplayNames = (current: GameState, restored: GameState): GameState => {
+/** Seat attributes outside the rules timeline: undo and rollback keep the current display name and settings. */
+const preserveSeatAttributes = (current: GameState, restored: GameState): GameState => {
   const currentPlayers = new Map(current.players.map((player) => [player.id, player]))
   for (const player of restored.players) {
     const currentPlayer = currentPlayers.get(player.id)
     if (currentPlayer) {
       player.name = currentPlayer.name
       player.nameIsDefault = currentPlayer.nameIsDefault
+      if (currentPlayer.preferences) player.preferences = { ...currentPlayer.preferences }
+      else delete player.preferences
     }
   }
 
@@ -922,7 +926,7 @@ export class GameCore {
           stageResume.playerIndex + (stageResume.extra?.anytimeActionTaken ? 0 : 1),
         )
       },
-      onStartHarvest: (stageResume) => { this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex, stageResume.extra) },
+      onStartHarvest: (stageResume) => { this.continueFromStartHarvest(stageResume.playerIndex, stageResume.extra) },
       onStartHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldStart(stageResume.playerIndex, stageResume.cardIndex) },
       onHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldPhase(stageResume.playerIndex, stageResume.cardIndex) },
       onEndHarvestFieldPhase: (stageResume) => { this.continueEndFieldPhase(stageResume.playerIndex, stageResume.cardIndex) },
@@ -1054,7 +1058,7 @@ export class GameCore {
   restoreCommandCheckpoint(checkpoint: SessionCommandCheckpoint): void {
     this.withCtx(() => {
       if (!commandValuesEqual(this.state, checkpoint.state)) {
-        this.state = preservePlayerDisplayNames(
+        this.state = preserveSeatAttributes(
           this.state,
           captureStateWithHistory(checkpoint.state, cloneCommandValue),
         )
@@ -2695,7 +2699,7 @@ export class GameCore {
   }
 
   private restoreHistory(entry: HistoryEntry) {
-    this.state = preservePlayerDisplayNames(this.state, restoreSessionState(entry.state, id => this.registry.get(id)))
+    this.state = preserveSeatAttributes(this.state, restoreSessionState(entry.state, id => this.registry.get(id)))
     if (isRestorableUndoBoundary(entry)) this.state.pendingUndoBoundary = true
     this.reconcileRoomAnimals()
     // Task 10/11: the previous GameCore pending field was deleted from
@@ -3129,7 +3133,7 @@ export class GameCore {
     if (this.stageDispatch.continueBeforeHarvestReactionHook(playerOrder, orderOffset)) {
       return this.respond()
     }
-    activatePendingHarvestSkips(this.state)
+    activatePendingHarvestSkips(this.state, 'before-start-of-harvest')
     return this.continueHarvestPrepWindow()
   }
 
@@ -3152,10 +3156,12 @@ export class GameCore {
     return this.continueFromStartHarvest()
   }
 
-  private continueFromStartHarvest(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onStartHarvest', playerIndex, cardIndex, extra)) {
+  private continueFromStartHarvest(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? this.getHarvestPlayerIndices()
+    if (this.stageDispatch.continueReactionWindow('onStartHarvest', playerOrder, orderOffset)) {
       return this.respond()
     }
+    activatePendingHarvestSkips(this.state, 'after-start-of-harvest')
     return this.continueHarvestFieldStart()
   }
 
@@ -5031,6 +5037,23 @@ export class GameCore {
       appendImmediateEvents(this.state, [{ type: 'game.ended' }])
     }
     return this.respond()
+  }
+
+  /**
+   * Changes one seat's settings (#2039). A setting is not a rule step: it adds
+   * no undo history, undo keeps it, and an open trigger selector keeps the
+   * value it froze when first evaluated.
+   */
+  setPlayerPreferences(playerIndex: number, preferences: unknown): SessionResponse {
+    return this.runAuthoritativeCommand('setPlayerPreferences', playerIndex, preferences, () => {
+      const player = this.state.players[playerIndex]
+      if (!player) return this.respond(false, 'invalid player index')
+      const parsed = parsePlayerPreferences(preferences)
+      if (!parsed) return this.respond(false, 'invalid preferences')
+      if (this.state.gameOver) return this.respond(false, 'game is over')
+      player.preferences = parsed
+      return this.respond()
+    })
   }
 
   submitDraftPick(playerId: string, pick: DraftPickPayload): SessionResponse {

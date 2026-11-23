@@ -7,6 +7,7 @@ import { gainLeaf, bonusVpLeaf } from '../../shared/cards/helpers/pay-gain-node'
 import { sumActionSpaceMovedToPlayer } from '../../shared/cards/helpers/event-provenance'
 import { E033_BeaverColony_impl } from '../../shared/cards/E/E033_BeaverColony'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { orderReactionsManually } from './_helpers/trigger-select'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit42Resources from './_helpers/audit/ae-negative-42-resources'
@@ -35,6 +36,7 @@ const setup = ({ played = true, playerCount = 2, moor = false, configure }: {
         })
       }
       if (played) state.players[0]!.minorPlayed = [CARD_ID]
+      orderReactionsManually(state)
       configure?.(state)
     },
   })

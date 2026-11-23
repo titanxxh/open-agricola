@@ -253,18 +253,13 @@ describe('E051 Whale Oil parity', () => {
     const fishingFood = (response: SessionResponse) =>
       response.state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food
 
-    // Harpooner's optional reaction shares the before window and keeps it open.
+    // Whale Oil's mandatory card-storage reaction needs no decision, so it settles
+    // at once (#2039 auto-resolve, the default); Harpooner's optional reaction keeps the before window open.
     let response = session.takeAction(0, 'fishing')
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
       .toBe('select-trigger')
-    expect(options(response).map((option) => option.value))
-      .toEqual(expect.arrayContaining([CARD_ID, 'A138_Harpooner']))
-    expect(options(response).find((option) => option.value === '__pass__')?.disabled).toBe(true)
-    expect(cardFood(response)).toBe(0)
-
-    response = session.resolveChoice(0, CARD_ID)
-    expect(response.ok, response.error).toBe(true)
+    expect(options(response).map((option) => option.value)).toEqual(['A138_Harpooner', '__pass__'])
     expect(cardFood(response)).toBe(1)
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(fishingFood(response)).toBe(3)

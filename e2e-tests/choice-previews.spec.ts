@@ -328,6 +328,8 @@ for (const first of ['C048_Farmstead', 'B027_Toolbox']) {
       const owner = state.players[0]!
       owner.minorPlayed = [farmstead, toolbox]
       owner.occupationPlayed = ['A116_WoodCutter']
+      // The owner orders the Turn-end sources (#2039: auto-resolve off).
+      owner.preferences = { autoResolveIndependentReactions: false }
       Object.assign(owner.resources, { wood: 8, stone: 2, reed: 0, food: 2 })
     } })
     try {
@@ -372,12 +374,15 @@ for (const first of ['C048_Farmstead', 'B027_Toolbox']) {
     await expect(choice(toolbox)).toBeVisible()
     response = await chooseUi(first)
     if (first === toolbox) response = await chooseUi('__skip__')
-    const second = first === farmstead ? toolbox : farmstead
+    // The other source is then the last mandatory one and starts without asking:
+    // the Farmstead reward pays out, the Toolbox offers its own optional build.
     await page.reload()
-    await expect(choice(first)).toHaveCount(0)
-    await expect(choice(second)).toBeEnabled()
-    response = await chooseUi(second)
-    if (second === toolbox) response = await chooseUi('__skip__')
+    await expect(choice(farmstead)).toHaveCount(0)
+    await expect(choice(toolbox)).toHaveCount(0)
+    if (first === farmstead) {
+      expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: toolbox })
+      response = await chooseUi('__skip__')
+    }
     expect(response.state.players[0]!.resources.food).toBe(3)
     expect(response.state.events.filter(event => event.type === 'resource.moved'
       && event.sourceCardId === farmstead && event.resources.food === 1)).toHaveLength(1)

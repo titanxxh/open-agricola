@@ -8,6 +8,9 @@ import { getPlayerCookeryCards } from '../helpers/cookery'
 const CARD_ID = 'C062_CookeryExtension'
 const VALID_FROM_RESOURCES: readonly string[] = ['vegetable', 'sheep', 'boar', 'cattle']
 
+/** Cookeries used in one harvest, keyed by its round so each harvest starts empty. */
+const usedCookeryKey = (round: number) => `usedCookeryIds:${round}`
+
 const computeExchangesListener: CardListenerRegistration = {
   id: 'C62-cookery-extension-compute-exchanges',
   cardIds: [CARD_ID],
@@ -19,7 +22,8 @@ const computeExchangesListener: CardListenerRegistration = {
     const player = ctx.player
     if (!player.minorPlayed?.includes(CARD_ID)) return
 
-    const used = (player.cardStates?.[CARD_ID]?.extraData?.usedCookeryIds ?? []) as string[]
+    const usedKey = usedCookeryKey(ctx.state.round)
+    const used = (player.cardStates?.[CARD_ID]?.extraData?.[usedKey] ?? []) as string[]
     const out: CardExchange[] = []
 
     for (const cookery of getPlayerCookeryCards(player)) {
@@ -40,7 +44,7 @@ const computeExchangesListener: CardListenerRegistration = {
           sideEffect: {
             type: 'pushExtraDataValue',
             sourceCard: CARD_ID,
-            key: 'usedCookeryIds',
+            key: usedKey,
             value: cookery.id,
           },
         })
@@ -53,16 +57,6 @@ const computeExchangesListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  effect: {
-    id: CARD_ID,
-    onStartHarvest: (_state, player) => {
-      player.cardStates ??= {}
-      player.cardStates[CARD_ID] ??= {} as never
-      const cs = player.cardStates[CARD_ID]
-      cs.extraData = { ...(cs.extraData ?? {}), usedCookeryIds: [] }
-      return
-    },
-  },
   listeners: [computeExchangesListener],
 } satisfies CardImpl
 

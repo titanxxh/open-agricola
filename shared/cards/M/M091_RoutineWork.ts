@@ -5,29 +5,31 @@ import type { DraftGameEvent, GameEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { foodCraftBuildingResource, isFoodCraftBuilding, playerFoodCraftBuildingIds } from './moor-batch1-helpers'
 
 const CARD_ID = 'M091_RoutineWork'
-const USED_CRAFT_BUILDING_IDS_KEY = 'usedCraftBuildingIds'
+/** Craft buildings used in one harvest, keyed by its round so each harvest starts empty. */
+const usedCraftBuildingIdsKey = (round: number) => `usedCraftBuildingIds:${round}`
 
 type QueryableEvent = GameEvent | DraftGameEvent
 type ExchangeEvent = Extract<QueryableEvent, { type: 'resource.exchanged' }>
 
-const specialEffect = (value: string[]): ActionFlow => ({
+const specialEffect = (round: number, value: string[]): ActionFlow => ({
   type: 'leaf',
   actionId: 'special-effect',
   sourceCard: CARD_ID,
-  params: { kind: 'set-extra-data', key: USED_CRAFT_BUILDING_IDS_KEY, value },
+  params: { kind: 'set-extra-data', key: usedCraftBuildingIdsKey(round), value },
 })
 
-const usedCraftBuildingIds = (player: CardListenerContext['player']) =>
-  readCardExtraData<string[]>(player, CARD_ID, USED_CRAFT_BUILDING_IDS_KEY) ?? []
+const usedCraftBuildingIds = (player: CardListenerContext['player'], round: number) =>
+  readCardExtraData<string[]>(player, CARD_ID, usedCraftBuildingIdsKey(round)) ?? []
 
 const mergedUsedCraftBuildingIds = (
   player: CardListenerContext['player'],
+  round: number,
   ids: readonly string[],
-) => [...new Set([...usedCraftBuildingIds(player), ...ids])]
+) => [...new Set([...usedCraftBuildingIds(player, round), ...ids])]
 
 const isExchangeEvent = (event: QueryableEvent): event is ExchangeEvent =>
   event.type === 'resource.exchanged'
@@ -53,7 +55,7 @@ const afterExchangeListener: CardListenerRegistration = {
     const ids = usedCraftBuildingIdsFromExchangeEvents(context.actionEvents ?? context.transactionEvents)
     if (ids.length === 0) return
     return {
-      flow: specialEffect(mergedUsedCraftBuildingIds(context.player, ids)),
+      flow: specialEffect(context.state.round, mergedUsedCraftBuildingIds(context.player, context.state.round, ids)),
       sourceCard: CARD_ID,
     }
   },
@@ -69,7 +71,7 @@ const tradeAppliedListener: CardListenerRegistration = {
     if (typeof sourceId !== 'string') return
     if (!isFoodCraftBuilding(sourceId)) return
     return {
-      flow: specialEffect(mergedUsedCraftBuildingIds(context.player, [sourceId])),
+      flow: specialEffect(context.state.round, mergedUsedCraftBuildingIds(context.player, context.state.round, [sourceId])),
       sourceCard: CARD_ID,
     }
   },
@@ -88,11 +90,8 @@ const cardImpl = {
   listeners: [afterExchangeListener, tradeAppliedListener],
   effect: {
     id: CARD_ID,
-    onStartHarvest: (_state, player) => {
-      writeCardExtraData(player, CARD_ID, USED_CRAFT_BUILDING_IDS_KEY, [])
-    },
-    onEndHarvestFeedingPhase: (_state, player) => {
-      const used = usedCraftBuildingIds(player)
+    onEndHarvestFeedingPhase: (state, player) => {
+      const used = usedCraftBuildingIds(player, state.round)
       const unused = playerFoodCraftBuildingIds(player).filter((id) => !used.includes(id))
       if (unused.length === 0) return
       return {

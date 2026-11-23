@@ -1,4 +1,6 @@
 import { openingSeatRandom } from './opening-seat-random'
+// After the seat mock: this store loads room.ts, which must bind the mocked `randomInt`.
+import { GamePreferencesStore } from '../../game/game-preferences-store'
 import { randomUUID } from 'node:crypto'
 import { beforeEach, afterEach, vi } from 'vitest'
 import type { ClientCommand } from '../../../shared/contract/protocol/ws'
@@ -51,7 +53,8 @@ export function recordedRouterFixture() {
     const committer = new RoomCommitter({ persistence, ...recording.replay, resources: recording.resources,
       viewerBuildExists: async id => !!await recording.resources.viewer(id) })
     const deps = { persistence, registry, checkpoint, broadcaster, commands, committer,
-      gameContextStore: recording.gameContextStore, lobby: createLobby({ registry, checkpoint, broadcaster }) }
+      gameContextStore: recording.gameContextStore, gamePreferences: new GamePreferencesStore(db),
+      lobby: createLobby({ registry, checkpoint, broadcaster }) }
     instances.push(deps)
     return deps
   }

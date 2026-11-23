@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import type { GameState } from '../../shared/contract/types'
@@ -149,15 +154,13 @@ describe('card-granted Moor special-action lifecycle', () => {
       })
     })
     install(session)
-    let response = session.takeSpecialAction(0, 'moor-special-1-2-market-work', 'hiring-fair')
+    // The first source, the sole applicable one, wakes the dormant sibling, which as the
+    // last mandatory source also runs without asking: no selector opens at all.
+    const response = session.takeSpecialAction(0, 'moor-special-1-2-market-work', 'hiring-fair')
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.request.kind).toBe('select-trigger')
-    expect(response.interaction.request.options.filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual([later])
-    expect(response.interaction.request.options.find(option => option.value === '__pass__')?.disabled).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, clay: 0, food: 0 })
-    session = restore(session, install)
-    response = selectTrigger(session, session.getState(), later)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, clay: 1, food: 1 })
+    session = restore(session, install)
+    expect(session.getState().state.players[0]!.resources).toMatchObject({ grain: 1, clay: 1, food: 1 })
     expect(response.state.players[1]!.resources).toMatchObject({ grain: 0, clay: 0, food: 0 })
     expect(response.state.events.filter(event => event.type === 'resource.moved' && [first, later].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId)).toEqual([first, later])
     expect(response.state.actionSpaces.every(space => space.takenBy.length === 0)).toBe(true)
@@ -202,10 +205,7 @@ describe('card-granted Moor special-action lifecycle', () => {
     assertRejected(session, () => session.resolveChoice(0, laterOption.value))
     response = session.resolveChoice(1, laterOption.value)
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[1]!.resources).toMatchObject({ reed: 1, food: 0 })
-    const alwaysOption = response.interaction.request.options.find(option => option.sourceCard === always)!
-    response = session.resolveChoice(1, alwaysOption.value)
-    expect(response.ok, response.error).toBe(true)
+    // The other source is then the owner's last mandatory source and runs without asking.
     expect(response.state.players[1]!.resources).toMatchObject({ reed: 1, food: 1 })
     expect(response.state.events.filter(event => event.type === 'resource.moved' && [first, always, later].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId))
       .toEqual([first, later, always])
@@ -300,9 +300,7 @@ describe('card-granted Moor special-action lifecycle', () => {
     expect(response.state.players[0]!.farmTerrain).toContainEqual(FOREST)
     session = restore(session, install)
     response = selectTrigger(session, session.getState(), other)
-    expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, fuel: 3, reed: 0, stone: 1 })
-    session = restore(session, install)
-    response = selectTrigger(session, session.getState(), probe)
+    // The probe is then the last mandatory source and runs without asking.
     expectGrowthBeforePeat(response)
     expectPeatProvenance(response, TOOL_SHED)
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, fuel: 3, reed: 1, stone: 1 })
@@ -359,9 +357,8 @@ describe('card-granted Moor special-action lifecycle', () => {
       expect.objectContaining({ consumed: false }),
     ])
     session = restore(session, install)
+    // After the Fertilizer, the probe is the last mandatory source and runs without asking.
     response = choose(session, session.getState(), FERTILIZER)
-    expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, fuel: 0 })
-    response = selectTrigger(session, response, probe)
     expectGrowthBeforePeat(response)
     expect(response.state.players[0]!.resources.stone).toBe(2)
     const probeEvents = response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === probe)

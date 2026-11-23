@@ -1,5 +1,6 @@
 import { expect } from 'vitest'
 import type { GameSession, SessionResponse } from '../../game/authoritative-session'
+import type { GameState } from '../../../shared/contract/types'
 
 type WaitResponse = SessionResponse & {
   interaction: Extract<SessionResponse['interaction'], { stateId: 'wait' }>
@@ -53,3 +54,20 @@ export const resolveSkipChoice = (
   expect(option).toBeDefined()
   return session.resolveChoice(wait.interaction.playerIndex, option!.value)
 }
+
+/**
+ * Every seat orders its same-timing reactions itself (#2039: the auto-resolve
+ * setting off), so a test can choose each order, including independent sources.
+ */
+export const orderReactionsManually = (state: Pick<GameState, 'players'>): void => {
+  for (const player of state.players) player.preferences = { autoResolveIndependentReactions: false }
+}
+
+/** Fixture options whose `configure` first makes every seat order reactions itself. */
+export const withManualReactionOrder = <T extends { configure?: (state: GameState) => void }>(options: T): T => ({
+  ...options,
+  configure: (state: GameState) => {
+    orderReactionsManually(state)
+    options.configure?.(state)
+  },
+})

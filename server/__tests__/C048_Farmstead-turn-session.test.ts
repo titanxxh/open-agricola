@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
@@ -175,13 +180,9 @@ describe('C048 Farmstead at the true Turn end', () => {
     if (response.state.players[0]!.cardStates[CARD]?.extraData?.qualifiedTurnToken === undefined) {
       response = choose(session, response, CARD)
     }
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 2 })
+    // The Farmstead reward is the sole Turn-end source left, and it is mandatory: it runs without asking.
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 3 })
     if (restoreAt === 'reward') { session = restore(session); response = session.getState() }
-    expect(options(response).map(option => option.value)).toContain(CARD)
-    expect(options(response).some(option => option.value === 'B027_Toolbox')).toBe(false)
-    expect(options(response).find(option => option.value === '__pass__')?.disabled ?? true).toBe(true)
-    response = choose(session, response, CARD)
-    expect(response.state.players[0]!.resources.food).toBe(3)
     expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'resource.paid', sourceCardId: 'C089_StableMaster', paymentFor: 'stables', resources: { wood: 1 } }))
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
   })
@@ -258,10 +259,12 @@ describe('C048 Farmstead at the true Turn end', () => {
     let response = qualifiedEndWindow(session)
     response = choose(session, response, first)
     if (first === 'B027_Toolbox') response = choose(session, response, '__skip__')
-    const second = first === CARD ? 'B027_Toolbox' : CARD
-    expect(options(response).map(option => option.value)).toContain(second)
-    response = choose(session, response, second)
-    if (second === 'B027_Toolbox') response = choose(session, response, '__skip__')
+    // The other source is the last mandatory one and starts without asking:
+    // the Farmstead reward pays out, the Toolbox offers its own optional build.
+    if (first === CARD) {
+      expect(response.interaction.stateId === 'wait' && response.interaction.sourceCard).toBe('B027_Toolbox')
+      response = choose(session, response, '__skip__')
+    }
     expect(response.state.players[0]!.resources.food).toBe(3)
     expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD && event.resources.food === 1)).toHaveLength(1)
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
@@ -294,7 +297,7 @@ describe('C048 Farmstead at the true Turn end', () => {
     expect(response.state.players[0]!.cardStates[CARD]?.extraData?.rewardedTurnToken).toBeUndefined()
     response = choose(session, response, CARD)
     expect(response.state.players[0]!.resources.food).toBe(2)
-    response = choose(session, response, 'B027_Toolbox')
+    // The Toolbox, the last mandatory source, starts without asking and offers its optional build.
     response = choose(session, response, '__skip__')
     const completed = stableFacts({ events: response.state.events.filter(event => event.type !== 'anytime.completed'), log: response.state.log, stables: response.state.players[0]!.stableTiles })
     const completedActivations = response.state.events.filter(event => event.type === 'anytime.completed')
@@ -312,7 +315,6 @@ describe('C048 Farmstead at the true Turn end', () => {
     const redoneTurn = readTurnScopeToken(response.state.players[0]!)
     response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
     response = choose(session, response, CARD)
-    response = choose(session, response, 'B027_Toolbox')
     response = choose(session, response, '__skip__')
     expect(response.state.players[0]!.resources).toMatchObject({ food: 2, wood: 19 })
     expect(stableFacts({ events: response.state.events.filter(event => event.type !== 'anytime.completed'), log: response.state.log, stables: response.state.players[0]!.stableTiles })).toEqual(completed)
@@ -354,13 +356,12 @@ describe('C048 Farmstead at the true Turn end', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.cardStates[CARD]?.extraData?.qualifiedTurnToken).toBeDefined()
     expect(options(response).some(option => option.value === CARD)).toBe(false)
-    response = choose(session, response, 'E093_Motivator')
+    // E093_Motivator is the only Turn-end source, and mandatory: it runs without asking.
     expect(response.state.players[0]!.resources.food).toBe(1)
     expect(response.state.players[0]!.cardStates[CARD]?.extraData?.rewardedTurnToken).toBeUndefined()
     expect(response.state.players[0]!.cardStates.E093_Motivator?.flagged).toBe(true)
     nextTurn(session)
     response = session.takeAction(0, 'reed-bank')
-    response = choose(session, response, 'E093_Motivator')
     expect(response.state.players[0]!.resources.food).toBe(1)
     expect(response.state.players[0]!.cardStates[CARD]?.extraData?.rewardedTurnToken).toBeUndefined()
   })
@@ -375,11 +376,12 @@ describe('C048 Farmstead at the true Turn end', () => {
     session.takeAction(0, 'farm-expansion')
     let response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] })
     response = choose(session, response, CARD)
-    response = choose(session, response, 'E093_Motivator')
+    // E093_Motivator is then the last mandatory source and runs without asking.
     expect(response.state.players[0]!.resources.food).toBe(3)
     const firstToken = response.state.players[0]!.cardStates[CARD]?.extraData?.rewardedTurnToken
     nextTurn(session)
     response = session.takeAction(0, 'D051_Archway')
+    // The unqualified Farmstead stays dormant in this anytime-window selector, so Motivator waits for the player.
     response = choose(session, response, 'E093_Motivator')
     expect(response.state.players[0]!.resources.food).toBe(4)
     response = session.resolveChoice(0, 'confirm')
@@ -400,8 +402,7 @@ describe('C048 Farmstead at the true Turn end', () => {
     expect(response.state.players[0]!.cardStates[CARD]?.extraData?.qualifiedTurnToken).toBe(readTurnScopeToken(response.state.players[0]!))
     expect(options(response).map(option => option.value)).toEqual(expect.arrayContaining([CARD, 'E093_Motivator']))
     response = choose(session, response, CARD)
-    expect(response.state.players[0]!.resources.food).toBe(5)
-    response = choose(session, response, 'E093_Motivator')
+    // E093_Motivator is then the last mandatory source and runs without asking.
     expect(response.state.players[0]!.resources.food).toBe(5)
     expect(response.state.players[0]!.cardStates[CARD]?.extraData?.rewardedTurnToken).not.toBe(firstToken)
     expect(readTurnScopeToken(response.state.players[0]!)).toBeUndefined()
@@ -604,7 +605,7 @@ describe('C048 Farmstead at the true Turn end', () => {
     response = choose(session, response, 'D074_RoyalWood')
     expect(response.state.players[0]!.resources.wood).toBe(19)
     response = choose(session, response, CARD)
-    response = choose(session, response, 'B027_Toolbox')
+    // The Toolbox is then the last mandatory source; it starts without asking and offers its optional build.
     response = choose(session, response, '__skip__')
     expect(response.state.players[0]!.resources.food).toBe(3)
     expect(response.state.players[0]!.cardStates.D074_RoyalWood?.extraData?.woodSpent).toBe(0)

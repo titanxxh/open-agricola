@@ -171,6 +171,7 @@ export class LocalSandboxCore {
         return core.resolveChoice(idx as never, 'confirm' as never)
       }
       case 'performRoundEnd': return core.performRoundEnd()
+      case 'setPlayerPreferences': return core.setPlayerPreferences(a[0], a[1])
       case 'undoStep': return core.undoStep()
       case 'undoAction': return core.undoAction()
       case 'newGame': {

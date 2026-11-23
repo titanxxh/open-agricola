@@ -1,4 +1,5 @@
 import { createMoorSpecialActionSpace } from '../moor/special-action-space'
+import { isIndependentReactionResult } from './independent-reaction'
 import type { ActionChoiceOption, ActionExecutionContext, ActionFlow, PlayerState, Resource, SupplyTokenCounts } from '../contract/types'
 import type { ActionHookResult } from '../actions/hooks'
 import {
@@ -35,6 +36,8 @@ export type TriggerOptionState = {
   actionId: string
   phase: string
   resourcesAfter?: Resource
+  /** Applicable, needs no decision: resolved before the player orders the rest when auto-resolve is on. */
+  independent: boolean
 }
 
 export type TriggerSelectEvaluation = {
@@ -406,6 +409,7 @@ export const evaluateTriggerSelect = (
       actionId,
       phase,
       resourcesAfter,
+      independent: applicable && isIndependentReactionResult(result, isActivateCardEffectNode(child)),
     }
     optionStates.push(state)
     if (!applicable) continue

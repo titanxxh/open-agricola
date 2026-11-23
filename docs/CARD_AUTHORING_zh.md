@@ -143,12 +143,13 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 
 | 派发方式 | Hook |
 |---|---|
-| Stage Dispatch：每个玩家一个 trigger-select，来源在进入窗口时冻结 | `onBeforeStartOfTurn`、`onAfterRevealAction`、`onPreparation`、`onRoundStart`、`onEndPreparation`、`onBeforeWork`、`onWorkStart`、`onAllWorkersPlaced`、`onEndTurn`、`onBeforeHarvest`、`onStartHarvestFieldPhase`、`onHarvestFieldPhase`、`onEndHarvestFieldPhase`、`onBeforeEndGame` |
-| 按玩家串行，再依次是改良、小改良和职业 | `onRoundEnd`、`onAfterRoundEnd`、`onBeforeReturnHome`、`onStartReturnHome`、`onReturnHome`、`onStartHarvest`、`onAfterReap`、`onHarvest`、`onStartHarvestFeedingPhase`、`onHarvestFeedingPhase`、`onEndHarvestFeedingPhase`、`onEndHarvest`、`onAfterHarvest` |
+| Stage Dispatch：每个玩家一个 trigger-select，来源在进入窗口时冻结 | `onBeforeStartOfTurn`、`onAfterRevealAction`、`onPreparation`、`onRoundStart`、`onEndPreparation`、`onBeforeWork`、`onWorkStart`、`onAllWorkersPlaced`、`onEndTurn`、`onBeforeHarvest`、`onStartHarvest`、`onStartHarvestFieldPhase`、`onHarvestFieldPhase`、`onEndHarvestFieldPhase`、`onBeforeEndGame` |
+| 按玩家串行，再依次是改良、小改良和职业 | `onRoundEnd`、`onAfterRoundEnd`、`onBeforeReturnHome`、`onStartReturnHome`、`onReturnHome`、`onAfterReap`、`onHarvest`、`onStartHarvestFeedingPhase`、`onHarvestFeedingPhase`、`onEndHarvestFeedingPhase`、`onEndHarvest`、`onAfterHarvest` |
 
 - 准备阶段的窗口用纯函数 `effect.stageEligibility[hook]` 过滤来源（`E111_Recluse`）。
 - `handHooks` 让手牌也能触发，`onBuy`、`onEndTurn` 和 `onBeforeEndGame` 除外。
 - 收获开始的范例是 `E110_Dentist`（`onStartHarvest`）。
+- 座位设置开启时（缺省），只获得非动物货物、把货物放到卡上或只改计数的必选效果，会先于玩家排序自动结算（[ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）；不要依赖出牌顺序。每次收获的记账放在按轮次区分的卡牌状态里（`C062_CookeryExtension`），随机抽取放在 action leaf 里（`M104_WildHarvest`），都不要写在阶段 hook 本身。
 - 测试：`E090_E127-parity-session.test.ts` 走到第 4 轮收获（§5）。
 
 ### 4.4 "You may pay X to get Y"

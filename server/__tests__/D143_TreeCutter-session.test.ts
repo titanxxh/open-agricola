@@ -4,7 +4,12 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { D143_TreeCutter_impl } from '../../shared/cards/D/D143_TreeCutter'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { SessionResponse } from '../game/authoritative-session'
 

@@ -115,13 +115,13 @@ describe('Moor Batch 1 counter and phase-listener minors', () => {
       { row: 0, col: 1, kind: 'moor' },
     ]
 
-    executeGainLeaf(session.withCtx(() => runCardEffectHook(session.state, player, 'M088_PeatIron', 'onHarvest')), session, player)
+    executeGainLeaf(session.withCtx(() => runCardEffectHook(session.state, player, 'M088_PeatIron', 'onStartHarvest')), session, player)
 
     expect(player.resources.fuel).toBe(1)
 
     const low = setup(['M088_PeatIron'])
     low.player.farmTerrain = [{ row: 0, col: 0, kind: 'moor' }]
-    expect(session.withCtx(() => runCardEffectHook(low.session.state, low.player, 'M088_PeatIron', 'onHarvest'))).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(low.session.state, low.player, 'M088_PeatIron', 'onStartHarvest'))).toBeNull()
   })
 
   it('M089 Birthing House rewards family growth with and without room', () => {

@@ -476,7 +476,8 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     expect(response.state.players[0]!.resources.wood).toBe(wood)
     expect(response.interaction.request.foodUsed).toBe(0)
     expect(response.interaction.request.remaining).toBe(4)
-    expect(response.state.players[0]!.cardStates.M091_RoutineWork?.extraData?.usedCraftBuildingIds).toEqual([])
+    // Nothing is recorded as used in this harvest (round 4) before feeding.
+    expect(response.state.players[0]!.cardStates.M091_RoutineWork?.extraData?.['usedCraftBuildingIds:4']).toBeUndefined()
     let offers = 0
     for (let step = 0; step < 30 && response.state.round === 4; step++) {
       expect(response.ok, response.error).toBe(true)

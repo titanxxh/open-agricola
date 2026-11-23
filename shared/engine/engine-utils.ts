@@ -506,6 +506,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     clone.selectedChildId = node.selectedChildId
     clone.resolveAfterSelection = node.resolveAfterSelection
     clone.autoSelectSoleInitialTrigger = node.autoSelectSoleInitialTrigger
+    clone.autoResolveIndependent = node.autoResolveIndependent
     clone.triggerOwnerPlayerId = node.triggerOwnerPlayerId
     clone.triggerChildren = node.triggerChildren.map((entry) => ({ ...entry }))
     clone.emittedChoices = [...node.emittedChoices]

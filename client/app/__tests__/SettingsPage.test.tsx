@@ -8,8 +8,11 @@ import type { AuthUser } from '../../contexts/AuthContext'
 
 const apiFetchMock = vi.fn()
 let prereleaseConfigured = false
+const gamePreferencesMock = vi.fn(async (_init?: RequestInit) =>
+  Response.json({ ok: true, preferences: { autoResolveIndependentReactions: true } }))
 const settingsApiFetch = (...args: [path: string, init?: RequestInit]) => args[0] === '/api/admin/beta-access'
   ? Promise.resolve(Response.json({ ok: true, grants: [] }))
+  : args[0] === '/api/account/game-preferences' ? gamePreferencesMock(args[1])
   : args[0] === '/api/prerelease/entry'
     ? Promise.resolve(Response.json({ ok: true, protocolVersion: 1, entry: prereleaseConfigured
       ? { kind: 'available', channel: 'prerelease', startUrl: 'https://pre.agricola.test/open-agricola/auth/start', returnTo: `${window.location.origin}/` }
@@ -120,6 +123,8 @@ vi.mock('../../components/common/LocaleSwitcher', () => ({
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  gamePreferencesMock.mockImplementation(async () =>
+    Response.json({ ok: true, preferences: { autoResolveIndependentReactions: true } }))
   vi.unstubAllGlobals()
   mockUser = { id: 'u1', username: 'testuser', displayName: 'Test User', isAdmin: false }
   prereleaseConfigured = false
@@ -127,6 +132,29 @@ afterEach(() => {
 })
 
 describe('SettingsPage', () => {
+  it('reads the account auto-resolve default and replaces it when toggled', async () => {
+    apiFetchMock.mockResolvedValue(Response.json({ ok: true, identities: [] }))
+    gamePreferencesMock.mockImplementation(async (init?: RequestInit) => Response.json({ ok: true,
+      preferences: init?.method === 'PUT' ? JSON.parse(String(init.body)) : { autoResolveIndependentReactions: true } }))
+    render(<SettingsPage />)
+    const toggle = await screen.findByTestId('account-auto-resolve-reactions')
+    await waitFor(() => expect(toggle).toBeEnabled())
+    expect(toggle).toBeChecked()
+    await userEvent.click(toggle)
+    await waitFor(() => expect(toggle).not.toBeChecked())
+    expect(gamePreferencesMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      method: 'PUT', body: JSON.stringify({ autoResolveIndependentReactions: false }),
+    }))
+  })
+
+  it('keeps the auto-resolve toggle disabled and reports a failed read', async () => {
+    apiFetchMock.mockResolvedValue(Response.json({ ok: true, identities: [] }))
+    gamePreferencesMock.mockImplementationOnce(async () => Response.json({ ok: false }, { status: 503 }))
+    render(<SettingsPage />)
+    expect(await screen.findByText('platform.gamePreferences.failed')).toBeInTheDocument()
+    expect(screen.getByTestId('account-auto-resolve-reactions')).toBeDisabled()
+  })
+
   it('offers the configured prerelease target to a Beta account in a new tab', async () => {
     mockUser = { id: 'beta', username: 'beta', displayName: 'Beta', betaAccess: true }
     prereleaseConfigured = true

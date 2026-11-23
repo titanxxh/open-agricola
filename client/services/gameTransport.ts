@@ -14,7 +14,7 @@ import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from
 import type { ClientCommand, ServerEvent, RoomViewer, SpectatingEndReason } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
 import type { SoloHandSelectionSubmission } from '../../shared/contract/solo-hand-selection'
-import type { ParentSelectionSubmission, PlayerState } from '../../shared/contract/types'
+import type { ParentSelectionSubmission, PlayerPreferences, PlayerState } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 
 export type ValidateResult = {
@@ -81,6 +81,7 @@ export interface GameTransport {
   devCreatePasture(playerIndex: number): Promise<GameSyncPayload>
   draftSubmit(playerId: string, pick: DraftPickPayload): Promise<GameSyncPayload>
   soloHandSubmit(playerIndex: number, selection: SoloHandSelectionSubmission): Promise<GameSyncPayload>
+  setPlayerPreferences(playerIndex: number, preferences: PlayerPreferences): Promise<GameSyncPayload>
   parentSubmit(playerIndex: number, selection: ParentSelectionSubmission): Promise<GameSyncPayload>
   validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult>
   onSnapshot(cb: SnapshotListener): () => void
@@ -192,6 +193,10 @@ export class HttpGameTransport implements GameTransport {
 
   performRoundEnd() {
     return this.send(() => post('/api/game/round-end'))
+  }
+
+  setPlayerPreferences(playerIndex: number, preferences: PlayerPreferences) {
+    return this.send(() => post('/api/game/preferences', { playerIndex, preferences }))
   }
 
   undoStep() {
@@ -842,6 +847,10 @@ export class WsGameTransport implements GameTransport {
 
   async performRoundEnd(): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'roundEnd' })
+  }
+
+  async setPlayerPreferences(playerIndex: number, preferences: PlayerPreferences): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'setPlayerPreferences', playerIndex, preferences })
   }
 
   async undoStep(): Promise<GameSyncPayload> {

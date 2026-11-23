@@ -38,6 +38,7 @@ import { BROWSER_WS_PROTOCOL } from '../../shared/contract/browser-auth'
 import { validateSession } from '../auth.ts'
 import { RoomCommitter } from '../game/room-committer.ts'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter.ts'
+import type { GamePreferencesStore } from '../game/game-preferences-store'
 import type { GameContextStore } from '../game/game-context-store.ts'
 import { getResources } from '../storage/runtime'
 import { ReplayResources } from '../storage/replay-resources'
@@ -211,6 +212,7 @@ type ConnectionDeps = {
   lobby: Lobby
   committer?: RoomCommitter
   gameContextStore?: GameContextStore
+  gamePreferences?: GamePreferencesStore
   commands: CommandStore
   activeUserSockets: Map<string, Set<WebSocket>>
   allowAnonymous: boolean
@@ -356,6 +358,7 @@ export async function createWsServer(
       gameBuildId: string
     }
     gameContextStore?: GameContextStore
+    gamePreferences?: GamePreferencesStore
     resources?: ReplayResources
     directory?: RoomDirectory
     instanceId?: string
@@ -444,6 +447,7 @@ export async function createWsServer(
       checkpoint,
       committer,
       gameContextStore: deps.gameContextStore,
+      gamePreferences: deps.gamePreferences,
       broadcaster,
       lobby,
       commands: new CommandStore(getDb()),

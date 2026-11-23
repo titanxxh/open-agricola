@@ -54,6 +54,7 @@ Unless the product direction changes, the following are not bugs. Cards without 
 
 Register a cross-card mechanism here only while it is still unimplemented. Remove the entry once the mechanism is implemented and covered by a test or a gate, and record the new generic mechanism in its module document under `docs/architecture/`. Completed work lives in pull requests, ADRs and tests, not here.
 
+- **Serial stage hooks** ([#2039](https://github.com/titanxxh/open-agricola/issues/2039)): `onAfterReap`, `onHarvest`, the three feeding hooks, `onEndHarvest`, `onAfterHarvest`, the three return-home hooks, `onRoundEnd` and `onAfterRoundEnd` still resolve one card at a time in play-zone order; same-timing cards there cannot be ordered. Several cards with the same printed timing also sit in different hooks (for example the "end of each work phase" cards across `onAllWorkersPlaced` and `onBeforeReturnHome`).
 
 ## 4. Reference anti-patterns: do not copy
 

@@ -444,6 +444,8 @@ export type PlayerState = {
   lastDraftSubmission?: import('../draft/types').DraftPickPayload
   parentCards: PlayerParentCards
   supplyTokensConsumed?: SupplyTokenCounts
+  /** Seat settings that shape rule resolution; absent means the defaults. Survive undo. */
+  preferences?: PlayerPreferences
   /**
    * Session-transient scratchpad: card ids of `BonusModifier` entries whose
    * `sources` fired during the currently-executing action. Initialised by
@@ -460,6 +462,14 @@ export type PlayerState = {
    */
   _extraTurnSkipCountsByCard?: Record<string, number>
   _extraTurnConsumedCountsByCard?: Record<string, number>
+}
+
+export type PlayerPreferences = {
+  /**
+   * Resolve a same-timing reaction that needs no decision before the player orders
+   * the rest (reference: NODE_PARALLEL independent children). Default true.
+   */
+  autoResolveIndependentReactions: boolean
 }
 
 export type FarmTilePosition = {

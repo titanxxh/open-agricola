@@ -118,6 +118,7 @@ export type StateUpdateCause =
   | 'dev'
   | 'reconnect'
   | 'draftSubmit'
+  | 'preferences'
 
 export type StateUpdateEnvelope = {
   type: 'stateUpdate'

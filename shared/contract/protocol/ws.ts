@@ -4,7 +4,7 @@ import type { CommitSelectionPayload } from './commit-selection'
 import type { FenceSelectionPayload, FenceSelectionQuote, StateUpdateEnvelope } from './game'
 import type { GameContextErrorCode, GameContextLifecycle } from './game-context'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
-import type { ParentSelectionSubmission, PlayerState } from '../types'
+import type { ParentSelectionSubmission, PlayerPreferences, PlayerState } from '../types'
 import type { MoorSpecialActionId } from '../../moor/types'
 import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 import type { SoloHandMode } from '../game-creation'
@@ -102,6 +102,8 @@ type ClientCommandBody =
   | { type: 'withdrawGameEnd'; proposalId: string }
   | { type: 'getGameEndProposal' }
   | { type: 'draftSubmit'; playerId: string; pick: DraftPickPayload }
+  /** Changes a controlled seat's settings (#2039); a recorded step, never undo history. */
+  | { type: 'setPlayerPreferences'; playerIndex: number; preferences: PlayerPreferences }
 
 export type ClientCommand = ClientCommandBody & { requestId?: string; commandContext?: CommandIdentity & Partial<CommandInput> & { roomId?: string; allocationId?: string } }
 

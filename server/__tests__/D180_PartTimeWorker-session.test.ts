@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { ActionChoiceOption, GameState, Resource } from '../../shared/contract/types'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'

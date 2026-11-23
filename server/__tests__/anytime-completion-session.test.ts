@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import { confirmNext, getChoiceOptions } from './_helpers/session-assertions'
@@ -104,8 +109,9 @@ const startAfterTurn = (session: GameSession) => {
   return commitStable(session, ok(session.takeAnytimeAction(0, CLEANER_ACTION)))
 }
 const pottersExchange = (session: GameSession, response: SessionResponse) => {
-  const potter = getChoiceOptions(response).find(option => option.sourceCard === POTTERS)!
-  const result = choose(session, response, potter.value)
+  // As the last mandatory source, Potter's Yard has already started its own exchange without asking.
+  const trigger = getChoiceOptions(response).find(option => option.value === POTTERS)
+  const result = trigger ? choose(session, response, trigger.value) : response
   expect(result.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: POTTERS })
   expect(result.state.players[0]!.resources).toMatchObject({ wood: 5, stone: 4, food: 5, clay: 1 })
   expect(isCardFlagged(result.state.players[0]!, CLEANER)).toBe(true)

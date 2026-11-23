@@ -7,7 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { orderReactionsManually, withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { expectWait } from './_helpers/trigger-select'
 import { choose, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
 import assert from 'node:assert/strict'
@@ -198,12 +203,15 @@ describe('A055 Junk Room after-reaction ordering', () => {
     resolve(first)
     if (first === UPHOLSTERY) acceptUpholstery()
     const second = first === CARD_ID ? UPHOLSTERY : CARD_ID
-    const remaining = expectWait(response)
-    expect(remaining.interaction.request.kind).toBe('select-trigger')
-    expect(remaining.interaction.request.options?.some((option) => option.value === first)).toBe(false)
-    response = session.resolveChoice(0, second)
-    expect(response.ok, response.error).toBe(true)
-    if (second === UPHOLSTERY) acceptUpholstery()
+    // The Junk Room is mandatory: as the last source it runs without asking. Upholstery stays optional.
+    if (second === UPHOLSTERY) {
+      const remaining = expectWait(response)
+      expect(remaining.interaction.request.kind).toBe('select-trigger')
+      expect(remaining.interaction.request.options?.some((option) => option.value === first)).toBe(false)
+      response = session.resolveChoice(0, second)
+      expect(response.ok, response.error).toBe(true)
+      acceptUpholstery()
+    }
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, reed: 0, food: 1 })
     expect(response.state.players[0]!.cardStates[UPHOLSTERY]?.counters).toMatchObject({ reed: 1, bonusVp: 1 })
     expect(gainLogs(response)).toHaveLength(1)
@@ -353,6 +361,6 @@ describe('ae-negative-08-flow', () => {
     for (const played of [false, true]) { const s = junk({ played, hand: played ? [BUCK] : [], resources: { wood: 1, clay: played ? 0 : 1, food: 0 } }); const before = undoRuleSnapshot(s.getState()); const card = played ? BUCK : JUNK; const r = buy(s, card); resource(r, 'food', 1); assert.equal(gainCount(r, JUNK), 1); purchaseUndo(before, s.undoAction()); const replay = buy(s, card); resource(replay, 'food', 1); assert.equal(gainCount(replay, JUNK), 1) }
   })
   it('A055 N6 two after sources reject consumed source and undo first response restores choice', () => {
-    for (const first of [JUNK, UPHOLSTERY]) { const s = junk({ extra: [UPHOLSTERY], hand: [BUCK], resources: { wood: 1, reed: 1, food: 0 } }); const initial = improve(s, BUCK); assert.ok(initial.interaction.stateId === 'wait' && initial.interaction.request.kind === 'select-trigger'); assertRejectedUnchanged(s, () => s.resolveChoice(1, first)); const chosen = ok(s.resolveChoice(0, first)); resource(chosen, 'food', first === JUNK ? 1 : 0); const undone = ok(s.undoStep()); assert.ok(undone.interaction.stateId === 'wait' && undone.interaction.request.kind === 'select-trigger'); assert.deepEqual(opts(undone).filter(o => [JUNK, UPHOLSTERY].includes(o.value)).map(o => o.value).sort(), [JUNK, UPHOLSTERY].sort()); resource(undone, 'food', 0); let r = source(s, undone, first); const second = first === JUNK ? UPHOLSTERY : JUNK; assertRejectedUnchanged(s, () => s.resolveChoice(0, first)); r = source(s, r, second); resource(r, 'food', 1); assert.equal(r.state.players[0]!.resources.reed, 0); assert.equal(r.state.players[0]!.cardStates[UPHOLSTERY]?.counters?.reed, 1); assert.equal(gainCount(r, JUNK), 1) }
+    for (const first of [JUNK, UPHOLSTERY]) { const s = junk({ extra: [UPHOLSTERY], hand: [BUCK], resources: { wood: 1, reed: 1, food: 0 } }); orderReactionsManually(s.state); const initial = improve(s, BUCK); assert.ok(initial.interaction.stateId === 'wait' && initial.interaction.request.kind === 'select-trigger'); assertRejectedUnchanged(s, () => s.resolveChoice(1, first)); const chosen = ok(s.resolveChoice(0, first)); resource(chosen, 'food', first === JUNK ? 1 : 0); const undone = ok(s.undoStep()); assert.ok(undone.interaction.stateId === 'wait' && undone.interaction.request.kind === 'select-trigger'); assert.deepEqual(opts(undone).filter(o => [JUNK, UPHOLSTERY].includes(o.value)).map(o => o.value).sort(), [JUNK, UPHOLSTERY].sort()); resource(undone, 'food', 0); let r = source(s, undone, first); const second = first === JUNK ? UPHOLSTERY : JUNK; assertRejectedUnchanged(s, () => s.resolveChoice(0, first)); if (second === UPHOLSTERY) r = source(s, r, second); resource(r, 'food', 1); assert.equal(r.state.players[0]!.resources.reed, 0); assert.equal(r.state.players[0]!.cardStates[UPHOLSTERY]?.counters?.reed, 1); assert.equal(gainCount(r, JUNK), 1) }
   })
 })

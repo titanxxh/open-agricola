@@ -4,6 +4,7 @@ import { rollAndCacheCardPick } from '../helpers/card-random'
 import { moorStartCardIds } from '../../moor/start-cards'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 
 const CARD_ID = 'M102_SavingsDeposit'
 
@@ -17,26 +18,38 @@ const passLeftLeaf = (): ActionFlow => ({
   params: { cardId: CARD_ID },
 })
 
+// The draw happens when this leaf executes, so a preview of the stage source never rolls.
+const DRAW_ACTION = 'card_M102_SavingsDeposit_draw'
+registerAdHocAction({
+  id: DRAW_ACTION,
+  nameKey: 'ui.interactionUseAbility',
+  descriptionKey: 'ui.interactionUseAbility',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ state, player, reportProtectedObservation }) => {
+    const pick = rollAndCacheCardPick(
+      state,
+      player,
+      CARD_ID,
+      `harvest-${state.round}`,
+      moorStartCardIds,
+      reportProtectedObservation,
+    )
+    state.pendingUndoBoundary = true
+    return startCardNumber(pick) <= (player.resources.clay ?? 0)
+      ? { type: 'flow', flow: gainLeaf(CARD_ID, { food: 6 }) }
+      : { type: 'ok' }
+  },
+})
+
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onStartHarvest: (state, player, ctx) => {
-      const pick = rollAndCacheCardPick(
-        state,
-        player,
-        CARD_ID,
-        `harvest-${state.round}`,
-        moorStartCardIds,
-        ctx?.reportProtectedObservation,
-      )
-      state.pendingUndoBoundary = true
-      const children: ActionFlow[] = []
-      if (startCardNumber(pick) <= (player.resources.clay ?? 0)) {
-        children.push(gainLeaf(CARD_ID, { food: 6 }))
-      }
-      children.push(passLeftLeaf())
-      return children.length === 1 ? children[0] : { type: 'seq', children }
-    },
+    onStartHarvest: (): ActionFlow => ({
+      type: 'seq',
+      children: [{ type: 'leaf', actionId: DRAW_ACTION, sourceCard: CARD_ID }, passLeftLeaf()],
+    }),
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

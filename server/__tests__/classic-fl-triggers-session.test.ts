@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { flCard, flSession, flOptions, chooseBranch, takeFlAnytime, confirmTurns } from './_helpers/classic-fl'
 import { playImprovement, playOccupation, choose, bonusScore } from './_helpers/card-play-lifecycle'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { orderReactionsManually, withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { resolveNonSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
@@ -170,6 +175,7 @@ describe('FL: individual card triggers and exclusions', () => {
     const net = 'C051_FishingNet'
     const researcher = 'C154_TwinResearcher'
     const session = keep(flSession((state) => {
+      orderReactionsManually(state)
       state.players[0]!.occupationPlayed = [card, researcher]
       state.players[1]!.minorPlayed = [net]
       state.players[0]!.resources.food = 1
@@ -192,9 +198,9 @@ describe('FL: individual card triggers and exclusions', () => {
     })
     const pointOffer = resolveTriggerIfPresent(session, offered, researcher)
     expect(pointOffer.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: researcher })
-    const afterPoint = chooseBranch(session, pointOffer)
-    expect(afterPoint.state.players[0]!.resources.food).toBe(0)
-    const response = accept(session, resolveTriggerIfPresent(session, afterPoint, card))
+    // After the point, the remaining sources are each the last mandatory one in turn:
+    // the bonus and the Fishing Net fee settle without further choices.
+    const response = chooseBranch(session, pointOffer)
 
     const actor = response.state.players[0]!
     const owner = response.state.players[1]!
@@ -413,6 +419,7 @@ describe('FL: individual card triggers and exclusions', () => {
     const net = 'C051_FishingNet'
     const researcher = 'C154_TwinResearcher'
     const session = keep(flSession((state) => {
+      orderReactionsManually(state)
       const actor = state.players[0]!
       const owner = state.players[1]!
       actor.occupationPlayed = [researcher]
@@ -436,15 +443,8 @@ describe('FL: individual card triggers and exclusions', () => {
         expect.objectContaining({ sourceCard: net, disabled: true }),
       ]) },
     })
-    const beforeFee = accept(session, choose(session, beforeDonation, fisherman))
-    expect(beforeFee.state.players[0]!.resources.food).toBe(1)
-    expect(beforeFee.interaction).toMatchObject({
-      stateId: 'wait', playerIndex: 1,
-      request: { kind: 'select-trigger', options: expect.arrayContaining([
-        expect.objectContaining({ sourceCard: net }),
-      ]) },
-    })
-    const response = accept(session, choose(session, beforeFee, net))
+    // After the Fisherman's donation, the Fishing Net is the owner's last mandatory source and runs without asking.
+    const response = accept(session, choose(session, beforeDonation, fisherman))
 
     const actor = response.state.players[0]!
     const owner = response.state.players[1]!

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { gainAction } from '../../shared/actions/effects/gain'
 

@@ -8,7 +8,7 @@ const CARD_ID = 'M088_PeatIron'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onHarvest: (_state, player) => {
+    onStartHarvest: (_state, player) => {
       if (countTerrain(player, 'moor') < 2) return
       return gainLeaf(CARD_ID, { fuel: 1 })
     },

@@ -11,6 +11,7 @@ import type { Broadcaster } from './broadcaster.ts'
 import type { Lobby } from '../game/lobby.ts'
 import type { RoomCommitter } from '../game/room-committer.ts'
 import type { GameContextStore } from '../game/game-context-store.ts'
+import type { GamePreferencesStore } from '../game/game-preferences-store.ts'
 
 export type ConnectionDeps = {
   authority?: RoomAuthority
@@ -21,6 +22,8 @@ export type ConnectionDeps = {
   lobby: Lobby
   committer?: RoomCommitter
   gameContextStore?: GameContextStore
+  /** Account defaults copied into a game's seats when it starts (#2039). */
+  gamePreferences?: GamePreferencesStore
   /** Admits new classic games (ADR 0049); absent means the build's `CLASSIC_EDITION_ENABLED`. Tests inject it. */
   classicEditionEnabled?: boolean
 }

@@ -136,6 +136,7 @@ If the card is an action-reaction listener, harvest field-stage card effect, bef
 - Assert that `interaction` offers selectable source cards instead of executing them in played-zone order.
 - Select each source card in separate paths and assert the resulting flow, state, log, and recalculated remaining triggers.
 - Cover deriving the same `trigger-select` again after `undoStep` or `undoAction`.
+- Same-timing sources follow the seat's auto-resolve setting ([ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)). To choose every order, turn it off with `orderReactionsManually(state)` or `withManualReactionOrder(options)` from `server/__tests__/_helpers/trigger-select.ts`; also cover the default, where an independent source settles first and a sole remaining mandatory source runs without asking.
 
 ## 5. Recommended Backend Entry Points
 

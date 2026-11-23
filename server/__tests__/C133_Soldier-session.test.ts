@@ -202,17 +202,7 @@ describe('C133_Soldier before-end scoring choice', () => {
       cardType: 'occupation',
     })
 
-    interaction = resp.interaction
-    expect(interaction.stateId).toBe('wait')
-    if (interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(interaction.request.kind).toBe('select-trigger')
-    if (interaction.request.kind !== 'select-trigger') throw new Error('expected select-trigger')
-    expect(interaction.request.options.map((option) => option.value)).toEqual([
-      CARD_ID,
-      '__pass__',
-    ])
-
-    resp = session.resolveChoice(0, CARD_ID)
+    // The Soldier is then the last mandatory source and starts its own choice without asking.
     expectSoldierChoice(resp, 0, [
       soldierChoice(0),
       soldierChoice(1),

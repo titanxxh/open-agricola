@@ -71,13 +71,13 @@ describe('CFL027 Trappist Beer prompt', () => {
     const options = prompts[0]!.request.kind === 'choice' ? prompts[0]!.request.options : []
     const accept = options.find(option => option.value !== '__skip__')!
     // The prompt names the card and spells out its plan: pay 1 grain, then skip this harvest.
+    // As the only start-of-Harvest source, the card's own optional plan is the prompt (#2039).
     expect(prompts[0]).toMatchObject({ promptKey: 'ui.interactionOptionalAction', sourceCard: TRAPPIST_BEER })
     expect(accept.descriptionPreview).toMatchObject({
-      kind: 'action', optional: true, showLabel: false, labelKey: `cards.${TRAPPIST_BEER}.name`,
-      effectPreview: { kind: 'rule', description: { kind: 'group', operator: 'sequence', parts: [
+      kind: 'group', optional: true, operator: 'sequence', parts: [
         { kind: 'action', labelKey: 'actions.pay.name', effectPreview: { kind: 'payment', resourcesPaid: { grain: 1 } } },
         { kind: 'action', labelKey: 'ui.timedOperations.skip-harvest' },
-      ] } },
+      ],
     })
     expect(labelKeys(accept.descriptionPreview)).not.toContain('actions.activate-card-effect.name')
 

@@ -183,7 +183,7 @@ export const emptyRoomTtlMs = (room: Pick<Room, 'status'>): number =>
 const getRoomStatus = (room?: Pick<Room, 'players' | 'maxPlayers' | 'status'>): RoomStatus =>
   room?.status ?? ((room && room.players.length >= room.maxPlayers) ? 'playing' : 'waiting')
 
-const roomSeatOwners = (
+export const roomSeatOwners = (
   room: Pick<Room, 'players' | 'seatOwners'>,
 ): RoomSeatOwner[] => {
   const owners = new Map(

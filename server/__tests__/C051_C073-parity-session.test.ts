@@ -557,7 +557,7 @@ describe('C062 Cookery Extension parity', () => {
       cost: { vegetable: 1 },
       food: { food: 4 },
     }))
-    expect(finished.state.players[0]!.cardStates.C062_CookeryExtension?.extraData?.usedCookeryIds)
+    expect(finished.state.players[0]!.cardStates.C062_CookeryExtension?.extraData?.['usedCookeryIds:4'])
       .toEqual(['Major_Fireplace1'])
   })
 })

@@ -508,6 +508,19 @@ const handleAuthorizedGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/preferences') {
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: unknown; preferences?: unknown }
+    if (typeof body.playerIndex !== 'number') {
+      await sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    if (!(await enforceSeatBinding(req, res, body.playerIndex))) return true
+    const playerIndex = body.playerIndex
+    const { resp, result } = await callAndRespond(req, s => s.setPlayerPreferences(playerIndex, body.preferences))
+    await sendJson(res, resp.ok ? 200 : 400, result)
+    return true
+  }
+
   if (req.method === 'POST' && req.url === '/api/game/undo') {
     const { resp, result } = await callAndRespond(req, s => s.undoStep())
     await sendJson(res, resp.ok ? 200 : 400, result)

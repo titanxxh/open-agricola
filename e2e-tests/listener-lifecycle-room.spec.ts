@@ -49,6 +49,8 @@ test('Hat, Spear and Steam Machine share a player-ordered window across room rel
       for (const space of state.actionSpaces) space.takenBy = []
       const owner = state.players[0]!
       owner.minorPlayed = [hat, spear, steam]
+      // The owner orders the reactions (#2039: auto-resolve off).
+      owner.preferences = { autoResolveIndependentReactions: false }
       owner.improvements = ['Major_Fireplace1']
       owner.resources.grain = 1
       state.actionSpaces.find(space => space.id === 'grain-seeds')!.takenBy = [{ playerId: owner.id, workerId: owner.workers[1]!.id }]
@@ -118,6 +120,8 @@ test('C094 drains Potter\'s Yard before Toolbox and preserves both room clients 
       const owner = state.players[0]!
       owner.minorPlayed = [TOOLBOX, POTTERS]
       owner.occupationPlayed = [CLEANER]
+      // The owner orders the construction reactions (#2039: auto-resolve off).
+      owner.preferences = { autoResolveIndependentReactions: false }
       Object.assign(owner.resources, { wood: 6, stone: 4, food: 6 })
       owner.farmyardSpaceStates = [{
         spaceKey: '0-0', sourceCardId: POTTERS, kind: 'farmyard-goods-token',

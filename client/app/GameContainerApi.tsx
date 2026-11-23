@@ -10,6 +10,7 @@ import { ActionReferencePlayerCount } from '../contexts/ActionReferenceContext'
 import { setPage } from '../utils/platform-page-url'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import { t, type Locale } from '../../shared/i18n'
+import { playerPreferences } from '../../shared/domain/player-preferences'
 import { getPlayerDisplayName } from '../utils/player-name'
 import {
   positionKey,
@@ -1704,6 +1705,27 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       />
   ) : null
 
+  // A participant's seat setting (#2039): it takes effect from the next same-timing window.
+  const preferenceSeatIndex = !isSpectator && selfPlayer && !state.gameOver && !serverMaintenance
+    ? state.players.findIndex(player => player.id === selfPlayer.id) : -1
+  const preferenceSeat = preferenceSeatIndex >= 0 ? state.players[preferenceSeatIndex] : undefined
+  const seatPreferenceToggle = preferenceSeat ? (
+    <label className="header-menu-item" title={t(locale, 'ui.preferences.autoResolveReactionsHint')}>
+      <input
+        type="checkbox"
+        data-testid="seat-auto-resolve-reactions"
+        checked={playerPreferences(preferenceSeat).autoResolveIndependentReactions}
+        disabled={persistencePaused || (isWs && wsStatus.phase !== 'ready')}
+        onChange={(event) => {
+          void transport.setPlayerPreferences(preferenceSeatIndex, {
+            autoResolveIndependentReactions: event.target.checked,
+          }).catch(() => {})
+        }}
+      />
+      {t(locale, 'ui.preferences.autoResolveReactions')}
+    </label>
+  ) : null
+
   const encyclopediaWindow = encyclopediaAttentionWindow({ state, interaction, playerId: selfPlayer?.id })
   const spectatorStatus = isSpectator ? (
     <div className="public-event-notification spectating-status" role="status" data-testid="spectating-status">
@@ -1733,7 +1755,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
         : selfPlayer ? playerNames[selfPlayer.id] : null}
       isMyTurn={isMyTurn}
       embedded={isEmbedded}
-      menuExtra={<>{!isEmbedded && user ? <InboxButton className="header-menu-item" /> : null}{gameEndControls}</>}
+      menuExtra={<>{seatPreferenceToggle}{!isEmbedded && user ? <InboxButton className="header-menu-item" /> : null}{gameEndControls}</>}
       menuAlert={gameEndMenuAlert}
       onOpenEncyclopedia={encyclopediaEntry ? () => setEncyclopediaOpenedIn({ window: encyclopediaWindow }) : undefined}
       encyclopediaEntryRef={encyclopediaEntry ? encyclopediaEntryRef : undefined}

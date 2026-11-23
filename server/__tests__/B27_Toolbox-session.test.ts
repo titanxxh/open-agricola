@@ -1,5 +1,10 @@
 import { commitFarmOperation } from '../../shared/domain/farm-operations'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { type SessionResponse } from '../game/authoritative-session'
 
 import { describe, expect, it, afterEach } from 'vitest'
@@ -154,9 +159,8 @@ describe('B27 Toolbox session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).not.toBe('ui.interactionToolboxImprovement')
 
-    const pottersYard = resp.interaction.request.options?.find((option) => option.sourceCard === POTTERS_YARD_ID)
-    expect(pottersYard).toBeDefined()
-    resp = session.resolveChoice(0, pottersYard!.value)
+    // Potter's Yard is then the last mandatory source: it claims its clay and opens its own exchange without asking.
+    expect(resp.interaction.sourceCard).toBe(POTTERS_YARD_ID)
     expect(resp.state.players[0]!.resources.clay).toBe(21)
     expect(resp.state.players[0]!.farmyardSpaceStates?.filter(token => token.sourceCardId === POTTERS_YARD_ID)).toEqual([])
     expect(resp.interaction.stateId).toBe('wait')

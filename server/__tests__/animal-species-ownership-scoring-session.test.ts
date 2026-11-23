@@ -3,7 +3,12 @@ import type { GameState, PlayerState } from '../../shared/contract/types'
 import { emptyResources } from '../../shared/contract/state-constants'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { assertRejectedUnchanged, confirmNext, getChoiceOptions, passPreparationExchanges } from './_helpers/session-assertions'
 import { buildHostedCardAnimalZoneId, getPlacedAnimalsByType } from '../../shared/domain/animal-zones'
 import { positionKey } from '../../shared/domain/farmyard-geometry'

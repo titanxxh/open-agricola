@@ -9,7 +9,12 @@ import { getRoundPersonPlacementOrder } from '../../shared/cards/helpers/round-p
 import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const evidence = createScenarioEvidence(import.meta.url)

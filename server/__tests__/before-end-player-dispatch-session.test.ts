@@ -1,4 +1,9 @@
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
@@ -127,9 +132,7 @@ describe('Before-End Player Dispatch session', () => {
 
     resp = session.resolveChoice(0, OWNER_CARD)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
-    expectSharedTrigger(resp, 0)
-
-    resp = session.resolveChoice(0, SHARED_CARD)
+    // The shared card is then each target player's last mandatory source and runs without asking.
     expect(resp.state.players[0]!.resources.food).toBe(1)
     expect(resp.state.players[1]!.resources.food).toBe(1)
     expect(resp.state.gameOver).toBe(true)

@@ -135,6 +135,8 @@ type ClientCommand = (
 
 `setPlayerColor { color }` is an authenticated, journaled waiting-room command with no client-supplied seat. It changes the caller's color only, persists before publication, and creates no Replay Step.
 
+`setPlayerPreferences { playerIndex, preferences }` changes one seat's settings in a running game ([ADR 0055](../adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)). Only a seat the connection controls may be named, as for `commitSelection`. It is a Replay Step (`cause: 'preferences'`) but adds no undo history, and undo keeps the change; the HTTP sandbox uses `POST /api/game/preferences`.
+
 `confirmPlayerColor` has no payload and starts a full ordinary Room only for the seat named by `colorConfirmationPlayerIndex` in `roomJoined` and `roomWaiting`. The server commits the initial Frame and confirmation receipt before publication. Earlier seats can still choose colors while waiting, but cannot confirm for the last arrival.
 
 Waiting-room events carry `playerColors` from the authoritative player state; roster entries include `connected` so reserved seats retain their names when a player disconnects.
