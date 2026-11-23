@@ -134,7 +134,8 @@ describe('summer heating settlement logs', () => {
       }
     })
     expect(session.performRoundEnd().ok).toBe(true)
-    settle(session, true)
+    const pending = settle(session, true)
+    // The covering grain batch opens nothing new, so it completes that player's feeding.
     const convertGrain = (playerIndex: number) => {
       const response = session.getState()
       if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'feed') throw new Error(JSON.stringify(response.interaction))
@@ -143,13 +144,11 @@ describe('summer heating settlement logs', () => {
       if (!recipe) throw new Error(JSON.stringify(response.interaction.request))
       const fed = session.resolveChoice(playerIndex, 'confirm', { selections: [{ sourceId: recipe.sourceId, exchangeIndex: recipe.exchangeIndex, count: 1 }] })
       expect(fed.ok, fed.error).toBe(true)
-      expect(fed.interaction).toMatchObject({ stateId: 'wait', playerIndex, request: { kind: 'feed' } })
       return fed
     }
-    const opportunity = convertGrain(0)
     session = restore(session)
     for (let attempt = 0; attempt < 2; attempt++) {
-      expect(session.resolveChoice(0, 'confirm', { selections: [] }).ok).toBe(true)
+      convertGrain(0)
       const fed = settle(session, true)
       expect(fed.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'feed' } })
       expect(fed.state.events.filter(event => event.type === 'harvest.heated')).toEqual([
@@ -158,10 +157,10 @@ describe('summer heating settlement logs', () => {
       if (attempt === 0) {
         const undone = session.undoStep()
         expect(undone.ok, undone.error).toBe(true)
-        expect(undone.interaction).toEqual(opportunity.interaction)
+        expect(undone.interaction).toEqual(pending.interaction)
         expect(undone.state.events.filter(event => event.type === 'harvest.heated')).toEqual([])
         expect(undone.state.log.filter(entry => entry.key === 'log.harvestHeatingWaived')).toEqual([])
-        expect(undone.state.players[0]!.resources).toMatchObject({ food: 1, grain: 1, fuel: 3 })
+        expect(undone.state.players[0]!.resources).toMatchObject({ food: 0, grain: 2, fuel: 3 })
       }
     }
     session.actionHooks.register({

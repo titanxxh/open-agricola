@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, ResourceKey } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
-import type { GameSession, SessionResponse } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { bonusScore, playImprovement, restoreSession } from './_helpers/card-play-lifecycle'
 import { markAllWorkersUsed } from '../../shared/domain/player'
@@ -87,6 +88,17 @@ const feedSelection = (response: SessionResponse, sourceId: string, resource: Re
   return { sourceId: recipe.sourceId, exchangeIndex: recipe.exchangeIndex, count }
 }
 
+// A feeding batch paused in its Exchange flow; `keepBaseline: false` reproduces a pre-baseline save.
+const restoreFeedingContinuation = (session: GameSession, keepBaseline: boolean) => {
+  const snapshot = JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session))) as
+    ReturnType<typeof serializeSessionSnapshot>
+  const resumes = snapshot.sessionCursor.engineStackCursor.frames.flatMap((frame) =>
+    frame.harvestSettlementResume?.kind === 'feed' ? [frame.harvestSettlementResume] : [])
+  expect(resumes).toEqual([expect.objectContaining({ opportunityBaseline: expect.any(Object) })])
+  if (!keepBaseline) for (const resume of resumes) delete resume.opportunityBaseline
+  return new GameSession(rehydrateState(snapshot))
+}
+
 const finishFeeding = (session: GameSession, response: SessionResponse) =>
   response.interaction.stateId === 'wait' && response.interaction.request.kind === 'feed'
     ? session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] }) : response
@@ -128,13 +140,13 @@ describe('authoritative Exchange Batch', () => {
     expect(feeding.ok, feeding.error).toBe(true)
     expect(feeding.state.roundPhase).toBe('feeding')
     expect(feeding.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })
-    const exchanged = session.resolveChoice(0, 'confirm', {
+    // Piggy Bank and the second vegetable were already offered, so this batch settles feeding at once.
+    const settled = session.resolveChoice(0, 'confirm', {
       selections: [feedSelection(feeding, 'C109_SchnappsDistiller', 'vegetable')],
     })
-    expect(exchanged.ok, exchanged.error).toBe(true)
-    expect(exchanged.interaction).toMatchObject({ request: { maxTradeTimesBySourceId: { C109_SchnappsDistiller: 0 } } })
-    const settled = finishFeeding(session, exchanged)
     expect(settled.ok, settled.error).toBe(true)
+    expect(settled.interaction.stateId).toBe('idle')
+    expect(settled.state.players[0]!.cardStates.C109_SchnappsDistiller?.extraData?.harvestExchangeUsage).toEqual({ round: 4, count: 1 })
     expect(settled.state.round).toBe(5)
     expect(settled.state.players[0]!.resources).toMatchObject({ food: 1, vegetable: 1, begging: 0 })
     expect(settled.state.events.filter((event) => event.type === 'resource.exchanged' && event.exchangeSource === 'C109_SchnappsDistiller'))
@@ -212,6 +224,9 @@ describe('authoritative Exchange Batch', () => {
     const furniture = feedSelection(pending, 'Major_Moor_FurnitureStall', 'wood')
     assertRejectedUnchanged(session, 'confirm', 0, { selections: [cooking, furniture] })
     const opportunity = session.resolveChoice(0, 'confirm', { selections: [cooking] })
+    expect(opportunity.ok, opportunity.error).toBe(true)
+    // The covered shortfall still reopens: the reaction wood exceeds what the cooking recipe left.
+    expect(opportunity.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed', foodUsed: 2, remaining: 2 } })
     expect(opportunity.state.players[0]!.resources).toMatchObject({ food: 2, wood: 1, clay: 0 })
     const settled = finishFeeding(session, session.resolveChoice(0, 'confirm', { selections: [furniture] }))
     expect(settled.ok, settled.error).toBe(true)
@@ -219,6 +234,84 @@ describe('authoritative Exchange Batch', () => {
     expect(settled.state.events.filter((event) => event.type === 'harvest.feedConverted')).toHaveLength(2)
     expect(settled.state.events.filter((event) => event.type === 'resource.paid' &&
       event.actorPlayerId === settled.state.players[0]!.id && event.paymentFor === 'feeding')).toHaveLength(1)
+    session.dispose()
+  })
+
+  it.each([
+    { food: 3, begging: 0, paid: { grain: 1, food: 4 } },
+    { food: 2, begging: 1, paid: { grain: 1, food: 3, begging: 1 } },
+  ])('settles a feeding batch in one submission when it opens nothing new, food=$food', ({ food, begging, paid }) => {
+    const session = createSession((state) => {
+      const player = state.players[0]!
+      player.resources.food = food
+      player.resources.grain = 1
+      state.players[1]!.resources.food = 4
+    })
+    const pending = enterFeeding(session)
+    expect(pending.interaction).toMatchObject({ request: { kind: 'feed', foodUsed: food, remaining: 4 - food } })
+    // Cooking the house sheep stays possible, so the Exchange Center remains a pausing anytime action.
+    expect(pending.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+    const settled = session.resolveChoice(0, 'confirm', { selections: [feedSelection(pending, '__basic__', 'grain')] })
+    expect(settled.ok, settled.error).toBe(true)
+    expect(settled.interaction.stateId).toBe('idle')
+    expect(settled.state.round).toBe(5)
+    expect(settled.state.players[0]!.resources).toMatchObject({ food: 0, grain: 0, sheep: 1, begging })
+    expect(settled.state.events.filter((event) => event.type === 'harvest.feedConverted')).toHaveLength(1)
+    expect(settled.state.events.filter((event) => event.type === 'resource.paid' &&
+      event.actorPlayerId === 'p1' && event.paymentFor === 'feeding')).toHaveLength(1)
+    expect(settled.state.log.filter((entry) => entry.key === 'log.harvestFeedDetail' && entry.playerId === 'p1'))
+      .toEqual([expect.objectContaining({ params: { player: 'Player 1', resources: paid } })])
+    expect(settled.scores?.[0]?.categories.find((category) => category.key === 'beggings')?.total).toBe(-3 * begging)
+    session.dispose()
+  })
+
+  it.each([true, false])('reopens a restored feeding batch only for new opportunities, baseline=%s', (keepBaseline) => {
+    const session = createSession((state) => {
+      const player = state.players[0]!
+      player.minorPlayed = ['E053_BoarSpear']
+      player.occupationPlayed = ['B104_SheepWalker']
+      player.resources.food = 2
+      state.players[1]!.resources.food = 4
+    })
+    const pending = enterFeeding(session)
+    if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'feed') throw new Error('Expected feed')
+    expect(pending.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+    const walker = pending.interaction.request.exchangeCatalog?.find((entry) =>
+      entry.sourceId === 'B104_SheepWalker' && entry.to.boar === 1)
+    if (!walker) throw new Error('Expected the real Sheep Walker recipe')
+    const reacting = session.resolveChoice(0, 'confirm', { selections: [
+      { sourceId: walker.sourceId, exchangeIndex: walker.exchangeIndex, count: 1 },
+    ] })
+    expect(reacting.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: 'E053_BoarSpear' })
+    const restored = restoreFeedingContinuation(session, keepBaseline)
+    expect(restored.getState().interaction).toEqual(reacting.interaction)
+    // Declining the reaction leaves only the boar the recipe produced and the Fireplace cooking offer.
+    const placing = restored.resolveChoice(0, '__skip__')
+    expect(placing.ok, placing.error).toBe(true)
+    if (placing.interaction.stateId !== 'wait' || placing.interaction.request.kind !== 'animal-reorg') {
+      throw new Error(`Expected boar placement: ${JSON.stringify(placing.interaction)}`)
+    }
+    expect(placing.state.log.filter((entry) => entry.key === 'log.harvestFeedDetail')).toHaveLength(0)
+    let response = restored.resolveChoice(0, 'confirm', { zones: placing.interaction.request.zones })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1, food: 0, begging: keepBaseline ? 2 : 0 })
+    if (keepBaseline) {
+      expect(response.interaction.stateId).toBe('idle')
+      expect(response.state.round).toBe(5)
+    } else {
+      expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed', foodUsed: 2, remaining: 2 } })
+      expect(response.state.log.filter((entry) => entry.key === 'log.harvestFeedDetail' && entry.playerId === 'p1')).toHaveLength(0)
+      response = restored.resolveChoice(0, 'confirm', { selections: [] })
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.round).toBe(5)
+    }
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1, food: 0, begging: 2 })
+    expect(response.state.events.filter((event) => event.type === 'resource.exchanged' &&
+      event.exchangeSource === 'B104_SheepWalker')).toHaveLength(1)
+    expect(response.state.events.filter((event) => event.type === 'resource.paid' &&
+      event.actorPlayerId === 'p1' && event.paymentFor === 'feeding')).toHaveLength(1)
+    expect(response.state.log.filter((entry) => entry.key === 'log.harvestFeedDetail' && entry.playerId === 'p1')).toHaveLength(1)
+    restored.dispose()
     session.dispose()
   })
 
@@ -237,6 +330,8 @@ describe('authoritative Exchange Batch', () => {
     const pending = enterFeeding(session)
     expect(pending.interaction.anytimeActions.map((action) => action.id)).not.toContain('E91-plow-builder-anytime')
     const exchanged = session.resolveChoice(0, 'confirm', { selections: [feedSelection(pending, 'Major_Joinery', 'wood')] })
+    // Joinery covers the shortfall; only the newly offered Plow Builder action reopens feeding.
+    expect(exchanged.interaction.stateId === 'wait' && exchanged.interaction.request.kind === 'feed').toBe(played)
     expect(exchanged.interaction.anytimeActions.map((action) => action.id).includes('E91-plow-builder-anytime')).toBe(played)
     const settled = finishFeeding(session, exchanged)
     expect(settled.ok, settled.error).toBe(true)
@@ -410,7 +505,8 @@ describe('authoritative Exchange Batch', () => {
     const pending = enterFeeding(session)
     const exchanged = session.resolveChoice(0, 'confirm', { selections: [feedSelection(pending, 'Major_Joinery', 'wood')] })
     expect(exchanged.ok, exchanged.error).toBe(true)
-    expect(exchanged.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })
+    // The shortfall is covered, but Plow Builder's action is new, so feeding reopens before payment.
+    expect(exchanged.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed', foodUsed: 3, remaining: 1 } })
     expect(exchanged.interaction.anytimeActions.map((action) => action.id)).toContain('E91-plow-builder-anytime')
     expect(exchanged.state.players[0]!.resources).toMatchObject({ food: 2, wood: 0, begging: 0 })
     const plowing = session.takeAnytimeAction(0, 'E91-plow-builder-anytime')

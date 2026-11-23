@@ -1,20 +1,20 @@
 import { expect, type Page } from '@playwright/test'
 import { createWorkSession } from '../../server/__tests__/_helpers/session-fixtures'
-import type { Resource } from '../../shared/contract/types'
+import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { serializeState } from '../../shared/session/serialization'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { emptyResources } from '../../shared/contract/state-constants'
 import { roomSnapshot, type roomDriver } from '../room-command-driver'
 
-/** Round 4 of a 2-player Moor game with every worker placed; the first player's resources come on top of 4 food and 2 fuel. */
-export const moorHarvestFixture = (firstPlayerResources: Partial<Resource>) => {
-  const fixture = createWorkSession({ seed: 5401, options: {
+/** Round 4 of a 2-player game with every worker placed and empty farms; players start with 4 food (and 2 fuel in Moor). */
+const harvestFixture = (moor: boolean, configureFirst: (player: PlayerState, state: GameState) => void) => {
+  const fixture = createWorkSession({ seed: 5401, options: moor ? {
     enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true,
-  }, configure: state => {
+  } : {}, configure: state => {
     state.round = 4
     for (const space of state.actionSpaces) space.takenBy = []
     for (const player of state.players) {
-      player.resources = { ...emptyResources, food: 4, fuel: 2 }
+      player.resources = { ...emptyResources, food: 4, ...(moor ? { fuel: 2 } : {}) }
       player.farmTerrain = []
       player.fields = []
       player.pastures = []
@@ -28,12 +28,20 @@ export const moorHarvestFixture = (firstPlayerResources: Partial<Resource>) => {
     for (const player of state.players) for (const worker of player.workers) {
       if (worker.isActive) occupied.takenBy.push({ playerId: player.id, workerId: worker.id })
     }
-    Object.assign(state.players[0]!.resources, firstPlayerResources)
+    configureFirst(state.players[0]!, state)
   } })
   try {
     return fixture.withCtx(() => serializeState(fixture.state, {}))
   } finally { fixture.dispose() }
 }
+
+/** Moor harvest fixture; the first player's resources come on top of 4 food and 2 fuel. */
+export const moorHarvestFixture = (firstPlayerResources: Partial<Resource>) =>
+  harvestFixture(true, player => Object.assign(player.resources, firstPlayerResources))
+
+/** Base-game harvest fixture; `configureFirst` adjusts the first player after the reset. */
+export const baseHarvestFixture = (configureFirst: (player: PlayerState, state: GameState) => void) =>
+  harvestFixture(false, configureFirst)
 
 /** Ends the round and skips the other harvest steps until the first player faces `kind`. */
 export const startHarvest = async (pages: [Page, Page], driver: ReturnType<typeof roomDriver>, kind: 'feed' | 'heating') => {

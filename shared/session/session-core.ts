@@ -71,7 +71,7 @@ import {
   type MandatoryContinuationProbe,
 } from '../engine/index.ts'
 import { HOST_OWNED_LISTENER_PHASES_KEY, isInjectedAnytimeResult, tagInjectedAnytimeFlow } from '../engine/action-context-flags.ts'
-import type { EngineFrame, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
+import type { EngineFrame, EngineSource, EngineStackCursor, FeedOpportunityBaseline, SubFlowReason } from '../engine/index.ts'
 import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
 import type { PendingCursor, PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
@@ -2337,9 +2337,26 @@ export class GameCore {
     }))
   }
 
-  /** Windows that exist only to offer anytime actions ignore voluntary supply discard. */
   private hasPausingAnytimeEntry(): boolean {
-    return this.buildAnytimeEntries().some((entry) => entry.descriptor.id !== 'discard-goods')
+    return this.pausingAnytimeEntryIds().length > 0
+  }
+
+  /** Windows that exist only to offer anytime actions ignore voluntary supply discard. */
+  private pausingAnytimeEntryIds(): string[] {
+    return this.buildAnytimeEntries().map((entry) => entry.descriptor.id).filter((id) => id !== 'discard-goods')
+  }
+
+  /**
+   * After a feeding batch, reopen feeding only for what its owner could not choose on
+   * submission: a new pausing anytime action or a reaction gain beyond the recipes.
+   * A continuation saved without a baseline reopens for any pausing anytime action.
+   */
+  private hasNewFeedingOpportunity(player: PlayerState, baseline: FeedOpportunityBaseline | undefined): boolean {
+    const anytimeIds = this.pausingAnytimeEntryIds()
+    if (anytimeIds.length === 0) return false
+    if (!baseline) return true
+    return anytimeIds.some((id) => !baseline.anytimeIds.includes(id))
+      || REAL_RESOURCE_KEYS.some((key) => (player.resources[key] ?? 0) > (baseline.resources[key] ?? 0))
   }
 
   private projectPendingInteractionRequest({
@@ -3907,7 +3924,7 @@ export class GameCore {
               frame.harvestSettlementResume.foodUsed, frame.harvestSettlementResume.feedQueue)
             const feedingFrame = this.engineStack.current()!
             feedingFrame.harvestSettlementResume = frame.harvestSettlementResume
-            if (this.hasPausingAnytimeEntry()) return
+            if (this.hasNewFeedingOpportunity(frameOwnerPlayer, frame.harvestSettlementResume.opportunityBaseline)) return
             this.engineStack.pop()
             this.finishFeedingSettlement(ownerIdx, frame.harvestSettlementResume)
           }
@@ -4675,7 +4692,15 @@ export class GameCore {
       type: 'leaf', actionId: 'exchange',
       actionContext: { submittedExchangeBatch: entries, harvestFeed: true },
     }
-    frame.harvestSettlementResume = harvestSettlementResume
+    const resources: Partial<Resource> = {}
+    for (const resource of REAL_RESOURCE_KEYS) {
+      resources[resource] = entries.reduce((amount, { trade, count }) =>
+        amount + ((trade.to[resource] ?? 0) - (trade.from[resource] ?? 0)) * count, player.resources[resource] ?? 0)
+    }
+    frame.harvestSettlementResume = {
+      ...harvestSettlementResume,
+      opportunityBaseline: { anytimeIds: this.pausingAnytimeEntryIds(), resources },
+    }
     this.engineStack.replaceCurrentFrameEngine(this.createFlowEngine(flow, playerIndex), { kind: 'flow', flow })
     this.runEngineSteps()
     return this.respond()
