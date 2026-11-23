@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { t, type Locale } from '../../../shared/i18n'
+import { useModalDialog } from '../../hooks/useModalDialog'
 import './CardDetails.css'
 
 type Props = {
@@ -11,11 +12,7 @@ type Props = {
 }
 
 export const CardDetails = ({ locale, card, onClose, play }: Props) => {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-
-  useEffect(() => {
-    dialogRef.current?.showModal()
-  }, [])
+  const dialogRef = useModalDialog()
 
   return createPortal(
     <dialog

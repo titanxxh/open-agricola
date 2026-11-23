@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocale } from '../../contexts/LocaleContext'
+import { useModalDialog } from '../../hooks/useModalDialog'
 import { whatsNewText, type WhatsNewRelease } from '../../../shared/contract/whats-new'
 import { markWhatsNewSeen, unseenWhatsNewVersions, useWhatsNew } from '../../services/whats-new'
 import './WhatsNew.css'
@@ -17,14 +18,8 @@ function WhatsNewDialog({ releases, fresh, onClose }: {
   onClose: () => void
 }) {
   const { locale, t } = useLocale()
-  const dialog = useRef<HTMLDialogElement>(null)
+  const dialog = useModalDialog()
   const titleId = useId()
-
-  useEffect(() => {
-    const element = dialog.current
-    element?.showModal()
-    return () => element?.close()
-  }, [])
 
   return createPortal(
     <dialog ref={dialog} className="community-group-dialog whats-new-dialog" aria-labelledby={titleId}

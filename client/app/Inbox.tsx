@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { InboxMessage, InboxPage } from '../../shared/contract/bug-report-feedback'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
+import { useModalDialog } from '../hooks/useModalDialog'
 import { feedbackKindKey, readInboxMessage, readInboxPage } from '../services/bug-report-feedback'
 import { inboxNotificationTarget, WEB_PUSH_INBOX_EVENT } from '../services/inbox-notification'
 import '../styles/components/inbox.css'
@@ -38,7 +39,6 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 function AccountInbox({ userId, setUnread }: { userId: string; setUnread: (value: InboxUnread) => void }) {
   const { apiFetch } = useAuth()
   const { locale, t } = useLocale()
-  const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const requestVersion = useRef(0)
   const loadedThrough = useRef<number | null>(null)
@@ -110,13 +110,6 @@ function AccountInbox({ userId, setUnread }: { userId: string; setUnread: (value
     }
   }, [read, refresh, userId])
   useEffect(() => {
-    if (!open) return
-    const element = dialog.current
-    element?.showModal()
-    return () => element?.close()
-  }, [open])
-
-  useEffect(() => {
     if (!open || !selected || selected.readAt !== null) return
     const version = reading.current
     const markDisplayed = async () => {
@@ -133,9 +126,7 @@ function AccountInbox({ userId, setUnread }: { userId: string; setUnread: (value
   }, [apiFetch, open, selected])
 
   const close = () => { reading.current++; setOpen(false); setSelected(null) }
-  return open ? createPortal(<dialog ref={dialog} className="inbox-dialog" aria-labelledby={titleId}
-      onClose={event => { if (!event.currentTarget.open) close() }}
-      onClick={event => { if (event.target === event.currentTarget) close() }}>
+  return open ? <InboxDialog titleId={titleId} onClose={close}>
       <header><h2 id={titleId}>{t('feedback.inbox')}</h2><button type="button" className="btn-link" onClick={close} aria-label={t('ui.close')}>×</button></header>
       {unavailableNotification && <p role="status">{t('webPush.notificationUnavailable')}</p>}
       {error && <div role="alert"><p>{t('feedback.failed')}</p><button type="button" className="btn-secondary" disabled={busy}
@@ -174,5 +165,14 @@ function AccountInbox({ userId, setUnread }: { userId: string; setUnread: (value
         </li>)}</ol>}
         {page.nextCursor !== null && <button type="button" className="btn-secondary" onClick={() => { void refresh(page.nextCursor ?? undefined) }}>{t('feedback.more')}</button>}
       </>}
-    </dialog>, document.body) : null
+    </InboxDialog> : null
+}
+
+function InboxDialog({ titleId, onClose, children }: { titleId: string; onClose: () => void; children: ReactNode }) {
+  const dialog = useModalDialog()
+  return createPortal(<dialog ref={dialog} className="inbox-dialog" aria-labelledby={titleId}
+    onClose={event => { if (!event.currentTarget.open) onClose() }}
+    onClick={event => { if (event.target === event.currentTarget) onClose() }}>
+    {children}
+  </dialog>, document.body)
 }

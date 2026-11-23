@@ -2,6 +2,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { FRONTEND_URL } from './fixtures'
+import { keepStylesheetLoading } from './helpers/modal-focus'
 import {
   animationsSettled, CATALOG, copiedLinks, DESKTOP, detail, entryParam, entryUrl, expectCatalog, expectNoHorizontalOverflow,
   expectResults, filterOption, filterPanel, filterSidebar, galleryEntries, LANDSCAPE, LAYOUTS, LOBBY, lobbyReady, mainNavigation,
@@ -60,22 +61,6 @@ async function walkRepresentativePath(page: Page, layout: Layout) {
   await expectResults(page, 12)
   await expect(selectedFilters(page)).toHaveText(['Mother×'])
   await expectNoHorizontalOverflow(page)
-}
-
-/**
- * Leaves a stylesheet loading for as long as the page lives, as the lobby's donation widget does on a slow network.
- * WebKit hands focus back from a closed modal only once the page's style is up to date, and focus() skips that
- * update while a stylesheet is loading (#2004).
- */
-async function keepStylesheetLoading(page: Page) {
-  await page.route('**/never-loads.css', () => {})
-  // Added after the load event, which a loading stylesheet would hold back.
-  await page.addInitScript(() => addEventListener('load', () => {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = '/never-loads.css'
-    document.head.append(link)
-  }))
 }
 
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')

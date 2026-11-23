@@ -1,10 +1,11 @@
-import { useId, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
 import { emptyResources } from '../../shared/contract/state-constants'
 import type { Locale } from '../../shared/i18n'
 import { t } from '../../shared/i18n'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { translateCardText } from '../components/common/cardText'
+import { useModalDialog } from '../hooks/useModalDialog'
 import type { AnytimeExchangeOption } from './anytime-exchange-ui'
 import type { HarvestFeedOption } from './hooks/use-harvest-flow'
 import type { useReserveCookingDraftPresentation } from './reserve-cooking-draft-presentation'
@@ -149,15 +150,9 @@ export function HarvestShortfallDialog({ locale, message, onBack, onContinue }: 
   onBack: () => void
   onContinue: () => void
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  const dialogRef = useModalDialog()
   const titleId = useId()
   const messageId = useId()
-
-  useLayoutEffect(() => {
-    const dialog = dialogRef.current
-    dialog?.showModal()
-    return () => { if (dialog?.open) dialog.close() }
-  }, [])
 
   return (
     <dialog

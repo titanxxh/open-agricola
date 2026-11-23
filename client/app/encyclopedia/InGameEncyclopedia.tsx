@@ -3,7 +3,7 @@ import { t, type Locale } from '../../../shared/i18n'
 import { AppErrorBoundary } from '../AppErrorBoundary'
 import { EncyclopediaLoadError } from './EncyclopediaLoadError'
 import { initialEncyclopediaAttention, nextEncyclopediaAttention } from './encyclopedia-attention'
-import { useModalDialog } from './useModalDialog'
+import { useModalDialog } from '../../hooks/useModalDialog'
 
 const loadContent = () => import('./InGameEncyclopediaContent').then(m => ({ default: m.InGameEncyclopediaContent }))
 // A rejected lazy component stays rejected, so a retry needs a fresh one.
