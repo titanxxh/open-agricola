@@ -28,12 +28,14 @@ export const autoResolvedTriggerChild = (
   state: GameState,
   fallbackChooserId: string,
 ): TriggerOptionState | undefined => {
-  const applicable = optionStates.filter(entry => entry.applicable)
-  if (!applicable.some(entry => isCardActivation(entry.child))) return undefined
-  if (node.anytimeWindow?.allowed && applicable.length < optionStates.length) return undefined
+  if (!optionStates.some(entry => isCardActivation(entry.child))) return undefined
+  // Freeze before any early return, so a later change only reaches later selectors.
   const chooserId = node.triggerOwnerPlayerId ?? node.ownerPlayerId ?? fallbackChooserId
   node.autoResolveIndependent ??= playerPreferences(state.players.find(player => player.id === chooserId))
     .autoResolveIndependentReactions
+  const applicable = optionStates.filter(entry => entry.applicable)
+  if (!applicable.some(entry => isCardActivation(entry.child))) return undefined
+  if (node.anytimeWindow?.allowed && applicable.length < optionStates.length) return undefined
   if (node.autoResolveIndependent) {
     const independent = applicable.find(entry =>
       isCardActivation(entry.child) && entry.mandatory && entry.doable && entry.independent)

@@ -541,11 +541,7 @@ describe('C048 Farmstead at the true Turn end', () => {
     expect(response.state.events.filter(event => event.type === 'farm.spacesUsed')).toEqual([])
   })
 
-  it.each([
-    { card: 'M062_HearthBrush', major: 'Major_Moor_TiledOven', resource: 'clay', buy: true },
-    { card: 'M063_PastoralLetter', major: 'Major_Moor_VillageChurch', resource: 'wood', buy: true },
-    { card: 'M063_PastoralLetter', major: 'Major_Moor_VillageChurch', resource: 'wood', buy: false },
-  ])('retains an unaffordable $card until anytime payment changes; buy=$buy', ({ card, major, resource, buy }) => {
+  const dormantMoorSource = ({ card, major, resource }: { card: string, major: string, resource: string }) => {
     const session = createWorkSession({ options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
       state.round = 10
       const player = state.players[0]!
@@ -561,10 +557,19 @@ describe('C048 Farmstead at the true Turn end', () => {
     } })
     sessions.push(session)
     session.takeAction(0, 'farm-expansion')
-    let response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 0 }] })
+    const response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 0 }] })
     expect(options(response).some(option => option.value === CARD)).toBe(true)
     expect(options(response).some(option => option.value === card)).toBe(false)
-    response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    return session
+  }
+
+  it.each([
+    { card: 'M062_HearthBrush', major: 'Major_Moor_TiledOven', resource: 'clay', buy: true },
+    { card: 'M063_PastoralLetter', major: 'Major_Moor_VillageChurch', resource: 'wood', buy: true },
+    { card: 'M063_PastoralLetter', major: 'Major_Moor_VillageChurch', resource: 'wood', buy: false },
+  ])('retains an unaffordable $card until anytime payment changes; buy=$buy', ({ card, major, resource, buy }) => {
+    const session = dormantMoorSource({ card, major, resource })
+    let response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
     expect(response.ok, response.error).toBe(true)
     expect(options(response).some(option => option.value === card && !option.disabled), JSON.stringify({ interaction: response.interaction, resources: response.state.players[0]!.resources })).toBe(true)
     response = choose(session, response, CARD)
@@ -581,6 +586,19 @@ describe('C048 Farmstead at the true Turn end', () => {
     }
     expect(response.state.players[0]!.resources.food).toBe(buy && resource === 'wood' ? 4 : 2)
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+  })
+
+  it('keeps the setting this selector froze when an anytime action wakes its dormant source', () => {
+    const session = dormantMoorSource({ card: 'M062_HearthBrush', major: 'Major_Moor_TiledOven', resource: 'clay' })
+    // Auto-resolve is turned on while the selector, opened with it off, waits for the dormant Hearth Brush.
+    let response = session.setPlayerPreferences(0, { autoResolveIndependentReactions: true })
+    expect(response.ok, response.error).toBe(true)
+    response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(response.ok, response.error).toBe(true)
+    // The Grocer cost 1 food; the independent Farmstead reward still waits for the owner's order.
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(options(response).filter(option => !option.disabled).map(option => option.value))
+      .toEqual(expect.arrayContaining([CARD, 'M062_HearthBrush']))
   })
 
 
