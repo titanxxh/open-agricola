@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { ActionDefinition } from '../../../contract/types'
 import {
   registerAdHocAction,
@@ -18,6 +18,14 @@ const makeDef = (id: string): ActionDefinition => ({
 })
 
 describe('ad-hoc action registry', () => {
+  // The registry is module state shared by every test file in this worker; cards register their actions on import.
+  // Put the real registrations back so later files (e.g. card-action-id.test.ts) still see them.
+  let registered: ActionDefinition[] = []
+  beforeAll(() => { registered = getAllAdHocActions() })
+  afterAll(() => {
+    _resetAdHocRegistry()
+    for (const def of registered) registerAdHocAction(def)
+  })
   beforeEach(() => _resetAdHocRegistry())
 
   it('register + lookup correctly', () => {
