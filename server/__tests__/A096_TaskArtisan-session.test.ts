@@ -1,4 +1,9 @@
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -254,10 +259,8 @@ describe('A096 Task Artisan parity', () => {
       if (!grain) throw new Error('Expected one grain to convert to one food')
       response = session.resolveChoice(0, `bulk:${grain.value.split(':')[1]}=1`)
       expect(response.ok, response.error).toBe(true)
-      expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 3, grain: 0 })
-      if (response.interaction.stateId !== 'wait') throw new Error('Expected the retained Quarry reaction')
-      expect(response.interaction.request.options?.find(option => option.value === '__pass__')?.disabled).toBe(true)
-
+      expect(response.state.players[0]!.resources).toMatchObject({ food: 1, grain: 0 })
+      // After the conversion, the Quarry reward is the last mandatory source and runs without asking.
       response = resolveTriggerIfPresent(session, response, CARD_ID)
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.resources.wood).toBe(4)

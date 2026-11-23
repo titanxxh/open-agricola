@@ -544,6 +544,14 @@ _Avoid_: Session 直接调用 `_internals()`、Session 按 node class 分支、�
 阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。准备窗口按每名玩家进入时的持牌和只读资格构建固定 activation 来源树，来源发现与实时 handler/支付分开；同一树在 pending 后继续，不重扫变化后的牌区。
 _Avoid_: Round/Harvest 业务顺序、响应生成、前端交互展示
 
+**Independent Reaction（独立反应）**:
+同一时机来源中无需玩家决定的必选激活：预览结果只获得非动物货物、把货物放到卡上、计分或只改卡牌计数。座位的自动结算设置开启时（缺省），它先于玩家排序自动结算；只剩一个适用的必选来源时，无论设置都直接执行（ADR 0055）。
+_Avoid_: 把可选、付费、选择、动物或随机效果当作独立反应；在规则求值时读取账号偏好
+
+**Seat Preference（座位设置）**:
+对局状态中每个座位的规则相关设置（`PlayerState.preferences`），目前只有 `autoResolveIndependentReactions`。开局时从账号默认值复制；对局中只能由该座位通过 `setPlayerPreferences` 修改，不进入撤销历史，撤销也不回退；选择器首次求值时冻结选择者的值。
+_Avoid_: 规则求值时读取账号数据、把设置变更当作可撤销的规则步骤
+
 **Before-Harvest Reaction Window（收获前反应窗口）**:
 每次 Harvest 开始前，按窗口开启时的 Start Player Marker 冻结顺时针玩家顺序，并让每名玩家决定其同时可用的卡牌反应结算顺序；mandatory 反应不能被 Pass，跳过本次 Harvest 不跳过该窗口。
 _Avoid_: 固定座位序扫描、跨玩家 trigger-select、把 skip-harvest 当成 skip-before-harvest

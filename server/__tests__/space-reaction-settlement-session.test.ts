@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { orderReactionsManually } from './_helpers/trigger-select'
 import type { GameState } from '../../shared/contract/types'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
@@ -24,6 +25,7 @@ function opening(configure: (state: GameState) => void, playerCount = 2) {
       for (const key of Object.keys(player.resources)) Reflect.set(player.resources, key, 0)
     }
     for (const space of state.actionSpaces) space.takenBy = []
+    orderReactionsManually(state)
     configure(state)
   } })
   sessions.push(session)
@@ -92,8 +94,7 @@ describe('space reaction settlement', () => {
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('select-trigger')
     expect(options(response).filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual(['TEST_Space', 'TEST_Placement'])
     response = choose(session, response, 'TEST_Placement')
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1, food: 0 })
-    response = choose(session, response, 'TEST_Space')
+    // TEST_Space is now the sole mandatory source, so it runs without asking.
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 1, food: 1 })
     expect(response.state.events.filter(event => event.type === 'card.triggered').map(event => event.sourceCardId)).toEqual(['TEST_Placement', 'TEST_Space'])
     expect(response.state.log.filter(entry => entry.key === 'log.cardTriggered')).toHaveLength(2)
@@ -118,15 +119,14 @@ describe('space reaction settlement', () => {
     listeners(session, registrations)
     let response = session.takeAction(0, 'forest')
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('select-trigger')
-    response = choose(session, response, 'TEST_Food')
-    response = choose(session, response, options(response).find(option => option.value !== '__skip__')!.value)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 1 })
     const interaction = structuredClone(response.interaction)
     session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
     sessions.push(session)
     session.withCtx(() => registrations.forEach(registration => requireActiveCardRegistry('space-settlement-restore').registerListener(registration)))
     expect(session.getState().interaction).toEqual(interaction)
-    response = choose(session, session.getState(), 'TEST_Pay')
+    response = choose(session, session.getState(), 'TEST_Food')
+    response = choose(session, response, options(response).find(option => option.value !== '__skip__')!.value)
+    // The food makes TEST_Pay applicable; as the sole mandatory source it runs without asking.
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0, clay: 1 })
     expect(readCardResourceStats(response.state.players[0]!, 'TEST_Food').used).toBe(1)
     expect(readCardResourceStats(response.state.players[0]!, 'TEST_Pay').used).toBe(1)
@@ -145,18 +145,16 @@ describe('space reaction settlement', () => {
       state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1
     }, 5)
     let response = animals(session, session.takeAction(0, 'pig-market'))
-    expect(response.state.players[0]!.resources.food).toBe(sidekickFirst ? 1 : 0)
-    expect(options(response).map(option => option.sourceCard)).toContain(HAT)
+    // With food, both sources apply. Without it, Sidekick is dormant and the Hat,
+    // the sole applicable mandatory source, runs without asking and supplies the food.
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(options(response).map(option => option.sourceCard)).toContain('A171_Sidekick')
     if (sidekickFirst) {
-      expect(options(response).map(option => option.sourceCard)).toContain('A171_Sidekick')
+      expect(options(response).map(option => option.sourceCard)).toContain(HAT)
+      // After Sidekick, the Hat is the last mandatory source and runs without asking.
       response = animals(session, accept(session, response, 'A171_Sidekick'))
-      expect(response.state.players[0]!.resources).toMatchObject({ food: 0, vegetable: 1 })
-      response = choose(session, response, HAT)
     } else {
-      expect(options(response).map(option => option.sourceCard)).not.toContain('A171_Sidekick')
-      response = choose(session, response, HAT)
-      expect(response.state.players[0]!.resources.food).toBe(1)
-      expect(options(response).map(option => option.sourceCard)).toContain('A171_Sidekick')
+      expect(options(response).map(option => option.sourceCard)).not.toContain(HAT)
       session = restore(session)
       response = animals(session, accept(session, session.getState(), 'A171_Sidekick'))
     }
@@ -209,7 +207,9 @@ describe('space reaction settlement', () => {
       .toEqual(expect.arrayContaining([HAT, 'E053_BoarSpear', 'C025_SteamMachine']))
     session = restore(session)
     response = session.getState()
-    for (const card of order) {
+    for (const [index, card] of order.entries()) {
+      // The Hat is mandatory: once it is the last source, it runs without asking.
+      if (card === HAT && index === order.length - 1) continue
       if (card === HAT) response = choose(session, response, HAT)
       else if (card === 'E053_BoarSpear') {
         response = accept(session, response, card)
@@ -249,7 +249,9 @@ describe('space reaction settlement', () => {
     expect(options(response).filter(option => option.sourceCard).map(option => option.sourceCard))
       .toEqual(expect.arrayContaining(['E053_BoarSpear', 'TEST_ExchangePig']))
     const order = spearFirst ? ['E053_BoarSpear', 'TEST_ExchangePig'] : ['TEST_ExchangePig', 'E053_BoarSpear']
-    for (const card of order) {
+    for (const [index, card] of order.entries()) {
+      // The mandatory test reaction runs without asking once it is the last source.
+      if (card === 'TEST_ExchangePig' && index === order.length - 1) continue
       if (card === 'TEST_ExchangePig') response = choose(session, response, card)
       else {
         response = accept(session, response, card)
@@ -427,8 +429,7 @@ describe('space reaction settlement', () => {
     expect(options(response).find(option => option.value === '__pass__')?.disabled).toBe(true)
     expect(session.resolveChoice(0, '__pass__').ok).toBe(false)
     response = choose(session, session.getState(), 'C148_MudWallower')
-    expect(options(response).find(option => option.value === '__pass__')?.disabled).toBe(true)
-    response = choose(session, response, 'B048_ForestStone')
+    // B048_ForestStone is now the last mandatory source and runs without asking.
     expect(response.state.players[0]!.resources, JSON.stringify(response.interaction)).toMatchObject({ wood: 3, food: 1 })
     expect(response.state.players[0]!.cardStates?.C148_MudWallower?.counters?.counter).toBe(1)
     expect(response.state.players[0]!.cardStates?.B048_ForestStone?.extraData?.foodCount).toBe(1)
@@ -505,9 +506,9 @@ describe('space reaction settlement', () => {
     }))
     let response = session.takeAction(0, 'forest')
     response = animals(session, choose(session, response, 'TEST_Play'))
+    // The newly played card does not join the frozen window; TEST_Food, the last
+    // mandatory source, runs without asking.
     expect(response.state.players[0]!.occupationPlayed).toContain('A165_PigBreeder')
-    expect(options(response).map(option => option.sourceCard).filter(Boolean)).toEqual(['TEST_Food'])
-    response = choose(session, response, 'TEST_Food')
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 3, boar: 1 })
     expect(readCardResourceStats(response.state.players[0]!, 'A165_PigBreeder')?.used ?? 0).toBe(0)
     expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'A165_PigBreeder')).toEqual([expect.objectContaining({ resources: { boar: 1 } })])

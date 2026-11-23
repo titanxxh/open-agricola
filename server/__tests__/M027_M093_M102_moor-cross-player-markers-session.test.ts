@@ -311,7 +311,13 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
     state.players[0]!.minorPlayed = [M102, M104]
     session.loadState(state)
 
-    const resp = session.performRoundEnd()
+    let resp = session.performRoundEnd()
+    // Both draw a start card, so neither is independent: the owner orders them.
+    expect(resp.interaction.stateId === 'wait' && resp.interaction.request.kind).toBe('select-trigger')
+    expect(resp.interaction.stateId === 'wait' && resp.interaction.request.options?.map((option) => option.value))
+      .toEqual([M102, M104, '__pass__'])
+    resp = session.resolveChoice(0, M102)
+    expect(resp.ok, resp.error).toBe(true)
     const gainedSources = resp.state.events
       .filter((event) => event.type === 'resource.moved' && event.actorPlayerId === resp.state.players[0]!.id)
       .map((event) => event.sourceCardId)

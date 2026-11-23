@@ -34,7 +34,7 @@ registerSelectionEffect('discard-grain-for-pigs', ({ state, player, positions, e
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onStartHarvestFieldPhase: (_state, player) => {
+  onBeforeHarvest: (_state, player) => {
     const grainFields = getLogicalFields(player).flatMap((field) => {
       const top = [...field.slots].reverse().find((slot) => slot.stack)
       if (top?.stack?.kind !== 'grain') return []

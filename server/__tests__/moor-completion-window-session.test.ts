@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { collectTriggerCardsAs } from '../../shared/cards/helpers/trigger-snapshot'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -404,11 +409,7 @@ describe('Moor primary body completion', () => {
     expect(r.state.players[0]!.resources).toMatchObject({ grain: 1, stone: 0 })
     r = accept(session, r, 'M058_PeatFertilizer')
     r = farm(session, r, { crops: [{ row: 0, col: 1, crop: 'grain' }] })
-    expect(r.interaction.request.kind).toBe('select-trigger')
-    expect(options(r).filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual([later])
-    expect(options(r).find(option => option.value === '__pass__')?.disabled).toBe(true)
-    reject(session, () => session.resolveChoice(0, '__pass__'))
-    r = choose(session, r, options(r).find(option => option.sourceCard === later)!.value)
+    // Sowing wakes the dormant mandatory source; as the last one it runs without asking.
     expect(r.state.players[0]!.resources).toMatchObject({ grain: 0, stone: 1 })
     expect(r.state.players[0]!.fields).toContainEqual({ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 3 }] })
     expect(r.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === later)).toHaveLength(1)
@@ -468,9 +469,7 @@ describe('Moor primary body completion', () => {
     reject(session, () => session.resolveChoice(0, options(r).find(option => option.sourceCard === moor)!.value))
     r = session.resolveChoice(1, options(r).find(option => option.sourceCard === moor)!.value)
     expect(r.ok, r.error).toBe(true)
-    expect(r.state.players[1]!.resources).toMatchObject({ reed: 1, stone: 0 })
-    r = session.resolveChoice(1, options(r).find(option => option.sourceCard === rule)!.value)
-    expect(r.ok, r.error).toBe(true)
+    // The rule source is then the owner's last mandatory source and runs without asking.
     expect(r.state.players[1]!.resources).toMatchObject({ reed: 1, stone: 1 })
     expect(r.state.players[0]!.resources).toMatchObject({ reed: 0, stone: 0 })
     expect(r.state.events.filter(event => event.type === 'resource.moved' && [rule, moor].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId)).toEqual([moor, rule])
@@ -502,9 +501,7 @@ describe('Moor primary body completion', () => {
     expect(options(r).filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual([always, later])
     r = session.resolveChoice(1, options(r).find(option => option.sourceCard === later)!.value)
     expect(r.ok, r.error).toBe(true)
-    expect(r.state.players[1]!.resources).toMatchObject({ reed: 1, food: 0 })
-    r = session.resolveChoice(1, options(r).find(option => option.sourceCard === always)!.value)
-    expect(r.ok, r.error).toBe(true)
+    // The other source is then the owner's last mandatory source and runs without asking.
     expect(r.state.players[1]!.resources).toMatchObject({ reed: 1, food: 1 })
   })
 
@@ -543,8 +540,8 @@ describe('Moor primary body completion', () => {
     let r = blackMarket(session)
     expect(r.interaction.stateId === 'wait' && r.interaction.request.kind).toBe('select-trigger')
     expect(options(r).filter(option => option.sourceCard).map(option => option.sourceCard).sort()).toEqual([rule, moor].sort())
+    // After the Moor source, the rule source is the last mandatory one and runs without asking.
     r = choose(session, r, options(r).find(option => option.sourceCard === moor)!.value)
-    r = choose(session, r, options(r).find(option => option.sourceCard === rule)!.value)
     expect(r.state.players[0]!.resources).toMatchObject({ clay: 1, stone: 1, wood: 0, fuel: 0 })
     expect(r.state.events.filter(event => event.type === 'resource.moved' && [rule, moor].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId)).toEqual([moor, rule])
   })

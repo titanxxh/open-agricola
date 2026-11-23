@@ -109,6 +109,8 @@ import { createFrontendHosting } from './frontend-hosting'
 import { createCommunityQrHandler } from './community-qr'
 import { createWhatsNewHandler } from './whats-new'
 import { createRetentionPolicyHandler } from './retention-policy-routes'
+import { createGamePreferencesHandler } from './game-preferences-routes'
+import { GamePreferencesStore } from './game/game-preferences-store'
 import { RoomRetentionStore } from './game/room-retention-store'
 
 assertProductionCookieConfig()
@@ -202,6 +204,9 @@ const handleBetaAccess = createBetaAccessHandler({ store: betaAccessStore, requi
 const handleBugReportFeedback = createBugReportFeedbackHandler({ service: new BugReportFeedbackService(getDb()),
   requireAdmin, authenticate: async req => validateSession(await getAuthToken(req)) })
 const handleRetentionPolicy = createRetentionPolicyHandler({ store: new RoomRetentionStore(getDb()), requireAdmin })
+const gamePreferencesStore = new GamePreferencesStore(getDb())
+const handleGamePreferences = createGamePreferencesHandler({ store: gamePreferencesStore,
+  authenticate: async req => validateSession(await getAuthToken(req)) })
 const replayStore = new ReplayStore(getDb())
 const replayReadLimiter = new ReplayReadLimiter()
 const bugReportCipher = TokenCipher.fromEnv()
@@ -482,6 +487,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   if (await handleBugReportFeedback(req, res)) return
   if (await handleWebPush(req, res)) return
   if (await handleRetentionPolicy(req, res)) return
+  if (await handleGamePreferences(req, res)) return
   if (await handleOperations(req, res)) return
 
   // ── Health ─────────────────────────────────────────────
@@ -1122,6 +1128,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 wssCtx = (await createWsServer(server, {
   persistence,
   gameContextStore,
+  gamePreferences: gamePreferencesStore,
   directory,
   internalUrl: process.env.INSTANCE_INTERNAL_URL,
 }))

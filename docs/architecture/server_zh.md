@@ -126,6 +126,7 @@ ClientCommand
 HTTP 负责产品 API、运维与调试。WebSocket 命令仍是对局同步主链路；校验端点不写规则状态。
 
 - `beta-access-{routes,store}.ts` 负责管理员 `/api/admin/beta-access` 授予；`experimental-features.ts` 以一次最新读取计算 `/api/auth/me` 资格。测试：`beta-access-routes.test.ts`。
+- `game-preferences-routes.ts` 负责 `GET`/`PUT /api/account/game-preferences`：已登录用户的座位设置默认值，存在 `user_game_preferences`（迁移 052，随账号删除）。Room 开局或重开时，`game/game-preferences-store.ts` 把它们复制到各座位；进行中的对局只读自身状态（[ADR 0055](../adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）。测试：`game-preferences-routes.test.ts`、`connection/__tests__/seat-preferences.test.ts`。
 - `GET /api/health`、`/api/rooms`、`/api/game/state` 与 `/cards-manifest.json` 提供健康、发现、快照与 metadata。
 - `game-setup-options.ts` 映射 WebSocket 和 `/api/game/new` 的建局选项。房间和沙盒沿用[卡牌版本准入](session.md#card-edition-and-the-deal)。
 - `oauth/{handler,store}.ts` 负责 provider 发起、回调与完成。PKCE 绑定账号关联，浏览器 challenge 绑定注册票据；显式无效凭证不回退 Cookie 身份。账号、身份、邀请与票据消费同事务提交。回调用 fragment，设置 `no-store` 与 `no-referrer`。

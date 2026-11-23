@@ -67,6 +67,7 @@ import {
 import type { InteractionContextSnapshot, PendingEnvelope } from './types'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
+import { autoResolvedTriggerChild } from './trigger-auto-resolve'
 import {
   getSuppressedBeforeListenerIds,
   withInjectedAnytimeResultFlag,
@@ -1084,6 +1085,14 @@ export function engineProceed(
       const options = evaluation.options
       if (options.length === 0 || evaluation.optionStates.every(entry => !entry.applicable || !entry.doable)) {
         node.resolveRemainingTriggerChildrenForPass()
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
+      const autoChild = autoResolvedTriggerChild(node, evaluation.optionStates, context.state, context.player.id)
+      if (autoChild) {
+        node.autoSelectSoleInitialTrigger = false
+        const child = node.chooseCard(autoChild.child.id)
+        // Selecting accepts the activation, as a player's selection does; the card's own flow keeps its optional root.
+        if (child?.optional === true) child.optionalActive = true
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
       if (node.autoSelectSoleInitialTrigger) {

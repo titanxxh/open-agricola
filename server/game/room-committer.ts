@@ -167,6 +167,8 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
       return intent(command.type, { selection: {
         groups: command.selection.groups.map(group => ({ kind: group.kind, cardIds: [...group.cardIds] })),
       } })
+    case 'setPlayerPreferences':
+      return intent(command.type, { preferences: command.preferences })
     case 'devSetResources':
       return intent(command.type, { resources: command.resources })
     case 'devSetRound':

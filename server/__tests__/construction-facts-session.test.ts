@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { GameState } from '../../shared/contract/types'
 import { setActiveWorkerCount, familySize } from '../../shared/domain/player'
@@ -314,12 +319,13 @@ describe('same-Turn onBuy and listener share pure rewards, #1341', () => {
     const session = setup([CLEANER, MANURE, TREE])
     ok(session.takeAction(0, 'farmland'))
     let r = build(session, anytime(session), 'stable')
-    for (const card of [first, second]) {
-      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger', JSON.stringify(r.interaction))
-      const option = r.interaction.request.options.find(o => o.sourceCard === card)
-      assert.ok(option)
-      r = choose(session, r, option.value)
-    }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger', JSON.stringify(r.interaction))
+    const option = r.interaction.request.options.find(o => o.sourceCard === first)
+    assert.ok(option)
+    // The second reward is then the last mandatory source and runs without asking.
+    r = choose(session, r, option.value)
+    expect(r.state.events.filter(event => event.type === 'card.triggered' && [first, second].includes(event.sourceCardId ?? ''))
+      .map(event => event.sourceCardId)).toEqual([first, second])
     expect(r.state.futureMeeples.filter(f => f.cardId === MANURE)).toHaveLength(3)
     expect(r.state.futureMeeples.filter(f => f.cardId === TREE)).toHaveLength(3)
     expect(r.state.players[0]!.cardStates[MANURE]?.extraData?.usedTurnToken).toBe(1)

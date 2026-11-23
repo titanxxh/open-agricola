@@ -54,6 +54,8 @@ export type StageResumeState = {
     resumeAfterCardId?: string | null
     anytimeActionTaken?: boolean
     beforeHarvestPlayerOrder?: number[]
+    /** The frozen player order of a reaction window (#2039). */
+    playerOrder?: number[]
     roundPreparationPlayerOrder?: number[]
     roundPreparation?: RoundPreparationContext
     supplyDiscardOffered?: number[]
@@ -430,6 +432,45 @@ export class StageDispatch {
         currentOffset + 1,
         { beforeHarvestPlayerOrder: [...playerOrder] },
       )
+      return true
+    }
+    return false
+  }
+
+  /**
+   * Frozen-order reaction window (#2039): players in `playerOrder`, frozen at
+   * window entry; each player's sources are captured on entry and previewed on
+   * clones. Optional sources can be passed together; same-timing sources enter
+   * one trigger-select whose auto-resolution follows the player's setting.
+   */
+  continueReactionWindow(
+    hook: StageCardEffectHook,
+    playerOrder: readonly number[],
+    orderOffset = 0,
+  ): boolean {
+    for (let offset = orderOffset; offset < playerOrder.length; offset += 1) {
+      const playerIndex = playerOrder[offset]
+      const player = playerIndex === undefined ? undefined : this.state.players[playerIndex]
+      if (!player || playerIndex === undefined) continue
+      const children = this.collectOwnStageReactionActivationFlows(hook, player, { inferMandatoryFromPreview: true })
+      if (!children.some((child) => child.type === 'leaf' && child.actionContext?.previewApplicable === true)) continue
+      const extra = { playerOrder: [...playerOrder] }
+      const sole = children.length === 1 ? children[0] : undefined
+      if (sole?.type === 'leaf' && typeof sole.params?.cardId === 'string') {
+        // A sole source orders nothing: its own flow runs, keeping the card's own choices and skip.
+        const flow = runCardEffectHook(this.state, player, sole.params.cardId, hook, undefined, {
+          actionHooks: this.host.actionHooks,
+          reportProtectedObservation: (observation) => this.host.reportProtectedObservation(observation),
+        })
+        if (!flow) continue
+        this.startFlow(flow, hook, playerIndex, 0, offset + 1, extra)
+        return true
+      }
+      this.startFlow({
+        type: 'parallel',
+        mode: 'trigger-select',
+        children: children.map((child) => ({ ...child, optional: true })),
+      }, hook, playerIndex, 0, offset + 1, extra)
       return true
     }
     return false

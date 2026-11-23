@@ -141,12 +141,13 @@ Declare `impl.effect.<hook>: (state, player, ctx?) => ActionFlow | void`. The ho
 
 | Dispatch | Hooks |
 |---|---|
-| Stage Dispatch: one trigger-select per player, sources frozen at window entry | `onBeforeStartOfTurn`, `onAfterRevealAction`, `onPreparation`, `onRoundStart`, `onEndPreparation`, `onBeforeWork`, `onWorkStart`, `onAllWorkersPlaced`, `onEndTurn`, `onBeforeHarvest`, `onStartHarvestFieldPhase`, `onHarvestFieldPhase`, `onEndHarvestFieldPhase`, `onBeforeEndGame` |
-| Serial per player, then improvements, minors and occupations | `onRoundEnd`, `onAfterRoundEnd`, `onBeforeReturnHome`, `onStartReturnHome`, `onReturnHome`, `onStartHarvest`, `onAfterReap`, `onHarvest`, `onStartHarvestFeedingPhase`, `onHarvestFeedingPhase`, `onEndHarvestFeedingPhase`, `onEndHarvest`, `onAfterHarvest` |
+| Stage Dispatch: one trigger-select per player, sources frozen at window entry | `onBeforeStartOfTurn`, `onAfterRevealAction`, `onPreparation`, `onRoundStart`, `onEndPreparation`, `onBeforeWork`, `onWorkStart`, `onAllWorkersPlaced`, `onEndTurn`, `onBeforeHarvest`, `onStartHarvest`, `onStartHarvestFieldPhase`, `onHarvestFieldPhase`, `onEndHarvestFieldPhase`, `onBeforeEndGame` |
+| Serial per player, then improvements, minors and occupations | `onRoundEnd`, `onAfterRoundEnd`, `onBeforeReturnHome`, `onStartReturnHome`, `onReturnHome`, `onAfterReap`, `onHarvest`, `onStartHarvestFeedingPhase`, `onHarvestFeedingPhase`, `onEndHarvestFeedingPhase`, `onEndHarvest`, `onAfterHarvest` |
 
 - Preparation windows filter sources with the pure `effect.stageEligibility[hook]` (`E111_Recluse`).
 - `handHooks` lets a hand card fire, except for `onBuy`, `onEndTurn` and `onBeforeEndGame`.
 - A harvest-start example is `E110_Dentist` (`onStartHarvest`).
+- With the seat setting on (the default), a mandatory effect that only gains non-animal goods, stores goods on a card or updates counters resolves before the player orders the rest ([ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)); do not rely on play-zone order. Keep per-harvest bookkeeping in round-keyed card state (`C062_CookeryExtension`) and random draws in an action leaf (`M104_WildHarvest`), never in the stage hook itself.
 - Test: `E090_E127-parity-session.test.ts` reaches the round-4 harvest (§5).
 
 ### 4.4 "You may pay X to get Y"

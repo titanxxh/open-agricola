@@ -119,11 +119,11 @@ anytime                  注册额外的 anytime 行动
   onBeforeEndGame → preScoringWindow → gameover
 ```
 
-阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）是准备窗口、StartOfTurn、回合结束、收获前、收获田间阶段和终局前的共享模型：
+阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）是准备窗口、StartOfTurn、回合结束、收获前、收获开始、收获田间阶段和终局前的共享模型：
 
 - 每个窗口冻结玩家顺序（规则要求时从起始玩家标记顺时针），并在每名玩家进入时，按持牌、手牌启用的 hook 与纯 `stageEligibility` 查询捕获一棵固定的 `activate-card-effect` 来源树。来源发现从不按当前支付能力过滤。
 - 单个来源直接展开；多个来源进入 `ParallelNode(mode='trigger-select')`。每次选择后，handler、支付与必选 / Pass 状态按实时克隆预览重算。已完成的来源不重放；窗口内打出的卡只参加后续窗口。
-- 窗口上下文、玩家顺序与树游标保存在 `stageResume`；恢复时不重扫牌区，也不重读已变化的标记。旧的串行阶段保留 `resumeAfterCardId` 用于自身索引恢复。
+- 窗口上下文、玩家顺序与树游标保存在 `stageResume`；恢复时不重扫牌区，也不重读已变化的标记。旧的串行阶段按 `resumeAfterCardId` 恢复。
 - 嵌套可选分支保留兑换机会，不削弱必选根。`requiresExplicitChoice` 在实时兑换可能提供资金时保持购买选择开放。
 - 阶段完成时，未安置动物先嵌套现有 `reorganize` flow，再恢复帧。
 - 阶段子流程的私有事件保留到最外层响应。
@@ -135,7 +135,7 @@ anytime                  注册额外的 anytime 行动
 - **未来计划**（[ADR 0018](../adr/0018-future-schedule-and-authoritative-action-entry.md)）：Exact Future Target 保留目标轮，超出 `current round < target <= 14` 时丢弃；Future Prefix 保留仍存在的连续后缀。一次性的未来 offer 使用 `scheduled-offer` 行动与 `cardStates[cardId].extraData.scheduledOffers`，不用资源 token。卡牌排未来 token，不自写 `targetRound` 状态机。
 - **回合结束**：普通轮转与卡牌驱动的 Turn 共用 `buildEndTurnReactionFlow()` 的同一棵冻结来源树；窗口完成时关闭 Turn Scope 一次。卡牌以既有 Turn 身份记录每 Turn 一次的凭据。
 - **收获前**：在收获跳过生效前冻结玩家顺序；所有玩家都参与；顺序保存在 `stageResume.extra.beforeHarvestPlayerOrder`。
-- **跳过整个收获**：待生效标记在所有 `onBeforeHarvest` 之后激活一次，该轮之后的每个收获步骤、阶段 hook 和 listener 都排除该玩家。
+- **跳过整个收获**：在 `onBeforeHarvest` 之后生效；若在收获开始窗口内决定，则在该窗口结束后生效。生效后，该轮之后的每个收获步骤、阶段 hook 和 listener 都排除该玩家。
 - **收获准备**：`harvestPrepWindow` 依据 `preHarvestGoodsWanted` / `preHarvestGoodsWantedBeforeReap` / `maySkipHarvestFieldPhase` metadata，只提供可支付、有次数限制且能产出所需货物的 Harvest 兑换。使用次数按来源和轮次记录。
 - **收割**：`reap` 是内部行动。完整收获使用 `trigger: { phase: 'harvest' }`；私人田间阶段收割不写收获摘要。`computeHarvestCount()` 返回带 `sources` / `tags` / `scope` 的数量，只能通过 `registerHarvestCountModifier()` 修改。逐作物 `reap` 事件汇入一个 parallel flow，之后才进入 `onAfterReap`。
 - **收割后 anytime**：按收获顺序、在计算喂食之前提供；每个 flow 后重建。
@@ -155,7 +155,7 @@ anytime                  注册额外的 anytime 行动
 - handler 可以读取状态与事件，返回 `ActionHookResult`、`ActionFlow`、费用、可执行性或选项。每次修改，包括写自身 `cardStates[cardId]`，都是返回的 leaf（`gain`、`pay`、`special-effect`、`exchange` 或可复用的内部行动）。
 - 规则动作、用格、放人和 Moor 反应的来源发现均构造普通内部 `activate-card` leaf，携带 listener、卡牌、事件、owner 和触发玩家。用格和放人来源合并到同一个 owner 分组；具体格与用格类型跨选择和恢复保留。发现时固定匹配来源，不求值 handler。激活读取实时状态，返回效果时才给 owner 卡计次，`countCardUse: false` 除外；查询与空结果不计次。pending 保留完成状态，撤销恢复计数。
 - **门禁**：所有会分发 listener 的 Vitest project 都安装 `shared/cards/__tests__/listener-purity-guard.ts`，为每次调用提供深层只读 Proxy，任何写入或返回实时引用都会失败。`pnpm run check:card-impl-boundaries` 静态拒绝所有已解析 handler 与 `deriveCardCostCandidate` 中对 context 的显式写入。没有豁免清单。
-- **Trigger-select**（`ParallelNode`）负责 select、pass、mandatory 与 independent 语义，没有 listener 专用节点。结构暂不适用的 child 本轮隐藏，sibling 执行后重新评估；适用但付不起的 child 保持可见并禁用。`mandatory: true` 只在必选 child 适用且可执行时禁用 Pass。Card listener 的适用性只来自返回结果；阶段卡牌效果仍在克隆上预览。
+- **Trigger-select**（`ParallelNode`）负责 select、pass、mandatory 与 independent 语义，没有 listener 专用节点。结构暂不适用的 child 本轮隐藏，sibling 执行后重新评估；适用但付不起的 child 保持可见并禁用。`mandatory: true` 只在必选 child 适用且可执行时禁用 Pass。Card listener 的适用性只来自返回结果；阶段卡牌效果仍在克隆上预览。自动结算见 [engine](engine_zh.md)。
 - 全部 `before` 反应使用已捕获的 `activate-card` 来源和 owner/trigger-select 调度。handler 在选中时读取实时状态，休眠 sibling 保留供重新判断，可选反应保留 Pass。用格和放人 before 保留原 flow 的义务：非可选返回 flow 禁用 Pass，可选根仍可跳过。未指定目标的返回效果在用格和放人 before 中归行动者，在其他反应中归持卡人；选序和计次归持卡人。新卡不回填已捕获窗口。规则动作可达性放宽在 `skipBeforeTriggers` 下让开；Pass 带该标记检查真实宿主和行动者，再检查通用替换回退。用格准入保留 ADR 0033 的当前步骤策略。
 - **逐配方分发**：`trade-applied` 执行确定性 `seq` / `parallel` flow 中的非可选 `special-effect` 与 `gain` leaf（`executeImmediateSpecialEffectFlows()`）。完整喂食批次使用普通 `exchange` 反应，支付与交互 flow 完成后才恢复喂食结算。
 - **Owner 与切换**：owner 与触发玩家显式传递；跨玩家确认和撤销边界由运行时负责。`confirm-player-switch` 由交出控制的玩家提交，并建立撤销边界。阶段效果派发中，交出控制的玩家是 `stage-hook` 帧携带的交接来源玩家；其他玩家作选择前由它确认。没有交接来源或交给其他玩家整理动物时，直接交接并建立撤销边界。阶段帧结束时不把控制交回其所有者；交回普通流程时只在下一位等待的玩家是其他人时写入撤销边界，不新增确认。

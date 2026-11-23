@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { GameState } from '../../shared/contract/types'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { encodeReplayFrame, decodeReplayFrame } from '../game/replay-codec'
 
@@ -135,7 +140,7 @@ describe('C179 committed enclosure facts', () => {
     let response = startNested(session)
     response = session.commitSelectionChoice(0, { edges: ['V-0-1'] })
     assert.equal(response.ok, true, response.error)
-    expect(response.state.players[0]!.resources.cattle).toBe(0)
+    // The outer reward is the last mandatory source once the nested fence settles, so it runs without asking.
     response = finish(session, response)
     expect(response.state.players[0]!.resources.cattle).toBe(1)
     expect(response.state.players[0]!.pastures).toHaveLength(2)

@@ -7,6 +7,7 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { orderReactionsManually } from './_helpers/trigger-select'
 
 const OPTIONAL = 'TEST_BeforeHarvestOptional'
 const MANDATORY = 'TEST_BeforeHarvestMandatory'
@@ -32,6 +33,8 @@ const setupRoundFour = (playerCount = 3) => {
   session.state.round = 4
   session.state.roundPhase = 'work'
   setPlaceholderHands(session)
+  // These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+  orderReactionsManually(session.state)
   session.loadState(session.state)
   return session
 }
@@ -187,15 +190,10 @@ describe('Before-Harvest reaction dispatch', () => {
 
     const afterOptional = session.resolveChoice(0, OPTIONAL)
     expect(afterOptional.state.players[0]!.resources.wood).toBe(1)
-    const remaining = expectWait(afterOptional, 0)
-    expect(remaining.request.kind).toBe('select-trigger')
-    expect(remaining.request.options).toEqual(expect.arrayContaining([
-      expect.objectContaining({ value: MANDATORY, sourceCard: MANDATORY }),
-      expect.objectContaining({ value: '__pass__', disabled: true }),
-    ]))
-    expect(remaining.request.options).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ value: OPTIONAL }),
-    ]))
+    // The mandatory effect is then the last source and runs without asking; it cannot be passed.
+    expect(afterOptional.state.players[0]!.resources.food).toBe(21)
+    expect(afterOptional.state.events.filter((event) => event.type === 'resource.moved'
+      && event.sourceCardId === MANDATORY)).toHaveLength(1)
   })
 
   it('recomputes mandatory status when an earlier reaction makes a card applicable', () => {
@@ -219,18 +217,10 @@ describe('Before-Harvest reaction dispatch', () => {
     }))
     session.loadState(session.state)
 
-    let response = session.performRoundEnd()
-    const first = expectWait(response, 0)
-    expect(first.request.kind).toBe('select-trigger')
-    expect(first.request.options).toEqual(expect.arrayContaining([
-      expect.objectContaining({ value: MANDATORY }),
-      expect.objectContaining({ value: '__pass__', disabled: true }),
-    ]))
-    expect(first.request.options).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ value: DYNAMIC_OPTIONAL }),
-    ]))
-
-    response = session.resolveChoice(0, MANDATORY)
+    // The dynamic card is dormant without food, so the mandatory effect, the sole applicable
+    // source, runs without asking; its food then makes the optional card applicable.
+    const response = session.performRoundEnd()
+    expect(response.state.players[0]!.resources.food).toBe(1)
 
     const remaining = expectWait(response, 0)
     expect(remaining.request.kind).toBe('select-trigger')

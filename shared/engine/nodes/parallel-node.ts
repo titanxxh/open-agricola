@@ -19,6 +19,8 @@ export class ParallelNode extends BaseNode {
   public selectedChildId: string | null = null
   public resolveAfterSelection = false
   public autoSelectSoleInitialTrigger = false
+  /** The chooser's auto-resolve setting, frozen when this selector is first evaluated. */
+  public autoResolveIndependent?: boolean
   public triggerOwnerPlayerId?: string
   public triggerChildren: ParallelTriggerChild[] = []
   public emittedChoices: ActionChoiceOption[] = []
@@ -177,6 +179,7 @@ export class ParallelNode extends BaseNode {
       data.selectedChildId = this.selectedChildId
       if (this.resolveAfterSelection) data.resolveAfterSelection = true
       if (this.autoSelectSoleInitialTrigger) data.autoSelectSoleInitialTrigger = true
+      if (this.autoResolveIndependent !== undefined) data.autoResolveIndependent = this.autoResolveIndependent
       data.triggerOwnerPlayerId = this.triggerOwnerPlayerId
       data.triggerChildren = this.triggerChildren
       data.emittedChoices = this.emittedChoices

@@ -15,7 +15,7 @@ registerAdHocAction({
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ player }) => {
-    scheduleNextHarvestSkip(player, CARD_ID)
+    scheduleNextHarvestSkip(player, CARD_ID, 'after-start-of-harvest')
     return { type: 'ok' }
   },
 })
@@ -23,7 +23,7 @@ registerAdHocAction({
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBeforeHarvest: () =>
+    onStartHarvest: () =>
       payGainFlow({
         cardId: CARD_ID,
         cost: { grain: 1 },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { orderReactionsManually } from './_helpers/trigger-select'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { ActionChoiceOption, PlayerState } from '../../shared/contract/types'
 
@@ -181,6 +182,8 @@ describe('harvest reaction flow', () => {
     player.pastures = [
       { id: 'sheep-pasture', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
     ]
+    // With auto-resolve off, a deterministic gain waits for the player's order (#2039).
+    orderReactionsManually(state)
 
     session.loadState(state)
     const resp = session.performRoundEnd()
@@ -211,15 +214,11 @@ describe('harvest reaction flow', () => {
       { id: 'sheep-pasture', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
     ]
 
+    orderReactionsManually(state)
     session.loadState(state)
+    // Cube Cutter needs food, so Butter Churn is the sole applicable source and, being
+    // mandatory, runs without asking; its food then makes Cube Cutter applicable.
     let resp = session.performRoundEnd()
-
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
-    expect(resp.interaction.request.options?.some((option) => option.sourceCard === 'B050_ButterChurn')).toBe(true)
-    expect(resp.interaction.request.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(false)
-
-    resp = resolveCardTrigger(session, resp, 'B050_ButterChurn')
 
     expect(resp.state.players[0]!.resources.food).toBe(1)
     expect(resp.interaction.stateId).toBe('wait')

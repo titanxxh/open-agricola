@@ -265,6 +265,9 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         if (data.mode === 'trigger-select') parallel.mode = 'trigger-select'
         parallel.resolveAfterSelection = data.resolveAfterSelection === true
         parallel.autoSelectSoleInitialTrigger = data.autoSelectSoleInitialTrigger === true
+        parallel.autoResolveIndependent = typeof data.autoResolveIndependent === 'boolean'
+          ? data.autoResolveIndependent
+          : undefined
         parallel.selectedChildId = typeof data.selectedChildId === 'string'
           ? data.selectedChildId
           : null

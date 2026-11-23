@@ -13,7 +13,7 @@ import { parseFenceSelectionQuote } from '../../shared/contract/protocol/farm-se
 import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { DraftPickPayload } from '../../shared/draft/types'
 import type { SoloHandSelectionSubmission } from '../../shared/contract/solo-hand-selection'
-import type { ParentSelectionSubmission } from '../../shared/contract/types'
+import type { ParentSelectionSubmission, PlayerPreferences } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 import type { GameTransport, SnapshotListener, ValidateResult } from '../services/gameTransport.ts'
 import type {
@@ -119,6 +119,9 @@ export class LocalGameTransport implements GameTransport {
   confirmNextPlayer() { return this.call('confirmNextPlayer', []) }
   confirmPlayerSwitch() { return this.call('confirmPlayerSwitch', []) }
   performRoundEnd() { return this.call('performRoundEnd', []) }
+  setPlayerPreferences(playerIndex: number, preferences: PlayerPreferences) {
+    return this.call('setPlayerPreferences', [playerIndex, preferences])
+  }
   undoStep() { return this.call('undoStep', []) }
   undoAction() { return this.call('undoAction', []) }
   newGame(seed?: number) { return this.call('newGame', [seed]) }

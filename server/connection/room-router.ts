@@ -40,6 +40,7 @@ import type {
   GameContextLifecycle,
 } from '../../shared/contract/protocol/game-context.ts'
 import { resolveSoloWorkshopSources } from '../game/workshop-room-cards'
+import { applySeatPreferenceDefaults } from '../game/game-preferences-store'
 import type { ConnectionCtx } from './connection-ctx.ts'
 import { refreshConnectionSeat } from './connection-ctx.ts'
 import { connectionViewerMetadata, connectedSeatIndexes, controlledSeatIndexes, visiblePlayerIdsForConnection } from '../game/room-viewer'
@@ -604,6 +605,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     await confirmCreated()
     return
   }
+  await applySeatPreferenceDefaults(room, ctx.gamePreferences)
   room.status = 'playing'
   room.startedAt ??= Date.now()
   return (await useSessionResponse(
@@ -848,6 +850,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     room.colorConfirmationPlayerIndex = ctx.currentPlayerIndex
   }
   if (starting) {
+    await applySeatPreferenceDefaults(room, ctx.gamePreferences)
     room.status = 'playing'
     room.startedAt ??= Date.now()
   }
@@ -969,6 +972,7 @@ async function handleConfirmPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientC
   try {
     const blocked = ctx.committer?.blockedError(room.id)
     if (blocked) throw new Error(blocked)
+    await applySeatPreferenceDefaults(room, ctx.gamePreferences)
     response = await executeRoomSession(room, () => room.session.getState())
     if (!response.ok) throw new Error(response.error ?? 'Unable to initialize game')
   } catch (error) {
@@ -1371,6 +1375,10 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     [index, colorsBySeat.get(index) ?? unusedColors.shift()!])
   session.updatePlayerColors(colors)
   for (const [playerIndex, name] of names) session.updatePlayerName(playerIndex, name)
+  await applySeatPreferenceDefaults(
+    { session, hotseat: room.hotseat, createdBy: room.createdBy, players: nextPlayers, seatOwners: nextOwners },
+    ctx.gamePreferences,
+  )
   const response: SessionResponse = session.withCtx(() => session.getState())
   return (await useSessionResponse(
     response,
@@ -1535,6 +1543,16 @@ function handleDraftSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { typ
   )
 }
 
+function handleSetPlayerPreferences(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'setPlayerPreferences' }>): void | Promise<void> {
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  const seat = msg.playerIndex
+  return useSessionResponse(
+    executeRoomSession(room, () => room.session.setPlayerPreferences(seat, msg.preferences)),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'preferences', seat),
+  )
+}
+
 const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, { type: K }>> } = {
   auth: handleAuth,
   getCommandScope: handleCommandScope,
@@ -1571,6 +1589,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   devPlayCard: handleDevPlayCard,
   devCreatePasture: handleDevCreatePasture,
   draftSubmit: handleDraftSubmit,
+  setPlayerPreferences: handleSetPlayerPreferences,
 }
 
 export async function dispatch(ctx: ConnectionCtx, msg: ClientCommand): Promise<void> {

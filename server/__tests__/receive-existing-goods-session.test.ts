@@ -4,7 +4,12 @@ import type { GameState, PlayerState } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { setStoredResource } from '../../shared/cards/helpers/card-storage'
 import { getCardStack, readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 
 import '../../shared/cards/E/E103_Wolf'
 import '../../shared/cards/C/C120_AgriculturalLabourer'
@@ -89,11 +94,11 @@ const wolfAndLabourer = () => setup((owner) => {
 })
 
 // Grain from the action space makes Agricultural Labourer take 1 clay off its card; that clay matches Wolf's top.
+// Wolf waits for the clay, so Agricultural Labourer is the sole applicable mandatory source and runs without asking.
 const reachWolfTrigger = (session: GameSession) => {
-  let response = session.takeAction(0, 'grain-seeds')
+  const response = session.takeAction(0, 'grain-seeds')
   expect(requestKind(response)).toBe('select-trigger')
-  response = session.resolveChoice(0, optionFor(response, LABOURER))
-  expect(requestKind(response)).toBe('select-trigger')
+  expect(listsCard(response, LABOURER)).toBe(false)
   expect(listsCard(response, WOLF)).toBe(true)
   return response
 }

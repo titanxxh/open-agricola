@@ -314,7 +314,7 @@ describe('M091 Routine Work', () => {
       type: 'leaf',
       actionId: 'special-effect',
       sourceCard: 'M091_RoutineWork',
-      params: { kind: 'set-extra-data', key: 'usedCraftBuildingIds', value: ['Major_Joinery'] },
+      params: { kind: 'set-extra-data', key: `usedCraftBuildingIds:${state.round}`, value: ['Major_Joinery'] },
     })
   })
 
@@ -346,7 +346,7 @@ describe('M091 Routine Work', () => {
     const player = state.players[0]!
     player.minorPlayed = ['M091_RoutineWork']
     player.improvements = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
-    writeCardExtraData(player, 'M091_RoutineWork', 'usedCraftBuildingIds', ['Major_Joinery'])
+    writeCardExtraData(player, 'M091_RoutineWork', `usedCraftBuildingIds:${state.round}`, ['Major_Joinery'])
 
     const flow = session.withCtx(() => session.withCtx(() => getCardEffect('M091_RoutineWork'))?.onEndHarvestFeedingPhase?.(state, player))
 
@@ -365,13 +365,27 @@ describe('M091 Routine Work', () => {
     }
   })
 
+  it('starts each harvest with every craft building unused', () => {
+    const session = setup()
+    const state = session.state
+    const player = state.players[0]!
+    player.minorPlayed = ['M091_RoutineWork']
+    player.improvements = ['Major_Joinery', 'Major_Pottery']
+    writeCardExtraData(player, 'M091_RoutineWork', `usedCraftBuildingIds:${state.round - 3}`, ['Major_Joinery', 'Major_Pottery'])
+
+    const flow = session.withCtx(() => getCardEffect('M091_RoutineWork')?.onEndHarvestFeedingPhase?.(state, player))
+
+    expect(flow?.type).toBe('seq')
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children).toHaveLength(2)
+  })
+
   it('returns no reward when every craft building was used this harvest', () => {
     const session = setup()
     const state = session.state
     const player = state.players[0]!
     player.minorPlayed = ['M091_RoutineWork']
     player.improvements = ['Major_Joinery', 'Major_Pottery']
-    writeCardExtraData(player, 'M091_RoutineWork', 'usedCraftBuildingIds', ['Major_Joinery', 'Major_Pottery'])
+    writeCardExtraData(player, 'M091_RoutineWork', `usedCraftBuildingIds:${state.round}`, ['Major_Joinery', 'Major_Pottery'])
 
     const flow = session.withCtx(() => session.withCtx(() => getCardEffect('M091_RoutineWork'))?.onEndHarvestFeedingPhase?.(state, player))
 

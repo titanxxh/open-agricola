@@ -141,6 +141,7 @@
 - 断言 `interaction` 展示的是可选择的来源卡，而不是直接按打出区顺序执行
 - 分别选择不同来源卡，断言后续 flow、状态、日志和剩余 trigger 的重算符合预期
 - 覆盖 `undoStep` 或 `undoAction` 后重新派生同一 trigger-select 的场景
+- 同时机来源遵循座位的自动结算设置（[ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）。要逐个选择顺序时，用 `server/__tests__/_helpers/trigger-select.ts` 的 `orderReactionsManually(state)` 或 `withManualReactionOrder(options)` 关掉它；同时覆盖缺省情况：独立来源先结算，只剩一个必选来源时不再询问
 
 ## 5. 推荐的后端入口清单
 

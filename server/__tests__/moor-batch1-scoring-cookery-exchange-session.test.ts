@@ -365,14 +365,30 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const resp = playMinor(session, 'M104_WildHarvest')
     expect(resp.state.players[0]!.resources.food).toBe(1)
 
-    const harvest = setup()
-    harvest.state.players[0]!.minorPlayed = ['M104_WildHarvest']
-    harvest.state.players[0]!.farmTerrain = Array.from({ length: 9 }, (_, index) => terrain(0, index, 'forest'))
-    const flow = harvest.withCtx(() => effect('M104_WildHarvest').onStartHarvest!(harvest.state, harvest.state.players[0]!))
-    expect(actionIds(flow)).toEqual(['gain'])
+    // The source draws only when its leaf runs, so offering it never rolls.
+    const offered = setup()
+    offered.state.players[0]!.minorPlayed = ['M104_WildHarvest']
+    const flow = offered.withCtx(() => effect('M104_WildHarvest').onStartHarvest!(offered.state, offered.state.players[0]!))
+    expect(actionIds(flow)).toEqual(['card_M104_WildHarvest_draw'])
+    expect(offered.state.rngTick ?? 0).toBe(0)
+    expect(offered.state.players[0]!.cardStates.M104_WildHarvest).toBeUndefined()
 
-    harvest.state.players[0]!.farmTerrain = []
-    expect(harvest.withCtx(() => effect('M104_WildHarvest').onStartHarvest!(harvest.state, harvest.state.players[0]!))).toBeUndefined()
+    const startHarvestFood = (forests: number) => {
+      const harvest = setup()
+      harvest.state.round = 4
+      harvest.state.players.forEach((entry) => markAllWorkersUsed(harvest.state, entry))
+      harvest.state.players[0]!.minorPlayed = ['M104_WildHarvest']
+      harvest.state.players[0]!.farmTerrain = Array.from({ length: forests }, (_, index) => terrain(Math.floor(index / 5), index % 5, 'forest'))
+      harvest.loadState(harvest.state)
+      const response = harvest.performRoundEnd()
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.cardStates.M104_WildHarvest?.extraData?.['harvest-4']).toBeDefined()
+      return response.state.events.filter((event) => event.type === 'resource.moved'
+        && event.sourceCardId === 'M104_WildHarvest' && event.round === 4)
+        .reduce((sum, event) => sum + (event.type === 'resource.moved' ? event.resources.food ?? 0 : 0), 0)
+    }
+    expect(startHarvestFood(9)).toBe(1)
+    expect(startHarvestFood(0)).toBe(0)
   })
 
   it('M105 is a cookery with vegetable and animal anytime exchanges plus grain bake exchange', () => {

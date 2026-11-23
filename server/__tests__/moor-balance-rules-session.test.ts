@@ -9,7 +9,12 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import { getFarmyardTilePositions, positionKey } from '../../shared/domain/farmyard-geometry'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
@@ -175,12 +180,15 @@ describe('Moor optional balance rules', () => {
     let response = session.takeSpecialAction(0, card.id, 'slash-and-burn', { tile: { row: 0, col: 4 } })
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('select-trigger')
     const order = [first, first === 'B132_EstateMaster' ? 'M059_NaturesFertilizer' : 'B132_EstateMaster']
-    for (const source of order) {
+    for (const [index, source] of order.entries()) {
       assert.equal(response.interaction.stateId, 'wait')
-      const option = response.interaction.request.options?.find(option => option.sourceCard === source)
-      assert.ok(option, JSON.stringify(response.interaction))
-      response = session.resolveChoice(0, option.value)
-      expect(response.ok, response.error).toBe(true)
+      // The second source is then the last mandatory one and starts without asking.
+      if (index === 0) {
+        const option = response.interaction.request.options?.find(option => option.sourceCard === source)
+        assert.ok(option, JSON.stringify(response.interaction))
+        response = session.resolveChoice(0, option.value)
+        expect(response.ok, response.error).toBe(true)
+      }
       if (source === 'M059_NaturesFertilizer') {
         response = session.resolveChoice(0, '__skip__')
         expect(response.ok, response.error).toBe(true)

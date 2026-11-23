@@ -156,9 +156,7 @@ describe('trailing trigger snapshots', () => {
       const mutatorChoice = proceedUntilChoice(engine, context)
       expect(mutatorChoice.choice.options.map((option) => option.value)).toContain('A085_Homekeeper')
       expect(engine.resolveChoice('A085_Homekeeper', context).type).toBe('ok')
-      const observerChoice = proceedUntilChoice(engine, context)
-      expect(observerChoice.choice.options.map((option) => option.value)).toContain('E089_Stallwright')
-      expect(engine.resolveChoice('E089_Stallwright', context).type).toBe('ok')
+      // The observer is then the last mandatory source and runs without asking.
       proceedUntil(engine, context, () => observed.length > 0)
     })
 
@@ -247,9 +245,7 @@ describe('trailing trigger snapshots', () => {
       const mutatorChoice = proceedUntilChoice(engine, context)
       expect(mutatorChoice.choice.options.map((option) => option.value)).toContain('B049_Scales')
       expect(engine.resolveChoice('B049_Scales', context).type).toBe('ok')
-      const observerChoice = proceedUntilChoice(engine, context)
-      expect(observerChoice.choice.options.map((option) => option.value)).toContain('B082_ValueAssets')
-      expect(engine.resolveChoice('B082_ValueAssets', context).type).toBe('ok')
+      // The observer is then the last mandatory source and runs without asking.
       proceedUntil(engine, context, () => seenZones.length > 0)
     })
 

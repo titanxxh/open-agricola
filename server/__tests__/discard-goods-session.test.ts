@@ -4,7 +4,12 @@ import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import '../../shared/cards/C/C125_Nightworker'
 import '../../shared/cards/E/E124_MayorCandidate'

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import type { GameState } from '../../shared/contract/types'
@@ -119,8 +124,8 @@ describe('farm operations at their original host completion', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, reed: 0, clay: 0 })
     expect(options(response).map(option => option.value)).toEqual(expect.arrayContaining([POTTER, RECEIPT]))
+    // After the receipt, Potter's Yard is the last mandatory source; it starts without asking and offers its own choice.
     response = choose(session, response, RECEIPT)
-    response = choose(session, response, POTTER)
     response = choose(session, response, '__skip__')
     const player = response.state.players[0]!
     expect(player.rooms).toBe(4)

@@ -16,7 +16,7 @@ describe('harvest requirement projection', () => {
     try {
       if (phase !== 'pending') {
         session.state.roundPhase = 'harvest'
-        activatePendingHarvestSkips(session.state)
+        activatePendingHarvestSkips(session.state, 'before-start-of-harvest')
       }
       if (phase === 'expired') session.state.round = 7
       const players = session.buildSyncPayload(session.getState(), []).state.players

@@ -688,3 +688,24 @@ describe('hotseat during a server outage (#1816)', () => {
     } finally { await recover(server) }
   })
 })
+
+describe('seat auto-resolve setting in the game menu (#2039)', () => {
+  it('shows the seat setting and sends a change for the confirmed seat only', async () => {
+    GameSocket.hotseat = false
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1098')
+    const user = userEvent.setup()
+    renderGame()
+    await screen.findByRole('region', { name: 'Action Spaces' })
+    await user.click(document.querySelector<HTMLButtonElement>('.header-action-btn[aria-haspopup="true"]')!)
+    const toggle = screen.getByTestId('seat-auto-resolve-reactions')
+    expect(toggle).toBeChecked()
+    await user.click(toggle)
+    await waitFor(() => expect(ruleCommands()).toEqual([
+      expect.objectContaining({ type: 'setPlayerPreferences', playerIndex: 0, preferences: { autoResolveIndependentReactions: false } }),
+    ]))
+    const updated = workPayload()
+    updated.state.players[0]!.preferences = { autoResolveIndependentReactions: false }
+    act(() => GameSocket.snapshot(updated))
+    expect(screen.getByTestId('seat-auto-resolve-reactions')).not.toBeChecked()
+  })
+})

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession as createFixtureWorkSession } from './_helpers/session-fixtures'
+import { withManualReactionOrder } from './_helpers/trigger-select'
+
+// These scenarios choose every reaction order themselves (#2039: auto-resolve off).
+const createWorkSession = (options: Parameters<typeof createFixtureWorkSession>[0] = {}) =>
+  createFixtureWorkSession(withManualReactionOrder(options))
 import { assertRejectedUnchanged, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
 import { installSpaceProbes, probeReward, SPACE_PROBES, spaceProbeCounts } from './_helpers/space-use-probes'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
@@ -63,6 +68,10 @@ function grant(session: GameSession, flow: ActionFlow): void {
 function triggerCount(response: SessionResponse, card: string): number {
   return response.state.events.filter(event => event.type === 'card.triggered' && event.sourceCardId === card).length
 }
+
+const triggerOrder = (response: SessionResponse, cards: string[]) => response.state.events
+  .filter(event => event.type === 'card.triggered' && cards.includes(event.sourceCardId ?? ''))
+  .map(event => event.sourceCardId)
 
 describe('action-space use boundaries through GameSession', () => {
   it.each([
@@ -479,10 +488,9 @@ describe('action-space use boundaries through GameSession', () => {
     }))
     let response = session.takeAction(0, 'forest')
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+    // The other source is then the last mandatory one and runs without asking.
     response = choose(session, response, first)
-    expect(response.state.players[0]!.resources).toMatchObject({ stone: first === SPACE_PROBES[2] ? 1 : 0,
-      reed: first === second ? 1 : 0 })
-    response = choose(session, response, first === second ? SPACE_PROBES[2] : second)
+    expect(triggerOrder(response, [SPACE_PROBES[2]!, second])).toEqual(first === second ? [second, SPACE_PROBES[2]] : [SPACE_PROBES[2], second])
     expect(spaceProbeCounts(response)).toEqual([1, 1, 1])
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 4, clay: 1, stone: 1, reed: 1 })
     expect(triggerCount(response, second)).toBe(1)
