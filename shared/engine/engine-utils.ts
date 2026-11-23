@@ -630,6 +630,16 @@ export function getActionEffectPreview(node: ActionNode, registry?: ActionRegist
       })
       return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts } }
     }
+    // A stage activation reads as the plan its card returns for this hook, on a detached preview.
+    const activationFlow = node.actionId === 'activate-card-effect' && registry && !descriptionPath.includes(node.actionId)
+      ? previewActivateCardEffectChild(node, previewContext).result?.flow
+      : undefined
+    if (activationFlow && registry) {
+      const planned = buildFlowNode({ registry, counterRef: { value: 0 } }, applyDefaultSourceCardToFlow(activationFlow, node.sourceCard), previewContext.player.id)
+      const description = getNodeDescriptionPreview(planned, registry, previewContext, [...descriptionPath, node.actionId])
+      // An optional activation already says so; its plan does not repeat it.
+      if (description) return { kind: 'rule', description: node.optional && description.optional ? { ...description, optional: undefined } : description }
+    }
     if (definition?.flowFactory && registry && !descriptionPath.includes(node.actionId)) {
       const flow = definition.flowFactory(previewContext)
       if (flow) {
@@ -848,9 +858,12 @@ export function getNodeDescriptionPreview(
       kind: 'action',
       ...metadata,
       ...(redundantScheduleLabel ? { showLabel: false } : {}),
+      // A stage activation is named by the card it activates, not by the internal action.
       labelKey: useChoiceLabelAsDescription
         ? node.choiceLabelKey!
-        : specialEffectLabelKey ?? (isCardChoiceLabel ? action.descriptionKey : action.nameKey),
+        : specialEffectLabelKey
+          ?? (node.actionId === 'activate-card-effect' && node.sourceCard ? `cards.${node.sourceCard}.name` : undefined)
+          ?? (isCardChoiceLabel ? action.descriptionKey : action.nameKey),
       labelParams: useChoiceLabelAsDescription ? node.choiceLabelParams : undefined,
       effectPreview,
     }
@@ -896,7 +909,8 @@ export function getNodeDescriptionPreview(
       })
       .filter((part): part is ChoiceDescriptionPreview => part !== undefined)
     if (parts.length === 0) return undefined
-    if (parts.length === 1 && !node.optional && !actor && !node.choiceLabelKey) return parts[0]
+    // A one-part group reads as that part; an optional group keeps its optionality on it.
+    if (parts.length === 1 && !actor && !node.choiceLabelKey) return node.optional ? { ...parts[0]!, optional: true } : parts[0]
     return {
       kind: 'group',
       ...metadata,

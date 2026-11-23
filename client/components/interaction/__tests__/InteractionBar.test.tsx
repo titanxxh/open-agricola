@@ -41,6 +41,25 @@ it('lets the player choose a Guest by its source card', () => {
   expect(resolveChoice).toHaveBeenCalledExactlyOnceWith('second')
 })
 
+it.each([['zh', /^钻石矿车:\s*接收$/], ['en', /^Diamond Mine:\s*Receive$/]] as const)(
+  'names the card of a %s round-start trigger labelled by what it does',
+  (locale, receive) => {
+    const resolveChoice = vi.fn()
+    renderBar(input => {
+      input.locale = locale
+      input.pending.choice = { ...pendingChoice, promptKey: 'ui.interactionSelectTrigger', options: [
+        { value: 'CWM073_DiamondMine', labelKey: 'actions.receive.name', sourceCard: 'CWM073_DiamondMine' },
+        { value: 'CWM005_BeeKeeper', labelKey: 'cards.CWM005_BeeKeeper.name', sourceCard: 'CWM005_BeeKeeper' },
+        { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass', disabled: true },
+      ] }
+    }, { resolveChoice })
+    fireEvent.click(screen.getByRole('button', { name: receive }))
+    expect(resolveChoice).toHaveBeenCalledExactlyOnceWith('CWM073_DiamondMine')
+    const beeKeeper = locale === 'zh' ? '养蜂人' : 'Beekeeper'
+    expect(screen.getByRole('button', { name: beeKeeper })).toBeEnabled()
+  },
+)
+
 it('labels the ordinary one-player confirmation Continue while retaining the multiplayer switch label', () => {
   const solo = baseInput()
   solo.playerNames = ['P1']

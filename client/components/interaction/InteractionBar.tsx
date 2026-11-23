@@ -682,7 +682,7 @@ export const InteractionBar = ({
                 />
               ) : (
                 <div className="interaction-actions">
-                  {choiceModel.visibleOptions.map(({ option, disabled, disabledTitleKey }) => {
+                  {choiceModel.visibleOptions.map(({ option, disabled, disabledTitleKey, sourceCardName }) => {
                     return (
                       <button
                         key={option.value}
@@ -698,6 +698,7 @@ export const InteractionBar = ({
                         {model.moorSolo && option.effectPreview?.kind === 'payment'
                           ? <span>{translateCardText(locale, option.labelKey)} </span>
                           : null}
+                        {sourceCardName ? <span className="interaction-option-source">{sourceCardName}{': '}</span> : null}
                         {renderChoiceOptionContent({
                           locale,
                           option,

@@ -148,14 +148,12 @@ describe('E162 Entrepreneur parity', () => {
   it('restores a pending resource choice and undoes discarding stored food', () => {
     const session = setup({ food: 1, storedFood: 1, resources: { clay: 1, reed: 1 } })
     let offered = startNextRound(session)
-    let discard = optionsOf(offered).find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1))
-    if (!discard) {
-      const source = optionsOf(offered).find(option => !option.disabled && option.sourceCard === CARD_ID)
-      if (!source) throw new Error('Entrepreneur is not a round-start source')
-      offered = session.resolveChoice(0, source.value)
-      expect(offered.ok, offered.error).toBe(true)
-      discard = optionsOf(offered).find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1))
-    }
+    // The round-start prompt previews the card's whole plan; choosing it opens the card's own choice.
+    const source = optionsOf(offered).find(option => !option.disabled && option.sourceCard === CARD_ID)
+    if (!source) throw new Error('Entrepreneur is not a round-start source')
+    offered = session.resolveChoice(0, source.value)
+    expect(offered.ok, offered.error).toBe(true)
+    const discard = optionsOf(offered).find((option) => descriptionEffects(option.descriptionPreview).some(effect => effect.kind === 'cardStack' && effect.amount === -1))
     expect(discard, JSON.stringify(offered.interaction)).toBeDefined()
     const pending = session.resolveChoice(0, discard!.value)
     expect(getCardStack(pending.state.players[0]!, CARD_ID)).toEqual([])

@@ -20,6 +20,7 @@ import {
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import { activationEventReadContext } from './continuation-events'
 import { ActionNode } from './nodes/action-node'
+import { getNodeSourceCard } from './nodes/interaction-helpers'
 import type { ParallelNode } from './nodes'
 import type { EngineNode } from './types'
 import type { GameEvent } from '../contract/events'
@@ -408,11 +409,15 @@ export const evaluateTriggerSelect = (
     }
     optionStates.push(state)
     if (!applicable) continue
+    // Only a child that comes from a card names one; a helper such as an injected exchange has no card,
+    // and when it cannot start it explains nothing, so it is not offered.
+    const sourceCard = isActivateCardActionNode(child) ? state.cardId : getNodeSourceCard(child)
+    if (!doable && !sourceCard) continue
     options.push({
       value: (cardIdCounts.get(state.cardId) ?? 0) > 1 ? state.child.id : state.cardId,
       labelKey: state.child.choiceLabelKey ?? `cards.${state.cardId}.name`,
       ...(state.child.choiceLabelParams ? { labelParams: state.child.choiceLabelParams } : {}),
-      sourceCard: state.cardId,
+      ...(sourceCard ? { sourceCard } : {}),
       ...(doable ? {} : { disabled: true, disabledReasonKey: TRIGGER_DISABLED_REASON }),
     })
   }

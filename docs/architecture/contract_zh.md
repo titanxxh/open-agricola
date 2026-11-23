@@ -246,6 +246,8 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 - `descriptionPreview` 递归描述 flow（`ChoiceDescriptionPreview`）：顺序、互斥与可兼选择、并行顺序、可选性和执行者。`Engine.describe()` 读取可执行 flow 而不推进；`Engine.describeFlow()` 描述独立计划；不透明的原生行动提供纯 `ActionDefinition.flowFactory`，执行也调用它。基础描述不含玩家 modifier，并保留所有条件分支；延后的数量在到期前保留其公式。
 - 改良和职业行动预览最多展开两个最终候选卡选项。超过两个时使用 `cardSelection` 简述，保留卡牌类型与限制。其 `types` 允许主要/小改良组合，或单独选择职业。真正的选卡和支付请求仍保留完整选项及预览；支付方案数不计入此阈值。`shared/actions/effects/{improvement,occupation}.ts` 的生产端共用 `helpers/card-choice.ts` 中的阈值，也适用于嵌套预览。职业候选不超过两个时，仍合并相同的支付预览。
 - 可见选项文字来自 `descriptionPreview` 与 `effectPreview`；`choiceLabelKey` 只用于语义覆盖。`special-effect` 从 `params.kind` 提供语义描述，纯展示同步不出现在描述中。
+- 只有一个子项的组显示为该子项，并保留组的可选性。阶段激活（`activate-card-effect`）以卡名命名，描述该卡 hook 返回的计划；预演在分离的副本上进行，与触发选择相同。
+- 触发选择的选项只有来自卡牌的子项才带 `sourceCard`。不来自卡牌的子项（例如注入的兑换）无法开始时不出现。触发选项以动作命名（`接收`）时，客户端在前面加卡名。测试：`classic-round-start-trigger-session.test.ts`。
 - 预览描述的是声明的效果，不保证未来条件成立。连续且相同的未来条目合并，其他条目按顺序分别显示。
 - 当前交互选项使用 Interaction Player 与权威支付求解器，包括数量上限与替代支付来源。
 - 农场格选择携带 `ActionChoiceOption.target`（执行者、逻辑田、位置、Card Field 槽）与 `targetCard`；客户端渲染这些事实并提交不透明的值。
@@ -258,6 +260,8 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 `LogEntry { key, params, playerId? }` 携带 i18n key 与参数，按当前语言渲染。开局条目可带稳定的 `playerId`，座位显示名变化时按身份刷新。
 
 没有名称、符合 `card_<CardId>_<action>` 约定的行动显示为该卡的效果，已记录的行也一样；卡牌由自己的行动触发时不再重复。公共事件提示用卡名和行动格名，不用 ID。测试：`ActionLog.test.tsx`、`card-action-id.test.ts`、`public-event-presentation.test.ts`。
+
+放置与它收取的货物按人员落下的行动格命名，不用 `place-farmer` 等包装行动。合成子流程（`__subflow:*`，例如访客回合）不追加 Session 行动明细行，其叶子按自身事件记录。测试：`log-mapper.test.ts`、`classic-guest-session.test.ts`。
 
 
 ## Beta 资格

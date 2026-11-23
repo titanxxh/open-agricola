@@ -26,6 +26,22 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('names a wrapped placement and its goods by the space it lands on, and keeps the source off the board', () => {
+    const base = { schemaVersion: 1, round: 2, phase: 'work', visibility: 'public', actorPlayerId: 'p1' } as const
+    const events = [
+      { ...base, id: 'place', seq: 1, type: 'worker.placed', sourceActionId: 'place-farmer', workerId: '2', spaceId: 'forest' },
+      { ...base, id: 'collect', seq: 2, type: 'resource.moved', sourceActionId: 'place-farmer', reason: 'collect', resources: { wood: 3 },
+        from: { kind: 'actionSpace', spaceId: 'forest' }, to: { kind: 'player', playerId: 'p1' } },
+      { ...base, id: 'home', seq: 3, type: 'worker.placed', sourceActionId: 'card_CWM033_LadyinWaiting_release', workerId: '3', spaceId: 'home' },
+    ] satisfies GameEvent[]
+    const actionNames = { forest: 'actions.forest.name', 'place-farmer': 'actions.place-farmer.name' }
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames }).map(row => [row.key, row.params?.action])).toEqual([
+      ['log.placeFarmer', 'card_CWM033_LadyinWaiting_release'],
+      ['log.actionDetail', 'actions.forest.name'],
+      ['log.placeFarmer', 'actions.forest.name'],
+    ])
+  })
+
   it('merges only the identified fence payment without assigning later or other-player costs to a free operation', () => {
     const base = { schemaVersion: 1, round: 7, phase: 'work', visibility: 'public', actorPlayerId: 'p1' } as const
     const fence = {

@@ -2442,6 +2442,22 @@ describe('Engine flow nodes', () => {
     expect(byValue['decline-offspring']!.labelKey).toBe('ui.interactionDecline')
   })
 
+  it('describes an optional one-step group as that optional step, not as a one-item sequence', () => {
+    const registry = new ActionRegistry()
+    registry.register(payAction)
+    const step = new ActionNode('pay-food', 'pay', 'C115_Sower', { food: 1 })
+    const optional = new SequenceNode('optional-one-step', [step])
+    optional.optional = true
+
+    const described = getNodeDescriptionPreview(optional, registry)
+    expect(described).toMatchObject({ kind: 'action', optional: true, labelKey: 'actions.pay.name' })
+    expect(getNodeDescriptionPreview(new SequenceNode('mandatory-one-step', [step]), registry))
+      .toEqual(getNodeDescriptionPreview(step, registry))
+    const twoSteps = new SequenceNode('optional-two-steps', [step, new ActionNode('pay-wood', 'pay', 'C115_Sower', { wood: 1 })])
+    twoSteps.optional = true
+    expect(getNodeDescriptionPreview(twoSteps, registry)).toMatchObject({ kind: 'group', operator: 'sequence', optional: true })
+  })
+
   it('omits card infobox sync from special-effect descriptions', () => {
     const registry = new ActionRegistry()
     registry.register(payAction)

@@ -176,7 +176,8 @@ describe('future meeple round-start actions', () => {
     expect(resp.state.players[0]!.resources.vegetable).toBe(0)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future action preparation')
     expect(resp.interaction.request.options?.find(option => option.sourceCard === 'D091_Plowman')?.disabled).toBe(true)
-    expect(resp.interaction.request.options?.find(option => option.labelKey === 'actions.exchange.name')?.disabled).toBe(true)
+    // The exchange has no card behind it, so it appears only once it can start (after the vegetable arrives).
+    expect(resp.interaction.request.options?.find(option => option.labelKey === 'actions.exchange.name')).toBeUndefined()
     const receipt = resp.interaction.request.options?.find(option => option.labelKey === 'actions.receive.name')
     expect(receipt).toBeDefined()
     resp = session.resolveChoice(0, receipt!.value)
@@ -185,6 +186,8 @@ describe('future meeple round-start actions', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choices after receiving the vegetable')
     const exchange = resp.interaction.request.options?.find((option) => option.labelKey === 'actions.exchange.name')
     expect(exchange).toBeDefined()
+    expect(exchange?.disabled).not.toBe(true)
+    expect(exchange?.sourceCard).toBeUndefined()
 
     resp = session.resolveChoice(0, exchange!.value)
     expect(resp.ok).toBe(true)

@@ -2941,7 +2941,8 @@ export class GameCore {
   }
 
   private logActionDetail(before: PlayerState, player: PlayerState) {
-    if (!this.activeSpaceId) return
+    // A synthetic sub-flow, such as a Guest turn, is no space a player chose; its leaves log from their own events.
+    if (!this.activeSpaceId || this.activeSpaceId.startsWith(SUBFLOW_SPACE_PREFIX)) return
     const space = this.getSpaceById(this.activeSpaceId)
     if (!space) return
     const detailParts = this.buildActionDetailParts(before, player)

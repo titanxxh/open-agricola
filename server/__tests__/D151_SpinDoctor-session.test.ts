@@ -152,7 +152,7 @@ describe('D151 Spin Doctor native session', () => {
       .toEqual([
         expect.objectContaining({
           params: {
-            action: 'actions.place-farmer.name',
+            action: 'actions.meeting-place.name',
             player: response.state.players[0]!.name,
           },
         }),

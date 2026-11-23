@@ -158,6 +158,8 @@ export type InteractionBarVisibleOption = {
   option: ActionChoiceOption
   disabled: boolean
   disabledTitleKey?: string
+  /** A trigger option labelled by what it does, such as Receive, also names the card it comes from. */
+  sourceCardName?: string
 }
 
 export type InteractionBarChoiceModel = {
@@ -448,6 +450,10 @@ const buildChoiceModel = (
           isSelectionConfirmDisabled),
       ...(option.disabled && option.disabledReasonKey
         ? { disabledTitleKey: option.disabledReasonKey }
+        : {}),
+      ...(choice.promptKey === 'ui.interactionSelectTrigger' && option.sourceCard
+        && option.labelKey !== `cards.${option.sourceCard}.name`
+        ? { sourceCardName: getCardDisplayName(locale, option.sourceCard) }
         : {}),
     })),
     showOptions,

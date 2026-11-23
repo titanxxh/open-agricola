@@ -283,6 +283,33 @@ describe('CI073 Guest', () => {
     expect(confirmNextPlayer(session).interaction.stateId).toBe('idle')
   })
 
+  it('logs an ordinary placement beside a pending Guest once, under the space it uses', () => {
+    const session = setup()
+    playGuest(session)
+    playRoundWithoutGuest(session, 3)
+    const offered = session.getState()
+    expect(offered.state.round).toBe(4)
+    expect(choiceLabels(offered)).toEqual(['actions.place-farmer.name', 'actions.activate-extra-turn.name'])
+    const wood = space(offered, 'forest').resources.wood
+    const logged = offered.state.log.length
+
+    expect(takeNormalWorkerTurn(session, 'forest').ok).toBe(true)
+    const handOff = confirmNextPlayer(session)
+    expect(handOff.ok, handOff.error).toBe(true)
+
+    // The log is newest first; these are the rows of A's turn.
+    const rows = handOff.state.log.slice(0, handOff.state.log.length - logged)
+    expect(JSON.stringify(rows)).not.toContain('__subflow')
+    expect(rows.filter(row => row.key === 'log.placeFarmer')).toEqual([
+      expect.objectContaining({ params: expect.objectContaining({ action: 'actions.forest.name' }) }),
+    ])
+    expect(rows.filter(row => row.key === 'log.actionDetail')).toEqual([
+      expect.objectContaining({ params: expect.objectContaining({
+        action: 'actions.forest.name', detailParts: expect.objectContaining({ gains: { wood } }),
+      }) }),
+    ])
+  })
+
   it('lets the left recipient buy and pass Guest on the next round and book its own Guest', () => {
     const session = setup()
     const [a, b] = session.state.players.map(player => player.id)
