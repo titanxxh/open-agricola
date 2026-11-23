@@ -13,6 +13,7 @@ const touch = (element: Element) => {
 }
 
 beforeAll(() => {
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
 })
 
