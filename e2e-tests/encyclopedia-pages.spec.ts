@@ -1,9 +1,11 @@
 // @covers client/app/encyclopedia/
+// @covers client/encyclopedia-static/ scripts/vite-encyclopedia.ts scripts/build-frontend.ts
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  DESKTOP, detail, entryUrl, expectCatalog, galleryEntries, lobbyReady, mainNavigation, MOBILE, newVisitor, type Layout,
+  copiedLinks, DESKTOP, detail, entryUrl, expectCatalog, expectNoHorizontalOverflow, expectResults, filterOption,
+  filterPanel, filterSidebar, galleryEntries, lobbyReady, mainNavigation, MOBILE, newVisitor, selectedFilters, type Layout,
 } from './helpers/encyclopedia'
 import { buildPagesFrontend, PAGES_API_ORIGIN, servePagesFrontend } from './helpers/pages-frontend'
 
@@ -82,6 +84,24 @@ function observe(page: Page) {
 }
 
 const settled = (page: Page) => page.waitForLoadState('networkidle')
+const standaloneUrl = () => `${site.origin}/encyclopedia/`
+const standaloneCard = () => `${standaloneUrl()}?page=encyclopedia&entry=card%3AA004_Baseboards`
+
+function observeStandalone(page: Page) {
+  const requests = observe(page)
+  const sockets: string[] = []
+  page.on('websocket', socket => sockets.push(socket.url()))
+  return {
+    ...requests,
+    async expectStatic() {
+      expect(requests.all().filter(({ url }) =>
+        ![site.origin, ASSET_ORIGIN].includes(url.origin) || /^\/(api|ws)(\/|$)/.test(url.pathname))).toEqual([])
+      expect(sockets).toEqual([])
+      expect(await page.context().cookies()).toEqual([])
+    },
+  }
+}
+
 const visibleNumbers = (page: Page) => page.locator('.encyclopedia-gallery__meta')
   .evaluateAll(metas => metas.map(meta => meta.textContent!.split(' · ')[0]!))
 
@@ -148,6 +168,7 @@ test.describe('encyclopedia pages artifact resources', () => {
       expect(requests.chunks().filter(chunk => encyclopediaChunks.includes(chunk))).toEqual([])
       expect(requests.catalogData()).toEqual([])
       expect([...requests.cardArt()]).toEqual([])
+      expect(requests.all().filter(({ url }) => url.pathname.startsWith('/encyclopedia/'))).toEqual([])
 
       if (signedIn) await mainNavigation(page).getByRole('link', { name: 'Card Encyclopedia' }).click()
       else await page.goto(catalogUrl())
@@ -225,5 +246,130 @@ test.describe('encyclopedia pages artifact resources', () => {
       await expect(page.getByRole('heading', { level: 1, name: '卡牌百科' })).toBeVisible()
       await expect(page.getByRole('alert')).toHaveCount(0)
     }
+  })
+})
+
+for (const layout of [DESKTOP, MOBILE]) {
+  test.describe(`standalone encyclopedia ${layout.name.replace('encyclopedia ', '')}`, () => {
+    test('browses and shares a card without a game backend @webkit', async ({ browser }) => {
+      const { context, page } = await newVisitor(browser, layout, { clipboard: true })
+      try {
+        const requests = observeStandalone(page)
+        await page.goto(`${standaloneUrl()}?bg=none`, { waitUntil: 'domcontentloaded' })
+        await expectCatalog(page)
+        await expectNoHorizontalOverflow(page)
+        await page.getByRole('button', { name: 'Next page' }).click()
+        await expectCatalog(page, 2)
+
+        const search = page.getByRole('searchbox', { name: 'Search cards' })
+        await search.fill('A004')
+        await expectResults(page, 1)
+        if (layout.phone) {
+          await page.getByRole('button', { name: 'Filters', exact: true }).click()
+          await filterOption(filterPanel(page), 'Minor Improvement').check()
+          await filterPanel(page).getByRole('button', { name: 'Show results (1)' }).click()
+        } else {
+          await filterOption(filterSidebar(page), 'Minor Improvement').check()
+        }
+        await expect(selectedFilters(page)).toHaveText(['Minor Improvement×'])
+        const opener = page.getByRole('button', { name: 'View Baseboards' })
+        await opener.focus()
+        await opener.press('Enter')
+        await expect(detail(page)).toHaveAccessibleName('Baseboards')
+        await page.getByRole('button', { name: 'Copy card link' }).click()
+        await expect(page.getByRole('status').filter({ hasText: 'Card link copied' })).toBeVisible()
+        const links = await copiedLinks(page)
+        expect(links).toEqual([standaloneCard()])
+        await page.goBack()
+        await expect(detail(page)).toBeHidden()
+        await expect(opener).toBeFocused()
+        await page.goForward()
+        await expect(detail(page)).toHaveAccessibleName('Baseboards')
+        await page.keyboard.press('Escape')
+        await expect(detail(page)).toBeHidden()
+        await expect(opener).toBeFocused()
+
+        await page.getByRole('button', { name: /^Display language/ }).click()
+        await page.getByRole('option', { name: '简体中文' }).click()
+        await expect(page.getByRole('heading', { level: 1, name: '卡牌百科' })).toBeVisible()
+        await expect(page.getByRole('button', { name: '查看 护壁板' })).toBeVisible()
+        expect(requests.catalogData().map(({ url }) => url.pathname)).toEqual(expect.arrayContaining([
+          '/encyclopedia/card-encyclopedia/manifest.json',
+          expect.stringMatching(/^\/encyclopedia\/card-encyclopedia\/search\.[a-f0-9]{16}\.json$/),
+        ]))
+        await expect.poll(() => requests.cardArt().has('A004')).toBe(true)
+        expect(await page.evaluate(() => navigator.serviceWorker.getRegistration())).toBeUndefined()
+        await requests.expectStatic()
+
+        const recipient = await newVisitor(browser, layout)
+        try {
+          const receivedRequests = observeStandalone(recipient.page)
+          const [link] = links
+          if (!link) throw new Error('The encyclopedia did not copy a share URL')
+          await recipient.page.goto(link, { waitUntil: 'domcontentloaded' })
+          await expect(detail(recipient.page)).toHaveAccessibleName('Baseboards')
+          await recipient.page.reload({ waitUntil: 'domcontentloaded' })
+          await expect(detail(recipient.page)).toHaveAccessibleName('Baseboards')
+          await recipient.page.getByRole('button', { name: 'Close details' }).click()
+          await expectCatalog(recipient.page)
+          await receivedRequests.expectStatic()
+          const lobbyLink = recipient.page.getByRole('link', { name: /Back to Lobby/i })
+          await expect(lobbyLink).toBeVisible()
+          await lobbyLink.click({ noWaitAfter: true })
+          await expect(recipient.page).toHaveURL(`${site.origin}/`)
+        } finally { await recipient.context.close() }
+      } finally { await context.close() }
+    })
+  })
+}
+
+test.describe('standalone encyclopedia recovery', () => {
+  test('recovers from a missing entry script, failed data and missing art @webkit', async ({ browser }) => {
+    const { context, page } = await newVisitor(browser, DESKTOP)
+    try {
+      const requests = observeStandalone(page)
+      for (const { pattern, message } of [
+        { pattern: /\/encyclopedia\/assets\/[^/]+\.js$/, message: 'Unable to load card data.' },
+        { pattern: /\/encyclopedia\/cards-manifest[^/]*\.json$/, message: 'Unable to load card data.' },
+        { pattern: /\/encyclopedia\/i18n\/en-cards\.[a-f0-9]{16}\.json$/, message: 'Unable to load card data.' },
+        { pattern: /\/encyclopedia\/card-encyclopedia\/manifest\.json$/, message: "Couldn't load the encyclopedia" },
+      ]) {
+        await page.route(pattern, route => route.fulfill({ status: 503, body: '' }))
+        await page.goto(standaloneCard(), { waitUntil: 'domcontentloaded' })
+        const alert = page.getByRole('alert')
+        await expect(alert).toContainText(message)
+        await page.unroute(pattern)
+        await alert.getByRole('button', { name: 'Retry' }).click({ noWaitAfter: true })
+        await expect(detail(page)).toHaveAccessibleName('Baseboards')
+      }
+
+      await page.route('**/deckA/A004.png', route => route.fulfill({ status: 404, body: '' }))
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      const face = detail(page).locator('.encyclopedia-text-face')
+      await expect(face.getByText('Image unavailable')).toBeVisible()
+      await expect(face.getByRole('heading', { name: 'Baseboards' })).toBeVisible()
+      await expect(face).toContainText('room')
+      await requests.expectStatic()
+    } finally { await context.close() }
+  })
+
+  test('opens a card under the installed root service worker @webkit', async ({ browser }) => {
+    const { context, page } = await newVisitor(browser, DESKTOP)
+    try {
+      // Visit the old route once so the actual application registers the root worker.
+      await page.goto(`${catalogUrl()}&bg=none`, { waitUntil: 'domcontentloaded' })
+      await expect.poll(() => page.evaluate(async () =>
+        (await navigator.serviceWorker.getRegistration())?.active?.state)).toBe('activated')
+      await page.close()
+
+      const reader = await context.newPage()
+      const requests = observeStandalone(reader)
+      await reader.goto(standaloneCard(), { waitUntil: 'domcontentloaded' })
+      expect(await reader.evaluate(() => navigator.serviceWorker.controller?.scriptURL)).toBe(`${site.origin}/sw.js`)
+      await expect(detail(reader)).toHaveAccessibleName('Baseboards')
+      await reader.reload({ waitUntil: 'domcontentloaded' })
+      await expect(detail(reader)).toHaveAccessibleName('Baseboards')
+      await requests.expectStatic()
+    } finally { await context.close() }
   })
 })

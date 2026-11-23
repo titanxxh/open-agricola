@@ -473,6 +473,16 @@ VITE_API_BASE=https://api.your-domain.com pnpm run build:pages-frontend
 
 该命令将构建写入 `dist-pages/`，供本地检查。发布时使用上述 Release 或手动 Actions 工作流，在部署前执行候选门禁。
 
+### 静态卡牌百科
+
+正式 Pages 构建使用 `scripts/vite-encyclopedia.ts`，在 `dist-pages/encyclopedia/index.html` 生成静态入口。卡牌元数据、目录、搜索索引和语言包与主前端来自同一个候选提交。卡图与字体使用现有素材站，构建时校验候选提交的 `public-assets.ref`。自托管与预发布构建不包含此入口。
+
+部署完成后，打开 `https://open-agricola.titanxxh.com/encyclopedia/`，再用全新浏览器上下文打开复制出的卡牌链接。链接带有 `page=encyclopedia` 和 `entry` 参数。游戏后端不可用时，目录与详情仍可从静态文件加载。大厅链接返回站点根路径。仓库默认的 `github.io` 项目地址会跳转到 Pages 自定义域名。
+
+百科入口启动时不初始化登录或游戏传输，也不注册 Service Worker。主前端已经安装的 Service Worker 仍可控制对此路径的访问。
+
+要回退百科变更，先在源码中撤销该变更，再按标准发布流程发布通过验证的候选。Pages broker 会重建整个站点并检查后端 SHA 是否一致。源码回退恢复百科代码和生成的数据。卡图版本随素材站发布。
+
 ### 主站图片资源
 
 `public-assets.ref` 固定图片仓的 Git commit，`public-assets.required.json` 声明主站需要的全部路径。构建和默认本地启动读取图片站的 `asset-version.txt` 和 `asset-manifest.json`；两者都必须与 `public-assets.ref` 一致，且清单必须包含所有必需路径。元数据不可达、响应无效、版本不一致或缺少文件都会使启动/构建失败。请求只访问公共 Pages 地址，不携带 GitHub API 凭据。测试配置只读取本地契约，不依赖网络。新构建统一从 `https://titanxxh.github.io/open-agricola-assets/assets/...` 加载公共图片和字体，不带版本查询参数，图片版本升级时未变化文件的 URL 保持不变。GitHub Pages 固定返回 `max-age=600` 并用 ETag 重新验证；原路径替换的文件可能在这段时间内仍是旧内容，需要与应用同时生效的内容应使用新路径。主站、初始 HTML 背景预加载、生成的 CSS 和不可变 Replay Viewer 对所有访客使用同一 Pages 来源，Replay CSP 允许该图片站路径的图片和字体，也保留旧 raw 图片仓路径的许可，供已有房间锁定的不可变 Viewer 使用；新构建仅包含 Pages 资源 URL。不按地域分流，也不在运行时回退 raw。公共资源本身不再打进主站 Pages artifact。已有 Viewer 保留其 `?v=` URL，Pages 会忽略该参数。图片仓按既有设计只发布当前文件；删除或重命名已发布路径会使引用它的已有 Viewer 失效。
