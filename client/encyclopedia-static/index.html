@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Agricola · Card Encyclopedia</title>
+  </head>
+  <body>
+    <div id="root">
+      <main>
+        <p id="loading" role="status">Loading…</p>
+        <div id="load-error" role="alert" hidden>
+          Unable to load card data. <button type="button" onclick="location.reload()">Retry</button>
+        </div>
+      </main>
+    </div>
+    <script>
+      // The cached HTML can outlive the entry script when Pages serves a new build.
+      window.addEventListener('error', (event) => {
+        if (!(event.target instanceof HTMLScriptElement) || event.target.type !== 'module') return
+        document.getElementById('loading')?.setAttribute('hidden', '')
+        document.getElementById('load-error')?.removeAttribute('hidden')
+      }, true)
+    </script>
+    <script type="module" src="/main.tsx"></script>
+  </body>
+</html>

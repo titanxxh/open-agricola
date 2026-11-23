@@ -21,6 +21,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   } else {
     const builds: { configFile: string; entryPoints: Record<string, string> }[] = [
       { configFile: 'vite.config.ts', entryPoints: { 'index.html': 'client/main.tsx', 'workshop-game.html': 'client/workshop-game/main.ts' } },
+      { configFile: 'scripts/vite-encyclopedia.ts', entryPoints: { 'client/encyclopedia-static/index.html': 'client/encyclopedia-static/main.tsx' } },
       { configFile: 'replay-viewer/vite.config.ts', entryPoints: { 'replay-viewer/index.html': 'replay-viewer/src/main.tsx' } },
     ]
     for (const { configFile, entryPoints } of builds) {

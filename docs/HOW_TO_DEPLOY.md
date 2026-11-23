@@ -451,6 +451,16 @@ VITE_API_BASE=https://api.your-domain.com pnpm run build:pages-frontend
 
 This writes `dist-pages/` for local inspection. Publish through the Release or manual Actions workflow above so the candidate gate runs before deployment.
 
+### Static card encyclopedia
+
+The stable Pages build runs `scripts/vite-encyclopedia.ts` to add a static entry at `dist-pages/encyclopedia/index.html`. Its metadata, catalog, search index and language packs come from the same candidate as the main frontend. Artwork and fonts use the existing asset site and the candidate's `public-assets.ref` build check. Hosted and prerelease builds omit this entry.
+
+After deployment, open `https://open-agricola.titanxxh.com/encyclopedia/`, then open a copied card link in a fresh browser context. The link carries the `page=encyclopedia` and `entry` query parameters. The directory and card details load from static files even when the game backend is unavailable. The lobby link returns to the site root. The repository's default `github.io` project URL redirects to the Pages custom domain.
+
+The encyclopedia entry starts without auth, game transport or service worker registration. A service worker already installed by the main frontend can still control visits to this route.
+
+To revert an encyclopedia change, revert it in source and publish the verified candidate through the standard release procedure. The Pages broker rebuilds the whole site and checks the matching backend SHA. The source revert restores encyclopedia code and generated data. Artwork versions follow releases of the asset site.
+
 ### Main-Site Image Assets
 
 `public-assets.ref` pins a Git commit in the asset repository. `public-assets.required.json` declares every path required by the main site. Production builds and the default local startup read the asset site's `asset-version.txt` and `asset-manifest.json`. Both must match `public-assets.ref`, and the manifest must contain every required path; unavailable metadata, malformed responses, version mismatches, or missing files fail startup/build. These requests use only the public Pages endpoint, without GitHub API credentials. Test configuration reads only the local contract and does not use the network.

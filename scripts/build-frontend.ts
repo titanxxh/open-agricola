@@ -1,8 +1,9 @@
 #!/usr/bin/env tsx
 import { execFileSync, spawnSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { copyFileSync, cpSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { HOSTED_APP_PATH, type FrontendBuild } from '../shared/contract/protocol/app-location.ts'
+import { cardsManifestAsset } from './browser-data.ts'
 
 const repoRoot = resolve(import.meta.dirname, '..')
 const mode = process.argv[2]
@@ -40,6 +41,29 @@ const build = spawnSync('pnpm', skipTypecheck
 })
 if (build.error) throw build.error
 if (build.status !== 0) process.exit(build.status ?? 1)
+
+if (mode === 'pages') {
+  execFileSync('pnpm', ['exec', 'vite', 'build', '--config', 'scripts/vite-encyclopedia.ts'], {
+    cwd: repoRoot,
+    stdio: 'inherit',
+  })
+  const pages = resolve(repoRoot, outputDirectory)
+  const encyclopedia = resolve(pages, 'encyclopedia')
+  const { fileName, sha256 } = cardsManifestAsset(readFileSync(resolve(pages, 'cards-manifest.json'), 'utf8'))
+  copyFileSync(resolve(pages, fileName), resolve(encyclopedia, fileName))
+  for (const directory of ['card-encyclopedia', 'i18n']) {
+    cpSync(resolve(pages, directory), resolve(encyclopedia, directory), { recursive: true })
+  }
+  const language: unknown = JSON.parse(readFileSync(resolve(repoRoot, 'i18n.ref'), 'utf8'))
+  const catalog: unknown = JSON.parse(readFileSync(resolve(encyclopedia, 'card-encyclopedia/manifest.json'), 'utf8'))
+  writeFileSync(resolve(encyclopedia, 'build.json'), JSON.stringify({
+    gameBuildId,
+    language,
+    publicAssetsRevision: readFileSync(resolve(repoRoot, 'public-assets.ref'), 'utf8').trim(),
+    cardsManifestSha256: sha256,
+    catalog,
+  }) + '\n')
+}
 
 const frontendBuild = {
   format: 1,
