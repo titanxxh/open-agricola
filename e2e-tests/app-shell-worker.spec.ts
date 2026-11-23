@@ -112,6 +112,17 @@ const uncached = async (page: Page, paths: readonly string[]) => {
 }
 const STORE_TIMEOUT = { timeout: 30_000 }
 
+/**
+ * The game screen's files, which the Worker fetches in the background after each visit (`warm` in `sw.js`). They
+ * come last in its queue, so a visit's own files can be stored while these are still on their way.
+ */
+function warmFiles(): string[] {
+  const list = readFileSync(join(siteDirectory, 'sw.js'), 'utf8').match(/warm:\[([^\]]*)\]/)?.[1] ?? ''
+  const files = [...list.matchAll(/assets\/[\w.-]+\.(?:js|css)/g)].map(([path]) => `/${path}`)
+  if (!files.some(path => /^\/assets\/GameContainerApi-[\w-]+\.js$/.test(path))) throw new Error('The Worker lists no game screen chunk to warm')
+  return files
+}
+
 test('the online encyclopedia works and the retired download and bookmark return 404 @webkit', async ({ page }) => {
   await controlledEncyclopedia(page)
   await expect(page.locator('.encyclopedia-offline')).toHaveCount(0)
@@ -132,7 +143,8 @@ test('a repeat visit loads the hashed app shell and startup data from the Worker
   const shell = await loadedShell(page)
   expect(shell.length).toBeGreaterThan(0)
   expect(startupData()).toHaveLength(4)
-  await expect.poll(() => uncached(page, [...shell, ...startupData()]), STORE_TIMEOUT).toEqual([])
+  // The Worker also fetches the game screen in the background; the next visit starts once it has stored that too.
+  await expect.poll(() => uncached(page, [...shell, ...startupData(), ...warmFiles()]), STORE_TIMEOUT).toEqual([])
 
   requests.length = 0
   await page.reload(documentLoad)
@@ -233,10 +245,7 @@ test('the first visit leaves the next one served by the Worker, game screen incl
   await encyclopediaReady(page)
   expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull()
   const shell = [...new Set(requests.filter(path => path.startsWith('/assets/') && /\.(js|css)$/.test(path)))]
-  const sw = readFileSync(join(siteDirectory, 'sw.js'), 'utf8')
-  const game = sw.match(/assets\/GameContainerApi-[\w-]+\.js/)?.[0]
-  if (!game) throw new Error('The Worker lists no game screen chunk to warm')
-  await expect.poll(() => uncached(page, [...shell, ...startupData(), `/${game}`]), STORE_TIMEOUT).toEqual([])
+  await expect.poll(() => uncached(page, [...shell, ...startupData(), ...warmFiles()]), STORE_TIMEOUT).toEqual([])
 
   requests.length = 0
   const next = await context.newPage()
