@@ -523,7 +523,7 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 ### 启用或暂停浏览器通知
 
-`server/web-push/` 管理设备开关、发送和点击解析。Room Commit 在持久化对局状态时记录轮抽机会。反馈服务在正式流程写入新补资料请求或首封上线通知时记录站内信事件。持久队列面向已开启的设备，每次尝试重新核对账号、设备和事件资格。加密载荷只含通知类别、不透明投递 ID 和通用本地化文案。测试见 `web-push-draft.test.ts` 和 `bug-report-{feedback,release-feedback}.test.ts`。
+`server/web-push/` 管理设备开关、发送和点击解析。Room Commit 在持久化对局状态时记录轮抽机会。反馈服务在正式流程写入新补资料请求或首封上线通知时记录站内信事件。持久队列面向已开启的设备，每次尝试重新核对账号、设备和事件资格。加密载荷只含通知类别、不透明投递 ID 和该类别的通用本地化文案，不含报告、消息、房间或玩家。Pages Worker 以站点名为标题、把文案作为正文，并显示品牌图标；更早安装的 Worker 把文案当作标题显示，所以文案需要单独读也完整。测试见 `web-push-provider.test.ts`、`web-push.spec.ts`、`web-push-draft.test.ts` 和 `bug-report-{feedback,release-feedback}.test.ts`。
 
 正式 Pages 提供 `/sw.js` 后，在后端环境配置 `WEB_PUSH_VAPID_SUBJECT`、`WEB_PUSH_VAPID_PUBLIC_KEY` 和 `WEB_PUSH_VAPID_PRIVATE_KEY`。使用 HTTPS 地址或 `mailto:` 邮箱作为联系地址，将私钥留在后端。各次部署沿用同一对密钥，以保留设备订阅。
 

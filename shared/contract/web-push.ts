@@ -15,6 +15,10 @@ export type WebPushTarget =
 export type WebPushPayload = {
   kind: WebPushKind
   deliveryId: string
+  /**
+   * Generic localized copy for the category, never the message, report, room or player. Current Workers show it as
+   * the body under the site name; Workers installed before that change show it as the title, so it reads on its own.
+   */
   title: string
 }
 
