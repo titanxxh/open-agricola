@@ -5,7 +5,7 @@ import { t, type Locale } from '../../shared/i18n'
 import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { PlayerCard } from '../components/common/PlayerCard'
 import { getPlayerDisplayName } from '../utils/player-name'
-import { useModalDialog } from './encyclopedia/useModalDialog'
+import { useModalDialog } from '../hooks/useModalDialog'
 import type { MultihandInput } from './multihand-seat'
 import './multihand.css'
 
