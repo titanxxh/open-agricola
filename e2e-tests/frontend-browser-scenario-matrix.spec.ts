@@ -478,16 +478,21 @@ test.describe('modal dialogs hand focus back while a stylesheet loads @webkit', 
 
   test('game: the harvest shortfall warning', async ({ browser, request }) => {
     const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
+    const driver = roomDriver(pages)
+    let joined = false
     try {
       await keepStylesheetLoading(pages[0])
       await joinRoomClients(pages, request)
-      const driver = roomDriver(pages)
+      joined = true
       await driver.command(0, { type: 'loadGame', state: moorHarvestFixture({ food: 2, grain: 1, fuel: 1 }) })
       await startHarvest(pages, driver, 'feed')
       const confirm = pages[0].locator('.exchange-overlay').getByRole('button', { name: 'Confirm', exact: true })
       const warning = pages[0].getByRole('alertdialog', { name: 'Resource shortage' })
       await closeTwice(confirm, warning, warning.getByRole('button', { name: 'Back to exchange', exact: true }))
-    } finally { await Promise.allSettled(pages.map(page => page.close())) }
+    } finally {
+      // The fixed room outlives this test; later room tests expect it out of the harvest.
+      try { if (joined) await driver.newGame() } finally { await Promise.allSettled(pages.map(page => page.close())) }
+    }
   })
 })
 
