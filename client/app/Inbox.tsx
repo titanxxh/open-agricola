@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { InboxMessage, InboxPage } from '../../shared/contract/bug-report-feedback'
 import { useAuth } from '../contexts/AuthContext'
@@ -43,6 +43,8 @@ function AccountInbox({ userId, setUnread }: { userId: string; setUnread: (value
   const requestVersion = useRef(0)
   const loadedThrough = useRef<number | null>(null)
   const reading = useRef(0)
+  const body = useRef<HTMLDivElement>(null)
+  const listScrollTop = useRef(0)
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState<InboxPage | null>(null)
   const [selected, setSelected] = useState<InboxMessage | null>(null)
@@ -86,6 +88,7 @@ function AccountInbox({ userId, setUnread }: { userId: string; setUnread: (value
     const load = () => { void refresh() }
     const openInbox = () => {
       reading.current++
+      listScrollTop.current = 0
       setOpen(true); setSelected(null); setBusy(false); setUnavailableNotification(false)
       load()
     }
@@ -125,47 +128,95 @@ function AccountInbox({ userId, setUnread }: { userId: string; setUnread: (value
     void markDisplayed()
   }, [apiFetch, open, selected])
 
+  const selectedId = selected?.id
+  useLayoutEffect(() => {
+    if (open && selectedId === undefined && body.current) body.current.scrollTop = listScrollTop.current
+  }, [open, selectedId])
+
   const close = () => { reading.current++; setOpen(false); setSelected(null) }
+  const back = () => { reading.current++; setBusy(false); setSelected(null); setError(false) }
+  const readFromList = (id: number) => {
+    listScrollTop.current = body.current?.scrollTop ?? 0
+    void read(id)
+  }
+  const relatedReports = selected?.kind === 'fix_released'
+    ? (selected.relatedReports ?? selected.release.reports).filter(report => report.issueNumber !== selected.issueNumber)
+    : []
   return open ? <InboxDialog titleId={titleId} onClose={close}>
-      <header><h2 id={titleId}>{t('feedback.inbox')}</h2><button type="button" className="btn-link" onClick={close} aria-label={t('ui.close')}>×</button></header>
+    <header className="inbox-dialog__header">
+      {selected && <button type="button" className="inbox-dialog__back" onClick={back} aria-label={t('feedback.back')} />}
+      <h2 id={titleId}>{t('feedback.inbox')}</h2>
+      <button type="button" className="inbox-dialog__close" onClick={close} aria-label={t('ui.close')}>×</button>
+    </header>
+    <div className="inbox-dialog__body" ref={body} key={selectedId ?? 'list'}>
       {unavailableNotification && <p role="status">{t('webPush.notificationUnavailable')}</p>}
       {error && <div role="alert"><p>{t('feedback.failed')}</p><button type="button" className="btn-secondary" disabled={busy}
         onClick={() => { if (selected) void read(selected.id); else void refresh() }}>{t('feedback.retry')}</button></div>}
       {selected ? <article className="inbox-message">
-        <button type="button" className="btn-link" onClick={() => { reading.current++; setBusy(false); setSelected(null); setError(false) }}>{t('feedback.back')}</button>
-        <h3>{selected.reportSummary}</h3><p className="inbox-message__kind">{t(feedbackKindKey[selected.kind])}</p>
-        <time dateTime={new Date(selected.createdAt).toISOString()}>{new Date(selected.createdAt).toLocaleString(locale)}</time>
-        <p className="inbox-message__explanation">{selected.kind === 'fix_released' ? t('feedback.releaseExplanation') : selected.explanation}</p>
-        {selected.kind === 'fix_released' && <>
-          {selected.explanation && <><h4>{t('feedback.fixSummary')}</h4><p className="inbox-message__explanation">{selected.explanation}</p></>}
-          {selected.release.historicalFirstIncluded && <p>{t('feedback.historicalFirstIncluded', { version: selected.release.historicalFirstIncluded.version })}{' '}<a href={selected.release.historicalFirstIncluded.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: selected.release.historicalFirstIncluded.version })}</a></p>}
-          <p>{t('feedback.firstVerifiedRelease', { version: selected.release.firstVerified.version })}</p>
-          <time dateTime={new Date(selected.release.firstVerified.verifiedAt).toISOString()}>{new Date(selected.release.firstVerified.verifiedAt).toLocaleString(locale)}</time>
-          <p><a href={selected.release.firstVerified.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: selected.release.firstVerified.version })}</a></p>
+        <h3>{selected.reportSummary}</h3>
+        <div className="inbox-message__meta">
+          <span>{t(feedbackKindKey[selected.kind])}</span>
+          <time dateTime={new Date(selected.createdAt).toISOString()}>{new Date(selected.createdAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}</time>
+        </div>
+        {selected.explanation && <p className="inbox-message__explanation">{selected.explanation}</p>}
+        {selected.kind === 'fix_released' && <div className="inbox-message__releases">
+          {selected.release.historicalFirstIncluded && <p>
+            <a href={selected.release.historicalFirstIncluded.url} target="_blank" rel="noopener noreferrer">{t('feedback.historicalFirstIncluded', { version: selected.release.historicalFirstIncluded.version })}</a>
+          </p>}
+          <p>
+            <a href={selected.release.firstVerified.url} target="_blank" rel="noopener noreferrer">{t('feedback.firstVerifiedRelease', { version: selected.release.firstVerified.version })}</a>
+            {' '}<time dateTime={new Date(selected.release.firstVerified.verifiedAt).toISOString()}>{new Date(selected.release.firstVerified.verifiedAt).toLocaleString(locale)}</time>
+          </p>
           {selected.currentProduction && selected.currentProduction.sha !== selected.release.firstVerified.sha && <p>
-            {t('feedback.currentProductionRelease', { version: selected.currentProduction.version })}{' '}
-            <a href={selected.currentProduction.url} target="_blank" rel="noopener noreferrer">{t('feedback.releaseLink', { version: selected.currentProduction.version })}</a>
+            <a href={selected.currentProduction.url} target="_blank" rel="noopener noreferrer">{t('feedback.currentProductionRelease', { version: selected.currentProduction.version })}</a>
             {' '}<time dateTime={new Date(selected.currentProduction.verifiedAt).toISOString()}>{new Date(selected.currentProduction.verifiedAt).toLocaleString(locale)}</time>
           </p>}
-          <h4>{t('feedback.relatedReports')}</h4>
-          <ul>{(selected.relatedReports ?? selected.release.reports).map(report => <li key={report.submissionId}>
-            <a href={`https://github.com/titanxxh/open-agricola/issues/${report.issueNumber}`} target="_blank" rel="noopener noreferrer">{t('feedback.reportLink', { number: report.issueNumber })}</a>
-          </li>)}</ul>
-        </>}
+        </div>}
         {selected.kind === 'needs_info' && <><h4>{t('feedback.missingItems')}</h4>
           <ul>{selected.missingItems.map((item, index) => <li key={index}>{item}</li>)}</ul>
           <p>{t('feedback.githubAccountHint')}</p></>}
         <a href={selected.issueUrl} target="_blank" rel="noopener noreferrer">{t('feedback.reportLink', { number: selected.issueNumber })}</a>
+        {relatedReports.length > 0 && <>
+          <h4>{t('feedback.relatedReports')}</h4>
+          <ul>{relatedReports.map(report => <li key={report.submissionId}>
+            <a href={`https://github.com/titanxxh/open-agricola/issues/${report.issueNumber}`} target="_blank" rel="noopener noreferrer">{t('feedback.reportLink', { number: report.issueNumber })}</a>
+          </li>)}</ul>
+        </>}
       </article> : !page ? !error && <p role="status">{t('platform.loading')}</p> : <>
-        {page.messages.length === 0 ? <p>{t('feedback.empty')}</p> : <ol className="inbox-list">{page.messages.map(entry => <li key={entry.id}>
-          <button type="button" disabled={busy} onClick={() => { void read(entry.id) }}>
-            <span>{entry.reportSummary}</span><small>{entry.readAt === null ? t('feedback.unread') : t('feedback.read')}</small>
-            <time dateTime={new Date(entry.createdAt).toISOString()}>{new Date(entry.createdAt).toLocaleString(locale)}</time>
-          </button>
-        </li>)}</ol>}
-        {page.nextCursor !== null && <button type="button" className="btn-secondary" onClick={() => { void refresh(page.nextCursor ?? undefined) }}>{t('feedback.more')}</button>}
+        {page.messages.length === 0 ? <p className="inbox-dialog__empty">{t('feedback.empty')}</p> : <InboxList messages={page.messages} busy={busy} onRead={readFromList} />}
+        {page.nextCursor !== null && <button type="button" className="inbox-dialog__more" onClick={() => { void refresh(page.nextCursor ?? undefined) }}>{t('feedback.more')}</button>}
       </>}
-    </InboxDialog> : null
+    </div>
+  </InboxDialog> : null
+}
+
+function InboxList({ messages, busy, onRead }: { messages: InboxMessage[]; busy: boolean; onRead: (id: number) => void }) {
+  const { locale, t } = useLocale()
+  const id = useId()
+  const unreadId = `${id}-unread`
+  const readId = `${id}-read`
+  const formatTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' })
+
+  return <>
+    <span id={unreadId} hidden>{t('feedback.unread')}</span>
+    <span id={readId} hidden>{t('feedback.read')}</span>
+    <ol className="inbox-list" role="list">{messages.map(entry => {
+      const unread = entry.readAt === null
+      const subjectId = `${id}-${entry.id}-subject`
+      const timeId = `${id}-${entry.id}-time`
+      const createdAt = new Date(entry.createdAt)
+      return <li key={entry.id}>
+        <button type="button" className="inbox-list__row" disabled={busy} onClick={() => onRead(entry.id)}
+          aria-labelledby={subjectId} aria-describedby={`${unread ? unreadId : readId} ${timeId}`}>
+          {unread && <span className="inbox-list__unread" aria-hidden="true" />}
+          <span className="inbox-list__summary">
+            <span id={subjectId} className="inbox-list__subject">{entry.reportSummary}</span>
+            <time id={timeId} dateTime={createdAt.toISOString()}>{formatTime.format(createdAt)}</time>
+          </span>
+        </button>
+      </li>
+    })}</ol>
+  </>
 }
 
 function InboxDialog({ titleId, onClose, children }: { titleId: string; onClose: () => void; children: ReactNode }) {
