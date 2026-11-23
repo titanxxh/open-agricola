@@ -12,6 +12,7 @@ import { getCardDisplayText, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
 import { resolveLogPlayerNames } from '../../../shared/events/log-player-names'
 import { resolveCardDisplayName, resolveCardRef, type CardRef } from './card-reference'
+import { cardActionSourceCardId } from '../../../shared/projections/card-action-id'
 
 const joinCardNames = (locale: Locale, names: string[]) =>
   names.join(translateMessage(locale, 'ui.listSeparator'))
@@ -21,7 +22,10 @@ const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
   if (translated !== value) return translated
   const actionKey = `actions.${value}.name`
   const actionName = t(locale, actionKey)
-  return actionName === actionKey ? value : actionName
+  if (actionName !== actionKey) return actionName
+  // An unnamed card action, including one already recorded in a retained log, reads as its card's effect.
+  const cardId = cardActionSourceCardId(value)
+  return cardId ? t(locale, 'log.cardEffectAction', { card: resolveCardDisplayName(locale, cardId) }) : value
 }
 
 const houseTypeLabel = (locale: Locale, type: PlayerState['houseType']) => {
@@ -384,7 +388,9 @@ export const prepareLogEntry = (
   }
   if (params && entry.key === 'log.cardTriggered') {
     const details: string[] = []
-    if (typeof params.triggerAction === 'string' && params.triggerAction) {
+    // A card triggered by its own action already names that card.
+    if (typeof params.triggerAction === 'string' && params.triggerAction
+      && cardActionSourceCardId(params.triggerAction) !== params.cardId) {
       details.push(resolveMaybeTranslationKey(locale, params.triggerAction))
     }
     if (params.replacement === true) details.push(t(locale, 'log.cardTriggerReplacement'))

@@ -5,6 +5,8 @@ import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { ExchangeOverlayPresentation, type ExchangeOverlayDraft } from '../exchange-overlay-presentation'
+import { exchangeSourceLabel } from '../exchange-source-label'
+import { buildExchangeCatalogOptions } from '../hooks/use-harvest-flow'
 
 const baseDraft = (): ExchangeOverlayDraft => ({
   bake: {
@@ -173,5 +175,19 @@ describe('ExchangeOverlayPresentation', () => {
     renderOverlay(draft, {}, { harvestFeedConfirmDisabled: true })
 
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+  })
+
+  it('names classic exchange cards in the viewer language', () => {
+    const catalog = [{ sourceId: 'CWM095_MountainCave', exchangeIndex: 0, from: { wood: 1 }, to: { stone: 1 }, max: 1 }]
+    for (const [locale, name, other] of [['zh', '山洞', 'Mountain Cave'], ['en', 'Mountain Cave', '山洞']] as const) {
+      const draft = baseDraft()
+      draft.harvest.isActive = true
+      draft.harvest.options = buildExchangeCatalogOptions(catalog, locale, id => exchangeSourceLabel(locale, id))
+      const { unmount } = renderOverlay(draft, {}, { locale, cardLabel: id => exchangeSourceLabel(locale, id) })
+      const row = screen.getByTestId('harvest-feed-option-CWM095_MountainCave-ex0')
+      expect(row.querySelector('.exchange-name')?.textContent).toBe(name)
+      expect(row.textContent).not.toContain(other)
+      unmount()
+    }
   })
 })

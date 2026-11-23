@@ -23,6 +23,7 @@ import type {
 import { isFarmyardBorderEdge, parseEdgeId, positionKey } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
+import { cardCounterLabel } from './card-counter-label'
 import { formatCardStatsLines, type CardStatLine } from '../common/cardStatsFormat'
 import { CardWithCopy } from '../common/CardWithCopy'
 import { GuestIcon } from '../common/GuestIcon'
@@ -694,11 +695,14 @@ const PlayedCardStats = ({
           {Object.entries(visibleCounters).map(([resKey, count]) => {
             if (count <= 0) return null
             const isKnownResource = resKey in emptyResources
+            const label = isKnownResource
+              ? `${count} ${t(locale, `resources.${resKey}`)}`
+              : cardCounterLabel(locale, resKey, count)
             return (
               <div
                 key={`state-${rawId}-${resKey}`}
                 className={isKnownResource ? `resource-chip resource-${resKey}` : 'card-future-item'}
-                title={`${count} ${t(locale, `resources.${resKey}`)}`}
+                title={label}
               >
                 {isKnownResource ? (
                   <>
@@ -706,9 +710,7 @@ const PlayedCardStats = ({
                     <span className="resource-chip-count">{count}</span>
                   </>
                 ) : (
-                  <span className="resource-chip-text">
-                    {count} {t(locale, `resources.${resKey}`)}
-                  </span>
+                  <span className="resource-chip-text">{label}</span>
                 )}
               </div>
             )

@@ -257,6 +257,8 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 
 `LogEntry { key, params, playerId? }` 携带 i18n key 与参数，按当前语言渲染。开局条目可带稳定的 `playerId`，座位显示名变化时按身份刷新。
 
+没有名称、符合 `card_<CardId>_<action>` 约定的行动显示为该卡的效果，已记录的行也一样；卡牌由自己的行动触发时不再重复。公共事件提示用卡名和行动格名，不用 ID。测试：`ActionLog.test.tsx`、`card-action-id.test.ts`、`public-event-presentation.test.ts`。
+
 
 ## Beta 资格
 
