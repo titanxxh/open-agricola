@@ -131,6 +131,7 @@ HTTP 负责产品 API、运维与调试。WebSocket 命令仍是对局同步主�
 - `oauth/{handler,store}.ts` 负责 provider 发起、回调与完成。PKCE 绑定账号关联，浏览器 challenge 绑定注册票据；显式无效凭证不回退 Cookie 身份。账号、身份、邀请与票据消费同事务提交。回调用 fragment，设置 `no-store` 与 `no-referrer`。
 - `prerelease-sessions.ts` 拥有无凭据主体与绝对会话期限。浏览器回执先于身份投影提交；重试重新核对同一来源 grant。logout-all 阻断此前的回调。有界失效记录按主体收窄，读取保留调用方的数据库、时间和行锁。会话和 Cookie 响应持有原生共享行锁直至发送，跨实例退出不能穿过发布边界。`prerelease-access.ts` 在 HTTP、命令和下发前把关，撤销后断连。删除先于确认；原生 view 与无服务 key 的 `scripts/prerelease/identity-audit.ts` 负责恢复重绑。
 - `prerelease-authority{,-routes}.ts` 拥有正式交接、目标 key 兑换/复核及持久事件。迁移 037/039 绑定来源撤销和 owner 代次审计；仅正式管理员可开放或退役代次。浏览器入口遵循统一 Origin/协议策略。测试：`{prerelease-authority,prerelease-retirement,auth-routes}.test.ts`；政策见 ADR 0042。
+- `PRERELEASE_CLOSED_ROUTES`（`shared/contract/prerelease-runtime.ts`）列出 pre 不提供的正式站专属功能：Issue 提交和 What's New。`prerelease-routes.ts` 以 `prerelease_readonly` 拒绝这些路由；pre 客户端的 `bindPrereleaseRequest` 在发请求前就拒绝。测试：`prerelease-{access-routes,runtime}.test.ts`、`prerelease-session.spec.ts`。
 
 认证测试：`auth-routes.test.ts`、`oauth/__tests__/store.test.ts`、`e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`。
 
