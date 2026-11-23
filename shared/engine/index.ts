@@ -19,6 +19,7 @@ export {
   type EngineFrameCursor,
   type EngineStackCursor,
   type EngineSource,
+  type FeedOpportunityBaseline,
   type SubFlowReason,
   type StageResumeState,
 } from './engine-stack'

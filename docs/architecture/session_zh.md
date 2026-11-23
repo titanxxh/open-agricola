@@ -142,7 +142,7 @@ type SessionResponse = {
 
 `computeHarvestFeedingOrderPriority()` 只调整喂食队列，数值较高者较晚，相同数值保持正常收获玩家顺序。队列在喂食阶段 hook 后冻结，并在 pending / 恢复时保留；田间和繁殖顺序不变。测试：`server/__tests__/classic-slaughterhouse-session.test.ts`。
 
-`handleFeedResolved()` 解析已提供目录与实时配方，完整校验批次后，把原等待帧替换为普通 Exchange flow。私有 `harvestSettlementResume` 保存剩余需求、已付食物、转换成本和玩家队列。完整批次反应与必需的动物整理结束后，才支付剩余食物、补乞讨和供暖。快照恢复与撤销同时恢复续行和引擎游标，不重做已完成兑换或重复扣除已付食物。
+`handleFeedResolved()` 解析已提供目录与实时配方，完整校验批次后，把原等待帧替换为普通 Exchange flow。私有 `harvestSettlementResume` 保存剩余需求、已付食物、转换成本、玩家队列和 `opportunityBaseline`：提交时随请求提供的可暂停随时行动，以及仅按所选配方结算后的库存。完整批次反应与必需的动物整理结束后，才支付剩余食物、补乞讨和供暖。之后只有出现提交时无法选择的机会，即基线中没有的可暂停随时行动，或反应使某项资源高于基线，才以同一续行重开喂养；否则按已确认批次立即结算，包括补乞讨。没有基线的旧续行在仍有可暂停随时行动时重开。快照恢复与撤销同时恢复续行和引擎游标，不重做已完成兑换或重复扣除已付食物。测试：`server/__tests__/exchange-batch-session.test.ts`。
 
 `startHeatingOrContinue()` 在各参与玩家的喂养续行结束后结算其供暖。`shared/moor/heating.ts` 的 `computeHeatingRequirementBeforeSeason()` 是保留房屋与当前卡牌折扣、上限的纯需求查询；普通查询随后应用季节。夏季正常需求大于零时，通过原有 `harvest.heated` 事实记录豁免，不打开支付交互。它在此 seam 读取玩家当前卡牌状态，不修改季节来重建假设支付。测试：`server/__tests__/season-heating-log-session.test.ts`。
 

@@ -39,12 +39,22 @@ export type StageResumeState = {
   extra?: Record<string, unknown>
 }
 
+/** What a feeding batch's owner could already choose when submitting it. */
+export type FeedOpportunityBaseline = {
+  /** Pausing anytime actions offered with the submitted feed request. */
+  anytimeIds: string[]
+  /** Supply after the submitted recipes alone, before any reaction. */
+  resources: Partial<Resource>
+}
+
 export type HarvestSettlementResume = {
   kind: 'feed'
   remaining: number
   foodUsed: number
   feedQueue: FeedQueueEntry[]
   resourcesConverted: Partial<Resource>
+  /** Absent in continuations saved before the baseline existed. */
+  opportunityBaseline?: FeedOpportunityBaseline
 } | {
   kind: 'heating'
   fuelUsed: number

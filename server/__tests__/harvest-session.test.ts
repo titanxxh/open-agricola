@@ -312,7 +312,10 @@ describe('harvest session flow', () => {
     resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: 'D060_LargePottery', exchangeIndex: 0, count: 1, sourceName: 'Large Pottery' },
     ] })
-    if (resp.interaction.request.kind === 'feed') resp = session.resolveChoice(0, 'confirm', { selections: [] })
+    // The second clay was already offered, so the covering batch settles feeding at once.
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(5)
 
     const p = resp.state.players[0]!
     // 1 clay -> 2 food; need 2 food, all consumed; no begging

@@ -3,7 +3,7 @@
 // @covers shared/moor/
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
-import { moorHarvestFixture, startHarvest } from './helpers/harvest-room'
+import { baseHarvestFixture, moorHarvestFixture, startHarvest } from './helpers/harvest-room'
 
 test('wood conversion and heating share the exchange center in a synchronized room', async ({ browser, request }, testInfo) => {
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
@@ -114,5 +114,41 @@ test('harvest shortfalls require confirmation and preserve exchange choices when
       ])
     }
     expect((await roomSnapshot(pages[1])).interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'heating' } })
+  } finally { await Promise.all(pages.map(page => page.close())) }
+})
+
+test('a feeding exchange that covers the shortfall settles with one confirmation', async ({ browser, request }) => {
+  const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
+  try {
+    await joinRoomClients(pages, request)
+    const driver = roomDriver(pages)
+    const page = pages[0]
+    const exchange = page.locator('.exchange-overlay')
+    await driver.command(0, { type: 'loadGame', state: baseHarvestFixture((player, state) => {
+      player.improvements = ['Major_Fireplace1']
+      state.availableMajorImprovements = state.availableMajorImprovements.filter(card => card !== 'Major_Fireplace1')
+      Object.assign(player.resources, { food: 3, grain: 1, sheep: 1 })
+      const room = player.roomTiles[0]!
+      player.houseAnimals = { [`${room.row}-${room.col}`]: 'sheep' }
+    }) })
+    await startHarvest(pages, driver, 'feed')
+    await expect(exchange).toContainText('3/4 · Begging 1')
+    // Cooking the house sheep stays on offer after the exchange; that alone no longer reopens feeding.
+    await expect(exchange.getByTestId(/^harvest-feed-option-Major_Fireplace1-/).first()).toBeVisible()
+    await page.getByTestId('harvest-feed-option-__basic__-ex0').getByRole('button', { name: '+', exact: true }).click()
+    await expect(exchange).toContainText('4/4 · Begging 0')
+    await driver.ui(0, () => exchange.getByRole('button', { name: 'Confirm', exact: true }).click())
+    await expect(page.getByRole('alertdialog', { name: 'Resource shortage' })).toHaveCount(0)
+    for (const roomPage of pages) {
+      await expect(roomPage.locator('.exchange-overlay')).toHaveCount(0)
+      const settled = await roomSnapshot(roomPage)
+      expect(settled.state.round).toBe(5)
+      expect(settled.interaction.stateId).toBe('idle')
+      expect(settled.state.players[0]!.resources).toMatchObject({ food: 0, grain: 0, sheep: 1, begging: 0 })
+      expect(settled.state.log.filter(entry => entry.key === 'log.harvestFeedDetail' &&
+        entry.playerId === settled.state.players[0]!.id)).toEqual([expect.objectContaining({
+        params: expect.objectContaining({ resources: { grain: 1, food: 4 } }),
+      })])
+    }
   } finally { await Promise.all(pages.map(page => page.close())) }
 })
