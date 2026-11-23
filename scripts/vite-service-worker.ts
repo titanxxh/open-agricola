@@ -21,6 +21,8 @@ type WorkerFeatures = {
   /** This build's content-addressed files with their SHA-256 and background warm set; omitted to leave them to the HTTP cache. */
   appShell?: Readonly<{ digests: Readonly<Record<string, string>>; warm: readonly string[] }>
   roomOffline: boolean
+  /** Site-relative URL of the brand icon that notifications display. */
+  notificationIcon: string
   emergencyTakeover: boolean
 }
 type AssetWorkerConfig = Pick<PublicAssetConfig, 'baseUrl' | 'digests'>
@@ -40,11 +42,21 @@ function roomOfflineCopy(locale: 'en' | 'zh') {
   return { message: message('ui.roomOfflineMessage'), retry: message('platform.retry') }
 }
 
+/** The bundled brand logo, which the app already loads, as the notification icon. */
+export function notificationIcon(bundle: Rolldown.OutputBundle, base: string): string {
+  const logo = Object.values(bundle).find(output => output.type === 'asset'
+    && output.originalFileNames.some(name => name.split(path.sep).join('/').endsWith('client/assets/brand-logo.png')))
+  if (!logo) throw new Error('The Pages Worker cannot find the brand logo for notifications')
+  return `${base}${logo.fileName}`
+}
+
 export function serviceWorkerPlugin(config: PublicAssetConfig): Plugin {
+  let base = '/'
   return {
     name: 'main-site-service-worker',
     apply: 'build',
     enforce: 'post',
+    configResolved: resolved => { base = resolved.base },
     // The Worker lists the finished bundle's hashed files, so it is built after every plugin has rewritten them.
     generateBundle: { order: 'post', async handler(_options, bundle) {
       const source = await buildServiceWorker(config, {
@@ -53,6 +65,7 @@ export function serviceWorkerPlugin(config: PublicAssetConfig): Plugin {
           ? { digests: appShellDigests(bundle, path.join(root, 'public')), warm: screenFiles(bundle, 'client/app/GameContainerApi.tsx') }
           : undefined,
         roomOffline: ROOM_OFFLINE_RETRY_ENABLED,
+        notificationIcon: notificationIcon(bundle, base),
         emergencyTakeover: SERVICE_WORKER_EMERGENCY_TAKEOVER,
       })
       this.emitFile({ type: 'asset', fileName, source })
@@ -162,7 +175,7 @@ function workerSource(config: AssetWorkerConfig, features: WorkerFeatures) {
   if (features.roomOffline) {
     add('installRoomOffline', 'service-worker/room-offline.worker.ts', { en: roomOfflineCopy('en'), zh: roomOfflineCopy('zh') })
   }
-  add('installWebPush', 'service-worker/web-push.worker.ts')
+  add('installWebPush', 'service-worker/web-push.worker.ts', { icon: features.notificationIcon })
   add('installWorkerCapabilities', 'service-worker/capabilities.ts')
   if (features.emergencyTakeover) {
     install.push('self.addEventListener("install", event => event.waitUntil(self.skipWaiting()));')

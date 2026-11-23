@@ -20,17 +20,40 @@ import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { buildPagesFrontend, servePagesFrontend } from './helpers/pages-frontend'
 import { authenticateSolo, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
 
-async function clickPush(worker: Worker, kind: WebPushKind, deliveryId: string) {
-  return worker.evaluate(async ({ kind, deliveryId }) => {
+type Displayed = { title: string; body?: string; icon?: string; badge?: string; data: unknown; tag?: string }
+
+/** Dispatches a push with this payload to the Worker and returns what it asked the browser to show. */
+async function showPush(worker: Worker, payload: unknown) {
+  return worker.evaluate(async payload => {
+    const scope = self as unknown as ServiceWorkerGlobalScope
+    const push = new PushEvent('push', { data: JSON.stringify(payload) })
+    let messageShown: Promise<unknown> | undefined
+    let displayed: Displayed | undefined
+    const show = scope.registration.showNotification
+    scope.registration.showNotification = async (title, options) => {
+      displayed = { title, body: options?.body, icon: options?.icon, badge: options?.badge, data: options?.data, tag: options?.tag }
+    }
+    try {
+      Object.defineProperty(push, 'waitUntil', { value: (work: Promise<unknown>) => { messageShown = work } })
+      scope.dispatchEvent(push)
+      await messageShown
+    } finally {
+      scope.registration.showNotification = show
+    }
+    return displayed
+  }, payload)
+}
+
+async function clickPush(worker: Worker, kind: WebPushKind, deliveryId: string, title: string) {
+  return worker.evaluate(async ({ kind, deliveryId, title }) => {
     // The Playwright callback runs in the active classic Service Worker.
     const scope = self as unknown as ServiceWorkerGlobalScope
-    const title = kind === 'draft' ? 'You have cards to draft' : 'You have a new inbox message'
     const push = new PushEvent('push', { data: JSON.stringify({ kind, deliveryId, title }) })
     let messageShown: Promise<unknown> | undefined
-    let displayed: { title: string; data: unknown; tag?: string } | undefined
+    let displayed: Displayed | undefined
     const show = scope.registration.showNotification
     scope.registration.showNotification = async (name, options) => {
-      displayed = { title: name, data: options?.data, tag: options?.tag }
+      displayed = { title: name, body: options?.body, icon: options?.icon, data: options?.data, tag: options?.tag }
     }
     try {
       Object.defineProperty(push, 'waitUntil', { value: (work: Promise<unknown>) => { messageShown = work } })
@@ -59,12 +82,12 @@ async function clickPush(worker: Worker, kind: WebPushKind, deliveryId: string) 
     try {
       scope.dispatchEvent(click)
       await clickComplete
-      return { title: notification.title, focusedUrl, openedUrl }
+      return { title: notification.title, body: notification.body, icon: notification.icon, focusedUrl, openedUrl }
     } finally {
       WindowClient.prototype.focus = focus
       scope.clients.openWindow = open
     }
-  }, { kind, deliveryId })
+  }, { kind, deliveryId, title })
 }
 
 test('a verified notification opens draft and inbox in the existing Pages game without replacing its connection',
@@ -141,7 +164,15 @@ test('a verified notification opens draft and inbox in the existing Pages game w
       const activeSocket = sockets.at(-1)
       expect(activeSocket?.isClosed()).toBe(false)
       const beforeClick = sockets.length
-      expect(await clickPush(worker, 'draft', draft)).toEqual({ title: 'You have cards to draft', focusedUrl: gameClient, openedUrl: null })
+      // The current backend's payload: generic copy under the site name with the bundled brand icon.
+      const icon = expect.stringMatching(/^\/assets\/brand-logo-[\w-]+\.png$/)
+      const draftCopy = "It's your turn to pick cards in the draft."
+      expect(await clickPush(worker, 'draft', draft, draftCopy))
+        .toEqual({ title: 'Open Agricola', body: draftCopy, icon, focusedUrl: gameClient, openedUrl: null })
+      // Payloads stay generic: an added field never reaches the notification, and an unreadable one still shows the site name.
+      const extra = await showPush(worker, { kind: 'draft', deliveryId: draft, title: draftCopy, roomName: 'Secret room' })
+      expect(extra).toEqual({ title: 'Open Agricola', body: draftCopy, icon, data: { kind: 'draft', deliveryId: draft }, tag: draft })
+      expect(await showPush(worker, { title: 'Not a delivery' })).toEqual({ title: 'Open Agricola', icon })
 
       const wrongAccount = await otherContext.newPage()
       await wrongAccount.goto(`${site.origin}/?push=${draft}&pushKind=draft`)
@@ -168,7 +199,9 @@ test('a verified notification opens draft and inbox in the existing Pages game w
         .toContain('page=settings')
 
       const lookup = game.waitForResponse(response => new URL(response.url()).pathname === `/api/v1/inbox/${messageId}`)
-      expect(await clickPush(worker, 'bug-report-inbox', inbox)).toEqual({ title: 'You have a new inbox message', focusedUrl: gameClient, openedUrl: null })
+      // A backend from before the copy change sends its short line as the title; it becomes the body.
+      expect(await clickPush(worker, 'bug-report-inbox', inbox, 'You have a new inbox message'))
+        .toEqual({ title: 'Open Agricola', body: 'You have a new inbox message', icon, focusedUrl: gameClient, openedUrl: null })
       expect((await lookup).status()).toBe(200)
       await expect(staleAccountTab.locator('dialog.inbox-dialog')).toHaveCount(0)
       const modal = game.locator('dialog.inbox-dialog')

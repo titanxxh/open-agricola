@@ -187,7 +187,7 @@ test.beforeAll(async () => {
   workerPath = join(siteDirectory, 'sw.js')
   normalWorker = readFileSync(workerPath, 'utf8')
   emergencyWorker = await buildServiceWorker({ baseUrl: PUBLISH_URL },
-    { assets: false, roomOffline: true, emergencyTakeover: true })
+    { assets: false, roomOffline: true, notificationIcon: '/assets/brand-logo.png', emergencyTakeover: true })
   assets = await startAssetOrigin(resolve(assetCheckout), directory)
 })
 

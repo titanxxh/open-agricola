@@ -45,16 +45,23 @@ async function clickNotification(scope: ServiceWorkerGlobalScope, click: WebPush
   await scope.clients.openWindow(url.href)
 }
 
-export function installWebPush(scope: ServiceWorkerGlobalScope): void {
+/** Build-time presentation: the site's brand icon as a site-relative URL. */
+export type WebPushPresentation = { icon: string }
+
+const NOTIFICATION_TITLE = 'Open Agricola'
+
+export function installWebPush(scope: ServiceWorkerGlobalScope, presentation: WebPushPresentation): void {
   scope.addEventListener('push', event => {
     let data: unknown
     try { data = event.data?.json() } catch { /* The browser requires a visible notification. */ }
     const click = parseWebPushClick(data)
-    const title = click && data && typeof data === 'object' && 'title' in data
-      && typeof data.title === 'string' && data.title.length > 0 && data.title.length <= 120 ? data.title : 'Open Agricola'
-    event.waitUntil(scope.registration.showNotification(title, click
-      ? { data: click, tag: click.deliveryId }
-      : {}))
+    // The payload's localized line becomes the body under the site name; see WebPushPayload.title.
+    const body = click && data && typeof data === 'object' && 'title' in data
+      && typeof data.title === 'string' && data.title.length > 0 && data.title.length <= 120 ? data.title : undefined
+    event.waitUntil(scope.registration.showNotification(NOTIFICATION_TITLE, {
+      icon: presentation.icon,
+      ...click ? { body, data: click, tag: click.deliveryId } : {},
+    }))
   })
   scope.addEventListener('notificationclick', event => {
     event.notification.close()

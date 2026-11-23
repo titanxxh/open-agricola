@@ -1,9 +1,15 @@
 import { createECDH, randomBytes, randomUUID } from 'node:crypto'
-import { generateVAPIDKeys } from 'web-push'
+import { encrypt, generateVAPIDKeys } from 'web-push'
 import { describe, expect, it, vi } from 'vitest'
-import { registerLanguagePack } from '../../shared/i18n'
+import '../language-packs'
+import type { WebPushKind } from '../../shared/contract/web-push'
 import { createPushProvider, parsePushSubscription, webPushRuntime } from '../web-push/provider'
 import type { PushDelivery } from '../web-push/store'
+
+vi.mock('web-push', async importOriginal => {
+  const actual = await importOriginal<typeof import('web-push')>()
+  return { ...actual, encrypt: vi.fn(actual.encrypt) }
+})
 
 const deviceKeys = () => ({
   p256dh: createECDH('prime256v1').generateKeys().toString('base64url'),
@@ -12,7 +18,6 @@ const deviceKeys = () => ({
 
 describe('Web Push provider', () => {
   it('posts encrypted bytes to the subscribed provider with the remaining TTL and a stable topic', async () => {
-    registerLanguagePack({ version: 1, locale: 'en', messages: { 'webPush.draftNotification': 'You have cards to draft' } })
     const delivery: PushDelivery = {
       deliveryId: randomUUID(), bindingId: randomUUID(), kind: 'draft', expiresAt: Date.now() + 60_000, locale: 'en',
       subscription: { endpoint: 'https://fcm.googleapis.com/fcm/send/example-device', keys: deviceKeys() },
@@ -40,7 +45,27 @@ describe('Web Push provider', () => {
     expect(secondHeaders.get('Topic')).toBe(firstHeaders.get('Topic'))
     expect(secondHeaders.get('Authorization')).toBe(firstHeaders.get('Authorization'))
     expect(first?.[1]?.body).toBeInstanceOf(Uint8Array)
-    expect(String(first?.[1]?.body)).not.toContain('You have cards to draft')
+    expect(String(first?.[1]?.body)).not.toContain("It's your turn to pick cards in the draft.")
+  })
+
+  it.each<[WebPushKind, string, string]>([
+    ['draft', 'en', "It's your turn to pick cards in the draft."],
+    ['draft', 'zh', '轮到你在轮抽中选牌了'],
+    ['bug-report-inbox', 'en', 'Your Bug Report has a new reply. Open it to view.'],
+    ['bug-report-inbox', 'zh', '你的 Bug Report 有新回复，点开查看'],
+    ['bug-report-inbox', 'fr', 'Your Bug Report has a new reply. Open it to view.'],
+  ])('encrypts only the %s category, the delivery ID and generic %s copy', async (kind, locale, title) => {
+    vi.mocked(encrypt).mockClear()
+    const delivery: PushDelivery = {
+      deliveryId: randomUUID(), bindingId: randomUUID(), kind, expiresAt: Date.now() + 60_000, locale,
+      subscription: { endpoint: 'https://fcm.googleapis.com/fcm/send/example-device', keys: deviceKeys() },
+    }
+    const send = createPushProvider({ ...generateVAPIDKeys(), subject: 'mailto:test@example.com' },
+      vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 201 })))
+    expect(await send(delivery, 60)).toEqual({ kind: 'accepted' })
+    const [[, , plaintext]] = vi.mocked(encrypt).mock.calls as [[string, string, string, string]]
+    // The exact object: no report title, message, room or player can ride along, and old Workers read every field.
+    expect(JSON.parse(plaintext)).toStrictEqual({ kind, deliveryId: delivery.deliveryId, title })
   })
 
   it('rejects arbitrary hosts and credentials at subscription intake', () => {
