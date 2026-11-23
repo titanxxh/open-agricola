@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { encodeReplayFrame, type JsonValue } from '../../server/game/replay-codec'
 import type { ReplayHeaderRow, ReplayStepRow } from '../replay-integrity'
-import { MAX_STORAGE_VALIDATION_CONCURRENCY, storageValidationConcurrency, validateReplays } from '../replay-validation-pool'
+import { validateReplays } from '../replay-validation-pool'
+import { MAX_STORAGE_VALIDATION_CONCURRENCY, storageValidationConcurrency } from '../storage-validation-concurrency'
 
 const replay = (roomId: string, length: number): { header: ReplayHeaderRow; rows: ReplayStepRow[] } => {
   let previous: JsonValue | null = null

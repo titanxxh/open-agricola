@@ -5,8 +5,8 @@ import { getDb, initializeDatabase } from '../server/db.ts'
 import {
   applyReplayRemovalLedger,
   removeReplay,
-  type ReplayRemovalReason,
 } from '../server/game/replay-removal.ts'
+import type { ReplayRemovalReason } from '../server/storage/replay-removal-ledger.ts'
 
 export type ReplayRemovalCliArgs =
   | {

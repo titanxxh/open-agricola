@@ -1,26 +1,12 @@
-import { availableParallelism } from 'node:os'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { validateReplay, type ReplayHeaderRow, type ReplayStepRow } from './replay-integrity'
+import { MAX_STORAGE_VALIDATION_CONCURRENCY } from './storage-validation-concurrency'
 
 const WORKER_ENTRY = join(import.meta.dirname, 'replay-validation-worker-entry.mjs')
-export const MAX_STORAGE_VALIDATION_CONCURRENCY = 64
 
 export type ReplayValidationCounts = { stepCount: number; segmentCount: number }
 export type ReplayValidationResult = { ok: true; counts: ReplayValidationCounts } | { ok: false; error: string }
-
-/**
- * Unset keeps the single-threaded default for online jobs that share the host
- * with players. `auto` uses every available CPU and is only for stopped
- * applications or a dedicated validation machine.
- */
-export function storageValidationConcurrency(value: string | undefined): number {
-  if (value === undefined || value === '') return 1
-  if (value === 'auto') return Math.min(availableParallelism(), MAX_STORAGE_VALIDATION_CONCURRENCY)
-  const count = /^[1-9]\d*$/.test(value) ? Number(value) : NaN
-  if (!(count <= MAX_STORAGE_VALIDATION_CONCURRENCY)) throw new Error('Invalid STORAGE_VALIDATION_CONCURRENCY')
-  return count
-}
 
 type ValidationLane = { validate: (header: ReplayHeaderRow, rows: ReplayStepRow[]) => Promise<ReplayValidationCounts> }
 

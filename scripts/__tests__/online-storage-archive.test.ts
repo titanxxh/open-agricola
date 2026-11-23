@@ -17,7 +17,8 @@ import { PostgresRoomPersistence } from '../../server/game/persistence/postgres-
 import { RoomCommitter, replayIntentFromCommand } from '../../server/game/room-committer'
 import { RoomDirectory } from '../../server/game/room-directory'
 import { snapshotToRoom, type Room } from '../../server/game/room'
-import { exportStorageArchive, restoreStorageArchive } from '../storage-archive'
+import { exportStorageArchive } from '../storage-archive'
+import { restoreStorageArchive } from '../storage-restore'
 
 const fileHash = async (path: string): Promise<string> => createHash('sha256').update(await readFile(path)).digest('hex')
 
