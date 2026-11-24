@@ -510,36 +510,6 @@ export const runReturnHomeHooks = (state: GameState, player: PlayerState): void 
   }
 }
 
-const runHookForAllCards = (
-  state: GameState,
-  player: PlayerState,
-  hookName: keyof CardEffect,
-): void => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
-  for (const cardId of allCards) {
-    const effect = getCardEffect(cardId)
-    const handler = effect?.[hookName] as ((s: GameState, p: PlayerState) => void) | undefined
-    if (handler) {
-      try {
-        handler(state, player)
-      } catch (err) {
-        if (isCustomCard(cardId)) {
-          console.warn(`[card-effects] custom card ${cardId} hook "${hookName}" threw, skipping:`, err)
-          continue
-        }
-        throw err
-      }
-    }
-  }
-}
-
-export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): void =>
-  runHookForAllCards(state, player, 'onBeforeEndGame')
-
 /**
  * Returns true when any of the player's played cards declares
  * `enforceReorganizeOnLastHarvest` for the round-14 harvest without newborns.

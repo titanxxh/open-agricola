@@ -1,5 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { collectCardsAs } from '../helpers/card-type'
+import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B133_VillagePeasant'
@@ -7,15 +8,14 @@ const CARD_ID = 'B133_VillagePeasant'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  // The vegetables move through a returned `gain` leaf (Card contract: Standard leaves).
   onBeforeEndGame: (_state, player) => {
     const majors = collectCardsAs(player, 'major')
     const minors = collectCardsAs(player, 'minor')
     const occupations = player.occupationPlayed.length
     const distinctImprovements = new Set([...majors, ...minors]).size
     const n = Math.min(majors.length, minors.length, Math.floor(distinctImprovements / 2), occupations)
-    if (n > 0) {
-      player.resources.vegetable += n
-    }
+    return n > 0 ? gainLeaf(CARD_ID, { vegetable: n }) : undefined
   },
 },
   reaches: [] as readonly string[],
