@@ -3,10 +3,10 @@ import { WEB_PUSH_KINDS, type WebPushKind } from '../../shared/contract/web-push
 import { Section } from '../components/common/Section'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
-import { onPagesWorkerChange } from '../services/pages-worker'
-import { findWebPushRegistration, getWebPushStatus, setWebPushPreference, webPushEnabledBuild, type WebPushStatus } from '../services/web-push'
+import { findPagesWorkerRegistration, onPagesWorkerChange } from '../services/pages-worker'
+import { getAccountPushDeviceCount, findWebPushRegistration, getWebPushStatus, setWebPushPreference, webPushEnabledBuild, type WebPushStatus } from '../services/web-push'
 
-const settingsText: Record<WebPushKind, string> = { draft: 'webPush.draft', 'bug-report-inbox': 'webPush.inbox' }
+const settingsText: Record<WebPushKind, string> = { turn: 'webPush.turn', draft: 'webPush.draft', 'bug-report-inbox': 'webPush.inbox' }
 
 const iosNeedsHomeScreen = () => (/(iPhone|iPad|iPod)/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
@@ -19,7 +19,8 @@ export function WebPushSettings() {
 
 function AccountWebPushSettings({ userId }: { userId: string }) {
   const { locale, t } = useLocale()
-  const [device, setDevice] = useState<{ registration: ServiceWorkerRegistration; status: WebPushStatus } | null>(null)
+  const [device, setDevice] = useState<{ registration: ServiceWorkerRegistration; status: WebPushStatus; turnSupported: boolean } | null>(null)
+  const [accountCount, setAccountCount] = useState<number | null>(null)
   const request = useRef(0)
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -28,17 +29,23 @@ function AccountWebPushSettings({ userId }: { userId: string }) {
   const installIos = iosNeedsHomeScreen()
 
   useEffect(() => {
-    if (installIos) return
     let cancelled = false
     const load = async () => {
       const requestId = ++request.current
       const current = () => !cancelled && request.current === requestId
       try {
-        const registration = await findWebPushRegistration()
+        const registration = installIos ? null : await findWebPushRegistration().catch(() => null)
         if (!current()) return
-        if (!registration) { setDevice(null); setFailure(false); return }
-        const status = await getWebPushStatus(registration, userId)
-        if (current()) { setDevice({ registration, status }); setFailure(false) }
+        const status = registration && await getWebPushStatus(registration, userId).catch(() => null)
+        if (!current()) return
+        if (registration && status) {
+          const turnSupported = !!await findPagesWorkerRegistration('turnPush').catch(() => null)
+          if (current()) { setDevice({ registration, status, turnSupported }); setFailure(false) }
+        } else {
+          setDevice(null)
+          const count = await getAccountPushDeviceCount(userId)
+          if (current()) { setAccountCount(count); setFailure(registration !== null) }
+        }
       } catch { if (current()) setFailure(true) }
       finally { if (current()) setReady(true) }
     }
@@ -57,9 +64,6 @@ function AccountWebPushSettings({ userId }: { userId: string }) {
       window.removeEventListener('online', refresh)
     }
   }, [installIos, userId])
-
-  if (!installIos && device && !device.status.publicKey
-    && !device.status.preferences.draft && !device.status.preferences['bug-report-inbox']) return null
 
   const update = async (kind: WebPushKind, enabled: boolean) => {
     if (!device) return
@@ -80,12 +84,15 @@ function AccountWebPushSettings({ userId }: { userId: string }) {
     }
   }
 
+  const count = device?.status.deviceCount ?? accountCount
   return <Section title={t('webPush.title')} variant="parchment">
+    {count !== null && <p>{t('webPush.deviceCount', { count })}</p>}
     {installIos ? <p>{t('webPush.installIos')}</p> : !device && ready && !failure ? <p>{t('webPush.unavailable')}</p> : null}
     {device && <>
       <p>{t('webPush.deviceOnly')}</p>
       {permission === 'denied' && <p>{t('webPush.blocked')}</p>}
       {WEB_PUSH_KINDS.map(kind => {
+        if (kind === 'turn' && !device.turnSupported && !device.status.preferences.turn) return null
         const enabled = device.status.preferences[kind]
         return <p key={kind}><label>
           <input type="checkbox" checked={enabled}

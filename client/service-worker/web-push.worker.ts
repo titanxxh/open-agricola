@@ -27,7 +27,7 @@ async function clickNotification(scope: ServiceWorkerGlobalScope, click: WebPush
     return (client.frameType === 'top-level' || client.frameType === 'auxiliary')
       && url.origin === scope.location.origin && (url.pathname === '/' || url.pathname === '/index.html')
   })
-  if (click.kind === 'draft') {
+  if (click.kind !== 'bug-report-inbox') {
     const actions = await Promise.all(candidates.map(async client => await askWindow(client, click) === 'handled' ? client : null))
     const existing = actions.find(client => client !== null)
     if (existing && await existing.focus().catch(() => null)) return

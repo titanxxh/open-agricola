@@ -58,7 +58,7 @@ export function createPushProvider(vapid: Vapid, request = fetch, now = Date.now
     const endpoint = pushEndpoint(delivery.subscription.endpoint)
     if (!endpoint) return { kind: 'discarded' }
     const { kind, locale, deliveryId } = delivery
-    const key = kind === 'draft' ? 'webPush.draftNotification' : 'webPush.inboxNotification'
+    const key = { turn: 'webPush.turnNotification', draft: 'webPush.draftNotification', 'bug-report-inbox': 'webPush.inboxNotification' }[kind]
     const title = getLanguagePack(locale)?.messages[key]
       ?? getLanguagePack('en')?.messages[key]
       ?? 'Open Agricola'
@@ -97,7 +97,7 @@ export function webPushRuntime(env = process.env): { publicKey: string | null; a
   const vapid = env.RELEASE_CHANNEL === 'prerelease' ? null : vapidFromEnv(env)
   return {
     publicKey: vapid?.publicKey ?? null,
-    allowed: { draft: !!vapid && env.WEB_PUSH_DRAFT_ENABLED === 'true',
+    allowed: { turn: !!vapid && env.WEB_PUSH_TURN_ENABLED === 'true', draft: !!vapid && env.WEB_PUSH_DRAFT_ENABLED === 'true',
       'bug-report-inbox': !!vapid && env.WEB_PUSH_INBOX_ENABLED === 'true' },
     send: vapid ? createPushProvider(vapid) : null,
   }

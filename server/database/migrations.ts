@@ -74,6 +74,7 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push({ name: '050-native-workshop-drafts', run: convertLegacyWorkshopDrafts })
     migrations.push('051-replay-retention.sql')
     migrations.push('052-user-game-preferences.sql')
+    migrations.push('053-turn-reminders.sql')
     for (const [index, filename] of migrations.entries()) {
       const version = index + 1
       if (await db.prepare('SELECT version FROM postgres_schema_migrations WHERE version = ?').get(version)) continue

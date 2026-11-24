@@ -7,15 +7,18 @@ import {
 import { getSessionByToken } from '../auth'
 import type { PostgresDatabase } from '../database/postgres'
 import { RoomHistoryStore } from '../game/persistence/room-history-store'
-import { draftPushOpportunity } from './draft'
+import { draftPushOpportunity } from './room-opportunities'
 
 const HOUR_MS = 60 * 60 * 1_000
 const CLAIM_MS = 30_000
 const DEVICES_PER_LOGIN = 8
 
-type DraftPushEvent = { kind: 'draft'; userId: string; roomId: string; seat: number; opportunityKey: string; stepNo: number; createdAt: number }
-export type WebPushEvent = DraftPushEvent | { kind: 'bug-report-inbox'; userId: string; messageId: number; createdAt: number }
-type BoundDevice = { id: string; endpoint: string; draft_enabled: boolean; inbox_enabled: boolean }
+export type RoomPushOpportunity = { kind: 'turn' } | { kind: 'draft'; opportunityKey: string }
+export type RoomPushEvent = RoomPushOpportunity & {
+  userId: string; roomId: string; seat: number; stepNo: number; createdAt: number
+}
+export type WebPushEvent = RoomPushEvent | { kind: 'bug-report-inbox'; userId: string; messageId: number; createdAt: number }
+type BoundDevice = { id: string; endpoint: string; draft_enabled: boolean; turn_enabled: boolean; inbox_enabled: boolean }
 type DeviceOptions = {
   deviceId: string
   expectedUserId?: string
@@ -49,20 +52,20 @@ export type PushDelivery = {
 }
 
 const preference = (device?: BoundDevice): WebPushPreferences =>
-  device ? { draft: device.draft_enabled, 'bug-report-inbox': device.inbox_enabled } : emptyWebPushPreferences()
+  device ? { turn: device.turn_enabled, draft: device.draft_enabled, 'bug-report-inbox': device.inbox_enabled } : emptyWebPushPreferences()
 
 /** Use the producer's database transaction to snapshot the opted-in bindings at event creation. */
 export async function enqueueWebPush(db: PostgresDatabase, event: WebPushEvent): Promise<void> {
-  const draft = event.kind === 'draft' ? event : undefined
+  const room = event.kind === 'bug-report-inbox' ? undefined : event
   const inboxId = event.kind === 'bug-report-inbox' ? event.messageId : null
-  const sourceKey = draft ? `${draft.roomId}:${draft.seat}:${draft.stepNo}` : String(inboxId)
+  const sourceKey = room ? `${room.roomId}:${room.seat}:${room.stepNo}` : String(inboxId)
   // Account deletion locks the User before cascading through sessions and bindings.
   if (!await db.prepare('SELECT id FROM users WHERE id=? FOR KEY SHARE').get(event.userId)) return
   await db.prepare(`
     WITH eligible AS (
       SELECT b.id FROM web_push_bindings b JOIN sessions s ON s.token=b.session_token AND s.user_id=b.user_id
       WHERE b.user_id=@userId AND s.expires_at>@createdAt AND s.auth_policy_version=@authVersion
-        AND CASE WHEN @kind='draft' THEN b.draft_enabled ELSE b.inbox_enabled END
+        AND CASE @kind WHEN 'draft' THEN b.draft_enabled WHEN 'turn' THEN b.turn_enabled ELSE b.inbox_enabled END
         AND NOT EXISTS (SELECT 1 FROM account_deletion_requests a WHERE a.user_id=b.user_id)
       FOR KEY SHARE OF b
     ), inserted AS (
@@ -74,9 +77,9 @@ export async function enqueueWebPush(db: PostgresDatabase, event: WebPushEvent):
     INSERT INTO web_push_deliveries(event_id,binding_id,next_attempt_at)
     SELECT inserted.id,eligible.id,@createdAt FROM inserted CROSS JOIN eligible
   `).run({
-    id: randomUUID(), kind: event.kind, sourceKey, userId: event.userId, roomId: draft?.roomId ?? null,
-    seat: draft?.seat ?? null, opportunityKey: draft?.opportunityKey ?? null, inboxId, createdAt: event.createdAt,
-    expiresAt: event.createdAt + (draft ? HOUR_MS : HOUR_MS * 24), authVersion: BROWSER_AUTH_VERSION,
+    id: randomUUID(), kind: event.kind, sourceKey, userId: event.userId, roomId: room?.roomId ?? null,
+    seat: room?.seat ?? null, opportunityKey: event.kind === 'draft' ? event.opportunityKey : null, inboxId, createdAt: event.createdAt,
+    expiresAt: event.createdAt + (room ? HOUR_MS : HOUR_MS * 24), authVersion: BROWSER_AUTH_VERSION,
   })
 }
 
@@ -149,20 +152,21 @@ export class WebPushStore {
         // A live endpoint may only belong to one browser device binding. An
         // endpoint owned by a different device cannot be moved by a preference write.
         const inserted = await this.db.prepare(`
-          INSERT INTO web_push_bindings(id,device_id,endpoint,p256dh,auth_secret,user_id,session_token,locale,draft_enabled,inbox_enabled)
-          VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(endpoint) DO NOTHING
+          INSERT INTO web_push_bindings(id,device_id,endpoint,p256dh,auth_secret,user_id,session_token,locale,turn_enabled,draft_enabled,inbox_enabled)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(endpoint) DO NOTHING
         `).run(randomUUID(), options.deviceId, endpoint, keys.p256dh, keys.auth, session.user.id,
-          sessionToken, options.locale, options.kind === 'draft', options.kind === 'bug-report-inbox')
+          sessionToken, options.locale, options.kind === 'turn', options.kind === 'draft', options.kind === 'bug-report-inbox')
         return inserted.changes === 1 ? preference(await this.binding(sessionToken, options.deviceId)) : null
       }
       const updated = await this.db.prepare(`
         UPDATE web_push_bindings SET locale=@locale,
+          turn_enabled=CASE WHEN @kind='turn' THEN @enabled ELSE turn_enabled END,
           draft_enabled=CASE WHEN @kind='draft' THEN @enabled ELSE draft_enabled END,
           inbox_enabled=CASE WHEN @kind='bug-report-inbox' THEN @enabled ELSE inbox_enabled END
         WHERE device_id=@deviceId AND session_token=@sessionToken
-        RETURNING id,endpoint,draft_enabled,inbox_enabled
+        RETURNING id,endpoint,turn_enabled,draft_enabled,inbox_enabled
       `).get<BoundDevice>({ ...options, sessionToken })
-      if (updated && !updated.draft_enabled && !updated.inbox_enabled) {
+      if (updated && !updated.turn_enabled && !updated.draft_enabled && !updated.inbox_enabled) {
         await this.db.prepare('DELETE FROM web_push_bindings WHERE id=?').run(updated.id)
       } else {
         await this.db.prepare(`
@@ -175,6 +179,22 @@ export class WebPushStore {
     })()
   }
 
+  async accountDeviceCount(token: string, expectedUserId: string) {
+    const session = await getSessionByToken(token, { db: this.db, now: this.now() })
+    return session?.user.id === expectedUserId ? this.deviceCount(expectedUserId) : null
+  }
+
+  async deviceCount(userId: string) {
+    const row = await this.db.prepare(`
+      SELECT count(*)::integer AS count FROM web_push_bindings b
+      JOIN sessions s ON s.token=b.session_token AND s.user_id=b.user_id
+      WHERE b.user_id=? AND s.expires_at>? AND s.auth_policy_version=?
+        AND (b.turn_enabled OR b.draft_enabled OR b.inbox_enabled)
+        AND NOT EXISTS (SELECT 1 FROM account_deletion_requests a WHERE a.user_id=b.user_id)
+    `).get<{ count: number }>(userId, this.now(), BROWSER_AUTH_VERSION)
+    return row!.count
+  }
+
   private isRetired(deviceId: string) {
     return this.db.prepare('SELECT 1 FROM web_push_retired_devices WHERE device_id=?').get(deviceId)
   }
@@ -184,7 +204,7 @@ export class WebPushStore {
   }
 
   private binding(token: string, deviceId: string) {
-    return this.db.prepare(`SELECT id,endpoint,draft_enabled,inbox_enabled FROM web_push_bindings
+    return this.db.prepare(`SELECT id,endpoint,turn_enabled,draft_enabled,inbox_enabled FROM web_push_bindings
       WHERE device_id=? AND session_token=?`).get<BoundDevice>(deviceId, token)
   }
 
@@ -215,14 +235,13 @@ export class WebPushStore {
       JOIN sessions s ON s.token=b.session_token AND s.user_id=b.user_id
       WHERE d.id=@deliveryId AND d.claim_token=@token AND d.status='pending'
         AND e.expires_at>@now AND s.expires_at>@now AND s.auth_policy_version=@authVersion
-        AND CASE WHEN e.kind='draft' THEN b.draft_enabled ELSE b.inbox_enabled END
+        AND CASE e.kind WHEN 'draft' THEN b.draft_enabled WHEN 'turn' THEN b.turn_enabled ELSE b.inbox_enabled END
         AND NOT EXISTS (SELECT 1 FROM account_deletion_requests a WHERE a.user_id=b.user_id)
     `).get<DeliveryRow>({ deliveryId: claim.deliveryId, token: claim.claimToken, now, authVersion: BROWSER_AUTH_VERSION })
     if (!row) return null
-    const eligible = row.kind === 'draft'
-      ? row.room_id && row.seat !== null && row.opportunity_key !== null
-        && await this.draftOpportunity(row.user_id, row.room_id, row.seat) === row.opportunity_key
-      : row.inbox_id !== null && await this.hasInbox(row.user_id, row.inbox_id, true)
+    const eligible = row.kind === 'bug-report-inbox'
+      ? row.inbox_id !== null && await this.hasInbox(row.user_id, row.inbox_id, true)
+      : await this.hasRoomOpportunity(row, true)
     if (!eligible) return null
     return {
       deliveryId: claim.deliveryId, kind: row.kind, bindingId: row.binding_id, locale: row.locale, expiresAt: row.expires_at,
@@ -257,14 +276,14 @@ export class WebPushStore {
       SELECT e.user_id,e.kind,e.room_id,e.seat,e.opportunity_key,e.inbox_id
       FROM web_push_deliveries d JOIN web_push_events e ON e.id=d.event_id
       JOIN sessions s ON s.user_id=e.user_id
-      WHERE d.id=? AND e.kind=? AND s.token=? AND s.expires_at>? AND s.auth_policy_version=?
+      WHERE d.id=? AND e.kind=? AND (e.kind<>'turn' OR e.expires_at>?) AND s.token=? AND s.expires_at>? AND s.auth_policy_version=?
         AND NOT EXISTS (SELECT 1 FROM account_deletion_requests a WHERE a.user_id=e.user_id)
     `).get<Pick<DeliveryRow, 'user_id' | 'kind' | 'room_id' | 'seat' | 'opportunity_key' | 'inbox_id'>>(
-      deliveryId, kind, sessionToken, this.now(), BROWSER_AUTH_VERSION,
+      deliveryId, kind, this.now(), sessionToken, this.now(), BROWSER_AUTH_VERSION,
     )
     if (!row || (expectedUserId !== undefined && row.user_id !== expectedUserId)) return { kind: 'unavailable' }
-    if (row.kind === 'draft' && row.room_id && row.seat !== null && await this.draftOpportunity(row.user_id, row.room_id, row.seat)) {
-      return { kind: 'draft', roomId: row.room_id }
+    if (row.kind !== 'bug-report-inbox' && row.room_id && await this.hasRoomOpportunity(row, false)) {
+      return { kind: row.kind, roomId: row.room_id }
     }
     if (row.kind === 'bug-report-inbox' && row.inbox_id !== null && await this.hasInbox(row.user_id, row.inbox_id, false)) {
       return { kind: 'bug-report-inbox', messageId: row.inbox_id }
@@ -277,15 +296,23 @@ export class WebPushStore {
       AND kind IN ('needs_info','fix_released') AND (NOT ? OR read_at IS NULL)`).get(messageId, userId, unread)
   }
 
-  private async draftOpportunity(userId: string, roomId: string, seat: number): Promise<string | null> {
+  private async hasRoomOpportunity(
+    event: Pick<DeliveryRow, 'user_id' | 'kind' | 'room_id' | 'seat' | 'opportunity_key'>, exact: boolean,
+  ) {
+    const { room_id: roomId, seat, user_id: userId } = event
+    if (!roomId || seat === null) return false
     const row = await this.db.prepare(`
-      SELECT r.state_json FROM rooms r JOIN game_contexts c ON c.room_id=r.id
+      SELECT CASE WHEN ?='draft' THEN r.state_json END AS state_json FROM rooms r JOIN game_contexts c ON c.room_id=r.id
       JOIN room_players p ON p.room_id=r.id
       WHERE r.id=? AND r.status='playing' AND r.hotseat=0 AND c.lifecycle='active'
         AND (c.expires_at IS NULL OR c.expires_at>?) AND p.user_id=? AND p.player_index=?
-    `).get<{ state_json: string | null }>(roomId, this.now(), userId, seat)
-    if (!row?.state_json) return null
+    `).get<{ state_json: string | null }>(event.kind, roomId, this.now(), userId, seat)
+    if (!row) return false
+    // The Room Commit expires the turn event atomically when the responder changes.
+    if (event.kind === 'turn') return true
+    if (!row.state_json) return false
     const { state } = await this.history.restore(roomId, row.state_json)
-    return draftPushOpportunity(state, seat)
+    const opportunity = draftPushOpportunity(state, seat)
+    return opportunity !== null && (!exact || opportunity === event.opportunity_key)
   }
 }

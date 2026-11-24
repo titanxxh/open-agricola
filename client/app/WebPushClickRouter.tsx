@@ -58,11 +58,11 @@ function EnabledWebPushClickRouter() {
       const port = event.ports[0]
       const probe = click.kind === 'bug-report-inbox' && 'probe' in event.data && event.data.probe === true
       const activeRoom = localRoom()
-      if (click.kind === 'draft' && !activeRoom) { port.postMessage(false); port.close(); return }
+      if (click.kind !== 'bug-report-inbox' && !activeRoom) { port.postMessage(false); port.close(); return }
       void target(click, accountId, 1_500).then(result => {
         if (current.signal.aborted) { port.postMessage(false); return }
-        if (click.kind === 'draft') {
-          port.postMessage(result.kind === 'draft' && result.roomId === activeRoom && localRoom() === activeRoom)
+        if (click.kind !== 'bug-report-inbox') {
+          port.postMessage('roomId' in result && result.roomId === activeRoom && localRoom() === activeRoom)
         } else if (probe) {
           port.postMessage(result.kind === 'bug-report-inbox' ? 'exact' : 'generic')
         } else {
@@ -78,7 +78,7 @@ function EnabledWebPushClickRouter() {
       const resolution = accountId ? target(click, accountId, 10_000) : Promise.resolve({ kind: 'unavailable' as const })
       void resolution.then(result => {
         if (current.signal.aborted) return
-        if (result.kind === 'draft') finishLaunch(result.roomId)
+        if ('roomId' in result) finishLaunch(result.roomId)
         else {
           finishLaunch()
           if (click.kind === 'bug-report-inbox' && accountId) {

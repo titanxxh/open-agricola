@@ -39,6 +39,10 @@ export function createWebPushHandler(args: {
       if (!body || !isWebPushId(body.deliveryId) || !isWebPushKind(body.kind) || typeof body.accountId !== 'string') return reply(200, { kind: 'unavailable' })
       return reply(200, await store.resolveClick(requestSessionToken(req), body.deliveryId, body.kind, body.accountId))
     }
+    if (url.pathname === WEB_PUSH_DEVICE_PATH && body?.operation === 'summary' && typeof body.accountId === 'string') {
+      const count = await store.accountDeviceCount(requestSessionToken(req), body.accountId)
+      return count === null ? reply(401, { ok: false }) : reply(200, { deviceCount: count })
+    }
     if (!body || !isWebPushId(body.deviceId)) return reply(400, { ok: false })
     if (url.pathname === WEB_PUSH_UNBIND_PATH) {
       await store.unbind(body.deviceId)
@@ -49,8 +53,8 @@ export function createWebPushHandler(args: {
     if (body.operation === 'status') {
       const endpoint = typeof body.endpoint === 'string' && body.endpoint.length <= 2_048 ? body.endpoint : null
       const preferences = await store.preferences(token, body.deviceId, endpoint, body.accountId,
-        allowed.draft || allowed['bug-report-inbox'])
-      return preferences ? reply(200, { ok: true, publicKey, allowed, preferences }) : reply(401, { ok: false })
+        Object.values(allowed).some(Boolean))
+      return preferences ? reply(200, { ok: true, publicKey, allowed, preferences, deviceCount: await store.deviceCount(body.accountId) }) : reply(401, { ok: false })
     }
     if (body.operation !== 'set' || !isWebPushKind(body.kind) || typeof body.enabled !== 'boolean'
       || typeof body.locale !== 'string' || !/^[a-z]{2,3}(?:-[a-z0-9]+)*$/.test(body.locale) || body.locale.length > 16) {
@@ -59,6 +63,6 @@ export function createWebPushHandler(args: {
     const subscription = parsePushSubscription(body.subscription)
     if (body.enabled && (!subscription || !allowed[body.kind])) return reply(400, { ok: false })
     const preferences = await store.bind(token, { deviceId: body.deviceId, expectedUserId: body.accountId, kind: body.kind, enabled: body.enabled, locale: body.locale, subscription })
-    return preferences ? reply(200, { ok: true, publicKey, allowed, preferences }) : reply(403, { ok: false })
+    return preferences ? reply(200, { ok: true, publicKey, allowed, preferences, deviceCount: await store.deviceCount(body.accountId) }) : reply(403, { ok: false })
   }
 }

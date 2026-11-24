@@ -1,6 +1,6 @@
 import type { GameTermination } from '../../shared/contract/protocol/game-termination'
 import { measure } from '../observability/metrics'
-import { draftPushOpportunities, newDraftPushEvents } from '../web-push/draft'
+import { roomPushOpportunities, newRoomPushEvents } from '../web-push/room-opportunities'
 import { ExecutionRevokedError } from './execution-access'
 import type { OwnerToken } from './room-directory'
 import { RoomOwnershipError } from './room-directory'
@@ -53,7 +53,7 @@ type RoomHead = {
   frame: JsonValue
   frameHash: string
   privateCursor: PrivateCursorComparison
-  draftOpportunities: ReadonlyArray<string | null>
+  pushOpportunities: ReturnType<typeof roomPushOpportunities>
   stepNo: number
   roomVersion: number
   checkpointStepNo: number
@@ -71,9 +71,11 @@ type PrepareRoomOptions = {
   onReady?: (result: PrepareRoomReadyResult) => void | Promise<void>
 }
 
+type PreparedRoomCommit = ReplayCommit & Pick<RoomHead, 'pushOpportunities'>
+
 type PendingCommit = {
   room: Room
-  commit: ReplayCommit
+  commit: PreparedRoomCommit
   frame: JsonValue
   encoded: EncodedReplayFrame
   privateCursor: PrivateCursorComparison
@@ -389,7 +391,9 @@ export class RoomCommitter {
       ? await this.resources.archiveCards(room.id, definitions)
       : definitions)
     const meta = { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, 'initial') }
-    const commit: ReplayCommit = {
+    const pushOpportunities = roomPushOpportunities(room, serialized.state)
+    const commit: PreparedRoomCommit = {
+      pushOpportunities,
       roomId: room.id,
       retireRoomId: options.retireRoomId,
       creationConfiguration: room.creationConfiguration,
@@ -399,7 +403,7 @@ export class RoomCommitter {
       retiredTermination: options.retiredTermination,
       serialized,
       meta,
-      draftPushEvents: newDraftPushEvents({ roomId: room.id, before: [], after: draftPushOpportunities(room, serialized.state),
+      roomPushEvents: newRoomPushEvents({ roomId: room.id, before: [], after: pushOpportunities,
         owners: meta.players, stepNo: 0, createdAt }),
       ...(options.receipt ? { receipt: { request: { ...options.receipt.request }, outcome: { ...options.receipt.outcome, roomId: room.id, roomVersion: 0, stepNo: 0, frameHash: encoded.frameHash } } } : {}),
       header: {
@@ -464,11 +468,14 @@ export class RoomCommitter {
     }
     const createdAt = this.now()
     const meta = { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, replayIntent.commandType) }
-    const commit: ReplayCommit = {
+    const pushOpportunities = roomPushOpportunities(room, serialized.state, response.interaction)
+    const endedTurn = head.pushOpportunities.some((previous, seat) => previous?.kind === 'turn' && pushOpportunities[seat]?.kind !== 'turn')
+    const commit: PreparedRoomCommit = {
+      pushOpportunities, endedTurn,
       roomId: room.id,
       serialized,
       meta,
-      draftPushEvents: newDraftPushEvents({ roomId: room.id, before: head.draftOpportunities, after: draftPushOpportunities(room, serialized.state),
+      roomPushEvents: newRoomPushEvents({ roomId: room.id, before: head.pushOpportunities, after: pushOpportunities,
         owners: meta.players, stepNo, createdAt }),
       ...(receipt ? { receipt: { request: { ...receipt.request }, outcome: { ...receipt.outcome, roomId: room.id, roomVersion, stepNo, frameHash: encoded.frameHash } } } : {}),
       step: {
@@ -549,7 +556,7 @@ export class RoomCommitter {
         frame,
         frameHash: hash,
         privateCursor: capturePrivateCursor(current.sessionCursor),
-        draftOpportunities: draftPushOpportunities(room, current.state),
+        pushOpportunities: roomPushOpportunities(room, current.state),
         stepNo: persisted.latestStepNo,
         roomVersion: persisted.roomVersion,
         checkpointStepNo: persisted.checkpointStepNo,
@@ -569,7 +576,7 @@ export class RoomCommitter {
 
   private async persist(
     room: Room,
-    commit: ReplayCommit,
+    commit: PreparedRoomCommit,
     frame: JsonValue,
     encoded: EncodedReplayFrame,
     onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void | Promise<void>,
@@ -613,7 +620,7 @@ export class RoomCommitter {
 
   private acceptCommit(
     room: Room,
-    commit: ReplayCommit,
+    commit: PreparedRoomCommit,
     frame: JsonValue,
     encoded: EncodedReplayFrame,
     privateCursor: PrivateCursorComparison,
@@ -628,7 +635,7 @@ export class RoomCommitter {
         frame,
         frameHash: encoded.frameHash,
         privateCursor,
-        draftOpportunities: draftPushOpportunities(room, commit.serialized.state),
+        pushOpportunities: commit.pushOpportunities,
         stepNo: commit.step.stepNo,
         roomVersion: commit.step.roomVersion,
         checkpointStepNo: encoded.checkpointStepNo,
