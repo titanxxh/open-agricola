@@ -119,9 +119,9 @@ anytime                  注册额外的 anytime 行动
   onBeforeEndGame → preScoringWindow → gameover
 ```
 
-阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）是准备窗口、StartOfTurn、回合结束、收获前、收获开始、收获田间阶段和终局前的共享模型：
+阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）是准备窗口、StartOfTurn、回合结束、工作阶段结束、收获前、收获开始、收获田间阶段和终局前的共享模型：
 
-- 每个窗口冻结玩家顺序（规则要求时从起始玩家标记顺时针），并在每名玩家进入时，按持牌、手牌启用的 hook 与纯 `stageEligibility` 查询捕获一棵固定的 `activate-card-effect` 来源树。来源发现从不按当前支付能力过滤。
+- 除回合结束外，每个窗口从起始玩家开始顺时针冻结玩家顺序，并在每名玩家进入时，按持牌、手牌启用的 hook 与纯 `stageEligibility` 查询捕获一棵固定的 `activate-card-effect` 来源树。来源发现从不按当前支付能力过滤。
 - 单个来源直接展开；多个来源进入 `ParallelNode(mode='trigger-select')`。每次选择后，handler、支付与必选 / Pass 状态按实时克隆预览重算。已完成的来源不重放；窗口内打出的卡只参加后续窗口。
 - 窗口上下文、玩家顺序与树游标保存在 `stageResume`；恢复时不重扫牌区，也不重读已变化的标记。旧的串行阶段按 `resumeAfterCardId` 恢复。
 - 嵌套可选分支保留兑换机会，不削弱必选根。`requiresExplicitChoice` 在实时兑换可能提供资金时保持购买选择开放。
@@ -134,15 +134,16 @@ anytime                  注册额外的 anytime 行动
 - **StartOfTurn**：回合开始激活、计划领取、付款门控的 offer 和计划行动共用一棵玩家树。到期的普通货物按玩家合并为一次 `receive`，保留各条目来源且不触发 Gain；带 `roomType` 或 `actionContext.resourceCondition` 的条目各自单独一次 `receive`，保留自身的领取条件与依赖；`futureMeeple.resolved` 只在实际领取后提交。
 - **未来计划**（[ADR 0018](../adr/0018-future-schedule-and-authoritative-action-entry.md)）：Exact Future Target 保留目标轮，超出 `current round < target <= 14` 时丢弃；Future Prefix 保留仍存在的连续后缀。一次性的未来 offer 使用 `scheduled-offer` 行动与 `cardStates[cardId].extraData.scheduledOffers`，不用资源 token。卡牌排未来 token，不自写 `targetRound` 状态机。
 - **回合结束**：普通轮转与卡牌驱动的 Turn 共用 `buildEndTurnReactionFlow()` 的同一棵冻结来源树；窗口完成时关闭 Turn Scope 一次。卡牌以既有 Turn 身份记录每 Turn 一次的凭据。
-- **收获前**：在收获跳过生效前冻结玩家顺序；所有玩家都参与；顺序保存在 `stageResume.extra.beforeHarvestPlayerOrder`。
+- **收获前**：在收获跳过生效前冻结玩家顺序；所有玩家都参与。
 - **跳过整个收获**：在 `onBeforeHarvest` 之后生效；若在收获开始窗口内决定，则在该窗口结束后生效。生效后，该轮之后的每个收获步骤、阶段 hook 和 listener 都排除该玩家。
 - **收获准备**：`harvestPrepWindow` 依据 `preHarvestGoodsWanted` / `preHarvestGoodsWantedBeforeReap` / `maySkipHarvestFieldPhase` metadata，只提供可支付、有次数限制且能产出所需货物的 Harvest 兑换。使用次数按来源和轮次记录。
+- **田间阶段**：其三个窗口还排除跳过田间和繁殖阶段的玩家。
 - **收割**：`reap` 是内部行动。完整收获使用 `trigger: { phase: 'harvest' }`；私人田间阶段收割不写收获摘要。`computeHarvestCount()` 返回带 `sources` / `tags` / `scope` 的数量，只能通过 `registerHarvestCountModifier()` 修改。逐作物 `reap` 事件汇入一个 parallel flow，之后才进入 `onAfterReap`。
 - **收割后 anytime**：按收获顺序、在计算喂食之前提供；每个 flow 后重建。
 - **喂食**：`computeHarvestFeedingRequirement()` 只能通过 `registerHarvestFeedingRequirementModifier()` 修改。feed 请求携带权威兑换目录（[Anytime 窗口策略](actions_zh.md#anytime-窗口策略)）；`handleFeedResolved()` 在任何修改前校验完整的有序计划。
 - **繁殖**：`getBreedThreshold()` 取已打出卡中最小的阈值；`computeHarvestBreedOrderPriority()` 只调整繁殖顺序。
 - **收获摘要**是规则事实：`harvestReapSummary`（作物、位置、数量应用）与 `harvestBreedSummary`（安置后结算的新生动物）保留到 `onAfterHarvest`；卡牌通过 `getHarvestOutcome()` 组合它们。
-- **终局前**：`onBeforeEndGame` 按 target 座位顺序与 `beforeEndGameScope` 分发；`handHooks` 不支持它。随后 `preScoringWindow` 逐玩家提供 `preScoring: true` 或 `'only'` 的 anytime listener，结束后才写 `gameOver`。`'only'` 在菜单和执行准入处排除较早窗口；`true` 保留普通阶段可用性。计分前花费使用显式 flow；Scoring Reserve 不扣真实资源。
+- **终局前**：`onBeforeEndGame` 中 `beforeEndGameScope` 为 `allPlayers` 的卡是每个 target 的来源；`handHooks` 不支持它。随后 `preScoringWindow` 逐玩家提供 `preScoring: true` 或 `'only'` 的 anytime listener，结束后才写 `gameOver`。`'only'` 在菜单和执行准入处排除较早窗口；`true` 保留普通阶段可用性。计分前花费使用显式 flow；Scoring Reserve 不扣真实资源。
 - **`onBeforePlayerTurn`** 是唯一的 non-flow hook：只做 skip-control，返回 `{ skipTurn?: true } | void`，从不返回 `ActionFlow`，也不产生 pending。
 - **定时规则**：`CardEffect.timedRules` 声明闭合的 `TimedRule` / `RuleBody`，由原生注册编译进既有 hook；`timed-rules.ts` 不查询运行时注册表。执行期公式来自 `rule-queries.ts`。
 

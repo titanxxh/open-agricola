@@ -11,7 +11,7 @@ The reference `ParallelNode::getChoices` resolves an *independent* mandatory chi
 
 ## Decision
 
-- **One window model.** Stage windows become frozen-order reaction windows: the player order is frozen at window entry, clockwise from the Start Player (Harvest windows leave out players who skip the Harvest); each player's sources are captured on entry and previewed on clones; optional sources can be passed together. The start-of-Harvest window is the first to use it; the other serial hooks follow in later #2039 changes.
+- **One window model.** Stage windows become frozen-order reaction windows: the player order is frozen at window entry, clockwise from the Start Player (Harvest windows leave out players who skip the Harvest); each player's sources are captured on entry and previewed on clones; optional sources can be passed together. The start-of-Harvest window was the first to use it; the work-end, Before-Harvest, field-phase and before-end windows followed, and the field-phase windows also leave out a player who skips the field and breeding phases, as the reference does. The other serial hooks follow in later #2039 changes.
 - **A seat setting decides auto-resolution.** `PlayerState.preferences.autoResolveIndependentReactions` (absent means on) governs every trigger selector whose children are card activations, both stage windows and action reactions. When on, the first applicable mandatory independent source resolves before the player orders the rest. A sole applicable mandatory source resolves in either setting. Independence is a pure check of the previewed result: a mandatory flow of non-animal `gain`, card storage, bonus points or bookkeeping `special-effect` leaves, or a stage effect that only changes state.
 - **The chooser's value is frozen on the selector** when it is first evaluated and kept in the engine cursor. The chooser is the reacting card's owner, so an opponent's independent reactions resolve inside the actor's command without a handoff.
 - **Exceptions keep the player in control:** a sole optional source keeps [card, Pass], because accepting an activation also accepts a card's leaf-root optional effect and counts a listener use; a selector that opens its own anytime window resolves nothing by itself while a dormant source remains; extra-turn providers and injected windows never auto-resolve.
@@ -23,7 +23,7 @@ The reference `ParallelNode::getChoices` resolves an *independent* mandatory chi
 - Players no longer confirm reactions that only gain goods; the setting restores manual ordering, and tests that check an order turn it off.
 - An auto-resolved independent source can change another source's condition before the player chooses; this is the reference trade-off.
 - Bookkeeping that ran as a stage hook moved to round-keyed card state, and random draws moved into action leaves, so previews and selectors never mutate or roll.
-- Compatibility with retained games is waived (#2039): a game paused inside the start-of-Harvest window when this ships resumes it under the new rules and may be offered a source again or skip one.
+- Compatibility with retained games is waived (#2039): a game paused inside a migrated window when the change ships resumes it under the new rules and may be offered a source again or skip one.
 
 ## Alternatives considered
 

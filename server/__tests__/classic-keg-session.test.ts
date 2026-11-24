@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { GameState } from '../../shared/contract/types'
 import { setActiveWorkerCount } from '../../shared/domain/player'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
-import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { getChoiceOptions } from './_helpers/session-assertions'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { buyMinor } from './_helpers/standard-solo-cards'
@@ -165,7 +165,7 @@ describe('CZ314 Keg', () => {
     expect(kegGuest.state.round).toBe(2)
   })
 
-  it('offers two Keg Guests in the work-end window in seat order and lets the first player decline', () => {
+  it('offers two Keg Guests in the work-end window from the start player and lets the other player decline', () => {
     const session = setup(state => setActiveWorkerCount(state.players[0]!, 3))
     const first = playKeg(session, 0, 'major-improvement')
     const [a, b] = first.state.players.map(player => player.id)
@@ -186,30 +186,29 @@ describe('CZ314 Keg', () => {
     expect(guestSources(takeTurn(session, 0, 'clay-pit'))).toEqual([])
 
     expect(guestSources(takeTurn(session, 1, 'reed-bank'))).toEqual([])
-    // A places the last family member; the work-end window starts with seat A.
-    const offeredA = takeTurn(session, 0, 'forest')
+    // A places the last family member; the work-end window starts with the start player, B (#2039).
+    const offeredB = takeTurn(session, 0, 'forest')
+    expect(offeredB.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1 })
+    expect(guestSources(offeredB)).toEqual([KEG])
+    const placed = dispatch(session, 1, KEG, 'fishing')
+    expect(guestPlacement(placed, b, 'guest:1')).toMatchObject({ spaceId: 'fishing' })
+    // The window hands over to A.
+    expect(placed.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-player-switch', fromPlayerIndex: 1, toPlayerIndex: 0 } })
+    const offeredA = confirmPlayerSwitch(session)
     expect(offeredA.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0 })
     expect(guestSources(offeredA)).toEqual([KEG])
     const decline = getChoiceOptions(offeredA).find(option => option.labelKey === 'ui.interactionDecline')
     expect(decline).toBeDefined()
     const declined = session.resolveChoice(0, decline!.value)
     expect(declined.ok, declined.error).toBe(true)
-    expect(declined.state.players[0]!.guests).toEqual([])
     const voided = expect.objectContaining({
       type: 'guest.voided', playerId: a, guestId: 'guest:1', cardId: KEG,
     })
     expect(declined.state.events.filter(event => event.type === 'guest.voided')).toEqual([voided])
 
-    const offeredB = nextTurn(session)
-    expect(offeredB.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1 })
-    expect(guestSources(offeredB)).toEqual([KEG])
-    const placed = dispatch(session, 1, KEG, 'fishing')
-    expect(guestPlacement(placed, b, 'guest:1')).toMatchObject({ spaceId: 'fishing' })
-
-    const next = placed
+    const next = declined
     expect(next.state.round).toBe(2)
     expect(next.state.players.map(player => player.guests)).toEqual([[], []])
-    expect(next.state.events.filter(event => event.type === 'guest.voided')).toEqual([voided])
   })
 
   it('keeps a Guest for each purchase when Keg comes back and A buys it again before the work-end window', () => {
