@@ -891,11 +891,12 @@ export class GameCore {
         this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.extra)
       },
       harvestPrepWindow: (stageResume) => { this.continueHarvestPrepWindow(stageResume.playerIndex) },
-      onAfterReap: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex) },
-      afterHarvestReapReaction: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex) },
-      onHarvest: (stageResume) => { this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
-      onEndHarvest: (stageResume) => { this.continueEndHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
-      onAfterHarvest: (stageResume) => { this.continueAfterHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
+      onAfterReap: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.extra) },
+      // The reap reactions run before the after-reap window opens.
+      afterHarvestReapReaction: () => { this.continueAfterReapEffects() },
+      onHarvest: (stageResume) => { this.continueHarvestEffects(stageResume.playerIndex, stageResume.extra) },
+      onEndHarvest: (stageResume) => { this.continueEndHarvestEffects(stageResume.playerIndex, stageResume.extra) },
+      onAfterHarvest: (stageResume) => { this.continueAfterHarvestEffects(stageResume.playerIndex, stageResume.extra) },
       onBeforeStartOfTurn: (stageResume) => {
         this.continueBeforeStartOfTurn(
           stageResume.playerIndex,
@@ -911,7 +912,7 @@ export class GameCore {
       onBeforeWork: (resume) => { this.continueAfterFutureMeepleActions(resume.playerIndex, resume.cardIndex, resume.extra) },
       onWorkStart: (resume) => { this.continueAfterBeforeWork(resume.playerIndex, resume.cardIndex, resume.extra) },
       onStartHarvestFeedingPhase: (stageResume) => {
-        this.continueStartHarvestFeedingPhase(stageResume.playerIndex, stageResume.cardIndex)
+        this.continueStartHarvestFeedingPhase(stageResume.playerIndex, stageResume.extra)
       },
       onEndTurn: (stageResume) => {
         this.finishCompletedActionTurn(stageResume.playerIndex)
@@ -931,8 +932,8 @@ export class GameCore {
       onStartHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldStart(stageResume.playerIndex, stageResume.extra) },
       onHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldPhase(stageResume.playerIndex, stageResume.extra) },
       onEndHarvestFieldPhase: (stageResume) => { this.continueEndFieldPhase(stageResume.playerIndex, stageResume.extra) },
-      onHarvestFeedingPhase: (stageResume) => { this.continueHarvestFeeding(stageResume.playerIndex, stageResume.cardIndex) },
-      onEndHarvestFeedingPhase: (stageResume) => { this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.cardIndex) },
+      onHarvestFeedingPhase: (stageResume) => { this.continueHarvestFeeding(stageResume.playerIndex, stageResume.extra) },
+      onEndHarvestFeedingPhase: (stageResume) => { this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.extra) },
       onRoundEnd: (stageResume) => { this.continueRoundEndHooks(stageResume.playerIndex, stageResume.extra) },
       onAllWorkersPlaced: (stageResume) => { this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.extra) },
       onBreedPhase: () => { this.continueEndHarvestEffects() },
@@ -3273,8 +3274,9 @@ export class GameCore {
     return this.continueAfterReapEffects()
   }
 
-  private continueAfterReapEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onAfterReap', playerIndex, cardIndex)) {
+  private continueAfterReapEffects(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? harvestPhase.getHarvestFieldPlayerIndices(this.state)
+    if (this.stageDispatch.continueReactionWindow('onAfterReap', playerOrder, orderOffset)) {
       return this.respond()
     }
     return this.continueEndFieldPhase()
@@ -3289,8 +3291,9 @@ export class GameCore {
     return this.continueHarvestEffects()
   }
 
-  private continueHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onHarvest', playerIndex, cardIndex)) {
+  private continueHarvestEffects(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? this.getHarvestPlayerIndices()
+    if (this.stageDispatch.continueReactionWindow('onHarvest', playerOrder, orderOffset)) {
       return this.respond()
     }
 
@@ -3320,15 +3323,17 @@ export class GameCore {
     return this.continueStartHarvestFeedingPhase()
   }
 
-  private continueStartHarvestFeedingPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onStartHarvestFeedingPhase', playerIndex, cardIndex)) {
+  private continueStartHarvestFeedingPhase(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? this.getHarvestPlayerIndices()
+    if (this.stageDispatch.continueReactionWindow('onStartHarvestFeedingPhase', playerOrder, orderOffset)) {
       return this.respond()
     }
     return this.continueHarvestFeeding()
   }
 
-  private continueHarvestFeeding(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onHarvestFeedingPhase', playerIndex, cardIndex)) {
+  private continueHarvestFeeding(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? this.getHarvestPlayerIndices()
+    if (this.stageDispatch.continueReactionWindow('onHarvestFeedingPhase', playerOrder, orderOffset)) {
       return this.respond()
     }
     return this.executeFeedingLogic()
@@ -3386,16 +3391,18 @@ export class GameCore {
     return this.continueHarvestFeedingQueue(feedQueue)
   }
 
-  private continueEndHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
+  private continueEndHarvestEffects(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
     this.state.roundPhase = 'harvest'
-    if (this.stageDispatch.continueStageHook('onEndHarvest', playerIndex, cardIndex)) {
+    const playerOrder = extra?.playerOrder ?? this.getHarvestPlayerIndices()
+    if (this.stageDispatch.continueReactionWindow('onEndHarvest', playerOrder, orderOffset)) {
       return this.respond()
     }
     return this.continueAfterHarvestEffects()
   }
 
-  private continueAfterHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onAfterHarvest', playerIndex, cardIndex)) {
+  private continueAfterHarvestEffects(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? this.getHarvestPlayerIndices()
+    if (this.stageDispatch.continueReactionWindow('onAfterHarvest', playerOrder, orderOffset)) {
       return this.respond()
     }
     delete this.state.harvestReapSummary
@@ -4927,8 +4934,9 @@ export class GameCore {
   private startHarvest(): SessionResponse { return harvestPhase.startHarvest(this) }
   private startBreedPhase(): SessionResponse { return harvestPhase.startBreedPhase(this) }
 
-  private continueAfterFeedingPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onEndHarvestFeedingPhase', playerIndex, cardIndex)) {
+  private continueAfterFeedingPhase(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? this.getHarvestPlayerIndices()
+    if (this.stageDispatch.continueReactionWindow('onEndHarvestFeedingPhase', playerOrder, orderOffset)) {
       return this.respond()
     }
     this.state.roundPhase = 'breeding'

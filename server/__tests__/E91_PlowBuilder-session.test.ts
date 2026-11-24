@@ -7,9 +7,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
   readCardExtraData,
   writeCardExtraData,
-  setCardFlag,
 } from '../../shared/cards/helpers/card-state'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { dispatchTradeAppliedListener } from '../../shared/actions/helpers/trade-applied-listener'
 import { collectComputeChoiceCandidates } from '../../shared/cards/card-listeners'
 import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
@@ -46,7 +44,7 @@ describe('E091_PlowBuilder session', () => {
     p.improvements.push('Major_Joinery')
     p.resources.food = 5
     if (options?.joineryUsed !== false) {
-      writeCardExtraData(p, CARD_ID, 'usedJoinery', true)
+      writeCardExtraData(p, CARD_ID, 'usedJoineryRound', round)
     }
     session.loadState(st2)
 
@@ -138,7 +136,7 @@ describe('E091_PlowBuilder session', () => {
       undefined,
       session.actionHooks,
     ))
-    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeFalsy()
+    expect(readCardExtraData<number>(player, CARD_ID, 'usedJoineryRound')).toBeUndefined()
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
@@ -154,7 +152,7 @@ describe('E091_PlowBuilder session', () => {
     expect(resp.ok).toBe(true)
 
     expect(resp.state.roundPhase).toBe('harvest')
-    expect(readCardExtraData<boolean>(resp.state.players[0]!, CARD_ID, 'usedJoinery')).toBe(true)
+    expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'usedJoineryRound')).toBe(4)
     expect(resp.interaction.anytimeActions.map((action) => action.id))
       .toContain('E91-plow-builder-anytime')
 
@@ -169,7 +167,7 @@ describe('E091_PlowBuilder session', () => {
 
     const p = resp.state.players[0]!
     expect(p.fields).toContainEqual(expect.objectContaining(tile))
-    expect(p.cardStates?.[CARD_ID]?.flagged).toBe(true)
+    expect(readCardExtraData<number>(p, CARD_ID, 'plowedRound')).toBe(4)
     expect(resp.interaction.anytimeActions.map((action) => action.id))
       .not.toContain('E91-plow-builder-anytime')
     expect(resp.state.events).toContainEqual(expect.objectContaining({ type: 'farm.fieldPlowed' }))
@@ -248,7 +246,7 @@ describe('E091_PlowBuilder session', () => {
     expect(extras.map((option) => option.value)).not.toContain('Major_Joinery')
   })
 
-  it('trade-applied listener sets usedJoinery on Major_Joinery sourceId', () => {
+  it('trade-applied listener marks the Harvest round on Major_Joinery sourceId', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -258,7 +256,7 @@ describe('E091_PlowBuilder session', () => {
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
 
-    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeUndefined()
+    expect(readCardExtraData<number>(player, CARD_ID, 'usedJoineryRound')).toBeUndefined()
     session.withCtx(() => dispatchTradeAppliedListener(
       state,
       player,
@@ -269,7 +267,7 @@ describe('E091_PlowBuilder session', () => {
       undefined,
       session.actionHooks,
     ))
-    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
+    expect(readCardExtraData<number>(player, CARD_ID, 'usedJoineryRound')).toBe(state.round)
   })
 
   it.each([
@@ -296,7 +294,7 @@ describe('E091_PlowBuilder session', () => {
       undefined,
       session.actionHooks,
     ))
-    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeFalsy()
+    expect(readCardExtraData<number>(player, CARD_ID, 'usedJoineryRound')).toBeUndefined()
   })
 
   it('trade-applied listener accepts the six-player Joinery copy', () => {
@@ -319,24 +317,7 @@ describe('E091_PlowBuilder session', () => {
       undefined,
       session.actionHooks,
     ))
-    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
-  })
-
-  it('onAfterHarvest clears both the per-use flag and usedJoinery', () => {
-    const session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.roundPhase = 'harvest'
-    const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
-    setCardFlag(player, CARD_ID, true)
-    writeCardExtraData(player, CARD_ID, 'usedJoinery', true)
-    session.loadState(state)
-
-    session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onAfterHarvest'))
-    expect(player.cardStates?.[CARD_ID]?.flagged).toBe(false)
-    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(false)
+    expect(readCardExtraData<number>(player, CARD_ID, 'usedJoineryRound')).toBe(state.round)
   })
 
   it('declining Joinery leaves its wood and does not arm Plow Builder', () => {
@@ -346,7 +327,7 @@ describe('E091_PlowBuilder session', () => {
     const response = session.resolveChoice(0, '__skip__')
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(1)
-    expect(readCardExtraData<boolean>(response.state.players[0]!, CARD_ID, 'usedJoinery')).toBeFalsy()
+    expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'usedJoineryRound')).toBeUndefined()
     expect(response.interaction.anytimeActions.map((action) => action.id)).not.toContain('E91-plow-builder-anytime')
   })
 
@@ -435,5 +416,5 @@ describe('ae-negative-44-cards', () => {
   const { sessions, save, ok, make, finish, choose, anytime, end, joineryMenu } = audit44Cards
   afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
   it('E091 N1 actual Minor Improvement buys Joinery for two wood two stone while card in hand cannot unlock it', () => { const s = make('E091_PlowBuilder', st => { st.players[0]!.minorHand = ['B007_Wage', 'B004_WoodPile']; Object.assign(st.players[0]!.resources, { wood: 2, stone: 2 }) }), p = joineryMenu(s), r = finish(s, choose(s, p, 'Major_Joinery'), false); assert.ok(r.state.players[0]!.improvements.includes('Major_Joinery')); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.stone, 0); const c = make('E091_PlowBuilder', st => { st.players[0]!.minorHand = ['B007_Wage', 'B004_WoodPile']; Object.assign(st.players[0]!.resources, { wood: 2, stone: 2 }) }, false), cp = joineryMenu(c); assert.ok(cp.interaction.stateId === 'wait' && cp.interaction.request.kind === 'choice'); assert.equal(cp.interaction.request.options.some(o => o.value === 'Major_Joinery'), false); const rejected = assertRejectedUnchanged(c, () => c.resolveChoice(0, 'Major_Joinery')), cr = finish(c, choose(c, cp, 'B007_Wage'), false); assert.ok(cr.state.players[1]!.minorHand.includes('B007_Wage')); assert.equal(cr.state.players[0]!.resources.food, 102); save('E091-N1', { p, r, cp, rejected, cr }) })
-  it('E091 N2 real harvest Joinery exchange unlocks exactly one one-food plow and resets after harvest', () => { const s = make('E091_PlowBuilder', st => { st.players[0]!.improvements = ['Major_Joinery']; st.players[0]!.resources.wood = 1; st.players[0]!.resources.food = 5 }, true, 4); let p = end(s); for (let n = 0; n < 12 && p.state.players[0]!.resources.wood === 1; n++) { const i = p.interaction; assert.ok(i.stateId === 'wait' && (i.request.kind === 'choice' || i.request.kind === 'select-trigger'), JSON.stringify(i)); const o = i.request.options.find(o => o.value !== '__skip__' && o.value !== '__pass__'); assert.ok(o); p = ok(s.resolveChoice(i.playerIndex, o.value)) } assert.equal(p.state.roundPhase, 'harvest'); assert.equal(p.state.players[0]!.resources.wood, 0); assert.equal(p.state.players[0]!.resources.food, 7); const a = anytime(s, 'E091_PlowBuilder'); assert.ok(a.interaction.stateId === 'wait' && a.interaction.request.kind === 'farm-select' && a.interaction.request.farm.farmType === 'plow'); const r = ok(s.commitSelectionChoice(0, { tile: a.interaction.request.farm.selectableTiles[0]! })); assert.equal(a.state.players[0]!.resources.food, 6); assert.equal(r.state.players[0]!.resources.food, 2); assert.equal(r.state.players[0]!.fields.length, 1); assert.equal(r.interaction.anytimeActions.some(a => JSON.stringify(a).includes('E091_PlowBuilder')), false); const settled = finish(s, r, false); assert.equal(settled.state.players[0]!.cardStates.E091_PlowBuilder?.extraData?.usedJoinery, false); save('E091-N2', { p, a, r, settled }) })
+  it('E091 N2 real harvest Joinery exchange unlocks exactly one one-food plow for that harvest', () => { const s = make('E091_PlowBuilder', st => { st.players[0]!.improvements = ['Major_Joinery']; st.players[0]!.resources.wood = 1; st.players[0]!.resources.food = 5 }, true, 4); let p = end(s); for (let n = 0; n < 12 && p.state.players[0]!.resources.wood === 1; n++) { const i = p.interaction; assert.ok(i.stateId === 'wait' && (i.request.kind === 'choice' || i.request.kind === 'select-trigger'), JSON.stringify(i)); const o = i.request.options.find(o => o.value !== '__skip__' && o.value !== '__pass__'); assert.ok(o); p = ok(s.resolveChoice(i.playerIndex, o.value)) } assert.equal(p.state.roundPhase, 'harvest'); assert.equal(p.state.players[0]!.resources.wood, 0); assert.equal(p.state.players[0]!.resources.food, 7); const a = anytime(s, 'E091_PlowBuilder'); assert.ok(a.interaction.stateId === 'wait' && a.interaction.request.kind === 'farm-select' && a.interaction.request.farm.farmType === 'plow'); const r = ok(s.commitSelectionChoice(0, { tile: a.interaction.request.farm.selectableTiles[0]! })); assert.equal(a.state.players[0]!.resources.food, 6); assert.equal(r.state.players[0]!.resources.food, 2); assert.equal(r.state.players[0]!.fields.length, 1); assert.equal(r.interaction.anytimeActions.some(a => JSON.stringify(a).includes('E091_PlowBuilder')), false); const settled = finish(s, r, false); assert.deepEqual([settled.state.players[0]!.cardStates.E091_PlowBuilder?.extraData?.usedJoineryRound, settled.state.players[0]!.cardStates.E091_PlowBuilder?.extraData?.plowedRound], [4, 4]); save('E091-N2', { p, a, r, settled }) })
 })

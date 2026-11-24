@@ -11,6 +11,8 @@ const CARD_ID = 'E073_Scythe'
 
 const HARVEST_ACTION_ID = 'card_E073_Scythe_harvest-field'
 const FULL_REAP_POSITION_KEY = 'fullReapPosition'
+/** The Harvest, by its round, the chosen field belongs to; a later Harvest never reuses it. */
+const FULL_REAP_ROUND_KEY = 'fullReapRound'
 
 const fieldKey = (row: number, col: number) => `${row}-${col}`
 
@@ -24,7 +26,7 @@ const scytheHarvestFieldAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, params }) => {
+  execute: ({ state, player, params }) => {
     const fieldId = params?.fieldId as string | undefined
     const field = getLogicalFields(player).find((candidate) => candidate.id === fieldId)
     if (!field || !hasOnlyCrops(field.stacks) || field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) < 2) {
@@ -33,14 +35,16 @@ const scytheHarvestFieldAction: ActionDefinition = {
     const slot = [...field.slots].reverse().find((candidate) => candidate.stack)
     if (!slot) return { type: 'fail', errorKey: 'log.actionFail' }
     writeCardExtraData(player, CARD_ID, FULL_REAP_POSITION_KEY, fieldKey(slot.tile.row, slot.tile.col))
+    writeCardExtraData(player, CARD_ID, FULL_REAP_ROUND_KEY, state.round)
     return { type: 'ok' }
   },
 }
 
 registerAdHocAction(scytheHarvestFieldAction)
 
-registerHarvestCountModifier(CARD_ID, ({ player, field, logicalField }) => {
+registerHarvestCountModifier(CARD_ID, ({ state, player, field, logicalField }) => {
   if (!player.minorPlayed?.includes(CARD_ID)) return
+  if (readCardExtraData<number>(player, CARD_ID, FULL_REAP_ROUND_KEY) !== state.round) return
   const selected = readCardExtraData<string>(player, CARD_ID, FULL_REAP_POSITION_KEY)
   const selectedField = logicalField
     ? logicalField.slots.some((slot) => selected === fieldKey(slot.tile.row, slot.tile.col))
@@ -71,12 +75,6 @@ const cardImpl = {
       })
       return { type: 'xor', optional: true, children }
     },
-    onEndHarvest: () => ({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'set-extra-data', key: FULL_REAP_POSITION_KEY, value: undefined },
-    }),
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

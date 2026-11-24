@@ -143,11 +143,13 @@ describe('duplicate six-player major behavior', () => {
     for (const entry of state.players) markAllWorkersUsed(state, entry)
     session.loadState(state)
     let response = session.performRoundEnd()
-    for (const cardId of player.improvements) {
-      expect(response.interaction.sourceCard).toBe(cardId)
-      const accept = response.interaction.request.options.find((option) => option.value !== '__skip__')!
-      response = session.resolveChoice(0, accept.value)
-      expect(response.ok).toBe(true)
+    // The six harvest conversions share one window; each selection converts that building once.
+    for (const [index, cardId] of player.improvements.entries()) {
+      expect(response.interaction).toMatchObject({ stateId: 'wait', spaceId: '__stage:onHarvest', request: { kind: 'select-trigger' } })
+      const options = response.interaction.stateId === 'wait' ? response.interaction.request.options ?? [] : []
+      expect(options.map((option) => option.value)).toEqual([...player.improvements.slice(index), '__pass__'])
+      response = session.resolveChoice(0, cardId)
+      expect(response.ok, response.error).toBe(true)
     }
     expect(response.state.players[0]!.resources).toMatchObject({
       wood: 0,

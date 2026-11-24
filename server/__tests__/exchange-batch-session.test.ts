@@ -68,10 +68,12 @@ const enterFeeding = (session: GameSession): SessionResponse => {
   for (let guard = 0; guard < 16 && response.interaction.stateId === 'wait' &&
     response.interaction.request.kind !== 'feed'; guard++) {
     const request = response.interaction.request
-    if (request.kind !== 'choice' || !request.options.some((entry) => entry.value === '__skip__')) {
+    // Decline every pre-feeding offer: a card's own choice skips, a same-timing selector passes.
+    const decline = request.kind === 'select-trigger' ? '__pass__' : '__skip__'
+    if ((request.kind !== 'choice' && request.kind !== 'select-trigger') || !request.options.some((entry) => entry.value === decline)) {
       throw new Error(`Unexpected harvest preparation ${JSON.stringify(response.interaction)}`)
     }
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    response = session.resolveChoice(response.interaction.playerIndex, decline)
     expect(response.ok, response.error).toBe(true)
   }
   expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })

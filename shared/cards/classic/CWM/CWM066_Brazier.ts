@@ -11,7 +11,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     // Standard exchanges, so exchange reactions (e.g. CI097_Slaughterhouse) see the conversion.
-    onStartHarvestFeedingPhase: (state, player) => {
+    onHarvestFeedingPhase: (state, player) => {
       const children = RECIPES.flatMap(([good, food]) => {
         const leaf = createSingleHarvestExchange(CARD_ID, () => ({
           from: { [good]: 1 }, to: { food }, max: 1, sourceId: CARD_ID, triggers: ['harvest'],

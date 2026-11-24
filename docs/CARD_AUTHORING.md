@@ -137,12 +137,7 @@ Leaf helpers live in `shared/cards/helpers/pay-gain-node.ts`:
 
 ### 4.3 At a stage of the round or harvest
 
-Declare `impl.effect.<hook>: (state, player, ctx?) => ActionFlow | void`. The hook names and their order are listed in `shared/cards/card-effects.ts` and in [hooks](architecture/hooks.md#stage-hooks).
-
-| Dispatch | Hooks |
-|---|---|
-| Stage Dispatch: one trigger-select per player, sources frozen at window entry | `onBeforeStartOfTurn`, `onAfterRevealAction`, `onPreparation`, `onRoundStart`, `onEndPreparation`, `onBeforeWork`, `onWorkStart`, `onAllWorkersPlaced`, `onEndTurn`, `onBeforeReturnHome`, `onStartReturnHome`, `onReturnHome`, `onAfterReturnHome`, `onBeforeHarvest`, `onStartHarvest`, `onStartHarvestFieldPhase`, `onHarvestFieldPhase`, `onEndHarvestFieldPhase`, `onRoundEnd`, `onAfterRoundEnd`, `onBeforeEndGame` |
-| Serial per player, then improvements, minors and occupations | `onAfterReap`, `onHarvest`, `onStartHarvestFeedingPhase`, `onHarvestFeedingPhase`, `onEndHarvestFeedingPhase`, `onEndHarvest`, `onAfterHarvest` |
+Declare `impl.effect.<hook>: (state, player, ctx?) => ActionFlow | void`. The hook names and their order are listed in `shared/cards/card-effects.ts` and in [hooks](architecture/hooks.md#stage-hooks). Every stage hook opens a Stage Dispatch window: one trigger-select per player, with sources frozen at window entry.
 
 The same printed timing goes on the same hook ([ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)):
 
@@ -153,14 +148,15 @@ The same printed timing goes on the same hook ([ADR 0055](adr/0055-same-timing-s
 | "At the start of the returning home phase" | `onStartReturnHome` (`A157_Bohemian`) |
 | "In the returning home phase (of each round)" | `onReturnHome` (`D107_Bellfounder`) |
 | "Immediately after each returning home phase" | `onAfterReturnHome` (`D018_SteamPlow`) |
+| "During each harvest feeding phase", "in the feeding phase of each harvest" | `onHarvestFeedingPhase` (`CWM005_BeeKeeper`) |
 | "At the end of each round", "at the end of round N" | `onRoundEnd` (`B053_SculptureCourse`) |
 | "After each round" | `onAfterRoundEnd` (`D167_PureBreeder`) |
 
 - Preparation windows filter sources with the pure `effect.stageEligibility[hook]` (`E111_Recluse`).
 - `handHooks` lets a hand card fire, except for `onBuy`, `onEndTurn` and `onBeforeEndGame`.
 - A harvest-start example is `E110_Dentist` (`onStartHarvest`).
-- With the seat setting on (the default), a mandatory effect that only gains non-animal goods, stores goods on a card or updates counters resolves before the player orders the rest ([ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)); do not rely on play-zone order. Keep per-harvest bookkeeping in round-keyed card state (`C062_CookeryExtension`) and random draws in an action leaf (`M104_WildHarvest`), never in the stage hook itself.
-- Test: `E090_E127-parity-session.test.ts` reaches the round-4 harvest (§5).
+- With the seat setting on (the default), a mandatory effect that only gains non-animal goods, stores goods on a card or updates counters resolves before the player orders the rest ([ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)); do not rely on play-zone order. Keep per-harvest bookkeeping in round-keyed card state (`C062_CookeryExtension`; a field selection tagged with its round, `A112_ScytheWorker`) and random draws in an action leaf (`M104_WildHarvest`), never in the stage hook itself.
+- Tests: `E090_E127-parity-session.test.ts` reaches the round-4 harvest (§5); `harvest-late-reaction-windows-session.test.ts` orders two same-timing cards both ways.
 
 ### 4.4 "You may pay X to get Y"
 
@@ -195,7 +191,7 @@ Tests: `E160_KelpGatherer-session.test.ts` (with `confirmPlayerSwitch`) and `A13
 |---|---|---|
 | Pastures hold more animals | `effect.computePastureCapacityModifiers` returning `{ sourceCard, kind: 'additive', apply }` | `A012_DrinkingTrough` |
 | Anything costs less, more or something else | the payment pipeline (§4.14) | `A088_HedgeKeeper`, `A143_Stonecutter` |
-| Harvest yields more | `registerHarvestCountModifier`; it does not filter ownership, so check the card is played | `E073_Scythe` |
+| Harvest yields more | `registerHarvestCountModifier`; it does not filter ownership, so check the card is played and that its field choice carries this Harvest's round | `E073_Scythe` |
 | Feeding costs less | `registerHarvestFeedingRequirementModifier` (played-only) | `E159_OldMiser` |
 | Breeding threshold | `effect.computeBreedThreshold`; the smallest wins | `E084_DollysMother` |
 | Extra room capacity | `effect.computeExtraRoomCapacity` | `B010_Caravan` |

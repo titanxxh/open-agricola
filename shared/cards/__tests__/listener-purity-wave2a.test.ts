@@ -721,12 +721,12 @@ describe('listener purity wave 2a', () => {
     expect(result?.flow).toMatchObject({ actionId: 'gain', sourceCard: E51, params: { food: 1 } })
   })
 
-  it('E91 PlowBuilder trade-applied listener returns usedJoinery leaf without mutating cardStates', () => {
+  it('E91 PlowBuilder trade-applied listener returns a Harvest round mark leaf without mutating cardStates', () => {
     const p = player(E91, {
       occupationPlayed: [E91],
       minorPlayed: [],
       improvements: ['Major_Joinery'],
-      cardStates: { [E91]: { extraData: { usedJoinery: false } } },
+      cardStates: { [E91]: { extraData: {} } },
     })
     const ctx = context(p, {
       actionId: 'trade-applied',
@@ -734,6 +734,7 @@ describe('listener purity wave 2a', () => {
       extraData: { sourceId: 'Major_Joinery' },
     })
     ctx.state.roundPhase = 'harvest'
+    ctx.state.round = 4
     const before = snapshot(p)
 
     const result = listenerById(
@@ -745,7 +746,7 @@ describe('listener purity wave 2a', () => {
     expectLeaf(result?.flow, {
       actionId: 'special-effect',
       sourceCard: E91,
-      params: { kind: 'set-extra-data', key: 'usedJoinery', value: true },
+      params: { kind: 'set-extra-data', key: 'usedJoineryRound', value: 4 },
     })
   })
 

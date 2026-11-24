@@ -119,7 +119,7 @@ anytime                  注册额外的 anytime 行动
   onBeforeEndGame → preScoringWindow → gameover
 ```
 
-阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）覆盖除串行 hook 外的所有阶段窗口（`CARD_AUTHORING_zh.md` §4.3）：
+阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）覆盖所有阶段窗口：
 
 - 除回合结束外，每个窗口从起始玩家开始顺时针冻结玩家顺序，并在每名玩家进入时，按持牌、手牌启用的 hook 与纯 `stageEligibility` 查询捕获一棵固定的 `activate-card-effect` 来源树。来源发现从不按当前支付能力过滤。
 - 单个来源直接展开；多个来源进入 `ParallelNode(mode='trigger-select')`。每次选择后，handler、支付与必选 / Pass 状态按实时克隆预览重算。已完成的来源不重放；窗口内打出的卡只参加后续窗口。
@@ -138,7 +138,7 @@ anytime                  注册额外的 anytime 行动
 - **收获前**：在收获跳过生效前冻结玩家顺序；所有玩家都参与。
 - **跳过整个收获**：在 `onBeforeHarvest` 之后生效；若在收获开始窗口内决定，则在该窗口结束后生效。生效后，该轮之后的每个收获步骤、阶段 hook 和 listener 都排除该玩家。
 - **收获准备**：`harvestPrepWindow` 依据 `preHarvestGoodsWanted` / `preHarvestGoodsWantedBeforeReap` / `maySkipHarvestFieldPhase` metadata，只提供可支付、有次数限制且能产出所需货物的 Harvest 兑换。使用次数按来源和轮次记录。
-- **田间阶段**：其三个窗口还排除跳过田间和繁殖阶段的玩家。
+- **田间阶段**：其窗口（含收割后窗口）还排除跳过田间和繁殖阶段的玩家。
 - **收割**：`reap` 是内部行动。完整收获使用 `trigger: { phase: 'harvest' }`；私人田间阶段收割不写收获摘要。`computeHarvestCount()` 返回带 `sources` / `tags` / `scope` 的数量，只能通过 `registerHarvestCountModifier()` 修改。逐作物 `reap` 事件汇入一个 parallel flow，之后才进入 `onAfterReap`。
 - **收割后 anytime**：按收获顺序、在计算喂食之前提供；每个 flow 后重建。
 - **喂食**：`computeHarvestFeedingRequirement()` 只能通过 `registerHarvestFeedingRequirementModifier()` 修改。feed 请求携带权威兑换目录（[Anytime 窗口策略](actions_zh.md#anytime-窗口策略)）；`handleFeedResolved()` 在任何修改前校验完整的有序计划。

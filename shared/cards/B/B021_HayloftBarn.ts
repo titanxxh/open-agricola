@@ -46,6 +46,14 @@ const buildFlow = (newCount: number, player: PlayerState): ActionFlow => {
   return food
 }
 
+/** Releases 1 food from the card through returned leaves; an emptied card also grants the Family Growth. */
+const releaseFoodFlow = (player: PlayerState): ActionFlow | undefined => {
+  const foodCount = readCardExtraData<number>(player, CARD_ID, 'foodCount') ?? 0
+  if (foodCount <= 0) return
+  const newCount = foodCount - 1
+  return { type: 'seq', children: [...setStoredFoodFlow(newCount), buildFlow(newCount, player)] }
+}
+
 /**
  * Detect grain gain from collect, gain, and receive actions.
  * When player obtains at least 1 grain, release 1 food from card.
@@ -62,19 +70,8 @@ const grainGainListener: CardListenerRegistration = {
     const grainGained = hasExchangeGained(events, 'grain') ||
       hasResourceMovedToPlayer(events, 'grain', context.player.id)
     if (!grainGained) return
-    const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
-    if (foodCount <= 0) return
-    const newCount = foodCount - 1
-    return {
-      flow: {
-        type: 'seq',
-        children: [
-          ...setStoredFoodFlow(newCount),
-          buildFlow(newCount, context.player),
-        ],
-      },
-      sourceCard: CARD_ID,
-    }
+    const flow = releaseFoodFlow(context.player)
+    if (flow) return { flow, sourceCard: CARD_ID }
   },
 }
 
@@ -90,12 +87,7 @@ const cardImpl = {
   onAfterReap: (state, player) => {
     const grainFields = state.harvestReapSummary?.[player.id]?.grainFields ?? 0
     if (grainFields <= 0) return
-    const foodCount = readCardExtraData<number>(player, CARD_ID, 'foodCount') ?? 0
-    if (foodCount <= 0) return
-    const newCount = foodCount - 1
-    writeCardExtraData(player, CARD_ID, 'foodCount', newCount)
-    updateInfobox(player, newCount)
-    return buildFlow(newCount, player)
+    return releaseFoodFlow(player)
   },
 },
   reaches: [] as readonly string[],

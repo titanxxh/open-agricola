@@ -10,9 +10,20 @@ import { fieldIsEmpty, fieldTotalRemaining } from '../../domain/field'
 import { getUnfencedStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { getLogicalFields } from '../helpers/card-field'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 
 const CARD_ID = 'D072_StableManure'
-registerHarvestCountModifier(CARD_ID, ({ player, field, logicalField }) => {
+const SELECTED_ROUND_EFFECT = 'd72-stable-manure-selected-round'
+
+// The selection marks its Harvest by round, so a later Harvest never reuses it.
+registerSelectionEffect(SELECTED_ROUND_EFFECT, ({ state }) => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-extra-data', key: 'selectedRound', value: state.round },
+}))
+registerHarvestCountModifier(CARD_ID, ({ state, player, field, logicalField }) => {
+  if (readCardExtraData<number>(player, CARD_ID, 'selectedRound') !== state.round) return
   const selected = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions') ?? []
   const selectedField = logicalField
     ? logicalField.slots.some((slot) => selected.includes(positionKey(slot.tile)))
@@ -62,6 +73,7 @@ const cardImpl = {
       optional: true,
       actionContext: {
         selectionKind: 'farm-position',
+        selectionEffect: SELECTED_ROUND_EFFECT,
         maxSelections: Math.min(unfencedCount, croppedFields.length),
         selectableTiles: croppedFields.map(({ tile, groupKey, sourceCard, cardFieldSlot }) => ({
           ...tile,
@@ -72,12 +84,6 @@ const cardImpl = {
       },
     }
   },
-  onEndHarvest: () => ({
-    type: 'leaf',
-    actionId: 'special-effect',
-    sourceCard: CARD_ID,
-    params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
-  }),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
