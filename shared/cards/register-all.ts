@@ -539,19 +539,24 @@ import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C179_BovinePioneer } from './C/C179_BovinePioneer'
 import { C180_Trapper } from './C/C180_Trapper'
 import { CE203_Shepherd } from './classic/CE/CE203_Shepherd'
+import { CFL001_FarmCart } from './classic/CFL/CFL001_FarmCart'
 import { CFL002_BeguineCourtyard } from './classic/CFL/CFL002_BeguineCourtyard'
 import { CFL003_BelgianShepherd } from './classic/CFL/CFL003_BelgianShepherd'
+import { CFL004_EducationalBuilding } from './classic/CFL/CFL004_EducationalBuilding'
 import { CFL005_Brabant } from './classic/CFL/CFL005_Brabant'
+import { CFL006_EndiveField } from './classic/CFL/CFL006_EndiveField'
 import { CFL007_DiamondTradingPost } from './classic/CFL/CFL007_DiamondTradingPost'
 import { CFL009_EbonyShoe } from './classic/CFL/CFL009_EbonyShoe'
 import { CFL010_StuckCart } from './classic/CFL/CFL010_StuckCart'
 import { CFL011_Towhead } from './classic/CFL/CFL011_Towhead'
 import { CFL012_Cart } from './classic/CFL/CFL012_Cart'
+import { CFL013_GiftTable } from './classic/CFL/CFL013_GiftTable'
 import { CFL014_JeneverDistillery } from './classic/CFL/CFL014_JeneverDistillery'
 import { CFL015_CourtyardGarden } from './classic/CFL/CFL015_CourtyardGarden'
 import { CFL018_Oce } from './classic/CFL/CFL018_Oce'
 import { CFL020_LoveGarden } from './classic/CFL/CFL020_LoveGarden'
 import { CFL021_LionsMound } from './classic/CFL/CFL021_LionsMound'
+import { CFL023_CarrotMuseum } from './classic/CFL/CFL023_CarrotMuseum'
 import { CFL024_LoversTryst } from './classic/CFL/CFL024_LoversTryst'
 import { CFL026_SpeculoosBakery } from './classic/CFL/CFL026_SpeculoosBakery'
 import { CFL027_TrappistBeer } from './classic/CFL/CFL027_TrappistBeer'
@@ -559,8 +564,10 @@ import { CFL028_HashwithFries } from './classic/CFL/CFL028_HashwithFries'
 import { CFL029_BirdTrap } from './classic/CFL/CFL029_BirdTrap'
 import { CFL030_WildBoarHunt } from './classic/CFL/CFL030_WildBoarHunt'
 import { CFL031_OldMaster } from './classic/CFL/CFL031_OldMaster'
+import { CFL032_Elder } from './classic/CFL/CFL032_Elder'
 import { CFL033_Sculptor } from './classic/CFL/CFL033_Sculptor'
 import { CFL035_Freemason } from './classic/CFL/CFL035_Freemason'
+import { CFL036_VegetableSeller } from './classic/CFL/CFL036_VegetableSeller'
 import { CFL038_ShepherdwithFlock } from './classic/CFL/CFL038_ShepherdwithFlock'
 import { CFL039_Cosmographer } from './classic/CFL/CFL039_Cosmographer'
 import { CFL040_Anatomist } from './classic/CFL/CFL040_Anatomist'
@@ -572,6 +579,7 @@ import { CFL045_SchoolDropout } from './classic/CFL/CFL045_SchoolDropout'
 import { CFL046_StableArchitect } from './classic/CFL/CFL046_StableArchitect'
 import { CFL047_FarmLawyer } from './classic/CFL/CFL047_FarmLawyer'
 import { CFL048_Botanist } from './classic/CFL/CFL048_Botanist'
+import { CFL049_Accountant } from './classic/CFL/CFL049_Accountant'
 import { CFL050_MeatSupplier } from './classic/CFL/CFL050_MeatSupplier'
 import { CFL051_NorthSeaFisherman } from './classic/CFL/CFL051_NorthSeaFisherman'
 import { CFL053_CafeSinger } from './classic/CFL/CFL053_CafeSinger'
@@ -591,6 +599,7 @@ import { CWA014_CatTongue } from './classic/CWA/CWA014_CatTongue'
 import { CWM001_Amazon } from './classic/CWM/CWM001_Amazon'
 import { CWM002_AnimalBuyer } from './classic/CWM/CWM002_AnimalBuyer'
 import { CWM003_ApplePicker } from './classic/CWM/CWM003_ApplePicker'
+import { CWM004_BargainingBakerr } from './classic/CWM/CWM004_BargainingBakerr'
 import { CWM005_BeeKeeper } from './classic/CWM/CWM005_BeeKeeper'
 import { CWM006_Borrower } from './classic/CWM/CWM006_Borrower'
 import { CWM008_BreadCarrier } from './classic/CWM/CWM008_BreadCarrier'
@@ -1695,19 +1704,24 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C179_BovinePioneer': C179_BovinePioneer.impl,
   'C180_Trapper': C180_Trapper.impl,
   'CE203_Shepherd': CE203_Shepherd.impl,
+  'CFL001_FarmCart': CFL001_FarmCart.impl,
   'CFL002_BeguineCourtyard': CFL002_BeguineCourtyard.impl,
   'CFL003_BelgianShepherd': CFL003_BelgianShepherd.impl,
+  'CFL004_EducationalBuilding': CFL004_EducationalBuilding.impl,
   'CFL005_Brabant': CFL005_Brabant.impl,
+  'CFL006_EndiveField': CFL006_EndiveField.impl,
   'CFL007_DiamondTradingPost': CFL007_DiamondTradingPost.impl,
   'CFL009_EbonyShoe': CFL009_EbonyShoe.impl,
   'CFL010_StuckCart': CFL010_StuckCart.impl,
   'CFL011_Towhead': CFL011_Towhead.impl,
   'CFL012_Cart': CFL012_Cart.impl,
+  'CFL013_GiftTable': CFL013_GiftTable.impl,
   'CFL014_JeneverDistillery': CFL014_JeneverDistillery.impl,
   'CFL015_CourtyardGarden': CFL015_CourtyardGarden.impl,
   'CFL018_Oce': CFL018_Oce.impl,
   'CFL020_LoveGarden': CFL020_LoveGarden.impl,
   'CFL021_LionsMound': CFL021_LionsMound.impl,
+  'CFL023_CarrotMuseum': CFL023_CarrotMuseum.impl,
   'CFL024_LoversTryst': CFL024_LoversTryst.impl,
   'CFL026_SpeculoosBakery': CFL026_SpeculoosBakery.impl,
   'CFL027_TrappistBeer': CFL027_TrappistBeer.impl,
@@ -1715,8 +1729,10 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CFL029_BirdTrap': CFL029_BirdTrap.impl,
   'CFL030_WildBoarHunt': CFL030_WildBoarHunt.impl,
   'CFL031_OldMaster': CFL031_OldMaster.impl,
+  'CFL032_Elder': CFL032_Elder.impl,
   'CFL033_Sculptor': CFL033_Sculptor.impl,
   'CFL035_Freemason': CFL035_Freemason.impl,
+  'CFL036_VegetableSeller': CFL036_VegetableSeller.impl,
   'CFL038_ShepherdwithFlock': CFL038_ShepherdwithFlock.impl,
   'CFL039_Cosmographer': CFL039_Cosmographer.impl,
   'CFL040_Anatomist': CFL040_Anatomist.impl,
@@ -1728,6 +1744,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CFL046_StableArchitect': CFL046_StableArchitect.impl,
   'CFL047_FarmLawyer': CFL047_FarmLawyer.impl,
   'CFL048_Botanist': CFL048_Botanist.impl,
+  'CFL049_Accountant': CFL049_Accountant.impl,
   'CFL050_MeatSupplier': CFL050_MeatSupplier.impl,
   'CFL051_NorthSeaFisherman': CFL051_NorthSeaFisherman.impl,
   'CFL053_CafeSinger': CFL053_CafeSinger.impl,
@@ -1747,6 +1764,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM001_Amazon': CWM001_Amazon.impl,
   'CWM002_AnimalBuyer': CWM002_AnimalBuyer.impl,
   'CWM003_ApplePicker': CWM003_ApplePicker.impl,
+  'CWM004_BargainingBakerr': CWM004_BargainingBakerr.impl,
   'CWM005_BeeKeeper': CWM005_BeeKeeper.impl,
   'CWM006_Borrower': CWM006_Borrower.impl,
   'CWM008_BreadCarrier': CWM008_BreadCarrier.impl,

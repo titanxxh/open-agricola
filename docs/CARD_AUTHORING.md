@@ -235,7 +235,7 @@ Tests: `E160_KelpGatherer-session.test.ts` (with `confirmPlayerSwitch`) and `A13
 - **Goods:** a `store-on-card` leaf, read back with `getStoredResource` and `take-from-card` (`E052_Cubbyhole`). "Take its goods at any time" is `cardResourceWithdrawal` in `helpers/card-resource-withdrawal.ts` (`CWM096_OakCask`).
 - **Goods on the farmyard:** a token on an unused space is `farmTokenSelection` in `helpers/farm-token-selection.ts` (`CWM064_Bonre`); one marker per room is `roomFoodMarkers` in `helpers/room-food-markers.ts` (`CWM071_Cookies`).
 - **Animals:** `meta.animalHolder: true` with `effect.onComputeAnimalZones` adding a `card:<id>` zone (`B012_Stockyard`).
-- **Crops:** a Card Field (`B068_Beanfield`; [cards](architecture/cards.md#card-fields-and-the-logical-field-seam)).
+- **Crops:** use `makeCardFieldImpl` for revised or classic Card Fields. A card can restrict when its field is sowable (`CFL006_EndiveField`; [cards](architecture/cards.md#card-fields-and-the-logical-field-seam)).
 
 ### 4.13 People left to place and "place another person"
 

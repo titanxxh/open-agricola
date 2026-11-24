@@ -312,6 +312,15 @@ describe('makeCardFieldImpl', () => {
       expect(deriveVirtualTileCol('D075_WoodField', 0)).toBe(4075)
       expect(deriveVirtualTileCol('D075_WoodField', 1)).toBe(4076)
     })
+    it('keeps every classic deck, card number and slot in a separate range from shipped tiles', () => {
+      const prefixes = ['CE', 'CI', 'CK', 'CFL', 'CBI', 'CWM']
+      const columns = prefixes.flatMap(deck => [6, 7].flatMap(number => [0, 1, 999].map(slot =>
+        deriveVirtualTileCol(`${deck}${String(number).padStart(3, '0')}_Test`, slot))))
+      expect(new Set(columns).size).toBe(columns.length)
+      expect(Math.min(...columns)).toBeGreaterThan(5082)
+      expect(deriveVirtualTileCol('CFL006_EndiveField', 0)).toBe(174006000)
+      expect(() => deriveVirtualTileCol('CFL006_EndiveField', 1000)).toThrow('invalid classic slot')
+    })
     it('E80 capacity=3 occupies 5080..5082', () => {
       expect(deriveVirtualTileCol('E080_RockGarden', 0)).toBe(5080)
       expect(deriveVirtualTileCol('E080_RockGarden', 2)).toBe(5082)
