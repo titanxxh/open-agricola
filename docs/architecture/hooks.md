@@ -121,7 +121,7 @@ Stage hooks return `ActionFlow` and run as resumable subflows through `EngineSta
 
 - Each window but turn end freezes its player order clockwise from the Start Player and, on each player's entry, captures a fixed tree of `activate-card-effect` sources using ownership, hand-enabled hooks and the pure `stageEligibility` query. Discovery never filters by current affordability.
 - One source expands directly; several enter `ParallelNode(mode='trigger-select')`. Handlers, payment and mandatory / pass state are recomputed from a live cloned-state preview after each selection. Completed sources never replay; cards played inside a window join only later windows.
-- Window context, player order and tree cursor persist in `stageResume`; restoration never rescans zones or rereads a changed marker. Legacy serial stages resume by `resumeAfterCardId`.
+- Window context, player order and tree cursor persist in `stageResume`; restoration never rescans zones or rereads a changed marker.
 - Nested optional branches keep exchange opportunities without weakening a mandatory root. `requiresExplicitChoice` keeps a purchase choice open while a live exchange could fund it.
 - At stage completion, unsettled animals nest the existing `reorganize` flow before the frame resumes.
 - Private events from stage subflows are held until the outermost response.
@@ -146,7 +146,7 @@ Window-specific invariants:
 - **`onBeforePlayerTurn`** is the one non-flow hook: skip-control only, `{ skipTurn?: true } | void`, never an `ActionFlow`, never pending.
 - **Timed rules**: `CardEffect.timedRules` declares a closed `TimedRule` / `RuleBody` that native registration compiles into existing hooks; `timed-rules.ts` reads no runtime registry. Execution-time formulas come from `rule-queries.ts`.
 
-Tests: `server/__tests__/{preparation-bga,before-harvest-reaction-dispatch,stage-animal-settlement,parallel-trigger-multi}-session.test.ts`, `server/__tests__/stage-hook-flow.test.ts`, `shared/actions/__tests__/future-meeples-entries.test.ts`.
+Tests: `server/__tests__/{preparation-bga,before-harvest-reaction-dispatch,stage-animal-settlement,parallel-trigger-multi,stage-window-dispatch}-session.test.ts`, `server/__tests__/stage-hook-flow.test.ts`, `shared/actions/__tests__/future-meeples-entries.test.ts`, `shared/cards/__tests__/printed-timing-hooks.test.ts`.
 
 ## Listener purity
 

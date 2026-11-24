@@ -64,7 +64,7 @@ describe('EngineStack', () => {
       spaceId: '__subflow:reorganize',
       reason: 'reorganize',
       undoBoundaryOnResolve: true,
-      stageResume: { hook: 'onReorganizeComplete', playerIndex: 1, cardIndex: 0, extra: { trigger: 'anytime' } },
+      stageResume: { hook: 'onReorganizeComplete', playerIndex: 1, extra: { trigger: 'anytime' } },
     })
     stack.push(frame)
 
@@ -75,7 +75,7 @@ describe('EngineStack', () => {
     expect(cursor.frames[0]!.reason).toBe('reorganize')
     expect(cursor.frames[0]!.undoBoundaryOnResolve).toBe(true)
     expect(cursor.frames[0]!.stageResume).toEqual({
-      hook: 'onReorganizeComplete', playerIndex: 1, cardIndex: 0, extra: { trigger: 'anytime' },
+      hook: 'onReorganizeComplete', playerIndex: 1, extra: { trigger: 'anytime' },
     })
 
     const rebuilt = EngineStack.fromCursor(cursor, (_source, _snapshot, frameCursor) => {

@@ -117,8 +117,8 @@ describe('B117_Informant session', () => {
     const ownerFlow = session.withCtx(() => effect!.onBeforeReturnHome!(state, owner))
     expect(ownerFlow).toBeDefined()
     expect((ownerFlow as Extract<ActionFlow, { type: 'leaf' }>).params?.wood).toBe(1)
-    // The opponent does not own this card, so the per-card iteration in
-    // continueStageHook would not invoke the hook for them. We don't assert
+    // The opponent does not own this card, so the reaction window's source
+    // collection would not invoke the hook for them. We don't assert
     // here on the listener-bus level; the trigger code in game-core gates
     // by getPlayerEffectCardIds(player) which excludes cards not in
     // occupationPlayed/minorPlayed/improvements. Sanity-check that owner

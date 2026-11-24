@@ -26,7 +26,7 @@ describe('computeAnytimePolicy', () => {
 
   it('does not open a closed stage or explicit window with request-level blocked ids', () => {
     expect(computeAnytimePolicy(base({
-      stageResume: { hook: 'onBeforeEndGame', playerIndex: 0, cardIndex: 0 },
+      stageResume: { hook: 'onBeforeEndGame', playerIndex: 0 },
       interactionKind: 'choice', blockedAnytimeIds: ['discard-goods'],
     }))).toEqual({ allowed: false, reason: 'stage-hook-chain' })
     expect(computeAnytimePolicy(base({
@@ -36,7 +36,7 @@ describe('computeAnytimePolicy', () => {
 
   it('uses an explicit window at a stage wait without recognizing its prompt', () => {
     expect(computeAnytimePolicy(base({
-      stageResume: { hook: 'onBeforeEndGame', playerIndex: 0, cardIndex: 0 },
+      stageResume: { hook: 'onBeforeEndGame', playerIndex: 0 },
       interactionKind: 'choice',
       anytimeWindow: { allowed: true, blockedIds: [] },
     }))).toEqual({ allowed: true, blockedIds: [] })
@@ -83,7 +83,7 @@ describe('computeAnytimePolicy', () => {
       computeAnytimePolicy(
         base({
           interactionKind: 'animal-reorg',
-          stageResume: { hook: 'onReorganizeComplete', playerIndex: 0, cardIndex: 0 },
+          stageResume: { hook: 'onReorganizeComplete', playerIndex: 0 },
         }),
       ),
     ).toEqual({ allowed: true, blockedIds: [] })
@@ -94,7 +94,7 @@ describe('computeAnytimePolicy', () => {
       computeAnytimePolicy(
         base({
           anytimeWindow: { allowed: true, blockedIds: ['exchange'] },
-          stageResume: { hook: 'beforeHarvest', playerIndex: 0, cardIndex: 0 },
+          stageResume: { hook: 'beforeHarvest', playerIndex: 0 },
         }),
       ),
     ).toEqual({ allowed: true, blockedIds: ['exchange'] })
@@ -104,7 +104,7 @@ describe('computeAnytimePolicy', () => {
     expect(
       computeAnytimePolicy(
         base({
-          stageResume: { hook: 'beforeHarvest', playerIndex: 0, cardIndex: 0 },
+          stageResume: { hook: 'beforeHarvest', playerIndex: 0 },
           interactionKind: 'choice',
         }),
       ),

@@ -30,6 +30,7 @@ The reference `ParallelNode::getChoices` resolves an *independent* mandatory chi
 - An auto-resolved independent source can change another source's condition before the player chooses; this is the reference trade-off.
 - Bookkeeping that ran as a stage hook moved to round-keyed card state, and random draws moved into action leaves, so previews and selectors never mutate or roll.
 - A card moved to the work-end window resolves before the undo boundary that opens returning home, like the cards already there.
+- No stage hook resolves outside a window: the serial dispatch loop and its `resumeAfterCardId` / `cardIndex` resume fields are gone. `stage-window-dispatch-session.test.ts` checks that every stage hook belongs to one window kind and that the last round opens every reaction window; `printed-timing-hooks.test.ts` checks that printed stage timings sit on their hooks.
 - Compatibility with retained games is waived (#2039): a game paused inside a migrated window when the change ships resumes it under the new rules and may be offered a source again or skip one; a game paused between a card's old and new window may miss or repeat that card once.
 
 ## Alternatives considered
