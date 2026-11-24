@@ -24,8 +24,6 @@ export type ExtraSowableField = {
   allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
   sourceCard: string
   groupKey?: string
-  /** Only one target in this group may be chosen in the same Sow. */
-  exclusiveSowGroup?: string
   /** True when card text treats this space as a field (B072 pastures); false for non-field crop spaces. */
   isField?: boolean
 }
