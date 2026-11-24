@@ -406,9 +406,8 @@ const pushStore = new WebPushStore(getDb())
 const pushRuntime = webPushRuntime()
 const handleWebPush = createWebPushHandler({ store: pushStore, ...pushRuntime, sendJson })
 const pushDelivery = pushRuntime.send ? new WebPushDelivery(pushStore, pushRuntime.send) : null
-const pushKinds = WEB_PUSH_KINDS.filter(kind => pushRuntime.allowed[kind])
-const pushTimer = pushDelivery && pushKinds.length ? setInterval(() => {
-  void pushDelivery.deliverDue(pushKinds).catch(() => { console.warn('[web-push] delivery deferred') })
+const pushTimer = pushDelivery ? setInterval(() => {
+  void pushDelivery.deliverDue(WEB_PUSH_KINDS).catch(() => { console.warn('[web-push] delivery deferred') })
 }, 5_000) : null
 pushTimer?.unref()
 

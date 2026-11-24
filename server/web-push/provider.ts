@@ -97,8 +97,7 @@ export function webPushRuntime(env = process.env): { publicKey: string | null; a
   const vapid = env.RELEASE_CHANNEL === 'prerelease' ? null : vapidFromEnv(env)
   return {
     publicKey: vapid?.publicKey ?? null,
-    allowed: { turn: !!vapid && env.WEB_PUSH_TURN_ENABLED === 'true', draft: !!vapid && env.WEB_PUSH_DRAFT_ENABLED === 'true',
-      'bug-report-inbox': !!vapid && env.WEB_PUSH_INBOX_ENABLED === 'true' },
+    allowed: { turn: !!vapid, draft: !!vapid, 'bug-report-inbox': !!vapid },
     send: vapid ? createPushProvider(vapid) : null,
   }
 }
