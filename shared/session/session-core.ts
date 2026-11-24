@@ -920,20 +920,20 @@ export class GameCore {
       onReturnHome: (stageResume) => { this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
       onStartReturnHome: (stageResume) => { this.continueStartReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
       onAfterRoundEnd: (stageResume) => { this.continueAfterRoundEnd(stageResume.playerIndex, stageResume.cardIndex) },
-      onBeforeEndGame: (stageResume) => { this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onBeforeEndGame: (stageResume) => { this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.extra) },
       preScoringWindow: (stageResume) => {
         this.continuePreScoringWindow(
           stageResume.playerIndex + (stageResume.extra?.anytimeActionTaken ? 0 : 1),
         )
       },
       onStartHarvest: (stageResume) => { this.continueFromStartHarvest(stageResume.playerIndex, stageResume.extra) },
-      onStartHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldStart(stageResume.playerIndex, stageResume.cardIndex) },
-      onHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldPhase(stageResume.playerIndex, stageResume.cardIndex) },
-      onEndHarvestFieldPhase: (stageResume) => { this.continueEndFieldPhase(stageResume.playerIndex, stageResume.cardIndex) },
+      onStartHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldStart(stageResume.playerIndex, stageResume.extra) },
+      onHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldPhase(stageResume.playerIndex, stageResume.extra) },
+      onEndHarvestFieldPhase: (stageResume) => { this.continueEndFieldPhase(stageResume.playerIndex, stageResume.extra) },
       onHarvestFeedingPhase: (stageResume) => { this.continueHarvestFeeding(stageResume.playerIndex, stageResume.cardIndex) },
       onEndHarvestFeedingPhase: (stageResume) => { this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.cardIndex) },
       onRoundEnd: (stageResume) => { this.continueRoundEndHooks(stageResume.playerIndex, stageResume.cardIndex) },
-      onAllWorkersPlaced: (stageResume) => { this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onAllWorkersPlaced: (stageResume) => { this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.extra) },
       onBreedPhase: () => { this.continueEndHarvestEffects() },
       onReorganizeComplete: (stageResume) => { this.continueAfterSubFlow(stageResume) },
     })
@@ -3128,9 +3128,8 @@ export class GameCore {
     orderOffset = 0,
     extra?: StageResumeState['extra'],
   ): SessionResponse {
-    const playerOrder = extra?.beforeHarvestPlayerOrder
-      ?? harvestPhase.getBeforeHarvestPlayerIndices(this.state)
-    if (this.stageDispatch.continueBeforeHarvestReactionHook(playerOrder, orderOffset)) {
+    const playerOrder = extra?.playerOrder ?? harvestPhase.getBeforeHarvestPlayerIndices(this.state)
+    if (this.stageDispatch.continueReactionWindow('onBeforeHarvest', playerOrder, orderOffset)) {
       return this.respond()
     }
     activatePendingHarvestSkips(this.state, 'before-start-of-harvest')
@@ -3165,8 +3164,9 @@ export class GameCore {
     return this.continueHarvestFieldStart()
   }
 
-  private continueHarvestFieldStart(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (playerIndex === 0 && cardIndex === 0) {
+  private continueHarvestFieldStart(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    // Only the window's entry starts the field phase; a resumed window carries its frozen order.
+    if (!extra?.playerOrder) {
       this.state.roundPhase = 'field'
       appendImmediateEvents(this.state, [{
         type: 'harvest.phaseStarted',
@@ -3188,14 +3188,16 @@ export class GameCore {
         }
       })
     }
-    if (this.stageDispatch.continueStageHook('onStartHarvestFieldPhase', playerIndex, cardIndex)) {
+    const playerOrder = extra?.playerOrder ?? harvestPhase.getHarvestFieldPlayerIndices(this.state)
+    if (this.stageDispatch.continueReactionWindow('onStartHarvestFieldPhase', playerOrder, orderOffset)) {
       return this.respond()
     }
     return this.continueHarvestFieldPhase()
   }
 
-  private continueHarvestFieldPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onHarvestFieldPhase', playerIndex, cardIndex)) {
+  private continueHarvestFieldPhase(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? harvestPhase.getHarvestFieldPlayerIndices(this.state)
+    if (this.stageDispatch.continueReactionWindow('onHarvestFieldPhase', playerOrder, orderOffset)) {
       return this.respond()
     }
     return this.continueHarvestReap()
@@ -3277,8 +3279,9 @@ export class GameCore {
     return this.continueEndFieldPhase()
   }
 
-  private continueEndFieldPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onEndHarvestFieldPhase', playerIndex, cardIndex)) {
+  private continueEndFieldPhase(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? harvestPhase.getHarvestFieldPlayerIndices(this.state)
+    if (this.stageDispatch.continueReactionWindow('onEndHarvestFieldPhase', playerOrder, orderOffset)) {
       return this.respond()
     }
     this.state.roundPhase = 'harvest'
@@ -4810,10 +4813,11 @@ export class GameCore {
     return roundPhase.handleConfirmNextPlayerResolved(this, nextPlayerIndex)
   }
 
-  private continueAllWorkersPlacedHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+  private continueAllWorkersPlacedHooks(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
     // No work turn follows this window, so a Guest granted from here on is placed at once.
     this.state.workEndWindowRound = this.state.round
-    if (this.stageDispatch.continueStageHook('onAllWorkersPlaced', playerIndex, cardIndex)) {
+    const playerOrder = extra?.playerOrder ?? roundPhase.startPlayerOrder(this.state)
+    if (this.stageDispatch.continueReactionWindow('onAllWorkersPlaced', playerOrder, orderOffset)) {
       return this.respond()
     }
     return roundPhase.performRoundEnd(this)
@@ -4994,13 +4998,14 @@ export class GameCore {
       }
     })
     if (this.state.round >= 14) {
-      return this.continueBeforeEndGameHooks(0, 0)
+      return this.continueBeforeEndGameHooks()
     }
     return this.continueBeforeStartOfTurn()
   }
 
-  private continueBeforeEndGameHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (cardIndex === 0 && this.stageDispatch.continueBeforeEndGamePlayerDispatch(playerIndex)) {
+  private continueBeforeEndGameHooks(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    const playerOrder = extra?.playerOrder ?? roundPhase.startPlayerOrder(this.state)
+    if (this.stageDispatch.continueReactionWindow('onBeforeEndGame', playerOrder, orderOffset)) {
       return this.respond()
     }
     return this.continuePreScoringWindow()

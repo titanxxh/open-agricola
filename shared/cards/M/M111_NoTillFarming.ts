@@ -1,6 +1,7 @@
 import { BASE_SOW_AMOUNT } from '../../domain/sow-amount'
 import { addFarmyardSpaceState, commitFarmOperation } from '../../domain/farm-operations'
 import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldOperationFlow } from '../../actions/plans/field-operation'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
@@ -30,8 +31,10 @@ const discardableTiles = (player: PlayerState): FarmTilePosition[] =>
     return tile ? [tile] : []
   })
 
+/** Takes 1 crop from each planted space and returns the harvest as a `gain`, as fields yield in the field phase. */
 const reapCropSpaces = (player: PlayerState) => {
   const next = []
+  const harvested: Partial<Record<'grain' | 'vegetable' | 'wood' | 'stone', number>> = {}
   for (const state of getFarmyardSpaceStates(player)) {
     if (
       state.sourceCardId !== CARD_ID ||
@@ -42,13 +45,15 @@ const reapCropSpaces = (player: PlayerState) => {
       next.push(state)
       continue
     }
-    player.resources[state.crop.kind] += 1
+    harvested[state.crop.kind] = (harvested[state.crop.kind] ?? 0) + 1
     const remaining = state.crop.remaining - 1
     if (remaining > 0) {
       next.push({ ...state, crop: { ...state.crop, remaining } })
     }
   }
+  if (Object.keys(harvested).length === 0) return undefined
   commitFarmOperation(player, { kind: 'space-states', states: next, positions: [], sourceCardId: CARD_ID })
+  return gainLeaf(CARD_ID, harvested)
 }
 
 const anytimeListener: CardListenerRegistration = {
@@ -100,9 +105,7 @@ const cardImpl = {
       })
       return true
     },
-    onHarvestFieldPhase: (_state, player) => {
-      reapCropSpaces(player)
-    },
+    onHarvestFieldPhase: (_state, player) => reapCropSpaces(player),
   },
   listeners: [anytimeListener],
   prerequisiteCheck: (player) => getLogicalFields(player).length >= 2,

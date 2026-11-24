@@ -348,10 +348,12 @@ describe('Moor field goods and non-field crop spaces', () => {
     ]
     session.loadState(session.state)
 
-    session.withCtx(() => runCardEffectHook(session.state, player, 'M111_NoTillFarming', 'onHarvestFieldPhase'))
+    const resources = { ...player.resources }
+    const flow = session.withCtx(() => runCardEffectHook(session.state, player, 'M111_NoTillFarming', 'onHarvestFieldPhase'))
 
-    expect(player.resources.grain).toBe(1)
-    expect(player.resources.vegetable).toBe(1)
+    // The harvest moves through a returned `gain` leaf (#2039, Card contract: Standard leaves).
+    expect(flow).toEqual({ type: 'leaf', actionId: 'gain', params: { grain: 1, vegetable: 1 }, sourceCard: 'M111_NoTillFarming' })
+    expect(player.resources).toEqual(resources)
     expect(statesOf(player, 'M111_NoTillFarming', 'non-field-crop-space')).toEqual([
       {
         spaceKey: '0-0',

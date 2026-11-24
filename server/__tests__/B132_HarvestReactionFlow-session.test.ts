@@ -225,8 +225,8 @@ describe('harvest reaction flow', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected second trigger-select')
     expect(resp.interaction.request.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(true)
 
+    // Selecting the card in the window uses it, so its own optional step does not ask again (#2039).
     resp = resolveCardTrigger(session, resp, 'C098_CubeCutter')
-    resp = acceptOptional(session, resp)
 
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.wood).toBe(0)

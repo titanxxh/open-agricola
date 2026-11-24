@@ -147,6 +147,12 @@ export const computeStartPlayerIdx = (state: GameState): number => {
   return startIdx === -1 ? 0 : startIdx
 }
 
+/** Every seat clockwise from the Start Player: the frozen order of a reaction window (#2039). */
+export const startPlayerOrder = (state: GameState): number[] => {
+  const startIdx = computeStartPlayerIdx(state)
+  return state.players.map((_, offset) => (startIdx + offset) % state.players.length)
+}
+
 /**
  * Top-level player action entry. Migrated from `GameCore.takeAction`
  * (S2 Task 10): the per-method body lives here, while GameCore retains

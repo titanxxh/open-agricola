@@ -10,9 +10,9 @@
  */
 
 import type { GameState } from '../../contract/types.ts'
-import { computeStartPlayerIdx } from './round.ts'
+import { startPlayerOrder } from './round.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
-import { isPlayerSkippingCurrentHarvest } from '../../cards/helpers/harvest-skip.ts'
+import { fieldAndBreedSkipSources, isPlayerSkippingCurrentHarvest } from '../../cards/helpers/harvest-skip.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 
 /**
@@ -29,12 +29,14 @@ export const getHarvestPlayerIndices = (state: GameState): number[] => {
  * Compute the frozen seat order for the Before-Harvest reaction window.
  * This window precedes harvest-skip activation, so every player participates.
  */
-export const getBeforeHarvestPlayerIndices = (state: GameState): number[] => {
-  const players = state.players
-  const startIdx = computeStartPlayerIdx(state)
-  return players
-    .map((_, offset) => (startIdx + offset) % players.length)
-}
+export const getBeforeHarvestPlayerIndices = (state: GameState): number[] => startPlayerOrder(state)
+
+/**
+ * The field-phase windows also leave out a player who skips this harvest's field and
+ * breeding phases, as the reference `getHarvestTurnOrder('harvestField')` does.
+ */
+export const getHarvestFieldPlayerIndices = (state: GameState): number[] =>
+  getHarvestPlayerIndices(state).filter((index) => fieldAndBreedSkipSources(state, state.players[index]!).length === 0)
 
 /**
  * Enter the harvest phase: mark `state.roundPhase = 'harvest'`, log the

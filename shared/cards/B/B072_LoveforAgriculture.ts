@@ -6,6 +6,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { gainLeaf } from '../helpers/pay-gain-node'
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
 
@@ -148,17 +149,23 @@ const cardImpl = {
   },
 
   // Harvest from sown pastures during field phase
+  // Each sown pasture yields 1 crop: the harvest is a `gain`, the remaining crops a card-state leaf.
   onHarvestFieldPhase: (_state, player) => {
-    const crops = getPastureCrops(player)
+    const crops = getPastureCrops(player).filter((entry) => entry.remaining > 0)
     if (crops.length === 0) return
-    for (const entry of crops) {
-      if (entry.remaining <= 0) continue
-      player.resources[entry.crop] += 1
-      entry.remaining -= 1
+    const harvested = { grain: 0, vegetable: 0 }
+    for (const entry of crops) harvested[entry.crop] += 1
+    const remaining = crops
+      .map((entry) => ({ ...entry, remaining: entry.remaining - 1 }))
+      .filter((entry) => entry.remaining > 0)
+    return {
+      type: 'seq',
+      children: [
+        gainLeaf(CARD_ID, Object.fromEntries(Object.entries(harvested).filter(([, amount]) => amount > 0))),
+        { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
+          params: { kind: 'set-extra-data', key: 'pastureCrops', value: remaining } },
+      ],
     }
-    // Remove exhausted crops
-    const remaining = crops.filter((c) => c.remaining > 0)
-    setPastureCrops(player, remaining)
   },
 
   computePastureCapacityModifiers: (player) => {
