@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-11-19. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-11-24. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 > This document covers official cards only. Hook ownership is derived from `ALL_CARD_IMPLS`; query the registry instead of mirroring it here.
 
@@ -12,7 +12,7 @@
 
 Reference PHP paths are relative to the reference implementation's source tree; OA paths are relative to this repository.
 
-None currently tracked.
+Love for Agriculture stores crops sown in a pasture separately from Farmyard and Card Fields. On current main, sowing grain in that pasture skips Tinsmith Master’s optional extra grain. The same player receives the choice on a normal field. Interactions that need to enumerate already planted pastures, including Farm Cart and Carrot Museum, also lack a logical field target.
 
 ## 2. Accepted differences
 
