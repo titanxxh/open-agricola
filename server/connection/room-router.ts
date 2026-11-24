@@ -1024,6 +1024,7 @@ async function handleStartTeamGame(ctx: ConnectionCtx, msg: Extract<ClientComman
   room.status = 'playing'; room.startedAt = Date.now()
   try {
     for (const [index, name] of names) room.session.updatePlayerName(index, name)
+    await applySeatPreferenceDefaults(room, ctx.gamePreferences)
     const resp = await executeRoomSession(room, () => room.session.getState())
     if (!resp.ok) throw new Error(resp.error ?? 'Unable to initialize Team game')
     await publishInitialState(ctx, room, resp, msg.requestId, async () => {

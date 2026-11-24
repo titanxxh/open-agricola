@@ -10,6 +10,7 @@ import { PRERELEASE_BUILD_PROTOCOL_PREFIX, PRERELEASE_GENERATION_PROTOCOL_PREFIX
 import { PrereleaseSessions } from '../../prerelease-sessions'
 import { getAccountDeletionRoomIds } from '../../auth'
 import { GameContextStore } from '../../game/game-context-store'
+import { GamePreferencesStore } from '../../game/game-preferences-store'
 import { RoomDirectory } from '../../game/room-directory'
 import { listMyActiveRooms } from '../../lobby-my-rooms'
 import { createTestDatabase } from '../../__tests__/_helpers/postgres'
@@ -146,6 +147,8 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
     expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(beforeStart)
     expect((await peers[1]!.mutate({ type: 'startTeamGame' }, undefined, roomId)).ok).toBe(false)
     expect(await db.prepare('SELECT state_json,team_members_json FROM rooms WHERE id=?').get(roomId)).toEqual(beforeStart)
+    // #2039: the host start copies each member's account default into every seat that member controls.
+    await new GamePreferencesStore(db).write(userIds[1]!, { autoResolveIndependentReactions: false })
     expect((await peers[0]!.mutate({ type: 'startTeamGame' }, undefined, roomId)).ok).toBe(true)
     expect(await db.prepare('SELECT player_index,user_id FROM room_players WHERE room_id=? ORDER BY player_index').all(roomId)).toEqual([
       { player_index: 0, user_id: userIds[0] }, { player_index: 1, user_id: userIds[1] },
@@ -156,6 +159,8 @@ it('keeps prerelease Multihand accounts unseated until the host starts, then bin
       expect(joined).toMatchObject({ roomId, controlledPlayerIndexes: [index, index + 2], visiblePlayerIds: [`p${index + 1}`, `p${index + 3}`] })
       const state = await peer.wait((event): event is Extract<ServerEvent, { type: 'stateUpdate' }> => event.type === 'stateUpdate')
       expect(state.payload.state).toMatchObject({ team: { playerTeams: [0, 1, 0, 1] } })
+      expect(state.payload.state.players.map(player => player.preferences))
+        .toEqual([undefined, { autoResolveIndependentReactions: false }, undefined, { autoResolveIndependentReactions: false }])
     }
     expect((await peers[0]!.mutate({ type: 'proposeGameEnd', intent: 'rematch' }, undefined, roomId)).ok).toBe(true)
     const proposed = await peers[0]!.wait((event): event is Extract<ServerEvent, { type: 'gameEndProposal' }> => event.type === 'gameEndProposal' && event.proposal !== null)

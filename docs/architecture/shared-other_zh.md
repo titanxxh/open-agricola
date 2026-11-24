@@ -38,6 +38,14 @@ Moor Balance Rules 是默认关闭的开局选项，由 `contract/game-variants.
 
 - 牌面行动候选以权威牌资格和具体行动、目标校验为准。展示区分单人当前牌、市场牌和借用的正面牌，不改变归属。受信任的卡牌后续保留自身时机及人员条件，普通公开特殊行动入口仍检查工作阶段及健康人员。
 
+## 仅预发布的契约
+
+以下 `shared/contract/` 文件只存在于 `prerelease` 分支。
+
+私有 Replay 桥（`protocol/replay-bridge.ts`）仅允许 manifest、checkpoint Segment、准确 Anchor、本局图片和单帧 Evidence。上下文绑定临时 nonce、环境／目标、应用 SHA、数据代次、room、Viewer hash、schema 与模式，不携带登录或远程读取凭证。请求限制并发／字节数并使用单调 ID，取消与关闭会退役在途工作。`replay-viewer-build.ts` 统一解析不可变 manifest 及桥／schema 声明；旧公开 Build 仍有效，但不能用于 pre。测试：`replay-bridge.test.ts`、`publish-replay-viewer.test.ts`。
+
+预发布 `team.ts` 定义Team/Multihand配置、座位分队和四种计分；`team-room.ts` 分离账号等待成员与规则座位。`teamRoomWaiting` 不含账号ID，host开局固定座位归属。等待期 `setTeam` 仅可移入有容量的队伍；只有房主能用 `swapMemberId` 明确交换两名Team成员。两人分组与命令receipt原子持久化，容量和账号归属不变。Multihand仍自动认领整队。共享可见集合不扩大命令权。测试：`team-network.test.ts`、`TeamWaitingRoom.test.tsx`。
+
 ## `shared/custom-code/`
 
 工坊源码是原生 Card Source 模块（[ADR 0052](../adr/0052-workshop-code-runs-only-in-the-browser.md)；[写卡指南](../CARD_AUTHORING_zh.md)）。`card-source-admission.ts` 只检查结构、不执行代码：导出一个以卡牌 ID 命名的卡，import 只能是指向共享引擎模块与卡牌 helper 的相对路径，并静态读取 `meta`。它也识别已退役的 `CARD_DEF` / `CARD_IMPL` 沙盒格式，所有路径都以同一条提示拒绝该格式。`compiler.ts` 转译通过准入的模块，作为保存的校验证据。只有作者浏览器里的 Worker 经 `client/local-sandbox/native-card-source.ts` 运行该模块；引擎不对它施加能力契约。运行时见 [`docs/CUSTOM_CARD_SANDBOX_zh.md`](../CUSTOM_CARD_SANDBOX_zh.md)。
