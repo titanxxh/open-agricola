@@ -93,7 +93,7 @@ cardField?: {
 }
 ```
 
-- `makeCardFieldImpl(cardId, def, options?)` registers the Card Field owner and derives sow integration; a card adds only configuration and optional `onReap` / `onCropRemoved` callbacks. Virtual columns come from `deriveVirtualTileCol(cardId, slotIdx)`.
+- `makeCardFieldImpl(cardId, def, options?)` registers the Card Field owner and derives sow integration; a card adds only configuration and optional `onReap` / `onCropRemoved` callbacks. `deriveVirtualTileCol(cardId, slotIdx)` preserves the existing A–E coordinates. Classic Card Fields use a separate range for each deck and card number so their slots remain distinct in mixed games.
 - The card-facing interface has three entries: `getLogicalFields(player)` (an immutable projection of Farmyard Fields plus every played Card Field, including empty fixed slots), `getFarmyardFields(player)` (geometry, fencing, adjacency, occupancy), and `mutateLogicalFields(state, player, options?)` with named `place`, `insertBottom`, `grow`, `remove` and atomic `replace`, which validates the target and then writes through the owning adapter.
 - Storage accepts every legal field good. `allowedCrops` is the ordinary Sow capability, not the storage schema: `place` enforces it unless a card effect bypasses it explicitly; Sow and `replace` always enforce it; `insertBottom` adds a rule-granted crop under the top without a new slot or the Sow whitelist.
 - `fieldOperationFlow` `move` accepts `sourceCrops`; the destination continuation rechecks the source crop and quantity, destination occupancy and `allowedCrops` before storing positions or mutating.

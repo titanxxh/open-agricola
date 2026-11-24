@@ -328,6 +328,74 @@ describe('Moor field goods and non-field crop spaces', () => {
     expect(getUnusedTerrainTiles(after)).toContainEqual({ row: 0, col: 0 })
   })
 
+  it('M111 rejects excess spaces before a Tinsmith bonus and keeps the remaining place available on retry', () => {
+    const session = setup()
+    const cardId = 'M111_NoTillFarming'
+    const player = session.state.players[0]!
+    player.minorPlayed = [cardId]
+    player.occupationPlayed = ['B115_TinsmithMaster']
+    player.fields = [{ row: 0, col: 2, stacks: [] }]
+    player.resources.grain = 4
+    session.loadState(session.state)
+
+    const first = { row: 1, col: 3, crop: 'grain' as const }
+    const ordinary = { row: 0, col: 2, crop: 'grain' as const }
+    const second = { row: 0, col: 3, crop: 'grain' as const }
+    const excess = { row: 1, col: 4, crop: 'grain' as const }
+    const planted = sow(session, [first])
+    expect(planted.ok, planted.error).toBe(true)
+    expect(statesOf(planted.state.players[0]!, cardId, 'non-field-crop-space')).toHaveLength(1)
+    resetOwnTurn(session)
+    session.state.actionSpaces.find(space => space.id === 'grain-utilization')!.takenBy = []
+    const rejected = sow(session, [ordinary, second, excess])
+    expect(rejected.ok).toBe(false)
+    expect(rejected.interaction).toMatchObject({ request: { kind: 'farm-select', farm: { farmType: 'sow' } } })
+    expect(rejected.state.players[0]!.resources.grain).toBe(3)
+    expect(statesOf(rejected.state.players[0]!, cardId, 'non-field-crop-space')).toHaveLength(1)
+    const retry = session.commitSelectionChoice(0, { crops: [ordinary, second] })
+    expect(retry.ok, retry.error).toBe(true)
+    expect(retry.interaction).toMatchObject({ promptParams: { triggerCardId: 'B115_TinsmithMaster' } })
+    const result = session.commitSelectionChoice(0, { positions: [{ row: ordinary.row, col: ordinary.col }] })
+    expect(result.ok, result.error).toBe(true)
+    expect(result.state.players[0]!.resources.grain).toBe(1)
+    expect(result.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 4 }])
+    expect(statesOf(result.state.players[0]!, cardId, 'non-field-crop-space')).toEqual([
+      { sourceCardId: cardId, spaceKey: '1-3', kind: 'non-field-crop-space', crop: { kind: 'grain', remaining: 3 } },
+      { sourceCardId: cardId, spaceKey: '0-3', kind: 'non-field-crop-space', crop: { kind: 'grain', remaining: 3 } },
+    ])
+    resetOwnTurn(session)
+    session.state.actionSpaces.find(space => space.id === 'grain-utilization')!.takenBy = []
+    expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
+  })
+
+  it('preparing an optional yield keeps the other grain-space owner available after M111 fills', () => {
+    const session = setup()
+    const noTill = 'M111_NoTillFarming'
+    const permaculturist = 'CWM040_Permaculturist'
+    const player = session.state.players[0]!
+    player.minorPlayed = [noTill]
+    player.occupationPlayed = ['B115_TinsmithMaster', permaculturist]
+    player.resources.grain = 3
+    player.fields = [{ row: 0, col: 2, stacks: [] }]
+    player.farmyardSpaceStates = [{
+      sourceCardId: noTill, spaceKey: '1-3', kind: 'non-field-crop-space', crop: { kind: 'vegetable', remaining: 1 },
+    }]
+    session.loadState(session.state)
+    const prompt = sow(session, [
+      { row: 0, col: 2, crop: 'grain' }, { row: 0, col: 3, crop: 'grain' }, { row: 1, col: 4, crop: 'grain' },
+    ])
+    expect(prompt.ok, prompt.error).toBe(true)
+    expect(prompt.interaction).toMatchObject({ promptParams: { triggerCardId: 'B115_TinsmithMaster' } })
+    expect(prompt.state.players[0]!.resources.grain).toBe(3)
+    expect(prompt.state.players[0]!.farmyardSpaceStates).toHaveLength(1)
+    const done = session.commitSelectionChoice(0, { positions: [] })
+    expect(done.ok, done.error).toBe(true)
+    const after = done.state.players[0]!
+    expect(after.resources.grain).toBe(0)
+    expect(statesOf(after, noTill, 'non-field-crop-space').map(site => site.spaceKey)).toEqual(['1-3', '0-3'])
+    expect(statesOf(after, permaculturist, 'non-field-crop-space').map(site => site.spaceKey)).toEqual(['1-4'])
+  })
+
   it('M111 reaps one crop from each non-field crop space during harvest field phase', () => {
     const session = setup()
     const player = session.state.players[0]!

@@ -6,7 +6,7 @@ import type { SessionResponse } from '../server/game/authoritative-session'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 import { matrixVariant } from './helpers/extended'
 
-async function prepare(page: Page, request: APIRequestContext, kind: 'sow' | 'animals') {
+async function prepare(page: Page, request: APIRequestContext, kind: 'sow' | 'occupied-fields' | 'animals') {
   expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(),
     data: { seed: 1372, playerCount: 2, customCardIds: [] },
   })).ok()).toBe(true)
@@ -14,13 +14,19 @@ async function prepare(page: Page, request: APIRequestContext, kind: 'sow' | 'an
     state.round = 5
     for (const player of state.players) player.resources.food = 20
     const player = state.players[0]!
-    if (kind === 'sow') {
+    if (kind !== 'animals') {
       state.roundActionOrder = state.roundActionOrder.map(() => null)
       state.roundActionOrder[0] = 'grain-utilization'
       player.occupationPlayed = ['B113_PatchCaregiver', 'B115_TinsmithMaster']
       player.fields = [{ row: 0, col: 2, stacks: [] }]
       player.resources.grain = 2
-      player.cardStates.B113_PatchCaregiver = { extraData: { cardFieldStacks: [null] } }
+      if (kind === 'occupied-fields') {
+        player.minorPlayed = ['CFL001_FarmCart']
+        player.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
+        player.cardStates.B113_PatchCaregiver = { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } }
+      } else {
+        player.cardStates.B113_PatchCaregiver = { extraData: { cardFieldStacks: [null] } }
+      }
     } else {
       player.minorPlayed = ['C011_WildlifeReserve']
       Object.assign(player.resources, { sheep: 1, boar: 1, cattle: 1 })
@@ -81,6 +87,35 @@ async function confirm(page: Page): Promise<SessionResponse> {
   const response: SessionResponse = await (await committed).json()
   expect(response.ok, response.error).toBe(true)
   return response
+}
+
+for (const location of ['farmyard', 'card'] as const) {
+  test(`Farm Cart sows and applies a yield bonus on an occupied ${location} field`, async ({ page, request }) => {
+    await prepare(page, request, 'occupied-fields')
+    await action(page, 'grain-utilization')
+    const farmTile = farm(page).locator('[data-farm-tile-key="0-2"]')
+    const seedChoices = location === 'farmyard' ? farmTile : tray(page)
+    await seedChoices.locator('.sow-choice-button[title="Grain"]').click()
+
+    const offered = await confirm(page)
+    expect(offered.interaction).toMatchObject({
+      stateId: 'wait', request: { kind: 'selection' }, promptParams: { triggerCardId: 'B115_TinsmithMaster' },
+    })
+    const bonusTarget = location === 'farmyard' ? farmTile : tray(page).locator('[data-card-field-position="-1-2113"]')
+    await bonusTarget.click()
+    if (location === 'farmyard') await expect(bonusTarget).toHaveClass(/position-selected/)
+    else await expect(bonusTarget).toHaveAttribute('aria-pressed', 'true')
+
+    const { state } = await confirm(page)
+    const owner = state.players[0]!
+    expect(owner.resources.grain).toBe(1)
+    expect(owner.fields[0]!.stacks).toEqual(location === 'farmyard'
+      ? [{ kind: 'grain', remaining: 4 }, { kind: 'vegetable', remaining: 2 }]
+      : [{ kind: 'vegetable', remaining: 2 }])
+    expect(owner.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual(location === 'card'
+      ? [{ crop: 'vegetable', remaining: 2, below: [{ crop: 'grain', remaining: 4 }] }]
+      : [{ crop: 'vegetable', remaining: 2 }])
+  })
 }
 
 for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }, { width: 1440, height: 900 }]) {

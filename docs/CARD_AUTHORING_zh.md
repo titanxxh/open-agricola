@@ -237,7 +237,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 - **资源：** `store-on-card` leaf，用 `getStoredResource` 和 `take-from-card` 读回（`E052_Cubbyhole`）。"随时取走卡上的资源"用 `helpers/card-resource-withdrawal.ts` 里的 `cardResourceWithdrawal`（`CWM096_OakCask`）。
 - **农场上的资源：** 未使用格子上的一个 token 用 `helpers/farm-token-selection.ts` 里的 `farmTokenSelection`（`CWM064_Bonre`）；每个房间一个标记用 `helpers/room-food-markers.ts` 里的 `roomFoodMarkers`（`CWM071_Cookies`）。
 - **动物：** `meta.animalHolder: true`，并用 `effect.onComputeAnimalZones` 添加一个 `card:<id>` 区域（`B012_Stockyard`）。
-- **作物：** Card Field（`B068_Beanfield`；[cards](architecture/cards_zh.md#card-field-与-logical-field-seam)）。
+- **作物：** 修订版和经典版卡田都用 `makeCardFieldImpl`。卡牌可限制本田允许播种的轮次（`CFL006_EndiveField`；[cards](architecture/cards_zh.md#card-field-与-logical-field-seam)）。
 
 ### 4.13 还没放置的人，以及 "place another person"
 
@@ -313,7 +313,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 | 一个 Guest | `helpers/guest-flow.ts` 里的 `grantGuestLeaf` / `grantImmediateGuestLeaf` | `CZ314_Keg`、`CI073_Guest` |
 | 多个玩家都可能得到的分数 | `effect.computeSharedPostScore` 返回 `{ playerId, score }` 条目 | `A135_AnimalReeve`、`CWM087_GoldMedal` |
 | 限制卡上的区域能留哪些动物 | `effect.getInvalidAnimals` | `B011_Feedyard` |
-| 在其他格子播种，或播种数量不同 | `effect.onComputeSowableFields` 配合 `onSowExtraField`；`effect.modifySowAmount` | `B072_LoveforAgriculture`、`E071_CowPatty` |
+| 在其他格子播种，或播种数量不同 | `effect.onComputeSowableFields` 配合 `onSowExtraField`；`effect.modifySowAmount` | `B072_LoveforAgriculture`、`CFL001_FarmCart`（在已有作物的田上按原坐标播种）、`E071_CowPatty` |
 | 玩家可能想留到收获再用的资源 | `effect.preHarvestGoodsWanted` | `A061_WinnowingFan` |
 | 由共享规则汇总的只读事实，例如预留的棋子或分数调整 | `effect.getRuleContributions` | `E159_OldMiser`、`CWM021_FenceDealer` |
 | 改写由卡自己的行动发起的请求 | `effect.projectInteractionRequest` | `C127_Lover` |

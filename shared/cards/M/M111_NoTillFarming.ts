@@ -71,7 +71,8 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-const availableExtraFields = (player: Parameters<typeof getUsedFarmyardTileKeys>[0]): ExtraSowableField[] => {
+const availableExtraFields = (player: PlayerState): ExtraSowableField[] => {
+  if (cropSpaces(player).length >= 2) return []
   const used = getUsedFarmyardTileKeys(player)
   const blocked = getPlacementBlockedFarmyardSpaceKeys(player)
   return getFarmyardTilePositions(player).flatMap((tile) => {

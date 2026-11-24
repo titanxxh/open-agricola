@@ -95,7 +95,7 @@ cardField?: {
 }
 ```
 
-- `makeCardFieldImpl(cardId, def, options?)` 注册 Card Field owner 并派生播种接入；卡牌只添加配置与可选的 `onReap` / `onCropRemoved` 回调。虚拟列由 `deriveVirtualTileCol(cardId, slotIdx)` 得出。
+- `makeCardFieldImpl(cardId, def, options?)` 注册 Card Field owner 并派生播种接入；卡牌只添加配置与可选的 `onReap` / `onCropRemoved` 回调。`deriveVirtualTileCol(cardId, slotIdx)` 保留 A–E 卡田的已有坐标。经典卡田按牌组和卡号分配独立区间，混用两个版本时各槽的坐标也互不冲突。
 - 面向卡牌的 interface 有三个入口：`getLogicalFields(player)`（Farmyard Field 加上每张已打出 Card Field 的不可变投影，含空的固定槽）、`getFarmyardFields(player)`（几何、围栏、相邻与占用），以及带具名 `place`、`insertBottom`、`grow`、`remove` 与原子 `replace` 的 `mutateLogicalFields(state, player, options?)`，它先校验目标，再通过所属 adapter 写入。
 - 存储接受所有合法田地货物。`allowedCrops` 是普通播种能力，不是存储 schema：`place` 默认执行该白名单，卡牌效果可显式绕过；播种与 `replace` 始终执行；`insertBottom` 在顶层之下加入规则授予的作物，不新增槽，也不受播种白名单限制。
 - `fieldOperationFlow` 的 `move` 接受 `sourceCrops`；目标续行在保存位置或修改田地之前重新检查来源作物与数量、目标占用与 `allowedCrops`。

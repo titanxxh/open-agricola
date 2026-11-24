@@ -235,7 +235,7 @@ Tests: `E160_KelpGatherer-session.test.ts` (with `confirmPlayerSwitch`) and `A13
 - **Goods:** a `store-on-card` leaf, read back with `getStoredResource` and `take-from-card` (`E052_Cubbyhole`). "Take its goods at any time" is `cardResourceWithdrawal` in `helpers/card-resource-withdrawal.ts` (`CWM096_OakCask`).
 - **Goods on the farmyard:** a token on an unused space is `farmTokenSelection` in `helpers/farm-token-selection.ts` (`CWM064_Bonre`); one marker per room is `roomFoodMarkers` in `helpers/room-food-markers.ts` (`CWM071_Cookies`).
 - **Animals:** `meta.animalHolder: true` with `effect.onComputeAnimalZones` adding a `card:<id>` zone (`B012_Stockyard`).
-- **Crops:** a Card Field (`B068_Beanfield`; [cards](architecture/cards.md#card-fields-and-the-logical-field-seam)).
+- **Crops:** use `makeCardFieldImpl` for revised or classic Card Fields. A card can restrict when its field is sowable (`CFL006_EndiveField`; [cards](architecture/cards.md#card-fields-and-the-logical-field-seam)).
 
 ### 4.13 People left to place and "place another person"
 
@@ -311,7 +311,7 @@ A card grants a rule action by returning that action's leaf: `plow`, `sow`, `con
 | A Guest | `grantGuestLeaf` / `grantImmediateGuestLeaf` in `helpers/guest-flow.ts` | `CZ314_Keg`, `CI073_Guest` |
 | Points that several players can earn | `effect.computeSharedPostScore` returning `{ playerId, score }` entries | `A135_AnimalReeve`, `CWM087_GoldMedal` |
 | A limit on which animals a card zone keeps | `effect.getInvalidAnimals` | `B011_Feedyard` |
-| Sowing on other tiles, or a different amount | `effect.onComputeSowableFields` with `onSowExtraField`; `effect.modifySowAmount` | `B072_LoveforAgriculture`, `E071_CowPatty` |
+| Sowing on other tiles, or a different amount | `effect.onComputeSowableFields` with `onSowExtraField`; `effect.modifySowAmount` | `B072_LoveforAgriculture`, `CFL001_FarmCart` (occupied field at its original coordinates), `E071_CowPatty` |
 | Goods the player may want to keep until the harvest | `effect.preHarvestGoodsWanted` | `A061_WinnowingFan` |
 | A read-only fact that shared rules add up, such as reserved pieces or a score adjustment | `effect.getRuleContributions` | `E159_OldMiser`, `CWM021_FenceDealer` |
 | Rewriting a request the card's own action raised | `effect.projectInteractionRequest` | `C127_Lover` |

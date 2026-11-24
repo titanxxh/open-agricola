@@ -1524,6 +1524,28 @@ describe('FarmBoard', () => {
     expect(html).not.toContain('extra-sow-tray')
   })
 
+  it('sows the offered crop on an occupied field while other occupied fields stay unavailable', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+    const tiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }]
+    player.fields = tiles.map(tile => ({ ...tile, stacks: [{ kind: 'grain', remaining: 2 }] }))
+    const { farmCells } = buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
+      selectionInteraction: null,
+      farmInteraction: { farmType: 'sow', selectableFields: [{ tile: tiles[0]!, allowedCrops: ['vegetable'] }] },
+    })
+    const updateSowSelection = vi.fn()
+    render(<FarmBoard {...createFarmBoardProps(player, {
+      farmCells, sowRemaining: { grain: 1, vegetable: 1, wood: 0, stone: 0 },
+    }, { updateSowSelection })} />)
+
+    const offered = screen.getByRole('radiogroup', { name: '0-1-sow-choice' })
+    expect(within(offered).queryByTitle('Grain')).toBeNull()
+    expect(screen.queryByRole('radiogroup', { name: '0-2-sow-choice' })).toBeNull()
+    fireEvent.click(within(offered).getByTitle('Vegetable'))
+    expect(updateSowSelection).toHaveBeenCalledExactlyOnceWith(tiles[0], 'vegetable')
+  })
+
   it('renders a recorded held-worker overlay', () => {
     const player: PlayerState = {
       ...createPlayer('p1', 'Player A', 'red'),

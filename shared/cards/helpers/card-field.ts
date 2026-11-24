@@ -48,16 +48,22 @@ const RHYTHM: Readonly<Record<Crop, number>> = BASE_SOW_AMOUNT
 const DECK_ORDINAL: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5 }
 const cardFieldDefs = new Map<string, CardFieldDef>()
 
-const parseCardBaseCol = (cardId: string): number => {
-  const match = cardId.match(/^([A-E])(\d+)_/)
-  if (!match) throw new Error(`[card-field] cardId "${cardId}" not in <Deck><Number>_ format`)
-  const ord = DECK_ORDINAL[match[1]]
-  if (ord === undefined) throw new Error(`[card-field] unknown deck letter "${match[1]}" in ${cardId}`)
-  return ord * 1000 + Number(match[2])
-}
+const CLASSIC_SLOTS_PER_CARD = 1000
 
-export const deriveVirtualTileCol = (cardId: string, slotIdx: number): number =>
-  parseCardBaseCol(cardId) + slotIdx
+export const deriveVirtualTileCol = (cardId: string, slotIdx: number): number => {
+  const revised = cardId.match(/^([A-E])(\d+)_/)
+  if (revised) return DECK_ORDINAL[revised[1]]! * 1000 + Number(revised[2]) + slotIdx
+
+  const classic = cardId.match(/^C([A-Z]{1,3})(\d{3})_/)
+  if (!classic) throw new Error(`[card-field] cardId "${cardId}" not in <Deck><Number>_ format`)
+  if (!Number.isSafeInteger(slotIdx) || slotIdx < 0 || slotIdx >= CLASSIC_SLOTS_PER_CARD) {
+    throw new Error(`[card-field] invalid classic slot ${slotIdx} in ${cardId}`)
+  }
+  // Base 27 has distinct digits 1–26 for every classic deck suffix. Each deck
+  // has 1,000 card numbers, and each card has a separate range for its slots.
+  const deck = [...classic[1]!].reduce((n, letter) => n * 27 + letter.charCodeAt(0) - 64, 0)
+  return (deck * 1000 + Number(classic[2])) * CLASSIC_SLOTS_PER_CARD + slotIdx
+}
 
 const readSlots = (
   player: PlayerState,
@@ -497,7 +503,8 @@ export const makeCardFieldImpl = (
   def: CardFieldDef,
   options?: CardFieldOptions,
 ): CardImpl => {
-  const baseCol = parseCardBaseCol(cardId)
+  const baseCol = deriveVirtualTileCol(cardId, 0)
+  deriveVirtualTileCol(cardId, def.capacity - 1)
   cardFieldDefs.set(cardId, def)
   cardFieldOptions.set(cardId, options ?? {})
 

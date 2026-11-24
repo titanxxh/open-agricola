@@ -17,6 +17,22 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CFL001_FarmCart",
+    "name": "Farm Cart",
+    "deck": "CFL",
+    "number": 1,
+    "cost": {
+      "wood": 3
+    },
+    "vp": 1,
+    "desc": [
+      "Whenever you __Sow__, you may sow 1 <GRAIN> on an existing <VEGETABLE> <FIELD> or 1 <VEGETABLE> on an existing <GRAIN> <FIELD>. Each <FIELD> can hold at most one pile of each."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL001.png",
+    "kind": "minor"
+  },
+  {
     "id": "CFL002_BeguineCourtyard",
     "name": "Beguine Courtyard",
     "deck": "CFL",
@@ -50,6 +66,22 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CFL004_EducationalBuilding",
+    "name": "Educational Building",
+    "deck": "CFL",
+    "number": 4,
+    "playerActionCardType": "minor",
+    "artUrl": "assets/classic/CFL/CFL004.png",
+    "cost": {
+      "clay": 2,
+      "reed": 1
+    },
+    "desc": [
+      "This card is an additional action space for you only. The first time you send your third or fourth family member to work, you may place that person here. Put alternating <WOOD> and <STONE>, starting with <WOOD>, on each remaining round space. At the start of those rounds, you receive the resource."
+    ],
+    "kind": "playerAction"
+  },
+  {
     "id": "CFL005_Brabant",
     "name": "Brabant",
     "deck": "CFL",
@@ -60,6 +92,32 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     ],
     "implemented": true,
     "artUrl": "assets/classic/CFL/CFL005.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL006_EndiveField",
+    "name": "Endive Field",
+    "deck": "CFL",
+    "number": 6,
+    "cost": {
+      "food": 2
+    },
+    "occupationPrerequisites": {
+      "min": 2
+    },
+    "prerequisite": "2 Occupations",
+    "desc": [
+      "When you play this card, you get 1 <VEGETABLE>. In rounds that end with a harvest, you may __Sow__ <VEGETABLE> on this card as if it were 1 <FIELD>. It counts as a <FIELD> except during scoring."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL006.png",
+    "cardField": {
+      "allowedCrops": [
+        "vegetable"
+      ],
+      "capacity": 1
+    },
+    "isField": true,
     "kind": "minor"
   },
   {
@@ -146,6 +204,21 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     ],
     "implemented": true,
     "artUrl": "assets/classic/CFL/CFL012.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CFL013_GiftTable",
+    "name": "Gift Table",
+    "deck": "CFL",
+    "artUrl": "assets/classic/CFL/CFL013.png",
+    "number": 13,
+    "cost": {
+      "wood": 1
+    },
+    "animalHolder": true,
+    "desc": [
+      "Pile these goods on this card, from bottom to top: <VEGETABLE>, <WOOD>, <SHEEP>, <WOOD>, <GRAIN>. At any time, you may buy the top good for 1 <FOOD>. The purchased <SHEEP> moves to your supply. You may exchange it for 2 <FOOD> at any time. It does not breed and it counts for scoring."
+    ],
     "kind": "minor"
   },
   {
@@ -270,6 +343,25 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CFL023_CarrotMuseum",
+    "name": "Carrot Museum",
+    "deck": "CFL",
+    "number": 23,
+    "cost": {
+      "wood": 2,
+      "clay": 2
+    },
+    "vp": 1,
+    "maxRound": 7,
+    "prerequisite": "Round 7 or before",
+    "desc": [
+      "At the end of rounds 8, 10, and 12, you get 1 <STONE> for each <VEGETABLE> <FIELD> you have and 1 <WOOD> for each <VEGETABLE> in your supply."
+    ],
+    "implemented": true,
+    "artUrl": "assets/classic/CFL/CFL023.png",
+    "kind": "minor"
+  },
+  {
     "id": "CFL024_LoversTryst",
     "name": "Lovers Tryst",
     "deck": "CFL",
@@ -375,6 +467,18 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CFL032_Elder",
+    "name": "Elder",
+    "deck": "CFL",
+    "number": 32,
+    "players": "1+",
+    "artUrl": "assets/classic/CFL/CFL032.png",
+    "desc": [
+      "When you play this card, place 2 <FOOD> from the general supply on it. After each returning home phase, you may return 1 <FOOD> from this card to use __space:fishing|Fishing__ or take a __Bake Bread__ action without placing a person. You can take the <FOOD> on this card at any time without the additional action."
+    ],
+    "kind": "occupation"
+  },
+  {
     "id": "CFL033_Sculptor",
     "name": "Sculptor",
     "deck": "CFL",
@@ -398,6 +502,33 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     ],
     "implemented": true,
     "artUrl": "assets/classic/CFL/CFL035.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL036_VegetableSeller",
+    "name": "Vegetable Seller",
+    "deck": "CFL",
+    "artUrl": "assets/classic/CFL/CFL036.png",
+    "number": 36,
+    "players": "1+",
+    "desc": [
+      "At any time, you can convert 1 <VEGETABLE> from your supply or borrowed from the general supply into 2 <FOOD>. For each borrowed <VEGETABLE> not returned before scoring, receive 1 begging card."
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "vegetable": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "CFL036_VegetableSeller",
+        "triggers": [
+          "anytime",
+          "harvest"
+        ]
+      }
+    ],
     "kind": "occupation"
   },
   {
@@ -542,6 +673,18 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     ],
     "implemented": true,
     "artUrl": "assets/classic/CFL/CFL048.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CFL049_Accountant",
+    "name": "Accountant",
+    "deck": "CFL",
+    "artUrl": "assets/classic/CFL/CFL049.png",
+    "number": 49,
+    "players": "3+",
+    "desc": [
+      "When you play this card, you receive 2/1/0 <WOOD> in a 3/4/5-player game. Each time any player plays an Occupation, place 1 <FOOD> from the supply on this card. At any time you may spend <FOOD> from this card to buy a <SHEEP> or <STONE> for 2 <FOOD>, a <PIG> or <GRAIN> for 3 <FOOD>, or a <CATTLE> or <VEGETABLE> for 4 <FOOD>."
+    ],
     "kind": "occupation"
   },
   {
@@ -805,6 +948,20 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM003.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM004_BargainingBakerr",
+    "name": "Bargaining Baker",
+    "deck": "CWM",
+    "number": 4,
+    "players": "1+",
+    "cost": {},
+    "desc": [
+      "Whenever you build an oven, pay 1 building resource of your choice less. Before you build an improvement with a baking symbol, you receive 1 <GRAIN>. An oven is an improvement with a baking symbol and “Oven” in its name."
+    ],
+    "artUrl": "assets/classic/CWM/CWM004.png",
+    "implemented": true,
     "kind": "occupation"
   },
   {

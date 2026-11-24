@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-11-19. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-11-24. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 > This document covers official cards only. Hook ownership is derived from `ALL_CARD_IMPLS`; query the registry instead of mirroring it here.
 
@@ -12,7 +12,7 @@
 
 Reference PHP paths are relative to the reference implementation's source tree; OA paths are relative to this repository.
 
-None currently tracked.
+Love for Agriculture stores crops sown in a pasture separately from Farmyard and Card Fields. On current main, sowing grain in that pasture skips Tinsmith Master’s optional extra grain. The same player receives the choice on a normal field. Interactions that need to enumerate already planted pastures, including Farm Cart and Carrot Museum, also lack a logical field target.
 
 ## 2. Accepted differences
 
@@ -24,6 +24,7 @@ Unless the product direction changes, the following are not bugs. Cards without 
 | Maintainer scheme B: a startable before flow may admit a space whose host cannot finish, requiring undo. Admission does not simulate the reward, and cards add no admission guards. | Space-use before benefits; [ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md) |
 | Maintainer interpretation confirmed 2026-10-30: collect the full pile, then optionally return half for an animal, preserving the original acquisition facts and thresholds. Collected animals complete ordinary housing, including any discards, before the return; returning goods cannot bypass that settlement. This supersedes #1336 for this card under [#1481](https://github.com/titanxxh/open-agricola/issues/1481); it is not a newly verified official ruling and does not change other cards' quantity- or type-limited takes. | `D180_PartTimeWorker` |
 | A second Bake Bread granted by a trailing placement reaction cannot replace again within the same Turn, regardless of the reference's flag-reset reaction order. Maintainer ruling in [#1331](https://github.com/titanxxh/open-agricola/issues/1331). | `A097_Freshman` |
+| Farm Cart adds the second crop as a lower layer. A mixed field counts for both crop types and follows the ordinary harvest order. [#1997](https://github.com/titanxxh/open-agricola/issues/1997) | `CFL001_FarmCart` |
 | Classic Guest interpretations adopted in [#1862](https://github.com/titanxxh/open-agricola/issues/1862). An Animal Farm Guest remains available if the card leaves play. The Anatomist's last-turn dispatch is optional. Speculoos Bakery reacts to a Bake Bread action whose origin is an Action space, a season's space included; Bake Bread from a card, an oven purchase included, does not count. A Keg bought after everyone has placed grants its Guest at once. Accepting Monastic Vows grants the Begging card and food even when there is no legal Guest placement. | `CG062_AnimalFarm`, `CFL040_Anatomist`, `CFL026_SpeculoosBakery`, `CNL017_MonasticVows`, `CZ314_Keg` |
 | Maintainer ruling for exhausted ordinary decks: a satisfied tier can be completed; each eligible card type independently draws up to three remaining cards and keeps one; an empty type is skipped, completion still succeeds when both are empty, and there is no downgrade, reshuffle or later compensation. This is an OA ruling, not an official FAQ. | `PS03` |
 | Reseller excludes an entire printed-cost candidate that contains a stable or fence component, and keeps its once-per-game opportunity when no supported candidate remains. This does not rule out future component refunds, tracked in [#849](https://github.com/titanxxh/open-agricola/issues/849). | `E146_Reseller` |
