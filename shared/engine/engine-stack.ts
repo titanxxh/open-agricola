@@ -35,7 +35,6 @@ export type SubFlowReason =
 export type StageResumeState = {
   hook: string
   playerIndex: number
-  cardIndex: number
   extra?: Record<string, unknown>
 }
 

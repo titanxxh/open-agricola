@@ -2,11 +2,10 @@ import { timedRuleSources } from '../cards/timed-rule-obligations'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import { getCardEffect, isHandCardEffectHook, runCardEffectHook } from '../cards/card-effects.ts'
 import type { FlowCardEffectHook } from '../cards/card-effects.ts'
-import { isPlayerSkippingCurrentHarvest } from '../cards/helpers/harvest-skip.ts'
 import type { ActionFlow, GameState, PlayerState, ProtectedObservation } from '../contract/types.ts'
 import type { Engine, EngineFrame } from '../engine/index.ts'
 import { cloneState } from './state-bootstrap.ts'
-import { roundPreparationHooks, type RoundPreparationHook, type RoundPreparationContext } from '../contract/card-effect-hooks'
+import { roundPreparationHooks, type ReactionWindowHook, type RoundPreparationHook, type RoundPreparationContext } from '../contract/card-effect-hooks'
 import { tagInjectedAnytimeFlow } from '../engine/action-context-flags'
 import { timedRuleOccurrences } from '../actions/timed-rules'
 
@@ -47,12 +46,10 @@ export type StageResumeState = {
     | 'onBreedPhase'
     | 'onReorganizeComplete'
   playerIndex: number
-  cardIndex: number
   extra?: {
     trigger?: ReorganizeTrigger
     originPlayerIndex?: number | null
     triggerActionId?: string | null
-    resumeAfterCardId?: string | null
     anytimeActionTaken?: boolean
     /** The frozen player order of a reaction window (#2039). */
     playerOrder?: number[]
@@ -146,7 +143,6 @@ export class StageDispatch {
     flow: ActionFlow,
     hook: StageResumeState['hook'],
     playerIndex: number,
-    nextCardIndex: number,
     resumePlayerIndex = playerIndex,
     extra?: StageResumeState['extra'],
   ): void {
@@ -159,7 +155,7 @@ export class StageDispatch {
       source: { kind: 'flow', flow },
       spaceId: `__stage:${hook}`,
       ownerPlayerIndex: playerIndex,
-      stageResume: { hook, playerIndex: resumePlayerIndex, cardIndex: nextCardIndex, ...(extra ? { extra } : {}) },
+      stageResume: { hook, playerIndex: resumePlayerIndex, ...(extra ? { extra } : {}) },
       deferredPlayerSwitch: null,
       handoffSourcePlayerIndex,
       reason: 'stage-hook',
@@ -167,51 +163,13 @@ export class StageDispatch {
     this.host.driveEngineSteps()
   }
 
-  continueStageHook(
-    hook: StageCardEffectHook,
-    playerIndex = 0,
-    cardIndex = 0,
+  /** A preparation window; every other stage hook runs in `continueReactionWindow`. */
+  continuePreparationWindow(
+    hook: RoundPreparationHook,
+    offset = 0,
     extra?: StageResumeState['extra'],
   ): boolean {
-    const preparationHook = roundPreparationHooks.find(candidate => candidate === hook)
-    if (preparationHook) return this.continueRoundPreparationHook(preparationHook, playerIndex, extra)
-    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
-      const player = this.state.players[currentPlayerIndex]
-      if (!player) continue
-      if (isPlayerSkippingCurrentHarvest(this.state, player)) continue
-      const cards = [
-        ...this.getPlayerEffectCardIds(player),
-        ...this.getPlayerHandEffectCardIds(player, hook),
-      ]
-      const startCardIndex = currentPlayerIndex === playerIndex
-        ? this.resolveStageStartCardIndex(cards, cardIndex, extra?.resumeAfterCardId)
-        : 0
-      for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
-        const cardId = cards[currentCardIndex]
-        if (!cardId) continue
-        const flow = runCardEffectHook(this.state, player, cardId, hook, undefined, { actionHooks: this.host.actionHooks,
-          reportProtectedObservation: (observation) => this.host.reportProtectedObservation(observation),
-        })
-        if (!flow) continue
-        this.startFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1, currentPlayerIndex, {
-          ...extra,
-          resumeAfterCardId: cardId,
-        })
-        return true
-      }
-    }
-    return false
-  }
-
-  private resolveStageStartCardIndex(
-    cards: string[],
-    cardIndex: number,
-    resumeAfterCardId?: string | null,
-  ): number {
-    if (!resumeAfterCardId) return cardIndex
-    const liveIndex = cards.indexOf(resumeAfterCardId)
-    if (liveIndex >= 0) return liveIndex + 1
-    return Math.max(0, cardIndex - 1)
+    return this.continueRoundPreparationHook(hook, offset, extra)
   }
 
   private getPlayerEffectCardIds(player: PlayerState): string[] {
@@ -360,7 +318,7 @@ export class StageDispatch {
       const reactions: ActionFlow = only && singleDoable && !inactiveActivation ? only
         : { type: 'parallel', mode: 'trigger-select', children }
       const flow: ActionFlow = completion ? { type: 'seq', children: [reactions, completion] } : reactions
-      this.startFlow(flow, hook, playerIndex, 0, currentOffset + 1, {
+      this.startFlow(flow, hook, playerIndex, currentOffset + 1, {
         ...extra, roundPreparationPlayerOrder: [...order],
       })
       return true
@@ -392,7 +350,7 @@ export class StageDispatch {
    * one trigger-select whose auto-resolution follows the player's setting.
    */
   continueReactionWindow(
-    hook: StageCardEffectHook,
+    hook: ReactionWindowHook,
     playerOrder: readonly number[],
     orderOffset = 0,
   ): boolean {
@@ -411,14 +369,14 @@ export class StageDispatch {
           reportProtectedObservation: (observation) => this.host.reportProtectedObservation(observation),
         })
         if (!flow) continue
-        this.startFlow(flow, hook, playerIndex, 0, offset + 1, extra)
+        this.startFlow(flow, hook, playerIndex, offset + 1, extra)
         return true
       }
       this.startFlow({
         type: 'parallel',
         mode: 'trigger-select',
         children: children.map((child) => ({ ...child, optional: true })),
-      }, hook, playerIndex, 0, offset + 1, extra)
+      }, hook, playerIndex, offset + 1, extra)
       return true
     }
     return false

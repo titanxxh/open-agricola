@@ -898,19 +898,15 @@ export class GameCore {
       onEndHarvest: (stageResume) => { this.continueEndHarvestEffects(stageResume.playerIndex, stageResume.extra) },
       onAfterHarvest: (stageResume) => { this.continueAfterHarvestEffects(stageResume.playerIndex, stageResume.extra) },
       onBeforeStartOfTurn: (stageResume) => {
-        this.continueBeforeStartOfTurn(
-          stageResume.playerIndex,
-          stageResume.cardIndex,
-          stageResume.extra,
-        )
+        this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.extra)
       },
       onAfterRevealAction: (resume) => { this.continueAfterRevealAction(resume.playerIndex, resume.extra) },
       onPreparation: (resume) => { this.continuePreparation(resume.playerIndex, resume.extra) },
       onMoorSoloPreparation: (resume) => { this.continueRoundStart(0, resume.extra) },
       onRoundStart: (resume) => { this.continueRoundStart(resume.playerIndex, resume.extra) },
       onEndPreparation: (resume) => { this.continueEndPreparation(resume.playerIndex, resume.extra) },
-      onBeforeWork: (resume) => { this.continueAfterFutureMeepleActions(resume.playerIndex, resume.cardIndex, resume.extra) },
-      onWorkStart: (resume) => { this.continueAfterBeforeWork(resume.playerIndex, resume.cardIndex, resume.extra) },
+      onBeforeWork: (resume) => { this.continueAfterFutureMeepleActions(resume.playerIndex, resume.extra) },
+      onWorkStart: (resume) => { this.continueAfterBeforeWork(resume.playerIndex, resume.extra) },
       onStartHarvestFeedingPhase: (stageResume) => {
         this.continueStartHarvestFeedingPhase(stageResume.playerIndex, stageResume.extra)
       },
@@ -1690,7 +1686,6 @@ export class GameCore {
       stageResume: {
         hook: 'onReorganizeComplete',
         playerIndex,
-        cardIndex: 0,
         extra: {
           trigger,
           originPlayerIndex: resumeExtra.originPlayerIndex ?? null,
@@ -3120,7 +3115,7 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     const flow = player && buildEndTurnReactionFlow(this.state, player, triggerActionId)
     if (flow) {
-      this.stageDispatch.startFlow(flow, 'onEndTurn', playerIndex, 0)
+      this.stageDispatch.startFlow(flow, 'onEndTurn', playerIndex)
       return this.respond()
     }
     return this.finishCompletedActionTurn(playerIndex)
@@ -3145,13 +3140,7 @@ export class GameCore {
       if (isPlayerSkippingCurrentHarvest(this.state, player)) continue
       const flow = this.buildHarvestPrepFlow(player)
       if (!flow) continue
-      this.stageDispatch.startFlow(
-        flow,
-        'harvestPrepWindow',
-        currentPlayerIndex,
-        0,
-        currentPlayerIndex + 1,
-      )
+      this.stageDispatch.startFlow(flow, 'harvestPrepWindow', currentPlayerIndex, currentPlayerIndex + 1)
       return this.respond()
     }
     return this.continueFromStartHarvest()
@@ -3268,7 +3257,7 @@ export class GameCore {
       }
     })
     if (reactionChildren.length > 0) {
-      this.stageDispatch.startFlow({ type: 'parallel', children: reactionChildren }, 'afterHarvestReapReaction', 0, 0)
+      this.stageDispatch.startFlow({ type: 'parallel', children: reactionChildren }, 'afterHarvestReapReaction', 0)
       return this.respond()
     }
     return this.continueAfterReapEffects()
@@ -3414,24 +3403,18 @@ export class GameCore {
   private startFirstRoundAfterSetup(): SessionResponse {
     if (this.state.phase !== 'playing') return this.respond()
     this.state.roundPhase = 'preparation'
-    return this.continueBeforeStartOfTurn(0, 0, {
+    return this.continueBeforeStartOfTurn(0, {
       roundPreparation: { kind: 'before-reveal', nextRound: 1 },
     })
   }
 
   private continueBeforeStartOfTurn(
-    playerIndex = 0,
-    cardIndex = 0,
+    offset = 0,
     extra?: StageResumeState['extra'],
   ): SessionResponse {
     const context = extra?.roundPreparation?.kind === 'before-reveal'
       ? extra.roundPreparation : { kind: 'before-reveal' as const, nextRound: this.state.round + 1 }
-    if (this.stageDispatch.continueStageHook(
-      'onBeforeStartOfTurn',
-      playerIndex,
-      cardIndex,
-      { ...extra, roundPreparation: context },
-    )) {
+    if (this.stageDispatch.continuePreparationWindow('onBeforeStartOfTurn', offset, { ...extra, roundPreparation: context })) {
       return this.respond()
     }
     const advanced = context.nextRound > this.state.round
@@ -3482,12 +3465,12 @@ export class GameCore {
   }
 
   private continueAfterRevealAction(offset = 0, extra?: StageResumeState['extra']): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onAfterRevealAction', offset, 0, extra)) return this.respond()
+    if (this.stageDispatch.continuePreparationWindow('onAfterRevealAction', offset, extra)) return this.respond()
     return this.continuePreparation(0, { roundPreparation: extra?.roundPreparation })
   }
 
   private continuePreparation(offset = 0, extra?: StageResumeState['extra']): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onPreparation', offset, 0, extra)) return this.respond()
+    if (this.stageDispatch.continuePreparationWindow('onPreparation', offset, extra)) return this.respond()
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const openActionSpaceIds = new Set<string>()
     const actionSpaceResourcesBefore = new Map<string, Resource>()
@@ -3531,20 +3514,20 @@ export class GameCore {
     appendImmediateEvents(this.state, accumulatedActionEvents)
     this.state.roundFirstPlayerId = this.state.players.find(player => player.startPlayer)?.id
     if (this.state.players.length === 1 && this.state.enableFarmersOfTheMoor) {
-      this.stageDispatch.startFlow({ type: 'leaf', actionId: 'moor-solo-preparation' }, 'onMoorSoloPreparation', 0, 0, 0, { roundPreparation: extra?.roundPreparation })
+      this.stageDispatch.startFlow({ type: 'leaf', actionId: 'moor-solo-preparation' }, 'onMoorSoloPreparation', 0, 0, { roundPreparation: extra?.roundPreparation })
       return this.respond()
     }
     return this.continueRoundStart(0, { roundPreparation: extra?.roundPreparation })
   }
 
   private continueRoundStart(offset = 0, extra: StageResumeState['extra'] = { roundPreparation: { kind: 'after-reveal', revealedAction: null } }): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onRoundStart', offset, 0, extra)) return this.respond()
+    if (this.stageDispatch.continuePreparationWindow('onRoundStart', offset, extra)) return this.respond()
     return this.continueEndPreparation(0, { roundPreparation: extra?.roundPreparation })
   }
 
   private continueEndPreparation(offset = 0, extra?: StageResumeState['extra']): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onEndPreparation', offset, 0, extra)) return this.respond()
-    return this.continueAfterFutureMeepleActions(0, 0, { roundPreparation: extra?.roundPreparation })
+    if (this.stageDispatch.continuePreparationWindow('onEndPreparation', offset, extra)) return this.respond()
+    return this.continueAfterFutureMeepleActions(0, { roundPreparation: extra?.roundPreparation })
   }
 
   private beforeWorkPlayerOrder(extra?: StageResumeState['extra']): number[] {
@@ -3587,9 +3570,9 @@ export class GameCore {
     return flow.children.some((child) => this.beforeWorkFlowIsUsable(state, player, child))
   }
 
-  private continueAfterFutureMeepleActions(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
+  private continueAfterFutureMeepleActions(offset = 0, extra?: StageResumeState['extra']): SessionResponse {
     let resumeExtra = extra
-    if (!resumeExtra?.beforeWorkDiscardComplete && playerIndex === 0 && cardIndex === 0) {
+    if (!resumeExtra?.beforeWorkDiscardComplete && offset === 0) {
       const offered = new Set(resumeExtra?.supplyDiscardOffered ?? [])
       const order = this.beforeWorkPlayerOrder(resumeExtra)
       const next = order.find((index) => {
@@ -3605,7 +3588,7 @@ export class GameCore {
           targetPlayerId: player.id,
           choiceLabelKey: 'actions.discard-goods.name',
           anytimeWindow: { allowed: true, blockedIds: ['discard-goods'] },
-        }, 'onBeforeWork', next, 0, 0, {
+        }, 'onBeforeWork', next, 0, {
           ...resumeExtra,
           roundPreparationPlayerOrder: order,
           supplyDiscardOffered: [...offered, next],
@@ -3618,14 +3601,14 @@ export class GameCore {
         roundPreparation: resumeExtra?.roundPreparation,
       }
     }
-    if (this.stageDispatch.continueStageHook('onBeforeWork', playerIndex, cardIndex, resumeExtra)) {
+    if (this.stageDispatch.continuePreparationWindow('onBeforeWork', offset, resumeExtra)) {
       return this.respond()
     }
-    return this.continueAfterBeforeWork(0, 0, { roundPreparation: resumeExtra?.roundPreparation })
+    return this.continueAfterBeforeWork(0, { roundPreparation: resumeExtra?.roundPreparation })
   }
 
-  private continueAfterBeforeWork(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onWorkStart', playerIndex, cardIndex, extra)) {
+  private continueAfterBeforeWork(offset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.stageDispatch.continuePreparationWindow('onWorkStart', offset, extra)) {
       return this.respond()
     }
     const frozenStartIdx = this.state.players.findIndex((player) => player.id === this.state.roundFirstPlayerId)
@@ -4963,7 +4946,7 @@ export class GameCore {
       .map((entry) => entry.index)
     const flow = this.buildHarvestBreedFlow(harvestOrder, breedOrder)
     if (flow) {
-      this.stageDispatch.startFlow(flow, 'onBreedPhase', 0, 0)
+      this.stageDispatch.startFlow(flow, 'onBreedPhase', 0)
       return this.respond()
     }
     return this.continueEndHarvestEffects()
@@ -5050,13 +5033,7 @@ export class GameCore {
           sourceCard: descriptor.sourceCard ?? entryFlow.sourceCard,
         })),
       }
-      this.stageDispatch.startFlow(
-        flow,
-        'preScoringWindow',
-        currentPlayerIndex,
-        0,
-        currentPlayerIndex,
-      )
+      this.stageDispatch.startFlow(flow, 'preScoringWindow', currentPlayerIndex, currentPlayerIndex)
       return this.respond()
     }
     if (!this.state.gameOver) {
