@@ -61,14 +61,14 @@ describe('E143_Hewer', () => {
   it('effect is registered', () => {
     const effect = getCardEffect(CARD_ID)
     expect(effect).not.toBeNull()
-    expect(effect!.onBeforeReturnHome).toBeDefined()
+    expect(effect!.onAllWorkersPlaced).toBeDefined()
   })
 
   it('gains stone + food when clay-pit is unoccupied and round >= 3', () => {
     const player = createPlayer()
     const state = createState([player], 3)
     // clay-pit is unoccupied (takenBy: [])
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onAllWorkersPlaced')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
@@ -78,7 +78,7 @@ describe('E143_Hewer', () => {
   it('does not trigger when round < 3', () => {
     const player = createPlayer()
     const state = createState([player], 2)
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onAllWorkersPlaced')
     expect(flow).toBeNull()
   })
 
@@ -87,7 +87,7 @@ describe('E143_Hewer', () => {
     const state = createState([player], 5)
     const clayPit = state.actionSpaces.find(s => s.id === 'clay-pit')!
     clayPit.takenBy = [{ playerId: 'p2', workerId: '1' }]
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeReturnHome')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onAllWorkersPlaced')
     expect(flow).toBeNull()
   })
 

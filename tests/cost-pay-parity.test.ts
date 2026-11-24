@@ -559,7 +559,7 @@ const playScenarioCards = (player: PlayerState, state: GameState, scenario: Scen
 }
 
 const timedRenovationInput = (player: PlayerState, state: GameState, scenario: ActionScenario) => {
-  const hookFlow = getActiveCardRegistry()?.getEffect('E087_MasterRenovator')?.onStartReturnHome?.(state, player)
+  const hookFlow = getActiveCardRegistry()?.getEffect('E087_MasterRenovator')?.onAllWorkersPlaced?.(state, player)
   if (hookFlow?.type !== 'seq' || hookFlow.children.length !== 1) {
     throw new Error(`${scenario.name}: expected one due timed renovation rule`)
   }

@@ -15,13 +15,15 @@ import { createEventQuery } from '../../events/query'
 import { readAnytimeTurn } from '../../engine/action-context-flags'
 import type { CardImpl } from '../registry'
 import { readTurnScopeToken } from '../helpers/turn-token'
+import { isWorkEndWindowOpen } from '../../domain/guests'
 
 const CARD_ID = 'B027_Toolbox'
 const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
 const WINDOW_OFFERED_TURN_TOKEN_KEY = 'windowOfferedTurnToken'
 
 const setFlagHandler = (context: CardListenerContext): ActionHookResult | void => {
-  if (context.state.roundPhase !== 'work') return
+  // The work-end window (`onAllWorkersPlaced`) follows the last Turn, so a build there counts for none.
+  if (context.state.roundPhase !== 'work' || isWorkEndWindowOpen(context.state)) return
   if (context.actionId === 'fence' && !hasOrdinaryFenceBuiltEvent(context)) return
 
   const affiliation = readAnytimeTurn(context.actionContext)

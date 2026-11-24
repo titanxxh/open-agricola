@@ -324,7 +324,7 @@ describe('before reactions retain the triggering use identity', () => {
   })
 })
 
-describe('work qualification through the existing return-home hooks', () => {
+describe('work qualification through the work-end and return-home windows', () => {
   it.each([
     { card: 'E010_StrawHat', sourceSpace: 'farmland', priorUses: 0 },
     { card: 'E010_StrawHat', sourceSpace: 'farmland', priorUses: 1 },
@@ -341,7 +341,8 @@ describe('work qualification through the existing return-home hooks', () => {
     let response = session.getState()
     for (let step = 0; step < 15; step++) {
       response = handoffs(session, response)
-      if (response.state.roundPhase !== 'work') break
+      // Straw Hat resolves in the work-end window (#2039), Archway just before returning home.
+      if (response.state.roundPhase !== 'work' || response.interaction.stateId === 'wait' && response.interaction.sourceCard === card) break
       const actor = response.state.currentPlayerIndex
       const placed = getRoundPersonPlacementOrder(response.state.players[0]!).length
       const available = session.getActionAvailability(actor)
@@ -358,7 +359,7 @@ describe('work qualification through the existing return-home hooks', () => {
         response = choose(session, response, option => option.value === '__skip__')
       }
     }
-    assert.equal(response.state.roundPhase, 'returning-home')
+    assert.equal(response.state.roundPhase, card === 'E010_StrawHat' ? 'work' : 'returning-home')
     assert.equal(response.state.events.some(event => event.round === 3 && event.type === 'work.ended'), false)
     if (card === 'E010_StrawHat') response = choose(session, response, option => option.labelKey === 'actions.move-farmer-to-space.name')
     else response = choose(session, response, option => !option.value.includes('skip'))

@@ -31,6 +31,7 @@ export type StageResumeState = {
     | 'onEndTurn'
     | 'onReturnHome'
     | 'onStartReturnHome'
+    | 'onAfterReturnHome'
     | 'onAfterRoundEnd'
     | 'onRoundEnd'
     | 'onBeforeEndGame'

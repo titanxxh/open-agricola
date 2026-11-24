@@ -314,27 +314,24 @@ describe('E087 renovation discount ownership', () => {
     expect(response.interaction.stateId).toBe('idle')
   })
 
-  it('can undo a skipped timed renovation while a second same-player stage offer remains', () => {
-    const session = setup({ occupations: ['D107_Bellfounder'] })
+  it('can undo a skipped timed renovation while a second same-player work-end offer remains', () => {
+    // Both are work-end sources (#2039): the renovation and Piggy Bank share one selector.
+    const session = setup({ minors: ['E027_PiggyBank'] })
     let response = ok(session.performRoundEnd())
-    if (wait(response).request.kind === 'select-trigger') {
-      const interaction = wait(response)
-      const option = interaction.request.options?.find(option => option.sourceCard === MASTER)
-      assert.ok(option)
-      response = ok(session.resolveChoice(0, option.value))
-    }
+    expect(wait(response).request.options?.map(option => option.value)).toEqual(['E027_PiggyBank', MASTER, '__pass__'])
+    response = ok(session.resolveChoice(0, MASTER))
     const offer = wait(response)
     expect(offer.request.options?.some(option => option.value === '__skip__')).toBe(true)
     response = ok(session.resolveChoice(0, '__skip__'))
     expect(response.state.players[0]).toMatchObject({ houseType: 'wood', resources: { clay: 2, reed: 1 } })
-    expect(wait(response).sourceCard).toBe('D107_Bellfounder')
+    expect(wait(response).request.options?.map(option => option.value)).toEqual(['E027_PiggyBank', '__pass__'])
     expect(response.interaction.allowedCommands).toContain('undoStep')
     const undone = ok(session.undoStep())
     expect(wait(undone).request.options?.some(option => option.value === '__skip__')).toBe(true)
     const restored = restore(session)
     const skipAgain = ok(restored.resolveChoice(0, '__skip__'))
-    expect(wait(skipAgain).sourceCard).toBe('D107_Bellfounder')
-    const final = ok(restored.resolveChoice(0, '__skip__'))
+    expect(wait(skipAgain).request.options?.map(option => option.value)).toEqual(['E027_PiggyBank', '__pass__'])
+    const final = ok(restored.resolveChoice(0, '__pass__'))
     expect(final.state.round).toBe(8)
     expect(final.state.players[0]!.houseType).toBe('wood')
     expect(paidEvents(final)).toHaveLength(0)

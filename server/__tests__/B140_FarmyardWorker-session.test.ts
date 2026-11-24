@@ -269,7 +269,7 @@ describe('B140 Farmyard Worker parity', () => {
     }] })
     expect(response.ok, response.error).toBe(true)
     settleFarmyardWorker(session, response)
-    expect(session.getState().state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
+    expect(session.getState().state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).not.toBe(session.getState().state.round)
     expect(finishWorkPhase(session).state.players[0]!.resources.food).toBe(scenario === 'cook' ? 2 : 0)
   })
 
@@ -314,7 +314,7 @@ describe('B140 Farmyard Worker parity', () => {
     response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'grain' }] })
     response = settleFarmyardWorker(session, response)
     expect(response.state.players[0]!.resources.food).toBe(0)
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).toBe(response.state.round)
     if (response.interaction.request.kind === 'confirm-next-player') session.resolveChoice(0, 'confirm')
     response = session.takeAction(0, actionId)
     if (actionId === 'sheep-market') {
@@ -324,10 +324,10 @@ describe('B140 Farmyard Worker parity', () => {
       response = settleFarmyardWorker(session, response)
     }
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).toBe(response.state.round)
     response = finishWorkPhase(session)
     expect(response.state.players[0]!.resources.food).toBe(2)
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(false)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).not.toBe(response.state.round)
   })
 
 })

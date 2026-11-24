@@ -6,7 +6,7 @@ const CARD_ID = 'D079_CarrotMuseum'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  timedRules: [{ key: 'museum-reward', at: { kind: 'rounds', rounds: [8, 10, 12], phase: 'onAfterRoundEnd' },
+  timedRules: [{ key: 'museum-reward', at: { kind: 'rounds', rounds: [8, 10, 12], phase: 'onRoundEnd' },
     body: { kind: 'gain', resources: { stone: { kind: 'fields', crop: 'vegetable' }, wood: { kind: 'supply', resource: 'vegetable' } } },
   }],
 },

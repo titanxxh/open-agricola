@@ -8,7 +8,7 @@ export type RoundPreparationContext =
   | { kind: 'after-reveal'; revealedAction: { actionId: string; roundSlot: number } | null }
 
 export type CardEffectHook = 'onBuy' | RoundPreparationHook | 'onHarvest' | 'onRoundEnd' | 'onEndTurn' | 'onReturnHome'
-  | 'onBeforeReturnHome' | 'onStartReturnHome'
+  | 'onBeforeReturnHome' | 'onStartReturnHome' | 'onAfterReturnHome'
   | 'onAfterRoundEnd'
   | 'onBeforeHarvest' | 'onStartHarvest'
   | 'onStartHarvestFieldPhase' | 'onHarvestFieldPhase' | 'onEndHarvestFieldPhase'
@@ -36,6 +36,7 @@ export const flowCardEffectHooks: FlowCardEffectHook[] = [
   'onReturnHome',
   'onBeforeReturnHome',
   'onStartReturnHome',
+  'onAfterReturnHome',
   'onAfterRoundEnd',
   'onBeforeHarvest',
   'onStartHarvest',

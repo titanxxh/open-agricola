@@ -371,198 +371,73 @@ describe('listener purity wave 2a', () => {
     ])
   })
 
-  it('B124 Trimmer after-fencing listener updates pasture area before gain without mutating cardStates', () => {
-    const p = player(B124, {
-      cardStates: { [B124]: { extraData: { pastureArea: 1 }, flagged: false } },
-      pastures: [
-        {
-          id: 'p1',
-          size: 3,
-          tiles: [
-            { row: 0, col: 0 },
-            { row: 0, col: 1 },
-            { row: 0, col: 2 },
-          ],
-          stables: 0,
-          animalType: null,
-          animalCount: 0,
-        },
-      ],
-    })
-    const actionEvents = [fenceBuilt([{ playerId: p.id, row: 0, col: 1 }, { playerId: p.id, row: 0, col: 2 }])]
-    const ctx = context(p, {
+  const trimmerPasture = () => [{
+    id: 'p1',
+    size: 3,
+    tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }],
+    stables: 0,
+    animalType: null,
+    animalCount: 0,
+  }]
+  const trimmer = (p: PlayerState, actionEvents: FarmFenceBuiltEvent[], phase: Partial<GameState> = {}) =>
+    listenerById(B124_Trimmer_impl.listeners, 'B124-trimmer-after-fencing').handler(context(p, {
+      state: { players: [p], actionSpaces: [], round: 5, roundPhase: 'work', events: [], ...phase } as GameState,
       actionId: 'fence',
       transactionEvents: actionEvents,
       actionEvents,
-    })
+    }))
+  const trimmerReward = [
+    { actionId: 'special-effect', sourceCard: B124, params: { kind: 'set-extra-data', key: 'rewardRound', value: 5 } },
+    { actionId: 'gain', sourceCard: B124, params: { stone: 2 } },
+  ]
+
+  it('B124 Trimmer after-fencing listener records its reward round before the gain without mutating cardStates', () => {
+    const p = player(B124, { pastures: trimmerPasture() })
     const before = snapshot(p)
 
-    const result = listenerById(
-      B124_Trimmer_impl.listeners,
-      'B124-trimmer-after-fencing',
-    ).handler(ctx)
+    const result = trimmer(p, [fenceBuilt([{ playerId: p.id, row: 0, col: 1 }, { playerId: p.id, row: 0, col: 2 }])])
 
     expectCardStatesUnchanged(p, before, 'B124 owner')
-    expectSeqLeaves(result?.flow, [
-      {
-        actionId: 'special-effect',
-        sourceCard: B124,
-        params: { kind: 'set-extra-data', key: 'pastureArea', value: 3 },
-      },
-      { actionId: 'special-effect', sourceCard: B124, params: { kind: 'set-flag', flag: true } },
-      { actionId: 'gain', sourceCard: B124, params: { stone: 2 } },
-    ])
+    expectSeqLeaves(result?.flow, trimmerReward)
   })
 
   it('B124 Trimmer rewards once and ignores later growth in the same work phase without mutating state', () => {
-    const p = player(B124, {
-      cardStates: { [B124]: { extraData: { pastureArea: 1 }, flagged: false } },
-      pastures: [
-        {
-          id: 'p1',
-          size: 3,
-          tiles: [
-            { row: 0, col: 0 },
-            { row: 0, col: 1 },
-            { row: 0, col: 2 },
-          ],
-          stables: 0,
-          animalType: null,
-          animalCount: 0,
-        },
-      ],
-    })
-    const listener = listenerById(
-      B124_Trimmer_impl.listeners,
-      'B124-trimmer-after-fencing',
-    )
-    const actionEvents = [fenceBuilt([{ playerId: p.id, row: 0, col: 1 }, { playerId: p.id, row: 0, col: 2 }])]
-
+    const p = player(B124, { pastures: trimmerPasture() })
     const beforeFirst = snapshot(p)
-    const first = listener.handler(context(p, {
-      actionId: 'fence',
-      transactionEvents: actionEvents,
-      actionEvents,
-    }))
+    const first = trimmer(p, [fenceBuilt([{ playerId: p.id, row: 0, col: 1 }, { playerId: p.id, row: 0, col: 2 }])])
     expectCardStatesUnchanged(p, beforeFirst, 'B124 first reward')
-    expectSeqLeaves(first?.flow, [
-      {
-        actionId: 'special-effect',
-        sourceCard: B124,
-        params: { kind: 'set-extra-data', key: 'pastureArea', value: 3 },
-      },
-      { actionId: 'special-effect', sourceCard: B124, params: { kind: 'set-flag', flag: true } },
-      { actionId: 'gain', sourceCard: B124, params: { stone: 2 } },
-    ])
+    expectSeqLeaves(first?.flow, trimmerReward)
 
-    p.cardStates[B124] = { extraData: { pastureArea: 3 }, flagged: true }
+    p.cardStates[B124] = { extraData: { rewardRound: 5 } }
     p.pastures[0]!.tiles.push({ row: 0, col: 3 })
 
     const beforeSecond = snapshot(p)
-    const secondEvents = [fenceBuilt([{ playerId: p.id, row: 0, col: 3 }])]
-    const second = listener.handler(context(p, {
-      actionId: 'fence',
-      transactionEvents: secondEvents,
-      actionEvents: secondEvents,
-    }))
-    expect(second).toBeUndefined()
+    expect(trimmer(p, [fenceBuilt([{ playerId: p.id, row: 0, col: 3 }])])).toBeUndefined()
     expectCardStatesUnchanged(p, beforeSecond, 'B124 later enclosure')
   })
 
-  it('B124 Trimmer updates pasture area but does not reward when fencing only subdivides existing pasture', () => {
-    const p = player(B124, {
-      cardStates: { [B124]: { extraData: { pastureArea: 3 }, flagged: false } },
-      pastures: [
-        {
-          id: 'p1',
-          size: 3,
-          tiles: [
-            { row: 0, col: 0 },
-            { row: 0, col: 1 },
-            { row: 0, col: 2 },
-          ],
-          stables: 0,
-          animalType: null,
-          animalCount: 0,
-        },
-      ],
-    })
-    const actionEvents = [fenceBuilt()]
-
-    const result = listenerById(
-      B124_Trimmer_impl.listeners,
-      'B124-trimmer-after-fencing',
-    ).handler(context(p, {
-      actionId: 'fence',
-      transactionEvents: actionEvents,
-      actionEvents,
-    }))
-
-    expectSeqLeaves(result?.flow, [
-      {
-        actionId: 'special-effect',
-        sourceCard: B124,
-        params: { kind: 'set-extra-data', key: 'pastureArea', value: 3 },
-      },
-    ])
+  it('B124 Trimmer rewards again in a later round', () => {
+    const p = player(B124, { cardStates: { [B124]: { extraData: { rewardRound: 4 } } }, pastures: trimmerPasture() })
+    expectSeqLeaves(trimmer(p, [fenceBuilt([{ playerId: p.id, row: 0, col: 1 }])])?.flow, trimmerReward)
   })
 
-  it('B124 Trimmer ignores fence after return home flag is set', () => {
-    const p = player(B124, {
-      cardStates: { [B124]: { extraData: { pastureArea: 1 }, flagged: true } },
-      pastures: [
-        {
-          id: 'p1',
-          size: 3,
-          tiles: [
-            { row: 0, col: 0 },
-            { row: 0, col: 1 },
-            { row: 0, col: 2 },
-          ],
-          stables: 0,
-          animalType: null,
-          animalCount: 0,
-        },
-      ],
-    })
-    const actionEvents = [fenceBuilt()]
+  it('B124 Trimmer does not reward when fencing only subdivides existing pasture', () => {
+    const p = player(B124, { pastures: trimmerPasture() })
+    expect(trimmer(p, [fenceBuilt()])).toBeUndefined()
+  })
 
-    const result = listenerById(
-      B124_Trimmer_impl.listeners,
-      'B124-trimmer-after-fencing',
-    ).handler(context(p, {
-      actionId: 'fence',
-      transactionEvents: actionEvents,
-      actionEvents,
-    }))
-
-    expect(result).toBeUndefined()
+  it('B124 Trimmer still rewards before work.ended, and ignores fencing once the work phase ended', () => {
+    const p = player(B124, { pastures: trimmerPasture() })
+    const enclosed = [fenceBuilt([{ playerId: p.id, row: 0, col: 1 }])]
+    expectSeqLeaves(trimmer(p, enclosed, { roundPhase: 'returning-home' })?.flow, trimmerReward)
+    const ended = [{ type: 'work.ended', round: 5 }] as unknown as GameState['events']
+    expect(trimmer(p, enclosed, { roundPhase: 'returning-home', events: ended })).toBeUndefined()
+    expect(trimmer(p, enclosed, { roundPhase: 'preparation' })).toBeUndefined()
   })
 
   it('B124 Trimmer ignores fence after-hook when no fence was built', () => {
-    const p = player(B124, {
-      cardStates: { [B124]: { extraData: { pastureArea: 1 }, flagged: false } },
-      pastures: [
-        {
-          id: 'p1',
-          size: 3,
-          tiles: [
-            { row: 0, col: 0 },
-            { row: 0, col: 1 },
-            { row: 0, col: 2 },
-          ],
-          stables: 0,
-          animalType: null,
-          animalCount: 0,
-        },
-      ],
-    })
-    const result = listenerById(
-      B124_Trimmer_impl.listeners,
-      'B124-trimmer-after-fencing',
-    ).handler(context(p, { actionId: 'fence', transactionEvents: [], actionEvents: [] }))
-
-    expect(result).toBeUndefined()
+    const p = player(B124, { pastures: trimmerPasture() })
+    expect(trimmer(p, [])).toBeUndefined()
   })
 
   it('B132 EstateMaster farm-usage listener returns a saturated leaf without mutating state or cardStates', () => {

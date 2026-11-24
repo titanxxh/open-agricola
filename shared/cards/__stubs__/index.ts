@@ -7,7 +7,6 @@ import { listener as computeCostsBuildDiscount } from './Stub_ComputeCosts_Build
 import { listener as afterGainFlow } from './Stub_After_GainFlow'
 import { listener as computeArgsExtraOption } from './Stub_ComputeArgs_ExtraOption'
 import { listener as isDoableOverride } from './Stub_IsDoable_Override'
-import { effect as onReturnHomeAccumulate } from './Stub_OnReturnHome_Accumulate'
 import { effect as onRoundEndEffect } from './Stub_OnRoundEnd'
 import { effect as onRoundEndFlowEffect } from './Stub_OnRoundEndFlow'
 import { listener as scopeOpponent } from './Stub_Scope_Opponent'
@@ -38,7 +37,6 @@ const allListeners = [
 ]
 
 const allEffects = [
-  onReturnHomeAccumulate,
   onRoundEndEffect,
   onRoundEndFlowEffect,
   beforeReturnHomeEffect,

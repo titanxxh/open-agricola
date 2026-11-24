@@ -105,8 +105,8 @@ anytime                  注册额外的 anytime 行动
 准备阶段: onBeforeStartOfTurn → 增轮 / action.revealed → onAfterRevealAction → onPreparation
   → 累积格补充 → onRoundStart（StartOfTurn）→ onEndPreparation → onBeforeWork → onWorkStart → work.started
 工作:    PlaceFarmer → 各原子行动 → onEndTurn → allWorkersUsed → onAllWorkersPlaced
-回家:    onBeforeReturnHome → work.ended → 归还临时人员 → onStartReturnHome
-  → onReturnHome → 归还普通人员
+回家:    onBeforeReturnHome → work.ended → 归还临时人员
+  → onStartReturnHome → onReturnHome → 归还普通人员 → onAfterReturnHome
 回合结束: onRoundEnd → onAfterRoundEnd
 收获（第 4/7/9/11/13/14 轮）:
   onBeforeHarvest → harvestPrepWindow → onStartHarvest
@@ -119,7 +119,7 @@ anytime                  注册额外的 anytime 行动
   onBeforeEndGame → preScoringWindow → gameover
 ```
 
-阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）是准备窗口、StartOfTurn、回合结束、工作阶段结束、收获前、收获开始、收获田间阶段和终局前的共享模型：
+阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）覆盖除串行 hook 外的所有阶段窗口（`CARD_AUTHORING_zh.md` §4.3）：
 
 - 除回合结束外，每个窗口从起始玩家开始顺时针冻结玩家顺序，并在每名玩家进入时，按持牌、手牌启用的 hook 与纯 `stageEligibility` 查询捕获一棵固定的 `activate-card-effect` 来源树。来源发现从不按当前支付能力过滤。
 - 单个来源直接展开；多个来源进入 `ParallelNode(mode='trigger-select')`。每次选择后，handler、支付与必选 / Pass 状态按实时克隆预览重算。已完成的来源不重放；窗口内打出的卡只参加后续窗口。
@@ -134,6 +134,7 @@ anytime                  注册额外的 anytime 行动
 - **StartOfTurn**：回合开始激活、计划领取、付款门控的 offer 和计划行动共用一棵玩家树。到期的普通货物按玩家合并为一次 `receive`，保留各条目来源且不触发 Gain；带 `roomType` 或 `actionContext.resourceCondition` 的条目各自单独一次 `receive`，保留自身的领取条件与依赖；`futureMeeple.resolved` 只在实际领取后提交。
 - **未来计划**（[ADR 0018](../adr/0018-future-schedule-and-authoritative-action-entry.md)）：Exact Future Target 保留目标轮，超出 `current round < target <= 14` 时丢弃；Future Prefix 保留仍存在的连续后缀。一次性的未来 offer 使用 `scheduled-offer` 行动与 `cardStates[cardId].extraData.scheduledOffers`，不用资源 token。卡牌排未来 token，不自写 `targetRound` 状态机。
 - **回合结束**：普通轮转与卡牌驱动的 Turn 共用 `buildEndTurnReactionFlow()` 的同一棵冻结来源树；窗口完成时关闭 Turn Scope 一次。卡牌以既有 Turn 身份记录每 Turn 一次的凭据。
+- **工作阶段结束**：没有进行中的 Turn；`roundPhase` 仍是 `'work'`。
 - **收获前**：在收获跳过生效前冻结玩家顺序；所有玩家都参与。
 - **跳过整个收获**：在 `onBeforeHarvest` 之后生效；若在收获开始窗口内决定，则在该窗口结束后生效。生效后，该轮之后的每个收获步骤、阶段 hook 和 listener 都排除该玩家。
 - **收获准备**：`harvestPrepWindow` 依据 `preHarvestGoodsWanted` / `preHarvestGoodsWantedBeforeReap` / `maySkipHarvestFieldPhase` metadata，只提供可支付、有次数限制且能产出所需货物的 Harvest 兑换。使用次数按来源和轮次记录。

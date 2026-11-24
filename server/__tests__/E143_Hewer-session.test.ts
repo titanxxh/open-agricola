@@ -33,7 +33,7 @@ describe('E143_Hewer session', () => {
     const clayPit = updatedState.actionSpaces.find(s => s.id === 'clay-pit')
     if (clayPit) clayPit.takenBy = []
 
-    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome'))
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onAllWorkersPlaced'))
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
@@ -56,7 +56,7 @@ describe('E143_Hewer session', () => {
     const updatedState = session.getState().state
     const updatedPlayer = updatedState.players[0]!
 
-    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome'))
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onAllWorkersPlaced'))
     expect(flow).toBeNull()
   })
 
@@ -79,7 +79,7 @@ describe('E143_Hewer session', () => {
     const clayPit = updatedState.actionSpaces.find(s => s.id === 'clay-pit')
     if (clayPit) clayPit.takenBy = [{ playerId: 'p2', workerId: '1' }]
 
-    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome'))
+    const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onAllWorkersPlaced'))
     expect(flow).toBeNull()
   })
 })

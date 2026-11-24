@@ -16,7 +16,7 @@ const cardImpl = {
       sourceCard: CARD_ID,
       params: { kind: 'set-counter', key: 'uses', value: 3 },
     }),
-    onAllWorkersPlaced: (state, player, context) => {
+    onBeforeReturnHome: (state, player, context) => {
       if (
         (player.cardStates[CARD_ID]?.counters?.uses ?? 0) <= 0 ||
         readCardExtraData(player, CARD_ID, 'usedRound') === state.round

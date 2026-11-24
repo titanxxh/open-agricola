@@ -13,7 +13,7 @@ const phaseOrder: Partial<Record<TimedRulePhase, number>> = {
   onBeforeStartOfTurn: 0, onAfterRevealAction: 1, onPreparation: 2, onRoundStart: 3,
   afterReceive: 3, onEndPreparation: 4, onBeforeWork: 5, onWorkStart: 6,
   afterCollect: 10, contributeExtraTurn: 10, onBeforePlayerTurn: 10, onEndTurn: 11,
-  onAllWorkersPlaced: 20, onBeforeReturnHome: 30, onStartReturnHome: 31, onReturnHome: 32,
+  onAllWorkersPlaced: 20, onBeforeReturnHome: 30, onStartReturnHome: 31, onReturnHome: 32, onAfterReturnHome: 33,
   onBeforeHarvest: 40, onStartHarvest: 41, onStartHarvestFieldPhase: 42, onHarvestFieldPhase: 43,
   onAfterReap: 44, onEndHarvestFieldPhase: 45, onHarvest: 46,
   onStartHarvestFeedingPhase: 47, onHarvestFeedingPhase: 48, onEndHarvestFeedingPhase: 49,

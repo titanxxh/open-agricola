@@ -29,7 +29,7 @@ describe('B160_PubOwner session', () => {
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.grain).toBe(1)
   })
 
-  it('onBeforeReturnHome gives 1 grain when forest, clay-pit, reed-bank all occupied', () => {
+  it('onAllWorkersPlaced gives 1 grain when forest, clay-pit, reed-bank all occupied', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -52,13 +52,13 @@ describe('B160_PubOwner session', () => {
 
     const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = session.withCtx(() => effect!.onBeforeReturnHome!(state, player))
+    const flow = session.withCtx(() => effect!.onAllWorkersPlaced!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params?.grain).toBe(1)
   })
 
-  it('onBeforeReturnHome does not trigger when forest is not occupied', () => {
+  it('onAllWorkersPlaced does not trigger when forest is not occupied', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -78,11 +78,11 @@ describe('B160_PubOwner session', () => {
     session.loadState(state)
 
     const effect = session.withCtx(() => getCardEffect(CARD_ID))
-    const flow = session.withCtx(() => effect!.onBeforeReturnHome!(state, player))
+    const flow = session.withCtx(() => effect!.onAllWorkersPlaced!(state, player))
     expect(flow).toBeUndefined()
   })
 
-  it('onBeforeReturnHome does not trigger when no spaces occupied', () => {
+  it('onAllWorkersPlaced does not trigger when no spaces occupied', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -97,7 +97,7 @@ describe('B160_PubOwner session', () => {
     session.loadState(state)
 
     const effect = session.withCtx(() => getCardEffect(CARD_ID))
-    const flow = session.withCtx(() => effect!.onBeforeReturnHome!(state, player))
+    const flow = session.withCtx(() => effect!.onAllWorkersPlaced!(state, player))
     expect(flow).toBeUndefined()
   })
 

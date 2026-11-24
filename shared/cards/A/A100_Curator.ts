@@ -8,7 +8,7 @@ const CARD_ID = 'A100_Curator'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onStartReturnHome: (state, player) => {
+  onReturnHome: (state, player) => {
     const accumulationSpaces = new Set(state.actionSpaces.filter(
       (space) => Object.values(space.gainPerRound ?? {}).some((value) => value > 0),
     ).map((space) => space.id))

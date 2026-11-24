@@ -144,7 +144,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     expect(session.withCtx(() => runCardEffectHook(state, owner, 'B175_FieldOverseer', 'onEndHarvestFieldPhase', undefined, { actionHooks: session.actionHooks }))).toBeNull()
   })
 
-  it('B179 Wild Boar Hunter offers 1 wood for 1 boar before return home when 3 wood spaces are occupied', () => {
+  it('B179 Wild Boar Hunter offers 1 wood for 1 boar in the returning home phase when 3 wood spaces are occupied', () => {
     const session = setupOwner('B179_WildBoarHunter')
     occupySpace(session, 'forest')
     occupySpace(session, 'copse-56')
@@ -153,7 +153,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const owner = state.players[0]!
     owner.resources.wood = 1
 
-    const flow = session.withCtx(() => runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome', undefined, { actionHooks: session.actionHooks }))
+    const flow = session.withCtx(() => runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onReturnHome', undefined, { actionHooks: session.actionHooks }))
 
     expect(flow).toMatchObject({
       type: 'seq',
@@ -173,14 +173,14 @@ describe('5+ reveal and reaction occupation cards', () => {
     let owner = state.players[0]!
     owner.resources.wood = 1
 
-    expect(session.withCtx(() => runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome', undefined, { actionHooks: session.actionHooks }))).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onReturnHome', undefined, { actionHooks: session.actionHooks }))).toBeNull()
 
     occupySpace(session, 'grove-56')
     state = session.getState().state
     owner = state.players[0]!
     owner.resources.wood = 0
 
-    expect(session.withCtx(() => runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onBeforeReturnHome', undefined, { actionHooks: session.actionHooks }))).toBeNull()
+    expect(session.withCtx(() => runCardEffectHook(state, owner, 'B179_WildBoarHunter', 'onReturnHome', undefined, { actionHooks: session.actionHooks }))).toBeNull()
   })
 
   it('C170 Amateur Fencer offers a free one-space pasture on play only when the owner has no pastures', () => {

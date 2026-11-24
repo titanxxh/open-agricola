@@ -30,7 +30,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onReturnHome: (state, player) => {
+  onRoundEnd: (state, player) => {
     if (harvestRounds.includes(state.round)) return
     const vegFields = getLogicalFields(player).flatMap((field) => {
       const top = [...field.slots].reverse().find((slot) => slot.stack)

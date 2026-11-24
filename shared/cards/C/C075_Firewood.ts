@@ -1,8 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState, PlayerState } from '../../contract/types'
-import { initCardState } from '../helpers/card-state'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { getCardDefinitionById } from '../helpers/card-type'
 
@@ -39,10 +38,7 @@ const buildTakeWoodFlow = (woodOnCard: number): ActionHookResult | void => {
 
 const firewoodReturnHomeEffect = {
   id: CARD_ID,
-  onReturnHome: (_state: GameState, player: PlayerState): void => {
-    const counters = initCardState(player, CARD_ID)
-    counters['wood'] = (counters['wood'] ?? 0) + 1
-  },
+  onReturnHome: (): ActionFlow => ({ type: 'leaf', actionId: 'store-on-card', params: { wood: 1 }, sourceCard: CARD_ID }),
 }
 
 const firewoodAfterBuildListener: CardListenerRegistration = {

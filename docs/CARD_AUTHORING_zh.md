@@ -13,7 +13,7 @@
 - **Closure（闭环）。** 卡符合 §1 的可行性定义：一个闭环的文件，不改核心路径，不新增 hook 点、phase、action 或引擎节点。它通过能力和带类型的 metadata 访问其他卡。见 [cards：边界](architecture/cards_zh.md#命名能力与边界)。门禁：`pnpm run check:card-impl-boundaries` 拒绝卡读取另一张卡的 ID，`pnpm run check:card-state-boundaries` 拒绝核心代码读取单张卡的状态。
 - **Local state（局部状态）。** 计数器、标记和 flag 持久化在 `player.cardStates[cardId]`，在 `presentation` 声明公开之前都是内部状态。公开的计数器 key 不是资源时，语言源里要有 `ui.cardCounters.<key>` 标签。见 [cards：局部状态](architecture/cards_zh.md#cardstates-中的局部状态)。门禁：`client/components/board/__tests__/card-counter-label.test.ts`。
 - **Purity（纯度）。** listener handler 读取状态，返回 flow、成本或选项。每一次修改，包括写卡自己的状态，都是一个返回的 leaf。见 [hooks：listener 纯度](architecture/hooks_zh.md#listener-纯度)。门禁：每个测试 project 里的 listener 纯度守卫。
-- **Timing（时机）。** 订阅和 phase 按卡面文字，照 §3 的表格选择（[ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)）。
+- **Timing（时机）。** 订阅和 phase 按卡面文字，照 §3 的表格选择（[ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)）。阶段效果按 §4.3 选卡面时机对应的 hook，写法相同的卡挂同一个 hook（[ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）。
 - **Admission（准入）。** 提供选项之前，卡检查自己能控制的东西：卡面前提，以及现在必须可用的目标，例如已翻开的行动格或能够开始的授予行动（`CWM061_BackDoor`），还有卡自己的费用，用 `reserve` 传入，让目标按付费之后的资源判断（`CWM023_ForestFarmer`、`C150_ParrotBreeder`）。后续的宿主步骤归引擎管，引擎只检查当前一步：玩家已接受的选择让后面某个必选步骤付不起时，Session 显示 `engine-blocked`，直到 `undoStep` / `undoAction`（`D014_HammerCrusher`、`CWM042_Remodeler`）。见 [hooks：当前步骤准入](architecture/hooks_zh.md#当前步骤准入与-blocked-恢复)、[ADR 0015](adr/0015-provisional-cross-player-continuation-resolution.md)，以及 [cards：helper](architecture/cards_zh.md#sharedcardshelpers-中的-helper) 里的 `reserved-resources.ts`。
 - **Standard leaves（标准 leaf）。** 资源通过标准 leaf 移动：新资源用 `gain`，行动格上的资源用 `collect`，卡上的资源用 `take-from-card` 和 `receive`，兑换用 `exchange`，费用用 `pay`。其他卡的反应订阅这些 leaf，统计也读取它们，所以两者都能看到这次移动（`CWM055_WoodWorker`、`CWM066_Brazier`）。对"获得资源"的反应，要订阅每一个可能入账该资源的 leaf（§4.1）。见 [actions：effect 与内部行动](architecture/actions_zh.md#effect-与内部行动)。
 - **Action parameters（行动参数）。** `params` 和 `actionContext` 的键名从该行动的 effect 文件或一张用过它的卡照抄，因为未知的键会被忽略而不报错：`shared/actions/effects/construct.ts` 用 `maxRooms` 限制房间数，`shared/actions/effects/stables.ts` 用 `max` 限制马厩数（`C149_ResourceRecycler`、`CWM037_MasterStableman`）。Session 测试提交比上限多一个的数量，预期被拒绝。
@@ -143,8 +143,20 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 
 | 派发方式 | Hook |
 |---|---|
-| Stage Dispatch：每个玩家一个 trigger-select，来源在进入窗口时冻结 | `onBeforeStartOfTurn`、`onAfterRevealAction`、`onPreparation`、`onRoundStart`、`onEndPreparation`、`onBeforeWork`、`onWorkStart`、`onAllWorkersPlaced`、`onEndTurn`、`onBeforeHarvest`、`onStartHarvest`、`onStartHarvestFieldPhase`、`onHarvestFieldPhase`、`onEndHarvestFieldPhase`、`onBeforeEndGame` |
-| 按玩家串行，再依次是改良、小改良和职业 | `onRoundEnd`、`onAfterRoundEnd`、`onBeforeReturnHome`、`onStartReturnHome`、`onReturnHome`、`onAfterReap`、`onHarvest`、`onStartHarvestFeedingPhase`、`onHarvestFeedingPhase`、`onEndHarvestFeedingPhase`、`onEndHarvest`、`onAfterHarvest` |
+| Stage Dispatch：每个玩家一个 trigger-select，来源在进入窗口时冻结 | `onBeforeStartOfTurn`、`onAfterRevealAction`、`onPreparation`、`onRoundStart`、`onEndPreparation`、`onBeforeWork`、`onWorkStart`、`onAllWorkersPlaced`、`onEndTurn`、`onBeforeReturnHome`、`onStartReturnHome`、`onReturnHome`、`onAfterReturnHome`、`onBeforeHarvest`、`onStartHarvest`、`onStartHarvestFieldPhase`、`onHarvestFieldPhase`、`onEndHarvestFieldPhase`、`onRoundEnd`、`onAfterRoundEnd`、`onBeforeEndGame` |
+| 按玩家串行，再依次是改良、小改良和职业 | `onAfterReap`、`onHarvest`、`onStartHarvestFeedingPhase`、`onHarvestFeedingPhase`、`onEndHarvestFeedingPhase`、`onEndHarvest`、`onAfterHarvest` |
+
+卡面时机写法相同，就挂同一个 hook（[ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）：
+
+| 卡面时机 | Hook |
+|---|---|
+| "At the end of each work phase"、"at the end of the work phases of rounds N" | `onAllWorkersPlaced`（`E023_Apiary`） |
+| "After each work phase"、"immediately before the returning home phase" | `onBeforeReturnHome`（`B117_Informant`） |
+| "At the start of the returning home phase" | `onStartReturnHome`（`A157_Bohemian`） |
+| "In the returning home phase (of each round)" | `onReturnHome`（`D107_Bellfounder`） |
+| "Immediately after each returning home phase" | `onAfterReturnHome`（`D018_SteamPlow`） |
+| "At the end of each round"、"at the end of round N" | `onRoundEnd`（`B053_SculptureCourse`） |
+| "After each round" | `onAfterRoundEnd`（`D167_PureBreeder`） |
 
 - 准备阶段的窗口用纯函数 `effect.stageEligibility[hook]` 过滤来源（`E111_Recluse`）。
 - `handHooks` 让手牌也能触发，`onBuy`、`onEndTurn` 和 `onBeforeEndGame` 除外。

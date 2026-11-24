@@ -7,7 +7,7 @@ const CARD_ID = 'D130_RecreationalCarpenter'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeReturnHome: (state, player) => {
+  onAllWorkersPlaced: (state, player) => {
     const meetingPlace = state.actionSpaces.find((s) => s.id === 'meeting-place')
     if (meetingPlace && spaceHasPlayer(meetingPlace, player.id)) return
     return {

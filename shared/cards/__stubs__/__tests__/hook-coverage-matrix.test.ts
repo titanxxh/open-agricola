@@ -19,9 +19,7 @@ import { CARD_ID as COMPUTE_COSTS_ID } from '../Stub_ComputeCosts_BuildDiscount'
 import { CARD_ID as AFTER_GAIN_ID } from '../Stub_After_GainFlow'
 import { CARD_ID as COMPUTE_ARGS_ID } from '../Stub_ComputeArgs_ExtraOption'
 import { CARD_ID as IS_DOABLE_ID } from '../Stub_IsDoable_Override'
-import { CARD_ID as ON_RETURN_HOME_ID } from '../Stub_OnReturnHome_Accumulate'
 import { CARD_ID as SCOPE_OPPONENT_ID } from '../Stub_Scope_Opponent'
-import { runReturnHomeHooks } from '../../card-effects'
 import { internalActionDefinitions } from '../../../actions/index'
 import { getFenceCount } from '../../../actions/effects/fencing'
 import { requireActiveCardRegistry } from '../../active-registry'
@@ -381,36 +379,6 @@ describe('Stub card: Stub_IsDoable_Override', () => {
     const result = engine.proceed({ state, player, space })
 
     expect(result.type).toBe('blocked')
-  })
-})
-
-describe('Stub card: Stub_OnReturnHome_Accumulate', () => {
-  beforeEach(() => {
-    actionHooks.clear()
-    clearStubCards()
-    registerStubCards()
-  })
-
-  it('accumulates grain counter each return home call', () => {
-    const player = createPlayer()
-    player.minorPlayed = [ON_RETURN_HOME_ID]
-    const state = createState(player)
-
-    runReturnHomeHooks(state, player)
-    runReturnHomeHooks(state, player)
-    runReturnHomeHooks(state, player)
-
-    expect(player.cardStates[ON_RETURN_HOME_ID]?.counters?.observedCount).toBe(3)
-    expect(player.cardStates[ON_RETURN_HOME_ID]?.counters?.grain).toBe(3)
-  })
-
-  it('does not trigger for player without card', () => {
-    const player = createPlayer()
-    const state = createState(player)
-
-    runReturnHomeHooks(state, player)
-
-    expect(player.cardStates[ON_RETURN_HOME_ID]).toBeUndefined()
   })
 })
 

@@ -6,7 +6,7 @@ const CARD_ID = 'E026_Sundial'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-  timedRules: [{ key: 'extra-sowing', at: { kind: 'rounds', rounds: [7, 9], phase: 'onBeforeReturnHome' }, body: { kind: 'condition', condition: { kind: 'has-fields' }, body: { kind: 'optional', body: { kind: 'action', actionId: 'sow' } } } }],
+  timedRules: [{ key: 'extra-sowing', at: { kind: 'rounds', rounds: [7, 9], phase: 'onAllWorkersPlaced' }, body: { kind: 'condition', condition: { kind: 'has-fields' }, body: { kind: 'optional', body: { kind: 'action', actionId: 'sow' } } } }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

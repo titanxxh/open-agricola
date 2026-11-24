@@ -54,7 +54,7 @@ Unless the product direction changes, the following are not bugs. Cards without 
 
 Register a cross-card mechanism here only while it is still unimplemented. Remove the entry once the mechanism is implemented and covered by a test or a gate, and record the new generic mechanism in its module document under `docs/architecture/`. Completed work lives in pull requests, ADRs and tests, not here.
 
-- **Serial stage hooks** ([#2039](https://github.com/titanxxh/open-agricola/issues/2039)): `onAfterReap`, `onHarvest`, the three feeding hooks, `onEndHarvest`, `onAfterHarvest`, the three return-home hooks, `onRoundEnd` and `onAfterRoundEnd` still resolve one card at a time in play-zone order; same-timing cards there cannot be ordered. Several cards with the same printed timing also sit in different hooks (for example the "end of each work phase" cards across `onAllWorkersPlaced` and `onBeforeReturnHome`).
+- **Serial stage hooks** ([#2039](https://github.com/titanxxh/open-agricola/issues/2039)): `onAfterReap`, `onHarvest`, the three feeding hooks, `onEndHarvest` and `onAfterHarvest` still resolve one card at a time in play-zone order; same-timing cards there cannot be ordered.
 
 ## 4. Reference anti-patterns: do not copy
 
@@ -113,7 +113,7 @@ Detail for cards in [Accepted differences](#2-accepted-differences) whose differ
 | `B175_FieldOverseer` | At the end of the harvest field phase, it counts grain fields only in other players' `harvestReapSummary` and pays food / grain / vegetable for the highest threshold of 3 / 4 / 6+. |
 | `B176_VillageIdiot` | On play it discards the rest of the occupation hand; hand / played `occupation.isDoable` and `providesOccupation` minor interception keep it the lone occupation, and before an opponent uses `meeting-place` the owner gets 1 wood + 1 food. |
 | `B178_TagAlong` | Immediately after an opponent uses a Resource Market variant, the owner may use `place-farmer-on-space` to put an available worker on the same occupied Action Space and run its action; it does not trigger for the owner's own use, non-Resource-Market spaces, no person who may enter (a healthy one under Farmers of the Moor), or a blocked / unexecutable target. |
-| `B179_WildBoarHunter` | Before returning home it counts wood accumulation spaces by actual `takenBy` occupancy; at 3+ and if the owner has wood, they may exchange 1 wood for 1 boar. |
+| `B179_WildBoarHunter` | In the returning home window it counts wood accumulation spaces by this round's recorded return-home placements; at 3+ and if the owner has wood, they may exchange 1 wood for 1 boar. |
 | `C169_FastMason` | Immediately after the owner collects from a clay / stone accumulation space, they may renovate in the matching material: clay collection only to clay, stone collection only from a clay house to stone, with `exactCost` dropping the reed. |
 | `C170_AmateurFencer` | On buy, if the owner has no pasture and a one-space fence is legal, they may run a B2-style free, exactly-one-space pasture non-action fence flow. |
 | `C171_YoungArtist` | In the returning-home phase, if the owner has food and at least one branch is feasible, they may pay 1 food and then either take a worker-less Minor Improvement action or draw up to 2 minors from the ordinary minor deck into hand. The Minor Improvement branch is judged after reserving / paying that food, so it is never offered when nothing would be buyable; infeasible branches are hidden, and there is no keep-one choice. |

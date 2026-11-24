@@ -63,16 +63,16 @@ const createState = (player: PlayerState): GameState => ({
 
 describe('C075_Firewood', () => {
   describe('onReturnHome effect (accumulate wood)', () => {
-    it('should add 1 wood to card each round', () => {
+    it('stores 1 wood on the card through a store-on-card leaf, without touching the card itself', () => {
       const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
       const state = createState(player)
+      const before = structuredClone(player.cardStates)
 
-      effect.onReturnHome!(state, player)
-      expect(player.cardStates[CARD_ID]?.counters?.wood).toBe(1)
-
-      effect.onReturnHome!(state, player)
-      expect(player.cardStates[CARD_ID]?.counters?.wood).toBe(2)
+      expect(effect.onReturnHome!(state, player)).toEqual({
+        type: 'leaf', actionId: 'store-on-card', params: { wood: 1 }, sourceCard: CARD_ID,
+      })
+      expect(player.cardStates).toEqual(before)
     })
 
   })

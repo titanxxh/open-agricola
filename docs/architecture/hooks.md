@@ -103,8 +103,8 @@ Tests: `shared/actions/effects/__tests__/pay-child-context.test.ts`, `shared/eng
 Preparation: onBeforeStartOfTurn -> advance round / action.revealed -> onAfterRevealAction -> onPreparation
   -> accumulate -> onRoundStart (StartOfTurn) -> onEndPreparation -> onBeforeWork -> onWorkStart -> work.started
 Work:        PlaceFarmer -> atomic actions -> onEndTurn -> allWorkersUsed -> onAllWorkersPlaced
-Return home: onBeforeReturnHome -> work.ended -> return temporary workers -> onStartReturnHome
-  -> onReturnHome -> return ordinary workers
+Return home: onBeforeReturnHome -> work.ended -> return temporary workers
+  -> onStartReturnHome -> onReturnHome -> return ordinary workers -> onAfterReturnHome
 Round end:   onRoundEnd -> onAfterRoundEnd
 Harvest in rounds 4/7/9/11/13/14:
   onBeforeHarvest -> harvestPrepWindow -> onStartHarvest
@@ -113,11 +113,11 @@ Harvest in rounds 4/7/9/11/13/14:
   -> postReapAnytimeWindow -> onStartHarvestFeedingPhase -> onHarvestFeedingPhase
     -> feed -> onEndHarvestFeedingPhase
   -> breed -> onEndHarvest -> onAfterHarvest
-Before game end: after round 14 onAfterRoundEnd completes, without opening round-15 preparation,
+Before game end: after round 14 onAfterRoundEnd, without round-15 preparation,
   onBeforeEndGame -> preScoringWindow -> gameover
 ```
 
-Stage hooks return `ActionFlow` and run as resumable subflows through `EngineStack`. **Stage Dispatch** ([ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)) is the shared model for preparation windows, StartOfTurn, turn end, work end, Before-Harvest, start of Harvest, Harvest field and before-end:
+Stage hooks return `ActionFlow` and run as resumable subflows through `EngineStack`. **Stage Dispatch** ([ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)) covers every stage window but the serial ones (`CARD_AUTHORING.md` §4.3):
 
 - Each window but turn end freezes its player order clockwise from the Start Player and, on each player's entry, captures a fixed tree of `activate-card-effect` sources using ownership, hand-enabled hooks and the pure `stageEligibility` query. Discovery never filters by current affordability.
 - One source expands directly; several enter `ParallelNode(mode='trigger-select')`. Handlers, payment and mandatory / pass state are recomputed from a live cloned-state preview after each selection. Completed sources never replay; cards played inside a window join only later windows.
@@ -132,6 +132,7 @@ Window-specific invariants:
 - **StartOfTurn**: round-start activations, scheduled receipts, payment-gated offers and scheduled actions share one player tree. Mature ordinary goods settle in one `receive` per player that keeps each entry's source and does not trigger Gain; an entry with `roomType` or `actionContext.resourceCondition` gets its own `receive`, keeping its own eligibility and dependencies; `futureMeeple.resolved` commits only after the actual receipt.
 - **Future schedules** ([ADR 0018](../adr/0018-future-schedule-and-authoritative-action-entry.md)): an Exact Future Target keeps its round and is dropped outside `current round < target <= 14`; a Future Prefix keeps its surviving contiguous suffix. One-time future offers use the `scheduled-offer` action and `cardStates[cardId].extraData.scheduledOffers`, not resource tokens. Cards queue future tokens instead of writing a `targetRound` state machine.
 - **Turn end**: ordinary rotation and card-driven Turns share one frozen source tree from `buildEndTurnReactionFlow()`; window completion closes the Turn Scope once. Cards record once-per-Turn receipts against the existing Turn identity.
+- **Work end**: no Turn is open; `roundPhase` is still `'work'`.
 - **Before-Harvest**: player order freezes before Harvest skips activate; every player participates.
 - **Whole-Harvest skip**: activates after `onBeforeHarvest`, or after the start-of-Harvest window if decided there; it then excludes the player from every later Harvest step, stage hook and listener that round.
 - **Harvest preparation**: `harvestPrepWindow` offers only payable, use-limited Harvest exchanges that produce a demanded good, from `preHarvestGoodsWanted` / `preHarvestGoodsWantedBeforeReap` / `maySkipHarvestFieldPhase` metadata. Usage is recorded per source and round.

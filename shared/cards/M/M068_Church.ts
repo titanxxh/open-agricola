@@ -14,7 +14,7 @@ const cardImpl = {
       player.improvements = player.improvements.filter((id) => id !== TARGET)
       return gainLeaf(CARD_ID, { food: 2 })
     },
-    onStartReturnHome: (_state, player) => {
+    onReturnHome: (_state, player) => {
       if ((player.resources.fuel ?? 0) < 1) return
       return {
         type: 'seq' as const,

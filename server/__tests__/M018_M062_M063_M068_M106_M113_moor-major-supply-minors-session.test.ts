@@ -255,7 +255,7 @@ describe('Moor major-supply and upgrade minors', () => {
     expect(stackFor(resp.state, 'well').cardIds).not.toContain('Major_Moor_VillageChurch')
     expect(resp.state.players[0]!.minorPlayed).toContain('M068_Church')
     expect(resp.state.players[0]!.resources.food).toBe(2)
-    expect(actionIds(session.withCtx(() => runCardEffectHook(resp.state, resp.state.players[0]!, 'M068_Church', 'onStartReturnHome'))))
+    expect(actionIds(session.withCtx(() => runCardEffectHook(resp.state, resp.state.players[0]!, 'M068_Church', 'onReturnHome'))))
       .toEqual(['pay', 'bonus-vp'])
   })
 

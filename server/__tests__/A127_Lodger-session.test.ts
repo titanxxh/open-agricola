@@ -8,6 +8,8 @@ import { addSyntheticLinkedOccupancyRef } from '../../shared/domain/space'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { testCardImpl } from './_helpers/test-card-impl'
+import type { CardImpl } from '../../shared/cards/registry'
 import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
 import * as audit15Lodger from './_helpers/audit/ae-negative-15-lodger'
 
@@ -18,8 +20,12 @@ afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 // Approved seam: three-player Session for the 3+ card, natural work/return-home commands.
 // Snapshots prepare round, rooms, family and card facts; no expiry handler is called directly.
-const setup = (configure: (state: GameState) => void = () => {}) => {
-  const session = createWorkSession({ seed: 4242, options: { playerCount: 3 }, configure(state) {
+// An optional start-of-return-home source that pauses the window before the Lodger expires.
+const PAUSE = 'TEST_StartReturnHomeOffer'
+const pauseCard = { [PAUSE]: testCardImpl(PAUSE, "{ effect: { id: CARD_ID, onStartReturnHome: () => ({ ...gainLeaf(CARD_ID, { food: 1 }), optional: true }) } }") }
+
+const setup = (configure: (state: GameState) => void = () => {}, cardImpls?: Record<string, CardImpl>) => {
+  const session = createWorkSession({ seed: 4242, options: { playerCount: 3 }, cardImpls, configure(state) {
     state.round = 9
     for (const player of state.players) player.resources.food = 60
     const owner = state.players[0]!
@@ -160,17 +166,21 @@ describe('A127 Lodger', () => {
   it('clears the selected held person and linked references before ordinary return-home cleanup, and undo restores them', () => {
     const session = setup(state => {
       const owner = state.players[0]!
-      owner.minorPlayed = ['D018_SteamPlow', 'C022_BasketChair', 'A029_AleBenches']
+      owner.minorPlayed = [PAUSE, 'C022_BasketChair', 'A029_AleBenches']
       owner.resources.grain = 1
       holdWorkerOnCard(owner, 'C022_BasketChair', '1')
       const lessons = state.actionSpaces.find(space => space.id === 'lessons')!
       addSyntheticLinkedOccupancyRef(lessons, owner.id, '1', 'C132_JobContract')
       lessons.blockedBy = [{ playerId: owner.id, workerId: '1', sourceSpaceId: 'forest' }]
-    })
+    }, pauseCard)
     const entering = finishRound(session, true)
-    expect(entering.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'D018_SteamPlow' })
+    // The start-of-return-home window (#2039) holds the offer and the Lodger's mandatory expiry.
+    const selector = entering.interaction.stateId === 'wait' ? entering.interaction.request : undefined
+    expect(selector?.kind).toBe('select-trigger')
+    expect(selector?.options?.map(option => option.value)).toEqual([PAUSE, LODGER, '__pass__'])
     expect(session.withCtx(() => getExtraRoomCapacity(entering.state.players[0]!))).toBe(1)
-    const returning = ok(session.resolveChoice(0, '__skip__'))
+    // Taking the offer leaves the Lodger as the sole mandatory source, which then expires the room.
+    const returning = ok(session.resolveChoice(0, PAUSE))
     expect(returning.state.roundPhase).toBe('returning-home')
     expect(returning.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'A029_AleBenches' })
     expect(returning.state.players[0]!.workers[0]).toMatchObject({
@@ -186,7 +196,7 @@ describe('A127 Lodger', () => {
 
     const undone = ok(session.undoStep())
     expect(undone.state.roundPhase).toBe('returning-home')
-    expect(undone.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'D018_SteamPlow' })
+    expect(undone.interaction).toEqual(entering.interaction)
     expect(session.withCtx(() => getExtraRoomCapacity(undone.state.players[0]!))).toBe(1)
     expect(getFamilyTokenLimit(undone.state.players[0]!)).toBe(5)
     expect(getWorkerHeldOnCard(undone.state.players[0]!, 'C022_BasketChair')).toBe('1')
@@ -197,7 +207,7 @@ describe('A127 Lodger', () => {
     expect(removals(undone)).toEqual([])
     expect(undone.state.log.some(entry => entry.key === 'log.workerRemoved')).toBe(false)
     expect(farmers(undone)).toMatchObject({ quantity: 3, total: 9 })
-    expect(removals(ok(session.resolveChoice(0, '__skip__')))).toHaveLength(1)
+    expect(removals(ok(session.resolveChoice(0, PAUSE)))).toHaveLength(1)
   })
 
   it('can remove a newborn first in the stable family collection and does not feed or score it', () => {

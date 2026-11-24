@@ -79,11 +79,11 @@ describe('B140 farmyard facts in its official three-player game', () => {
     expect(response.state.players).toHaveLength(3)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 0 })
     expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).toBe(response.state.round)
     const scores = structuredClone(response.scores)
     const ended = endWork(session, response)
     expect(ended.state.players[0]!.resources.food).toBe(2)
-    expect(ended.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(false)
+    expect(ended.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).not.toBe(ended.state.round)
     expect(ended.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toHaveLength(1)
     expect(ended.scores).toEqual(scores)
     expect(ended.state.players.slice(1).map(player => player.resources.food)).toEqual([0, 0])
@@ -101,7 +101,7 @@ describe('B140 farmyard facts in its official three-player game', () => {
       const undone = succeeded(restored.undoAction())
       expect(undone.state.players[0]!.resources.grain).toBe(1)
       expect(undone.state.players[0]!.fields[0]!.stacks).toEqual([])
-      expect(undone.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
+      expect(undone.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).not.toBe(undone.state.round)
       response = sow(restored)
     }
     const ended = endWork(restored, response)
@@ -112,7 +112,7 @@ describe('B140 farmyard facts in its official three-player game', () => {
   it('does not qualify its owner when another player sows', () => {
     const session = setup(1)
     const response = sow(session, 1)
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).not.toBe(response.state.round)
     const ended = endWork(session, response, 1)
     expect(ended.state.players.map(player => player.resources.food)).toEqual([0, 0, 0])
     expect(ended.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toEqual([])
@@ -133,7 +133,7 @@ describe('B140 farmyard facts in its official three-player game', () => {
       { id: 'goods-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
     ] }))
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(1)
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).toBe(response.state.round)
     expect(endWork(session, response).state.players[0]!.resources.food).toBe(2)
   })
 
@@ -152,7 +152,7 @@ describe('B140 farmyard facts in its official three-player game', () => {
     expect(accept).toBeDefined()
     const response = succeeded(session.resolveChoice(0, accept!.value))
     expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).toBe(response.state.round)
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
@@ -166,7 +166,7 @@ describe('B140 farmyard facts in its official three-player game', () => {
     expect(response.interaction.request.selection?.kind).toBe('farm-position')
     response = succeeded(session.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
     expect(response.state.players[0]!.resources.food).toBe(0)
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).toBe(response.state.round)
     expect(endWork(session, response).state.players[0]!.resources.food).toBe(2)
   })
 })

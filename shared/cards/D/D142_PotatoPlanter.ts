@@ -8,7 +8,7 @@ const CARD_ID = 'D142_PotatoPlanter'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeReturnHome: (state, player) => {
+  onAllWorkersPlaced: (state, player) => {
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
 
