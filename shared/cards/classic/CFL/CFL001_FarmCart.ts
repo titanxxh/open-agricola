@@ -1,8 +1,7 @@
 import { BASE_SOW_AMOUNT } from '../../../domain/sow-amount'
 import type { PlayerState } from '../../../contract/types'
 import { defineMinorCard } from '../../card-source'
-import { getLogicalFields, insertPreparedFieldLayer } from '../../helpers/card-field'
-import { ensureCardState } from '../../helpers/card-state'
+import { getLogicalFields, mutateLogicalFields } from '../../helpers/card-field'
 
 const CARD_ID = 'CFL001_FarmCart'
 
@@ -14,12 +13,9 @@ const plantingSites = (player: PlayerState) => getLogicalFields(player).flatMap(
   if (field.allowedCrops && !field.allowedCrops.includes(crop)) return []
   const slot = field.slots.find(slot => slot.stack)
   if (!slot) return []
-  // Occupied Card Field slots use a second Sow target for the layer below them.
-  // The original slot remains the identity of the field and of later harvests.
-  const tile = field.kind === 'card' ? { row: -2, col: slot.tile.col } : slot.tile
   return [{
     target: { fieldId: field.id, slot: slot.index },
-    tile, crop, sourceCard: field.sourceCard ?? CARD_ID, groupKey: field.groupKey,
+    tile: slot.tile, crop, sourceCard: field.sourceCard ?? CARD_ID, groupKey: field.groupKey,
   }]
 })
 
@@ -40,24 +36,18 @@ export const CFL001_FarmCart = defineMinorCard({
       id: CARD_ID,
       onComputeSowableFields: player => plantingSites(player).map(site => ({
         tile: site.tile, allowedCrops: [site.crop], sourceCard: site.sourceCard,
-        groupKey: site.groupKey, isField: true,
+        groupKey: site.groupKey, isField: true, exclusiveSowGroup: CARD_ID,
       })),
-      onSowExtraField: (player, tile, crop, amount) => {
+      onSowExtraField: (player, tile, crop, amount, state) => {
+        if (!state || player.resources[crop] < 1) return false
         const site = plantingSites(player).find(site =>
           site.tile.row === tile.row && site.tile.col === tile.col && site.crop === crop)
-        if (!site || player.cardStates[CARD_ID]?.flagged || player.resources[crop] < 1) return false
-        if (!insertPreparedFieldLayer(player, site.target, crop, amount ?? BASE_SOW_AMOUNT[crop]).ok) return false
+        if (!site) return false
+        const fields = mutateLogicalFields(state, player, { emitEvents: false })
+        if (!fields.insertBottom(site.target, crop, amount ?? BASE_SOW_AMOUNT[crop]).ok) return false
         player.resources[crop] -= 1
-        ensureCardState(player, CARD_ID).flagged = true
         return true
       },
     },
-    listeners: [{
-      id: CARD_ID + '-sow-limit',
-      cardIds: [CARD_ID], actions: ['sow'], phases: ['immediatelyAfter'], mandatory: true,
-      handler: ({ player }) => player.cardStates[CARD_ID]?.flagged
-        ? { flow: { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } } }
-        : undefined,
-    }],
   },
 })

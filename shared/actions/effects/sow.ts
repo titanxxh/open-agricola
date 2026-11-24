@@ -159,8 +159,11 @@ export const validateSow = (
       sowAmounts,
     },
   )
-  const extraSourceCards = new Map(extraFields.map((field) =>
-    [positionKey(field.tile), { cardId: field.sourceCard, isField: field.isField === true }] as const))
+  const extraSourceCards = new Map(extraFields.map((field) => [positionKey(field.tile), {
+    cardId: field.sourceCard,
+    isField: field.isField === true,
+    exclusiveSowGroup: field.exclusiveSowGroup,
+  }] as const))
   return { validated, extraAllowedCrops, extraSourceCards }
 }
 
@@ -169,8 +172,10 @@ const sowTargets = (
   crops: readonly SowSelection[],
   extraSourceCards: ReadonlyMap<string, { cardId: string; isField: boolean }>,
 ) => {
+  const logicalFields = getLogicalFields(player)
+  const farmyardKeys = new Set(logicalFields.filter(field => field.kind === 'farmyard').map(positionKey))
   const cardSlots = new Map(
-    getLogicalFields(player).flatMap((field) => field.kind === 'card' && field.sourceCard
+    logicalFields.flatMap((field) => field.kind === 'card' && field.sourceCard
       ? field.slots.map((slot) => [positionKey(slot.tile), { cardId: field.sourceCard!, slot: slot.index, groupKey: field.groupKey }] as const)
       : []),
   )
@@ -180,7 +185,7 @@ const sowTargets = (
     const extraCard = extraSourceCards.get(key)
     const target: SowTarget = cardSlot
       ? { kind: 'card-field', row: sel.row, col: sel.col, cardId: cardSlot.cardId, slot: cardSlot.slot }
-      : extraCard
+      : extraCard && !farmyardKeys.has(key)
         ? { kind: 'extra', row: sel.row, col: sel.col, cardId: extraCard.cardId, isField: extraCard.isField }
         : { kind: 'farmyard', row: sel.row, col: sel.col }
     // Card Field targets keep their card metadata so the board can render them as selectable.
@@ -197,29 +202,35 @@ const readSowPayload = (actionContext?: Record<string, unknown>): SowPayload | u
   return payload as SowPayload
 }
 
-/** Plans the final amounts; asks for the next optional bonus source, or places everything. */
 /**
  * One entry per target. An identical repeat on a farmyard field collapses, as
- * `validateSowSelection` always did; a repeat with another crop, or on a card or
- * extra target, is rejected so a plan can never differ from what is planted.
+ * `validateSowSelection` always did. Resolve all slot and group conflicts before
+ * asking for bonuses, while the player can still change their crop selection.
  */
 const canonicalSowSelections = (
   crops: readonly SowSelection[],
-  extraKeys: ReadonlySet<string>,
+  extraFields: ReadonlyMap<string, { exclusiveSowGroup?: string }>,
 ): SowSelection[] | undefined => {
   const byKey = new Map<string, SowSelection>()
+  const usedExclusiveGroups = new Set<string>()
   for (const sel of crops) {
     const key = positionKey({ row: Number(sel?.row), col: Number(sel?.col) })
     const first = byKey.get(key)
-    if (!first) {
-      byKey.set(key, sel)
+    if (first) {
+      if (first.crop !== sel.crop || extraFields.has(key)) return undefined
       continue
     }
-    if (first.crop !== sel.crop || extraKeys.has(key)) return undefined
+    const group = extraFields.get(key)?.exclusiveSowGroup
+    if (group !== undefined) {
+      if (usedExclusiveGroups.has(group)) return undefined
+      usedExclusiveGroups.add(group)
+    }
+    byKey.set(key, sel)
   }
   return [...byKey.values()]
 }
 
+/** Ask for the next optional bonus or place the planned amounts. */
 const continueSow = (
   outerCtx: ActionMutationContext,
   submittedCrops: SowSelection[],
@@ -232,7 +243,7 @@ const continueSow = (
   if (!validated.ok) {
     return { type: 'fail', errorKey: validated.error?.code ?? 'log.action', recoverable: true }
   }
-  const crops = canonicalSowSelections(submittedCrops, new Set(extraSourceCards.keys()))
+  const crops = canonicalSowSelections(submittedCrops, extraSourceCards)
   if (!crops) return { type: 'fail', errorKey: 'INVALID_POSITION', recoverable: true }
   const targets = sowTargets(ctx.player, crops, extraSourceCards)
   const plans = planSowAmounts({
@@ -310,9 +321,10 @@ const finalizeSow = (
   }
   const player = ctx.player
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
-  const logicalTargets = new Map(
+  const emptyCardSlots = new Map(
     getLogicalFields(nextPlayer).flatMap((field) => field.kind === 'card'
-      ? field.slots.map((slot) => [positionKey(slot.tile), { fieldId: field.id, slot: slot.index }] as const)
+      ? field.slots.filter(slot => !slot.stack)
+        .map((slot) => [positionKey(slot.tile), { fieldId: field.id, slot: slot.index }] as const)
       : []),
   )
   const mutations = mutateLogicalFields(ctx.state, nextPlayer, { emitEvents: false })
@@ -321,7 +333,7 @@ const finalizeSow = (
       const key = positionKey({ row: sel.row, col: sel.col })
       if (extraAllowedCrops.has(key)) {
         const amount = amounts.get(key) ?? BASE_SOW_AMOUNT[sel.crop]
-        const logicalTarget = logicalTargets.get(key)
+        const logicalTarget = emptyCardSlots.get(key)
         if (logicalTarget) {
           if (!mutations.place(logicalTarget, sel.crop, amount).ok) {
             return { type: 'fail', errorKey: 'invalid extra sow field', recoverable: true }
@@ -329,7 +341,7 @@ const finalizeSow = (
           nextPlayer.resources[sel.crop] -= 1
           continue
         }
-        const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop, amount)
+        const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop, amount, ctx.state)
         if (!handled) return { type: 'fail', errorKey: 'invalid extra sow field', recoverable: true }
       }
     }

@@ -311,7 +311,7 @@ A card grants a rule action by returning that action's leaf: `plow`, `sow`, `con
 | A Guest | `grantGuestLeaf` / `grantImmediateGuestLeaf` in `helpers/guest-flow.ts` | `CZ314_Keg`, `CI073_Guest` |
 | Points that several players can earn | `effect.computeSharedPostScore` returning `{ playerId, score }` entries | `A135_AnimalReeve`, `CWM087_GoldMedal` |
 | A limit on which animals a card zone keeps | `effect.getInvalidAnimals` | `B011_Feedyard` |
-| Sowing on other tiles, or a different amount | `effect.onComputeSowableFields` with `onSowExtraField`; `effect.modifySowAmount` | `B072_LoveforAgriculture`, `E071_CowPatty` |
+| Sowing on other tiles, or a different amount | `effect.onComputeSowableFields` with `onSowExtraField`; `effect.modifySowAmount` | `B072_LoveforAgriculture`, `CFL001_FarmCart` (occupied field at its original coordinates), `E071_CowPatty` |
 | Goods the player may want to keep until the harvest | `effect.preHarvestGoodsWanted` | `A061_WinnowingFan` |
 | A read-only fact that shared rules add up, such as reserved pieces or a score adjustment | `effect.getRuleContributions` | `E159_OldMiser`, `CWM021_FenceDealer` |
 | Rewriting a request the card's own action raised | `effect.projectInteractionRequest` | `C127_Lover` |

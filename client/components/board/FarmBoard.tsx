@@ -1360,7 +1360,6 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
             isRoomSelected || isPlowSelected || isStableSelected || isFieldSelected
           const isTileLocked = !!cell.isLocked
           const fieldInfo = cell.fieldInfo
-          const isEmptyField = !!fieldInfo && fieldInfo.stacks.length === 0
           const cropStack =
             fieldInfo && fieldInfo.stacks.length > 0
               ? (
@@ -1371,8 +1370,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                 )
               : null
           const allowedSowCrops = cell.sowSelectableCrops ?? []
-          const isSowSelectable =
-            isInteractive && (isEmptyField || !fieldInfo) && allowedSowCrops.length > 0
+          const isSowSelectable = isInteractive && allowedSowCrops.length > 0
           const currentSowChoice = isInteractive ? (pendingSowSelections[tileKey] ?? '') : ''
           const availableGrain =
             sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)

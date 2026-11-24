@@ -224,37 +224,6 @@ export const getLogicalFields = (player: PlayerState): readonly LogicalField[] =
 
 const validAmount = (amount: number) => Number.isSafeInteger(amount) && amount > 0
 
-const writableCardTarget = (player: PlayerState, target: LogicalFieldTarget) => {
-  if (!target.fieldId.startsWith('card:')) return
-  const cardId = target.fieldId.slice('card:'.length)
-  if (!playedCardIds(player).includes(cardId)) return
-  const def = cardFieldDefs.get(cardId)
-  if (!def) return
-  const slot = target.slot ?? 0
-  if (!Number.isSafeInteger(slot) || slot < 0 || slot >= def.capacity) return
-  return { cardId, def, slot, slots: readSlots(player, cardId, def) }
-}
-
-/** Insert a layer in a prepared Sow player. Sow commits the whole batch and its events. */
-export const insertPreparedFieldLayer = (
-  player: PlayerState, target: LogicalFieldTarget, crop: Crop, amount: number,
-): LogicalFieldMutationResult => {
-  if (!validAmount(amount)) return { ok: false, error: 'invalid-amount' }
-  const field = player.fields.find(field => farmyardFieldId(field) === target.fieldId)
-  if (field) {
-    field.stacks.unshift({ kind: crop, remaining: amount })
-  } else {
-    const card = writableCardTarget(player, target)
-    if (!card) return { ok: false, error: 'invalid-target' }
-    const top = card.slots[card.slot]
-    card.slots[card.slot] = top
-      ? { ...top, below: [{ crop, remaining: amount }, ...(top.below ?? [])] }
-      : { crop, remaining: amount }
-    writeSlots(player, card.cardId, card.slots)
-  }
-  return { ok: true }
-}
-
 export const mutateLogicalFields = (
   state: GameState,
   player: PlayerState,
@@ -280,7 +249,16 @@ export const mutateLogicalFields = (
   }
   const farmyardTarget = (target: LogicalFieldTarget) =>
     player.fields.find((field) => farmyardFieldId(field) === target.fieldId)
-  const cardTarget = (target: LogicalFieldTarget) => writableCardTarget(player, target)
+  const cardTarget = (target: LogicalFieldTarget) => {
+    if (!target.fieldId.startsWith('card:')) return
+    const cardId = target.fieldId.slice('card:'.length)
+    if (!playedCardIds(player).includes(cardId)) return
+    const def = cardFieldDefs.get(cardId)
+    if (!def) return
+    const slot = target.slot ?? 0
+    if (!Number.isSafeInteger(slot) || slot < 0 || slot >= def.capacity) return
+    return { cardId, def, slot, slots: readSlots(player, cardId, def) }
+  }
   const emit = <T extends DraftGameEvent['type']>(event: DraftGameEvent<T>) => {
     if (options.emitEvents === false) return
     if (options.eventSink) {
@@ -406,9 +384,17 @@ export const mutateLogicalFields = (
     if (!validAmount(amount)) return { ok: false, error: 'invalid-amount' }
     const target = normalizeTarget(requestedTarget)
     if (!target) return { ok: false, error: 'invalid-target' }
-    const result = insertPreparedFieldLayer(player, target, crop, amount)
-    if (result.ok) emitAdded(farmyardTarget(target) ?? { cardId: target.fieldId.slice('card:'.length) }, crop, amount)
-    return result
+    const field = farmyardTarget(target)
+    if (field) return place({ fieldId: target.fieldId, slot: 0 }, crop, amount)
+    const card = cardTarget(target)
+    if (!card) return { ok: false, error: 'invalid-target' }
+    const top = card.slots[card.slot]
+    card.slots[card.slot] = top
+      ? { ...top, below: [{ crop, remaining: amount }, ...(top.below ?? [])] }
+      : { crop, remaining: amount }
+    writeSlots(player, card.cardId, card.slots)
+    emitAdded(card, crop, amount)
+    return { ok: true }
   }
   const grow = (
     requestedTarget: LogicalFieldMutationTarget,

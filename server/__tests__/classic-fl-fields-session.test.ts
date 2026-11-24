@@ -4,7 +4,7 @@ import type { GameState } from '../../shared/contract/types'
 import { deriveVirtualTileCol, getLogicalFields } from '../../shared/cards/helpers/card-field'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
-import { createWorkSession } from './_helpers/session-fixtures'
+import { createWorkSession, loadTestCardImpls } from './_helpers/session-fixtures'
 import { choose, playImprovement, restoreSession } from './_helpers/card-play-lifecycle'
 import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { confirmTurns } from './_helpers/classic-fl'
@@ -60,6 +60,7 @@ describe('classic FL field rules', () => {
     const session = game(4, state => {
       const player = state.players[0]!
       player.minorPlayed = [CART]
+      player.occupationPlayed = ['B115_TinsmithMaster']
       player.fields = [
         { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
         { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 2 }] },
@@ -78,32 +79,37 @@ describe('classic FL field rules', () => {
     ]))
     const rejected = session.commitSelectionChoice(0, { crops: [first, second] })
     expect(rejected.ok).toBe(false)
+    expect(rejected.interaction).toMatchObject({ request: { kind: 'farm-select', farm: { farmType: 'sow' } } })
     expect(rejected.state.players[0]!.fields).toEqual(before.state.players[0]!.fields)
     expect(rejected.state.players[0]!.resources).toMatchObject({ grain: 1, vegetable: 1 })
-    const result = session.commitSelectionChoice(0, { crops: [first, empty] })
+    const bonus = session.commitSelectionChoice(0, { crops: [first, empty] })
+    expect(bonus.interaction).toMatchObject({ promptParams: { triggerCardId: 'B115_TinsmithMaster' } })
+    const result = session.commitSelectionChoice(0, { positions: [{ row: first.row, col: first.col }] })
     expect(result.ok, result.error).toBe(true)
     expect(result.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 0 })
     expect(result.state.players[0]!.fields[0]!.stacks).toEqual([
-      { kind: 'vegetable', remaining: 2 }, { kind: 'grain', remaining: 2 },
+      { kind: 'vegetable', remaining: 3 }, { kind: 'grain', remaining: 2 },
     ])
     expect(result.state.events).toContainEqual(expect.objectContaining({
       type: 'farm.sown', sows: [
-        expect.objectContaining({ crop: 'vegetable', added: 2 }), expect.objectContaining({ crop: 'grain', added: 3 }),
+        expect.objectContaining({ crop: 'vegetable', added: 3 }), expect.objectContaining({ crop: 'grain', added: 3 }),
       ],
     }))
-    expect(scoreQuantity(result, 'vegetables')).toBe(4)
+    expect(scoreQuantity(result, 'vegetables')).toBe(5)
     atEnd(session.state)
     const harvest = autoAdvanceRoundEnd(session)
     expect(harvest.state.players[0]!.fields[0]!.stacks).toEqual([
-      { kind: 'vegetable', remaining: 2 }, { kind: 'grain', remaining: 1 },
+      { kind: 'vegetable', remaining: 3 }, { kind: 'grain', remaining: 1 },
     ])
   })
 
-  it('can use Sow with only an occupied compatible card field and never adds another pile to a mixed field', () => {
+  it('preserves the card field slot through an optional Sow bonus, restore and placement', () => {
     const cropField = 'E070_CropRotationField'
+    const tile = { row: -1, col: 5070 }
     const session = game(4, state => {
       const player = state.players[0]!
       player.minorPlayed = [CART, cropField, 'B068_Beanfield']
+      player.occupationPlayed = ['B115_TinsmithMaster']
       player.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 2 }] }]
       player.cardStates[cropField] = { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } }
       player.cardStates.B068_Beanfield = { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } }
@@ -111,10 +117,84 @@ describe('classic FL field rules', () => {
     })
     const options = sowOptions(session.takeAction(0, 'grain-utilization'))
     expect(options).toHaveLength(1)
-    expect(options[0]).toMatchObject({ sourceCard: cropField, allowedCrops: ['grain'] })
-    const result = session.commitSelectionChoice(0, { crops: [{ ...options[0]!.tile, crop: 'grain' }] })
+    expect(options[0]).toMatchObject({ tile, sourceCard: cropField, allowedCrops: ['grain'] })
+    const bonus = session.commitSelectionChoice(0, { crops: [{ ...tile, crop: 'grain' }] })
+    expect(bonus.interaction).toMatchObject({
+      promptParams: { triggerCardId: 'B115_TinsmithMaster' },
+      request: { kind: 'selection', selection: {
+        kind: 'farm-position', selectablePositions: [{ ...tile, sourceCard: cropField, cardFieldSlot: 0, groupKey: cropField }],
+      } },
+    })
+    expect(bonus.state.players[0]!.resources.grain).toBe(1)
+    const restored = restoreSession(session)
+    sessions.push(restored)
+    const result = restored.commitSelectionChoice(0, { positions: [tile] })
     expect(result.ok, result.error).toBe(true)
     expect(result.state.players[0]!.resources.grain).toBe(0)
+    expect(cardFields(restored).find(field => field.sourceCard === cropField)?.stacks).toEqual([
+      { kind: 'grain', remaining: 4 }, { kind: 'vegetable', remaining: 2 },
+    ])
+    expect(result.state.events).toContainEqual(expect.objectContaining({
+      type: 'farm.sown', sows: [{ location: { kind: 'field', playerId: result.state.players[0]!.id, ...tile }, crop: 'grain', added: 4 }],
+    }))
+  })
+
+  it('offers the farmland and adjacent-pasture bonuses on the real occupied farmyard tile', () => {
+    const tile = { row: 0, col: 2 }
+    const session = game(4, state => {
+      const player = state.players[0]!
+      player.minorPlayed = [CART, 'E071_CowPatty']
+      player.occupationPlayed = ['B115_TinsmithMaster']
+      player.fields = [{ ...tile, stacks: [{ kind: 'grain', remaining: 2 }] }]
+      player.pastures = [{ id: 'pasture', size: 1, tiles: [{ row: 1, col: 2 }], stables: 0, animalType: null, animalCount: 0 }]
+      player.resources.vegetable = 1
+    })
+    expect(sowOptions(session.takeAction(0, 'grain-utilization'))).toHaveLength(1)
+    let result = session.commitSelectionChoice(0, { crops: [{ ...tile, crop: 'vegetable' }] })
+    for (const modifier of ['E071_CowPatty', 'B115_TinsmithMaster']) {
+      expect(result.ok, result.error).toBe(true)
+      expect(result.interaction).toMatchObject({
+        promptParams: { triggerCardId: modifier },
+        request: { kind: 'selection', selection: { selectablePositions: [tile] } },
+      })
+      result = session.commitSelectionChoice(0, { positions: [tile] })
+    }
+    expect(result.ok, result.error).toBe(true)
+    expect(result.state.players[0]!.resources.vegetable).toBe(0)
+    expect(result.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'vegetable', remaining: 4 }, { kind: 'grain', remaining: 2 }])
+    expect(result.state.events).toContainEqual(expect.objectContaining({
+      type: 'farm.sown', sows: [{ location: { kind: 'field', playerId: result.state.players[0]!.id, ...tile }, crop: 'vegetable', added: 4 }],
+    }))
+  })
+
+  it('limits a granted Sow to its selected card field and rejects other occupied fields and crops', () => {
+    const granter = 'TEST_SelectedFieldSow'
+    const cropField = 'E070_CropRotationField'
+    const tile = { row: -1, col: 5070 }
+    const session = game(4, state => {
+      const player = state.players[0]!
+      player.minorPlayed = [CART, cropField, granter]
+      player.cardStates[cropField] = { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } }
+      player.cardStates[granter] = { extraData: { selectedPositions: ['-1-5070'] } }
+      player.fields = [{ row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
+      player.resources.grain = 1
+      player.resources.vegetable = 1
+    })
+    loadTestCardImpls(session, { [granter]: { listeners: [{
+      id: granter + '-after-forest', cardIds: [granter], phases: ['after'], actions: ['place-farmer'], mandatory: true,
+      handler: ({ space }) => space?.id === 'forest' ? { flow: {
+        type: 'leaf', actionId: 'sow', sourceCard: granter,
+        actionContext: { allowedFields: 'fromSelectedFields', sourceCard: granter, cropType: 'grain' },
+      } } : undefined,
+    }] } })
+    const options = sowOptions(session.takeAction(0, 'forest'))
+    expect(options).toHaveLength(1)
+    expect(options[0]).toMatchObject({ tile, sourceCard: cropField, allowedCrops: ['grain'] })
+    expect(session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] }).ok).toBe(false)
+    expect(session.commitSelectionChoice(0, { crops: [{ ...tile, crop: 'vegetable' }] }).ok).toBe(false)
+    const result = session.commitSelectionChoice(0, { crops: [{ ...tile, crop: 'grain' }] })
+    expect(result.ok, result.error).toBe(true)
+    expect(result.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 1 })
     expect(cardFields(session).find(field => field.sourceCard === cropField)?.stacks).toEqual([
       { kind: 'grain', remaining: 3 }, { kind: 'vegetable', remaining: 2 },
     ])

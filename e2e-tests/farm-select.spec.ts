@@ -86,7 +86,7 @@ test.describe('FarmSelect Interactions End-to-End Tests', () => {
     await confirm(page, 'Confirm plow');
     await expectInteraction(page, 'Choose plow and/or sow');
     await page.getByRole('button', { name: 'Sow' }).click();
-    await expectInteraction(page, 'Select crops for each empty field');
+    await expectInteraction(page, 'Choose crops to sow');
     await page.locator('.farm-tile.field .sow-choice-button[title="Grain"]').first().click();
     await confirm(page, 'Confirm sowing');
     await expect(page.locator('.farm-tile.field .field-crop-grain').first()).toBeVisible();

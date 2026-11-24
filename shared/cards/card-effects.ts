@@ -24,6 +24,8 @@ export type ExtraSowableField = {
   allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
   sourceCard: string
   groupKey?: string
+  /** Only one target in this group may be chosen in the same Sow. */
+  exclusiveSowGroup?: string
   /** True when card text treats this space as a field (B072 pastures); false for non-field crop spaces. */
   isField?: boolean
 }
@@ -365,9 +367,10 @@ export type CardEffect = {
   ) => Meeple[]
   /** Return extra sowable tiles (e.g. pasture tiles that can be sown). */
   onComputeSowableFields?: (player: PlayerState) => ExtraSowableField[]
-  /** Handle sowing into an extra field returned by onComputeSowableFields.
-   *  `amount` is the final good count from the Sow amount modifiers; absent means the base amount. */
-  onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop, amount?: number) => boolean
+  /** Apply the final Sow amount to the prepared player. Sow commits the batch and emits its events. */
+  onSowExtraField?: (
+    player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop, amount?: number, state?: GameState,
+  ) => boolean
   /**
    * Adjust how many goods this player's Sow places on one sown target.
    * Called once per target before anything is placed; `optional` deltas are offered to the player.
@@ -1065,6 +1068,7 @@ export const handleSowExtraField = (
   tile: FarmTilePosition,
   crop: ExtraSowableCrop,
   amount?: number,
+  state?: GameState,
 ): boolean => {
   const allCards = [
     ...player.improvements,
@@ -1075,7 +1079,7 @@ export const handleSowExtraField = (
     const effect = getCardEffect(cardId)
     if (!effect?.onSowExtraField) continue
     try {
-      if (effect.onSowExtraField(player, tile, crop, amount)) return true
+      if (effect.onSowExtraField(player, tile, crop, amount, state)) return true
     } catch (err) {
       if (cardId.startsWith('CUSTOM_')) {
         console.warn(`[card-effects] custom card ${cardId} onSowExtraField threw, skipping:`, err)

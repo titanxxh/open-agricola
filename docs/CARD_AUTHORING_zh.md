@@ -313,7 +313,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 | 一个 Guest | `helpers/guest-flow.ts` 里的 `grantGuestLeaf` / `grantImmediateGuestLeaf` | `CZ314_Keg`、`CI073_Guest` |
 | 多个玩家都可能得到的分数 | `effect.computeSharedPostScore` 返回 `{ playerId, score }` 条目 | `A135_AnimalReeve`、`CWM087_GoldMedal` |
 | 限制卡上的区域能留哪些动物 | `effect.getInvalidAnimals` | `B011_Feedyard` |
-| 在其他格子播种，或播种数量不同 | `effect.onComputeSowableFields` 配合 `onSowExtraField`；`effect.modifySowAmount` | `B072_LoveforAgriculture`、`E071_CowPatty` |
+| 在其他格子播种，或播种数量不同 | `effect.onComputeSowableFields` 配合 `onSowExtraField`；`effect.modifySowAmount` | `B072_LoveforAgriculture`、`CFL001_FarmCart`（在已有作物的田上按原坐标播种）、`E071_CowPatty` |
 | 玩家可能想留到收获再用的资源 | `effect.preHarvestGoodsWanted` | `A061_WinnowingFan` |
 | 由共享规则汇总的只读事实，例如预留的棋子或分数调整 | `effect.getRuleContributions` | `E159_OldMiser`、`CWM021_FenceDealer` |
 | 改写由卡自己的行动发起的请求 | `effect.projectInteractionRequest` | `C127_Lover` |
