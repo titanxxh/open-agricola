@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionChoiceOption, ActionFlow } from '../../contract/types'
-import { isCardFlagged, setCardFlag, readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { getCardDefinitionById } from '../helpers/card-type'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -11,18 +11,21 @@ import { getAvailableMajorImprovementIds } from '../major/supply'
 
 const CARD_ID = 'E091_PlowBuilder'
 
-const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+/** The Harvest, by its round, in which the owner used the Joinery, and the one in which they plowed. */
+const USED_JOINERY_ROUND = 'usedJoineryRound'
+const PLOWED_ROUND = 'plowedRound'
+
+const markRound = (key: string, round: number): ActionFlow => ({
   type: 'leaf',
   actionId: 'special-effect',
   sourceCard: CARD_ID,
-  params,
+  params: { kind: 'set-extra-data', key, value: round },
 })
 
 /**
  * The reference isListeningTo: catches Exchange events; if `trade.sourceId` has
- * Joinery identity, sets a per-harvest flag `usedJoinery=true`. Cleared at
- * EndHarvestFeedingPhase. We mirror this with a `trade-applied` listener
- * scoped to the card owner.
+ * Joinery identity, marks this Harvest as one in which the Joinery was used.
+ * The mark carries the Harvest's round, so the next Harvest starts unmarked.
  */
 const tradeAppliedListener: CardListenerRegistration = {
   id: 'E91-plow-builder-trade-applied',
@@ -35,10 +38,7 @@ const tradeAppliedListener: CardListenerRegistration = {
     const sourceId = context.extraData?.sourceId
     if (typeof sourceId !== 'string') return
     if (getCardDefinitionById(sourceId)?.joineryIdentity !== true) return
-    return {
-      flow: specialEffect({ kind: 'set-extra-data', key: 'usedJoinery', value: true }),
-      sourceCard: CARD_ID,
-    }
+    return { flow: markRound(USED_JOINERY_ROUND, context.state.round), sourceCard: CARD_ID }
   },
 }
 
@@ -71,12 +71,11 @@ const anytimeListener: CardListenerRegistration = {
   actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
     if (context.state.roundPhase !== 'harvest' && context.state.roundPhase !== 'feeding') return
-    // Rule: anytime gate is `isFlagged('usedJoinery') && !isFlagged`. The
-    // `usedJoinery` flag is set by the trade-applied listener above.
-    const usedJoinery = readCardExtraData<boolean>(context.player, CARD_ID, 'usedJoinery') === true
-    if (!usedJoinery) return
+    // Once per Harvest in which the owner used the Joinery.
+    const round = context.state.round
+    if (readCardExtraData<number>(context.player, CARD_ID, USED_JOINERY_ROUND) !== round) return
+    if (readCardExtraData<number>(context.player, CARD_ID, PLOWED_ROUND) === round) return
     if (context.player.resources.food < 1) return
     return {
       flow: {
@@ -84,7 +83,7 @@ const anytimeListener: CardListenerRegistration = {
         children: [
           payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
           { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID },
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
+          markRound(PLOWED_ROUND, round),
         ],
       },
       sourceCard: CARD_ID,
@@ -96,13 +95,6 @@ const cardImpl = {
   listeners: [choiceCandidateListener, tradeAppliedListener, anytimeListener],
   effect: {
     id: CARD_ID,
-    /** Clear both the per-use flag (anytime gate) and the per-harvest
-     *  `usedJoinery` flag at the end of the harvest. Mirrors the reference's
-     *  EndHarvestFeedingPhase reset. */
-    onAfterHarvest: (_state, player) => {
-      setCardFlag(player, CARD_ID, false)
-      writeCardExtraData(player, CARD_ID, 'usedJoinery', false)
-    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

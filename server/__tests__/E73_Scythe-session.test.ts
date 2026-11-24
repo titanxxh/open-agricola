@@ -6,10 +6,9 @@ import '../../shared/cards/E/E073_Scythe'
 import '../../shared/cards/E/E112_GrainThief'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import type { ActionFlow, ActionSpace, Field } from '../../shared/contract/types'
+import type { ActionFlow, Field } from '../../shared/contract/types'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { reap } from '../../shared/actions/effects/reap'
-import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import assert from 'node:assert/strict'
 import { assertRuleOutcome } from './_helpers/negative-rule-audit'
 import * as audit41Harvest from './_helpers/audit/ae-negative-41-harvest'
@@ -296,7 +295,8 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 3, vegetable: 1 })
     expect(response.state.players[0]!.fields[0]!.stacks).toEqual([])
     expect(response.state.players[0]!.cardStates.E112_GrainThief?.extraData?.selectedPositions).toBeUndefined()
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.fullReapPosition).toBeUndefined()
+    // The choice stays on the card, tagged with its Harvest's round; a later Harvest ignores it.
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData).toMatchObject({ fullReapPosition: '0-0', fullReapRound: 4 })
     expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'E112_GrainThief' && (event.resources.grain ?? 0) > 0)).toHaveLength(0)
     expect(response.scores).toHaveLength(2)
   })
@@ -315,7 +315,7 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     player.resources.grain = 0
     player.resources.vegetable = 0
     player.cardStates = {
-      [CARD_ID]: { extraData: { fullReapPosition: '0-0' } },
+      [CARD_ID]: { extraData: { fullReapPosition: '0-0', fullReapRound: state.round } },
     }
     session.loadState(state)
 
@@ -330,33 +330,29 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     ])
   })
 
-  it('keeps fullReapPosition after field phase reap and clears it with EndHarvest cleanup', () => {
+  it('full-reaps the chosen field only in the Harvest of the round it was chosen', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
       makeField(0, 0, [{ kind: 'grain', remaining: 2 }]),
     ]
+    player.resources.grain = 0
     player.cardStates = {
-      [CARD_ID]: { extraData: { fullReapPosition: '0-0' } },
+      [CARD_ID]: { extraData: { fullReapPosition: '0-0', fullReapRound: state.round } },
     }
     session.loadState(state)
 
     session.withCtx(() => reap(state, player))
+    expect(player.resources.grain).toBe(2)
+    expect(player.fields[0]!.stacks).toEqual([])
 
-    expect(player.cardStates[CARD_ID]?.extraData?.fullReapPosition).toBe('0-0')
-
-    const cleanup = session.withCtx(() => session.withCtx(() => getCardEffect(CARD_ID))!.onEndHarvest!(state, player)) as Extract<ActionFlow, { type: 'leaf' }>
-    const result = session.withCtx(() => specialEffectAction.execute({
-      state,
-      player,
-      params: cleanup.params,
-      sourceCard: CARD_ID,
-      space: { id: 'special-effect' } as ActionSpace,
-    } as Parameters<typeof specialEffectAction.execute>[0]))
-
-    expect(result.type).toBe('ok')
-    expect(player.cardStates[CARD_ID]?.extraData?.fullReapPosition).toBeUndefined()
+    // A later Harvest without a new choice reaps the same field normally.
+    state.round = 7
+    player.fields = [makeField(0, 0, [{ kind: 'grain', remaining: 2 }])]
+    session.withCtx(() => reap(state, player))
+    expect(player.resources.grain).toBe(3)
+    expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
   })
 })
 
@@ -364,7 +360,7 @@ describe('ae-negative-41-harvest', () => {
   const { sessions, ok, save, setup, finish, select, next, field, cardSow, slots, vegetable, end, source } = audit41Harvest
   afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
   it('E073 N1 selecting exactly one grain field reaps its full stack while another vegetable field reaps normally',()=>{
-   const s=setup('E073_Scythe',st=>{field(st,4);vegetable(st,2,3)},true,4),p=source(s,end(s),'E073_Scythe'),q=select(s,p,o=>o.value!=='__skip__'),r=finish(s,q);assert.equal(r.state.players[0]!.resources.grain,4);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.equal(r.state.players[0]!.fields[0]!.stacks.length,0);assert.equal(r.state.players[0]!.fields[1]!.stacks[0]!.remaining,2);assert.equal(r.state.players[0]!.cardStates.E073_Scythe?.extraData?.fullReapPosition,undefined);save('E073-N1',{p,q,r})
+   const s=setup('E073_Scythe',st=>{field(st,4);vegetable(st,2,3)},true,4),p=source(s,end(s),'E073_Scythe'),q=select(s,p,o=>o.value!=='__skip__'),r=finish(s,q);assert.equal(r.state.players[0]!.resources.grain,4);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.equal(r.state.players[0]!.fields[0]!.stacks.length,0);assert.equal(r.state.players[0]!.fields[1]!.stacks[0]!.remaining,2);assert.equal(r.state.players[0]!.cardStates.E073_Scythe?.extraData?.fullReapRound,4);save('E073-N1',{p,q,r})
   })
   it('E073 N2 decline held card and a single crop give only normal reap without an extra source',()=>{
    for(const mode of ['decline','hand','single']){const s=setup('E073_Scythe',st=>field(st,mode==='single'?1:4),mode!=='hand',4),r=finish(s,end(s),false,mode==='decline'?undefined:'E073_Scythe');assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.fields[0]!.stacks[0]?.remaining??0,mode==='single'?0:3);save(`E073-N2-${mode}`,r)}

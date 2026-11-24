@@ -70,7 +70,7 @@ const cardImpl = {
         apply: (capacity) => capacity / 2,
       },
     ],
-    onStartHarvestFeedingPhase: () => gainLeaf(CARD_ID, { food: 1 }),
+    onHarvestFeedingPhase: () => gainLeaf(CARD_ID, { food: 1 }),
   },
 } satisfies CardImpl
 

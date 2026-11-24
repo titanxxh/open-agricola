@@ -139,12 +139,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 
 ### 4.3 在轮次或收获的某个阶段
 
-声明 `impl.effect.<hook>: (state, player, ctx?) => ActionFlow | void`。hook 名称及其顺序列在 `shared/cards/card-effects.ts` 和 [hooks](architecture/hooks_zh.md#阶段-hook)。
-
-| 派发方式 | Hook |
-|---|---|
-| Stage Dispatch：每个玩家一个 trigger-select，来源在进入窗口时冻结 | `onBeforeStartOfTurn`、`onAfterRevealAction`、`onPreparation`、`onRoundStart`、`onEndPreparation`、`onBeforeWork`、`onWorkStart`、`onAllWorkersPlaced`、`onEndTurn`、`onBeforeReturnHome`、`onStartReturnHome`、`onReturnHome`、`onAfterReturnHome`、`onBeforeHarvest`、`onStartHarvest`、`onStartHarvestFieldPhase`、`onHarvestFieldPhase`、`onEndHarvestFieldPhase`、`onRoundEnd`、`onAfterRoundEnd`、`onBeforeEndGame` |
-| 按玩家串行，再依次是改良、小改良和职业 | `onAfterReap`、`onHarvest`、`onStartHarvestFeedingPhase`、`onHarvestFeedingPhase`、`onEndHarvestFeedingPhase`、`onEndHarvest`、`onAfterHarvest` |
+声明 `impl.effect.<hook>: (state, player, ctx?) => ActionFlow | void`。hook 名称及其顺序列在 `shared/cards/card-effects.ts` 和 [hooks](architecture/hooks_zh.md#阶段-hook)。每个阶段 hook 都开一个 Stage Dispatch 窗口：每个玩家一个 trigger-select，来源在进入窗口时冻结。
 
 卡面时机写法相同，就挂同一个 hook（[ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）：
 
@@ -155,14 +150,15 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 | "At the start of the returning home phase" | `onStartReturnHome`（`A157_Bohemian`） |
 | "In the returning home phase (of each round)" | `onReturnHome`（`D107_Bellfounder`） |
 | "Immediately after each returning home phase" | `onAfterReturnHome`（`D018_SteamPlow`） |
+| "During each harvest feeding phase"、"in the feeding phase of each harvest" | `onHarvestFeedingPhase`（`CWM005_BeeKeeper`） |
 | "At the end of each round"、"at the end of round N" | `onRoundEnd`（`B053_SculptureCourse`） |
 | "After each round" | `onAfterRoundEnd`（`D167_PureBreeder`） |
 
 - 准备阶段的窗口用纯函数 `effect.stageEligibility[hook]` 过滤来源（`E111_Recluse`）。
 - `handHooks` 让手牌也能触发，`onBuy`、`onEndTurn` 和 `onBeforeEndGame` 除外。
 - 收获开始的范例是 `E110_Dentist`（`onStartHarvest`）。
-- 座位设置开启时（缺省），只获得非动物货物、把货物放到卡上或只改计数的必选效果，会先于玩家排序自动结算（[ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）；不要依赖出牌顺序。每次收获的记账放在按轮次区分的卡牌状态里（`C062_CookeryExtension`），随机抽取放在 action leaf 里（`M104_WildHarvest`），都不要写在阶段 hook 本身。
-- 测试：`E090_E127-parity-session.test.ts` 走到第 4 轮收获（§5）。
+- 座位设置开启时（缺省），只获得非动物货物、把货物放到卡上或只改计数的必选效果，会先于玩家排序自动结算（[ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)）；不要依赖出牌顺序。每次收获的记账放在按轮次区分的卡牌状态里（`C062_CookeryExtension`；田地选择带上所属轮次，见 `A112_ScytheWorker`），随机抽取放在 action leaf 里（`M104_WildHarvest`），都不要写在阶段 hook 本身。
+- 测试：`E090_E127-parity-session.test.ts` 走到第 4 轮收获（§5）；`harvest-late-reaction-windows-session.test.ts` 用两张同时机的卡测两种顺序。
 
 ### 4.4 "You may pay X to get Y"
 
@@ -197,7 +193,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 |---|---|---|
 | 牧场能容纳更多动物 | `effect.computePastureCapacityModifiers` 返回 `{ sourceCard, kind: 'additive', apply }` | `A012_DrinkingTrough` |
 | 任何东西更便宜、更贵或改用别的资源支付 | 支付管线（§4.14） | `A088_HedgeKeeper`、`A143_Stonecutter` |
-| 收割产量更多 | `registerHarvestCountModifier`；它不过滤归属，所以要检查卡已打出 | `E073_Scythe` |
+| 收割产量更多 | `registerHarvestCountModifier`；它不过滤归属，所以要检查卡已打出，且所选田地属于本次收获的轮次 | `E073_Scythe` |
 | 喂养所需更少 | `registerHarvestFeedingRequirementModifier`（只对已打出的卡） | `E159_OldMiser` |
 | 繁殖门槛 | `effect.computeBreedThreshold`；取最小值 | `E084_DollysMother` |
 | 额外的房间容量 | `effect.computeExtraRoomCapacity` | `B010_Caravan` |

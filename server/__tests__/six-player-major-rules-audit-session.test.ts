@@ -140,8 +140,8 @@ describe('Six-player major printed-rule audit', () => {
       if (response.interaction.stateId !== 'wait') throw new Error('harvest stopped')
       const interaction = response.interaction
       const request = interaction.request
-      if (request.kind === 'choice') {
-        const option = request.options.find((entry) => entry.value !== '__skip__' && entry.value !== 'cancel')!
+      if (request.kind === 'choice' || request.kind === 'select-trigger') {
+        const option = request.options.find((entry) => !['__skip__', '__pass__', 'cancel'].includes(entry.value))!
         response = session.resolveChoice(interaction.playerIndex, option.value)
       } else if (request.kind === 'confirm-player-switch') {
         response = session.resolveChoice(request.fromPlayerIndex, 'confirm')

@@ -46,7 +46,9 @@ const makePlayer = (fields: Field[]): PlayerState => ({
   stats: { actions: {} },
 })
 
+const ROUND = 4
 const makeState = (player: PlayerState): GameState => ({
+  round: ROUND,
   players: [player],
 } as GameState)
 
@@ -83,7 +85,7 @@ describe('A112 and D72 harvest count integration', () => {
     ])
     player.minorPlayed.push('E073_Scythe')
     player.cardStates.E073_Scythe = {
-      extraData: { fullReapPosition: '0-0' },
+      extraData: { fullReapPosition: '0-0', fullReapRound: ROUND },
     }
 
     const result = reap(makeState(player), player)
@@ -156,7 +158,7 @@ describe('A112 and D72 harvest count integration', () => {
     ])
     player.occupationPlayed.push('A112_ScytheWorker')
     player.cardStates.A112_ScytheWorker = {
-      extraData: { selectedPositions: ['0-0'] },
+      extraData: { selectedPositions: ['0-0'], selectedRound: ROUND },
     }
 
     const result = reap(makeState(player), player)
@@ -197,7 +199,8 @@ describe('A112 and D72 harvest count integration', () => {
         selectableTiles: [{ row: 0, col: 0 }],
       },
     })
-    expect((flow as { actionContext?: Record<string, unknown> }).actionContext?.selectionEffect).toBeUndefined()
+    expect((flow as { actionContext?: Record<string, unknown> }).actionContext?.selectionEffect)
+      .toBe('a112-scythe-worker-selected-round')
   })
 
   it('A112 selects a Card Field once and harvests one additional grain', () => {
@@ -222,7 +225,7 @@ describe('A112 and D72 harvest count integration', () => {
       },
     })
     player.cardStates.A112_ScytheWorker = {
-      extraData: { selectedPositions: ['-1-2113'] },
+      extraData: { selectedPositions: ['-1-2113'], selectedRound: ROUND },
     }
     const result = reap(state, player)
 
@@ -240,7 +243,7 @@ describe('A112 and D72 harvest count integration', () => {
     ])
     player.minorPlayed.push('D072_StableManure')
     player.cardStates.D072_StableManure = {
-      extraData: { selectedPositions: ['0-0'] },
+      extraData: { selectedPositions: ['0-0'], selectedRound: ROUND },
     }
 
     const result = reap(makeState(player), player)
@@ -265,7 +268,7 @@ describe('A112 and D72 harvest count integration', () => {
     ])
     player.minorPlayed.push('D072_StableManure')
     player.cardStates.D072_StableManure = {
-      extraData: { selectedPositions: ['0-0'] },
+      extraData: { selectedPositions: ['0-0'], selectedRound: ROUND },
     }
 
     const result = reap(makeState(player), player)
@@ -297,7 +300,7 @@ describe('A112 and D72 harvest count integration', () => {
     ])
     player.minorPlayed.push('D072_StableManure')
     player.cardStates.D072_StableManure = {
-      extraData: { selectedPositions: ['0-0'] },
+      extraData: { selectedPositions: ['0-0'], selectedRound: ROUND },
     }
 
     const result = reap(makeState(player), player)
@@ -346,7 +349,8 @@ describe('A112 and D72 harvest count integration', () => {
         selectableTiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }],
       },
     })
-    expect((flow as { actionContext?: Record<string, unknown> }).actionContext?.selectionEffect).toBeUndefined()
+    expect((flow as { actionContext?: Record<string, unknown> }).actionContext?.selectionEffect)
+      .toBe('d72-stable-manure-selected-round')
   })
 
   it('A112 and E112 on the same grain field cancel to one harvest count and report both sources', () => {
@@ -356,7 +360,7 @@ describe('A112 and D72 harvest count integration', () => {
     ])
     player.occupationPlayed.push('A112_ScytheWorker', 'E112_GrainThief')
     player.cardStates.A112_ScytheWorker = {
-      extraData: { selectedPositions: ['0-0'] },
+      extraData: { selectedPositions: ['0-0'], selectedRound: ROUND },
     }
     player.cardStates.E112_GrainThief = {
       extraData: { selectedPositions: ['0-0'] },
@@ -385,7 +389,7 @@ describe('A112 and D72 harvest count integration', () => {
     player.occupationPlayed.push('E112_GrainThief')
     player.minorPlayed.push('D072_StableManure')
     player.cardStates.D072_StableManure = {
-      extraData: { selectedPositions: ['0-0'] },
+      extraData: { selectedPositions: ['0-0'], selectedRound: ROUND },
     }
     player.cardStates.E112_GrainThief = {
       extraData: { selectedPositions: ['0-0'] },
@@ -421,7 +425,7 @@ describe('A112 and D72 harvest count integration', () => {
     player.occupationPlayed.push('E112_GrainThief')
     player.minorPlayed.push('D072_StableManure')
     player.cardStates.D072_StableManure = {
-      extraData: { selectedPositions: ['0-0'] },
+      extraData: { selectedPositions: ['0-0'], selectedRound: ROUND },
     }
     player.cardStates.E112_GrainThief = {
       extraData: { selectedPositions: ['0-0'] },
@@ -491,21 +495,22 @@ describe('A112 and D72 harvest count integration', () => {
     })
   })
 
-  it('A112 and D72 clear selected positions on end harvest', () => {
-    const player = makePlayer([])
-    const state = makeState(player)
+  it('A112 and D72 selections from an earlier Harvest add no harvest count', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 3 }] },
+    ])
+    player.occupationPlayed.push('A112_ScytheWorker')
+    player.minorPlayed.push('D072_StableManure')
+    player.cardStates.A112_ScytheWorker = { extraData: { selectedPositions: ['0-0'], selectedRound: ROUND - 3 } }
+    player.cardStates.D072_StableManure = { extraData: { selectedPositions: ['0-1'], selectedRound: ROUND - 3 } }
 
-    expect(A112_ScytheWorker_impl.effect.onEndHarvest!(state, player)).toEqual({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: 'A112_ScytheWorker',
-      params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
-    })
-    expect(D072_StableManure_impl.effect.onEndHarvest!(state, player)).toEqual({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: 'D072_StableManure',
-      params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
-    })
+    const result = reap(makeState(player), player)
+
+    expect(player.resources).toMatchObject({ grain: 1, vegetable: 1 })
+    expect(result.reapSummary.harvestedCrops?.map(entry => entry.sources)).toEqual([['base'], ['base']])
+    expect(A112_ScytheWorker_impl.effect.onEndHarvest).toBeUndefined()
+    expect(D072_StableManure_impl.effect.onEndHarvest).toBeUndefined()
   })
 })

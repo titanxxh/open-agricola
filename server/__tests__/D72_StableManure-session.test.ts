@@ -165,7 +165,8 @@ describe('D072_StableManure session', () => {
       null,
       { crop: 'wood', remaining: 1 },
     ])
-    expect(harvested.cardStates.D072_StableManure?.extraData?.selectedPositions).toBeUndefined()
+    // The selection stays tagged with its Harvest's round, so a later Harvest ignores it.
+    expect(harvested.cardStates.D072_StableManure?.extraData).toMatchObject({ selectedPositions: ['-1-4076'], selectedRound: 4 })
   })
 
   it('applies Grain Thief selection thresholds to card fields', () => {
@@ -470,8 +471,8 @@ describe('D072 Stable Manure parity', () => {
 describe('ae-negative-41-harvest', () => {
   const { sessions, ok, save, setup, finish, field, vegetable, end, source } = audit41Harvest
   afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
-  it('D072 N1 one unfenced stable permits exactly one extra crop on selected field and harvest end clears the selection',()=>{
-   const s=setup('D072_StableManure',st=>{field(st,3);vegetable(st,2,3);st.players[0]!.stableTiles=[{row:0,col:3}]},true,4),p=source(s,end(s),'D072_StableManure','selection'),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]})));assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks[0]!.remaining),[1,2]);assert.equal(r.state.players[0]!.cardStates.D072_StableManure?.extraData?.selectedPositions,undefined);save('D072-N1',{p,r})
+  it('D072 N1 one unfenced stable permits exactly one extra crop on the selected field of this Harvest only',()=>{
+   const s=setup('D072_StableManure',st=>{field(st,3);vegetable(st,2,3);st.players[0]!.stableTiles=[{row:0,col:3}]},true,4),p=source(s,end(s),'D072_StableManure','selection'),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]})));assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks[0]!.remaining),[1,2]);assert.equal(r.state.players[0]!.cardStates.D072_StableManure?.extraData?.selectedRound,4);save('D072-N1',{p,r})
   })
   it('D072 N2 two selected fields exceed one unfenced stable and reject before legal one field reap',()=>{
    const s=setup('D072_StableManure',st=>{field(st,3);vegetable(st,2,3);st.players[0]!.stableTiles=[{row:0,col:3}]},true,4),p=source(s,end(s),'D072_StableManure','selection'),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:0,col:2}]})),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]})));assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.resources.vegetable,1);save('D072-N2',{p,bad,r})

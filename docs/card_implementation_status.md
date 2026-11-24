@@ -54,8 +54,6 @@ Unless the product direction changes, the following are not bugs. Cards without 
 
 Register a cross-card mechanism here only while it is still unimplemented. Remove the entry once the mechanism is implemented and covered by a test or a gate, and record the new generic mechanism in its module document under `docs/architecture/`. Completed work lives in pull requests, ADRs and tests, not here.
 
-- **Serial stage hooks** ([#2039](https://github.com/titanxxh/open-agricola/issues/2039)): `onAfterReap`, `onHarvest`, the three feeding hooks, `onEndHarvest` and `onAfterHarvest` still resolve one card at a time in play-zone order; same-timing cards there cannot be ordered.
-
 ## 4. Reference anti-patterns: do not copy
 
 - Do not treat imported prerequisite metadata as rule authority. Prerequisites follow publisher card text, printed icons and official rulings; a field the reference runtime ignores can become a real restriction under OA's generic validation.

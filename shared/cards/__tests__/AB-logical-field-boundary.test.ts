@@ -112,8 +112,16 @@ describe('A/B Logical Field consumers', () => {
       children: [expect.objectContaining({ params: { food: 1 } })],
     })
     expect(ruleSession.withCtx(() => A106_SlurrySpreader_impl.effect.onAfterReap!(state, player))).toMatchObject({ params: { food: 2 } })
-    expect(ruleSession.withCtx(() => B021_HayloftBarn_impl.effect.onAfterReap!(state, player))).toMatchObject({ params: { food: 1 } })
-    expect(readCardExtraData<number>(player, 'B021_HayloftBarn', 'foodCount')).toBe(3)
+    // The card's food moves through returned leaves; the handler itself changes nothing.
+    expect(ruleSession.withCtx(() => B021_HayloftBarn_impl.effect.onAfterReap!(state, player))).toMatchObject({
+      type: 'seq',
+      children: [
+        expect.objectContaining({ params: { kind: 'set-extra-data', key: 'foodCount', value: 3 } }),
+        expect.objectContaining({ params: { kind: 'set-infobox', text: '3 Food' } }),
+        expect.objectContaining({ actionId: 'gain', params: { food: 1 } }),
+      ],
+    })
+    expect(readCardExtraData<number>(player, 'B021_HayloftBarn', 'foodCount')).toBe(4)
   })
 
   it('lets A070 remove a vegetable from a Card Field outside harvest', () => {

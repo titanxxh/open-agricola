@@ -74,7 +74,8 @@ it('Scythe fully harvests one grain field while the other field and Wood Field h
   const owner = response.state.players[0]!
   expect(owner.resources).toMatchObject({ grain: 3, vegetable: 1, wood: 2 })
   expect(owner.fields.map(field => field.stacks)).toEqual([[], [{ kind: 'vegetable', remaining: 1 }]])
-  expect(owner.cardStates[CARD]?.extraData?.fullReapPosition).toBeUndefined()
+  // The choice stays tagged with its Harvest's round, so a later Harvest ignores it.
+  expect(owner.cardStates[CARD]?.extraData?.fullReapRound).toBe(4)
 })
 
 it('declining Scythe preserves the ordinary one-crop harvest on every field', () => {
