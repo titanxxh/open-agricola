@@ -507,7 +507,7 @@ Keep the same `/sw.js` URL and root scope. For emergency replacement, set `SERVI
 
 After stable Pages is serving `/sw.js`, configure `WEB_PUSH_VAPID_SUBJECT`, `WEB_PUSH_VAPID_PUBLIC_KEY`, and `WEB_PUSH_VAPID_PRIVATE_KEY` in the backend environment. Use an HTTPS or `mailto:` contact as the subject and keep the private key on the backend. Reuse the key pair across deployments so devices can keep their subscriptions.
 
-Set `WEB_PUSH_TURN_ENABLED`, `WEB_PUSH_DRAFT_ENABLED`, or `WEB_PUSH_INBOX_ENABLED` to `true` for each category to enable. All default to `false`. Settings show how many browser subscriptions on the account have an active session and at least one enabled category. Set the affected switch to `false` and restart the backend to pause that category. The stable Pages Worker continues to handle clicks on previously delivered notifications.
+Valid credentials enable turn, draft, and inbox notifications on stable deployments. Each device starts with all preferences off. Settings show the number of browser subscriptions on the account with an active session and at least one enabled category. To pause all delivery, unset the VAPID subject and restart the backend. Restore the subject with the same key pair to resume.
 
 On each supported device, opt in from the browser notification settings. On iOS, use the installed Home Screen app. Verify a turn, a draft, and an inbox notification, then turn off each category independently. Check that clicking the inbox notification in an open room shows the exact message while the room connection stays active.
 

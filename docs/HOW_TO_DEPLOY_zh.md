@@ -527,7 +527,7 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 正式 Pages 提供 `/sw.js` 后，在后端环境配置 `WEB_PUSH_VAPID_SUBJECT`、`WEB_PUSH_VAPID_PUBLIC_KEY` 和 `WEB_PUSH_VAPID_PRIVATE_KEY`。使用 HTTPS 地址或 `mailto:` 邮箱作为联系地址，将私钥留在后端。各次部署沿用同一对密钥，以保留设备订阅。
 
-将需要启用的类别开关 `WEB_PUSH_TURN_ENABLED`、`WEB_PUSH_DRAFT_ENABLED` 或 `WEB_PUSH_INBOX_ENABLED` 设为 `true`。三个开关默认关闭。通知设置显示账号下登录有效且已开启至少一类提醒的浏览器订阅数。暂停某一类时，将对应开关设为 `false` 并重启后端。正式 Pages 的 Worker 继续处理此前已送达的通知点击。
+正式环境配置有效凭据后，行动、轮抽和站内信三类推送都可用。新设备默认关闭各类提醒。通知设置显示账号下登录有效且已开启至少一类提醒的浏览器订阅数。要暂停全部发送，移除 VAPID 联系地址并重启后端。恢复联系地址并沿用原密钥对即可恢复发送。
 
 在每台支持的设备上通过浏览器通知设置开启。iOS 使用已安装到主屏幕的应用。分别验证行动、轮抽和站内信通知，再逐类关闭。确认在已有房间中点击站内信通知能打开指定消息，对局连接保持有效。
 

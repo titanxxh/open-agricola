@@ -82,14 +82,16 @@ describe('Web Push provider', () => {
     expect(parsePushSubscription({ keys, endpoint: 'https://fcm.googleapis.com@example.org/fcm/send/test' })).toBeNull()
   })
 
-  it('keeps preferences unavailable without matching credentials and allows the categories independently', () => {
+  it('makes all categories available with valid credentials on stable deployments', () => {
     const keys = generateVAPIDKeys()
-    const env = { WEB_PUSH_DRAFT_ENABLED: 'true', WEB_PUSH_VAPID_PUBLIC_KEY: keys.publicKey,
-      WEB_PUSH_VAPID_PRIVATE_KEY: keys.privateKey, WEB_PUSH_VAPID_SUBJECT: 'mailto:test@example.com' }
-    expect(webPushRuntime(env).allowed).toEqual({ turn: false, draft: true, 'bug-report-inbox': false })
-    expect(webPushRuntime({ ...env, WEB_PUSH_DRAFT_ENABLED: 'false', WEB_PUSH_TURN_ENABLED: 'true' }).allowed)
-      .toEqual({ turn: true, draft: false, 'bug-report-inbox': false })
-    expect(webPushRuntime({ ...env, WEB_PUSH_VAPID_PUBLIC_KEY: generateVAPIDKeys().publicKey }).publicKey).toBeNull()
-    expect(webPushRuntime({ ...env, RELEASE_CHANNEL: 'prerelease' }).allowed).toEqual({ turn: false, draft: false, 'bug-report-inbox': false })
+    const env = { WEB_PUSH_VAPID_PUBLIC_KEY: keys.publicKey, WEB_PUSH_VAPID_PRIVATE_KEY: keys.privateKey,
+      WEB_PUSH_VAPID_SUBJECT: 'mailto:test@example.com' }
+    expect(webPushRuntime(env)).toMatchObject({
+      publicKey: keys.publicKey, allowed: { turn: true, draft: true, 'bug-report-inbox': true }, send: expect.any(Function),
+    })
+    const unavailable = { publicKey: null, allowed: { turn: false, draft: false, 'bug-report-inbox': false }, send: null }
+    expect(webPushRuntime({})).toEqual(unavailable)
+    expect(webPushRuntime({ ...env, WEB_PUSH_VAPID_PUBLIC_KEY: generateVAPIDKeys().publicKey })).toEqual(unavailable)
+    expect(webPushRuntime({ ...env, RELEASE_CHANNEL: 'prerelease' })).toEqual(unavailable)
   })
 })
