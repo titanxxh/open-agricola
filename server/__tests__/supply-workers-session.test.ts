@@ -397,7 +397,9 @@ describe('temporary people at harvest and scoring', () => {
     const food = played.state.players[0]!.resources.food
     const returning = confirmNextPlayer(session)
     expect(returning.ok, returning.error).toBe(true)
-    expect(returning.interaction.sourceCard).toBe('A152_NightSchoolStudent')
+    // Bohemian settles on its own (#2039); Night-School Student keeps [card, Pass].
+    expect(returning.interaction.stateId === 'wait' && returning.interaction.request.options?.map((option) => option.value))
+      .toEqual(['A152_NightSchoolStudent', '__pass__'])
     const accept = returning.interaction.request?.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     expect(session.resolveChoice(0, accept!.value).ok).toBe(true)
@@ -456,7 +458,12 @@ describe('temporary people at harvest and scoring', () => {
     })
     chooseSupplyWorkerTurn(session, GUEST_ROOM)
     expect(session.resolveChoice(0, 'grain-seeds').ok).toBe(true)
-    const returning = confirmNextPlayer(session)
+    const offered = confirmNextPlayer(session)
+    expect(offered.ok, offered.error).toBe(true)
+    // Turnip Farmer settles on its own (#2039); the other two share one selector.
+    expect(offered.interaction.stateId === 'wait' && offered.interaction.request.options?.map((option) => option.value))
+      .toEqual(['C097_SeedResearcher', 'C155_FoodDistributor', '__pass__'])
+    const returning = session.resolveChoice(0, 'C097_SeedResearcher')
     expect(returning.ok, returning.error).toBe(true)
     expect(returning.interaction.sourceCard).toBe('C097_SeedResearcher')
     const foodOnly = returning.interaction.request?.options?.find((option) => option.labelKey !== 'ui.interactionSeedResearcher')
@@ -543,7 +550,9 @@ describe('temporary people at harvest and scoring', () => {
     expect(returning.ok, returning.error).toBe(true)
     expect(returning.state.players[0]!.cardStates.A035_SwimmingClass?.counters?.bonusVp).toBe(2)
     expect(returning.interaction.stateId).toBe('wait')
-    expect(returning.interaction.sourceCard).toBe('A100_Curator')
+    // Swimming Class settled on its own (#2039); Curator keeps [card, Pass].
+    expect(returning.interaction.stateId === 'wait' && returning.interaction.request.options?.map((option) => option.value))
+      .toEqual(['A100_Curator', '__pass__'])
     expect(returning.state.actionSpaces.find((space) => space.id === 'fishing')!.takenBy).toEqual([])
     expect(inactiveWorkersInSupply(returning.state.players[0]!)).toHaveLength(2)
     const resumed = mode === 'snapshot'

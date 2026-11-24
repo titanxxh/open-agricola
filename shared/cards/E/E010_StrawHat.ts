@@ -6,7 +6,7 @@ const CARD_ID = 'E010_StrawHat'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-  timedRules: [{ key: 'farmland-workers', at: { kind: 'rounds', rounds: [3, 6], phase: 'onBeforeReturnHome' }, body: { kind: 'operation', operation: { kind: 'each-space-worker', spaceId: 'farmland', alternativeGain: { food: 1 } } } }],
+  timedRules: [{ key: 'farmland-workers', at: { kind: 'rounds', rounds: [3, 6], phase: 'onAllWorkersPlaced' }, body: { kind: 'operation', operation: { kind: 'each-space-worker', spaceId: 'farmland', alternativeGain: { food: 1 } } } }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

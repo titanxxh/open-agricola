@@ -6,7 +6,7 @@ const CARD_ID = 'D107_Bellfounder'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onStartReturnHome: (_state, player) => {
+  onReturnHome: (_state, player) => {
     const allClay = player.resources.clay ?? 0
     if (allClay < 1) return
     return {

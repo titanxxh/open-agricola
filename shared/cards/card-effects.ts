@@ -291,6 +291,7 @@ export type CardEffect = {
   onReturnHome?: FlowEffectHandler
   onBeforeReturnHome?: FlowEffectHandler
   onStartReturnHome?: FlowEffectHandler
+  onAfterReturnHome?: FlowEffectHandler
   onAfterRoundEnd?: FlowEffectHandler
   onBeforeHarvest?: FlowEffectHandler
   onStartHarvest?: FlowEffectHandler
@@ -481,32 +482,6 @@ export const runCardEffectHook = (
       return null
     }
     throw err
-  }
-}
-
-/**
- * Run onReturnHome hook for a player's cards that have it.
- * This is called during the returning home phase.
- */
-export const runReturnHomeHooks = (state: GameState, player: PlayerState): void => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
-  for (const cardId of allCards) {
-    const effect = getCardEffect(cardId)
-    if (effect?.onReturnHome) {
-      try {
-        effect.onReturnHome(state, player)
-      } catch (err) {
-        if (isCustomCard(cardId)) {
-          console.warn(`[card-effects] custom card ${cardId} onReturnHome threw, skipping:`, err)
-          continue
-        }
-        throw err
-      }
-    }
   }
 }
 

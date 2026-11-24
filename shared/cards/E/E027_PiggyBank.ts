@@ -88,7 +88,7 @@ const cardImpl = {
   getStatePresentation: player => ({
     infobox: `${player.cardStates[CARD_ID]?.counters?.[FOOD_KEY] ?? 0} / ${FOOD_THRESHOLD}`,
   }),
-  onBeforeReturnHome: (_state, player) => {
+  onAllWorkersPlaced: (_state, player) => {
     if ((player.resources.food ?? 0) < 1) return
 
     // Offer to place 1 food on card (pay 1 food from supply, store on card counter)

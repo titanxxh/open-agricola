@@ -40,7 +40,7 @@ const drawMinorBranch = (): ActionFlow => ({
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onStartReturnHome: (state, player, context) => {
+    onReturnHome: (state, player, context) => {
       if (player.resources.food < 1) return
       const children: ActionFlow[] = []
       const canAffordMinorAfterFee = evaluateWithReservedResources(state, player, { food: 1 }, (nextState, nextPlayer) =>

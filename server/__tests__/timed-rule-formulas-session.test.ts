@@ -45,7 +45,7 @@ describe('deferred rule quantities', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, stone: 0 })
     const previews = session.buildSyncPayload(response, []).state.players[0]!.scheduledEffects
     expect(previews.map(entry => entry.round)).toEqual([8, 10, 12])
-    expect(previews[0]).toMatchObject({ timing: 'onAfterRoundEnd', description: { effectPreview: { kind: 'formulaGain', resources: {
+    expect(previews[0]).toMatchObject({ timing: 'onRoundEnd', description: { effectPreview: { kind: 'formulaGain', resources: {
       stone: { kind: 'fields', crop: 'vegetable' }, wood: { kind: 'supply', resource: 'vegetable' },
     } } } })
     for (const [round, vegetables, fields, wood, stone] of [[8, 3, 2, 3, 2], [10, 1, 0, 4, 2], [12, 2, 1, 6, 3]]) {

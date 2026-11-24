@@ -7,7 +7,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onAfterRoundEnd: (state, player) => {
+  onRoundEnd: (state, player) => {
     if (harvestRounds.includes(state.round)) return
     if (player.resources.grain < 1) return
 

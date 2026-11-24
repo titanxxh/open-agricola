@@ -91,7 +91,7 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
     expect(response.state.events).toEqual(expect.arrayContaining([expect.objectContaining({
       type: 'farm.animalMoved', newlyPlacedOnFarmyard: { horse: 1 },
     })]))
-    expect(response.state.players[0]!.cardStates.B140_FarmyardWorker?.flagged).toBe(true)
+    expect(response.state.players[0]!.cardStates.B140_FarmyardWorker?.extraData?.placedRound).toBe(response.state.round)
     const food = response.state.players[0]!.resources.food
     const state = session.getState().state
     state.players.forEach((entry) => markAllWorkersUsed(state, entry))

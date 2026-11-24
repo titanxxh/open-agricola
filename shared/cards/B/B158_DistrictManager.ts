@@ -8,7 +8,7 @@ const CARD_ID = 'B158_DistrictManager'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeReturnHome: (state, player) => {
+  onAllWorkersPlaced: (state, player) => {
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     const grove = state.actionSpaces.find((s) => s.id === 'grove')
     if (!forest || !grove) return

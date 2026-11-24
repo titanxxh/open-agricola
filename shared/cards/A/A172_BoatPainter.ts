@@ -8,7 +8,7 @@ const CARD_ID = 'A172_BoatPainter'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBeforeReturnHome: (state) => {
+    onAllWorkersPlaced: (state) => {
       const fishingOccupied = state.actionSpaces.some((space) =>
         space.id === 'fishing' && isSpaceOccupied(space))
       const travelingPlayersOccupied = state.actionSpaces.some((space) =>

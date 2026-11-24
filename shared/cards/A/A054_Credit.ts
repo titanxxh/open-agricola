@@ -11,17 +11,7 @@ const cardImpl = {
   onBuy: (_state, _player) => {
     return gainLeaf(CARD_ID, { food: 5 })
   },
-  onRoundEnd: (state, player) => {
-    if (harvestRounds.includes(state.round)) return
-    // Must pay 1 food or take a begging marker
-    player.cardStates = player.cardStates ?? {}
-    player.cardStates[CARD_ID] = player.cardStates[CARD_ID] ?? {}
-    player.cardStates[CARD_ID]!.extraData = {
-      ...(player.cardStates[CARD_ID]!.extraData ?? {}),
-      debtDue: true,
-    }
-  },
-  onAfterRoundEnd: (state, _player) => {
+  onRoundEnd: (state) => {
     if (harvestRounds.includes(state.round)) return
     return {
       type: 'xor',

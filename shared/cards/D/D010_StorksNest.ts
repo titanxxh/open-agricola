@@ -8,7 +8,7 @@ const CARD_ID = 'D010_StorksNest'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onStartReturnHome: (_state, player) => {
+  onReturnHome: (_state, player) => {
     if (player.rooms <= familySize(player)) return
     if (player.resources.food < 1) return
     if (!hasInactiveWorkerInSupply(player)) return

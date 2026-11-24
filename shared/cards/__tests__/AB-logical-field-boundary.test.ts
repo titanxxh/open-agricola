@@ -121,7 +121,7 @@ describe('A/B Logical Field consumers', () => {
     state.round = 5
     setCardField(player, 'B068_Beanfield', [{ crop: 'vegetable', remaining: 2 }])
 
-    expect(ruleSession.withCtx(() => A070_LiftingMachine_impl.effect.onReturnHome!(state, player))).toMatchObject({
+    expect(ruleSession.withCtx(() => A070_LiftingMachine_impl.effect.onRoundEnd!(state, player))).toMatchObject({
       actionContext: {
         selectableTiles: [expect.objectContaining({ row: -1, col: 2068, sourceCard: 'B068_Beanfield' })],
       },

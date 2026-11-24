@@ -115,11 +115,6 @@ const cardImpl = {
       if (worker?.supplyUse?.status !== 'reserved' || worker.supplyUse.returnRound !== state.round) return
       return supplyWorkerTurnFlow(state, player, CARD_ID, [consumeSupplyWorkerTurn(CARD_ID)], worker.id)
     },
-    onReturnHome: (_state, player) => {
-      if (readCardExtraData<FarmTilePosition>(player, CARD_ID, BOUND_FOREST_KEY)) return
-      writeCardExtraData(player, CARD_ID, TEMP_WORKER_KEY, undefined)
-      writeCardExtraData(player, CARD_ID, FARM_TERRAIN_MARKERS_KEY, [])
-    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

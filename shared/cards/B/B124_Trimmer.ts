@@ -1,71 +1,45 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isCardFlagged, setCardFlag, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { getActionNewlyEnclosedPastureTiles, hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B124_Trimmer'
-/** Newly enclosed area belongs to the completed host, while the work-phase
- * limit and its reset remain on the card owner. */
+const REWARD_ROUND_KEY = 'rewardRound'
 
-const countPastureTiles = (player: CardListenerContext['player']): number =>
-  player.pastures.reduce((sum, p) => sum + (p.tiles?.length ?? 0), 0)
+/** The work phase lasts until `work.ended`, as for Action Space use (`action-space-use.ts`). */
+const isWorkPhaseOpen = (state: CardListenerContext['state']): boolean =>
+  state.roundPhase === 'work' || (state.roundPhase === 'returning-home'
+    && !state.events.some((event) => event.round === state.round && event.type === 'work.ended'))
 
-const setStoredArea = (player: CardListenerContext['player'], area: number) =>
-  writeCardExtraData(player, CARD_ID, 'pastureArea', area)
-
-const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'special-effect',
-  sourceCard: CARD_ID,
-  params,
-})
-
+/** Newly enclosed area belongs to the completed host; the once-per-work-phase
+ * limit is the owner's reward round. */
 const afterFencingListener: CardListenerRegistration = {
   id: 'B124-trimmer-after-fencing',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!hasFenceBuiltEvent(context)) return
-    if (isCardFlagged(context.player, CARD_ID)) return
-    const currentArea = countPastureTiles(context.player)
-    const newlyEnclosed = getActionNewlyEnclosedPastureTiles(context)
-    const children: ActionFlow[] = [
-      specialEffect({ kind: 'set-extra-data', key: 'pastureArea', value: currentArea }),
-    ]
-    if (newlyEnclosed.length > 0) {
-      children.push(specialEffect({ kind: 'set-flag', flag: true }), gainLeaf(CARD_ID, { stone: 2 }))
+    if (!isWorkPhaseOpen(context.state) || !hasFenceBuiltEvent(context)) return
+    if (readCardExtraData<number>(context.player, CARD_ID, REWARD_ROUND_KEY) === context.state.round) return
+    if (getActionNewlyEnclosedPastureTiles(context).length === 0) return
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-extra-data', key: REWARD_ROUND_KEY, value: context.state.round } },
+          gainLeaf(CARD_ID, { stone: 2 }),
+        ],
+      },
+      sourceCard: CARD_ID,
     }
-    return { flow: { type: 'seq', children }, sourceCard: CARD_ID }
   },
 }
 
 const cardImpl = {
   listeners: [afterFencingListener],
-  effect: {
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const area = countPastureTiles(player)
-    setStoredArea(player, area)
-    // If bought during work phase, unflag to allow triggering
-    setCardFlag(player, CARD_ID, false)
-  },
-  onWorkStart: (_state, player) => {
-    // Unflag at start of work phase to allow triggering
-    return { type: 'seq', children: [
-      specialEffect({ kind: 'set-flag', flag: false }),
-      specialEffect({ kind: 'set-extra-data', key: 'pastureArea', value: countPastureTiles(player) }),
-    ] }
-  },
-  onReturnHome: (_state, player) => {
-    // Flag at return home to prevent triggering outside work phase
-    setCardFlag(player, CARD_ID, true)
-  },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

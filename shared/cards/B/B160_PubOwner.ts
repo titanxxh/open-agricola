@@ -9,7 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { grain: 1 }),
-  onBeforeReturnHome: (state, _player) => {
+  onAllWorkersPlaced: (state, _player) => {
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
     const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')

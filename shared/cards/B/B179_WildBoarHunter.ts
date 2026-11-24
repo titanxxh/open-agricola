@@ -2,17 +2,19 @@ import { defineOccupationCard } from '../card-source'
 import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { getReturnHomePlacements } from '../helpers/round-placement'
 
 const CARD_ID = 'B179_WildBoarHunter'
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBeforeReturnHome: (state, player) => {
+    onReturnHome: (state, player) => {
       if ((player.resources.wood ?? 0) < 1) return
-      const occupiedWoodSpaces = state.actionSpaces.filter((space) =>
-        isWoodAccumulationSpaceId(space.id) && space.takenBy.length > 0,
-      ).length
+      // Temporary people left before this window; this round's recorded placements still count them.
+      const occupiedWoodSpaces = new Set(getReturnHomePlacements(state)
+        .filter((entry) => isWoodAccumulationSpaceId(entry.spaceId))
+        .map((entry) => entry.spaceId)).size
       if (occupiedWoodSpaces < 3) return
       return payGainFlow({ cardId: CARD_ID, cost: { wood: 1 }, gain: { boar: 1 } })
     },

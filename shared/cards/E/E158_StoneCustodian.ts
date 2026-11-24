@@ -8,7 +8,7 @@ const STONE_SPACES = ['eastern-quarry', 'western-quarry']
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeReturnHome: (state, _player) => {
+  onAllWorkersPlaced: (state, _player) => {
     const count = STONE_SPACES.filter((id) => {
       const space = state.actionSpaces.find((s) => s.id === id)
       return (space?.resources?.stone ?? 0) > 0

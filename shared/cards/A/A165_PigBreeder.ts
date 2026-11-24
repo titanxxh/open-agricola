@@ -8,7 +8,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { boar: 1 }),
-  timedRules: [{ key: 'extra-breeding', at: { kind: 'rounds', rounds: [12], phase: 'onAfterRoundEnd' }, body: { kind: 'condition', condition: { kind: 'compare', left: { kind: 'supply', resource: 'boar' }, operator: 'ge', right: 2 }, body: { kind: 'operation', operation: { kind: 'breed-animals', animals: ['boar'], requireCapacity: true } } } }],
+  timedRules: [{ key: 'extra-breeding', at: { kind: 'rounds', rounds: [12], phase: 'onRoundEnd' }, body: { kind: 'condition', condition: { kind: 'compare', left: { kind: 'supply', resource: 'boar' }, operator: 'ge', right: 2 }, body: { kind: 'operation', operation: { kind: 'breed-animals', animals: ['boar'], requireCapacity: true } } } }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

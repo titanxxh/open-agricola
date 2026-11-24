@@ -9,7 +9,7 @@ const CARD_ID = 'E143_Hewer'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeReturnHome: (state, _player) => {
+  onAllWorkersPlaced: (state, _player) => {
     if (state.round < 3) return
 
     const claySpaceIds = [

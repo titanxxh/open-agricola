@@ -11,7 +11,7 @@ Every card keeps every rule below. Check each rule against the card before calli
 - **Closure.** The card is feasible as §1 defines: one closed file that changes no core path and adds no hook point, phase, action or engine node. It reaches other cards through capabilities and typed metadata. See [cards: boundaries](architecture/cards.md#naming-capabilities-and-boundaries). Gates: `pnpm run check:card-impl-boundaries` rejects a card reading another card's ID, `pnpm run check:card-state-boundaries` rejects core code reading one card's state.
 - **Local state.** Counters, flags and markers persist in `player.cardStates[cardId]` and stay internal until `presentation` declares them public. A public counter whose key is not a resource needs a `ui.cardCounters.<key>` label in the language source. See [cards: local state](architecture/cards.md#local-state-in-cardstates). Gate: `client/components/board/__tests__/card-counter-label.test.ts`.
 - **Purity.** A listener handler reads state and returns flows, costs or options. Every mutation, including a write to the card's own state, is a returned leaf. See [hooks: listener purity](architecture/hooks.md#listener-purity). Gate: the listener-purity guard in every test project.
-- **Timing.** The subscription and the phase follow the printed text through the tables in §3 ([ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)).
+- **Timing.** The subscription and the phase follow the printed text through the tables in §3 ([ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)). A stage effect uses the hook of its printed timing in §4.3; cards with the same wording share it ([ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)).
 - **Admission.** Before offering an option, the card checks what it controls itself: its printed prerequisite and a target that must be usable now, such as a revealed Action Space or a granted action that can start (`CWM061_BackDoor`), and its own fee, passed as `reserve` so the target is judged after paying it (`CWM023_ForestFarmer`, `C150_ParrotBreeder`). Later host steps belong to the engine, which checks only the current step: when a choice the player accepted leaves a later mandatory step unpayable, the Session shows `engine-blocked` until `undoStep` / `undoAction` (`D014_HammerCrusher`, `CWM042_Remodeler`). See [hooks: current-step admission](architecture/hooks.md#current-step-admission-and-blocked-recovery), [ADR 0015](adr/0015-provisional-cross-player-continuation-resolution.md) and `reserved-resources.ts` in [cards: helpers](architecture/cards.md#helpers-under-sharedcardshelpers).
 - **Standard leaves.** Goods move through the standard leaves: `gain` for new goods, `collect` for goods on an Action Space, `take-from-card` and `receive` for goods on a card, `exchange` for conversions, `pay` for costs. Other cards' reactions subscribe to these leaves and the statistics read them, so both see the movement (`CWM055_WoodWorker`, `CWM066_Brazier`). A reaction to getting goods subscribes to every leaf that can credit them (§4.1). See [actions: effects and internal actions](architecture/actions.md#effects-and-internal-actions).
 - **Action parameters.** `params` and `actionContext` keys are copied from the action's effect file or from a card that uses it, because an unknown key is ignored without an error: `shared/actions/effects/construct.ts` limits rooms with `maxRooms`, `shared/actions/effects/stables.ts` limits stables with `max` (`C149_ResourceRecycler`, `CWM037_MasterStableman`). The Session test submits one more than the limit and expects a rejection.
@@ -141,8 +141,20 @@ Declare `impl.effect.<hook>: (state, player, ctx?) => ActionFlow | void`. The ho
 
 | Dispatch | Hooks |
 |---|---|
-| Stage Dispatch: one trigger-select per player, sources frozen at window entry | `onBeforeStartOfTurn`, `onAfterRevealAction`, `onPreparation`, `onRoundStart`, `onEndPreparation`, `onBeforeWork`, `onWorkStart`, `onAllWorkersPlaced`, `onEndTurn`, `onBeforeHarvest`, `onStartHarvest`, `onStartHarvestFieldPhase`, `onHarvestFieldPhase`, `onEndHarvestFieldPhase`, `onBeforeEndGame` |
-| Serial per player, then improvements, minors and occupations | `onRoundEnd`, `onAfterRoundEnd`, `onBeforeReturnHome`, `onStartReturnHome`, `onReturnHome`, `onAfterReap`, `onHarvest`, `onStartHarvestFeedingPhase`, `onHarvestFeedingPhase`, `onEndHarvestFeedingPhase`, `onEndHarvest`, `onAfterHarvest` |
+| Stage Dispatch: one trigger-select per player, sources frozen at window entry | `onBeforeStartOfTurn`, `onAfterRevealAction`, `onPreparation`, `onRoundStart`, `onEndPreparation`, `onBeforeWork`, `onWorkStart`, `onAllWorkersPlaced`, `onEndTurn`, `onBeforeReturnHome`, `onStartReturnHome`, `onReturnHome`, `onAfterReturnHome`, `onBeforeHarvest`, `onStartHarvest`, `onStartHarvestFieldPhase`, `onHarvestFieldPhase`, `onEndHarvestFieldPhase`, `onRoundEnd`, `onAfterRoundEnd`, `onBeforeEndGame` |
+| Serial per player, then improvements, minors and occupations | `onAfterReap`, `onHarvest`, `onStartHarvestFeedingPhase`, `onHarvestFeedingPhase`, `onEndHarvestFeedingPhase`, `onEndHarvest`, `onAfterHarvest` |
+
+The same printed timing goes on the same hook ([ADR 0055](adr/0055-same-timing-sources-resolve-by-a-seat-setting.md)):
+
+| Printed timing | Hook |
+|---|---|
+| "At the end of each work phase", "at the end of the work phases of rounds N" | `onAllWorkersPlaced` (`E023_Apiary`) |
+| "After each work phase", "immediately before the returning home phase" | `onBeforeReturnHome` (`B117_Informant`) |
+| "At the start of the returning home phase" | `onStartReturnHome` (`A157_Bohemian`) |
+| "In the returning home phase (of each round)" | `onReturnHome` (`D107_Bellfounder`) |
+| "Immediately after each returning home phase" | `onAfterReturnHome` (`D018_SteamPlow`) |
+| "At the end of each round", "at the end of round N" | `onRoundEnd` (`B053_SculptureCourse`) |
+| "After each round" | `onAfterRoundEnd` (`D167_PureBreeder`) |
 
 - Preparation windows filter sources with the pure `effect.stageEligibility[hook]` (`E111_Recluse`).
 - `handHooks` lets a hand card fire, except for `onBuy`, `onEndTurn` and `onBeforeEndGame`.

@@ -54,7 +54,7 @@ describe('E/M Logical Field consumers', () => {
     state.round = 7
     player.resources.grain = 1
 
-    expect(ruleSession.withCtx(() => E023_Apiary_impl.effect.onBeforeReturnHome!(state, player))).toMatchObject({ type: 'seq' })
+    expect(ruleSession.withCtx(() => E023_Apiary_impl.effect.onAllWorkersPlaced!(state, player))).toMatchObject({ type: 'seq' })
     expect(ruleSession.withCtx(() => E107_LandSurveyor_impl.effect.onHarvestFieldPhase!(state, player))).toMatchObject({ params: { food: 1 } })
     expect(ruleSession.withCtx(() => M025_HouseholdInventory_impl.prerequisiteCheck!(player))).toBe(true)
     expect(ruleSession.withCtx(() => M058_PeatFertilizer_impl.prerequisiteCheck!(player))).toBe(true)

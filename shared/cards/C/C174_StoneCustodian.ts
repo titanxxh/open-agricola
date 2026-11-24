@@ -7,7 +7,7 @@ const CARD_ID = 'C174_StoneCustodian'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBeforeReturnHome: (state) => {
+    onAllWorkersPlaced: (state) => {
       const stoneSpaceCount = state.actionSpaces.filter((space) =>
         (space.gainPerRound.stone ?? 0) > 0 && (space.resources.stone ?? 0) > 0).length
       if (stoneSpaceCount === 0) return

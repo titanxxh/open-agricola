@@ -541,7 +541,7 @@ Session 推进当前 `EngineFrame` 时使用的执行口径，负责把下一步
 _Avoid_: Session 直接调用 `_internals()`、Session 按 node class 分支、另建一套 EngineStack
 
 **Stage Dispatch**:
-阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。准备窗口按每名玩家进入时的持牌和只读资格构建固定 activation 来源树，来源发现与实时 handler/支付分开；同一树在 pending 后继续，不重扫变化后的牌区。
+阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。准备窗口和冻结顺序反应窗口（工作阶段结束、回家、收获、轮末、终局前）按每名玩家进入时的持牌和只读资格构建固定 activation 来源树，来源发现与实时 handler/支付分开；同一树在 pending 后继续，不重扫变化后的牌区。
 _Avoid_: Round/Harvest 业务顺序、响应生成、前端交互展示
 
 **Independent Reaction（独立反应）**:

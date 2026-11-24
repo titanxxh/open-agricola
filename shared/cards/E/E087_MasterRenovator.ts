@@ -6,7 +6,7 @@ const CARD_ID = 'E087_MasterRenovator'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-  timedRules: [{ key: 'extra-renovation', at: { kind: 'rounds', rounds: [7, 9], phase: 'onStartReturnHome' }, body: { kind: 'operation', operation: { kind: 'discounted-action', actionId: 'renovate-house', discounts: [{ wood: 1 }, { clay: 1 }, { stone: 1 }, { reed: 1 }] } } }],
+  timedRules: [{ key: 'extra-renovation', at: { kind: 'rounds', rounds: [7, 9], phase: 'onAllWorkersPlaced' }, body: { kind: 'operation', operation: { kind: 'discounted-action', actionId: 'renovate-house', discounts: [{ wood: 1 }, { clay: 1 }, { stone: 1 }, { reed: 1 }] } } }],
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -916,10 +916,11 @@ export class GameCore {
       onEndTurn: (stageResume) => {
         this.finishCompletedActionTurn(stageResume.playerIndex)
       },
-      onBeforeReturnHome: (stageResume) => { this.continueBeforeReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
-      onReturnHome: (stageResume) => { this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
-      onStartReturnHome: (stageResume) => { this.continueStartReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
-      onAfterRoundEnd: (stageResume) => { this.continueAfterRoundEnd(stageResume.playerIndex, stageResume.cardIndex) },
+      onBeforeReturnHome: (stageResume) => { this.continueBeforeReturnHomeHooks(stageResume.playerIndex, stageResume.extra) },
+      onReturnHome: (stageResume) => { this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.extra) },
+      onStartReturnHome: (stageResume) => { this.continueStartReturnHomeHooks(stageResume.playerIndex, stageResume.extra) },
+      onAfterReturnHome: (stageResume) => { this.continueAfterReturnHomeHooks(stageResume.playerIndex, stageResume.extra) },
+      onAfterRoundEnd: (stageResume) => { this.continueAfterRoundEnd(stageResume.playerIndex, stageResume.extra) },
       onBeforeEndGame: (stageResume) => { this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.extra) },
       preScoringWindow: (stageResume) => {
         this.continuePreScoringWindow(
@@ -932,7 +933,7 @@ export class GameCore {
       onEndHarvestFieldPhase: (stageResume) => { this.continueEndFieldPhase(stageResume.playerIndex, stageResume.extra) },
       onHarvestFeedingPhase: (stageResume) => { this.continueHarvestFeeding(stageResume.playerIndex, stageResume.cardIndex) },
       onEndHarvestFeedingPhase: (stageResume) => { this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.cardIndex) },
-      onRoundEnd: (stageResume) => { this.continueRoundEndHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onRoundEnd: (stageResume) => { this.continueRoundEndHooks(stageResume.playerIndex, stageResume.extra) },
       onAllWorkersPlaced: (stageResume) => { this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.extra) },
       onBreedPhase: () => { this.continueEndHarvestEffects() },
       onReorganizeComplete: (stageResume) => { this.continueAfterSubFlow(stageResume) },
@@ -4832,10 +4833,22 @@ export class GameCore {
     })
   }
 
-  private continueBeforeReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
-      return this.respond()
-    }
+  /**
+   * A return-home or round-end window (#2039): a frozen-order reaction window,
+   * clockwise from the Start Player. The step that follows a window runs once,
+   * after the window completes.
+   */
+  private continueStartPlayerWindow(
+    hook: 'onBeforeReturnHome' | 'onStartReturnHome' | 'onReturnHome' | 'onAfterReturnHome' | 'onRoundEnd' | 'onAfterRoundEnd',
+    orderOffset: number,
+    extra: StageResumeState['extra'] | undefined,
+  ): boolean {
+    const playerOrder = extra?.playerOrder ?? roundPhase.startPlayerOrder(this.state)
+    return this.stageDispatch.continueReactionWindow(hook, playerOrder, orderOffset)
+  }
+
+  private continueBeforeReturnHomeHooks(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.continueStartPlayerWindow('onBeforeReturnHome', orderOffset, extra)) return this.respond()
     appendImmediateEvents(this.state, [{ type: 'work.ended' }])
     recordReturnHomePlacements(this.state)
     for (const returned of returnSupplyWorkers(this.state)) {
@@ -4848,17 +4861,19 @@ export class GameCore {
     return this.continueStartReturnHomeHooks()
   }
 
-  private continueStartReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onStartReturnHome', playerIndex, cardIndex)) {
-      return this.respond()
-    }
+  private continueStartReturnHomeHooks(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.continueStartPlayerWindow('onStartReturnHome', orderOffset, extra)) return this.respond()
     return this.continueReturnHomeHooks()
   }
 
-  private continueReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onReturnHome', playerIndex, cardIndex)) {
-      return this.respond()
-    }
+  private continueReturnHomeHooks(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.continueStartPlayerWindow('onReturnHome', orderOffset, extra)) return this.respond()
+    this.returnWorkersHome()
+    return this.continueAfterReturnHomeHooks()
+  }
+
+  /** Ordinary people come home, Guests and held workers leave, and the work-phase records clear. */
+  private returnWorkersHome(): void {
     // Guests leave with the cleared spaces but go back to the general supply, not home.
     const returnedWorkers = this.state.actionSpaces.flatMap((space) =>
       (space.takenBy ?? []).filter((worker) => !isGuestWorkerId(worker.workerId)).map((worker) => ({
@@ -4892,7 +4907,10 @@ export class GameCore {
       guestId: guest.id,
       cardId: guest.sourceCardId,
     })))
+  }
 
+  private continueAfterReturnHomeHooks(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.continueStartPlayerWindow('onAfterReturnHome', orderOffset, extra)) return this.respond()
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
     if (pendingAnimal !== -1) {
       this.startReorganizeSubFlow(pendingAnimal, 'returning-home')
@@ -4978,17 +4996,13 @@ export class GameCore {
   /** S2 Task 10 part 7: thin delegator — body lives in `phases/round.ts`. */
   private finalizeRound(): SessionResponse { return roundPhase.finalizeRound(this) }
 
-  private continueRoundEndHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onRoundEnd', playerIndex, cardIndex)) {
-      return this.respond()
-    }
+  private continueRoundEndHooks(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.continueStartPlayerWindow('onRoundEnd', orderOffset, extra)) return this.respond()
     return this.continueAfterRoundEnd()
   }
 
-  private continueAfterRoundEnd(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {
-      return this.respond()
-    }
+  private continueAfterRoundEnd(orderOffset = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.continueStartPlayerWindow('onAfterRoundEnd', orderOffset, extra)) return this.respond()
     if (this.state.players.length === 1 && this.state.farmersOfTheMoor) {
       this.state.farmersOfTheMoor.soloRetentionPaid = false
     }

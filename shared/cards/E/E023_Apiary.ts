@@ -7,7 +7,7 @@ const CARD_ID = 'E023_Apiary'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeReturnHome: (_state, player) => {
+  onAllWorkersPlaced: (_state, player) => {
     if (getLogicalFields(player).length === 0) return
     return {
       type: 'seq',

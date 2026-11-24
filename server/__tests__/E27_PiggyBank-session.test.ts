@@ -56,7 +56,7 @@ const createSpace = (id: string): ActionSpace => ({
 })
 
 describe('E027_PiggyBank session', () => {
-  it('onBeforeReturnHome offers to place 1 food on card when player has food', () => {
+  it('onAllWorkersPlaced offers to place 1 food on card when player has food', () => {
     const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -69,7 +69,7 @@ describe('E027_PiggyBank session', () => {
 
     const effect = session.withCtx(() => getCardEffect(CARD_ID))
     expect(effect).toBeDefined()
-    const flow = session.withCtx(() => effect!.onBeforeReturnHome!(state, player))
+    const flow = session.withCtx(() => effect!.onAllWorkersPlaced!(state, player))
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
@@ -78,7 +78,7 @@ describe('E027_PiggyBank session', () => {
     expect(children[1].actionId).toBe('store-on-card')
   })
 
-  it('onBeforeReturnHome returns undefined when player has no food', () => {
+  it('onAllWorkersPlaced returns undefined when player has no food', () => {
     const session = new GameSession(42)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -90,7 +90,7 @@ describe('E027_PiggyBank session', () => {
     session.loadState(state)
 
     const effect = session.withCtx(() => getCardEffect(CARD_ID))
-    const flow = session.withCtx(() => effect!.onBeforeReturnHome!(state, player))
+    const flow = session.withCtx(() => effect!.onAllWorkersPlaced!(state, player))
     expect(flow).toBeUndefined()
   })
 

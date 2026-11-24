@@ -10,6 +10,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'onReturnHome',
   'onBeforeReturnHome',
   'onStartReturnHome',
+  'onAfterReturnHome',
   'onAfterRoundEnd',
   'onBeforeHarvest',
   'onStartHarvest',

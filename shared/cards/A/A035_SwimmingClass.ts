@@ -9,7 +9,7 @@ const CARD_ID = 'A035_SwimmingClass'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onStartReturnHome: (state, player) => {
+  onReturnHome: (state, player) => {
     if (!getReturningPersonPlacements(state).some((entry) => entry.spaceId === 'fishing' && entry.playerId === player.id)) return
     const newborns = newbornCount(player)
     if (newborns <= 0) return
