@@ -49,6 +49,8 @@ describe('Web Push provider', () => {
   })
 
   it.each<[WebPushKind, string, string]>([
+    ['turn', 'en', 'It’s your turn to act.'],
+    ['turn', 'zh', '轮到你行动了'],
     ['draft', 'en', "It's your turn to pick cards in the draft."],
     ['draft', 'zh', '轮到你在轮抽中选牌了'],
     ['bug-report-inbox', 'en', 'Your Bug Report has a new reply. Open it to view.'],
@@ -84,8 +86,10 @@ describe('Web Push provider', () => {
     const keys = generateVAPIDKeys()
     const env = { WEB_PUSH_DRAFT_ENABLED: 'true', WEB_PUSH_VAPID_PUBLIC_KEY: keys.publicKey,
       WEB_PUSH_VAPID_PRIVATE_KEY: keys.privateKey, WEB_PUSH_VAPID_SUBJECT: 'mailto:test@example.com' }
-    expect(webPushRuntime(env).allowed).toEqual({ draft: true, 'bug-report-inbox': false })
+    expect(webPushRuntime(env).allowed).toEqual({ turn: false, draft: true, 'bug-report-inbox': false })
+    expect(webPushRuntime({ ...env, WEB_PUSH_DRAFT_ENABLED: 'false', WEB_PUSH_TURN_ENABLED: 'true' }).allowed)
+      .toEqual({ turn: true, draft: false, 'bug-report-inbox': false })
     expect(webPushRuntime({ ...env, WEB_PUSH_VAPID_PUBLIC_KEY: generateVAPIDKeys().publicKey }).publicKey).toBeNull()
-    expect(webPushRuntime({ ...env, RELEASE_CHANNEL: 'prerelease' }).allowed).toEqual({ draft: false, 'bug-report-inbox': false })
+    expect(webPushRuntime({ ...env, RELEASE_CHANNEL: 'prerelease' }).allowed).toEqual({ turn: false, draft: false, 'bug-report-inbox': false })
   })
 })

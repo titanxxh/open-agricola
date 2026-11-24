@@ -12,6 +12,7 @@ const PENDING_UNBIND = 'open-agricola:web-push-unbind-v1'
 type LocalBinding = { deviceId: string; userId: string }
 export type WebPushStatus = {
   publicKey: string | null
+  deviceCount: number | null
   allowed: WebPushPreferences
   preferences: WebPushPreferences
 }
@@ -87,18 +88,38 @@ export function captureWebPushAccountReconciliation(): (userId: string | null) =
   }
 }
 
-const isPreferences = (value: unknown): value is WebPushPreferences =>
-  !!value && typeof value === 'object' && 'draft' in value && typeof value.draft === 'boolean'
-  && 'bug-report-inbox' in value && typeof value['bug-report-inbox'] === 'boolean'
+function readPreferences(value: unknown): WebPushPreferences {
+  if (!value || typeof value !== 'object' || !('draft' in value) || typeof value.draft !== 'boolean'
+    || !('bug-report-inbox' in value) || typeof value['bug-report-inbox'] !== 'boolean'
+    || ('turn' in value && typeof value.turn !== 'boolean')) throw new Error('Invalid notification preferences')
+  return { draft: value.draft, 'bug-report-inbox': value['bug-report-inbox'], turn: 'turn' in value && value.turn === true }
+}
+
+const isDeviceCount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+
+export async function getAccountPushDeviceCount(userId: string): Promise<number> {
+  const response = await fetchWebPush(WEB_PUSH_DEVICE_PATH, { operation: 'summary', accountId: userId })
+  if (!response.ok) throw new Error('Notification device count unavailable')
+  const data: unknown = await response.json()
+  if (!data || typeof data !== 'object' || !('deviceCount' in data) || !isDeviceCount(data.deviceCount)) {
+    throw new Error('Invalid notification device count')
+  }
+  return data.deviceCount
+}
 
 async function readStatus(response: Response): Promise<WebPushStatus> {
   if (!response.ok) throw new Error('Notification settings unavailable')
   const value: unknown = await response.json()
   if (!value || typeof value !== 'object' || !('ok' in value) || value.ok !== true || !('publicKey' in value)
     || (value.publicKey !== null && typeof value.publicKey !== 'string')
-    || !('allowed' in value) || !isPreferences(value.allowed)
-    || !('preferences' in value) || !isPreferences(value.preferences)) throw new Error('Invalid notification settings')
-  return { publicKey: value.publicKey, allowed: value.allowed, preferences: value.preferences }
+    || ('deviceCount' in value && !isDeviceCount(value.deviceCount))
+    || !('allowed' in value)
+    || !('preferences' in value)) throw new Error('Invalid notification settings')
+  return {
+    deviceCount: 'deviceCount' in value && isDeviceCount(value.deviceCount) ? value.deviceCount : null,
+    publicKey: value.publicKey, allowed: readPreferences(value.allowed), preferences: readPreferences(value.preferences),
+  }
 }
 
 export async function getWebPushStatus(registration: ServiceWorkerRegistration, userId: string): Promise<WebPushStatus> {
@@ -114,7 +135,7 @@ export async function getWebPushStatus(registration: ServiceWorkerRegistration, 
   if (latest?.deviceId === device.deviceId) return status
   if (current || (latest && latest.userId !== userId)) throw new Error('Notification account changed')
   if (latest) return getWebPushStatus(registration, userId)
-  if (status.allowed.draft || status.allowed['bug-report-inbox']) localStorage.setItem(DEVICE, JSON.stringify(device))
+  if (Object.values(status.allowed).some(Boolean)) localStorage.setItem(DEVICE, JSON.stringify(device))
   return status
 }
 
@@ -141,7 +162,7 @@ export async function setWebPushPreference(args: {
   const status = await readStatus(await fetchWebPush(WEB_PUSH_DEVICE_PATH, {
     operation: 'set', accountId: userId, deviceId: device.deviceId, subscription: subscription?.toJSON() ?? null, kind, enabled, locale,
   }))
-  if (!status.preferences.draft && !status.preferences['bug-report-inbox']) await subscription?.unsubscribe().catch(() => false)
+  if (!Object.values(status.preferences).some(Boolean)) await subscription?.unsubscribe().catch(() => false)
   return status
 }
 
@@ -150,7 +171,7 @@ export async function resolveWebPushClick(click: WebPushClick, accountId: string
   if (!response.ok) return { kind: 'unavailable' }
   const value: unknown = await response.json()
   if (value && typeof value === 'object' && 'kind' in value && value.kind === click.kind) {
-    if (value.kind === 'draft' && 'roomId' in value && typeof value.roomId === 'string') return { kind: 'draft', roomId: value.roomId }
+    if ((value.kind === 'draft' || value.kind === 'turn') && 'roomId' in value && typeof value.roomId === 'string') return { kind: value.kind, roomId: value.roomId }
     if (value.kind === 'bug-report-inbox' && 'messageId' in value && typeof value.messageId === 'number'
       && Number.isSafeInteger(value.messageId) && value.messageId > 0) return { kind: 'bug-report-inbox', messageId: value.messageId }
   }

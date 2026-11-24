@@ -1,5 +1,6 @@
 // @covers client/service-worker/web-push.worker.ts
 // @covers client/app/WebPushClickRouter.tsx
+// @covers client/app/WebPushSettings.tsx
 // @covers client/services/web-push.ts
 // @covers server/web-push/
 //
@@ -90,7 +91,7 @@ async function clickPush(worker: Worker, kind: WebPushKind, deliveryId: string, 
   }, { kind, deliveryId, title })
 }
 
-test('a verified notification opens draft and inbox in the existing Pages game without replacing its connection',
+test('shows the account device count and opens draft, inbox and turn notifications in the correct Pages game',
   async ({ browser, browserName, request }, testInfo) => {
     test.skip(browserName !== 'chromium', 'The Chromium runner exposes the active Service Worker for event injection')
     test.setTimeout(180_000)
@@ -124,11 +125,16 @@ test('a verified notification opens draft and inbox in the existing Pages game w
       await game.goto(`${site.origin}/?bg=none`)
       await expect.poll(() => game.evaluate(async () =>
         (await navigator.serviceWorker.getRegistration())?.active?.state)).toBe('activated')
+      await game.goto(`${site.origin}/?page=settings&bg=none`)
+      await expect(game.getByText('Devices with notifications enabled: 1', { exact: true })).toBeVisible()
+      await expect(game.getByRole('checkbox', { name: 'Turn reminders' })).toBeVisible()
       await game.goto(`${site.origin}/?transport=ws&maxPlayers=2&draftMode=simultaneous&draftPoolSize=7&bg=none`)
       const invitation = game.locator('.ws-invite-roomid strong')
       await expect(invitation).toBeVisible()
       const roomId = await invitation.innerText()
       const other = await otherContext.newPage()
+      await other.goto(`${site.origin}/?page=settings&bg=none`)
+      await expect(other.getByText('Devices with notifications enabled: 0', { exact: true })).toBeVisible()
       await other.goto(`${site.origin}/?room=${roomId}&bg=none`)
       await other.getByRole('button', { name: 'Confirm color and start', exact: true }).click()
       await expect(game.getByRole('dialog', { name: 'Card draft' })).toBeVisible()
@@ -215,6 +221,33 @@ test('a verified notification opens draft and inbox in the existing Pages game w
       expect(sockets).toHaveLength(beforeClick)
       expect(activeSocket?.isClosed()).toBe(false)
       expect(await game.evaluate(() => performance.timeOrigin)).toBe(pageStart)
+
+      const guestDevice = randomUUID()
+      const guestSubscription = { ...subscription, endpoint: subscription.endpoint + '-guest' }
+      await store.preferences(otherCookie.value, guestDevice, null)
+      await store.bind(otherCookie.value, { deviceId: guestDevice, subscription: guestSubscription, kind: 'turn', enabled: true, locale: 'en' })
+      await store.bind(cookie.value, { deviceId, subscription, kind: 'turn', enabled: true, locale: 'en' })
+
+      const hostGameUrl = `${site.origin}/?transport=ws&maxPlayers=2&bg=none`
+      await game.goto(hostGameUrl)
+      const ordinaryRoom = await game.locator('.ws-invite-roomid strong').innerText()
+      const guestGameUrl = `${site.origin}/?room=${ordinaryRoom}&bg=none`
+      await other.goto(guestGameUrl)
+      await other.getByRole('button', { name: 'Confirm color and start', exact: true }).click()
+      await expect(game.locator('.game-layout')).toBeVisible()
+      await expect(other.locator('.game-layout')).toBeVisible()
+      const turns: Array<{ recipient: string; id: string }> = []
+      await new WebPushDelivery(store, async item => {
+        turns.push({ recipient: item.subscription.endpoint, id: item.deliveryId })
+        return { kind: 'accepted' }
+      }).deliverDue(['turn'])
+      expect(turns).toHaveLength(1)
+      const hostActs = turns[0]!.recipient === subscription.endpoint
+      const actingWorker = hostActs ? worker : otherContext.serviceWorkers().find(item => item.url() === `${site.origin}/sw.js`)
+      if (!actingWorker) throw new Error('Missing responder Worker')
+      const turnClick = await clickPush(actingWorker, 'turn', turns[0]!.id, 'It’s your turn to act.')
+      expect(turnClick).toMatchObject({ title: 'Open Agricola', body: 'It’s your turn to act.', openedUrl: null })
+      expect(turnClick.focusedUrl).toBe(hostActs ? hostGameUrl : guestGameUrl)
 
     } finally {
       await Promise.all([context.close(), otherContext.close()])
