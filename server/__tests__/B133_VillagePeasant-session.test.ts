@@ -103,6 +103,9 @@ describe('B133 Village Peasant parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.gameOver).toBe(true)
     expect(response.state.players[0]!.resources.vegetable).toBe(2)
+    // The vegetables arrive through the card's gain leaf, so other cards and statistics see them.
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)
+      .map(event => event.type === 'resource.moved' ? event.resources : null)).toEqual([{ vegetable: 2 }])
   })
 
   it('B133 S3: a zero card category grants no vegetable at scoring', () => {
