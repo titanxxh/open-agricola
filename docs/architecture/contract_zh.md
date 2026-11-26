@@ -50,7 +50,7 @@
 - `actionSpaces[*].takenBy` 是 `WorkerRef[]`。卡牌创建的联动占用附加 `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`，清理时读取语义 metadata，不读其他卡的 ID。食客的引用带有 `guest: true`，工人 ID 为 `guest:<n>`。
 - `spend-worker` 把卡上人员放到不可交互的 `card-worker:<sourceCard>` holder，由 `shared/domain/card-worker-space.ts` 的纯工厂创建。其 WorkerRef 在归家清理前都是放置事实，即使来源卡离开已打出区域也是如此；恢复时从代码重建 holder 定义，不接受存储的回调。
 - `workPhaseObtainedResources`（归家后清空）和 `completedFeedingPhases` 是共享事实，卡牌读取它们，不各自维护计数。
-- 放置事实是聚合值：`farm.animalMoved.newlyPlacedOnFarmyard` 统计新安置到实体农场区域的待安置动物（在所有者农场上带 `farmPosition` 的卡牌区域也算实体区域）；`addFarmyardSpaceState(..., eventSink)` 把向实体田地增加的货物记为 `resource.moved`；卡牌逻辑田地仍是独立位置。
+- `farm.animalMoved.newlyPlacedOnFarmyard` 统计新安置到实体农场区域的待安置动物。玩家自己的卡牌区域带 `farmPosition`，或其汇总容量标记了 `farmyardBacked`，都计入放置事实。`addFarmyardSpaceState(..., eventSink)` 把向实体田地增加的货物记为 `resource.moved`。卡牌逻辑田地仍是独立位置。
 
 **事件与日志。**
 

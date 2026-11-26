@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { buildCardAnimalZoneId } from '../../domain/animal-zones'
+import { buildFarmyardCardAnimalZone } from '../../domain/animal-zones'
 import { getVisibleTerrainTiles } from '../../moor/farm-terrain'
 
 const CARD_ID = 'M034_HomeWood'
@@ -10,17 +10,11 @@ const cardImpl = {
     id: CARD_ID,
     onComputeAnimalZones: (player, zones, _state) => {
       getVisibleTerrainTiles(player, 'forest').forEach((tile) => {
-        zones.push({
-          id: buildCardAnimalZoneId(CARD_ID, tile),
-          zoneType: 'card',
-          cardId: CARD_ID,
+        zones.push(buildFarmyardCardAnimalZone(CARD_ID, {
           capacity: 1,
-          animalType: null,
-          animalCount: 0,
           allowedAnimalType: null,
           farmPosition: tile,
-          displaySource: 'farm-position',
-        })
+        }))
       })
     },
     getInvalidAnimals: (_player, _zone, meeples) =>

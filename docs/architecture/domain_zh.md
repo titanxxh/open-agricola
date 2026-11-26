@@ -45,6 +45,7 @@ shared/domain/
 - 每个“能否容纳”的问题都使用 `canAccommodateAnimalTotals()` 或 `canAccommodateAllAnimals()`，它们搜索合法的最终安置（允许之后的系统 `reorganize`），并遵守 `occupiedZoneLimit` 与必空组（`requiredEmptyZoneGroupIds`：每组至少一个被标记区域为空）。卡牌从不在局部测试单个区域。会永久降低 holder 容量的候选按支付后的容量过滤。
 - `onComputeAnimalZones(player, zones, state)` 添加区域；`computePastureCapacityModifiers(player, state)` 按打出顺序先返回替换再返回叠加 modifier；`onComputeSharedAnimalZones()` 贡献 Hosted Card Animal Zone，存于卡牌 owner 的 `animalCountsByZone`，但按 `animalOwnerPlayerId`（繁殖时按 `breedingOwnerPlayerId`）结算。每个 holder 写入方都持久化 `cardId`、`ownerPlayerId` 与 `animalOwnerPlayerId`；改写与跨玩家扣减只触及当前 Animal Owner 的条目。`computeAnimalZones` 为缺少 `cardId` 的卡牌区域补上它。固定物种用 `allowedAnimalType`；`animalType` 只表示当前占用。
 - 由农场位置承载的区域声明 `farmPosition`、`countsFarmyardSpaceAsUnused` 与 `displaySource: 'farm-position'`；客户端只在该位置渲染服务端提供的区域。
+- `buildFarmyardCardAnimalZone()` 构造容量全部来自所有者农场实体格的卡牌区域。绑定单格时传入 `farmPosition`。汇总区域用运行时标记 `farmyardBacked` 记录放置事实，沿用汇总区域的 ID、存储和展示。
 - `isHouseAnimalZone()` / `countHouseAnimals()` 包含标记了 `houseAnimalZone` 的区域；`blocksHouseAnimalZones` 会移除它们。
 - 动物统计与消耗（`getAssignedAnimalsByType()`、`subtractAnimalsFromBoard()`）同时读写旧 holder 字段与 `animalCountsByZone`。支付顺序在 `animal-payment.ts`：先卡牌局部的 `consumeAnimalPayment()`，再农场与 holder，最后是标记 `capacityCounterKey` / `capacityLossOnPayment` 的计数型 holder。`animalPaymentPreference.prefer` 指定的具体卡牌计数器最先扣，并关闭计数型 holder 的回退。系统移除通过 `onAnimalRemoved()` 通知卡牌。
 - 动物整理在修改前校验身份、物种、数量、混放、容量、库存、互斥上限与必空组；非法输入返回可恢复的 `log.reorganizeFail` 且不改变任何东西。省略的区域为空；少分配表示主动弃养。进入整理时，从停用或缩小的卡牌存储中移出的动物回到待安置状态，总数不减少。

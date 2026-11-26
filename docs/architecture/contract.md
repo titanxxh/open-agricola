@@ -48,7 +48,7 @@ Selected fields:
 - `actionSpaces[*].takenBy` is `WorkerRef[]`. Card-created linked occupancy adds `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`, so cleanup reads semantic metadata instead of another card's ID. A Guest's ref carries `guest: true` and a `guest:<n>` worker ID.
 - `spend-worker` puts a Card-held Person on a non-interactive `card-worker:<sourceCard>` holder created by the pure factory in `shared/domain/card-worker-space.ts`. Its WorkerRefs are placement facts until return-home cleanup, even if the source card leaves the played zone; recovery recreates the holder definition from code and never accepts stored callbacks.
 - `workPhaseObtainedResources` (cleared after returning home) and `completedFeedingPhases` are shared facts cards read instead of keeping per-card counters.
-- Placement facts are aggregates: `farm.animalMoved.newlyPlacedOnFarmyard` counts newly placed reserve animals in physical farmyard zones (a card zone with a `farmPosition` on the owner's farm counts as physical), and `addFarmyardSpaceState(..., eventSink)` emits positive goods additions to a physical field as `resource.moved`; logical card fields stay separate locations.
+- `farm.animalMoved.newlyPlacedOnFarmyard` counts newly placed reserve animals in physical farmyard zones. The player's own card zones qualify with a `farmPosition` or with aggregate capacity marked `farmyardBacked`. `addFarmyardSpaceState(..., eventSink)` emits positive goods additions to a physical field as `resource.moved`. Logical card fields stay separate locations.
 
 **Events and logs.**
 

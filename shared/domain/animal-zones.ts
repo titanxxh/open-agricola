@@ -48,6 +48,8 @@ export type AnimalZone = {
   displayOwnerName?: string
   pastureIndex?: number
   farmPosition?: { row: number; col: number }
+  /** Aggregate capacity supplied entirely by spaces on the zone owner's farm. */
+  farmyardBacked?: true
   countsFarmyardSpaceAsUnused?: boolean
   displaySource?: 'played-card' | 'farm-position' | 'borrowed-played-card'
   occupancyGroup?: string
@@ -65,6 +67,20 @@ export const buildCardAnimalZoneId = (
 ): string => position
   ? `card:${cardId}@${positionKey(position)}`
   : `card:${cardId}`
+
+export const buildFarmyardCardAnimalZone = (
+  cardId: string,
+  { capacity, allowedAnimalType, farmPosition }: Pick<AnimalZone, 'capacity' | 'allowedAnimalType' | 'farmPosition'>,
+): AnimalZone => ({
+  id: buildCardAnimalZoneId(cardId, farmPosition),
+  zoneType: 'card',
+  cardId,
+  capacity,
+  animalType: allowedAnimalType ?? null,
+  animalCount: 0,
+  allowedAnimalType,
+  ...(farmPosition ? { farmPosition, displaySource: 'farm-position' } : { farmyardBacked: true }),
+})
 
 export const buildHostedCardAnimalZoneId = (
   cardId: string,
