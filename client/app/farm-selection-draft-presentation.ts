@@ -20,6 +20,22 @@ type FenceSubmitError = {
   newEdges: string[]
 }
 
+const fenceErrorKeys: Readonly<Record<string, string>> = {
+  INVALID_EDGE: 'ui.fenceErrorInvalidEdge',
+  NO_NEW_FENCES: 'ui.fenceErrorNoNew',
+  NOT_ENOUGH_WOOD: 'ui.fenceErrorNoWood',
+  FENCE_NOT_CONNECTED: 'ui.fenceErrorNotConnected',
+  NO_ENCLOSED_AREA: 'ui.fenceErrorNotClosed',
+}
+
+const fenceCommitErrorText = (locale: Locale, code: string, selected: number): string => {
+  const key = `fence.error.${code}`
+  const specific = t(locale, key)
+  if (specific !== key) return specific
+  const fallback = Object.hasOwn(fenceErrorKeys, code) ? fenceErrorKeys[code] : 'ui.fenceErrorUnknown'
+  return t(locale, fallback, { edges: t(locale, 'ui.interactionFenceSelectSubtitle', { selected }) })
+}
+
 export type FarmSelectionSubmitDraft = Omit<
   InteractionSubmitDraft,
   | 'value'
@@ -258,8 +274,9 @@ export const useFarmSelectionDraftPresentation = ({
     sowRemaining,
   ])
 
+  const pendingFenceEdgesLength = farmDraft.pendingFenceEdges.length + farmDraft.pendingPalisadeEdges.length
   const fenceErrorText: string | null = farmDraft.fenceError
-    ? t(locale, `fence.error.${farmDraft.fenceError.code}`)
+    ? fenceCommitErrorText(locale, farmDraft.fenceError.code, pendingFenceEdgesLength)
     : null
   const roomErrorText: string | null = farmDraft.roomError
     ? t(locale, farmCommitErrorMessageKey('room', farmDraft.roomError))
@@ -277,7 +294,7 @@ export const useFarmSelectionDraftPresentation = ({
   const interactionBarDraft = useMemo(() => ({
     pendingRoomTilesLength: farmDraft.pendingRoomTiles.length,
     maxRoomSelections,
-    pendingFenceEdgesLength: farmDraft.pendingFenceEdges.length + farmDraft.pendingPalisadeEdges.length,
+    pendingFenceEdgesLength,
     pendingStableTilesLength: farmDraft.pendingStableTiles.length,
     maxStableSelections,
     pendingFarmHandSelected: farmDraft.pendingFarmHand !== null,
@@ -294,8 +311,6 @@ export const useFarmSelectionDraftPresentation = ({
   }), [
     farmDraft.fencePlacementMode,
     farmDraft.pendingFarmHand,
-    farmDraft.pendingFenceEdges,
-    farmDraft.pendingPalisadeEdges,
     farmDraft.pendingPlowTile,
     farmDraft.pendingPositionSelections,
     farmDraft.pendingRoomTiles,
@@ -305,6 +320,7 @@ export const useFarmSelectionDraftPresentation = ({
     maxPositionSelections,
     maxRoomSelections,
     maxStableSelections,
+    pendingFenceEdgesLength,
     plowErrorText,
     roomErrorText,
     sowErrorText,

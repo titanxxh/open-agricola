@@ -7,6 +7,7 @@ import { createInitialState } from '../../../shared/session/state-bootstrap'
 import { serializeState } from '../../../shared/session/serialization'
 import { AuthProvider } from '../../contexts/AuthContext'
 import { LocaleProvider } from '../../contexts/LocaleContext'
+import { CommandRejectedError, HttpGameTransport, type SnapshotListener } from '../../services/gameTransport'
 import { GameContainerApi } from '../GameContainerApi'
 
 const payload: GameSyncPayload = {
@@ -57,6 +58,61 @@ afterEach(() => {
 })
 
 describe('GameContainerApi responsive presentation', () => {
+  it('guards same-frame fence confirmation and ignores an older request settling during the next one', async () => {
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
+    const response = structuredClone(payload)
+    const fenceInteraction: GameSyncPayload['interaction'] = {
+      stateId: 'wait', requestKey: 'fence-1', playerIndex: 0,
+      allowedCommands: ['commitSelection'], anytimeActions: [], promptKey: 'ui.interactionFenceSelect',
+      request: {
+        kind: 'farm-select',
+        farm: { farmType: 'fence', selectableEdges: ['H-2-2'] },
+        options: [{ value: 'confirm', labelKey: 'ui.interactionFenceConfirm' }],
+      },
+    }
+    response.interaction = fenceInteraction
+    setupViewport(true, response)
+    let publish: SnapshotListener | undefined
+    const onSnapshot = HttpGameTransport.prototype.onSnapshot
+    vi.spyOn(HttpGameTransport.prototype, 'onSnapshot').mockImplementation(function (this: HttpGameTransport, listener) {
+      publish = listener
+      return onSnapshot.call(this, listener)
+    })
+    const first = Promise.withResolvers<GameSyncPayload>()
+    const second = Promise.withResolvers<GameSyncPayload>()
+    const commit = vi.spyOn(HttpGameTransport.prototype, 'commitSelection')
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    const { container } = renderGame()
+    const confirm = await screen.findByRole('button', { name: 'Confirm fences' })
+    const selectEdge = () => fireEvent.click(container.querySelector('[data-fence-edge="H-2-2"] .farm-fence-hit')!)
+    selectEdge()
+    expect(confirm).toBeEnabled()
+    act(() => {
+      confirm.click()
+      confirm.click()
+    })
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(confirm).toBeDisabled()
+    act(() => publish?.(response))
+    expect(confirm).toBeDisabled()
+
+    act(() => publish?.({ ...response, interaction: { ...fenceInteraction, requestKey: 'fence-2' } }))
+    selectEdge()
+    fireEvent.click(confirm)
+    expect(commit).toHaveBeenCalledTimes(2)
+    expect(confirm).toBeDisabled()
+
+    await act(async () => first.reject(new CommandRejectedError({ ok: false, error: 'NO_ENCLOSED_AREA' })))
+    expect(confirm).toBeDisabled()
+    expect(container.querySelector('.interaction-error')).toBeNull()
+    await act(async () => second.reject(new CommandRejectedError({ ok: false, error: 'NO_ENCLOSED_AREA' })))
+    expect(confirm).toBeEnabled()
+    expect(container.querySelector('.interaction-error')).toHaveTextContent('Fence failed: fences do not enclose a region')
+  })
+
   it('preserves explicit supply expansion when the hand moves between desktop and mobile hosts', async () => {
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
     window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')

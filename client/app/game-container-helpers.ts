@@ -75,10 +75,9 @@ const farmErrorKeys = {
 } as const
 
 export const farmCommitErrorMessageKey = (
-  farmType: FarmCommitType,
+  farmType: Exclude<FarmCommitType, 'fence'>,
   error?: string,
 ): string => {
-  if (farmType === 'fence') return error ? `fence.error.${error}` : 'fence.error.UNKNOWN'
   const typeMap = farmErrorKeys[farmType]
   return (error && error in typeMap)
     ? typeMap[error as keyof typeof typeMap]

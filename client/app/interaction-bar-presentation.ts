@@ -107,6 +107,7 @@ export type InteractionBarPresentationInput = {
       sow: boolean
     }
     fence: {
+      submitting?: boolean
       canBuildPalisades: boolean
       placementMode: 'fence' | 'palisade'
       setPlacementMode?: (mode: 'fence' | 'palisade') => void
@@ -434,8 +435,8 @@ const buildChoiceModel = (
           option.value === 'confirm' &&
           isRoomConfirmDisabled) ||
         (choice.promptKey === 'ui.interactionFenceSelect' &&
-          option.value === 'confirm' &&
-          (isFenceConfirmDisabled || !!farm.fence.borrowedSources?.hasMissingSources)) ||
+          (farm.fence.submitting || (option.value === 'confirm' &&
+            (isFenceConfirmDisabled || !!farm.fence.borrowedSources?.hasMissingSources)))) ||
         (choice.promptKey === 'ui.interactionStableSelect' &&
           option.value === 'confirm' &&
           isStableConfirmDisabled) ||

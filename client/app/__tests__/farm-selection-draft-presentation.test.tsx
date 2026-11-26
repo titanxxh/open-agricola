@@ -46,6 +46,29 @@ describe('useFarmSelectionDraftPresentation', () => {
     rerender({ locale: 'en' })
     expect(result.current.borrowedFenceSources?.donors.map((donor) => donor.name)).toEqual(['Player 2', 'Player 2'])
   })
+
+  it.each([
+    ['en', 'Fence failed: fences do not enclose a region (Selected 1 edges)', 'Fence failed: unknown reason (Selected 1 edges)'],
+    ['zh', '围栏失败：围栏未形成封闭区域（已选 1 条围栏边）', '围栏失败：未知原因（已选 1 条围栏边）'],
+  ])('shows readable fence rejections in %s and preserves the draft', (locale, openFenceMessage, fallback) => {
+    const plan: InteractionPresentationPlan = { kind: 'farm-fence-selection', pendingChoice,
+      farm: { farmType: 'fence', selectableEdges: ['H-0-0', 'V-0-0'] } }
+    const { result } = renderHook(() => useFarmSelectionDraftPresentation({
+      interactionPresentationPlan: plan, locale, displayPlayer: player('p1'),
+    }))
+
+    act(() => result.current.controls.toggleFenceEdge('H-0-0'))
+    act(() => result.current.setCommitError('fence', 'NO_ENCLOSED_AREA'))
+    expect(result.current.interactionBarDraft.fenceErrorText).toBe(openFenceMessage)
+    expect(result.current.submitDraft.fenceEdges).toEqual(['H-0-0'])
+
+    act(() => result.current.setCommitError('fence', 'FUTURE_RULE_ERROR'))
+    expect(result.current.interactionBarDraft.fenceErrorText).toBe(fallback)
+    act(() => result.current.controls.toggleFenceEdge('V-0-0'))
+    expect(result.current.submitDraft.fenceEdges).toEqual(['H-0-0', 'V-0-0'])
+    expect(result.current.interactionBarDraft.fenceErrorText).toBeNull()
+  })
+
   it('owns farm draft controls, submit draft, local errors, borrowed fence donors, and reset', () => {
     const roomPlan: InteractionPresentationPlan = {
       kind: 'farm-room-selection',
