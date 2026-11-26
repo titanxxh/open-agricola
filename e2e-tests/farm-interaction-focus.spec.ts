@@ -57,7 +57,15 @@ const fenceEdge = (page: Page, edge: string) => farm(page).locator(`[data-fence-
 const fenceConfirm = (page: Page) => page.locator('.interaction-bar [data-choice-value="confirm"]')
 
 test.describe('mobile fence confirmation', () => {
-  test.use(devices['iPhone 13'])
+  const phone = devices['iPhone 13']
+  test.use({
+    userAgent: phone.userAgent,
+    viewport: phone.viewport,
+    screen: phone.screen,
+    deviceScaleFactor: phone.deviceScaleFactor,
+    isMobile: phone.isMobile,
+    hasTouch: phone.hasTouch,
+  })
 
   for (const [locale, message] of [
     ['en', 'Fence failed: fences do not enclose a region (Selected 1 edges)'],
