@@ -6,11 +6,13 @@ import type { GameSession } from '../game/authoritative-session'
 import { sessionOptions } from './_helpers/card-regression-session'
 import { confirmTurns } from './_helpers/classic-fl'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { resolveNonSkipChoice } from './_helpers/trigger-select'
 
 const IRON_PLOW = 'CWM091_IronPlow'
 const ROTHERHAM_PLOW = 'CWM105_RotherhamPlow'
 const STEEL_PLOW = 'CWM109_SteelPlow'
 const DONKEY = 'CWM074_Donkey'
+const SUNDAY_WORKER = 'CWM048_SundayWorker'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
@@ -185,8 +187,8 @@ describe('classic WM plows (CWM091, CWM105, CWM109) session', () => {
     const after1 = session.commitSelectionChoice(0, { tile: { row: 0, col: 3 } })
     // Accept 2nd plow
     const opt2 = sessionOptions(after1).find((o) => o.value !== '__skip__')!
-    const step2 = session.resolveChoice(0, opt2.value)
-    const after2 = session.commitSelectionChoice(0, { tile: { row: 0, col: 4 } })
+    session.resolveChoice(0, opt2.value)
+    session.commitSelectionChoice(0, { tile: { row: 0, col: 4 } })
 
     // Skip on 3rd optional plow must skip the remaining plow chain in ONE click and move directly to Cultivation's remaining Sow option!
     const afterSkip = session.resolveChoice(0, '__skip__')
@@ -196,7 +198,7 @@ describe('classic WM plows (CWM091, CWM105, CWM109) session', () => {
     // Cultivation's OR node now offers Sow (or __skip__)
     const remainingSow = sessionOptions(afterSkip).find((o) => o.value.includes('sow'))!
     expect(remainingSow).toBeDefined()
-    const cultSowSelect = session.resolveChoice(0, remainingSow.value)
+    session.resolveChoice(0, remainingSow.value)
     const finalResp = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
     expect(finalResp.ok, finalResp.error).toBe(true)
     expect(finalResp.state.players[0]!.fields).toHaveLength(3)
@@ -215,7 +217,7 @@ describe('classic WM plows (CWM091, CWM105, CWM109) session', () => {
     const start = session.takeAction(0, 'farmland')
     // Donkey's `before` optional additional plow runs before the base `plow` leaf's `computeReplace` XOR:
     const donkeyAccept = sessionOptions(start).find((o) => o.value !== '__skip__')!
-    const donkeyPlow = session.resolveChoice(0, donkeyAccept.value)
+    session.resolveChoice(0, donkeyAccept.value)
     const afterDonkey = session.commitSelectionChoice(0, { tile: { row: 1, col: 2 } })
 
     // Now the base `plow` leaf offers XOR between base plow, Iron Plow, Rotherham Plow, and Steel Plow!
@@ -236,6 +238,66 @@ describe('classic WM plows (CWM091, CWM105, CWM109) session', () => {
     expect(done.ok, done.error).toBe(true)
     // 2 initial + 1 Donkey additional + 2 Rotherham replacement = 5 fields total; Iron & Steel Plows stay unflagged!
     expect(done.state.players[0]!.fields).toHaveLength(5)
+    expect(done.state.players[0]!.cardStates[IRON_PLOW]?.flagged).toBeFalsy()
+    expect(done.state.players[0]!.cardStates[STEEL_PLOW]?.flagged).toBeFalsy()
+  })
+
+  it('offers Rotherham, Iron, and Steel Plow replacements on card-granted uses of Farmland such as Sunday Worker', () => {
+    const session = setup(7, (state) => {
+      const p0 = state.players[0]!
+      p0.occupationPlayed = [SUNDAY_WORKER]
+      p0.minorPlayed = [IRON_PLOW, ROTHERHAM_PLOW, STEEL_PLOW]
+      p0.fields = [
+        { row: 1, col: 2, stacks: [] },
+        { row: 1, col: 3, stacks: [] },
+      ]
+    })
+
+    // First Farmland use: choose Rotherham Plow to plow (0, 2) and (2, 3) (non-adjacent).
+    const firstFarmland = session.takeAction(0, 'farmland')
+    const firstRotherham = sessionOptions(firstFarmland).find(
+      (o) => o.labelKey === `cards.${ROTHERHAM_PLOW}.name`,
+    )!
+    expect(firstRotherham).toBeDefined()
+    session.resolveChoice(0, firstRotherham.value)
+    session.commitSelectionChoice(0, { tile: { row: 0, col: 2 } })
+    const afterFirstUse = session.commitSelectionChoice(0, { tile: { row: 2, col: 3 } })
+    expect(afterFirstUse.ok, afterFirstUse.error).toBe(true)
+    expect(afterFirstUse.state.players[0]!.fields).toHaveLength(4)
+    expect(afterFirstUse.interaction).toMatchObject({
+      stateId: 'wait',
+      sourceCard: SUNDAY_WORKER,
+    })
+
+    // Accept Sunday Worker (1 food) to repeat Farmland: all three WM plows must be offered on the repeated space use!
+    const repeatedUse = resolveNonSkipChoice(session, afterFirstUse)
+    expect(repeatedUse.ok, repeatedUse.error).toBe(true)
+    const repeatedLabels = sessionOptions(repeatedUse).map((o) => o.labelKey)
+    expect(repeatedLabels).toEqual(
+      expect.arrayContaining([
+        `cards.${IRON_PLOW}.name`,
+        `cards.${ROTHERHAM_PLOW}.name`,
+        `cards.${STEEL_PLOW}.name`,
+      ]),
+    )
+
+    // Choose Rotherham Plow again on the repeated Farmland use to plow (1, 1) and (1, 4) -> 6 fields total!
+    const secondRotherham = sessionOptions(repeatedUse).find(
+      (o) => o.labelKey === `cards.${ROTHERHAM_PLOW}.name`,
+    )!
+    session.resolveChoice(0, secondRotherham.value)
+    session.commitSelectionChoice(0, { tile: { row: 1, col: 1 } })
+    const done = session.commitSelectionChoice(0, { tile: { row: 1, col: 4 } })
+    expect(done.ok, done.error).toBe(true)
+    expect(done.state.players[0]!.resources.food).toBe(9)
+    expect(done.state.players[0]!.fields.map((f) => `${f.row}-${f.col}`).sort()).toEqual([
+      '0-2',
+      '1-1',
+      '1-2',
+      '1-3',
+      '1-4',
+      '2-3',
+    ])
     expect(done.state.players[0]!.cardStates[IRON_PLOW]?.flagged).toBeFalsy()
     expect(done.state.players[0]!.cardStates[STEEL_PLOW]?.flagged).toBeFalsy()
   })

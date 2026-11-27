@@ -17,6 +17,15 @@ const optionalPlowChain = (remaining: number): ActionFlow =>
         ],
       }
 
+const isPlowSpaceBodyPlow = (actionContext: Record<string, unknown> | undefined): boolean => {
+  if (actionContext?.checkedReplaceAction === true) return false
+  const origin = actionContext?.sourceLocation as { kind?: unknown; spaceId?: unknown } | undefined
+  return (
+    origin?.kind === 'actionSpace'
+    && (origin.spaceId === 'farmland' || origin.spaceId === 'cultivation')
+  )
+}
+
 const cardImpl = {
   listeners: [
     {
@@ -25,8 +34,7 @@ const cardImpl = {
       actions: ['plow'],
       phases: ['computeReplace'],
       handler: (context) => {
-        if (context.sourceCard) return
-        if (context.space?.id !== 'farmland' && context.space?.id !== 'cultivation') return
+        if (!isPlowSpaceBodyPlow(context.actionContext)) return
         if (isCardFlagged(context.player, CARD_ID)) return
         return {
           decline: true,

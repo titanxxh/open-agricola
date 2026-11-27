@@ -139,6 +139,7 @@ const cardImpl = {
       actions: ['pay'],
       phases: ['isDoable', 'computeReplace'],
       handler: (context) => {
+        if (context.actionContext?.checkedReplaceAction === true) return
         if (!canUseVillageSchool(context.player, undefined, context.turnScopeProjection)) return
         const rawCost = readStandalonePayCost(context.params)
         if (!rawCost || !hasBuildingResourceInCost(rawCost)) return
