@@ -49,6 +49,12 @@ registerAdHocAction({
   },
 })
 
+const isFarmlandSpaceBodyPlow = (actionContext: Record<string, unknown> | undefined): boolean => {
+  if (actionContext?.checkedReplaceAction === true) return false
+  const origin = actionContext?.sourceLocation as { kind?: unknown; spaceId?: unknown } | undefined
+  return origin?.kind === 'actionSpace' && origin.spaceId === 'farmland'
+}
+
 const cardImpl = {
   listeners: [
     {
@@ -57,7 +63,7 @@ const cardImpl = {
       actions: ['plow'],
       phases: ['computeReplace'],
       handler: (context) => {
-        if (context.sourceCard || context.space?.id !== 'farmland') return
+        if (!isFarmlandSpaceBodyPlow(context.actionContext)) return
         const allowedFirstTiles = legalFirstPlowTiles(context.player)
         if (allowedFirstTiles.length === 0) return
         return {
