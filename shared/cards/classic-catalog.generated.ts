@@ -1663,6 +1663,21 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CWM048_SundayWorker",
+    "name": "Sunday Worker",
+    "deck": "CWM",
+    "number": 48,
+    "players": "3+",
+    "cost": {},
+    "vp": 0,
+    "desc": [
+      "Once during rounds 7 and 14, you may pay 1 <FOOD> to take one of your peoples' actions twice. If you use an accumulation space with that action, you get double the amount of goods and/or <FOOD>."
+    ],
+    "artUrl": "assets/classic/CWM/CWM048.png",
+    "implemented": true,
+    "kind": "occupation"
+  },
+  {
     "id": "CWM049_SunriseAdmirer",
     "name": "Sunrise Admirer",
     "deck": "CWM",
@@ -1978,6 +1993,33 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM067.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM068_CashCrop",
+    "name": "Cash Crop",
+    "deck": "CWM",
+    "number": 68,
+    "cost": {},
+    "vp": 0,
+    "extraVp": true,
+    "prerequisite": "1 Occupation",
+    "occupationPrerequisites": {
+      "min": 1
+    },
+    "cardField": {
+      "allowedCrops": [
+        "grain",
+        "vegetable"
+      ],
+      "capacity": 1
+    },
+    "isField": true,
+    "desc": [
+      "When you __Sow__, you may __Sow__ on this card as if it were 1 <FIELD>. Whenever you harvest goods from this card during the field phase of a harvest, you must exchange these harvested goods for 1 bonus <SCORE> each."
+    ],
+    "artUrl": "assets/classic/CWM/CWM068.png",
+    "implemented": true,
     "kind": "minor"
   },
   {
@@ -2339,6 +2381,23 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM091_IronPlow",
+    "name": "Iron Plow",
+    "deck": "CWM",
+    "number": 91,
+    "cost": {
+      "stone": 1,
+      "wood": 1
+    },
+    "vp": 0,
+    "desc": [
+      "Once during the game, when you use the __space:farmland|Farmland__ action space, you may plow 2 <FIELD> instead of 1 and take a __Sow__ action afterward."
+    ],
+    "artUrl": "assets/classic/CWM/CWM091.png",
+    "implemented": true,
+    "kind": "minor"
+  },
+  {
     "id": "CWM092_Keys",
     "name": "Keys",
     "deck": "CWM",
@@ -2543,6 +2602,26 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM105_RotherhamPlow",
+    "name": "Rotherham Plow",
+    "deck": "CWM",
+    "number": 105,
+    "cost": {
+      "wood": 2
+    },
+    "vp": 0,
+    "prerequisite": "1 Occupation",
+    "occupationPrerequisites": {
+      "min": 1
+    },
+    "desc": [
+      "Whenever you use the __space:farmland|Farmland__ action space, you may plow 2 <FIELD> if they are not diagonally or orthogonally adjacent to each other instead of 1."
+    ],
+    "artUrl": "assets/classic/CWM/CWM105.png",
+    "implemented": true,
+    "kind": "minor"
+  },
+  {
     "id": "CWM106_Ruins",
     "name": "Ruins",
     "deck": "CWM",
@@ -2651,6 +2730,27 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM109_SteelPlow",
+    "name": "Steel Plow",
+    "deck": "CWM",
+    "number": 109,
+    "cost": {
+      "wood": 3,
+      "stone": 1
+    },
+    "vp": 0,
+    "prerequisite": "3 Occupations",
+    "occupationPrerequisites": {
+      "min": 3
+    },
+    "desc": [
+      "Once during the game, when you use either the __space:farmland|Farmland__ or __space:cultivation|Cultivation__ action space, you can plow up to 4 <FIELD> instead of 1."
+    ],
+    "artUrl": "assets/classic/CWM/CWM109.png",
+    "implemented": true,
+    "kind": "minor"
+  },
+  {
     "id": "CWM111_UndisturbedPond",
     "name": "Undisturbed Pond",
     "deck": "CWM",
@@ -2668,6 +2768,27 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM111.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM112_VillageSchool",
+    "name": "Village School",
+    "deck": "CWM",
+    "number": 112,
+    "cost": {
+      "stone": 1,
+      "reed": 1
+    },
+    "vp": 1,
+    "prerequisite": "1 Occupation",
+    "occupationPrerequisites": {
+      "min": 1
+    },
+    "desc": [
+      "Once per turn, when paying a cost, you may discard 1 card from your hand to pay 1 less building resource of your choice."
+    ],
+    "artUrl": "assets/classic/CWM/CWM112.png",
+    "implemented": true,
     "kind": "minor"
   },
   {
