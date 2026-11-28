@@ -21,6 +21,7 @@ import '../B/B068_Beanfield'
 import '../D/D025_WitchesDanceFloor'
 import '../D/D064_BakingCourse'
 import '../M/M085_OvenInstallation'
+import '../classic/CWM/CWM062_BackyardWell'
 
 registerAdHocMinorImprovement(new MinorImprovement({
   id: 'TEST_WaresSingle',
@@ -105,6 +106,13 @@ describe('identity metadata migrations', () => {
     it('treats Pottery and Large Pottery as pottery-like played majors', () => {
       expect(playerHasCardCapability(makePlayer({ improvements: ['Major_Pottery'] }), 'potteryIdentity', { asType: 'major' })).toBe(true)
       expect(playerHasCardCapability(makePlayer({ minorPlayed: ['D060_LargePottery'] }), 'potteryIdentity', { asType: 'major' })).toBe(true)
+    })
+
+    it('treats Major Well and Backyard Well as having wellIdentity while keeping Backyard Well minor-only', () => {
+      expect(playerHasCardCapability(makePlayer({ improvements: ['Major_Well'] }), 'wellIdentity')).toBe(true)
+      expect(playerHasCardCapability(makePlayer({ improvements: ['Major_Well2'] }), 'wellIdentity', { asType: 'major' })).toBe(true)
+      expect(playerHasCardCapability(makePlayer({ minorPlayed: ['CWM062_BackyardWell'] }), 'wellIdentity')).toBe(true)
+      expect(playerHasCardCapability(makePlayer({ minorPlayed: ['CWM062_BackyardWell'] }), 'wellIdentity', { asType: 'major' })).toBe(false)
     })
   })
 

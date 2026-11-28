@@ -43,7 +43,7 @@ export const isCardListenerAction = (target: unknown): target is CardListenerAct
   typeof target === 'string' && Object.hasOwn(listenerActionContract, target)
 
 export const listenerEventContract = [
-  'farm.animalMoved', 'farm.sown', 'farm.cropAdded', 'resource.moved',
+  'farm.animalMoved', 'farm.sown', 'farm.cropAdded', 'farm.cropRemoved', 'resource.moved',
   'farm.fieldPlowed', 'farm.roomBuilt', 'farm.stableBuilt', 'farm.fenceBuilt', 'farm.spacesUsed',
   'worker.useCompleted', 'farm.terrainChanged',
   'anytime.completed',

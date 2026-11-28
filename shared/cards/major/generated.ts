@@ -266,6 +266,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 4,
     "extraVp": false,
+    "wellIdentity": true,
     "desc": [
       "[Put 1 <FOOD> on the 5 next turns. At the start of each turn, collect the <FOOD>]"
     ],
@@ -583,6 +584,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 4,
     "extraVp": false,
+    "wellIdentity": true,
     "desc": [
       "[Put 1 <FOOD> on the 5 next turns. At the start of each turn, collect the <FOOD>]"
     ],

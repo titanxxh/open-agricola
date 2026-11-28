@@ -1,15 +1,34 @@
 import { registerAdHocAction } from '../../../actions/helpers/ad-hoc-action-registry'
+import type {
+  CardStackChangedEvent,
+  DraftGameEvent,
+  PaymentPurpose,
+  ResourcePaidEvent,
+} from '../../../contract/events'
 import type { Bonus, BonusChoice, PlayerState } from '../../../contract/types'
+import type { QueryableGameEvent } from '../../../events/query'
+import type { CardListenerContext } from '../../card-listeners'
 import { defineOccupationCard } from '../../card-source'
-import { incCounter } from '../../helpers/card-state'
+import { incCounter, initCardState } from '../../helpers/card-state'
 import { getRoomsBuiltThisAction } from '../../helpers/construction-events'
 import { sumActualPaidResource } from '../../helpers/event-provenance'
 import type { CardImpl } from '../../registry'
 
 const CARD_ID = 'CWM018_ExpertBuilder'
 const STORE_ACTION_ID = 'card_CWM018_ExpertBuilder_store'
+const SPEND_ACTION_ID = 'card_CWM018_ExpertBuilder_spend'
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 type BuildingResource = (typeof BUILDING_RESOURCES)[number]
+
+const isResourcePaidEvent = (
+  event: QueryableGameEvent,
+): event is ResourcePaidEvent | DraftGameEvent<'resource.paid'> =>
+  event.type === 'resource.paid'
+
+const isCardStackChangedEvent = (
+  event: QueryableGameEvent,
+): event is CardStackChangedEvent | DraftGameEvent<'card.stackChanged'> =>
+  event.type === 'card.stackChanged'
 
 registerAdHocAction({
   id: STORE_ACTION_ID,
@@ -37,6 +56,57 @@ registerAdHocAction({
   },
 })
 
+registerAdHocAction({
+  id: SPEND_ACTION_ID,
+  nameKey: 'actions.pay.name',
+  descriptionKey: 'actions.pay.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ player, params, eventSink }) => {
+    const rawSpent = params?.spent
+    if (!rawSpent || typeof rawSpent !== 'object') {
+      return { type: 'fail', errorKey: 'log.payFail' }
+    }
+    const paymentFor: PaymentPurpose =
+      typeof params?.paymentFor === 'string'
+        ? (params.paymentFor as PaymentPurpose)
+        : 'cardEffect'
+    const counters = initCardState(player, CARD_ID)
+    const spent: Partial<Record<BuildingResource, number>> = {}
+    for (const resource of BUILDING_RESOURCES) {
+      const rawAmount = (rawSpent as Record<string, unknown>)[resource]
+      if (typeof rawAmount !== 'number' || rawAmount <= 0) continue
+      const available = counters[resource] ?? 0
+      if (available < rawAmount) {
+        return { type: 'fail', errorKey: 'log.payFail' }
+      }
+      counters[resource] = available - rawAmount
+      spent[resource] = rawAmount
+    }
+    const keys = Object.keys(spent)
+    if (keys.length === 0) return { type: 'ok' }
+    eventSink?.emit<'resource.paid'>({
+      type: 'resource.paid',
+      resources: spent,
+      paymentFor,
+      paymentSources: [{ from: { kind: 'card', playerId: player.id, cardId: CARD_ID }, resources: spent }],
+      to: { kind: 'supply' },
+      sourceCardId: CARD_ID,
+    })
+    for (const key of keys) {
+      eventSink?.emit<'card.stateChanged'>({
+        type: 'card.stateChanged',
+        sourceCardId: CARD_ID,
+        cardId: CARD_ID,
+        targetPlayerId: player.id,
+        key,
+      })
+    }
+    return { type: 'ok', resourcesPaid: spent }
+  },
+})
+
 const buildDiscountChoices = (player: PlayerState): BonusChoice[] => {
   const counters = player.cardStates[CARD_ID]?.counters ?? {}
   let partials: Array<Partial<Record<BuildingResource, number>>> = [{}]
@@ -56,6 +126,32 @@ const buildDiscountChoices = (player: PlayerState): BonusChoice[] => {
     .map((discount) => ({ discount }))
 }
 
+const collectConstructPaymentEvents = (
+  context: CardListenerContext,
+  actorId: string,
+): QueryableGameEvent[] => {
+  const actionEvents = context.actionEvents ?? []
+  const anchorSeqs = actionEvents.flatMap((event) =>
+    (event.type === 'farm.roomBuilt' || (isResourcePaidEvent(event) && event.paymentFor === 'construct'))
+      && 'seq' in event
+      && typeof event.seq === 'number'
+      ? [event.seq]
+      : [],
+  )
+  if (anchorSeqs.length === 0) return [...actionEvents]
+  const minSeq = Math.min(...anchorSeqs)
+  const seenIds = new Set(
+    actionEvents.flatMap((event) => ('id' in event && typeof event.id === 'string' ? [event.id] : [])),
+  )
+  const committedFollowUps = (context.state.events ?? []).filter(
+    (event) =>
+      event.seq >= minSeq
+      && !seenIds.has(event.id)
+      && (event.actorPlayerId === actorId || event.targetPlayerId === actorId),
+  )
+  return [...actionEvents, ...committedFollowUps]
+}
+
 const cardImpl = {
   listeners: [
     {
@@ -69,13 +165,21 @@ const cardImpl = {
         const actor = context.triggerPlayer ?? context.player
         const owner = context.ownerPlayer ?? context.player
         if (getRoomsBuiltThisAction(context, actor.id) < 1) return
+        const constructEvents = collectConstructPaymentEvents(context, actor.id)
         const paidKinds = BUILDING_RESOURCES.filter(
           (resource) =>
             sumActualPaidResource(
-              context.actionEvents ?? [],
+              constructEvents,
               resource,
               (event) => event.paymentFor === 'construct',
-            ) > 0,
+            ) > 0
+            || constructEvents.some(
+              (event) =>
+                isCardStackChangedEvent(event)
+                && (event.delta ?? 0) < 0
+                && event.targetPlayerId === actor.id
+                && (event.resources?.[resource] ?? 0) > 0,
+            ),
         )
         if (paidKinds.length === 0) return
         if (paidKinds.length === 1) {
@@ -138,23 +242,16 @@ const cardImpl = {
         const choices = buildDiscountChoices(context.player)
         const choiceIndex = payment.bonusChoiceIndex?.[CARD_ID]
         const chosen = typeof choiceIndex === 'number' ? choices[choiceIndex] : undefined
-        if (!chosen?.discount) return
-        const deductions = BUILDING_RESOURCES.flatMap((resource) => {
-          const used = chosen.discount?.[resource] ?? 0
-          return used > 0
-            ? [{
-                type: 'leaf' as const,
-                actionId: 'special-effect',
-                sourceCard: CARD_ID,
-                countCardUse: false,
-                params: { kind: 'increment-counter', key: resource, amount: -used },
-              }]
-            : []
-        })
-        if (deductions.length === 0) return
+        if (!chosen?.discount || Object.keys(chosen.discount).length === 0) return
         return {
           sourceCard: CARD_ID,
-          flow: deductions.length === 1 ? deductions[0]! : { type: 'seq', children: deductions },
+          flow: {
+            type: 'leaf',
+            actionId: SPEND_ACTION_ID,
+            sourceCard: CARD_ID,
+            countCardUse: false,
+            params: { spent: chosen.discount, paymentFor: payment.paymentFor },
+          },
         }
       },
     },

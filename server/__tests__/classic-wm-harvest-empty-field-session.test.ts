@@ -265,4 +265,111 @@ describe('CWM014_CropRotator & CWM077_EdibleRoots session', () => {
       ),
     ).toBe(false)
   })
+
+  it('triggers CWM014 on non-reap crop removal (A070_LiftingMachine), leaves stone fields untouched on play, and isolates CWM077 field deltas per player', () => {
+    // 1. Non-reap removal: A070_LiftingMachine removes the last vegetable at end of Round 1 -> CWM014 offers grain sow!
+    const liftingSession = setup(1, (state) => {
+      const p0 = state.players[0]!
+      p0.occupationPlayed = [ROTATOR]
+      p0.minorPlayed = ['A070_LiftingMachine']
+      Object.assign(p0.resources, { grain: 1, vegetable: 0 })
+      p0.fields = [
+        { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+        { row: 0, col: 3, stacks: [] },
+        { row: 0, col: 4, stacks: [] },
+      ]
+    })
+    for (const p of liftingSession.state.players) markAllWorkersUsed(liftingSession.state, p)
+    const r1End = liftingSession.performRoundEnd()
+    if (r1End.interaction.stateId === 'wait' && r1End.interaction.request.kind === 'choice') {
+      resolveNonSkipChoice(liftingSession, r1End)
+    }
+    let afterLift = liftingSession.commitSelectionChoice(0, { positions: ['0-2'] })
+    expect(afterLift.ok, afterLift.error).toBe(true)
+    expect(afterLift.state.players[0]!.resources.vegetable).toBe(1)
+    if (afterLift.interaction.stateId === 'wait' && afterLift.interaction.request.kind === 'choice') {
+      afterLift = resolveNonSkipChoice(liftingSession, afterLift)
+    }
+    assert(
+      afterLift.interaction.stateId === 'wait'
+      && afterLift.interaction.request.kind === 'farm-select'
+      && afterLift.interaction.request.farm.farmType === 'sow',
+    )
+    expect(afterLift.interaction.request.farm.selectableFields).toEqual([
+      { tile: { row: 0, col: 2 }, allowedCrops: ['grain'] },
+    ])
+    const afterRotateSow = liftingSession.commitSelectionChoice(0, {
+      crops: [{ row: 0, col: 2, crop: 'grain' }],
+    })
+    expect(afterRotateSow.ok, afterRotateSow.error).toBe(true)
+    expect(afterRotateSow.state.players[0]!.fields[0]!.stacks).toEqual([
+      { kind: 'grain', remaining: 3 },
+    ])
+
+    // 2. Playing CWM014 with a stone-bearing field (C006_StoneClearing) takes ONLY grain/vegetable and leaves stone on field!
+    const stoneFieldSession = setup(1, (state) => {
+      const p0 = state.players[0]!
+      p0.occupationHand = [ROTATOR]
+      p0.minorPlayed = ['C006_StoneClearing']
+      Object.assign(p0.resources, { grain: 0, vegetable: 0, stone: 0 })
+      p0.fields = [
+        { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },
+        { row: 0, col: 3, stacks: [{ kind: 'stone', remaining: 1 }] },
+      ]
+    })
+    let playedWithStone = stoneFieldSession.takeAction(0, 'lessons')
+    if (
+      playedWithStone.interaction.stateId === 'wait'
+      && sessionOptions(playedWithStone).some((o) => o.value === ROTATOR)
+    ) {
+      playedWithStone = stoneFieldSession.resolveChoice(0, ROTATOR)
+    }
+    expect(playedWithStone.ok, playedWithStone.error).toBe(true)
+    expect(playedWithStone.state.players[0]!.resources).toMatchObject({ grain: 1, stone: 0 })
+    expect(playedWithStone.state.players[0]!.fields).toEqual([
+      { row: 0, col: 2, stacks: [] },
+      { row: 0, col: 3, stacks: [{ kind: 'stone', remaining: 1 }] },
+    ])
+
+    // 3. Cross-player Round 4 harvest: Player 0 (Crop Rotator) sows (0, 2) before Player 1 (Edible Roots) resolves (0, 2)!
+    const crossPlayer = setup(4, (state) => {
+      const p0 = state.players[0]!
+      const p1 = state.players[1]!
+      p0.occupationPlayed = [ROTATOR]
+      Object.assign(p0.resources, { grain: 1, vegetable: 0, food: 10 })
+      p0.fields = [{ row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
+
+      p1.minorPlayed = [ROOTS]
+      Object.assign(p1.resources, { grain: 0, vegetable: 0, food: 10 })
+      p1.fields = [
+        { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+        { row: 0, col: 3, stacks: [] },
+        { row: 0, col: 4, stacks: [] },
+      ]
+    })
+    for (const p of crossPlayer.state.players) markAllWorkersUsed(crossPlayer.state, p)
+    const initialHarvest = crossPlayer.performRoundEnd()
+    if (
+      initialHarvest.interaction.stateId === 'wait'
+      && initialHarvest.interaction.playerIndex === 0
+      && initialHarvest.interaction.request.kind === 'choice'
+    ) {
+      resolveNonSkipChoice(crossPlayer, initialHarvest)
+    }
+    let crossHarvest = crossPlayer.commitSelectionChoice(0, {
+      crops: [{ row: 0, col: 2, crop: 'grain' }],
+    })
+    if (
+      crossHarvest.interaction.stateId === 'wait'
+      && crossHarvest.interaction.request.kind === 'confirm-player-switch'
+    ) {
+      crossHarvest = crossPlayer.confirmPlayerSwitch(crossHarvest.interaction.request.fromPlayerIndex)
+    }
+    const p1Roots = sessionOptions(crossHarvest).find((o) => o.sourceCard === ROOTS)
+    if (p1Roots) {
+      crossHarvest = crossPlayer.resolveChoice(1, p1Roots.value)
+    }
+    // Player 1 had 10 food + 1 Edible Roots - 4 feeding = 7 food!
+    expect(crossHarvest.state.players[1]!.resources.food).toBe(7)
+  })
 })

@@ -71,8 +71,10 @@ const currentReapAndPostEvents = (
 
 const findFieldForOrigin = (
   fields: readonly LogicalField[],
-  origin: { kind: string; row?: number; col?: number; cardId?: string },
+  origin: { kind: string; playerId?: string; row?: number; col?: number; cardId?: string },
+  playerId: string,
 ): LogicalField | undefined => {
+  if (origin.playerId !== playerId) return undefined
   if (origin.kind === 'field') {
     return fields.find(
       (field) => field.kind === 'farmyard' && field.row === origin.row && field.col === origin.col,
@@ -87,6 +89,7 @@ const findFieldForOrigin = (
 const netPostReapDelta = (
   fields: readonly LogicalField[],
   postEvents: readonly AnyEvent[],
+  playerId: string,
 ): Map<string, number> => {
   const deltaByFieldId = new Map<string, number>()
   const add = (fieldId: string, delta: number) => {
@@ -95,14 +98,14 @@ const netPostReapDelta = (
   for (const event of postEvents) {
     if (event.type === 'farm.sown') {
       for (const sow of (event as FarmSownEvent | DraftGameEvent<'farm.sown'>).sows) {
-        const field = findFieldForOrigin(fields, sow.location)
+        const field = findFieldForOrigin(fields, sow.location, playerId)
         if (field) add(field.id, sow.added)
       }
     } else if (event.type === 'farm.cropAdded') {
       const cropAdded = event as FarmCropAddedEvent | DraftGameEvent<'farm.cropAdded'>
       if (cropAdded.reason !== 'sow') {
         for (const crop of cropAdded.crops) {
-          const field = findFieldForOrigin(fields, crop.location)
+          const field = findFieldForOrigin(fields, crop.location, playerId)
           if (field) add(field.id, crop.amount)
         }
       }
@@ -110,7 +113,7 @@ const netPostReapDelta = (
       const cropRemoved = event as FarmCropRemovedEvent | DraftGameEvent<'farm.cropRemoved'>
       if (cropRemoved.reason !== 'reap') {
         for (const crop of cropRemoved.crops) {
-          const field = findFieldForOrigin(fields, crop.location)
+          const field = findFieldForOrigin(fields, crop.location, playerId)
           if (field) add(field.id, -crop.amount)
         }
       }
@@ -131,10 +134,10 @@ const cardImpl = {
         const fields = getLogicalFields(context.player)
         const { reapMoves, postEvents } = currentReapAndPostEvents(context)
         if (reapMoves.length === 0) return
-        const postDeltas = netPostReapDelta(fields, postEvents)
+        const postDeltas = netPostReapDelta(fields, postEvents, context.player.id)
         const emptiedFieldIds = new Set<string>()
         for (const event of reapMoves) {
-          const field = findFieldForOrigin(fields, event.from)
+          const field = findFieldForOrigin(fields, event.from, context.player.id)
           if (!field) continue
           const currentRemaining = field.stacks.reduce((sum, stack) => sum + stack.remaining, 0)
           const remainingAtReapEnd = currentRemaining - (postDeltas.get(field.id) ?? 0)
