@@ -608,8 +608,10 @@ import { CWM010_CloisterDweller } from './classic/CWM/CWM010_CloisterDweller'
 import { CWM011_Contractor } from './classic/CWM/CWM011_Contractor'
 import { CWM012_CovetousFarmer } from './classic/CWM/CWM012_CovetousFarmer'
 import { CWM013_Cowboy } from './classic/CWM/CWM013_Cowboy'
+import { CWM014_CropRotator } from './classic/CWM/CWM014_CropRotator'
 import { CWM015_DebrisDealer } from './classic/CWM/CWM015_DebrisDealer'
 import { CWM016_Diplomat } from './classic/CWM/CWM016_Diplomat'
+import { CWM018_ExpertBuilder } from './classic/CWM/CWM018_ExpertBuilder'
 import { CWM019_FamilyPlanner } from './classic/CWM/CWM019_FamilyPlanner'
 import { CWM020_FarmSchoolGraduate } from './classic/CWM/CWM020_FarmSchoolGraduate'
 import { CWM021_FenceDealer } from './classic/CWM/CWM021_FenceDealer'
@@ -650,6 +652,7 @@ import { CWM058_AppleTree } from './classic/CWM/CWM058_AppleTree'
 import { CWM059_Apprenticeship } from './classic/CWM/CWM059_Apprenticeship'
 import { CWM060_Attic } from './classic/CWM/CWM060_Attic'
 import { CWM061_BackDoor } from './classic/CWM/CWM061_BackDoor'
+import { CWM062_BackyardWell } from './classic/CWM/CWM062_BackyardWell'
 import { CWM063_Birdcage } from './classic/CWM/CWM063_Birdcage'
 import { CWM064_Bonre } from './classic/CWM/CWM064_Bonre'
 import { CWM065_BoundaryStones } from './classic/CWM/CWM065_BoundaryStones'
@@ -663,9 +666,11 @@ import { CWM072_Crib } from './classic/CWM/CWM072_Crib'
 import { CWM073_DiamondMine } from './classic/CWM/CWM073_DiamondMine'
 import { CWM074_Donkey } from './classic/CWM/CWM074_Donkey'
 import { CWM076_DrainedPond } from './classic/CWM/CWM076_DrainedPond'
+import { CWM077_EdibleRoots } from './classic/CWM/CWM077_EdibleRoots'
 import { CWM078_FarmSchool } from './classic/CWM/CWM078_FarmSchool'
 import { CWM079_FestivalHall } from './classic/CWM/CWM079_FestivalHall'
 import { CWM080_FishHook } from './classic/CWM/CWM080_FishHook'
+import { CWM081_FishPond } from './classic/CWM/CWM081_FishPond'
 import { CWM082_FlowerPots } from './classic/CWM/CWM082_FlowerPots'
 import { CWM083_FreeRangeChickens } from './classic/CWM/CWM083_FreeRangeChickens'
 import { CWM085_Fruitcake } from './classic/CWM/CWM085_Fruitcake'
@@ -1779,8 +1784,10 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM011_Contractor': CWM011_Contractor.impl,
   'CWM012_CovetousFarmer': CWM012_CovetousFarmer.impl,
   'CWM013_Cowboy': CWM013_Cowboy.impl,
+  'CWM014_CropRotator': CWM014_CropRotator.impl,
   'CWM015_DebrisDealer': CWM015_DebrisDealer.impl,
   'CWM016_Diplomat': CWM016_Diplomat.impl,
+  'CWM018_ExpertBuilder': CWM018_ExpertBuilder.impl,
   'CWM019_FamilyPlanner': CWM019_FamilyPlanner.impl,
   'CWM020_FarmSchoolGraduate': CWM020_FarmSchoolGraduate.impl,
   'CWM021_FenceDealer': CWM021_FenceDealer.impl,
@@ -1821,6 +1828,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM059_Apprenticeship': CWM059_Apprenticeship.impl,
   'CWM060_Attic': CWM060_Attic.impl,
   'CWM061_BackDoor': CWM061_BackDoor.impl,
+  'CWM062_BackyardWell': CWM062_BackyardWell.impl,
   'CWM063_Birdcage': CWM063_Birdcage.impl,
   'CWM064_Bonre': CWM064_Bonre.impl,
   'CWM065_BoundaryStones': CWM065_BoundaryStones.impl,
@@ -1834,9 +1842,11 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM073_DiamondMine': CWM073_DiamondMine.impl,
   'CWM074_Donkey': CWM074_Donkey.impl,
   'CWM076_DrainedPond': CWM076_DrainedPond.impl,
+  'CWM077_EdibleRoots': CWM077_EdibleRoots.impl,
   'CWM078_FarmSchool': CWM078_FarmSchool.impl,
   'CWM079_FestivalHall': CWM079_FestivalHall.impl,
   'CWM080_FishHook': CWM080_FishHook.impl,
+  'CWM081_FishPond': CWM081_FishPond.impl,
   'CWM082_FlowerPots': CWM082_FlowerPots.impl,
   'CWM083_FreeRangeChickens': CWM083_FreeRangeChickens.impl,
   'CWM085_Fruitcake': CWM085_Fruitcake.impl,
