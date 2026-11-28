@@ -1,9 +1,9 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
-import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
 import { dispatchableGuests, findDispatchableGuest } from '../../../domain/guests'
 import { addWorkerRef, findActionSpaceById } from '../../../domain/space'
 import { createCardWorkerSpace } from '../../../domain/card-worker-space'
+import { selectWorkerForMoorAction } from '../../../moor/heating'
 
 const ensureCardPseudoSpace = (state: GameState, cardId: string): ActionSpace => {
   const spaceId = `card-worker:${cardId}`
@@ -22,6 +22,9 @@ const cardSpendGuests = (state: GameState, player: PlayerState, sourceCard: stri
   sourceCard === undefined || actionContext?.guestId !== undefined || actionContext?.[FAMILY_PERSON_KEY] === true
     ? [] : dispatchableGuests(state, player)
 
+const availableFamilyWorker = (state: GameState, player: PlayerState) =>
+  selectWorkerForMoorAction(state, player, '')
+
 export const spendWorkerAction: ActionDefinition = {
   id: 'spend-worker',
   nameKey: 'actions.spend-worker.name',
@@ -30,13 +33,13 @@ export const spendWorkerAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) => context?.actionContext?.guestId !== undefined
     ? findDispatchableGuest(state, player, context.actionContext.guestId) !== undefined
-    : workersAvailable(state, player) > 0 || cardSpendGuests(state, player, context?.sourceCard, context?.actionContext).length > 0,
+    : availableFamilyWorker(state, player) !== null || cardSpendGuests(state, player, context?.sourceCard, context?.actionContext).length > 0,
   execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
     // A card that takes another person may take a Guest of this round instead of a family member.
     const guests = cardSpendGuests(state, player, sourceCard, actionContext)
     if (guests.length > 0) {
       const choices: ActionFlow[] = [
-        ...(workersAvailable(state, player) > 0 ? [{
+        ...(availableFamilyWorker(state, player) !== null ? [{
           type: 'leaf' as const, actionId: 'spend-worker', sourceCard,
           actionContext: { ...actionContext, [FAMILY_PERSON_KEY]: true }, choiceLabelKey: 'actions.place-farmer.name',
         }] : []),
@@ -50,7 +53,7 @@ export const spendWorkerAction: ActionDefinition = {
     }
     const guest = actionContext?.guestId === undefined ? undefined : findDispatchableGuest(state, player, actionContext.guestId)
     if (actionContext?.guestId !== undefined && !guest) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
-    const worker = guest ? undefined : smallestAvailableWorker(state, player)
+    const worker = guest ? undefined : availableFamilyWorker(state, player)
     const personId = guest?.id ?? worker?.id
     if (!personId) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }

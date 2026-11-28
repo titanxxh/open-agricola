@@ -357,5 +357,50 @@ describe('CWM090_Honeymoon & CWM036_MasterCook session', () => {
       ),
     )
     expect(unblockedAfterOpponent).toBe(true)
+
+    // 5. In Farmers of the Moor with worker '1' sick and worker '2' healthy, Master Cook spends healthy worker '2'
+    const moorSession = createWorkSession(
+      withManualReactionOrder({
+        seed: 3695,
+        options: { playerCount: 3, enableFarmersOfTheMoor: true },
+        configure: (state) => {
+          state.round = 1
+          for (const player of state.players) {
+            player.minorHand = ['__test_placeholder__']
+            player.occupationHand = ['__test_placeholder__']
+            player.resources.food = 10
+            setWorkersAtHome(state, player, 2)
+          }
+          state.players[0]!.occupationPlayed = [MASTER_COOK]
+          state.players[0]!.sickWorkerIds = ['1']
+        },
+      }),
+    )
+    sessions.push(moorSession)
+
+    let moorResp = confirmTurns(moorSession, moorSession.takeAnytimeAction(0, MASTER_COOK_ANYTIME_ID))
+    expect(
+      moorResp.state.actionSpaces.find((space) => space.id === `card-worker:${MASTER_COOK}`)
+        ?.takenBy,
+    ).toEqual([{ playerId: moorResp.state.players[0]!.id, workerId: '2' }])
+    // Seats 1 and 2 place; when rotation returns to Seat 0, activate the Guest turn and dispatch to day-laborer
+    confirmTurns(moorSession, moorSession.takeAction(1, 'forest'))
+    moorResp = confirmTurns(moorSession, moorSession.takeAction(2, 'clay-pit'))
+    expect(moorResp.state.currentPlayerIndex).toBe(0)
+    const activateMoorGuest = sessionOptions(moorResp).find(
+      (option) => option.labelKey === 'actions.activate-extra-turn.name',
+    )
+    if (activateMoorGuest) {
+      moorResp = moorSession.resolveChoice(0, activateMoorGuest.value)
+    }
+    const guestOnDayLaborer = sessionOptions(moorResp).find(
+      (option) => option.value === 'day-laborer',
+    )
+    expect(guestOnDayLaborer).toBeDefined()
+    confirmTurns(moorSession, moorSession.resolveChoice(0, 'day-laborer'))
+    confirmTurns(moorSession, moorSession.takeAction(1, 'reed-bank'))
+    confirmTurns(moorSession, moorSession.takeAction(2, 'grain-seeds'))
+    // Sick worker '1' cannot take fishing -> takeAction on Seat 0 is rejected
+    expect(moorSession.takeAction(0, 'fishing').ok).toBe(false)
   })
 })

@@ -1,4 +1,5 @@
 import { breedLeaf, canBreedAnimals } from '../../../actions/effects/breed'
+import { hasAffordableFoodExchange } from '../../../actions/effects/exchange'
 import { defineMinorCard } from '../../card-source'
 import { payLeaf } from '../../helpers/pay-gain-node'
 import type { CardImpl } from '../../registry'
@@ -6,27 +7,18 @@ import type { CardImpl } from '../../registry'
 const CARD_ID = 'CWM102_Ram'
 const EXTRA_BREED_ROUNDS = [6, 8, 10, 12]
 
-const sheepTierScore = (count: number): number => {
-  if (count <= 0) return -1
-  if (count <= 3) return 1
-  if (count <= 5) return 2
-  if (count <= 7) return 3
-  return 4
-}
-
 const cardImpl = {
   effect: {
     id: CARD_ID,
     computeBreedableAnimalCount: (_state, _player, animalType, count) =>
       animalType === 'sheep' ? count + 1 : undefined,
-    computeBonusScore: (_state, player, ctx) => {
-      const sheep =
-        ctx?.categories.find((category) => category.key === 'sheeps')?.quantity ??
-        player.resources.sheep
-      return sheepTierScore(sheep + 1) - sheepTierScore(sheep)
-    },
-    onHarvestFeedingPhase: () => ({
+    getRuleContributions: () => ({ scoringAnimals: { sheep: 1 } }),
+    onHarvestFeedingPhase: (state, player, ctx) => ({
       type: 'xor',
+      anytimeWindow: { allowed: true },
+      ...(player.resources.food < 1 && hasAffordableFoodExchange(state, player, ctx?.actionHooks)
+        ? { requiresExplicitChoice: true }
+        : {}),
       children: [
         payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
         {
