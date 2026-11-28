@@ -6,6 +6,7 @@ import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/s
 import type { GameState } from '../../shared/contract/types'
 
 const CARD_ID = 'B140_FarmyardWorker'
+const MUD_PATCH = 'A011_MudPatch'
 const sessions: GameSession[] = []
 const track = (session: GameSession) => { sessions.push(session); return session }
 const succeeded = (response: SessionResponse) => {
@@ -61,12 +62,13 @@ const sow = (session: GameSession, actor = 0) => {
 }
 
 const endWork = (session: GameSession, response: SessionResponse, actor = 0) => {
+  const round = response.state.round
   confirmNext(session, response)
   let last = succeeded(session.takeAction(actor, 'forest'))
   if (last.interaction.stateId === 'wait' && last.interaction.request.kind === 'confirm-next-player') {
     last = confirmNext(session, last)
   }
-  if (last.state.round === 10) last = succeeded(session.performRoundEnd())
+  if (last.state.round === round) last = succeeded(session.performRoundEnd())
   return last
 }
 
@@ -135,6 +137,65 @@ describe('B140 farmyard facts in its official three-player game', () => {
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(1)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.placedRound).toBe(response.state.round)
     expect(endWork(session, response).state.players[0]!.resources.food).toBe(2)
+  })
+
+  it.each([
+    { cardId: MUD_PATCH, placed: { boar: 1 }, food: 2 },
+    { cardId: 'B012_Stockyard', placed: {}, food: 0 },
+  ])('awards $food food for a new Pig Market boar housed by $cardId', ({ cardId, placed, food }) => {
+    const session = setup(0, state => {
+      state.round = 12
+      const player = state.players[0]!
+      player.minorPlayed = [cardId]
+      player.houseAnimals = { '2-0': 'sheep' }
+      player.resources.sheep = 1
+      state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1
+    })
+    const pending = succeeded(session.takeAction(0, 'pig-market'))
+    expect(pending.state.players[0]!.resources.boar).toBe(1)
+    if (pending.interaction.request.kind !== 'animal-reorg') throw new Error('Expected animal reorganization')
+    expect(pending.interaction.request.zones).toContainEqual(expect.objectContaining({ id: `card:${cardId}` }))
+    const response = succeeded(session.resolveChoice(0, 'confirm', { zones: [
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: `card:${cardId}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
+    ] }))
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.resources).toMatchObject({ boar: 1, food: 0 })
+    expect(response.state.events.findLast(event => event.type === 'farm.animalMoved')).toMatchObject({
+      newlyPlacedOnFarmyard: placed,
+    })
+    const ended = endWork(session, response)
+    expect(ended.state.round).toBe(13)
+    expect(ended.state.players[0]!.resources).toMatchObject({ boar: 1, food })
+    expect(ended.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID))
+      .toEqual(food > 0 ? [expect.objectContaining({ resources: { food } })] : [])
+    expect(ended.scores).toEqual(response.scores)
+  })
+
+  it.each(['onto', 'off'] as const)('does not qualify when a reorganization only moves an old boar %s Mud Patch', direction => {
+    const fromMudPatch = direction === 'off'
+    const session = setup(0, state => {
+      const player = state.players[0]!
+      player.minorPlayed = [MUD_PATCH]
+      if (fromMudPatch) player.cardStates[MUD_PATCH] = { extraData: { animalCounts: { boar: 1 } } }
+      else player.houseAnimals = { '2-0': 'boar' }
+      player.resources.boar = 1
+      state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep = 1
+    })
+    const pending = succeeded(session.takeAction(0, 'sheep-market'))
+    expect(pending.interaction.request.kind).toBe('animal-reorg')
+    const destination = fromMudPatch ? { id: 'house:2-0', zoneType: 'house' } : { id: `card:${MUD_PATCH}`, zoneType: 'card' }
+    const response = succeeded(session.resolveChoice(0, 'confirm', { zones: [
+      { ...destination, animalType: 'boar', animalCount: 1 },
+    ] }))
+    expect(response.state.players[0]!.resources).toMatchObject({ boar: 1, sheep: 0, food: 0 })
+    expect(response.state.players[0]!.houseAnimals).toEqual(fromMudPatch ? { '2-0': 'boar' } : {})
+    expect(response.state.events.findLast(event => event.type === 'farm.animalMoved')).toMatchObject({
+      animals: { boar: 1 }, newlyPlacedOnFarmyard: {},
+    })
+    const ended = endWork(session, response)
+    expect(ended.state.players[0]!.resources.food).toBe(0)
+    expect(ended.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toEqual([])
   })
 
   it('qualifies when a real card adds a crop to an existing farmyard field', () => {

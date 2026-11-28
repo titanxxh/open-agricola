@@ -238,6 +238,7 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 - **资源：** `store-on-card` leaf，用 `getStoredResource` 和 `take-from-card` 读回（`E052_Cubbyhole`）。"随时取走卡上的资源"用 `helpers/card-resource-withdrawal.ts` 里的 `cardResourceWithdrawal`（`CWM096_OakCask`）。
 - **农场上的资源：** 未使用格子上的一个 token 用 `helpers/farm-token-selection.ts` 里的 `farmTokenSelection`（`CWM064_Bonre`）；每个房间一个标记用 `helpers/room-food-markers.ts` 里的 `roomFoodMarkers`（`CWM071_Cookies`）。
 - **动物：** `meta.animalHolder: true`，并用 `effect.onComputeAnimalZones` 添加一个 `card:<id>` 区域（`B012_Stockyard`）。
+  容量全部来自实体农场格时使用 `buildFarmyardCardAnimalZone()`。绑定单格的区域传入 `farmPosition`（`M034_HomeWood`），汇总区域传入总容量（`A011_MudPatch`）。见[动物区域](architecture/domain_zh.md)。
 - **作物：** 修订版和经典版卡田都用 `makeCardFieldImpl`。卡牌可限制本田允许播种的轮次（`CFL006_EndiveField`；[cards](architecture/cards_zh.md#card-field-与-logical-field-seam)）。
 
 ### 4.13 还没放置的人，以及 "place another person"

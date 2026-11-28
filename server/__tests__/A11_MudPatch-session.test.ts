@@ -199,13 +199,16 @@ describe('ae-negative-05-housing', () => {
     })
   })
   describe('Mud Patch per-field boundary', () => {
-    it('A011 N6 aggregate zone proves total capacity but exposes no per field assignment', () => {
+    it('A011 N6 keeps the aggregate holder ID and stored animal counts for two fields', () => {
       const s = setup({ card: MUD, played: true, emptyFields: 2, houseSheep: true, markets: { 'pig-market': { boar: 3 } } })
       const r = turn(s, 0, 'pig-market'); const mud = reorg(r).filter(z => z.id === `card:${MUD}`)
       assert.equal(mud.length, 1); assert.equal(mud[0]!.capacity, 2)
       assert.equal(reorg(r).filter(z => z.zoneType === 'card').length, 1)
       const done = assign(s, 0, [house(), zone(`card:${MUD}`, 'boar', 2)])
       assert.equal(boars(done), 2); assert.ok(done.state.players[0]!.fields.every(f => f.stacks.length === 0))
+      expect(done.state.players[0]!.cardStates[MUD]?.extraData).toEqual({
+        animalCounts: { boar: 2 }, animalType: 'boar', held: 2,
+      })
     })
   })
 })

@@ -457,7 +457,9 @@ export const reorganizeAction: ActionDefinition = {
         const previous = readAnimalCountsForZoneAssignment(zone)[animal] ?? 0
         const next = readAnimalCountsForZoneAssignment(assignmentsById.get(zone.id))[animal] ?? 0
         movedExisting += Math.max(0, previous - next)
-        if (zone.zoneType !== 'card' || (zone.farmPosition && zone.ownerPlayerId === ctx.player.id)) {
+        const onFarmyard = zone.zoneType !== 'card' ||
+          (zone.ownerPlayerId === ctx.player.id && (zone.farmPosition || zone.farmyardBacked))
+        if (onFarmyard) {
           farmyardAdded += Math.max(0, next - previous)
         }
       }
