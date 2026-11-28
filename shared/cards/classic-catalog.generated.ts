@@ -1109,6 +1109,21 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CWM014_CropRotator",
+    "name": "Crop Rotator",
+    "deck": "CWM",
+    "number": 14,
+    "players": "1+",
+    "cost": {},
+    "vp": 0,
+    "desc": [
+      "Whenever you remove the last <GRAIN>/<VEGETABLE> from a <FIELD>, you may immediately __Sow__ a <VEGETABLE>/<GRAIN> in that <FIELD>. When you play this card, immediately take 1 <GRAIN> or <VEGETABLE> from each of your <FIELD> and place them in your supply."
+    ],
+    "artUrl": "assets/classic/CWM/CWM014.png",
+    "implemented": true,
+    "kind": "occupation"
+  },
+  {
     "id": "CWM015_DebrisDealer",
     "name": "Debris Dealer",
     "deck": "CWM",
@@ -1142,6 +1157,21 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM016.png",
+    "kind": "occupation"
+  },
+  {
+    "id": "CWM018_ExpertBuilder",
+    "name": "Expert Builder",
+    "deck": "CWM",
+    "number": 18,
+    "players": "3+",
+    "cost": {},
+    "vp": 0,
+    "desc": [
+      "Whenever any player (including you) builds 1 or more rooms, they must place 1 resource of those paid on this card. You may use these resources to pay for your extensions or renovations."
+    ],
+    "artUrl": "assets/classic/CWM/CWM018.png",
+    "implemented": true,
     "kind": "occupation"
   },
   {
@@ -1897,6 +1927,23 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM062_BackyardWell",
+    "name": "Backyard Well",
+    "deck": "CWM",
+    "number": 62,
+    "cost": {
+      "stone": 2,
+      "wood": 1
+    },
+    "vp": 2,
+    "desc": [
+      "Once this game, at any time, you may place 1 <STONE> from the general supply on 1 Unused farmyard space next to your home. (It now counts as used.) If you do this, place 1 <FOOD> on each of the next 3 Round spaces. At the start of these rounds, you receive the <FOOD>. (Backyard Well counts as a __Well__.)"
+    ],
+    "artUrl": "assets/classic/CWM/CWM062.png",
+    "implemented": true,
+    "kind": "minor"
+  },
+  {
     "blocksHouseAnimalZones": true,
     "id": "CWM063_Birdcage",
     "name": "Birdcage",
@@ -2160,6 +2207,21 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM077_EdibleRoots",
+    "name": "Edible Roots",
+    "deck": "CWM",
+    "number": 77,
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "3 fields",
+    "desc": [
+      "Whenever you harvest the last good from a <FIELD> and place it in your supply, you receive 1 <FOOD>."
+    ],
+    "artUrl": "assets/classic/CWM/CWM077.png",
+    "implemented": true,
+    "kind": "minor"
+  },
+  {
     "id": "CWM078_FarmSchool",
     "name": "Farm School",
     "deck": "CWM",
@@ -2222,6 +2284,24 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM080.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM081_FishPond",
+    "name": "Fish Pond",
+    "deck": "CWM",
+    "number": 81,
+    "cost": {
+      "clay": 1
+    },
+    "vp": 0,
+    "extraVp": true,
+    "prerequisite": "1 Unused space",
+    "desc": [
+      "Place 1 <CLAY> from the general supply on 1 Unused farmyard space. It now counts as used. Whenever you use the __space:fishing|Fishing__ action space, you may place some or all of the <FOOD> on this card. At the end of the game, you receive -1/1/2/3/4 bonus <SCORE> for 0/1/4/6/8 <FOOD> on this card."
+    ],
+    "artUrl": "assets/classic/CWM/CWM081.png",
+    "implemented": true,
     "kind": "minor"
   },
   {
