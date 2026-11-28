@@ -1513,6 +1513,24 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "occupation"
   },
   {
+    "id": "CWM036_MasterCook",
+    "name": "Master Cook",
+    "deck": "CWM",
+    "number": 36,
+    "desc": [
+      "Each round, instead of placing your first Family member on an Action space, you may place it on this card and receive 2 <FOOD> and 1 Guest token to place that round. (You may not do this if you will be placing more people after your first without another player placing in between.)"
+    ],
+    "cost": {},
+    "vp": 0,
+    "prerequisite": "",
+    "players": "3+",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM036.png",
+    "kind": "occupation"
+  },
+  {
     "id": "CWM037_MasterStableman",
     "name": "Master Stableman",
     "deck": "CWM",
@@ -2462,6 +2480,26 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "kind": "minor"
   },
   {
+    "id": "CWM090_Honeymoon",
+    "name": "Honeymoon",
+    "deck": "CWM",
+    "number": 90,
+    "desc": [
+      "In Round 14, you place 2 fewer Family members."
+    ],
+    "cost": {
+      "food": 2
+    },
+    "vp": 5,
+    "prerequisite": "Round 13 or before",
+    "maxRound": 13,
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM090.png",
+    "kind": "minor"
+  },
+  {
     "id": "CWM091_IronPlow",
     "name": "Iron Plow",
     "deck": "CWM",
@@ -2658,6 +2696,25 @@ export const classicCardDefinitions: readonly (CardDefinition & {
     "extraVp": false,
     "implemented": true,
     "artUrl": "/assets/classic/CWM/CWM101.png",
+    "kind": "minor"
+  },
+  {
+    "id": "CWM102_Ram",
+    "name": "Ram",
+    "deck": "CWM",
+    "number": 102,
+    "desc": [
+      "The Ram counts as a <SHEEP> in your farm for scoring and breeding, but must be fed 1 <FOOD> in the Feeding phase of each Harvest or it is discarded. Your <SHEEP> breed at the end of Rounds 6, 8, 10, and 12."
+    ],
+    "cost": {
+      "sheep": 1
+    },
+    "vp": 1,
+    "prerequisite": "",
+    "passing": false,
+    "extraVp": false,
+    "implemented": true,
+    "artUrl": "/assets/classic/CWM/CWM102.png",
     "kind": "minor"
   },
   {

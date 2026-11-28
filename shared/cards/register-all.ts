@@ -629,6 +629,7 @@ import { CWM032_Hunter } from './classic/CWM/CWM032_Hunter'
 import { CWM033_LadyinWaiting } from './classic/CWM/CWM033_LadyinWaiting'
 import { CWM034_LivestockKeeper } from './classic/CWM/CWM034_LivestockKeeper'
 import { CWM035_Mailman } from './classic/CWM/CWM035_Mailman'
+import { CWM036_MasterCook } from './classic/CWM/CWM036_MasterCook'
 import { CWM037_MasterStableman } from './classic/CWM/CWM037_MasterStableman'
 import { CWM038_Minimalist } from './classic/CWM/CWM038_Minimalist'
 import { CWM040_Permaculturist } from './classic/CWM/CWM040_Permaculturist'
@@ -678,6 +679,7 @@ import { CWM086_GlassblowersShop } from './classic/CWM/CWM086_GlassblowersShop'
 import { CWM087_GoldMedal } from './classic/CWM/CWM087_GoldMedal'
 import { CWM088_GrainElevator } from './classic/CWM/CWM088_GrainElevator'
 import { CWM089_HomeGarden } from './classic/CWM/CWM089_HomeGarden'
+import { CWM090_Honeymoon } from './classic/CWM/CWM090_Honeymoon'
 import { CWM091_IronPlow } from './classic/CWM/CWM091_IronPlow'
 import { CWM092_Keys } from './classic/CWM/CWM092_Keys'
 import { CWM093_Kindling } from './classic/CWM/CWM093_Kindling'
@@ -688,6 +690,7 @@ import { CWM097_OpenGate } from './classic/CWM/CWM097_OpenGate'
 import { CWM098_PettingZoo } from './classic/CWM/CWM098_PettingZoo'
 import { CWM100_PlumPatch } from './classic/CWM/CWM100_PlumPatch'
 import { CWM101_PrizewinningSheep } from './classic/CWM/CWM101_PrizewinningSheep'
+import { CWM102_Ram } from './classic/CWM/CWM102_Ram'
 import { CWM103_Raspberries } from './classic/CWM/CWM103_Raspberries'
 import { CWM105_RotherhamPlow } from './classic/CWM/CWM105_RotherhamPlow'
 import { CWM106_Ruins } from './classic/CWM/CWM106_Ruins'
@@ -1805,6 +1808,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM033_LadyinWaiting': CWM033_LadyinWaiting.impl,
   'CWM034_LivestockKeeper': CWM034_LivestockKeeper.impl,
   'CWM035_Mailman': CWM035_Mailman.impl,
+  'CWM036_MasterCook': CWM036_MasterCook.impl,
   'CWM037_MasterStableman': CWM037_MasterStableman.impl,
   'CWM038_Minimalist': CWM038_Minimalist.impl,
   'CWM040_Permaculturist': CWM040_Permaculturist.impl,
@@ -1854,6 +1858,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM087_GoldMedal': CWM087_GoldMedal.impl,
   'CWM088_GrainElevator': CWM088_GrainElevator.impl,
   'CWM089_HomeGarden': CWM089_HomeGarden.impl,
+  'CWM090_Honeymoon': CWM090_Honeymoon.impl,
   'CWM091_IronPlow': CWM091_IronPlow.impl,
   'CWM092_Keys': CWM092_Keys.impl,
   'CWM093_Kindling': CWM093_Kindling.impl,
@@ -1864,6 +1869,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'CWM098_PettingZoo': CWM098_PettingZoo.impl,
   'CWM100_PlumPatch': CWM100_PlumPatch.impl,
   'CWM101_PrizewinningSheep': CWM101_PrizewinningSheep.impl,
+  'CWM102_Ram': CWM102_Ram.impl,
   'CWM103_Raspberries': CWM103_Raspberries.impl,
   'CWM105_RotherhamPlow': CWM105_RotherhamPlow.impl,
   'CWM106_Ruins': CWM106_Ruins.impl,
