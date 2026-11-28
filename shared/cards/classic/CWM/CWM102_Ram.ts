@@ -21,6 +21,11 @@ const cardImpl = {
         : {}),
       children: [
         payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
+        // The feeding-phase anytime menu only lists cooking; the basic 1 grain / 1 vegetable -> 1 food
+        // conversion is offered here so it can still pay the fee when food runs out.
+        ...(player.resources.food < 1
+          ? (['grain', 'vegetable'] as const).map((crop) => payLeaf({ cardId: CARD_ID, cost: { [crop]: 1 } }))
+          : []),
         {
           type: 'leaf',
           actionId: 'special-effect',
