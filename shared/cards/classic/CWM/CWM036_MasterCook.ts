@@ -1,7 +1,7 @@
-import { peopleLeftToPlace } from '../../../actions/guest-turns'
 import { canPlaceWorkerOnSpace } from '../../../actions/helpers/placement-availability'
 import type { ActionHookRegistry } from '../../../actions/hooks'
 import type { GameState, PlayerState } from '../../../contract/types'
+import { hasPendingExtraTurn } from '../../card-effects'
 import { isGuestWorkerId } from '../../../domain/guests'
 import {
   activeWorkSnakeOpening,
@@ -18,8 +18,21 @@ import type { CardImpl } from '../../registry'
 
 const CARD_ID = 'CWM036_MasterCook'
 
+// Guests and supply people (Guest Room, Lady-in-Waiting, ...) are not family members.
+const isFamilyMember = (player: PlayerState, workerId: string): boolean =>
+  !isGuestWorkerId(workerId) &&
+  player.workers.some((worker) => worker.id === workerId && worker.supplyUse === undefined)
+
 const hasPlacedFamilyMemberThisRound = (player: PlayerState): boolean =>
-  getRoundPersonPlacementDetails(player).some((entry) => !isGuestWorkerId(entry.workerId))
+  getRoundPersonPlacementDetails(player).some((entry) => isFamilyMember(player, entry.workerId))
+
+// A player still has a turn this round: an ordinary worker or any pending extra
+// turn (Guests, Adoptive Parents' newborn, ...), the same test round end uses.
+const hasTurnLeft = (
+  state: GameState,
+  player: PlayerState,
+  actionHooks: ActionHookRegistry | undefined,
+): boolean => workersAvailable(state, player) > 0 || hasPendingExtraTurn(state, player, actionHooks)
 
 const countOtherPlayersPlacements = (state: GameState, playerId: string): number =>
   state.players
@@ -53,7 +66,7 @@ const hasAnotherPlayerBeforeNextTurn = (
 
   const willPlaceMoreAfterFirst =
     workersAvailable(state, player) > 1 ||
-    peopleLeftToPlace(state, player, actionHooks) > workersAvailable(state, player) ||
+    hasPendingExtraTurn(state, player, actionHooks) ||
     hasLegalSpaceForGrantedGuest(state, player, actionHooks)
   if (!willPlaceMoreAfterFirst) return true
 
@@ -65,7 +78,7 @@ const hasAnotherPlayerBeforeNextTurn = (
     let otherBeforeReverse = false
     for (let step = 1; step < stepsToStart; step += 1) {
       const other = state.players[(playerIdx + step) % count]
-      if (other && peopleLeftToPlace(state, other, actionHooks) > 0) {
+      if (other && hasTurnLeft(state, other, actionHooks)) {
         otherBeforeReverse = true
         break
       }
@@ -74,7 +87,7 @@ const hasAnotherPlayerBeforeNextTurn = (
   }
 
   return state.players.some(
-    (other) => other.id !== player.id && peopleLeftToPlace(state, other, actionHooks) > 0,
+    (other) => other.id !== player.id && hasTurnLeft(state, other, actionHooks),
   )
 }
 

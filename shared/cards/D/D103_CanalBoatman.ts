@@ -2,7 +2,8 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { peopleLeftToPlace } from '../../actions/guest-turns'
+import { dispatchableGuests } from '../../domain/guests'
+import { selectWorkerForMoorAction } from '../../moor/heating'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D103_CanalBoatman'
@@ -15,7 +16,9 @@ const listener: CardListenerRegistration = {
   phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !TRIGGER_SPACE_IDS.has(context.space.id)) return
-    if (peopleLeftToPlace(context.state, context.player, context.actionHooks) <= 0) return
+    // Same people `spend-worker` may take for a card: a healthy family member or a Guest.
+    if (selectWorkerForMoorAction(context.state, context.player, '') === null &&
+      dispatchableGuests(context.state, context.player).length === 0) return
     if (context.player.resources.food < 1) return
 
     return {

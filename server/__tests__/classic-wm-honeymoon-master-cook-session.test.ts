@@ -4,6 +4,7 @@ import { hasLegalPlaceFarmerTargets } from '../../shared/actions/effects/place-f
 import { CWM036_MasterCook } from '../../shared/cards/classic/CWM/CWM036_MasterCook'
 import { CWM090_Honeymoon } from '../../shared/cards/classic/CWM/CWM090_Honeymoon'
 import { getWorkersHeldOnCard } from '../../shared/cards/helpers/card-held-workers'
+import { pushToCardStack } from '../../shared/cards/helpers/card-state'
 import type { GameState } from '../../shared/contract/types'
 import {
   markAllWorkersUsed,
@@ -14,6 +15,7 @@ import {
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { playMinor, sessionOptions } from './_helpers/card-regression-session'
 import { confirmTurns } from './_helpers/classic-fl'
+import { chooseSupplyWorkerTurn } from './_helpers/supply-worker-turn'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { withManualReactionOrder } from './_helpers/trigger-select'
 
@@ -402,5 +404,67 @@ describe('CWM090_Honeymoon & CWM036_MasterCook session', () => {
     confirmTurns(moorSession, moorSession.takeAction(2, 'grain-seeds'))
     // Sick worker '1' cannot take fishing -> takeAction on Seat 0 is rejected
     expect(moorSession.takeAction(0, 'fishing').ok).toBe(false)
+  })
+})
+
+describe('CWM036_MasterCook placement counting', () => {
+  it('counts an opponent pending Adoptive Parents newborn turn as a placement in between', () => {
+    const session = setupThreePlayer(1, (state) => {
+      state.players[0]!.occupationPlayed = [MASTER_COOK]
+      state.players[0]!.resources.food = 0
+      // Seat 1: ordinary workers all out, one newborn activatable via A092_AdoptiveParents.
+      const p1 = state.players[1]!
+      setActiveWorkerCount(p1, 1)
+      setWorkersAtHome(state, p1, 0)
+      p1.workers.find((worker) => worker.isActive)!.isNewborn = true
+      p1.occupationPlayed = ['A092_AdoptiveParents']
+      p1.resources.food = 3
+      // Seat 2: ordinary workers all out, no extra turn.
+      setWorkersAtHome(state, state.players[2]!, 0)
+      state.currentPlayerIndex = 0
+    })
+
+    const initial = session.getState()
+    expect(workersAvailable(initial.state, initial.state.players[1]!)).toBe(0)
+    expect(initial.interaction.anytimeActions.some((entry) => entry.id === MASTER_COOK_ANYTIME_ID)).toBe(true)
+
+    const cooked = confirmTurns(session, session.takeAnytimeAction(0, MASTER_COOK_ANYTIME_ID))
+    expect(cooked.ok, cooked.error).toBe(true)
+    expect(cooked.state.players[0]!.resources.food).toBe(2)
+    expect(cooked.state.players[0]!.guests).toHaveLength(1)
+    expect(cooked.state.actionSpaces.find((space) => space.id === `card-worker:${MASTER_COOK}`)?.takenBy)
+      .toEqual([{ playerId: cooked.state.players[0]!.id, workerId: '1' }])
+  })
+
+  it('does not treat an earlier Guest Room supply person as the first family member', () => {
+    const session = setupThreePlayer(1, (state) => {
+      state.players[0]!.occupationPlayed = [MASTER_COOK]
+      state.currentPlayerIndex = 0
+    })
+    // Guest Room offers its supply turn on load, so add it after the idle fixture check.
+    const state = session.getState().state
+    const p0 = state.players[0]!
+    p0.minorPlayed = ['E022_GuestRoom']
+    pushToCardStack(p0, 'E022_GuestRoom', ['food'])
+    session.loadState(state)
+
+    chooseSupplyWorkerTurn(session, 'E022_GuestRoom')
+    const supplyPlaced = confirmTurns(session, session.resolveChoice(0, 'day-laborer'))
+    expect(supplyPlaced.ok, supplyPlaced.error).toBe(true)
+    const supplyWorkerId = supplyPlaced.state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy[0]!.workerId
+    expect(supplyPlaced.state.players[0]!.workers.find((worker) => worker.id === supplyWorkerId)?.supplyUse).toBeDefined()
+    expect(workersAvailable(supplyPlaced.state, supplyPlaced.state.players[0]!)).toBe(2)
+
+    confirmTurns(session, session.takeAction(1, 'forest'))
+    const back = confirmTurns(session, session.takeAction(2, 'clay-pit'))
+    expect(back.state.currentPlayerIndex).toBe(0)
+    expect(back.interaction.anytimeActions.some((entry) => entry.id === MASTER_COOK_ANYTIME_ID)).toBe(true)
+
+    const food = back.state.players[0]!.resources.food
+    const cooked = confirmTurns(session, session.takeAnytimeAction(0, MASTER_COOK_ANYTIME_ID))
+    expect(cooked.ok, cooked.error).toBe(true)
+    expect(cooked.state.players[0]!.resources.food).toBe(food + 2)
+    expect(cooked.state.players[0]!.guests).toHaveLength(1)
+    expect(workersAvailable(cooked.state, cooked.state.players[0]!)).toBe(1)
   })
 })
