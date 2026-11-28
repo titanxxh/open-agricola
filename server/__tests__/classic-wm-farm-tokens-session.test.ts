@@ -195,4 +195,29 @@ describe('CWM062_BackyardWell & CWM081_FishPond session', () => {
     expect(afterStore8.state.players[0]!.cardStates[FISH_POND]?.counters?.food).toBe(8)
     expect(cardBonusScore(afterStore8, FISH_POND)).toBe(4)
   })
+
+  it('wires Backyard Well wellIdentity into Storage Barn (+1 stone) without counting as Major Well for Water Gully', () => {
+    const session = setup(1, (state) => {
+      const p0 = state.players[0]!
+      p0.minorPlayed = [BACKYARD_WELL]
+      p0.minorHand = ['A006_StorageBarn', 'E042_WaterGully', FISH_POND]
+      Object.assign(p0.resources, { stone: 1, clay: 1 })
+    })
+
+    let meeting = session.takeAction(0, 'meeting-place')
+    const branch = sessionOptions(meeting).find((o) => o.value.startsWith('action-improvement-'))
+    if (branch) {
+      meeting = session.resolveChoice(0, branch.value)
+    }
+    const minorOptions = sessionOptions(meeting)
+    expect(minorOptions.some((o) => o.value === 'A006_StorageBarn')).toBe(true)
+    // E042_WaterGully explicitly requires "Major Well", so minor Backyard Well does not unlock it:
+    expect(minorOptions.some((o) => o.value === 'E042_WaterGully')).toBe(false)
+
+    const playedBarn = session.resolveChoice(0, 'A006_StorageBarn')
+    expect(playedBarn.ok, playedBarn.error).toBe(true)
+    // A006_StorageBarn is a passing minor (passes to player 1's hand) and awards 1 stone from Backyard Well's wellIdentity:
+    expect(playedBarn.state.players[1]!.minorHand).toContain('A006_StorageBarn')
+    expect(playedBarn.state.players[0]!.resources.stone).toBe(2)
+  })
 })

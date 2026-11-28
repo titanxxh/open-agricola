@@ -1,4 +1,5 @@
 import { defineMinorCard } from '../card-source'
+import { playerHasCardCapability } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A006_StorageBarn'
@@ -8,7 +9,7 @@ const cardImpl = {
   id: CARD_ID,
   onBuy: (_state, player) => {
     const gains: Record<string, number> = {}
-    if (player.improvements.includes('Major_Well')) gains.stone = 1
+    if (playerHasCardCapability(player, 'wellIdentity')) gains.stone = 1
     if (player.improvements.includes('Major_Joinery')) gains.wood = 1
     if (player.improvements.includes('Major_Pottery')) gains.clay = 1
     if (player.improvements.includes('Major_Basket')) gains.reed = 1

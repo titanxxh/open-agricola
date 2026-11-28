@@ -15,6 +15,7 @@ describe('card display metadata serialization', () => {
       cookingHearthIdentity: true,
       ovenIdentity: true,
       potteryIdentity: true,
+      wellIdentity: true,
       waresSalesmanGains: [{ wood: 1, reed: 1 }],
     })
 
@@ -25,6 +26,7 @@ describe('card display metadata serialization', () => {
       cookingHearthIdentity: true,
       ovenIdentity: true,
       potteryIdentity: true,
+      wellIdentity: true,
       waresSalesmanGains: [{ wood: 1, reed: 1 }],
     })
   })

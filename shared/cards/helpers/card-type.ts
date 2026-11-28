@@ -69,6 +69,7 @@ export type CardCapability =
   | 'ovenIdentity'
   | 'joineryIdentity'
   | 'potteryIdentity'
+  | 'wellIdentity'
   | 'animalHolder'
   | 'blocksHouseAnimalZones'
   | 'blocksRenovation'

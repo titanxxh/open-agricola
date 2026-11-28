@@ -77,6 +77,7 @@ export type CardDefinition = {
   firewoodBuildTrigger?: boolean
   joineryIdentity?: boolean
   potteryIdentity?: boolean
+  wellIdentity?: boolean
   preventsHandDiscard?: boolean
   animalHolder?: boolean
   blocksHouseAnimalZones?: boolean

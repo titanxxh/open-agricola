@@ -1,11 +1,12 @@
 import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { playerHasCardCapability } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E042_WaterGully'
 
 const cardImpl = {
-  prerequisiteCheck: (player) => player.improvements.includes('Major_Well'),
+  prerequisiteCheck: (player) => playerHasCardCapability(player, 'wellIdentity', { asType: 'major' }),
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

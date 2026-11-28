@@ -55,6 +55,7 @@ export const CWM062_BackyardWell = defineMinorCard({
     number: 62,
     cost: { stone: 2, wood: 1 },
     vp: 2,
+    wellIdentity: true,
     desc: [
       'Once this game, at any time, you may place 1 <STONE> from the general supply on 1 Unused farmyard space next to your home. (It now counts as used.) If you do this, place 1 <FOOD> on each of the next 3 Round spaces. At the start of these rounds, you receive the <FOOD>. (Backyard Well counts as a __Well__.)',
     ],

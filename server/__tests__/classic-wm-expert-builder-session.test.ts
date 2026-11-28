@@ -199,4 +199,41 @@ describe('CWM018_ExpertBuilder session', () => {
     expect(stableBuilt.interaction.request.kind).toBe('confirm-next-player')
     expect(stableBuilt.state.players[0]!.cardStates[EXPERT]?.counters?.wood).toBe(2)
   })
+
+  it('requires placing 1 paid resource back on Expert Builder even when a room extension is funded 100% from stored resources', () => {
+    const session = setup(1, (state) => {
+      const p0 = state.players[0]!
+      p0.occupationPlayed = [EXPERT]
+      p0.cardStates[EXPERT] = { counters: { wood: 5, reed: 2 } }
+      Object.assign(p0.resources, { wood: 0, reed: 0, clay: 0, stone: 0 })
+    })
+
+    const expand = session.takeAction(0, 'farm-expansion')
+    const constructBranch = sessionOptions(expand).find((o) => o.value.includes('construct'))
+    if (constructBranch) {
+      session.resolveChoice(0, constructBranch.value)
+    }
+    let afterRoom = session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })
+    expect(afterRoom.ok, afterRoom.error).toBe(true)
+    const payOpt = sessionOptions(afterRoom).find((o) => o.effectPreview?.kind === 'payment')
+    if (payOpt) {
+      afterRoom = session.resolveChoice(0, payOpt.value)
+    }
+
+    assert(afterRoom.interaction.stateId === 'wait')
+    expect(afterRoom.interaction.playerIndex).toBe(0)
+    expect(afterRoom.interaction.sourceCard).toBe(EXPERT)
+    const storeChoices = sessionOptions(afterRoom)
+    expect(storeChoices.map((o) => o.labelKey).sort()).toEqual(['resources.reed', 'resources.wood'])
+
+    const putBackReed = storeChoices.find((o) => o.labelKey === 'resources.reed')!
+    const completed = session.resolveChoice(0, putBackReed.value)
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.players[0]!.rooms).toBe(3)
+    expect(completed.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0 })
+    expect(completed.state.players[0]!.cardStates[EXPERT]?.counters).toMatchObject({
+      wood: 0,
+      reed: 1,
+    })
+  })
 })
