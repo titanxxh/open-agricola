@@ -14,6 +14,7 @@ import { isPaymentResourceKey } from '../../../contract/resource-keys'
 import { cardEffectHandChangedEvent } from '../../../session/private-hand-events'
 import { defineMinorCard } from '../../card-source'
 import { playerHasCardCapability } from '../../helpers/card-type'
+import { payLeaf } from '../../helpers/pay-gain-node'
 import { isUsedThisTurnOrGap, markUsedThisTurnOrGapLeaf } from '../../helpers/turn-token'
 import type { CardImpl } from '../../registry'
 
@@ -155,16 +156,18 @@ const cardImpl = {
           return context.doable ? undefined : { doable: true }
         }
         const baseParams = context.params && 'cost' in context.params ? context.params : {}
+        const discountedLeaf = payLeaf({
+          cardId: context.sourceCard ?? CARD_ID,
+          cost: discounted,
+          choiceLabelKey: `cards.${CARD_ID}.name`,
+        })
         return {
           decline: true,
           sourceCard: CARD_ID,
-          alternativeFlow: {
-            type: 'leaf',
-            actionId: 'pay',
-            sourceCard: context.sourceCard ?? CARD_ID,
-            choiceLabelKey: `cards.${CARD_ID}.name`,
-            params: { ...baseParams, cost: discounted },
-          },
+          alternativeFlow:
+            discountedLeaf.type === 'leaf' && Object.keys(baseParams).length > 0
+              ? { ...discountedLeaf, params: { ...baseParams, ...discountedLeaf.params } }
+              : discountedLeaf,
         }
       },
     },
