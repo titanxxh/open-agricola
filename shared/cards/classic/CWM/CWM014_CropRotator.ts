@@ -1,11 +1,10 @@
+import { receiveFromCardLeaf } from '../../../actions/effects/receive'
 import { registerAdHocAction } from '../../../actions/helpers/ad-hoc-action-registry'
 import type { DraftGameEvent, FarmCropRemovedEvent, ResourceLocation } from '../../../contract/events'
 import type { ActionFlow, FarmTilePosition, Resource } from '../../../contract/types'
 import { permittedSowCrops } from '../../../domain/farmyard-interaction'
-import { addResourcesFromCards } from '../../../session/stats'
 import type { CardListenerContext } from '../../card-listeners'
 import { defineOccupationCard } from '../../card-source'
-import { addCardResourceGained } from '../../helpers/card-state'
 import { getLogicalFields, mutateLogicalFields, type LogicalField } from '../../helpers/card-field'
 import type { CardImpl } from '../../registry'
 
@@ -68,25 +67,12 @@ registerAdHocAction({
         entry.field.kind === 'card'
           ? { kind: 'card', playerId: player.id, cardId: entry.field.sourceCard! }
           : { kind: 'field', playerId: player.id, row: entry.field.row, col: entry.field.col }
-      player.resources[entry.crop] = (player.resources[entry.crop] ?? 0) + 1
       gainedTotals[entry.crop] = (gainedTotals[entry.crop] ?? 0) + 1
       removedCrops.push({ location, crop: entry.crop, amount: 1 })
-      eventSink?.emit<'resource.moved'>({
-        type: 'resource.moved',
-        resources: { [entry.crop]: 1 },
-        from: location,
-        to: { kind: 'player', playerId: player.id },
-        reason: 'cardEffect',
-        sourceCardId: CARD_ID,
-      })
       const callbackFlow = result.ownerCallback?.()
       if (callbackFlow) ownerFlows.push(callbackFlow)
     }
 
-    if (Object.keys(gainedTotals).length > 0) {
-      addResourcesFromCards(player, gainedTotals)
-      addCardResourceGained(player, CARD_ID, gainedTotals)
-    }
     if (removedCrops.length > 0) {
       eventSink?.emit<'farm.cropRemoved'>({
         type: 'farm.cropRemoved',
@@ -95,10 +81,19 @@ registerAdHocAction({
         reason: 'cardEffect',
       })
     }
-    if (ownerFlows.length === 0) return { type: 'ok', resourcesGained: gainedTotals }
+    const followUpChildren: ActionFlow[] = [
+      ...(Object.keys(gainedTotals).length > 0 ? [receiveFromCardLeaf(CARD_ID, gainedTotals)] : []),
+      ...(ownerFlows.length <= 1
+        ? ownerFlows
+        : [{ type: 'parallel' as const, children: ownerFlows }]),
+    ]
+    if (followUpChildren.length === 0) return { type: 'ok' }
     return {
       type: 'flow',
-      flow: ownerFlows.length === 1 ? ownerFlows[0]! : { type: 'parallel', children: ownerFlows },
+      flow:
+        followUpChildren.length === 1
+          ? followUpChildren[0]!
+          : { type: 'seq', children: followUpChildren },
     }
   },
 })

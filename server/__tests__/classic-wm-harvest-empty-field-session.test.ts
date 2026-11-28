@@ -306,14 +306,16 @@ describe('CWM014_CropRotator & CWM077_EdibleRoots session', () => {
       { kind: 'grain', remaining: 3 },
     ])
 
-    // 2. Playing CWM014 with a stone-bearing field (C006_StoneClearing) takes ONLY grain/vegetable and leaves stone on field!
+    // 2. Playing CWM014 with a stone-bearing field (C006_StoneClearing) AND B021_HayloftBarn in play:
+    // takes ONLY grain/vegetable (leaving stone on field) via standard receive leaf so Hayloft Barn releases 1 food!
     const stoneFieldSession = setup(1, (state) => {
       const p0 = state.players[0]!
       p0.occupationHand = [ROTATOR]
-      p0.minorPlayed = ['C006_StoneClearing']
-      Object.assign(p0.resources, { grain: 0, vegetable: 0, stone: 0 })
+      p0.minorPlayed = ['C006_StoneClearing', 'B021_HayloftBarn']
+      p0.cardStates.B021_HayloftBarn = { extraData: { foodCount: 4 } }
+      Object.assign(p0.resources, { grain: 0, vegetable: 0, stone: 0, food: 10 })
       p0.fields = [
-        { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },
+        { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
         { row: 0, col: 3, stacks: [{ kind: 'stone', remaining: 1 }] },
       ]
     })
@@ -324,10 +326,19 @@ describe('CWM014_CropRotator & CWM077_EdibleRoots session', () => {
     ) {
       playedWithStone = stoneFieldSession.resolveChoice(0, ROTATOR)
     }
+    const hayloftOpt = sessionOptions(playedWithStone).find((o) => o.sourceCard === 'B021_HayloftBarn')
+    if (hayloftOpt) {
+      playedWithStone = stoneFieldSession.resolveChoice(0, hayloftOpt.value)
+    }
     expect(playedWithStone.ok, playedWithStone.error).toBe(true)
-    expect(playedWithStone.state.players[0]!.resources).toMatchObject({ grain: 1, stone: 0 })
+    expect(playedWithStone.state.players[0]!.resources).toMatchObject({
+      grain: 1,
+      stone: 0,
+      food: 11,
+    })
+    expect(playedWithStone.state.players[0]!.cardStates.B021_HayloftBarn?.extraData?.foodCount).toBe(3)
     expect(playedWithStone.state.players[0]!.fields).toEqual([
-      { row: 0, col: 2, stacks: [] },
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },
       { row: 0, col: 3, stacks: [{ kind: 'stone', remaining: 1 }] },
     ])
 
