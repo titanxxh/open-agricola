@@ -1,7 +1,7 @@
 import { canPlaceWorkerOnSpace } from '../../../actions/helpers/placement-availability'
 import type { ActionHookRegistry } from '../../../actions/hooks'
 import type { GameState, PlayerState } from '../../../contract/types'
-import { hasPendingExtraTurn } from '../../card-effects'
+import { hasPendingExtraTurn, shouldSkipPlayerTurn } from '../../card-effects'
 import { isGuestWorkerId } from '../../../domain/guests'
 import {
   activeWorkSnakeOpening,
@@ -33,6 +33,19 @@ const hasTurnLeft = (
   player: PlayerState,
   actionHooks: ActionHookRegistry | undefined,
 ): boolean => workersAvailable(state, player) > 0 || hasPendingExtraTurn(state, player, actionHooks)
+
+// Whether `player` actually places on their next turn: a planned skip (e.g. D134_OysterEater)
+// passes it. Skip handlers consume their counter in `cardStates`, so they run on a copy.
+const placesOnNextTurn = (
+  state: GameState,
+  player: PlayerState,
+  actionHooks: ActionHookRegistry | undefined,
+): boolean =>
+  hasTurnLeft(state, player, actionHooks) &&
+  !shouldSkipPlayerTurn(state, {
+    ...player,
+    cardStates: JSON.parse(JSON.stringify(player.cardStates ?? {})) as PlayerState['cardStates'],
+  })
 
 const countOtherPlayersPlacements = (state: GameState, playerId: string): number =>
   state.players
@@ -78,7 +91,7 @@ const hasAnotherPlayerBeforeNextTurn = (
     let otherBeforeReverse = false
     for (let step = 1; step < stepsToStart; step += 1) {
       const other = state.players[(playerIdx + step) % count]
-      if (other && hasTurnLeft(state, other, actionHooks)) {
+      if (other && placesOnNextTurn(state, other, actionHooks)) {
         otherBeforeReverse = true
         break
       }
@@ -87,7 +100,7 @@ const hasAnotherPlayerBeforeNextTurn = (
   }
 
   return state.players.some(
-    (other) => other.id !== player.id && hasTurnLeft(state, other, actionHooks),
+    (other) => other.id !== player.id && placesOnNextTurn(state, other, actionHooks),
   )
 }
 
@@ -146,9 +159,6 @@ const cardImpl = {
       phases: ['isDoable'],
       handler: (context) => {
         if (context.actionSpaceUse?.newPlacement !== true) return
-        const isGuestPlacement =
-          (context.actionContext?.workerSource as { kind?: unknown } | undefined)?.kind === 'guest'
-        if (isGuestPlacement) return
         if (
           readCardExtraData<number>(context.player, CARD_ID, 'usedRound') === context.state.round &&
           readCardExtraData<number>(context.player, CARD_ID, 'othersPlaced') ===

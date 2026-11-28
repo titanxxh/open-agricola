@@ -436,6 +436,29 @@ describe('CWM036_MasterCook placement counting', () => {
       .toEqual([{ playerId: cooked.state.players[0]!.id, workerId: '1' }])
   })
 
+  it('does not count an opponent whose next turn D134_OysterEater skips as a placement in between', () => {
+    const session = setupThreePlayer(1, (state) => {
+      state.players[0]!.occupationPlayed = [MASTER_COOK]
+      // Seat 1: one worker left, but its next placement is skipped.
+      const p1 = state.players[1]!
+      setWorkersAtHome(state, p1, 1)
+      p1.occupationPlayed = ['D134_OysterEater']
+      p1.cardStates = { ...(p1.cardStates ?? {}), D134_OysterEater: { extraData: { skipNextPlacement: 1, skipRound: 1 } } }
+      // Seat 2: ordinary workers all out.
+      setWorkersAtHome(state, state.players[2]!, 0)
+      state.currentPlayerIndex = 0
+    })
+
+    const initial = session.getState()
+    expect(workersAvailable(initial.state, initial.state.players[1]!)).toBe(1)
+    expect(initial.interaction.anytimeActions.some((entry) => entry.id === MASTER_COOK_ANYTIME_ID)).toBe(false)
+    const rejected = session.takeAnytimeAction(0, MASTER_COOK_ANYTIME_ID)
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players[0]!.guests ?? []).toHaveLength(0)
+    // The skip counter is still pending for Seat 1's real turn.
+    expect(rejected.state.players[1]!.cardStates.D134_OysterEater?.extraData?.skipNextPlacement).toBe(1)
+  })
+
   it('does not treat an earlier Guest Room supply person as the first family member', () => {
     const session = setupThreePlayer(1, (state) => {
       state.players[0]!.occupationPlayed = [MASTER_COOK]

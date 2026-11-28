@@ -310,6 +310,36 @@ describe('CWM102_Ram session', () => {
     expect(r2.state.players[0]!.resources.begging).toBe(4) // 4 from 2 unfed family members, 0 from Ram!
     expect(r2.state.players[0]!.resources.sheep).toBe(1)
 
+    // 3b. With 0 food but 1 grain and no cooking improvement, the basic grain -> food conversion can fund the fee: keep the choice
+    const grainToFeedRam = setup(7, (state) => {
+      const p0 = state.players[0]!
+      p0.minorPlayed = [RAM]
+      p0.resources.food = 0
+      p0.resources.grain = 1
+      addSheepPasture(state, 1)
+    })
+    confirmTurns(grainToFeedRam, grainToFeedRam.takeAction(0, 'clay-pit'))
+    confirmTurns(grainToFeedRam, grainToFeedRam.takeAction(1, 'forest'))
+    confirmTurns(grainToFeedRam, grainToFeedRam.takeAction(0, 'reed-bank'))
+    let rGrain = stepUntil(
+      grainToFeedRam,
+      grainToFeedRam.takeAction(1, 'day-laborer'),
+      (resp) =>
+        resp.interaction.stateId === 'wait' &&
+        resp.interaction.request.kind === 'choice' &&
+        sessionOptions(resp).some((option) => option.sourceCard === RAM),
+    )
+    expect(rGrain.state.players[0]!.minorPlayed).toContain(RAM)
+    expect(rGrain.state.players[0]!.resources.grain).toBe(1)
+    const payWithGrain = sessionOptions(rGrain).find(
+      (option) => option.labelKey === 'actions.pay.name' && !option.disabled,
+    )
+    assert(payWithGrain)
+    rGrain = stepUntil(grainToFeedRam, grainToFeedRam.resolveChoice(0, payWithGrain.value))
+    expect(rGrain.state.round).toBe(8)
+    expect(rGrain.state.players[0]!.minorPlayed).toContain(RAM)
+    expect(rGrain.state.players[0]!.resources.grain).toBe(0)
+
     // 4. Stays silent at Round 5 end (not 6/8/10/12) even with 1 physical sheep, and at Round 6 end with 0 physical sheep
     const roundFive = setup(5, (state) => {
       state.players[0]!.minorPlayed = [RAM]
