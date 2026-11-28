@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
-import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
+import { CWM087_GoldMedal } from '../../shared/cards/classic/CWM/CWM087_GoldMedal'
 import { CWM102_Ram } from '../../shared/cards/classic/CWM/CWM102_Ram'
+import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
+import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import type { GameState } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
@@ -11,14 +13,16 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { withManualReactionOrder } from './_helpers/trigger-select'
 
 const RAM = CWM102_Ram.meta.id
+const GOLD_MEDAL = CWM087_GoldMedal.meta.id
+const LORD_OF_MANOR = 'D100_LordoftheManor'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 
-function addSheepPasture(state: GameState, sheepCount: number) {
-  const p0 = state.players[0]!
-  p0.resources.sheep = sheepCount
-  p0.pastures = [
+function addSheepPasture(state: GameState, sheepCount: number, playerIndex = 0) {
+  const player = state.players[playerIndex]!
+  player.resources.sheep = sheepCount
+  player.pastures = [
     {
       id: 'pasture-1',
       tiles: [
@@ -27,13 +31,17 @@ function addSheepPasture(state: GameState, sheepCount: number) {
       ],
       animalType: sheepCount > 0 ? 'sheep' : null,
       animalCount: sheepCount,
-      stableCount: 0,
+      stableCount: 3,
     },
   ]
-  p0.fenceSegments = ['H-0-1', 'H-0-2', 'H-1-1', 'H-1-2', 'V-0-1', 'V-0-3'].map((edge) => ({
+  player.stableTiles = [
+    { row: 0, col: 1 },
+    { row: 0, col: 2 },
+  ]
+  player.fenceSegments = ['H-0-1', 'H-0-2', 'H-1-1', 'H-1-2', 'V-0-1', 'V-0-3'].map((edge) => ({
     edge,
     type: 'fence' as const,
-    source: { kind: 'own' as const, ownerPlayerId: p0.id },
+    source: { kind: 'own' as const, ownerPlayerId: player.id },
   }))
 }
 
@@ -100,7 +108,7 @@ function stepUntil(
 }
 
 describe('CWM102_Ram session', () => {
-  it('pays 1 sheep on play, is not cookable as a physical sheep, scores as +1 sheep, breeds at Round 6 end, and feeds 1 food to stay and breed in Round 7 Harvest', () => {
+  it('pays 1 sheep on play, is not cookable as a physical sheep, counts in the sheeps scoring category (including Lord of the Manor and Gold Medal), breeds at Round 6 end, and feeds 1 food to stay and breed in Round 7 Harvest', () => {
     const session = setup(6, (state) => {
       const p0 = state.players[0]!
       p0.minorHand = [RAM]
@@ -120,7 +128,7 @@ describe('CWM102_Ram session', () => {
     expect(r.state.currentPlayerIndex).toBe(0)
 
     // Verify if the sole physical sheep is cooked on Fireplace, sheep becomes 0, Ram CANNOT be cooked,
-    // and scoring treats 0 physical sheep + Ram = 1 sheep (-1 -> +1 => +2 bonus VP, plus +1 printed VP)
+    // and scoring counts 0 physical sheep + Ram = 1 sheep directly in the sheeps category (score 1 instead of -1)
     const openCook = session.takeAnytimeAction(0, 'exchange')
     expect(openCook.ok, openCook.error).toBe(true)
     const tradeOpt = sessionOptions(openCook).find(
@@ -130,14 +138,13 @@ describe('CWM102_Ram session', () => {
     const cooked = session.resolveChoice(0, tradeOpt.value)
     expect(cooked.ok, cooked.error).toBe(true)
     expect(cooked.state.players[0]!.resources.sheep).toBe(0)
-    // With 0 physical sheep, exchange is no longer available — Ram cannot be cooked!
     expect(
       cooked.interaction.anytimeActions.some((entry) => entry.id === 'exchange'),
     ).toBe(false)
-    const zeroSheepBonus = cooked.scores[0]!.categories
-      .find((category) => category.key === 'cardBonusVp')
-      ?.entries.find((entry) => entry.type === 'bonus' && entry.cardId === RAM)
-    expect(zeroSheepBonus?.score).toBe(2)
+    const zeroSheepCategory = cooked.scores[0]!.categories.find(
+      (category) => category.key === 'sheeps',
+    )
+    expect(zeroSheepCategory).toMatchObject({ quantity: 1, total: 1 })
 
     // Undo the Fireplace cook and close the anytime exchange menu so 1 physical sheep remains
     r = session.undoStep()
@@ -182,14 +189,46 @@ describe('CWM102_Ram session', () => {
     expect(r.state.players[0]!.resources.food).toBe(9)
     expect(r.state.players[0]!.resources.begging).toBe(0)
     expect(r.state.players[0]!.resources.sheep).toBe(3)
-    // 3 physical sheep + 1 Ram = 4 sheep -> sheep tier rises from 1 VP (1-3) to 2 VP (4-5) => +1 bonus VP!
-    const threeSheepBonus = r.scores[0]!.categories
-      .find((category) => category.key === 'cardBonusVp')
-      ?.entries.find((entry) => entry.type === 'bonus' && entry.cardId === RAM)
-    expect(threeSheepBonus?.score).toBe(1)
+    // 3 physical sheep + 1 Ram = 4 sheep directly in sheeps category (2 VP)!
+    expect(r.scores[0]!.categories.find((category) => category.key === 'sheeps')).toMatchObject({
+      quantity: 4,
+      total: 2,
+    })
+
+    // Mixed-edition category consumers: 7 physical sheep + Ram = 8 sheep (4 VP) triggers D100_LordoftheManor
+    // and wins CWM087_GoldMedal outright against an opponent with 7 sheep (3 VP)
+    const categorySession = setup(7, (state) => {
+      addSheepPasture(state, 7, 0)
+      addSheepPasture(state, 7, 1)
+      state.players[0]!.minorPlayed = [RAM, GOLD_MEDAL]
+      state.players[0]!.occupationPlayed = [LORD_OF_MANOR]
+      writeCardExtraData(state.players[0]!, GOLD_MEDAL, 'category', 'sheeps')
+    })
+    const categoryState = categorySession.getState()
+    expect(
+      categoryState.scores[0]!.categories.find((category) => category.key === 'sheeps'),
+    ).toMatchObject({ quantity: 8, total: 4 })
+    expect(
+      categoryState.scores[1]!.categories.find((category) => category.key === 'sheeps'),
+    ).toMatchObject({ quantity: 7, total: 3 })
+    const p0Bonuses = categoryState.scores[0]!.categories.find(
+      (category) => category.key === 'cardBonusVp',
+    )?.entries
+    const p1Bonuses = categoryState.scores[1]!.categories.find(
+      (category) => category.key === 'cardBonusVp',
+    )?.entries
+    expect(
+      p0Bonuses?.find((entry) => entry.type === 'bonus' && entry.cardId === LORD_OF_MANOR)?.score,
+    ).toBe(1)
+    expect(
+      p0Bonuses?.find((entry) => entry.type === 'bonus' && entry.cardId === GOLD_MEDAL)?.score,
+    ).toBe(2)
+    expect(
+      p1Bonuses?.find((entry) => entry.type === 'bonus' && entry.cardId === GOLD_MEDAL),
+    ).toBeUndefined()
   })
 
-  it('allows discarding Ram in Harvest to save food for family (0 begging, stops breeding), auto-discards with 0 food and no conversions, and stays silent without a physical sheep or outside Rounds 6/8/10/12', () => {
+  it('allows voluntary discard, preserves feeding choice when cooking can fund 1 food from 0 food, auto-discards with 0 food and no conversions, and stays silent without a physical sheep or outside Rounds 6/8/10/12', () => {
     // 1. Voluntary discard when food reaches 4 at Harvest saves all 4 food for family (0 begging) and prevents breeding with 1 physical sheep
     const voluntaryDiscard = setup(7, (state) => {
       const p0 = state.players[0]!
@@ -217,7 +256,45 @@ describe('CWM102_Ram session', () => {
     expect(r1.state.players[0]!.resources.begging).toBe(0)
     expect(r1.state.players[0]!.resources.sheep).toBe(1) // did not breed after Ram was discarded!
 
-    // 2. Auto-discards without prompting when food = 0 and no anytime conversions exist (Minimal prompts; no extra begging from Ram)
+    // 2. When food = 0 at Harvest but Fireplace + 1 sheep can fund Ram's fee, pauses on Ram's explicit choice so player can cook and feed Ram!
+    const cookToFeedRam = setup(7, (state) => {
+      const p0 = state.players[0]!
+      p0.minorPlayed = [RAM]
+      p0.improvements = ['Major_Fireplace1']
+      takeMajorImprovementFromSupply(state, 'Major_Fireplace1')
+      p0.resources.food = 0
+      addSheepPasture(state, 1)
+    })
+    confirmTurns(cookToFeedRam, cookToFeedRam.takeAction(0, 'clay-pit'))
+    confirmTurns(cookToFeedRam, cookToFeedRam.takeAction(1, 'forest'))
+    confirmTurns(cookToFeedRam, cookToFeedRam.takeAction(0, 'reed-bank'))
+    let rCook = stepUntil(
+      cookToFeedRam,
+      cookToFeedRam.takeAction(1, 'day-laborer'),
+      (resp) =>
+        resp.interaction.stateId === 'wait' &&
+        resp.interaction.request.kind === 'choice' &&
+        sessionOptions(resp).some((option) => option.sourceCard === RAM),
+    )
+    expect(rCook.state.players[0]!.minorPlayed).toContain(RAM)
+    const menu = cookToFeedRam.takeAnytimeAction(0, 'exchange')
+    expect(menu.ok, menu.error).toBe(true)
+    const cookSheep = sessionOptions(menu).find(
+      (option) => option.value.startsWith('trade:') && !option.disabled,
+    )
+    assert(cookSheep)
+    rCook = cookToFeedRam.resolveChoice(0, cookSheep.value)
+    expect(rCook.ok, rCook.error).toBe(true)
+    expect(rCook.state.players[0]!.resources.food).toBe(2)
+    const payRamNow = sessionOptions(rCook).find(
+      (option) => option.labelKey === 'actions.pay.name' && !option.disabled,
+    )
+    assert(payRamNow)
+    rCook = stepUntil(cookToFeedRam, cookToFeedRam.resolveChoice(0, payRamNow.value))
+    expect(rCook.state.round).toBe(8)
+    expect(rCook.state.players[0]!.minorPlayed).toContain(RAM)
+
+    // 3. Auto-discards without prompting when food = 0 and no anytime conversions exist (Minimal prompts; no extra begging from Ram)
     const autoDiscard = setup(7, (state) => {
       const p0 = state.players[0]!
       p0.minorPlayed = [RAM]
@@ -233,7 +310,7 @@ describe('CWM102_Ram session', () => {
     expect(r2.state.players[0]!.resources.begging).toBe(4) // 4 from 2 unfed family members, 0 from Ram!
     expect(r2.state.players[0]!.resources.sheep).toBe(1)
 
-    // 3. Stays silent at Round 5 end (not 6/8/10/12) even with 1 physical sheep, and at Round 6 end with 0 physical sheep
+    // 4. Stays silent at Round 5 end (not 6/8/10/12) even with 1 physical sheep, and at Round 6 end with 0 physical sheep
     const roundFive = setup(5, (state) => {
       state.players[0]!.minorPlayed = [RAM]
       addSheepPasture(state, 1)
