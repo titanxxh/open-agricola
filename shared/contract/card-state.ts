@@ -6,6 +6,7 @@ export type CardRuleContributions = {
   reservedSupply?: Partial<Record<SupplyTokenKey, number>>
   unusedSpaceReduction?: number
   farmerScoreAdjustment?: number
+  scoringAnimals?: Partial<Record<AnimalKey, number>>
 }
 
 export type PublicCardMarker = {

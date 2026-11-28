@@ -1,3 +1,4 @@
+import type { AnimalKey } from '../contract/animals'
 import type { CardRuleContributions } from '../contract/card-state'
 import type { PlayerState, SupplyTokenKey } from '../contract/types'
 import { getCardEffect } from './card-effects'
@@ -36,3 +37,8 @@ export const getCardFarmerScoreAdjustment = (player: PlayerState): number =>
     const adjustment = contribution.farmerScoreAdjustment
     return sum + (typeof adjustment === 'number' && Number.isFinite(adjustment) ? Math.trunc(adjustment) : 0)
   }, 0)
+
+export const getCardScoringAnimalCount = (player: PlayerState, animal: AnimalKey): number =>
+  collectCardRuleContributions(player).reduce(
+    (sum, contribution) => sum + nonNegativeInteger(contribution.scoringAnimals?.[animal]), 0,
+  )
