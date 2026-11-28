@@ -1,4 +1,8 @@
-import { getCardFarmerScoreAdjustment, getCardUnusedSpaceReduction } from '../cards/card-rule-contributions'
+import {
+  getCardFarmerScoreAdjustment,
+  getCardScoringAnimalCount,
+  getCardUnusedSpaceReduction,
+} from '../cards/card-rule-contributions'
 import { getFencedStableCount } from './pasture'
 import type { GameState, PlayerState, Resource } from '../contract/types.ts'
 import { getFarmyardTileCount } from '../domain/farm.ts'
@@ -410,7 +414,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       ],
     })
 
-    const sheepCount = player.resources.sheep
+    const sheepCount = player.resources.sheep + getCardScoringAnimalCount(player, 'sheep')
     const sheepScore = scoreByRanges(sheepCount, ['0', '1-3', '4-5', '6-7', '8+'])
     categories.push({
       key: 'sheeps',
@@ -419,7 +423,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       entries: [{ type: 'quantity', quantity: sheepCount, score: sheepScore }],
     })
 
-    const boarCount = player.resources.boar
+    const boarCount = player.resources.boar + getCardScoringAnimalCount(player, 'boar')
     const boarScore = scoreByRanges(boarCount, ['0', '1-2', '3-4', '5-6', '7+'])
     categories.push({
       key: 'boars',
@@ -428,7 +432,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       entries: [{ type: 'quantity', quantity: boarCount, score: boarScore }],
     })
 
-    const cattleCount = player.resources.cattle
+    const cattleCount = player.resources.cattle + getCardScoringAnimalCount(player, 'cattle')
     const cattleScore = scoreByRanges(cattleCount, ['0', '1', '2-3', '4-5', '6+'])
     categories.push({
       key: 'cattles',
@@ -438,7 +442,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     })
 
     if (state.enableFarmersOfTheMoor === true) {
-      const horseCount = player.resources.horse ?? 0
+      const horseCount = (player.resources.horse ?? 0) + getCardScoringAnimalCount(player, 'horse')
       const baseHorseScore = horseCount > 0 ? horseCount : -1
       const horseScore = baseHorseScore + getAnimalScoreAdjustment(state, player, 'horse', {
         quantity: horseCount,

@@ -185,4 +185,69 @@ describe('source-aware scoring rules', () => {
     expect(undone.state.players[1]!.resources).toMatchObject({ clay: 2, wood: 0 })
     expectHolder(purchaseGardenPath(restored, 1, 'major-improvement'), 0)
   })
+
+  it('adds CardRuleContributions.scoringAnimals into animal categories before bonus and post-score queries', () => {
+    const customCardId = 'community_ScoringHerd'
+    const session = createWorkSession({
+      seed: 428030,
+      options: { playerCount: 2, enableFarmersOfTheMoor: true },
+      customCards: [
+        {
+          cardType: 'minor',
+          cardJson: {
+            id: customCardId,
+            name: 'Scoring Herd',
+            cost: {},
+            vp: 0,
+            desc: [],
+          },
+        },
+      ],
+      cardImpls: {
+        [customCardId]: {
+          effect: {
+            id: customCardId,
+            getRuleContributions: () => ({
+              scoringAnimals: { sheep: 1, boar: 2, cattle: -3, horse: 1.8 },
+            }),
+          },
+        },
+      },
+      configure(state) {
+        for (const player of state.players) {
+          completeFarm(player)
+          player.minorHand = ['__test_placeholder__']
+          player.occupationHand = ['__test_placeholder__']
+          player.minorPlayed = []
+          player.occupationPlayed = []
+          player.improvements = []
+          player.cardStates = {}
+        }
+        state.players[0]!.resources.sheep = 7
+        state.players[1]!.resources.sheep = 7
+        state.players[0]!.minorPlayed = [customCardId, 'CWM087_GoldMedal']
+        state.players[0]!.occupationPlayed = ['D100_LordoftheManor']
+        state.players[1]!.occupationPlayed = ['D100_LordoftheManor']
+        state.players[0]!.cardStates.CWM087_GoldMedal = { extraData: { category: 'sheeps' } }
+      },
+    })
+    sessions.push(session)
+
+    const response = session.getState()
+    const category = (playerIndex: number, key: string) =>
+      response.scores[playerIndex]!.categories.find((entry) => entry.key === key)
+
+    // 7 + 1 = 8 sheep (4 VP), 1 + 2 = 3 boar (2 VP), negative cattle ignored (1 cattle -> 1 VP), 1 + floor(1.8) = 2 horses (2 VP)
+    expect(category(0, 'sheeps')).toMatchObject({ quantity: 8, total: 4 })
+    expect(category(0, 'boars')).toMatchObject({ quantity: 3, total: 2 })
+    expect(category(0, 'cattles')).toMatchObject({ quantity: 1, total: 1 })
+    expect(category(0, 'horses')).toMatchObject({ quantity: 2, total: 2 })
+    expect(category(1, 'sheeps')).toMatchObject({ quantity: 7, total: 3 })
+
+    // D100_LordoftheManor scores 2 on Seat 0 (pastures + sheeps) vs 1 on Seat 1 (pastures only), and CWM087_GoldMedal sees Seat 0 winning sheeps outright (4 vs 3)
+    expect(bonus(response, 0, 'D100_LordoftheManor')).toBe(2)
+    expect(bonus(response, 1, 'D100_LordoftheManor')).toBe(1)
+    expect(bonus(response, 0, 'CWM087_GoldMedal')).toBe(2)
+    expect(bonus(response, 1, 'CWM087_GoldMedal')).toBe(0)
+  })
 })
