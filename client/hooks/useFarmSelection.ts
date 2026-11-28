@@ -112,6 +112,7 @@ export const useFarmSelection = () => {
         setPendingPalisadeEdges((prev) => [...prev, edgeId])
       } else setPendingPalisadeEdges((prev) => [...prev, edgeId])
     }
+    setFenceError(null)
   }
 
   const toggleRoomTile = (

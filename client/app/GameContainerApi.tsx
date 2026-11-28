@@ -19,6 +19,7 @@ import { useGameSync } from '../hooks/useGameSync'
 import { gameNeedsTurnTab, useTurnTabTitle } from './use-turn-tab-title'
 import { interactionFocusRequestKey, useInteractionFocus } from './interaction-focus'
 import { getImprovementSelection } from './improvement-selection'
+import { useFenceSelectionConfirmation } from './fence-selection-confirmation'
 import { useFenceSelectionQuote } from './fence-selection-quote'
 import { buildFenceCommitPayload } from './farm-commit-ui'
 import { useCardPlayChoice } from '../hooks/useCardPlayChoice'
@@ -672,6 +673,10 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const setFarmDraftCommitError = farmSelectionDraft.setCommitError
   const setFarmDraftSubmitError = farmSelectionDraft.setSubmitError
   const resetFarmSelectionDraft = farmSelectionDraft.reset
+  const fenceRequestKey = farmInteraction?.farmType === 'fence' ? interactionFocusRequestKey(interaction) : null
+  const onFenceRejected = useCallback((error: string) => setFarmDraftCommitError('fence', error), [setFarmDraftCommitError])
+  const { submit: submitFence, submitting: fenceSubmitting, syncRequest: syncFenceRequest } =
+    useFenceSelectionConfirmation(fenceRequestKey, transport, onFenceRejected)
   const fenceQuoteRequest = useMemo(() => {
     if (!isInteractive || interaction.stateId !== 'wait' || !interaction.requestKey ||
       interaction.request.kind !== 'farm-select' || interaction.request.farm.farmType !== 'fence') return null
@@ -830,6 +835,10 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       return true
     }
     if (submitCommand.kind === 'commitSelection') {
+      if (farmType === 'fence') {
+        submitFence(submitCommand.playerIndex, submitCommand.payload)
+        return true
+      }
       void transport.commitSelection(submitCommand.playerIndex, submitCommand.payload)
         .then((resp) => {
           if (!resp.ok && farmType) setFarmCommitError(farmType, resp.error)
@@ -858,7 +867,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     }
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
     return true
-  }, [isInteractive, setFarmCommitError, setLocalFarmSubmitError, transport])
+  }, [isInteractive, setFarmCommitError, setLocalFarmSubmitError, submitFence, transport])
 
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
@@ -1193,8 +1202,11 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
   const animalReorgRoom = useRef<string | null>(null)
   const [showHarvestShortfall, setShowHarvestShortfall] = useState(false)
   const handleSnapshot = useCallback((payload: GameSyncPayload, roomId?: string) => {
+    const roomChanged = !!roomId && !!animalReorgRoom.current && animalReorgRoom.current !== roomId
+    const nextRequestKey = interactionFocusRequestKey(payload.interaction)
+    syncFenceRequest(nextRequestKey, roomChanged)
     if (roomId) {
-      if (animalReorgRoom.current && animalReorgRoom.current !== roomId) resetAnimalReorgDraft()
+      if (roomChanged) resetAnimalReorgDraft()
       animalReorgRoom.current = roomId
       setRoomInUrl(roomId)
     }
@@ -1203,7 +1215,6 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
     applySnapshotPublicEventCancellations(payload)
     syncAnimalReorgFromInteraction(payload.interaction, payload.state)
     if (payload.ok) {
-      const nextRequestKey = interactionFocusRequestKey(payload.interaction)
       if (draftRequestKey.current !== nextRequestKey) {
         setSelectedSpecialAction(null)
         resetFarmSelectionDraft()
@@ -1211,7 +1222,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
       draftRequestKey.current = nextRequestKey
       resetExchangeDraft()
     }
-  }, [applySnapshot, applySnapshotPublicEventCancellations, resetAnimalReorgDraft, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction])
+  }, [applySnapshot, applySnapshotPublicEventCancellations, resetAnimalReorgDraft, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction, syncFenceRequest])
 
   const snapshotTransport = isWs ? wsTransport : transport
   useEffect(() => {
@@ -2062,6 +2073,7 @@ export const GameContainerApi = ({ workshopSandbox = false }: { workshopSandbox?
         sow: isSelectingSow,
       },
       fence: {
+        submitting: fenceSubmitting,
         canBuildPalisades: !!activePlayer && playerCanBuildPalisades(activePlayer),
         placementMode: farmSelectionDraft.interactionBarDraft.fencePlacementMode,
         setPlacementMode: farmSelectionDraft.controls.setFencePlacementMode,

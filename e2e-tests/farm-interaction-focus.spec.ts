@@ -1,13 +1,15 @@
 // @covers client/components/board/
 // @covers client/components/interaction/
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { devices, expect, test, type APIRequestContext, type Page, type WebSocketRoute } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import type { GameState, SessionResponse } from '../shared/contract/types'
+import type { ClientCommand, ServerEvent } from '../shared/contract/protocol/ws'
 import { browserRequestHeaders, BACKEND_URL } from './fixtures'
 import { matrixVariant } from './helpers/extended'
+import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
 
-async function prepare(page: Page, request: APIRequestContext, configure?: (state: GameState) => void, moor = false) {
+async function prepare(page: Page, request: APIRequestContext, configure?: (state: GameState) => void, moor = false, locale = 'en') {
   const options = { playerCount: 2, enableFarmersOfTheMoor: moor, allowIncompleteFarmersOfTheMoorMinorDeal: moor }
   expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { headers: browserRequestHeaders(), data: { ...options, seed: 1368, customCardIds: [] } })).ok()).toBe(true)
   const fixture = createWorkSession({ seed: 1368, options, configure: state => {
@@ -20,7 +22,7 @@ async function prepare(page: Page, request: APIRequestContext, configure?: (stat
       data: { state: fixture.withCtx(() => serializeState(fixture.state, { actionHooks: fixture.actionHooks })) },
     })).ok()).toBe(true)
   } finally { fixture.dispose() }
-  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+  await page.addInitScript(value => localStorage.setItem('open-agricola-locale-v2', value), locale)
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   await expect(page.locator('.game-layout')).toBeVisible()
 }
@@ -49,6 +51,141 @@ async function choice(page: Page, value: string): Promise<SessionResponse> {
   expect(response.ok, response.error).toBe(true)
   return response
 }
+
+const pastureEdges = ['H-2-2', 'H-3-2', 'V-2-2', 'V-2-3']
+const fenceEdge = (page: Page, edge: string) => farm(page).locator(`[data-fence-edge="${edge}"] .farm-fence-hit`)
+const fenceConfirm = (page: Page) => page.locator('.interaction-bar [data-choice-value="confirm"]')
+
+test.describe('mobile fence confirmation', () => {
+  const phone = devices['iPhone 13']
+  test.use({
+    userAgent: phone.userAgent,
+    viewport: phone.viewport,
+    screen: phone.screen,
+    deviceScaleFactor: phone.deviceScaleFactor,
+    isMobile: phone.isMobile,
+    hasTouch: phone.hasTouch,
+  })
+
+  for (const [locale, message] of [
+    ['en', 'Fence failed: fences do not enclose a region (Selected 1 edges)'],
+    ['zh', '围栏失败：围栏未形成封闭区域（已选 1 条围栏边）'],
+  ] as const) {
+    test(`keeps an open fence editable after a localized rejection in ${locale}`, async ({ page, request }) => {
+      await prepare(page, request, undefined, false, locale)
+      await action(page, 'fencing')
+      const confirm = fenceConfirm(page)
+      const firstEdge = fenceEdge(page, pastureEdges[0]!)
+      await firstEdge.tap()
+      const commit = async (): Promise<SessionResponse> => {
+        const response = page.waitForResponse(reply => reply.url().endsWith('/api/game/commit-selection'))
+        await confirm.tap()
+        return (await response).json()
+      }
+      const rejected = await commit()
+      expect(rejected).toMatchObject({ ok: false, error: 'NO_ENCLOSED_AREA' })
+      expect(rejected.state.players[0]).toMatchObject({ resources: { wood: 20 }, fenceSegments: [] })
+      await expect(page.locator('.interaction-error')).toHaveText(message)
+      await expect(firstEdge).toHaveAttribute('aria-pressed', 'true')
+
+      for (const edge of pastureEdges.slice(1)) await fenceEdge(page, edge).tap()
+      await expect(page.locator('.interaction-error')).toHaveCount(0)
+      const accepted = await commit()
+      expect(accepted.ok, accepted.error).toBe(true)
+      expect(accepted.state.players[0]!.fenceSegments).toHaveLength(4)
+      expect(accepted.state.players[0]!.resources.wood).toBe(16)
+    })
+  }
+
+  for (const interruption of ['before commit', 'after commit'] as const) {
+    test(`guards repeated confirmation and recovers once when disconnected ${interruption}`, async ({ page, browser, request }) => {
+      const sockets: Array<{ client: WebSocketRoute; upstream: WebSocketRoute }> = []
+      const confirmations: Extract<ClientCommand, { type: 'commitSelection' }>[] = []
+      await page.routeWebSocket('**/ws', client => {
+        const upstream = client.connectToServer()
+        sockets.push({ client, upstream })
+        const isFirstSocket = sockets.length === 1
+        client.onMessage(raw => {
+          const message: ClientCommand = JSON.parse(raw.toString())
+          if (message.type === 'commitSelection') {
+            confirmations.push(message)
+            if (isFirstSocket && interruption === 'before commit') return
+          }
+          upstream.send(raw)
+        })
+        upstream.onMessage(raw => {
+          const message: ServerEvent = JSON.parse(raw.toString())
+          if (isFirstSocket && interruption === 'after commit' && confirmations[0]?.requestId &&
+            (message.type === 'stateUpdate' || message.type === 'commandReceipt') &&
+            message.requestId === confirmations[0].requestId) return
+          client.send(raw)
+        })
+      })
+      const peer = await browser.newPage()
+      try {
+        await joinRoomClients([page, peer], request)
+        const driver = roomDriver([page, peer])
+        const session = createWorkSession({ seed: 1368, configure(state) {
+          state.round = 14
+          state.players[0]!.resources.wood = 10
+        } })
+        try {
+          await driver.command(0, { type: 'loadGame', state: session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks })) })
+        } finally { session.dispose() }
+
+        const beginFence = async () => {
+          await driver.ui(0, () => page.locator('[data-action-id="fencing"] button').first().tap())
+          for (const edge of pastureEdges) await fenceEdge(page, edge).tap()
+          await expect(page.getByTestId('fence-selection-cost')).toHaveText('Cost: 4 wood')
+        }
+        await beginFence()
+        const confirm = fenceConfirm(page)
+        // All clicks run in the same browser task before waiting for a render.
+        await confirm.evaluate(button => {
+          if (!(button instanceof HTMLButtonElement)) throw new Error('Missing fence confirm button')
+          button.click()
+          button.click()
+          button.click()
+        })
+        await expect(confirm).toBeDisabled()
+        await expect.poll(() => confirmations.length).toBe(1)
+        const original = confirmations[0]?.commandContext?.commandId
+        expect(original).toBeTruthy()
+        expect((await roomSnapshot(page)).state.players[0]!.fenceSegments).toHaveLength(0)
+        if (interruption === 'after commit') {
+          await expect.poll(async () => (await roomSnapshot(peer)).state.players[0]!.fenceSegments.length).toBe(4)
+        } else {
+          expect((await roomSnapshot(peer)).state.players[0]!.fenceSegments).toHaveLength(0)
+        }
+
+        const socket = sockets[0]
+        if (!socket) throw new Error('Missing first room connection')
+        await socket.client.close({ code: 1006 })
+        await socket.upstream.close({ code: 1012 })
+        await expect.poll(() => sockets.length).toBe(2)
+        await expect.poll(async () => (await roomSnapshot(page)).interaction)
+          .toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+        expect(confirmations.map(command => command.commandContext?.commandId))
+          .toEqual(interruption === 'before commit' ? [original, original] : [original])
+        for (const actor of [page, peer]) {
+          await expect.poll(async () => (await roomSnapshot(actor)).state.players[0]!.fenceSegments.length).toBe(4)
+          const settled = await roomSnapshot(actor)
+          expect(settled.state.players[0]!.resources.wood).toBe(6)
+          expect(settled.state.players[0]!.fenceSegments).toHaveLength(4)
+          expect(settled.state.events.filter(event => event.type === 'farm.fenceBuilt')).toHaveLength(1)
+          expect(settled.state.events.filter(event => event.type === 'resource.paid' && event.paymentFor === 'fencing')).toHaveLength(1)
+        }
+
+        await driver.command(0, { type: 'undoAction' })
+        await beginFence()
+        await expect(confirm).toBeEnabled()
+        await driver.ui(0, () => confirm.tap())
+        expect(confirmations.at(-1)?.commandContext?.commandId).not.toBe(original)
+        expect((await roomSnapshot(page)).state.players[0]!.resources.wood).toBe(6)
+      } finally { await peer.close() }
+    })
+  }
+})
 
 for (const operation of ['room', 'stable', 'plow', 'sow'] as const) {
   test(`${operation} focuses the farm and confirms an authoritative ordinary target`, async ({ page, request }) => {
