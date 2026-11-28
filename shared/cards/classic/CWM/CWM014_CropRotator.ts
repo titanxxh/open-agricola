@@ -176,6 +176,7 @@ const buildRotationResult = (
           cropType: oppositeCrop,
           minSelections: 1,
           maxSelections: 1,
+          autoResolveSingleSelection: true,
           excludedFields: buildExcludedFields(fields, field.id),
         },
       },

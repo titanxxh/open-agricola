@@ -59,36 +59,14 @@ describe('CWM014_CropRotator & CWM077_EdibleRoots session', () => {
       lessons = session.resolveChoice(0, ROTATOR)
     }
     expect(lessons.ok, lessons.error).toBe(true)
-    // Immediate reap took 1 grain from (0, 2) and 1 grain from (0, 3) -> 2 grain in supply!
+    // Immediate take-crops took 1 grain from (0, 2) and 1 grain from (0, 3) -> 2 grain in supply!
     expect(lessons.state.players[0]!.resources.grain).toBe(2)
+    assert(lessons.interaction.stateId === 'wait' && lessons.interaction.request.kind === 'choice')
 
-    const sowPrompt =
-      lessons.interaction.stateId === 'wait' && lessons.interaction.request.kind === 'choice'
-        ? resolveNonSkipChoice(session, lessons)
-        : lessons
-    assert(
-      sowPrompt.interaction.stateId === 'wait'
-      && sowPrompt.interaction.request.kind === 'farm-select'
-      && sowPrompt.interaction.request.farm.farmType === 'sow',
-    )
-    expect(sowPrompt.interaction.request.farm.selectableFields).toEqual([
-      { tile: { row: 0, col: 2 }, allowedCrops: ['vegetable'] },
-    ])
-
-    // Already-empty (0, 4) and same-crop 'grain' on (0, 2) must both be rejected without mutating state!
-    const rejectOtherEmpty = session.commitSelectionChoice(0, {
-      crops: [{ row: 0, col: 4, crop: 'vegetable' }],
-    })
-    expect(rejectOtherEmpty.ok).toBe(false)
-    const rejectSameCrop = session.commitSelectionChoice(0, {
-      crops: [{ row: 0, col: 2, crop: 'grain' }],
-    })
-    expect(rejectSameCrop.ok).toBe(false)
-
-    const sown = session.commitSelectionChoice(0, {
-      crops: [{ row: 0, col: 2, crop: 'vegetable' }],
-    })
+    // Accepting the optional rotation prompt auto-resolves sowing vegetable onto the sole emptied field (0, 2) without a second farm-select prompt!
+    const sown = resolveNonSkipChoice(session, lessons)
     expect(sown.ok, sown.error).toBe(true)
+    expect(sown.interaction.request.kind).toBe('confirm-next-player')
     expect(sown.state.players[0]!.resources).toMatchObject({ grain: 2, vegetable: 0 })
     expect(sown.state.players[0]!.fields).toEqual([
       { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 2 }] },
@@ -197,15 +175,16 @@ describe('CWM014_CropRotator & CWM077_EdibleRoots session', () => {
       expect.arrayContaining([ROTATOR, ROOTS]),
     )
 
-    // Now pick Crop Rotator first -> sow grain on (0, 2), then Edible Roots runs!
+    // Now pick Crop Rotator first -> auto-sows grain on (0, 2) upon accepting, then Edible Roots runs!
     const rotatorTrigger = sessionOptions(backToTriggerSelect).find((o) => o.sourceCard === ROTATOR)!
     let r4Next = harvestSession.resolveChoice(0, rotatorTrigger.value)
-    if (r4Next.interaction.stateId === 'wait' && r4Next.interaction.request.kind === 'choice') {
+    if (
+      r4Next.interaction.stateId === 'wait'
+      && r4Next.interaction.request.kind === 'choice'
+      && sessionOptions(r4Next).some((o) => o.value === '__skip__')
+    ) {
       r4Next = resolveNonSkipChoice(harvestSession, r4Next)
     }
-    r4Next = harvestSession.commitSelectionChoice(0, {
-      crops: [{ row: 0, col: 2, crop: 'grain' }],
-    })
     // Remaining trigger (Edible Roots) in manual mode -> +1 food (11) then Round 4 feeding (-4 food) = 7 food!
     const remainingRoots = sessionOptions(r4Next).find((o) => o.sourceCard === ROOTS)
     if (remainingRoots) {
@@ -287,22 +266,11 @@ describe('CWM014_CropRotator & CWM077_EdibleRoots session', () => {
     let afterLift = liftingSession.commitSelectionChoice(0, { positions: ['0-2'] })
     expect(afterLift.ok, afterLift.error).toBe(true)
     expect(afterLift.state.players[0]!.resources.vegetable).toBe(1)
-    if (afterLift.interaction.stateId === 'wait' && afterLift.interaction.request.kind === 'choice') {
-      afterLift = resolveNonSkipChoice(liftingSession, afterLift)
-    }
-    assert(
-      afterLift.interaction.stateId === 'wait'
-      && afterLift.interaction.request.kind === 'farm-select'
-      && afterLift.interaction.request.farm.farmType === 'sow',
-    )
-    expect(afterLift.interaction.request.farm.selectableFields).toEqual([
-      { tile: { row: 0, col: 2 }, allowedCrops: ['grain'] },
-    ])
-    const afterRotateSow = liftingSession.commitSelectionChoice(0, {
-      crops: [{ row: 0, col: 2, crop: 'grain' }],
-    })
-    expect(afterRotateSow.ok, afterRotateSow.error).toBe(true)
-    expect(afterRotateSow.state.players[0]!.fields[0]!.stacks).toEqual([
+    assert(afterLift.interaction.stateId === 'wait' && afterLift.interaction.request.kind === 'choice')
+    // Accepting the optional Crop Rotator prompt sows grain on (0, 2) immediately without a second farm-select prompt!
+    afterLift = resolveNonSkipChoice(liftingSession, afterLift)
+    expect(afterLift.ok, afterLift.error).toBe(true)
+    expect(afterLift.state.players[0]!.fields[0]!.stacks).toEqual([
       { kind: 'grain', remaining: 3 },
     ])
 
@@ -359,17 +327,22 @@ describe('CWM014_CropRotator & CWM077_EdibleRoots session', () => {
       ]
     })
     for (const p of crossPlayer.state.players) markAllWorkersUsed(crossPlayer.state, p)
-    const initialHarvest = crossPlayer.performRoundEnd()
+    let crossHarvest = crossPlayer.performRoundEnd()
     if (
-      initialHarvest.interaction.stateId === 'wait'
-      && initialHarvest.interaction.playerIndex === 0
-      && initialHarvest.interaction.request.kind === 'choice'
+      crossHarvest.interaction.stateId === 'wait'
+      && crossHarvest.interaction.playerIndex === 0
+      && crossHarvest.interaction.request.kind === 'choice'
     ) {
-      resolveNonSkipChoice(crossPlayer, initialHarvest)
+      crossHarvest = resolveNonSkipChoice(crossPlayer, crossHarvest)
     }
-    let crossHarvest = crossPlayer.commitSelectionChoice(0, {
-      crops: [{ row: 0, col: 2, crop: 'grain' }],
-    })
+    if (
+      crossHarvest.interaction.stateId === 'wait'
+      && crossHarvest.interaction.playerIndex === 0
+      && crossHarvest.interaction.request.kind === 'choice'
+      && sessionOptions(crossHarvest).some((o) => o.value === '__skip__')
+    ) {
+      crossHarvest = resolveNonSkipChoice(crossPlayer, crossHarvest)
+    }
     if (
       crossHarvest.interaction.stateId === 'wait'
       && crossHarvest.interaction.request.kind === 'confirm-player-switch'

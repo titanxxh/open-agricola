@@ -18,6 +18,7 @@
 - **Standard leaves（标准 leaf）。** 资源通过标准 leaf 移动：新资源用 `gain`，行动格上的资源用 `collect`，卡上的资源用 `take-from-card` 和 `receive`，兑换用 `exchange`，费用用 `pay`。其他卡的反应订阅这些 leaf，统计也读取它们，所以两者都能看到这次移动（`CWM055_WoodWorker`、`CWM066_Brazier`）。对"获得资源"的反应，要订阅每一个可能入账该资源的 leaf（§4.1）。见 [actions：effect 与内部行动](architecture/actions_zh.md#effect-与内部行动)。
 - **Action parameters（行动参数）。** `params` 和 `actionContext` 的键名从该行动的 effect 文件或一张用过它的卡照抄，因为未知的键会被忽略而不报错：`shared/actions/effects/construct.ts` 用 `maxRooms` 限制房间数，`shared/actions/effects/stables.ts` 用 `max` 限制马厩数（`C149_ResourceRecycler`、`CWM037_MasterStableman`）。Session 测试提交比上限多一个的数量，预期被拒绝。
 - **Optionality（可选性）。** 卡面写的 "may"、"can" 和 "up to" 把选择权交给玩家：节点是 `optional`，或者菜单里带一个停止选项（`CWM069_ChangingPlans`、`CWM045_StableDeliveryman`）。hook 返回的非 optional leaf 会不经询问直接执行。见 [engine：节点类型](architecture/engine_zh.md#节点类型)和 §4.4。
+- **Minimal prompts（最少询问）。** 只在仍有真实选择时询问玩家：动态过滤后只剩一个分支时直接返回该子节点而非单分支 `xor`，不可放弃的反应设 `mandatory: true`（`CWM018_ExpertBuilder`），已接受的 `sow` 锁定唯一田地与唯一作物时设 `autoResolveSingleSelection: true`（`E070_CropRotationField`、`CWM014_CropRotator`），除实时兑换可能改变单选项外不设 `requiresExplicitChoice`。见 [engine：节点类型](architecture/engine_zh.md#节点类型)和 §4.16。
 - **Scope（范围）。** 卡按卡面写的生命周期读取数据。"本次行动"是 handler 的 `actionEvents` / `eventQuery`；"本回合（Turn）"是 Turn Scope，通过 `helpers/turn-token.ts` 读取（`A074_StableTree`）；"本轮"是 `state.round`。`state.events` 是整局游戏已提交的日志：仍在执行的行动的事件可能还不在里面；依赖先后顺序的累计要按顺序逐步计算（`CWM056_Almshouse`）。见 [session：Turn Scope](architecture/session_zh.md#turn-scope-与行动执行作用域)和 [hooks：事件](architecture/hooks_zh.md#hook-系统)。
 - **Identity（身份）。** 卡用坐标记住农场上的东西：一个格子或一段围栏。`pasture.id` 按位置生成，围栏变化时会重新编号；数组下标也会移动（`CWM074_Donkey`）。读取自己的标记时，卡要确认被标记的东西仍然在（`CWM005_BeeKeeper`）。见 [domain](architecture/domain_zh.md) 的"农场"段。
 - **Edition（版本）。** 新旧版卡牌同在一局时，卡仍然正确，版本差异由卡自己声明；没有规则读取对局的 Card Edition（[ADR 0050](adr/0050-rules-code-does-not-assume-one-card-edition.md)）。
@@ -276,9 +277,9 @@ leaf helper 在 `shared/cards/helpers/pay-gain-node.ts`：
 
 ### 4.16 选择与农场选取
 
-- **多个效果选一个：** `xor` flow；给每个子节点设置 `choiceLabelKey`，让各选项的文字不同（`B026_AgrarianFences`）。
+- **多个效果选一个：** `xor` flow；给每个子节点设置 `choiceLabelKey`，让各选项的文字不同（`B026_AgrarianFences`）。动态过滤后只剩一个子节点时直接返回它（`CWM018_ExpertBuilder`）。
 - **一组值的菜单：** `emit-choice` leaf，`params.options: [{ value, labelKey, labelParams }]`；`requiresExplicitChoice: true` 表示只剩一个选项时也要询问。答案交给 `effect.resolveChoice(state, player, choice)`，它可以返回下一个 flow，包括再一个 `emit-choice`（`B003_Moonshine`、`CWM114_WineCloset`、`CWM045_StableDeliveryman`）。
-- **农场格子：** `selection` leaf，`actionContext: { selectionKind: 'farm-position', selectionEffect, minSelections, maxSelections, selectableTiles }`，再用 `shared/actions/helpers/selection-effect-registry.ts` 里的 `registerSelectionEffect` / `registerSelectionValidator` 定义选中后做什么、哪些选法合法（`A070_LiftingMachine`、`CWM103_Raspberries`）。测试里用 `commitSelectionChoice(i, { positions: ['row-col'] })` 作答。
+- **农场格子：** `selection` leaf，`actionContext: { selectionKind: 'farm-position', selectionEffect, minSelections, maxSelections, selectableTiles }`，再用 `shared/actions/helpers/selection-effect-registry.ts` 里的 `registerSelectionEffect` / `registerSelectionValidator` 定义选中后做什么、哪些选法合法（`A070_LiftingMachine`、`CWM103_Raspberries`）。测试里用 `commitSelectionChoice(i, { positions: ['row-col'] })` 作答。已接受的 optional `sow` 已锁定唯一田地和唯一作物（`minSelections: 1, maxSelections: 1`）时，设置 `actionContext.autoResolveSingleSelection: true`，确认后直接落种而不再弹二次选田（`E070_CropRotationField`、`CWM014_CropRotator`）。
 
 ### 4.17 让一个行动可以执行或不能执行
 
