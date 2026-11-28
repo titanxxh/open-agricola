@@ -332,13 +332,16 @@ describe('CWM102_Ram session', () => {
     expect(rGrain.state.players[0]!.minorPlayed).toContain(RAM)
     expect(rGrain.state.players[0]!.resources.grain).toBe(1)
     const payWithGrain = sessionOptions(rGrain).find(
-      (option) => option.labelKey === 'actions.pay.name' && !option.disabled,
+      (option) => option.labelKey !== 'actions.special-effect.return-card-to-board.name' && !option.disabled,
     )
     assert(payWithGrain)
     rGrain = stepUntil(grainToFeedRam, grainToFeedRam.resolveChoice(0, payWithGrain.value))
     expect(rGrain.state.round).toBe(8)
     expect(rGrain.state.players[0]!.minorPlayed).toContain(RAM)
     expect(rGrain.state.players[0]!.resources.grain).toBe(0)
+    // The crop went through the standard basic conversion, not a raw card cost.
+    expect(rGrain.state.players[0]!.stats?.resourcesConverted.grain).toBe(1)
+    expect(rGrain.state.players[0]!.stats?.foodFromConversion.grain).toBe(1)
 
     // 4. Stays silent at Round 5 end (not 6/8/10/12) even with 1 physical sheep, and at Round 6 end with 0 physical sheep
     const roundFive = setup(5, (state) => {

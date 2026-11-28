@@ -407,25 +407,6 @@ export const getExchangeCatalog = ({
 export const getFeedExchangeCatalog = (player: PlayerState, state: GameState, actionHooks?: ActionHookRegistry) =>
   getExchangeCatalog({ player, windows: ['harvest', 'anytime'], state, actionHooks, includeBasicConversions: true })
 
-export const hasAffordableFoodExchange = (
-  state: GameState,
-  player: PlayerState,
-  actionHooks?: ActionHookRegistry,
-): boolean =>
-  buildExchangeOptions(
-    player,
-    undefined,
-    state,
-    undefined,
-    { anytimeInteractionKind: 'choice' },
-    actionHooks,
-  ).options.some(
-    (option) =>
-      option.value !== 'cancel' &&
-      option.effectPreview?.kind === 'resourceExchange' &&
-      (option.effectPreview.resourcesGained?.food ?? 0) > 0,
-  )
-
 const isReserveFoodTrade = (state: GameState, trade: Trade): boolean => {
   const animals = animalKeysForState(state)
   const food = trade.to.food ?? 0

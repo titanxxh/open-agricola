@@ -1,11 +1,40 @@
 import { breedLeaf, canBreedAnimals } from '../../../actions/effects/breed'
-import { hasAffordableFoodExchange } from '../../../actions/effects/exchange'
+import { canAffordTrade, getExchangeCatalog } from '../../../actions/effects/exchange'
+import type { ActionHookRegistry } from '../../../actions/hooks'
+import type { ActionFlow, GameState, PlayerState } from '../../../contract/types'
+import { BASIC_CONVERSION_SOURCE_ID } from '../../basic-conversion'
 import { defineMinorCard } from '../../card-source'
 import { payLeaf } from '../../helpers/pay-gain-node'
 import type { CardImpl } from '../../registry'
 
 const CARD_ID = 'CWM102_Ram'
 const EXTRA_BREED_ROUNDS = [6, 8, 10, 12]
+
+// A cooking-style exchange (e.g. Fireplace) the player can use now to raise food for the fee.
+const canCookForFood = (state: GameState, player: PlayerState, actionHooks?: ActionHookRegistry): boolean =>
+  getExchangeCatalog({
+    player,
+    windows: state.roundPhase === 'feeding' ? ['anytime', 'harvest'] : ['anytime'],
+    state,
+    actionHooks,
+  }).some((entry) => (entry.to.food ?? 0) > 0 && canAffordTrade(player, entry.trade, 1, state))
+
+// The feeding-phase anytime menu only lists cooking, so the basic 1 crop -> 1 food conversion
+// runs here as a standard exchange before the fee is paid.
+const payWithCrop = (crop: 'grain' | 'vegetable'): ActionFlow => ({
+  type: 'seq',
+  children: [
+    {
+      type: 'leaf',
+      actionId: 'exchange',
+      sourceCard: CARD_ID,
+      actionContext: {
+        directTrade: { from: { [crop]: 1 }, to: { food: 1 }, sourceId: BASIC_CONVERSION_SOURCE_ID },
+      },
+    },
+    payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
+  ],
+})
 
 const cardImpl = {
   effect: {
@@ -16,15 +45,13 @@ const cardImpl = {
     onHarvestFeedingPhase: (state, player, ctx) => ({
       type: 'xor',
       anytimeWindow: { allowed: true },
-      ...(player.resources.food < 1 && hasAffordableFoodExchange(state, player, ctx?.actionHooks)
+      ...(player.resources.food < 1 && canCookForFood(state, player, ctx?.actionHooks)
         ? { requiresExplicitChoice: true }
         : {}),
       children: [
         payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
-        // The feeding-phase anytime menu only lists cooking; the basic 1 grain / 1 vegetable -> 1 food
-        // conversion is offered here so it can still pay the fee when food runs out.
         ...(player.resources.food < 1
-          ? (['grain', 'vegetable'] as const).map((crop) => payLeaf({ cardId: CARD_ID, cost: { [crop]: 1 } }))
+          ? (['grain', 'vegetable'] as const).filter((crop) => player.resources[crop] >= 1).map(payWithCrop)
           : []),
         {
           type: 'leaf',
